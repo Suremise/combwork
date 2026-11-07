@@ -636,6 +636,34 @@ describe("HI-2660: a reviewer's pass accepting another agent's focused-test run"
     expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
   })
 
+  // HR3's round 1: evidence that arrives after the checks (just after them, or while the queue waits for the repository's
+  // lock) is read again before the target moves, at the last check and in IntegrationStarted's write.
+  const queueWith = (e: Env, extra: Pick<NonNullable<Parameters<Env['queue']>[0]>, 'hooks' | 'lock'>) => {
+    const run = queueChecks({ env: base, logDir: tempDir('focused-logs-'), timeoutMs: () => 60_000, setupCommand: () => '' })
+    return e.queue({ runCheck: run.runCheck, manifests: [], focused: { env: base, pickTimeoutMs: () => 30_000, jobs: () => 3, dir: tempDir('focused-files-') }, ...extra })
+  }
+  for (const when of ['afterChecks', 'lock'] as const)
+    it(`an accepted run that fails again ${when === 'lock' ? 'while the queue waits for the lock' : 'just after the checks'}: the target doesn't move, the card goes back for its proof`, async () => {
+      const e = team(picker([{ test: 'claude-real', needs: ['real'] }]), runner().command)
+      const { card, revision } = await built(e)
+      await ran(e, card, revision, 'claude-real', 'B1', 'accepted-run')
+      await passAccepting(e, card, ['claude-real'])
+      const before = sh(e.project, 'rev-parse', 'main')
+      let failed = false
+      const fail = async () => {
+        if (failed) return
+        failed = true
+        await ran(e, card, revision, 'claude-real', 'B1', 'failed-before-integration', { result: 'failed' })
+      }
+      const q = when === 'lock' ? queueWith(e, { lock: async (fn) => (await fail(), fn()) }) : queueWith(e, { hooks: { afterChecks: fail } })
+      const [o] = await q.drain('main')
+      expect(failed).toBe(true)
+      expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
+      expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'noProof', tests: ['claude-real'] } })
+      expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+      expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+    })
+
   it('a fail accepts nothing, and says so; more than ACCEPT_MAX ids are cut there', async () => {
     const e = team(picker([{ test: 'claude-real', needs: ['real'] }]), runner().command)
     const { card, revision } = await built(e)
