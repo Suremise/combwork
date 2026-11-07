@@ -1729,6 +1729,9 @@ module.exports.SCENARIOS = [
   {
     id: 'review-passed',
     title: 'A review that passes: its verdict moves the card to Passed, not to Done (#170; #1536: a project where an agent reviews and merges come after, so a pass stops in Passed)',
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       // A reviewer agent, and merges reported by the builder, not checked: a pass waits in Passed for the merge.
@@ -2815,6 +2818,7 @@ module.exports.SCENARIOS = [
     id: 'card-loop-lane-join',
     title: "A card loop reviewer joins its builder's lane (#483) by the builder's name, then waits for the first card",
     async setup(c) {
+      await swapRoles(c)
       await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', column: 'doing', agent: 'implementer' })
       await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'implementer' })
     },
@@ -3218,6 +3222,9 @@ module.exports.SCENARIOS = [
   {
     id: 'intent-review-request',
     title: "A reviewer starts a review, asks the builder something and fails it (#1267): start review, request to builder and verdict",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -3489,6 +3496,9 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-follow-up-check',
     title: "A card loop reviewer told of a follow-up to check, on a card in Review (#1467): it answers with cw_loop_step naming it, not a verdict",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -3579,6 +3589,9 @@ module.exports.SCENARIOS = [
   {
     id: 'old-move-review',
     title: "A reviewer's review start and failed verdict are start review and a verdict for now (#1268): today's skills, the card back in Doing with its builder",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
