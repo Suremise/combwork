@@ -3349,7 +3349,7 @@ export function sampleMissText(def: AdvancedDef, value: unknown): Text | null {
   )
 }
 
-const GROUP_NAMES: Record<string, string> = { cw: APP_NAME, 'claude-code': 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot', antigravity: 'Antigravity CLI' } // i18n-ignore: product names
+const GROUP_NAMES: Record<string, string> = { cw: APP_NAME, 'claude-code': 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot', antigravity: 'Antigravity' } // i18n-ignore: product names
 export const groupName = (g: AdvancedGroup): string => GROUP_NAMES[g] ?? g
 
 /** The CLI version an override was made for: the installed one when it was set, and the value it was set to. */

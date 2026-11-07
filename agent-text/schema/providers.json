@@ -14,16 +14,18 @@
       "text": "plain"
     }
   },
-  "providers.antigravity.noInert": {
-    "placeholders": {
-      "provider": "plain",
-      "servers": "plain"
-    }
-  },
   "providers.antigravity.notOwnConversation": {
     "placeholders": {
       "provider": "plain",
       "conversation": "plain"
+    }
+  },
+  "providers.antigravity.projectServers": {
+    "placeholders": {
+      "provider": "plain",
+      "count": "plural",
+      "files": "plain",
+      "servers": "plain"
     }
   },
   "providers.antigravity.unreadableConfig": {

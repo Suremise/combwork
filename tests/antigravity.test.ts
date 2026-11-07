@@ -1,7 +1,7 @@
 // The Antigravity CLI as a provider (HI-2544, against agy 1.5.0; the runtime facts are HI-2543's and HI-2544's own runs):
 // install and readiness (signed out only on the recorded pattern), the catalog from `agy models`, the environment (account
 // variables, the updater, a private USERPROFILE with HOME kept), the workspace's .agents config (fail closed), each
-// agent's private profile (Combwork's servers, the inert server standing in for a project's, hooks switched off), the
+// agent's private profile (Combwork's servers; a project's own server not given refuses the launch), the
 // launch settings and arguments, conversation ids, and the PC-wide account.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -16,8 +16,8 @@ process.env.CW_USER_DATA = join(base, 'userdata')
 const { classifyModels, isEditorCopy, parseAntigravityVersion } = await import('../src/main/providers/antigravity/install')
 const { parseModels } = await import('../src/main/providers/antigravity/models')
 const { ANTIGRAVITY_ENV_STRIP, antigravityEnv, inProfile, brainDir } = await import('../src/main/providers/antigravity/home')
-const { UnreadableConfig, scannedFolders, workspaceCustomizations } = await import('../src/main/providers/antigravity/projectConfig')
-const { agyServer, antigravity, antigravityArgs, inertServer, isConversationId, launchSettings, profileConfig, profileFolder, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
+const { UnreadableConfig, scannedFolders, workspaceServers } = await import('../src/main/providers/antigravity/projectConfig')
+const { agyServer, antigravity, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
 const { advanced } = await import('../src/main/advanced')
 const { ensurePcAccounts, homeAccount, pcAccountId, pcWideSignIn } = await import('../src/shared/connectionDefaults')
 const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
@@ -111,17 +111,22 @@ describe("the workspace's .agents config (what agy would load from it)", () => {
   mkdirSync(join(repo, '.agents'), { recursive: true })
   mkdirSync(join(sub, '_agent'), { recursive: true })
   writeFileSync(join(repo, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { sentinel: { command: 'x' }, shared: { url: 'https://x' } } }))
-  writeFileSync(join(repo, '.agents', 'hooks.json'), JSON.stringify({ 'repo-lint': { PostToolUse: [] } }))
   writeFileSync(join(sub, '_agent', 'mcp_config.json'), JSON.stringify({ mcpServers: { legacy: { command: 'y' } } }))
 
   it('each folder up to the repository root (the one with .git), and no further', () => {
     expect(scannedFolders(sub)).toEqual([sub, join(repo, 'packages'), repo])
   })
 
-  it("its servers and named hooks, the legacy folders too, from the folder and each --add-dir", async () => {
-    const w = await workspaceCustomizations([sub])
-    expect([...w.servers.keys()].sort()).toEqual(['legacy', 'sentinel', 'shared'])
-    expect([...w.hooks.keys()]).toEqual(['repo-lint'])
+  it('its servers, the legacy folders too, from the folder and each --add-dir, each with its file and definition', async () => {
+    const w = await workspaceServers([sub])
+    expect([...w.keys()].sort()).toEqual(['legacy', 'sentinel', 'shared'])
+    expect(w.get('sentinel')).toEqual({ file: join(repo, '.agents', 'mcp_config.json'), def: { command: 'x' } })
+    expect(w.get('legacy')?.file).toBe(join(sub, '_agent', 'mcp_config.json'))
+    const added = join(base, 'added')
+    mkdirSync(join(added, '.git'), { recursive: true })
+    mkdirSync(join(added, '.agents'), { recursive: true })
+    writeFileSync(join(added, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { extra: { command: 'z' } } }))
+    expect([...(await workspaceServers([sub, added])).keys()].sort()).toEqual(['extra', 'legacy', 'sentinel', 'shared'])
   })
 
   it('a file it can’t read as JSON (or of the wrong shape) refuses: never read as empty', async () => {
@@ -130,46 +135,47 @@ describe("the workspace's .agents config (what agy would load from it)", () => {
     mkdirSync(join(bad, '.agents'), { recursive: true })
     for (const text of ['{ not json', '[1, 2]', JSON.stringify({ mcpServers: ['x'] })]) {
       writeFileSync(join(bad, '.agents', 'mcp_config.json'), text)
-      await expect(workspaceCustomizations([bad]), text).rejects.toBeInstanceOf(UnreadableConfig)
+      await expect(workspaceServers([bad]), text).rejects.toBeInstanceOf(UnreadableConfig)
     }
     // An empty file is none.
     writeFileSync(join(bad, '.agents', 'mcp_config.json'), '')
-    expect((await workspaceCustomizations([bad])).servers.size).toBe(0)
+    expect((await workspaceServers([bad])).size).toBe(0)
   })
 })
 
 describe("an agent's private profile, written for each launch", () => {
   const tools = { command: 'C:\\Program Files\\Combwork\\Combwork.exe', args: ['C:\\Program Files\\Combwork\\resources\\app.asar.unpacked\\out\\main\\cw-mcp.js'], env: { ELECTRON_RUN_AS_NODE: '1', CW_API_TOKEN: 'launch-token', CW_PROJECT: 'alpha' } }
-  const workspace = { servers: new Map([['sentinel', 'p'], [TOOLS_SERVER, 'p']]), hooks: new Map([['repo-lint', 'h']]) }
+  const project = join('C:\\repo', '.agents', 'mcp_config.json')
+  const workspace = new Map([['sentinel', { file: project, def: { command: 'node', args: ['sentinel.js'] } }]])
 
-  it("Combwork's servers with their own env (the launch's token); the project's of the same name never replaces one", () => {
-    const made = profileConfig({ [TOOLS_SERVER]: tools, remote: { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer t' } } }, workspace)
+  it("Combwork's servers with their own env (the launch's token)", () => {
+    const made = profileConfig({ [TOOLS_SERVER]: tools, remote: { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer t' } } }, new Map())
     const servers = made.mcp.mcpServers as Record<string, Record<string, unknown>>
     expect(servers[TOOLS_SERVER]).toEqual({ command: tools.command, args: tools.args, env: tools.env })
     expect(servers.remote).toEqual({ url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer t' } })
-  })
-
-  it("Combwork's inert server in place of each project server not given: it carries no token, only what runs it", () => {
-    const made = profileConfig({ [TOOLS_SERVER]: tools }, workspace)
-    const servers = made.mcp.mcpServers as Record<string, Record<string, unknown>>
-    expect(servers.sentinel).toEqual({ command: tools.command, args: tools.args, env: { ELECTRON_RUN_AS_NODE: '1', CW_MCP_INERT: '1' } })
-    expect(JSON.stringify(servers.sentinel)).not.toContain('launch-token')
     expect(made.refused).toBeUndefined()
   })
 
-  it('each project hook switched off by its name', () => {
-    expect(profileConfig({ [TOOLS_SERVER]: tools }, workspace).hooks).toEqual({ 'repo-lint': { enabled: false } })
+  it("a project server the agent wasn't given refuses the launch, naming its file: nothing stands in for it", () => {
+    const made = profileConfig({ [TOOLS_SERVER]: tools }, workspace)
+    expect(made.refused).toEqual(new Map([['sentinel', project]]))
+    expect(Object.keys(made.mcp.mcpServers as object)).toEqual([TOOLS_SERVER])
+    expect(profileConfig({}, workspace).refused?.has('sentinel')).toBe(true)
   })
 
-  it("without Combwork's server to stand in, the project's servers refuse the launch (never left to start)", () => {
-    expect(profileConfig({}, workspace).refused).toEqual(['sentinel', TOOLS_SERVER])
-    expect(profileConfig({}, { servers: new Map(), hooks: new Map() }).refused).toBeUndefined()
+  it('given under its name counts only as the same server (were the given one to end, agy would start the project’s)', () => {
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'], env: { K: 'v' } } }, workspace).refused).toBeUndefined()
+    expect(profileConfig({ sentinel: { command: 'node', args: ['other.js'] } }, workspace).refused?.get('sentinel')).toBe(project)
+    // Combwork's own server's name in a project's file is refused too, unless it is Combwork's server as given.
+    expect(profileConfig({ [TOOLS_SERVER]: tools }, new Map([[TOOLS_SERVER, { file: project, def: { command: 'evil.exe' } }]])).refused?.has(TOOLS_SERVER)).toBe(true)
+    expect(sameServer({ url: 'https://a' }, { url: 'https://a', headers: {} })).toBe(true)
+    expect(sameServer({ url: 'https://a' }, { command: 'https://a' })).toBe(false)
+    expect(sameServer({}, {})).toBe(false)
   })
 
   it('agy’s form of a server: stdio or Streamable HTTP; one with neither is left out', () => {
     expect(agyServer({ command: 'node', args: [], env: {} })).toEqual({ command: 'node', env: {} })
     expect(agyServer({ description: 'x' })).toBeNull()
-    expect(inertServer({ url: 'https://x' })).toBeNull()
   })
 
   it('kept per agent (a moved project finds it unchanged); the Assistant’s per workspace', () => {

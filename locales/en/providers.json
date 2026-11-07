@@ -15,13 +15,13 @@
     "defaultMessage": "Couldn't check {provider}'s sign-in: {text}. Choose Check again; if you haven't signed in yet, run agy in a terminal.",
     "description": "Provider Setup, under Antigravity CLI, when listing its models failed for a reason other than a known sign-in error (a network or service error, a timeout). {provider} is its name, {text} the CLI's own words (not translated). agy is a command: keep it; Check again is a button."
   },
-  "providers.antigravity.noInert": {
-    "defaultMessage": "{provider} didn't start: the project has its own MCP servers ({servers}), and Combwork can't keep them out of the agent without its own MCP server. Turn Combwork's tools on for this agent, or remove the servers from the project's .agents folder.",
-    "description": "Why an Antigravity CLI agent didn't start (its pane): the project defines MCP servers the agent wasn't given, and Combwork's own MCP server (needed to stand in for them) isn't available. {provider} is the CLI's name, {servers} their names. .agents is a folder's name: keep it."
-  },
   "providers.antigravity.notOwnConversation": {
     "defaultMessage": "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.",
     "description": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id."
+  },
+  "providers.antigravity.projectServers": {
+    "defaultMessage": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.",
+    "description": "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork."
   },
   "providers.antigravity.signIn.runs": {
     "defaultMessage": "**Sign in** runs `agy` in a terminal: sign in there. Combwork never signs in for you.",

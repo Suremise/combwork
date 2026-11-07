@@ -3,7 +3,7 @@
   "providers.action.signIn": "Se connecter",
   "providers.action.update": "Mettre à jour",
   "providers.antigravity.checkFailed": "Impossible de vérifier la connexion de {provider} : {text}. Choisis Vérifier à nouveau ; si tu ne t’es pas encore connecté, exécute agy dans un terminal.",
-  "providers.antigravity.noInert": "{provider} n’a pas démarré : le projet a ses propres serveurs MCP ({servers}), et Combwork ne peut pas les tenir à l’écart de l’agent sans son propre serveur MCP. Active les outils de Combwork pour cet agent, ou retire les serveurs du dossier .agents du projet.",
+  "providers.antigravity.projectServers": "{provider} n’a pas démarré : {count, plural, one {{files} définit} other {{files} définissent}} des serveurs MCP que cet agent n’a pas reçus ({servers}), et {provider} les démarrerait dans sa session. Combwork ne peut pas les tenir à l’écart, il ne démarre donc pas {provider} ici. Retire-les de ce fichier, ou donne-les à l’agent dans les serveurs MCP de Combwork.",
   "providers.antigravity.notOwnConversation": "{provider} n’a pas repris {conversation} : elle ne fait pas partie des conversations de cet agent (elle a peut-être été supprimée, ou appartient à un autre agent). Démarre plutôt une nouvelle session.",
   "providers.antigravity.signIn.runs": "**Se connecter** exécute `agy` dans un terminal : connecte-toi là. Combwork ne se connecte jamais à ta place.",
   "providers.antigravity.signIn.shared": "La connexion est celle de ce PC : les agents Antigravity de chaque espace de travail l’utilisent, et se déconnecter les déconnecte tous.",

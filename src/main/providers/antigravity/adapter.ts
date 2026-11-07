@@ -7,7 +7,7 @@ import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../..
 import { ASSISTANT_AGENT_ID } from '../../../shared/assistant'
 import { TOOLS_SERVER } from '../../../shared/assistantTools'
 import { isProviderEnabled } from '../../../shared/providers'
-import { msg } from '../../../shared/i18n'
+import { fmt, msg } from '../../../shared/i18n'
 import { overrideId } from '../../../shared/advanced'
 import { advanced } from '../../advanced'
 import { launchOverrides } from '../../advancedValues'
@@ -18,15 +18,14 @@ import { compareVersions, hookForwardCommand, syncAgentsSkills, toSpawnable, AGE
 import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { antigravityEnv, brainDir, inProfile, profilesRoot } from './home'
 import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
-import { UnreadableConfig, workspaceCustomizations } from './projectConfig'
+import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
 // because agy keeps its conversations there (brain\<id>), with HOME left the user's. Each launch rewrites the profile's
-// MCP servers (Combwork's, with the launch's token) and the overrides that keep out what the agent wasn't given: a project's
-// own MCP servers are replaced by Combwork's inert server of the same name (a private definition replaces the project's,
-// and agy falls back to the project's only if the private one ends: HI-2544's sentinel runs), and its named hooks are
-// switched off. The user's own global agy customizations (~\.gemini) are never read (Darren, 7 Nov: hidden for now).
+// MCP servers (Combwork's, with the launch's token). A workspace folder's own MCP servers the agent wasn't given refuse the
+// launch (profileConfig: agy can't be kept from starting them). The user's own global agy customizations (~\.gemini) are
+// never read (Darren, 7 Nov: hidden for now).
 // Hooks, transcripts and usage are HI-2545's and HI-2546's: until they land those parts return nothing.
 
 const NAME = ANTIGRAVITY_DESCRIPTOR.name
@@ -34,7 +33,7 @@ const NAME = ANTIGRAVITY_DESCRIPTOR.name
 const REFUSED = {
   unreadable: msg({ id: 'providers.antigravity.unreadableConfig', defaultMessage: "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.", description: "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words." }),
   notOwn: msg({ id: 'providers.antigravity.notOwnConversation', defaultMessage: "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id." }),
-  noInert: msg({ id: 'providers.antigravity.noInert', defaultMessage: "{provider} didn't start: the project has its own MCP servers ({servers}), and Combwork can't keep them out of the agent without its own MCP server. Turn Combwork's tools on for this agent, or remove the servers from the project's .agents folder.", description: "Why an Antigravity CLI agent didn't start (its pane): the project defines MCP servers the agent wasn't given, and Combwork's own MCP server (needed to stand in for them) isn't available. {provider} is the CLI's name, {servers} their names. .agents is a folder's name: keep it." })
+  projectServers: msg({ id: 'providers.antigravity.projectServers', defaultMessage: "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.", description: "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork." })
 }
 
 /** An agent's private profile: kept per agent; the Assistant's (the same id in every workspace) per workspace too. */
@@ -54,36 +53,35 @@ export function agyServer(def: McpServerDef): Record<string, unknown> | null {
 }
 
 /**
- * Combwork's inert MCP server, standing in for a project server of the same name the agent wasn't given: cw-mcp.js run as
- * Combwork's own server is (`tools`: its definition) with CW_MCP_INERT=1, which answers the handshake, offers no tools
- * and stays up. Only the variable that makes Combwork's executable run it as Node is kept, never the launch's token.
+ * The private profile's mcp_config.json for a launch: Combwork's servers, each with the launch's own token in its env. A
+ * workspace server the agent wasn't given (one not defined in the profile under its name) refuses the launch: `refused`,
+ * with the file each comes from. agy 1.5.0 can't be kept from starting it: a same-name private definition replaces it only
+ * while that one runs (agy falls back to the project's when it ends, HI-2544's sentinel runs), and `disabled` still starts
+ * it, so nothing short of not launching keeps it out (HR1, 02:27: fail closed).
  */
-export function inertServer(tools: McpServerDef): Record<string, unknown> | null {
-  if (typeof tools.command !== 'string' || !tools.command) return null
-  const keep = Object.fromEntries(Object.entries(tools.env ?? {}).filter(([k]) => k.toUpperCase() === 'ELECTRON_RUN_AS_NODE'))
-  return { command: tools.command, ...(tools.args?.length ? { args: tools.args } : {}), env: { ...keep, CW_MCP_INERT: '1' } }
-}
-
-/**
- * The private profile's mcp_config.json and hooks.json for a launch: Combwork's servers (each with the launch's own token
- * in its env), Combwork's inert server in place of each workspace server not given, and each workspace hook switched off.
- */
-export function profileConfig(given: Record<string, McpServerDef>, workspace: { servers: Map<string, string>; hooks: Map<string, string> }): { mcp: Record<string, unknown>; hooks: Record<string, unknown>; refused?: string[] } {
+export function profileConfig(given: Record<string, McpServerDef>, workspace: Map<string, WorkspaceServer>): { mcp: Record<string, unknown>; refused?: Map<string, string> } {
   const servers: Record<string, unknown> = {}
   for (const [name, def] of Object.entries(given)) {
     const s = agyServer(def)
     if (s) servers[name] = s
   }
-  const inert = given[TOOLS_SERVER] ? inertServer(given[TOOLS_SERVER]) : null
-  const missing: string[] = []
-  for (const name of workspace.servers.keys()) {
-    if (servers[name]) continue
-    if (inert) servers[name] = inert
-    else missing.push(name)
+  // Given under its name counts only as the same server (what runs it): were Combwork's to end, agy's fallback would then
+  // start nothing the agent wasn't given.
+  const refused = new Map([...workspace].filter(([name, w]) => !servers[name] || !sameServer(servers[name], w.def)).map(([name, w]) => [name, w.file]))
+  return { mcp: { mcpServers: servers }, ...(refused.size ? { refused } : {}) }
+}
+
+/** Whether two MCP server definitions start the same server: the same command and arguments, or the same URL. */
+export function sameServer(a: unknown, b: unknown): boolean {
+  const what = (d: unknown): string | null => {
+    if (!d || typeof d !== 'object') return null
+    const o = d as Record<string, unknown>
+    if (typeof o.url === 'string' && o.url) return JSON.stringify(['url', o.url])
+    if (typeof o.command === 'string' && o.command) return JSON.stringify(['cmd', o.command, Array.isArray(o.args) ? o.args : []])
+    return null
   }
-  const hooks: Record<string, unknown> = {}
-  for (const name of workspace.hooks.keys()) hooks[name] = { enabled: false }
-  return { mcp: { mcpServers: servers }, hooks, ...(missing.length ? { refused: missing } : {}) }
+  const x = what(a)
+  return x !== null && x === what(b)
 }
 
 /**
@@ -216,20 +214,22 @@ export class AntigravityAdapter implements ProviderAdapter {
     // A resume reopens only one of this agent's own conversations (in its profile), never another's or a missing one.
     if (ctx.resume && !(await this.ownsConversation(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.notOwn, { provider: NAME, conversation: ctx.sessionId })
     const delivered = await syncAgentsSkills(ctx, NAME)
-    let workspace: Awaited<ReturnType<typeof workspaceCustomizations>>
+    let workspace: Map<string, WorkspaceServer>
     try {
-      workspace = await workspaceCustomizations([ctx.cwd, ...(ctx.extraDirs ?? [])])
+      workspace = await workspaceServers([ctx.cwd, ...(ctx.extraDirs ?? [])])
     } catch (e) {
       if (e instanceof UnreadableConfig) throw combworkError(REFUSED.unreadable, { provider: NAME, file: e.file, why: e.why })
       throw e
     }
     const made = profileConfig(ctx.mcpServers, workspace)
-    if (made.refused) throw combworkError(REFUSED.noInert, { provider: NAME, servers: made.refused.join(', ') })
+    if (made.refused) {
+      const files = [...new Set(made.refused.values())]
+      throw combworkError(REFUSED.projectServers, { provider: NAME, servers: fmt.list([...made.refused.keys()]), count: files.length, files: fmt.list(files) })
+    }
     const profile = profileFolder(ctx.agentId, ctx.workspacePath)
     await mkdir(join(profile, '.gemini', 'config'), { recursive: true })
     // The servers' env (and the launch's token) stays in the profile, under Combwork's own data: never the project.
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'mcp_config.json'), made.mcp)
-    await writeJsonAtomic(join(profile, '.gemini', 'config', 'hooks.json'), made.hooks)
     await writeJsonAtomic(join(ctx.privateDir, 'agy-settings.json'), launchSettings(ctx, launchOverrides(ctx.overrides, ANTIGRAVITY, 'preApproveCombworkTools')))
     return delivered
   }
@@ -361,7 +361,7 @@ export class AntigravityAdapter implements ProviderAdapter {
   /** The project's own MCP servers (.agents\mcp_config.json): never given to its agents unless added to the workspace. */
   async projectMcpServers(projectPath: string): Promise<Record<string, McpServerDef>> {
     try {
-      const { servers } = await workspaceCustomizations([projectPath])
+      const servers = await workspaceServers([projectPath])
       return Object.fromEntries([...servers.keys()].map((n) => [n, {} as McpServerDef]))
     } catch {
       return {}

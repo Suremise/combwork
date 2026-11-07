@@ -84,7 +84,7 @@
     "description": "Provider Setup → Antigravity CLI, when only an editor copy was found: why Combwork needs the standalone CLI."
   },
   "agents.antigravity.installNote": {
-    "defaultMessage": "Install the Antigravity CLI with Google’s installer, in PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`. It installs `agy` in %LOCALAPPDATA%\\agy\\bin. Then run `agy` once in a terminal to sign in: the sign-in is this PC’s, shared by every workspace. If the CLI is installed somewhere else, set its path in Settings → Antigravity CLI.",
+    "defaultMessage": "Install the Antigravity CLI with Google’s installer, in PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`. It installs `agy` in %LOCALAPPDATA%\\agy\\bin. Then run `agy` once in a terminal to sign in: the sign-in is this PC’s, shared by every workspace. If the CLI is installed somewhere else, set its path in Settings → Antigravity.",
     "description": "Provider Setup → Antigravity CLI: how to install it. Keep the command in backticks, agy and %LOCALAPPDATA%\\agy\\bin exactly as they are; Settings → Antigravity CLI is a place in Combwork."
   },
   "agents.antigravity.modelPlaceholder": {
@@ -100,7 +100,7 @@
     "description": "What Antigravity CLI's Plan mode does (the mode picker)."
   },
   "agents.antigravity.signInHelp": {
-    "defaultMessage": "Sign in again: run agy in a terminal (Help → Provider Setup → Antigravity CLI shows how). The sign-in is shared by every workspace on this PC.",
+    "defaultMessage": "Sign in again: run agy in a terminal (Help → Provider Setup → Antigravity shows how). The sign-in is shared by every workspace on this PC.",
     "description": "How to sign in to Antigravity again. agy is a command: keep it; Help → Provider Setup → Antigravity CLI is a menu path in Combwork."
   },
   "agents.batch.busy": {

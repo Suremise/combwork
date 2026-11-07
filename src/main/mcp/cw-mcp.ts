@@ -1670,23 +1670,7 @@ function sayConnected(): void {
     .finally(() => clearTimeout(deadline))
 }
 
-/**
- * The inert server (HI-2544): started with CW_MCP_INERT=1 in place of a project's own MCP server that an Antigravity agent
- * wasn't given. agy runs a same-name server from the agent's private profile instead of the project's, but falls back to
- * the project's if that one ends (HI-2544's sentinel runs on agy 1.5.0), so this one stays up: it answers the handshake,
- * offers no tools, and does nothing else (no Combwork API, no files, until its input ends).
- */
-const INERT = process.env.CW_MCP_INERT === '1'
-
-function inert(m: { id?: unknown; method?: string; params?: { protocolVersion?: unknown } }): void {
-  if (m.id === undefined) return
-  // agent-protocol: an MCP handshake's fields, not text anyone reads
-  if (m.method === 'initialize') return reply(m.id, { protocolVersion: typeof m.params?.protocolVersion === 'string' ? m.params.protocolVersion : '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'combwork-inert', version: VERSION } })
-  if (m.method === 'tools/list') return reply(m.id, { tools: [] })
-  reply(m.id, {})
-}
-
-createInterface({ input: process.stdin }).on('close', INERT ? () => process.exit(0) : inputEnded).on('line', (line) => {
+createInterface({ input: process.stdin }).on('close', inputEnded).on('line', (line) => {
   if (!line.trim()) return
   let msg: unknown
   try {
@@ -1695,8 +1679,5 @@ createInterface({ input: process.stdin }).on('close', INERT ? () => process.exit
     // agent-protocol: JSON-RPC's own error message
     return replyError(null, -32700, 'Parse error')
   }
-  for (const m of Array.isArray(msg) ? msg : [msg]) {
-    if (INERT) inert(m as { id?: unknown; method?: string })
-    else void handle(m as { id?: unknown; method?: string })
-  }
+  for (const m of Array.isArray(msg) ? msg : [msg]) void handle(m as { id?: unknown; method?: string })
 })

@@ -1,7 +1,8 @@
 // The Antigravity CLI as a provider (HI-2544), through Combwork with a stand-in agy (fake-agy/: no sign-in, no model):
 // an agent on its PC-wide account launches in a private profile of its own (USERPROFILE; HOME left the user's), with
-// auto-update off and an account variable of Combwork's own environment left out; the project's own MCP server (a
-// sentinel, which marks a file when it is started) is never started, Combwork's inert server running in its place; the
+// auto-update off and an account variable of Combwork's own environment left out; a project that defines an MCP server
+// the agent wasn't given (a sentinel, which marks a file when it is started) is refused before agy starts, as is one whose
+// config can't be read, and the sentinel never starts (agy 1.5.0 can't be kept from starting it: HR1, fail closed); the
 // conversation's id comes from the status line; two new conversations one after the other, then each resumed by its id;
 // a conversation that isn't the agent's is never resumed. The fake proves the adapter's side only (HI-2548 runs the real
 // CLI). Dev build, throwaway profile and workspace.
@@ -32,8 +33,8 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const sentinel = path.join(lib.WORK, 'antigravity-sentinel.cjs')
   fs.writeFileSync(sentinel, `require('fs').appendFileSync(${JSON.stringify(marker)}, 'started\\n'); setInterval(() => {}, 1000)\n`)
   fs.mkdirSync(path.join(alpha, '.agents'), { recursive: true })
-  fs.writeFileSync(path.join(alpha, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { sentinel: { command: process.execPath, args: [sentinel] } } }))
-  fs.writeFileSync(path.join(alpha, '.agents', 'hooks.json'), JSON.stringify({ 'project-hook': { SessionStart: [{ type: 'command', command: 'exit 0' }] } }))
+  const projectMcp = path.join(alpha, '.agents', 'mcp_config.json')
+  fs.writeFileSync(projectMcp, JSON.stringify({ mcpServers: { sentinel: { command: process.execPath, args: [sentinel] } } }))
   lib.enableProviders(userData, ['claude-code', 'antigravity'])
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -61,6 +62,59 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
 
   const gem = await lib.addAgent(inv, alpha, { name: 'Gem', provider: 'antigravity' })
   check('an agent is added on Antigravity', gem?.provider === 'antigravity', JSON.stringify(gem))
+
+  // --- A project server the agent wasn't given: refused before agy starts (nothing could keep agy from starting it).
+  const refusedStart = () => inv('session:start', alpha, { agentId: gem.id }).then(() => null, (err) => String(err?.message ?? err))
+  const why = await refusedStart()
+  check("a project that defines an MCP server the agent wasn't given is refused, naming the server and its file", /MCP servers this agent wasn't given \(sentinel\)/.test(why ?? '') && (why ?? '').includes(projectMcp), why ?? 'started')
+  check('…before agy starts', entries('session').length === 0 && !(await live(gem.id)), JSON.stringify(entries('session')))
+  check('…and the sentinel never started', !fs.existsSync(marker))
+  // --- A project config agy would read that Combwork can't: refused too (never read as none).
+  fs.writeFileSync(projectMcp, '{ not json')
+  const why2 = await refusedStart()
+  check("a project config that can't be read is refused, naming the file", /couldn't read/.test(why2 ?? '') && (why2 ?? '').includes(projectMcp) && entries('session').length === 0, why2 ?? 'started')
+  // Without the project's servers, it launches.
+  fs.rmSync(projectMcp)
+
+  // --- What the user sees, light and dark (kept with --keep-files): Provider Setup's tab, Settings → Accounts' PC-wide row,
+  // its Settings page and its Advanced tab, all with the fake agy.
+  const shots = async (name, target = page) => {
+    while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
+    await page.mouse.move(5, 5)
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+      await target.screenshot({ path: path.join(lib.WORK, `antigravity-${name}-${theme}.png`) })
+    }
+  }
+  await page.evaluate(() => window.combwork.invoke('provider:refresh', 'antigravity'))
+  await page.keyboard.press('Control+Shift+P')
+  await page.locator('.palette input').waitFor({ timeout: HUNG_MS })
+  await page.keyboard.type('Provider Setup')
+  await page.locator('.palette-item[data-command="help.agentSetup"]').waitFor({ timeout: HUNG_MS })
+  await page.keyboard.press('Enter')
+  const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
+  await setup.locator('.setup-tab', { hasText: 'Antigravity' }).click()
+  check('Provider Setup has an Antigravity tab, the fake found and signed in', !!(await until(async () => /1\.5\.0/.test(await setup.innerText().catch(() => '')), HUNG_MS)), await setup.innerText().catch(() => ''))
+  await shots('setup', setup)
+  await page.keyboard.press('Escape')
+  await setup.waitFor({ state: 'detached', timeout: HUNG_MS })
+  await page.keyboard.press('Control+,')
+  await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
+  await page.locator('.settings-nav .row[data-section="accounts"]').click()
+  check("Settings → Accounts lists Antigravity's PC-wide sign-in", !!(await until(async () => /Antigravity/.test(await page.locator('.settings-content, .settings-page, main').first().innerText().catch(() => '')), HUNG_MS)))
+  await shots('accounts')
+  await page.locator('.settings-nav .row', { hasText: 'Antigravity' }).first().click()
+  await until(async () => (await page.locator('.settings-nav .row.selected', { hasText: 'Antigravity' }).count()) > 0, HUNG_MS)
+  await shots('settings')
+  await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
+  const agTab = page.locator('.advanced-tabs [role="tab"][data-tab="antigravity"]')
+  await agTab.waitFor({ timeout: HUNG_MS })
+  await agTab.click()
+  // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
+  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 2, HUNG_MS)))
+  await shots('advanced')
+  await page.keyboard.press('Escape')
+  await page.getByText('alpha', { exact: true }).first().click()
 
   // --- First conversation.
   const startNew = async (agentId = gem.id) => {
@@ -92,14 +146,8 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check("…and Combwork's environment's GEMINI_API_KEY left out", e.GEMINI_API_KEY === undefined, JSON.stringify(e))
   const args = first.launch?.args ?? []
   check('it is given its settings for this launch only (--settings), the status line among them', args.includes('--settings') && /"statusLine"/.test(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8')), JSON.stringify(args))
-  const mcp = entries('mcp').at(-1)
-  check("the project's server is replaced in the profile by Combwork's inert one", !!mcp && mcp.project.includes('sentinel') && mcp.own.includes('sentinel'), JSON.stringify(mcp))
   const profileMcp = JSON.parse(fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'config', 'mcp_config.json'), 'utf8')).mcpServers
-  check("…which carries no launch token, and runs Combwork's own server in inert mode", profileMcp.sentinel?.env?.CW_MCP_INERT === '1' && Object.keys(profileMcp.sentinel.env).every((k) => ['CW_MCP_INERT', 'ELECTRON_RUN_AS_NODE'].includes(k)), JSON.stringify(profileMcp.sentinel))
-  check("…and the project's hook is switched off", JSON.parse(fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'config', 'hooks.json'), 'utf8'))['project-hook']?.enabled === false)
-  // The inert server is up (the fake falls back to the project's if it ends, as agy does): the sentinel never starts.
-  await until(async () => entries('mcp').length > 0, HUNG_MS)
-  check("the project's own MCP server was never started", !fs.existsSync(marker), fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8') : '')
+  check("its profile's MCP servers are Combwork's own", 'combwork' in profileMcp && !('sentinel' in profileMcp), JSON.stringify(Object.keys(profileMcp)))
   // A turn: written to its conversation.
   check('its turns are kept in its own conversation, in its profile', await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity'))
   check('it stops', !!(await stop()))
@@ -128,7 +176,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const before = entries('session').length
   const refused = await inv('session:start', alpha, { agentId: gem.id, resumeId: theirs.conv }).then(() => null, (err) => String(err?.message ?? err))
   check("another agent's conversation is never resumed by this one", entries('session').length === before && !(await live(gem.id)) && /isn't in this agent's own conversations/.test(refused ?? ''), refused ?? 'started')
-  check("the project's own MCP server was never started, all along", !fs.existsSync(marker))
+  check('the sentinel was never started, all along', !fs.existsSync(marker))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

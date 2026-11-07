@@ -3,7 +3,7 @@
   "providers.action.signIn": "Entrar",
   "providers.action.update": "Atualizar",
   "providers.antigravity.checkFailed": "Não foi possível verificar o login do {provider}: {text}. Escolha Verificar de novo; se você ainda não entrou, execute agy em um terminal.",
-  "providers.antigravity.noInert": "O {provider} não iniciou: o projeto tem servidores MCP próprios ({servers}), e o Combwork não consegue mantê-los longe do agente sem o próprio servidor MCP. Ative as ferramentas do Combwork para este agente ou remova os servidores da pasta .agents do projeto.",
+  "providers.antigravity.projectServers": "O {provider} não iniciou: {count, plural, one {{files} define} other {{files} definem}} servidores MCP que este agente não recebeu ({servers}), e o {provider} os iniciaria na sessão. O Combwork não consegue mantê-los de fora, então não inicia o {provider} aqui. Remova-os desse arquivo ou dê-os ao agente nos servidores MCP do Combwork.",
   "providers.antigravity.notOwnConversation": "O {provider} não retomou {conversation}: ela não está entre as conversas deste agente (pode ter sido removida ou ser de outro agente). Inicie uma nova sessão.",
   "providers.antigravity.signIn.runs": "**Entrar** executa `agy` em um terminal: entre por lá. O Combwork nunca faz login por você.",
   "providers.antigravity.signIn.shared": "O login é deste PC: os agentes do Antigravity de todos os espaços de trabalho o usam, e sair desconecta todos eles.",

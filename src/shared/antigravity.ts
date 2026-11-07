@@ -125,7 +125,7 @@ export const ANTIGRAVITY_MODEL_GROUPS: ModelGroup[] = []
 
 export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   id: ANTIGRAVITY,
-  name: 'Antigravity CLI', // i18n-ignore: a product name
+  name: 'Antigravity', // i18n-ignore: a product name
   assistant: 'Antigravity', // i18n-ignore: a product name
   company: 'Google', // i18n-ignore: a company name
   cliName: 'agy',
@@ -169,15 +169,15 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   // agy reads AGENTS.md and GEMINI.md natively (HI-2448).
   instructionsFile: 'AGENTS.md',
   installNote:
-    'Install the Antigravity CLI with Google’s installer, in PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`. It installs `agy` in %LOCALAPPDATA%\\agy\\bin. Then run `agy` once in a terminal to sign in: the sign-in is this PC’s, shared by every workspace. If the CLI is installed somewhere else, set its path in Settings → Antigravity CLI.', // i18n-ignore: English, as main's notices use it (text has the window's)
+    'Install the Antigravity CLI with Google’s installer, in PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`. It installs `agy` in %LOCALAPPDATA%\\agy\\bin. Then run `agy` once in a terminal to sign in: the sign-in is this PC’s, shared by every workspace. If the CLI is installed somewhere else, set its path in Settings → Antigravity.', // i18n-ignore: English, as main's notices use it (text has the window's)
   extensionNote:
     "You have Antigravity's agent inside an editor. Combwork doesn't use the editor's copy. Install the standalone Antigravity CLI; your editor keeps working as before.", // i18n-ignore: English, as main's notices use it (text has the window's)
-  signInHelp: 'Sign in again: run agy in a terminal (Help → Provider Setup → Antigravity CLI shows how). The sign-in is shared by every workspace on this PC.', // i18n-ignore: English for main's notices (text has the window's)
+  signInHelp: 'Sign in again: run agy in a terminal (Help → Provider Setup → Antigravity shows how). The sign-in is shared by every workspace on this PC.', // i18n-ignore: English for main's notices (text has the window's)
   safeguardHelp: null,
   text: {
-    installNote: msg({ id: 'agents.antigravity.installNote', defaultMessage: 'Install the Antigravity CLI with Google’s installer, in PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`. It installs `agy` in %LOCALAPPDATA%\\agy\\bin. Then run `agy` once in a terminal to sign in: the sign-in is this PC’s, shared by every workspace. If the CLI is installed somewhere else, set its path in Settings → Antigravity CLI.', description: 'Provider Setup → Antigravity CLI: how to install it. Keep the command in backticks, agy and %LOCALAPPDATA%\\agy\\bin exactly as they are; Settings → Antigravity CLI is a place in Combwork.' }),
+    installNote: msg({ id: 'agents.antigravity.installNote', defaultMessage: 'Install the Antigravity CLI with Google’s installer, in PowerShell: `irm https://antigravity.google/cli/install.ps1 | iex`. It installs `agy` in %LOCALAPPDATA%\\agy\\bin. Then run `agy` once in a terminal to sign in: the sign-in is this PC’s, shared by every workspace. If the CLI is installed somewhere else, set its path in Settings → Antigravity.', description: 'Provider Setup → Antigravity CLI: how to install it. Keep the command in backticks, agy and %LOCALAPPDATA%\\agy\\bin exactly as they are; Settings → Antigravity CLI is a place in Combwork.' }),
     extensionNote: msg({ id: 'agents.antigravity.extensionNote', defaultMessage: "You have Antigravity's agent inside an editor. Combwork doesn't use the editor's copy. Install the standalone Antigravity CLI; your editor keeps working as before.", description: 'Provider Setup → Antigravity CLI, when only an editor copy was found: why Combwork needs the standalone CLI.' }),
-    signInHelp: msg({ id: 'agents.antigravity.signInHelp', defaultMessage: 'Sign in again: run agy in a terminal (Help → Provider Setup → Antigravity CLI shows how). The sign-in is shared by every workspace on this PC.', description: "How to sign in to Antigravity again. agy is a command: keep it; Help → Provider Setup → Antigravity CLI is a menu path in Combwork." }),
+    signInHelp: msg({ id: 'agents.antigravity.signInHelp', defaultMessage: 'Sign in again: run agy in a terminal (Help → Provider Setup → Antigravity shows how). The sign-in is shared by every workspace on this PC.', description: "How to sign in to Antigravity again. agy is a command: keep it; Help → Provider Setup → Antigravity CLI is a menu path in Combwork." }),
     safeguardHelp: null,
     modelPlaceholder: msg({ id: 'agents.antigravity.modelPlaceholder', defaultMessage: 'Model ID, e.g. gemini-3.8-flash-medium', description: 'Placeholder of the custom model ID box (Antigravity CLI). Keep the model ID exactly as it is.' })
   },

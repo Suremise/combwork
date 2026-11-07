@@ -5,8 +5,8 @@ interface CombworkMessageValues {
   'providers.action.signIn': undefined
   'providers.action.update': undefined
   'providers.antigravity.checkFailed': { provider: string | number; text: string | number }
-  'providers.antigravity.noInert': { provider: string | number; servers: string | number }
   'providers.antigravity.notOwnConversation': { provider: string | number; conversation: string | number }
+  'providers.antigravity.projectServers': { provider: string | number; count: number; files: string | number; servers: string | number }
   'providers.antigravity.signIn.runs': undefined
   'providers.antigravity.signIn.shared': undefined
   'providers.antigravity.unreadableConfig': { provider: string | number; file: string | number; why: string | number }
