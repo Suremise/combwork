@@ -75,8 +75,9 @@ const prose = (seed, n) => {
 
   // Agents: two in alpha (one running a few turns), one in beta.
   const alpha = path.join(ws, 'alpha')
-  const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })
-  await lib.addAgent(inv, alpha, { name: 'Tester' })
+  // Each builds and reviews the other's lanes (HI-2664: a lane part only for a role that does it).
+  const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either' })
+  await lib.addAgent(inv, alpha, { name: 'Tester', workflowRole: 'either' })
   await lib.addAgent(inv, path.join(ws, 'beta'), { name: 'Builder' })
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
   await inv('session:start', alpha, { agentId: coder.id })
