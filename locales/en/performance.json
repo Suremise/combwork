@@ -816,8 +816,8 @@
     "description": "Performance → Compare, a note on a scenario of model trials. Keep ≈ (it marks an estimate)."
   },
   "performance.compare.note.fakePerCall": {
-    "defaultMessage": "With the fake Claude Code or fake Codex, each Combwork tool call starts a combwork MCP server of its own: API requests and tool-list starts count per call, not per session.",
-    "description": "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep Combwork (the app's name), MCP, Claude Code and Codex."
+    "defaultMessage": "With the fake Claude Code, Codex or Antigravity CLI, each Combwork tool call starts a combwork MCP server of its own: API requests and tool-list starts count per call, not per session.",
+    "description": "Performance → Compare, a note on a comparison of scenario runs on the scripted fake CLIs (HI-2186): what they do differs from a real CLI. Keep Combwork (the app's name), MCP, Claude Code, Codex and Antigravity."
   },
   "performance.compare.note.fakeUsage": {
     "defaultMessage": "Provider usage isn’t compared: a fake’s tokens are simulated, not a provider’s.",

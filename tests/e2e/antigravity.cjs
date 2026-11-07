@@ -67,6 +67,14 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const checks = await until(async () => (entries('models').length ? entries('models') : null), HUNG_MS)
   check("agy's checks run in Combwork's check profile, never the user's own", !!checks && checks.every((m) => /antigravity[\\/]check$/i.test(m.env?.USERPROFILE ?? '') && m.env.USERPROFILE.toLowerCase().startsWith(userData.toLowerCase())), JSON.stringify(checks?.map((m) => m.env?.USERPROFILE)))
 
+  // Never on any other agy (HI-2548: a fake Combwork couldn't run fell back to the user's real one): stopped here.
+  const fakeAgy = path.join(__dirname, 'fake-agy', 'agy.cmd')
+  const selected = await until(async () => (await inv('provider:refresh', 'antigravity'))?.antigravity?.path ?? null, HUNG_MS)
+  if (String(selected ?? '').toLowerCase() !== fakeAgy.toLowerCase()) {
+    console.log(`FAIL stopped before any session: Combwork selected ${selected ?? 'no agy'}, not the fake`)
+    await app.close()
+    process.exit(1)
+  }
   const gem = await lib.addAgent(inv, alpha, { name: 'Gem', provider: 'antigravity' })
   check('an agent is added on Antigravity', gem?.provider === 'antigravity', JSON.stringify(gem))
 
@@ -160,6 +168,8 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   }
   const first = await startNew()
   check("the conversation's id comes from its status line", /^[0-9a-f-]{36}$/.test(first.conv ?? '') && first.conv === first.launch?.conversation, JSON.stringify({ conv: first.conv, launch: first.launch?.conversation }))
+  // agy sends SessionStart only with its first prompt: started with none, its status line saying idle is its prompt showing.
+  check('…and, started with no prompt, it is ready once its status line says idle (HI-2548)', !!(await until(async () => (await live(gem.id))?.status === 'ready', HUNG_MS)), (await live(gem.id))?.status)
   const e = first.launch?.env ?? {}
   const agentScreens = entries('onboarding').filter((o) => (o.env?.USERPROFILE ?? '').toLowerCase() === (e.USERPROFILE ?? '').toLowerCase())
   check("…past agy's first-run screens (Set up's, copied into its profile)", agentScreens.length > 0 && agentScreens.every((o) => !o.shown) && fs.existsSync(path.join(e.USERPROFILE, '.gemini', 'antigravity-cli', 'cache', 'onboarding.json')), JSON.stringify(agentScreens))

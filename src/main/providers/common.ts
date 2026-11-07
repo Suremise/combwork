@@ -25,8 +25,11 @@ export function readFirstLine(path: string, max = 1 << 20): Promise<string> {
 /** `ended`: it didn't exit by itself (its timeout ended it, or it couldn't start): its code says nothing then. */
 export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number; ended?: true }> {
   const shell = /\.(cmd|bat)$/i.test(file)
+  // Through cmd, Node joins the command and its arguments as they are: a path with spaces ("C:\My Tools\agy.cmd") would be
+  // read as "C:\My" (HI-2548), so it and any argument with a space are quoted.
+  const quote = (a: string): string => (shell && /\s/.test(a) && !/^".*"$/.test(a) ? `"${a}"` : a)
   return new Promise((resolve) => {
-    execFile(file, args, { timeout: timeoutMs, windowsHide: true, shell, encoding: 'utf8', env }, (err, stdout, stderr) => {
+    execFile(quote(file), args.map(quote), { timeout: timeoutMs, windowsHide: true, shell, encoding: 'utf8', env }, (err, stdout, stderr) => {
       const raw = err ? (err as NodeJS.ErrnoException & { code?: number | string }).code : 0
       const code = err ? (raw as unknown as number) || 1 : 0
       const ended = !!err && (!!(err as { killed?: boolean }).killed || typeof raw !== 'number')

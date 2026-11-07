@@ -32,7 +32,8 @@ const CODEX: Cli = { provider: 'codex', version: '0.160.1', path: 'C:\\Users\\t\
 const pass = (name: string, clis: Cli[] = []) => ({ name, ok: true, seconds: 3, clis })
 const COPILOT: Cli = { provider: 'copilot', version: '1.0.93', path: 'C:\\Users\\t\\AppData\\Local\\Microsoft\\WinGet\\Links\\copilot.exe' }
 /** Each real suite once (#1521: reviewcopiesreal needs all three), its Combwork having selected every CLI it needs. */
-const realResults = () => [pass('about'), ...suites.filter((s) => s.needs?.length).map((s) => pass(s.name, s.needs!.includes('copilot') ? [CLAUDE, CODEX, COPILOT] : [CLAUDE, CODEX]))]
+const AGY: Cli = { provider: 'antigravity', version: '1.5.0', path: 'C:\\Users\\t\\AppData\\Local\\agy\\bin\\agy.exe' }
+const realResults = () => [pass('about'), ...suites.filter((s) => s.needs?.length).map((s) => pass(s.name, [CLAUDE, CODEX, ...(s.needs!.includes('copilot') ? [COPILOT] : []), ...(s.needs!.includes('agy') ? [AGY] : [])]))]
 /** A run record of the whole real tier (and one fake suite), every suite passed, as run.mjs writes it. */
 const fullRecord = (over: Record<string, unknown> = {}) => {
   const results = realResults()
@@ -103,8 +104,8 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
   it('takes each CLI whose real suites all ran and passed, with the version their Combwork selected', () => {
     const { manifest, updated, problems } = manifestFromRecord(fullRecord(), suites)
     expect(problems).toEqual([])
-    expect(updated).toEqual(['claude-code', 'codex', 'copilot'])
-    expect(manifest).toEqual({ 'claude-code': { version: '2.1.292', testedAt: '2026-10-07', record: '0123456789ab' }, codex: { version: '0.160.1', testedAt: '2026-10-07', record: '0123456789ab' }, copilot: { version: '1.0.93', testedAt: '2026-10-07', record: '0123456789ab' } })
+    expect(updated).toEqual(['claude-code', 'codex', 'copilot', 'antigravity'])
+    expect(manifest).toEqual({ antigravity: { version: '1.5.0', testedAt: '2026-10-07', record: '0123456789ab' }, 'claude-code': { version: '2.1.292', testedAt: '2026-10-07', record: '0123456789ab' }, codex: { version: '0.160.1', testedAt: '2026-10-07', record: '0123456789ab' }, copilot: { version: '1.0.93', testedAt: '2026-10-07', record: '0123456789ab' } })
   })
 
   it("never vouches for a CLI the record doesn't show working, and keeps its earlier entry", () => {
@@ -112,7 +113,7 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
     const changed = (name: string, change: (r: Result) => object) => fullRecord({ results: fullRecord().results.map((r: Result) => (r.name === name ? change(r) : r)) })
     // A real suite skipped for the environment, or failed: no result for that CLI.
     let out = manifestFromRecord(changed(alone('codex')[0], (r) => ({ ...r, skipped: 'environment: usage limit', environment: true })), suites, current)
-    expect(out.updated).toEqual(['claude-code', 'copilot'])
+    expect(out.updated).toEqual(['claude-code', 'copilot', 'antigravity'])
     expect(out.manifest.codex).toEqual(current.codex)
     expect(out.problems).toEqual([`Codex: not all of its real suites passed (${alone('codex')[0]})`])
     expect(manifestFromRecord(changed(alone('claude')[0], (r) => ({ ...r, ok: false })), suites).problems).toEqual([`Claude Code: not all of its real suites passed (${alone('claude')[0]})`])
@@ -122,7 +123,7 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
     out = manifestFromRecord(fullRecord({ results: [pass('about')] }), suites, current)
     expect(out.updated).toEqual([])
     expect(out.manifest).toEqual(current)
-    expect(out.problems).toEqual(['Claude Code: none of its real suites ran', 'Codex: none of its real suites ran', 'GitHub Copilot: none of its real suites ran'])
+    expect(out.problems).toEqual(['Claude Code: none of its real suites ran', 'Codex: none of its real suites ran', 'GitHub Copilot: none of its real suites ran', 'Antigravity: none of its real suites ran'])
   })
 
   it('takes the version only from what every suite of the CLI ran: none unsaid, all the same', () => {
@@ -146,7 +147,7 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
     expect(manifestFromRecord(record({ clis: [{ ...CODEX, version: '0.161.0' }] }), own).problems).toEqual(['Codex: its real suites ran different versions (0.160.1, 0.161.0)'])
     // A CLI whose only suites start no Combwork: nothing says its version.
     const only = [{ name: 'codex-nocombwork', needs: ['codex'], noCombwork: 'runs codex itself' }]
-    expect(manifestFromRecord(fullRecord({ results: [pass('codex-nocombwork')] }), only).problems).toEqual(['Claude Code: none of its real suites ran', 'Codex: none of its real suites says which version Combwork used', 'GitHub Copilot: none of its real suites ran'])
+    expect(manifestFromRecord(fullRecord({ results: [pass('codex-nocombwork')] }), only).problems).toEqual(['Claude Code: none of its real suites ran', 'Codex: none of its real suites says which version Combwork used', 'GitHub Copilot: none of its real suites ran', 'Antigravity: none of its real suites ran'])
     // Every suite marked so says why, and is a real suite.
     for (const s of suites.filter((x) => x.noCombwork)) expect(s.needs?.some((n) => n !== 'packaged'), s.name).toBe(true)
   })
@@ -166,9 +167,9 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
     /** Why `need` isn't vouched by a record of `ran`'s suites, which ran some of its suites. */
     const notAllRan = (name: string, need: string, ran: string) => `${name}: not all of its real suites ran (${real(need).filter((n) => !real(ran).includes(n)).join(', ')} didn't)`
     it("takes each CLI from the record where all its real suites ran and passed", () => {
-      const { manifest, updated, problems } = manifestFromRecords([only('codex', { when: '2026-10-19 10:00' }), only('claude', { when: '2026-10-19 12:00' }), only('copilot')], suites)
+      const { manifest, updated, problems } = manifestFromRecords([only('codex', { when: '2026-10-19 10:00' }), only('claude', { when: '2026-10-19 12:00' }), only('copilot'), only('agy')], suites)
       expect(problems).toEqual([])
-      expect(updated).toEqual(['claude-code', 'codex', 'copilot'])
+      expect(updated).toEqual(['claude-code', 'codex', 'copilot', 'antigravity'])
       expect(manifest['claude-code']).toEqual({ version: '2.1.292', testedAt: '2026-10-19', record: '0123456789ab' })
       expect(manifest.codex.version).toBe('0.160.1')
       // A CLI two records both cover, at one version: taken, dated by the later run.
@@ -186,12 +187,12 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
       const out = manifestFromRecords([only('codex'), only('claude')], suites)
       expect(out.updated).toEqual(['claude-code', 'codex'])
       // Its suites that also need Codex ran in the first record, the others nowhere.
-      expect(out.problems).toEqual([notAllRan('GitHub Copilot', 'copilot', 'codex')])
+      expect(out.problems).toEqual([notAllRan('GitHub Copilot', 'copilot', 'codex'), 'Antigravity: none of its real suites ran'])
       expect(manifestFromRecords([solo('codex'), solo('claude')], suites).problems).toContain('GitHub Copilot: none of its real suites ran')
       const failed = only('copilot', { results: only('copilot').results.map((r: Result) => (r.name === alone('copilot')[0] ? { ...r, ok: false } : r)) })
       // Each reason is the first record's where that CLI's suites ran: the failed one for Copilot (and for Claude Code,
       // whose shared suites ran there too).
-      expect(manifestFromRecords([failed, only('codex')], suites).problems).toEqual([notAllRan('Claude Code', 'claude', 'copilot'), `GitHub Copilot: not all of its real suites passed (${alone('copilot')[0]})`])
+      expect(manifestFromRecords([failed, only('codex')], suites).problems).toEqual([notAllRan('Claude Code', 'claude', 'copilot'), `GitHub Copilot: not all of its real suites passed (${alone('copilot')[0]})`, 'Antigravity: none of its real suites ran'])
     })
     it('refuses a CLI two records ran at different versions', () => {
       const newer = only('codex', { results: only('codex').results.map((r: Result) => ({ ...r, clis: r.clis.map((c: Cli) => (c.provider === 'codex' ? { ...c, version: '0.161.0' } : c)) })) })
@@ -206,7 +207,7 @@ describe('npm run tested-clis: the manifest from a run record (#365)', () => {
       const conflicted = (b: object) => manifestFromRecords([only('codex'), only('claude'), b], suites)
       // Partial: one Codex suite, at 0.161.0, the others not run.
       const partial = fullRecord({ results: [pass('about'), at(codexRuns[0], '0.161.0')] })
-      expect(conflicted(partial).problems).toEqual(['Codex: the records ran different versions (0.160.1, 0.161.0)', notAllRan('GitHub Copilot', 'copilot', 'codex')])
+      expect(conflicted(partial).problems).toEqual(['Codex: the records ran different versions (0.160.1, 0.161.0)', notAllRan('GitHub Copilot', 'copilot', 'codex'), 'Antigravity: none of its real suites ran'])
       expect(conflicted(partial).updated).toEqual(['claude-code'])
       // Failed: every Codex suite ran at 0.161.0, one failed.
       const failed = fullRecord({ results: [pass('about'), ...codexRuns.map((r: Result, i: number) => ({ ...at(r, '0.161.0'), ok: i !== 0 }))] })
@@ -239,8 +240,8 @@ describe('npm run release: the manifest must be of the code released (#365)', ()
     expect(manifestStale(manifest, () => [MANIFEST])).toBeNull()
   })
   it('refuses one that is missing a CLI, comes from uncommitted changes, an unknown commit, or older code', () => {
-    expect(manifestStale(null, () => [])).toBe('it has no tested version for Claude Code and Codex and GitHub Copilot')
-    expect(manifestStale({ 'claude-code': manifest['claude-code'], copilot: manifest.copilot }, () => [])).toBe('it has no tested version for Codex')
+    expect(manifestStale(null, () => [])).toBe('it has no tested version for Claude Code and Codex and GitHub Copilot and Antigravity')
+    expect(manifestStale({ 'claude-code': manifest['claude-code'], copilot: manifest.copilot, antigravity: manifest.antigravity }, () => [])).toBe('it has no tested version for Codex')
     expect(manifestStale({ ...manifest, codex: { ...manifest.codex, record: '0123456789ab+fedcba987654' } }, () => [])).toBe("Codex's entry comes from a run on uncommitted changes (0123456789ab+fedcba987654)")
     expect(manifestStale(manifest, () => null)).toBe("Claude Code's entry comes from a commit git doesn't know (0123456789ab)")
     expect(manifestStale(manifest, () => [MANIFEST, 'src/main/sessions.ts', 'package.json'])).toBe("Claude Code's entry was tested on 0123456789ab, and 2 files have changed since (src/main/sessions.ts, package.json)")
@@ -264,7 +265,7 @@ describe('npm run release: test-only changes since the record, let through on th
     const out = await check(['tests/settingsWorkspace.test.ts', 'tests/workflow/focused.test.ts', 'tests/e2e/advanced.cjs', 'tests/e2e/mergequeuefolder.cjs'])
     expect(out.stale).toBeNull()
     const files = ['tests/settingsWorkspace.test.ts', 'tests/workflow/focused.test.ts', 'tests/e2e/advanced.cjs', 'tests/e2e/mergequeuefolder.cjs']
-    expect(out.excluded).toEqual({ 'claude-code': { record: REC, files }, codex: { record: REC, files }, copilot: { record: REC, files } })
+    expect(out.excluded).toEqual({ antigravity: { record: REC, files }, 'claude-code': { record: REC, files }, codex: { record: REC, files }, copilot: { record: REC, files } })
     // The manifest alone changed: nothing to list.
     expect(await manifestCheck(manifest, () => [MANIFEST], same)).toEqual({ stale: null, excluded: {} })
   })
@@ -307,7 +308,7 @@ describe('npm run release: test-only changes since the record, let through on th
     // The refusals before it are manifestStale's, unchanged.
     expect((await manifestCheck(manifest, () => null, same)).stale).toBe(`Claude Code's entry comes from a commit git doesn't know (${REC})`)
     expect((await manifestCheck({ ...manifest, codex: { ...manifest.codex, record: '0123456789ab+fedcba987654' } }, () => [], same)).stale).toBe("Codex's entry comes from a run on uncommitted changes (0123456789ab+fedcba987654)")
-    expect((await manifestCheck(null, () => [], same)).stale).toBe('it has no tested version for Claude Code and Codex and GitHub Copilot')
+    expect((await manifestCheck(null, () => [], same)).stale).toBe('it has no tested version for Claude Code and Codex and GitHub Copilot and Antigravity')
   })
 
   // Its git runs in the run context's environment (its allowlist, no repository-selection variables), with no global or
@@ -410,7 +411,7 @@ describe('npm run release: a version-only bump since the record keeps the manife
     const out = await check([...ALL, 'tests/settingsWorkspace.test.ts'], bumped)
     expect(out.stale).toBeNull()
     expect(out.excluded.codex).toEqual({ record: REC, files: [...ALL, 'tests/settingsWorkspace.test.ts'], version: '1.2.0' })
-    expect(Object.keys(out.excluded).sort()).toEqual(['claude-code', 'codex', 'copilot'])
+    expect(Object.keys(out.excluded).sort()).toEqual(['antigravity', 'claude-code', 'codex', 'copilot'])
     // The bump alone, package.json and the lockfile only (no release notes yet): through as well.
     expect((await check(['package.json', 'package-lock.json'], bumped)).stale).toBeNull()
   })

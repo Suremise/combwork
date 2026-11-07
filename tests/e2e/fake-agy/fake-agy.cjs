@@ -173,7 +173,10 @@ function start(def, fallback) {
   const p = spawn(def.command, def.args || [], { env: { ...process.env, ...def.env }, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
   running.push(p)
   p.on('error', () => undefined)
-  p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }) + '\n')
+  p.stdin.on('error', () => undefined)
+  p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'fake-agy', version: '1.5.0' } } }) + '\n')
+  // As an MCP client does once initialized (the Combwork server then tells Combwork the launch has connected, #865).
+  p.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n')
   // One that ends: the project's of that name instead (the real CLI's fallback, HI-2544's sentinel runs).
   p.on('exit', () => {
     if (fallback) start(fallback, null)
@@ -183,6 +186,101 @@ const { own, project } = servers()
 for (const [name, def] of Object.entries(own)) start(def, project[name])
 for (const [name, def] of Object.entries(project)) if (!own[name]) start(def, null)
 log({ kind: 'mcp', conversation: conv, own: Object.keys(own), project: Object.keys(project) })
+
+// --- The scenarios' steps (HI-2548), as fake-claude and fake-codex take them: "skill NAME" and "skillref NAME FILE" (a
+// read_file of the delivered copy in .agents\skills), "cw TOOL {json}", "boardmove N COLUMN", "boardreview N ACTION
+// [COLUMN]", "boardcomment N" (a call_mcp_tool through the launch's real Combwork MCP server, the profile's `combwork`),
+// "work N" (a model call of N seconds), "shell: <command line>" (a run_command in cmd) and "patch FILE" (an edit_file appending a line).
+// Each is a model call of its own between PreInvocation and PostInvocation, its tool between PreToolUse and PostToolUse
+// (a deny refuses it), and its call and result steps in the transcript as 1.5.0 writes them.
+const { callOwnTool, parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+/** Whether it follows Combwork's notices as a model does (the scenarios': FAKE_AGY_FOLLOW_NOTICES=1). */
+const follows = () => process.env.FAKE_AGY_FOLLOW_NOTICES === '1'
+/** A tool's result step, as 1.5.0 writes one: its times first, then the output, or an error. */
+const result = (text, error) => write({ source: 'MODEL', type: 'GENERIC', status: error ? 'ERROR' : 'DONE', ...(error ? { error: text } : {}), content: `Created At: ${now()}\nCompleted At: ${now()}\n${error ? `Encountered error in step execution: ${text}` : text}` })
+/** One tool call in a model call: its call step, PreToolUse (a deny refuses it), what it does, its result, PostToolUse. */
+async function tool(invoked, toolCall, run) {
+  await invoked(async () => {
+    write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [toolCall] })
+    const at = step
+    const pre = fire('PreToolUse', { stepIdx: at, toolCall })
+    if (pre.decision === 'deny' || !pre.decision) {
+      result(`tool call denied by pre-tool hook: ${pre.reason ?? ''}`, true)
+      return
+    }
+    const r = await run()
+    result(r.text, r.isError)
+    fire('PostToolUse', { stepIdx: at, toolCall, error: r.isError ? r.text : '' })
+  })
+}
+let lastCall = null
+/** A Combwork tool, through the launch's own Combwork MCP server (the profile's), as agy's call_mcp_tool. */
+async function ownCall(name, args, invoked) {
+  const def = servers().own.combwork
+  lastCall = { text: 'error: no Combwork MCP server', isError: true }
+  await tool(invoked, { name: 'call_mcp_tool', args: { Arguments: args, ServerName: 'combwork', ToolName: name } }, async () => {
+    lastCall = def?.command ? await callOwnTool({ command: def.command, args: def.args, env: def.env }, name, args) : lastCall
+    return lastCall
+  })
+  return lastCall
+}
+async function readInbox(invoked) {
+  const listed = await ownCall('cw_inbox', {}, invoked)
+  const ids = [...new Set([...String(listed?.text ?? '').matchAll(/\bm\d+\b/g)].map((m) => m[0]))]
+  if (ids.length) await ownCall('cw_inbox', { ack: ids }, invoked)
+}
+/** A file read as agy reads one (read_file, its Path). */
+const readFile = (file, invoked) => tool(invoked, { name: 'read_file', args: { Path: file } }, async () => (fs.existsSync(file) ? { text: fs.readFileSync(file, 'utf8') } : { text: `file not found: ${file}`, isError: true }))
+const skillDir = (name) => [name, `cw-${name}`].map((d) => path.join(process.cwd(), '.agents', 'skills', d)).find((d) => fs.existsSync(path.join(d, 'SKILL.md'))) ?? path.join(process.cwd(), '.agents', 'skills', name)
+/** A skill's reference file, by the link its delivered SKILL.md has (HI-2011). */
+function skillRef(name, file) {
+  const dir = skillDir(name)
+  const text = fs.existsSync(path.join(dir, 'SKILL.md')) ? fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') : ''
+  return text.includes(`](${file})`) || text.includes(`](./${file})`) ? path.resolve(dir, file) : path.join(dir, `no-link-to-${file}`)
+}
+/** A command in cmd with the session's environment, as run_command; logged (kind "shell"). */
+function shellRun(cmd) {
+  return new Promise((resolve) => {
+    const p = spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${cmd}"`], { cwd: process.cwd(), env: process.env, windowsVerbatimArguments: true, windowsHide: true })
+    let out = ''
+    p.stdout.on('data', (d) => (out += d))
+    p.stderr.on('data', (d) => (out += d))
+    p.on('close', (code) => {
+      log({ kind: 'shell', cmd, code, out })
+      resolve({ text: out || `exit code ${code}`, isError: code !== 0 })
+    })
+  })
+}
+/** One scenario step (the text between " then "s); nothing when it is none of them. */
+async function scripted(s, invoked) {
+  for (const m of s.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) await readFile(path.join(skillDir(m[1]), 'SKILL.md'), invoked)
+  for (const m of s.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) await readFile(skillRef(m[1], m[2]), invoked)
+  const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(s)
+  if (move) await ownCall('cw_update_task', { number: Number(move[1]), column: move[2].toLowerCase() }, invoked)
+  const rev = /\bboardreview\s+(\d+)\s+(\w+)(?:\s+(hold|todo|doing|review|passed|done)\b)?/i.exec(s)
+  if (rev) await ownCall('cw_update_task', { number: Number(rev[1]), review: rev[2].toLowerCase(), ...(rev[3] ? { column: rev[3].toLowerCase(), comment: 'Fake review: passed.' } : {}) }, invoked)
+  const comment = /\bboardcomment\s+(\d+)/i.exec(s)
+  if (comment) await ownCall('cw_update_task', { number: Number(comment[1]), comment: 'Fake: done, see the files.' }, invoked)
+  const c = parseToolStep(s)
+  if (c) await ownCall(c.tool, c.args, invoked)
+  const pause = /\bwork\s+(\d+)/i.exec(s)
+  // A model call that takes N seconds (agy's turn begins with its invocation zero, so the turn is under way meanwhile).
+  if (pause) await invoked(() => sleep(Number(pause[1]) * 1000))
+  const sh = /\bshell:\s*(.+)$/i.exec(s)
+  if (sh) await tool(invoked, { name: 'run_command', args: { CommandLine: sh[1].trim(), WaitMsBeforeAsync: 5000, toolSummary: sh[1].trim().slice(0, 60) } }, () => shellRun(sh[1].trim()))
+  const patch = /\bpatch\s+([\w.-]+)/i.exec(s)
+  if (patch) {
+    const target = path.resolve(process.cwd(), patch[1])
+    let allowed = false
+    await tool(invoked, { name: 'edit_file', args: { Path: target, Target: '', Replacement: 'edited' } }, async () => {
+      allowed = true
+      fs.appendFileSync(target, `edited by ${process.env.CW_AGENT || 'agent'}\n`)
+      return { text: `Made 1 replacement in ${target}` }
+    })
+    log({ kind: 'edit', agent: process.env.CW_AGENT || 'agent', file: patch[1], allowed })
+  }
+}
 
 // Its first-run screens (1.5.0: a colour scheme, then its Terms of Service & Data Use), until cache\onboarding.json says
 // they are done: here the line "accept" completes them, writing what 1.5.0 writes (onboarding.json, jetski_state's
@@ -216,6 +314,8 @@ async function turn(text) {
     return
   }
   lastUserInput = text
+  // The prompt shown in its pane, as agy's TUI shows the user's message (a first prompt given with -i too).
+  process.stdout.write(`${text}\n`)
   if (!started) {
     started = true
     fire('SessionStart')
@@ -234,14 +334,37 @@ async function turn(text) {
     fire('PostInvocation', { invocationNum: invocation, initialNumSteps: at })
     invocation++
   }
+  // A model call whose tool runs asynchronously (a Combwork tool, a command).
+  const invoked = async (body) => {
+    const at = step
+    fire('PreInvocation', { invocationNum: invocation, initialNumSteps: at })
+    await body()
+    fire('PostInvocation', { invocationNum: invocation, initialNumSteps: at })
+    invocation++
+  }
   let carried = /carry on/i.test(text)
+  // Combwork's doorbell (#650): it reads its inbox as a model does (and acks what it read, following notices); new work
+  // it read (a task, a handover) is what this turn does, anything else is logged (kind "wake").
+  statusLine('working')
+  if (isDoorbell(text)) {
+    // New work: only tasks and handovers, a card named by its key ("1 task (AL-1) (m1)") or its number.
+    const work = doorbellIsWork(text) || /^\[CW\] New in your inbox: (\d+ (task|tasks|handover|handovers)( \([^)]*\))?( and |, )?)+ \(m\d/.test(text)
+    const r = await ownCall('cw_inbox', {}, invoked)
+    const rows = r.isError ? [] : inboxRows(r.text)
+    if (rows.length && follows()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) }, invoked)
+    const read = rows.map((x) => x.text).join(' ')
+    if (!work) log({ kind: 'wake', text: read, doorbell: text })
+    text = work ? read : ''
+  }
+  // The scenarios' steps (tests/scenarios), as the other fakes take them, each step a model call of its own.
+  for (const s of text.split(' then ')) await scripted(s, invoked)
   for (let execution = 0; execution < 4; execution++) {
     statusLine('working')
-    const tool = execution === 0 ? /^tool (.+)$/.exec(text) : null
-    if (tool) {
+    const toolLine = execution === 0 ? /^tool (.+)$/.exec(text) : null
+    if (toolLine) {
       call(() => {
         write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'call_mcp_tool', args: { Arguments: {}, ServerName: 'fake', ToolName: 'echo' } }] })
-        write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\n${tool[1]}` })
+        write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\n${toolLine[1]}` })
       })
     }
     if (execution === 0 && text === 'image') {
@@ -299,6 +422,11 @@ async function turn(text) {
     if (stop.decision === 'continue' || carried) {
       carried = false
       write({ source: 'SYSTEM', type: 'SYSTEM_MESSAGE', status: 'DONE', content: `The following is a <SYSTEM_MESSAGE> not actually sent by the user.\n\n<SYSTEM_MESSAGE>\nStop hook blocked termination: ${stop.reason || 'continue'}\n</SYSTEM_MESSAGE>` })
+      // Combwork's notice ("[CW] …"): one that follows notices reads its inbox and acks it, as a model does.
+      if (String(stop.reason ?? '').startsWith('[CW]')) {
+        log({ kind: 'notice', at: 'Stop', text: stop.reason })
+        if (follows()) await readInbox(invoked)
+      }
       continue
     }
     break

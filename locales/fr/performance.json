@@ -197,7 +197,7 @@
   "performance.compare.notComparable": "Pas comparables : {reasons} Les chiffres sont affichés, mais un écart ne signifie pas un changement.",
   "performance.compare.note.cliVersions": "Les versions des CLI diffèrent ({base} et {run}).",
   "performance.compare.note.estimates": "Certains coûts sont des estimations de Combwork (≈), pas ceux du fournisseur.",
-  "performance.compare.note.fakePerCall": "Avec le Claude Code ou le Codex factices, chaque appel Combwork démarre son propre serveur MCP combwork : les requêtes à l’API et les démarrages de la liste d’outils comptent par appel, pas par session.",
+  "performance.compare.note.fakePerCall": "Avec le Claude Code, le Codex ou l’Antigravity CLI factices, chaque appel Combwork démarre son propre serveur MCP combwork : les requêtes à l’API et les démarrages de la liste d’outils comptent par appel, pas par session.",
   "performance.compare.note.fakeUsage": "L’utilisation des fournisseurs n’est pas comparée : les jetons d’un fournisseur factice sont simulés, pas ceux d’un vrai fournisseur.",
   "performance.compare.note.leftOut": "{n, plural, one {# échantillon écarté} many {# échantillons écartés} other {# échantillons écartés}} : {why}.",
   "performance.compare.note.measuredPartly": "{n, plural, one {# échantillon mesuré} many {# échantillons mesurés} other {# échantillons mesurés}} en partie (enregistrement désactivé, mesures perdues ou manquantes) : les tailles ne sont pas jugées.",

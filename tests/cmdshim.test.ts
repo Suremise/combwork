@@ -4,7 +4,7 @@
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { CMD_MAX_CHARS, commandLineLength, promptArg, runsThroughCmd, shimTarget, toSpawnable } from '../src/main/providers/common'
+import { CMD_MAX_CHARS, commandLineLength, promptArg, run, runsThroughCmd, shimTarget, toSpawnable } from '../src/main/providers/common'
 import { tempDir } from './tempDir'
 
 const base = tempDir('cw-cmdshim-')
@@ -115,5 +115,20 @@ describe.runIf(windows)('starting one', () => {
     expect(() => toSpawnable(cmd, long)).toThrow(/tool\.cmd has to run through cmd\.exe, which takes a command line of at most 8,191 characters.*Set the CLI's path in Settings to its \.exe/)
     expect(runsThroughCmd(cmd)).toBe(true)
     expect(promptArg(cmd, 'Fix "the" tests & 100%')).toBe('Fix the tests 100')
+  })
+})
+
+// HI-2548: a CLI's checks (its --version, Antigravity's models) run its .cmd through cmd: at a path with spaces and
+// non-ASCII letters, it was read as the path's first word and the CLI not found, so Combwork took another copy.
+describe('a check run through a .cmd at a path with spaces and non-ASCII letters (HI-2548)', () => {
+  it.runIf(windows)('runs it, its arguments passed as they are', async () => {
+    const dir = join(base, 'my tools é 漢字', 'agy bin ß')
+    mkdirSync(dir, { recursive: true })
+    const cmd = join(dir, 'tool.cmd')
+    writeFileSync(cmd, '@echo version 1.5.0 %*\r\n')
+    const r = await run(cmd, ['--version'])
+    expect(r.code, r.stderr).toBe(0)
+    expect(r.stdout.trim()).toBe('version 1.5.0 --version')
+    expect((await run(cmd, ['two words'])).stdout.trim()).toBe('version 1.5.0 "two words"')
   })
 })

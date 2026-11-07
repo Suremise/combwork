@@ -5926,6 +5926,18 @@ class SessionManager {
     if (conv && runId !== l.state.runId) log.warn(`${userText(this.label(l.state))}: a status line of run ${runId ?? 'none'} named conversation ${conv}: not this launch's (${l.state.runId}), ignored`)
     else if (conv && !l.state.sessionId) void this.adoptSessionId(l, conv, 'status line') // i18n-ignore: a log line's words
     else if (conv && conv !== l.state.sessionId) log.warn(`${userText(this.label(l.state))}: its status line named conversation ${conv}, not ${l.state.sessionId}: kept ${l.state.sessionId}`)
+    // A CLI whose first hook waits for its first prompt (agy 1.5.0: SessionStart comes with it), started with none: its
+    // status line saying idle is its prompt showing (HI-2548; recorded: authenticating, initializing, then idle before
+    // any prompt). The current launch's only, in hook order, while it is still starting and asked nothing at its start.
+    if (runId === l.state.runId && l.state.status === 'starting' && l.adapter.statusLineIdle?.(body)) {
+      const id = liveId(l.state.projectPath, l.state.agentId)
+      void this.inHookOrder(l.state.runId, () => {
+        if (this.live.get(id) !== l || l.state.runId !== runId || l.state.status !== 'starting' || l.askedAtStart) return
+        this.fact(l.state, { lifecycle: 'running' })
+        l.state.status = 'ready'
+        this.emitState(l.state)
+      })
+    }
     // What only the status line tells of (HI-2545, agy): its permission prompt and a turn ended with no hook. The current
     // launch's own only, about the conversation it runs, applied in hook order and only to a turn that runs then.
     if ((l.adapter.statusLineAsk || l.adapter.statusLineIdle) && runId === l.state.runId) {
