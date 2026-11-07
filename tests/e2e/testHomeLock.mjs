@@ -61,30 +61,74 @@ export function leasesEnv(leases, env = process.env) {
   return Object.keys(held).length ? { [LEASES_VAR]: JSON.stringify(held) } : {}
 }
 
-/** A process running now (process.kill 0: no signal sent). */
-function pidAlive(pid) {
+/** The machine's processes (folderProcesses.cjs), or null when they can't be listed. */
+function listProcesses() {
   try {
-    process.kill(pid, 0)
-    return true
-  } catch (e) {
-    return e?.code === 'EPERM'
-  }
-}
-
-/**
- * A home's lease state (`holder.state` in its lock folder; HR1 on s17 and s29): `holder`, who holds it now (pid, start,
- * and the acquisition's random generation; null once let go), and `consumers`, what used the home and hasn't been proven
- * gone: a suite's folder (registered before it starts), its process and its test copies of Combwork. Consumers outlive
- * the lease that noted them, a clean release and a crash alike; only a reset that found none of them using the home
- * clears them (clearConsumers). A holder left in the record by a run that ended without letting go is a consumer too.
- */
-export function holderOf(dir) {
-  try {
-    const s = JSON.parse(readFileSync(join(dir, 'holder.state'), 'utf8'))
-    return s && typeof s === 'object' ? { holder: s.holder ?? null, consumers: Array.isArray(s.consumers) ? s.consumers : [] } : null
+    return createRequire(import.meta.url)('./folderProcesses.cjs').processes()
   } catch {
     return null
   }
+}
+
+/** A process's start may be read a little apart from when its holder recorded it (its own clock, then the system's). */
+const START_SLACK_MS = 2000
+const sameStart = (a, b) => typeof a === 'number' && typeof b === 'number' && Math.abs(a - b) <= START_SLACK_MS
+
+/**
+ * Whether `pid` is the live holder that was recorded (its actual start, as the system lists it, the recorded one: a pid
+ * reused since is another process) and `owner` is that holder or a process it started (HR2 on s34). From one process list.
+ */
+export function holderLiveFor(holder, owner, list) {
+  if (!list) return false
+  const live = list.find((p) => p.pid === holder.pid)
+  if (!live || !sameStart(live.started, holder.started)) return false
+  if (owner === holder.pid) return true
+  // Up the reuser's parent chain, each parent started before its child (a parent id reused since is no parent).
+  const byPid = new Map(list.map((p) => [p.pid, p]))
+  let p = byPid.get(owner)
+  for (let hops = 0; p && hops < 64; hops++) {
+    const parent = byPid.get(p.parent)
+    if (!parent || parent.started > p.started) return false
+    if (parent.pid === holder.pid) return sameStart(parent.started, holder.started)
+    p = parent
+  }
+  return false
+}
+
+/** The most consumers a home's lease state keeps: past it, registering one is refused, never an old one forgotten. */
+export const MAX_CONSUMERS = 2000
+/** Why a lease state can't be used: unreadable, not JSON, or not its shape. Its file is never written over then. */
+export class LeaseStateUnknown extends Error {}
+
+const isConsumer = (c) => !!c && typeof c === 'object' && (typeof c.folder === 'string' ? !!c.folder : Number.isInteger(c.pid) && c.pid > 0 && typeof c.started === 'number' && c.started > 0)
+const isHolder = (h) => h === null || (!!h && typeof h === 'object' && Number.isInteger(h.pid) && h.pid > 0 && typeof h.started === 'number' && typeof h.gen === 'string' && !!h.gen)
+
+/**
+ * A home's lease state (`holder.state` in its lock folder; HR1 on s17 and s29, HR2 on s34): `holder`, who holds it now
+ * (pid, start, and the acquisition's random generation; null once let go), and `consumers`, what used the home and hasn't
+ * been proven gone: a suite's folder (registered before it starts), its process and its test copies of Combwork.
+ * Consumers outlive the lease that noted them, a clean release and a crash alike; only a reset that found none of them
+ * using the home clears them (clearConsumers). A holder left in the record by a run that ended without letting go is a
+ * consumer too. None there (never written, or let go with nothing left): null. Unreadable, not JSON or not that shape:
+ * LeaseStateUnknown, never taken for empty.
+ */
+export function holderOf(dir) {
+  const file = join(dir, 'holder.state')
+  let text
+  try {
+    text = readFileSync(file, 'utf8')
+  } catch (e) {
+    if (e?.code === 'ENOENT') return null
+    throw new LeaseStateUnknown(`${file} can't be read (${e?.code ?? e?.message})`)
+  }
+  let s
+  try {
+    s = JSON.parse(text)
+  } catch {
+    throw new LeaseStateUnknown(`${file} isn't JSON (cut short?)`)
+  }
+  if (!s || typeof s !== 'object' || !isHolder(s.holder ?? null) || !Array.isArray(s.consumers) || !s.consumers.every(isConsumer)) throw new LeaseStateUnknown(`${file} isn't a lease state (holder, consumers)`)
+  return { holder: s.holder ?? null, consumers: s.consumers }
 }
 function writeState(dir, state) {
   mkdirSync(dir, { recursive: true })
@@ -100,50 +144,69 @@ const key = (c) => (c.folder ? `f:${String(c.folder).toLowerCase()}` : `p:${c.pi
 /**
  * Notes what uses the home under this lease (HR1 on s17, s29), before it does: a suite's folder before the suite starts
  * (the CLIs Combwork starts there name it on their command lines), the suite's process as soon as it is spawned, and its
- * test copies of Combwork. Kept until a reset proves them gone.
+ * test copies of Combwork. Kept until a reset proves them gone: none is ever dropped (HR2 on s34). Past MAX_CONSUMERS,
+ * refused, saying what to do; under a lease whose state couldn't be read, nothing is written (its reset is refused).
  */
 export function noteConsumers(lease, roots) {
-  if (!lease?.dir || lease.reused || !roots.length) return
+  if (!lease?.dir || lease.reused || lease.stateUnknown || !roots.length) return
   const s = holderOf(lease.dir) ?? { holder: null, consumers: [] }
   const seen = new Set(s.consumers.map(key))
-  const add = roots.filter((r) => (r.folder || (r.pid > 0 && r.started > 0)) && !seen.has(key(r))).map((r) => (r.folder ? { folder: r.folder } : { pid: r.pid, started: r.started }))
-  writeState(lease.dir, { ...s, consumers: [...s.consumers, ...add].slice(-200) })
+  const add = roots.filter((r) => isConsumer(r.folder ? { folder: r.folder } : { pid: r.pid, started: r.started }) && !seen.has(key(r))).map((r) => (r.folder ? { folder: r.folder } : { pid: r.pid, started: r.started }))
+  if (s.consumers.length + add.length > MAX_CONSUMERS) throw new Error(`the test home's lease state ${join(lease.dir, 'holder.state')} already keeps ${s.consumers.length} consumers no reset has checked: run once without --warm-homes, so a reset checks and lets go of those gone`)
+  if (add.length) writeState(lease.dir, { ...s, consumers: [...s.consumers, ...add] })
 }
 
 /** After a reset found none of them using the home: its consumers are let go (the holder stays as it is). */
 export function clearConsumers(lease) {
-  if (!lease?.dir || lease.reused) return
+  if (!lease?.dir || lease.reused || lease.stateUnknown) return
   const s = holderOf(lease.dir) ?? { holder: null, consumers: [] }
   writeState(lease.dir, { ...s, consumers: [] })
 }
 
 /**
  * Takes a CLI test home's lease (waiting in turn, as the slots do), or reuses the one a parent passed this process
- * (CW_TEST_HOME_LEASES) only while that exact acquisition still holds it: its generation, pid and start in the lease
- * state (HR1 on s29). An older token is taken for nothing, even while another run holds the same home. A reused lease
- * never lets its user reset the home (`reused`: testHomes.mjs refuses). Refused out of order: Claude Code's while
- * Codex's is held. `release()` lets it go (a reused one: nothing), keeping its consumers.
+ * (CW_TEST_HOME_LEASES) only while that exact acquisition still holds it (its generation, pid and start in the lease
+ * state; HR1 on s29) and that holder is the live process recorded and this process is it or one it started (HR2 on s34:
+ * `processes`, the process list, read once). An older token, a reused pid or an unrelated process with the current
+ * token is taken for nothing. A reused lease never lets its user reset the home (`reused`: testHomes.mjs refuses).
+ * Refused out of order: Claude Code's while Codex's is held. A lease state that can't be read is left as it is
+ * (`stateUnknown`: no reset under it). `release()` lets it go (a reused one: nothing), keeping its consumers.
  */
-export async function acquireTestHome(cli, home, { poolRoot, env = process.env, alive = pidAlive, owner = process.pid, ownerStarted = Math.floor(Date.now() - process.uptime() * 1000), ...options } = {}) {
+export async function acquireTestHome(cli, home, { poolRoot, env = process.env, alive, owner = process.pid, ownerStarted = Math.floor(Date.now() - process.uptime() * 1000), processes = listProcesses, ...options } = {}) {
   const dir = homeLockDir(cli, home, poolRoot)
   const token = inherited(env)[cli]
-  const now = holderOf(dir)?.holder
-  if (token && typeof token === 'object' && token.dir === dir && now && token.gen === now.gen && token.pid === now.pid && token.started === now.started && alive(now.pid)) return { release() {}, reused: true, waitedMs: 0, dir, cli }
+  if (token && typeof token === 'object' && token.dir === dir) {
+    let now = null
+    try {
+      now = holderOf(dir)?.holder ?? null
+    } catch {
+      // Unknown: never reused.
+    }
+    if (now && token.gen === now.gen && token.pid === now.pid && token.started === now.started && holderLiveFor(now, owner, processes())) return { release() {}, reused: true, waitedMs: 0, dir, cli }
+  }
   const held = heldLeases(env)
   const after = HOME_ORDER.slice(HOME_ORDER.indexOf(cli) + 1).filter((c) => held[c])
   if (after.length) throw new Error(`${NAMES[cli]} is asked for while ${after.map((c) => NAMES[c]).join(' and ')} is held: test home leases are taken in the order ${HOME_ORDER.join(', then ')}`)
-  const lease = await waitForSlot(dir, { ...options, owner, alive, slots: 1 })
+  const lease = await waitForSlot(dir, { ...options, owner, ...(alive ? { alive } : {}), slots: 1 })
   lease.dir = dir
   lease.cli = cli
   if (!lease.release) return lease
-  const s = holderOf(dir) ?? { holder: null, consumers: [] }
-  // A holder still in the record ended without letting go: what it ran may still be using the home.
-  const consumers = s.holder && s.holder.pid !== owner ? [...s.consumers, { pid: s.holder.pid, started: s.holder.started }] : s.consumers
-  if (s.holder && s.holder.pid !== owner) lease.takeover = { pid: s.holder.pid, started: s.holder.started }
-  lease.gen = randomBytes(12).toString('hex')
-  lease.holderPid = owner
-  lease.holderStarted = ownerStarted
-  writeState(dir, { holder: { pid: owner, started: ownerStarted, gen: lease.gen }, consumers })
+  let s
+  try {
+    s = holderOf(dir) ?? { holder: null, consumers: [] }
+  } catch (e) {
+    // Its consumers unknown: the file stays as it is for someone to look at, and no reset runs under this lease.
+    lease.stateUnknown = e.message
+  }
+  if (s) {
+    // A holder still in the record ended without letting go: what it ran may still be using the home.
+    const consumers = s.holder && s.holder.pid !== owner ? [...s.consumers, { pid: s.holder.pid, started: s.holder.started }] : s.consumers
+    if (s.holder && s.holder.pid !== owner) lease.takeover = { pid: s.holder.pid, started: s.holder.started }
+    lease.gen = randomBytes(12).toString('hex')
+    lease.holderPid = owner
+    lease.holderStarted = ownerStarted
+    writeState(dir, { holder: { pid: owner, started: ownerStarted, gen: lease.gen }, consumers })
+  }
   own.set(cli, dir)
   const release = lease.release
   lease.release = () => {
@@ -151,8 +214,8 @@ export async function acquireTestHome(cli, home, { poolRoot, env = process.env, 
     process.off('exit', release)
     try {
       // Let go: no holder; what it noted using the home stays until a reset proves it gone.
-      const state = holderOf(dir) ?? { holder: null, consumers: [] }
-      if (state.holder?.gen === lease.gen) writeState(dir, { ...state, holder: null })
+      const state = lease.stateUnknown ? null : holderOf(dir)
+      if (state && state.holder?.gen === lease.gen) writeState(dir, { ...state, holder: null })
     } catch {
       // Not written: the next holder takes this one for one that didn't let go, and waits for what it ran.
     }

@@ -100,7 +100,12 @@ export function homeUsers(cli, home, { lease = null, processes = listProcesses, 
   const list = processes()
   if (!list) return ['the process list (it couldn\'t be read)']
   const fp = createRequire(import.meta.url)('./folderProcesses.cjs')
-  const state = lease?.dir ? holderOf(lease.dir) : null
+  let state = null
+  try {
+    state = lease?.dir ? holderOf(lease.dir) : null
+  } catch (e) {
+    return [`the lease state (${e.message})`]
+  }
   const roots = []
   const users = []
   for (const c of state?.consumers ?? []) {
@@ -202,6 +207,8 @@ export async function freshenHome(cli, home, deps = {}) {
   const lease = deps.lease ?? null
   // A lease reused from a parent (a nested run) never resets: the parent may be using the home (HR1 on s17).
   if (lease?.reused) throw new HomeNotReady('nested', `${HOME_NAMES[cli]}'s test home is held by a parent run: a nested run doesn't reset it`)
+  // Its consumers unknown (the lease state unreadable, not JSON or not its shape, HR2 on s34): never taken for none.
+  if (lease?.stateUnknown) throw new HomeNotReady('unknown', `${HOME_NAMES[cli]}'s test home isn't reset: its lease state ${lease.stateUnknown}, so what used the home can't be told. Look at what it lists and what still runs there, end what is left, remove the file, and run again`)
   const status = deps.status ?? ((c, h) => signInStatus(c, h))
   const users = deps.users ?? ((c, h) => homeUsers(c, h, { lease, self: deps.self ?? null }))
   const waitMs = deps.waitMs ?? 60_000

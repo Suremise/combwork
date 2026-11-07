@@ -3,18 +3,23 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, sym
 import { homedir } from 'os'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
+import { createRequire } from 'module'
 import { tempDir } from './tempDir'
 // @ts-expect-error: plain .mjs module without types
 import { assertTestHome, freshenHome, freshenedLine, homeUsers, HomeNotReady, MARKER } from './e2e/testHomes.mjs'
 // @ts-expect-error: plain .mjs module without types
 import { classify, UNCLASSIFIED } from './e2e/testHomeManifest.mjs'
 // @ts-expect-error: plain .mjs module without types
-import { acquireTestHome, holderOf, homesOf, leasesEnv, LEASES_VAR, noteConsumers } from './e2e/testHomeLock.mjs'
+import { acquireTestHome, holderLiveFor, holderOf, homesOf, leasesEnv, LEASES_VAR, MAX_CONSUMERS, noteConsumers } from './e2e/testHomeLock.mjs'
 
 // The CLI test homes start each run fresh, keeping only the sign-in (HI-2606, design s17 with Darren's answers): fake
 // homes with known bytes, the CLIs' sign-in status scripted, nothing real read or signed in.
 
+const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
 const tmp = tempDir('cw-test-homes-')
+/** A process list in which this process is the holder, started at HOLDER_STARTED (its acquisitions pass ownerStarted). */
+const HOLDER_STARTED = 5_000_000
+const asHolder = () => [{ pid: process.pid, parent: 1, started: HOLDER_STARTED, commandLine: 'node.exe vitest' }]
 afterAll(() => rmSync(tmp, { recursive: true, force: true }))
 let n = 0
 const CREDENTIALS = '{"claudeAiOauth":{"accessToken":"fake-access","refreshToken":"fake-refresh"}}'
@@ -207,11 +212,11 @@ describe('the test homes\' leases (testHomeLock.mjs)', () => {
 
   it('is reused by a child its holder passed it to, never taken again there; the holder\'s own environment is left alone', async () => {
     const p = pool()
-    const held = await acquireTestHome('codex', join(tmp, 'cx2'), { poolRoot: p, wait: false, alive: () => true })
+    const held = await acquireTestHome('codex', join(tmp, 'cx2'), { poolRoot: p, wait: false, alive: () => true, ownerStarted: HOLDER_STARTED })
     try {
       expect(process.env[LEASES_VAR]).toBeUndefined()
       const env = leasesEnv([held], {})
-      const child = await acquireTestHome('codex', join(tmp, 'cx2'), { poolRoot: p, wait: false, env })
+      const child = await acquireTestHome('codex', join(tmp, 'cx2'), { poolRoot: p, wait: false, env, processes: asHolder })
       expect(child.reused).toBe(true)
       child.release()
     } finally {
@@ -269,16 +274,16 @@ describe('HR1 on s17: who uses a home, and putting back only what the reset wrot
   it("reuses an inherited lease only while its holder still holds it, and a reused lease never resets", async () => {
     const p = lockPool()
     const home = join(tmp, 'clh3')
-    const held = await acquireTestHome('claude', home, { poolRoot: p, wait: false, alive: () => true })
+    const held = await acquireTestHome('claude', home, { poolRoot: p, wait: false, alive: () => true, ownerStarted: HOLDER_STARTED })
     const env = leasesEnv([held], {})
-    const reused = await acquireTestHome('claude', home, { poolRoot: p, wait: false, env, alive: () => true })
+    const reused = await acquireTestHome('claude', home, { poolRoot: p, wait: false, env, alive: () => true, processes: asHolder })
     expect(reused.reused).toBe(true)
     const h = claudeHome()
     await expect(freshenHome('claude', h, { ...deps(['in', 'in']), lease: reused })).rejects.toThrow(/held by a parent run/)
     expect(existsSync(join(h, 'projects'))).toBe(true)
     held.release()
     // Stale: the parent let it go; the token is taken for nothing.
-    const fresh = await acquireTestHome('claude', home, { poolRoot: p, wait: false, env, alive: () => true })
+    const fresh = await acquireTestHome('claude', home, { poolRoot: p, wait: false, env, alive: () => true, processes: asHolder })
     expect(fresh.reused).toBeUndefined()
     fresh.release()
   })
@@ -329,7 +334,8 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
   /** A parent that starts a detached CLI stand-in (its home only in its environment) and exits: the child's pid. */
   const orphanFrom = (parentOut: string): { parent: { pid: number; started: number }; child: () => number } => {
     const started = Date.now()
-    const parent = spawn(process.execPath, ['-e', `const c = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(SLEEP)}], { detached: true, stdio: 'ignore', env: { ...process.env, CLAUDE_CONFIG_DIR: 'x' } }); c.unref(); require('fs').writeFileSync(${JSON.stringify(parentOut)}, String(c.pid))`], { stdio: 'ignore' })
+    const childEnv = ctx.childEnv({ CLAUDE_CONFIG_DIR: 'x' })
+    const parent = spawn(process.execPath, ['-e', `const c = require('child_process').spawn(process.execPath, ['-e', ${JSON.stringify(SLEEP)}], { detached: true, stdio: 'ignore', env: ${JSON.stringify(childEnv)} }); c.unref(); require('fs').writeFileSync(${JSON.stringify(parentOut)}, String(c.pid))`], { stdio: 'ignore', env: ctx.childEnv({}) })
     return { parent: { pid: parent.pid!, started }, child: () => Number(readFileSync(parentOut, 'utf8')) }
   }
   const waitFor = async (fn: () => boolean): Promise<void> => {
@@ -392,7 +398,7 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
     // Registered before the suite started; the runner then crashed (no release).
     noteConsumers(crashed, [{ folder: suite }])
     // A CLI whose own parent is long gone, launched with a path in the suite's folder (as Combwork passes --settings).
-    const cli = spawn(process.execPath, ['-e', SLEEP, join(suite, 'profile', 'settings.json')], { detached: true, stdio: 'ignore' })
+    const cli = spawn(process.execPath, ['-e', SLEEP, join(suite, 'profile', 'settings.json')], { detached: true, stdio: 'ignore', env: ctx.childEnv({}) })
     spawned.push(cli.pid!)
     const next = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: (pid: number) => pid !== 4321 })
     try {
@@ -411,23 +417,101 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
     const old = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
     const oldEnv = leasesEnv([old], {})
     old.release()
-    const now = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+    const now = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true, ownerStarted: HOLDER_STARTED })
     try {
       // The new holder is alive in the same folder; the old token's generation is another's.
-      const viaOld = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: oldEnv, alive: () => true, owner: 999 })
+      const viaOld = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: oldEnv, alive: () => true, owner: 999, processes: asHolder })
       expect(viaOld.reused).toBeUndefined()
       viaOld.release?.()
       // The current generation, but a holder start that isn't this holder's (its pid reused): not reused either.
       const token = JSON.parse(leasesEnv([now], {})[LEASES_VAR])
       token.claude.started -= 60000
-      const reusedPid = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: { [LEASES_VAR]: JSON.stringify(token) }, alive: () => true, owner: 998 })
+      const reusedPid = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: { [LEASES_VAR]: JSON.stringify(token) }, alive: () => true, owner: 998, processes: asHolder })
       expect(reusedPid.reused).toBeUndefined()
       reusedPid.release?.()
       // The exact acquisition: reused, and it can't reset.
-      const exact = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: leasesEnv([now], {}), alive: () => true })
+      const exact = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, env: leasesEnv([now], {}), alive: () => true, processes: asHolder })
       expect(exact.reused).toBe(true)
     } finally {
       now.release()
     }
   })
+})
+
+describe('HR2 on s34: reuse checks the live holder, nothing is evicted, an unreadable ledger is never taken for empty', () => {
+  const lockPool = (): string => join(tmp, `locks-s34-${++n}`)
+  const holder = { pid: 300, started: 1000, gen: 'g' }
+
+  it('reuses only for the recorded holder alive as recorded, or a process it started', () => {
+    // The holder itself, as recorded.
+    expect(holderLiveFor(holder, 300, [{ pid: 300, parent: 1, started: 1000 }])).toBe(true)
+    // The same pid, unchanged token and state, but another process now (its actual start differs): no.
+    expect(holderLiveFor(holder, 300, [{ pid: 300, parent: 1, started: 999_999 }])).toBe(false)
+    // An unrelated live process with the current token: no.
+    expect(holderLiveFor(holder, 400, [{ pid: 300, parent: 1, started: 1000 }, { pid: 400, parent: 1, started: 2000 }])).toBe(false)
+    // A grandchild of the holder (a suite's nested runner): yes.
+    expect(holderLiveFor(holder, 402, [{ pid: 300, parent: 1, started: 1000 }, { pid: 401, parent: 300, started: 1500 }, { pid: 402, parent: 401, started: 1600 }])).toBe(true)
+    // A "child" started before its parent id's holder: a reused parent id, so no.
+    expect(holderLiveFor(holder, 401, [{ pid: 300, parent: 1, started: 1000 }, { pid: 401, parent: 300, started: 500 }])).toBe(false)
+    // No process list: no.
+    expect(holderLiveFor(holder, 300, null)).toBe(false)
+  })
+
+  it('keeps every consumer no reset has checked, across releases, past any count a run reaches; refuses one past the bound rather than drop one', async () => {
+    const p = lockPool()
+    const lockHome = join(tmp, `cap-${n}`)
+    const first = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+    noteConsumers(first, [{ pid: 777, started: 7000 }])
+    first.release()
+    // Warm runs register many more without a reset: well past the 200 the earlier ledger kept.
+    for (let k = 0; k < 3; k++) {
+      const l = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+      noteConsumers(l, Array.from({ length: 150 }, (_, i) => ({ pid: 10_000 + k * 1000 + i, started: 9000 })))
+      l.release()
+    }
+    const next = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+    try {
+      expect(holderOf(next.dir).consumers).toContainEqual({ pid: 777, started: 7000 })
+      // The first one still running: the reset stays blocked.
+      const users = homeUsers('claude', lockHome, { lease: next, processes: () => [{ pid: 777, parent: 1, started: 7000, commandLine: 'claude.exe' }] })
+      expect(users.join()).toMatch(/pid 777/)
+      expect(() => noteConsumers(next, Array.from({ length: MAX_CONSUMERS }, (_, i) => ({ pid: 90_000 + i, started: 9000 })))).toThrow(/run once without --warm-homes/)
+      expect(holderOf(next.dir).consumers).toContainEqual({ pid: 777, started: 7000 })
+    } finally {
+      next.release()
+    }
+  })
+
+  for (const [what, write] of [
+    ['cut short', (f: string) => writeFileSync(f, '{"holder":null,"consumers":[{"pid":5')],
+    ['with consumers that are not identities', (f: string) => writeFileSync(f, JSON.stringify({ holder: null, consumers: [{ pid: 'x' }] }))],
+    ['not a state at all', (f: string) => writeFileSync(f, '[]')],
+    ['unreadable (a folder in its place)', (f: string) => mkdirSync(f, { recursive: true })]
+  ] as const) {
+    it(`a lease state ${what} is left as it is, and no reset runs under it, saying what to do`, async () => {
+      const p = lockPool()
+      const lockHome = join(tmp, `bad-${n}`)
+      const first = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+      const file = join(first.dir, 'holder.state')
+      first.release()
+      rmSync(file, { recursive: true, force: true })
+      write(file)
+      const before = existsSync(file) && !statSync(file).isDirectory() ? readFileSync(file, 'utf8') : null
+      const next = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: () => true })
+      try {
+        expect(next.stateUnknown).toBeTruthy()
+        const h = claudeHome()
+        const err = await freshenHome('claude', h, { ...deps(['in', 'in']), lease: next }).catch((e: unknown) => e)
+        expect((err as { kind: string }).kind).toBe('unknown')
+        expect((err as Error).message).toMatch(/end what is left, remove the file, and run again/)
+        expect(existsSync(join(h, 'projects'))).toBe(true)
+        noteConsumers(next, [{ pid: 1234, started: 1 }])
+      } finally {
+        next.release()
+      }
+      // Byte for byte as it was, after the acquisition, the refused reset, a registration and the release.
+      if (before !== null) expect(readFileSync(file, 'utf8')).toBe(before)
+      else expect(statSync(file).isDirectory()).toBe(true)
+    })
+  }
 })
