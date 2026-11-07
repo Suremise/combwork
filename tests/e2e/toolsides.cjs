@@ -148,6 +148,7 @@ const hasReview = (launch) => hiddenOf(launch) !== null && !['cw_start_review', 
     const bothLive = async () => (await inv('session:live')).find((s) => s.agentId === both.id)
     const bothLaunches = () => launches().filter((l) => l.env?.CW_AGENT === 'Both')
     await inv('session:start', alpha, { agentId: both.id })
+    // A launch or relaunch before any turn of its own: ready, not finished (HI-2688).
     check('an either-role agent starts', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
     const b0 = bothLaunches().at(-1)
     check('with no review, its launch leaves out the review tools (CW_WORKFLOW_HIDDEN), its side being both', !!b0 && sideOf(b0) === 'both' && lacksReview(b0), JSON.stringify(b0 && hiddenOf(b0)))
@@ -156,6 +157,7 @@ const hasReview = (launch) => hiddenOf(launch) !== null && !['cw_start_review', 
     await inv('workflow:setOptions', alpha, REVIEW)
     check('review turned on: an idle agent is restarted by the change itself, with the review tools', !!(await lib.until(async () => bothLaunches().length === 2 && hasReview(bothLaunches()[1]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
     check('…resuming its conversation', bothLaunches()[1]?.opts['--resume'] === b0.sessionId, JSON.stringify(bothLaunches()[1]?.opts['--resume']))
+    // A launch or relaunch before any turn of its own: ready, not finished (HI-2688).
     check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
     check('…and asked again, nothing more to do', (await inv('session:restartForTools', alpha, both.id, 'ifIdle')) === 'same')
 
@@ -174,6 +176,7 @@ const hasReview = (launch) => hiddenOf(launch) !== null && !['cw_start_review', 
     check('Restart When Its Turn Is Over: the question goes', !!(await lib.until(async () => (await asked.count()) === 0, HUNG_MS)))
     check('…relaunched without the review tools once its turn ended', !!(await lib.until(async () => bothLaunches().length === 3 && lacksReview(bothLaunches()[2]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
     check('…in the same conversation', bothLaunches()[2]?.opts['--resume'] === b0.sessionId)
+    // A launch or relaunch before any turn of its own: ready, not finished (HI-2688).
     check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
 
     // Busy, review turned on (tools added), Later: it keeps the tools it launched with, and work needing the new ones
@@ -191,14 +194,17 @@ const hasReview = (launch) => hiddenOf(launch) !== null && !['cw_start_review', 
     check('…a workflow change that leaves its list as it is asks nothing again', (await inv('workflow:setOptions', alpha, { ...REVIEW, options: { ...REVIEW.options, maxAgents: 7 } }), (await asked.count()) === 0))
     check('…still a restart to make, should it be asked again', (await inv('session:restartForTools', alpha, both.id, 'ifIdle')) === 'restarting')
     check('…which loads the review tools', !!(await lib.until(async () => bothLaunches().length === 4 && hasReview(bothLaunches()[3]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
+    // A launch or relaunch before any turn of its own: ready, not finished (HI-2688).
     check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
     // A board change that brings a tool back with no settings change: on a project without review, a card moved into
     // Review by hand keeps the review tools, so a running agent launched without them is restarted with them.
     await inv('workflow:setOptions', alpha, NO_REVIEW)
+    // A launch or relaunch before any turn of its own: ready, not finished (HI-2688).
     check('review off again: the idle agent is restarted without the review tools', !!(await lib.until(async () => bothLaunches().length === 5 && lacksReview(bothLaunches()[4]) && (await bothLive())?.status === 'ready', HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
     const moved = (await api('POST', '/v1/tasks', { title: 'Moved to Review by hand', project: 'alpha' })).body?.number
     await inv('tasks:update', moved, { column: 'review' }).catch(() => api('PATCH', `/v1/tasks/${moved}`, { column: 'review' }))
     check('a card moved into Review by hand: the agent is restarted with the review tools, no setting changed', !!(await lib.until(async () => bothLaunches().length === 6 && hasReview(bothLaunches()[5]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
+    // A launch or relaunch before any turn of its own: ready, not finished (HI-2688).
     check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
     await inv('session:stop', alpha, both.id).catch(() => undefined)
     void maker
