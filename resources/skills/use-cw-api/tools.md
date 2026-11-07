@@ -152,7 +152,7 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 - A named setup (model, effort, context, mode, arguments) on an account (the user's alone).
 - `list`: id, account, CLI, values.
 - `add` on an existing `account`; `update` a `connection` (`""`: the CLI's own). Need Change settings and the user's OK; not undoable.
-- `launch` (`update`): `tools: false` makes its agents Independent; where that takes one off a lane or a card, `confirm` as for `cw_update_agent`.
+- `launch` (`update`): an object, such as `{ "tools": false, "overrides": { … } }`, `{ "preset": "terminal" }` (all off) or `{}` (all on). `tools: false` makes its agents Independent; where that takes one off a lane or a card, `confirm` as for `cw_update_agent`.
 
 ## Documents (`cw_doc_outline` and `cw_read_section`)
 

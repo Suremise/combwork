@@ -98,7 +98,7 @@ const T = {
   'connection.arg.account': agentMsg({ id: 'tool.connection.arg.account', text: 'add: its account, by id or name, from list.' }),
   'connection.arg.model': agentMsg({ id: 'tool.connection.arg.model', text: 'Empty: the CLI decides (each value below too).' }),
   'connection.arg.mode': agentMsg({ id: 'tool.connection.arg.mode', text: 'Permission mode.' }),
-  'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: guidance, tools, typing, overrides by key, each false to turn off; "terminal": all off; empty: all on.' }),
+  'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: guidance, tools, typing, overrides by key (false: off); preset: "terminal" sets all off; an empty object, all on.' }),
   'updateAgent.arg.confirm': agentMsg({ id: 'tool.updateAgent.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make this agent Independent while on a lane or holding a card.' }),
   'connection.arg.confirm': agentMsg({ id: 'tool.connection.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make those agents Independent.' }),
   'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
