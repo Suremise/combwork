@@ -274,7 +274,10 @@ export async function keptTargets(ws: WorkspaceService, project: { path: string;
   const wf = await workflowFor(ws, project.path)
   if (!wf) return out
   const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
-  const cards = store.cards().flatMap((c) => {
+  // The board's cards read once (a whole-project read on main's thread), for the lanes too (HR3's round 2).
+  const all = store.cards()
+  const byId = new Map(all.map((c) => [c.id, c]))
+  const cards = all.flatMap((c) => {
     const s = wf.state(c)
     const target = s.started && IN_FLIGHT.has(s.stage) && wf.rulesetOf(c, s).options.finish !== 'committed' ? s.started.target : null
     return target && target !== now ? [{ c, target }] : []
@@ -288,10 +291,10 @@ export async function keptTargets(ws: WorkspaceService, project: { path: string;
     // Its cards still to start (its queued list, once it applies), each under the rules it would start with; none left,
     // a card it is given next (its own target none), under the lane's.
     const listed = (rec.pending ?? rec.cards).flatMap((n) => {
-      const c = store.cards().find((x) => x.id === n)
+      const c = byId.get(n)
       return c && wf.state(c).stage === 'todo' ? [c] : []
     })
-    const stand = rec.cards.map((n) => store.cards().find((x) => x.id === n)).find((c) => !!c)
+    const stand = listed.length ? undefined : rec.cards.map((n) => byId.get(n)).find((c) => !!c)
     const next = listed.length ? listed.map((c) => ({ card: c, options: wf.rulesetOf(c).options })) : stand ? [{ card: { ...stand, target: undefined, kind: 'code' as const }, options: laneOptions }] : []
     const targets = new Set<string>()
     for (const { card, options } of next) {

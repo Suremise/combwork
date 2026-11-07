@@ -806,6 +806,24 @@ describe('a change of the target says what keeps its own (HI-2674)', () => {
       wf.cfg.agentFolder = agentFolder
     }
   })
+
+  it("reads the board's cards once, however many cards a lane has still to start (HR3's round 2)", async () => {
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const { w, repo } = await workspace({ project: { ...pair, target: 'rel1' }, preset: 'pair' })
+    git(repo, 'branch', 'rel1')
+    git(repo, 'branch', 'rel2')
+    const cards: number[] = []
+    for (let i = 0; i < 5; i++) cards.push((await inWorkspace(w, () => tasks.createTask({ title: `Later ${i}`, project: 'p' }, user))).number)
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards, name: 'long', by: 'B1 (p)' })
+    const reads = vi.spyOn(FactStore.prototype, 'cards')
+    try {
+      const kept = await form.keptTargets(w, { path: repo, name: 'p' }, 'rel2')
+      expect(kept.lanes).toEqual([expect.objectContaining({ name: 'long', target: 'rel1' })])
+      expect(reads).toHaveBeenCalledTimes(1)
+    } finally {
+      reads.mockRestore()
+    }
+  })
 })
 
 describe('the one-time presets notice (#1278, §16.17)', () => {
