@@ -3,7 +3,7 @@ import { watch, type FSWatcher } from 'original-fs'
 import { readFile } from 'original-fs/promises'
 import { readFileSync } from 'original-fs'
 import { join } from 'path'
-import { ADVANCED_DEFS, LEGACY_ADVANCED, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
+import { ADVANCED_DEFS, LEGACY_ADVANCED, advancedDef, advancedFileText, advancedRegExp, advancedRow, checkAdvanced, cliFacing, literalRegExp, onConnection, parseAdvancedFile, withValues, type AdvancedDef, type AdvancedState, type MadeFor, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
 import { CombworkError, combworkError } from './combworkError'
 import type { AppSettings, ProviderId } from '../shared/types'
@@ -256,6 +256,8 @@ export class AdvancedStore {
   async setNow(id: string, raw: unknown): Promise<void> {
     const def = advancedDef(id)
     if (!def) throw combworkError(msg({ id: 'service.advanced.unknown', defaultMessage: 'No advanced setting "{id}".', description: 'An error changing an advanced setting: Combwork has none with the id {id}.' }), { id }, { kind: 'notFound' })
+    // A connection's switch since HI-2670: changed on each connection, never here (its old value is kept for the copy).
+    if (onConnection(def) && raw !== null && raw !== undefined) throw combworkError(msg({ id: 'service.advanced.onConnection', defaultMessage: '"{id}" is set on each connection now: Settings → Accounts & Connections, a connection\'s ⋯ menu, Launch Settings.', description: "An error changing an advanced setting (HI-2670): this one moved to each connection's launch settings. {id} is the setting's id; Settings → Accounts & Connections and Launch Settings are where it is now: use their translated names." }), { id }, { kind: 'invalid' })
     if (this.fileError) throw combworkError(msg({ id: 'service.advanced.fixFirst', defaultMessage: '{problem} Fix advanced.json (Settings → Advanced → Open advanced.json) before changing settings here.', description: "An error changing an advanced setting while advanced.json (a file name: keep it) can't be read; {problem} says why, a sentence. Settings → Advanced → Open advanced.json is where to open it: use its translated names." }), { problem: this.fileText() }, { kind: 'conflict' })
     const values = { ...this.values }
     const madeFor = { ...this.madeFor }

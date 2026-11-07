@@ -669,8 +669,11 @@ export interface AppConfig {
    * their order here; an account's first is its base connection, made with it.
    */
   connections?: Connection[]
-  /** One-time changes to this file (HI-2106): `accounts1`, its connections became accounts, and their defaults connections. */
-  migrations?: { accounts1?: AccountsMigration }
+  /**
+   * One-time changes to this file (HI-2106): `accounts1`, its connections became accounts, and their defaults connections;
+   * `launch1` (HI-2670), the app-wide guidance and CLI override switches copied onto every connection, with the ids copied.
+   */
+  migrations?: { accounts1?: AccountsMigration; launch1?: { at: string; copied: string[] } }
   /** Legacy (no longer written since HI-2650): per provider, the account last chosen as a workspace's default (or launched on). */
   lastUsedConnection?: Partial<Record<ProviderId, string>>
   /** HI-1875's one-time move (the most recently used default to the top of each CLI's order) is done. */
@@ -821,6 +824,26 @@ export interface Connection {
    * into it: a usage move only compares it (any case) to match an agent to the same-tagged connection on the target.
    */
   tag?: string
+  /**
+   * What Combwork adds to its sessions (HI-2670, shared/launchPolicy.ts): absent, everything, as before. Each switch
+   * stored only when off; the CLI's overrides by their key (`statusLine`, `mcpIsolation`…), only those not at their default.
+   */
+  launch?: ConnectionLaunch
+}
+
+/**
+ * A connection's launch switches (HI-2670): what of Combwork's its sessions get. Off, a session gets none of it, as if its
+ * CLI were started in a terminal in that folder (the "Launch as from a terminal" preset turns everything off).
+ */
+export interface ConnectionLaunch {
+  /** Combwork's guidance, the latest handover and the Workspace notes note. */
+  guidance?: false
+  /** Combwork's tools (the combwork MCP server), its skills, the Agent API and cw-progress; off makes its agents Independent. */
+  tools?: false
+  /** Combwork typing into its sessions: wakes, inbox notices, messages, card prompts, and hooks that add to its context. */
+  typing?: false
+  /** Combwork's overrides of the CLI (`<cli>.override.<key>` in advanced.ts), by key, each only when not its default. */
+  overrides?: Record<string, boolean>
 }
 
 /** What a connection launches with (HI-2106): two connections on one account with the same values are the same setup. */
@@ -1960,6 +1983,8 @@ export interface AgentInfo extends AgentDef {
   /** Its connection (HI-2106), while `connection` says its account to today's screens: its id and name. */
   connectionId?: string
   connectionName?: string
+  /** Its connection launches without Combwork's tools (HI-2670): it is Independent, whatever role it has saved. */
+  toolsOff?: true
 }
 
 /**
@@ -3993,7 +4018,7 @@ export interface DueDeps {
  * `teamPause` (HI-2081): its workspace's team is paused (before an update): nothing of it starts or is woken until it
  * resumes; it pauses the lane.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause' | 'independent'
 
 /**
  * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a

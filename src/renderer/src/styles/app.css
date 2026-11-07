@@ -5144,6 +5144,46 @@ h2.section#unused-worktrees {
   border: 1px solid var(--border);
   color: var(--fg-muted);
 }
+/* A connection launching with less of Combwork's than everything (HI-2670): opens its Launch Settings. */
+.connection-plain {
+  white-space: nowrap;
+  font: inherit;
+  font-size: 11px;
+  padding: 0 6px;
+  margin-left: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+/* A connection's Launch Settings (HI-2670): the preset, then each switch. */
+.launch-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 560px;
+}
+.launch-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border);
+}
+.launch-switch {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.launch-switch .checkbox {
+  margin-top: 2px;
+}
+.launch-overrides-h {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
 /* A connection's tag (HI-2530): beside its name, like First, with a tag icon. */
 .connection-tag {
   display: inline-flex;

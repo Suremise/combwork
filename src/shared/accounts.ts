@@ -383,7 +383,8 @@ export const baseConnection = (account: string, connections: readonly Connection
 /** The connection on an account whose values are these (as launchValues keeps them), the earliest; none if no such one. */
 export function matchingConnection(account: Pick<Account, 'id' | 'provider' | 'kind'>, values: LaunchValues, connections: readonly Connection[]): Connection | undefined {
   const want = launchValues(values, account.provider, account.kind === 'server')
-  return connectionsOn(account.id, connections).find((c) => sameValues(launchValues(c, account.provider, account.kind === 'server'), want))
+  // Never one with launch settings of its own (HI-2670): its sessions get less of Combwork's than the values say.
+  return connectionsOn(account.id, connections).find((c) => !c.launch && sameValues(launchValues(c, account.provider, account.kind === 'server'), want))
 }
 
 /** An effort level's name in a connection's name: "High", "Xhigh". */

@@ -21,6 +21,8 @@ import { sessions } from './sessions'
 import { endReviews, releaseAgentCards } from './tasks'
 import { laneAgentRemoved } from './lanes'
 import { workspace, workspaceOf } from './workspace'
+import { agentImpact, assertAgentChangeConfirmed } from './connectionLaunch'
+import type { LaunchImpact } from '../shared/launchPolicy'
 import * as wt from './worktrees'
 import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
@@ -413,7 +415,20 @@ export function cleanDialectPick(v: unknown): string | undefined {
   return t && t.toLowerCase() !== 'auto' ? t.slice(0, 400) : undefined
 }
 
-export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void; session?: string | null } = {}): Promise<AgentDef> {
+/**
+ * What a change of an agent's connection or role would take out of the workflow (HI-2670: Settings asks first), or null:
+ * it would be made Independent while on a running lane or holding a card in Doing or Review.
+ */
+export async function agentChangeImpact(projectPath: string, agentId: string, patch: AgentPatch): Promise<LaunchImpact | null> {
+  projectPath = workspace.assertSessionHost(projectPath)
+  if (workspace.isAssistantHome(projectPath)) return null
+  const before = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === agentId)
+  if (!before) return null
+  const after: AgentDef = { ...before, ...(patch.workflowRole !== undefined ? { workflowRole: patch.workflowRole ? cleanWorkflowRole(patch.workflowRole) : undefined } : {}), ...(patch.connection ? { connection: patch.connection } : {}) }
+  return agentImpact(workspaceOf(projectPath), projectPath, basename(projectPath), before, after)
+}
+
+export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void; session?: string | null; confirmed?: string | null } = {}): Promise<AgentDef> {
   // The Combwork Assistant's settings for this workspace are its agent's, too (it keeps its name).
   projectPath = workspace.assertSessionHost(projectPath)
   // The Assistant gets Combwork's own tools, not the projects' MCP servers, whatever it is given (sessions.ts).
@@ -478,6 +493,9 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // an agent sharing its name from before names were unique keeps it while its other settings change, but only while it
   // still has that name. The Assistant's agent is never renamed.
   const name = patch.name
+  // Made Independent (HI-2670: Independent chosen, or a connection without Combwork's tools) while on a lane or holding
+  // a card: only with `confirmed` naming that exact set (agentImpact), worked out again here, just before the write.
+  if (before && !workspace.isAssistantHome(projectPath)) await assertAgentChangeConfirmed(workspaceOf(projectPath), projectPath, basename(projectPath), before, { ...before, ...clean }, opts.confirmed)
   // Its connection (HI-1769), checked under the lock with the write: one that exists, is the CLI's it will run and is on
   // here. Only the one already saved, for the same CLI, may stay while it is off here (the default runs it meanwhile).
   // Whether the patch changes its CLI was decided from the agent as read before the write (resetting what belongs to the
