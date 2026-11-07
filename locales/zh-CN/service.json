@@ -192,7 +192,7 @@
   "service.metrics.droppedPerProject": "丢弃的测量数据按项目统计，不按角色或提供方统计。",
   "service.metrics.notCliContext": "CLI 自己添加的上下文（它自己的系统提示词、工具定义、读取的文件）。",
   "service.metrics.notNetwork": "提供方的网络流量：Combwork 只负责启动 CLI，不是它们与提供方之间的代理。",
-  "service.metrics.notPerProvider": "Agent API 请求、工具调用和工具列表不按提供方记录：它们属于所有提供方。",
+  "service.metrics.notPerProvider": "Agent API 请求和工具调用不按提供方记录：它们属于所有提供方。",
   "service.metrics.notSkillReads": "模型是否读取了技能：可以统计交付的技能，但无法观察是否读取。",
   "service.metrics.notTokens": "每个 Combwork 工具或每部分指引消耗的提供方 Token：提供方只报告会话的用量，不报告其上下文各部分的开销。",
   "service.metrics.notTransport": "HTTP 标头和传输：请求大小为收到的正文字节数，响应大小为写入的 JSON 正文（中止的回复可能未全部发送）。",

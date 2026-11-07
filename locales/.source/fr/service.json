@@ -192,7 +192,7 @@
   "service.metrics.droppedPerProject": "Dropped measurements are counted per project, not per role or provider.",
   "service.metrics.notCliContext": "Context a CLI adds itself (its own system prompt, tool definitions, files it reads).",
   "service.metrics.notNetwork": "Provider network traffic: Combwork starts the CLIs; it is not a proxy between them and their providers.",
-  "service.metrics.notPerProvider": "Agent API requests, tool calls and the tool list aren’t recorded per provider: they are every provider’s.",
+  "service.metrics.notPerProvider": "Agent API requests and tool calls aren’t recorded per provider: they are every provider’s.",
   "service.metrics.notSkillReads": "Whether a model read a skill: delivered skills are counted, reading one is not observable.",
   "service.metrics.notTokens": "Provider tokens per Combwork tool or per guidance part: providers report a session’s usage, not what each part of its context cost.",
   "service.metrics.notTransport": "HTTP headers and transport: request sizes are the body bytes received, response sizes the JSON body written (an aborted reply may not all have been sent).",

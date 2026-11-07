@@ -544,5 +544,7 @@
   "tips.modelSwitched.title": "Ein Agent mit einem anderen Modell wird markiert",
   "tips.modelSwitched.text": "Landet ein Agent auf einem anderen Modell, als seine Verbindung ihm gab (das Angebot von Codex für ein günstigeres Modell nahe deinem Limit, oder /model), markiert seine Fußzeile das Modell mit einer Warnung, und Aktivität zeigt „Modell gewechselt“. Starte den Agenten neu, um zurückzukehren.",
   "tips.waitingOnPurpose.title": "Eine Karte, die absichtlich wartet",
-  "tips.waitingOnPurpose.text": "Eine Karte in In Arbeit wartet auf ein ruhiges Zeitfenster oder auf eine Antwort? Rechtsklick, Als wartend markieren…, und den Grund angeben: Combwork meldet sie nicht mehr als festgefahren, bis du das aufhebst oder sie In Arbeit verlässt. Ihr Agent läuft weiter."
+  "tips.waitingOnPurpose.text": "Eine Karte in In Arbeit wartet auf ein ruhiges Zeitfenster oder auf eine Antwort? Rechtsklick, Als wartend markieren…, und den Grund angeben: Combwork meldet sie nicht mehr als festgefahren, bis du das aufhebst oder sie In Arbeit verlässt. Ihr Agent läuft weiter.",
+  "tips.perfFailures.title": "Abgelehnt heißt nicht kaputt",
+  "tips.perfFailures.text": "Leistung → Fehlschläge sortiert, was nicht erfolgreich war: echte Fehler in Rot, getrennt von Aufrufen, die eine Workflow-Regel abgelehnt hat, und falschen Aufrufen. Ablehnungen und falsche Aufrufe nach Grund zeigt, welche Regel oder Meldung am häufigsten kam: eine Tool-Beschreibung, die klarer werden sollte."
 }

@@ -15,6 +15,22 @@
     "defaultMessage": "Bodies only, in UTF-8 bytes: what Combwork's API sent and received. Not provider traffic: Combwork isn't between the CLIs and their providers.",
     "description": "Tooltip of the Data card. Keep UTF-8."
   },
+  "performance.card.failures": {
+    "defaultMessage": "Failures",
+    "description": "Title of the Performance page's card of failed Agent API requests, by kind (HI-2553)."
+  },
+  "performance.card.failuresSub": {
+    "defaultMessage": "{refused, plural, one {# refused by a rule} other {# refused by a rule}} · {invalid, plural, one {# wrong call} other {# wrong calls}}{unknown, plural, =0 {} one { · # not sorted} other { · # not sorted}}",
+    "description": "Under the Failures card (HI-2553): the requests a workflow rule or a guard refused, those that were wrong calls (a bad argument, an unknown card), and those recorded before Combwork sorted them."
+  },
+  "performance.card.failuresTip": {
+    "defaultMessage": "Agent API requests that didn’t succeed, by kind. Real errors: something went wrong in Combwork (a server error). Refused by a rule: a workflow rule or a guard said no and said what to do instead (a submit with nothing new, a move the rules don’t allow, no access); that is the workflow working, not a fault. Wrong calls: a bad argument, an unknown card, a missing file. Not sorted: recorded before Combwork sorted failures. Cancelled requests aren’t counted here.",
+    "description": "Tooltip of the Failures card (HI-2553). Real errors, Refused by a rule, Wrong calls and Not sorted are words of the card: keep them as there."
+  },
+  "performance.card.failuresValue": {
+    "defaultMessage": "{errors, plural, =0 {No real errors} one {# real error} other {# real errors}}",
+    "description": "The value of the Failures card (HI-2553): Agent API requests that failed for a real error (a server error), shown apart from refusals and wrong calls."
+  },
   "performance.card.guidance": {
     "defaultMessage": "Guidance per launch",
     "description": "Title of a Performance card: the size of what Combwork gave each session at launch, on average."
@@ -24,8 +40,16 @@
     "description": "Under the Guidance per launch card's size. {core} and {catalog} are sizes such as \"4 KB\": Combwork's session contract and its skills' catalog."
   },
   "performance.card.guidanceTip": {
-    "defaultMessage": "What Combwork gave each session at launch, on average: its session contract (core), what it adds for the project, the Assistant's role and mode, and its skills' catalog (names and descriptions). Skill bodies are separate: a model reads one only when it uses it.",
+    "defaultMessage": "What Combwork gave each session at launch, on average: its session contract (core), what it adds for the project, the Assistant's role and mode, and its skills' catalog (names and descriptions). Skill bodies are separate: a model reads one only when it uses it. The tool list (its Combwork tools' definitions) is apart: the Combwork tool list table has it by provider.",
     "description": "Tooltip of the Guidance per launch card. core and catalog are words of the card: keep them as there."
+  },
+  "performance.card.guidanceTools": {
+    "defaultMessage": "Tool list {tools} a start, ≈ {upfront} if deferred",
+    "description": "A second line under the Guidance per launch card (HI-2553): the Combwork tools' definitions each session's CLI got, on average, and Combwork's estimate (≈) of what a CLI that defers tools (Claude Code) gets at the start if it does. {tools} and {upfront} are sizes such as \"24 KB\"."
+  },
+  "performance.card.guidanceToolsAll": {
+    "defaultMessage": "Tool list {tools} a start",
+    "description": "A second line under the Guidance per launch card (HI-2553), when how much was put in the prompt at the start isn't known: the Combwork tools' definitions each session's CLI got, on average. {tools} is a size such as \"24 KB\"."
   },
   "performance.card.latency": {
     "defaultMessage": "Latency",
@@ -56,7 +80,7 @@
     "description": "Under the API requests card's number. {rate} is requests per hour while Combwork was recording; {failed} and {cancelled} are percentages (\"2%\")."
   },
   "performance.card.requestsTip": {
-    "defaultMessage": "Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Combwork was recording, not the whole range. Failed: refused, client or server errors. Cancelled: the client went away before the reply. Waits (an isolated check waiting for a check copy) are counted but never failed.",
+    "defaultMessage": "Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Combwork was recording, not the whole range. Failed: refused by a rule, wrong calls and real errors (the Failures card has each). Cancelled: the client went away before the reply. Waits (an isolated check waiting for a check copy) are counted but never failed.",
     "description": "Tooltip of the API requests card. An hour, Failed and Cancelled are words of the card, Waits a column of the Agent API table: keep them as there."
   },
   "performance.card.toolReplies": {
@@ -1195,6 +1219,30 @@
     "defaultMessage": "Save what this page shows (its scope, range and Who; every provider’s, each named in its rows) as a JSON file, with units, coverage and Combwork's version. Shift+click: with project names replaced (project-1, project-2…) and no workspace path.",
     "description": "Tooltip of the Performance page's Export button. Who is the name of the page's filter of who did the work: keep it as named there. Keep JSON, Shift+click and project-1, project-2… as they are."
   },
+  "performance.failures.errorsTip": {
+    "defaultMessage": "Real errors: something went wrong in Combwork (a server error), or, for a tool call, no reply came (a timeout, no connection).",
+    "description": "Info tip of the Errors column (HI-2553)."
+  },
+  "performance.failures.invalid": {
+    "defaultMessage": "Wrong calls",
+    "description": "Column header of the Agent API and Combwork tools tables (HI-2553): requests or calls with a bad argument, an unknown card or a missing file."
+  },
+  "performance.failures.invalidTip": {
+    "defaultMessage": "A bad argument, an unknown card, a missing file. A tool agents keep calling wrong may need a clearer description.",
+    "description": "Info tip of the Wrong calls column (HI-2553)."
+  },
+  "performance.failures.refused": {
+    "defaultMessage": "Refused",
+    "description": "Column header of the Agent API and Combwork tools tables (HI-2553): requests or calls a workflow rule or a guard refused."
+  },
+  "performance.failures.refusedTip": {
+    "defaultMessage": "A workflow rule or a guard said no, and what to do instead: the workflow working, not a fault.",
+    "description": "Info tip of the Refused column (HI-2553)."
+  },
+  "performance.failures.unsorted": {
+    "defaultMessage": "Not sorted",
+    "description": "Column header of the Agent API and Combwork tools tables (HI-2553), shown only when there are any: failures recorded before Combwork sorted them by kind."
+  },
   "performance.guidance.catalog": {
     "defaultMessage": "Catalog",
     "description": "Column header of the Guidance at launch table: the size of the skills' names and descriptions, per launch."
@@ -1336,8 +1384,8 @@
     "description": "Label of the Performance page's provider filter, and a column header: the CLI (Claude Code, Codex, Copilot)."
   },
   "performance.provider.note": {
-    "defaultMessage": "Launches and the providers’ usage: the only parts recorded per provider.",
-    "description": "Beside the Performance page's Provider filter: what it changes."
+    "defaultMessage": "Launches, the Combwork tool list and the providers’ usage: the only parts recorded per provider.",
+    "description": "Beside the Performance page's Provider filter: what it changes (HI-2553: the tool list too). Combwork tool list is a table's heading: name it as there."
   },
   "performance.provider.nothing": {
     "defaultMessage": "Nothing from {provider} in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}{filtered, select, yes { for this filter} other {}}.",
@@ -1358,6 +1406,38 @@
   "performance.range.name": {
     "defaultMessage": "{range, select, 24h {24 hours} 7d {7 days} other {30 days}}",
     "description": "A time range button of the Performance page. {range} is a key (24h, 7d or 30d): don't translate the keys, only the texts."
+  },
+  "performance.reasons.count": {
+    "defaultMessage": "Count",
+    "description": "Column header of the Refusals and wrong calls by reason table (HI-2553): how many requests."
+  },
+  "performance.reasons.heading": {
+    "defaultMessage": "Refusals and wrong calls by reason",
+    "description": "Heading of the Performance page's table of why Agent API requests were refused or were wrong calls (HI-2553)."
+  },
+  "performance.reasons.kind": {
+    "defaultMessage": "Kind",
+    "description": "Column header of the Refusals and wrong calls by reason table (HI-2553): refused or wrong call."
+  },
+  "performance.reasons.kindValue": {
+    "defaultMessage": "{kind, select, refused {Refused} other {Wrong call}}",
+    "description": "A cell of the Kind column (HI-2553). {kind} is a key (refused or invalid): don't translate the keys, only the texts."
+  },
+  "performance.reasons.other": {
+    "defaultMessage": "No reason recorded (an error without a rule or message id, or past the twelve reasons a route keeps)",
+    "description": "A cell of the Reason column (HI-2553): refusals or wrong calls whose reason Combwork could not tell, or past the twelve reasons kept per route."
+  },
+  "performance.reasons.reason": {
+    "defaultMessage": "Reason",
+    "description": "Column header of the Refusals and wrong calls by reason table (HI-2553): the rule or message id."
+  },
+  "performance.reasons.tip": {
+    "defaultMessage": "The most common reasons Combwork gave, by route, as a general sentence: Combwork keeps which rule or message it was, never what it said, so the card, file or name it was about shows as “…”. Under it, the rule’s (rule:) or message’s (msg:) id. A reason that keeps coming back points to a rule or a tool description to make clearer.",
+    "description": "Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule: and msg: as they are (prefixes shown in the table). “…” is how a left-out value shows: keep it."
+  },
+  "performance.reasons.unknown": {
+    "defaultMessage": "A reason this version of Combwork doesn’t know",
+    "description": "A cell of the Reason column (HI-2553): a rule or message recorded by another version of Combwork, not found in this one. Its id shows under it."
   },
   "performance.refresh": {
     "defaultMessage": "Refresh",
@@ -1390,10 +1470,6 @@
   "performance.routes.empty": {
     "defaultMessage": "No requests.",
     "description": "The Agent API table when it has no rows."
-  },
-  "performance.routes.failed": {
-    "defaultMessage": "Failed",
-    "description": "Column header of the Agent API table: requests that failed."
   },
   "performance.routes.heading": {
     "defaultMessage": "Agent API",
@@ -1632,12 +1708,24 @@
     "description": "Column header of the Combwork tool list table: how many session starts were given the list."
   },
   "performance.toolList.tip": {
-    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Combwork measured it).",
-    "description": "Tooltip of the Combwork tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep Combwork (the app's name)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, by provider (Unknown: starts from before Combwork recorded it). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. If deferred is an estimate, not a measurement: what Claude Code puts in its prompt at the start when it defers MCP tools (their names, and in full only the few Combwork marks). Whether a launch deferred them isn’t observable. Codex and Copilot get the whole list. The list sits at the start of the prompt, where a provider’s prompt cache can keep it after the first turn; whether it did isn’t measured here. A dash: not measured (sessions from before Combwork measured it).",
+    "description": "Tooltip of the Combwork tool list table on the Performance page (HI-2063, HI-2553). Descriptions, Parameters, Schemas and If deferred are its columns: name them as there. Keep Combwork, Claude Code, Codex and Copilot (names)."
   },
   "performance.toolList.tools": {
     "defaultMessage": "Tools",
     "description": "Column header of the Combwork tool list table: how many tools a start was given, on average."
+  },
+  "performance.toolList.unknownProvider": {
+    "defaultMessage": "Unknown",
+    "description": "A cell of the Combwork tool list table's Provider column (HI-2553): starts recorded before Combwork recorded their CLI."
+  },
+  "performance.toolList.upfront": {
+    "defaultMessage": "If deferred",
+    "description": "Column header of the Combwork tool list table (HI-2553): Combwork's estimate of the bytes a CLI that defers MCP tools (Claude Code) puts in its prompt at the start, if it does, a start, on average. Shown with ≈."
+  },
+  "performance.toolList.upfrontTip": {
+    "defaultMessage": "Combwork’s estimate, not a measurement: what a CLI that defers MCP tools gets at the start if it does, the tools Combwork marks to be sent in full and the others’ names. Claude Code defers them unless its tool search is off (a setting, a model or a gateway can turn it off); whether a launch did, and how the CLI words the list, aren’t observable. A dash: a CLI that doesn’t defer (Codex and Copilot get the whole list: Bytes), or not known.",
+    "description": "Info tip of the If deferred column of the Combwork tool list table (HI-2553). Keep Combwork, Claude Code, Codex and Copilot (names); Bytes is a column: name it as there."
   },
   "performance.tools.calls": {
     "defaultMessage": "Calls",
@@ -1657,7 +1745,7 @@
   },
   "performance.tools.errors": {
     "defaultMessage": "Errors",
-    "description": "Column header of the Combwork tools table: calls that failed."
+    "description": "Column header of the Combwork tools and Agent API tables: calls or requests that failed for a real error (HI-2553: not refusals or wrong calls, which have columns of their own)."
   },
   "performance.tools.heading": {
     "defaultMessage": "Combwork tools",
@@ -1679,9 +1767,13 @@
     "defaultMessage": "{requests, plural, one {# request} other {# requests}}{failed, plural, =0 {} other {, # failed{cancelled, plural, =0 {} other { ({cancelled, number} cancelled)}}}} · {toolCalls, plural, one {# tool call} other {# tool calls}} ({chars, number} characters) · {launches, plural, one {# launch} other {# launches}}{partial, select, yes { · recorded for {duration} of it} other {}}",
     "description": "Tooltip of a bar of the requests chart, after its hour or day and a colon: what happened then. {duration} is how long Combwork recorded in it (\"40 min\"), shown when {partial} is yes. Lower case."
   },
-  "performance.trend.failed": {
-    "defaultMessage": "Failed",
-    "description": "Legend of the requests chart: the bars' colour for requests that failed."
+  "performance.trend.errors": {
+    "defaultMessage": "Real errors",
+    "description": "Legend of the requests chart (HI-2553): the bars' colour for requests that failed for a real error (a server error)."
+  },
+  "performance.trend.errorsLine": {
+    "defaultMessage": "{errors, plural, one {# real error} other {# real errors}}",
+    "description": "A second line in the tooltip of a bar of the requests chart (HI-2553), shown when there were any: requests that failed for a real error."
   },
   "performance.trend.heading": {
     "defaultMessage": "{step, select, hour {API requests by hour} other {API requests by day}}",
@@ -1698,6 +1790,10 @@
   "performance.trend.notRecordedLegend": {
     "defaultMessage": "Not recorded",
     "description": "Legend of the requests chart: the hatched bars, when Combwork recorded nothing."
+  },
+  "performance.trend.refused": {
+    "defaultMessage": "Refused or wrong call",
+    "description": "Legend of the requests chart (HI-2553): the bars' colour for requests refused by a rule, wrong calls and cancelled ones: not faults."
   },
   "performance.trend.slot": {
     "defaultMessage": "<b>{when}</b>: {detail}",

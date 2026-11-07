@@ -544,5 +544,7 @@
   "tips.modelSwitched.title": "Un agent sur un autre modèle est signalé",
   "tips.modelSwitched.text": "Si un agent se retrouve sur un autre modèle que celui de sa connexion (la proposition de Codex d’un modèle moins cher près de ta limite, ou /model), son pied de page signale le modèle par un avertissement et Activité indique Modèle changé. Redémarre l’agent pour revenir.",
   "tips.waitingOnPurpose.title": "Une carte qui attend exprès",
-  "tips.waitingOnPurpose.text": "Une carte En cours attend un moment calme, ou une réponse ? Clic droit dessus, Marquer comme en attente…, et dis pourquoi : Combwork cesse de la signaler comme à l’arrêt jusqu’à ce que tu lèves l’attente ou qu’elle quitte En cours. Son agent continue de tourner."
+  "tips.waitingOnPurpose.text": "Une carte En cours attend un moment calme, ou une réponse ? Clic droit dessus, Marquer comme en attente…, et dis pourquoi : Combwork cesse de la signaler comme à l’arrêt jusqu’à ce que tu lèves l’attente ou qu’elle quitte En cours. Son agent continue de tourner.",
+  "tips.perfFailures.title": "Refusé n’est pas cassé",
+  "tips.perfFailures.text": "Performances → Échecs trie ce qui n’a pas abouti : les vraies erreurs en rouge, à part des appels refusés par une règle du flux de travail et des appels erronés. Refus et appels erronés par motif montre quelle règle ou quel message revient le plus : une description d’outil à rendre plus claire."
 }

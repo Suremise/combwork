@@ -22,8 +22,58 @@ export interface Timed {
 /**
  * How a request ended. `waiting` (HI-1831): a reply that says to ask again (an isolated check's resolve while no check
  * copy is free): an expected wait, not a failure. Before HI-1831 those were recorded as `client-error`.
+ *
+ * A failed request's kind (HI-2553): `refused` (409: a workflow rule or a guard said no, and what to do instead), `invalid`
+ * (a wrong call: a bad argument, an unknown card, a missing file; 4xx but 401, 403 and 409), `denied` (401, 403) and
+ * `server-error` (5xx: a real error). `client-error` is a 4xx recorded before HI-2553, its kind not known.
  */
-export type MetricOutcome = 'ok' | 'client-error' | 'denied' | 'server-error' | 'cancelled' | 'waiting'
+export type MetricOutcome = 'ok' | 'refused' | 'invalid' | 'client-error' | 'denied' | 'server-error' | 'cancelled' | 'waiting'
+
+/**
+ * How a tool call ended (HI-2553): `refused` and `invalid` as MetricOutcome's, from the Agent API's status, or the bridge's
+ * own check of the arguments (`invalid`); `failed`, a real error (5xx, a thrown exception, a timeout or no connection).
+ * `error` is a failed call recorded before HI-2553, its kind not known.
+ */
+export type ToolOutcome = 'ok' | 'refused' | 'invalid' | 'failed' | 'error'
+
+/** What a failure was (HI-2553), as the Performance view sorts it; `unknown` for one recorded before its kind was. */
+export type FailureKind = 'refused' | 'invalid' | 'error' | 'unknown'
+
+/** A request's or a tool call's failure kind; null when it didn't fail (ok, a wait, cancelled by the caller). */
+export function failureKind(outcome: MetricOutcome | ToolOutcome): FailureKind | null {
+  switch (outcome) {
+    case 'refused':
+    case 'denied':
+      return 'refused'
+    case 'invalid':
+      return 'invalid'
+    case 'server-error':
+    case 'failed':
+      return 'error'
+    case 'client-error':
+    case 'error':
+      return 'unknown'
+    default:
+      return null
+  }
+}
+
+/**
+ * A reason Combwork gave for a refusal or a wrong call (HI-2553): a workflow rule's id (`rule:<id>`) or its message's id
+ * (`msg:<id>`), never its text; `other` when it had neither, or past REASONS_MAX in a series.
+ */
+export const REASON_LABEL = /^(?:(?:rule|msg):[A-Za-z0-9_.-]{1,96}|other)$/
+
+/** At most this many reasons a series keeps; the rest are counted as `other`. */
+export const REASONS_MAX = 12
+
+/** Adds `n` of a reason to a series' reasons, within REASONS_MAX (past it, or a label that isn't one, as `other`). */
+export function addReason(to: Record<string, number>, reason: string, n: number): void {
+  const label = REASON_LABEL.test(reason) ? reason : 'other'
+  const named = Object.keys(to).filter((k) => k !== 'other').length
+  const key = label in to || label === 'other' || named < REASONS_MAX ? label : 'other'
+  to[key] = (to[key] ?? 0) + n
+}
 
 /** Agent API requests, by route template, method, caller role and outcome. */
 export interface ApiSeries extends Timed {
@@ -34,6 +84,8 @@ export interface ApiSeries extends Timed {
   /** Request body and response body, UTF-8 bytes (JSON as sent; headers and transport not included). */
   requestBytes: number
   responseBytes: number
+  /** A refused or wrong call's series (HI-2553): how many of its requests each reason had (REASON_LABEL), at most REASONS_MAX and `other`. */
+  reasons?: Record<string, number>
 }
 
 /** Combwork tool calls as the MCP bridge answered them: the final text the model gets. */
@@ -42,7 +94,7 @@ export interface McpSeries extends Timed {
   role: 'agent' | 'assistant'
   /** The caller asked for the full form (detail, details, full card) or took the default compact one. */
   mode: 'compact' | 'detail'
-  outcome: 'ok' | 'error'
+  outcome: ToolOutcome
   /** The reply's text: characters (UTF-16 code units) and UTF-8 bytes. */
   chars: number
   bytes: number
@@ -95,12 +147,21 @@ export interface GuidanceSeries {
  * Its instructions aren't counted here: they are Combwork's session contract, counted once per launch in GuidanceSeries.
  */
 export interface CatalogSeries {
+  /** The CLI of the launch whose bridge sent it (HI-2553); `unknown`: recorded before Combwork counted it, or not known. */
+  provider: string
   role: 'agent' | 'assistant'
   /** The side of the workflow of the launch whose bridge sent it (HI-2049); `unknown`: recorded before Combwork counted it. */
   workflow: LaunchWorkflow | 'unknown'
   starts: number
   tools: number
   toolsBytes: number
+  /**
+   * What a CLI that defers MCP tools (Claude Code) is given at the start (HI-2553), of the starts that reported it
+   * (`upfrontStarts`): the tools Combwork marks to be sent in full, as the JSON has them, and the other tools' names (a
+   * JSON list of them). The CLI's own wording of that isn't observable; a CLI that doesn't defer gets `toolsBytes`.
+   */
+  upfrontStarts: number
+  upfrontBytes: number
   /**
    * The same list's characters (its JSON's UTF-16 code units), and of how many of the starts: a bridge from before
    * HI-2049 sent bytes only, so its starts are in `starts` and not here.
@@ -207,6 +268,8 @@ export interface TrendPoint {
   /** Requests that didn't succeed (client or server error, refused, cancelled); `cancelled` of them, by the client. */
   failed: number
   cancelled: number
+  /** Of `failed`, the real errors (5xx, HI-2553): shown apart from refusals and wrong calls. Absent before HI-2553. */
+  errors?: number
   /** Replies that said to ask again (HI-1831), not among `failed`. */
   waits: number
   requestBytes: number

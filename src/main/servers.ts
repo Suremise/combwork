@@ -117,7 +117,7 @@ import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
 import { unsubmittedOf } from './unsubmitted'
 import { idleOwnWatchOf } from './idleWatch'
-import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
+import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, reasonOf, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
@@ -353,6 +353,8 @@ interface ApiRequest {
   authenticated: boolean
   /** Answered with a wait (HI-1831: an error status whose body says to ask again): recorded as `waiting`, not a failure. */
   waiting: boolean
+  /** A refusal's or a wrong call's reason (HI-2553, metrics.ts reasonOf): its rule's or message's id. */
+  reason?: string
   /** The request's workspace, as far as it was known (the developer console's Combwork events). */
   ws: string | null
 }
@@ -3964,7 +3966,9 @@ route('POST', '/v1/metrics/mcp', async ({ body }) => {
   for (const c of calls) if (c && typeof c === 'object' && recordMcp(h, project, role, c as Record<string, unknown> as never)) accepted++
   // On the side of the launch its token is for (HI-2049), never the agent's next one; the Assistant's is none.
   const side = agent ? sessions.launchSide(agent.projectPath, agent.agentId, agentCallerRun()) : 'none'
-  if (body?.catalog && typeof body.catalog === 'object' && recordCatalog(h, project, role, side, body.catalog)) accepted++
+  // Its CLI (HI-2553): the launch its token is for (an agent's), or the Assistant's session now.
+  const provider = agent ? sessions.launchProvider(agent.projectPath, agent.agentId, agentCallerRun()) : (sessions.liveFor(requireWorkspace().assistantHome, ASSISTANT_AGENT_ID)?.provider ?? null)
+  if (body?.catalog && typeof body.catalog === 'object' && recordCatalog(h, project, role, side, body.catalog, provider)) accepted++
   return { accepted, refused: calls.length + (body?.catalog ? 1 : 0) - accepted }
 })
 
@@ -4412,7 +4416,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
     appMetrics.requestEnded()
     working()
     if (!m.authenticated) appMetrics.unauthenticated()
-    else if (!m.skip && m.handle) recordApi(m.handle, m.project, { route: m.route, method: req.method ?? '', role: m.role, outcome: outcomeOf(res, m), requestBytes: m.requestBytes, responseBytes: m.responseBytes, ms: metricsClock.mono() - started })
+    else if (!m.skip && m.handle) recordApi(m.handle, m.project, { route: m.route, method: req.method ?? '', role: m.role, outcome: outcomeOf(res, m), requestBytes: m.requestBytes, responseBytes: m.responseBytes, ms: metricsClock.mono() - started, ...(m.reason ? { reason: m.reason } : {}) })
     if (m.authenticated && !m.skip && !m.route.startsWith('/v1/console')) captureApiCall(req, res, url, m, who, metricsClock.mono() - started)
   })
   const url = new URL(req.url ?? '/', 'http://127.0.0.1')
@@ -4545,6 +4549,8 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     if (status === 500) log.error(`API ${req.method} ${url.pathname}`, e)
     // A wait (resolve's 409 while no check copy is free) is an answer to ask again, not a failure (HI-1831).
     if (e instanceof HttpError && e.extra && 'wait' in e.extra) m.waiting = true
+    // Why it was refused or a wrong call (HI-2553): its rule's or message's id, never its text.
+    if (status >= 400 && status < 500) m.reason = reasonOf(e)
     send(res, status, body)
   }
 }

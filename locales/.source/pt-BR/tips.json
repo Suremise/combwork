@@ -376,6 +376,8 @@
   "tips.perfCompare.title": "Before and after a change",
   "tips.perfCompareAgents.text": "Comparing two scenario benchmarks? Open a scenario in Performance → Compare: its measures show the session under test first, then the other agents (a lane’s builder and reviewer) and all of them together, with each agent’s Combwork tool calls.",
   "tips.perfCompareAgents.title": "Which agent a change came from",
+  "tips.perfFailures.text": "Performance → Failures sorts what didn’t succeed: real errors in red, apart from calls a workflow rule refused and wrong calls. Refusals and wrong calls by reason shows which rule or message came up most: a tool description to make clearer.",
+  "tips.perfFailures.title": "Refused is not broken",
   "tips.performance.text": "Performance, in the activity bar, shows what Combwork's API, tools and guidance cost for the last day, week or month: the whole workspace or one project. Each project has its own Performance tab too.",
   "tips.performance.title": "What Combwork itself costs",
   "tips.permissionMode.text": "Click the mode in an agent's footer, or press {key}, to move between asking first, accepting edits and planning.",
@@ -531,6 +533,8 @@
   "tips.versionControlTab.title": "One tab for version control and workflow",
   "tips.viewerTokens.text": "An app that shows what your agents are doing, such as Apiary, needs only a viewer token: Settings → Agent API → Viewer tokens makes one that can read everything and change nothing, and revokes it again.",
   "tips.viewerTokens.title": "Let another app watch Combwork",
+  "tips.waitingOnPurpose.text": "A card in Active held for a quiet window, or waiting for an answer? Right-click it, Mark as Waiting…, and say why: Combwork stops reporting it as stalled until you clear it or it leaves Active. Its agent keeps running.",
+  "tips.waitingOnPurpose.title": "A card that waits on purpose",
   "tips.workflowDefaults.text": "Settings → Version Control sets the options every project starts from: Combwork defaults, for every workspace, and the open workspace’s over them. A project’s own options still win, and saving lists the projects that inherit the change.",
   "tips.workflowDefaults.title": "Set a workflow once for every project",
   "tips.workflowOptions.text": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
@@ -542,7 +546,5 @@
   "tips.workspaceMovedDefender.text": "If Combwork had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
   "tips.workspaceMovedDefender.title": "Defender exclusions follow a moved workspace",
   "tips.workspaceNotes.text": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
-  "tips.workspaceNotes.title": "Notes about this machine for every agent",
-  "tips.waitingOnPurpose.title": "A card that waits on purpose",
-  "tips.waitingOnPurpose.text": "A card in Active held for a quiet window, or waiting for an answer? Right-click it, Mark as Waiting…, and say why: Combwork stops reporting it as stalled until you clear it or it leaves Active. Its agent keeps running."
+  "tips.workspaceNotes.title": "Notes about this machine for every agent"
 }

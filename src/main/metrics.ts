@@ -23,6 +23,7 @@ import {
   type GuidanceSeries,
   type McpSeries,
   type MetricOutcome,
+  addReason,
   type MetricsCoverage,
   type MetricsFilters,
   type MetricsPart,
@@ -135,9 +136,9 @@ function drop(b: Bucket, owner: string, n = 1): void {
 const SKILL_COUNTS = ['sharedScans', 'hits', 'misses', 'invalidations', 'tooLarge', 'files', 'bytes', 'headerBytes', 'entries'] as const
 const emptySkills = (): SkillServiceSeries => ({ scans: emptyTimed(), sharedScans: 0, hits: 0, misses: 0, invalidations: 0, tooLarge: 0, files: 0, bytes: 0, headerBytes: 0, entries: 0 })
 const GUIDANCE_COUNTS = ['launches', 'guidanceBytes', 'guidanceChars', 'customBytes', 'customChars', 'roleBytes', 'roleChars', 'modeBytes', 'modeChars', 'skills', 'skillCatalogBytes', 'skillBytes', 'skillsNotDelivered', 'skillsUnmeasured'] as const
-const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'] as const
+const CATALOG_COUNTS = ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars', 'upfrontStarts', 'upfrontBytes'] as const
 const newBucket = (start: number, span: Bucket['span']): Bucket => ({ start, span, projects: dict(), workspace: emptyPart(), skills: emptySkills(), dropped: 0, droppedBy: dict(), series: 0 })
-const emptyCatalog = (role: CatalogSeries['role'], workflow: CatalogSeries['workflow']): CatalogSeries => ({ role, workflow, starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 })
+const emptyCatalog = (provider: string, role: CatalogSeries['role'], workflow: CatalogSeries['workflow']): CatalogSeries => ({ provider, role, workflow, starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0, upfrontStarts: 0, upfrontBytes: 0 })
 /** A guidance series' key: by CLI, role and workflow side, and its dialect chain where one overrides text (HI-2443). */
 const guidanceKey = (provider: string, role: string, workflow: string, dialect?: string): string => `${provider} ${role} ${workflow}${dialect ? ` ${dialect}` : ''}`
 const emptyGuidance = (provider: string, role: GuidanceSeries['role'], workflow: GuidanceSeries['workflow'], dialect?: string): GuidanceSeries => ({ provider, role, workflow, ...(dialect ? { dialect } : {}), launches: 0, guidanceBytes: 0, guidanceChars: 0, customBytes: 0, customChars: 0, roleBytes: 0, roleChars: 0, modeBytes: 0, modeChars: 0, skills: 0, skillCatalogBytes: 0, skillBytes: 0, skillsNotDelivered: 0, skillsUnmeasured: 0 })
@@ -160,7 +161,23 @@ const ROLES = new Set(['agent', 'assistant', 'api', 'viewer', 'unknown'])
 const WORKFLOWS = new Set<string>(['builder', 'reviewer', 'either', 'none'])
 /** A series' workflow side as saved: one Combwork records, else `unknown` (saved before HI-2049, or not one it knows). */
 const workflowOf = (v: unknown): GuidanceSeries['workflow'] => (typeof v === 'string' && WORKFLOWS.has(v) ? (v as LaunchWorkflow) : 'unknown')
-const OUTCOMES = new Set(['ok', 'client-error', 'denied', 'server-error', 'cancelled', 'waiting'])
+const OUTCOMES = new Set(['ok', 'refused', 'invalid', 'client-error', 'denied', 'server-error', 'cancelled', 'waiting'])
+/** A tool call's outcomes (HI-2553: `error` is one recorded before its kind was). */
+const TOOL_OUTCOMES = new Set<string>(['ok', 'refused', 'invalid', 'failed', 'error'])
+/** A catalog series' provider: one Combwork knows, else `unknown` (recorded before HI-2553, or a launch it can't tell). */
+const providerOf = (v: unknown): string => (typeof v === 'string' && PROVIDER_IDS.has(v) ? v : 'unknown')
+const catalogKey = (provider: string, role: string, workflow: string): string => `${provider} ${role} ${workflow}`
+/** A series' reasons as saved: each a label (REASON_LABEL) and a count, within REASONS_MAX; null when there are none. */
+function readReasons(v: unknown): Record<string, number> | null {
+  const o = obj(v)
+  if (!o) return null
+  const out: Record<string, number> = dict()
+  for (const [k, n] of Object.entries(o)) {
+    const c = count(n)
+    if (c) addReason(out, k, c)
+  }
+  return Object.keys(out).length ? out : null
+}
 const OTHER = '(other)'
 /**
  * A family's overflow series (HI-2628 round 1): where a fold puts a series a full day has no room for, its labels
@@ -184,9 +201,10 @@ const UNCOUNTED: Record<Family, Set<string>> = (() => {
   const roles = ['agent', 'assistant']
   return {
     api: new Set([...ROLES].flatMap((r) => [...OUTCOMES].map((o) => overflowKey.api(r, o)))),
-    mcp: new Set(roles.flatMap((r) => ['compact', 'detail'].flatMap((m) => ['ok', 'error'].map((o) => overflowKey.mcp(r, m, o))))),
+    mcp: new Set(roles.flatMap((r) => ['compact', 'detail'].flatMap((m) => [...TOOL_OUTCOMES].map((o) => overflowKey.mcp(r, m, o))))),
     guidance: new Set(roles.flatMap((r) => sides.map((w) => overflowKey.guidance(r, w)))),
-    catalog: new Set(roles.flatMap((r) => sides.map((w) => `${r} ${w}`)))
+    // By provider too (HI-2553): each Combwork knows, and `unknown`.
+    catalog: new Set([...PROVIDER_IDS, 'unknown'].flatMap((p) => roles.flatMap((r) => sides.map((w) => catalogKey(p, r, w)))))
   }
 })()
 const counted = (family: Family, key: string): boolean => !UNCOUNTED[family].has(key)
@@ -268,14 +286,18 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     mergeTimed(had, t)
     had.requestBytes += bytes.requestBytes
     had.responseBytes += bytes.responseBytes
+    // A refusal's or a wrong call's reasons (HI-2553), as labels only.
+    const reasons = outcome === 'refused' || outcome === 'invalid' ? readReasons(s.reasons) : null
+    if (reasons) for (const [k, n] of Object.entries(reasons)) addReason((had.reasons ??= dict()), k, n)
   })
   each(o.mcp, (s) => {
     const t = readTimed(s)
     const sizes = readCounts(s, ['chars', 'bytes'] as const)
-    if (!t || !sizes || (s.role !== 'agent' && s.role !== 'assistant') || (s.mode !== 'compact' && s.mode !== 'detail') || (s.outcome !== 'ok' && s.outcome !== 'error')) return
+    if (!t || !sizes || (s.role !== 'agent' && s.role !== 'assistant') || (s.mode !== 'compact' && s.mode !== 'detail') || typeof s.outcome !== 'string' || !TOOL_OUTCOMES.has(s.outcome)) return
+    const outcome = s.outcome as McpSeries['outcome']
     const tool = inSet(TOOLS, s.tool)
-    const key = `${tool} ${s.role} ${s.mode} ${s.outcome}`
-    const had = part.mcp[key] ?? (room('mcp', key) ? (part.mcp[key] = { tool, role: s.role, mode: s.mode, outcome: s.outcome, ...emptyTimed(), chars: 0, bytes: 0 }) : null)
+    const key = `${tool} ${s.role} ${s.mode} ${outcome}`
+    const had = part.mcp[key] ?? (room('mcp', key) ? (part.mcp[key] = { tool, role: s.role, mode: s.mode, outcome, ...emptyTimed(), chars: 0, bytes: 0 }) : null)
     if (!had) return
     mergeTimed(had, t)
     had.chars += sizes.chars
@@ -294,12 +316,14 @@ function readPart(v: unknown, b: Bucket, owner: string): PartData {
     if (g) for (const k of GUIDANCE_COUNTS) g[k] += c[k]
   })
   each(o.catalog, (s) => {
-    // Saved before HI-2049: bytes only, so none of its starts has its characters; before HI-2063, none has their parts.
-    const c = readCounts(s, CATALOG_COUNTS, ['toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'])
-    if (!c || (s.role !== 'agent' && s.role !== 'assistant') || c.charStarts > c.starts || c.partStarts > c.charStarts || c.partToolsChars > c.toolsChars || c.descriptionChars + c.paramChars > c.partToolsChars) return
+    // Saved before HI-2049: bytes only, so none of its starts has its characters; before HI-2063, none has their parts;
+    // before HI-2553, no provider and no up-front part.
+    const c = readCounts(s, CATALOG_COUNTS, ['toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars', 'upfrontStarts', 'upfrontBytes'])
+    if (!c || (s.role !== 'agent' && s.role !== 'assistant') || c.charStarts > c.starts || c.partStarts > c.charStarts || c.partToolsChars > c.toolsChars || c.descriptionChars + c.paramChars > c.partToolsChars || c.upfrontStarts > c.starts) return
     const workflow = workflowOf(s.workflow)
-    const key = `${s.role} ${workflow}`
-    const g = part.catalog[key] ?? (room('catalog', key) ? (part.catalog[key] = emptyCatalog(s.role, workflow)) : null)
+    const provider = providerOf(s.provider)
+    const key = catalogKey(provider, s.role, workflow)
+    const g = part.catalog[key] ?? (room('catalog', key) ? (part.catalog[key] = emptyCatalog(provider, s.role, workflow)) : null)
     if (g) for (const k of CATALOG_COUNTS) g[k] += c[k]
   })
   return part
@@ -757,10 +781,12 @@ function mergePart(bucket: Bucket, a: PartData, b: PartData, capped: boolean): v
     return (map[key] ??= make(overflow))
   }
   for (const [k, v] of Object.entries(b.api)) {
-    const t = into('api', a.api, k, overflowKey.api(v.role, v.outcome), (o) => ({ ...v, ...(o ? { route: OTHER, method: OTHER } : {}), ...emptyTimed(), requestBytes: 0, responseBytes: 0 }))
+    const { reasons: _reasons, ...labels } = v
+    const t = into('api', a.api, k, overflowKey.api(v.role, v.outcome), (o): ApiSeries => ({ ...labels, ...(o ? { route: OTHER, method: OTHER } : {}), ...emptyTimed(), requestBytes: 0, responseBytes: 0 }))
     mergeTimed(t, v)
     t.requestBytes += v.requestBytes
     t.responseBytes += v.responseBytes
+    for (const [r, n] of Object.entries(v.reasons ?? {})) addReason((t.reasons ??= dict()), r, n)
   }
   for (const [k, v] of Object.entries(b.mcp)) {
     const t = into('mcp', a.mcp, k, overflowKey.mcp(v.role, v.mode, v.outcome), (o) => ({ ...v, ...(o ? { tool: OTHER } : {}), ...emptyTimed(), chars: 0, bytes: 0 }))
@@ -773,8 +799,8 @@ function mergePart(bucket: Bucket, a: PartData, b: PartData, capped: boolean): v
     for (const f of GUIDANCE_COUNTS) t[f] += v[f] ?? 0
   }
   for (const [k, v] of Object.entries(b.catalog)) {
-    const t = into('catalog', a.catalog, k, k, () => emptyCatalog(v.role, v.workflow))
-    for (const f of CATALOG_COUNTS) t[f] += v[f]
+    const t = into('catalog', a.catalog, k, k, () => emptyCatalog(v.provider ?? 'unknown', v.role, v.workflow))
+    for (const f of CATALOG_COUNTS) t[f] += v[f] ?? 0
   }
 }
 
@@ -962,10 +988,29 @@ export function apiOutcome(r: { finished: boolean; status: number; waiting: bool
   if (!r.finished) return 'cancelled'
   if (r.waiting) return 'waiting'
   const s = r.status
-  return s < 400 ? 'ok' : s === 401 || s === 403 ? 'denied' : s < 500 ? 'client-error' : 'server-error'
+  // A failure's kind (HI-2553): a rule or a guard said no (409), access (401, 403), a wrong call (any other 4xx), a real error.
+  return s < 400 ? 'ok' : s === 401 || s === 403 ? 'denied' : s === 409 ? 'refused' : s < 500 ? 'invalid' : 'server-error'
 }
 
-export function recordApi(h: MetricsHandle | null, project: string | null, r: { route: string; method: string; role: ApiSeries['role']; outcome: MetricOutcome; requestBytes: number; responseBytes: number; ms: number }): void {
+/** The label of a refusal's or a wrong call's reason (HI-2553): its rule's id or its message's, never its text; `other` without either. */
+export function reasonOf(e: unknown): string {
+  const rule = (e as { refusal?: { rule?: unknown } })?.refusal?.rule
+  if (typeof rule === 'string') return `rule:${rule}`
+  const id = messageId((e as { text?: unknown })?.text)
+  return id ? `msg:${id}` : 'other'
+}
+
+/** The id of a text's message (a Text's own, or its first part's), if it has one. */
+function messageId(t: unknown, depth = 0): string | null {
+  if (!t || typeof t !== 'object' || depth > 3) return null
+  const o = t as Record<string, unknown>
+  if (typeof o.id === 'string') return o.id
+  for (const k of ['m', 'said', 'shown', 'cap'] as const) if (o[k]) return messageId(o[k], depth + 1)
+  for (const k of ['lines', 'list'] as const) if (Array.isArray(o[k]) && o[k].length) return messageId(o[k][0], depth + 1)
+  return null
+}
+
+export function recordApi(h: MetricsHandle | null, project: string | null, r: { route: string; method: string; role: ApiSeries['role']; outcome: MetricOutcome; requestBytes: number; responseBytes: number; ms: number; reason?: string }): void {
   try {
     const at = bucketOf(h)
     if (!at) return
@@ -973,11 +1018,12 @@ export function recordApi(h: MetricsHandle | null, project: string | null, r: { 
     if (!part) return at.store.changed()
     const route = inSet(ROUTES, r.route)
     const method = inSet(METHODS, r.method)
-    const s = series(at.b, ownerOf(project), 'api', part.api, `${method} ${route} ${r.role} ${r.outcome}`, () => ({ route, method, role: r.role, outcome: r.outcome, ...emptyTimed(), requestBytes: 0, responseBytes: 0 }))
+    const s = series(at.b, ownerOf(project), 'api', part.api, `${method} ${route} ${r.role} ${r.outcome}`, (): ApiSeries => ({ route, method, role: r.role, outcome: r.outcome, ...emptyTimed(), requestBytes: 0, responseBytes: 0 }))
     if (s) {
       addTiming(s, r.ms)
       s.requestBytes += Math.max(0, Math.floor(r.requestBytes))
       s.responseBytes += Math.max(0, Math.floor(r.responseBytes))
+      if (r.outcome === 'refused' || r.outcome === 'invalid') addReason((s.reasons ??= dict()), r.reason ?? 'other', 1)
     }
     at.store.changed()
   } catch (e) {
@@ -989,11 +1035,13 @@ export function recordApi(h: MetricsHandle | null, project: string | null, r: { 
 export const MCP_REPORT_LIMITS = { events: 50, chars: 50_000_000, ms: 3_600_000, tools: 200 }
 
 /** One Combwork tool call the bridge answered (its report, checked: bad values are refused, not stored). */
-export function recordMcp(h: MetricsHandle | null, project: string | null, role: McpSeries['role'], e: { tool: unknown; mode: unknown; ok: unknown; chars: unknown; bytes: unknown; ms: unknown }): boolean {
+export function recordMcp(h: MetricsHandle | null, project: string | null, role: McpSeries['role'], e: { tool: unknown; mode: unknown; ok: unknown; kind?: unknown; chars: unknown; bytes: unknown; ms: unknown }): boolean {
   const chars = count(e.chars, MCP_REPORT_LIMITS.chars)
   const bytes = count(e.bytes, MCP_REPORT_LIMITS.chars * 4)
   const ms = count(e.ms, MCP_REPORT_LIMITS.ms)
   if (chars === null || bytes === null || ms === null || typeof e.ok !== 'boolean' || (e.mode !== 'compact' && e.mode !== 'detail')) return false
+  // A failed call's kind (HI-2553); a bridge from before it says none: `error`, its kind not known.
+  if (e.kind !== undefined && (e.ok || (e.kind !== 'refused' && e.kind !== 'invalid' && e.kind !== 'failed'))) return false
   try {
     const at = bucketOf(h)
     if (!at) return true
@@ -1004,7 +1052,7 @@ export function recordMcp(h: MetricsHandle | null, project: string | null, role:
       return true
     }
     const tool = inSet(TOOLS, e.tool)
-    const outcome = e.ok ? 'ok' : 'error'
+    const outcome: McpSeries['outcome'] = e.ok ? 'ok' : ((e.kind as McpSeries['outcome'] | undefined) ?? 'error')
     const s = series(at.b, ownerOf(project), 'mcp', part.mcp, `${tool} ${role} ${e.mode} ${outcome}`, () => ({ tool, role, mode: e.mode as McpSeries['mode'], outcome, ...emptyTimed(), chars: 0, bytes: 0 }))
     if (s) {
       addTiming(s, ms)
@@ -1024,7 +1072,7 @@ export function recordMcp(h: MetricsHandle | null, project: string | null, role:
  * its start counts in `starts`, not `charStarts`; one from before HI-2063 sends no parts: in `charStarts`, not
  * `partStarts`. Parts come both or neither, with the characters, and add up to no more than them.
  */
-export function recordCatalog(h: MetricsHandle | null, project: string | null, role: CatalogSeries['role'], workflow: CatalogSeries['workflow'], c: { tools: unknown; toolsBytes: unknown; toolsChars?: unknown; descriptionChars?: unknown; paramChars?: unknown }): boolean {
+export function recordCatalog(h: MetricsHandle | null, project: string | null, role: CatalogSeries['role'], workflow: CatalogSeries['workflow'], c: { tools: unknown; toolsBytes: unknown; toolsChars?: unknown; descriptionChars?: unknown; paramChars?: unknown; upfrontBytes?: unknown }, provider?: string | null): boolean {
   const int = (v: unknown): number | null => {
     const n = count(v, 10_000_000)
     return n !== null && Number.isInteger(n) ? n : null
@@ -1032,7 +1080,9 @@ export function recordCatalog(h: MetricsHandle | null, project: string | null, r
   const tools = count(c.tools, MCP_REPORT_LIMITS.tools)
   const toolsBytes = int(c.toolsBytes)
   const toolsChars = c.toolsChars === undefined ? undefined : int(c.toolsChars)
-  if (tools === null || toolsBytes === null || toolsChars === null || !Number.isInteger(tools)) return false
+  // What a CLI that defers tools gets at the start (HI-2553): a bridge from before it sends none. Never more than the list.
+  const upfrontBytes = c.upfrontBytes === undefined ? undefined : int(c.upfrontBytes)
+  if (tools === null || toolsBytes === null || toolsChars === null || upfrontBytes === null || !Number.isInteger(tools) || (upfrontBytes !== undefined && upfrontBytes > toolsBytes)) return false
   const hasParts = c.descriptionChars !== undefined || c.paramChars !== undefined
   const parts = hasParts ? { description: int(c.descriptionChars), param: int(c.paramChars) } : null
   if (parts && (toolsChars === undefined || parts.description === null || parts.param === null || parts.description + parts.param > toolsChars)) return false
@@ -1046,11 +1096,16 @@ export function recordCatalog(h: MetricsHandle | null, project: string | null, r
       return true
     }
     const side = workflowOf(workflow)
-    const s = series(at.b, ownerOf(project), 'catalog', part.catalog, `${role} ${side}`, () => emptyCatalog(role, side))
+    const cli = providerOf(provider)
+    const s = series(at.b, ownerOf(project), 'catalog', part.catalog, catalogKey(cli, role, side), () => emptyCatalog(cli, role, side))
     if (s) {
       s.starts++
       s.tools += tools
       s.toolsBytes += toolsBytes
+      if (upfrontBytes !== undefined) {
+        s.upfrontStarts++
+        s.upfrontBytes += upfrontBytes
+      }
       if (toolsChars !== undefined) {
         s.toolsChars += toolsChars
         s.charStarts++
@@ -1141,7 +1196,7 @@ const NOT_MEASURED = NOT_MEASURED_TEXT.map((m) => englishText(m))
 
 /** What a role or provider filter can't narrow (#850), each item's text for the window. */
 const NOT_FILTERED = {
-  provider: msg({ id: 'service.metrics.notPerProvider', defaultMessage: 'Agent API requests, tool calls and the tool list aren’t recorded per provider: they are every provider’s.', description: "A note on the Performance page while it is filtered by provider: these numbers can't be narrowed to one provider." }),
+  provider: msg({ id: 'service.metrics.notPerProvider', defaultMessage: 'Agent API requests and tool calls aren’t recorded per provider: they are every provider’s.', description: "A note on the Performance page while it is filtered by provider: these numbers can't be narrowed to one provider." }),
   shared: msg({ id: 'service.metrics.sharedNumbers', defaultMessage: 'The skill service and Combwork-wide numbers are shared: not per role or provider.', description: "A note on the Performance page while it is filtered by role or provider: these numbers can't be narrowed." }),
   dropped: msg({ id: 'service.metrics.droppedPerProject', defaultMessage: 'Dropped measurements are counted per project, not per role or provider.', description: "A note on the Performance page while it is filtered by role or provider: dropped measurements can't be narrowed." })
 }
@@ -1157,7 +1212,7 @@ function filtered(p: PartData, f: { role?: MetricsRole; provider?: string }): Pa
     for (const [k, v] of Object.entries(m)) if ((!f.role || v.role === f.role) && (!more || more(v))) out[k] = v
     return out
   }
-  return { api: keep(p.api), mcp: keep(p.mcp), guidance: keep(p.guidance, (g) => !f.provider || g.provider === f.provider), catalog: keep(p.catalog) }
+  return { api: keep(p.api), mcp: keep(p.mcp), guidance: keep(p.guidance, (g) => !f.provider || g.provider === f.provider), catalog: keep(p.catalog, (c) => !f.provider || c.provider === f.provider) }
 }
 
 /** How much of [from, to) the stretches cover, ms. */
@@ -1179,7 +1234,7 @@ function trendOf(inRange: Bucket[], from: number, to: number, parts: (b: Bucket)
   const start = to - first > slots * step ? Math.floor((to - (slots - 1) * step) / step) * step : first
   const points: TrendPoint[] = Array.from({ length: slots }, (_, i) => {
     const a = start + i * step
-    return { start: new Date(a).toISOString(), observedMs: overlap(observed, Math.max(a, from), Math.min(a + step, to)), requests: 0, failed: 0, cancelled: 0, waits: 0, requestBytes: 0, responseBytes: 0, toolCalls: 0, toolChars: 0, launches: 0, guidanceBytes: 0 }
+    return { start: new Date(a).toISOString(), observedMs: overlap(observed, Math.max(a, from), Math.min(a + step, to)), requests: 0, failed: 0, cancelled: 0, errors: 0, waits: 0, requestBytes: 0, responseBytes: 0, toolCalls: 0, toolChars: 0, launches: 0, guidanceBytes: 0 }
   })
   for (const b of inRange) {
     const pt = points[Math.floor((b.start - start) / step)]
@@ -1190,6 +1245,7 @@ function trendOf(inRange: Bucket[], from: number, to: number, parts: (b: Bucket)
         if (a.outcome === 'waiting') pt.waits += a.count
         else if (a.outcome !== 'ok') pt.failed += a.count
         if (a.outcome === 'cancelled') pt.cancelled += a.count
+        if (a.outcome === 'server-error') pt.errors! += a.count
         pt.requestBytes += a.requestBytes
         pt.responseBytes += a.responseBytes
       }

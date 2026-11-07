@@ -772,7 +772,7 @@
     "description": "On the Performance page, under What isn't measured: the coding agent CLIs' own network traffic."
   },
   "service.metrics.notPerProvider": {
-    "defaultMessage": "Agent API requests, tool calls and the tool list aren’t recorded per provider: they are every provider’s.",
+    "defaultMessage": "Agent API requests and tool calls aren’t recorded per provider: they are every provider’s.",
     "description": "A note on the Performance page while it is filtered by provider: these numbers can't be narrowed to one provider."
   },
   "service.metrics.notSkillReads": {

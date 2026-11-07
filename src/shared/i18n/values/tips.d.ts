@@ -378,6 +378,8 @@ interface CombworkMessageValues {
   'tips.perfCompare.title': undefined
   'tips.perfCompareAgents.text': undefined
   'tips.perfCompareAgents.title': undefined
+  'tips.perfFailures.text': undefined
+  'tips.perfFailures.title': undefined
   'tips.performance.text': undefined
   'tips.performance.title': undefined
   'tips.permissionMode.text': { key: string | number }

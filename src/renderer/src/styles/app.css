@@ -12164,6 +12164,11 @@ textarea.input.task-blocked-input {
 .perf-coverage {
   margin: 0 0 12px;
 }
+/* Real errors stand out from refusals and wrong calls (HI-2553). */
+.perf-real-errors {
+  color: var(--error);
+  font-weight: 600;
+}
 .perf-empty {
   display: flex;
   flex-direction: column;
