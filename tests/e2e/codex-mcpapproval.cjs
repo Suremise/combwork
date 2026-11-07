@@ -15,16 +15,25 @@ const stampLog = path.join(ws, '.combwork', 'mcp', 'stamp', 'calls.log')
 const small = { provider: 'codex', model: 'gpt-6-luna', effort: 'low' }
 const MODES = ['read-only', 'ask', 'approve-for-me', 'full-access']
 const TURN_MS = 180000
-// The terminal catching up with what a hook or the stamp log said already: a bound for a hung run.
+// Combwork's server logging a call it ran after the hook or the stamp log said so already: a bound for a hung run.
 const SHOWN_MS = 30000
-// Codex 0.163 calls MCP tools from one script (Combwork's transcript: "Script"), whose result waits for every call in it:
-// its screen says each call done, with its reply ("Called", redrawn over "Calling" as its last letters).
-// Codex redraws a line by moving the cursor over letters that didn't change, and plainText makes each move a space: any
-// letter of a reply can read as a space ("DE-1 crea ed in Todo", HI-2210).
-const gappy = (text) => [...text].map((c) => (c === ' ' ? ' ' : `[${c.replace(/[\\\]^-]/g, '\\$&')} ]`)).join('')
-const LISTED = new RegExp(`ed combwork\\.cw_list_projects\\s*└\\s*${gappy('demo')} \\(on`)
+// Which Combwork tools ran is read from Combwork's own server's test log (CW_TEST_MCP_LOG: each call it ran, whose, and
+// its reply's start), not the screen: Codex redraws its update notice over the history now and then, over a call's
+// "Called" line among others (HI-2699). Nobody answers an approval here, so a call that ran wasn't asked about.
+const mcpLog = path.join(scratch, 'cxmcp-mcp-calls.jsonl')
+const calls = () =>
+  (fs.existsSync(mcpLog) ? fs.readFileSync(mcpLog, 'utf8').split('\n') : []).flatMap((line) => {
+    try {
+      const c = JSON.parse(line)
+      return c?.tool ? [c] : []
+    } catch {
+      return []
+    }
+  })
+/** The call of Combwork's `tool` that worked, by `whose` (its log line), or undefined. */
+const ran = (tool, whose) => calls().find((c) => c.tool === tool && c.ok && whose(c))
 // Its reply names the card by its key alone (#1219, HI-1661): "DE-1 created in Todo".
-const CREATED = new RegExp(`ed combwork\\.cw_create_task\\s*└\\s*([A-Z]{2,4}-\\d+) ${gappy('created in Todo')}`)
+const CREATED = /^([A-Z]{2,4}-\d+) created in Todo/
 const record = {}
 let failed = 0
 const check = (name, ok, extra = '') => {
@@ -59,7 +68,7 @@ process.stdin.on('data', (d) => {
 `
 
 function prepare() {
-  for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
+  for (const d of [userData, ws, mcpLog]) fs.rmSync(d, { recursive: true, force: true })
   lib.gitProject(proj)
   fs.mkdirSync(path.dirname(stampLog), { recursive: true })
   fs.writeFileSync(path.join(path.dirname(stampLog), 'server.js'), STAMP_SERVER)
@@ -78,7 +87,7 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
 
 ;(async () => {
   prepare()
-  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases() })
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47897), CODEX_HOME: lib.CODEX_HOME, PATH: lib.pathWithoutStoreAliases(), CW_TEST_MCP_LOG: mcpLog })
   const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], env })
   try {
     const page = await app.firstWindow()
@@ -117,24 +126,24 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
           }, TURN_MS, 1000)
           if (end === 'turn ended') console.log(`INFO ${mode}: attempt ${attempt} ended without stamp's call: ${JSON.stringify((await screen(key)).slice(-300))}`)
         }
-        // Combwork's reply on screen, which can come after the hook or the log write that ended the wait above; Codex asking
-        // about a Combwork tool instead ends it too, and fails below.
+        // Combwork's tool ran (its server's log, written as it replies, which can come after the hook or the stamp log write
+        // that ended the wait above); Codex asking about a Combwork tool instead ends it too, and fails below.
         const own = await lib.until(async () => {
           const w = await live(proj, def.id)
           if (w?.status === 'waiting' && /combwork/.test(w.statusMessage ?? '')) return 'asked'
-          return LISTED.test(await screen(key)) ? 'shown' : null
+          return ran('cw_list_projects', (c) => c.agent === def.id) ? 'ran' : null
         }, SHOWN_MS, 500)
         const l = await live(proj, def.id)
         out.stampCall = end ?? 'no outcome'
         out.stampRan = stamped(mode)
-        out.combworkCall = own === 'shown' ? 'called, with its reply' : own === 'asked' ? `Codex asked: ${l?.statusMessage}` : null
+        out.combworkCall = own === 'ran' ? 'called, with its reply' : own === 'asked' ? `Codex asked: ${l?.statusMessage}` : null
         out.waitingMessage = l?.status === 'waiting' ? (l.statusMessage ?? '') : null
         // Codex's automatic reviewer looked at the call (Approve for me).
         out.reviewed = /Reviewing approval request/.test(await screen(key))
         out.screenEnd = (await screen(key)).slice(-1500)
         fs.writeFileSync(path.join(scratch, `mcpapproval-${mode}.txt`), (await screen(key)).slice(-6000))
         await page.screenshot({ path: path.join(scratch, `mcpapproval-${mode}.png`) })
-        check(`${mode}: Combwork's tool ran without Codex asking`, own === 'shown', out.combworkCall ?? out.screenEnd.slice(-400))
+        check(`${mode}: Combwork's tool ran without Codex asking`, own === 'ran', out.combworkCall ?? out.screenEnd.slice(-400))
         check(`${mode}: stamp's call came to an outcome`, !!end, out.screenEnd.slice(-400))
         if (end === 'asked') {
           check(`${mode}: Codex asks about stamp's tool, not Combwork's`, /mcp__stamp__stamp/.test(out.waitingMessage) && !/combwork/.test(out.waitingMessage), out.waitingMessage)
@@ -179,23 +188,25 @@ const stamped = (text) => (fs.existsSync(stampLog) ? fs.readFileSync(stampLog, '
         const l = await live(home, 'assistant')
         if (l?.status === 'waiting') asked = true
         if (asked) return true
-        // The turn over and both replies on screen (the terminal can follow the Stop hook).
-        const shown = await screen(akey)
-        return (l?.status === 'finished' || l?.status === 'ready') && LISTED.test(shown) && CREATED.test(shown)
+        // The turn over and both calls run (their server's log can follow the Stop hook).
+        const mine = (c) => c.role === 'assistant'
+        return (l?.status === 'finished' || l?.status === 'ready') && !!ran('cw_list_projects', mine) && !!ran('cw_create_task', mine)
       }, TURN_MS, 1000)
       const l = await live(home, 'assistant')
       const shown = await screen(akey)
+      const listed = ran('cw_list_projects', (c) => c.role === 'assistant')
+      const created = ran('cw_create_task', (c) => c.role === 'assistant')
       record.assistant = { asked, screenEnd: shown.slice(-1500) }
       fs.writeFileSync(path.join(scratch, 'mcpapproval-assistant.txt'), (await screen(akey)).slice(-6000))
       await page.screenshot({ path: path.join(scratch, 'mcpapproval-assistant.png') })
       check('Assistant: its turn ended', !!done, record.assistant.screenEnd.slice(-400))
       check('Assistant: never asked about a Combwork tool', !asked, l?.statusMessage ?? '')
-      check('Assistant: cw_list_projects ran', LISTED.test(shown), record.assistant.screenEnd.slice(-400))
-      check('Assistant: cw_create_task ran', CREATED.test(shown), record.assistant.screenEnd.slice(-400))
+      check('Assistant: cw_list_projects ran', !!listed, record.assistant.screenEnd.slice(-400))
+      check('Assistant: cw_create_task ran', !!created, record.assistant.screenEnd.slice(-400))
       const card = (await inv('tasks:list')).find((t) => t.title === 'MCP approval check')
       record.assistant.cardMade = card ? { number: card.number, project: card.project } : null
       check('Assistant: the card is on the board, in demo', card?.project === 'demo', JSON.stringify(record.assistant.cardMade))
-      const [, key] = CREATED.exec(shown) ?? []
+      const [, key] = CREATED.exec(created?.reply ?? '') ?? []
       check('Assistant: the reply named that card, by its key', !!card && key === card.key, JSON.stringify({ key, card: card && { key: card.key, number: card.number } }))
 
       // A Combwork tool outside its Control subset (#1174, #1281: Codex pre-approves only the subset, per tool): writing a
