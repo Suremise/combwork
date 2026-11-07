@@ -4,6 +4,7 @@
 // looks for a conversation (only Combwork's profiles, the path agy reports only when it is that conversation's there).
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { pathToFileURL } from 'url'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -115,16 +116,27 @@ describe("agy's transcript as usage", () => {
     expect(Object.values(u.days!).reduce((n, d) => n + d.requests, 0)).toBe(2)
   })
 
-  it("doesn't count cached tokens twice (input includes them), unless its setting says input doesn't", async () => {
+  it("counts the cache once: a request's input is without its cache read (1.5.0's subagent request), unless its setting says it includes it", async () => {
+    const child = parseAgyTranscript(fixture('subagent-child-1.5.0.jsonl'), 'ded852d1-0c96-4f30-bf60-bc1a470ed6c8')
+    expect(child).toMatchObject({ requests: 2, inputTokens: 2198 + 7413, cacheReadTokens: 5058, outputTokens: 55 + 9, userMessages: 0 })
     const line = JSON.stringify({ step_index: 1, source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', created_at: '2026-11-07T02:00:00Z', input_tokens: 5000, cache_read_tokens: 1000, output_tokens: 10 })
-    const inclusive = parseAgyTranscript(line, PLAIN)
-    expect(inclusive).toMatchObject({ inputTokens: 4000, cacheReadTokens: 1000, contextTokens: 5010, contextInputTokens: 5000 })
-    await advanced.set('antigravity.usage.inputIncludesCache', false)
+    expect(parseAgyTranscript(line, PLAIN)).toMatchObject({ inputTokens: 5000, cacheReadTokens: 1000, contextTokens: 6010, contextInputTokens: 6000 })
+    await advanced.set('antigravity.usage.inputIncludesCache', true)
     try {
-      expect(parseAgyTranscript(line, PLAIN)).toMatchObject({ inputTokens: 5000, cacheReadTokens: 1000, contextTokens: 6010 })
+      expect(parseAgyTranscript(line, PLAIN)).toMatchObject({ inputTokens: 4000, cacheReadTokens: 1000, contextTokens: 5010 })
     } finally {
       await advanced.set('antigravity.usage.inputIncludesCache', null)
     }
+  })
+
+  it('counts a compaction (its CHECKPOINT): its own request, what it left, asked for by /compact, which is no prompt', () => {
+    const u = parseAgyTranscript(fixture('tools-resume-compact-1.5.0.jsonl'), TOOLS)
+    // Three prompts (the first, AGAIN, and the path Git Bash made of a /compact), /compact itself, then the checkpoint.
+    expect(u.userMessages).toBe(3)
+    expect(u.requests).toBe(6)
+    expect(u.compactions).toEqual([{ timestamp: '2026-11-07T11:47:44Z', trigger: 'manual', preTokens: 8163 + 36, postTokens: 820, lastInputTokens: 8163, lastOutputTokens: 36 }])
+    expect(u.contextTokens).toBe(820)
+    expect(u.lastPrompt).toBe('C:/Program Files/Git/compact')
   })
 
   it('reads a file agy wrote again without counting its steps twice; the usage worker has its parser', () => {
@@ -205,5 +217,74 @@ describe("agy's status line", () => {
     const lines = readFileSync(join(__dirname, 'fixtures', 'advanced', 'statusline-antigravity-1.5.0.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l))
     expect(antigravity.statusLine(lines[0])).toEqual({})
     expect(antigravity.statusLine(lines[1])).toEqual({ modelName: 'Gemini 3.8 Flash (Low)', effort: 'low', contextWindow: 1048576 })
+  })
+})
+
+describe("agy 1.5.0's tools, resume, compaction, image and subagent (HI-2546's runs)", () => {
+  const kinds = (p: { items: { kind: string }[] }) => p.items.map((i) => i.kind)
+
+  it("shows file tools by their path, a command by agy's own summary, refused; a resume's notice; /compact as a command, then its compaction", () => {
+    const p = items(fixture('tools-resume-compact-1.5.0.jsonl'), 'C:\\work')
+    expect(kinds(p)).toEqual(['user', 'tool', 'tool', 'tool', 'user', 'notice', 'assistant', 'user', 'notice', 'assistant', 'command', 'notice', 'compaction'])
+    const tools = p.items.flatMap((i) => (i.kind === 'tool' ? [i.tool] : []))
+    expect(tools.map((t) => [t.toolUseId, t.name, t.summary, t.isError])).toEqual([
+      ['2', 'read_file', 'notes.txt', false],
+      ['4', 'edit_file', 'notes.txt', false],
+      ['6', 'run_command', 'Echo probe-done', true]
+    ])
+    expect(tools[0].result).toBe('Showing lines 1-1 of 1\n1: apple banana')
+    expect(tools[2].result).toMatch(/^permission check failed for unsandboxed "echo probe-done"/)
+    expect(tools[2].input).toBe('CommandLine: echo probe-done\nWaitMsBeforeAsync: 5000')
+    expect(p.items[5]).toMatchObject({ kind: 'notice', level: 'info', text: expect.stringMatching(/^\[Notice\] All your subagents/) })
+    expect(p.items[10]).toMatchObject({ kind: 'command', name: '/compact', args: '' })
+    expect(p.items[12]).toMatchObject({ kind: 'compaction', trigger: 'manual', preTokens: 8163 + 36, postTokens: 820, summary: expect.stringMatching(/^# Resuming from a compaction/) })
+  })
+
+  it("shows the image a tool read, from agy's media file in a Combwork profile, never another file", () => {
+    const text = fixture('image-1.5.0.jsonl')
+    const p = items(text)
+    const tool = p.items.flatMap((i) => (i.kind === 'tool' ? [i.tool] : []))[0]
+    expect(tool.images).toEqual([{ id: 0, path: null }])
+    expect(p.images).toHaveLength(1)
+    // The line the location names, its media entry put in a profile of this test's.
+    const conv = 'b6078cac-11ea-44a7-a86d-584af6b5b6ce'
+    const media = join(profilesRoot(), 'agent-img', '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'media')
+    mkdirSync(media, { recursive: true })
+    writeFileSync(join(media, 'step_2_media_0.png'), readFileSync(join(FIX, 'image-1.5.0-media.png')))
+    const loc = p.images[0]
+    const line = JSON.parse(Buffer.from(text).subarray(loc.offset, loc.offset + loc.length).toString('utf8'))
+    expect(line.step_index).toBe(2)
+    const here = (uri: string) => ({ ...line, media: [{ ...line.media[0], uri }] })
+    const own = pathToFileURL(join(media, 'step_2_media_0.png')).href
+    expect(antigravity.imageData(here(own), loc)).toBe(`data:image/png;base64,${readFileSync(join(FIX, 'image-1.5.0-media.png')).toString('base64')}`)
+    // Outside the profiles, outside logs\media, or not an image: none.
+    writeFileSync(join(base, 'elsewhere.png'), 'x')
+    expect(antigravity.imageData(here(pathToFileURL(join(base, 'elsewhere.png')).href), loc)).toBeNull()
+    expect(antigravity.imageData(here(own.replace('/media/', '/')), loc)).toBeNull()
+    expect(antigravity.imageData({ media: [{ mime_type: 'text/plain', uri: own }] }, loc)).toBeNull()
+  })
+
+  it("a subagent is a conversation of its own: its parent's task is its prompt, its answer a note in the parent's", async () => {
+    const child = items(fixture('subagent-child-1.5.0.jsonl'))
+    expect(child.items[0]).toMatchObject({ kind: 'user', text: 'What is 2+2? Reply with just the answer.' })
+    expect(child.items.flatMap((i) => (i.kind === 'tool' ? [[i.tool.name, i.tool.summary]] : []))).toEqual([['send_message', '4']])
+    const parent = items(fixture('subagent-parent-1.5.0.jsonl'))
+    const tools = parent.items.flatMap((i) => (i.kind === 'tool' ? [i.tool] : []))
+    expect(tools.map((t) => [t.name, t.summary])).toEqual([
+      ['invoke_subagent', 'What is 2+2? Reply with just the answer.'],
+      ['read_file', expect.stringMatching(/transcript\.jsonl$/)],
+      ['manage_subagents', 'list']
+    ])
+    expect(parent.items.at(-2)).toMatchObject({ kind: 'notice', level: 'info', from: 'task', text: '4' })
+    expect(parent.items.at(-1)).toMatchObject({ kind: 'assistant', text: '4' })
+    // Its parent, from its first step; the parent's own first step names none.
+    const dir = join(base, 'subs')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'child.jsonl'), fixture('subagent-child-1.5.0.jsonl'))
+    writeFileSync(join(dir, 'parent.jsonl'), fixture('subagent-parent-1.5.0.jsonl'))
+    expect(await antigravity.subSessionOf(join(dir, 'child.jsonl'), 'ded852d1-0c96-4f30-bf60-bc1a470ed6c8')).toEqual({ parentId: 'f57ee6fa-3d66-4a22-b458-764656e4d25d', kind: 'subagent' })
+    expect(await antigravity.subSessionOf(join(dir, 'parent.jsonl'), 'f57ee6fa-3d66-4a22-b458-764656e4d25d')).toBeNull()
+    // Its usage is its own, never its parent's.
+    expect(parseAgyTranscript(fixture('subagent-parent-1.5.0.jsonl'), 'f57ee6fa-3d66-4a22-b458-764656e4d25d')).toMatchObject({ requests: 4, cacheReadTokens: 0, userMessages: 1 })
   })
 })

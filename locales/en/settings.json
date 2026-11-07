@@ -515,6 +515,14 @@
     "defaultMessage": "Transcript: a tool result's times",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
+  "settings.advanced.antigravity.transcript.systemMessage.desc": {
+    "defaultMessage": "A message in agy's transcript from agy itself or another conversation (a subagent's task or answer): who sent it is its first group, what it says its second. Wrong, those messages aren't shown, and a subagent's conversation isn't found under its parent.",
+    "description": "What the advanced setting \"Transcript: agy's messages\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.title": {
+    "defaultMessage": "Transcript: agy's messages",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
   "settings.advanced.antigravity.transcript.userRequest.desc": {
     "defaultMessage": "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.",
     "description": "What the advanced setting \"Transcript: your prompt\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."

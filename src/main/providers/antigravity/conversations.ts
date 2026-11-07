@@ -1,9 +1,12 @@
 import { dirname, join, resolve } from 'path'
-import { existsSync, readdirSync, readFileSync } from 'original-fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'original-fs'
 import { readdir, readFile, stat } from 'original-fs/promises'
+import { fileURLToPath } from 'url'
+import type { SubSession } from '../../../shared/types'
 import type { ExternalSession } from '../types'
+import { keepBounded, readFirstLine } from '../common'
 import { brainDir } from './home'
-import { annotationTitle } from './transcript'
+import { annotationTitle, parentOf } from './transcript'
 
 // Where agy keeps an agent's conversations in its profile (HI-2546, read from 1.5.0's): brain\<id>\.system_generated\logs
 // holds transcript_full.jsonl (what its hooks name) and transcript.jsonl (each argument encoded again); annotations\<id>.pbtxt
@@ -115,8 +118,56 @@ export async function listConversations(root: string, folder: string, skip?: (id
       if (!isConversationId(id) || skip?.(id)) continue
       const p = transcriptIn(profile, id)
       const st = p ? await stat(p).catch(() => null) : null
-      if (p && st && st.size > 0) out.push({ id, transcriptPath: p, modified: st.mtime.toISOString(), bytes: st.size, mtimeMs: st.mtimeMs })
+      if (!p || !st || st.size === 0) continue
+      const sub = await subOf(p, st.mtimeMs)
+      out.push({ id, transcriptPath: p, modified: st.mtime.toISOString(), bytes: st.size, mtimeMs: st.mtimeMs, ...(sub ? { sub } : {}) })
     }
   }
   return out
+}
+
+/** Each transcript's answer, by path and time: its first step never changes once written. */
+const subs = new Map<string, SubSession | null>()
+
+/**
+ * Whether a transcript is a subagent's (HI-2546, 1.5.0's runs): a subagent is a conversation of its own, whose first step
+ * is its parent's task, a SYSTEM_MESSAGE from the parent's conversation (parentOf).
+ */
+export async function subOf(path: string, mtimeMs?: number): Promise<SubSession | null> {
+  const key = `${path.toLowerCase()}|${mtimeMs ?? ''}`
+  const known = subs.get(key)
+  if (known !== undefined) return known
+  const parent = parentOf(await readFirstLine(path).catch(() => ''))
+  const sub: SubSession | null = parent ? { parentId: parent, kind: 'subagent' } : null
+  keepBounded(subs, key, sub)
+  return sub
+}
+
+/** The largest image Combwork shows from agy's media files. */
+const MEDIA_MAX = 20 * 1024 * 1024
+
+/**
+ * An image a step names (its `media` entry: {mime_type, uri}) as a data URL, read from the file its uri names: only a file
+ * in a conversation's logs\media in one of Combwork's profiles (under `root`), never anywhere else agy's word points.
+ */
+export function mediaData(entry: unknown, root: string): string | null {
+  const m = entry as { mime_type?: unknown; uri?: unknown } | null
+  if (!m || typeof m.uri !== 'string' || typeof m.mime_type !== 'string' || !/^image\/[\w.+-]+$/.test(m.mime_type)) return null
+  let file: string
+  try {
+    file = resolve(m.uri.startsWith('file:') ? fileURLToPath(m.uri) : m.uri)
+  } catch {
+    return null
+  }
+  const r = folderKey(root)
+  if (!file.toLowerCase().startsWith(r + '\\') && !file.toLowerCase().startsWith(r + '/')) return null
+  const parts = file.slice(r.length + 1).split(/[\\/]/)
+  // <profile key>\.gemini\antigravity-cli\brain\<id>\.system_generated\logs\media\<file>
+  if (parts.length !== 9 || parts[1] !== '.gemini' || parts[2] !== 'antigravity-cli' || parts[3] !== 'brain' || !isConversationId(parts[4]) || parts[5] !== '.system_generated' || parts[6] !== 'logs' || parts[7] !== 'media') return null
+  try {
+    if (statSync(file).size > MEDIA_MAX) return null
+    return `data:${m.mime_type};base64,${readFileSync(file).toString('base64')}`
+  } catch {
+    return null
+  }
 }

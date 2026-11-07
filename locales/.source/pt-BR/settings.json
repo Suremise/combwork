@@ -128,6 +128,8 @@
   "settings.advanced.antigravity.transcript.modelChange.title": "Transcript: the model picked",
   "settings.advanced.antigravity.transcript.stepHeader.desc": "The times agy writes before a tool's result in its transcript, which Combwork leaves out when it shows the result. Wrong, results show with those times.",
   "settings.advanced.antigravity.transcript.stepHeader.title": "Transcript: a tool result's times",
+  "settings.advanced.antigravity.transcript.systemMessage.desc": "A message in agy's transcript from agy itself or another conversation (a subagent's task or answer): who sent it is its first group, what it says its second. Wrong, those messages aren't shown, and a subagent's conversation isn't found under its parent.",
+  "settings.advanced.antigravity.transcript.systemMessage.title": "Transcript: agy's messages",
   "settings.advanced.antigravity.transcript.userRequest.desc": "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.",
   "settings.advanced.antigravity.transcript.userRequest.title": "Transcript: your prompt",
   "settings.advanced.antigravity.usage.inputIncludesCache.desc": "Whether a request's input_tokens in agy's transcript already count its cache_read_tokens. Wrong, Combwork counts cached tokens twice, or leaves them out of the context.",

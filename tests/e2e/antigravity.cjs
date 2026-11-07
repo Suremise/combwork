@@ -117,7 +117,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await agTab.waitFor({ timeout: HUNG_MS })
   await agTab.click()
   // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
-  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 6, HUNG_MS)))
+  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 7, HUNG_MS)))
   await shots('advanced')
   await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
@@ -168,8 +168,8 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
     const u = await inv('session:usage', alpha, first.conv).catch(() => null)
     return u?.requests === 3 ? u : null
   }, HUNG_MS)
-  // The fake's requests: input 7000 + 100 × its step (the cache read among it from the second on: 4000), output 20.
-  check("its usage counts each request, the cache once, its prompts, model and agy's title", !!used && used.inputTokens === 7100 + 7300 + 7500 - 8000 && used.cacheReadTokens === 8000 && used.outputTokens === 60 && used.userMessages === 2 && used.model === 'Gemini 3.8 Flash (Low)' && used.title === 'Fake: hello antigravity' && used.costUsd === null, JSON.stringify(used && { ...used, days: undefined, timeline: undefined }))
+  // The fake's requests: input 3000 + 100 × its step without the cache read (4000 from the second on), output 20.
+  check("its usage counts each request, the cache once, its prompts, model and agy's title", !!used && used.inputTokens === 3100 + 3300 + 3500 && used.cacheReadTokens === 8000 && used.contextTokens === 3500 + 4000 + 20 && used.outputTokens === 60 && used.userMessages === 2 && used.model === 'Gemini 3.8 Flash (Low)' && used.title === 'Fake: hello antigravity' && used.costUsd === null, JSON.stringify(used && { ...used, days: undefined, timeline: undefined }))
   const details = await live(gem.id)
   check("the status line gives the model, its effort and the context window", details?.modelName === 'Gemini 3.8 Flash (Low)' && details?.effort === 'low', JSON.stringify({ modelName: details?.modelName, effort: details?.effort }))
   check('it stops', !!(await stop()))

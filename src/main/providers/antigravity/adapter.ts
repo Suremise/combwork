@@ -15,13 +15,13 @@ import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
 import { compareVersions, exportSubtitleText, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
-import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { antigravityEnv, brainDir, checkEnv, inProfile, inUserProfile, profilesRoot } from './home'
 import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
 import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
 import { agyStatusDetails } from './status'
 import { AntigravityConversationParser, AntigravityUsageParser, parseAgyTranscript } from './transcript'
-import { conversationTitle, isConversationId, listConversations, profileOf, profileOfNow, profileTranscript, transcriptIn } from './conversations'
+import { conversationTitle, isConversationId, listConversations, mediaData, profileOf, profileOfNow, profileTranscript, subOf, transcriptIn } from './conversations'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
@@ -301,8 +301,9 @@ export class AntigravityAdapter implements ProviderAdapter {
     return listConversations(profilesRoot(), folder, skip)
   }
 
-  subSessionOf(): Promise<SubSession | null> {
-    return Promise.resolve(null)
+  /** A subagent's conversation, from its first step (subOf); a transcript of Combwork's profiles only. */
+  subSessionOf(path: string, _sessionId: string, mtimeMs?: number): Promise<SubSession | null> {
+    return subOf(path, mtimeMs)
   }
 
   /**
@@ -338,9 +339,11 @@ export class AntigravityAdapter implements ProviderAdapter {
     return new AntigravityConversationParser(projectPath)
   }
 
-  /** None: agy 1.5.0's transcripts recorded so far hold no image data. */
-  imageData(): string | null {
-    return null
+  /** An image a tool read (its result step's `media`, a file in the conversation's logs\media): mediaData. */
+  imageData(line: Record<string, any>, loc: ImageLocation): string | null {
+    let v: any = line
+    for (const k of loc.path) v = v?.[k]
+    return mediaData(v, profilesRoot())
   }
 
   exportSubtitle(sessionId: string, project: string): string {

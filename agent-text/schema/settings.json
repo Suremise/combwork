@@ -50,6 +50,12 @@
   "settings.advanced.antigravity.transcript.stepHeader.title": {
     "placeholders": {}
   },
+  "settings.advanced.antigravity.transcript.systemMessage.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.title": {
+    "placeholders": {}
+  },
   "settings.advanced.antigravity.transcript.userRequest.desc": {
     "placeholders": {}
   },

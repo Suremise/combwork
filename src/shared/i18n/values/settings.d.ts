@@ -130,6 +130,8 @@ interface CombworkMessageValues {
   'settings.advanced.antigravity.transcript.modelChange.title': undefined
   'settings.advanced.antigravity.transcript.stepHeader.desc': undefined
   'settings.advanced.antigravity.transcript.stepHeader.title': undefined
+  'settings.advanced.antigravity.transcript.systemMessage.desc': undefined
+  'settings.advanced.antigravity.transcript.systemMessage.title': undefined
   'settings.advanced.antigravity.transcript.userRequest.desc': undefined
   'settings.advanced.antigravity.transcript.userRequest.title': undefined
   'settings.advanced.antigravity.usage.inputIncludesCache.desc': undefined

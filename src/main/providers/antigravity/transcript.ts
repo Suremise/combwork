@@ -1,4 +1,4 @@
-import type { DayUsage, SessionUsage, TranscriptItem, TranscriptTool, UsageTokens } from '../../../shared/types'
+import type { CompactionEvent, DayUsage, SessionUsage, TranscriptImageRef, TranscriptItem, TranscriptTool, UsageTokens } from '../../../shared/types'
 import { emptyDay, localDay } from '../../../shared/usageDays'
 import { TimelineBuilder } from '../../../shared/usageTimeline'
 import { ANTIGRAVITY } from '../../../shared/antigravity'
@@ -8,14 +8,19 @@ import type { ConversationParserLike, ImageLocation } from '../types'
 import { advancedValues as advanced } from '../../advancedValues'
 
 /**
- * The Antigravity CLI's transcript of a conversation (HI-2546, read from 1.5.0's): brain\<conversation id>\.system_generated\
- * logs\transcript_full.jsonl in the agent's profile (what its hooks name), one step per line: {step_index, source, type,
- * status, created_at, …}. Types seen: USER_INPUT (source USER_EXPLICIT: the user's prompt, wrapped in what agy adds),
- * PLANNER_RESPONSE (the model's request: its text in `content`, its `tool_calls` [{name, args}] and its tokens) and
- * GENERIC (a tool call's result or error, one step per call, in the order the request made them). transcript.jsonl beside
- * it is the same with each argument JSON-encoded again. The format isn't documented as stable, so anything unrecognised
- * is left out, and a line that goes back to a step already read (agy writing the file again from the start, as a rewind
- * may) is left out too: the reader reads a file that shrank again from its start.
+ * The Antigravity CLI's transcript of a conversation (HI-2546, read from 1.5.0's: tests/fixtures/antigravity): brain\
+ * <conversation id>\.system_generated\logs\transcript_full.jsonl in the agent's profile (what its hooks name), one step a
+ * line: {step_index, source, type, status, created_at, …}. Types seen:
+ * - USER_INPUT (source USER_EXPLICIT): the user's prompt inside what agy adds (a slash command, `/compact`, among them);
+ * - PLANNER_RESPONSE: a model request, its text in `content`, its `tool_calls` [{name, args}] and its tokens;
+ * - the result of each of those calls, one step each, in order (GENERIC; an image a tool read in its `media`, a file
+ *   under logs\media);
+ * - SYSTEM_MESSAGE (source SYSTEM): a message from agy ("sender=system") or another conversation (a subagent's answer,
+ *   or, as a subagent's first step, its parent's task);
+ * - CHECKPOINT (source SYSTEM): a compaction, its summary in `content`, its own request's tokens.
+ * transcript.jsonl beside it is the same with each argument JSON-encoded again. A subagent is a conversation of its own.
+ * The format isn't documented as stable: anything unrecognised is left out, as is a line for a step already read (agy
+ * writing the file again from the start); the reader reads a file that shrank again from its start.
  */
 
 export type AgyStep = {
@@ -31,6 +36,7 @@ export type AgyStep = {
   output_tokens?: number
   thinking?: string
   tool_calls?: { name?: string; args?: Record<string, unknown> }[]
+  media?: { mime_type?: string; uri?: string }[]
 }
 
 export function parseStep(line: string): AgyStep | null {
@@ -71,11 +77,37 @@ export function modelChange(content: unknown): string | null {
   return pattern('antigravity.transcript.modelChange')?.exec(content)?.[1]?.trim() || null
 }
 
-/** A user's prompt: USER_INPUT from the user (not one agy made itself, a continuation's). */
+/** A SYSTEM_MESSAGE's sender ("system", or another conversation's id) and what it says (antigravity.transcript.systemMessage). */
+export function systemMessage(content: unknown): { sender: string; text: string } | null {
+  if (typeof content !== 'string') return null
+  const m = pattern('antigravity.transcript.systemMessage')?.exec(content)
+  return m ? { sender: m[1], text: m[2].trim() } : null
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** A subagent's parent, from its transcript's first step: a SYSTEM_MESSAGE whose sender is a conversation. */
+export function parentOf(first: string): string | null {
+  const s = parseStep(first)
+  if (!s || s.type !== 'SYSTEM_MESSAGE' || s.step_index !== 0) return null
+  const m = systemMessage(s.content)
+  return m && UUID.test(m.sender) ? m.sender : null
+}
+
+/** A prompt that is a slash command (`/compact`): its name and arguments, or null. */
+export function slashCommand(text: string): { name: string; args: string } | null {
+  const m = /^(\/[A-Za-z][\w-]*)(?:\s+([\s\S]*))?$/.exec(text.trim())
+  return m ? { name: m[1], args: (m[2] ?? '').trim() } : null
+}
+
+/** A user's prompt: USER_INPUT from the user (not one agy made itself). */
 export const isUserPrompt = (s: AgyStep): boolean => s.type === 'USER_INPUT' && s.source === 'USER_EXPLICIT'
 
 /** A model request: PLANNER_RESPONSE. */
 export const isModelRequest = (s: AgyStep): boolean => s.type === 'PLANNER_RESPONSE'
+
+/** A compaction: CHECKPOINT. */
+export const isCompaction = (s: AgyStep): boolean => s.type === 'CHECKPOINT'
 
 /** transcript.jsonl encodes each argument as JSON again ("\"probe-A\""): decoded, as transcript_full.jsonl has them. */
 export function plainArgs(args: unknown): Record<string, unknown> {
@@ -97,8 +129,11 @@ export function plainArgs(args: unknown): Record<string, unknown> {
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
 
-/** The arguments that say what a call is about, by agy's argument names, first found first. */
-const SUMMARY_KEYS = ['CommandLine', 'Command', 'AbsolutePath', 'TargetFile', 'FilePath', 'Path', 'DirectoryPath', 'SearchPath', 'Url', 'Query', 'Pattern', 'Prompt', 'Task'] // i18n-ignore: agy's argument names
+/**
+ * The arguments that say what a call is about, by agy's argument names (1.5.0: read_file and edit_file's Path, run_command's
+ * CommandLine and its own toolSummary, invoke_subagent's Prompt), first found first.
+ */
+const SUMMARY_KEYS = ['toolSummary', 'CommandLine', 'Command', 'AbsolutePath', 'TargetFile', 'FilePath', 'Path', 'DirectoryPath', 'SearchPath', 'Url', 'Query', 'Pattern', 'Prompt', 'Message', 'Task'] // i18n-ignore: agy's argument names
 const PATH_KEYS = new Set(['AbsolutePath', 'TargetFile', 'FilePath', 'Path', 'DirectoryPath', 'SearchPath']) // i18n-ignore: agy's argument names
 
 /** A tool call as the viewer shows it: an MCP server's tool as "<server> · <tool>" (as Copilot's are), else agy's name. */
@@ -110,10 +145,11 @@ export function agyTool(name: string, args: Record<string, unknown>, root: strin
   }
   const key = SUMMARY_KEYS.find((k) => typeof args[k] === 'string' && (args[k] as string).trim())
   const summary = key ? (PATH_KEYS.has(key) ? shortPath(args[key], root) : firstLine(args[key])) : firstLine(Object.values(args).find((v) => typeof v === 'string' && v.trim()))
-  return { name, summary: summary.slice(0, 200), input: formatToolInput(name, args) }
+  const { toolSummary: _summary, ...input } = args
+  return { name, summary: summary.slice(0, 200), input: formatToolInput(name, input) }
 }
 
-/** agy's transcript parser: the user's prompts, the model's text and its tool calls with their results. */
+/** agy's transcript parser: the user's prompts, the model's text and its tool calls with their results and images. */
 export class AntigravityConversationParser implements ConversationParserLike {
   readonly items: TranscriptItem[] = []
   readonly images: ImageLocation[] = []
@@ -123,6 +159,9 @@ export class AntigravityConversationParser implements ConversationParserLike {
   private waiting: TranscriptTool[] = []
   /** The last step read: a line for one before it is agy writing the file again (left out). */
   private last = -1
+  /** The context before a compaction (the last request's input and output), and whether a /compact asked for it. */
+  private context = 0
+  private compactAsked = false
 
   constructor(projectPath: string | null = null) {
     this.root = projectPath
@@ -131,7 +170,7 @@ export class AntigravityConversationParser implements ConversationParserLike {
   feed(buf: Buffer): number {
     let start = 0
     for (let nl = buf.indexOf(10); nl !== -1; nl = buf.indexOf(10, start)) {
-      this.line(buf.toString('utf8', start, nl))
+      this.line(buf.toString('utf8', start, nl), this.offset + start, nl - start)
       start = nl + 1
     }
     this.offset += start
@@ -142,7 +181,18 @@ export class AntigravityConversationParser implements ConversationParserLike {
     this.items.push({ ...item, id: this.items.length } as TranscriptItem)
   }
 
-  private line(text: string): void {
+  /** The images a step names (its `media`): each read from the file it names when shown (imageData). */
+  private media(s: AgyStep, offset: number, length: number): TranscriptImageRef[] {
+    const out: TranscriptImageRef[] = []
+    ;(Array.isArray(s.media) ? s.media : []).forEach((m, i) => {
+      if (!m || typeof m.uri !== 'string' || !String(m.mime_type ?? '').startsWith('image/')) return
+      this.images.push({ offset, length, path: ['media', i] })
+      out.push({ id: this.images.length - 1, path: null })
+    })
+    return out
+  }
+
+  private line(text: string, offset: number, length: number): void {
     const s = parseStep(text)
     if (!s) return
     if (typeof s.step_index === 'number') {
@@ -153,23 +203,43 @@ export class AntigravityConversationParser implements ConversationParserLike {
     if (s.type === 'USER_INPUT') {
       this.waiting = []
       const said = userRequestText(s.content)
-      if (isUserPrompt(s) && said) this.push({ kind: 'user', timestamp: ts, text: said, images: [] })
+      if (!isUserPrompt(s) || !said) return
+      const cmd = slashCommand(said)
+      if (cmd) {
+        this.compactAsked = cmd.name === '/compact'
+        this.push({ kind: 'command', timestamp: ts, name: cmd.name, args: cmd.args, output: '' })
+      } else this.push({ kind: 'user', timestamp: ts, text: said, images: [] })
       return
     }
     if (isModelRequest(s)) {
       this.waiting = []
+      this.context = num(s.input_tokens) + num(s.cache_read_tokens) + num(s.output_tokens) || this.context
       if (typeof s.thinking === 'string' && s.thinking.trim()) this.push({ kind: 'thinking', timestamp: ts, text: s.thinking })
       if (typeof s.content === 'string' && s.content.trim()) this.push({ kind: 'assistant', timestamp: ts, text: s.content })
       const calls = Array.isArray(s.tool_calls) ? s.tool_calls : []
       calls.forEach((c, i) => {
         if (!c || typeof c !== 'object') return
-        const args = plainArgs(c.args)
-        const shown = agyTool(String(c.name ?? 'tool'), args, this.root)
+        const shown = agyTool(String(c.name ?? 'tool'), plainArgs(c.args), this.root)
         // The call's id: the step its result will be (agy's hooks name a call by it, stepIdx), as far as known now.
         const tool: TranscriptTool = { toolUseId: `${(s.step_index ?? 0) + 1 + i}`, ...shown, result: null, isError: false, images: [] }
         this.waiting.push(tool)
         this.push({ kind: 'tool', timestamp: ts, tool })
       })
+      return
+    }
+    if (s.type === 'SYSTEM_MESSAGE') {
+      const m = systemMessage(s.content)
+      if (!m || !m.text) return
+      // A subagent's first step is its parent's task: its prompt. Another conversation's message later is a subagent's answer.
+      if (s.step_index === 0 && UUID.test(m.sender)) this.push({ kind: 'user', timestamp: ts, text: m.text, images: [] })
+      else this.push({ kind: 'notice', timestamp: ts, text: m.text, level: 'info', ...(UUID.test(m.sender) ? { from: 'task' as const } : {}) })
+      return
+    }
+    if (isCompaction(s)) {
+      this.waiting = []
+      const summary = typeof s.content === 'string' && s.content.trim() ? s.content : null
+      this.push({ kind: 'compaction', timestamp: ts, trigger: this.compactAsked ? 'manual' : 'auto', preTokens: this.context, postTokens: num(s.output_tokens), nextRequestTokens: null, summary })
+      this.compactAsked = false
       return
     }
     // Any other step: the next waiting call's result, else agy's own note (an error shown as one).
@@ -180,6 +250,7 @@ export class AntigravityConversationParser implements ConversationParserLike {
       if (typeof s.step_index === 'number') tool.toolUseId = `${s.step_index}`
       tool.isError = failed
       tool.result = failed && error ? error : stepOutput(s.content)
+      tool.images = this.media(s, offset, length)
       return
     }
     if (failed && (error || stepOutput(s.content))) this.push({ kind: 'notice', timestamp: ts, text: error || stepOutput(s.content), level: 'error' })
@@ -187,15 +258,18 @@ export class AntigravityConversationParser implements ConversationParserLike {
 }
 
 /**
- * Usage from agy's transcript: each PLANNER_RESPONSE is a request, with its input (the whole prompt, the cache read
- * included unless antigravity.usage.inputIncludesCache is off), cache read and output tokens. agy publishes no per-token
- * prices (prices.ts), so it has no cost.
+ * Usage from agy's transcript: each PLANNER_RESPONSE is a request, and each CHECKPOINT (a compaction's summary), with its
+ * input (without its cache read, unless antigravity.usage.inputIncludesCache is on), cache read and output tokens. agy
+ * publishes no per-token prices (prices.ts), so it has no cost. A subagent's requests are in its own conversation.
  */
 export class AntigravityUsageParser {
   private usage: SessionUsage
   private days: Record<string, DayUsage> = {}
   private timeline = new TimelineBuilder()
   private last = -1
+  private compactAsked = false
+  /** The compaction whose context after it the next request gives. */
+  private pending: CompactionEvent | null = null
 
   constructor(sessionId: string) {
     this.usage = {
@@ -228,9 +302,33 @@ export class AntigravityUsageParser {
     return d ? (this.days[d] ??= emptyDay()) : null
   }
 
+  /** A request's tokens counted: the session's, its day's and the timeline's. Its fresh input, cache read and output. */
+  private request(s: AgyStep, ts: string | undefined, inclusive: boolean): { fresh: number; cache: number; output: number } | null {
+    const input = num(s.input_tokens)
+    const cache = num(s.cache_read_tokens)
+    const output = num(s.output_tokens)
+    if (input + cache + output === 0) return null
+    const fresh = inclusive ? Math.max(0, input - cache) : input
+    const usage = this.usage
+    usage.inputTokens += fresh
+    usage.cacheReadTokens += cache
+    usage.outputTokens += output
+    usage.requests++
+    const d = this.day(ts)
+    if (d) {
+      d.inputTokens += fresh
+      d.cacheReadTokens += cache
+      d.outputTokens += output
+      d.requests++
+    }
+    const step: Partial<UsageTokens> = { inputTokens: fresh, cacheReadTokens: cache, outputTokens: output }
+    this.timeline.add(ts || usage.lastActivity, step, 1, -1, 0, usage.model)
+    return { fresh, cache, output }
+  }
+
   feed(text: string): void {
     const usage = this.usage
-    const inclusive = advanced.get<boolean>('antigravity.usage.inputIncludesCache') !== false
+    const inclusive = advanced.get<boolean>('antigravity.usage.inputIncludesCache') === true
     for (const line of text.split('\n')) {
       const s = parseStep(line)
       if (!s) continue
@@ -247,33 +345,37 @@ export class AntigravityUsageParser {
         const picked = modelChange(s.content)
         if (picked) usage.model = picked
         if (!isUserPrompt(s)) continue
+        const said = userRequestText(s.content)
+        const cmd = said ? slashCommand(said) : null
+        // A slash command isn't a prompt (/compact asks for a compaction).
+        if (cmd) {
+          this.compactAsked = cmd.name === '/compact'
+          continue
+        }
         usage.userMessages++
         const d = this.day(ts)
         if (d) d.prompts++
-        const said = userRequestText(s.content)
         if (said) usage.lastPrompt = said
       } else if (isModelRequest(s)) {
-        const input = num(s.input_tokens)
-        const cache = num(s.cache_read_tokens)
-        const output = num(s.output_tokens)
-        if (input + cache + output === 0) continue
-        const fresh = inclusive ? Math.max(0, input - cache) : input
-        const step: Partial<UsageTokens> = { inputTokens: fresh, cacheReadTokens: cache, outputTokens: output }
-        usage.inputTokens += fresh
-        usage.cacheReadTokens += cache
-        usage.outputTokens += output
-        usage.requests++
-        usage.contextInputTokens = fresh + cache
-        usage.lastOutputTokens = output
-        usage.contextTokens = fresh + cache + output
-        const d = this.day(ts)
-        if (d) {
-          d.inputTokens += fresh
-          d.cacheReadTokens += cache
-          d.outputTokens += output
-          d.requests++
+        const r = this.request(s, ts, inclusive)
+        if (!r) continue
+        usage.contextInputTokens = r.fresh + r.cache
+        usage.lastOutputTokens = r.output
+        usage.contextTokens = r.fresh + r.cache + r.output
+        if (this.pending) {
+          this.pending.postTokens = usage.contextInputTokens
+          this.pending = null
         }
-        this.timeline.add(ts || usage.lastActivity, step, 1, -1, 0, usage.model)
+      } else if (isCompaction(s)) {
+        const before = usage.contextTokens
+        const r = this.request(s, ts, inclusive)
+        // Until the next request says, what it left is its summary.
+        this.pending = { timestamp: ts ?? '', trigger: this.compactAsked ? 'manual' : 'auto', preTokens: before, postTokens: r?.output ?? 0, ...(usage.contextInputTokens !== undefined ? { lastInputTokens: usage.contextInputTokens, lastOutputTokens: usage.lastOutputTokens ?? 0 } : {}) }
+        usage.compactions.push(this.pending)
+        if (r) usage.contextTokens = r.output
+        this.compactAsked = false
+        const d = this.day(ts)
+        if (d) d.compactions++
       }
     }
   }

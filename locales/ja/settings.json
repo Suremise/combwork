@@ -128,6 +128,8 @@
   "settings.advanced.antigravity.transcript.modelChange.title": "トランスクリプト：選ばれたモデル",
   "settings.advanced.antigravity.transcript.stepHeader.desc": "agyがトランスクリプトでツールの結果の前に書く時刻です。Combworkは結果を表示するときにこれを省きます。間違っていると、結果がその時刻と一緒に表示されます。",
   "settings.advanced.antigravity.transcript.stepHeader.title": "トランスクリプト：ツール結果の時刻",
+  "settings.advanced.antigravity.transcript.systemMessage.desc": "agyのトランスクリプトにある、agy自身または別の会話（サブエージェントのタスクや回答）からのメッセージです。送信者が1つ目のグループ、内容が2つ目のグループです。間違っていると、これらのメッセージは表示されず、サブエージェントの会話が親の会話の下に見つかりません。",
+  "settings.advanced.antigravity.transcript.systemMessage.title": "トランスクリプト：agyのメッセージ",
   "settings.advanced.antigravity.transcript.userRequest.desc": "agyの記録の中で、agyが追加する内容（時刻、変更された設定）に混じってあなたのプロンプトがある場所です（1つ目のグループ）。間違っていても、Combworkはプロンプトを数え続けますが、agyが追加した内容と一緒に表示します。",
   "settings.advanced.antigravity.transcript.userRequest.title": "トランスクリプト：あなたのプロンプト",
   "settings.advanced.antigravity.usage.inputIncludesCache.desc": "agyのトランスクリプトで、リクエストのinput_tokensにcache_read_tokensがすでに含まれているかどうかです。間違っていると、Combworkはキャッシュのトークンを二重に数えるか、コンテキストから外します。",

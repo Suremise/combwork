@@ -128,6 +128,8 @@
   "settings.advanced.antigravity.transcript.modelChange.title": "Transcription : le modèle choisi",
   "settings.advanced.antigravity.transcript.stepHeader.desc": "Les heures qu’agy écrit avant le résultat d’un outil dans sa transcription, que Combwork laisse de côté quand il affiche le résultat. Faux, les résultats s’affichent avec ces heures.",
   "settings.advanced.antigravity.transcript.stepHeader.title": "Transcription : les heures du résultat d’un outil",
+  "settings.advanced.antigravity.transcript.systemMessage.desc": "Un message dans la transcription d’agy, d’agy lui-même ou d’une autre conversation (la tâche ou la réponse d’un sous-agent) : qui l’a envoyé est son premier groupe, ce qu’il dit le second. Faux, ces messages ne s’affichent pas, et la conversation d’un sous-agent n’est pas trouvée sous sa conversation parente.",
+  "settings.advanced.antigravity.transcript.systemMessage.title": "Transcription : les messages d’agy",
   "settings.advanced.antigravity.transcript.userRequest.desc": "Où se trouve ton prompt dans l’enregistrement d’agy, parmi ce qu’agy ajoute (l’heure, un paramètre changé) : son premier groupe. Faux, Combwork compte toujours tes prompts, mais les affiche avec ce qu’agy a ajouté.",
   "settings.advanced.antigravity.transcript.userRequest.title": "Transcription : ton prompt",
   "settings.advanced.antigravity.usage.inputIncludesCache.desc": "Si les input_tokens d’une requête dans la transcription d’agy comptent déjà ses cache_read_tokens. Faux, Combwork compte deux fois les tokens du cache, ou les laisse hors du contexte.",

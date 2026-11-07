@@ -2971,9 +2971,24 @@ const SOURCES: readonly AdvancedSource[] = [
     title: msg({ id: 'settings.advanced.antigravity.usage.inputIncludesCache.title', defaultMessage: 'Usage: input tokens include the cache', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
     desc: msg({ id: 'settings.advanced.antigravity.usage.inputIncludesCache.desc', defaultMessage: "Whether a request's input_tokens in agy's transcript already count its cache_read_tokens. Wrong, Combwork counts cached tokens twice, or leaves them out of the context.", description: 'What the advanced setting "Usage: input tokens include the cache" is for, and what goes wrong when it is wrong (Settings → Advanced). agy, input_tokens and cache_read_tokens are names: keep them.' }),
     kind: 'boolean',
-    default: true,
+    // Off (HI-2546's runs): a subagent's first request, whose prompt is the usual ~7,100 tokens, had input_tokens 2198 and cache_read_tokens 5058.
+    default: false,
     applies: 'now',
-    samples: [{ from: `${FIX}/antigravity/plain-1.5.0.jsonl`, version: '1.5.0', fields: ['cache_read_tokens', 'content', 'created_at', 'input_tokens', 'output_tokens', 'source', 'status', 'step_index', 'type'] }]
+    samples: [{ from: `${FIX}/antigravity/subagent-child-1.5.0.jsonl`, version: '1.5.0', text: '"input_tokens":2198,"cache_read_tokens":5058', shows: 'A request read partly from the cache' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.transcript.systemMessage',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.systemMessage.title', defaultMessage: "Transcript: agy's messages", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.systemMessage.desc', defaultMessage: "A message in agy's transcript from agy itself or another conversation (a subagent's task or answer): who sent it is its first group, what it says its second. Wrong, those messages aren't shown, and a subagent's conversation isn't found under its parent.", description: 'What the advanced setting "Transcript: agy\'s messages" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`\[Message\][^\n]*? sender=(\S+)[^\n]*? content=([\s\S]*?)\s*</SYSTEM_MESSAGE>`,
+    flags: '',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/antigravity/subagent-child-1.5.0.jsonl`, version: '1.5.0', text: '[Message] timestamp=2026-11-07T11:46:52Z sender=f57ee6fa-3d66-4a22-b458-764656e4d25d priority=MESSAGE_PRIORITY_HIGH content=What is 2+2? Reply with just the answer.\n</SYSTEM_MESSAGE>', shows: "A subagent's task from its parent" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/antigravity/tools-resume-compact-1.5.0.jsonl`, version: '1.5.0', text: '[Message] timestamp=2026-11-07T11:47:13Z sender=system priority=MESSAGE_PRIORITY_LOW content=[Notice] All your subagents and background tasks have been stopped due to server restart. If you want a subagent to continue working, it needs to be revived by sending it a new message. If resuming work, please check on status and restart as needed.\n</SYSTEM_MESSAGE>', shows: "agy's own notice on a resume" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
   },
   {
     id: overrideId('antigravity', 'preApproveCombworkTools'),

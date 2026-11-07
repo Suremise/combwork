@@ -128,6 +128,8 @@
   "settings.advanced.antigravity.transcript.modelChange.title": "Transkrypcja: wybrany model",
   "settings.advanced.antigravity.transcript.stepHeader.desc": "Czasy, które agy zapisuje w transkrypcji przed wynikiem narzędzia, a które Combwork pomija, pokazując wynik. Błędne: wyniki są pokazywane z tymi czasami.",
   "settings.advanced.antigravity.transcript.stepHeader.title": "Transkrypcja: czasy wyniku narzędzia",
+  "settings.advanced.antigravity.transcript.systemMessage.desc": "Wiadomość w transkrypcji agy od samego agy lub od innej rozmowy (zadanie lub odpowiedź subagenta): nadawca jest pierwszą grupą, treść drugą. Błędne: te wiadomości nie są pokazywane, a rozmowa subagenta nie jest znajdowana pod rozmową nadrzędną.",
+  "settings.advanced.antigravity.transcript.systemMessage.title": "Transkrypcja: wiadomości agy",
   "settings.advanced.antigravity.transcript.userRequest.desc": "Gdzie w zapisie agy jest twój prompt, wśród tego, co agy dodaje (godzina, zmienione ustawienie): jego pierwsza grupa. Błędne: Combwork nadal liczy twoje prompty, ale pokazuje je z tym, co dodał agy.",
   "settings.advanced.antigravity.transcript.userRequest.title": "Transkrypcja: twój prompt",
   "settings.advanced.antigravity.usage.inputIncludesCache.desc": "Czy input_tokens żądania w transkrypcji agy już obejmują jego cache_read_tokens. Błędne: Combwork liczy tokeny z pamięci podręcznej dwa razy albo pomija je w kontekście.",

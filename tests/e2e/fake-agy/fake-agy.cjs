@@ -133,8 +133,8 @@ log({ kind: 'mcp', conversation: conv, own: Object.keys(own), project: Object.ke
 
 process.stdout.write(`Antigravity CLI 1.5.0 (fake) · conversation ${conv}\n> `)
 statusLine('idle')
-// Each request's tokens: the whole prompt as input, the cache read among it from the second request on (as 1.5.0 records them).
-const tokens = () => ({ input_tokens: 7000 + 100 * step, cache_read_tokens: step > 1 ? 4000 : 0, output_tokens: 20 })
+// Each request's tokens: its input without the cache read (4000 from the second request on), as 1.5.0 records them.
+const tokens = () => ({ input_tokens: 3000 + 100 * step, cache_read_tokens: step > 1 ? 4000 : 0, output_tokens: 20 })
 const turn = (text) => {
   // The first prompt says the model it starts on, as 1.5.0's does.
   const picked = step === 0 ? `\n<USER_SETTINGS_CHANGE>\nThe user changed setting \`Model Selection\` from None to ${flag('--model') || 'Gemini 3.8 Flash (Low)'}. No need to comment on this change if the user doesn't ask about it.\n</USER_SETTINGS_CHANGE>` : ''
