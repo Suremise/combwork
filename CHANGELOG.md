@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- **The command palette opens empty** (HI-2730). Opened again after a command or project was chosen in it, the palette showed what was typed last for a moment before clearing it, so on a slow PC keys typed straight after Ctrl+Shift+P or Ctrl+P joined the old text and found *No matching commands*. It now opens empty, and what you type at once is all it searches for.
 - **A CLI started from a `.cmd` or `.bat` launcher in a folder whose name has a space starts** (HI-2722). A launcher Combwork can't start as Node and its script runs through cmd.exe, which removed the quotes around its path: the agent, or the CLI's sign-in, update or setup, exited at once with *'C:\My' is not recognized as an internal or external command*. Combwork now quotes cmd.exe's command line the way it needs, so the CLI starts and gets its arguments as they were, for every provider.
 - **Transcript images load just before you reach them** (HI-2726). In the Sessions tab, an image in a transcript loaded only once it was on screen, so an opened tool call's image just below the view showed its placeholder until you scrolled; images now load as they come near.
 - **A CLI at a path with spaces is found** (HI-2548). Combwork checked a CLI's version through its `.cmd` with the path unquoted, so at a path with spaces the check failed and Combwork took another copy it found. It now runs it as it is. An Antigravity agent started without a prompt is also ready once its CLI is, rather than starting until its first prompt.
