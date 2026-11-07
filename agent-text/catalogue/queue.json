@@ -115,6 +115,10 @@
     "text": "Combwork merges this card (its rules), but workflow rules aren't enforced: merge it yourself and report the merge (cw_report_merge).",
     "note": "A card read under Combwork merges while Settings → Advanced: workflow rules are enforced is off: nothing refuses, so the agent merges and reports as before 1.0."
   },
+  "queue.line.waiting": {
+    "text": "{who} It is in the merge queue for {target}, waiting for {cards} to be Done: it is blocked by them, and the queue merges it once they are.",
+    "note": "{who}: queue.line.who. {target}: the branch it merges into. {cards}: the cards it is blocked by that are not Done yet (keys, comma-joined). HI-2709."
+  },
   "queue.line.who": {
     "text": "Combwork merges this card (its rules): don't merge it yourself.",
     "note": "The first sentence of every queue line for a card Combwork's merge queue merges (#1354): the agent never merges it itself."

@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "決定事項が空です。代わりに削除してください。",
   "tasks.error.decisionGone": "その決定事項は{card}にもうありません。",
   "tasks.error.decisionsUsers": "カードの決定事項を変更・削除できるのはユーザーだけです。",
+  "tasks.error.dependencyTooLate": "{card} は今まさに {target} にマージされているため、もう {cards} を待つことはできません。依存関係は変更されていません。",
   "tasks.error.doingNobodyNew": "「進行中」に作成するカードには担当エージェントが必要です（agent）。ユーザーにどれを望むか確認してください：エージェントを割り当てる、エージェントを開始する（「未着手」に作成してからcw_start_task）、担当者なし（「未着手」に作成してから、overrideとユーザーの理由を付けて移動）。",
   "tasks.error.emptyComment": "コメントが空です。",
   "tasks.error.emptyDecision": "決定事項が空です。",

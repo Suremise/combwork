@@ -1950,6 +1950,7 @@ that can't be written fails the change whole.
 | `IntegrationFailed` | entry id, revision, target, reason (conflict, checks, target moved, folder busy, not up to date), files, log, transient (bool), conflicts (HI-1181: a conflict's hunks) | The queue's test merge or checks fail. |
 | `Integrated` | entry id?, revision, target, result revision, method, by (combwork, agent, outside), the rules skipped when merged by hand before they passed (the **outside the rules** mark) | The target moved with the change in it (recorded) or containment found it (observed). |
 | `MergedInPart` (observed) | revision (the merge base now in the target), target | Some of an unfinished card's work found in the target: the **merged outside, in part** mark (§16.4.4) [P2: a mark needs a fact]. |
+| `InTarget` (observed) | revision, target, submission (its `Submitted` fact) | A card in Review whose submitted change is in its target already: the **already in main** mark; it stays in Review (§16.4.4) [HI-2709]. |
 | `LeftTarget` (observed) | revision, target | A Done card's revision no longer in its target: the **no longer in main** mark (§16.4.4) [P2]. |
 | `Accepted` | revision (None code cards) or submission id (no-code cards, which have no revision) | None's integration, and a no-code card's acceptance on either platform. |
 | `Moved` | from stage, to stage, cause (intent, user, derived, override) | Every stage change. |
@@ -2018,7 +2019,7 @@ tied to its `Stale` fact) [HR2's #1263 round 1]. Its rules:
 | A stale pass's line back at **exactly** the approved revision (the same commit: a follow-up taken back) | `CarriedOver` (how: same revision), once per return, written only while the head it follows is still the newest observed: the reviewer passed that commit, so the stale mark goes and the pass holds again. Where Combwork merges, the Approved card with no queue entry is queued again (unless a follow-up waits for its reviewer's check, whose `ok` queues it, or the OK before merging is still to come, which is asked again); the builder is woken: no need to submit again. Where the agent merges, the builder is woken to merge it. Recorded while the rules are off, this is done once they're on [#1623]. |
 | **Integration needs a change** [answering HB3's round 1 finding 2] | Containment and observed integration count only a card with a **non-empty change**: its revision differs from `Started.base` and isn't an ancestor of it. A card just started (its revision is its base, an ancestor of the target) is never found "in the target". |
 | A card with its own line, in **Approved**: the approved revision (or one that replays to it) found in the target, not by Combwork | `Integrated` (observed, `by: outside`) → Done; the queue cancels its entry; the lane counts it [#1112 C]. |
-| A card with its own line, in **Review**, whose revision was merged by hand before its review passed | `Integrated` (observed) → Done, with an **outside the rules** mark naming the rules skipped (shown like an override). Combwork never moves it back (OP-25) [#1112 C]. |
+| A card with its own line, in **Review**, whose submitted change is found in its target before its review passed: merged by hand, or carried in another card's merge (HI-2684 carried HI-2682's commits) | `InTarget` (observed: revision, target, the submission it was read for), a mark, once per submission: the card **stays in Review** and its review decides, with the rules on or off. The Work section says its code is already in main. Once its review passes, the queue finds the change in the target and closes it as merged (`Integrated`, by outside, as for an Approved card above), or the agent's merge report does; the user can also move it. A later submission has no mark until it is found in the target too. Before HI-2709 such a card was closed at once, outside the rules: a merge outside its review is no reason to skip it [HI-2709]. |
 | A card in **Active** (or Todo) with some of its work found in the target (a partial hand merge) | A **merged outside, in part** mark with the revision; the card stays where it is and its agent goes on. Its work is its line's own commits (first-parent since its base): the target merged into the card (an update) is not its work in the target [P2]. Its later change is computed from its line as usual; the merged part is then in the target and drops out of the diff [HB3's round 1 finding 2]. |
 | A card's line deleted **after** Done | Nothing: its facts and pin (§16.9.3) keep what was reviewed, and no slot is recreated [HB3's round 1 finding 11]. |
 | A **shared-folder** card whose line is the target: its commits | `HeadMoved` only. These are working revisions, on the target by construction, never an integration: the card reaches Done only through its rules (§16.7.2's "Committed is done" row), so a Pair project working in its folder still reviews before Done [P1, answering HR2's round 1 finding 1]. |
@@ -3339,7 +3340,20 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
 
 #### 16.9.1 An entry's way through
 
-1. Take the next entry (`IntegrationRequested` not cancelled, failed or integrated, in order).
+1. Take the next entry (`IntegrationRequested` not cancelled, failed or integrated, in order) whose card **isn't
+   waiting for a blocker** (HI-2709): a card blocked by a card that isn't Done (or that can't be read) stays in the
+   queue, in its place, shown as **waiting for HI-x** (the queue's list, the card's Work section and its agents' card
+   reads), and the entries behind it go on. Its blockers are read again at each run, before its test merge and before
+   its advance, and finally in the write of `IntegrationStarted`, the advance's authority: a blocker that isn't Done
+   there means nothing begins, the entry stays open, and it is tested again once unblocked. A dependency added in
+   Review, while queued or while it is tested holds it so. One added once `IntegrationStarted` is written (its advance
+   begun, no outcome yet) is **refused** ("being merged into main now"), since nothing can hold that merge any more; a
+   blocker reopened from Done after that point doesn't stop it either. A blocker moving into Done, or a dependency
+   taken away, runs its queue again (`enqueue`): the entry is still the approved one, so there's no new approval.
+   **Every route that closes a card as merged** keeps the same rule, one check (`closeWaitsFor`) read in its own write: reconciliation's close of a
+   passed card whose change is in the target writes nothing while a blocker isn't Done (the card waits, Merging), the
+   queue's already-in-the-target step (a forward merge's own close too) says `waiting`, and an agent's merge report is refused (`merge.waitsForBlockers`,
+   two messages in 7 locales). The queue's own `Integrated` follows its advance, decided in `IntegrationStarted`'s write.
 2. Check `integrate.approved` (quorum, approvals, not stale), and **check containment first**: if the change is
    already in the target (merged by hand meanwhile), record `Integrated` (observed) instead of making an empty merge
    [HB3's round 1 finding 19]. An entry that isn't approved any more gets an outcome, never a skip that leaves it
@@ -4109,7 +4123,7 @@ project's builders (`setBuilderCount`: its builder and either agents, #1438), at
   an agent's merge (`mergeWorktree` with the target, the target's merge slot, #350): committed work only, refused while
   a session in the branch's folder is mid-task. A line whose card isn't Done (`started.line`, any stage but done) says
   so with a link, and main merges it only when the request names that card, after the window's confirmation; the merge
-  is then observed as one outside the rules (§16.4.4). A card the queue merges takes Merge anyway (#1357). Every merge
+  is then observed as one outside the rules (§16.4.4; a card in Review is only marked, HI-2709). A card the queue merges takes Merge anyway (#1357). Every merge
   route (`agents:merge`, `worktrees:mergeUnused`, `worktrees:mergeBranch`) goes through one check in main
   (`authorizedMerge`), so the older Merge dialog (an agent's 0.9 worktree, an unused worktree's Open, kept until #1452
   removes the field) shows the same note and asks the same; a slot row's Open → Merge opens Merge a branch.
@@ -6457,7 +6471,7 @@ Each is a test P2's spike passes without UI (`tests/workflow/` or a unit suite),
 | S38 | No-code card with no review (Git and None) → submit with a summary → Done; no revision invented, no `Integrated` fact. | HR2 r1 notes | Git, None |
 | S39 | All off (Git): a blocked card's agent starts it → started with a warning, no refusal; submit → Done with no guard; the user drags any card anywhere with no question. | HR2 r1 f2 | Git |
 | S40 | The upgrade, with a running lane: one card in Doing, one in Review, one in Passed; the project has reviewer agents → options: A reviewer agent, Not checked; the Review card has an adopted submission and gets its verdict; the Passed card has no invented verdict and finishes by the builder's report of its merge; Review and Approved stay visible; an agent's old `column` move is translated into its intent. | HB3 r1 f1 | Git |
-| S41 | A card just started (its revision is its base) → no observation marks it Done. An Active card part of whose work the user merges by hand → marked "merged outside, in part"; it stays Active. A Review card merged by hand → Done with "outside the rules". | HB3 r1 f2 | Git |
+| S41 | A card just started (its revision is its base) → no observation marks it Done. An Active card part of whose work the user merges by hand → marked "merged outside, in part"; it stays Active. A Review card merged by hand → marked "already in main" and still in Review: its review decides (HI-2709). | HB3 r1 f2 | Git |
 | S42 | Team, target checked out in the project folder; a reviewer's session lives there, idle, reviewing in a review copy → the queue advances. The user has uncommitted edits in a file the merge changes → paused (not returned) with the file named. While an hour of merge checks runs, the user commits from the Git view → not held up; the swap afterwards catches the moved target and retests. | HB3 r1 f3 | Git |
 | S43 | A lane: AM-11 waits in the queue → AM-12 doesn't start ("waiting: AM-11 merging"); AM-11 is returned → its builder fixes it in the same clean slot; AM-12 starts after AM-11 is Done, from a target that contains it. | HB3 r1 f4 | Git |
 | S44 | Solo, Assistant off: one agent in the project folder, no trailers → start, commit, submit → Done ("Committed is done"); its change is `base..HEAD`. | HB3 r1 f5 | Git |

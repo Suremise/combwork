@@ -295,6 +295,8 @@
   "workflow.refused.merge.combworkMerges.nextReturned": "Elle est revenue de la file de fusion : corrige-la dans ton worktree, fais un commit et soumets-la de nouveau.",
   "workflow.refused.merge.combworkMerges.nextStale": "Sa validation est périmée : sa branche a changé depuis qu’elle a été validée en relecture (elle est à {current}). Soumets-la de nouveau à la relecture ; elle entre dans la file une fois validée de nouveau.",
   "workflow.refused.merge.combworkMerges.nextTesting": "La file de fusion la fusionne dans {target} en ce moment et la passe ensuite en Terminé : attends cela, ou qu’elle revienne.",
+  "workflow.refused.merge.waitsForBlockers.message": "{card} dépend de {waitsFor}, qui n’est pas terminée : elle n’est pas close comme fusionnée d’ici là.",
+  "workflow.refused.merge.waitsForBlockers.next": "Attends que {waitsFor} soit terminée, puis signale de nouveau la fusion.",
   "workflow.refused.move.doingNobody.message": "{card} serait à l’étape {stage} sans personne dessus{also, select, yes {, et le déplacement passe outre ces règles : {rules}} other {}}.",
   "workflow.refused.move.doingNobody.next": "{reader, select, you {Choisis : personne dessus, un agent dessus, ou un agent qui la démarre.} other {Demande à l’utilisateur ce qu’il veut : personne dessus (déplace-la à nouveau avec override et sa raison), un agent dessus (agent), ou un agent qui la démarre (cw_start_task).}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {Ces règles se définissent dans Gestion de versions, où tu peux les modifier.} other {Ces règles se définissent dans Gestion de versions, où l’utilisateur peut les modifier.}}",

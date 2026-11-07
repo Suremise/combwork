@@ -295,6 +295,8 @@
   "workflow.refused.merge.combworkMerges.nextReturned": "Sie kam aus der Merge-Warteschlange zurück: Behebe es in deinem Worktree, committe und reiche sie erneut ein.",
   "workflow.refused.merge.combworkMerges.nextStale": "Das bestandene Review ist veraltet: Der Branch hat sich seitdem geändert (er steht jetzt auf {current}). Reiche die Karte erneut zum Review ein; sie kommt in die Warteschlange, sobald sie es wieder bestanden hat.",
   "workflow.refused.merge.combworkMerges.nextTesting": "Die Merge-Warteschlange mergt sie gerade in {target} und verschiebt sie danach nach Erledigt: Warte darauf oder darauf, dass sie zurückkommt.",
+  "workflow.refused.merge.waitsForBlockers.message": "{card} hängt von {waitsFor} ab, das noch nicht erledigt ist: Bis dahin wird sie nicht als gemergt abgeschlossen.",
+  "workflow.refused.merge.waitsForBlockers.next": "Warte, bis {waitsFor} erledigt ist, und melde den Merge dann erneut.",
   "workflow.refused.move.doingNobody.message": "{card} wäre in {stage}, ohne dass jemand daran arbeitet{also, select, yes {, und das Verschieben überspringt: {rules}} other {}}.",
   "workflow.refused.move.doingNobody.next": "{reader, select, you {Wähle, ob niemand daran arbeitet, ein Agent sie bekommt oder ein Agent damit gestartet wird.} other {Frag den Benutzer, was er möchte: niemand daran (verschiebe sie erneut mit override und seinem Grund), ein Agent daran (agent) oder ein Agent, der damit gestartet wird (cw_start_task).}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {Diese Regeln werden unter Versionsverwaltung festgelegt, wo du sie ändern kannst.} other {Diese Regeln werden unter Versionsverwaltung festgelegt, wo der Benutzer sie ändern kann.}}",

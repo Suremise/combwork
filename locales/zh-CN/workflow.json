@@ -295,6 +295,8 @@
   "workflow.refused.merge.combworkMerges.nextReturned": "它已从合并队列退回：请在你的工作树中修复、提交，然后重新提交。",
   "workflow.refused.merge.combworkMerges.nextStale": "它的通过结论已失效：通过评审后其分支已有变化（现在位于 {current}）。请重新提交评审；再次通过后即进入队列。",
   "workflow.refused.merge.combworkMerges.nextTesting": "合并队列正在将它合并到 {target}，完成后移到“已完成”：请等待，或等它被退回。",
+  "workflow.refused.merge.waitsForBlockers.message": "{card} 依赖尚未完成的 {waitsFor}：在此之前不会作为已合并关闭。",
+  "workflow.refused.merge.waitsForBlockers.next": "等待 {waitsFor} 完成，然后再次报告合并。",
   "workflow.refused.move.doingNobody.message": "{card} 将在“{stage}”中无人负责{also, select, yes {，并且此移动会跳过以下规则：{rules}} other {}}。",
   "workflow.refused.move.doingNobody.next": "{reader, select, you {请选择：无人负责、交给一个智能体，或启动一个智能体处理它。} other {请询问用户想要哪种：无人负责（带上 override 和用户的理由再次移动）、交给一个智能体（agent），或启动一个智能体处理它（cw_start_task）。}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {这些规则在“版本控制”中设置，你可以在那里更改。} other {这些规则在“版本控制”中设置，用户可以在那里更改。}}",

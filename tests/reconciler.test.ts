@@ -386,7 +386,7 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     expect(kinds(w, card).filter((k) => k === 'Integrated' || k === 'Moved').slice(-2)).toEqual(['Integrated', 'Moved'])
   })
 
-  it("S41: a card just started isn't Done; part of an Active card's work merged by hand is a mark; a Review card merged by hand is Done outside the rules", async () => {
+  it("S41: a card just started isn't Done; part of an Active card's work merged by hand is a mark; a Review card merged by hand is marked and stays in Review (HI-2709)", async () => {
     const fresh = await workspace()
     const just = (await inWorkspace(fresh.w, () => tasks.createTask({ title: 'Just started', project: 'p' }, user))).number
     await inWorkspace(fresh.w, () => tasks.updateTask(just, { column: 'doing', agent: 'a1' }, user))
@@ -410,10 +410,11 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     await inWorkspace(rev.w, () => tasks.updateTask(reviewed, { column: 'review' }, builder))
     git(rev.repo, 'merge', '-q', '--no-ff', '-m', 'by hand', 'card')
     await reconcileNow(rev.w, rev.repo)
+    // HI-2709: its review still decides; it is closed as merged once that passes (the queue's or the merge report's).
     const r = foldCard(factsOf(rev.w, reviewed))
-    expect(r.integrated).toMatchObject({ by: 'outside' })
-    expect(r.marks.outsideRules).toEqual(['review'])
-    expect(await column(rev.w, reviewed)).toBe('done')
+    expect(r.integrated).toBeNull()
+    expect(r.marks.inTarget).toMatchObject({ target: 'main' })
+    expect(await column(rev.w, reviewed)).toBe('review')
   })
 
   // HR2's round 1: an observation recorded while the rules were off is acted on once they're on again, once.
@@ -460,7 +461,7 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     expect(wakes()).toHaveLength(1)
   })
 
-  it('turned off, the same hand merge of a Review card is recorded and the card stays in Review', async () => {
+  it('turned off, the same hand merge of a Review card is marked and the card stays in Review', async () => {
     await advanced.set(ENFORCE, false)
     const { w, repo, wt } = await workspace()
     const card = (await inWorkspace(w, () => tasks.createTask({ title: 'Reviewed', project: 'p' }, user))).number
@@ -469,8 +470,9 @@ describe('reconciliation acts with workflow rules enforced (#1263)', () => {
     await inWorkspace(w, () => tasks.updateTask(card, { column: 'review' }, builder))
     git(repo, 'merge', '-q', '--no-ff', '-m', 'by hand', 'card')
     await reconcileNow(w, repo)
-    expect(factsOf(w, card).find((f) => f.kind === 'Integrated')).toMatchObject({ data: { by: 'outside', outsideRules: ['review'] } })
-    expect(kinds(w, card).at(-1)).toBe('Integrated')
+    // HI-2709: never an integration while in Review (rules on or off): a mark.
+    expect(factsOf(w, card).find((f) => f.kind === 'InTarget')).toMatchObject({ data: { target: 'main' } })
+    expect(kinds(w, card).at(-1)).toBe('InTarget')
     expect(await column(w, card)).toBe('review')
     expect(actions(w, card)).toEqual([])
   })

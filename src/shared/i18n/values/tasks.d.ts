@@ -31,6 +31,7 @@ interface CombworkMessageValues {
   'tasks.error.decisionEmptied': undefined
   'tasks.error.decisionGone': { card: string | number }
   'tasks.error.decisionsUsers': undefined
+  'tasks.error.dependencyTooLate': { card: string | number; target: string | number; cards: string | number }
   'tasks.error.doingNobodyNew': undefined
   'tasks.error.emptyComment': undefined
   'tasks.error.emptyDecision': undefined

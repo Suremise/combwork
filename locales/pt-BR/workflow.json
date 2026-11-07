@@ -295,6 +295,8 @@
   "workflow.refused.merge.combworkMerges.nextReturned": "Ele voltou da fila de merge: corrija no seu worktree, faça commit e envie de novo.",
   "workflow.refused.merge.combworkMerges.nextStale": "A revisão bem-sucedida está desatualizada: o branch mudou desde que ele passou na revisão (agora está em {current}). Envie de novo para revisão; ele entra na fila assim que passar na revisão.",
   "workflow.refused.merge.combworkMerges.nextTesting": "A fila de merge está fazendo o merge dele em {target} agora e o move para Concluído depois: espere por isso ou que ele volte.",
+  "workflow.refused.merge.waitsForBlockers.message": "{card} depende de {waitsFor}, que ainda não está Concluído: até lá, não é fechado como mesclado.",
+  "workflow.refused.merge.waitsForBlockers.next": "Aguarde {waitsFor} ficar Concluído e informe o merge de novo.",
   "workflow.refused.move.doingNobody.message": "O cartão {card} ficaria em {stage} sem ninguém nele{also, select, yes {, e a movimentação pula estas regras: {rules}} other {}}.",
   "workflow.refused.move.doingNobody.next": "{reader, select, you {Escolha: ninguém nele, um agente nele ou um agente iniciado nele.} other {Pergunte ao usuário o que ele quer: ninguém nele (mova-o de novo com override e o motivo dele), um agente nele (agent) ou um agente iniciado nele (cw_start_task).}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {Essas regras são definidas em Controle de versão, onde você pode alterá-las.} other {Essas regras são definidas em Controle de versão, onde o usuário pode alterá-las.}}",

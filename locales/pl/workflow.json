@@ -295,6 +295,8 @@
   "workflow.refused.merge.combworkMerges.nextReturned": "Wróciła z kolejki scalania: popraw to w swoim worktree, zrób commit i przekaż ją ponownie.",
   "workflow.refused.merge.combworkMerges.nextStale": "Jej zaliczenie jest nieaktualne: gałąź zmieniła się od zaliczenia recenzji (jest teraz na {current}). Prześlij ją ponownie do recenzji; trafi do kolejki, gdy znów zostanie zaliczona.",
   "workflow.refused.merge.combworkMerges.nextTesting": "Kolejka scalania właśnie scala ją do {target}, a potem przeniesie do Gotowe: poczekaj na to albo na jej zwrot.",
+  "workflow.refused.merge.waitsForBlockers.message": "Karta {card} zależy od {waitsFor}, która nie jest jeszcze gotowa: do tego czasu nie zostanie zamknięta jako scalona.",
+  "workflow.refused.merge.waitsForBlockers.next": "Poczekaj, aż {waitsFor} będzie gotowa, a potem ponownie zgłoś scalenie.",
   "workflow.refused.move.doingNobody.message": "Karta {card} trafiłaby na etap {stage} bez nikogo przy niej{also, select, yes {, a przeniesienie pomija reguły: {rules}} other {}}.",
   "workflow.refused.move.doingNobody.next": "{reader, select, you {Wybierz: nikt przy niej, agent przy niej albo agent uruchomiony na niej.} other {Zapytaj użytkownika, czego chce: nikt przy niej (przenieś ją ponownie z override i jego powodem), agent przy niej (agent) albo agent uruchomiony na niej (cw_start_task).}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {Te reguły ustawia się w zakładce Kontrola wersji, gdzie możesz je zmienić.} other {Te reguły ustawia się w zakładce Kontrola wersji, gdzie użytkownik może je zmienić.}}",

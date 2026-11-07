@@ -139,9 +139,9 @@ describe('the Agent API (#845)', () => {
     setLanguage('de', GERMAN)
     expect(apiErrorReply(combworkError(M.gone, { n: 4 }, { kind: 'notFound' }))).toEqual({ status: 404, body: { error: 'Card #4 is gone.' } })
     expect(apiErrorReply(combworkError(msg({ id: 'errors.workspace.none', defaultMessage: 'No workspace is open.', description: 'test' }), undefined, { kind: 'conflict' }))).toEqual({ status: 409, body: { error: 'No workspace is open.' } })
-    // Without a kind, the English message says the status, as for any other error.
-    expect(apiErrorReply(combworkError(msg({ id: 'errors.test.unknownTask', defaultMessage: 'Unknown task #{n}', description: 'test' }), { n: 9 })).status).toBe(404)
-    expect(apiErrorReply(new Error('Unknown task #9'))).toEqual({ status: 404, body: { error: 'Unknown task #9' } })
+    // Without a kind, 500 whatever its words, and a plain error's words don't say a status either (HI-2704).
+    expect(apiErrorReply(combworkError(msg({ id: 'errors.test.unknownTask', defaultMessage: 'Unknown task #{n}', description: 'test' }), { n: 9 })).status).toBe(500)
+    expect(apiErrorReply(new Error('Unknown task #9'))).toEqual({ status: 500, body: { error: 'Unknown task #9' } })
   })
 
   it("leaves the window's text as data out where a whole object goes to agents, and only that", () => {

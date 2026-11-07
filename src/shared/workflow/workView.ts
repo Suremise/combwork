@@ -183,6 +183,8 @@ export interface WorkMarks {
   outsideRules: string[]
   /** Some of the unfinished card's work found in the target. */
   mergedInPart: FactData['MergedInPart'] | null
+  /** HI-2709: in Review, its submitted change is already in its target (it stays in Review); for the latest submission and target only. */
+  inTarget: FactData['InTarget'] | null
   /** A Done card's revision no longer in its target. */
   leftTarget: FactData['LeftTarget'] | null
   /** The user (or the Assistant) moved the latest submission past its review and approvals. */
@@ -389,6 +391,16 @@ export function reviewSkipOf(facts: readonly Fact[]): { skip: ReviewSkip | null;
 }
 
 /** A fact's `platform.unknown`: each field that couldn't be read, and why (text only). */
+/**
+ * HI-2709: the card's "already in its target" mark while it is about what the card is now: its latest submission (that
+ * very one), into its target; a later submission or another target shows none (the mark stays in its history), and
+ * reconcile looks again for that one.
+ */
+export function inTargetNow(s: CardState): FactData['InTarget'] | null {
+  const m = s.marks.inTarget
+  return m && m.submission === s.latest?.id && m.revision === s.latest?.revision && m.target === (s.started?.target ?? null) ? m : null
+}
+
 function unknownOf(platform: Record<string, unknown> | undefined): Record<string, string> {
   const u = platform?.unknown
   if (!u || typeof u !== 'object') return {}
@@ -465,7 +477,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     revisions,
     verdicts,
     checks,
-    marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden, override },
+    marks: { carriedOver, stale: s.stale, outsideRules: s.marks.outsideRules ?? [], mergedInPart: s.marks.mergedInPart ?? null, inTarget: inTargetNow(s), leftTarget: s.marks.leftTarget ?? null, overridden: s.approvalOverridden, override },
     integration: s.integrated && integrated ? { revision: s.integrated.revision, target: s.integrated.target, result: s.integrated.result, method: s.integrated.method, by: s.integrated.by, mergeCommit: s.integrated.method === 'merge' ? s.integrated.result : null, at: integrated.at } : null,
     accepted: s.accepted && accepted ? { revision: s.accepted.revision ?? null, submission: s.accepted.submission ?? null, at: accepted.at, actor: accepted.actor } : null,
     refused,

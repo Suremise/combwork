@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "A decisão está vazia: remova-a.",
   "tasks.error.decisionGone": "Essa decisão não está mais em {card}.",
   "tasks.error.decisionsUsers": "Só o usuário altera ou remove as decisões de um cartão.",
+  "tasks.error.dependencyTooLate": "{card} está sendo mesclado em {target} agora, então não pode mais aguardar {cards}. As dependências não mudaram.",
   "tasks.error.doingNobodyNew": "Um cartão criado em Fazendo precisa de um agente nele (agent). Pergunte ao usuário o que ele quer: um agente nele, um agente iniciado nele (crie-o em A fazer e depois use cw_start_task) ou ninguém nele (crie-o em A fazer e depois mova-o com override e o motivo dele).",
   "tasks.error.emptyComment": "O comentário está vazio.",
   "tasks.error.emptyDecision": "A decisão está vazia.",

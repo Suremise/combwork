@@ -675,7 +675,10 @@ export class Workflow {
         const written = fn(w, prepared)
         this.closeSettled(w)
         // Into Done by whatever route: its finish, once, in the move's own transaction (HI-2014).
-        if (w.current === 'done' && w.was !== 'done') recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
+        if (w.current === 'done' && w.was !== 'done') {
+          recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
+          this.kickDependents(w)
+        }
         return written
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
@@ -1172,6 +1175,64 @@ export class Workflow {
   doneByFacts(id: number): boolean {
     const s = this.state(id)
     return s.stage === 'done' && (!!s.integrated || !!s.accepted)
+  }
+
+  /**
+   * HI-2709: the cards a card in the merge queue waits for, by key: those it is blocked by that aren't Done. Read in a
+   * write (`tx`, the advance's `IntegrationStarted` one), they are that write's: its blocked-by list and each blocker's
+   * stage as they are then, never a record read before. A blocker that can't be read counts as waited for (by its number):
+   * a card is never merged on doubt.
+   */
+  queueWaitingOn(id: number, tx?: Tx): string[] {
+    const read = (n: number): CardRecord | null => {
+      try {
+        return tx ? tx.card(n) : this.store.card(n)
+      } catch {
+        return null
+      }
+    }
+    const card = read(id)
+    if (!card) return []
+    const out: string[] = []
+    for (const b of card.blockedBy) {
+      const dep = read(b)
+      if (!dep) out.push(`#${b}`)
+      else if (dep.stage !== 'done') out.push(dep.key)
+    }
+    return out
+  }
+
+  /**
+   * HI-2709: the one rule every route that closes a card as merged keeps, in its own write (`w.tx`, so a dependency added
+   * while its reads ran counts): not while a card it depends on isn't Done. An agent's merge report is refused so;
+   * reconciliation writes nothing (reconcile.ts integratedOutside); the queue's advance decided it in IntegrationStarted's
+   * write. With the rules not enforced, nothing is refused.
+   */
+  blockersNotDone(w: Write): GuardRefusal | null {
+    if (!this.enforced()) return null
+    const waits = this.closeWaitsFor(w)
+    return waits.length ? ({ rule: 'merge.waitsForBlockers', values: { card: w.card.key, waitsFor: waits.join(', ') } } as GuardRefusal) : null
+  }
+
+  /**
+   * HI-2709: the choke point of every write that records a card as merged (`Integrated`): what it still waits for, read
+   * in that write (empty: it may close). The queue's integrated(), reconciliation's integratedOutside and an agent's merge
+   * report all ask it. `afterAdvance`: the queue's own record of an advance it made, which only records what the target
+   * now has; its authority was IntegrationStarted's write, which asked this then.
+   */
+  closeWaitsFor(w: Write, opts: { afterAdvance?: boolean } = {}): string[] {
+    return opts.afterAdvance ? [] : this.queueWaitingOn(w.card.id, w.tx)
+  }
+
+  /**
+   * HI-2709: a card into Done, in its write: each card it blocks that waits in a merge queue gets that queue run again
+   * (`enqueue`, its entry's target), so a queue that went idle with only waiting entries takes it, with no new approval.
+   */
+  private kickDependents(w: Write): void {
+    for (const dep of this.store.dependents(w.card.id)) {
+      const e = openEntry(foldCard(w.tx.facts(dep), w.tx.card(dep).stage))
+      if (e) w.tx.action(dep, 'enqueue', { target: e.target }, null)
+    }
   }
 
   /**
@@ -2033,7 +2094,7 @@ export class Workflow {
     }
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) ?? this.blockersNotDone(w) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
       const open = combwork ? openEntry(w.state()) : undefined

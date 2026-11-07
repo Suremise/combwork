@@ -173,6 +173,33 @@ const until = (fn, ms) => lib.until(fn, ms, 200)
     const twoRow = card.locator(`.progress-queue-list li[data-entry^="${twoKey}/"]`)
     check("…each with its approved revision and Remove", (await twoRow.locator('code').innerText()) === two.revision.slice(0, 7) && (await twoRow.getByRole('button', { name: `Remove ${twoKey} from the queue` }).count()) === 1)
     check('the Merges badge counts them', !!(await until(async () => (await tab('merges').locator('.progress-tab-badge').textContent().catch(() => '')) === '2', HUNG_MS)), await tab('merges').getAttribute('aria-label'))
+
+    // --- HI-2709: Three made to depend on a card that isn't Done: its row stays, in its place, saying what it waits
+    // for, and so does its Work section; the dependency taken away, it's an ordinary queued card again.
+    const blocker = (await inv('tasks:create', { title: 'Blocker', project: 'alpha' })).number
+    const blockerKey = await keyOf(blocker)
+    await inv('tasks:update', three.n, { blockedBy: [blocker] })
+    const threeRow = card.locator(`.progress-queue-list li[data-entry^="${threeKey}/"]`)
+    check('a queued card depending on one not Done: its row says "Waiting for" it, still in its place', !!(await until(async () => ((await threeRow.locator('.progress-queue-waiting').innerText().catch(() => '')) ?? '') === `Waiting for ${blockerKey}` && (await cardText()).includes(`${twoKey} and ${threeKey} waiting`), HUNG_MS)), await cardText())
+    await setWidth(420)
+    await shoot('merges-waiting-on')
+    await q.showBoard(page)
+    await q.openByTitle(page, three.n)
+    const cardDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    const workQueue = cardDialog.locator('.card-work-queue')
+    check("…and its Work section: queued, waiting for it to be Done", !!(await until(async () => ((await workQueue.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ').includes(`Queued for ${TARGET}, waiting for ${blockerKey} to be Done`), HUNG_MS)), await workQueue.innerText().catch(() => ''))
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+      await page.mouse.move(5, 5)
+      await workQueue.screenshot({ path: path.join(fx.shots, `progressqueue-card-waiting-on-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+    await page.keyboard.press('Escape')
+    await until(async () => (await cardDialog.count()) === 0, HUNG_MS)
+    await showTab('merges')
+    await inv('tasks:update', three.n, { blockedBy: [] })
+    check('…the dependency taken away: an ordinary queued row again', !!(await until(async () => (await threeRow.count()) === 1 && (await threeRow.locator('.progress-queue-waiting').count()) === 0, HUNG_MS)), await cardText())
     await setWidth(300)
     await shoot('merges-narrow')
     await setWidth(420)

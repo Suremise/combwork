@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "Merge-Warteschlange · {target}",
   "board.queue.transient": "{why} (vorübergehend)",
+  "board.queue.waitingOn": "Wartet auf {cards}",
   "board.readOnly.newer": "Dieses Board wurde von einer neueren Version von Combwork gespeichert: Es ist hier schreibgeschützt.",
   "board.restore09.done": "Das 0.9-Board ist zurück",
   "board.restore09.doneDetail": "Das 1.0-Board ist als {file} aufbewahrt.",
@@ -968,6 +969,7 @@
   "board.work.filesNotRead": "{note, select, beforeChange {Dateien nicht gelesen} noBaseOrHead {Dateien nicht gelesen: Es gab keine Basis und keine Revision zum Vergleichen} other {Dateien nicht gelesen: Combwork konnte {why} nicht lesen}}",
   "board.work.folder": "Ordner",
   "board.work.folderGone": "Ihr Ordner {folder} ist kein Worktree eines Agenten mehr: Ihre Dateien können hier nicht geöffnet werden.",
+  "board.work.inTarget": "Ihr Code ist schon in {target}: Sie bleibt im Review und wird als gemergt abgeschlossen, sobald ihr Review besteht.",
   "board.work.integrated": "{method, select, merge {In {target} gemergt als {result}} squash {In {target} gesquasht als {result}} fastForward {{target} vorgerückt auf {result}} sameTree {Schon in {target}, bei {result}} other {In {target} committet als {result}}}",
   "board.work.leftTarget": "Nicht mehr in {target}: Ihre Revision {revision} wurde entfernt.",
   "board.work.mergedInPart": "Teilweise gemergt: Ein Teil ihrer Arbeit ist schon in {target}.",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} steht auf",
   "board.workQueue.testing": "Wird gerade getestet: {step}",
   "board.workQueue.unreadRef": "nicht gelesen",
+  "board.workQueue.waiting": "In der Warteschlange für {target}, wartet darauf, dass {cards} in Erledigt ist",
   "board.workflows": "Workflows"
 }

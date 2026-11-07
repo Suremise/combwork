@@ -13449,6 +13449,15 @@ button.progress-card-key:hover {
 .progress-queue-remove {
   flex-shrink: 0;
 }
+/* HI-2709: a queued card blocked by others that aren't Done says so beside its title; the title gives way first. */
+.progress-queue-waiting {
+  flex-shrink: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--warning);
+}
 .progress-queue-actions {
   display: flex;
   flex-wrap: wrap;

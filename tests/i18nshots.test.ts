@@ -90,9 +90,9 @@ describe('the i18nshots route (#769)', () => {
     const pick = (f: string) => affectedSuites([f], names)
     for (const f of ['tests/e2e/i18nshots.cjs', 'tests/e2e/i18nshots/core.cjs', 'tests/e2e/i18nshots/board.cjs', 'locales/pl/language.json', 'src/renderer/src/components/Popups.tsx', 'src/main/progress.ts']) expect(pick(f).suites, f).toContain('i18nshots')
     // A translation alone needs nothing else: every other suite runs in English.
-    expect(pick('locales/de/board.json')).toEqual({ suites: ['i18nshots'], why: ['locales/de/board.json: i18nshots'] })
+    expect(pick('locales/de/board.json')).toEqual({ suites: ['i18nshots'], why: ['locales/de/board.json: i18nshots'], because: { i18nshots: ['locales/de/board.json (its area)'] } })
     // The i18n tooling and each area's unit tests are npm test's (#768): no suite.
-    for (const f of ['scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/src/renderer/src/components/Board.tsx.json', 'tests/i18n/language.test.ts']) expect(pick(f), f).toEqual({ suites: [], why: [] })
+    for (const f of ['scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/src/renderer/src/components/Board.tsx.json', 'tests/i18n/language.test.ts']) expect(pick(f), f).toEqual({ suites: [], why: [], because: {} })
     // Its text report's layout check (#899): the route and the suite that seeds it.
     expect(pick('tests/e2e/layoutReport.cjs').suites).toEqual(expect.arrayContaining(['i18nreport', 'i18nshots']))
   })

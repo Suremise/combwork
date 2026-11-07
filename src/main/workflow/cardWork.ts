@@ -382,6 +382,10 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
         const x = d as FactData['LeftTarget']
         return `${r(x.revision)}, ${x.target}`
       }
+      case 'InTarget': {
+        const x = d as FactData['InTarget']
+        return `${r(x.revision)}, ${x.target}`
+      }
       case 'Moved': {
         const x = d as FactData['Moved']
         return `${x.from} to ${x.to} (${x.cause})`
