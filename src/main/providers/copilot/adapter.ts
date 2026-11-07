@@ -21,7 +21,7 @@ import { overrideId } from '../../../shared/advanced'
 import { copilotTranscriptTurns } from './turns'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
 import { readCopilotModels } from './models'
-import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, locateCopilot } from './install'
+import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, copilotUpdateUpToDate, locateCopilot } from './install'
 import { advanced } from '../../advanced'
 import { agentMsg, say } from '../../../shared/agentText'
 
@@ -170,8 +170,8 @@ export class CopilotAdapter implements ProviderAdapter {
     return copilotReadiness(info)
   }
 
-  latestVersion(): Promise<string | null> {
-    return copilotLatestVersion()
+  latestVersion(executable?: string | null): Promise<string | null> {
+    return copilotLatestVersion(executable)
   }
 
   installCommand(): CommandSpec {
@@ -184,6 +184,10 @@ export class CopilotAdapter implements ProviderAdapter {
 
   updateRetry(executable: string, exitCode: number): ReturnType<typeof copilotUpdateRetry> {
     return copilotUpdateRetry(executable, exitCode)
+  }
+
+  updateUpToDate(executable: string, exitCode: number): boolean {
+    return copilotUpdateUpToDate(executable, exitCode)
   }
 
   /** Copilot's own sign-in, run in a terminal for the user to complete (never typed into by Combwork). */

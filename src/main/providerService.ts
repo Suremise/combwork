@@ -227,7 +227,8 @@ class ProviderService {
       if (this.refreshes.get(id) === run) noteCliFolder(id, found.path)
       // Found is known before its version, models and sign-in are: Automatic's pick needs only that (#506).
       if (found.path && this.refreshes.get(id) === run && !this.info(id).found) this.set(id, { ...this.info(id), found: true, path: found.path })
-      const latest = latestWanted ? await adapter.latestVersion() : prev.latestVersion
+      // What the found copy's own installer can deliver (HI-2729): a WinGet install's from WinGet, not npm.
+      const latest = latestWanted ? await adapter.latestVersion(found.path) : prev.latestVersion
       // The version this release was tested with, against the installed one (#365).
       const tested = await testedVersion(id)
       // The CLI's own models and what each can do, so new models show without a Combwork update (#125). If it can't say,
@@ -269,7 +270,7 @@ class ProviderService {
     return next
   }
 
-  private runTask(id: ProviderId, task: ProviderTask, cmd: { file: string; args: string[]; line?: string }, label: string, typed?: { keys: KeySteps; ready?: RegExp; busyTitle?: RegExp; busyScreen?: (screen: string) => boolean; done?: () => boolean }, shown: () => string = () => label, onExit?: (code: number) => void, place?: { env?: Record<string, string>; cwd?: string }): string {
+  private runTask(id: ProviderId, task: ProviderTask, cmd: { file: string; args: string[]; line?: string }, label: string, typed?: { keys: KeySteps; ready?: RegExp; busyTitle?: RegExp; busyScreen?: (screen: string) => boolean; done?: () => boolean }, shown: () => string = () => label, onExit?: (code: number) => boolean | void, place?: { env?: Record<string, string>; cwd?: string }): string {
     const key = `task:${id}:${task}`
     if (hasPty(key)) return key
     // A command toSpawnable already gave its command line (an adapter's) is started as it is.
@@ -350,8 +351,9 @@ class ProviderService {
       onExit: (code) => {
         if (watch) clearInterval(watch)
         gate?.dispose()
-        onExit?.(code)
-        if (code === 0 || finished) toast('success', tr(msg({ id: 'service.providers.taskDone', defaultMessage: '{task} finished', description: "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended well." }), { task: shown() }))
+        // True from onExit: a code its installer uses for nothing to do (HI-2729), which ended well too.
+        const endedWell = onExit?.(code) === true
+        if (code === 0 || finished || endedWell) toast('success', tr(msg({ id: 'service.providers.taskDone', defaultMessage: '{task} finished', description: "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended well." }), { task: shown() }))
         else toast('warning', tr(msg({ id: 'service.providers.taskFailed', defaultMessage: '{task} exited with code {code}', description: "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended with the exit code {code}." }), { task: shown(), code: String(code) }))
         if (task === 'login' && code === 0) this.signedIn(id)
         void this.refresh(id, true)
@@ -401,6 +403,8 @@ class ProviderService {
       if (hasPty(`task:${id}:${task}`)) return `task:${id}:${task}`
       const cmd = retryUpdate ? pending!.retry.command : adapter.updateCommand(info.path)
       const key = this.runTask(id, task, cmd, `${name} update`, undefined, shown, (code) => { // i18n-ignore: the task's name in the log
+        // Its installer having nothing newer (WinGet's 0x8A15002B) isn't a failure: the check after it says up to date.
+        if (code !== 0 && adapter.updateUpToDate?.(info.path!, code)) return true
         const retry = adapter.updateRetry?.(info.path!, code)
         if (retry && this.info(id).path === info.path && this.info(id).version === info.version) this.updateRetries.set(id, { path: info.path!, version: info.version, retry })
         this.set(id, this.info(id))

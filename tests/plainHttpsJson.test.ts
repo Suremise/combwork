@@ -4,6 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'net'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { plainHttpGet, plainHttpsJson } from '../src/main/plainHttpsJson'
+import { tempDir } from './tempDir'
 
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 10000
@@ -177,12 +178,14 @@ describe('the version checks', () => {
       const { codex } = await import('../src/main/providers/codex/adapter')
       const { copilotLatestVersion } = await import('../src/main/providers/copilot/install')
 
-      reply = async () => ({ version: '2.1.300', tag_name: 'rust-v0.130.1' })
+      // An empty folder as Claude Code's home: no settings, so its update channel is latest's.
+      vi.stubEnv('CLAUDE_CONFIG_DIR', tempDir('claude-home-'))
+      reply = async () => ({ version: '2.1.300', latest: '2.1.300', tag_name: 'rust-v0.130.1' })
       expect(await claudeCode.latestVersion()).toBe('2.1.300')
       expect(await codex.latestVersion()).toBe('0.130.1')
       expect(await copilotLatestVersion()).toBe('2.1.300')
       expect(calls).toEqual([
-        { url: 'https://registry.npmjs.org/@anthropic-ai/claude-code/latest', opts: { timeoutMs: 6000 } },
+        { url: 'https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags', opts: { timeoutMs: 6000 } },
         { url: 'https://api.github.com/repos/openai/codex/releases/latest', opts: { timeoutMs: 6000, headers: { Accept: 'application/vnd.github+json' } } },
         { url: expect.stringMatching(/^https:\/\/registry\.npmjs\.org\/.+\/latest$/), opts: { timeoutMs: 6000 } }
       ])
@@ -192,6 +195,7 @@ describe('the version checks', () => {
       expect(await codex.latestVersion()).toBeNull()
       expect(await copilotLatestVersion()).toBeNull()
     } finally {
+      vi.unstubAllEnvs()
       vi.doUnmock('../src/main/plainHttpsJson')
       vi.resetModules()
     }

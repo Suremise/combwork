@@ -108,6 +108,16 @@ export function claudeHome(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
 }
 
+/** The release channel Claude Code updates from: its user settings' autoUpdatesChannel ("stable"), else "latest" (only read). */
+export async function claudeUpdateChannel(home: string = claudeHome()): Promise<string> {
+  try {
+    const v = (JSON.parse(await readFile(join(home, 'settings.json'), 'utf8')) as { autoUpdatesChannel?: unknown }).autoUpdatesChannel
+    return v === 'stable' ? 'stable' : 'latest'
+  } catch {
+    return 'latest'
+  }
+}
+
 /** The fields Combwork reads from `claude auth status --json` (HI-980), as Settings → Advanced names them. */
 export interface AuthStatusFields {
   loggedIn: string
@@ -332,9 +342,16 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return out
   }
 
+  /**
+   * The newest release on the channel `claude update` follows (HI-2729): its settings' autoUpdatesChannel, "stable" or
+   * "latest" (its default), as npm's tag of that name. Stable lags latest by days: latest's would offer an Update that
+   * leaves a stable install where it is.
+   */
   async latestVersion(): Promise<string | null> {
     try {
-      return ((await plainHttpsJson('https://registry.npmjs.org/@anthropic-ai/claude-code/latest', { timeoutMs: 6000 })) as { version?: string }).version ?? null
+      const tags = (await plainHttpsJson('https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags', { timeoutMs: 6000 })) as Record<string, unknown>
+      const tag = tags[await claudeUpdateChannel()] ?? tags.latest
+      return typeof tag === 'string' ? tag : null
     } catch {
       return null
     }
