@@ -1,6 +1,6 @@
 // Which scenarios each fake provider runs (HI-2662, tests/scenarios/delivery.cjs): the common set, every scenario, on the
 // fake Claude Code; the delivery contracts on the fake Codex and the Copilot CLI. No scenario may drop out of every set,
-// and one whose own code reads the provider must be a delivery contract, so a provider's own behaviour never goes
+// and one whose own definition depends on the provider must be a delivery contract, so a provider's own behaviour never goes
 // untested there. --only names any scenario on any provider; --every runs all of them anywhere.
 import { describe, expect, it } from 'vitest'
 import { createRequire } from 'module'
@@ -8,14 +8,13 @@ import { createRequire } from 'module'
 const require = createRequire(import.meta.url)
 type Scenario = { id: string; [k: string]: unknown }
 const { SCENARIOS } = require('./scenarios/scenarios.cjs') as { SCENARIOS: Scenario[] }
-const { DELIVERY, DELIVERY_PROVIDERS, scenarioSet } = require('./scenarios/delivery.cjs') as {
+const { DELIVERY, DELIVERY_PROVIDERS, providerSensitive, scenarioSet } = require('./scenarios/delivery.cjs') as {
   DELIVERY: Record<string, string>
   DELIVERY_PROVIDERS: string[]
+  providerSensitive: (s: Scenario) => boolean
   scenarioSet: (s: Scenario[], provider: string, o?: { only?: string[]; every?: boolean }) => Scenario[]
 }
 const ids = (list: Scenario[]) => list.map((s) => s.id)
-/** A scenario's own code, as the selection guard reads it. */
-const code = (s: Scenario) => ['setup', 'prompt', 'fake', 'expect', 'observe', 'fakeSkips'].map((k) => (typeof s[k] === 'function' ? String(s[k]) : JSON.stringify(s[k] ?? ''))).join('\n')
 
 describe('the scenario sets by provider (HI-2662)', () => {
   it('names only scenarios that exist, each with what of the delivery it exercises, sorted', () => {
@@ -38,10 +37,23 @@ describe('the scenario sets by provider (HI-2662)', () => {
     for (const p of DELIVERY_PROVIDERS) expect(ids(scenarioSet(SCENARIOS, p))).toEqual(ids(SCENARIOS).filter((id) => id in DELIVERY))
   })
 
-  it('keeps every scenario whose own code reads the provider among the delivery contracts', () => {
-    const reads = SCENARIOS.filter((s) => /\bprovider\b/.test(code(s))).map((s) => s.id)
-    expect(reads.length).toBeGreaterThan(0)
-    expect(reads.filter((id) => !(id in DELIVERY))).toEqual([])
+  it('keeps every scenario whose own definition depends on the provider among the delivery contracts', () => {
+    const sensitive = SCENARIOS.filter(providerSensitive).map((s) => s.id)
+    expect(sensitive.length).toBeGreaterThan(5)
+    expect(sensitive.filter((id) => !(id in DELIVERY))).toEqual([])
+    // HR3's round 1: skips by provider under another parameter name, and the wakes and timings each CLI meets its own way.
+    for (const id of ['coordinator-lanes-to-end', 'review-decision-next-round', 'skill-changed', 'inbox-act-then-ack']) expect(sensitive, id).toContain(id)
+    // The agent watch's wake isn't seen lexically: listed by hand, for what it delivers.
+    expect(DELIVERY['assistant-agent-watch']).toMatch(/agent watch/)
+  })
+
+  it('reads a definition as provider-dependent whatever its callback calls the provider', () => {
+    expect(providerSensitive({ id: 'x', fakeSkips: (p: string) => (p === 'fake' ? [] : ['a check']) })).toBe(true)
+    expect(providerSensitive({ id: 'x', fakeSkips: ['a check'] })).toBe(false)
+    for (const k of ['fakeWakes', 'beforeLaunch', 'beforePrompt', 'during']) expect(providerSensitive({ id: 'x', [k]: () => null }), k).toBe(k !== 'during')
+    expect(providerSensitive({ id: 'x', expect: (_o: unknown, c: { provider: string }) => c.provider === 'codex' })).toBe(true)
+    expect(providerSensitive({ id: 'x', during: () => 'the providers page' })).toBe(false)
+    expect(providerSensitive({ id: 'x', expect: () => [] })).toBe(false)
   })
 
   it('--every runs all of them anywhere; --only names any scenario on any provider; model trials pick their own', () => {

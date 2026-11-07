@@ -172,7 +172,9 @@ node tests/scenarios/measure.cjs              # what sessions are given about Co
 **delivery contracts**: the scenarios whose result depends on how that CLI is given and gives back what Combwork sends
 (its skills, tool calls and replies, prompts typed into its pane, hook context, its shell and process tree, its folder, a
 fresh launch). Each id in `DELIVERY` says which of those it exercises. `tests/scenarioSelection.test.ts` fails a scenario
-whose own code reads the provider but isn't there, and checks that every scenario still runs on `fake`. A provider's own
+whose own definition depends on the provider but isn't there (`providerSensitive`: a `fakeSkips` function, a
+`fakeWakes`, `beforeLaunch` or `beforePrompt`, or the provider read in a callback; a lexical check, so what a helper does
+isn't seen and the list is reviewed by hand too), and checks that every scenario still runs on `fake`. A provider's own
 checks stay where they are (`fakeSkips` by provider). `--every` runs the whole set on a delivery provider, and `--only` a
 named scenario on any provider, for a doubt about it there. A guidance-wide check is then `npm run scenarios` and the
 two providers' default runs: about an hour where the three whole sets took two and a half.
