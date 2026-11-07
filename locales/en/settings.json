@@ -1043,6 +1043,14 @@
     "defaultMessage": "Screen: turn done",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
+  "settings.advanced.claude-code.update.channelSetting.desc": {
+    "defaultMessage": "The Claude Code setting that names the release channel `claude update` installs from (stable or latest), which Combwork reads from Claude Code's managed and user settings, never changes, to offer only an update on that channel. Wrong, Combwork compares Claude Code with the latest channel, and may offer an update it can't make.",
+    "description": "What the advanced setting \"Update channel setting\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2729). Keep `claude update` as it is (a command), and stable and latest (the channels' names)."
+  },
+  "settings.advanced.claude-code.update.channelSetting.title": {
+    "defaultMessage": "Update channel setting",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The release channel Claude Code updates from (stable or latest)."
+  },
   "settings.advanced.claudeFooter.desc": {
     "defaultMessage": "Claude Code's footer in the {mode} mode (\"{footer}\"). Combwork reads an agent's permission mode from its footer (the mode found last on screen), and switches modes by pressing Shift+Tab until the footer shows the one wanted; wrong, Combwork doesn't see the agent in {mode}, and can't switch to it without a restart.",
     "description": "What the advanced setting is for (Settings → Advanced, under Claude Code). {mode} is a permission mode's name; {footer} is Claude Code's own footer text, in English: keep it as it is."
@@ -2354,6 +2362,22 @@
   "settings.advanced.cw.wait.cardMaxSeconds.title": {
     "defaultMessage": "Card waits: longest",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.cw.winget.showSeconds.desc": {
+    "defaultMessage": "How long `winget show` may take to say the newest version WinGet has of a coding agent CLI installed with it (it may update its list of packages first). Past it, Combwork offers no update and doesn't say the CLI is up to date.",
+    "description": "What the advanced setting \"WinGet: time to say its version\" does (Settings → Advanced). Keep `winget show` as it is (a command)."
+  },
+  "settings.advanced.cw.winget.showSeconds.title": {
+    "defaultMessage": "WinGet: time to say its version",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\"). WinGet is Windows' package manager: keep its name."
+  },
+  "settings.advanced.cw.winget.version.desc": {
+    "defaultMessage": "How Combwork finds the newest version WinGet has of a coding agent CLI installed with it, in what `winget show` prints: a regular expression whose first group is the version. Provider Setup offers such a CLI an update only once WinGet has a newer one. Wrong, Combwork can't tell, and offers no update and doesn't say it is up to date.",
+    "description": "What the advanced setting \"WinGet: version line\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `winget show` as it is (a command)."
+  },
+  "settings.advanced.cw.winget.version.title": {
+    "defaultMessage": "WinGet: version line",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork. WinGet is Windows' package manager: keep its name."
   },
   "settings.advanced.cw.workflow.enforce.desc": {
     "defaultMessage": "Combwork keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Combwork sees a card's work merged or changed outside Combwork. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Combwork only records what happens to each card's work, without moving cards or waking agents for it.",

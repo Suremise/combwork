@@ -448,6 +448,12 @@
   "settings.advanced.claude-code.turnScreen.done.title": {
     "placeholders": {}
   },
+  "settings.advanced.claude-code.update.channelSetting.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.update.channelSetting.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claudeFooter.desc": {
     "placeholders": {
       "mode": "plain",
@@ -1452,6 +1458,18 @@
     "placeholders": {}
   },
   "settings.advanced.cw.wait.cardMaxSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.winget.showSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.winget.showSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.winget.version.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.winget.version.title": {
     "placeholders": {}
   },
   "settings.advanced.cw.workflow.enforce.desc": {

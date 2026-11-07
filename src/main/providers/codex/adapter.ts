@@ -21,6 +21,7 @@ import { combworkError } from '../../combworkError'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
 import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, childArgs, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
 import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
@@ -40,6 +41,8 @@ import type { HookListing, HookRow } from '../../../shared/hooks'
 import { withoutCombworkAuth } from '../../../shared/hooks'
 
 const log = createLogger('codex')
+/** Codex's WinGet package. */
+export const CODEX_WINGET_ID = 'OpenAI.Codex'
 /** Rollouts stat'd at once while listing a folder's sessions (HI-1681). */
 const LIST_AT_ONCE = 8
 /** A rollout's session, from its session_meta. */
@@ -762,7 +765,12 @@ export class CodexAdapter implements ProviderAdapter {
     return out
   }
 
-  async latestVersion(): Promise<string | null> {
+  /**
+   * The newest version the installer of `executable` delivers (HI-2729): a WinGet install's from the WinGet source, which
+   * gets Codex's releases days after GitHub; any other's (npm, the standalone installer, which `codex update` runs), GitHub's.
+   */
+  async latestVersion(executable?: string | null, fromWinget: typeof wingetVersion = wingetVersion): Promise<string | null> {
+    if (executable && isWingetPath(executable)) return fromWinget(CODEX_WINGET_ID)
     try {
       const reply = await plainHttpsJson('https://api.github.com/repos/openai/codex/releases/latest', { timeoutMs: 6000, headers: { Accept: 'application/vnd.github+json' } })
       const tag = (reply as { tag_name?: string }).tag_name ?? ''
@@ -783,8 +791,14 @@ export class CodexAdapter implements ProviderAdapter {
     return { file: '/bin/bash', args: ['-lc', 'curl -fsSL https://chatgpt.com/codex/install.sh | sh'] } // i18n-ignore: a command run in a terminal
   }
 
+  /** `codex update`, except for a WinGet install: WinGet updates it, keeping its package record (HI-2729). */
   updateCommand(executable: string): CommandSpec {
+    if (isWingetPath(executable)) return wingetUpgradeCommand(CODEX_WINGET_ID)
     return { ...toSpawnable(executable, ['update']) }
+  }
+
+  updateUpToDate(executable: string, exitCode: number): boolean {
+    return isWingetPath(executable) && wingetUpToDate(exitCode)
   }
 
   loginCommand(executable: string): CommandSpec {

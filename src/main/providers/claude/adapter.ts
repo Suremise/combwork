@@ -27,6 +27,8 @@ import { claudeBackgroundTasks } from './background'
 import { claudeRetryWait } from './retry'
 import { claudeSafeguards } from './safeguards'
 import { claudeTranscriptTurns } from './turns'
+import { claudeUpdateChannel, type UpdateChannel } from './updateChannel'
+import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
@@ -108,13 +110,25 @@ export function claudeHome(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
 }
 
-/** The release channel Claude Code updates from: its user settings' autoUpdatesChannel ("stable"), else "latest" (only read). */
-export async function claudeUpdateChannel(home: string = claudeHome()): Promise<string> {
+/** Claude Code's WinGet package (its docs' "winget install Anthropic.ClaudeCode"). */
+export const CLAUDE_WINGET_ID = 'Anthropic.ClaudeCode'
+
+/**
+ * The newest version the installer of `executable` delivers (HI-2729): a WinGet install's from the WinGet source (it
+ * gets Claude Code's releases days after npm, and `claude update` leaves it alone); any other's, npm's tag of the channel
+ * `claude update` follows (managed, then user settings: stable lags latest by about a week), none when that can't be told.
+ */
+export async function claudeLatestVersion(executable: string | null | undefined, deps: { channel?: () => Promise<UpdateChannel | null>; winget?: typeof wingetVersion } = {}): Promise<string | null> {
+  if (executable && isWingetPath(executable)) return (deps.winget ?? wingetVersion)(CLAUDE_WINGET_ID)
   try {
-    const v = (JSON.parse(await readFile(join(home, 'settings.json'), 'utf8')) as { autoUpdatesChannel?: unknown }).autoUpdatesChannel
-    return v === 'stable' ? 'stable' : 'latest'
+    const channel = await (deps.channel ?? (() => claudeUpdateChannel(claudeHome())))()
+    if (!channel) return null
+    const tags = (await plainHttpsJson('https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags', { timeoutMs: 6000 })) as Record<string, unknown>
+    // A channel npm has no tag for isn't latest's: none, not a version `claude update` won't install.
+    const tag = tags?.[channel]
+    return typeof tag === 'string' ? tag : null
   } catch {
-    return 'latest'
+    return null
   }
 }
 
@@ -342,19 +356,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return out
   }
 
-  /**
-   * The newest release on the channel `claude update` follows (HI-2729): its settings' autoUpdatesChannel, "stable" or
-   * "latest" (its default), as npm's tag of that name. Stable lags latest by days: latest's would offer an Update that
-   * leaves a stable install where it is.
-   */
-  async latestVersion(): Promise<string | null> {
-    try {
-      const tags = (await plainHttpsJson('https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags', { timeoutMs: 6000 })) as Record<string, unknown>
-      const tag = tags[await claudeUpdateChannel()] ?? tags.latest
-      return typeof tag === 'string' ? tag : null
-    } catch {
-      return null
-    }
+  latestVersion(executable?: string | null): Promise<string | null> {
+    return claudeLatestVersion(executable)
   }
 
   isNewer(latest: string, current: string): boolean {
@@ -371,8 +374,14 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return { file: '/bin/bash', args: ['-lc', 'curl -fsSL https://claude.ai/install.sh | bash'] } // i18n-ignore: a command run in a terminal
   }
 
+  /** `claude update`, except for a WinGet install, which it doesn't update ("Claude is up to date!"): WinGet does (HI-2729). */
   updateCommand(executable: string): CommandSpec {
+    if (isWingetPath(executable)) return wingetUpgradeCommand(CLAUDE_WINGET_ID)
     return { file: executable, args: ['update'] }
+  }
+
+  updateUpToDate(executable: string, exitCode: number): boolean {
+    return isWingetPath(executable) && wingetUpToDate(exitCode)
   }
 
   loginCommand(executable: string): CommandSpec {

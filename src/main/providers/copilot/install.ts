@@ -13,7 +13,7 @@ import { listOf } from '../../../shared/advanced'
 import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue } from '../common'
 import type { CommandSpec, UpdateRetry } from '../types'
 import { COPILOT_ENV_STRIP, copilotEnv, copilotHome, stripsTokens } from './home'
-import { wingetUpToDate, wingetVersion } from '../winget'
+import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 
 // The GitHub Copilot CLI's installation and sign-in, for Provider Setup (#452, from the #403 spike on CLI 1.0.93). The
 // adapter delegates locate, readiness and the install, update and sign-in tasks here.
@@ -131,7 +131,7 @@ async function candidates(env: Record<string, string>): Promise<{ path: string; 
 
 /** How it was installed, from its path: an update goes through the same installer. */
 export function installKind(path: string): 'winget' | 'npm' | 'other' {
-  if (/[\\/]Microsoft[\\/]WinGet[\\/](Links|Packages)[\\/]/i.test(path)) return 'winget'
+  if (isWingetPath(path)) return 'winget'
   if (/\.(cmd|bat)$/i.test(path) || /[\\/]node_modules[\\/]/i.test(path)) return 'npm'
   return 'other'
 }
@@ -229,7 +229,7 @@ export function copilotInstallCommand(): CommandSpec {
  * executable without updating WinGet's record (#1101). Readiness offers no Update for other installs.
  */
 export function copilotUpdateCommand(executable: string): CommandSpec {
-  if (installKind(executable) === 'winget') return { file: 'winget.exe', args: ['upgrade', '--id', WINGET_ID, '--exact', '--source', 'winget'] }
+  if (installKind(executable) === 'winget') return wingetUpgradeCommand(WINGET_ID)
   if (process.platform === 'win32') return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', 'npm', 'install', '-g', `${NPM_PACKAGE}@latest`] }
   return { file: '/bin/bash', args: ['-lc', `npm install -g ${NPM_PACKAGE}@latest`] } // i18n-ignore: a command run in a terminal
 }

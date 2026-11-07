@@ -1,31 +1,41 @@
+import { advanced } from '../advanced'
 import { run } from './common'
+import type { CommandSpec } from './types'
 
-// What the WinGet source can deliver of a package (HI-2729): a WinGet install updates from it, not from npm or GitHub,
-// which it follows days later, so an update is only offered once WinGet has it.
+// A CLI installed with WinGet (HI-2729): it updates from the WinGet source, through `winget upgrade`, not from npm or
+// GitHub, which WinGet follows days later, nor through the CLI's own updater (Claude Code's `claude update` answers
+// "Claude is up to date!" for a WinGet install). So an update is offered only once WinGet has it, and made by WinGet.
 
-/** How long `winget show` may take: it may refresh its source first. */
-const WINGET_SHOW_MS = 30_000
+/** A copy WinGet installed: its Links folder's, or one in its Packages folder. */
+export function isWingetPath(path: string): boolean {
+  return /[\\/]Microsoft[\\/]WinGet[\\/](Links|Packages)[\\/]/i.test(path)
+}
 
 /** The command that asks the WinGet source for a package's newest version (it reads, never installs). */
 export function wingetShowArgs(id: string): string[] {
   return ['show', '--id', id, '--exact', '--source', 'winget', '--accept-source-agreements', '--disable-interactivity']
 }
 
-/**
- * The version in `winget show`'s reply: its first `<field>: <version>` line ("Version: 1.0.106"). WinGet words its field
- * names in Windows' display language, so the name isn't matched, only that the field before it holds no version.
- */
-export function parseWingetVersion(stdout: string): string | null {
-  for (const line of stdout.split(/\r?\n/)) {
-    const m = /^[^:]+:\s*v?(\d+(?:\.\d+)+(?:-[0-9A-Za-z.]*[0-9A-Za-z])?)\s*$/.exec(line.trim())
-    if (m) return m[1]
-  }
-  return null
+/** The update of a package WinGet installed, from the same source. */
+export function wingetUpgradeCommand(id: string): CommandSpec {
+  return { file: 'winget.exe', args: ['upgrade', '--id', id, '--exact', '--source', 'winget'] }
 }
 
-/** The newest version of a WinGet package in the winget source, or null when WinGet can't say (missing, offline, timed out). */
+/**
+ * The version in `winget show`'s reply, by Settings → Advanced's pattern (cw.winget.version): its first group, else what
+ * it found. WinGet words its field names in Windows' display language, so the default matches only a field holding a version.
+ */
+export function parseWingetVersion(stdout: string, pattern: RegExp = advanced.pattern('cw.winget.version')): string | null {
+  const m = pattern.exec(stdout)
+  return m ? (m[1] ?? m[0]).trim() || null : null
+}
+
+/**
+ * The newest version of a WinGet package in the winget source, or null when WinGet can't say (missing, offline, past
+ * Settings → Advanced's time, cw.winget.showSeconds). Run as a child process, never on main's thread.
+ */
 export async function wingetVersion(id: string, runFn: typeof run = run): Promise<string | null> {
-  const r = await runFn('winget.exe', wingetShowArgs(id), WINGET_SHOW_MS)
+  const r = await runFn('winget.exe', wingetShowArgs(id), advanced.number('cw.winget.showSeconds') * 1000)
   return r.code === 0 && !r.ended ? parseWingetVersion(r.stdout) : null
 }
 

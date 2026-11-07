@@ -821,6 +821,31 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 'https://api.githubcopilot.com',
     applies: 'now'
   },
+  // A CLI installed with WinGet is compared with what WinGet can install (HI-2729): `winget show`'s version.
+  {
+    id: 'cw.winget.version',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.winget.version.title', defaultMessage: 'WinGet: version line', description: "An advanced setting's title (Settings → Advanced), listed under Combwork. WinGet is Windows' package manager: keep its name." }),
+    desc: msg({ id: 'settings.advanced.cw.winget.version.desc', defaultMessage: "How Combwork finds the newest version WinGet has of a coding agent CLI installed with it, in what `winget show` prints: a regular expression whose first group is the version. Provider Setup offers such a CLI an update only once WinGet has a newer one. Wrong, Combwork can't tell, and offers no update and doesn't say it is up to date.", description: 'What the advanced setting "WinGet: version line" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `winget show` as it is (a command).' }),
+    kind: 'pattern',
+    // The first "<field>: <version>" line: WinGet words its field names ("Version") in Windows' display language.
+    default: String.raw`^[^:\r\n]+:[ \t]*v?(\d+(?:\.\d+)+(?:-[0-9A-Za-z.]*[0-9A-Za-z])?)[ \t]*\r?$`,
+    flags: 'm',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/winget-show-copilot-1.29.380.txt`, version: '1.29.380', source: 'WinGet', text: 'Version: 1.0.106' }] // i18n-ignore: WinGet's recorded output (#367)
+  },
+  {
+    id: 'cw.winget.showSeconds',
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.winget.showSeconds.title', defaultMessage: 'WinGet: time to say its version', description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\"). WinGet is Windows' package manager: keep its name." }),
+    desc: msg({ id: 'settings.advanced.cw.winget.showSeconds.desc', defaultMessage: "How long `winget show` may take to say the newest version WinGet has of a coding agent CLI installed with it (it may update its list of packages first). Past it, Combwork offers no update and doesn't say the CLI is up to date.", description: 'What the advanced setting "WinGet: time to say its version" does (Settings → Advanced). Keep `winget show` as it is (a command).' }),
+    kind: 'number',
+    default: 30,
+    min: 5,
+    max: 300,
+    unit: 's',
+    applies: 'now'
+  },
   {
     id: 'cw.progress.lanesShown',
     group: 'cw',
@@ -2039,6 +2064,16 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 'autoMemoryDirectory',
     applies: 'sessions',
     samples: [{ from: `${FIX}/advanced/memory-setting-claude-2.1.312.json`, version: '2.1.312', fields: ['autoMemoryDirectory'] }]
+  },
+  {
+    id: 'claude-code.update.channelSetting',
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.update.channelSetting.title', defaultMessage: 'Update channel setting', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The release channel Claude Code updates from (stable or latest)." }),
+    desc: msg({ id: 'settings.advanced.claude-code.update.channelSetting.desc', defaultMessage: "The Claude Code setting that names the release channel `claude update` installs from (stable or latest), which Combwork reads from Claude Code's managed and user settings, never changes, to offer only an update on that channel. Wrong, Combwork compares Claude Code with the latest channel, and may offer an update it can't make.", description: 'What the advanced setting "Update channel setting" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2729). Keep `claude update` as it is (a command), and stable and latest (the channels\' names).' }),
+    kind: 'field',
+    default: 'autoUpdatesChannel',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/update-channel-claude-2.1.319.json`, version: '2.1.319', fields: ['autoUpdatesChannel'] }]
   },
   // Codex
   {
