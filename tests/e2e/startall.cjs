@@ -13,6 +13,9 @@ const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 20000
+// Agents ▾ with three agents: each batch action, Start New and Archive and Start New with their one-agent entries after
+// them (HI-2665), Remove All last after a line.
+const AGENTS_MENU = ['Start New (3)', 'Start New for One Agent', 'Start Fresh (Idle Agents)…', 'Archive and Start New (3)', 'Archive and Start New for One Agent', 'Remove All (3)…']
 
 const userData = path.join(lib.WORK, 'startall-profile')
 const ws = path.join(lib.WORK, 'startall-ws')
@@ -119,9 +122,9 @@ const check = (name, ok, extra = '') => {
   check('no Explorer or Terminal button in the header', (await header.locator('button', { hasText: /Explorer|Terminal/ }).count()) === 0)
   // Agents ▾: the batch actions with their counts, Start Fresh (Idle Agents)… after Start New (#1437), Remove All last
   // after a line; each in its action's colour (#344).
-  check('Agents ▾ has Start New (3), Start Fresh (Idle Agents)…, Archive and Start New (3) and Remove All (3)…', JSON.stringify(await lib.agentsMenu(page)) === JSON.stringify(['Start New (3)', 'Start Fresh (Idle Agents)…', 'Archive and Start New (3)', 'Remove All (3)…']), JSON.stringify(await lib.agentsMenu(page)))
+  check('Agents ▾ has Start New (3), Start Fresh (Idle Agents)…, Archive and Start New (3) and Remove All (3)…', JSON.stringify(await lib.agentsMenu(page)) === JSON.stringify(AGENTS_MENU), JSON.stringify(await lib.agentsMenu(page)))
   const acts = () => page.locator('.menu .menu-item').evaluateAll((items) => items.map((m) => [...m.classList].find((c) => c.startsWith('act-')) ?? 'none'))
-  check("each entry wears its action's colour", JSON.stringify(await acts()) === JSON.stringify(['act-start', 'act-start', 'act-archive-start', 'act-remove']), JSON.stringify(await acts()))
+  check("each entry wears its action's colour", JSON.stringify(await acts()) === JSON.stringify(['act-start', 'act-start', 'act-start', 'act-archive-start', 'act-archive-start', 'act-remove']), JSON.stringify(await acts()))
   check('…with a line before Remove All', !!(await page.locator('.menu > *').evaluateAll((els) => els.at(-2)?.classList.contains('menu-sep'))))
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
@@ -150,7 +153,7 @@ const check = (name, ok, extra = '') => {
   }, HUNG_MS)
   check('Enter on Agents ▾: the focus is in the menu, on Start New (3) as its active descendant, the button expanded', !!opened, JSON.stringify(await focusState()))
   await page.keyboard.press('ArrowDown')
-  check('↓: the active descendant is Start Fresh (Idle Agents)…', !!(await lib.until(async () => (await focusState()).chosen === 'Start Fresh (Idle Agents)…', HUNG_MS)), JSON.stringify(await focusState()))
+  check('↓: the active descendant is Start New for One Agent (HI-2665)', !!(await lib.until(async () => (await focusState()).chosen === 'Start New for One Agent', HUNG_MS)), JSON.stringify(await focusState()))
   await page.keyboard.press('Escape')
   check('Escape: the menu closes, the focus back on Agents ▾, no longer expanded', !!(await lib.until(async () => {
     const f = await focusState()
@@ -180,7 +183,8 @@ const check = (name, ok, extra = '') => {
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await lib.fitWindow(app, page, { width: 900, height: 900 })
-    const names = ['Active', "Resume Stopped's last session", 'Stop all 2 running agents', 'Agents', 'More actions']
+    // Stop (2) with its ▾ (HI-2665): two running agents to choose from.
+    const names = ['Active', "Resume Stopped's last session", 'Stop all 2 running agents', 'Choose an agent to stop', 'Agents', 'More actions']
     const at = (await lib.until(async () => {
       const a = await actionsAt()
       return JSON.stringify(a.map((x) => x.name)) === JSON.stringify(names) && allReachable(a) ? a : null
@@ -227,8 +231,9 @@ const check = (name, ok, extra = '') => {
   check('900 px with the Progress panel (~265 px): one row, Active gone from it, the rest and ⋯ reachable', at265.at(-1)?.name === 'More actions' && !at265.some((x) => x.name === 'Active') && allReachable(at265) && (await oneRow()), JSON.stringify(at265))
   check('…the status its most urgent count only, the rest in its tooltip', !(await statusText()).includes('·') && (await statusText()).length > 0, await statusText())
   const items265 = await menuNames()
-  const folded = RUN.filter((n) => !at265.some((x) => x.name === n))
-  check("…⋯ starts with Active, then what of Resume and Stop left the row, then Agents ▾'s actions", JSON.stringify(items265.slice(0, 5 + folded.length)) === JSON.stringify(['Active', ...folded, 'Start New (3)', 'Start Fresh (Idle Agents)…', 'Archive and Start New (3)', 'Remove All (3)…']), JSON.stringify({ items265, row: at265.map((x) => x.name) }))
+  // Stop all 2 running agents folded with its one-agent entry after it (HI-2665; Resume has one agent, so none).
+  const folded = RUN.filter((n) => !at265.some((x) => x.name === n)).flatMap((n) => (n === 'Stop all 2 running agents' ? [n, 'Stop One Agent'] : [n]))
+  check("…⋯ starts with Active, then what of Resume and Stop left the row, then Agents ▾'s actions", JSON.stringify(items265.slice(0, 1 + folded.length + AGENTS_MENU.length)) === JSON.stringify(['Active', ...folded, ...AGENTS_MENU]), JSON.stringify({ items265, row: at265.map((x) => x.name) }))
   await page.screenshot({ path: path.join(lib.WORK, 'startall-header-265.png'), clip: { x: 0, y: 0, width: 900, height: 120 } })
   await toggleProgress()
   // The Assistant's panel open too (a main area of about a hundred pixels): only ⋯ is left beside the name.
@@ -239,7 +244,7 @@ const check = (name, ok, extra = '') => {
   }, 5000)) || (await actionsAt())
   check('900 px with the Assistant open (a squeezed main area): one row, only ⋯ beside the name, reachable', cramped.length === 1 && cramped[0].name === 'More actions' && allReachable(cramped) && (await oneRow()), JSON.stringify(cramped))
   const crampedItems = await menuNames()
-  check("…⋯ starts with Active, Resume and Stop, then Agents ▾'s actions", JSON.stringify(crampedItems.slice(0, 7)) === JSON.stringify(['Active', "Resume Stopped's last session", 'Stop all 2 running agents', 'Start New (3)', 'Start Fresh (Idle Agents)…', 'Archive and Start New (3)', 'Remove All (3)…']), JSON.stringify(crampedItems))
+  check("…⋯ starts with Active, Resume and Stop, then Agents ▾'s actions", JSON.stringify(crampedItems.slice(0, 4 + AGENTS_MENU.length)) === JSON.stringify(['Active', "Resume Stopped's last session", 'Stop all 2 running agents', 'Stop One Agent', ...AGENTS_MENU]), JSON.stringify(crampedItems))
   await page.screenshot({ path: path.join(lib.WORK, 'startall-header-cramped.png') })
   await page.evaluate(() => document.activeElement?.blur())
   await page.keyboard.press('Control+Alt+I')

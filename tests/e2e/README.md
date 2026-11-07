@@ -304,14 +304,15 @@ same code while every required check still runs:
   from it (#365, RELEASING.md). The runner itself never starts a CLI.
 - **The reviewer** checks the record instead of repeating it (#533): its fingerprint is the code it's reviewing
   (`npm run e2e -- --fingerprint` in the builder's folder), it's recent, the suites the change needs ran, and each
-  failure in it is explained. It then runs the quick checks (`npm run typecheck`, `npm run lint`), the unit tests the
-  change affects (`npx vitest run --changed <base>`, where `<base>` is the commit the card's work started from;
-  uncommitted changes count too; it follows imports, so add the tests that read a changed file, such as a skill's
-  Markdown or a fixture), not the whole unit suite, and only the new or changed suites and those it doubts
-  (the one or two closest to the riskiest change), saying which on the card, and spends the rest of its time on its own probes. It reruns a whole suite or set only when there's no record, the
-  fingerprint differs or the record is stale, a result looks wrong, or the change is to shared test infrastructure (the
-  runner, `lib.cjs`, the run context, the scenario harness, `vitest.config.ts` or a helper in `tests/`), and says in
-  its verdict which and why.
+  failure in it is explained. A valid result stands (HI-2660; the `review-agent-work` skill, §3): the card's checks
+  recorded at the revision (`cw_start_review`'s `checksAtRevision`) and the suites in the record are not run again. It
+  runs what no record covers (a check the change needs that didn't run, or whose command, test or CLI changed since),
+  the `runYourself` tests the merge needs from it (realProof = review) unless it accepts the builder's run of each at
+  the revision (`cw_verdict`'s `accept`), and its own probes, and spends its time on those.
+  It reruns a suite, a set or a unit test only for a doubt it names in its verdict ("reran X because Y"): the record is
+  missing or for other code, a result looks wrong, or the change is to shared test infrastructure (the runner,
+  `lib.cjs`, the run context, the scenario harness, `vitest.config.ts` or a helper in `tests/`). Normally at most one
+  focused rerun.
 - **Follow-up rounds** run only the suites that failed plus those the fixes touch, by name (`--affected` can help pick
   them). **Before a card passes**, every suite it names has run on its final code (the builder's last record). How
   narrow a round's tests are, and what never runs on a card unless it asks, is AGENTS.md's **Tests per card**.
@@ -330,7 +331,7 @@ same code while every required check still runs:
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
   bisected over the merge commits since the last full run), **once for a version's first RC** (RELEASING.md, What a
   release checks; the real tier then runs on its own, `--all --only-real` with Copilot's suites named, RELEASING Step 4; an RC
-  fix round and the release rerun only the slice a change touched), and **on request** (the user, or a card that asks for it). Run the real tier on its own
+  fix round and the release rerun only the slices a change invalidates, by the release's coverage ledger), and **on request** (the user, or a card that asks for it). Run the real tier on its own
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
   suites a change needs, such as a review round's fixes, and isn't any merge's gate.
 - **A flake fix, or a change to a suite's waits**, is proven by focused repeats under load (the `investigate-flake`
@@ -355,7 +356,34 @@ only the unit tests use select nothing, and `tests/e2esuites.test.ts` checks tha
 suite. Real suites come in when an area names them, or when the change is to Combwork's side of every CLI (`REAL_TIER` in
 `affected.mjs`: `sessions.ts`, the providers, `providerService`, the terminal host, hook status, transcripts,
 `lib.cjs`) or to code no area names; a provider's own adapter (`src/main/providers/claude/`, `codex/`) picks only its
-real suites. Add an area to `affected.mjs` when you add a
+real suites.
+
+A few of those shared files are selected by **the parts of them a change touches** instead (HI-2659, `SPLIT` in
+`affectedUnits.mjs`): `ipc.ts` and `shared/api.ts` by IPC channel, `actions.ts` by action, `commands.ts` by command,
+`workspace.ts` by its top-level functions, and `runner.mjs`'s seam tables by the seam names added or removed. Each
+changed part is followed to what names it (a channel's callers, an action's, a function's, and theirs while they are in
+those files too; its name spelled in a string, `x['f']`, counts too), and a file that names it counts as it would
+changed: its own suite, its area's suites, or every suite when it is itself shared by everything (`store.ts`,
+`sessions.ts`…) or in no area. A command is also reached by the generic dispatch (palette, menus, shortcuts), mapped to
+`commands.ts`'s own areas' suites. A part public in either revision counts as public, and a public part's trail must
+reach a file that runs it. Lines that are only comments select nothing, unless a comment they're in now covers code, or
+no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines map only for its test seams' branches
+(`CW_TEST_SLOW_IPC`, `FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access
+check, the error path) is every suite. **Workspace settings and the rest of `WorkspaceService` stay every suite**: its
+members and the `workspace` instance are never narrowed, since its instances flow where the tracer can't follow (passed
+on 2,150 times in `src/main`, 234 of them to callees it can't resolve). So HI-2654's `setAdvanced` is still every suite,
+unchanged; HI-2652's seam selects 2 suites, and HI-2653's New Project 28 from `actions.ts` (37 with its `Overlays.tsx`)
+(`tests/affectedUnits.test.ts` checks all three, and the suites the two narrowed ones need). Narrowing
+`WorkspaceService`'s members is HI-2678.
+**The escape hatch** errs towards more, each time with a reason in the selection's output: whatever it can't follow
+selects every suite (a line in no function or entry, such as an import or module code; a file it can't parse or read in
+either revision; a public part whose trail reaches nothing that runs it, a cycle of public parts included; any use of
+an import of the module other than a short safe list: `mod.name`, the part called or read by name, a function handed
+off by its name, a type. Every reference to such an import is checked, so an alias, a computed key (`x[k]`),
+`Object.keys`, a spread, a destructuring, an argument, a template or a store is every suite, whatever its form; a module
+re-exported whole; a channel built at run time; a `WorkspaceService` member), the files still in `EVERYTHING` but not
+`SPLIT` select every suite as before (each with its reason there), and a change you know is cross-cutting though it touches only a few parts (a behaviour every handler
+relies on, a type's meaning) runs `--all`, said on the card. Add an area to `affected.mjs` when you add a
 suite or a source file; `tests/e2esuites.test.ts` checks every suite and source file is covered. What only the unit
 tests use (`tests/*.test.ts` and their helpers in `tests/`, `vitest.config.ts`, CI's workflow: `UNIT_ONLY`) selects no
 suite, so an e2e suite or scenario must never load a `.ts` helper from `tests/` (the unit test fails if one does).
@@ -658,8 +686,8 @@ in the run record. Seeing 0xc0000142, run fewer test runs at once rather than lo
 Windows' "Application Error" dialog even for processes that had the error mode (children of Vitest workers during full
 unit runs beside e2e runs), and the process waits behind it until someone clicks OK. Fewer heavy runs at once makes it
 rarer (a full unit run is a heavy run, above); only a machine-wide setting, left to the machine's owner, would stop it.
-The `failfast` suite checks the reporting (a child ending with 0xc0000142 is seen at once, and said), not that a real
-startup failure shows no dialog.
+`tests/windowsExits.test.ts` checks the reporting (a real child ending with 0xc0000142 is seen at once, and said: the
+`failfast` suite's checks until HI-2663), not that a real startup failure shows no dialog.
 
 ## Housekeeping
 

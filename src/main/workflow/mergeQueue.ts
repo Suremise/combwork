@@ -18,7 +18,7 @@ import { onOutputSettled, withLauncherEnv } from '../gitWorker'
 import { gitExe } from '../gitTool'
 import { endTree } from '../progressReporters/wrapper'
 import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
-import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
+import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, readResults, reviewProved, standingFocusedRun, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
 import { FOCUSED_PICK, FOCUSED_RUN } from '../../shared/workflow/options'
 import { boundedRead, pathChanges, runPick } from './focusedRun'
 import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, type PushPending, type PushSettled } from './queueLogs'
@@ -332,6 +332,35 @@ function statusPaths(out: string): string[] {
 const nulList = (out: string): string[] => out.split('\0').filter(Boolean)
 
 /** Whether the user approved advancing this entry's test merge (`expected` → `result`) into its checked-out target. */
+/**
+ * A real-CLI or packaged focused test's proof at the submitted revision, from the card's facts as they are (G20, realProof
+ * = review; HI-2660): the test's standing run there (`standingFocusedRun`: its latest counted run, not the queue's, its
+ * command unchanged), passed, and either run by one of `reviewers` (the lane reviewer, an agent whose pass approved the
+ * latest submission) or accepted by its run id in such a reviewer's passing verdict of that submission at the current
+ * generation (`acceptedBy`). None: no proof stands, so an earlier pass never stands behind a later counted failure.
+ */
+export function focusedProof(s: CardState, commands: Readonly<Record<string, string>>, reviewers: ReadonlySet<string>, test: string, revision: string): { run: FactData['CheckRan']; acceptedBy?: string } | undefined {
+  const c = standingFocusedRun(s.checks, test, revision, commands)
+  if (!c || c.result !== 'passed') return undefined
+  if (c.agent && reviewers.has(c.agent)) return { run: c }
+  const v = s.verdicts.findLast((x) => x.pass && x.submission === s.latest?.id && x.generation === s.generation && reviewers.has(x.reviewer) && (x.accepted ?? []).some((a) => a.test === test && a.run === c.run))
+  return v ? { run: c, acceptedBy: v.reviewer } : undefined
+}
+
+/** The reviewers whose runs and acceptances prove a card's focused tests: its lane reviewer and its passing reviewers. */
+export const proofReviewers = (reviewer: string | null | undefined, s: CardState): Set<string> => new Set([reviewer, ...passingReviewers(s)].filter((x): x is string => !!x))
+
+/**
+ * HI-2660 (HR3's round 1): the tests accepted as review proof for this entry and test merge (`FocusedAccepted`) whose
+ * proof no longer stands in `s` (a counted failure since, its acceptance gone, its command changed): read again at the
+ * queue's last check and in `IntegrationStarted`'s write, so evidence that arrived after the checks is never hidden by
+ * what they accepted.
+ */
+export function focusedProofGone(s: CardState, commands: Readonly<Record<string, string>>, reviewers: ReadonlySet<string>, entry: QueueEntry, result: string): string[] {
+  const tests = [...new Set(s.focusedAccepted.filter((a) => a.entry === entry.id && a.result === result).map((a) => a.test))]
+  return tests.filter((t) => !focusedProof(s, commands, reviewers, t, entry.revision))
+}
+
 function advanceApprovedIn(s: CardState, entry: string, expected: string, result: string): boolean {
   return s.approvals.some((a) => {
     const r = s.made[a.request]
@@ -900,9 +929,10 @@ export class MergeQueue {
    * the entry still the card's open one, the card in Merging, approved at the current generation and not stale. A
    * decision, a cancel or a stale pass that landed after the queue's last check stops it here, before git is touched.
    * Workflow rules turned off by now (while the queue waited for the repository lock, say): no advance begins, `rulesOff`.
-   * The queue paused by now (Pause queue): none begins either, `held`, the entry left open.
+   * The queue paused by now (Pause queue): none begins either, `held`, the entry left open. A focused test's review
+   * proof gone since its checks (HI-2660): none begins, `proofGone`, and the entry goes round again.
    */
-  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff' | 'held' | 'ask'> {
+  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff' | 'held' | 'ask' | 'proofGone'> {
     return this.write(card, (w) => {
       const s = w.state()
       const e = s.entries.find((x) => x.id === entry.id)
@@ -910,6 +940,9 @@ export class MergeQueue {
       const r = w.ruleset!
       const approved = r.options.review === 'none' ? !s.stale : !notApproved(s, r, card.labels)
       if (!open || s.stage !== 'merging' || !approved) return 'denied' as const
+      // HI-2660: the focused tests' review proof read again here, in the lock, on the facts as they are now: one that no
+      // longer stands sends the entry round again, whose checks then return the card for its proof (`noProof`).
+      if (focusedProofGone(s, r.options.commands, proofReviewers(this.wf.store.card(card.id).reviewer, s), entry, data.result).length) return 'proofGone' as const
       if (this.cfg.enforced && !this.cfg.enforced()) return 'rulesOff' as const
       if (this.wf.store.queuePause(entry.target) || this.cfg.teamPaused?.()) return 'held' as const
       // A checked-out target under Ask each time (OP-40): only with the user's Approve of this entry and test merge, as
@@ -1045,6 +1078,11 @@ export class MergeQueue {
       // The last check before the target moves: still approved (a decision since cancels the entry).
       const last = this.stillApproved(card, entry)
       if (!last.ok) return this.skip(card, entry, last.cancelled)
+      // HI-2660: a focused test's review proof gone since its checks: round again, whose checks return the card for it.
+      if (focusedProofGone(last.s, this.wf.rulesetOf(card, last.s).options.commands, proofReviewers(this.wf.store.card(card.id).reviewer, last.s), entry, result).length) {
+        if (++retests > MAX_RETESTS) return this.pause(target, card, entry, 'targetMovesFast')
+        continue
+      }
       // Paused meanwhile (Pause queue): the entry's checks are done, and it waits, open, for Resume (from its test merge).
       const held = this.paused(target)
       if (held) return this.held(card, entry, held.reason)
@@ -1490,16 +1528,23 @@ export class MergeQueue {
       if (unproved.length) return { kind: 'focused', focused: { why: 'newProof', tests: unproved.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
       tests = chosenTests({ ...choice, source: 'picked', picked: approved, added: p.tests })
     }
-    // Proof is its reviewer's (finding 1): a counted, passing run of that test's check at the submitted revision, by the
-    // card's lane reviewer or an agent whose pass approved the submission. A builder's own run never counts.
-    const reviewers = new Set([card.reviewer, ...passingReviewers(s)].filter((x): x is string => !!x))
+    // Proof is its review's (finding 1): the test's standing run at the submitted revision (its latest counted run there,
+    // not the queue's, its command unchanged: HI-2660, so a later counted failure is never hidden by an earlier pass),
+    // passed, and either run by the card's lane reviewer or an agent whose pass approved the submission, or another
+    // agent's run (the builder's) that such a pass accepted by its run id (HI-2660, the user's decision, 7 Nov). A
+    // builder's own run never counts unaccepted.
+    const reviewers = proofReviewers(card.reviewer, s)
     const proved = tests.filter(reviewProved)
-    const runOf = (t: FocusedTest): FactData['CheckRan'] | undefined => s.checks.findLast((c) => c.name === focusedCheckName(t.id) && c.revision === entry.revision && c.result === 'passed' && c.counted && !!c.agent && reviewers.has(c.agent))
+    const proofOf = (t: FocusedTest): { run: FactData['CheckRan']; acceptedBy?: string } | undefined => focusedProof(s, o.commands, reviewers, t.id, entry.revision)
+    const runOf = (t: FocusedTest): FactData['CheckRan'] | undefined => proofOf(t)?.run
     const missing = proved.filter((t) => !runOf(t))
     if (missing.length) return { kind: 'focused', focused: { why: 'noProof', tests: missing.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
     if (proved.length) {
       await this.write(card, (w) => {
-        for (const t of proved) if (!w.state().focusedAccepted.some((a) => a.entry === entry.id && a.result === result && a.test === t.id)) w.fact('FocusedAccepted', { entry: entry.id, revision: entry.revision, result, test: t.id, run: runOf(t)!.run })
+        for (const t of proved) {
+          const p = proofOf(t)!
+          if (!w.state().focusedAccepted.some((a) => a.entry === entry.id && a.result === result && a.test === t.id)) w.fact('FocusedAccepted', { entry: entry.id, revision: entry.revision, result, test: t.id, run: p.run.run, ...(p.acceptedBy ? { acceptedBy: p.acceptedBy } : {}) })
+        }
       })
     }
     const ids = tests.filter((t) => !reviewProved(t)).map((t) => t.id)
@@ -1657,7 +1702,7 @@ export class MergeQueue {
       if (where[target]) return 'retest'
       const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: null })
       if (started === 'rulesOff') return this.settle(card, entry, target, { pause: 'rulesOff' })
-      if (started === 'denied' || started === 'held' || started === 'ask') return started === 'ask' ? 'retest' : started
+      if (started === 'denied' || started === 'held' || started === 'ask' || started === 'proofGone') return started === 'ask' || started === 'proofGone' ? 'retest' : started
       await this.cfg.hooks?.afterStarted?.(entry.id)
       if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
       if ((await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok) return 'done'
@@ -1759,6 +1804,7 @@ export class MergeQueue {
     if (started === 'rulesOff') return { pause: 'rulesOff' }
     // Ask each time, as the setting is now: asked here, before the lock is released.
     if (started === 'ask') return { outcome: await this.askAdvance(card, entry, target, expected, result, folder) }
+    if (started === 'proofGone') return 'retest'
     if (started === 'denied' || started === 'held') return started
     await this.cfg.hooks?.afterStarted?.(entry.id)
 

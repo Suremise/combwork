@@ -10,7 +10,7 @@ import { execFileSync, execSync, spawnSync } from 'child_process'
 import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
-import { MANIFEST, manifestStale } from './testedClis.mjs'
+import { gitReaders, MANIFEST, manifestCheck } from './testedClis.mjs'
 import { recordBuild } from './buildFact.mjs'
 import { installerName, makeRelease } from './distCopy.mjs'
 import { dialectCheckArgs, dialectReleaseProblem, lastReleaseTag } from './dialectRelease.mjs'
@@ -63,11 +63,14 @@ if (dialectsOnly) {
 } else {
   // The CLI versions this release was tested with (#365): made from the real tier's run record on this code.
   const manifestFile = new URL(`../${MANIFEST}`, import.meta.url)
-  const stale = manifestStale(existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile, 'utf8')) : null, changedSince)
+  // HI-2661: test-only changes since a record that its real tier can't have run (testOnlyFiles' allowlist) are let
+  // through, and listed here for the release's coverage ledger (RELEASING.md, What a release checks).
+  const { stale, excluded } = await manifestCheck(existsSync(manifestFile) ? JSON.parse(readFileSync(manifestFile, 'utf8')) : null, changedSince, gitReaders(root, spawnSync))
   if (stale) {
-    console.error(`${MANIFEST} isn't of this code: ${stale}. Run the real tier on this commit (npm run e2e -- --all --real --build --record), then npm run tested-clis, and commit the manifest (RELEASING.md).`)
+    console.error(`${MANIFEST} isn't of this code: ${stale}. Run the real tier on this commit (npm run e2e -- --all --only-real <Copilot's suites> --build --record, RELEASING.md Step 4), then npm run tested-clis, and commit the manifest (RELEASING.md).`)
     process.exit(1)
   }
+  for (const [id, { record, files }] of Object.entries(excluded)) console.log(`${MANIFEST}: ${id}'s entry is from ${record}; test-only files changed since, not run by its real tier (for the coverage ledger): ${files.join(', ')}`)
 }
 // The committed notices must match what ships (#386): the build would otherwise regenerate them after the clean-tree check.
 if (spawnSync('node', ['scripts/licenses.mjs', '--check'], { stdio: 'inherit', cwd: root }).status !== 0) process.exit(1)

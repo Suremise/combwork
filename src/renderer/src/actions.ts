@@ -8,6 +8,7 @@ import { AGENT_LIMIT_MAX, MANY_AGENTS, OPEN_WORKFLOW_OPTIONS, agentLimitText, ch
 import { moveToCell, neighbourCell, orderByCells, type CellDirection } from '@shared/paneCells'
 import { autoProvider, autoProviderPending, isKnownProvider, isProviderEnabled, providerName } from '@shared/providers'
 import { agentsToResume, resumeAll, stalledOnSignIn, type ResumeAllResult } from '@shared/resumeAll'
+import { resumeOneNow } from '@shared/oneAgent'
 import { holdShort, holdText } from '@shared/sessionResume'
 import type { FreshRow } from '@shared/freshStarts'
 import type { ResumeHold } from '@shared/agentFolders'
@@ -688,6 +689,20 @@ export async function resumeLast(path: string | null = get().selectedProject, ag
     const id = await quickAddAgent(path)
     if (id) await latest(id)
   })
+}
+
+/**
+ * Resumes one agent chosen from a Resume (n) menu (HI-2665), by its project and id, read again now: one a refused
+ * sign-in stopped is told to carry on, a stopped one resumed as its pane's Resume does. One that has gone, or can no
+ * longer resume, is said so and left: never another agent, never a new one.
+ */
+export async function resumeOneAgent(path: string, agentId: string): Promise<void> {
+  const a = agentOf(project(path), agentId)
+  const now = resumeOneNow(a)
+  if (now === 'gone') return notify('info', tr(msg({ id: 'actions.resumeOne.gone', defaultMessage: 'That agent is no longer in the project', description: "A notification's title: the agent chosen from Resume (n)'s menu was removed before it could be resumed." })))
+  if (now === 'notNow') return notify('info', tr(msg({ id: 'actions.resumeOne.notNow', defaultMessage: '{agent} can no longer be resumed', description: "A notification's title: the agent chosen from Resume (n)'s menu ({agent}: its name) started, or its conversation can't resume now, before it could be resumed." }), { agent: a!.name }))
+  if (now === 'carryOn') return void (await attempt(tr(msg({ id: 'actions.resumeOne.carryOnFailed', defaultMessage: 'Could not carry on {agent}', description: "An error's title: telling an agent ({agent}) whose sign-in was refused to carry on failed." }), { agent: a!.name }), () => call('session:carryOn', path, agentId)))
+  await resumeLast(path, agentId)
 }
 
 async function resumeLatest(path: string, id: string): Promise<void> {

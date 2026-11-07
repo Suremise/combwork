@@ -1042,6 +1042,13 @@ const verdictOf = (card) => (card?.comments ?? []).filter((x) => /^Coder\b/.test
 // HI-2261: a record said to name another commit than the one reviewed ("names 584ab5f, not the reviewed revision 273f1f2",
 // "the recorded run did not cover the code being reviewed") says it is for other code too.
 const STALE_REASON = /\bstale\b|\bolder\b|outdated|out[ -]of[ -]date|predates|superseded|no longer (matches|current)|(newer|later|subsequent) (commit|change)|commit(ted)? after|after (it|the record|that record)|(doesn't|does not|didn't|did not) match|not the (reviewed|submitted|current) (revision|commit)|(names|is for|covers) (another|a different|an earlier) (commit|revision)|(doesn't|does not|didn't|did not) cover (this|the) (revision|code|commit)/i
+/**
+ * HI-2660: a verdict naming why a recorded test ran again ("reran greet.test.js because …", "re-ran X to check …"): a
+ * rerun for a named doubt. A rerun with none ("reran greet.test.js: passed") is the duplication the review skill rules out.
+ */
+const NAMED_DOUBT = /\bre-?r[au]n\b[^\n]{0,200}?(\bbecause\b|\bsince\b|\bto (check|see|confirm|rule out)\b)/i
+/** The scenario's check that a review reused the record: no recorded test run again, or a verdict naming its doubt. */
+const reusedOrDoubted = (o, card) => testRunsOf(o).length === 0 || NAMED_DOUBT.test(verdictOf(card))
 /** The test runs that ran the whole suite: `npm test`, or `node --test` naming no file. */
 const wholeSuiteRuns = (o) => testRunsOf(o).filter((r) => r.files.length === 0).map((r) => r.command)
 /** The project's test files' sleeps that a check follows with no reason given (`npm run test:waits`'s own finder). */
@@ -1215,10 +1222,11 @@ module.exports.SCENARIOS = [
       ['gave a verdict (passed or failed)', history(o.cards.b).some((h) => /^Review (passed|failed)$/.test(h)), history(o.cards.b).join(' | ')],
       ['checked which code the record is for (git)', runs(o, 'git').length > 0, o.tools.map((t) => t.name).join(',')],
       ["didn't run the whole suite again", wholeSuiteRuns(o).length === 0, wholeSuiteRuns(o).join(' | ')],
-      ['ran the test the change affects (greet.test.js)', testRunsOf(o).some((r) => r.files.some((f) => /(^|[\\/])greet\.test\.js$/.test(f))), o.tools.flatMap(commandsOf).join(' | ').slice(0, 500)],
+      // HI-2660: the record covers every test, so any test run is a rerun: none, or one whose doubt the verdict names.
+      ['ran no recorded test again, or the verdict names its doubt (reran … because …)', reusedOrDoubted(o, o.cards.b), `${o.tools.flatMap(commandsOf).join(' | ').slice(0, 300)} || ${verdictOf(o.cards.b).slice(0, 200)}`],
       ['changed no files (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
     ],
-    fakeSkips: ['checked which code the record is for (git)', 'ran the test the change affects (greet.test.js)']
+    fakeSkips: ['checked which code the record is for (git)']
   },
   {
     id: 'review-record-stale',
@@ -5483,6 +5491,46 @@ module.exports.SCENARIOS.push({
     ]
   },
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
+})
+
+// The Combwork tools only scenarios run on the fake Claude Code alone call (fakeScope.cjs, HI-2663), each once, through
+// this CLI's MCP path: on all three fakes, so Codex's and Copilot's naming and arguments for them stay checked. What a
+// call then does is theirs to check, on the fake Claude Code. Not a model trial (fakeScope.cjs's NOT_A_TRIAL).
+const SWEEP = [
+  ['cw_ask_user', (c) => ({ card: `#${c.cards.s}`, kind: 'decide', text: 'Sweep: which option?' })],
+  ['cw_report_merge', (c) => ({ card: `#${c.cards.s}` })],
+  ['cw_update_tasks', (c) => ({ numbers: [c.cards.s], addLabels: ['sweep'] })],
+  ['cw_doc_outline', () => ({ path: 'README.md' })],
+  ['cw_read_section', () => ({ path: 'README.md', heading: '#alpha' })],
+  ['cw_put_back', (c) => ({ card: `#${c.cards.s}`, why: 'Sweep: put back.' })],
+  ['cw_request_builder', (c) => ({ card: `#${c.cards.s}`, text: 'Sweep: a question for the builder.' })],
+  ['cw_ask_assistant', (c) => ({ card: `#${c.cards.s}`, text: 'Sweep: a request for the Assistant.' })],
+  ['cw_notify', (c) => ({ title: `#${c.cards.s}: sweep`, message: 'Sweep: a notification.' })]
+]
+module.exports.SCENARIOS.push({
+  id: 'tool-sweep',
+  title: "Each Combwork tool the fake-Claude-only scenarios use, called once through this CLI's MCP path (HI-2663): its call reaches Combwork's server with its arguments",
+  files: { 'README.md': '# alpha\n\nA project for the tool sweep.\n' },
+  async setup(c) {
+    await pairInProject(c)
+    await c.card('s', { title: 'Sweep the tools', description: 'A card for each tool to name.' })
+  },
+  prompt: (c) => `Call each Combwork tool once on card #${c.cards.s}.`,
+  fake: (c) => SWEEP.map(([tool, args]) => `cw ${tool} ${JSON.stringify(args(c))}`).join(' then '),
+  // Each call as the server logged it: the same tool, and every argument as sent (a refusal by a rule is still Combwork's reply).
+  expect: (o, c) =>
+    SWEEP.map(([tool, args]) => {
+      const sent = args(c)
+      // The log keeps a call's arguments as their JSON text.
+      const calls = called(o, tool).map((x) => {
+        try {
+          return typeof x.args === 'string' ? JSON.parse(x.args) : (x.args ?? {})
+        } catch {
+          return {}
+        }
+      })
+      return [`${tool}: reached Combwork with its arguments`, calls.some((a) => Object.entries(sent).every(([k, v]) => JSON.stringify(a[k]) === JSON.stringify(v))), JSON.stringify(calls)]
+    })
 })
 
 module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

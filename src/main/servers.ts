@@ -8,7 +8,7 @@ import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachme
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
-import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, CombworkEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, Connection, ConnectionLaunch, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, CombworkEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { callsMade } from '../shared/activity'
 import { DEFAULT_API_PORT, CW_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
@@ -47,7 +47,7 @@ import { providerService } from './providerService'
 import { agentInstallInfo } from './providers/common'
 import { config } from './config'
 import { refusal, refusalBody } from '../shared/workflow/refusals'
-import { testsGiven, type FocusedTest } from '../shared/workflow/focused'
+import { ACCEPT_MAX, testsGiven, validTestId, type FocusedTest } from '../shared/workflow/focused'
 import { askAssistant, AskRefused } from './assistantAsk'
 import { agentWorkflowRole, isWorkflowRole, workflowPairs, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
@@ -102,6 +102,8 @@ import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { accountOnIn, connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
 import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, combworkAccounts, updateConnection } from './accounts'
+import { changeConnection } from './connectionLaunch'
+import { cleanLaunch, policySummary, terminalPreset } from '../shared/launchPolicy'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
@@ -117,7 +119,7 @@ import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
 import { unsubmittedOf } from './unsubmitted'
 import { idleOwnWatchOf } from './idleWatch'
-import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
+import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, reasonOf, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
@@ -353,6 +355,8 @@ interface ApiRequest {
   authenticated: boolean
   /** Answered with a wait (HI-1831: an error status whose body says to ask again): recorded as `waiting`, not a failure. */
   waiting: boolean
+  /** A refusal's or a wrong call's reason (HI-2553, metrics.ts reasonOf): its rule's or message's id. */
+  reason?: string
   /** The request's workspace, as far as it was known (the developer console's Combwork events). */
   ws: string | null
 }
@@ -507,6 +511,13 @@ function progressOf(projectPath: string, agentId: string) {
   return { title: r.title, ...(r.total !== null ? { step: r.step ?? 0, total: r.total } : {}), ...(r.stepName ? { stepName: r.stepName } : {}), ...(r.waiting ? { waiting: r.waiting } : {}), ...(etaMs !== null ? { etaMs } : {}), ...(r.state === 'stale' ? { stale: true } : {}) }
 }
 
+/** What of Combwork's an agent's connection launches it with (HI-2670), in short; null: everything. */
+const launchSummaryOf = (a: AgentInfo): string | null => {
+  const c = getConnection(a.connection)
+  const cli = accountById(c?.account)?.provider
+  return c && cli ? policySummary(c, cli) : null
+}
+
 /**
  * An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648), as
  * does one whose hooks aren't reaching Combwork (#1336) and one whose CLI waits to retry its model request (HI-1972).
@@ -550,6 +561,8 @@ async function projectSummary(p: string) {
       provider: a.live?.provider ?? agentProvider(a, config.settings),
       // Its role in the workflow (#1430): its own, else the guess from its note or name.
       workflowRole: agentWorkflowRole(a),
+      // What of Combwork's its connection launches it with (HI-2670), when not everything: "plain" or "partly plain: …".
+      ...(launchSummaryOf(a) ? { launch: launchSummaryOf(a) } : {}),
       // Where it works now (#1451): its running session's folder, else where a new conversation would start, short (a
       // slot's name, project, or home: <name>); its slot, and that slot's line.
       folder: places.get(a.id)!.now.at,
@@ -747,7 +760,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 14
+export const API_VERSION = 15
 
 /** Who Combwork takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -806,7 +819,7 @@ route('GET', '/v1/workspaces', async () => openWorkspaces().map((w) => ({ name: 
 /** A project in a short listing (?view=short): its state and agents, without ids, paths or settings. */
 async function projectRow(p: string): Promise<ProjectRow> {
   const s = await projectSummary(p)
-  return { name: s.name, workspace: s.workspace, active: s.active, branch: s.branch, agents: s.agents.map((a) => ({ name: a.name, provider: a.provider, workflowRole: a.workflowRole, status: a.status, branch: a.branch, backgroundTasks: a.backgroundTasks, ...(a.watching ? { watching: a.watching.label } : {}), ...(a.progress ? { progress: progressLabel(a.progress) } : {}) })) }
+  return { name: s.name, workspace: s.workspace, active: s.active, branch: s.branch, agents: s.agents.map((a) => ({ name: a.name, provider: a.provider, workflowRole: a.workflowRole, ...(a.launch ? { launch: a.launch } : {}), status: a.status, branch: a.branch, backgroundTasks: a.backgroundTasks, ...(a.watching ? { watching: a.watching.label } : {}), ...(a.progress ? { progress: progressLabel(a.progress) } : {}) })) }
 }
 
 route('GET', '/v1/projects', async ({ query }) => {
@@ -1195,7 +1208,9 @@ function connectionValues(c: Connection, wide: boolean): Record<string, unknown>
 /** A connection as the Agent API lists it (HI-2108): its id, name, account (its name and CLI), its values, and `usable: false` where it can't be used here. */
 function connectionRow(c: Connection, usable: boolean, wide: boolean): Record<string, unknown> {
   const a = accountById(c.account)
-  return { id: c.id, name: c.name, account: a?.name ?? c.account, cli: a?.provider ?? null, ...connectionValues(c, wide), ...(usable ? {} : { usable: false }) }
+  // Its launch settings in short (HI-2670), when not everything.
+  const launch = a ? policySummary(c, a.provider) : null
+  return { id: c.id, name: c.name, account: a?.name ?? c.account, cli: a?.provider ?? null, ...connectionValues(c, wide), ...(launch ? { launch } : {}), ...(usable ? {} : { usable: false }) }
 }
 
 /** An account's connections by name, for a refusal (HI-2108): "On Personal: Personal, Personal · High." */
@@ -1388,13 +1403,27 @@ route('PATCH', '/v1/connections/:ref', async ({ params, body }) =>
     const r = connectionRef(ref, allConnections(), allConnections().map((c) => c.id))
     if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, say(API.connection.severalNamed, { name: ref, ids: r.ids!.join(', ') })) : new HttpError(404, say(API.connection.noneNamed, { name: ref }))
     const v = connectionValuesArg(body)
-    if (!Object.keys(v).length) throw new HttpError(400, say(API.connection.nothingToChange))
-    const c = await checked(() => connectionsCall(() => updateConnection(r.id, v)))
-    return { done: [API.done.updatedConnection, { connection: c.name }], act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
+    // Its launch settings (HI-2670): `launch`, and `confirm` naming what it takes out of the workflow, when it does.
+    const launch = body?.launch === undefined ? undefined : launchArg(body.launch, r.id)
+    if (!Object.keys(v).length && launch === undefined) throw new HttpError(400, say(API.connection.nothingToChange))
+    // Values and launch settings together (HR1 on s44): what it affects read first, then, after every await, Change
+    // settings and the Assistant's session checked at the write (atWrite), and both saved or neither.
+    const c = Object.keys(v).length && launch === undefined ? await checked(() => connectionsCall(() => updateConnection(r.id, v))) : await connectionsCall(() => changeConnection(r.id, { values: v, launch, confirmed: typeof body?.confirm === 'string' ? body.confirm : null, atWrite: () => checked(() => undefined) }))
+    const cli = accountById(c.account)?.provider
+    const done: [AgentMsg, Record<string, string>] = launch !== undefined && !Object.keys(v).length ? [API.done.launchedConnection, { connection: c.name, how: (cli && policySummary(c, cli, true)) || '' }] : [API.done.updatedConnection, { connection: c.name }]
+    return { done, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
   })
 )
 
-/** A workflowRole argument (#1430): builder, reviewer, either or generalist (HI-686). */
+/** A launch argument (HI-2670): the connection's switches, `{ preset: 'terminal' }` for all off, or {} for all on. */
+function launchArg(v: unknown, id: string): ConnectionLaunch {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new HttpError(400, say(API.connection.launchArg))
+  const cli = accountById(getConnection(id)?.account)?.provider
+  if ((v as { preset?: unknown }).preset === 'terminal') return cli ? terminalPreset(cli) : { guidance: false, tools: false, typing: false }
+  return (cli && cleanLaunch(v, cli)) || {}
+}
+
+/** A workflowRole argument (#1430): builder, reviewer, either, generalist (HI-686) or independent (HI-2670). */
 function workflowRoleArg(v: unknown): WorkflowRole {
   if (isWorkflowRole(v)) return v
   throw new HttpError(400, say(API.agent.workflowRoleArg))
@@ -1462,6 +1491,8 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     refuseOldFields(body, getConnection(a.connection)?.account)
     // Another CLI's connection is a change of CLI: only while it is stopped (updateAgent refuses it otherwise).
     const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentMcpArg(body), ...(conn ? { connection: conn.connection } : {}), ...role }, {
+      // What it takes out of the workflow (HI-2670), as a refusal named it, once the user agreed.
+      confirmed: typeof body?.confirm === 'string' ? body.confirm : null,
       // Control and the Assistant's session checked again under the lock, with the write (HI-2328).
       check: (current) => {
         guard()
@@ -3754,6 +3785,14 @@ function testsField(body: any): FocusedTest[] | undefined {
   return t.tests
 }
 
+/** A verdict body's accept (HI-2660): at most ACCEPT_MAX focused test ids, when given; the runtime checks each again. */
+function acceptField(body: any): string[] | undefined {
+  const v = body?.accept
+  if (v === undefined || v === null) return undefined
+  if (!Array.isArray(v) || v.length > ACCEPT_MAX || !v.every(validTestId)) throw new HttpError(400, say(API.intent.acceptArg, { max: ACCEPT_MAX }))
+  return v
+}
+
 /** A body's submission number (start-review, verdict), when given. */
 function submissionField(body: any): number | undefined {
   const v = body?.submission
@@ -3809,7 +3848,8 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     if (body?.pass !== true && body?.pass !== false) throw new HttpError(400, say(API.intent.passArg))
     const failKind = body?.failKind ?? undefined
     if (failKind !== undefined && failKind !== 'content' && failKind !== 'explanation') throw new HttpError(400, say(API.intent.unknownFailKind, { value: String(failKind) }))
-    return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind }
+    const accept = acceptField(body)
+    return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind, ...(accept ? { accept } : {}) }
   },
   'report-merge': (body) => ({ kind: 'reportMerge', result: textField(body, 'result') }),
   'focused-skip': (body) => {
@@ -3984,7 +4024,9 @@ route('POST', '/v1/metrics/mcp', async ({ body }) => {
   for (const c of calls) if (c && typeof c === 'object' && recordMcp(h, project, role, c as Record<string, unknown> as never)) accepted++
   // On the side of the launch its token is for (HI-2049), never the agent's next one; the Assistant's is none.
   const side = agent ? sessions.launchSide(agent.projectPath, agent.agentId, agentCallerRun()) : 'none'
-  if (body?.catalog && typeof body.catalog === 'object' && recordCatalog(h, project, role, side, body.catalog)) accepted++
+  // Its CLI (HI-2553): the launch its token is for (an agent's), or the Assistant's session now.
+  const provider = agent ? sessions.launchProvider(agent.projectPath, agent.agentId, agentCallerRun()) : (sessions.liveFor(requireWorkspace().assistantHome, ASSISTANT_AGENT_ID)?.provider ?? null)
+  if (body?.catalog && typeof body.catalog === 'object' && recordCatalog(h, project, role, side, body.catalog, provider)) accepted++
   return { accepted, refused: calls.length + (body?.catalog ? 1 : 0) - accepted }
 })
 
@@ -4432,7 +4474,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
     appMetrics.requestEnded()
     working()
     if (!m.authenticated) appMetrics.unauthenticated()
-    else if (!m.skip && m.handle) recordApi(m.handle, m.project, { route: m.route, method: req.method ?? '', role: m.role, outcome: outcomeOf(res, m), requestBytes: m.requestBytes, responseBytes: m.responseBytes, ms: metricsClock.mono() - started })
+    else if (!m.skip && m.handle) recordApi(m.handle, m.project, { route: m.route, method: req.method ?? '', role: m.role, outcome: outcomeOf(res, m), requestBytes: m.requestBytes, responseBytes: m.responseBytes, ms: metricsClock.mono() - started, ...(m.reason ? { reason: m.reason } : {}) })
     if (m.authenticated && !m.skip && !m.route.startsWith('/v1/console')) captureApiCall(req, res, url, m, who, metricsClock.mono() - started)
   })
   const url = new URL(req.url ?? '/', 'http://127.0.0.1')
@@ -4565,6 +4607,8 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     if (status === 500) log.error(`API ${req.method} ${url.pathname}`, e)
     // A wait (resolve's 409 while no check copy is free) is an answer to ask again, not a failure (HI-1831).
     if (e instanceof HttpError && e.extra && 'wait' in e.extra) m.waiting = true
+    // Why it was refused or a wrong call (HI-2553): its rule's or message's id, never its text.
+    if (status >= 400 && status < 500) m.reason = reasonOf(e)
     send(res, status, body)
   }
 }

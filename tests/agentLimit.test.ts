@@ -236,7 +236,7 @@ describe('Combwork keeps to it', () => {
     )
     const reply = apiErrorReply(refused)
     expect(reply).toEqual({ status: 409, body: { error: refusedAt(12) } })
-    expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
+    expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('refused')
   })
 
   it('the user keeps to it too (HI-2058); at 24, the most any project has', async () => {

@@ -55,6 +55,8 @@
   "tips.assistantLanes.title": "Une nouvelle conversation pour chaque couloir",
   "tips.assistantMcp.textAdded": "L’Assistant reçoit un serveur MCP de l’espace de travail seulement quand tu l’ajoutes pour lui, comme pour un projet : avec + dans Serveurs MCP de sa vue, dans la barre d’activité, ou en cochant Assistant dans Ajouter à… de la vue MCP. Un serveur avec tes propres notes peut atteindre l’Assistant et aucun projet.",
   "tips.assistantMcp.title": "Serveurs MCP pour l’Assistant uniquement",
+  "tips.assistantMemory.text": "En plus de son journal, l’agent de code de l’Assistant enregistre ses propres notes sur la façon de travailler avec toi. Mémoire, dans la vue Assistant de la barre d’activité, les liste, MEMORY.md en premier : ouvre-en une pour la lire ou la corriger.",
+  "tips.assistantMemory.title": "Voir ce dont se souvient l’agent de code de l’Assistant",
   "tips.assistantMessages.text": "L’Assistant ne peut pas confier un nouveau travail à un agent en attente ou au travail, mais il peut lui laisser un message, comme ta réponse : il est remis dès que l’agent peut le prendre. Son volet l’affiche comme non lu (✉) jusque-là ; clique dessus pour l’annuler.",
   "tips.assistantMessages.title": "L’Assistant peut joindre un agent occupé",
   "tips.assistantNoticeOpens.text": "Une notification de l’Assistant ou d’un agent au sujet d’un agent ou d’une carte l’ouvre quand tu cliques dessus : le volet de l’agent, ou la carte. Les plus anciennes sont dans le panneau Notifications et s’ouvrent aussi depuis là.",
@@ -284,6 +286,8 @@
   "tips.lanesLegend.title": "Ce que veulent dire les couleurs d’un couloir",
   "tips.language.text": "Combwork suit la langue d’affichage de Windows quand il l’a. Paramètres → Général → Langue en choisit une autre ; les langues traduites par IA sont signalées, et les améliorations sont les bienvenues. Combwork parle toujours aux agents en anglais.",
   "tips.language.title": "Combwork dans ta langue",
+  "tips.launchSettings.text": "Le menu ⋯ d’une connexion → Paramètres de lancement… → Lancer comme depuis un terminal démarre ses agents sans rien des consignes, des outils ni de la saisie de Combwork, comme si tu avais ouvert la CLI toi-même dans ce dossier. Ils sont indépendants : dans l’équipe, mais hors du flux de travail.",
+  "tips.launchSettings.title": "Un agent comme depuis un terminal",
   "tips.leftRunning.text": "Un processus lancé par la commande d’un agent qui tourne encore après la fin de son shell apparaît dans Activité comme Laissé en cours, avec son temps CPU et L’arrêter. Au-delà de dix minutes, une notification le signale une fois, et l’agent est prévenu aussi.",
   "tips.leftRunning.title": "Repérer ce qu’une commande a laissé en cours",
   "tips.leftoverBranches.text": "Gestion de versions → Modifications liste les branches restantes : celle d’une carte remplacée ou archivée, celle d’un agent d’avant les emplacements. Compares-en une d’abord avec ta branche cible, puis Supprimer… ; une branche avec ses propres commits les liste avant de disparaître.",
@@ -352,6 +356,8 @@
   "tips.noCodeCards.title": "Cartes sans code",
   "tips.off.message": "Elles restent dans Aide → Astuces…, et Paramètres → Général les réactive.",
   "tips.off.title": "Astuces désactivées",
+  "tips.oneAgent.text": "Le ▾ à côté de Reprendre (n) et Arrêter (n) dans l’en-tête du projet liste ces agents : choisis-en un pour n’agir que sur lui. Agents ▾ et le menu contextuel d’un projet offrent la même chose pour Nouvelle session, Archiver et repartir, Reprendre tous les agents et Arrêter tous les agents.",
+  "tips.oneAgent.title": "Reprendre ou arrêter un seul agent",
   "tips.outageResume.text": "Active Paramètres → Avancé → Reprendre les agents après une coupure de connexion, et un agent arrêté par un redémarrage du routeur ou une micro-coupure du Wi-Fi attend la connexion, puis relance de lui-même ce qui a été interrompu. Jamais pour une limite d’utilisation ou une connexion au compte expirée.",
   "tips.outageResume.title": "Les agents peuvent continuer après une coupure de connexion",
   "tips.overview.text": "La Vue d’ensemble de l’espace de travail montre ce que chaque projet a utilisé, ce qui tourne en ce moment et le tableau, jour par jour. {key}",
@@ -542,5 +548,7 @@
   "tips.modelSwitched.title": "Un agent sur un autre modèle est signalé",
   "tips.modelSwitched.text": "Si un agent se retrouve sur un autre modèle que celui de sa connexion (la proposition de Codex d’un modèle moins cher près de ta limite, ou /model), son pied de page signale le modèle par un avertissement et Activité indique Modèle changé. Redémarre l’agent pour revenir.",
   "tips.waitingOnPurpose.title": "Une carte qui attend exprès",
-  "tips.waitingOnPurpose.text": "Une carte En cours attend un moment calme, ou une réponse ? Clic droit dessus, Marquer comme en attente…, et dis pourquoi : Combwork cesse de la signaler comme à l’arrêt jusqu’à ce que tu lèves l’attente ou qu’elle quitte En cours. Son agent continue de tourner."
+  "tips.waitingOnPurpose.text": "Une carte En cours attend un moment calme, ou une réponse ? Clic droit dessus, Marquer comme en attente…, et dis pourquoi : Combwork cesse de la signaler comme à l’arrêt jusqu’à ce que tu lèves l’attente ou qu’elle quitte En cours. Son agent continue de tourner.",
+  "tips.perfFailures.title": "Refusé n’est pas cassé",
+  "tips.perfFailures.text": "Performances → Échecs trie ce qui n’a pas abouti : les vraies erreurs en rouge, à part des appels refusés par une règle du flux de travail et des appels erronés. Refus et appels erronés par motif montre quelle règle ou quel message revient le plus : une description d’outil à rendre plus claire."
 }

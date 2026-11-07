@@ -142,6 +142,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     planModeToggle: true,
     promptCacheTtl: false,
     reportsCost: false,
+    defersMcpTools: false,
     compactFocus: false,
     contextLimit: false,
     autoCompactReserve: null,

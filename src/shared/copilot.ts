@@ -263,6 +263,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     promptCacheTtl: false,
     // Its transcript counts the session's AI credits (session.usage_checkpoint), and one credit is $0.01.
     reportsCost: true,
+    defersMcpTools: false,
     // /compact takes focus instructions.
     compactFocus: true,
     contextLimit: false,

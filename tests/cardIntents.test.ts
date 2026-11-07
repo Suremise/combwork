@@ -927,6 +927,9 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(parse('verdict', { comment: 'ok' })).toBe(400)
     expect(parse('verdict', { pass: false, comment: 'No', failKind: 'style' })).toBe(400)
     expect(parse('verdict', { pass: false, comment: 'No', failKind: 'explanation' })).toEqual({ kind: 'verdict', pass: false, comment: 'No', submission: undefined, failKind: 'explanation' })
+    // HI-2660: a pass accepting others' focused-test runs, by test id; at most 50, each a test id (the runtime checks again).
+    expect(parse('verdict', { pass: true, comment: 'ok', accept: ['claude-real'] })).toEqual({ kind: 'verdict', pass: true, comment: 'ok', submission: undefined, failKind: undefined, accept: ['claude-real'] })
+    for (const accept of ['claude-real', [''], ['a\u0000b'], [1], Array.from({ length: 51 }, (_, i) => `t${i}`)]) expect(parse('verdict', { pass: true, comment: 'ok', accept }), JSON.stringify(accept).slice(0, 40)).toBe(400)
     // HI-1367: a reviewer's decision on focused tests a merge skipped.
     expect(parse('focused-skip', { request: ' HI-12/r40 ', merge: false, why: ' Signed out ' })).toEqual({ kind: 'focusedSkip', request: 'HI-12/r40', merge: false, why: 'Signed out' })
     expect(parse('focused-skip', { request: 'HI-12/r40', why: 'x' })).toBe(400)

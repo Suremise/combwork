@@ -200,6 +200,8 @@ describe('the canary dialect over the session contract (card 1)', () => {
     out.push({ name: 'notes', text: deliveredNotes('MACHINE NOTE').text, values: ['MACHINE NOTE', 'Workspace notes'] })
     out.push({ name: 'notes cut', text: deliveredNotes('MACHINE NOTE\n'.repeat(500), 600).text, values: ['MACHINE NOTE', 'Workspace notes'] })
     out.push({ name: 'starter', text: instructionsStarter('webapp', 'Codex'), values: ['webapp', 'Codex'] })
+    out.push({ name: 'connection starter', text: instructionsStarter('webapp', 'Codex', { connection: 'Work' }), values: ['Work', 'Codex'] })
+    out.push({ name: 'user starter', text: instructionsStarter('webapp', 'Codex', 'user'), values: ['Codex'] })
     out.push({ name: 'shared starter', text: shareInstructions([{ provider: 'claude-code', file: 'CLAUDE.md', content: null, importLine: '@AGENTS.md' }], null, 'webapp')['AGENTS.md'], values: ['webapp'] })
     return out
   }

@@ -548,8 +548,10 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     expect(text).toMatch(/run every command with the review copy as its working directory: change into it first/)
     // #1443: a pooled reviewer's start is its assignment, no lane to join.
     expect(text).toMatch(/A reviewer from the project's pool is told of each card it is given in its inbox: that is its start/)
-    // #533: the run records Combwork keeps of the revision are checked, not repeated.
-    expect(text).toMatch(/the runs recorded as the card's checks of that revision/)
+    // #533, HI-2660: the run records of the revision are reused, not repeated; a rerun names its doubt.
+    expect(text).toMatch(/\*\*Reuse the builder's run, don't repeat it\*\*: a result recorded at the exact revision you review stands \(`cw_start_review`'s `checksAtRevision`/)
+    expect(text).toMatch(/\*\*Missing\*\*, so run it: [^\n]*Missing never counts as a pass/)
+    expect(text).toMatch(/\*\*A doubt you name\*\*[^\n]*the verdict says "reran X because Y"\. No doubt, no rerun\./)
   })
 
   it("say where the rules decide, never one case as the rule: self-review, the latest submission, a second reviewer, the user's OK", () => {
@@ -964,6 +966,15 @@ describe('RELEASING.md on the 1.0 path', () => {
     expect(checks).toMatch(/\*\*The first release candidate\*\*, about \*\*2–3 hours\*\*/)
     expect(checks).toMatch(/\*\*An RC fix round\*\*, \*\*15–45 min\*\*/)
     expect(checks).toMatch(/\*\*The release of the tested candidate\*\*, \*\*15–30 min\*\*/)
+    // HI-2661: the coverage ledger: a fix round reruns what its changes invalidate, a path in no class everything, and
+    // the installers' own bytes are checked; the manifest's allowlist is fail-closed.
+    expect(checks).toMatch(/### The coverage ledger/)
+    expect(checks).toMatch(/\*\*A fix round reruns the invalidated slices and nothing else\.\*\*/)
+    expect(checks).toMatch(/A path in no class invalidates everything, as for a first RC\./)
+    expect(checks).toMatch(/installer's \*\*SHA-256\*\*/)
+    expect(checks).toMatch(/\*\*The installer the user installs, and the one `npm run release` uploads, always get rows of their own bytes:\*\*/)
+    expect(checks).toMatch(/Without one, or where it is uncertain, the full affected set runs: that is the fallback/)
+    expect(checks).toMatch(/Anything not on it means the real tier runs again\./)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/The full set is for guidance-wide changes only \(HI-2010, HI-2011, HI-2012\); a publishable RC gets 3 to 5 scenarios picked at random/)
     expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
     // #1534: where each build is recorded.

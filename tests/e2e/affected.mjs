@@ -5,6 +5,9 @@
 // tests/e2e/README.md). Suites that start a real CLI (the real tier) are picked only when a change touches what they
 // cover (an area naming them, or REAL_TIER), which is when a merge also needs the real tier. tests/e2esuites.test.ts
 // checks that every suite is in an area, every source file is covered, and what no area names falls back to every suite.
+// Some EVERYTHING files are selected by the parts of them a change touches instead (HI-2659): SPLIT in affectedUnits.mjs,
+// whose selection --affected and the picker work out from the diff (splitSelections) and pass to affectedSuites as
+// `units`; without it, or when it can't follow a change (affectedUnits.mjs says when), they select every suite.
 //
 // `node tests/e2e/affected.mjs --pick` is this repository's focused-test picker (HI-1367, the merge queue's "each
 // card's focused tests"): see pickTests and UNIT_SCANS below. Imported (run.mjs, the unit tests), it does nothing.
@@ -12,12 +15,18 @@ import { execFileSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
 import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
+import { gitChangedLines, gitRevision, splitOf, unitSelection } from './affectedUnits.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 
-/** Changes to these touch everything (the IPC contract, types, the store, the shell, the test harness): every suite. */
+/**
+ * Changes to these touch everything (the IPC contract, types, the store, the shell, the test harness): every suite. The
+ * SPLIT ones (affectedUnits.mjs: ipc.ts, shared/api.ts, actions.ts, commands.ts, workspace.ts, runner.mjs) only when
+ * their changed parts can't be followed. A file leaves this list for SPLIT, a card at a time, once its parts have callers
+ * a name search can find.
+ */
 export const EVERYTHING = [
   'src/main/index.ts',
   'src/main/ipc.ts',
@@ -81,6 +90,7 @@ export const EVERYTHING = [
   'tests/e2e/fake-bridge.cjs',
   'tests/e2e/suites.mjs',
   'tests/e2e/affected.mjs',
+  'tests/e2e/affectedUnits.mjs',
   'tests/e2e/record.mjs',
   'tests/e2e/runner.mjs',
   'tests/e2e/build.mjs',
@@ -114,8 +124,6 @@ export const EVERYTHING = [
  */
 export const AREAS = [
   { paths: ['tests/e2e/codexDiagnostics.cjs'], suites: ['codex-background'] },
-  // A process that fails to start, reported with its code (#599).
-  { paths: ['tests/e2e/windowsExits.cjs', 'tests/e2e/record.mjs'], suites: ['failfast'] },
   { paths: ['src/main/ptyHost.ts', 'src/main/sessions.ts'], suites: ['stopswitch', 'replysize', 'quit', 'copilotsize', 'termsize'] },
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts', 'src/main/ptyHost.ts', 'src/shared/agentProcesses.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/linger.cjs'], suites: ['leftovers', 'leftovers-restart', 'unexpectedclose-leftovers'] },
   { paths: ['tests/e2e/fake-claude/devapp/'], suites: ['leftovers-restart'] },
@@ -142,6 +150,7 @@ export const AREAS = [
   { paths: ['src/main/advanced.ts'], suites: ['replysize', 'assistantsettings'] },
   // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
+  { paths: ['src/main/assistantMemory.ts', 'src/shared/assistantMemory.ts', 'src/renderer/src/components/AssistantMemory.tsx', 'src/renderer/src/components/AssistantView.tsx'], suites: ['assistantmemory', 'assistantimages'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
   { paths: ['src/main/startView.ts', 'src/shared/startView.ts'], suites: ['journal', 'assistantcompact', 'assistantresume'] },
   // Builds recorded as facts (#1534): the scripts' side, Combwork's route and markers, the Advanced switch.
@@ -156,7 +165,7 @@ export const AREAS = [
   { paths: ['src/main/benchmarks.ts', 'src/shared/benchmark.ts', 'src/renderer/src/views/PerformanceCompare.tsx'], suites: ['perfcompare'] },
   // Cost per card and per lane (#602): the holds, the minutes the parsers give, the card's line, the lane's hover, Performance's Cards.
   { paths: ['src/main/cardCosts.ts', 'src/shared/cardCosts.ts', 'src/shared/usageTimeline.ts', 'src/renderer/src/components/CardCost.tsx', 'src/renderer/src/views/PerformanceCards.tsx', 'src/main/providers/claude/usage.ts', 'src/main/providers/codex/rollout.ts', 'src/main/providers/copilot/events.ts'], suites: ['cardcost', 'unpricedcost', 'overview'] },
-  { paths: ['src/main/metrics.ts', 'src/main/metricsUsage.ts', 'src/shared/metrics.ts', 'src/shared/metricsView.ts', 'src/renderer/src/views/Performance.tsx'], suites: ['performance', 'perfcompare', 'bridgereport', 'perftable', 'cardcost'] },
+  { paths: ['src/main/metrics.ts', 'src/main/metricsUsage.ts', 'src/shared/metrics.ts', 'src/shared/metricsView.ts', 'src/renderer/src/views/Performance.tsx', 'src/renderer/src/views/perfReasons.ts'], suites: ['performance', 'perfcompare', 'bridgereport', 'perftable', 'cardcost'] },
   // A launch's side of the workflow for its metrics (HI-2049): replysize checks each real launch's guidance and tool list carry it.
   { paths: ['src/main/launchSides.ts', 'src/shared/workflow/roles.ts'], suites: ['replysize'] },
   // The Combwork tool list's parts as the bridge measures them (HI-2063): replysize checks a real launch's, bridgereport the bridge's reports.
@@ -291,7 +300,7 @@ export const AREAS = [
   { paths: ['tests/e2e/queuefocused.cjs', 'scripts/focusedTests.mjs'], suites: ['queuefocused'] },
   // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, cw_queue.
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/queueControls.ts', 'src/main/folderFence.ts', 'src/shared/workflow/facts.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeuefolder.cjs', 'tests/e2e/mergequeuecrash.cjs'], suites: ['mergequeuecrash', 'mergequeuefolder'] },
-  { paths: ['src/main/workflow/mergeQueue.ts', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergestrict.cjs'], suites: ['mergestrict', 'workflowoptions'] },
+  { paths: ['src/main/workflow/mergeQueue.ts', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/queueFixture.cjs'], suites: ['p5lane', 'workflowoptions'] },
   { paths: ['src/main/workflow/queueControls.ts', 'src/shared/workflow/queue.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/cardIntents.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/queuecontrols.cjs'], suites: ['queuecontrols', 'replysize'] },
   // The queue on the card, in the Git tab and in the Merge dialog (#1357).
   { paths: ['src/renderer/src/components/CardQueue.tsx', 'src/renderer/src/components/GitQueueSection.tsx', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/ForYou.tsx', 'src/renderer/src/components/AgentDialogs.tsx', 'src/shared/workflow/workView.ts', 'src/main/workflow/queueControls.ts', 'src/shared/workflow/queue.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/queuecard.cjs'], suites: ['queuecard'] },
@@ -432,6 +441,7 @@ export const AREAS = [
   { paths: ['tests/e2e/notifytarget.cjs', 'src/renderer/src/noticeTarget.ts', 'src/renderer/src/components/Overlays.tsx', 'src/main/events.ts'], suites: ['notifytarget'] },
   { paths: ['src/main/updater.ts', 'src/main/updateFeed.ts', 'src/renderer/src/components/Updates.tsx', 'src/main/buildIdentity.ts', 'src/shared/updates.ts', 'tests/e2e/fakeInstall.cjs'], suites: ['update', 'about'] },
   { paths: ['src/shared/workflow/roles.ts', 'tests/e2e/agentrole.cjs'], suites: ['agentrole', 'agentstable', 'lanestart'] },
+  { paths: ['src/shared/launchPolicy.ts', 'src/main/connectionLaunch.ts', 'src/main/independent.ts', 'src/renderer/src/components/LaunchSettings.tsx', 'tests/e2e/launchsettings.cjs'], suites: ['launchsettings', 'agentrole'] },
   { paths: ['src/renderer/src/components/AgentDialogs.tsx', 'src/renderer/src/components/PermissionMode.tsx'], suites: ['agentrole', 'agents-ui', 'agents', 'mode', 'context', 'codex-handover', 'footerfit', 'dialogs', 'mcpagents'] },
   { paths: ['src/renderer/src/components/AgentPanes.tsx'], suites: ['paneheader', 'pages', 'reorder', 'unmerged', 'sessionname', 'ctxpercent', 'footerfit', 'longsession', 'startfail', 'cardchip', 'agents-ui', 'unpricedcost', 'swap', 'templates', 'narrowmain', 'placement'] },
   { paths: ['src/shared/paneCells.ts'], suites: ['placement', 'swap', 'reorder', 'pages', 'agents'] },
@@ -494,7 +504,7 @@ export const AREAS = [
   { paths: ['src/main/gitCompare.ts', 'src/renderer/src/components/ChangesCompare.tsx'], suites: ['changescompare', 'changespicker'] },
   { paths: ['src/renderer/src/components/ChangesLeftovers.tsx', 'src/shared/branchCleanup.ts'], suites: ['changesleftovers', 'gitcleanup'] },
   { paths: ['src/renderer/src/components/DataTable.tsx', 'src/shared/tableView.ts'], suites: ['overview', 'ctxpercent', 'performance', 'perftable', 'boardarchive'] },
-  { paths: ['src/renderer/src/views/ProjectView.tsx'], suites: ['agents-ui', 'agentstable', 'resumeall', 'paneheader', 'rail', 'tabstrip', 'startall', 'narrowmain', 'removeall', 'defaultprovider'] },
+  { paths: ['src/renderer/src/views/ProjectView.tsx', 'src/renderer/src/oneAgentMenu.ts', 'src/shared/oneAgent.ts'], suites: ['oneagent', 'agents-ui', 'agentstable', 'resumeall', 'paneheader', 'rail', 'tabstrip', 'startall', 'narrowmain', 'removeall', 'defaultprovider'] },
   { paths: ['src/renderer/src/views/SettingsView.tsx'], suites: ['numbers', 'keys', 'providers', 'context', 'models', 'assistantsettings'] },
   { paths: ['tests/e2e/settingstips.cjs', 'src/renderer/src/views/SettingsView.tsx', 'src/renderer/src/components/ui.tsx', 'src/shared/settingsCatalog.ts'], suites: ['settingstips'] },
   { paths: ['src/shared/settingsCatalog.ts', 'src/main/settingsTools.ts'], suites: ['assistantsettings', 'numbers', 'replysize', 'providers', 'context'] },
@@ -658,7 +668,7 @@ const PROVIDER_OWN = ['src/main/providers/claude/', 'src/main/providers/codex/',
  * { suites, why } (why: a line per reason). A real-CLI suite is needed when an area names it, its own file changed, or
  * a file in REAL_TIER (or one no area names) changed. Only DOCS_ONLY files and unit tests select nothing.
  */
-export function affectedSuites(files, suiteNames, realNames = []) {
+export function affectedSuites(files, suiteNames, realNames = [], units = {}) {
   const picked = new Set()
   const why = []
   let all = null
@@ -673,9 +683,17 @@ export function affectedSuites(files, suiteNames, realNames = []) {
     }
     if (under(file, REAL_TIER) && !under(file, PROVIDER_OWN)) allReal ??= `${file}: every real-CLI suite`
     const areas = AREAS.filter((a) => under(file, a.paths))
-    for (const a of areas) for (const s of a.suites) picked.add(s)
+    // A SPLIT file (affectedUnits.mjs), by the units its change touches, when the caller worked them out (its areas'
+    // suites are in that, when its change needs them).
+    const u = units[file]
+    if (!u || u.all) for (const a of areas) for (const s of a.suites) picked.add(s)
     if (under(file, EVERYTHING)) {
-      all ??= `${file}: shared by every part of Combwork`
+      if (u && !u.all) {
+        for (const s of u.suites) picked.add(s)
+        why.push(`${file}: by its changed parts: ${u.suites.length ? [...new Set(u.suites)].join(', ') : 'no suite'}`, ...u.why.map((w) => `  ${w}`))
+        continue
+      }
+      all ??= u?.all ?? `${file}: shared by every part of Combwork`
       continue
     }
     if (areas.length) {
@@ -690,6 +708,42 @@ export function affectedSuites(files, suiteNames, realNames = []) {
   const real = realNames.filter((n) => allReal || picked.has(n))
   if (all) return { all: true, why: [all, ...(allReal ? [allReal] : [])], real }
   return { suites: suiteNames.filter((n) => picked.has(n) || (allReal && realNames.includes(n))), why: [...why, ...(allReal ? [allReal] : [])] }
+}
+
+/**
+ * How a file that names a changed unit of a SPLIT file counts (affectedUnits.mjs): as it would changed itself, without
+ * the real tier: { suites, why } (its own suite, its areas'), { all: why } (shared by everything, or in no area), or
+ * null (docs and unit tests: no suite).
+ */
+export function placeReference(file, suiteNames) {
+  const f = file.replace(/\\/g, '/')
+  const own = /^tests\/e2e\/([^/]+)\.cjs$/i.exec(f)
+  if (own && suiteNames.includes(own[1])) return { suites: [own[1]] }
+  if (under(f, EVERYTHING)) return { all: 'shared by every part of Combwork' }
+  const suites = [...new Set(AREAS.filter((a) => under(f, a.paths)).flatMap((a) => a.suites))]
+  if (suites.length) return { suites }
+  if (under(f, DOCS_ONLY) || unitTest(f)) return null
+  return { all: 'which no area names' }
+}
+
+/**
+ * The unit selections (affectedUnits.mjs) of the SPLIT files among files, changed from base (a commit) to head (a
+ * commit, or null: the working tree, as --affected and the picker see it): { file: unitSelection's result }, for
+ * affectedSuites' units. Errors don't escape: a file it can't work out selects every suite, saying why.
+ */
+export function splitSelections(files, { cwd = process.cwd(), base, head = null, suiteNames }) {
+  const out = {}
+  const split = [...new Set(files.map((f) => f.replace(/\\/g, '/')))].filter((f) => splitOf(f))
+  if (!split.length) return out
+  const revs = { base: gitRevision(cwd, base), head: gitRevision(cwd, head) }
+  for (const file of split) {
+    try {
+      out[file] = unitSelection({ file, ...revs, lines: gitChangedLines(cwd, base, head, file), place: (f) => placeReference(f, suiteNames), areaSuites: (f) => [...new Set(AREAS.filter((a) => under(f, a.paths)).flatMap((a) => a.suites))] })
+    } catch (e) {
+      out[file] = { all: `${file}: its changed parts couldn't be worked out (${e.message}), so every suite`, suites: [], why: [] }
+    }
+  }
+  return out
 }
 
 const gitLines = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8', env: runContext.baseEnv() }).split(/\r?\n/).filter(Boolean)
@@ -769,7 +823,8 @@ export const UNIT_SCANS = [
   { test: 'tests/i18n/numbers.test.ts', paths: ['locales/en/'] },
   { test: 'tests/i18nCatalogues.test.ts', paths: ['locales/', 'src/shared/i18n/values/'] },
   { test: 'tests/i18nCatalogues.test.ts', paths: ['src/'], lines: ['msg\\(', '\\btr\\(', 'tRich\\(', 'defaultMessage', 'description', '\\bid:'] },
-  { test: 'tests/i18nGuard.test.ts', paths: ['src/', 'i18n/allow/'] },
+  // A real file and its allowlist (Board.tsx's); the whole source is the CLI's (check:repo, CI), not this test's (HI-2663).
+  { test: 'tests/i18nGuard.test.ts', paths: ['src/renderer/src/components/Board.tsx', 'i18n/allow/'] },
   // Agent text (HI-2065): the guard against new hard-coded agent text over src/ and its lists; the catalogue and schema
   // extracted from the agentMsg() descriptors, current.
   { test: 'tests/agentTextGuard.test.ts', paths: ['src/', 'agent-text/allow/'] },
@@ -856,9 +911,9 @@ export const isUnitTestFile = (f) => /^tests\/(?:[^/]+\/)*[^/]+\.test\.ts$/.test
  * (realNames: the real tier's, packagedNames: the installer's); vitestRelated: the unit test files Vitest's import
  * graph relates to the change. Unit tests first (sorted), then suites (in suites' order).
  */
-export function pickTests({ paths, added = [], deleted = [], diffLines = {}, suites, realNames = [], packagedNames = [], vitestRelated = [] }) {
+export function pickTests({ paths, added = [], deleted = [], diffLines = {}, suites, realNames = [], packagedNames = [], vitestRelated = [], units = {} }) {
   const files = [...new Set(paths.map(slashes).filter(Boolean))]
-  const affected = affectedSuites(files, suites, realNames)
+  const affected = affectedSuites(files, suites, realNames, units)
   if (affected.all) return { every: true, why: affected.why }
   const unit = unitPicks({ paths: files, added, deleted, diffLines, vitestRelated })
   const tests = [
@@ -952,9 +1007,11 @@ async function pickCli() {
   const suites = SUITES.map((s) => s.name)
   const realNames = SUITES.filter(isRealCli).map((s) => s.name)
   const packagedNames = SUITES.filter((s) => (s.needs ?? []).includes('packaged')).map((s) => s.name)
+  // The SPLIT files by their changed parts (the checkout is the revision: its working tree against the base).
+  const units = splitSelections(paths, { cwd, base, head: null, suiteNames: suites })
   // Every suite: no need to look further.
-  if (affectedSuites(paths, suites, realNames).all) {
-    const picked = pickTests({ paths, suites, realNames, packagedNames })
+  if (affectedSuites(paths, suites, realNames, units).all) {
+    const picked = pickTests({ paths, suites, realNames, packagedNames, units })
     for (const w of picked.why) console.error(w)
     for (const l of pickLines(picked)) console.log(l)
     return
@@ -963,7 +1020,7 @@ async function pickCli() {
   const added = paths.filter((p) => !atBase.has(p))
   const deleted = paths.filter((p) => atBase.has(p) && !existsSync(join(cwd, p)))
   const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
-  const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: listVitestRelated(cwd, base) })
+  const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: listVitestRelated(cwd, base), units })
   for (const w of picked.why) console.error(w)
   for (const l of pickLines(picked)) console.log(l)
 }

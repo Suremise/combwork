@@ -15,6 +15,7 @@ import { cx, timeAgo } from '../util'
 import { TerminalView } from './TerminalView'
 import { ProviderIcon } from './ProviderIcon'
 import { UsageMoveRuleRow } from './UsageMoveRule'
+import { LAUNCH_SETTINGS_MENU, LaunchSettingsDialog, launchBadge } from './LaunchSettings'
 import { AddConnectionDialog, MaskingBanner, ServerConnectionDetail, setUpConnection, setUpHint, setUpLabel } from './ServerConnections'
 
 /**
@@ -185,6 +186,8 @@ export function AccountsSettings() {
   const [adding, setAdding] = useState(false)
   // The connection dialog (HI-2107): on an account, a connection given to edit.
   const [dialog, setDialog] = useState<{ account: string; connection?: string } | null>(null)
+  // A connection's Launch Settings while open (HI-2670): its id.
+  const [launchFor, setLaunchFor] = useState<string | null>(null)
   // An account being dragged to another place in the one order (HI-2107), and the row it would drop on.
   const [dragging, setDragging] = useState<string | null>(null)
   const [dropAt, setDropAt] = useState<string | null>(null)
@@ -326,6 +329,11 @@ export function AccountsSettings() {
               <span className="connection-name">
                 {c.name}
                 {i === 0 && rows.length > 1 && <span className="connection-base" title={tr(M.baseTip)}>{tr(M.base)}</span>}
+                {launchBadge(c, a.provider) && (
+                  <button className="connection-plain" data-plain={c.id} title={tr(LAUNCH_SETTINGS_MENU)} onClick={() => setLaunchFor(c.id)}>
+                    {launchBadge(c, a.provider)}
+                  </button>
+                )}
               </span>
               <span className={cx('connection-cell', 'connection-tag-cell', !c.tag && 'faint')} data-cell="tag">
                 <span className="connection-cell-label">{tr(M.colTag)}</span>
@@ -376,6 +384,7 @@ export function AccountsSettings() {
                     openMenu(e, [
                       { label: tr(M.edit), icon: 'edit', onClick: () => setDialog({ account: a.id, connection: c.id }) },
                       { label: tr(M.duplicate), icon: 'copy', onClick: () => void act(M.connectionFailed, () => call('connection:duplicate', c.id)) },
+                      { label: tr(LAUNCH_SETTINGS_MENU), icon: 'terminal', onClick: () => setLaunchFor(c.id) },
                       { separator: true },
                       { label: tr(M.removeConnection), icon: 'trash', danger: true, onClick: () => void removeConnection(c) }
                     ])
@@ -622,6 +631,11 @@ export function AccountsSettings() {
       </div>
       {adding && <AddConnectionDialog clis={view.providers} onClose={() => setAdding(false)} onSignIn={(id, cli) => void signIn(id, cli)} />}
       {dialog && <ConnectionDialog account={dialog.account} connection={dialog.connection} onClose={() => setDialog(null)} />}
+      {(() => {
+        const row = launchFor ? view.connectionRows.find((r) => r.id === launchFor) : undefined
+        const cli = row && [...view.connections, ...view.homes].find((x) => x.id === row.account)?.provider
+        return row && cli ? <LaunchSettingsDialog row={row} cli={cli} onClose={() => setLaunchFor(null)} /> : null
+      })()}
       {(() => {
         const a = accountDialog ? view.connections.find((x) => x.id === accountDialog) : undefined
         if (!a) return null

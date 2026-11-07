@@ -44,7 +44,7 @@ export type CardIntent =
   | { kind: 'submit'; summary: string; revision?: string; note?: string; paths?: string[]; followUp?: boolean; tests?: FocusedTest[] }
   | { kind: 'declarePaths'; paths: string[] }
   | { kind: 'startReview'; submission?: number }
-  | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string }
+  | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string; accept?: string[] }
   | { kind: 'reportMerge'; result?: string }
   | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[]; actions?: AskAction[] }
   | { kind: 'cannot'; rule: string; why: string }
@@ -115,7 +115,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'startReview':
         return w.startReview(named, who, { ...(intent.submission !== undefined ? { submission: intent.submission } : {}) })
       case 'verdict':
-        return w.verdict(named, who, { pass: intent.pass, comment: intent.comment, ...(intent.submission !== undefined ? { submission: intent.submission } : {}), ...(intent.failKind ? { failKind: intent.failKind } : {}) })
+        return w.verdict(named, who, { pass: intent.pass, comment: intent.comment, ...(intent.submission !== undefined ? { submission: intent.submission } : {}), ...(intent.failKind ? { failKind: intent.failKind } : {}), ...(intent.accept?.length ? { accept: intent.accept } : {}) })
       case 'reportMerge':
         return w.reportMerge(named, who, { ...(intent.result ? { result: intent.result } : {}) })
       case 'ask':

@@ -204,6 +204,9 @@ interface CombworkMessageValues {
   'actions.resumeAll.resumed': { agents: string | number }
   'actions.resumeAll.show': { agent: string | number }
   'actions.resumeAll.title': { n: number }
+  'actions.resumeOne.carryOnFailed': { agent: string | number }
+  'actions.resumeOne.gone': undefined
+  'actions.resumeOne.notNow': { agent: string | number }
   'actions.session.listFailed': undefined
   'actions.session.resumeFailed': undefined
   'actions.session.startFailed': undefined

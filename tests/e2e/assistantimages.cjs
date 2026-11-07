@@ -75,7 +75,7 @@ const stamp = (d, name) => `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.
   await page.locator('.activity-btn[aria-label="Assistant"]').click()
   await lib.until(async () => (await page.locator('.assistant-summary').count()) > 0, 10000)
   const sections = (await page.locator('.sidebar .section-header').allTextContents()).map((t) => t.replace(/\d+$/, '').trim())
-  check('sections in order: Modes, MCP Servers (HI-2059), Conversations, Journal (#1033), Attachments', JSON.stringify(sections) === JSON.stringify(['Modes', 'MCP Servers', 'Conversations', 'Journal', 'Attachments']), JSON.stringify(sections))
+  check('sections in order: Modes, MCP Servers (HI-2059), Conversations, Journal (#1033), Attachments, Memory (HI-2666)', JSON.stringify(sections) === JSON.stringify(['Modes', 'MCP Servers', 'Conversations', 'Journal', 'Attachments', 'Memory']), JSON.stringify(sections))
 
   // --- New Mode…: Enter in its prompt (a real key press: keydown, keypress, keyup) never opens it again (#355).
   const newMode = async (name) => {

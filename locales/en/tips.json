@@ -223,6 +223,14 @@
     "defaultMessage": "MCP servers for the Assistant only",
     "description": "A tip's title. MCP is a protocol's name: keep it."
   },
+  "tips.assistantMemory.text": {
+    "defaultMessage": "Besides its journal, the Assistant's coding agent saves notes of its own about working with you. Memory in the Assistant view on the activity bar lists them, MEMORY.md first: open one to read or correct it.",
+    "description": "A tip (HI-2666). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. MEMORY.md is a file's name: keep it."
+  },
+  "tips.assistantMemory.title": {
+    "defaultMessage": "See what the Assistant's coding agent remembers",
+    "description": "A tip's title (HI-2666)."
+  },
   "tips.assistantMessages.text": {
     "defaultMessage": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -1139,6 +1147,14 @@
     "defaultMessage": "Combwork in your language",
     "description": "A tip's title."
   },
+  "tips.launchSettings.text": {
+    "defaultMessage": "A connection's ⋯ → Launch Settings… → Launch as from a terminal starts its agents with none of Combwork's guidance, tools or typing, as if you had opened the CLI in that folder yourself. They are Independent: in the team, but out of the workflow.",
+    "description": "A tip (HI-2670). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Launch Settings… is a menu entry, Launch as from a terminal a switch). Glossary: independent."
+  },
+  "tips.launchSettings.title": {
+    "defaultMessage": "An agent as if from a terminal",
+    "description": "A tip's title (HI-2670): a connection whose sessions start with none of Combwork's additions."
+  },
   "tips.leftRunning.text": {
     "defaultMessage": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
     "description": "A tip (HI-2111). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Left running is a row's label; End It a button)."
@@ -1419,6 +1435,14 @@
     "defaultMessage": "Tips are off",
     "description": "A notice after \"Don't show tips\" on the tip card."
   },
+  "tips.oneAgent.text": {
+    "defaultMessage": "The ▾ beside Resume (n) and Stop (n) in the project header lists those agents: choose one to act on it alone. Agents ▾ and a project's right-click menu have the same for Start New, Archive and Start New, Resume All and Stop All.",
+    "description": "A tip (HI-2665). ▾ is the narrow arrow button beside the project header's Resume (n) and Stop (n): keep it. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.oneAgent.title": {
+    "defaultMessage": "Resume or stop just one agent",
+    "description": "A tip's title (HI-2665)."
+  },
   "tips.outageResume.text": {
     "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -1498,6 +1522,14 @@
   "tips.perfCompareAgents.title": {
     "defaultMessage": "Which agent a change came from",
     "description": "A tip's title."
+  },
+  "tips.perfFailures.text": {
+    "defaultMessage": "Performance → Failures sorts what didn’t succeed: real errors in red, apart from calls a workflow rule refused and wrong calls. Refusals and wrong calls by reason shows which rule or message came up most: a tool description to make clearer.",
+    "description": "A tip (HI-2553). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Failures is a card, Refusals and wrong calls by reason a table of the Performance view)."
+  },
+  "tips.perfFailures.title": {
+    "defaultMessage": "Refused is not broken",
+    "description": "A tip's title (HI-2553): a request refused by a workflow rule isn't a fault."
   },
   "tips.performance.text": {
     "defaultMessage": "Performance, in the activity bar, shows what Combwork's API, tools and guidance cost for the last day, week or month: the whole workspace or one project. Each project has its own Performance tab too.",

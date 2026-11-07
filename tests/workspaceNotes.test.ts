@@ -173,8 +173,8 @@ describe('delivered at launch, on every CLI, after Combwork\'s guidance', () => 
   })
 
   it('Claude Code: the switch off (#1167) leaves a resumed prompt as Claude Code keeps it', async () => {
-    await advanced.set(overrideId('claude-code', 'promptSnapshotOff'), false)
-    const args = claudeCode.buildCommand('C:\\bin\\claude.exe', context({ cliVersion: '2.1.305', resume: true, promptAddedBefore: true, overrides: overridesNow('claude-code') })).args
+    // Its connection's switch (HI-2670), as the launch read it.
+    const args = claudeCode.buildCommand('C:\\bin\\claude.exe', context({ cliVersion: '2.1.305', resume: true, promptAddedBefore: true, overrides: { ...overridesNow('claude-code'), [overrideId('claude-code', 'promptSnapshotOff')]: false } })).args
     expect(args).not.toContain('--system-prompt-snapshot')
   })
 

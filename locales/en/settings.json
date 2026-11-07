@@ -3307,6 +3307,74 @@
     "defaultMessage": "Cancel",
     "description": "A dialog's button in Settings → Accounts & Connections that closes it without changing anything."
   },
+  "settings.connections.launch.assistant": {
+    "defaultMessage": "The Assistant uses this connection: it always launches with Combwork's guidance, tools and typing, whatever these say. They apply to the connection's other agents.",
+    "description": "A note in a connection's Launch Settings (HI-2670) when the Combwork Assistant uses it: its role needs them."
+  },
+  "settings.connections.launch.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "A button of a connection's Launch Settings dialog (HI-2670): closes it without saving."
+  },
+  "settings.connections.launch.guidanceText": {
+    "defaultMessage": "How to work with Combwork, the project's latest handover and the Workspace notes note, at each launch.",
+    "description": "Under \"Combwork's guidance for agents\" in a connection's Launch Settings (HI-2670). Workspace notes is the name of a note: use its translated name."
+  },
+  "settings.connections.launch.intro": {
+    "defaultMessage": "What Combwork adds to the sessions this connection launches. Whatever you turn off, Combwork still shows their pane, status, transcript, sessions and usage.",
+    "description": "The first line of a connection's Launch Settings dialog (HI-2670)."
+  },
+  "settings.connections.launch.menu": {
+    "defaultMessage": "Launch Settings…",
+    "description": "An entry of a connection's ⋯ menu (Settings → Accounts & Connections, HI-2670): opens what of Combwork's the sessions it launches get."
+  },
+  "settings.connections.launch.overrides": {
+    "defaultMessage": "Overrides of {cli}",
+    "description": "A heading in a connection's Launch Settings (HI-2670), above Combwork's overrides of the coding agent CLI's own behaviour ({cli}: its name), each with a switch."
+  },
+  "settings.connections.launch.partlyBadge": {
+    "defaultMessage": "Partly plain",
+    "description": "A badge on a connection's row in Settings → Accounts & Connections (HI-2670): some of what Combwork adds to its sessions is turned off. Short."
+  },
+  "settings.connections.launch.plainBadge": {
+    "defaultMessage": "As from a terminal",
+    "description": "A badge on a connection's row in Settings → Accounts & Connections (HI-2670): it launches with none of Combwork's additions. Short."
+  },
+  "settings.connections.launch.preset": {
+    "defaultMessage": "Launch as from a terminal",
+    "description": "The preset at the top of a connection's Launch Settings (HI-2670): turns off everything Combwork adds, so its sessions start as the coding agent CLI would in a terminal in that folder."
+  },
+  "settings.connections.launch.presetText": {
+    "defaultMessage": "Its sessions get what {cli} started in a terminal in that folder would: none of Combwork's guidance, tools, MCP servers, overrides or typing. Its agents are Independent.",
+    "description": "Under \"Launch as from a terminal\" in a connection's Launch Settings (HI-2670). {cli} is the coding agent CLI's name (\"Claude Code\"). Glossary: independent."
+  },
+  "settings.connections.launch.restart": {
+    "defaultMessage": "Running sessions keep what they launched with until they restart. An agent made Independent gets nothing more of Combwork at once.",
+    "description": "A note at the foot of a connection's Launch Settings (HI-2670)."
+  },
+  "settings.connections.launch.save": {
+    "defaultMessage": "Save",
+    "description": "A button of a connection's Launch Settings dialog (HI-2670): saves them."
+  },
+  "settings.connections.launch.title": {
+    "defaultMessage": "{name}: launch settings",
+    "description": "Title of a connection's Launch Settings dialog (HI-2670), opened from its ⋯ menu in Settings → Accounts & Connections. {name} is the connection's name."
+  },
+  "settings.connections.launch.tools": {
+    "defaultMessage": "Combwork's tools",
+    "description": "A switch in a connection's Launch Settings (HI-2670): its sessions get Combwork's MCP server (its tools), skills, the Agent API and cw-progress."
+  },
+  "settings.connections.launch.toolsText": {
+    "defaultMessage": "The combwork MCP server, Combwork's skills, the Agent API and cw-progress. Turned off, the agents on this connection are Independent: no lanes, reviews or cards, until their tools are back.",
+    "description": "Under \"Combwork's tools\" in a connection's Launch Settings (HI-2670). combwork is an MCP server's name and cw-progress a command's: keep them. Glossary: independent."
+  },
+  "settings.connections.launch.typing": {
+    "defaultMessage": "Combwork types into the agent",
+    "description": "A switch in a connection's Launch Settings (HI-2670): Combwork may type wakes, inbox notices, messages and card prompts into its sessions."
+  },
+  "settings.connections.launch.typingText": {
+    "defaultMessage": "Wakes, inbox notices, messages and card prompts, and the replies of its hooks that add to its context. Its status hooks stay either way.",
+    "description": "Under \"Combwork types into the agent\" in a connection's Launch Settings (HI-2670)."
+  },
   "settings.connections.masking.full": {
     "defaultMessage": "Combwork is near the most API keys it can keep masking for. Past it, a new key is refused.",
     "description": "A warning in Settings → Accounts & Connections: Combwork keeps a fingerprint of every API key ever saved (to hide it in logs and exports), and is nearly at its limit."

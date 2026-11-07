@@ -828,6 +828,23 @@ interface CombworkMessageValues {
   'settings.connections.add.title': { cli: string | number }
   'settings.connections.add.titleAny': undefined
   'settings.connections.cancel': undefined
+  'settings.connections.launch.assistant': undefined
+  'settings.connections.launch.cancel': undefined
+  'settings.connections.launch.guidanceText': undefined
+  'settings.connections.launch.intro': undefined
+  'settings.connections.launch.menu': undefined
+  'settings.connections.launch.overrides': { cli: string | number }
+  'settings.connections.launch.partlyBadge': undefined
+  'settings.connections.launch.plainBadge': undefined
+  'settings.connections.launch.preset': undefined
+  'settings.connections.launch.presetText': { cli: string | number }
+  'settings.connections.launch.restart': undefined
+  'settings.connections.launch.save': undefined
+  'settings.connections.launch.title': { name: string | number }
+  'settings.connections.launch.tools': undefined
+  'settings.connections.launch.toolsText': undefined
+  'settings.connections.launch.typing': undefined
+  'settings.connections.launch.typingText': undefined
   'settings.connections.masking.full': undefined
   'settings.connections.masking.gap': { date: string | number }
   'settings.connections.masking.reset': undefined

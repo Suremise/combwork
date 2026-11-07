@@ -76,9 +76,9 @@ describe('waits (HI-1831)', () => {
   it("an isolated check's resolve answered with a wait is recorded as waiting: counted, never a failure", async () => {
     const { byRoute, totals } = await import('../src/shared/metricsView')
     metrics.knownRoute('/v1/progress/resolve')
-    // How servers.ts tells them: resolve's 409 with `wait` is a wait; a 409 without one, a client error.
+    // How servers.ts tells them: resolve's 409 with `wait` is a wait; a 409 without one, a refusal (HI-2553).
     expect(metrics.apiOutcome({ finished: true, status: 409, waiting: true })).toBe('waiting')
-    expect(metrics.apiOutcome({ finished: true, status: 409, waiting: false })).toBe('client-error')
+    expect(metrics.apiOutcome({ finished: true, status: 409, waiting: false })).toBe('refused')
     expect(metrics.apiOutcome({ finished: false, status: 409, waiting: true })).toBe('cancelled')
     expect(metrics.apiOutcome({ finished: true, status: 200, waiting: false })).toBe('ok')
     const { w } = await open()
@@ -1581,10 +1581,148 @@ describe("HI-2063: the tool list's parts", () => {
 describe('HI-2063: Copy Diagnostics says the tool list a start', () => {
   it('counts only, per role and workflow role; what was not measured is said, never zero', async () => {
     const { toolListLine } = await import('../src/main/diagnostics')
-    const row = { role: 'agent' as const, workflow: 'builder' as const, starts: 3, tools: 98, bytes: 63000.4, chars: 61234.2, descriptionChars: 30120, paramChars: 12004, schemaChars: 19110 }
+    const row = { provider: 'codex', role: 'agent' as const, workflow: 'builder' as const, upfront: null, starts: 3, tools: 98, bytes: 63000.4, chars: 61234.2, descriptionChars: 30120, paramChars: 12004, schemaChars: 19110 }
     expect(toolListLine('Workspace 1', [row, { ...row, role: 'assistant', workflow: 'none', starts: 1, chars: 70000, descriptionChars: null, paramChars: null, schemaChars: null }, { ...row, workflow: 'unknown', chars: null }])).toBe(
-      '- Workspace 1 Combwork tool list (24 h): agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
+      '- Workspace 1 Combwork tool list (24 h): codex agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; codex assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; codex agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
     )
     expect(toolListLine('Workspace 2', [])).toBe('- Workspace 2 Combwork tool list (24 h): none recorded')
+  })
+})
+
+describe('HI-2553: failures by kind, their reasons, and the tool list by provider', () => {
+  const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
+  const write = (path: string, data: unknown) => {
+    mkdirSync(join(path, '.combwork', 'metrics'), { recursive: true })
+    writeFileSync(join(path, '.combwork', 'metrics', 'metrics.json'), JSON.stringify(data))
+  }
+
+  it('a rule refusal, a wrong call and a thrown error each land in their own kind, with their reason', async () => {
+    const { apiErrorReply } = await import('../src/main/servers')
+    const { WorkflowRefusedError } = await import('../src/main/tasks')
+    const { refusal } = await import('../src/shared/workflow/refusals')
+    const { combworkError } = await import('../src/main/combworkError')
+    const { msg } = await import('../src/shared/i18n')
+    const { failureKind } = await import('../src/shared/metrics')
+    const ruled = new WorkflowRefusedError(refusal('move.doingNobody', { card: 'AL-1', stage: 'active' }))
+    const wrong = combworkError(msg({ id: 'test.metrics.badArgument', defaultMessage: 'number must be a card', description: 'test' }), undefined, { kind: 'invalid' })
+    const thrown = new TypeError("Cannot read properties of undefined (reading 'x')")
+    const outcome = (e: unknown) => metrics.apiOutcome({ finished: true, status: apiErrorReply(e).status, waiting: false })
+    expect([outcome(ruled), outcome(wrong), outcome(thrown)]).toEqual(['refused', 'invalid', 'server-error'])
+    expect([failureKind(outcome(ruled)), failureKind(outcome(wrong)), failureKind(outcome(thrown))]).toEqual(['refused', 'invalid', 'error'])
+    // Their reasons: the rule's id, the message's id, none; never their text.
+    expect([metrics.reasonOf(ruled), metrics.reasonOf(wrong), metrics.reasonOf(new Error('Unknown task 99'))]).toEqual(['rule:move.doingNobody', 'msg:test.metrics.badArgument', 'other'])
+    // Access is its own outcome, sorted among the refused; a 4xx or a tool failure before HI-2553 is not sorted.
+    expect(metrics.apiOutcome({ finished: true, status: 403, waiting: false })).toBe('denied')
+    expect(metrics.apiOutcome({ finished: true, status: 404, waiting: false })).toBe('invalid')
+    expect([failureKind('denied'), failureKind('client-error'), failureKind('error'), failureKind('failed'), failureKind('ok'), failureKind('waiting'), failureKind('cancelled')]).toEqual(['refused', 'unknown', 'unknown', 'error', null, null, null])
+  })
+
+  it("a route's reasons are counted on its refused and wrong-call series, kept within their cap, and read back from the database", async () => {
+    const { reasonRows, totals, byRoute } = await import('../src/shared/metricsView')
+    const { REASONS_MAX } = await import('../src/shared/metrics')
+    metrics.knownRoute('/v1/tasks/:n/submit')
+    const { w, path } = await open()
+    const h = metrics.metricsHandle(w)
+    const submit = (outcome: 'refused' | 'invalid' | 'server-error', reason?: string) => metrics.recordApi(h, 'alpha', api('/v1/tasks/:n/submit', { method: 'POST', outcome, ...(reason ? { reason } : {}) }))
+    for (let i = 0; i < 3; i++) submit('refused', 'rule:submit.nothingNew')
+    submit('refused', 'rule:move.doingNobody')
+    submit('invalid', 'msg:tasks.unknownCard')
+    // A real error keeps no reason.
+    submit('server-error', 'msg:never.kept')
+    // Past the cap, and a label that isn't one: `other`.
+    for (let i = 0; i < REASONS_MAX + 3; i++) submit('invalid', `msg:many.reason${i}`)
+    submit('invalid', 'a reason with its text in it')
+    const read = () => Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.api)
+    const check = (series: ReturnType<typeof read>) => {
+      const rows = reasonRows(series, 100)
+      expect(rows.find((r) => r.reason === 'rule:submit.nothingNew')).toMatchObject({ route: '/v1/tasks/:n/submit', kind: 'refused', count: 3 })
+      // The cap: REASONS_MAX - 1 more named after msg:tasks.unknownCard, then `other` (4 past it, and the text).
+      expect(rows.find((r) => r.reason === 'other')).toMatchObject({ kind: 'invalid', count: 5 })
+      expect(rows.filter((r) => r.kind === 'invalid').length).toBe(REASONS_MAX + 1)
+      expect(rows.some((r) => r.reason.includes('never') || r.reason.includes('text'))).toBe(false)
+      const t = totals({ api: series, mcp: [], guidance: [], catalog: [], providers: [], safeguards: [] })
+      expect(t.apiFailures).toEqual({ refused: 4, invalid: REASONS_MAX + 5, error: 1, unknown: 0 })
+      expect(byRoute(series)[0].failures).toEqual({ refused: 4, invalid: REASONS_MAX + 5, error: 1, unknown: 0 })
+    }
+    check(read())
+    // Saved and opened again: the same reasons, the same kinds.
+    await w.close()
+    await w.open(path)
+    check(read())
+    await disposeWorkspaceService(w)
+  })
+
+  it("a tool call's kind is the bridge's; one without a kind (an older bridge) is not sorted; a kind on a success is refused", async () => {
+    const { totals, byTool } = await import('../src/shared/metricsView')
+    const { w } = await open()
+    const h = metrics.metricsHandle(w)
+    const call = { tool: 'cw_submit', mode: 'compact', chars: 40, bytes: 40, ms: 5 }
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false, kind: 'refused' })).toBe(true)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false, kind: 'invalid' })).toBe(true)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false, kind: 'failed' })).toBe(true)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false })).toBe(true)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: true, kind: 'refused' })).toBe(false)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false, kind: 'oops' })).toBe(false)
+    const mcp = Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.mcp)
+    expect(mcp.map((m) => m.outcome).sort()).toEqual(['error', 'failed', 'invalid', 'refused'])
+    expect(totals({ api: [], mcp, guidance: [], catalog: [], providers: [], safeguards: [] }).toolFailures).toEqual({ refused: 1, invalid: 1, error: 1, unknown: 1 })
+    expect(byTool(mcp)[0]).toMatchObject({ tool: 'cw_submit', calls: 4, errors: 4, failures: { refused: 1, invalid: 1, error: 1, unknown: 1 } })
+    await disposeWorkspaceService(w)
+  })
+
+  it('the tool list is counted by provider, with what a CLI that defers tools got up front', async () => {
+    const { toolListRows, totals } = await import('../src/shared/metricsView')
+    const { w } = await open()
+    const h = metrics.metricsHandle(w)
+    const list = { tools: 38, toolsBytes: 24000, toolsChars: 23800, upfrontBytes: 3000 }
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', list, 'claude-code')).toBe(true)
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { ...list, upfrontBytes: 3200 }, 'claude-code')).toBe(true)
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'reviewer', list, 'codex')).toBe(true)
+    // A launch that ended (no provider), and an older bridge with no up-front part.
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { tools: 38, toolsBytes: 24000 }, null)).toBe(true)
+    // Up front can't be more than the list.
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { ...list, upfrontBytes: 25000 }, 'codex')).toBe(false)
+    const catalog = Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.catalog)
+    const rows = Object.fromEntries(toolListRows(catalog).map((r) => [r.provider, r]))
+    // An estimate if deferred, for a CLI that can defer (Claude Code) only: never for Codex (it gets the whole list, Bytes),
+    // nor a provider not known (round 1: whether a launch deferred isn't observable, so it is never shown as what it got).
+    expect(rows['claude-code']).toMatchObject({ starts: 2, bytes: 24000, upfront: 3100 })
+    expect(rows.codex).toMatchObject({ starts: 1, bytes: 24000, upfront: null })
+    expect(rows.unknown).toMatchObject({ starts: 1, upfront: null })
+    const t = totals({ api: [], mcp: [], guidance: [], catalog, providers: [], safeguards: [] })
+    expect([t.toolListStarts, t.avgToolListBytes, t.avgToolListUpfrontBytes]).toEqual([4, 24000, (3000 + 3200) / 2])
+    // The provider filter offers the tool list's providers, though no launch or usage has them; never `unknown` (round 1).
+    const { providersIn } = await import('../src/shared/metricsView')
+    const report = { scope: { kind: 'workspace' }, providers: [], projects: {}, workspace: { api: [], mcp: [], guidance: [], catalog: [{ provider: 'codex', starts: 1 }, { provider: 'unknown', starts: 1 }] } } as unknown as Parameters<typeof providersIn>[0]
+    expect(providersIn(report)).toEqual(['codex'])
+    // The provider filter narrows the tool list too.
+    const codexOnly = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, provider: 'codex', from: new Date(T0 - HOUR).toISOString() })
+    expect(Object.values(codexOnly.projects).flatMap((p) => p.catalog).map((c) => c.provider)).toEqual(['codex'])
+    await disposeWorkspaceService(w)
+  })
+
+  it('a catalog series saved before HI-2553 reads back as an unknown provider, with no up-front part', async () => {
+    const { w, path } = await open()
+    await w.close()
+    const old = { role: 'agent', workflow: 'builder', starts: 2, tools: 76, toolsBytes: 48000, toolsChars: 47000, charStarts: 2 }
+    write(path, { version: 1, buckets: [{ start: hourOf(T0) - HOUR, span: 'hour', projects: { alpha: { catalog: { 'agent builder': old } } } }] })
+    await w.open(path)
+    const [c] = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' }, from: new Date(T0 - 2 * HOUR).toISOString() }).projects.alpha.catalog
+    expect(c).toMatchObject({ provider: 'unknown', starts: 2, upfrontStarts: 0, upfrontBytes: 0 })
+    await disposeWorkspaceService(w)
+  })
+  it('a reason is said as its sentence, its values left out, never echoing its id alone (round 1)', async () => {
+    const { reasonMessages, reasonSentence } = await import('../src/renderer/src/views/perfReasons')
+    const { trTemplate, msg } = await import('../src/shared/i18n')
+    // A rule's: its refusal's first sentence, the card and stage it was about as "…".
+    expect(reasonSentence('rule:move.doingNobody', {})).toBe('… would be in … with nobody on it.')
+    // A message's, found by its id in the English catalogue.
+    const found = await reasonMessages(['msg:workflow.refused.start.slotAvailable.message', 'msg:no.such.message', 'rule:move.doingNobody'])
+    expect(Object.keys(found)).toEqual(['msg:workflow.refused.start.slotAvailable.message'])
+    expect(reasonSentence('msg:workflow.refused.start.slotAvailable.message', found)).toBe("… can't start: no slot is free.")
+    // One it can't say (unknown here, or `other`): none, so the view says what it is instead.
+    expect([reasonSentence('msg:no.such.message', found), reasonSentence('rule:no.such.rule', found), reasonSentence('other', found)]).toEqual([null, null, null])
+    // Plurals, selects, numbers and tags in their general form.
+    expect(trTemplate(msg({ id: 'test.template', defaultMessage: '{n, plural, one {# card} other {# cards}} in <b>{name}</b>{kind, select, a {!} other {.}} {size, number}', description: 'test' }))).toBe('2 cards in …. 2')
   })
 })

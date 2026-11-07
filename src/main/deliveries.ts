@@ -164,6 +164,8 @@ const T = {
   controlDown: agentMsg({ id: 'inbox.refused.controlDown', text: 'the user turned Settings → Assistant → Control down', note: "Why a delivery the Assistant left was refused, as its sender reads it: Control no longer lets it message agents." }),
   assistantEnded: agentMsg({ id: 'inbox.refused.assistantEnded', text: "the Assistant's session that left it ended", note: 'Why a delivery the Assistant left was refused, as its sender reads it.' }),
   noInbox: agentMsg({ id: 'inbox.refused.noInbox', text: '{name} has no inbox: turn on the Agent API', note: "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name." }),
+  independent: agentMsg({ id: 'inbox.refused.independent', text: '{name} is Independent: Combwork gives it nothing, and the user works with it in its pane', note: "Why an Independent agent (HI-2670) is given no delivery, as its sender sees it: it takes no part in the workflow. name: the agent's name." }),
+  plain: agentMsg({ id: 'inbox.refused.plain', text: "{name} runs as if started from a terminal, without Combwork's tools or typing, so it has no inbox until it restarts", note: "Why an agent is given no delivery (HI-2670), as its sender sees it: its running session launched without Combwork's tools or without Combwork typing into it (its connection's launch settings). name: the agent's name." }),
   late: agentMsg({ id: 'inbox.expired.late', text: 'not received in time', note: 'Why a delivery expired, as its sender reads it: not read before its expiry.' }),
   runEnded: agentMsg({ id: 'inbox.expired.sessionEnded', text: 'the session it was for has ended', note: 'Why a delivery for one launch of its agent expired, as its sender reads it.' }),
   otherConversation: agentMsg({ id: 'inbox.expired.otherConversation', text: 'its agent is in another conversation now', note: "Why a delivery for one conversation of its agent expired, as its sender reads it." }),
@@ -858,6 +860,11 @@ export const setInboxProjectForTests = (fn: ((host: string) => Promise<InboxProj
 }
 /** Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. */
 const noInbox = (name: string): string => say(T.noInbox, { name })
+/** Why Combwork gives an agent nothing (HI-2670: sessions.keepsOut), as its sender sees it; null when it may. */
+function keptOut(host: string, agentId: string, name: string): string | null {
+  const why = sessions.keepsOut(host, agentId)
+  return why ? say(why === 'independent' ? T.independent : T.plain, { name }) : null
+}
 /** A delivery refused because its agent can't read an inbox: the message says so, and what to do. */
 export class NoInbox extends Error {}
 /** For tests: whether agents can read their inbox (null: as the settings say). */
@@ -875,6 +882,9 @@ function whyNot(store: Store, r: DeliveryRecord): { to: 'refused' | 'expired'; w
   if (why) return { to: 'refused', why }
   // Its agent can't read an inbox (the Agent API turned off since it was made): refused, never typed instead.
   if (!readsInbox(store.host, r.agentId)) return { to: 'refused', why: noInbox(r.agentName ?? r.agentId) }
+  // Independent now, or running without Combwork's tools or typing (HI-2670): refused, its sender told why.
+  const out = keptOut(store.host, r.agentId, r.agentName ?? r.agentId)
+  if (out) return { to: 'refused', why: out }
   // Held by its team's pause (HI-2081): its time stands still while it is held, and is moved on at the resume.
   if (Date.parse(r.expires) <= clock() && !pauseHeld(store, r)) return { to: 'expired', why: say(T.late) }
   const live = sessions.liveFor(store.host, r.agentId)
@@ -1083,6 +1093,9 @@ function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta
   const agentName = nd.agentName?.slice(0, 300)
   // An agent that can't read an inbox is given none (#650's decision): refused now, with the reason its sender sees.
   if (!readsInbox(host, nd.agentId)) throw new NoInbox(noInbox(agentName ?? nd.agentId))
+  // Nor one Combwork keeps out of (HI-2670): an Independent agent, or a session without Combwork's tools or typing.
+  const out = keptOut(host, nd.agentId, agentName ?? nd.agentId)
+  if (out) throw new NoInbox(out)
   return { meta, agentName }
 }
 

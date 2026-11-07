@@ -55,6 +55,8 @@
   "tips.assistantLanes.title": "每个通道一个新对话",
   "tips.assistantMcp.textAdded": "与项目一样，只有为助手添加的工作区 MCP 服务器才会提供给它：在活动栏上助手视图的“MCP 服务器”中点 +，或在 MCP 视图的“添加到…”中勾选“助手”。包含你个人笔记的服务器可以只提供给助手，而不提供给任何项目。",
   "tips.assistantMcp.title": "仅供助手使用的 MCP 服务器",
+  "tips.assistantMemory.text": "除了日志，助手的编码智能体还会保存它自己关于与你协作的笔记。活动栏中助手视图里的记忆会列出它们，MEMORY.md 排在最前：打开一条即可阅读或更正。",
+  "tips.assistantMemory.title": "查看助手的编码智能体记住了什么",
   "tips.assistantMessages.text": "助手无法给等待中或工作中的智能体布置新任务，但可以给它留一条消息，比如你的回答：智能体一能接收就会送达。在此之前，它的窗格会将其显示为未读（✉）；点击即可取消。",
   "tips.assistantMessages.title": "助手可以联系忙碌的智能体",
   "tips.assistantNoticeOpens.text": "助手或智能体发来的、关于某个智能体或某张卡片的通知，点击即可打开它：智能体的窗格，或那张卡片。较早的通知在“通知”面板中，也能从那里打开。",
@@ -284,6 +286,8 @@
   "tips.lanesLegend.title": "通道颜色的含义",
   "tips.language.text": "Combwork 会跟随 Windows 的显示语言（如果支持）。“设置”→“常规”→“语言”可以选择其他语言；由 AI 翻译的语言会有标记，欢迎改进。与智能体交流时仍使用英语。",
   "tips.language.title": "用你的语言使用 Combwork",
+  "tips.launchSettings.text": "连接的 ⋯ →“启动设置…”→“如同从终端启动”会让它的智能体在没有 Combwork 的指引、工具或输入的情况下启动，就像你自己在该文件夹中打开了 CLI。它们是独立的：在团队中，但不在工作流程中。",
+  "tips.launchSettings.title": "如同从终端启动的智能体",
   "tips.leftRunning.text": "智能体的命令启动、在其 shell 退出后仍在运行的进程，会在“活动”中显示为“遗留运行”，附带 CPU 时间和“结束…”。超过十分钟后，会有一条通知告知一次，也会告知智能体。",
   "tips.leftRunning.title": "发现命令遗留运行的进程",
   "tips.leftoverBranches.text": "“版本控制”→“更改”会列出遗留分支：被取代或已归档卡片的分支、槽位之前智能体的分支。可先将其与目标分支比较，再使用“删除…”；有自己提交的分支会在删除前列出这些提交。",
@@ -352,6 +356,8 @@
   "tips.noCodeCards.title": "无代码卡片",
   "tips.off.message": "“帮助”→“提示…”中仍可查看，“设置”→“常规”可以重新打开。",
   "tips.off.title": "提示已关闭",
+  "tips.oneAgent.text": "项目标题栏中恢复（n）和停止（n）旁的 ▾ 会列出这些智能体：选择一个，只对它执行操作。智能体 ▾ 和项目的右键菜单也为新建会话、归档并新建会话、恢复所有智能体和停止所有智能体提供同样的选择。",
+  "tips.oneAgent.title": "只恢复或停止一个智能体",
   "tips.outageResume.text": "开启“设置”→“高级”→“连接中断后恢复智能体”后，因路由器重启或 Wi-Fi 短暂断开而停止的智能体会等待连接恢复，然后自动重新运行被中断的内容。用量限制或登录过期时不会恢复。",
   "tips.outageResume.title": "连接中断后，智能体可以继续工作",
   "tips.overview.text": "“工作区概览”按天显示每个项目的用量、当前正在运行的内容和看板。{key}",
@@ -542,5 +548,7 @@
   "tips.modelSwitched.title": "使用其他模型的智能体会被标记",
   "tips.modelSwitched.text": "如果智能体最终使用的模型不是其连接指定的（接近上限时 Codex 提议的更便宜模型，或 /model），它的页脚会用警告标记该模型，“活动”会显示“模型已更换”。重启智能体即可回到原模型。",
   "tips.waitingOnPurpose.title": "有意等待的卡片",
-  "tips.waitingOnPurpose.text": "进行中的卡片在等一个安静的时段，或等一个答复？右键单击它，选择“标记为等待中…”，并写明原因：在你取消标记或它离开进行中之前，Combwork 不再将其报告为停滞。其代理继续运行。"
+  "tips.waitingOnPurpose.text": "进行中的卡片在等一个安静的时段，或等一个答复？右键单击它，选择“标记为等待中…”，并写明原因：在你取消标记或它离开进行中之前，Combwork 不再将其报告为停滞。其代理继续运行。",
+  "tips.perfFailures.title": "被拒绝不等于出故障",
+  "tips.perfFailures.text": "性能 → 失败 会将未成功的内容分类：真正的错误以红色显示，与工作流程规则拒绝的调用和错误调用分开。“按原因列出的拒绝和错误调用”显示哪条规则或哪条消息出现得最多：提示哪个工具说明需要写得更清楚。"
 }

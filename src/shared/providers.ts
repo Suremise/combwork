@@ -83,6 +83,11 @@ export interface ProviderCapabilities {
   promptCacheTtl: boolean
   /** The provider reports the session's API-equivalent cost itself. */
   reportsCost: boolean
+  /**
+   * The CLI defers MCP tools (HI-2553): its model sees their names and loads a tool's definition when it uses one, but for
+   * those Combwork marks to be sent in full (shared/combworkToolLoad.ts). Else it is given the whole list at the start.
+   */
+  defersMcpTools: boolean
   /** Compacting takes focus instructions. */
   compactFocus: boolean
   /**

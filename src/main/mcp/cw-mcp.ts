@@ -32,6 +32,7 @@ import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 import { toolListSize } from '../../shared/toolListSize'
 import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint } from '../../shared/combworkToolLoad'
 import { agentMsg, say } from '../../shared/agentText'
+import { ACCEPT_MAX } from '../../shared/workflow/focused'
 
 /**
  * What this server says to agents (dialects, HI-2065; HI-2434): its tools' descriptions, its replies and its errors, each
@@ -44,7 +45,7 @@ const T = {
   'arg.agent': agentMsg({ id: 'tool.arg.agent', text: 'Its name or id; optional when the project has one agent.' }),
   'arg.mcpServers': agentMsg({ id: 'tool.arg.mcpServers', text: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). combwork is always given.' }),
   'arg.connection': agentMsg({ id: 'tool.arg.connection', text: 'Its connection, by id or name (cw_connection): its model, effort, mode and CLI. Default: the first usable here.' }),
-  'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }),
+  'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), generalist (never in a lane), or independent (no part in the workflow). Default: from its name.' }),
   'arg.override': agentMsg({ id: 'tool.arg.override', text: "Moves it past the rules the move skips: reason is the user's own why, never made up." }),
   'intent.arg.revision': agentMsg({ id: 'tool.intent.arg.revision', text: "Default: the card's current revision (its commit, or its files' hash). A commit's short id (7+ characters) will do." }),
   'intent.arg.submission': agentMsg({ id: 'tool.intent.arg.submission', text: 'Default: the latest.' }),
@@ -97,6 +98,9 @@ const T = {
   'connection.arg.account': agentMsg({ id: 'tool.connection.arg.account', text: 'add: its account, by id or name, from list.' }),
   'connection.arg.model': agentMsg({ id: 'tool.connection.arg.model', text: 'Empty: the CLI decides (each value below too).' }),
   'connection.arg.mode': agentMsg({ id: 'tool.connection.arg.mode', text: 'Permission mode.' }),
+  'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: what of Combwork its sessions get. guidance, tools, typing (false: off; tools off makes its agents Independent), overrides by key; preset "terminal": all off; an empty object: all on.' }),
+  'updateAgent.arg.confirm': agentMsg({ id: 'tool.updateAgent.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make this agent Independent (its role, or a connection without Combwork tools) while it is on a lane or holds a card.' }),
+  'connection.arg.confirm': agentMsg({ id: 'tool.connection.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make those agents Independent.' }),
   'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
   'promptAgent.description': agentMsg({ id: 'tool.promptAgent.description', text: 'Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use cw_start_task.' }),
   'messageAgent.description': agentMsg({ id: 'tool.messageAgent.description', text: "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-cw-api, tools.md)" }),
@@ -351,7 +355,13 @@ const notices = new AsyncLocalStorage<Set<string>>()
 async function api(method: string, path: string, body?: unknown, replyMs?: number): Promise<unknown> {
   // agent-protocol: an HTTP header
   const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}) }
-  const res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
+  let res: Awaited<ReturnType<typeof agentApiCall>>
+  try {
+    res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
+  } catch (e) {
+    // No reply (no connection, a timeout): a real error, whatever its message (HI-2553).
+    throw Object.assign(e instanceof Error ? e : new Error(String(e)), { noReply: true })
+  }
   if (res.notice) {
     try {
       notices.getStore()?.add(decodeURIComponent(res.notice))
@@ -366,8 +376,20 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
   } catch {
     // keep text
   }
-  if (res.status < 200 || res.status >= 300) throw new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : say(T['call.error.http'], { status: res.status }))
+  if (res.status < 200 || res.status >= 300) throw Object.assign(new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : say(T['call.error.http'], { status: res.status })), { status: res.status })
   return data
+}
+
+/**
+ * A failed call's kind (HI-2553): by the Agent API's status (409, 401 and 403 refused; another 4xx a wrong call; 5xx a
+ * real error); no reply, a real error; the bridge's own check of the arguments (a plain Error it threw), a wrong call;
+ * anything else (a TypeError, a RangeError: a fault), a real error.
+ */
+function failureOf(e: unknown): 'refused' | 'invalid' | 'failed' {
+  const status = (e as { status?: unknown })?.status
+  if (typeof status === 'number') return status === 409 || status === 401 || status === 403 ? 'refused' : status >= 500 ? 'failed' : 'invalid'
+  if ((e as { noReply?: unknown })?.noReply) return 'failed'
+  return e instanceof Error && e.constructor === Error ? 'invalid' : 'failed'
 }
 
 /** How long a wait's reply may take: the wait as Combwork will hold it (at most `max`), and a minute to spare. */
@@ -392,7 +414,7 @@ const settingsArgs = {
   mcpServers: { type: 'array', items: { type: 'string' }, description: say(T['arg.mcpServers']) },
   connection: { type: 'string', description: say(T['arg.connection']) }
 }
-const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: say(T['arg.workflowRole']) }
+const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist', 'independent'], description: say(T['arg.workflowRole']) }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Combwork fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
@@ -442,9 +464,9 @@ function intentTools(): Tool[] {
       'cw_verdict',
       'verdict',
       say(T['verdict.description']),
-      { pass: { type: 'boolean' }, comment: { type: 'string', description: say(T['verdict.arg.comment']) }, failKind: { type: 'string', enum: ['content', 'explanation'], description: say(T['verdict.arg.failKind']) }, submission },
+      { pass: { type: 'boolean' }, comment: { type: 'string', description: say(T['verdict.arg.comment']) }, failKind: { type: 'string', enum: ['content', 'explanation'], description: say(T['verdict.arg.failKind']) }, accept: { type: 'array', items: { type: 'string' }, maxItems: ACCEPT_MAX }, submission },
       ['pass', 'comment'],
-      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
+      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, accept: a.accept, submission: a.submission })
     ),
     intent(
       'cw_focused_skip',
@@ -746,8 +768,8 @@ const tools: Tool[] = [
   {
     name: 'cw_update_agent',
     description: say(T['updateAgent.description']),
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs }, required: ['project', 'agent'] },
-    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, ...legacyAgentArgs(a) })
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs, confirm: { type: 'string', description: say(T['updateAgent.arg.confirm']) } }, required: ['project', 'agent'] },
+    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, confirm: a.confirm, ...legacyAgentArgs(a) })
   },
   {
     name: 'cw_connection',
@@ -765,13 +787,15 @@ const tools: Tool[] = [
         mode: { type: 'string', description: say(T['connection.arg.mode']) },
         context200k: { type: 'string', enum: ['on', 'off', ''] },
         extraArgs: { type: 'string' },
-        tag: { type: 'string' }
+        tag: { type: 'string' },
+        launch: { type: 'object', description: say(T['connection.arg.launch']) },
+        confirm: { type: 'string', description: say(T['connection.arg.confirm']) }
       },
       required: ['action']
     },
     run: async (a) => {
       if (a.action === 'list') return connectionListText((await api('GET', '/v1/connections')) as Parameters<typeof connectionListText>[0])
-      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag', 'launch', 'confirm'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
       // agent-protocol: connectionChangedText's verb, which it words (shared/toolReplies.ts)
       if (a.action === 'add') return connectionChangedText('Made', (await api('POST', '/v1/connections', body)) as ConnectionPublic)
       if (a.action !== 'update') throw new Error(say(T['connection.error.action']))
@@ -1411,8 +1435,8 @@ function testLog(name: string, args: unknown, error: string | null, size: { mode
 }
 
 /** Tests only: the tool list as this server first sent it (HI-2186), once a server, as `kind: 'list'` (not a call). */
-function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number }): string | undefined {
-  return testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars })
+function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number; upfrontBytes: number }): string | undefined {
+  return testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars, upfrontBytes: size.upfrontBytes })
 }
 
 let testSeq = 0
@@ -1453,6 +1477,8 @@ interface CallReport {
   tool: string
   mode: 'compact' | 'detail'
   ok: boolean
+  /** A failed call's kind (HI-2553, failureOf). */
+  kind?: 'refused' | 'invalid' | 'failed'
   chars: number
   bytes: number
   ms: number
@@ -1460,7 +1486,7 @@ interface CallReport {
   testId?: string
 }
 const pending: CallReport[] = []
-let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number; testId?: string } | null = null
+let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number; upfrontBytes: number; testId?: string } | null = null
 let flushTimer: NodeJS.Timeout | null = null
 /** At most this many calls in one report (the API's limit), sent at most every 2 seconds. */
 const REPORT_MAX = 50
@@ -1476,8 +1502,8 @@ function flushReports(): void {
   flushTimer = null
   if (sending || (!pending.length && !catalog)) return
   const batch = pending.splice(0, REPORT_MAX)
-  const calls = batch.map((c) => ({ tool: c.tool, mode: c.mode, ok: c.ok, chars: c.chars, bytes: c.bytes, ms: c.ms }))
-  const listed = catalog ? { tools: catalog.tools, toolsBytes: catalog.toolsBytes, toolsChars: catalog.toolsChars, descriptionChars: catalog.descriptionChars, paramChars: catalog.paramChars } : null
+  const calls = batch.map((c) => ({ tool: c.tool, mode: c.mode, ok: c.ok, ...(c.kind ? { kind: c.kind } : {}), chars: c.chars, bytes: c.bytes, ms: c.ms }))
+  const listed = catalog ? { tools: catalog.tools, toolsBytes: catalog.toolsBytes, toolsChars: catalog.toolsChars, descriptionChars: catalog.descriptionChars, paramChars: catalog.paramChars, upfrontBytes: catalog.upfrontBytes } : null
   // Tests only: the test log's lines this report carries, and when it went and when Combwork had taken it (HI-2186).
   const testIds = [...batch.map((c) => c.testId), catalog?.testId].filter((x): x is string => !!x)
   const sentAt = new Date().toISOString()
@@ -1568,8 +1594,12 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       if (!listed) {
         listed = true
         const size = { tools: list.length, toolsBytes: Buffer.byteLength(JSON.stringify(list), 'utf8'), ...toolListSize(list) }
-        const testId = testLogList(size)
-        catalog = { ...size, ...(testId ? { testId } : {}) }
+        // What a CLI that defers tools gets at the start (HI-2553): those marked to be sent in full, and the rest's names.
+        const full = list.filter((t) => FULL.has(t.name))
+        const names = list.filter((t) => !FULL.has(t.name)).map((t) => t.name)
+        const upfrontBytes = Math.min(size.toolsBytes, Buffer.byteLength(JSON.stringify(full), 'utf8') + Buffer.byteLength(JSON.stringify(names), 'utf8'))
+        const testId = testLogList({ ...size, upfrontBytes })
+        catalog = { ...size, upfrontBytes, ...(testId ? { testId } : {}) }
         scheduleReports()
       }
       return
@@ -1582,6 +1612,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       calling++
       let text: string
       let ok = true
+      let kind: CallReport['kind']
       let testId: string | undefined
       const said = new Set<string>()
       try {
@@ -1594,6 +1625,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         reply(id, { content: [{ type: 'text', text }] })
       } catch (e) {
         ok = false
+        kind = failureOf(e)
         // A call that gave arguments its tool doesn't take, or left a required one out, is told what it takes (HI-2229).
         const hint = argumentHint(tool.name, tool.inputSchema, args)
         text = `${say(T['call.error'], { message: (e as Error).message })}${hint ? `\n${hint}` : ''}`
@@ -1602,7 +1634,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
       calling--
-      reportCall({ tool: tool.name, mode: modeOf(args), ok, chars: text.length, bytes: Buffer.byteLength(text, 'utf8'), ms: performance.now() - started, ...(testId ? { testId } : {}) })
+      reportCall({ tool: tool.name, mode: modeOf(args), ok, ...(kind ? { kind } : {}), chars: text.length, bytes: Buffer.byteLength(text, 'utf8'), ms: performance.now() - started, ...(testId ? { testId } : {}) })
       return
     }
     default:

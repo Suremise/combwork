@@ -57,6 +57,8 @@ interface CombworkMessageValues {
   'tips.assistantLanes.title': undefined
   'tips.assistantMcp.textAdded': undefined
   'tips.assistantMcp.title': undefined
+  'tips.assistantMemory.text': undefined
+  'tips.assistantMemory.title': undefined
   'tips.assistantMessages.text': undefined
   'tips.assistantMessages.title': undefined
   'tips.assistantNoticeOpens.text': undefined
@@ -286,6 +288,8 @@ interface CombworkMessageValues {
   'tips.lanesLegend.title': undefined
   'tips.language.text': undefined
   'tips.language.title': undefined
+  'tips.launchSettings.text': undefined
+  'tips.launchSettings.title': undefined
   'tips.leftRunning.text': undefined
   'tips.leftRunning.title': undefined
   'tips.leftoverBranches.text': undefined
@@ -356,6 +360,8 @@ interface CombworkMessageValues {
   'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
+  'tips.oneAgent.text': undefined
+  'tips.oneAgent.title': undefined
   'tips.outageResume.text': undefined
   'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }
@@ -376,6 +382,8 @@ interface CombworkMessageValues {
   'tips.perfCompare.title': undefined
   'tips.perfCompareAgents.text': undefined
   'tips.perfCompareAgents.title': undefined
+  'tips.perfFailures.text': undefined
+  'tips.perfFailures.title': undefined
   'tips.performance.text': undefined
   'tips.performance.title': undefined
   'tips.permissionMode.text': { key: string | number }

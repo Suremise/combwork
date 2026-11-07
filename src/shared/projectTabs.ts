@@ -1,5 +1,6 @@
 import { agentMsg, say } from './agentText'
 import { msg } from './i18n/msg'
+import type { MemorySource } from './types'
 
 /**
  * A project's tabs, in the order the tab strip shows them (#216), and the title bar's Project menu built from the same
@@ -42,11 +43,20 @@ export const MORE_TABS = STRIP_TABS.filter((t) => 'more' in t)
 
 /**
  * What a new instructions file (CLAUDE.md, AGENTS.md…) starts with when Memory creates it: its agents read it, so it is
- * English whatever the window's language, under a heading of the project's own name.
+ * English whatever the window's language, under a heading and a line that name whom it applies to (HI-2667, its
+ * `scope`): a project's file the project, a connection's that connection's agents in every project, the user's every
+ * project.
  */
-export const instructionsStarter = (project: string, provider: string): string => `# ${project}\n\n${say(STARTER, { provider })}\n`
+export const instructionsStarter = (project: string, provider: string, scope?: MemorySource['scope']): string => {
+  if (scope === 'user') return `# ${say(USER_HEADING)}\n\n${say(USER_STARTER, { provider })}\n`
+  if (scope) return `# ${scope.connection}\n\n${say(CONNECTION_STARTER, { provider })}\n`
+  return `# ${project}\n\n${say(STARTER, { provider })}\n`
+}
 
 const STARTER = agentMsg({ id: 'contract.instructions.starterFor', text: 'Instructions for {provider} in this project.', note: "A new instructions file's first line under the project's name (Memory creates it). provider: the CLI's name (Claude Code)." })
+const CONNECTION_STARTER = agentMsg({ id: 'contract.instructions.starterConnection', text: 'Instructions for {provider} agents on this connection, in every project.', note: "A connection's new instructions file's first line, under the connection's name (Memory creates it): its agents read it in every project. provider: the CLI's name (Claude Code)." })
+const USER_HEADING = agentMsg({ id: 'contract.instructions.userHeading', text: 'All projects', note: "The heading of the user's own new instructions file (~/.claude/CLAUDE.md and the like), which applies in every project (Memory creates it)." })
+const USER_STARTER = agentMsg({ id: 'contract.instructions.starterUser', text: 'Instructions for {provider} in every project.', note: "The user's own new instructions file's first line, under its heading (Memory creates it). provider: the CLI's name (Claude Code)." })
 
 /** The command that shows a tab. */
 export const tabCommand = (id: ProjectTab): string => `project.tab.${id}`

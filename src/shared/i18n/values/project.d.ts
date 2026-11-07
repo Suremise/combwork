@@ -296,6 +296,14 @@ interface CombworkMessageValues {
   'project.none.createFirst': undefined
   'project.none.newProject': undefined
   'project.none.select': undefined
+  'project.oneAgent.archiveOne': undefined
+  'project.oneAgent.carryOn': undefined
+  'project.oneAgent.chooseResume': undefined
+  'project.oneAgent.chooseStop': undefined
+  'project.oneAgent.resumeOne': undefined
+  'project.oneAgent.startNewOne': undefined
+  'project.oneAgent.stopOne': undefined
+  'project.oneAgent.stopped': undefined
   'project.overview.byAgent': undefined
   'project.overview.mergeSlot': undefined
   'project.overview.noAgents': undefined

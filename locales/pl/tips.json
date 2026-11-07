@@ -55,6 +55,8 @@
   "tips.assistantLanes.title": "Nowa rozmowa dla każdego toru",
   "tips.assistantMcp.textAdded": "Asystent dostaje serwer MCP obszaru roboczego dopiero wtedy, gdy dodasz go dla niego, tak jak dla projektu: przyciskiem + w sekcji Serwery MCP jego widoku na pasku aktywności albo zaznaczając Asystent w Dodaj do… w widoku MCP. Serwer z Twoimi notatkami może trafić do Asystenta i do żadnego projektu.",
   "tips.assistantMcp.title": "Serwery MCP tylko dla Asystenta",
+  "tips.assistantMemory.text": "Oprócz dziennika agent kodujący Asystenta zapisuje własne notatki o pracy z tobą. Pamięć w widoku Asystenta na pasku aktywności wymienia je, najpierw MEMORY.md: otwórz jedną, aby ją przeczytać lub poprawić.",
+  "tips.assistantMemory.title": "Zobacz, co pamięta agent kodujący Asystenta",
   "tips.assistantMessages.text": "Asystent nie może dać nowego zadania agentowi, który czeka lub pracuje, ale może zostawić mu wiadomość, na przykład Twoją odpowiedź: trafi do agenta, gdy tylko będzie mógł ją przyjąć. Do tego czasu panel agenta pokazuje ją jako nieprzeczytaną (✉); kliknij to, żeby ją anulować.",
   "tips.assistantMessages.title": "Asystent dotrze do zajętego agenta",
   "tips.assistantNoticeOpens.text": "Powiadomienie od Asystenta lub agenta dotyczące jednego agenta albo jednej karty otwiera po kliknięciu to, czego dotyczy: panel agenta albo kartę. Starsze są w panelu Powiadomienia i tam też się otwierają.",
@@ -284,6 +286,8 @@
   "tips.lanesLegend.title": "Co oznaczają kolory toru",
   "tips.language.text": "Combwork używa języka wyświetlania Windows, jeśli go obsługuje. Ustawienia → Ogólne → Język pozwala wybrać inny; języki przetłumaczone przez AI są oznaczone, a poprawki mile widziane. Z agentami Combwork nadal rozmawia po angielsku.",
   "tips.language.title": "Combwork w Twoim języku",
+  "tips.launchSettings.text": "Menu ⋯ połączenia → Ustawienia uruchamiania… → Uruchamiaj jak z terminala uruchamia jego agentów bez wskazówek, narzędzi i wpisywania Combwork, tak jakbyś sam otworzył CLI w tym folderze. Są niezależni: w zespole, ale poza przepływem pracy.",
+  "tips.launchSettings.title": "Agent jak z terminala",
   "tips.leftRunning.text": "Proces uruchomiony przez polecenie agenta, który działa dalej po zakończeniu powłoki, widać w Aktywności jako Pozostawiony, z czasem CPU i przyciskiem Zakończ. Po dziesięciu minutach powiadomienie mówi o tym raz, a agent też dostaje informację.",
   "tips.leftRunning.title": "Zobacz, co polecenie zostawiło działające",
   "tips.leftoverBranches.text": "Kontrola wersji → Zmiany wyświetla pozostałe gałęzie: gałąź zastąpionej lub zarchiwizowanej karty, gałąź agenta sprzed slotów. Najpierw porównaj ją z gałęzią docelową, potem użyj Usuń…; gałąź z własnymi commitami wyświetla je przed usunięciem.",
@@ -352,6 +356,8 @@
   "tips.noCodeCards.title": "Karty bez kodu",
   "tips.off.message": "Nadal są w Pomoc → Wskazówki…, a w Ustawienia → Ogólne włączysz je z powrotem.",
   "tips.off.title": "Wskazówki są wyłączone",
+  "tips.oneAgent.text": "▾ obok Wznów (n) i Zatrzymaj (n) w nagłówku projektu wymienia tych agentów: wybierz jednego, aby działać tylko na nim. Agenci ▾ i menu kontekstowe projektu mają to samo dla Zacznij nową, Zarchiwizuj i zacznij nową, Wznów wszystkich agentów i Zatrzymaj wszystkich agentów.",
+  "tips.oneAgent.title": "Wznów lub zatrzymaj tylko jednego agenta",
   "tips.outageResume.text": "Włącz Ustawienia → Zaawansowane → Wznawiaj agentów po zerwaniu połączenia, a agent zatrzymany przez restart routera lub chwilowy zanik Wi-Fi poczeka na połączenie i sam ponownie wykona to, co zostało przerwane. Nigdy przy limicie użycia ani wygasłym logowaniu.",
   "tips.outageResume.title": "Agenci mogą kontynuować po zerwaniu połączenia",
   "tips.overview.text": "Przegląd obszaru roboczego pokazuje, ile zużył każdy projekt, co teraz działa i tablicę, dzień po dniu. {key}",
@@ -542,5 +548,7 @@
   "tips.modelSwitched.title": "Agent na innym modelu jest oznaczony",
   "tips.modelSwitched.text": "Jeśli agent trafi na inny model, niż dało mu połączenie (propozycja Codex tańszego modelu blisko Twojego limitu albo /model), jego stopka oznacza model ostrzeżeniem, a Aktywność pokazuje Model zmieniony. Uruchom agenta ponownie, aby wrócić.",
   "tips.waitingOnPurpose.title": "Karta, która celowo czeka",
-  "tips.waitingOnPurpose.text": "Karta w Aktywne czeka na spokojny moment albo na odpowiedź? Kliknij ją prawym przyciskiem, Oznacz jako czekającą…, i napisz dlaczego: Combwork przestaje zgłaszać ją jako utkniętą, dopóki tego nie wyłączysz albo nie opuści Aktywne. Jej agent dalej działa."
+  "tips.waitingOnPurpose.text": "Karta w Aktywne czeka na spokojny moment albo na odpowiedź? Kliknij ją prawym przyciskiem, Oznacz jako czekającą…, i napisz dlaczego: Combwork przestaje zgłaszać ją jako utkniętą, dopóki tego nie wyłączysz albo nie opuści Aktywne. Jej agent dalej działa.",
+  "tips.perfFailures.title": "Odrzucone to nie zepsute",
+  "tips.perfFailures.text": "Wydajność → Niepowodzenia sortuje to, co się nie powiodło: prawdziwe błędy na czerwono, osobno od wywołań odrzuconych przez regułę przepływu pracy i błędnych wywołań. Odmowy i błędne wywołania według przyczyny pokazują, która reguła lub komunikat pojawiały się najczęściej: opis narzędzia do doprecyzowania."
 }

@@ -21,6 +21,7 @@ import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { connectionInput, type ConnectionPatch } from '../shared/accounts'
 import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, setUsageMove, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { launchImpact, setConnectionLaunch } from './connectionLaunch'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -69,6 +70,7 @@ import * as tasks from './tasks'
 import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
+import { assistantMemoryFor } from './assistantMemory'
 import { finalWhys } from '../shared/assistantActivity'
 import { changeGroups } from './assistantChanges'
 import { UndoNotFound, userUndo } from './assistantUndo'
@@ -1155,7 +1157,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return projectAgents.addLegacyAgent(p, opts)
     },
     'agents:memory': async () => ({ running: await agentsMemory(), total: totalmem(), free: freemem() }),
-    'agents:update': (p, id, patch) => projectAgents.updateAgent(p, id, patch),
+    'agents:update': (p, id, patch, confirmed) => projectAgents.updateAgent(p, id, patch, { confirmed: typeof confirmed === 'string' ? confirmed : null }),
+    'agents:impact': (p, id, patch) => projectAgents.agentChangeImpact(p, id, patch),
     'agents:remove': (p, id, opts) => projectAgents.removeAgent(p, id, opts),
     'agents:worktreeChecks': (p) => projectAgents.worktreeChecks(p),
     'agents:missingWorktree': (p, id) => missingWorktree(workspace.assertProject(p), String(id)),
@@ -1703,6 +1706,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'file:read': async (p) => readFile(guardFile(p), 'utf8').catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? '' : Promise.reject(e))),
     'file:write': (p, content, expected) => writeTextUnlessChanged(guardFile(p, true), content, expected),
 
+    'assistant:memory': (id) => (workspace.path ? assistantMemoryFor(workspace.path, knownProvider(id)) : { provider: knownProvider(id), folder: null, files: [] }),
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
       return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()
@@ -1833,6 +1837,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:move': (id, index) => moveConnection(id, Number(index)),
     'connection:add': (account, input) => addConnection(String(account), connectionInput(input) as ConnectionPatch & { name: string }),
     'connection:update': (id, patch) => updateConnection(String(id), connectionInput(patch)),
+    'connection:launchImpact': (id, launch) => launchImpact(String(id), launch),
+    'connection:setLaunch': (id, launch, confirmed) => setConnectionLaunch(String(id), launch, typeof confirmed === 'string' ? confirmed : null),
     'connection:duplicate': (id) => duplicateConnection(String(id)),
     'connection:remove': (id) => removeConnection(String(id)),
     'connection:move': (id, index) => moveConnectionInAccount(String(id), Number(index)),

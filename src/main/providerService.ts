@@ -10,8 +10,10 @@ import { msg, onLanguageChange, tr } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { config } from './config'
 import { advanced } from './advanced'
+import { overrides } from './advancedValues'
+import { overrideId } from '../shared/advanced'
 import { noteCliFolder, refreshPath } from './freshPath'
-import { emit, toast } from './events'
+import { emit, onCombworkEvent, toast } from './events'
 import { createLogger } from './logger'
 import { childEnv, hasPty, killPty, spawnPty, startSize, writePty } from './ptyHost'
 import { connectionsManaged } from './connectionSeam'
@@ -421,12 +423,19 @@ export const providerService = new ProviderService()
 onLanguageChange(() => providerService.relabel())
 
 // A CLI is checked again when an advanced setting its check depends on changes (ProviderAdapter.locateSettings).
-const locateValues = (): Map<ProviderId, string> => new Map(allProviders().map((p) => [p.id, JSON.stringify((p.locateSettings ?? []).map((id) => advanced.get(id)))]))
+// An override among them is read as Combwork's own runs of the CLI read it (HI-2670: from its connections), so a change of
+// a connection's launch settings checks it again too.
+const locateValue = (p: ProviderId, id: string): unknown => (id.startsWith(overrideId(p, '')) ? overrides(p, id.slice(overrideId(p, '').length)) : advanced.get(id))
+const locateValues = (): Map<ProviderId, string> => new Map(allProviders().map((p) => [p.id, JSON.stringify((p.locateSettings ?? []).map((id) => locateValue(p.id, id)))]))
 let lastLocateValues = locateValues()
-advanced.onChange(() => {
+const relocate = (): void => {
   const now = locateValues()
   for (const [id, v] of now) if (v !== lastLocateValues.get(id) && providerService.info(id).found) void providerService.refresh(id)
   lastLocateValues = now
+}
+advanced.onChange(relocate)
+onCombworkEvent((e) => {
+  if (e.type === 'connections-changed') relocate()
 })
 
 // Automatic's default provider (#474) follows what this process found.

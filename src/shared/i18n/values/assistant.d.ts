@@ -122,6 +122,19 @@ interface CombworkMessageValues {
   'assistant.loadNames.taken': { project: string | number; name: string | number }
   'assistant.mcpSecret.argument': { start: string | number }
   'assistant.mcpSecret.named': { where: string; key: string | number; ref: string | number }
+  'assistant.memory.choose': undefined
+  'assistant.memory.copied': undefined
+  'assistant.memory.copyPath': undefined
+  'assistant.memory.empty': { provider: string | number }
+  'assistant.memory.heading': undefined
+  'assistant.memory.loading': undefined
+  'assistant.memory.openFolder': undefined
+  'assistant.memory.refresh': undefined
+  'assistant.memory.row': undefined
+  'assistant.memory.section': undefined
+  'assistant.memory.target': undefined
+  'assistant.memory.tip': undefined
+  'assistant.memory.unsupported': { provider: string | number }
   'assistant.modes.create': undefined
   'assistant.modes.createFailed': undefined
   'assistant.modes.defaultBadge': undefined

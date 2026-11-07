@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Impossible de placer les volets ainsi dans cette disposition.",
-  "worktrees.agent.badWorkflowRole": "Un rôle dans le flux de travail est builder, reviewer, either ou generalist.",
+  "worktrees.agent.badWorkflowRole": "Un rôle dans le flux de travail est builder, reviewer, either, generalist ou independent.",
   "worktrees.agent.chooseMove": "Choisis où déplacer l’agent.",
   "worktrees.agent.effortRefused": "{chosen, select, yes {{model}} other {Le modèle par défaut de la CLI}} ne prend pas l’effort « {effort} ». Choisis l’un des niveaux qu’il prend.",
   "worktrees.agent.enterName": "Saisis un nom.",

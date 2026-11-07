@@ -5,8 +5,8 @@
     "audience": "both"
   },
   "worktrees.agent.badWorkflowRole": {
-    "text": "A role in the workflow is builder, reviewer, either or generalist.",
-    "note": "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English.",
+    "text": "A role in the workflow is builder, reviewer, either, generalist or independent.",
+    "note": "An error: an agent's role in the workflow was given as something else. builder, reviewer, either, generalist and independent are values: keep them in English.",
     "audience": "both"
   },
   "worktrees.agent.chooseMove": {

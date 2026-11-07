@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "在此布局中无法这样摆放窗格。",
-  "worktrees.agent.badWorkflowRole": "工作流程中的角色是 builder、reviewer、either 或 generalist。",
+  "worktrees.agent.badWorkflowRole": "工作流程中的角色是 builder、reviewer、either、generalist 或 independent。",
   "worktrees.agent.chooseMove": "请选择要将智能体移到的位置。",
   "worktrees.agent.effortRefused": "{chosen, select, yes {{model}} other {CLI 的默认模型}}不支持“{effort}”推理强度。请从它支持的级别中选择一个。",
   "worktrees.agent.enterName": "请输入名称。",

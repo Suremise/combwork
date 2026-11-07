@@ -9,6 +9,7 @@ interface CombworkMessageValues {
   'service.advanced.notJson': { error: string | number }
   'service.advanced.notObject': { example: string | number }
   'service.advanced.notValues': undefined
+  'service.advanced.onConnection': { id: string | number }
   'service.advanced.unknown': { id: string | number }
   'service.answerRelay.title': { card: string | number }
   'service.assistantAsk.title': { card: string | number }

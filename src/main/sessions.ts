@@ -4,11 +4,11 @@ import { maskText } from '../shared/redact'
 import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
-import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
+import { launchPolicy, MCP_ISOLATION, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
-import { overridesNow } from './advancedValues'
 import { folderChanging, folderSteady, inFolder } from './folderFence'
 import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { copyFile, lstat, mkdir, open, readdir, rename, rm, rmdir, stat, writeFile } from 'original-fs/promises'
@@ -30,7 +30,7 @@ import { atMost, whenAll } from '../shared/atMost'
 import { agentPlace, bindSession, claimPlace, ClaimRefused, folderAgent, folderFacts, heldSlots, releaseWriter, settleWriter, slotHeldWords } from './agentFolders'
 import { slotEnv } from './slots'
 import { copiesDirOf, grantsCopies } from './copies'
-import { agentWorkflowRole, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
+import { agentWorkflowRole, inWorkflow, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
 import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
 import { dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
@@ -118,6 +118,7 @@ import { withBinOnPath } from './progressReporters/shims'
 import { combworkSkills, parseSkillFrontmatter, skillFor } from './skills'
 import { copyBook, sessionEnded } from './skillCopies'
 import { workspaceNotesFor } from './workspaceNotes'
+import { independentIn } from './independent'
 import { skillOff } from '../shared/skillDelivery'
 import { samePath } from '../shared/movePaths'
 import { chainGuidanceRevision, GUIDANCE_REVISION, launchParts, launchRecord } from './guidance'
@@ -194,6 +195,8 @@ const M = {
   connectionFallback: msg({ id: 'session.connection.fallback', defaultMessage: "{why, select, missing {The connection chosen for it was removed} other {Its connection {wanted} is off in this workspace}}, so it started on {name}, its CLI's first usable one here. Choose another in its Agent Settings.", description: "A notice (HI-2108) when an agent starts on another connection than its own: its own was removed, or is on an account turned off in this workspace ({wanted}: its name). {name} is the account it started on. Agent Settings names a dialog." }),
   noSession: msg({ id: 'session.error.noSession', defaultMessage: 'No session is running for this agent.', description: "An action on an agent's session is refused: the agent isn't running." }),
   moveFailed: msg({ id: 'session.start.moveFailed', defaultMessage: "Combwork couldn't move {project}'s model settings to its agents: {error}. Start it again.", description: "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start." }),
+  independentNoTask: msg({ id: 'session.start.independentTask', defaultMessage: '{agent} is Independent: Combwork gives it no tasks. Start it and work with it in its pane.', description: "Starting an agent on a task is refused (HI-2670): the agent's role is Independent (its own, or its connection launches it without Combwork's tools), so Combwork never types a task into it. {agent} is the agent's name." }),
+  plainNoTask: msg({ id: 'session.start.plainTask', defaultMessage: "{agent}'s connection launches it without Combwork typing into it, so it can't be given a task as it starts.", description: "Starting an agent on a task is refused (HI-2670): its connection's launch settings have \"Combwork types into the agent\" off. {agent} is the agent's name." }),
   stoppedBeforeStart: msg({ id: 'session.error.stoppedBeforeStart', defaultMessage: 'The agent was stopped before it had started.', description: "Starting an agent failed: it was stopped (or its workspace closed) while it was starting." }),
   stoppedBeforePrompt: msg({ id: 'session.error.stoppedBeforePrompt', defaultMessage: 'The agent stopped before the prompt was sent.', description: 'Typing a prompt into an agent failed: it stopped or restarted meanwhile.' }),
   typingBusy: msg({ id: 'session.error.typingBusy', defaultMessage: 'Combwork is already typing a prompt into this agent; it is busy.', description: 'An action on an agent is refused: Combwork is typing a prompt into it now.' }),
@@ -437,6 +440,11 @@ interface LiveSession {
    * from when it first became ready (readyAt), for a CLI that never connects it.
    */
   combworkTools?: 'connecting' | 'connected'
+  /**
+   * What of Combwork's this launch got (HI-2670: its connection's launch policy as it launched), which its hooks and
+   * deliveries keep to until it restarts. Missing (before it is prepared): everything.
+   */
+  policy?: LaunchPolicy
   /** This launch's side of the workflow, as its metrics count it (HI-2049): taken once, as it launched. */
   workflow?: LaunchWorkflow
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
@@ -629,6 +637,8 @@ export interface EffectiveSettings {
   connectionName?: string
   /** The connection itself (HI-2397: `connection` is its account), for what the window names; not part of the signature either. */
   connectionId?: string
+  /** What of Combwork's it launches with (HI-2670: its connection's launch policy; the Assistant keeps its own). */
+  launch: LaunchPolicy
 }
 
 /** Files read once for a whole session list (instead of once per session). */
@@ -1729,7 +1739,19 @@ class SessionManager {
     const chime = pc.chime === 'inherit' ? s.notifications.chimeEnabled : pc.chime === 'on'
     // Never the CLI's own setting for the Assistant (#1284: Control relies on knowing its mode), whatever its connection says.
     const permissionMode = assistant && isCliOwnMode(l.permissionMode) ? providerDescriptor(cli).assistantMode : l.permissionMode
-    return { provider: l.provider, skills, skillHashes, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection, ...(choice.ok ? { connectionName: choice.connection.name, connectionId: choice.connection.id } : {}) }
+    // Its connection's launch policy (HI-2670): without Combwork's tools, no combwork server and none of Combwork's or the
+    // workspace's skills; with its MCP isolation off too, none of the workspace's servers either (the CLI's own config
+    // decides, as in a terminal). Part of the signature, so a change of it asks running agents for a restart.
+    const launch = launchPolicy(choice.ok ? choice.connection : null, l.provider, { assistant })
+    const delivered = launch.tools ? skills : []
+    if (!launch.tools) {
+      delete mcpServers[TOOLS_SERVER]
+      if (!launch.overrides[overrideId(l.provider, MCP_ISOLATION)]) for (const k of Object.keys(mcpServers)) delete mcpServers[k]
+    } else if (mcpServers[TOOLS_SERVER] && !launch.guidance) {
+      // Its tools without Combwork's guidance as their instructions (#1285).
+      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_GUIDANCE: '0' } }
+    }
+    return { provider: l.provider, skills: delivered, skillHashes: launch.tools ? skillHashes : {}, skillProblems, mcpServers, model: l.model, effort: l.effort, permissionMode, extraArgs, use200kContext: l.use200kContext, chime, connection, launch, ...(choice.ok ? { connectionName: choice.connection.name, connectionId: choice.connection.id } : {}) }
   }
 
   signature(e: EffectiveSettings): string {
@@ -2214,6 +2236,12 @@ class SessionManager {
     const holder = opts.resumeId ? this.projectStates(projectPath).find((s) => s.sessionId === opts.resumeId) : undefined
     if (holder) throw combworkError(msg({ id: 'session.start.openIn', defaultMessage: 'This conversation is already open in {agent}. An agent can only resume a session no other agent is running.', description: "Resuming a conversation is refused: another agent is running it. {agent} is that agent's name." }), { agent: holder.agentName ?? msg({ id: 'session.start.anotherAgent', defaultMessage: 'another agent', description: "Stands for an agent whose name isn't known, in the middle of a sentence (\"This conversation is already open in another agent.\")." }) }, { kind: 'conflict' })
     const assistant = workspace.isAssistantHome(projectPath)
+    // A task given as it starts is Combwork typing into it (HI-2670): refused for an Independent agent, and on a
+    // connection that launches without Combwork's typing, rather than dropped.
+    if (opts.prompt?.trim() && !assistant) {
+      if (!inWorkflow(agentWorkflowRole(agent))) throw combworkError(M.independentNoTask, { agent: agent.name }, { kind: 'conflict' })
+      if (!launchPolicy(getConnection(agent.connection), agentProvider(agent, config.settings)).typing) throw combworkError(M.plainNoTask, { agent: agent.name }, { kind: 'conflict' })
+    }
     const existing = opts.resumeId ? (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === opts.resumeId) : undefined
     times.mark('sessionsFile')
     this.assertStarting(id)
@@ -2709,8 +2737,13 @@ class SessionManager {
     state.permissionMode = mode ?? undefined
     // Given Combwork's tools, it takes no line of Combwork's until they have connected (#865).
     l.combworkTools = eff.mcpServers[TOOLS_SERVER] ? 'connecting' : undefined
+    // What of Combwork's it launches with (HI-2670), frozen for this run: its hooks and deliveries read this, not a
+    // connection changed since (they also read its role as it is now, so an agent made Independent gets nothing more).
+    const policy = eff.launch
+    l.policy = policy
     // Its own Agent API token for this launch, which confines its board calls to its project (the Assistant has its own).
-    if (!workspace.isAssistantHome(projectPath)) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
+    // None without Combwork's tools (HI-2670): nothing of Combwork's to call it with.
+    if (!workspace.isAssistantHome(projectPath) && policy.tools) await newAgentToken({ workspace: workspaceOf(projectPath).path!, projectPath, agentId: agent.id }, state.runId)
     const assistantText = workspace.isAssistantHome(projectPath) ? await this.assistantInstructions(projectPath, agent).catch(() => null) : null
     // A new conversation starts in its mode; a resumed one is told it if it was last given another (below).
     l.mode = !resume ? assistantText?.modeId || undefined : undefined
@@ -2719,23 +2752,24 @@ class SessionManager {
     // Its chain's texts for cw-mcp.js and cw-progress.js (HI-2443), in the same private folder: a chain that
     // overrides nothing writes nothing, and they speak the Default as before.
     const pinned = l.dialect?.chain
-    const dialectEnv: Record<string, string> = pinned?.hash
+    const dialectEnv: Record<string, string> = pinned?.hash && policy.tools
       ? ((await writeDialectFile(hookAuth.dir, pinned).catch((e) => {
           log.warn(`${userText(this.label(state))}: its dialect file couldn't be written, so its Combwork tools and cw-progress speak the Default`, e)
           return null
         }))?.env ?? {})
       : {}
     times?.mark('tokens')
-    const guidance = await this.combworkGuidance(projectPath).catch(() => '')
+    // Neither with its connection's guidance off (HI-2670): the guidance, its latest handover and the Workspace notes.
+    const guidance = policy.guidance ? await this.combworkGuidance(projectPath).catch(() => '') : ''
     // The Workspace notes note as it is now (#1433): every agent, whatever its tools or folder; a running one keeps its own.
-    const notes = await workspaceNotesFor(projectPath).catch(() => '')
+    const notes = policy.guidance ? await workspaceNotesFor(projectPath).catch(() => '') : ''
     // Instructions of Combwork's own given to this conversation at an earlier launch, by any agent (SessionRecord.promptAdded).
     const promptAddedBefore = resume && (await workspace.sessionsFile(projectPath).catch(() => null))?.sessions.find((s) => s.id === sessionId)?.promptAdded === true
     if (assistantText?.text.trim() || notes.trim()) l.promptAdded = true
     // A reviewer's grant of the project's review copies (#1439): one fixed folder, made if new, so it never changes
     // between submissions. Never in a slot (either building there) nor with review copies off.
     const copies = copiesDirOf(workspaceOf(projectPath).worktreesRoot, projectPath)
-    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.extraDirs, on: advanced.get(COPIES_REVIEW) !== false, reviews: reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
+    const granted = grantsCopies({ capable: adapter.descriptor.capabilities.extraDirs, on: advanced.get(COPIES_REVIEW) !== false, reviews: policy.tools && reviewsWork(agentWorkflowRole(agent)), inProjectFolder: !l.slotEnv && samePlace(cwd, projectPath), assistant: workspace.isAssistantHome(projectPath) })
     const extraDirs = granted && (await mkdir(copies, { recursive: true }).then(() => true, () => false)) ? [copies] : []
     l.extraDirs = extraDirs
     l.cliVersion = info.version ?? null
@@ -2745,9 +2779,11 @@ class SessionManager {
     // Agents' temp folder (HI-2496): its own folder there, made, when the setting has one (none: the system Temp, as
     // before). Never in a project, slot or Combwork's own folders, of any open workspace: one that is stops the launch.
     const assistantHost = workspace.isAssistantHome(projectPath)
-    const tempSetting = agentTempSetting(workspaceOf(projectPath))
+    // None with every override of its connection's off (HI-2670: as in a terminal, the system Temp).
+    const tempSetting = Object.values(policy.overrides).some((v) => v) || !Object.keys(policy.overrides).length ? agentTempSetting(workspaceOf(projectPath)) : null
     const tempDir = tempSetting ? await prepareAgentTemp({ setting: tempSetting, host: projectPath, agentId: agent.id, assistant: assistantHost, protect: [...(await protectedFolders(openWorkspaces())), projectPath, cwd] }) : null
     times?.mark('tempDir')
+    const binPath = (env: Record<string, string>, dir: string | null): Record<string, string> => (policy.tools ? withBinOnPath(env, dir) : env)
     const ctx = {
       projectPath,
       agentId: agent.id,
@@ -2777,24 +2813,24 @@ class SessionManager {
       instructions: assistantText?.text,
       notes,
       promptAddedBefore,
-      overrides: overridesNow(adapter.id),
+      // Its connection's overrides of its CLI (HI-2670), as this launch read them.
+      overrides: policy.overrides,
       trustedCombworkTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
-      initialPrompt: l.initialPrompt,
+      // Not typed in without its connection's typing (HI-2670), nor given on the command line.
+      initialPrompt: policy.typing ? l.initialPrompt : undefined,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
       ...(conn ? { connectionHome: conn.folder } : {}),
       // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
       // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
       tempDir,
       // Its temp folder's variables last, over the account's and server's (HI-2496): none set, the environment as before.
-      env: withAgentTemp(withBinOnPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
+      // Without Combwork's tools (HI-2670), only what its hooks report status with: no project, agent or API variables,
+      // no cw-progress on its PATH.
+      env: withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
         CW_HOOK_TOKEN: hookAuth.token,
-        CW_PROJECT: basename(projectPath),
-        CW_PROJECT_PATH: projectPath,
-        CW_WORKSPACE: workspaceOf(projectPath).path!,
         CW_RUN_ID: state.runId,
         ...(state.sessionId ? { CW_SESSION_ID: state.sessionId } : {}),
-        CW_AGENT: agent.name,
-        CW_PROVIDER: adapter.id,
+        ...(policy.tools ? { CW_PROJECT: basename(projectPath), CW_PROJECT_PATH: projectPath, CW_WORKSPACE: workspaceOf(projectPath).path!, CW_AGENT: agent.name, CW_PROVIDER: adapter.id } : {}),
         // Its dialect's file (HI-2443), for cw-progress run in its shell; none while it speaks the Default.
         ...dialectEnv,
         // Its slot's name and port block (#1429's slotEnv), while it runs in one.
@@ -2802,7 +2838,7 @@ class SessionManager {
         // Its connection's folder as the CLI's home (HI-1755): its login, settings and memory, its transcripts shared.
         ...(conn ? { [conn.homeEnv]: conn.folder } : {}),
         // Not for the Assistant: it reaches the API through its Combwork tools, with its own token.
-        ...(workspace.isAssistantHome(projectPath) ? {} : this.apiEnv(projectPath, agent.id))
+        ...(workspace.isAssistantHome(projectPath) || !policy.tools ? {} : this.apiEnv(projectPath, agent.id))
       }))), this.binDir), tempDir)
     }
     const delivered = await adapter.prepareLaunch(ctx)
@@ -4035,6 +4071,20 @@ class SessionManager {
     return !!l?.inputBlocked && l.inputBlocked.runId === l.state.runId
   }
 
+  /**
+   * Why Combwork keeps out of an agent (HI-2670): `independent`, its role now (its own, or its connection launching
+   * without Combwork's tools), whatever its launch got; `plain`, the launch it runs got neither Combwork's tools nor its
+   * typing. Null: Combwork may type into it, deliver to it and add to its context. Read at each use from the workspace's
+   * projects as held (no file is read): hooks and deliveries ask it. The Assistant: never.
+   */
+  keepsOut(projectPath: string, agentId: string): 'independent' | 'plain' | null {
+    const ws = workspaceFor(projectPath)
+    if (!ws || ws.isAssistantHome(projectPath)) return null
+    if (independentIn(ws, projectPath, agentId)) return 'independent'
+    const policy = this.live.get(liveId(projectPath, agentId))?.policy
+    return policy && (!policy.tools || !policy.typing) ? 'plain' : null
+  }
+
   /** Its input box as drawn now, as clearInput reads it ('' when empty, null when none is on the screen). */
   private boxNow(l: LiveSession): string | null {
     const box = l.screen && l.adapter.promptBox ? l.adapter.promptBox(l.screen.textWithoutDim()) : null
@@ -4443,6 +4493,9 @@ class SessionManager {
   async newConversation(projectPath: string, agentId: string, prompt: string, allowed?: () => void, purpose?: FolderPurpose): Promise<LiveSessionState> {
     projectPath = workspace.assertProject(projectPath)
     const now = this.agentNow(projectPath, agentId)
+    // Never for an agent Combwork keeps out of (HI-2670): the task would be typed into it.
+    const out = this.keepsOut(projectPath, agentId)
+    if (out) throw combworkError(out === 'independent' ? M.independentNoTask : M.plainNoTask, { agent: this.liveFor(projectPath, agentId)?.agentName ?? agentId }, { kind: 'conflict' })
     if (!now) throw combworkError(msg({ id: 'session.newConversation.notRunning', defaultMessage: "It isn't running.", description: 'Giving an agent a task in a new conversation is refused: it isn\'t running.' }), undefined, { kind: 'conflict' })
     if (now.pending || this.delivering.has(this.key(projectPath, agentId))) throw combworkError(msg({ id: 'session.newConversation.pending', defaultMessage: 'It has just been given a prompt that its CLI has not taken yet.', description: "Giving an agent a task in a new conversation is refused: a prompt Combwork typed hasn't been taken yet." }), undefined, { kind: 'conflict' })
     allowed?.()
@@ -5550,6 +5603,12 @@ class SessionManager {
     return l && runId && l.state.runId === runId && l.workflow ? l.workflow : 'unknown'
   }
 
+  /** The CLI of an agent's launch `runId` (HI-2553), for the tool list its combwork server reports; null once it has ended or another took its place. */
+  launchProvider(projectPath: string, agentId: string, runId: string | null): ProviderId | null {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return l && runId && l.state.runId === runId ? l.state.provider : null
+  }
+
   /** Whether the agent may hand over to a new conversation of its own now (#1057): set by handOverCheck.ts, which knows the lanes. */
   handOverAllowed: (projectPath: string, agentId: string, turnOver?: boolean) => Promise<boolean> = async (projectPath, agentId, turnOver) => {
     const st = this.liveFor(projectPath, agentId)
@@ -5965,7 +6024,9 @@ class SessionManager {
     const files = hook.editedPaths.map((f) => resolve(isAbsolute(f) ? f : join(base, f)))
     // The folder's write log (#1214): a check running there meanwhile doesn't count, whatever the lock mode.
     observer.markEdits(files)
-    if (mode === 'off') {
+    // Without Combwork's tools, or Independent now (HI-2670): no lock reply ever reaches its context; its edits are
+    // still claimed, so another agent's are warned or held as before.
+    if (mode === 'off' || l.policy?.tools === false || this.keepsOut(l.state.projectPath, l.state.agentId) === 'independent') {
       decided('allowed')
       return this.editAccepted(id, files, null)
     }
@@ -6326,9 +6387,13 @@ class SessionManager {
   /** The start context for a launch, in its CLI's reply form, or null (none, or it couldn't be made). */
   private async startContextFor(l: LiveSession, source: string | null): Promise<Record<string, unknown> | null> {
     if (!this.startContext || !l.adapter.startContextReply) return null
+    // Context of Combwork's (HI-2670): never without its guidance, nor into an agent Combwork keeps out of.
+    const barred = (): boolean => l.policy?.guidance === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
+    if (barred()) return null
     try {
       const text = await this.startContext(l.state, source)
-      return text ? l.adapter.startContextReply(text) : null
+      // Asked again once it is made (HR1 on s44): made Independent meanwhile, it gets none.
+      return text && !barred() ? l.adapter.startContextReply(text) : null
     } catch (e) {
       log.warn('start context', e)
       return null
@@ -6402,6 +6467,14 @@ class SessionManager {
   private noticeReplies = new WeakMap<object, (reply: Record<string, unknown> | null) => void>()
 
   /**
+   * Whether no notice of Combwork's may go into a launch's context now (HI-2670): launched without Combwork's typing or
+   * tools, or its agent Independent now. Asked before a notice is worked out and again once it is, before it is given.
+   */
+  private noticeBarred(l: LiveSession): boolean {
+    return l.policy?.typing === false || l.policy?.tools === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
+  }
+
+  /**
    * The notice for a hook in the launch's order (#650), with the turn ledger as it is just before it (nothing else of the
    * launch is handled while this is worked out): none for a hook the ledger finds stale; a checkpoint after the agent's
    * own tool call; the drain at a Stop of the running turn that Combwork hasn't carried on yet (the ledger's own count, so at
@@ -6409,6 +6482,9 @@ class SessionManager {
    */
   private async noticeIn(runId: string | null, l: LiveSession, ledger: TurnLedger, body: Record<string, any>, woke: boolean, typed: boolean, at: number): Promise<Record<string, unknown> | null> {
     if (!this.inboxNotice) return null
+    // Never into a launch without Combwork's typing or tools, nor an agent Independent now (HI-2670): its hooks still
+    // report its status, and add nothing to its context.
+    if (this.noticeBarred(l)) return null
     const hook = l.adapter.normalizeHook(body)
     const ev = hook.event
     // What the ledger would make of it (a copy: it is admitted below, with what it was told).
@@ -6417,8 +6493,9 @@ class SessionManager {
     if (drain && !(ledger.active && ledger.active.state === 'running' && ledger.active.continued === 0)) return null
     const turn = ledger.active
     const text = await this.inboxNotice(l.state, drain ? 'drain' : 'checkpoint')
-    // Still that launch and that turn (the queue holds the rest of the launch's hooks, so only its end can change them).
-    if (!text || this.findLaunch(runId, body.session_id)?.[1] !== l || ledger.active !== turn) return null
+    // Still that launch and that turn (the queue holds the rest of the launch's hooks, so only its end can change them),
+    // and still one Combwork may add to (HR1 on s44: made Independent while the notice was worked out, it gets none).
+    if (!text || this.findLaunch(runId, body.session_id)?.[1] !== l || ledger.active !== turn || this.noticeBarred(l)) return null
     const reply = l.adapter.noticeReply(String(body.hook_event_name ?? ''), text)
     // A CLI that takes the drain as a new prompt: that prompt is Combwork's own, in the turn it carries on.
     if (reply && drain && l.adapter.drainIsPrompt) expectInjected(ledger, text)

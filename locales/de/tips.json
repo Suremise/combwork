@@ -55,6 +55,8 @@
   "tips.assistantLanes.title": "Eine neue Unterhaltung für jede Lane",
   "tips.assistantMcp.textAdded": "Der Assistent erhält einen MCP-Server des Arbeitsbereichs erst, wenn du ihn für ihn hinzufügst, wie bei einem Projekt: mit + unter „MCP-Server“ in seiner Ansicht in der Aktivitätsleiste oder durch Ankreuzen von Assistent unter „Hinzufügen zu…“ in der Ansicht „MCP“. Ein Server mit deinen eigenen Notizen kann so den Assistenten erreichen und kein Projekt.",
   "tips.assistantMcp.title": "MCP-Server nur für den Assistenten",
+  "tips.assistantMemory.text": "Neben seinem Journal speichert der Coding-Agent des Assistenten eigene Notizen über die Arbeit mit dir. Gedächtnis in der Assistent-Ansicht in der Aktivitätsleiste listet sie auf, MEMORY.md zuerst: Öffne eine, um sie zu lesen oder zu korrigieren.",
+  "tips.assistantMemory.title": "Sieh, was sich der Coding-Agent des Assistenten merkt",
   "tips.assistantMessages.text": "Der Assistent kann einem wartenden oder arbeitenden Agenten keine neue Aufgabe geben, aber eine Nachricht hinterlassen, etwa deine Antwort: Sie wird zugestellt, sobald der Agent sie annehmen kann. Bis dahin zeigt sein Bereich sie als ungelesen (✉); ein Klick darauf bricht sie ab.",
   "tips.assistantMessages.title": "Der Assistent erreicht auch beschäftigte Agenten",
   "tips.assistantNoticeOpens.text": "Eine Benachrichtigung des Assistenten oder eines Agenten über einen Agenten oder eine Karte öffnet diese per Klick: den Bereich des Agenten oder die Karte. Ältere stehen im Panel Benachrichtigungen und lassen sich auch dort öffnen.",
@@ -284,6 +286,8 @@
   "tips.lanesLegend.title": "Was die Farben einer Lane bedeuten",
   "tips.language.text": "Combwork folgt der Anzeigesprache von Windows, wenn es sie hat. Einstellungen → Allgemein → Sprache wählt eine andere; von KI übersetzte Sprachen sind gekennzeichnet, und Verbesserungen sind willkommen. Mit Agenten spricht Combwork weiterhin Englisch.",
   "tips.language.title": "Combwork in deiner Sprache",
+  "tips.launchSettings.text": "Das Menü ⋯ einer Verbindung → Starteinstellungen… → Wie aus einem Terminal starten startet ihre Agenten ohne Combworks Anleitung, Tools oder Tippen, als hättest du die CLI selbst in diesem Ordner geöffnet. Sie sind unabhängig: im Team, aber außerhalb des Workflows.",
+  "tips.launchSettings.title": "Ein Agent wie aus einem Terminal",
   "tips.leftRunning.text": "Ein Prozess, den der Befehl eines Agenten gestartet hat und der weiterläuft, nachdem seine Shell beendet ist, steht im Tab „Aktivität“ als „Laufen gelassen“, mit seiner CPU-Zeit und „Beenden…“. Nach zehn Minuten meldet eine Benachrichtigung das einmal, und auch der Agent wird informiert.",
   "tips.leftRunning.title": "Sehen, was ein Befehl laufen gelassen hat",
   "tips.leftoverBranches.text": "Versionsverwaltung → Änderungen listet übrig gebliebene Branches auf: den einer ersetzten oder archivierten Karte oder den eines Agenten aus der Zeit vor Slots. Vergleiche einen zuerst mit deinem Zielbranch und lösche ihn dann mit „Löschen…“; einer mit eigenen Commits listet diese auf, bevor er entfernt wird.",
@@ -352,6 +356,8 @@
   "tips.noCodeCards.title": "Karten ohne Code",
   "tips.off.message": "Unter Hilfe → Tipps… findest du sie weiterhin, und Einstellungen → Allgemein schaltet sie wieder ein.",
   "tips.off.title": "Tipps sind aus",
+  "tips.oneAgent.text": "Das ▾ neben Fortsetzen (n) und Stoppen (n) in der Projektkopfzeile listet diese Agenten auf: Wähle einen aus, um nur ihn zu bedienen. Agenten ▾ und das Rechtsklickmenü eines Projekts bieten dasselbe für Neu beginnen, Archivieren und neu beginnen, Alle Agenten fortsetzen und Alle Agenten stoppen.",
+  "tips.oneAgent.title": "Nur einen Agenten fortsetzen oder stoppen",
   "tips.outageResume.text": "Schalte Einstellungen → Erweitert → Agenten nach einem Verbindungsabbruch fortsetzen ein, und ein Agent, den ein Router-Neustart oder ein kurzer WLAN-Aussetzer gestoppt hat, wartet auf die Verbindung und wiederholt dann von selbst, was abgebrochen wurde. Nie bei einem Nutzungslimit oder einer abgelaufenen Anmeldung.",
   "tips.outageResume.title": "Agenten können nach einem Verbindungsabbruch weitermachen",
   "tips.overview.text": "Die Arbeitsbereichsübersicht zeigt, was jedes Projekt verbraucht hat, was gerade läuft und das Board, nach Tag. {key}",
@@ -542,5 +548,7 @@
   "tips.modelSwitched.title": "Ein Agent mit einem anderen Modell wird markiert",
   "tips.modelSwitched.text": "Landet ein Agent auf einem anderen Modell, als seine Verbindung ihm gab (das Angebot von Codex für ein günstigeres Modell nahe deinem Limit, oder /model), markiert seine Fußzeile das Modell mit einer Warnung, und Aktivität zeigt „Modell gewechselt“. Starte den Agenten neu, um zurückzukehren.",
   "tips.waitingOnPurpose.title": "Eine Karte, die absichtlich wartet",
-  "tips.waitingOnPurpose.text": "Eine Karte in In Arbeit wartet auf ein ruhiges Zeitfenster oder auf eine Antwort? Rechtsklick, Als wartend markieren…, und den Grund angeben: Combwork meldet sie nicht mehr als festgefahren, bis du das aufhebst oder sie In Arbeit verlässt. Ihr Agent läuft weiter."
+  "tips.waitingOnPurpose.text": "Eine Karte in In Arbeit wartet auf ein ruhiges Zeitfenster oder auf eine Antwort? Rechtsklick, Als wartend markieren…, und den Grund angeben: Combwork meldet sie nicht mehr als festgefahren, bis du das aufhebst oder sie In Arbeit verlässt. Ihr Agent läuft weiter.",
+  "tips.perfFailures.title": "Abgelehnt heißt nicht kaputt",
+  "tips.perfFailures.text": "Leistung → Fehlschläge sortiert, was nicht erfolgreich war: echte Fehler in Rot, getrennt von Aufrufen, die eine Workflow-Regel abgelehnt hat, und falschen Aufrufen. Ablehnungen und falsche Aufrufe nach Grund zeigt, welche Regel oder Meldung am häufigsten kam: eine Tool-Beschreibung, die klarer werden sollte."
 }

@@ -40,6 +40,7 @@ import type { workspaceDb } from './boardStore'
 import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
 import { hooksMissingFor, onHooksHealthChanged } from './hooksHealth'
 import { teamPauseOf } from './teamPause'
+import { independentIn } from './independent'
 
 const log = createLogger('lanes')
 
@@ -100,6 +101,7 @@ const A = {
   reordered: agentMsg({ id: 'lane.tell.reordered', text: 'Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. cw_lane next names your next card.', note: "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)." }),
   itsBranch: agentMsg({ id: 'lane.reorder.itsBranch', text: 'its branch', note: "In place of {line}: where a put-back card's work stays, when its branch's name isn't known." }),
   putBackWhy: agentMsg({ id: 'lane.reorder.putBackWhy', text: 'Put back by a lane reorder applied now ({by})', note: "The reason recorded on a card put back by a reorder applied now (HI-1995), stored on the card's facts; {by} is who reordered." }),
+  independent: agentMsg({ id: 'lane.refused.independent', text: "{agent} is Independent: it takes no part in the workflow (its own role, or its connection launches it without Combwork's tools), so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-2670): an Independent agent is never a lane's builder or reviewer." }),
   generalist: agentMsg({ id: 'lane.refused.generalist', text: "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer." }),
   sharedItem: agentMsg({ id: 'lane.warn.sharedItem', text: "{card} is also in {builder}'s lane ({lane})", note: "One card of a start's list another builder's running lane lists too (HI-1821); {lane} is that lane's id. Joined with \"; \" into lane.warn.shared's {items}." }),
   shared: agentMsg({ id: 'lane.warn.shared', text: "Warning: {items}. A card belongs to one lane: ask the Assistant or the user to take it out of one of them (a builder's own cw_lane start never takes a card off its lane).", note: "cw_lane start's warning (HI-1821, HI-2169): cards on two lanes; {items} are lane.warn.sharedItem's." }),
@@ -506,6 +508,11 @@ function keptLaneFacts(ws: WorkspaceService): Map<number, { key: string; facts: 
   return c.cards
 }
 
+/** A running lane's agents that are Independent now (HI-2670), by id. */
+function outOfWorkflow(ws: WorkspaceService, l: LaneRecord): Set<string> {
+  return new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && !!ws.path && independentIn(ws, join(ws.path, l.project), a.id)).map((a) => a.id))
+}
+
 /** Lanes as they read now. */
 async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promise<LaneInfo[]> {
   const cards = await cardsOf(ws, lanes)
@@ -516,6 +523,8 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const atLimit = ws.path && rulesEnforced() ? roundLimitCards(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards)) : new Set<number>()
   // Their agents whose hooks aren't arriving (#1336): such a lane pauses.
   const deaf = (l: LaneRecord): Set<string> => new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && !!ws.path && hooksMissingFor(join(ws.path, l.project), a.id)).map((a) => a.id))
+  // And those Independent now (HI-2670): such a lane pauses too.
+  const out = (l: LaneRecord): Set<string> => outOfWorkflow(ws, l)
   // Each project's ruleset now, for the old rules marks (#1421): only read when a running lane recorded one.
   const recorded = lanes.filter((l) => running(l) && l.ruleset).map((l) => l.ruleset!)
   const current = recorded.length ? await rulesetsNow(ws) : new Map<string, string>()
@@ -525,7 +534,7 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
   const deps = await dueDepsOf(ws, lanes, cards)
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null)))
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined)))
 }
 
 /**
@@ -899,7 +908,10 @@ async function refuseGeneralist(ws: WorkspaceService, project: string, ids: read
   const cfg = await ws.projectConfig(join(ws.path, project)).catch(() => null)
   for (const id of ids) {
     const a = id && cfg ? projectAgents(cfg).find((x) => x.id === id) : undefined
-    if (a && agentWorkflowRole(a) === 'generalist') throw new LaneError(400, say(A.generalist, { agent: a.name }))
+    const role = a ? agentWorkflowRole(a) : null
+    if (a && role === 'generalist') throw new LaneError(400, say(A.generalist, { agent: a.name }))
+    // Independent (HI-2670): no part in the workflow at all.
+    if (a && role === 'independent') throw new LaneError(400, say(A.independent, { agent: a.name }))
   }
 }
 
@@ -1561,7 +1573,7 @@ export function laneNow(ws: WorkspaceService, by: { lane: string } | { card: num
   const atLimit = on ? roundLimitCards(ws, l.cards) : new Set<number>()
   const deaf = new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && hooksMissingFor(join(ws.path!, l.project), a.id)).map((a) => a.id))
   const owners = new Map([...cardOwnersNow(ws, l.cards)].map(([n, o]) => [n, o.lane]))
-  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners, null, !!teamPauseOf(ws))
+  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners, null, !!teamPauseOf(ws), null, outOfWorkflow(ws, l))
 }
 
 /** The running lane of a project agent (as builder, else as reviewer), or null. */
@@ -1802,6 +1814,11 @@ export function startLanes(): void {
     if (e.type === 'workspace-changed') {
       const ws = e.workspace ? openWorkspaces().find((w) => w.path && same(w.path, e.workspace!.path)) : undefined
       if (ws) changed(ws)
+      return
+    }
+    // A connection changed (HI-2670: its tools off makes its agents Independent): every open workspace's lanes look again.
+    if (e.type === 'connections-changed') {
+      openWorkspaces().forEach((w) => changed(w))
       return
     }
     // A project's workflow written (#1421): its lanes' old rules marks may have come or gone. Its team paused or resumed

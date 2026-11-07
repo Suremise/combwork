@@ -692,6 +692,9 @@
   "api.connection.controlOff": {
     "placeholders": {}
   },
+  "api.connection.launchArg": {
+    "placeholders": {}
+  },
   "api.connection.nameAccount": {
     "placeholders": {}
   },
@@ -981,6 +984,12 @@
       "note": "plain"
     }
   },
+  "api.done.launchedConnection": {
+    "placeholders": {
+      "connection": "plain",
+      "how": "plain"
+    }
+  },
   "api.done.messaged": {
     "placeholders": {
       "typed": "select",
@@ -1172,6 +1181,11 @@
   },
   "api.inbox.readArg": {
     "placeholders": {}
+  },
+  "api.intent.acceptArg": {
+    "placeholders": {
+      "max": "plain"
+    }
   },
   "api.intent.actionsArg": {
     "placeholders": {

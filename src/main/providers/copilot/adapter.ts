@@ -571,7 +571,7 @@ export class CopilotAdapter implements ProviderAdapter {
     const sources: MemorySource[] = [
       { provider: p, id: 'project', label: 'AGENTS.md', path: join(projectPath, 'AGENTS.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
       { provider: p, id: 'project-github', label: '.github/copilot-instructions.md', path: join(projectPath, '.github', 'copilot-instructions.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
-      { provider: p, id: 'user', label: userMemoryLabel('copilot-instructions.md'), path: join(copilotHome(), 'copilot-instructions.md'), kind: 'claude-md', exists: false }
+      { provider: p, id: 'user', label: userMemoryLabel('copilot-instructions.md'), path: join(copilotHome(), 'copilot-instructions.md'), kind: 'claude-md', exists: false, scope: 'user' }
     ]
     for (const s of sources) s.exists = existsSync(s.path)
     return sources

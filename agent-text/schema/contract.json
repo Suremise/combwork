@@ -121,10 +121,23 @@
   "contract.instructions.starter": {
     "placeholders": {}
   },
+  "contract.instructions.starterConnection": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
   "contract.instructions.starterFor": {
     "placeholders": {
       "provider": "plain"
     }
+  },
+  "contract.instructions.starterUser": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "contract.instructions.userHeading": {
+    "placeholders": {}
   },
   "contract.journal.rule": {
     "placeholders": {}

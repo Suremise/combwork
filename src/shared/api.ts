@@ -7,12 +7,14 @@ import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { ConnectionPatch, ConnectionsView } from './accounts'
+import type { LaunchImpact } from './launchPolicy'
 import type { ServerModelsRead } from './serverConnection'
 import type { MovedNotice } from './connectionDefaults'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
   Connection,
+  ConnectionLaunch,
   CopyView,
   SlotTestOp,
   SlotOptions,
@@ -96,6 +98,7 @@ import type {
   LaneStartResult,
   ModelPrice,
   MemorySource,
+  AssistantMemory,
   NoteFile,
   PlanUsage,
   ProjectConfig,
@@ -650,7 +653,10 @@ export interface CombworkRequests {
   'agents:memory': () => { running: { agents: number; bytes: number } | null; total: number; free: number }
   /** Changing provider clears the agent's model, effort and mode, and its session to resume (conversations can't move between providers). */
   /** Changes an agent's name and settings; for the Combwork Assistant's home, its settings for this workspace (mode too). */
-  'agents:update': (projectPath: string, agentId: string, patch: AgentPatch) => AgentDef
+  /** `confirmed` (HI-2670): agents:impact's fingerprint, when the change takes the agent off its lanes or cards. */
+  'agents:update': (projectPath: string, agentId: string, patch: AgentPatch, confirmed?: string | null) => AgentDef
+  /** What a change of an agent (its connection or role) would take out of the workflow (HI-2670); null: nothing. */
+  'agents:impact': (projectPath: string, agentId: string, patch: AgentPatch) => LaunchImpact | null
   /**
    * Removes an agent (its session must be stopped). deleteWorktree also removes its worktree and branch; 'merged-clean'
    * only when they are fully merged into the main branch (`mergedInto`, the one the user was shown) and clean then,
@@ -982,6 +988,8 @@ export interface CombworkRequests {
   'file:write': (path: string, content: string, expected?: string) => void
 
   'memory:list': (projectPath: string) => MemorySource[]
+  /** The Assistant's own memory (HI-2666): what `provider` (the one it runs on) saved for the window's workspace's folder. */
+  'assistant:memory': (provider: ProviderId) => AssistantMemory
   /** Whether the given providers all read the project's AGENTS.md (directly or through an import). */
   'memory:instructionsShared': (projectPath: string, providers: ProviderId[]) => boolean
   /** Makes the given providers share AGENTS.md; returns the files written. */
@@ -1118,6 +1126,13 @@ export interface CombworkRequests {
   'connection:add': (account: string, input: ConnectionPatch & { name: string }) => Connection
   /** Changes a connection's name or values (each null leaves it to the CLI); running agents on it are offered Restart or Switch Now. */
   'connection:update': (id: string, patch: ConnectionPatch) => Connection
+  /**
+   * What saving these launch settings (HI-2670) would take out of the workflow: agents on running lanes or holding cards
+   * in Doing or Review, made Independent by its Combwork tools going off. Null: nothing to confirm.
+   */
+  'connection:launchImpact': (id: string, launch: ConnectionLaunch | null) => LaunchImpact | null
+  /** Saves a connection's launch settings (HI-2670); `confirmed`, launchImpact's fingerprint, when it has one. */
+  'connection:setLaunch': (id: string, launch: ConnectionLaunch | null, confirmed?: string | null) => Connection
   /** A copy of a connection, after it. */
   'connection:duplicate': (id: string) => Connection
   /** Removes a connection; refused while an agent or the Assistant in an open workspace uses it, naming them. */

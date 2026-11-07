@@ -1117,8 +1117,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const p = this.id
     // The user's own file: each connection's on in the workspace (HI-1755: each is its own home), else ~/.claude's.
     const users: MemorySource[] = homes
-      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('CLAUDE.md', h.name), path: join(h.home, 'CLAUDE.md'), kind: 'claude-md', exists: false })) // i18n-ignore: a file's name
-      : [{ provider: p, id: 'user', label: userMemoryLabel('CLAUDE.md'), path: join(claudeHome(), 'CLAUDE.md'), kind: 'claude-md', exists: false }] // i18n-ignore: a file's name
+      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('CLAUDE.md', h.name), path: join(h.home, 'CLAUDE.md'), kind: 'claude-md', exists: false, scope: { connection: h.name } })) // i18n-ignore: a file's name
+      : [{ provider: p, id: 'user', label: userMemoryLabel('CLAUDE.md'), path: join(claudeHome(), 'CLAUDE.md'), kind: 'claude-md', exists: false, scope: 'user' }] // i18n-ignore: a file's name
     const sources: MemorySource[] = [
       { provider: p, id: 'project', label: 'CLAUDE.md', path: join(projectPath, 'CLAUDE.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
       { provider: p, id: 'project-dot', label: '.claude/CLAUDE.md', path: join(projectPath, '.claude', 'CLAUDE.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
@@ -1126,15 +1126,22 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       ...users
     ]
     for (const s of sources) s.exists = existsSync(s.path)
-    const dir = await this.transcriptDir(projectPath)
-    const memDir = dir ? join(dir, 'memory') : null
-    if (memDir && (await isDir(memDir))) {
-      const files = (await readdir(memDir)).filter((f) => f.endsWith('.md')).sort((a, b) => (a === 'MEMORY.md' ? -1 : b === 'MEMORY.md' ? 1 : a.localeCompare(b)))
-      for (const f of files) {
-        sources.push({ provider: p, id: `auto:${f}`, label: f, path: join(memDir, f), kind: 'auto-memory', exists: true })
-      }
-    }
+    sources.push(...(await this.autoMemory(projectPath)).files)
     return sources
+  }
+
+  /**
+   * Claude Code's auto memory for a folder: `memory/` in the folder its transcripts are under (`transcriptDir`, which
+   * a connection's home reaches through its junction, HI-1755), else where Claude Code would make it; its `.md` files,
+   * MEMORY.md (the index) first. A project's Memory tab lists them, and the Assistant's memory (HI-2666, its sessions run
+   * in the workspace's folder).
+   */
+  async autoMemory(folder: string): Promise<{ folder: string; files: MemorySource[] }> {
+    const dir = await this.transcriptDir(folder)
+    const memDir = join(dir ?? join(claudeHome(), 'projects', encodeProjectPath(claudeSpelling(folder))), 'memory')
+    if (!(await isDir(memDir))) return { folder: memDir, files: [] }
+    const names = (await readdir(memDir)).filter((f) => f.endsWith('.md')).sort((a, b) => (a === 'MEMORY.md' ? -1 : b === 'MEMORY.md' ? 1 : a.localeCompare(b)))
+    return { folder: memDir, files: names.map((f) => ({ provider: this.id, id: `auto:${f}`, label: f, path: join(memDir, f), kind: 'auto-memory', exists: true })) }
   }
 
   fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean {

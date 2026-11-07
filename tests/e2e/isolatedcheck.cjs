@@ -302,9 +302,9 @@ const starts = () => (fs.existsSync(started) ? fs.readFileSync(started, 'utf8').
       const [h, c] = [await headers(), await cells()]
       // innerText as shown: the headers are upper case.
       const col = (name) => h.findIndex((x) => x.toLowerCase().startsWith(name.toLowerCase()))
-      return c.length && col('Waits') >= 0 ? { failed: c[col('Failed')], waits: c[col('Waits')] } : null
+      return c.length && col('Waits') >= 0 ? { failed: [col('Refused'), col('Wrong calls'), col('Errors')].map((i) => (i >= 0 ? c[i] : '?')).join(' '), waits: c[col('Waits')] } : null
     }, HUNG_MS)
-    check("…Performance's Agent API table: resolve has no failures, its waits counted apart", shown?.failed === '—' && /^[1-9]/.test(shown?.waits ?? ''), JSON.stringify(shown))
+    check("…Performance's Agent API table: resolve has no failures, its waits counted apart", shown?.failed === '— — —' && /^[1-9]/.test(shown?.waits ?? ''), JSON.stringify(shown))
     check('…and the chart has Waits in its legend', (await page.locator('.performance-page:visible .stack-legend', { hasText: 'Waits' }).count()) === 1)
     await page.mouse.move(5, 5)
     await page.locator('.performance-page:visible').screenshot({ path: path.join(shots, 'isolatedcheck-3-performance-waits.png') })
