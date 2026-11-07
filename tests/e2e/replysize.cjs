@@ -80,6 +80,16 @@ const prose = (seed, n) => {
   await lib.addAgent(inv, alpha, { name: 'Tester', workflowRole: 'either' })
   await lib.addAgent(inv, path.join(ws, 'beta'), { name: 'Builder' })
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
+  /**
+   * A workflow change restarts alpha's running agents whose tools it changes (HI-2694), with a new token each: before a
+   * call with an agent's own token, each is running again on the list it would launch with now (asked: 'same').
+   */
+  const toolsSettled = async () => {
+    for (const s of (await inv('session:live')).filter((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.status !== 'stopped')) {
+      const ok = await until(async () => (await inv('session:restartForTools', alpha, s.agentId, 'ifIdle')) === 'same' && ['ready', 'finished', 'watching'].includes((await live(alpha, s.agentId))?.status), HUNG_MS)
+      check(`a workflow change: ${s.agentId} running on its tools now`, !!ok, JSON.stringify(await live(alpha, s.agentId)))
+    }
+  }
   await inv('session:start', alpha, { agentId: coder.id })
   await until(async () => (await live(alpha, coder.id))?.status === 'ready', HUNG_MS)
   for (let i = 1; i <= 4; i++) {
@@ -328,12 +338,14 @@ const prose = (seed, n) => {
   {
     const rules = await inv('workflow:form', alpha)
     await inv('workflow:setOptions', alpha, { preset: rules.preset, options: { ...rules.own, preChecks: ['quick'], commands: { ...rules.own.commands, quick: 'node check.js' } } })
+    await toolsSettled()
     try {
       const checked = JSON.parse(tool('cw_read_task', { number: todo[0] }).text)
       measure('cw_read_task (checks fields)', JSON.stringify({ checks: checked.checks, checksHint: checked.checksHint }), 200)
       check('…and its checks where they name one: the names as data, a hint with <name>', JSON.stringify(checked.checks) === '["quick"]' && /^before review: cw-progress --check <name> --card "[A-Z]+-\d+".*Budget, other checks: project notes; work-on-card$/.test(checked.checksHint ?? ''), JSON.stringify([checked.checks, checked.checksHint]))
     } finally {
       await inv('workflow:setOptions', alpha, { preset: rules.preset, options: rules.own })
+      await toolsSettled()
     }
   }
   const latest = JSON.parse(measure('cw_read_task (latestComment)', tool('cw_read_task', { number: target, latestComment: true }), 1500))
@@ -817,10 +829,12 @@ const prose = (seed, n) => {
   console.log('\n--- Performance metrics')
   const since = new Date(Date.now() - 3600_000).toISOString()
   const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.token && l.cwd.toLowerCase() === alpha.toLowerCase())
-  const coderToken = launch?.token
-  check("metrics: the agent's own token is known", !!coderToken)
+  // Its agent's latest launch's token, read at each call: a workflow change restarts it with a new one (HI-2694).
+  const launchAgent = launch?.env?.CW_AGENT
+  const latestToken = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.token && l.env?.CW_AGENT === launchAgent && l.cwd.toLowerCase() === alpha.toLowerCase())?.token
+  check("metrics: the agent's own token is known", !!latestToken())
   const asCoder = (method, request) =>
-    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(coderToken), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
+    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(latestToken()), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
   const unicode = (await api('POST', '/v1/tasks', { title: 'Ünïcödé 日本語 🐝 "quoted" \\ back', project: 'alpha', description: 'Ελληνικά — ✓ — \n new line' })).body.number
   const expected = {}
   for (const [name, args] of [['cw_list_tasks', {}], ['cw_list_tasks', { details: true }], ['cw_read_task', { number: unicode }], ['cw_read_task', { number: 999999 }]]) {
@@ -868,7 +882,7 @@ const prose = (seed, n) => {
   check("metrics: the bridge's own reports aren't counted as API traffic", !routes.includes('/v1/metrics/mcp'))
   check("metrics: an agent's API calls are its project's", (alphaPart?.api ?? []).some((sr) => sr.role === 'agent' && sr.route === '/v1/tasks/:n'))
   // A project agent sees its own project only.
-  const coderApi = (p) => api('GET', p, undefined, coderToken)
+  const coderApi = (p) => api('GET', p, undefined, latestToken())
   check("metrics: an agent can't read the workspace's", (await coderApi('/v1/metrics?scope=workspace')).status === 403)
   const own = await coderApi('/v1/metrics?scope=project&project=alpha')
   check('metrics: an agent reads its own project only', own.status === 200 && Object.keys(own.body.projects).join() === 'alpha' && !own.body.workspace && !own.body.app, JSON.stringify(Object.keys(own.body ?? {})))
@@ -906,15 +920,15 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   check("inbox: the Assistant's ack with read: the ack line, then the read", measure('cw_inbox (ack, read)', tool('cw_inbox', { ack: ['m99'], read: true }, 'assistant'), 200) === 'Nothing acked. Not in your inbox: m99.\nNothing new.', texts['cw_inbox (ack, read)'])
   // A delivery the token's own agent has received (alpha's latest launch: the agent a card was started on, its task):
   // read with its token, it is that agent's to ack, whoever it is.
-  const firstRead = await api('POST', '/v1/inbox', {}, coderToken)
+  const firstRead = await api('POST', '/v1/inbox', {}, latestToken())
   check('inbox: a read with the agent\'s own token: { items, unacked }', firstRead.status === 200 && Object.keys(firstRead.body).filter((k) => k !== 'names').sort().join() === 'items,unacked', firstRead.text)
   const coderMessage = [...(firstRead.body?.unacked ?? []), ...(firstRead.body?.items ?? []).flatMap((i) => i.ids)][0]
   check('…with one received, its to ack', !!coderMessage, firstRead.text)
-  const both = await api('POST', '/v1/inbox', { ack: [coderMessage, 'm99999'], read: true }, coderToken)
+  const both = await api('POST', '/v1/inbox', { ack: [coderMessage, 'm99999'], read: true }, latestToken())
   check("inbox: ack with read, with the agent's own token: acked, an id not its own unknown, then the read", both.status === 200 && both.body.acked?.join() === coderMessage && both.body.unknown?.join() === 'm99999' && Array.isArray(both.body.unread) && Array.isArray(both.body.items) && Array.isArray(both.body.unacked) && !both.body.unacked.includes(coderMessage), both.text)
-  const ackOnly = await api('POST', '/v1/inbox', { ack: [coderMessage] }, coderToken)
+  const ackOnly = await api('POST', '/v1/inbox', { ack: [coderMessage] }, latestToken())
   check('inbox: ack only lists nothing: { acked, unknown, unread }', ackOnly.status === 200 && Object.keys(ackOnly.body).sort().join() === 'acked,unknown,unread' && ackOnly.body.acked.join() === coderMessage, ackOnly.text)
-  check("inbox: read isn't a flag of any kind", (await api('POST', '/v1/inbox', { ack: [coderMessage], read: 'yes' }, coderToken)).status === 400)
+  check("inbox: read isn't a flag of any kind", (await api('POST', '/v1/inbox', { ack: [coderMessage], read: 'yes' }, latestToken())).status === 400)
   check("inbox: the workspace's token has no inbox, combined or not", (await api('POST', '/v1/inbox', { ack: [coderMessage], read: true })).status === 400 && (await api('POST', '/v1/inbox', {})).status === 400)
   const coderBoth = asCoder('tools/call', { name: 'cw_inbox', arguments: { ack: [coderMessage], read: true } }).content[0].text
   check("inbox: the agent's tool, ack with read: the ack line, then the read's", coderBoth.split('\n')[0] === `Acked ${coderMessage}.` && /^(Nothing new\.|\d+ new:)/.test(coderBoth.split('\n')[1] ?? '') && coderBoth.length <= 2000, coderBoth)
@@ -1006,11 +1020,13 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   // the rules it started under).
   const alphaRules = await inv('workflow:form', alpha)
   await inv('workflow:setOptions', alpha, { preset: alphaRules.preset, options: { ...alphaRules.own, review: 'agent', noSelfReview: true } })
+  await toolsSettled()
   const builtCard = todo[44]
   const builtStart = intent('cw_start_card', { card: `#${builtCard}` }).text
   const builtFolder = builtStart.match(/folder: ([^;]+);/)?.[1]
   check('a card started for the unsubmitted watch, with its folder', !!builtFolder && fs.existsSync(builtFolder), builtStart)
   await inv('workflow:setOptions', alpha, { preset: alphaRules.preset, options: alphaRules.own })
+  await toolsSettled()
   const builtCommit = (file) => {
     fs.writeFileSync(path.join(builtFolder, file), `${file}\n`)
     lib.git(builtFolder, ['add', file])
