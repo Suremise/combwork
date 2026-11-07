@@ -225,6 +225,43 @@ describe("agy's hooks through sessions (s56)", () => {
     }
   })
 
+  it("status reports, however they queue, end as the last valid one says: the prompt showing is derived from it (HR2's round 3, the Assistant's note)", async () => {
+    const ordered = sessions as unknown as { inHookOrder: (key: string, fn: () => Promise<void> | void) => Promise<void> }
+    const PENDING = { agent_state: 'tool_use', tool_confirmation_pending: true }
+    const WORKING = { agent_state: 'working', tool_confirmation_pending: false }
+    // Another conversation's report (not the one the launch runs): stale, dropped in order.
+    const OTHER = { agent_state: 'working', conversation_id: NEW, session_id: NEW }
+    const cases: [Record<string, unknown>[], string][] = [
+      [[PENDING, WORKING], 'working'],
+      [[WORKING, PENDING], 'waiting'],
+      [[PENDING, PENDING], 'waiting'],
+      [[PENDING, OTHER], 'waiting'],
+      [[PENDING, OTHER, WORKING], 'working'],
+      [[WORKING, OTHER, PENDING, WORKING, PENDING], 'waiting']
+    ]
+    for (const [reports, want] of cases) {
+      const { st } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
+      await hook(st, 'PreInvocation', zero(MAIN, 1))
+      // Held: every report arrives before any is applied.
+      let release!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      const held = run(() => ordered.inHookOrder(st.runId, () => gate))
+      for (const r of reports) await run(() => sessions.handleStatusLine(st.runId, { conversation_id: MAIN, session_id: MAIN, model: null, ...r }))
+      release()
+      await held
+      await run(() => ordered.inHookOrder(st.runId, () => undefined))
+      expect(st.status, JSON.stringify(reports)).toBe(want)
+      // The same, applied one at a time as they come: the same end.
+      const { st: one } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
+      await hook(one, 'PreInvocation', zero(MAIN, 1))
+      for (const r of reports) {
+        await run(() => sessions.handleStatusLine(one.runId, { conversation_id: MAIN, session_id: MAIN, model: null, ...r }))
+        await run(() => ordered.inHookOrder(one.runId, () => undefined))
+      }
+      expect(one.status, JSON.stringify(reports)).toBe(want)
+    }
+  })
+
   it("the user's /new: its prompt moves the launch to it; the old conversation's late events carry no notice", async () => {
     const { st } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl'), [NEW]: fixture('run-new-1.5.0.jsonl') })
     // The agent as its project has it (the session it moves to is recorded under it).

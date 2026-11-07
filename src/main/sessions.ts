@@ -5935,35 +5935,31 @@ class SessionManager {
     // launch's own only, about the conversation it runs, applied in hook order and only to a turn that runs then.
     if ((l.adapter.statusLineAsk || l.adapter.statusLineIdle) && runId === l.state.runId) {
       const id = liveId(l.state.projectPath, l.state.agentId)
-      const own = !conv || !l.state.sessionId || conv === l.state.sessionId
-      const ask = own ? (l.adapter.statusLineAsk?.(body) ?? null) : null
-      const idle = own && !!l.adapter.statusLineIdle?.(body)
-      l.statusIdle = idle
+      const ask = l.adapter.statusLineAsk?.(body) ?? null
+      const idle = !!l.adapter.statusLineIdle?.(body)
       // Anything but idle is news of the turn going on: no silent end stands.
       if (!idle) this.cancelIdleGrace(l)
-      if (ask || l.statusAsk || idle) {
-        // About the turn and session as the report arrived (HR1 and HR2 on HI-2545): hooks queued before it may begin
-        // another turn by the time it is applied, and an old report must never ask, answer or end that one, nor change
-        // what the running turn's own prompt is known as.
-        const turn = l.ledger?.active?.state === 'running' ? l.ledger.active.id : null
-        const session = l.state.sessionId
-        void this.inHookOrder(l.state.runId, () => {
-          const now = l.ledger?.active
-          if (!turn || !session || this.live.get(id) !== l || l.state.sessionId !== session || now?.id !== turn || now.state !== 'running') return
-          // Its prompt, once as it begins; gone without a tool's start or end (answered, or cancelled): no longer asked.
-          const asked = l.statusAsk?.turn === turn && l.statusAsk.session === session
-          // One known of an earlier turn or session is over: forgotten.
-          if (l.statusAsk && !asked) l.statusAsk = undefined
-          if (ask && !asked) {
-            l.statusAsk = { turn, session }
-            this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
-          } else if (!ask && asked) {
-            l.statusAsk = undefined
-            this.carryOut(id, l, hookStep({ kind: 'toolEnd' }, this.statusInput(l)), 'statusline', { kind: 'toolEnd' })
-          }
-          if (idle && l.statusIdle && !l.idleGrace) this.startIdleGrace(id, l, turn)
-        })
-      }
+      // Derived, never tracked at the door (the Assistant's note on HI-2545, after HR1's and HR2's rounds): every report
+      // is queued in hook order as it comes, unfiltered, and only there validated: still this launch, about the
+      // conversation it runs, and the turn running as the report arrived still the running one. The prompt showing is
+      // then the latest valid report's alone, compared with what the one before said: false to true asks once, true to
+      // false answers it. So reports applied in any arrival order end as the last valid one says.
+      const turn = l.ledger?.active?.state === 'running' ? l.ledger.active.id : null
+      const session = l.state.sessionId
+      void this.inHookOrder(l.state.runId, () => {
+        const now = l.ledger?.active
+        if (this.live.get(id) !== l || !turn || !session || l.state.sessionId !== session || (conv && conv !== session) || now?.id !== turn || now.state !== 'running') return
+        l.statusIdle = idle
+        const was = l.statusAsk?.turn === turn && l.statusAsk.session === session
+        if (ask && !was) {
+          l.statusAsk = { turn, session }
+          this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
+        } else if (!ask && was) {
+          l.statusAsk = undefined
+          this.carryOut(id, l, hookStep({ kind: 'toolEnd' }, this.statusInput(l)), 'statusline', { kind: 'toolEnd' })
+        } else if (!ask) l.statusAsk = undefined
+        if (idle && !l.idleGrace) this.startIdleGrace(id, l, turn)
+      })
     }
   }
 
