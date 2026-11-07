@@ -657,9 +657,50 @@ function transcriptText(file) {
 // the run context's environment (combworkEnv): without one, Playwright would pass on the suite's own.
 const apps = new Set()
 const launchElectron = _electron.launch.bind(_electron)
+
+// The user's own Antigravity CLI home (HI-2698): agy reads its home from USERPROFILE and has no test-home variable, so a
+// test Combwork that ran agy in the user's profile would write there (its logs, conversation index, onboarding state). It is
+// listed (names, sizes and times; never read) when a suite starts its first Combwork, and again as the suite ends: any
+// change fails the suite. (agy run by hand, or by another lane's Combwork without HI-2698, meanwhile would too: say so.)
+const AGY_USER_HOME = path.join(require('os').homedir(), '.gemini', 'antigravity-cli')
+let agyHomeBefore = null
+function agyHomeListing() {
+  const out = []
+  const walk = (dir) => {
+    let names = []
+    try {
+      names = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const d of names) {
+      const p = path.join(dir, d.name)
+      if (d.isDirectory()) walk(p)
+      else {
+        try {
+          const s = fs.statSync(p)
+          out.push(`${path.relative(AGY_USER_HOME, p)}|${s.size}|${s.mtimeMs}`)
+        } catch {}
+      }
+    }
+  }
+  walk(AGY_USER_HOME)
+  return out.sort()
+}
+process.on('exit', () => {
+  if (!agyHomeBefore) return
+  const after = agyHomeListing()
+  const before = new Set(agyHomeBefore)
+  const now = new Set(after)
+  const changed = [...after.filter((x) => !before.has(x)).map((x) => `+ ${x.split('|')[0]}`), ...agyHomeBefore.filter((x) => !now.has(x)).map((x) => `- ${x.split('|')[0]}`)]
+  if (!changed.length) return
+  console.log(`FAIL the user's own Antigravity home is untouched (HI-2698: agy ran in the user's profile; or agy was run by hand, or by a Combwork without HI-2698, meanwhile): ${changed.slice(0, 8).join(', ')}`)
+  process.exitCode = 1
+})
 _electron.launch = async (...args) => {
   const env = args[0]?.env
   if (!isCombworkEnv(env)) throw new Error("Start a test Combwork with lib.combworkEnv({ CW_USER_DATA, … }) as its env (tests/e2e/runContext.cjs), never the suite's own environment")
+  if (!agyHomeBefore) agyHomeBefore = agyHomeListing()
   // The CLI homes, test folders (#382, #452): Combwork looks for the CLIs when it starts, and their sign-in checks read these.
   for (const k of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR']) {
     if (!env[k]) throw new Error(`A test Combwork needs ${k} (combworkEnv gives an empty one of the suite's; a suite may give a test home, never none): without it the CLI reads the user's own home (#382)`)

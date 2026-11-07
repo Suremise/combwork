@@ -60,6 +60,10 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const own = accounts.find((a) => a.id === 'antigravity')
   check("Antigravity's PC-wide account is its own", !!own && own.provider === 'antigravity' && own.home === 'cli', JSON.stringify(accounts.map((a) => [a.id, a.provider, a.home])))
 
+  // Its checks (HI-2698): agy's sign-in check ran in Combwork's check profile, under this test copy's data, never the user's.
+  const checks = await until(async () => (entries('models').length ? entries('models') : null), HUNG_MS)
+  check("agy's checks run in Combwork's check profile, never the user's own", !!checks && checks.every((m) => /antigravity[\\/]check$/i.test(m.env?.USERPROFILE ?? '') && m.env.USERPROFILE.toLowerCase().startsWith(userData.toLowerCase())), JSON.stringify(checks?.map((m) => m.env?.USERPROFILE)))
+
   const gem = await lib.addAgent(inv, alpha, { name: 'Gem', provider: 'antigravity' })
   check('an agent is added on Antigravity', gem?.provider === 'antigravity', JSON.stringify(gem))
 
