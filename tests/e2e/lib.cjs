@@ -1485,14 +1485,14 @@ function gitEnv(vars = {}) {
  */
 /**
  * Sets an agent's connection's launch settings (HI-2670: Combwork's guidance and its overrides of the CLI are each
- * connection's now, no longer Settings → Advanced's), as its Launch Settings dialog saves them: `launch` whole, e.g.
+ * connection's now, no longer Settings → Advanced's), as its Launch Settings dialog saves them: `settings` whole, e.g.
  * `{ overrides: { terminalTitle: false } }`, `{ guidance: false }`, or `{}` for everything on. Returns the connection's id.
  */
-async function setAgentLaunch(inv, projectPath, agentId, launch) {
+async function setAgentLaunch(inv, projectPath, agentId, settings) {
   const cfg = JSON.parse(fs.readFileSync(path.join(projectPath, '.combwork', 'project.json'), 'utf8'))
   const id = (cfg.agents ?? []).find((a) => a.id === agentId)?.connection
   if (!id) throw new Error(`agent ${agentId} has no connection in ${projectPath}`)
-  await inv('connection:setLaunch', id, launch, null)
+  await inv('connection:setLaunch', id, settings, null)
   return id
 }
 
