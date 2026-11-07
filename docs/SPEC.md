@@ -4847,6 +4847,22 @@ repeating them (#533) [note §8].
   kept for their return); Add Agent and Agent Settings then offer only Independent, the other roles greyed out with "This
   connection launches without Combwork's tools". It can be chosen on any connection too. The Agent API and the
   Combwork tools' enum take it.
+- **Tools by side** [HI-2664, Darren's 7 Nov decisions (02:25 and 02:30, the card's): "Changing role should maybe require a
+  restart of the session to load different tools"] **Built**: a project agent's combwork server is told its side,
+  `CW_SIDE` in its env (`effective()`): `toolSideOf(launchWorkflow(role, laneParts))`, builder, reviewer or `both`
+  (either, generalist, a lane giving it both parts). `cw-mcp.ts` leaves out `hiddenForSide(side)`
+  (`shared/assistantTools.ts`): a builder `REVIEWER_ONLY_TOOLS` (cw_start_review, cw_verdict, cw_request_builder,
+  cw_focused_skip), a reviewer `BUILDER_ONLY_TOOLS` (cw_start_card, cw_submit, cw_put_back, cw_declare_paths,
+  cw_cannot_within_rules, cw_merge_slot, cw_report_merge, cw_reorder_tasks, cw_update_tasks). The Assistant is offered
+  none of `WORKER_ONLY_TOOLS` (the intent tools but cw_ask_user, and cw_focused_skip); it keeps cw_release_slot and its
+  Control-level tools. Measured on the bridge (replysize): both sides 38 tools, 24.7 KB; builder 34, 22.8 KB; reviewer 29,
+  19.7 KB; the Assistant 50, 37.9 KB (was 41.5). The side is in the launch signature, so a change shows "restart needed";
+  `sessions.restartForSide` restarts through `switchAtSafePoint` (same conversation): after a role saved in Agent
+  Settings, `ifIdle` restarts an idle agent at once and answers `busy` for a working one, and the window asks first
+  (Restart When Its Turn Is Over → `atSafePoint`; Later: its old tools until it restarts). A `lanes-changed` event
+  restarts, at its turn's end, a running agent the change gives tools it lacks (`widenOnly`); one only losing tools
+  carries on, its calls refused as before. No session-contract sentence. Hiding tools a project's workflow settings make
+  unusable, with live list updates, is HI-2694 (split off, Darren 7 Nov).
 - **Templates v2 and Combwork's own** [#1436] **Built [#1436]**: `TEMPLATE_VERSION` 2 (`shared/templates.ts`). Each agent
   `role: WorkflowRole` (none given: #1430's guess) and an optional `note` (the agent's free text); `worktree` is gone,
   with the plan's worktree types (`worktrees`, `oldWorktrees`, `mergedInto`, `setup`), the load's removal of old

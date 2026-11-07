@@ -1387,6 +1387,22 @@
     "defaultMessage": "Worktree on <code>{branch}</code> (from {base})",
     "description": "Where an agent works (Agent Settings): its worktree's branch ({branch}) and the branch it started from ({base}). Keep the <code> tags."
   },
+  "agents.side.later": {
+    "defaultMessage": "Later",
+    "description": "Button (HI-2664): the agent keeps its old tools until it restarts."
+  },
+  "agents.side.restartMessage": {
+    "defaultMessage": "{agent} is working. Its new role's tools load when it restarts; it carries on in the same conversation.",
+    "description": "The question after an agent's role was changed while it is working (HI-2664). {agent} is its name."
+  },
+  "agents.side.restartTitle": {
+    "defaultMessage": "Restart {agent} for its new role?",
+    "description": "Title of the question after an agent's workflow role was changed while it is working (HI-2664): it needs a restart to get its new role's tools. {agent} is its name."
+  },
+  "agents.side.restartWhenDone": {
+    "defaultMessage": "Restart When Its Turn Is Over",
+    "description": "Button (HI-2664): the agent restarts once its turn is over, in the same conversation, with its new role's tools."
+  },
   "agents.start.exited": {
     "defaultMessage": "{cli} exited with code {code}.",
     "description": "Why an agent couldn't start, when its CLI ({cli}) said nothing: it exited with an exit code ({code}, a number)."

@@ -366,6 +366,7 @@ export const SUITES = [
   { name: 'tips' },
   { name: 'tipwindows' },
   { name: 'tooltips' },
+  { name: 'toolsides' },
   { name: 'transcript' },
   { name: 'turnledger' },
   { name: 'unexpectedclose' },
