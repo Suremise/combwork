@@ -21,7 +21,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
-import { assistantTools, isReservedServerName, TOOLS_SERVER } from '../shared/assistantTools'
+import { assistantTools, isReservedServerName, toolSideOf, TOOLS_SERVER } from '../shared/assistantTools'
 import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
@@ -1725,6 +1725,12 @@ class SessionManager {
     const combwork = this.combworkMcp(projectPath, agent?.id)
     // Its instructions name only the skills the session gets (#1431).
     if (combwork) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...combwork, env: { ...combwork.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : combwork
+    // A project agent's side of the workflow (HI-2664): its tools follow it. Part of the signature, so a change of its role
+    // or of its part in a running lane asks for a restart (switchSide restarts it at a safe point).
+    if (mcpServers[TOOLS_SERVER] && !assistant && forAgent) {
+      const side = toolSideOf(launchWorkflow(agentWorkflowRole(forAgent), await this.laneParts(projectPath, forAgent.id).catch(() => [])))
+      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side } }
+    }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
