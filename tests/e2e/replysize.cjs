@@ -1085,8 +1085,9 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   await inv('connections:setOn', max.id, true)
   const linked = measure('cw_add_agent (connection)', tool('cw_add_agent', { project: 'beta', name: 'Linked', connection: 'Max' }, 'assistant'), 400)
   check('a new agent on a connection: its line names it', /^Added Linked \(id a-\w+\) to beta: claude-code on Max, in the project folder, stopped\.$/.test(linked), linked)
-  // The providers' JSON (about 9,200 characters) with a connection on here: about 60 more.
-  measure('cw_list_providers (connections)', tool('cw_list_providers', {}, 'assistant'), 9500)
+  // The providers' JSON with a connection on here: about 11,430 characters since Antigravity (HI-2544) made it four CLIs
+  // (three were about 9,200; HI-2696 raised the limit for that, the entry's fields unchanged).
+  measure('cw_list_providers (connections)', tool('cw_list_providers', {}, 'assistant'), 12000)
   // beta's status with Linked's connection and each agent's connection fields (about 3,040 characters).
   measure('cw_project_status (connections)', tool('cw_project_status', { project: 'beta' }, 'assistant'), 3500)
   await inv('connections:setOn', max.id, false)
