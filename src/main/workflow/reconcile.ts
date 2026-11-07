@@ -458,7 +458,7 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
     if (!sameCycle(w, s)) return
     // HI-2709: never while a card it depends on isn't Done, read in this write (a dependency added while containment was
     // read counts): nothing written; it waits, as the queue does, and is looked at again once they are Done.
-    if (wf.queueWaitingOn(w.card.id, w.tx).length) return
+    if (wf.closeWaitsFor(w).length) return
     // Unique per cycle: two Combworks observing the same merge write one `Integrated` (§16.17).
     const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } }) // i18n-ignore: a fact's kind and codes, not text
     if (f) w.written.push(f as Fact)

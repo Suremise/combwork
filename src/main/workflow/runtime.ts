@@ -1210,8 +1210,18 @@ export class Workflow {
    */
   blockersNotDone(w: Write): GuardRefusal | null {
     if (!this.enforced()) return null
-    const waits = this.queueWaitingOn(w.card.id, w.tx)
+    const waits = this.closeWaitsFor(w)
     return waits.length ? ({ rule: 'merge.waitsForBlockers', values: { card: w.card.key, waitsFor: waits.join(', ') } } as GuardRefusal) : null
+  }
+
+  /**
+   * HI-2709: the choke point of every write that records a card as merged (`Integrated`): what it still waits for, read
+   * in that write (empty: it may close). The queue's integrated(), reconciliation's integratedOutside and an agent's merge
+   * report all ask it. `afterAdvance`: the queue's own record of an advance it made, which only records what the target
+   * now has; its authority was IntegrationStarted's write, which asked this then.
+   */
+  closeWaitsFor(w: Write, opts: { afterAdvance?: boolean } = {}): string[] {
+    return opts.afterAdvance ? [] : this.queueWaitingOn(w.card.id, w.tx)
   }
 
   /**

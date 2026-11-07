@@ -951,7 +951,7 @@ export class MergeQueue {
       // HI-2709: the advance's authority over the card's blockers (SPEC §16.9.1): its blocked-by list and their stages as
       // this write reads them. One that isn't Done (or can't be read) holds it: nothing begins, the entry stays open, and
       // it is tested again once unblocked. A dependency added after this write is refused (tasks.ts: too late to hold it).
-      if (this.wf.queueWaitingOn(card.id, w.tx).length) return 'waiting' as const
+      if (this.wf.closeWaitsFor(w).length) return 'waiting' as const
       // HI-2660: the focused tests' review proof read again here, in the lock, on the facts as they are now: one that no
       // longer stands sends the entry round again, whose checks then return the card for its proof (`noProof`).
       if (focusedProofGone(s, r.options.commands, proofReviewers(this.wf.store.card(card.id).reviewer, s), entry, data.result).length) return 'proofGone' as const
@@ -1045,7 +1045,7 @@ export class MergeQueue {
         if (!isUnknown(found) && found) {
           // A forward merge (HI-2679) has no line to reconcile: its attempt's own frozen commit, proven in the target just
           // now, is what is recorded (never a newer source head's).
-          if (s.forward) await this.integrated(card, entry, revision, target, head, 'merge', 'outside')
+          if (s.forward) await this.integrated(card, entry, revision, target, head, 'merge', 'outside') // no advance: the blocker rule applies
           else await reconcile(this.wf, card)
           // HI-2709: not closed while a dependency added meanwhile isn't Done (reconcile writes nothing then): it waits.
           const held = this.wf.state(card).stage !== 'done' ? this.wf.queueWaitingOn(card.id) : []
@@ -1132,7 +1132,8 @@ export class MergeQueue {
       // only: decided again in IntegrationStarted's write, in the lock.
       if (folder && this.cfg.checkedOutTarget?.() === 'ask' && !advanceApprovedIn(this.wf.state(card), entry.id, expected, result)) return this.askAdvance(card, entry, target, expected, result, folder)
       const method = methodOf(this.wf.rulesetOf(card, s).options.style, s.started?.target, target)
-      const integrate = (): Promise<void> => this.integrated(card, entry, revision, target, result, method, 'combwork')
+      // The record of its own advance: written whatever (HI-2709: its blockers were decided in IntegrationStarted's write).
+      const integrate = async (): Promise<void> => void (await this.integrated(card, entry, revision, target, result, method, 'combwork', { afterAdvance: true }))
       const adv = folder ? await this.advanceCheckedOut(card, entry, target, expected, result, folder, integrate) : await this.advanceRef(card, entry, target, expected, result)
       // Settled in the lock: a pause, the terminal state, the ask.
       if (typeof adv === 'object' && 'outcome' in adv) return adv.outcome
@@ -1957,18 +1958,25 @@ export class MergeQueue {
     return { folder, branch, ref, expected, result, phase, files: sides.map(({ path, side }) => ({ path, side })), commands }
   }
 
-  /** `Integrated` → Done; the slot released, the lane ended if done; a decision recorded after the advance began → For you. */
-  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'combwork' | 'outside'): Promise<void> {
-    await this.write(card, (w) => {
+  /**
+   * `Integrated` → Done; the slot released, the lane ended if done; a decision recorded after the advance began → For you.
+   * HI-2709: the blocker rule's choke point (wf.closeWaitsFor, read in this write) for every caller: `waiting`, nothing
+   * written, while a card it depends on isn't Done. Only the record of the queue's own advance (`afterAdvance`) is
+   * written whatever: the target has moved, its blockers decided in IntegrationStarted's write.
+   */
+  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'combwork' | 'outside', opts: { afterAdvance?: boolean } = {}): Promise<'written' | 'waiting' | 'already'> {
+    return this.write(card, (w) => {
       // One Integrated per cycle, whoever writes it (the queue, or another Combwork's recovery or observation).
       const st = w.state()
-      if (st.integrated) return
+      if (st.integrated) return 'already' as const
+      if (this.wf.closeWaitsFor(w, opts).length) return 'waiting' as const
       const startedAt = this.wf.store.facts(card.id).filter((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === entry.id).at(-1)?.seq ?? Infinity
       const f = w.tx.append(card.id, { kind: 'Integrated', actor: 'combwork', source: 'recorded', dedupe: `cycle:${st.cycle}`, ...(w.ruleset ? { ruleset: w.ruleset.id } : {}), data: { entry: entry.id, revision, target, result, method, by } }) // i18n-ignore: a fact's kind and codes, not text
       w.written.push(f)
       w.move('done', 'derived')
       if (by === 'combwork') this.owePush(w, entry.id, target, result)
       if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', workflowText(FOR_YOU.decidedAfterMerge, { card: card.key }))
+      return 'written' as const
     })
   }
 
@@ -2017,6 +2025,8 @@ export class MergeQueue {
       const { expected, result, checkedOut } = e.started
       const done = async () => {
         await this.write(card, (w) => {
+          // A begun advance recovered (HI-2709: a record after an advance, closeWaitsFor's `afterAdvance`: its blockers were
+          // decided in its IntegrationStarted's write, so it is written whatever).
           // How it landed, as an advance records it, by the style its entry was queued with (HR2's #1184 round 1).
           const requested = this.wf.store.facts(card.id).find((x) => x.kind === 'IntegrationRequested' && (x.data as FactData['IntegrationRequested']).entry === e.id)?.data as FactData['IntegrationRequested'] | undefined
           const method = methodOf(requested?.style ?? this.wf.rulesetOf(card, s).options.style, s.started?.target, e.target)
