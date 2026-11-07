@@ -392,6 +392,26 @@ describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2
     expect(graph('src/main/x.ts').startsOf('src/main/x.ts')).toMatch(/starts a worker/)
     expect(graph('tests/x.ts').unknownOf('tests/x.ts')).toBeTruthy()
   })
+  it("an inline script's starter is its file's even when the script is the only evidence of one (HR1, HI-2697 round 1)", () => {
+    // The wrapper starts whatever executable it is handed: its only starter evidence is its node script's.
+    const w: Files = {
+      'src/main/types.ts': FILES['src/main/types.ts'],
+      'src/main/lib.ts': LIB,
+      'src/main/worker.ts': "import { fa } from './lib'\nfa()\n",
+      'src/main/wrapper.ts': "import { spawn } from 'child_process'\nimport { fb } from './lib'\nexport function start(executable: string): number {\n  const S = `process.env.ELECTRON_RUN_AS_NODE = '1'; require('child_process').spawn(process.execPath, ['worker.js'])`\n  spawn(executable, ['-e', S])\n  return fb()\n}\n",
+      ...t('wrapper', "import { execPath } from 'node:process'\nimport { start } from '../src/main/wrapper'\nit('w', () => start(execPath))\n")
+    }
+    const head: Files = { ...w, 'src/main/lib.ts': LIB_FA }
+    const graph = importGraph(Object.keys(head), (f: string) => head[f] ?? null)
+    expect(graph.unknownOf('src/main/wrapper.ts')).toBeNull()
+    expect(graph.startsOf('src/main/wrapper.ts')).toMatch(/its node script/)
+    // lib.fa is in the worker entry's closure: the test reaching the wrapper's starter is kept.
+    const r = narrowRelated({ related: ['tests/wrapper.test.ts'], changes: { 'src/main/lib.ts': change('src/main/lib.ts', w, head) }, graph, read: (f: string) => head[f] ?? null, workers: ['src/main/worker.ts'] }) as Narrowed
+    expect(r.keep).toEqual(['tests/wrapper.test.ts'])
+    // Outside every entry's closure, the starter doesn't matter: a change to the wrapper's other unit narrows by name.
+    const other = narrowRelated({ related: ['tests/wrapper.test.ts'], changes: { 'src/main/lib.ts': change('src/main/lib.ts', w, head) }, graph, read: (f: string) => head[f] ?? null, workers: ['src/main/types.ts'] }) as Narrowed
+    expect(other.why.join('\n')).not.toMatch(/wrapper\.ts .*starts a worker/)
+  })
   it("the merge queue's node scripts, cw-mcp and the renderer's window uses stay known (HI-2697)", () => {
     const hubs = ['src/main/workflow/launcher.ts', 'src/main/workflow/gitHost.ts', 'src/main/mcp/cw-mcp.ts', 'src/renderer/src/commitLoop.tsx', 'src/renderer/src/commitWatch.ts', 'src/renderer/src/windowHealth.ts']
     const files = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8', env: runContext.baseEnv() }).split(/\r?\n/).filter(Boolean)
