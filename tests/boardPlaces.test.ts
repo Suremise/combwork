@@ -13,8 +13,9 @@ import { writeCardOutside } from './boardDb'
 
 // The card documents read (one card's, or a list of them), counted; the reads themselves unchanged.
 const reads = vi.hoisted(() => ({ docs: 0 }))
-vi.mock('../src/main/boardStore', async (original) => {
-  const real = await original<typeof import('../src/main/boardStore')>()
+const { mockFactory } = await vi.hoisted(() => import('./keepType'))
+vi.mock('../src/main/boardStore', mockFactory<typeof import('../src/main/boardStore')>(async (original) => {
+  const real = await original()
   return {
     ...real,
     cardDoc: (...a: Parameters<typeof real.cardDoc>) => {
@@ -27,7 +28,7 @@ vi.mock('../src/main/boardStore', async (original) => {
       return out
     }
   }
-})
+}))
 
 const base = tempDir('cw-board-places-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')

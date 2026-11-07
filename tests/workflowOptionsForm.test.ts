@@ -9,6 +9,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { Contradiction, WorkflowOptions } from '../src/shared/workflow/options'
+import { bound } from './keepType'
 
 const base = tempDir('cw-wfoptions-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -937,7 +938,7 @@ describe("workflow writes take turns: a level's check and write, and a project's
     const { w, repo } = await workspace()
     const g = gate()
     const reached = gate()
-    const real = w.saveWorkspaceConfigWith.bind(w)
+    const real = bound(w, w.saveWorkspaceConfigWith)
     const spy = vi.spyOn(w, 'saveWorkspaceConfigWith').mockImplementation(async (change) => {
       reached.open()
       await g.wait
@@ -964,7 +965,7 @@ describe("workflow writes take turns: a level's check and write, and a project's
       const { w, repo } = await workspace()
       const g = gate()
       const reached = gate()
-      const real = w.mutateProjectConfig.bind(w)
+      const real = bound(w, w.mutateProjectConfig)
       const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation(async (path, fn) => {
         reached.open()
         await g.wait

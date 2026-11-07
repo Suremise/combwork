@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { tempDir } from '../tempDir'
+import type { CombworkWindow } from '../../src/main/windows'
+import type { WorkspaceService } from '../../src/main/workspace'
 
 // #845 (E10a): errors read by both audiences. A service throws a CombworkError: its message is English (the Agent API, the
 // log), and IPC tells the window its text in the language Combwork shows. The window's text as data beside an English
@@ -15,8 +17,9 @@ vi.mock('electron', async () => {
   return { ...stub, ipcMain, default: { ...stub.default, ipcMain } }
 })
 /** The window a call comes from: Combwork's own, showing a workspace. */
-let callerWorkspace: unknown = null
-vi.mock('../../src/main/windows', async (original) => ({ ...(await original<object>()), windowOf: () => (callerWorkspace ? { ws: callerWorkspace } : null) }))
+let callerWorkspace: WorkspaceService | null = null
+const { mockFactory } = await vi.hoisted(() => import('../keepType'))
+vi.mock('../../src/main/windows', mockFactory<typeof import('../../src/main/windows')>(async (original) => ({ ...(await original()), windowOf: () => (callerWorkspace ? ({ ws: callerWorkspace } as CombworkWindow) : null) })))
 
 const { setLanguage } = await import('../../src/shared/i18n')
 const { msg } = await import('../../src/shared/i18n/msg')

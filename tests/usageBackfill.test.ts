@@ -12,6 +12,7 @@ import { priceUsage } from '../src/shared/usageDays'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { SessionListItem, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { bound, spyOnPrivate } from './keepType'
 
 const base = tempDir('cw-usage-backfill-')
 // The CLIs' homes are the test's own (HI-1666): a list looks in each for sessions started outside Combwork, and the user's
@@ -146,10 +147,9 @@ describe("the usage history's import", () => {
   })
 
   it("isn't recorded as done when a session fails to import: nothing is retired, and the next try imports what is left", async () => {
-    const h = usageHistory as unknown as { importKept: (...a: unknown[]) => Promise<unknown> }
-    const real = h.importKept.bind(usageHistory)
+    const real = bound(usageHistory, usageHistory['importKept'])
     // The deleted session's import fails (the worker ended, a write another Combwork held).
-    const fail = vi.spyOn(h, 'importKept').mockImplementation((host, k, ...rest) => ((k as { id: string }).id === deleted ? Promise.reject(new Error('the usage worker ended')) : real(host, k, ...rest)))
+    const fail = spyOnPrivate(usageHistory, 'importKept', usageHistory['importKept']).mockImplementation((host, k, ...rest) => (k.id === deleted ? Promise.reject(new Error('the usage worker ended')) : real(host, k, ...rest)))
     await run(() => usageHistory.opened(w))
     fail.mockRestore()
     expect(usageHistory.progressOf(wsPath).importing).toBe(true)

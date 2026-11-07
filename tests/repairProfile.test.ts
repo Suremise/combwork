@@ -118,7 +118,7 @@ const tail = (names: string[], prefix: string): string[] => names.map((n) => n.s
 const record = (from: string) => (config.get().profileMoves ?? []).find((m) => m.from.toLowerCase() === from.toLowerCase())
 const prefixOf = (ws: WS): string => runPrefix('workspace', ws.openPlace)
 /** What the window's banner and the palette's Repair go by (the workspace's info carries it to the window). */
-const movedOf = (ws: WS): WorkspaceMoved | null => (ws as unknown as { moved: WorkspaceMoved | null }).moved
+const movedOf = (ws: WS): WorkspaceMoved | null => ws['moved']
 
 describe('what the profile keeps by the workspace folder follows a move (HI-2007)', () => {
   it('moved and repaired: the pin and the close-command runs; the old token file is left as it is', async () => {
@@ -415,7 +415,7 @@ describe('what the profile keeps by the workspace folder follows a move (HI-2007
     renameSync(at, to)
     await ws.open(to)
     // As the first run is renamed, the workspace's lifetime ends, as a close or a switch ends it (close() then finishes).
-    renames.during = async () => (ws as unknown as { life: AbortController }).life.abort()
+    renames.during = async () => ws['life'].abort()
     // The rest of checkMoved is refused for a closed workspace, as the window's call of it (which logs it) sees.
     await expect(inWorkspace(ws, () => checkMoved(ws))).rejects.toThrow(/closed/)
     await ws.close()

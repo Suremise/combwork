@@ -10,6 +10,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { B1, commit, moved, R1, setup } from './workflow/harness'
+import { bound } from './keepType'
 
 const base = tempDir('cw-vcswitch-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -149,7 +150,7 @@ describe('switching a project (#1419)', () => {
     const { w, repo } = await workspace({ platform: 'git', workflow: { platform: 'git', preset: 'pair', options: pair, presetAsked: 'chosen' } })
     // The save reads the project as Git, then waits for its lock while another Combwork on this workspace switches it to
     // None (this Combwork's own switch takes its turn after the save: workflowWrite, #1422), as its switch writes it.
-    const mutate = w.mutateProjectConfig.bind(w)
+    const mutate = bound(w, w.mutateProjectConfig)
     let first = true
     w.mutateProjectConfig = async (path, fn) => {
       if (first) {

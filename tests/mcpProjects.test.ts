@@ -11,6 +11,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import { MCP_ADDED_MODEL, mcpAdded, mcpOnInProject, mcpServerShown, migratedProjectMcp, migratedWorkspaceMcp, serverOnIn } from '../src/shared/agentMcp'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-mcp-projects-')
 const profile = join(base, 'profile')
@@ -204,7 +205,7 @@ describe('MCP servers per project (HI-2059)', () => {
     // apiary remembers docs, off in the workspace.
     writeFileSync(join(apiary, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
     w = createWorkspaceService()
-    const write = w.mutateProjectConfig.bind(w)
+    const write = bound(w, w.mutateProjectConfig)
     // ambrosia's write goes through; apiary's fails, after it.
     const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(Object.assign(new Error('EBUSY: locked'), { code: 'EBUSY' })) : write(p, fn, o)))
     await w.open(wsPath)
@@ -225,7 +226,7 @@ describe('MCP servers per project (HI-2059)', () => {
     writeFileSync(join(wsPath, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes'], model: 2 } }))
     writeFileSync(join(apiary, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
     w = createWorkspaceService()
-    const write = w.mutateProjectConfig.bind(w)
+    const write = bound(w, w.mutateProjectConfig)
     const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(new Error('EPERM')) : write(p, fn, o)))
     await w.open(wsPath)
     spy.mockRestore()
@@ -240,7 +241,7 @@ describe('MCP servers per project (HI-2059)', () => {
     writeFileSync(join(wsPath, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes'], model: 2 } }))
     writeFileSync(join(apiary, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', provider: 'claude-code' }], mcp: { disabled: [], enabled: ['docs', 'notes'] } }))
     w = createWorkspaceService()
-    const write = w.mutateProjectConfig.bind(w)
+    const write = bound(w, w.mutateProjectConfig)
     const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(new Error('EPERM')) : write(p, fn, o)))
     await w.open(wsPath)
     spy.mockRestore()
@@ -293,7 +294,7 @@ describe('MCP servers per project (HI-2059)', () => {
   it('Add to… whose second write fails keeps the first and says which changed and which failed', async () => {
     await open()
     await add(apiary, 'docs')
-    const write = w.mutateProjectConfig.bind(w)
+    const write = bound(w, w.mutateProjectConfig)
     vi.spyOn(w, 'mutateProjectConfig').mockImplementation((p, fn, o) => (p === apiary ? Promise.reject(new Error('EBUSY: resource busy')) : write(p, fn, o)))
     const r = await run(async () => mcp.setMcpPlaces('docs', await shown('docs'), { [ambrosia]: true, [apiary]: false }))
     expect(r).toEqual({ added: [ambrosia], removed: [], failed: [{ place: apiary, error: 'EBUSY: resource busy' }] })
@@ -329,7 +330,7 @@ describe('MCP servers per project (HI-2059)', () => {
     await open()
     await run(() => mcp.addMcpFromFile(file('godot.json', godot), 'godot'))
     await add(ambrosia, 'godot')
-    const read = w.projectConfig.bind(w)
+    const read = bound(w, w.projectConfig)
     const unreadable = (): void => void vi.spyOn(w, 'projectConfig').mockImplementation((p, o) => (p === ambrosia ? Promise.reject(Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })) : read(p, o)))
     unreadable()
     await expect(run(() => mcp.addMcpFromFile(file('godot.json', { ...godot, args: ['unseen-new-server.js'] }), 'godot', true))).rejects.toThrow("Couldn't read the settings of ambrosia, so godot wasn't changed")

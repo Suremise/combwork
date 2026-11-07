@@ -11,6 +11,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
 import { moveFolder } from './moveFolder'
 import type { SessionRecord } from '../src/shared/types'
+import { bound } from './keepType'
 
 const base = tempDir('cw-session-store-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
@@ -358,7 +359,7 @@ describe('following the project', () => {
     await run(() => workspace.upsertSession(p, { id: 't2' }))
     // Every refresh reads each project's records, as the app's does.
     w.setLiveProvider((pp, cfg, scope) => sessions.liveInfo(pp, cfg, scope))
-    const exportFor = w.exportSessions.bind(w)
+    const exportFor = bound(w, w.exportSessions)
     w.exportSessions = async (pp: string) => {
       const n = await exportFor(pp)
       await w.refresh()
@@ -400,7 +401,7 @@ describe('following the project', () => {
     await run(() => workspace.projectIds({ fresh: true }))
     await run(() => workspace.upsertSession(p, { id: 'k1' }))
     // Worked out before the project was hidden as removed (a change waiting for its database lease meanwhile).
-    const place = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
+    const place = await run(() => w['sessionsPlace'](p))
     await run(() => removal.removeProject(p, 'remove'))
     const file = join(p, '.combwork', 'sessions.json')
     expect((await readSessions(place)).sessions).toEqual([])
@@ -445,7 +446,7 @@ describe('following the project', () => {
       await in2(() => workspace.projectIds({ fresh: true }))
       await in2(() => workspace.upsertSession(p2, { id: 'kept' }))
       // Worked out while the project was present (a change that then waits), and not asked again before the close.
-      place = await in2(() => (s2 as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p2))
+      place = await in2(() => s2['sessionsPlace'](p2))
       await in2(() => removal.removeProject(p2, 'remove'))
       // The service opens another workspace: a late change still finds the project removed.
       const ws3 = join(base, 'next-ws')
@@ -480,7 +481,7 @@ describe('following the project', () => {
     // its folder's scope" above). Not by setting its project.json aside (HI-2361): the project is present, so a refresh
     // meanwhile makes it a project.json of its own, with no id, which could land over the original as it came back (or
     // hold it, refusing the rename): the project then had a new id, and its records read as none after Restore.
-    const own = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
+    const own = await run(() => w['sessionsPlace'](p))
     expect(own.scope).toBe(idOf(p))
     const place: SessionsPlace = { ...own, scope: 'folder:held-read' }
     expect(place.removed!()).toBe(false)
@@ -514,7 +515,7 @@ describe('following the project', () => {
     await run(() => workspace.ensureProject(p))
     await run(() => workspace.projectIds({ fresh: true }))
     await run(() => workspace.upsertSession(p, { id: 'before' }))
-    const place = await run(() => (w as unknown as { sessionsPlace: (pp: string) => Promise<SessionsPlace> }).sessionsPlace(p))
+    const place = await run(() => w['sessionsPlace'](p))
     // Written into its folder, then the removal didn't end with it hidden: it is present.
     await run(() => w.exportSessions(p))
     await run(() => w.releaseSessions(p))

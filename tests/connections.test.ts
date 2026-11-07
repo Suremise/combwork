@@ -20,6 +20,7 @@ import { connectionRef, connectionsFor, connectionShown, resolveConnection, type
 import { cliReadyOf, connectionCli, connectionOf, connectionSwitchDue, firstReadyConnection, firstUsableConnection, launchedName, offeredConnections, offHereChoice } from '../src/shared/connectionLabel'
 import type { Account, LiveSessionState } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-connections-')
 const home = join(base, 'claude-home')
@@ -1533,7 +1534,7 @@ describe("HI-2670 (HR3 on s45): an agent's change to Independent is checked at i
   it('a change that looked like none is refused when the agent was made a builder meanwhile (and given a card)', async () => {
     const p = join(wsPath, 'api1')
     await here(() => w.updateAgent(p, 'k', { workflowRole: 'independent' }))
-    const actualUpdate = w.updateAgent.bind(w)
+    const actualUpdate = bound(w, w.updateAgent)
     const tasks = await import('../src/main/tasks')
     let carding: Promise<unknown> | null = null
     const spy = vi.spyOn(w, 'updateAgent').mockImplementationOnce(async (host, id, patch, check) => {

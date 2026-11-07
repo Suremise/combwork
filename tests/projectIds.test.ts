@@ -11,6 +11,7 @@ import { moveFolder } from './moveFolder'
 import { tempDir } from './tempDir'
 import { readCardIn, writeCardOutside } from './boardDb'
 import { storeDocs } from './storeDocs'
+import { bound } from './keepType'
 
 const base = tempDir('cw-projectids-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -457,7 +458,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       // The older read, the first to list `gone`, is held where it reads it, until the newer one has settled.
       let release!: () => void
       const held = new Promise<void>((r) => (release = r))
-      const read = w.projectConfig.bind(w)
+      const read = bound(w, w.projectConfig)
       let holding = true
       let reached = false
       w.projectConfig = (async (p: string, o?: never) => {
@@ -506,7 +507,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
           await held
         }
         // The listing's read of `gone` is its first; the one in project.json's lock, giving it its id, the second.
-        const read = w.projectConfig.bind(w)
+        const read = bound(w, w.projectConfig)
         let reads = 0
         w.projectConfig = (async (p: string, o?: never) => {
           if (at === 'the read in the lock' && p.toLowerCase() === gone.toLowerCase() && ++reads === 2) await hold(p)
@@ -542,7 +543,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       // The refresh is held once it has listed the folders, `gone` among them.
       let release!: () => void
       const held = new Promise<void>((r) => (release = r))
-      const list = w.listProjectPaths.bind(w)
+      const list = bound(w, w.listProjectPaths)
       let reached = false
       w.listProjectPaths = (async (o?: { hidden?: boolean }) => {
         const paths = await list(o)
@@ -575,7 +576,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
       const gone = join(wsPath, 'gone')
       mkdirSync(gone)
       // Its exclusion from git starts beside the folders: the project goes then, after `.combwork` was made.
-      const exclude = w.ensureGitExclude.bind(w)
+      const exclude = bound(w, w.ensureGitExclude)
       w.ensureGitExclude = async (p: string) => {
         if (p.toLowerCase() === gone.toLowerCase()) rmSync(gone, { recursive: true, force: true })
         else await exclude(p)
@@ -706,7 +707,7 @@ describe('what the workspace remembers of projects a read missed is bounded (#55
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
     let reached = false
-    const read = w.projectConfig.bind(w)
+    const read = bound(w, w.projectConfig)
     w.projectConfig = (async (p: string, o?: never) => {
       if (p.toLowerCase() === gone.toLowerCase()) {
         reached = true

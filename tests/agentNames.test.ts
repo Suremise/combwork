@@ -11,6 +11,7 @@ import * as electron from 'electron'
 import { duplicateAgentNames, nameTaken, projectPrefix, suggestAgentName } from '../src/shared/agentNames'
 import type { AgentDef, CombworkEvent } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-agentnames-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -240,13 +241,12 @@ describe('Combwork keeps agent names unique across the workspace', () => {
     const off = onCombworkEvent((e: CombworkEvent) => void (e.type === 'toast' && toasts.push(e.toast.title)))
     // The older refresh is held once it has read beta, as one begun just before a change and slow to end. Only the test's
     // own: it runs in a context of its own, which a refresh the watcher schedules meanwhile doesn't have.
-    const service = w as unknown as { projectInfo: (p: string) => Promise<{ path: string }> }
-    const real = service.projectInfo.bind(w)
+    const real = bound(w, w.projectInfo)
     const mine = new AsyncLocalStorage<string>()
     const gate: { open: () => void } = { open: () => undefined }
     const held = new Promise<void>((r) => (gate.open = r))
     let holding = true
-    const spy = vi.spyOn(service, 'projectInfo').mockImplementation(async (p: string) => {
+    const spy = vi.spyOn(w, 'projectInfo').mockImplementation(async (p: string) => {
       const info = await real(p)
       if (holding && p === beta && mine.getStore() === 'older') {
         holding = false

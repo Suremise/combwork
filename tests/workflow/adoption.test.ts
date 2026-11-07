@@ -10,6 +10,7 @@ import { as09, readCard, writeCard, writeCardOutside } from '../boardDb'
 import { commit, gitRepo, sh } from './harness'
 import { allOff } from '../../src/shared/workflow/options'
 import { foldCard, type Fact } from '../../src/shared/workflow/facts'
+import { bound } from '../keepType'
 
 const base = tempDir('cw-adoption-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -80,7 +81,7 @@ async function world(): Promise<{ ws: string; w: WS; wt: string }> {
 
 /** Runs `fn` once, just after the adoption has classified the cards (its first read after its snapshot is the projects' list). */
 function afterSnapshot(w: WS, fn: () => void): void {
-  const list = w.listProjectPaths.bind(w)
+  const list = bound(w, w.listProjectPaths)
   let done = false
   w.listProjectPaths = async (opts) => {
     if (!done) {
