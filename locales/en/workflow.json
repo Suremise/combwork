@@ -127,6 +127,10 @@
     "defaultMessage": "Only the stage names change: names aren’t rules, so they apply now, to every card.",
     "description": "The message of the dialog before saving workflow options when only stage names change (glossary 2.2: stage)."
   },
+  "workflow.form.appliesNowBranches": {
+    "defaultMessage": "Only the other branches work can merge into change: they aren’t rules, so they apply now. A lane or card already merging into one keeps it.",
+    "description": "HI-2556: the message of the dialog before saving workflow options when only “Other branches work can merge into” changes (or that and stage names)."
+  },
   "workflow.form.cantSave": {
     "defaultMessage": "These options can’t be saved:",
     "description": "Above the reasons the workflow options can’t be saved, each a sentence of its own."
@@ -410,6 +414,10 @@
   "workflow.form.openAdvanced": {
     "defaultMessage": "Open Advanced",
     "description": "A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced."
+  },
+  "workflow.form.otherTargets": {
+    "defaultMessage": "Branches, separated by commas (such as 1.2.0)",
+    "description": "HI-2556: the placeholder of the field “Other branches work can merge into” (branch names besides Work merges into). Keep 1.2.0 as it is."
   },
   "workflow.form.overMax": {
     "defaultMessage": "This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.",
@@ -746,6 +754,14 @@
   "workflow.option.okBefore.title": {
     "defaultMessage": "Your OK before merging",
     "description": "A workflow option (glossary 2.6, G10)."
+  },
+  "workflow.option.otherTargets.desc": {
+    "defaultMessage": "Branches a lane or a card can merge into instead (its Merges into), each through its own merge queue with the same merge checks, separated by commas.",
+    "description": "What the workflow option “Other branches work can merge into” does (HI-2556). Merges into is the lane’s and card’s field: as translated there."
+  },
+  "workflow.option.otherTargets.title": {
+    "defaultMessage": "Other branches work can merge into",
+    "description": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it."
   },
   "workflow.option.preChecks.desc": {
     "defaultMessage": "A card goes to review only once each of these named commands has passed on its work.",

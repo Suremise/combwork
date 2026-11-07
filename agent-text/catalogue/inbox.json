@@ -179,6 +179,10 @@
     "text": "something on its screen is taking its keys, and it waits for the user to answer it there",
     "note": "Why Combwork could not type a line into an agent now (HI-2191), in the reply of the call that wanted it."
   },
+  "inbox.noLine.keptOut": {
+    "text": "Combwork types nothing into it: it is Independent, or runs without Combwork's tools or typing",
+    "note": "Why Combwork could not type a line into an agent (HI-2670), in the reply of the call that wanted it: the agent is Independent, or its session launched as if from a terminal."
+  },
   "inbox.noLine.launchTask": {
     "text": "its CLI hasn't taken its launch's task yet",
     "note": "Why Combwork could not type a line into an agent now, in the reply of the call that wanted it."
@@ -247,9 +251,17 @@
     "text": "the user turned Settings → Assistant → Control down",
     "note": "Why a delivery the Assistant left was refused, as its sender reads it: Control no longer lets it message agents."
   },
+  "inbox.refused.independent": {
+    "text": "{name} is Independent: Combwork gives it nothing, and the user works with it in its pane",
+    "note": "Why an Independent agent (HI-2670) is given no delivery, as its sender sees it: it takes no part in the workflow. name: the agent's name."
+  },
   "inbox.refused.noInbox": {
     "text": "{name} has no inbox: turn on the Agent API",
     "note": "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name."
+  },
+  "inbox.refused.plain": {
+    "text": "{name} runs as if started from a terminal, without Combwork's tools or typing, so it has no inbox until it restarts",
+    "note": "Why an agent is given no delivery (HI-2670), as its sender sees it: its running session launched without Combwork's tools or without Combwork typing into it (its connection's launch settings). name: the agent's name."
   },
   "inbox.relay.check": {
     "text": "For you to check: {said} If it grants a change {asker} can't make itself (Done past its rules, no code, skipping its review), make it, within any conditions it sets, with the answer as the reason; otherwise nothing is needed.",

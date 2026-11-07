@@ -8,7 +8,7 @@
 import type { ConflictsRecord } from './conflicts'
 import { askedQuestion, foldCard, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type CheckRanData, type Fact, type FactData, type LoopAsk, type FileChange, type ForYouKind, type QueueEntry, type RoundChoice, type StageId } from './facts'
 import type { StoredText } from '../types'
-import { baseRulesetId, REVIEW_SKIPPED } from './compile'
+import { baseRulesetId, REVIEW_SKIPPED, rulesBaseId } from './compile'
 
 /** An Override's move when the user applied changed options to a card in flight (§16.11.4, OP-38). */
 export const APPLY_OPTIONS = 'applyOptions'
@@ -257,6 +257,8 @@ export interface WorkView {
   kind: CardKind | null
   /** A kind a project agent proposed when it made the card, not answered yet (OP-6/OP-7, #1277). */
   kindProposed: CardKind | null
+  /** Its own Merges into as the card has it now (HI-2556), null: none (its lane's or the project's). Its start's is `target`. */
+  cardTarget: string | null
   /** It skips review (#1625): who set it and their reason; null when it doesn't. */
   reviewSkip: ReviewSkip | null
   /** A project agent's proposal that it skip review, its reason, not answered yet (#1625). */
@@ -352,6 +354,8 @@ export interface WorkCard {
   preWorkflow: boolean
   /** Its kind as the card has it (the `kind` column, #1277). */
   kind?: CardKind
+  /** Its own Merges into (HI-2556: the `target` column), absent for the project's or its lane's. */
+  target?: string
 }
 
 /** The kind a project agent proposed (`KindProposed`) and nobody has answered yet (`KindDecided`), or null (#1277). */
@@ -446,6 +450,7 @@ export function workView(c: WorkCard, facts: readonly Fact[]): WorkView {
     // The card's kind now, not the one its cycle started with: a change after its start shows at once (HR3's #1277 round 1).
     kind: c.kind ?? started?.cardKind ?? null,
     kindProposed: kindProposed(facts),
+    cardTarget: c.target ?? null,
     ...reviewSkipView(facts),
     folder: started?.folder ?? null,
     line: started?.line ?? null,
@@ -539,6 +544,8 @@ export interface WorkBadge {
   /** Its kind (no code: no commits, §16.7.3) and a kind an agent proposed, not answered yet (#1277). */
   kind: CardKind | null
   kindProposed: CardKind | null
+  /** Its own Merges into (HI-2556), the card's now; absent: none (its lane's, shown on the lane, or the project's). */
+  target?: string
   /** It skips review (#1625): who set it and their reason (the Review skipped mark); and an agent's proposal, its reason. */
   reviewSkip: ReviewSkip | null
   reviewSkipProposed: string | null
@@ -571,7 +578,7 @@ export interface WorkBadge {
 }
 
 /** Whether a card is in flight under rules that aren't `current` (its project's ruleset now; null: not known, no mark). */
-export const onOldRules = (v: Pick<WorkView, 'stage' | 'ruleset'>, current: string | null | undefined): boolean => !!current && !!v.ruleset && v.stage !== 'todo' && v.stage !== 'done' && baseRulesetId(v.ruleset) !== current
+export const onOldRules = (v: Pick<WorkView, 'stage' | 'ruleset'>, current: string | null | undefined): boolean => !!current && !!v.ruleset && v.stage !== 'todo' && v.stage !== 'done' && rulesBaseId(v.ruleset) !== current
 
 /**
  * The stages a card in flight keeps (#1421), its review skip applied (#1625): its rules with no review while it skips
@@ -620,6 +627,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     forYou: v.forYou,
     kind: v.kind,
     kindProposed: v.kindProposed,
+    ...(v.cardTarget ? { target: v.cardTarget } : {}),
     reviewSkip: v.reviewSkip,
     reviewSkipProposed: v.reviewSkipProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,

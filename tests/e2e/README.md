@@ -331,7 +331,7 @@ same code while every required check still runs:
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
   bisected over the merge commits since the last full run), **once for a version's first RC** (RELEASING.md, What a
   release checks; the real tier then runs on its own, `--all --only-real` with Copilot's suites named, RELEASING Step 4; an RC
-  fix round and the release rerun only the slice a change touched), and **on request** (the user, or a card that asks for it). Run the real tier on its own
+  fix round and the release rerun only the slices a change invalidates, by the release's coverage ledger), and **on request** (the user, or a card that asks for it). Run the real tier on its own
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
   suites a change needs, such as a review round's fixes, and isn't any merge's gate.
 - **A flake fix, or a change to a suite's waits**, is proven by focused repeats under load (the `investigate-flake`
@@ -686,8 +686,8 @@ in the run record. Seeing 0xc0000142, run fewer test runs at once rather than lo
 Windows' "Application Error" dialog even for processes that had the error mode (children of Vitest workers during full
 unit runs beside e2e runs), and the process waits behind it until someone clicks OK. Fewer heavy runs at once makes it
 rarer (a full unit run is a heavy run, above); only a machine-wide setting, left to the machine's owner, would stop it.
-The `failfast` suite checks the reporting (a child ending with 0xc0000142 is seen at once, and said), not that a real
-startup failure shows no dialog.
+`tests/windowsExits.test.ts` checks the reporting (a real child ending with 0xc0000142 is seen at once, and said: the
+`failfast` suite's checks until HI-2663), not that a real startup failure shows no dialog.
 
 ## Housekeeping
 

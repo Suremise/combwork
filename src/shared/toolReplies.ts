@@ -356,6 +356,8 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   decisions?: Omit<TaskDecision, 'id'>[]
   agent: { id: string; name: string; status: string; backgroundTasks: number } | null
   stalled: string | null
+  /** Its own Merges into (HI-2556), when it has one: the branch its work merges into instead of the project's. */
+  target?: string
   /** With a review going on (TaskCard.review): why it has stalled (its reviewer removed or not running), if it has. */
   reviewStalled?: string
   /**
@@ -818,7 +820,8 @@ export interface ProjectRow {
    * `watching`: what a watching agent waits for ("Waiting for #12 → Review"). `progress`: its open progress run, short
    * ("e2e: 12 suites 4/12, about 6 min left").
    */
-  agents: { name: string; provider: string; workflowRole?: string; status: string; branch: string | null; backgroundTasks: number; watching?: string; progress?: string }[]
+  /** `launch` (HI-2670): its connection's launch settings in short, when not everything ("plain: …"). */
+  agents: { name: string; provider: string; workflowRole?: string; launch?: string; status: string; branch: string | null; backgroundTasks: number; watching?: string; progress?: string }[]
 }
 
 /** An agent's open progress run in a few words, title clipped, for the short listing. */
@@ -834,7 +837,7 @@ export function projectRowText(p: ProjectRow, many: boolean): string {
   const agents = p.agents.map((a) =>
     say(R.projectAgent, {
       name: a.name,
-      tags: `${a.provider}${a.workflowRole ? `, ${a.workflowRole}` : ''}${a.branch ? `, ${a.branch}` : ''}`,
+      tags: `${a.provider}${a.workflowRole ? `, ${a.workflowRole}` : ''}${a.launch ? `, ${a.launch}` : ''}${a.branch ? `, ${a.branch}` : ''}`,
       // agent-protocol: the watch's own label (a value), its first word made lower case to follow the name
       state: a.watching ? a.watching.replace(/^Waiting/, 'waiting') : statusText(a.status),
       hasBackground: yn(a.backgroundTasks > 0),

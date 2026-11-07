@@ -24,7 +24,7 @@ import { WorkspaceStorageList } from '../components/Storage'
 import { AntivirusPanel } from '../components/Antivirus'
 import { AccountsSettings } from '../components/AccountsSettings'
 import { AdvancedSettings } from '../components/AdvancedSettings'
-import { ADVANCED_DEFS, groupName, shownText, type AdvancedState } from '@shared/advanced'
+import { LISTED_ADVANCED, groupName, shownText, type AdvancedState } from '@shared/advanced'
 import { choose, chooseTab, confirm, get, notify, set, showView, useLanguage, useRememberedTab, useStore, WORKFLOW_DEFAULTS_TAB, WORKFLOW_DEFAULTS_TABS } from '../store'
 import { TabPanel, Tabs } from '../components/Tabs'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
@@ -946,7 +946,7 @@ function advancedMatches(q: string, modifiedOnly: boolean, advanced: AdvancedSta
   const words = q.split(/\s+/).filter(Boolean)
   const hits = (text: string): boolean => words.every((w) => text.toLowerCase().includes(w))
   // Its English matches as well as what it shows, as Settings' own rows do.
-  return ADVANCED_DEFS.some((d) => (!modifiedOnly || advanced?.values[d.id] !== undefined || advanced?.workspace?.[d.id] !== undefined) && hits(`${d.id} ${d.setting ?? ''} ${groupName(d.group)} ${d.title} ${d.desc} ${shownText(d.text.title)} ${shownText(d.text.desc)}`))
+  return LISTED_ADVANCED.some((d) => (!modifiedOnly || advanced?.values[d.id] !== undefined || advanced?.workspace?.[d.id] !== undefined) && hits(`${d.id} ${d.setting ?? ''} ${groupName(d.group)} ${d.title} ${d.desc} ${shownText(d.text.title)} ${shownText(d.text.desc)}`))
 }
 
 function DataFolder() {

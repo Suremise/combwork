@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
-import { ADVANCED_DEFS, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, folderList, foldersText, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
+import { LISTED_ADVANCED, advancedRow, type AdvancedGroup, advancedShown, advancedTakesText, advancedUnit, checkAdvanced, cliFacing, folderList, foldersText, groupName, shownText, type AdvancedDef, type AdvancedRow } from '@shared/advanced'
 import { msg, tr, tRich } from '@shared/i18n'
 import { INBOX_SWITCH_ID } from '@shared/inboxSwitches'
 import type { ProviderId } from '@shared/types'
@@ -37,7 +37,7 @@ const TABS_KEY = 'settings.advanced'
  * a group of a CLI Combwork no longer offers keeps a tab after them.
  */
 const GROUPS: AdvancedGroup[] = (() => {
-  const used = new Set(ADVANCED_DEFS.map((d) => d.group))
+  const used = new Set(LISTED_ADVANCED.map((d) => d.group))
   const ordered: AdvancedGroup[] = ['cw', ...PROVIDERS.map((p) => p.id).filter((id) => used.has(id))]
   return [...ordered, ...[...used].filter((g) => !ordered.includes(g))].filter((g) => used.has(g))
 })()
@@ -52,7 +52,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   const [ownModified, setModifiedOnly] = useState(false)
   const modifiedOnly = outerModified || ownModified
   const words = `${query} ${filter}`.toLowerCase().split(/\s+/).filter(Boolean)
-  const rows = useMemo(() => ADVANCED_DEFS.map((d) => advancedRow(d, state)), [state])
+  const rows = useMemo(() => LISTED_ADVANCED.map((d) => advancedRow(d, state)), [state])
   const matches = (text: string): boolean => words.every((w) => text.toLowerCase().includes(w))
   // Its English matches as well as what it shows, as Settings' own rows do.
   const shown = rows.filter((r) => (!modifiedOnly || r.override !== undefined || r.workspaceValue !== undefined) && matches(`${r.def.id} ${r.def.setting ?? ''} ${groupName(r.def.group)} ${r.def.title} ${r.def.desc} ${shownText(r.def.text.title)} ${shownText(r.def.text.desc)}`))
@@ -72,7 +72,7 @@ export function AdvancedSettings({ query, modifiedOnly: outerModified }: { query
   const remembered = useRememberedTab<AdvancedGroup>(TABS_KEY, GROUPS, 'cw')
   const count = (g: AdvancedGroup): number => shown.filter((r) => r.def.group === g).length
   // A value's own id searched for opens its group's tab, whatever is remembered.
-  const exact = ADVANCED_DEFS.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
+  const exact = LISTED_ADVANCED.find((d) => words.length === 1 && d.id.toLowerCase() === words[0])?.group
   const tab: AdvancedGroup = !filtering ? remembered : (filterTab ?? exact ?? (count(remembered) ? remembered : (groups.find((g) => count(g) > 0) ?? remembered)))
   const choose = (g: AdvancedGroup): void => (filtering ? setClicked({ key: filterKey, tab: g }) : chooseTab(TABS_KEY, g))
   if (!state) return null

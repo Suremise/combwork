@@ -24,7 +24,7 @@ import { agentText, linesOf, withValues, type Text } from '../../shared/advanced
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
 import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
-import { allOff, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
@@ -214,8 +214,8 @@ export function keptNames<T extends Partial<WorkflowOptions>>(options: T): T {
   return { ...options, stageNames: Object.fromEntries(Object.entries(names).map(([k, v]) => [k, typeof v === 'string' ? keptStageName(v) : v])) }
 }
 
-/** Whether a change of these options applies at once (#1417): only names (N5) changed, which aren't rules. */
-export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k))
+/** Whether a change of these options applies at once (#1417): only names (N5), or the branches lanes and cards may pick (HI-2556), changed, which aren't rules. */
+export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k) || (BRANCH_OPTIONS as readonly string[]).includes(k))
 
 /** The options a save would set, their problems, and what changes from the options in force now. */
 function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<WorkflowOptions>, change: WorkflowChange, folder: string) {

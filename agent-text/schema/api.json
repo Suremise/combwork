@@ -396,6 +396,12 @@
   "api.card.saidSkipsReview": {
     "placeholders": {}
   },
+  "api.card.saidTarget": {
+    "placeholders": {
+      "own": "select",
+      "target": "plain"
+    }
+  },
   "api.card.setReviewed": {
     "placeholders": {}
   },
@@ -686,6 +692,9 @@
   "api.connection.controlOff": {
     "placeholders": {}
   },
+  "api.connection.launchArg": {
+    "placeholders": {}
+  },
   "api.connection.nameAccount": {
     "placeholders": {}
   },
@@ -973,6 +982,12 @@
       "cards": "plain",
       "putBack": "select",
       "note": "plain"
+    }
+  },
+  "api.done.launchedConnection": {
+    "placeholders": {
+      "connection": "plain",
+      "how": "plain"
     }
   },
   "api.done.messaged": {
@@ -1312,6 +1327,9 @@
     "placeholders": {}
   },
   "api.lane.projectRequired": {
+    "placeholders": {}
+  },
+  "api.lane.targetText": {
     "placeholders": {}
   },
   "api.lane.unknown": {

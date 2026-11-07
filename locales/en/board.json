@@ -1947,6 +1947,14 @@
     "defaultMessage": "Starting…",
     "description": "The Start Lane button while the lane is being started."
   },
+  "board.laneStart.target": {
+    "defaultMessage": "Merges into",
+    "description": "HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (Darren’s name for it)."
+  },
+  "board.laneStart.targetDefault": {
+    "defaultMessage": "{branch} (the project’s)",
+    "description": "HI-2556: the first choice of the Start Lane dialog’s Merges into: the project’s Work merges into, {branch} its name."
+  },
   "board.laneStart.title": {
     "defaultMessage": "Start Lane",
     "description": "Title of the Start Lane dialog: a builder and a reviewer agent work through cards in turn (a lane, a card loop), started from the window. Glossary: lane."
@@ -2166,6 +2174,14 @@
   "board.lanes.state": {
     "defaultMessage": "{state, select, paused {paused} ended {merged} other {abandoned}}",
     "description": "A lane's state in its header in the Progress panel, lower case (a lane: a builder and its reviewer working through cards in turn): paused, merged (it ended: its cards were merged) or abandoned."
+  },
+  "board.lanes.target": {
+    "defaultMessage": "into {branch}",
+    "description": "HI-2556: a lane’s mark in its header (Progress panel), lower case: its cards merge into {branch} (a branch name), not the project’s Work merges into."
+  },
+  "board.lanes.targetTip": {
+    "defaultMessage": "This lane’s cards are made from {branch} and merge into it, not the project’s Work merges into, until the lane ends.",
+    "description": "HI-2556: tooltip and accessible name of a lane header’s Merges into mark (Progress panel). {branch} is a branch name."
   },
   "board.lanes.teamPause": {
     "defaultMessage": "paused: the team is pausing",
@@ -3562,6 +3578,26 @@
   "board.strip.runs": {
     "defaultMessage": "{n, plural, one {# run} other {# runs}}: {states}",
     "description": "The folded Progress strip's name: how many runs, then how many are in each state (\"8 runs: 5 running, 2 failed\"). {states} is that list."
+  },
+  "board.target.failed": {
+    "defaultMessage": "Where the card merges wasn’t changed",
+    "description": "HI-2556: an error toast’s title: setting a card’s Merges into failed. Its text says why."
+  },
+  "board.target.field": {
+    "defaultMessage": "Merges into",
+    "description": "HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (Darren’s name for it)."
+  },
+  "board.target.mark": {
+    "defaultMessage": "Into {branch}",
+    "description": "HI-2556: a mark on a card’s tile: its work merges into {branch} (a branch name), not the project’s Work merges into."
+  },
+  "board.target.markTip": {
+    "defaultMessage": "This card’s work is made from {branch} and merges into it, not the project’s Work merges into.",
+    "description": "HI-2556: tooltip and accessible name of a card tile’s Merges into mark. {branch} is a branch name."
+  },
+  "board.target.own": {
+    "defaultMessage": "{branch} (the project’s)",
+    "description": "HI-2556: the first choice of the card dialog’s Merges into: the project’s Work merges into, {branch} its name."
   },
   "board.team.cw": {
     "defaultMessage": "Combwork",

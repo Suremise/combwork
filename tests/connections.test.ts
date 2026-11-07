@@ -10,6 +10,8 @@
 // change of connection (kept, cleared, a change of CLI resetting what was the old one's, decided again under the lock).
 // In this file's temp folders
 // only: the CLI is never run (its status is faked) and nothing signs in.
+import { writesAt } from '../src/main/dbWrites'
+import { AsyncResource } from 'async_hooks'
 import { lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -1522,4 +1524,124 @@ afterAll(async () => {
   accounts.stopAccountWatches()
   advanced.stop()
   await disposeWorkspaceService(w)
+})
+
+describe("HI-2670 (HR3 on s45): an agent's change to Independent is checked at its file's save, under the board's lock", () => {
+  // Another caller's board write: run in the test's own context, never inside the change's own write (whose board lock
+  // a write there would join, as a change made inside another is part of it).
+  const outside = AsyncResource.bind(<T>(fn: () => T): T => fn())
+  it('a change that looked like none is refused when the agent was made a builder meanwhile (and given a card)', async () => {
+    const p = join(wsPath, 'api1')
+    await here(() => w.updateAgent(p, 'k', { workflowRole: 'independent' }))
+    const actualUpdate = w.updateAgent.bind(w)
+    const tasks = await import('../src/main/tasks')
+    let carding: Promise<unknown> | null = null
+    const spy = vi.spyOn(w, 'updateAgent').mockImplementationOnce(async (host, id, patch, check) => {
+      // Another save makes it a builder, and a card is given to it, while this change waits for its project's lock.
+      await actualUpdate(host, id, { workflowRole: 'builder' })
+      carding = outside(() => here(() => tasks.createTask({ title: 'Given meanwhile', project: 'api1', agent: 'k', column: 'doing' }, { kind: 'user' })))
+      return actualUpdate(host, id, patch, check)
+    })
+    try {
+      await expect(here(() => updateAgent(p, 'k', { workflowRole: 'independent' }))).rejects.toThrow(/changed meanwhile/)
+      expect((await w.projectConfig(p)).agents?.find((x) => x.id === 'k')?.workflowRole).toBe('builder')
+    } finally {
+      spy.mockRestore()
+      await carding
+    }
+  })
+
+  it('no card is given to it while its file is saved: the board waits for the save', async () => {
+    const p = join(wsPath, 'alpha')
+    await here(() => w.updateAgent(p, 'a-one', { workflowRole: 'builder' }))
+    const tasks = await import('../src/main/tasks')
+    let carding: Promise<unknown> | null = null
+    // The role saved in project.json when the card was given: Independent only if the board waited for the save.
+    let roleWhenGiven: unknown = null
+    configTestHooks.beforeConfigWrite = async (written) => {
+      if (written !== p || carding) return
+      const state = { given: false }
+      carding = outside(() => here(() => tasks.createTask({ title: 'Given during the save', project: 'alpha', agent: 'a-one', column: 'doing' }, { kind: 'user' }))).then(() => {
+        state.given = true
+        roleWhenGiven = (JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8')) as { agents: { id: string; workflowRole?: string }[] }).agents.find((x) => x.id === 'a-one')?.workflowRole
+      })
+      // The save goes on once the card is given, or once its write waits for the board's lock (counted with this
+      // change's own): HR3's probe, which gave it during the save, without waiting on a lock the save holds.
+      const until = Date.now() + HUNG_MS
+      while (!state.given && writesAt(wsPath) < 2 && Date.now() < until) await new Promise((r) => setImmediate(r))
+    }
+    try {
+      await here(() => updateAgent(p, 'a-one', { workflowRole: 'independent' }))
+      await carding
+      // Given once the save was in place, never while it was being made with nothing to confirm.
+      expect(roleWhenGiven).toBe('independent')
+    } finally {
+      configTestHooks.beforeConfigWrite = undefined
+      await here(() => w.updateAgent(p, 'a-one', { workflowRole: 'builder' }))
+    }
+  })
+})
+
+describe('HI-2670 (HR3 on s46): lock order, and what a change affects read as the file is', () => {
+  it('a rename with a role change takes the names lock before the board lock', async () => {
+    const p = join(wsPath, 'api1')
+    const names = await import('../src/main/agentNames')
+    const boards = await import('../src/main/boardStore')
+    const actual = names.withAgentNames
+    let boardHeldAtNames: boolean | null = null
+    const spy = vi.spyOn(names, 'withAgentNames').mockImplementationOnce(async (host, fn) => {
+      boardHeldAtNames = boards.inBoardWrite(wsPath)
+      return actual(host, fn)
+    })
+    try {
+      await here(() => updateAgent(p, 'k', { name: 'Renamed K', workflowRole: 'reviewer' }))
+      expect(boardHeldAtNames).toBe(false)
+      expect((await w.projectConfig(p)).agents?.find((x) => x.id === 'k')).toMatchObject({ name: 'Renamed K', workflowRole: 'reviewer' })
+    } finally {
+      spy.mockRestore()
+      await here(() => updateAgent(p, 'k', { name: 'Api K' }))
+    }
+  })
+
+  it("a project.json being written (its .bak older) refuses turning a connection's tools off, never reading its agents as gone", async () => {
+    const account = await signedInConnection('Probe', 'probe@example.com')
+    const conn = baseOf(account.id)
+    const p = join(wsPath, 'alpha')
+    const file = join(p, '.combwork', 'project.json')
+    await here(() => w.updateAgent(p, 'a-one', { connection: conn, workflowRole: 'builder' }))
+    const tasks = await import('../src/main/tasks')
+    const launchSettings = await import('../src/main/connectionLaunch')
+    await here(() => tasks.createTask({ title: 'Held while config is unsettled', project: 'alpha', agent: 'a-one', column: 'doing' }, { kind: 'user' }))
+    const original = readFileSync(file, 'utf8')
+    writeFileSync(`${file}.bak`, JSON.stringify({ version: 2, agents: [] }))
+    writeFileSync(file, '{')
+    try {
+      await expect(launchSettings.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/couldn't read which agents, lanes and cards/)
+      expect(accounts.getConnection(conn)?.launch).toBeUndefined()
+    } finally {
+      writeFileSync(file, original)
+    }
+    // Readable again: it names a-one's card, and asks for confirmation.
+    await expect(launchSettings.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/One \(.*doing\).*confirm: [0-9a-f]+/)
+  })
+
+  it("a project.json that is missing for an open project refuses it too: unavailable is never empty (HR2 on s47)", async () => {
+    const account = await signedInConnection('Probe 2', 'probe2@example.com')
+    const conn = baseOf(account.id)
+    const p = join(wsPath, 'alpha')
+    const file = join(p, '.combwork', 'project.json')
+    await here(() => w.updateAgent(p, 'a-one', { connection: conn, workflowRole: 'builder' }))
+    const tasks = await import('../src/main/tasks')
+    const launchSettings = await import('../src/main/connectionLaunch')
+    await here(() => tasks.createTask({ title: 'Held while project.json is away', project: 'alpha', agent: 'a-one', column: 'doing' }, { kind: 'user' }))
+    const aside = `${file}.aside-hi2670`
+    renameSync(file, aside)
+    try {
+      await expect(launchSettings.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/couldn't read which agents, lanes and cards.*alpha's project\.json is missing/)
+      expect(accounts.getConnection(conn)?.launch).toBeUndefined()
+    } finally {
+      renameSync(aside, file)
+    }
+    await expect(launchSettings.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/One \(.*doing\).*confirm: [0-9a-f]+/)
+  })
 })

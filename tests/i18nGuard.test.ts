@@ -7,7 +7,7 @@ import { createRequire } from 'module'
 import { dirname, join, resolve } from 'path'
 import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
-import { ALLOW_DIR, allowName, baseLists, defaultBaseRef, growth, readLists, runGuard, sitesOf } from '../scripts/i18nGuard.mjs'
+import { ALLOW_DIR, allowName, baseLists, growth, readLists, runGuard, sitesOf } from '../scripts/i18nGuard.mjs'
 
 const ROOT = resolve(__dirname, '..')
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => Record<string, string> }
@@ -315,14 +315,8 @@ describe('the i18n guard: what review round 1 found', () => {
 })
 
 describe("Combwork's own source", () => {
-  it('has no new hard-coded UI text, and its allowlists are no bigger than at the merge base', () => {
-    const ref = defaultBaseRef(ROOT)
-    const base = baseLists(ROOT, ref) as { base: string; lists: Lists | null } | null
-    // CI checks out the history (fetch-depth 0), so it always has a base to compare with.
-    if (process.env.CI) expect(base, `no merge base with ${ref}`).not.toBeNull()
-    const r = runGuard({ root: ROOT, against: base?.lists ?? undefined }) as Result
-    expect(r.exit, r.lines.join('\n')).toBe(0)
-  }, 120_000)
+  // The whole source against its merge base is `node scripts/i18nGuard.mjs` (check:repo, CI's `npm run i18n:guard`),
+  // which fails on CI without a merge base too: it was also run here until HI-2663, the same scan twice.
 
   it('a new hard-coded string in a real file fails, against its real allowlist', () => {
     const rel = 'src/renderer/src/components/Board.tsx'

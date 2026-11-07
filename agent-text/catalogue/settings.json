@@ -2705,6 +2705,10 @@
     "text": "{what}, or null to inherit",
     "note": "What a workflow option takes: {what} (settings.agent.takes.*), and null, which inherits the level's value."
   },
+  "settings.agent.takes.otherTargets": {
+    "text": "a list of branch names besides project.workflow.target, e.g. [\"1.2.0\"] (each one a lane or card may take as its target)",
+    "note": "What the workflow option otherTargets takes (HI-2556). The JSON and project.workflow.target (a setting's id) are code: keep them."
+  },
   "settings.agent.takes.preChecks": {
     "text": "a list of check names, e.g. [\"typecheck\", \"lint\"] (each with its command in project.workflow.commands)",
     "note": "What the workflow option preChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them."

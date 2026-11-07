@@ -1,6 +1,5 @@
 // The merge queue's controls in the app (#1353, SPEC §16.9.3, OP-9): a project set to "Combwork merges" into `integration`
 // (queueFixture.cjs), fake Claude Code agents acting by their own tokens.
-// - Pause queue (the window's): an approved card waits, unmerged, the pause kept with who; Resume merges it;
 // - Remove from queue during its check, then a restart: never merged (S33a);
 // - Retry merge after a red check: queued again once, and merged;
 // - GET /v1/queue's shape for a project agent; an agent's and a script's pause refused (403);
@@ -43,23 +42,8 @@ const TARGET = 'integration'
       return { status: res.status, body: await res.json().catch(() => null) }
     }
 
-    // --- Pause queue: an approved card waits; Resume merges it.
-    q.steer(fx, 'pass')
-    const paused = await h.inv('queue:pause', fx.alpha, TARGET)
-    check('Pause queue: saved as the user\'s', paused?.paused?.reason === 'user' && paused.paused.by === 'user', JSON.stringify(paused?.paused))
-    const before = q.head(fx)
-    const one = await q.approve(fx, h, reviewer, 'One', { 'one.txt': 'one\n' })
-    check('a card approved while paused', Object.values(one.steps).every((s) => s.status === 200), JSON.stringify(one.steps))
-    const waiting = await until(async () => {
-      const v = await view()
-      return idle(v) && v.queued.some((e) => e.card === one.n) ? v : null
-    }, HUNG_MS)
-    check('…waits in the queue, unmerged: queued, no advance begun, the target unmoved', !!waiting && !(await h.kinds(one.n)).includes('IntegrationStarted') && q.head(fx) === before && (await column(one.n)) === 'passed', JSON.stringify(waiting))
-    const resumed = await h.inv('queue:resume', fx.alpha, TARGET)
-    check('Resume: resumed', resumed?.resumed === true && resumed.view.paused === null, JSON.stringify(resumed))
-    check('…and the card is merged', await done(one.n), JSON.stringify(await h.kinds(one.n)))
-    const v1 = await view()
-    check('…its outcome kept in the model, newest first', v1?.recent?.[0]?.card === one.n && v1.recent[0].outcome === 'merged' && v1.recent[0].result === q.head(fx), JSON.stringify(v1?.recent?.[0]))
+    // Pause queue and Resume (an approved card waits, unmerged; the pause kept as the user's) are progressqueue's, through the
+    // window's Pause, queuecard's (approved while paused waits) and queuePause.test.ts's: here too, over IPC, until HI-2663.
 
     // --- Remove from queue during its check: back to Passed, never merged.
     q.steer(fx, 'wait')

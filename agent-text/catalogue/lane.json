@@ -207,6 +207,10 @@
     "text": "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.",
     "note": "cw_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer."
   },
+  "lane.refused.independent": {
+    "text": "{agent} is Independent: it takes no part in the workflow (its own role, or its connection launches it without Combwork's tools), so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.",
+    "note": "cw_lane's refusal (HI-2670): an Independent agent is never a lane's builder or reviewer."
+  },
   "lane.refused.joinNoLane": {
     "text": "{builder} has no lane running yet: give the cards too, and the lane starts with you as its reviewer",
     "note": "cw_lane join refused: the builder has no running lane, and no cards were given to start one."
@@ -374,6 +378,10 @@
   "lane.status.hooks": {
     "text": "paused: {agent}'s hooks aren't arriving",
     "note": "A lane pauses while its builder's or reviewer's hooks aren't arriving (#1336): nothing is typed into that agent."
+  },
+  "lane.status.independent": {
+    "text": "paused: {agent} is Independent now (its connection launches it without Combwork's tools, or its role was changed): give the lane another agent, or end it",
+    "note": "A lane pauses while its builder or reviewer is Independent (HI-2670): Combwork gives that agent nothing. The user gives the lane another agent or ends it."
   },
   "lane.status.itsAgent": {
     "text": "its agent",

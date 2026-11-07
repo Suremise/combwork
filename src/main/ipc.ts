@@ -21,6 +21,7 @@ import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { connectionInput, type ConnectionPatch } from '../shared/accounts'
 import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, setUsageMove, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
+import { launchImpact, setConnectionLaunch } from './connectionLaunch'
 import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setServerModelContext, setUpServerConnection } from './serverConnections'
 import { cancelServerChecks, lastServerCheck, readServerContext, testServerTools } from './serverDiagnostics'
 import { requireMasking } from './keyCoverage'
@@ -904,6 +905,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
     'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     'tasks:setReviewSkip': (n, skip, opts) => tasks.setReviewSkip(n, skip === true, { kind: 'user' }, { reason: opts?.reason }),
+    'tasks:setTarget': (n, target) => tasks.setTarget(n, typeof target === 'string' ? target.slice(0, 250) : null, { kind: 'user' }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
       const user = { kind: 'user' } as const
@@ -1156,7 +1158,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return projectAgents.addLegacyAgent(p, opts)
     },
     'agents:memory': async () => ({ running: await agentsMemory(), total: totalmem(), free: freemem() }),
-    'agents:update': (p, id, patch) => projectAgents.updateAgent(p, id, patch),
+    'agents:update': (p, id, patch, confirmed) => projectAgents.updateAgent(p, id, patch, { confirmed: typeof confirmed === 'string' ? confirmed : null }),
+    'agents:impact': (p, id, patch) => projectAgents.agentChangeImpact(p, id, patch),
     'agents:remove': (p, id, opts) => projectAgents.removeAgent(p, id, opts),
     'agents:worktreeChecks': (p) => projectAgents.worktreeChecks(p),
     'agents:missingWorktree': (p, id) => missingWorktree(workspace.assertProject(p), String(id)),
@@ -1577,7 +1580,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
       if (typeof r.builder !== 'string' || !r.builder) throw combworkError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
-      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}) })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
     'costs:cards': (q) => {
@@ -1841,6 +1844,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:move': (id, index) => moveConnection(id, Number(index)),
     'connection:add': (account, input) => addConnection(String(account), connectionInput(input) as ConnectionPatch & { name: string }),
     'connection:update': (id, patch) => updateConnection(String(id), connectionInput(patch)),
+    'connection:launchImpact': (id, launch) => launchImpact(String(id), launch),
+    'connection:setLaunch': (id, launch, confirmed) => setConnectionLaunch(String(id), launch, typeof confirmed === 'string' ? confirmed : null),
     'connection:duplicate': (id) => duplicateConnection(String(id)),
     'connection:remove': (id) => removeConnection(String(id)),
     'connection:move': (id, index) => moveConnectionInAccount(String(id), Number(index)),

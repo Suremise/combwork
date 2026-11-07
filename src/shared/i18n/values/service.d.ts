@@ -9,6 +9,7 @@ interface CombworkMessageValues {
   'service.advanced.notJson': { error: string | number }
   'service.advanced.notObject': { example: string | number }
   'service.advanced.notValues': undefined
+  'service.advanced.onConnection': { id: string | number }
   'service.advanced.unknown': { id: string | number }
   'service.answerRelay.title': { card: string | number }
   'service.assistantAsk.title': { card: string | number }
@@ -184,6 +185,12 @@ interface CombworkMessageValues {
   'service.laneStarts.freshBlockedBody': { why: string; minutes: number; reason: string | number }
   'service.laneStarts.freshBlockedTitle': { agent: string | number }
   'service.lanes.noWorkspace': undefined
+  'service.lanes.targetBuilder': undefined
+  'service.lanes.targetCard': { card: string | number; cardTarget: string | number; target: string | number }
+  'service.lanes.targetFixed': { builder: string | number; target: string | number }
+  'service.lanes.targetMissing': { unknown: string; target: string | number }
+  'service.lanes.targetNotListed': { hasTargets: string; target: string | number; default: string | number; hasOthers: string; others: string | number }
+  'service.lanes.targetRulesOff': undefined
   'service.lanes.teamPaused': undefined
   'service.lanes.unknown': { id: string | number }
   'service.mcp.addedDropped': { n: number }

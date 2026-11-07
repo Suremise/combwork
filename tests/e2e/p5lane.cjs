@@ -373,6 +373,9 @@ const ancestor = (x, y) => {
     const [up] = await factsOf(c2, 'Updated')
     check('…brought up to date by the queue (strict): Updated, carried, from the reviewed revision', up?.data?.carried === true && up.data.from === two.rev, JSON.stringify(up))
     check("…merged with the user's commit kept, naming both revisions", git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Combwork-Updated: ${up?.data?.to}`) && git(alpha, 'log', '-1', '--format=%B', 'main').includes(`Combwork-Revision: ${two.rev}`) && ancestor(two.moved, 'main'))
+    // (mergestrict's, until HI-2663) The queue's own ref for the update goes with the outcome.
+    const key2 = await keyOf(c2)
+    check("…its entry's update ref dropped with the outcome", !!(await waitHung(() => !git(alpha, 'for-each-ref', '--format=%(refname)', 'refs/cw/queue/').includes(`${key2}-e`))))
     // The queue's update and merge leave the slot alone. Combwork starts Three about a second after Two is Done (HI-1990), its
     // line made in the slot: the slot may be exactly as Three's start prepared it by now (HR1's round 2: its own
     // SlotPrepared, on the lease Three was started with: that line checked out at that revision, nothing changed), and
@@ -404,6 +407,21 @@ const ancestor = (x, y) => {
     check('…the slot untouched', untouched(three.was) && (await factsOf(c3, 'Updated')).length === 0, JSON.stringify(worktreeNow()))
     const k3 = await keyOf(c3)
     await shoot('4-three-returned', 'merges', async () => (await queueText()).includes(`${k3} returned`) && (await onBoard('Active', c3)))
+    // (mergestrict's, until HI-2663; HI-1181 round 1) Strict's return shows its hunks too (it isn't up to date, not a
+    // conflict, as its reason), the card's side first: strict merges the target into it.
+    await q.showBoard(page)
+    await q.openByTitle(page, c3)
+    const threeDialog = page.locator('.dialog').filter({ has: page.locator('.task-title-input') })
+    await threeDialog.waitFor({ timeout: HUNG_MS })
+    const fileRow = threeDialog.locator('[data-conflict-file="a.txt"]')
+    check("…its Work section lists a.txt with its one conflict", !!(await waitHung(async () => /a\.txt\s+1 conflict/.test(await fileRow.innerText().catch(() => '')))), await threeDialog.innerText().catch(() => ''))
+    await fileRow.locator('button').click()
+    const cardSideFirst = (t) => {
+      const at = [k3, 'two by B1', 'main', 'TWO by the user'].map((x) => t.indexOf(x))
+      return at.every((x, i) => x >= 0 && (i === 0 || x > at[i - 1]))
+    }
+    check("…unfolded: the card's side first, then main's", !!(await waitHung(async () => cardSideFirst(await fileRow.locator('.card-work-hunk-text').innerText().catch(() => '')))), await fileRow.innerText().catch(() => ''))
+    await page.keyboard.press('Escape')
     // B1 brings its line up to date in the slot (its side kept), checks and submits again; the review passes.
     git(wt, 'merge', '-q', '-X', 'ours', '-m', 'main in', 'main')
     const resumed = await round(c3, 'a.txt', { commitIt: false })

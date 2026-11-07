@@ -215,7 +215,7 @@ function helpers(h) {
    * A lane started from the window: the Todo column's Start Lane with These Cards… (all of `cards`, the column's own),
    * or a card's Start Lane with It…; the builder and reviewer (or the pool) chosen; the lane recorded.
    */
-  const startLane = async (p, cards, builder, reviewer) => {
+  const startLane = async (p, cards, builder, reviewer, target) => {
     await showBoard(path.basename(p))
     await until(async () => (await col('todo').locator('.task-card').count()) >= cards.length, HUNG_MS)
     if (cards.length > 1) {
@@ -231,6 +231,11 @@ function helpers(h) {
     await until(async () => (await dialog.count()) === 1, HUNG_MS)
     await dialog.locator('#lane-start-builder').selectOption(builder.id)
     await dialog.locator('#lane-start-reviewer').selectOption(reviewer ? reviewer.id : '*pool')
+    // Its Merges into (HI-2556), offered once the project lists another branch.
+    if (target) {
+      await until(async () => (await dialog.locator('#lane-start-target').count()) === 1, HUNG_MS)
+      await dialog.locator('#lane-start-target').selectOption(target)
+    }
     await dialog.getByRole('button', { name: /^(Start Lane|Wait and Start)$/ }).click()
     await until(async () => (await dialog.count()) === 0, HUNG_MS)
     return until(async () => (await inv('lanes:list')).find((l) => l.builder.id === builder.id && l.state !== 'ended' && JSON.stringify(l.cards.map((x) => x.number)) === JSON.stringify(cards)), HUNG_MS)
@@ -319,14 +324,29 @@ function helpers(h) {
     must('Team saved from the tab: Combwork merges into main, slots, G15 On, G17 One per lane, quick and tests before review and merge', opts?.finish === 'combworkMerges' && opts.target === 'main' && !!opts.commands?.typecheck && !!opts.commands?.test && opts.folder === 'slots' && opts.slotsUpToDate === true && opts.reviewerMode === 'lane' && opts.preChecks?.length === 2 && opts.mergeChecks?.length === 2, JSON.stringify(opts))
     await inv('project:updateConfig', alpha, { slots: { setup: `node "${path.join(fx.tools, 'setup.js')}"` } })
 
+    // --- HI-2556: 1.2.0 beside main, listed in the tab's Other branches work can merge into: it applies at once.
+    git(alpha, 'branch', '1.2.0')
+    const others = form.locator('.workflow-option[data-option="otherTargets"] input')
+    await others.fill('1.2.0')
+    await others.press('Enter')
+    await form.locator('[data-action="save"]').click()
+    await save.waitFor({ timeout: HUNG_MS })
+    check('HI-2556: listing 1.2.0 under Other branches work can merge into applies now (not a rule)', !!(await until(async () => /apply now/.test(await x.text(save)), HUNG_MS)), await x.text(save))
+    await save.getByRole('button', { name: 'Save', exact: true }).click()
+    await save.waitFor({ state: 'detached', timeout: HUNG_MS })
+    must('…saved', !!(await until(async () => JSON.stringify((await inv('workflow:form', alpha))?.options?.otherTargets) === '["1.2.0"]', HUNG_MS)))
+
     // --- Two lanes from the window at once, each lent a slot, its builder started there in a new conversation.
     const a1 = await x.create(alpha, 'Lane one: first')
     check(`…the key is the project's (its cards' ${(await x.card(a1)).key})`, (await x.card(a1)).key.startsWith(`${key}-`))
     const a2 = await x.create(alpha, 'Lane one: second')
     const l1 = await x.startLane(alpha, [a1, a2], b1, r1)
     const c1 = await x.create(alpha, 'Lane two: only')
-    const l2 = await x.startLane(alpha, [c1], b2, r2)
+    const l2 = await x.startLane(alpha, [c1], b2, r2, '1.2.0')
     check('two lanes started from the window, AL-B1 / AL-R1 and AL-B2 / AL-R2', !!l1 && !!l2, JSON.stringify(await inv('lanes:list')))
+    check('HI-2556: lane 2 merges into 1.2.0, lane 1 into the project’s main', l2?.target === '1.2.0' && !l1?.target, JSON.stringify([l1?.target, l2?.target]))
+    await x.showTab('lanes')
+    check('…its header says "into 1.2.0"', !!(await until(async () => (await x.laneTop(l2.id).locator('[data-lane-target="1.2.0"]').count()) === 1, HUNG_MS)), await x.text(x.laneTop(l2.id)))
     Object.assign(kept, { a1, a2, c1, l1: l1?.id, l2: l2?.id })
     const slotA = await until(() => x.slotOfLane(alpha, l1.id), HUNG_MS)
     const slotB = await until(() => x.slotOfLane(alpha, l2.id), HUNG_MS)
@@ -341,18 +361,19 @@ function helpers(h) {
     }
     check("the slots' warming ran as Combwork's, for each slot", !!(await until(async () => ['slot-a', 'slot-b'].every((n) => lines(setupLog).includes(n)), HUNG_MS)) && (await x.runs()).some((r) => r.source === 'combwork' && r.slot === 'slot-a'), JSON.stringify({ log: lines(setupLog), runs: (await x.runs()).filter((r) => r.slot).map((r) => [r.slot, r.source, r.defaultName]) }))
 
-    // Each card its own line from main's head.
-    const startIn = async (b, n, slot) => {
+    // Each card its own line from its target's head (main; lane 2's 1.2.0, HI-2556).
+    const startIn = async (b, n, slot, target = 'main') => {
       const s = await x.intent(alpha, b, n, 'start')
       const line = s.body?.data?.line
-      const base = git(alpha, 'rev-parse', 'main')
+      const base = git(alpha, 'rev-parse', target)
       const ok = s.status === 200 && same(s.body?.data?.folder, slot.folder) && !!line && !!(await until(() => git(slot.folder, 'branch', '--show-current') === line && git(slot.folder, 'rev-parse', 'HEAD') === base, HUNG_MS))
       return { ok, line, why: JSON.stringify({ s: s.body, branch: git(slot.folder, 'branch', '--show-current') }) }
     }
     const s1 = await startIn(b1, a1, slotA)
     must(`${key}-B1's first card starts in slot-a on its own line from main's head`, s1.ok, s1.why)
-    const s3 = await startIn(b2, c1, slotB)
-    must(`${key}-B2's card starts in slot-b on its own line from main's head`, s3.ok && s3.line !== s1.line, s3.why)
+    const s3 = await startIn(b2, c1, slotB, '1.2.0')
+    must(`${key}-B2's card starts in slot-b on its own line from 1.2.0's head`, s3.ok && s3.line !== s1.line, s3.why)
+    check('HI-2556: …its start records 1.2.0 as its target', (await x.fact(c1, 'Started'))?.data?.target === '1.2.0', JSON.stringify((await x.fact(c1, 'Started'))?.data))
     Object.assign(kept, { line3: s3.line })
 
     // --- Lane 1's first card: counted checks in the slot, submitted.
@@ -485,7 +506,7 @@ function helpers(h) {
     await h.app.close().catch(() => undefined)
   }
 
-  // --- The second start: the restart's Resume All (S35), then the pool (beta) and everyone in the project folder (gamma).
+  // --- The second start: the restart's Resume All (S35), then the pool (beta).
   h = await startCombwork()
   try {
     if (kept.ok) {
@@ -513,6 +534,9 @@ function helpers(h) {
       await inv('session:start', alpha, { agentId: kept.r2.id }).catch(() => undefined)
       check('lane 2 carries on after the restart: submitted, reviewed, passed', (await x.intent(alpha, b2, kept.c1, 'submit', { summary: 'two: ready' })).status === 200 && (await x.intent(alpha, kept.r2, kept.c1, 'start-review')).status === 200 && (await x.intent(alpha, kept.r2, kept.c1, 'verdict', { pass: true, comment: 'two: passed' })).status === 200)
       check('…merged: Done, the lane ended', (await x.done(kept.c1)) && !!(await until(async () => !!(await x.lane(kept.l2))?.endedAt, HUNG_MS)))
+      // HI-2556: through 1.2.0's own queue, into 1.2.0 and not main.
+      const i3 = await x.fact(kept.c1, 'Integrated')
+      check('HI-2556: …into 1.2.0 through its own queue, not into main', i3?.data?.target === '1.2.0' && isIn(alpha, i3.data.result, '1.2.0') && !isIn(alpha, i3.data.result, 'main'), JSON.stringify(i3?.data))
     }
   } catch (e) {
     caught('restart: ', e)
@@ -522,11 +546,9 @@ function helpers(h) {
   } catch (e) {
     caught('the pool: ', e)
   }
-  try {
-    await everyoneInTheFolder(h)
-  } catch (e) {
-    caught('everyone in the project folder: ', e)
-  }
+  // Everyone in the project folder with the pool (HR2's round 1 finding 2 on #1428) is reviewerpool's section 2, with this
+  // suite's checks of it (no slot lent, the builder's and the reviewer's folder), and a Codex reviewer leased a copy at the
+  // revision is reviewcopies's: run here too until HI-2663.
   if (kept.ok)
     try {
       await gallery(h, kept)
@@ -653,39 +675,6 @@ async function pool(h) {
     return (await inv('lanes:start', beta, { builder: b2.id, reviewer: null, pool: true, cards: [p5] }).catch((e) => (/ is working| is starting| is waiting/.test(String(e)) ? null : Promise.reject(e))))?.lane ?? null
   }, HUNG_MS)
   check('another lane on the pool, left running', !!l5 && !!(await until(() => x.slotOfLane(beta, l5.id), HUNG_MS)), JSON.stringify(await x.live(beta, b2.id)))
-}
-
-/**
- * C. gamma, everyone in the project folder with the pool (HR2's round 1 finding 2 on #1428): Committed is done, two
- * builders in the project folder, one pooled Codex reviewer; each card is reviewed from the pool in a review copy at its
- * revision and is Done, and no slot is lent.
- */
-async function everyoneInTheFolder(h) {
-  const { inv } = h
-  const x = helpers(h)
-  await inv('workflow:setOptions', gamma, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity: fx.identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
-  const g1 = await lib.addAgent(inv, gamma, { name: 'G-B1', workflowRole: 'builder' })
-  const g2 = await lib.addAgent(inv, gamma, { name: 'G-B2', workflowRole: 'builder' })
-  const gr = await lib.addAgent(inv, gamma, { name: 'G-R1', workflowRole: 'reviewer', provider: 'codex' })
-  for (const [b, title] of [[g1, 'Folder: first'], [g2, 'Folder: second']]) {
-    const n = await x.create(gamma, title)
-    const l = await inv('lanes:start', gamma, { builder: b.id, reviewer: null, pool: true, cards: [n] })
-    check(`${b.name}'s lane on the pool, with no slot`, l.lane?.pool === true && !l.slot, JSON.stringify(l))
-    const s = await x.intent(gamma, b, n, 'start')
-    check(`${b.name} starts its card in the project folder`, s.status === 200 && same(s.body?.data?.folder ?? gamma, gamma) && same((await x.live(gamma, b.id))?.cwd, gamma), JSON.stringify(s.body))
-    const key = (await x.card(n)).key
-    const rev = commitIn(gamma, { [`${key}.txt`]: `${key}\n` }, title, key)
-    const sub = await x.intent(gamma, b, n, 'submit', { summary: `${title}: ready`, revision: rev })
-    check('…submitted', sub.status === 200, JSON.stringify(sub.body))
-    // The builder moves on in the folder: the reviewer reads the card at its revision in a copy.
-    commitIn(gamma, { 'later.txt': `after ${key}\n` }, `after ${title}`)
-    await until(async () => (await assignedOf(x, n)).includes(gr.id), HUNG_MS)
-    await x.idle(gamma, gr.id)
-    const { s: r, copy } = await x.startReview(gamma, gr, n)
-    must(`G-R1 reviews it from the pool in a review copy at ${rev.slice(0, 7)}`, r.status === 200 && !!copy && git(copy, 'rev-parse', 'HEAD') === rev && same((await x.live(gamma, gr.id))?.cwd, gamma), JSON.stringify(r.body))
-    check('…passes it: Done (committed)', (await x.intent(gamma, gr, n, 'verdict', { pass: true, comment: 'passed' })).status === 200 && (await x.done(n)))
-  }
-  check('no slot was lent in gamma', (await x.slots(gamma)).length === 0, JSON.stringify(await x.slots(gamma)))
 }
 
 /**

@@ -4,8 +4,8 @@
     "description": "An error: saving where the user put the agents' panes in a layout (dragging a pane to another cell) was given a layout or places Combwork doesn't know."
   },
   "worktrees.agent.badWorkflowRole": {
-    "defaultMessage": "A role in the workflow is builder, reviewer, either or generalist.",
-    "description": "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English."
+    "defaultMessage": "A role in the workflow is builder, reviewer, either, generalist or independent.",
+    "description": "An error: an agent's role in the workflow was given as something else. builder, reviewer, either, generalist and independent are values: keep them in English."
   },
   "worktrees.agent.chooseMove": {
     "defaultMessage": "Choose where to move the agent.",

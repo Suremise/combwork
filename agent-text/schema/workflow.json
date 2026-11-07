@@ -296,6 +296,12 @@
   "workflow.option.okBefore.title": {
     "placeholders": {}
   },
+  "workflow.option.otherTargets.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.otherTargets.title": {
+    "placeholders": {}
+  },
   "workflow.option.preChecks.desc": {
     "placeholders": {}
   },

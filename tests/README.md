@@ -136,3 +136,55 @@ ones too (the backlog in #524's audit); it is a report and exits 0. Builders run
 checks, reads state once after an action, or raises a timeout with no stated reason.
 
 A test that flakes anyway is investigated with the `investigate-flake` skill (`.claude/skills`, `.agents/skills`).
+
+## Which test owns what: retired duplicates and their owners (HI-2663)
+
+HI-2627's inventory marked six areas SLIM: cut repeated execution before coverage, retire no whole area, and keep the
+safety cases (loss of work, crash ownership, storage and settings races, file corruption). HI-2663 audited each area
+(every candidate read on both sides) and retired a check only once it had named the test that still owns it; any check
+only the retired one made was moved into that owner first. Read this table before adding a check like one of these: its
+owner is where it goes. **Measured** times are suite runs before (the full run of 6 Nov, run-20261106-141513) and after
+(run-20261107-021625 at 26211c113, the same suites; the machine was loaded, so a few seconds either way is noise);
+**estimated** ones are smaller than that noise.
+
+The waits found along the way cost more than any duplicate: `lib.until` now says a wait of 10 s or more that ran out
+(`WAIT ran out after … at <suite:line>`), and each run and its record list them per suite. HI-2688 sweeps the rest.
+
+| Area | Retired, or trimmed | Its assertions' owner now | Time saved |
+|---|---|---|---|
+| Notifications and UI; usage and logging | 14 waits that ran out unchecked: `status === 'ready'` after a turn (a fake's is then `finished`: `lib.agentIdle`), a board wait on pane toolbars that stay mounted, an option found by a CSS selector | the same checks, now waiting for what they meant | **measured**: consolewindow 266 → 33 s, consoletext 130 → 18 s, notifytarget 219 → 190 s |
+| Guidance and scenarios | 86 scenarios run on the fake Claude Code only, 16 as model trials only, the rest on all three fakes (`scenarios/fakeScope.cjs`) | each id's owner in `scenarios/fakeScope-matrix.md`; per-CLI delivery: the scenarios kept on all three, `tool-sweep` for the tools only fake-alone scenarios call, codex.test.ts, carryingon.cjs, copilot.test.ts, copilot.cjs | **projected** about 73 min per three-provider fake pass (152.7 → about 80 min, from the 6 Nov per-scenario times), until comparable runs confirm it |
+| Test harness | the runner's second process listing after each suite | `stopProcessesIn` takes `endCopies`' listing when nothing was ended; listed again after an ending (each still by pid and start time) | **measured** per listing 0.9–1.0 s: about 1 s a suite, ~6 min of the runner's thread per full set |
+| Test harness | `failfast.cjs` | `windowsExits.test.ts`: the reporting it checked, and its one real-child check (0xc0000142, Windows only) | **measured** 1 s, one suite slot |
+| Repository guards | `i18nGuard.test.ts`'s scan of the whole source against its merge base | `node scripts/i18nGuard.mjs` (check:repo, CI's `i18n:guard`), which now also fails on CI without a merge base, the test's one extra assertion | **measured** about 11 s a full unit run, and one per change to `src/` it picked |
+| Git and the merge queue | `mergestrict.cjs` (S55's strict part) | `p5lane` Lane A (strict's update, carried, both trailers, the slot untouched, notUpToDate, resumed), with mergestrict's two checks moved there (the update ref dropped; the Work section's hunks, the card's side first); `queueStrict.test.ts` | **measured** 22 s |
+| Workflow and lanes | `p7lane`'s part C (everyone in the project folder with the pool) | `reviewerpool` section 2, with its checks moved there (no slot lent, the builder's and the reviewer's folder); `reviewcopies` (a Codex reviewer's copy at the revision) | estimated 15–20 s |
+| Usage and progress | `progresstabs`' real one-minute wait for the "long" lane wait | the same rendered transition, the window's clock moved on past the bound (`page.clock`); `laneBar.test.ts` the bound's arithmetic | **measured** 154 → 97 s |
+| Usage and progress | `progressreport`'s late total, `--check` with no command, and `CW_PROGRESS=0` runs | `progressReport.test.ts` (late total once, `--check lint` exit 2, `progressTarget` off) and `progress.test.ts` | **measured** 239 → 185 s |
+| Notifications and UI | `tips`' "none after a reload" | `tips.test.ts` ("shows one a day"), and the suite's own #295 check (the same start path) | estimated 7 s |
+| Workflow and lanes | `p6rules`' G1b (two reviewers' quorum) | `tests/workflow/scenarios.git.test.ts` S57(c); in the app with Combwork merging, `p7lane`'s pool | estimated 6 s |
+| Git and the merge queue | `mergequeue`'s options moved to the agent merge during a check | `queuecard`'s "old rules" (Work section, Git tab history), `progressqueue` | estimated 5 s |
+| Git and the merge queue | `queuecontrols`' Pause and Resume over IPC | `progressqueue` (the window's Pause and Resume), `queuecard`, `queuePause.test.ts` | estimated 5 s |
+| Git and the merge queue | `gitview`'s project without git | `versioncontrol` (None: Workflow only, no Initialise, and now no status bar item), `gitinit` | estimated 3 s |
+
+**Kept, unchanged** (each audited; one line for why):
+- **Workflow, board and lanes**: suites share their setup (start, submit, review, merge), but each one's assertions are its own. The splits are recorded in their headers. The card-loop and wake suites differ in trigger, recipient and stall. `slotrecovery` and `lanebrief` (restart and ownership) stay.
+- **Git, locks and the merge queue**: these stay as the safety and boundary cases:
+  - `mergequeuecrash` and `queueupgrade` (crash seams);
+  - `queuelease` (takeover);
+  - `repolock` and `lockask`;
+  - `slotrelease`, `slotwriterhold` and the slot repair suites;
+  - `gitcleanup`, `unusedwt` and `unusedslots` (loss of work).
+
+  Kept but tentative, so not touched: `p5lane` Lane B, `mergequeuecrash`'s terminal part and `slotsessions`' restart step.
+- **Usage, performance and logging**: the metrics retention and cap arithmetic and their suites, and `performance`, `perftable` and `perfcompare`. The rest of `progressreport` stays (the shims, card defaults, nested Combwork).
+- **Notifications, navigation and UI**: the geometry and window suites (`tipcorner`, `tabstrip`, `rail`, `narrowmain`, `windows`…), `notifyonce` and `inbox`. They have no unit equivalent.
+- **Guidance and scenarios**: 52 scenarios stay on all three fakes:
+  - per-CLI skill delivery and reading, launch guidance and modes;
+  - the shell, typed lines, hooks, slots and copies;
+  - loss of work and settings.
+
+  Model trials (HI-2655) are unchanged.
+- **Test harness and guards**: every guard that is a rule's only owner (`tests/README.md`'s Isolation rules, e2esuites' suite and seam lists, focusedPick, checkRepo, line endings, control characters, temp folders, quiet copies, process identity, no shell starts), `isolation`, `harnessleftovers` and `scenarioteardown`. The upkeep left is HI-2689.
+
+**Release pass only:** an area whose code, callers and dependencies didn't change runs in the release pass, and in a focused run when its code changes (`--affected`, HI-2659). Nothing above moved a test out of the release pass.

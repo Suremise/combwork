@@ -319,6 +319,50 @@
       "project": "plain"
     }
   },
+  "tasks.error.targetCheckedOut": {
+    "placeholders": {
+      "unknown": "select",
+      "card": "plain",
+      "folder": "plain"
+    }
+  },
+  "tasks.error.targetHasWork": {
+    "placeholders": {
+      "unknown": "select",
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "tasks.error.targetLane": {
+    "placeholders": {
+      "card": "plain",
+      "builder": "plain",
+      "target": "plain"
+    }
+  },
+  "tasks.error.targetMissing": {
+    "placeholders": {
+      "unknown": "select",
+      "target": "plain"
+    }
+  },
+  "tasks.error.targetMoved": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.targetNotAgents": {
+    "placeholders": {}
+  },
+  "tasks.error.targetNotListed": {
+    "placeholders": {
+      "hasTargets": "select",
+      "target": "plain",
+      "default": "plain",
+      "hasOthers": "select",
+      "others": "plain"
+    }
+  },
   "tasks.error.tooLong": {
     "placeholders": {
       "what": "select",
@@ -747,6 +791,12 @@
   "tasks.history.takenFromOfWorkspace": {
     "placeholders": {
       "agent": "plain"
+    }
+  },
+  "tasks.history.target": {
+    "placeholders": {
+      "own": "select",
+      "target": "plain"
     }
   },
   "tasks.history.toProject": {

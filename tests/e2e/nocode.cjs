@@ -33,6 +33,8 @@ const check = (name, ok, extra = '') => {
   fs.mkdirSync(claudeHome, { recursive: true })
   lib.gitProject(alpha, { 'a.txt': 'one\n', '.gitignore': '.combwork/\n' })
   lib.gitProject(gamma, { 'a.txt': 'one\n', '.gitignore': '.combwork/\n' })
+  // HI-2556: gamma lists 1.2.0 as another branch work can merge into.
+  lib.git(gamma, ['branch', '1.2.0'])
   // Beta: no version control (None).
   fs.mkdirSync(beta, { recursive: true })
   fs.writeFileSync(path.join(beta, 'notes.md'), 'notes\n')
@@ -58,7 +60,7 @@ const check = (name, ok, extra = '') => {
     // Alpha: a reviewer agent, committed is done, everyone in the project folder. Beta (None) and gamma (Git): no review.
     await inv('workflow:setOptions', alpha, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project' } })
     await inv('workflow:setOptions', beta, { preset: null, options: { review: 'none', folder: 'project' } })
-    await inv('workflow:setOptions', gamma, { preset: null, options: { review: 'none', finish: 'committed', folder: 'project' } })
+    await inv('workflow:setOptions', gamma, { preset: null, options: { review: 'none', finish: 'committed', folder: 'project', otherTargets: ['1.2.0'] } })
     const agents = {
       builder: [alpha, await lib.addAgent(inv, alpha, { name: 'Builder' })],
       reviewer: [alpha, await lib.addAgent(inv, alpha, { name: 'Reviewer' })],
@@ -213,6 +215,42 @@ const check = (name, ok, extra = '') => {
     const sSub = await api('builder', 'POST', `/v1/tasks/${sRef}/submit`, { summary: 'Built.' })
     const sk = await facts(s)
     check('submitted: Done at once, with no reviewer', sSub.status === 200 && (await card(s))?.column === 'done' && !sk.includes('ReviewStarted') && !sk.includes('Verdict') && sk.includes('Accepted'), JSON.stringify({ body: sSub.body, facts: sk }))
+
+    // --- HI-2556: the New Card dialog's Merges into (gamma lists 1.2.0): the card made on it, its tile says so; the next
+    // New Card, and one cancelled and opened again, start on the project's own branch (HR2's round 1: no carry-over).
+    // Cancel: a project changed counts as an edit, so it asks to discard first.
+    const cancelCard = async () => {
+      await edit.getByRole('button', { name: 'Cancel' }).click()
+      const discard = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
+      if (await lib.until(async () => (await discard.count()) === 1 || (await edit.count()) === 0, HUNG_MS) && (await discard.count()) === 1) await discard.getByRole('button', { name: 'Discard', exact: true }).click()
+      await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
+    }
+    const newCard = async () => {
+      await page.locator('.board-toolbar button', { hasText: 'New Card' }).first().click()
+      await edit.waitFor({ timeout: HUNG_MS })
+      await edit.locator('select:has(option[value="alpha"])').first().selectOption('gamma')
+      const field = edit.locator('#card-target')
+      return (await lib.until(async () => (await field.count()) === 1 && (await field.locator('option[value="1.2.0"]').count()) === 1, HUNG_MS)) ? field : null
+    }
+    let field = await newCard()
+    check('HI-2556: the New Card dialog offers Merges into where the project lists another branch (gamma)', !!field)
+    if (field) {
+      await edit.locator('.task-title-input').fill('Start the 1.2.0 notes')
+      await field.selectOption('1.2.0')
+      await edit.getByRole('button', { name: 'Add Card' }).click()
+      const onRelease = await lib.until(async () => (await inv('tasks:list')).find((c) => c.title === 'Start the 1.2.0 notes'), HUNG_MS)
+      check('…the card made merges into 1.2.0', !!onRelease && (await work(onRelease.number))?.cardTarget === '1.2.0', JSON.stringify(onRelease && (await work(onRelease.number))))
+      check('…its tile says "Into 1.2.0"', !!onRelease && !!(await lib.until(async () => (await tile(onRelease.number).locator('[data-card-target="1.2.0"]').count()) === 1, HUNG_MS)))
+      field = await newCard()
+      check('…the next New Card starts on the project’s own branch', !!field && (await field.inputValue()) === '', field ? await field.inputValue() : 'no field')
+      if (field) {
+        await field.selectOption('1.2.0')
+        await cancelCard()
+      }
+      field = await newCard()
+      check('…and so does one opened after a cancelled pick', !!field && (await field.inputValue()) === '', field ? await field.inputValue() : 'no field')
+      await cancelCard()
+    }
 
     // --- A project agent only proposes it, with its reason: the user keeps the review in the dialog; agents never set it.
     const skipProposed = await api('builder', 'POST', '/v1/tasks', { title: 'Rename the helper', skipReview: 'It only renames a file' })

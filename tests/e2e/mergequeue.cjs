@@ -7,7 +7,6 @@
 //   into the queue (requeue) and is merged;
 // - merged by hand during its check (S7): observed, never merged twice;
 // - the target moved during its check (S27): tested again on the new head, never an untested advance;
-// - the project's options moved to the agent merge during its check: merged all the same (the card's ruleset);
 // - workflow rules turned off during its check: no advance (paused); on again, it is merged;
 // - Combwork ended right after the target moved, before `Integrated` (S33c): the next start records it, once.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
@@ -144,14 +143,8 @@ ${JSON.stringify(await h.kinds(five.n))}`)
     check("…its result's first parent is the moved target: tested again on it", !!i6 && lib.git(fx.alpha, ['rev-parse', `${i6.data.result}^1`]).trim() === moved, JSON.stringify(i6))
     check('…its checks ran twice (once per test merge)', (await h.facts(six.n)).filter((f) => f.kind === 'CheckRan').length === 2)
 
-    // --- The project's options move to the agent merge during its check: the card's ruleset still merges it.
-    q.steer(fx, 'wait')
-    const seven = await q.approve(fx, h, reviewer, 'Seven', { 'seven.txt': 'seven\n' })
-    check('options: its check is running', (await checkRunning()))
-    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { finish: 'agentMerges' }) })
-    fs.writeFileSync(fx.go, 'go')
-    check("…merged all the same under the card's ruleset: Done, Integrated by Combwork", (await done(seven.n)) && (await integrated(seven.n))[0]?.data?.by === 'combwork', JSON.stringify(await h.kinds(seven.n)))
-    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx) })
+    // The project's options moving to the agent merge during a card's check, the card's ruleset still merging it, is
+    // queuecard's "old rules" (through its Work section and the Git tab's history) and progressqueue's: here too until HI-2663.
 
     // --- Workflow rules off during its check: no advance; on again, merged.
     q.steer(fx, 'wait')
