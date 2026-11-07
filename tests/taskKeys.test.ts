@@ -166,7 +166,7 @@ describe('runTask: the setup keys go in once Codex has loaded and is idle', () =
     vi.useFakeTimers({ now: 0 })
     const keys = [{ keys: '\x15', waitMs: 150 }, { keys: '/permissions', waitMs: 200 }, { keys: '\r', waitMs: 900 }, { keys: '2', waitMs: 300 }]
     const run = (providerService as unknown as { runTask: (...a: unknown[]) => string }).runTask.bind(providerService)
-    run('codex', 'setup', 'codex.exe', [], 'Codex setup', { keys, ready: CODEX_LOADED, busyTitle: BUSY })
+    run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys, ready: CODEX_LOADED, busyTitle: BUSY })
     // Its prompt drawn while loading, the output ending in the middle of "loading".
     pty.onData!(stream.slice(0, loading + 1))
     pty.onData!(stream.slice(loading + 1, folder))
@@ -191,7 +191,7 @@ describe('runTask: the setup keys go in once Codex has loaded and is idle', () =
       vi.useFakeTimers({ now: 0 })
       const { codex } = await import('../src/main/providers/codex/adapter')
       const run = (providerService as unknown as { runTask: (...a: unknown[]) => string }).runTask.bind(providerService)
-      run('codex', 'setup', 'codex.exe', [], 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY })
+      run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY })
       pty.onData!(stream)
       await vi.advanceTimersByTimeAsync(3000)
       // The menu is open; the number isn't typed until it shows.
@@ -206,7 +206,7 @@ describe('runTask: the setup keys go in once Codex has loaded and is idle', () =
     vi.useFakeTimers({ now: 0 })
     const { codex } = await import('../src/main/providers/codex/adapter')
     const run = (providerService as unknown as { runTask: (...a: unknown[]) => string }).runTask.bind(providerService)
-    run('codex', 'setup', 'codex.exe', [], 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY })
+    run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY })
     pty.onData!(stream)
     pty.onData!('\r\n  1. Approve for me   Only ask for actions detected as potentially unsafe')
     await vi.advanceTimersByTimeAsync(10_000)
@@ -219,7 +219,7 @@ describe('runTask: the setup keys go in once Codex has loaded and is idle', () =
     vi.useFakeTimers({ now: 0 })
     const { codex } = await import('../src/main/providers/codex/adapter')
     const run = (providerService as unknown as { runTask: (...a: unknown[]) => string }).runTask.bind(providerService)
-    run('codex', 'setup', 'codex.exe', [], 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY, busyScreen: codexHoldsInput })
+    run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: CODEX_LOADED, busyTitle: BUSY, busyScreen: codexHoldsInput })
     pty.onData!(stream)
     // Until /permissions has gone in, and no further: its Enter comes 200 ms later.
     for (let ms = 0; ms < 5000 && pty.typed.length < 2; ms += 10) await vi.advanceTimersByTimeAsync(10)
@@ -295,7 +295,7 @@ describe('runTask: the setup keys go in once Codex has loaded and is idle', () =
     vi.useFakeTimers({ now: 0 })
     const { codex } = await import('../src/main/providers/codex/adapter')
     const run = (providerService as unknown as { runTask: (...a: unknown[]) => string }).runTask.bind(providerService)
-    run('codex', 'setup', 'codex.exe', [], 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: /never shown/, busyTitle: BUSY, busyScreen: codexHoldsInput })
+    run('codex', 'setup', { file: 'codex.exe', args: [] }, 'Codex setup', { keys: codex.modeMenuKeys('ask'), ready: /never shown/, busyTitle: BUSY, busyScreen: codexHoldsInput })
     pty.onData!(draw('codex-0.161-held-working'))
     await vi.advanceTimersByTimeAsync(45_000)
     expect(typed()).toEqual([])

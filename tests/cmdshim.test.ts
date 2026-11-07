@@ -1,10 +1,11 @@
 // Starting a CLI from a .cmd launcher: a Node CLI's (npm's, or a one-line one) is started as node and its script,
 // without cmd.exe and its 8,191-character command line; anything else still goes through cmd.exe, and a command line
 // too long for it is refused with a message saying what to do, rather than cmd.exe exiting at once.
+import { spawnSync } from 'child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { dirname, join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { CMD_MAX_CHARS, commandLineLength, promptArg, runsThroughCmd, shimTarget, toSpawnable } from '../src/main/providers/common'
+import { CMD_MAX_CHARS, childArgs, cmdArg, commandLineLength, promptArg, runsThroughCmd, shimTarget, toSpawnable } from '../src/main/providers/common'
 import { tempDir } from './tempDir'
 
 const base = tempDir('cw-cmdshim-')
@@ -112,8 +113,58 @@ describe.runIf(windows)('starting one', () => {
     const cmd = join(dir, 'tool.cmd')
     writeFileSync(cmd, '@"%~dp0tool.exe" %*\r\n')
     expect(toSpawnable(cmd, ['--version']).args).toEqual(['/d', '/s', '/c', cmd, '--version'])
+    expect(toSpawnable(cmd, ['--version']).line).toBe(`/d /s /c "${cmd} --version"`)
     expect(() => toSpawnable(cmd, long)).toThrow(/tool\.cmd has to run through cmd\.exe, which takes a command line of at most 8,191 characters.*Set the CLI's path in Settings to its \.exe/)
     expect(runsThroughCmd(cmd)).toBe(true)
     expect(promptArg(cmd, 'Fix "the" tests & 100%')).toBe('Fix the tests 100')
+  })
+
+  // HI-2722: cmd's /s strips the line's first and last quote, which took a quoted path's own quotes: at a path with spaces
+  // cmd.exe said "'C:\…\antigravity' is not recognized" and the agent never started.
+  it('at a path with spaces and other letters: it starts, and its arguments arrive as they were', () => {
+    const dir = join(base, 'proj ä ö · Gem One', 'bin (x86)')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'echo.cjs'), 'process.stdout.write(JSON.stringify(process.argv.slice(2)))\n')
+    // Not a launcher Combwork starts directly (it passes an argument of its own), so it goes through cmd.exe.
+    const cmd = join(dir, 'agy.cmd')
+    writeFileSync(cmd, '@node "%~dp0echo.cjs" --own %*\r\n')
+    expect(runsThroughCmd(cmd)).toBe(true)
+    const args = ['--settings', join(dir, 'agy settings.json'), 'plain', '', 'with "quotes" inside', 'a&b|c<d>e^f', 'tail\\', 'ä ö · 日本', promptArg(cmd, 'Fix "the" tests & 100%')]
+    const s = toSpawnable(cmd, args)
+    expect(s.file).toMatch(/cmd\.exe$/i)
+    expect(s.line).toBe(`/d /s /c "${[cmd, ...args].map(cmdArg).join(' ')}"`)
+    const a = childArgs(s)
+    expect(a).toEqual({ args: [s.line], windowsVerbatimArguments: true })
+    const r = spawnSync(s.file, a.args, { windowsVerbatimArguments: a.windowsVerbatimArguments, encoding: 'utf8', windowsHide: true, env: { SystemRoot: process.env.SystemRoot ?? 'C:\\Windows', PATH: dirname(process.execPath) } })
+    expect(r.stderr).toBe('')
+    expect(JSON.parse(r.stdout)).toEqual(['--own', ...args])
+  })
+
+  it("the length cmd.exe is refused at is its command line's own", () => {
+    const dir = join(base, 'spawn length')
+    mkdirSync(dir, { recursive: true })
+    const cmd = join(dir, 'tool.cmd')
+    writeFileSync(cmd, '@"%~dp0tool.exe" %*\r\n')
+    const fixed = commandLineLength(process.env.ComSpec || 'cmd.exe', `/d /s /c "${cmdArg(cmd)} "`)
+    expect(toSpawnable(cmd, ['x'.repeat(CMD_MAX_CHARS - fixed)]).line).toBeDefined()
+    expect(() => toSpawnable(cmd, ['x'.repeat(CMD_MAX_CHARS - fixed + 1)])).toThrow(/8,191 characters/)
+  })
+})
+
+describe('an argument of the line cmd.exe runs', () => {
+  it('is quoted where cmd.exe or the program would split it, as the program reads it back', () => {
+    expect(cmdArg('plain')).toBe('plain')
+    expect(cmdArg('C:\\no-spaces\\x.cmd')).toBe('C:\\no-spaces\\x.cmd')
+    expect(cmdArg('')).toBe('""')
+    expect(cmdArg('C:\\a b\\x.cmd')).toBe('"C:\\a b\\x.cmd"')
+    expect(cmdArg('a&b')).toBe('"a&b"')
+    expect(cmdArg('k=v')).toBe('"k=v"')
+    expect(cmdArg('say "hi"')).toBe('"say \\"hi\\""')
+    expect(cmdArg('C:\\a b\\')).toBe('"C:\\a b\\\\"')
+    expect(cmdArg('x\\"y')).toBe('"x\\\\\\"y"')
+  })
+
+  it('a list without a command line is spawned as it is', () => {
+    expect(childArgs({ file: 'x.exe', args: ['a b'] })).toEqual({ args: ['a b'], windowsVerbatimArguments: false })
   })
 })

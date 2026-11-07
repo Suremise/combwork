@@ -664,7 +664,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       for (const k of Object.keys(env)) if (k.toUpperCase() === 'CLAUDE_CODE_TMPDIR') delete env[k]
       env.CLAUDE_CODE_TMPDIR = ctx.tempDir
     }
-    return { file: s.file, args: s.args, env }
+    return { ...s, env }
   }
 
   autoCompact(ctx: LaunchContext, cmd: CommandSpec, models: string[]): AutoCompactSetting {
