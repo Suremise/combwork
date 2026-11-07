@@ -397,14 +397,22 @@ so a key built at run time can still reach the part only through something named
 related test**, with a reason in the picker's output: a changed file that isn't code, is added, deleted or unparseable,
 has a changed line outside every function, method or entry (module code, an import that isn't type-only, a
 constructor) or in a class's field, or whose module code names a changed part; a test the graph doesn't connect to the
-change; one loading a file whose imports can't all be known (a path worked out at run time, one not in the repository,
-a file it can't read or parse), whatever else reaches the change; one loading a file that uses the module whole, as the
-graph resolves its imports (`import * as` other than `mod.name`, `export *`, a `require` or `import()` not taken apart
-by name, `vi.importActual`, `vi.mock` from the original) or lists keys by reflection. `import.meta.glob`'s and
-`createRequire`'s literal paths are edges like any import. A
-changed `import type` counts for nothing. A `WorkspaceService` member keeps nearly every test of main, since nearly
-every one names `workspace`: narrowing those by which receivers can be one is HI-2678. When the e2e side is every
-suite the pick is still `{"every":true}`, unchanged.
+change; one loading a file that uses the module whole, as the graph resolves its imports (`import * as` other than
+`mod.name`, `export *`, a `require` or `import()` not taken apart by name, `vi.importActual`, `vi.mock` from the
+original, a glob of it) or lists keys by reflection; and one loading an **unknown** file, whatever else reaches the
+change. What a file loads is an allowlist (literal static imports, `import()`, `require()`, a `createRequire` require,
+Vitest's mocks and `importActual`, `import.meta.glob`): those are taken and blanked with the comments, types and strings,
+and a gate reads what is left for any other way to load or run code (`LOADS_CODE`: `require`, `import(`, `import.meta`,
+a Vitest loader, the `module` module, `eval`, `vi` other than its calls that load nothing…), so any form not on the
+list makes its file unknown with no rule of its own. A worker or a node process is unknown outside `src/` (a test
+running or naming a script); in `src/` it runs one of the build's entries (`electron.vite.config.ts`'s main input), so
+it counts only when the change is in what an entry loads, or the entries can't be read; a `node -e` script is read as a
+file of its own. External programs (git, the CLIs) are the boundary. A changed `import type` counts for nothing. A
+`WorkspaceService` member keeps nearly every test of main, since nearly every one names `workspace`: narrowing those
+by which receivers can be one is HI-2678. Measured at 1.2.0's head (HI-2677, round 4): 363 files are unknown (three in
+`src/`: the queue's launcher and git host, whose `node -e` scripts are built from text, and `cw-mcp.ts`), so 189 of 704
+test files can be left out at all, and a one-function change to `settingsTools.ts` still selects all 33 related. When the e2e side is
+every suite the pick is still `{"every":true}`, unchanged.
 
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in

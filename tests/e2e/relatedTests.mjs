@@ -19,16 +19,27 @@
 // Names are searched as whole words in each file's text, comments and strings too (a string is how a key or a spied
 // method is named), in the revision tested; a key (a channel, a command id) by its key's boundaries.
 //
+// What a file loads is an allowlist, not a list of loader spellings (the Assistant's design after round 3): every code
+// file reached is parsed, a closed set of literal loading forms is taken (fileLoads: static imports, `import('<x>')`,
+// `require('<x>')`, a createRequire require, Vitest's mock and importActual with a literal path, a literal
+// import.meta.glob) and blanked with the comments, the types and the strings, and the gate (LOADS_CODE, VI_SAFE) reads
+// what is left: any token of another way to load or run code (require, import(, import.meta, a Vitest loader, the module
+// module, eval, vitest's own export, `vi` other than for its calls that load nothing, a global by a computed key) makes
+// the file unknown. So a form not on the allowlist needs no rule of its own. A worker or a process running JavaScript
+// (STARTS) is unknown outside src (it runs a script it names; a string naming a script there is too); in src it runs a
+// build entry (electron.vite.config.ts's main input but the app's index), so it keeps the tests reaching it only when a
+// change is in an entry's closure, or the entries can't be read (the Assistant's option 4); a node script from text
+// is read as a file of its own, and is unknown unless fixed text loading nothing of the repository. External programs
+// (git, the CLIs) are the boundary: what they run isn't JavaScript a change here is in.
+//
 // Whatever it can't tell keeps every related test, with a reason. For a changed file (narrowChange's `all`): not code,
 // added or deleted, unparseable in either revision, a changed line outside every unit (module code, an import that
 // isn't type-only, a constructor) or in a class's field (set as an instance is made), its own module code naming a
-// changed unit (run as it loads), or a unit with no name. For a test: a file it loads whose own imports can't all be
-// known (importGraph's unknownOf: a path worked out at run time in any form that loads, one not in the repository, a
-// require function handed on, a file unreadable or unparseable), whatever else of it reaches the change; the import
-// graph read here reaching no changed file from it (Vitest followed a way this doesn't); or a file it loads listing keys
-// by reflection (Object.getOwnPropertyNames, Reflect.ownKeys, Object.getOwnPropertyDescriptors: a method by no name).
-// Every code file reached is parsed, and its edges, unknowns and whole uses come from the same list of loading forms
-// (fileLoads), resolved as the graph resolves them (a directory's index, `.js` for `.ts`), not by a file name. A changed
+// changed unit (run as it loads), or a unit with no name. For a test: a file it loads that is unknown (the gate, a
+// repository path not there, a file unreadable or unparseable), whatever else of it reaches the change; the import graph
+// read here reaching no changed file from it (Vitest followed a way this doesn't); or a file it loads listing keys by
+// reflection (Object.getOwnPropertyNames, Reflect.ownKeys, Object.getOwnPropertyDescriptors: a method by no name).
+// Paths are resolved as the graph resolves them (a directory's index, `.js` for `.ts`), not by a file name. A changed
 // `import type` counts for nothing: it is erased before a test runs, and typecheck checks it. Changed test files and
 // UNIT_SCANS' picks are affected.mjs's, whatever this leaves out. tests/relatedTests.test.ts checks each rule.
 import { parse } from '@babel/parser'
@@ -118,45 +129,95 @@ export function parseCode(text, file) {
 }
 
 /**
- * What a code file loads, from its syntax tree, in one pass (HR1's round 2: discovery and whole use from the same
- * forms): { edges: Set of repo paths, unknown: why what it loads can't all be known, or null, whole: Map(repo path → how
- * it uses that module whole) }. The forms that load a module:
- * - static: `import … from`, `export … from`, `export * from` (whole: it re-exports all);
- * - `import(p)`, `require(p)` and a require from createRequire (a binding, `createRequire(u)(p)`, `module.createRequire`):
- *   whole unless taken apart by name at once (`const { a } = …`, `(…).a`; `.then` hands it on whole);
- * - vi.importActual, vi.importMock (whole), vi.mock and vi.doMock (whole when its factory takes the original), by
- *   whatever name `vi` is imported from vitest;
- * - import.meta.glob: each literal glob's files are edges, and its code files are used whole (a map of namespaces);
- * and an `import * as` or default import used other than as `mod.name` (or a literal key) or in a type is whole.
- * Unknown: a path worked out at run time in any of them, one not in the repository, a glob that isn't a literal, or a
- * require function handed on (`const r = require`, passed as an argument) rather than called.
+ * The gate (the Assistant's design on HI-2677, after round 3: an allowlist, not a list of loader spellings). What is
+ * left of a file's code once its comments, its type-only imports and the allowed loading forms (fileLoads) are blanked
+ * out is read for these: a hit means it may load or run code some other way, so the file is unknown, which keeps every
+ * related test loading it. Strings are read too (one can be code). A form not on the allowlist needs no rule of its
+ * own: it leaves one of these behind. A false hit only keeps a test.
  */
-export function fileLoads(ast, file, known) {
+export const LOADS_CODE = [
+  ['require', /\brequire\b/],
+  ['import()', /\bimport\s*\(/],
+  ['import.meta', /\bimport\s*\.\s*meta\b(?!\s*\.\s*(?:url|dirname|filename|env)\b)/],
+  ['a Vitest module loader', /importActual|importMock|doMock|unmock|\bmock\s*\(/],
+  ['createRequire or the module module', /createRequire|(['"`])(?:node:)?module\1|\b_load\b|mainModule/],
+  ['eval or a Function made from text', /\beval\b|\bFunction\s*\(|\.constructor\b|process\s*\.\s*(?:binding|dlopen)/],
+  ['vitest other than by a named import', /\bvitest\b(?![/'"`.-])|(['"`])vitest\1/]
+]
+/**
+ * A worker or a process running JavaScript. In src, what it runs is one of the build's entries (electron.vite.config.ts's
+ * main input, the app's own `index` aside: the workers and the scripts run as Node), an external program, or a script
+ * made from text (LOADS_CODE's, unknown): so it matters only when a change reaches an entry's closure (narrowRelated's
+ * `workers`). Anywhere else (tests, scripts) it runs a script it names, so the file is unknown.
+ */
+/** Strings the gate keeps (all others are blanked): the ones that make a process run JavaScript. */
+const KEPT_STRING = /^node(?:\.exe)?(?:\s|$)|ELECTRON_RUN_AS_NODE/i
+export const STARTS =/process\s*\.\s*execPath|ELECTRON_RUN_AS_NODE|\bfork\s*\(|\bWorker\s*\(|utilityProcess|(['"`])node(?:\.exe)?(?![\w:.-])/
+/** Vitest's `vi` calls that load no module: any other use of `vi` (another member, `vi[…]`, `vi` handed on, an alias) is the gate's. */
+export const VI_SAFE = ['fn', 'spyOn', 'hoisted', 'resetModules', 'useFakeTimers', 'useRealTimers', 'isFakeTimers', 'advanceTimersByTime', 'advanceTimersByTimeAsync', 'advanceTimersToNextTimer', 'advanceTimersToNextTimerAsync', 'runAllTimers', 'runAllTimersAsync', 'runOnlyPendingTimers', 'runOnlyPendingTimersAsync', 'runAllTicks', 'clearAllTimers', 'getTimerCount', 'setSystemTime', 'getMockedSystemTime', 'getRealSystemTime', 'clearAllMocks', 'resetAllMocks', 'restoreAllMocks', 'isMockFunction', 'mocked', 'waitFor', 'waitUntil', 'stubEnv', 'unstubAllEnvs', 'stubGlobal', 'unstubAllGlobals', 'setConfig', 'resetConfig']
+const VI_USE = new RegExp(`\\bvi\\b(?!\\s*\\.\\s*(?:${VI_SAFE.join('|')})\\b)`)
+
+/** Why what is left of a file's code may load code other than by the allowed forms (the gate), or null. */
+export function loadsCode(rest) {
+  if (VI_USE.test(rest)) return 'uses vi other than for its calls that load nothing'
+  for (const [what, re] of LOADS_CODE) if (re.test(rest)) return `may load code by ${what}`
+  return null
+}
+
+/** The static forms' specifiers: `… from '<x>'` and `import '<x>'`. */
+const STATIC = /(?:\bfrom|\bimport)\s*(['"])([^'"\n]+)\1/g
+/** `export * from '<x>'`: whole. */
+const EXPORT_ALL = /\bexport\s*(?:type\s*)?\*\s*(?:as\s+[\w$]+\s*)?from\s*(['"])([^'"\n]+)\1/g
+
+/**
+ * What a code file loads: { edges: Set of repo paths, unknown: why what it loads can't all be known (the gate's reason, a
+ * repository path not there, or the file not parsing), or null, whole: Map(repo path → how it uses that module whole) }.
+ * The allowlist, each literal: the static forms (`import … from`, `import '…'`, `export … from`; `export *` is whole),
+ * and, recognised by its syntax and then blanked so the gate doesn't see it:
+ * - `import('<x>')` and `require('<x>')` (an unbound require), whole unless taken apart by name at once (`const { a } =`,
+ *   `(…).a`);
+ * - `const r = createRequire(import.meta.url | __filename)` with createRequire imported by its name from module, and
+ *   every use of r a call `r('<x>')` (as above);
+ * - `vi.mock('<x>', …)`, `vi.doMock`, `vi.unmock`, `vi.doUnmock` (whole with a factory taking the original),
+ *   `vi.importActual('<x>')` and `vi.importMock` (whole), `vi` imported by its name from vitest;
+ * - `import.meta.glob('<g>' | ['<g>', …], { literal options })`: its files are edges, its code files used whole;
+ * - a type-only `import('<x>')` (erased).
+ * An `import * as` or default import used other than as `ns.name`, `ns['literal']` or in a type is whole. Anything else
+ * that may load code leaves a gate token: a form not taken in full (a computed path, a require handed on, an alias of vi
+ * or createRequire, a glob's computed option) is never blanked.
+ */
+export function fileLoads(text, file, known) {
   const edges = new Set()
   const whole = new Map()
-  let unknown = null
+  let ast
+  try {
+    ast = parseCode(text, file)
+  } catch (e) {
+    return { edges, unknown: `doesn't parse (${e.message}), so what it loads isn't known`, whole }
+  }
+  const blank = (ast.comments ?? []).map((c) => [c.start, c.end])
   const line = (n) => n?.loc?.start.line ?? '?'
-  const unsure = (why) => {
-    unknown ??= why
-  }
-  const wholly = (t, why) => {
-    if (t && !whole.has(t)) whole.set(t, why)
-  }
   const literal = (n) => (n?.type === 'StringLiteral' ? n.value : n?.type === 'TemplateLiteral' && !n.expressions.length ? n.quasis[0].value.cooked : null)
+  let missing = null
+  let computedGlobal = null
+  // Node's script-from-text flags met (ArrayExpression): unknown only in a file that starts node.
+  const flags = []
+  // Outside src, a string naming a script (`worker.cjs`, `x.mjs`) may be handed to a worker or a process anywhere (a
+  // src starter's test override): the file is unknown.
+  let named = null
+  const scriptName = (value, node) => {
+    // A path an allowed form has loaded (blanked before its strings are visited) is an edge, not a script handed on.
+    if (blank.some(([s, e]) => node.start >= s && node.end <= e)) return
+    if (!file.startsWith('src/') && /\.(?:c|m)?[jt]sx?$/i.test(value.trim())) named ??=`names a script, ${value.trim().slice(-60)} (line ${line(node)}), which a worker or a process may run`
+  }
   const to = (spec, node) => {
     const t = resolveSpecifier(file, spec, known)
     if (t) edges.add(t)
-    else if (repoPath(spec)) unsure(`loads ${spec} (line ${line(node)}), which isn't in the repository`)
+    else if (repoPath(spec)) missing ??= `loads ${spec} (line ${line(node)}), which isn't in the repository`
     return t
   }
-  // A path a call loads: its target, or null (unknown, or a package).
-  const load = (arg, node, what) => {
-    const spec = literal(arg)
-    if (spec == null) {
-      unsure(`${what} a module by a path worked out at run time (line ${line(node)})`)
-      return null
-    }
-    return to(spec, node)
+  const wholly = (t, why) => {
+    if (t && CODE.test(t) && !whole.has(t)) whole.set(t, why)
   }
   const up = (p) => {
     let q = p
@@ -169,98 +230,182 @@ export function fileLoads(ast, file, known) {
     if (par?.type === 'VariableDeclarator' && par.init === q.node && par.id.type === 'ObjectPattern') return par.id.properties.every((p) => p.type === 'ObjectProperty' && !p.computed)
     return false
   }
-  // The names `vi` and createRequire go by (imported under another name too), and the require functions.
-  const viNames = new Set(['vi'])
-  const crNames = new Set(['createRequire'])
-  for (const st of ast.program.body) {
-    if (st.type !== 'ImportDeclaration') continue
-    for (const sp of st.specifiers) {
-      if (sp.type !== 'ImportSpecifier') continue
-      const imported = keyName(sp.imported)
-      if (st.source.value === 'vitest' && imported === 'vi') viNames.add(sp.local.name)
-      if (/^(node:)?module$/.test(st.source.value) && imported === 'createRequire') crNames.add(sp.local.name)
-    }
+  // A call loading a literal path, taken in full: its edge, whole unless taken apart by name, and blanked.
+  const loadCall = (p, what) => {
+    const spec = literal(p.node.arguments?.[0] ?? p.node.source)
+    if (spec == null || (p.node.arguments && p.node.arguments.length !== 1)) return false
+    const t = to(spec, p.node)
+    if (!byName(up(p))) wholly(t, `${what} ${t} whole (line ${line(p.node)})`)
+    blank.push([p.node.start, p.node.end])
+    return true
   }
-  const isCreateRequire = (n) => n?.type === 'CallExpression' && ((n.callee.type === 'Identifier' && crNames.has(n.callee.name)) || (n.callee.type === 'MemberExpression' && !n.callee.computed && keyName(n.callee.property) === 'createRequire'))
-  const requireNames = new Set(['require'])
+  const plainOptions = (n) => !n || (n.type === 'ObjectExpression' && n.properties.every((q) => q.type === 'ObjectProperty' && !q.computed && ['BooleanLiteral', 'StringLiteral'].includes(q.value.type)))
+  // createRequire imported by its own name from module, and the requires made from it: [binding, declarator].
+  const crImport = ast.program.body.find((st) => st.type === 'ImportDeclaration' && /^(node:)?module$/.test(st.source.value) && st.specifiers.length === 1 && st.specifiers[0].type === 'ImportSpecifier' && keyName(st.specifiers[0].imported) === 'createRequire' && st.specifiers[0].local.name === 'createRequire')
+  const viImport = ast.program.body.filter((st) => st.type === 'ImportDeclaration' && st.source.value === 'vitest' && st.importKind !== 'type')
+  const viOk = viImport.every((st) => st.specifiers.every((sp) => sp.type === 'ImportSpecifier' && keyName(sp.imported) === sp.local.name))
+  // `vi` here is Vitest's: imported from vitest by that name, or the global (no binding of its own).
+  const isVitestVi = (p) => {
+    const b = p.scope.getBinding('vi')
+    return !b || (b.kind === 'module' && b.path.parentPath?.node.source?.value === 'vitest')
+  }
   traverse(ast, {
-    VariableDeclarator(p) {
-      if (p.node.id.type === 'Identifier' && isCreateRequire(p.node.init)) requireNames.add(p.node.id.name)
-    },
-    AssignmentExpression(p) {
-      if (p.node.left.type === 'Identifier' && isCreateRequire(p.node.right)) requireNames.add(p.node.left.name)
-    }
-  })
-  traverse(ast, {
-    ImportDeclaration(p) {
-      const t = to(p.node.source.value, p.node)
-      if (!t || p.node.importKind === 'type') return
-      for (const sp of p.node.specifiers) {
-        if (sp.type === 'ImportSpecifier') continue
-        for (const ref of p.scope.getBinding(sp.local.name)?.referencePaths ?? []) {
-          if (ref.findParent((a) => a.isTSTypeQuery() || a.isTSTypeReference())) continue
-          if (!byName(up(ref))) wholly(t, `uses ${t} whole as ${sp.local.name} (line ${line(ref.node)})`)
+    Program(prog) {
+      // vitest's named imports (no alias), blanked: what they name is read where it is used.
+      if (viOk) for (const st of viImport) blank.push([st.start, st.end])
+      // From module, only names that load nothing (unaliased) are allowed text; createRequire is taken below.
+      for (const st of ast.program.body) {
+        if (st.type !== 'ImportDeclaration' || st === crImport || !/^(node:)?module$/.test(st.source.value)) continue
+        if (st.specifiers.length && st.specifiers.every((sp) => sp.type === 'ImportSpecifier' && ['syncBuiltinESMExports', 'builtinModules', 'isBuiltin'].includes(keyName(sp.imported)) && keyName(sp.imported) === sp.local.name)) blank.push([st.start, st.end])
+      }
+      if (!crImport) return
+      const cr = prog.scope.getBinding('createRequire')
+      const requires = []
+      let all = true
+      for (const ref of cr?.referencePaths ?? []) {
+        const call = ref.parentPath
+        const decl = call.parentPath
+        const arg = call.node.arguments?.[0]
+        const base = arg && call.node.arguments.length === 1 && ((arg.type === 'Identifier' && arg.name === '__filename' && !call.scope.getBinding('__filename')) || (arg.type === 'MemberExpression' && arg.object.type === 'MetaProperty' && keyName(arg.property) === 'url'))
+        // `createRequire(import.meta.url)('<x>')`, called at once.
+        if (call.isCallExpression() && call.node.callee === ref.node && base && decl.isCallExpression() && decl.node.callee === call.node) {
+          if (!loadCall(decl, 'requires')) all = false
+          continue
         }
+        if (!(call.isCallExpression() && call.node.callee === ref.node && base && decl.isVariableDeclarator() && decl.node.id.type === 'Identifier')) {
+          all = false
+          continue
+        }
+        const b = decl.scope.getBinding(decl.node.id.name)
+        if (!b || !b.constant) {
+          all = false
+          continue
+        }
+        requires.push([b, decl])
+      }
+      for (const [b, decl] of requires) {
+        let ok = true
+        for (const ref of b.referencePaths) {
+          const call = ref.parentPath
+          if (!(call.isCallExpression() && call.node.callee === ref.node && loadCall(call, 'requires'))) ok = false
+        }
+        if (ok) blank.push([decl.node.start, decl.node.end])
+        else all = false
+      }
+      if (all) blank.push([crImport.start, crImport.end])
+    },
+    TSImportType(p) {
+      blank.push([p.node.start, p.node.end])
+    },
+    // A node flag running a script from text (`-e`, `--eval`, `-p`, `--print`), in a file that starts node (STARTS): the
+    // script must be the next element, a constant literal of the file, read as a file of its own, loading no repository
+    // file and leaving no gate token; else the file is unknown. (Outside such a file, `-p` is git's or a CLI's flag.)
+    ArrayExpression(p) {
+      const els = p.node.elements
+      for (let i = 0; i < els.length; i++) {
+        if (els[i]?.type !== 'StringLiteral' || !/^-(?:e|p|-eval|-print)$/.test(els[i].value)) continue
+        const next = els[i + 1]
+        const b = next?.type === 'Identifier' ? p.scope.getBinding(next.name) : null
+        const init = b?.constant && b.path.isVariableDeclarator() ? b.path.node.init : next
+        const script = literal(init)
+        const sub = script == null ? null : fileLoads(script, file.replace(/[^/]*$/, 'inline-script.js'), known)
+        if (sub && !sub.unknown && !sub.starts && !sub.edges.size) blank.push([init.start, init.end])
+        else flags.push(`may run a script made from text it can't read (${els[i].value}, line ${line(els[i])})`)
       }
     },
-    ExportAllDeclaration(p) {
-      const t = to(p.node.source.value, p.node)
-      if (p.node.exportKind !== 'type') wholly(t, `re-exports all of ${t} (line ${line(p.node)})`)
+    // The global object read by a key worked out at run time (`globalThis[k]`): it may be any global, a loader too.
+    MemberExpression(p) {
+      const o = p.node.object
+      if (p.node.computed && literal(p.node.property) == null && o.type === 'Identifier' && ['globalThis', 'global', 'window', 'self'].includes(o.name) && !p.scope.getBinding(o.name)) computedGlobal ??= `reads the global object by a computed key (line ${line(p.node)})`
     },
-    ExportNamedDeclaration(p) {
-      if (p.node.source) to(p.node.source.value, p.node)
+    // Types are erased before a test runs; a string is code only through a sink the gate reads (eval, Function, a
+    // worker, a process: identifiers, or a string naming node to run, which stays).
+    'TSTypeAnnotation|TSTypeAliasDeclaration|TSInterfaceDeclaration|TSTypeParameterInstantiation|TSDeclareFunction'(p) {
+      blank.push([p.node.start, p.node.end])
+      p.skip()
+    },
+    StringLiteral(p) {
+      if (p.parentPath.isImportDeclaration() || p.parentPath.isExportDeclaration()) return
+      scriptName(p.node.value, p.node)
+      if (!KEPT_STRING.test(p.node.value)) blank.push([p.node.start, p.node.end])
+    },
+    TemplateElement(p) {
+      scriptName(p.node.value.raw, p.node)
+      if (!/(?:^|\s)node(?:\.exe)?(?:\s|$)|ELECTRON_RUN_AS_NODE/i.test(p.node.value.raw)) blank.push([p.node.start, p.node.end])
     },
     ImportExpression(p) {
-      const t = load(p.node.source, p.node, 'imports')
-      if (!byName(up(p))) wholly(t, `imports ${t} whole (line ${line(p.node)})`)
-    },
-    Identifier(p) {
-      // A require function anywhere but called (or `require.resolve`, which loads nothing) may load anything.
-      if (!requireNames.has(p.node.name) || !p.isReferencedIdentifier()) return
-      if (p.node.name === 'require' && p.scope.hasBinding('require')) return
-      const par = p.parentPath.node
-      if ((par.type === 'CallExpression' || par.type === 'OptionalCallExpression') && par.callee === p.node) return
-      if (par.type === 'MemberExpression' && par.object === p.node && !par.computed && ['resolve', 'cache', 'main'].includes(keyName(par.property))) return
-      if (par.type === 'VariableDeclarator' && par.id === p.node) return
-      if (par.type === 'AssignmentExpression' && par.left === p.node) return
-      if (p.parentPath.isTSTypeQuery() || p.findParent((a) => a.isTSTypeReference())) return
-      unsure(`hands on a require function (${p.node.name}, line ${line(p.node)}), which may load anything`)
+      loadCall(p, 'imports')
     },
     CallExpression(p) {
       const n = p.node
       const c = n.callee
+      if (c.type === 'Import') return void loadCall(p, 'imports')
+      if (c.type === 'Identifier' && c.name === 'require' && !p.scope.getBinding('require')) return void loadCall(p, 'requires')
       const member = c.type === 'MemberExpression' && !c.computed ? keyName(c.property) : null
-      if (c.type === 'Import' || (c.type === 'Identifier' && requireNames.has(c.name) && !(c.name === 'require' && p.scope.hasBinding('require'))) || isCreateRequire(c)) {
-        const t = load(n.arguments[0], n, c.type === 'Import' ? 'imports' : 'requires')
-        if (!byName(up(p))) wholly(t, `${c.type === 'Import' ? 'imports' : 'requires'} ${t} whole (line ${line(n)})`)
+      if (member && viOk && c.object.type === 'Identifier' && c.object.name === 'vi' && isVitestVi(p)) {
+        const spec = literal(n.arguments[0])
+        if (spec == null) return
+        if (['importActual', 'importMock'].includes(member) && n.arguments.length === 1) {
+          wholly(to(spec, n), `imports the actual ${resolveSpecifier(file, spec, known)} whole (line ${line(n)})`)
+          blank.push([c.start, n.arguments[0].end])
+        } else if (['mock', 'doMock', 'unmock', 'doUnmock'].includes(member)) {
+          const t = to(spec, n)
+          if (n.arguments.slice(1).some((a) => !/Function/.test(a.type) || a.params.length > 0)) wholly(t, `mocks ${t} from its original, whole (line ${line(n)})`)
+          blank.push([c.start, n.arguments[0].end])
+        }
         return
       }
-      if (c.type === 'MemberExpression' && c.object?.type === 'Identifier' && viNames.has(c.object.name) && ['mock', 'doMock', 'importActual', 'importMock'].includes(member)) {
-        const t = load(n.arguments[0], n, member === 'mock' || member === 'doMock' ? 'mocks' : 'imports the actual')
-        if (member === 'importActual' || member === 'importMock') wholly(t, `imports the actual ${t} whole (line ${line(n)})`)
-        else if (n.arguments.some((a, i) => i > 0 && /Function/.test(a.type) && a.params.length > 0)) wholly(t, `mocks ${t} from its original, whole (line ${line(n)})`)
-        return
-      }
-      if (member === 'glob' && c.object?.type === 'MetaProperty') {
+      if (member === 'glob' && c.object.type === 'MetaProperty' && n.arguments.length <= 2 && plainOptions(n.arguments[1])) {
         const arg = n.arguments[0]
         const globs = arg?.type === 'ArrayExpression' ? arg.elements.map(literal) : [literal(arg)]
-        if (globs.some((g) => g == null)) {
-          unsure(`globs modules by a pattern worked out at run time (line ${line(n)})`)
-          return
-        }
+        if (!globs.length || globs.some((g) => g == null)) return
         for (const g of globs) {
           const re = globRegex(file, g)
           if (!re) continue
           for (const [k, f] of known) {
             if (!re.test(k)) continue
             edges.add(f)
-            if (CODE.test(f)) wholly(f, `globs ${f} with others, whole (line ${line(n)})`)
+            wholly(f, `globs ${f} with others, whole (line ${line(n)})`)
           }
+        }
+        blank.push([n.start, n.end])
+      }
+    },
+    'ExportAllDeclaration|ExportNamedDeclaration'(p) {
+      if (p.node.source) to(p.node.source.value, p.node)
+    },
+    ImportDeclaration(p) {
+      // Its edge (and a path not in the repository, by its line); a type-only one too: the graph is a superset.
+      const t = to(p.node.source.value, p.node)
+      if (p.node.importKind === 'type') return
+      for (const sp of p.node.specifiers) {
+        if (sp.type === 'ImportSpecifier') continue
+        for (const ref of p.scope.getBinding(sp.local.name)?.referencePaths ?? []) {
+          if (ref.findParent((a) => a.isTSTypeQuery() || a.isTSTypeReference())) continue
+          const q = ref.parentPath?.node
+          if (!((q?.type === 'MemberExpression' || q?.type === 'OptionalMemberExpression') && q.object === ref.node && (!q.computed || q.property.type === 'StringLiteral'))) wholly(t, `uses ${t} whole as ${sp.local.name} (line ${line(ref.node)})`)
         }
       }
     }
   })
-  return { edges, unknown, whole }
+  // What is left for the gate, and the static forms' edges from it.
+  blank.sort((a, b) => a[0] - b[0])
+  let code = ''
+  let at = 0
+  for (const [s, e] of blank) {
+    if (e <= at) continue
+    code += text.slice(at, Math.max(at, s)) + ' '
+    at = e
+  }
+  code += text.slice(at)
+  for (const m of code.matchAll(STATIC)) to(m[2], null)
+  for (const m of code.matchAll(EXPORT_ALL)) {
+    const t = resolveSpecifier(file, m[2], known)
+    wholly(t, `re-exports all of ${t}`)
+  }
+  const starts = STARTS.test(code) ? `starts a worker or a process running JavaScript` : null
+  const unknown = loadsCode(code) ?? computedGlobal ?? missing ?? named ?? (starts && flags.length ? flags[0] : null) ?? (starts && !file.startsWith('src/') ? `${starts}: a script it names` : null)
+  return { edges, unknown, whole, starts }
 }
 
 /**
@@ -276,7 +421,7 @@ export function importGraph(files, read, prefetch) {
   const info = new Map()
   const infoOf = (f) => {
     if (info.has(f)) return info.get(f)
-    let r = { edges: new Set(), unknown: null, whole: new Map() }
+    let r = { edges: new Set(), unknown: null, whole: new Map(), starts: null }
     info.set(f, r)
     if (!CODE.test(f)) return r
     const text = read(f)
@@ -284,11 +429,7 @@ export function importGraph(files, read, prefetch) {
       r.unknown = `${f} couldn't be read, so what it loads isn't known`
       return r
     }
-    try {
-      r = fileLoads(parseCode(text, f), f, known)
-    } catch (e) {
-      r.unknown = `doesn't parse (${e.message}), so what it loads isn't known`
-    }
+    r = fileLoads(text, f, known)
     if (r.unknown) r.unknown = `${f} ${r.unknown}`
     info.set(f, r)
     return r
@@ -308,7 +449,7 @@ export function importGraph(files, read, prefetch) {
     closures.set(start, seen)
     return seen
   }
-  return { known, closure, edgesOf: (f) => infoOf(f).edges, unknownOf: (f) => infoOf(f).unknown, wholeOf: (f, m) => infoOf(f).whole.get(m) ?? null }
+  return { known, closure, edgesOf: (f) => infoOf(f).edges, unknownOf: (f) => infoOf(f).unknown, wholeOf: (f, m) => infoOf(f).whole.get(m) ?? null, startsOf: (f) => infoOf(f).starts ?? null }
 }
 
 /** Whether a file's text names a word: an identifier's boundaries, so `setAdvanced` isn't found in `setAdvancedAll`. */
@@ -423,9 +564,15 @@ function namesOf(parsed, unit) {
 /**
  * The related tests a change needs: { keep: [tests], dropped: [tests], why: [lines] }. related: Vitest's (repo paths);
  * changes: { file: narrowChange's result } for each changed file; graph: importGraph of the revision tested; read: its
- * texts; setupFiles: those every test loads (vitest.config.ts).
+ * texts; setupFiles: those every test loads (vitest.config.ts); workers: the build's worker and script entries (paths,
+ * workerEntriesOf), or null when they can't be read. A src file starting a worker or a process running JavaScript
+ * (STARTS) keeps the tests that load it when a changed file is in an entry's closure, or when the entries are null.
  */
-export function narrowRelated({ related, changes, graph, read, setupFiles = [] }) {
+export function narrowRelated({ related, changes, graph, read, setupFiles = [], workers = null }) {
+  // Whether a change reaches what a src worker or process may run: then, and when that can't be read, a starter counts.
+  const entryFiles = workers ? new Set(workers.flatMap((w) => [...graph.closure(w)].map(lower))) : null
+  const changeRuns = !entryFiles || Object.keys(changes).some((f) => entryFiles.has(lower(f)))
+  const runsWhy = !entryFiles ? "the build's worker entries couldn't be read" : 'a change is in what one of the build’s workers or scripts loads'
   const keep = []
   const dropped = []
   const why = []
@@ -446,7 +593,8 @@ export function narrowRelated({ related, changes, graph, read, setupFiles = [] }
   for (const test of [...new Set(related.map(slashes))]) {
     const files = new Set([...graph.closure(graph.known.get(lower(test)) ?? test), ...setup])
     // A file it loads whose own imports aren't all known may load the change: its closure isn't the whole of it.
-    const unsure = [...files].map((f) => graph.unknownOf(f)).find(Boolean)
+    const starter = changeRuns ? [...files].find((f) => graph.startsOf(f)) : null
+    const unsure = [...files].map((f) => graph.unknownOf(f)).find(Boolean) ?? (starter ? `${starter} ${graph.startsOf(starter)}, and ${runsWhy}` : null)
     if (unsure) {
       keep.push(test)
       reasons.unknown.set(unsure, (reasons.unknown.get(unsure) ?? 0) + 1)
@@ -513,6 +661,25 @@ export function setupFilesOf(configText) {
 }
 
 /**
+ * The build's worker and script entries, from electron.vite.config.ts's text: the main build's rollup input, each
+ * `name: resolve(__dirname, '<path>')`, the app's own `index` aside (no starter in src starts the app). Null when the
+ * input isn't in that form, entry for entry (a line it can't read): then every starter counts (narrowRelated).
+ */
+export function workerEntriesOf(configText) {
+  const m = /\binput\s*:\s*\{([^{}]*)\}/.exec(configText ?? '')
+  if (!m) return null
+  const entries = []
+  for (const raw of m[1].split(/\r?\n/)) {
+    const l = raw.replace(/\/\/.*$/, '').trim()
+    if (!l) continue
+    const e = /^(['"]?)([\w-]+)\1\s*:\s*resolve\(\s*__dirname\s*,\s*(['"])([^'"]+)\3\s*\)\s*,?$/.exec(l)
+    if (!e) return null
+    if (e[2] !== 'index') entries.push(e[4].replace(/^\.\//, ''))
+  }
+  return entries.length ? entries : null
+}
+
+/**
  * narrowRelated for the picker (affected.mjs's CLI): the working tree in cwd against base (a commit), paths the changed
  * files, related Vitest's list. Never throws: anything it can't work out keeps every related test, saying why.
  */
@@ -531,7 +698,7 @@ export function narrowRelatedInTree({ cwd, base, paths, related }) {
         changes[file] = { all: `${file}: its changed parts couldn't be worked out (${e.message}), so every test that loads it` }
       }
     }
-    return narrowRelated({ related, changes, graph: importGraph(files, (f) => revs.head.read(f)), read: (f) => revs.head.read(f), setupFiles })
+    return narrowRelated({ related, changes, graph: importGraph(files, (f) => revs.head.read(f)), read: (f) => revs.head.read(f), setupFiles, workers: workerEntriesOf(revs.head.read('electron.vite.config.ts')) })
   } catch (e) {
     return { keep: [...related], dropped: [], why: [`the related unit tests couldn't be narrowed (${e.message}), so every one`] }
   }

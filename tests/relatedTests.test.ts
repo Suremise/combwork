@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { gitChangedLines, gitRevision, lineDiff, memoryRevision } from './e2e/affectedUnits.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { importGraph, narrowChange, narrowRelated, narrowRelatedInTree, resolveSpecifier, setupFilesOf } from './e2e/relatedTests.mjs'
+import { importGraph, narrowChange, narrowRelated, narrowRelatedInTree, resolveSpecifier, setupFilesOf, workerEntriesOf } from './e2e/relatedTests.mjs'
 import { tempDir } from './tempDir'
 
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -234,9 +234,9 @@ describe('a module the graph resolves, or loads it cannot know (HR3, round 1)', 
     const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
     for (const k of ['mixed', 'missing', 'createdComputed', 'globComputed']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)
     const why = lib.why.join('\n')
-    expect(why).toMatch(/tests\/mixed\.test\.ts imports a module by a path worked out at run time \(line 2\)/)
+    expect(why).toMatch(/tests\/mixed\.test\.ts may load code by import\(\)/)
     expect(why).toMatch(/tests\/missing\.test\.ts loads \.\.\/src\/main\/gone \(line 2\), which isn't in the repository/)
-    expect(why).toMatch(/globs modules by a pattern worked out at run time/)
+    expect(why).toMatch(/tests\/globComputed\.test\.ts may load code by import\.meta/)
     // A literal import() taken apart by name, and an unrelated built-key lookup, leave it out.
     expect(lib.dropped).toContain('tests/literalLookup.test.ts')
   })
@@ -278,18 +278,104 @@ describe('loaders the graph must see, computed or whole (HR1, round 2)', () => {
   const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
   it('a computed vi.importActual (vi imported under any name) is a path worked out at run time: kept, beside a literal import() by name, left out', () => {
     for (const k of ['viComputed', 'viAliased']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)
-    expect(lib.why.join('\n')).toMatch(/viComputed\.test\.ts imports the actual a module by a path worked out at run time/)
+    expect(lib.why.join('\n')).toMatch(/viComputed\.test\.ts uses vi other than for its calls that load nothing/)
     expect(lib.dropped).toContain('tests/literalLookup.test.ts')
   })
   it("a createRequire require used whole, or handed on, keeps the test; one taken apart by name doesn't", () => {
     expect(lib.keep).toContain('tests/requireWhole.test.ts')
     expect(lib.keep).toContain('tests/requireHanded.test.ts')
     expect(lib.dropped).toContain('tests/requireByName.test.ts')
-    expect(lib.why.join('\n')).toMatch(/hands on a require function \(req/)
+    expect(lib.why.join('\n')).toMatch(/requireHanded\.test\.ts may load code by createRequire/)
   })
   it("import.meta.glob of code is a use of each module it matches, whole", () => {
     expect(lib.keep).toContain('tests/globWhole.test.ts')
     expect(lib.why.join('\n')).toMatch(/globs src\/main\/lib\.ts with others, whole/)
+  })
+})
+
+describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2, round 3)', () => {
+  const computed = "const p = '../src/main/' + 'lib'"
+  const base: Files = {
+    'src/main/types.ts': FILES['src/main/types.ts'],
+    'src/main/lib.ts': LIB,
+    'src/main/useB.ts': FILES['src/main/useB.ts'],
+    // HR2's probes: each loads lib by a computed path beside a named fb edge, so only the gate can keep it.
+    ...t('localRequire', `import { createRequire } from 'module'\nimport { fb } from '../src/main/lib'\nconst require = createRequire(import.meta.url)\nit('r', () => { ${computed}; const ns = require(p); ns[process.env.KEY!](); fb() })\n`),
+    ...t('viComputedKey', `import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\nit('v', async () => { ${computed}; const ns = await vi['importActual']<Record<string, () => number>>(p); ns[process.env.KEY!](); fb() })\n`),
+    ...t('vitestExport', `import { vitest } from 'vitest'\nimport { fb } from '../src/main/lib'\nit('v', async () => { ${computed}; const ns = await vitest.importActual<Record<string, () => number>>(p); ns[process.env.KEY!](); fb() })\n`),
+    ...t('importMock', `import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\nit('v', async () => { ${computed}; await vi.importMock(p); fb() })\n`),
+    ...t('mockComputed', `import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\n${computed}\nvi.mock(p)\nit('v', () => fb())\n`),
+    ...t('doMockComputed', `import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\n${computed}\nit('v', () => { vi.doMock(p); fb() })\n`),
+    ...t('viHanded', "import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\nconst v = vi\nit('v', () => { void v; fb() })\n"),
+    // Allowed: each a literal form, so they narrow.
+    ...t('literalForms', "import { vi } from 'vitest'\nimport { createRequire } from 'module'\nimport { fb } from '../src/main/lib'\nconst require = createRequire(import.meta.url)\nvi.mock('../src/main/useB', () => ({ useB: () => 0 }))\nit('v', async () => { const { useB } = await import('../src/main/useB'); require('../src/main/useB').useB(); createRequire(import.meta.url)('../src/main/useB').useB(); vi.fn(); vi.spyOn(console, 'log'); useB(); fb() })\n")
+  }
+  const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
+  it("keeps each of HR2's probes: a createRequire require named require, vi['importActual'], vitest's own export, and the other Vitest loaders computed", () => {
+    for (const k of ['localRequire', 'viComputedKey', 'vitestExport', 'importMock', 'mockComputed', 'doMockComputed', 'viHanded']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)
+  })
+  it('leaves out a file whose loads are all literal allowed forms, naming nothing changed', () => {
+    expect(lib.dropped).toEqual(['tests/literalForms.test.ts'])
+  })
+  it('a worker or a process running JavaScript (the Assistant\'s option 4): in src, it counts only when the change is in what a build entry loads', () => {
+    const w: Files = {
+      'src/main/types.ts': FILES['src/main/types.ts'],
+      'src/main/lib.ts': LIB,
+      'src/main/logWriter.ts': "import { fb } from './lib'\nfb()\n",
+      'src/main/other.ts': 'export function fo(): number {\n  return 1\n}\n',
+      'src/main/logger.ts': "import { Worker } from 'worker_threads'\nimport { fb } from './lib'\nimport { fo } from './other'\nexport const log = (script: string) => new Worker(script) && fb() + fo()\n",
+      ...t('logger', "import { log } from '../src/main/logger'\nit('l', () => log('x'))\n"),
+      ...t('spawns', "import { spawnSync } from 'child_process'\nimport { fo } from '../src/main/other'\nit('s', () => spawnSync(process.execPath, []) && fo())\n"),
+      ...t('script', "import { log } from '../src/main/logger'\nit('s', () => log('fixture-worker.cjs'))\n")
+    }
+    const other = (workers: string[] | null): Narrowed => {
+      const head: Files = { ...w, 'src/main/other.ts': w['src/main/other.ts'].replace('return 1', 'return 2') }
+      const graph = importGraph(Object.keys(head), (f: string) => head[f] ?? null)
+      return narrowRelated({ related: ['tests/logger.test.ts', 'tests/spawns.test.ts', 'tests/script.test.ts'], changes: { 'src/main/other.ts': change('src/main/other.ts', w, head) }, graph, read: (f: string) => head[f] ?? null, workers }) as Narrowed
+    }
+    // other.ts is in no entry's closure: logger.ts's worker doesn't matter, and the tests narrow by name (fo is named).
+    expect(other(['src/main/logWriter.ts']).keep).toContain('tests/logger.test.ts')
+    expect(other(['src/main/logWriter.ts']).why.join('\n')).not.toMatch(/logger\.ts starts a worker/)
+    // A test starting node itself, or naming a script, is unknown whatever the entries are.
+    expect(other(['src/main/logWriter.ts']).why.join('\n')).toMatch(/spawns\.test\.ts starts a worker or a process running JavaScript: a script it names/)
+    expect(other(['src/main/logWriter.ts']).why.join('\n')).toMatch(/script\.test\.ts names a script, fixture-worker\.cjs/)
+    // lib.ts is in logWriter's closure: a change to it keeps every test reaching a starter; unreadable entries do too.
+    const libChange = (workers: string[] | null): string => {
+      const head: Files = { ...w, 'src/main/lib.ts': LIB_FA }
+      const graph = importGraph(Object.keys(head), (f: string) => head[f] ?? null)
+      return narrowRelated({ related: ['tests/logger.test.ts'], changes: { 'src/main/lib.ts': change('src/main/lib.ts', w, head) }, graph, read: (f: string) => head[f] ?? null, workers }).why.join('\n')
+    }
+    expect(libChange(['src/main/logWriter.ts'])).toMatch(/src\/main\/logger\.ts starts a worker or a process running JavaScript, and a change is in what one of the build’s workers or scripts loads/)
+    expect(libChange(null)).toMatch(/the build's worker entries couldn't be read/)
+  })
+  it("electron.vite.config.ts's worker and script entries, the app's own index aside; null when an entry isn't in the known form", () => {
+    expect(workerEntriesOf("input: {\n  index: resolve(__dirname, 'src/main/index.ts'),\n  // a worker\n  'git-worker': resolve(__dirname, 'src/main/gitWorker.ts'),\n}")).toEqual(['src/main/gitWorker.ts'])
+    expect(workerEntriesOf("input: {\n  w: resolve(__dirname, WORKER),\n}")).toBeNull()
+    expect(workerEntriesOf('build: {}')).toBeNull()
+    expect(workerEntriesOf(readFileSync(join(root, 'electron.vite.config.ts'), 'utf8'))).toContain('src/main/logWriter.ts')
+  })
+  it('a node script from text is read as a file of its own: a fixed one loading nothing of the repository is allowed', () => {
+    const unknown = (text: string): string | null => importGraph(['src/x.ts'], () => text).unknownOf('src/x.ts')
+    expect(unknown("import { spawn } from 'child_process'\nconst S = `const c = require('child_process'); c.spawn('git')`\nspawn(process.execPath, ['-e', S])\n")).toBeNull()
+    expect(unknown("import { spawn } from 'child_process'\nconst S = `require('./lib')`\nspawn(process.execPath, ['-e', S])\n")).toMatch(/script made from text/)
+    expect(unknown("import { spawn } from 'child_process'\nconst S = `require(${JSON.stringify(p)})`\nspawn(process.execPath, ['-e', S])\n")).toMatch(/script made from text/)
+    // `-p` is git's patch flag where nothing starts node.
+    expect(unknown("export const args = ['log', '-p', '-U0']\n")).toBeNull()
+  })
+  it("the gate's tokens, each on what an allowed form leaves behind; comments, strings and types are nothing", () => {
+    const unknown = (text: string): string | null => importGraph(['src/x.ts'], () => text).unknownOf('src/x.ts')
+    for (const [text, what] of [
+      ['const f = require', 'require'],
+      ['void import(p)', 'import\\(\\)'],
+      ['void import.meta.glob(g)', 'import\\.meta'],
+      ["import Module from 'module'\nvoid Module", 'createRequire or the module module'],
+      ['eval(s)', 'eval'],
+      ['new Function(s)', 'eval'],
+      ['vi.unmock(p)', 'uses vi other than'],
+      ['x.importActual(p)', 'Vitest module loader'],
+      ['globalThis[k]()', 'global object by a computed key']
+    ] as const) expect(unknown(text), text).toMatch(new RegExp(what))
+    for (const text of ["// require(x), import(p), eval\nexport const a = 1\n", "const s = 'require(x) eval(y) import(z)'\n", "type T = typeof import('./y')\nconst u: import('./y').U = 1\n", 'const k = import.meta.url\n', "import { syncBuiltinESMExports } from 'module'\nsyncBuiltinESMExports()\n", "const global = { a: 1 }\nvoid global[k]\n"]) expect(unknown(text), text).toBeNull()
   })
 })
 
