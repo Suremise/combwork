@@ -12,7 +12,7 @@ import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
 import { fmt, msg } from '../shared/i18n'
 import { agentMsg, inDefaultDialect, inDialectOf, say } from '../shared/agentText'
-import { CombworkError } from './combworkError'
+import { CombworkError, saidError } from './combworkError'
 import { onCombworkEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
@@ -202,7 +202,7 @@ export async function readLanesFile(file: string): Promise<{ docs: unknown[] } |
     text = await readFile(file, 'utf8')
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw new Error(say(A.readFailed, { error: (e as Error).message }), { cause: e })
+    throw saidError(A.readFailed, { error: (e as Error).message }, { cause: e })
   }
   let v: unknown
   try {
@@ -215,7 +215,7 @@ export async function readLanesFile(file: string): Promise<{ docs: unknown[] } |
     try {
       await renameRetrying(file, to)
     } catch (e) {
-      throw new Error(say(A.damaged, { error: (e as Error).message }), { cause: e })
+      throw saidError(A.damaged, { error: (e as Error).message }, { cause: e })
     }
     log.warn(`The lanes file was damaged: set aside as ${userText(to)}`)
     return { docs: [] }

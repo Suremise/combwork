@@ -132,7 +132,7 @@ import { hookTokenMatches, refusedHookNote } from './hookTokens'
 import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
-import { agentError, CombworkError, shownError } from './combworkError'
+import { agentError, CombworkError, SaidError, shownError } from './combworkError'
 import { agentField, agentText, type TextPart } from '../shared/advanced'
 import { storedForAgents } from '../shared/taskHistory'
 import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
@@ -191,7 +191,12 @@ class HttpError extends Error {
 }
 
 /** An error answered with another status: its message, and a CombworkError's text, so the reply says it in the caller's dialect. */
-const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => new HttpError(status, (e as Error).message, extra, e instanceof CombworkError ? e.text : undefined)
+const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => {
+  const h = new HttpError(status, (e as Error).message, extra, e instanceof CombworkError ? e.text : undefined)
+  // An agent message's id (HI-2691, combworkError.ts SaidError): Performance's reason for it, the status still this one.
+  if (e instanceof SaidError) h.saidId = e.saidId
+  return h
+}
 
 /** A reply's body as sent: its JSON as it is, whatever names its data uses (a console event's raw payload, #845). */
 export const replyText = (body: unknown): string => (body === undefined ? '' : JSON.stringify(body))
@@ -3503,7 +3508,7 @@ const WAITS_PER_CALLER = 2
  * the default) }. A project agent names only accounts on in its workspace.
  */
 function readUsageWatch(v: unknown, ws: WorkspaceService): UsageWatch[] {
-  const shape = say(API.watch.usageShape)
+  const shape = apiSaid(API.watch.usageShape)
   if (!Array.isArray(v) || !v.length) throw new HttpError(400, shape)
   if (v.length > USAGE_WATCH_MAX) throw new HttpError(400, apiSaid(API.watch.usageMax, { max: String(USAGE_WATCH_MAX) }))
   const seen = agentCaller() ? combworkAccounts().filter((a) => accountOnIn(ws.config, a, allAccounts())) : combworkAccounts()
@@ -4779,17 +4784,34 @@ const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409
  * CombworkError's kind says it, else its English message does (statusFor).
  */
 function errorStatus(e: unknown): number {
-  if (e instanceof CombworkError && e.kind) return KIND_STATUS[e.kind]
+  if ((e instanceof CombworkError || e instanceof SaidError) && e.kind) return KIND_STATUS[e.kind]
   return e instanceof HttpError ? e.status : e instanceof tasks.TaskPermissionError ? 403 : e instanceof tasks.TaskConflictError ? 409 : statusFor(e as Error)
 }
 
+/**
+ * The status of an error with no kind of its own, by its English words: a fallback, its patterns tried in order, so a
+ * name or a quoted cause in a message can change which one wins.
+ *
+ * Why each pattern stays (HI-2691's audit, source by source): every one but those named below still has producers thrown
+ * with no kind (window messages through `combworkError()` in tasks.ts, sessions, workspace, worktrees and the like;
+ * agent messages through `saidError()` whose values are names, keys, reasons or errors, which could change today's
+ * status if typed). They go once each of their producers reachable from the Agent API has a kind.
+ * - `Invalid session id`: shared/defaults.ts's plain Error, a programming error. `URI malformed`: decodeURIComponent's
+ *   own error on a bad path.
+ * - `card watches`, `Not a project`, `No workspace`, `workspace was closed`: some of their producers are typed now
+ *   (watches.ts's file-full and limit errors, closedError, notes.ts, teamPause.ts); the rest are not: watches.ts's read
+ *   and damaged-file errors (their cause quoted), a project's path or name quoted, tasks.ts's and lanes' noWorkspace,
+ *   metricsUsage's closed read.
+ * - `A failed review leaves` was removed: its message became tasks.error.failedToDoing ("A failed review sends…",
+ *   HI-1946), thrown with its kind.
+ */
 function statusFor(e: Error): number {
   const m = String(e?.message ?? '')
   if (/Invalid session id|URI malformed|Unknown provider|Project names cannot|pinned to worktrees/i.test(m)) return 400
   if (/already running|already open|already being opened|is starting|Stop it first|Stop the|archived|No session is running|ran in .* Resume it|is required to run|is turned off|no agents yet|No workspace|busy|no handover|changed while the cards|workspace was closed|card watches|not a conversation/i.test(m)) return 409
   if (/several agents: choose/i.test(m)) return 400
   if (/Not a project|Unknown (project|agent|task)|no longer exists/i.test(m)) return 404
-  if (/is archived|is done\.|has no project|needs a title|is too long|Unknown column|labels must|up to \d+ labels|^(blockedBy|links):|Choose a project|comment is empty|Unknown position|before or position|can't go before|, not in (On Hold|Todo|Doing|Review|Passed|Done)|A failed review leaves|There is no card #|^cards:|other project first/i.test(m)) return 400
+  if (/is archived|is done\.|has no project|needs a title|is too long|Unknown column|labels must|up to \d+ labels|^(blockedBy|links):|Choose a project|comment is empty|Unknown position|before or position|can't go before|, not in (On Hold|Todo|Doing|Review|Passed|Done)|There is no card #|^cards:|other project first/i.test(m)) return 400
   return 500
 }
 
@@ -4937,4 +4959,6 @@ onWatchPlacing(watchWhilePlaced)
 /** For unit tests: request parts whose refusals tests say through the canary (tests/agentTextApi.test.ts, HI-2436). */
 /** A route's handler by its method and template (HI-2681: tests run a route's real errors through metrics.ts reasonOf). */
 const routeHandler = (method: string, template: string): Handler | undefined => routes.find((r) => r.method === method && r.template === template)?.handler
-export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler }
+/** Runs fn as a project agent's request (HI-2691: tests run its routes' real errors), as serveApi's caller scope does. */
+const asAgent = <T>(workspace: string, projectPath: string, agentId: string, fn: () => T): T => callerStore.run({ kind: 'agent', runId: 'test', workspace, projectPath, agentId }, () => inRequestScope({ projectPath, agentId }, fn))
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, httpFrom }
