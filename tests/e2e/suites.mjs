@@ -7,6 +7,8 @@
 // Every suite that starts the real Claude Code has one (#368): none runs in the user's ~/.claude (tests/e2esuites.test.ts).
 // noCombwork (with why): a real suite that runs its CLI without a test copy of Combwork, so the run record has no version Combwork
 // selected for it: npm run tested-clis requires it to pass, and takes the CLI's version from its suites that start Combwork.
+// everything (with what): a suite whose code under test is all in affected.mjs's EVERYTHING, so it is in no area: any
+// change to that code runs every suite already (HI-2689; tests/e2esuites.test.ts fails an area that selects nothing).
 // Suites that start a real CLI (claude, codex) share it with each other, so they run one at a time, in a lane beside
 // the others; those marked serial (with why) and the installer's run last, alone; every other suite is safe to run
 // beside others (its own profile, folders and Agent API port). Sorted by name, so suites added on different
@@ -107,7 +109,7 @@ export const SUITES = [
   { name: 'combworkfolder' },
   { name: 'combworktools' },
   { name: 'combworkvcs' },
-  { name: 'commitburst' },
+  { name: 'commitburst', everything: "React's commit watch (commitWatch.ts, commitLoop.tsx, shared/commitWatch.ts), in every test copy's window" },
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'connectionapi' },
   { name: 'connectiondefaults' },
@@ -178,7 +180,7 @@ export const SUITES = [
   { name: 'installdir' },
   { name: 'intents' },
   { name: 'isolatedcheck' },
-  { name: 'isolation' },
+  { name: 'isolation', everything: "the run context (runContext.cjs) and testQuiet.ts: what every test copy and its children are given" },
   { name: 'journal' },
   { name: 'journalbrowse' },
   { name: 'keys' },

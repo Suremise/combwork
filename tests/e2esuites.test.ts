@@ -20,6 +20,8 @@ import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/re
 // @ts-expect-error: plain .mjs modules without types
 import { makeDist } from '../scripts/distCopy.mjs'
 // @ts-expect-error: plain .mjs modules without types
+import { sleepExplained } from '../scripts/testWaits.mjs'
+// @ts-expect-error: plain .mjs modules without types
 import { buildLock, buildStamp, buildStamped, buildStampedAt, builtOnce, devBuild, ensureBuild, ensureBuildWithSlot } from './e2e/build.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { LANES, LANE_FIRST, LANE_PORTS, claimHeld, claimLane, describeHolder, holdOwnPool, laneHolders, lanePorts, laneWaitLine, lanesFirst, laneWork, pickLane, portFree, waitForLane } from './e2e/lanes.mjs'
@@ -52,13 +54,18 @@ describe('the e2e suite list', () => {
 
   it('names suites that exist, and every suite file is listed', () => {
     for (const n of names) expect(existsSync(join(dir, `${n}.cjs`)), n).toBe(true)
-    const helpers = ['lib', 'fake-bridge', 'fake-copilot-api', 'runContext', 'evidence', 'codexDiagnostics', 'folderProcesses', 'storeDocs', 'boardRows', 'sessionDeliveryCodec', 'windowsExits', 'layoutReport', 'queueFixture', 'fakeInstall', 'toolLimits']
     const files = execFileSync('git', ['ls-files', 'tests/e2e/*.cjs'], { cwd: root, encoding: 'utf8' })
       .split(/\r?\n/)
       .filter(Boolean)
       .map((f) => f.replace(/^tests\/e2e\//, '').replace(/\.cjs$/, ''))
       .filter((f) => !f.includes('/'))
-    for (const f of files) if (!helpers.includes(f)) expect(names, `${f}.cjs isn't in suites.mjs`).toContain(f)
+    // A helper is a .cjs some e2e file (a suite, lib, the runner) requires (HI-2689: derived, not a list kept by hand);
+    // anything else at the top of tests/e2e must be a suite.
+    const sources = execFileSync('git', ['ls-files', 'tests/e2e'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter((f) => /\.(c|m)?js$/.test(f)).map((f) => readFileSync(join(root, f), 'utf8'))
+    const required = new Set(sources.flatMap((t) => [...t.matchAll(/require\(\s*(?:path\.join\(__dirname,\s*)?['"]\.\.?\/?([\w.-]+?)(?:\.cjs)?['"]/g)].map((m) => m[1])))
+    for (const f of files) if (!required.has(f)) expect(names, `${f}.cjs isn't in suites.mjs, and no e2e file requires it`).toContain(f)
+    // And each such helper is no suite (a suite is never loaded by another).
+    for (const f of files) if (required.has(f) && names.includes(f)) expect.fail(`${f}.cjs is a suite that another e2e file requires`)
   })
 
   it('says why a suite must run alone', () => {
@@ -149,16 +156,16 @@ describe('the e2e suite list', () => {
   })
 
   it('no fixed wait of 1 s or more without a reason: wait for the condition (lib.until) instead', () => {
-    // A long sleep is slower and flakier than waiting for what the next check needs. The ones left say why: they check
-    // that something does NOT happen, are a loop's poll interval, or are a race's timeout.
+    // A long sleep is slower and flakier than waiting for what the next check needs. The ones left say why, in the one
+    // accepted form npm run test:waits takes too (sleepExplained, HI-2689): a comment beside or above it (they check
+    // that something does NOT happen, or are a loop's poll interval), or a race's timeout.
     const unexplained: string[] = []
     for (const n of names) {
-      readFileSync(join(dir, `${n}.cjs`), 'utf8')
-        .split(/\r?\n/)
-        .forEach((line, i) => {
-          const m = /sleep\((\d+)\)/.exec(line)
-          if (m && Number(m[1]) >= 1000 && !/on purpose|poll interval|Promise\.race/.test(line)) unexplained.push(`${n}.cjs:${i + 1}`)
-        })
+      const lines = readFileSync(join(dir, `${n}.cjs`), 'utf8').split(/\r?\n/)
+      lines.forEach((line, i) => {
+        const m = /sleep\((\d+)\)/.exec(line)
+        if (m && Number(m[1]) >= 1000 && !sleepExplained(lines, i)) unexplained.push(`${n}.cjs:${i + 1}`)
+      })
     }
     expect(unexplained).toEqual([])
   })
@@ -175,11 +182,26 @@ describe('the e2e suite list', () => {
 describe('the suites a change needs (affected.mjs)', () => {
   const areas = AREAS as Area[]
 
-  it('puts every suite in an area, and names only real suites and paths', () => {
+  it('puts every suite in an area, or says it is covered by EVERYTHING; names only real suites and paths', () => {
     const inAreas = new Set(areas.flatMap((a) => a.suites))
-    for (const n of names) expect(inAreas.has(n), `${n} is in no area`).toBe(true)
+    // A suite whose code is all in EVERYTHING (so every change to it runs every suite) says so in suites.mjs, with why
+    // (HI-2689); any other suite is in an area.
+    for (const s of suites as { name: string; everything?: string }[]) {
+      if (s.everything !== undefined) {
+        expect(typeof s.everything === 'string' && s.everything.length > 10, `${s.name}: say what of EVERYTHING it covers`).toBe(true)
+        expect(inAreas.has(s.name), `${s.name} is in an area: drop its everything`).toBe(false)
+      } else expect(inAreas.has(s.name), `${s.name} is in no area`).toBe(true)
+    }
     for (const s of inAreas) expect(names, s).toContain(s)
     for (const p of [...areas.flatMap((a) => a.paths), ...(EVERYTHING as string[])]) expect(existsSync(join(root, p.replace(/\/$/, ''))), p).toBe(true)
+  })
+
+  it('every area selects something EVERYTHING does not: a path outside it, or a real-CLI suite (HI-2689)', () => {
+    // An area whose paths are all in EVERYTHING and whose suites are all fake changes nothing: any change to its paths
+    // runs every fake suite already. Real-CLI suites under EVERYTHING still pick the real tier, so they stay.
+    const real = new Set(realNames)
+    const dead = areas.filter((a) => a.paths.every((p) => under(p.endsWith('/') ? `${p}x` : p, EVERYTHING)) && a.suites.every((s) => !real.has(s)))
+    expect(dead.map((a) => a.paths.join(', '))).toEqual([])
   })
 
   it('covers every source file: in an area, one every suite needs, or one only the unit tests load', () => {

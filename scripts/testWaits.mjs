@@ -91,6 +91,13 @@ function inPoll(lines, i, checkAt) {
 /** A comment on the line, or a comment line just above it: why the sleep is meant. */
 const commented = (lines, i) => /\/\/|\/\*/.test(lines[i]) || /^\s*(\/\/|\*|\/\*)/.test(lines[i - 1] ?? '')
 
+/**
+ * The one accepted reason for a fixed sleep (HI-2689), for this script and tests/e2esuites.test.ts's long sleeps alike:
+ * a comment on its line or the line above saying why it is meant, or the sleep being a race's timeout
+ * (`Promise.race([…, sleep(n)])`, in code). The reviewer judges what the comment says (tests/README.md).
+ */
+export const sleepExplained = (lines, i) => commented(lines, i) || /Promise\.race\(/.test(code(lines[i]))
+
 /** The sleeps in a file's text that a check follows within NEAR lines: { line (1-based), code, commented }. */
 export function findWaits(text) {
   const lines = text.split(/\r?\n/)
@@ -106,7 +113,7 @@ export function findWaits(text) {
     if (at < 0 || WAITS.test(near[at])) return
     // A pause inside a polling loop is how the loop waits for its condition, not a wait before a check.
     if (inPoll(lines, i, i + at)) return
-    out.push({ line: i + 1, code: line.trim(), commented: commented(lines, i) })
+    out.push({ line: i + 1, code: line.trim(), commented: sleepExplained(lines, i) })
   })
   return out
 }

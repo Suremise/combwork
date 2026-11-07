@@ -131,12 +131,9 @@ export const EVERYTHING = [
  */
 export const AREAS = [
   { paths: ['tests/e2e/codexDiagnostics.cjs'], suites: ['codex-background'] },
-  { paths: ['src/main/ptyHost.ts', 'src/main/sessions.ts'], suites: ['stopswitch', 'replysize', 'quit', 'copilotsize', 'termsize'] },
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts', 'src/main/ptyHost.ts', 'src/shared/agentProcesses.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/linger.cjs'], suites: ['leftovers', 'leftovers-restart', 'unexpectedclose-leftovers'] },
-  { paths: ['tests/e2e/fake-claude/devapp/'], suites: ['leftovers-restart'] },
   { paths: ['tests/scenarios/harness.cjs', 'tests/e2e/folderProcesses.cjs', 'tests/e2e/fake-claude/linger.cjs', 'src/main/progressReporters/'], suites: ['scenarioteardown'] },
   { paths: ['tests/e2e/folderProcesses.cjs', 'tests/e2e/leftCopies.mjs', 'tests/e2e/lanes.mjs'], suites: ['harnessleftovers'] },
-  { paths: ['src/renderer/src/commitWatch.ts', 'src/renderer/src/commitLoop.tsx', 'src/shared/commitWatch.ts'], suites: ['commitburst'] },
   // HI-2379: a shared folder's attribution of a burst of merged commits, and main's stall while it runs.
   { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/observe.ts'], suites: ['mergeburst'] },
   // The real CLIs' background processes (#515): only when what tracks them changes, not with every sessions.ts change.
@@ -573,8 +570,6 @@ export const AREAS = [
   { paths: ['src/main/codexChecks.ts'], suites: ['connections-codex', 'codexownhooks'] },
   // The CLI's own setting and the Assistant's other MCP servers (#1284).
   { paths: ['src/shared/cliOwnMode.ts', 'src/renderer/src/components/PermissionMode.tsx', 'src/main/providers/claude/', 'tests/e2e/cliownmode.cjs'], suites: ['cliownmode'] },
-  // The run context: every suite (above); isolation checks what it gives a test Combwork and the children a suite starts.
-  { paths: ['tests/e2e/runContext.cjs', 'src/main/testQuiet.ts'], suites: ['isolation'] },
   // A typed prompt's line breaks for Codex (HI-1327): the fake Codex's (codexnewline) and the real one's (codex-newline).
   { paths: ['tests/e2e/codexnewline.cjs', 'tests/e2e/codex-newline.cjs', 'src/shared/terminalInput.ts', 'src/main/providers/codex/'], suites: ['codexnewline', 'codex-newline'] },
   // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
@@ -609,8 +604,6 @@ export const AREAS = [
   { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/codexLogWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
   // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Combwork and Repair.
   { paths: ['src/main/sessionStore.ts', 'tests/e2e/storeDocs.cjs', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'tests/e2e/sessionDeliveryCodec.cjs'], suites: ['agents', 'assistantimages', 'assistantmode', 'cardchip', 'overview', 'providerdetect', 'quit', 'restart', 'resume', 'review', 'safeguards', 'sessionname', 'sessioncleanup', 'sessionorigin', 'sessionsize', 'sessiontree', 'wtrecreate', 'storage', 'transcript', 'wsmove', 'changespicker', 'dialogs', 'files', 'i18nlive', 'performance', 'projectrename', 'wsoverview', 'removeall', 'codex', 'codex-handover'] },
-  // Background tasks read from Claude Code's transcript (#640: one the agent stopped wakes nothing).
-  { paths: ['src/main/providers/claude/background.ts'], suites: ['background', 'turnledger', 'idlestatus'] }
 ]
 
 /** Whether a repo path is under one of these paths (a file, or a folder ending in /). Case-insensitive, / separators. */
@@ -825,6 +818,21 @@ export function changedFiles(base = 'main', cwd = process.cwd()) {
 // The e2e suites are affectedSuites' (above): a change it can't place means every test.
 
 /**
+ * The test files `npm run check:repo` runs by test name (its `vitest run … -t "…"` run), from package.json, as
+ * tests/checkRepo.test.ts reads its script: null when it isn't in that form (the caller then takes every test file).
+ */
+export function checkRepoNamed(packageText = null) {
+  try {
+    const text = packageText ?? readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+    const script = JSON.parse(text).scripts?.['check:repo'] ?? ''
+    const m = /vitest run ((?:tests\/\S+\.test\.ts\s+)+)-t "/.exec(script)
+    return m ? m[1].trim().split(/\s+/) : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * The unit tests that read the repository rather than import it, and the changes that can break them. Each entry:
  * `test` (its repo path; a test may have several entries), `paths` (as under() takes them: a file, or a folder ending
  * in /; none: anywhere), and what change to a file under them selects it: `adds` (one added, deleted or renamed),
@@ -886,9 +894,9 @@ export const UNIT_SCANS = [
   { test: 'tests/i18nCatalogues.test.ts', paths: ['src/'], lines: ['msg\\(', '\\btr\\(', 'tRich\\(', 'defaultMessage', 'description', '\\bid:'] },
   // A real file and its allowlist (Board.tsx's); the whole source is the CLI's (check:repo, CI), not this test's (HI-2663).
   { test: 'tests/i18nGuard.test.ts', paths: ['src/renderer/src/components/Board.tsx', 'i18n/allow/'] },
-  // Agent text (HI-2065): the guard against new hard-coded agent text over src/ and its lists; the catalogue and schema
-  // extracted from the agentMsg() descriptors, current.
-  { test: 'tests/agentTextGuard.test.ts', paths: ['src/', 'agent-text/allow/'] },
+  // Agent text (HI-2065): two real files and their lists; the whole source is the CLI's (check:repo, CI), not this
+  // test's (HI-2689). The catalogue and schema extracted from the agentMsg() descriptors, current.
+  { test: 'tests/agentTextGuard.test.ts', paths: ['src/shared/combworkGuidance.ts', 'src/shared/toolReplies.ts', 'agent-text/allow/'] },
   { test: 'tests/agentText.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },
   // HI-2457: agentTextSchema() against the schema area files on disk; each glob user's source read (none imported but schema.ts).
   { test: 'tests/globCache.test.ts', paths: ['agent-text/schema/', 'src/main/installDir.ts', 'src/shared/i18n/catalogues.ts'] },
@@ -946,7 +954,9 @@ export const UNIT_SCANS = [
   // deleted, or a describe or test renamed in a file it runs by name.
   { test: 'tests/checkRepo.test.ts', paths: ['package.json'] },
   { test: 'tests/checkRepo.test.ts', paths: ['tests/'], adds: true },
-  { test: 'tests/checkRepo.test.ts', paths: ['tests/admission.test.ts', 'tests/bundled.test.ts', 'tests/e2esuites.test.ts', 'tests/folderProcesses.test.ts', 'tests/i18nCatalogues.test.ts'], lines: ['\\bdescribe\\(', '\\bit\\('] },
+  // The files check:repo runs by test name (its `-t` run), read from package.json as checkRepo.test.ts reads them
+  // (HI-2689): unreadable there, every test file.
+  { test: 'tests/checkRepo.test.ts', paths: checkRepoNamed() ?? ['tests/'], lines: ['\\bdescribe\\(', '\\bit\\('] },
   // This table's own check: a test file added, or one starting to scan the repository.
   // The hubs most tests reach must stay known to the unit picker's gate (HI-2697): their text, not their imports.
   { test: 'tests/relatedTests.test.ts', paths: ['src/main/workflow/launcher.ts', 'src/main/workflow/gitHost.ts', 'src/main/mcp/cw-mcp.ts', 'src/renderer/src/commitLoop.tsx', 'src/renderer/src/commitWatch.ts', 'src/renderer/src/windowHealth.ts'] },
