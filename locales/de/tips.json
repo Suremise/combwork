@@ -546,5 +546,7 @@
   "tips.waitingOnPurpose.title": "Eine Karte, die absichtlich wartet",
   "tips.waitingOnPurpose.text": "Eine Karte in In Arbeit wartet auf ein ruhiges Zeitfenster oder auf eine Antwort? Rechtsklick, Als wartend markieren…, und den Grund angeben: Combwork meldet sie nicht mehr als festgefahren, bis du das aufhebst oder sie In Arbeit verlässt. Ihr Agent läuft weiter.",
   "tips.perfFailures.title": "Abgelehnt heißt nicht kaputt",
-  "tips.perfFailures.text": "Leistung → Fehlschläge sortiert, was nicht erfolgreich war: echte Fehler in Rot, getrennt von Aufrufen, die eine Workflow-Regel abgelehnt hat, und falschen Aufrufen. Ablehnungen und falsche Aufrufe nach Grund zeigt, welche Regel oder Meldung am häufigsten kam: eine Tool-Beschreibung, die klarer werden sollte."
+  "tips.perfFailures.text": "Leistung → Fehlschläge sortiert, was nicht erfolgreich war: echte Fehler in Rot, getrennt von Aufrufen, die eine Workflow-Regel abgelehnt hat, und falschen Aufrufen. Ablehnungen und falsche Aufrufe nach Grund zeigt, welche Regel oder Meldung am häufigsten kam: eine Tool-Beschreibung, die klarer werden sollte.",
+  "tips.serverDiagnostics.title": "Ein Agent auf Ollama gibt nur Text aus?",
+  "tips.serverDiagnostics.text": "Server prüfen… bei einem Server-Konto unter Einstellungen → Konten & Verbindungen zeigt den echten Kontext seines Modells und testet einen Tool-Aufruf. Ein Kontext, der kleiner ist als der Prompt von Claude Code, ist der übliche Grund, warum ein lokales Modell einen Tool-Aufruf ausschreibt, statt ihn zu machen."
 }

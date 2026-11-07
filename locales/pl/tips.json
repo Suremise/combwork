@@ -546,5 +546,7 @@
   "tips.waitingOnPurpose.title": "Karta, która celowo czeka",
   "tips.waitingOnPurpose.text": "Karta w Aktywne czeka na spokojny moment albo na odpowiedź? Kliknij ją prawym przyciskiem, Oznacz jako czekającą…, i napisz dlaczego: Combwork przestaje zgłaszać ją jako utkniętą, dopóki tego nie wyłączysz albo nie opuści Aktywne. Jej agent dalej działa.",
   "tips.perfFailures.title": "Odrzucone to nie zepsute",
-  "tips.perfFailures.text": "Wydajność → Niepowodzenia sortuje to, co się nie powiodło: prawdziwe błędy na czerwono, osobno od wywołań odrzuconych przez regułę przepływu pracy i błędnych wywołań. Odmowy i błędne wywołania według przyczyny pokazują, która reguła lub komunikat pojawiały się najczęściej: opis narzędzia do doprecyzowania."
+  "tips.perfFailures.text": "Wydajność → Niepowodzenia sortuje to, co się nie powiodło: prawdziwe błędy na czerwono, osobno od wywołań odrzuconych przez regułę przepływu pracy i błędnych wywołań. Odmowy i błędne wywołania według przyczyny pokazują, która reguła lub komunikat pojawiały się najczęściej: opis narzędzia do doprecyzowania.",
+  "tips.serverDiagnostics.title": "Agent na Ollama tylko wypisuje tekst?",
+  "tips.serverDiagnostics.text": "Sprawdź serwer… przy koncie serwera w Ustawienia → Konta i połączenia pokazuje rzeczywisty kontekst jego modelu i testuje wywołanie narzędzia. Kontekst mniejszy niż prompt Claude Code to zwykły powód, dla którego model lokalny wypisuje wywołanie narzędzia zamiast je wykonać."
 }

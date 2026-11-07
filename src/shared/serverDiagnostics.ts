@@ -99,14 +99,14 @@ export function ollamaShow(reply: unknown): { trained: number | null; numCtx: nu
 // ---------------------------------------------------------------------------
 
 export const TEST_TOOL = 'get_weather'
-export const TEST_CITY = 'Reykjavik'
+export const TEST_CITY = 'Reykjavik' // i18n-ignore: a failure's code, not text (the window says each in its words)
 /** The test's tool, as the Anthropic Messages API takes it. */
 const TOOL = {
   name: TEST_TOOL,
-  description: 'Get the current weather for a city.',
-  input_schema: { type: 'object', properties: { city: { type: 'string', description: 'The city name.' } }, required: ['city'] }
+  description: 'Get the current weather for a city.', // i18n-ignore: what the tool-call test sends the model (English, its own test text), never shown
+  input_schema: { type: 'object', properties: { city: { type: 'string', description: 'The city name.' } }, required: ['city'] } // i18n-ignore: what the tool-call test sends the model (English, its own test text), never shown
 }
-const PROMPT = `What is the weather in ${TEST_CITY} right now? Use the ${TEST_TOOL} tool, then tell me exactly what it returned, including its station code.`
+const PROMPT = `What is the weather in ${TEST_CITY} right now? Use the ${TEST_TOOL} tool, then tell me exactly what it returned, including its station code.` // i18n-ignore: what the tool-call test sends the model (English, its own test text), never shown
 /** The test's output budget: enough for a call or a short answer, with thinking off. */
 export const TEST_MAX_TOKENS = 1024
 
@@ -121,7 +121,7 @@ export function step1Body(model: string): Record<string, unknown> {
  */
 export function testResult(random: () => number = Math.random): { text: string; code: string } {
   const code = String(10000 + Math.floor(random() * 89999))
-  return { text: `-7.3 °C, light snow, station code ${code}`, code }
+  return { text: `-7.3 °C, light snow, station code ${code}`, code } // i18n-ignore: what the tool-call test sends the model (English, its own test text), never shown
 }
 
 /** Step 2's request body: step 1's call and its synthetic result. */
@@ -217,7 +217,7 @@ function messageOf(text: string | undefined): { blocks: Record<string, unknown>[
 /** A reply that isn't a 2xx Messages reply: its failure (null: none of these, go on). */
 function failed(reply: StepReply): StepJudgement | null {
   const seen: ReplySeen = { status: reply.status }
-  if (reply.status < 200 || reply.status >= 300) return { ok: false, why: errorWhy(reply.status, reply.errorText ?? '') ?? 'unexpected', seen }
+  if (reply.status < 200 || reply.status >= 300) return { ok: false, why: errorWhy(reply.status, reply.errorText ?? '') ?? 'unexpected', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
   return null
 }
 
@@ -235,23 +235,23 @@ export function judgeStep1(reply: StepReply): StepJudgement {
   const bad = failed(reply)
   if (bad) return bad
   const m = messageOf(reply.text)
-  if (!m) return { ok: false, why: 'protocol', seen: { status: reply.status } }
+  if (!m) return { ok: false, why: 'protocol', seen: { status: reply.status } } // i18n-ignore: a failure's code, not text (the window says each in its words)
   const seen: ReplySeen = { status: reply.status, ...(m.stopReason ? { stopReason: m.stopReason } : {}), blocks: kinds(m.blocks) }
   const calls = m.blocks.filter((b) => b.type === 'tool_use')
   if (!calls.length) {
-    if (m.stopReason === 'max_tokens' && onlyThinking(m.blocks)) return { ok: false, why: 'thinkingBudget', seen }
-    if (toolShaped(textOf(m.blocks))) return { ok: false, why: 'toolText', seen }
-    if (textOf(m.blocks).trim()) return { ok: false, why: 'noToolCall', seen }
-    return { ok: false, why: 'unexpected', seen }
+    if (m.stopReason === 'max_tokens' && onlyThinking(m.blocks)) return { ok: false, why: 'thinkingBudget', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
+    if (toolShaped(textOf(m.blocks))) return { ok: false, why: 'toolText', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
+    if (textOf(m.blocks).trim()) return { ok: false, why: 'noToolCall', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
+    return { ok: false, why: 'unexpected', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
   }
-  if (calls.length > 1) return { ok: false, why: 'extraCalls', seen }
+  if (calls.length > 1) return { ok: false, why: 'extraCalls', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
   const call = calls[0]
-  if (call.name !== TEST_TOOL) return { ok: false, why: 'wrongTool', seen }
+  if (call.name !== TEST_TOOL) return { ok: false, why: 'wrongTool', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
   const input = obj(call.input)
-  if (!input || typeof input.city !== 'string' || !input.city.trim() || typeof call.id !== 'string' || !call.id) return { ok: false, why: 'invalidArguments', seen }
+  if (!input || typeof input.city !== 'string' || !input.city.trim() || typeof call.id !== 'string' || !call.id) return { ok: false, why: 'invalidArguments', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
   // The city as asked for, whatever its case, accents or a country after it ("reykjavík, Iceland").
   const asked = input.city.trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z]/g, '')
-  if (!asked.startsWith(TEST_CITY.toLowerCase())) return { ok: false, why: 'wrongArgument', seen }
+  if (!asked.startsWith(TEST_CITY.toLowerCase())) return { ok: false, why: 'wrongArgument', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
   return { ok: true, toolUse: { id: call.id, input } }
 }
 
@@ -260,13 +260,13 @@ export function judgeStep2(reply: StepReply, code: string): StepJudgement {
   const bad = failed(reply)
   if (bad) return bad
   const m = messageOf(reply.text)
-  if (!m) return { ok: false, why: 'protocol', seen: { status: reply.status } }
+  if (!m) return { ok: false, why: 'protocol', seen: { status: reply.status } } // i18n-ignore: a failure's code, not text (the window says each in its words)
   const seen: ReplySeen = { status: reply.status, ...(m.stopReason ? { stopReason: m.stopReason } : {}), blocks: kinds(m.blocks) }
-  if (m.blocks.some((b) => b.type === 'tool_use')) return { ok: false, why: 'resultIgnored', seen }
-  if (m.stopReason === 'max_tokens') return { ok: false, why: onlyThinking(m.blocks) ? 'thinkingBudget' : 'incomplete', seen }
+  if (m.blocks.some((b) => b.type === 'tool_use')) return { ok: false, why: 'resultIgnored', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
+  if (m.stopReason === 'max_tokens') return { ok: false, why: onlyThinking(m.blocks) ? 'thinkingBudget' : 'incomplete', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
   // A completed round trip ends its turn (HR3 on s11): any other stop isn't one, whatever its text holds.
-  if (m.stopReason !== 'end_turn') return { ok: false, why: 'unexpected', seen }
-  if (!textOf(m.blocks).includes(code)) return { ok: false, why: 'resultIgnored', seen }
+  if (m.stopReason !== 'end_turn') return { ok: false, why: 'unexpected', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
+  if (!textOf(m.blocks).includes(code)) return { ok: false, why: 'resultIgnored', seen } // i18n-ignore: a failure's code, not text (the window says each in its words)
   return { ok: true }
 }
 

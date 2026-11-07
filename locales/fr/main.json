@@ -490,5 +490,7 @@
   "main.window.stopped": "La fenêtre de Combwork a cessé de fonctionner.",
   "main.window.unresponsive": "La fenêtre de Combwork ne répond pas.",
   "main.window.unresponsiveDetail": "{stillRunning} Attends-la, ou recharge-la.",
-  "main.window.wait": "Attendre"
+  "main.window.wait": "Attendre",
+  "main.server.context.invalid": "Une taille de contexte est un nombre entier de jetons, de 1 à {max, number}.",
+  "main.server.context.noModel": "La connexion n’a plus de modèle {model}."
 }

@@ -490,5 +490,7 @@
   "main.window.stopped": "Combworkのウィンドウが動作を停止しました。",
   "main.window.unresponsive": "Combworkのウィンドウが応答していません。",
   "main.window.unresponsiveDetail": "{stillRunning}応答を待つか、再読み込みしてください。",
-  "main.window.wait": "待つ"
+  "main.window.wait": "待つ",
+  "main.server.context.invalid": "コンテキストサイズはトークン数の整数で、1から{max, number}までです。",
+  "main.server.context.noModel": "この接続には現在モデル{model}がありません。"
 }

@@ -490,5 +490,7 @@
   "main.window.stopped": "Das Combwork-Fenster funktioniert nicht mehr.",
   "main.window.unresponsive": "Das Combwork-Fenster reagiert nicht.",
   "main.window.unresponsiveDetail": "{stillRunning} Warte oder lade es neu.",
-  "main.window.wait": "Warten"
+  "main.window.wait": "Warten",
+  "main.server.context.invalid": "Eine Kontextgröße ist eine ganze Zahl von Tokens, von 1 bis {max, number}.",
+  "main.server.context.noModel": "Die Verbindung hat jetzt kein Modell {model} mehr."
 }

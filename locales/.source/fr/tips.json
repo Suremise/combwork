@@ -440,6 +440,8 @@
   "tips.searchClear.title": "Clear a search in one go",
   "tips.searchTranscripts.text": "The Sessions tab searches every session's name, date and transcript (Ctrl+F there): the tree keeps what matches, and a hit opens the conversation at that message.",
   "tips.searchTranscripts.title": "Search every past session",
+  "tips.serverDiagnostics.text": "Check Server… on a server account in Settings → Accounts & Connections shows its model's real context and tests a tool call. A context smaller than Claude Code's prompt is the usual reason a local model prints a tool call instead of making it.",
+  "tips.serverDiagnostics.title": "An agent on Ollama just prints text?",
   "tips.sessionCleanup.text": "The Sessions tab's Clean Up Old Sessions… button archives or deletes every session last active more than {hours, plural, one {# hour} other {# hours}}, {week, plural, one {# day} other {# days}} or {month, plural, one {# day} other {# days}} ago. Running sessions and the one you're reading are left alone.",
   "tips.sessionCleanup.title": "Clear out old sessions",
   "tips.sessionSizes.text": "The Sessions tab shows each session's transcript size. One in amber is past Warn when a transcript is over: hand its work over to a new conversation to keep things quick.",

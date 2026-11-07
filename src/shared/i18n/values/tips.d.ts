@@ -442,6 +442,8 @@ interface CombworkMessageValues {
   'tips.searchClear.title': undefined
   'tips.searchTranscripts.text': undefined
   'tips.searchTranscripts.title': undefined
+  'tips.serverDiagnostics.text': undefined
+  'tips.serverDiagnostics.title': undefined
   'tips.sessionCleanup.text': { hours: number; week: number; month: number }
   'tips.sessionCleanup.title': undefined
   'tips.sessionSizes.text': undefined

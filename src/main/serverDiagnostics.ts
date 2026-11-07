@@ -179,19 +179,19 @@ export function readServerContext(id: string, model: string, request: string): P
           }
           break
         }
-        if (!reached && context.kind === 'generic') return current() ? { ok: false, why: 'unreachable' } : { ok: false, why: 'stale' }
-        if (!current()) return { ok: false, why: 'stale' }
+        if (!reached && context.kind === 'generic') return current() ? { ok: false, why: 'unreachable' } : { ok: false, why: 'stale' } // i18n-ignore: a failure's code, not text (the window says each in its words)
+        if (!current()) return { ok: false, why: 'stale' } // i18n-ignore: a failure's code, not text (the window says each in its words)
         const r: ContextCheck = { ok: true, context, at }
         remember(id, model, { context: r })
         log.info(`connection ${id}: context read (${context.kind})`)
         return r
       } catch (e) {
-        if (e instanceof Stale) return { ok: false, why: 'stale' }
+        if (e instanceof Stale) return { ok: false, why: 'stale' } // i18n-ignore: a failure's code, not text (the window says each in its words)
         throw e
       }
     },
-    { ok: false, why: 'stale' },
-    { ok: false, why: 'busy' }
+    { ok: false, why: 'stale' }, // i18n-ignore: a failure's code, not text (the window says each in its words)
+    { ok: false, why: 'busy' } // i18n-ignore: a failure's code, not text (the window says each in its words)
   )
 }
 
@@ -232,19 +232,19 @@ export function testServerTools(id: string, model: string, request: string, rand
         return done
       }
       const one = await send(step1Body(model))
-      if (!one) return { ok: false, why: 'stale' }
-      if (one.status === 0) return finish({ ok: false, why: 'unreachable', step: 1 })
+      if (!one) return { ok: false, why: 'stale' } // i18n-ignore: a failure's code, not text (the window says each in its words)
+      if (one.status === 0) return finish({ ok: false, why: 'unreachable', step: 1 }) // i18n-ignore: a failure's code, not text (the window says each in its words)
       const j1 = judgeStep1(one)
       if (!j1.ok) return finish({ ok: false, why: j1.why, step: 1, seen: j1.seen })
       const result = testResult(random)
       const two = await send(step2Body(model, j1.toolUse!, result.text))
-      if (!two) return { ok: false, why: 'stale' }
-      if (two.status === 0) return finish({ ok: false, why: 'unreachable', step: 2 })
+      if (!two) return { ok: false, why: 'stale' } // i18n-ignore: a failure's code, not text (the window says each in its words)
+      if (two.status === 0) return finish({ ok: false, why: 'unreachable', step: 2 }) // i18n-ignore: a failure's code, not text (the window says each in its words)
       const j2 = judgeStep2(two, result.code)
       return finish(j2.ok ? { ok: true, at: 0 } : { ok: false, why: j2.why, step: 2, seen: j2.seen })
     },
-    { ok: false, why: 'stale' },
-    { ok: false, why: 'busy' }
+    { ok: false, why: 'stale' }, // i18n-ignore: a failure's code, not text (the window says each in its words)
+    { ok: false, why: 'busy' } // i18n-ignore: a failure's code, not text (the window says each in its words)
   )
 }
 

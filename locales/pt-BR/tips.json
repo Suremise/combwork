@@ -546,5 +546,7 @@
   "tips.waitingOnPurpose.title": "Um cartão que aguarda de propósito",
   "tips.waitingOnPurpose.text": "Um cartão em Fazendo espera um momento tranquilo ou uma resposta? Clique nele com o botão direito, Marcar como aguardando…, e diga por quê: o Combwork deixa de marcá-lo como travado até você encerrar a espera ou ele sair de Fazendo. O agente continua rodando.",
   "tips.perfFailures.title": "Recusado não é quebrado",
-  "tips.perfFailures.text": "Desempenho → Falhas classifica o que não deu certo: erros reais em vermelho, à parte das chamadas que uma regra do fluxo de trabalho recusou e das chamadas erradas. Recusas e chamadas erradas por motivo mostra qual regra ou mensagem apareceu mais: uma descrição de ferramenta a deixar mais clara."
+  "tips.perfFailures.text": "Desempenho → Falhas classifica o que não deu certo: erros reais em vermelho, à parte das chamadas que uma regra do fluxo de trabalho recusou e das chamadas erradas. Recusas e chamadas erradas por motivo mostra qual regra ou mensagem apareceu mais: uma descrição de ferramenta a deixar mais clara.",
+  "tips.serverDiagnostics.title": "Um agente no Ollama só escreve texto?",
+  "tips.serverDiagnostics.text": "Verificar servidor… em uma conta de servidor, em Configurações → Contas e conexões, mostra o contexto real do modelo e testa uma chamada de ferramenta. Um contexto menor que o prompt do Claude Code é o motivo comum para um modelo local escrever uma chamada de ferramenta em vez de fazê-la."
 }

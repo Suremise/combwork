@@ -546,5 +546,7 @@
   "tips.waitingOnPurpose.title": "Une carte qui attend exprès",
   "tips.waitingOnPurpose.text": "Une carte En cours attend un moment calme, ou une réponse ? Clic droit dessus, Marquer comme en attente…, et dis pourquoi : Combwork cesse de la signaler comme à l’arrêt jusqu’à ce que tu lèves l’attente ou qu’elle quitte En cours. Son agent continue de tourner.",
   "tips.perfFailures.title": "Refusé n’est pas cassé",
-  "tips.perfFailures.text": "Performances → Échecs trie ce qui n’a pas abouti : les vraies erreurs en rouge, à part des appels refusés par une règle du flux de travail et des appels erronés. Refus et appels erronés par motif montre quelle règle ou quel message revient le plus : une description d’outil à rendre plus claire."
+  "tips.perfFailures.text": "Performances → Échecs trie ce qui n’a pas abouti : les vraies erreurs en rouge, à part des appels refusés par une règle du flux de travail et des appels erronés. Refus et appels erronés par motif montre quelle règle ou quel message revient le plus : une description d’outil à rendre plus claire.",
+  "tips.serverDiagnostics.title": "Un agent sur Ollama ne fait qu’écrire du texte ?",
+  "tips.serverDiagnostics.text": "Vérifier le serveur… sur un compte de serveur, dans Paramètres → Comptes et connexions, montre le contexte réel de son modèle et teste un appel d’outil. Un contexte plus petit que le prompt de Claude Code est la raison habituelle pour laquelle un modèle local écrit un appel d’outil au lieu de le faire."
 }
