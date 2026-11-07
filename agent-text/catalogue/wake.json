@@ -571,9 +571,41 @@
     "text": "Usage reached: {hits}. Your watch has ended: carry on (cw_connection list for every account's usage).",
     "note": "Typed when a usage watch fires (HI-2195). hits: each account and the limits that reached their share (\"Anthropic-1: Weekly 98% (resets …)\"), \"; \" between."
   },
+  "wake.watch.cardsDamaged": {
+    "text": "The card watches file is {why} and couldn't be set aside ({error}): it was left as it is",
+    "note": "HI-2691: a damaged card watches file that couldn't be moved aside. why: what is wrong with it; error: why it couldn't be moved (as it is)."
+  },
+  "wake.watch.cardsFull": {
+    "text": "Too many card watches to keep in this workspace",
+    "note": "HI-2691: card watches not saved: they would no longer fit what Combwork keeps."
+  },
+  "wake.watch.cardsFullWait": {
+    "text": "Too many card watches to keep in this workspace: wait for some to end",
+    "note": "HI-2691: a card watch refused: the watches would no longer fit what Combwork keeps."
+  },
+  "wake.watch.cardsReadFailed": {
+    "text": "Could not read the card watches ({error})",
+    "note": "HI-2691: the card watches couldn't be read. error: why (the system's or the database's error, as it is)."
+  },
+  "wake.watch.cardsTooBig": {
+    "text": "The card watches file is too big, and its extra watches could not be set aside",
+    "note": "HI-2691: card watches not loaded: the file holds more than Combwork keeps, and the extra ones could not be moved aside."
+  },
+  "wake.watch.cardsTooMany": {
+    "text": "This workspace already has {max} card watches, the most Combwork keeps: wait for some to end",
+    "note": "HI-2691: a card watch refused: the workspace has as many as Combwork keeps. max: how many."
+  },
   "wake.watch.label": {
     "text": "Waiting for {cards}{hasColumn, select, yes { → {column}} other {}}",
     "note": "What a watching agent shows (the Agent API's watch, its header): its cards, and the column it waits for."
+  },
+  "wake.watch.noSuchLane": {
+    "text": "No such {count, plural, one {lane} other {lanes}}: {lanes} (cw_lane list gives the lanes and their ids)",
+    "note": "HI-2691: a lane watch refused: lanes it names are not known. count: how many; lanes: their ids, joined with \", \". servers.ts answers it 404 by its opening (/^No such lane/)."
+  },
+  "wake.watch.notAProject": {
+    "text": "Not a project of this workspace: {project}",
+    "note": "HI-2691: a watch refused: the project it names (its path or name, as given) isn't one of this workspace's."
   },
   "wake.watch.notCancelled": {
     "text": "Could not cancel the watch: {error}",

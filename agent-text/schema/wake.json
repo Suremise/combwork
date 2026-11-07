@@ -751,11 +751,47 @@
       "hits": "plain"
     }
   },
+  "wake.watch.cardsDamaged": {
+    "placeholders": {
+      "why": "plain",
+      "error": "plain"
+    }
+  },
+  "wake.watch.cardsFull": {
+    "placeholders": {}
+  },
+  "wake.watch.cardsFullWait": {
+    "placeholders": {}
+  },
+  "wake.watch.cardsReadFailed": {
+    "placeholders": {
+      "error": "plain"
+    }
+  },
+  "wake.watch.cardsTooBig": {
+    "placeholders": {}
+  },
+  "wake.watch.cardsTooMany": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
   "wake.watch.label": {
     "placeholders": {
       "cards": "plain",
       "hasColumn": "select",
       "column": "plain"
+    }
+  },
+  "wake.watch.noSuchLane": {
+    "placeholders": {
+      "count": "plural",
+      "lanes": "plain"
+    }
+  },
+  "wake.watch.notAProject": {
+    "placeholders": {
+      "project": "plain"
     }
   },
   "wake.watch.notCancelled": {

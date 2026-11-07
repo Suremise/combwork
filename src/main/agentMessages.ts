@@ -1,7 +1,8 @@
 import type { DeliverySender, DeliveryState } from '../shared/deliveries'
 import { createDelivery, cancelDeliveries, deliveryNow, offerNow, roundNow, TooManyWaiting, waitingCount } from './deliveries'
 import { sessions } from './sessions'
-import { agentMsg, say } from '../shared/agentText'
+import { agentMsg } from '../shared/agentText'
+import { saidError } from './combworkError'
 
 const T = {
   notRunning: agentMsg({ id: 'inbox.message.notRunning', text: '{agent} isn\'t running.', note: '#530: a message left for an agent (cw_message_agent) refused: the agent isn\'t running. agent: its name.' }),
@@ -41,13 +42,13 @@ const fateOf = (s: DeliveryState): MessageFate => (s === 'offered' || s === 'rec
  */
 export async function leaveMessage(projectPath: string, agentId: string, agentName: string, from: DeliverySender, text: string, card?: number): Promise<{ id: string; fate: MessageFate; queued: number; detail?: string; round?: number }> {
   const st = sessions.liveFor(projectPath, agentId)
-  if (!st) throw new Error(say(T.notRunning, { agent: agentName }))
+  if (!st) throw saidError(T.notRunning, { agent: agentName })
   const t = text.trim()
-  if (!t) throw new Error(say(T.noText))
-  if (t.length > MESSAGE_MAX_CHARS) throw new Error(say(T.tooLong, { max: String(MESSAGE_MAX_CHARS), n: String(t.length) }))
+  if (!t) throw saidError(T.noText)
+  if (t.length > MESSAGE_MAX_CHARS) throw saidError(T.tooLong, { max: String(MESSAGE_MAX_CHARS), n: String(t.length) })
   const round = card ? await roundNow(projectPath, card) : undefined
   const r = await createDelivery(projectPath, { agentId, agentName, conversation: st.sessionId || null, kind: 'rebrief', from, ...(card ? { card, round } : {}), body: t, maxWaiting: MAX_QUEUED }).catch((e) => {
-    if (e instanceof TooManyWaiting) throw new Error(say(T.tooMany, { agent: agentName, max: String(MAX_QUEUED) }))
+    if (e instanceof TooManyWaiting) throw saidError(T.tooMany, { agent: agentName, max: String(MAX_QUEUED) })
     throw e
   })
   await offerNow(projectPath, agentId)

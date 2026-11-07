@@ -14,7 +14,7 @@ import { startTask, START_NOTE_MAX } from './taskStart'
 import { CW_LANE_START } from './tasks'
 import { inWorkspace } from './workspace'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
-import { CombworkError, combworkError } from './combworkError'
+import { CombworkError, combworkError, saidError } from './combworkError'
 import { changeFreshStart, freshStartsNow, holdLaneStart, laneNow, laneRunsWith, lanesEnforced, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { whyNoLine } from './lineWriter'
@@ -375,7 +375,7 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
         })
       })
       // Made and then ended without being given (its launch failed after the record was saved): not started.
-      if (launched.record && NOT_GIVEN.has(launched.record.state)) throw new Error(say(A.notGiven, { agent: a.name, state: launched.record.state }))
+      if (launched.record && NOT_GIVEN.has(launched.record.state)) throw saidError(A.notGiven, { agent: a.name, state: launched.record.state })
       started.push({ agentId: a.id, name: a.name, role, how })
     } catch (e) {
       // Over at its launch (Combwork quitting): not started, and no failure; the next start starts it.

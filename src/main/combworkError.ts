@@ -25,6 +25,7 @@
  *   log read (they stay English strings with `// i18n-ignore: <reason>`).
  */
 import { agentText, englishText, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
+import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import type { Msg, Values } from '../shared/i18n'
 import type { CombworkErrorData, CombworkErrorKind } from '../shared/types'
 
@@ -47,6 +48,33 @@ export class CombworkError extends Error implements CombworkErrorData {
     return this.kind ? { text: this.text, kind: this.kind } : { text: this.text }
   }
 }
+
+/**
+ * An agent message said now, as an error (HI-2691). It is a plain Error whose message is exactly `say(m, values)` in the
+ * current dialect scope, so every reader of `.message` (a reply, the log, a wake that quotes it) sees what it saw
+ * before. It carries the message's id (`saidId`, which metrics.ts `reasonOf()` records as `agent:<id>`, never the text)
+ * and, optionally, the Agent API's status (`kind`, as a CombworkError's; servers.ts `httpFrom()` keeps the id when it
+ * wraps one).
+ *
+ * A `kind` only where the status today can't depend on the values: a message with no placeholder, or numbers only.
+ * A name, key, reason or error text can hold the words servers.ts `statusFor()` matches ("busy", "archived",
+ * "Unknown agent"…) and change which of its patterns wins (HR1, HI-2691/s12). Those messages keep `statusFor()`'s
+ * classification of their whole text, a cause included, as before. With a `kind`, a dialect whose wording lacks the
+ * English words keeps the status (it used to fall to 500): a deliberate change.
+ */
+export class SaidError extends Error {
+  readonly saidId: string
+  readonly kind?: CombworkErrorKind
+
+  constructor(m: AgentMsg, values?: AgentValues, options?: { kind?: CombworkErrorKind; cause?: unknown }) {
+    super(say(m, values), options?.cause === undefined ? undefined : { cause: options.cause })
+    this.saidId = m.id
+    if (options?.kind) this.kind = options.kind
+  }
+}
+
+/** A `SaidError`: `throw saidError(T.tooLong, { max: '40' }, { kind: 'invalid' })` where `throw new Error(say(…))` was. */
+export const saidError = (m: AgentMsg, values?: AgentValues, options?: { kind?: CombworkErrorKind; cause?: unknown }): SaidError => new SaidError(m, values, options)
 
 /** A message's values as a `CombworkError` takes them: its placeholders, each text (a `Text` is formatted in the same language) or a number. */
 type ErrorArgs<Id extends string> = string extends Id

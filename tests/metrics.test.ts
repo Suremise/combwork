@@ -1755,4 +1755,110 @@ describe('HI-2553: failures by kind, their reasons, and the tool list by provide
     expect(englishTemplate('{n, plural, one {# card} other {# cards}} in {name}{kind, select, a {!} other {.}} {size, number}')).toBe('2 cards in …. 2')
     await disposeWorkspaceService(w)
   })
+
+  describe("HI-2691: the services' errors on Agent API paths keep their agent message's id, with statuses and text as before", () => {
+    // An agent message as the catalogue has it (its id and English): what say() and saidError() read of it.
+    // The areas of the messages these tests name (named files: no scan of the folder).
+    const catalogue = Object.assign({}, ...['api', 'inbox', 'notice', 'wake'].map((a) => JSON.parse(readFileSync(join(import.meta.dirname, '..', 'agent-text', 'catalogue', `${a}.json`), 'utf8')))) as Record<string, { text: string }>
+    const agentMsgOf = (id: string) => ({ id, text: catalogue[id].text })
+    const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409 } as const
+    afterEach(async () => (await import('../src/shared/agentText')).setChainResolver(null))
+
+    it('an unknown lane through its real route, wrapped by httpFrom (404), and a project outside the workspace thrown as it is (404): each its id, its text unchanged', async () => {
+      const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+      const { inWorkspace } = await import('../src/main/workspace')
+      const { w, path } = await open()
+      mkdirSync(join(path, 'alpha'))
+      const call = (who: string | null, method: string, template: string, body: unknown) =>
+        inWorkspace(w, () => {
+          const run = () => apiTextTestHooks.routeHandler(method, template)!({ params: [], query: new URLSearchParams(), body, signal: new AbortController().signal })
+          return who ? apiTextTestHooks.asAgent(path, who, 'a-test', run) : run()
+        }).then(() => null, (e: unknown) => e)
+      // cw_wait_for_tasks on lanes Combwork doesn't know: watches.ts's error, wrapped by the route (httpFrom, its own 404).
+      for (const [lanes, text] of [[['nope'], 'No such lane: nope (cw_lane list gives the lanes and their ids)'], [['a', 'b'], 'No such lanes: a, b (cw_lane list gives the lanes and their ids)']] as const) {
+        const e = await call(join(path, 'alpha'), 'POST', '/v1/tasks/wait', { lanes, wake: true })
+        expect([apiErrorReply(e).status, metrics.reasonOf(e), apiErrorReply(e).body.error]).toEqual([404, 'agent:wake.watch.noSuchLane', text])
+      }
+      // Thrown as it is: a card watch from a project that isn't the workspace's (watches.ts, as a route's caller would
+      // reach it once its cards are read), its status the fallback's 404 (untyped: the path is a value), what the API's
+      // catch answers (apiErrorReply) and records (reasonOf).
+      const { registerWatch } = await import('../src/main/watches')
+      const outside = join(base, 'elsewhere')
+      const e = await inWorkspace(w, () => registerWatch(w, outside, 'a-test', { cards: [1] } as never)).then(() => null, (x: unknown) => x)
+      expect([apiErrorReply(e).status, metrics.reasonOf(e), apiErrorReply(e).body.error]).toEqual([404, 'agent:wake.watch.notAProject', `Not a project of this workspace: ${outside}`])
+      await disposeWorkspaceService(w)
+    })
+
+    it('a kind only where no value can change the status: each typed one gives the status its English had from statusFor()', async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { SaidError } = await import('../src/main/combworkError')
+      const { say } = await import('../src/shared/agentText')
+      // Every typed saidError in src/main (no placeholder, or numbers only), with sample values: a new one is added here.
+      const typed: [string, Record<string, string> | undefined, keyof typeof KIND_STATUS][] = [
+        ['inbox.create.badKey', undefined, 'invalid'],
+        ['inbox.create.tooLong', { length: '5000', max: '4000' }, 'invalid'],
+        ['notice.team.noWorkspace', undefined, 'conflict'],
+        ['api.workspace.closed', undefined, 'conflict'],
+        ['api.workspace.noneOpen', undefined, 'conflict'],
+        ['wake.watch.cardsTooBig', undefined, 'conflict'],
+        ['wake.watch.cardsFull', undefined, 'conflict'],
+        ['wake.watch.cardsTooMany', { max: '500' }, 'conflict'],
+        ['wake.watch.cardsFullWait', undefined, 'conflict']
+      ]
+      for (const [id, values, kind] of typed) {
+        const m = agentMsgOf(id)
+        expect([id, KIND_STATUS[kind]]).toEqual([id, apiErrorReply(new Error(say(m, values))).status])
+        expect(apiErrorReply(new SaidError(m, values, { kind })).status).toBe(KIND_STATUS[kind])
+      }
+      // The source has no other: each `saidError(…, { …kind… })` call is one of the list's (the closed error and the
+      // noneOpen ones by API, watches.ts's card watches by T), and none takes a value but a number.
+      const src = (f: string) => readFileSync(join(import.meta.dirname, '..', 'src', 'main', f), 'utf8')
+      const calls = ['deliveries.ts', 'teamPause.ts', 'watches.ts', 'notes.ts', 'agentMessages.ts', 'lanes.ts', 'laneStart.ts'].flatMap((f) => src(f).match(/saidError\([^\n]*kind: '\w+'[^\n]*/g) ?? [])
+      expect(calls).toHaveLength(10)
+      for (const c of calls) expect(c.replace(/String\([^)]*\)/g, 'N'), c).not.toMatch(/\{ (?!kind)[^}]*: (?!N\b)[^}]*\}, \{/)
+    })
+
+    it('untyped ones keep the fallback: a name, key or quoted cause holding a classifier word gives the status it gave before', async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { SaidError } = await import('../src/main/combworkError')
+      const { say } = await import('../src/shared/agentText')
+      const cases: [string, Record<string, string>, number][] = [
+        // A project named so: "busy" (409) is tried before "Not a project" (404), as before.
+        ['wake.watch.notAProject', { project: 'busy-work' }, 409],
+        ['wake.watch.notAProject', { project: 'D:\\work\\alpha' }, 404],
+        // An agent's name: "archived" (409) before anything else.
+        ['inbox.message.notRunning', { agent: 'archived' }, 0],
+        // A quoted cause: its words count, as before.
+        ['wake.watch.cardsReadFailed', { error: 'Unknown agent: busy' }, 409],
+        ['wake.watch.notSaved', { error: 'the workspace was closed' }, 409]
+      ]
+      for (const [id, values, want] of cases) {
+        const m = agentMsgOf(id)
+        const before = apiErrorReply(new Error(say(m, values)))
+        const after = apiErrorReply(new SaidError(m, values))
+        expect([id, after.status, after.body.error]).toEqual([id, before.status, before.body.error])
+        if (want) expect(after.status).toBe(want)
+        expect(metrics.reasonOf(new SaidError(m, values))).toBe(`agent:${id}`)
+      }
+    })
+
+    it("in a dialect without the English words: a typed error keeps its status, an untyped one the fallback's, each reply its dialect's text", async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { SaidError } = await import('../src/main/combworkError')
+      const { say, setChainResolver } = await import('../src/shared/agentText')
+      const { inRequestScope } = await import('../src/shared/agentText/asyncScope')
+      setChainResolver(() => ({ texts: { 'api.workspace.closed': 'Workspace gone', 'wake.watch.notAProject': 'Projekt fehlt: {project}' }, files: ['test.json'], hash: 'test-2691' }))
+      inRequestScope(null, () => {
+        const closed = agentMsgOf('api.workspace.closed')
+        const typed = apiErrorReply(new SaidError(closed, undefined, { kind: 'conflict' }))
+        // Its words gone, the fallback would say 500; its kind keeps 409, and the reply is the dialect's text, byte for byte.
+        expect(apiErrorReply(new Error(say(closed))).status).toBe(500)
+        expect([typed.status, typed.body.error]).toEqual([409, say(closed)])
+        expect(typed.body.error).toBe('Workspace gone')
+        const notAProject = agentMsgOf('wake.watch.notAProject')
+        const untyped = apiErrorReply(new SaidError(notAProject, { project: 'alpha' }))
+        expect([untyped.status, untyped.body.error]).toEqual([apiErrorReply(new Error(say(notAProject, { project: 'alpha' }))).status, 'Projekt fehlt: alpha'])
+      })
+    })
+  })
 })
