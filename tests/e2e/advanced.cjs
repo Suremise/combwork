@@ -208,6 +208,9 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await foldersOwn.fill('F:\\Workspace evidence')
     await foldersOwn.press('Enter')
     check("…a workspace's own list goes in workspace.json", !!(await lib.until(() => JSON.stringify(wsOwn()['cw.cards.attachmentFolders']) === JSON.stringify(['F:\\Workspace evidence']), HUNG_MS)), JSON.stringify(wsOwn()))
+    // HI-2717: the file is written before the save's answer reaches the window. An emptied box is compared with the window's
+    // value, so one emptied while the window still had none was no change and saved nothing: wait for the window's value.
+    check('…and the window uses it', !!(await lib.until(() => page.evaluate(() => JSON.stringify(window.__cwAdvancedValue('cw.cards.attachmentFolders')) === JSON.stringify(['F:\\Workspace evidence'])), HUNG_MS)), JSON.stringify(await page.evaluate(() => window.__cwAdvancedValue('cw.cards.attachmentFolders'))))
     await foldersOwn.fill('')
     await foldersOwn.press('Enter')
     check("…emptied, it goes from workspace.json: Combwork's list applies", !!(await lib.until(() => !('cw.cards.attachmentFolders' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
@@ -235,6 +238,8 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await tempCombwork.fill('%LOCALAPPDATA%\\combwork-test\\agent-tmp')
     await tempCombwork.press('Enter')
     check('…a folder goes in advanced.json, its variable kept', !!(await lib.until(() => JSON.stringify(readFile().values['cw.agents.tempFolder']) === JSON.stringify(['%LOCALAPPDATA%\\combwork-test\\agent-tmp']), HUNG_MS)), JSON.stringify(readFile().values['cw.agents.tempFolder']))
+    // As for the folders above (HI-2717): emptied below, it is compared with the window's value, so wait for that.
+    check('…and the window uses it', !!(await lib.until(() => page.evaluate(() => JSON.stringify(window.__cwAdvancedValue('cw.agents.tempFolder')) === JSON.stringify(['%LOCALAPPDATA%\\combwork-test\\agent-tmp'])), HUNG_MS)), JSON.stringify(await page.evaluate(() => window.__cwAdvancedValue('cw.agents.tempFolder'))))
     await temp.screenshot({ path: path.join(lib.WORK, 'advanced-tempfolder.png') })
     await tempCombwork.fill('D:\\a; E:\\b')
     await tempCombwork.press('Enter')
