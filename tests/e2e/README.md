@@ -361,16 +361,18 @@ A few of those shared files are selected by **the parts of them a change touches
 `workspace.ts` by `WorkspaceService` method or function, and `runner.mjs`'s seam tables by the seam names added or
 removed. Each changed part is followed to what names it (a channel's callers, an action's, a method's, and theirs while
 they are in those files too), and a file that names it counts as it would changed: its own suite, its area's suites, or
-every suite when it is itself shared by everything (`store.ts`, `sessions.ts`…) or in no area. Lines that are only
-comments select nothing. The IPC dispatch's own lines map only for its test seams' branches (`CW_TEST_SLOW_IPC`,
+every suite when it is itself shared by everything (`store.ts`, `sessions.ts`…) or in no area. A part public in either
+revision counts as public, and a public part's trail must reach a file that runs it. Lines that are only comments select
+nothing, unless a comment they're in now covers code, or no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines map only for its test seams' branches (`CW_TEST_SLOW_IPC`,
 `FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access check, the error path) is
 every suite. So a one-file fix to one of them selects the suites that reach what it changed: HI-2652's seam, 2 suites;
 HI-2653's New Project, 28 from `actions.ts` (37 with its `Overlays.tsx`); HI-2654's `setAdvanced`, about 50, through
 `advanced:set`, which many suites call (`tests/affectedUnits.test.ts` checks these three keep the suites they need).
 **The escape hatch** errs towards more, each time with a reason in the selection's output: whatever it can't follow
 selects every suite (a line in no function or entry, such as an import or module code; a file it can't parse or read in
-either revision; a public part nothing names; a module imported as a namespace and indexed, or re-exported whole; a
-channel built at run time), the files still in `EVERYTHING` but not `SPLIT` select every suite as before (each with its
+either revision; a public part whose trail reaches nothing that runs it, a cycle of public parts included; a computed
+access (`x[k]`) on what a file took from the module, by its binding: the import itself, a variable made from it, a
+parameter typed as its class; a module re-exported whole; a channel built at run time), the files still in `EVERYTHING` but not `SPLIT` select every suite as before (each with its
 reason there), and a change you know is cross-cutting though it touches only a few parts (a behaviour every handler
 relies on, a type's meaning) runs `--all`, said on the card. Add an area to `affected.mjs` when you add a
 suite or a source file; `tests/e2esuites.test.ts` checks every suite and source file is covered. What only the unit

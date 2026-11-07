@@ -7,16 +7,20 @@
 //
 // It errs towards more: whatever it can't follow selects every suite, with a reason (unitSelection's `all`): a file it
 // can't read or parse in either revision, one added or deleted, a changed line outside any unit (imports, module
-// code), a public unit nothing names (it may be reached in a way a name search can't see), a SPLIT module imported as
-// a namespace and indexed, or re-exported, and a channel named only at run time. Lines whose text is all comment count
-// for nothing. tests/affectedUnits.test.ts checks each rule, and the selections of HI-2652, HI-2653 and HI-2654.
+// code), a public unit (public in either revision) whose trail reaches no file that runs it (it may be reached in a
+// way a name search can't see; a cycle of public units naming only each other too), a computed access on what a file
+// took from a SPLIT module (by its binding), a re-export of it, and a channel named only at run time. Lines whose text
+// is all comment count for nothing, unless a comment they're in covers code in one revision and not the other.
+// tests/affectedUnits.test.ts checks each rule, and the selections of HI-2652, HI-2653 and HI-2654.
 import { parse } from '@babel/parser'
+import traverseModule from '@babel/traverse'
 import { execFileSync } from 'child_process'
 import { readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
+const traverse = traverseModule.default ?? traverseModule
 
 /** Where a channel or a command is named by its callers: the window, main, the preload and the suites. */
 const KEY_SCOPE = ['src/', 'tests/e2e/']
@@ -215,7 +219,10 @@ export function unitsOf(text, file, cfg = splitOf(file) ?? {}) {
     for (let i = s; i < e; i++) if (!/\s/.test(text[i]) && !inComment(i)) return false
     return true
   }
-  return { units, unitAt, lineOf, commentOnly, text, ast, tokens: ast.tokens ?? [], imports }
+  // The comments a line is in, by their first and last lines.
+  const commentLines = (ast.comments ?? []).map((c) => [c.loc.start.line, c.loc.end.line])
+  const commentsAt = (line) => commentLines.filter(([s, e]) => s <= line && line <= e)
+  return { units, unitAt, lineOf, commentOnly, commentsAt, lineCount: lineStarts.length, text, ast, tokens: ast.tokens ?? [], imports }
 }
 
 /** A key's boundaries in a string: not part of a longer channel or command id. */
@@ -253,11 +260,54 @@ function importsModule(text, file) {
   return new RegExp(`(from\\s*|import\\s*\\(\\s*|require\\s*\\(\\s*)['"][^'"]*/${esc(base)}(\\.[a-z]+)?['"]`).test(text)
 }
 /** A namespace import of the module that is indexed (x[…]), or `export * from` it: what a name search can't follow. */
-function untraceable(text, file) {
+function untraceable(text, file, parsed, member = false) {
   const base = esc(file.replace(/^.*\//, '').replace(/\.[^.]+$/, ''))
   if (new RegExp(`export\\s*\\*\\s*(as\\s+\\w+\\s*)?from\\s*['"][^'"]*/${base}(\\.[a-z]+)?['"]`).test(text)) return 're-exports it all'
-  for (const m of text.matchAll(new RegExp(`import\\s*\\*\\s*as\\s+(\\w+)\\s+from\\s*['"][^'"]*/${base}(\\.[a-z]+)?['"]`, 'g'))) if (new RegExp(`\\b${esc(m[1])}\\s*\\[|\\(\\s*${esc(m[1])}\\s+as\\b`).test(text)) return `indexes its namespace import ${m[1]}[…]`
-  return null
+  if (!parsed || parsed.error) return null
+  return computedAccess(parsed, new RegExp(`/${base}(\\.[a-z]+)?$`), { member })
+}
+
+/**
+ * A computed member access (x[k], k not a literal) that may reach a SPLIT module's unit, which a name search can't
+ * follow, by its binding (scopes as @babel/traverse sees them): on a name imported from the module (a namespace, a
+ * named value, a default), on a variable that is one of those again (`const w = workspace`), and, for a class's
+ * members, on what such an import makes or is typed as (`const ws = workspaceOf(p)`, `ws: WorkspaceService`), or
+ * (self, in the module itself) `this`. source: the import specifiers that name the module. Its description, or null.
+ */
+function computedAccess(parsed, source, { member = false, self = false } = {}) {
+  // An import's binding (a type-only import's kind is 'unknown' to Babel's scopes).
+  const fromModule = (b) => !!b && b.path.parentPath?.node?.type === 'ImportDeclaration' && source.test(b.path.parentPath.node.source?.value ?? '')
+  const typedAsImport = (path, id) => {
+    let found = false
+    walk(id?.typeAnnotation ?? { type: 'None' }, (m) => {
+      if (m.type === 'Identifier' && fromModule(path.scope.getBinding(m.name))) found = true
+    })
+    return found
+  }
+  const reaches = (path, node, depth = 0) => {
+    const v = unwrap(node?.type === 'AwaitExpression' ? node.argument : node)
+    if (!v || depth > 4) return false
+    if (v.type === 'ThisExpression') return self
+    if (v.type !== 'Identifier') return member && (v.type === 'CallExpression' || v.type === 'OptionalCallExpression') && v.callee.type === 'Identifier' && fromModule(path.scope.getBinding(v.callee.name))
+    const b = path.scope.getBinding(v.name)
+    if (!b) return false
+    if (fromModule(b)) return true
+    const d = b.path.node
+    if (b.kind === 'param') return member && typedAsImport(b.path, d.type === 'AssignmentPattern' ? d.left : d)
+    if (d.type !== 'VariableDeclarator' || d.id.type !== 'Identifier') return false
+    if (member && typedAsImport(b.path, d.id)) return true
+    // A class's instance comes from a call of what the module exports (workspaceOf(p)); a function, only by name.
+    return reaches(b.path, d.init, depth + 1)
+  }
+  let hit = null
+  traverse(parsed.ast, {
+    'MemberExpression|OptionalMemberExpression'(path) {
+      const n = path.node
+      if (hit || !n.computed || ['StringLiteral', 'NumericLiteral'].includes(unwrap(n.property)?.type)) return
+      if (reaches(path, n.object)) hit = `indexes ${parsed.text.slice(unwrap(n.object).start, unwrap(n.object).end)}[…] (line ${n.loc.start.line}), which a name can't follow`
+    }
+  })
+  return hit
 }
 /** A channel built at run time (`invoke(\`git:${x}\`)`, `call('git:' + x)`): the static prefixes, any of which a channel may start with. */
 const DYNAMIC_CALL = /\b(?:invoke|call|callShared)\s*\(\s*(?:`([^`$]*)\$\{|(['"])([^'"]*)\2\s*\+)/g
@@ -440,7 +490,7 @@ export function unitSelection({ file, base, head, lines, place, areaSuites }) {
   const every = (reason) => {
     all ??= `${file}: ${reason}, so every suite`
   }
-  const result = () => ({ all, suites: all ? [] : [...suites], why: all ? [] : why })
+  const result = () => ({ all, suites: all ? [] : [...suites], why: all ? [] : [...new Set(why)] })
   const revs = [base, head]
   const texts = revs.map((r) => r.read(file))
   if (texts.some((t) => t == null)) {
@@ -468,20 +518,41 @@ export function unitSelection({ file, base, head, lines, place, areaSuites }) {
   for (const [i, s] of sides.entries()) if (s.error) every(`doesn't parse in ${revs[i].name} (${s.error})`)
   if (all) return result()
 
+  // Unchanged lines paired across the revisions (base's line → head's, and back), from the diff.
+  const changedOn = [new Set(lines.removed), new Set(lines.added)]
+  const pairs = [[], []]
+  for (let i = 1, j = 1; i <= sides[0].lineCount && j <= sides[1].lineCount; ) {
+    if (changedOn[0].has(i)) i++
+    else if (changedOn[1].has(j)) j++
+    else {
+      pairs[0][i] = j
+      pairs[1][j] = i
+      i++
+      j++
+    }
+  }
+  // A line of comment alone changes no code unless a comment it is in now covers, or no longer covers, code: an
+  // unchanged line inside that comment that isn't all comment in the other revision (`/*` and `*/` added around code).
+  const movesCode = (i, n) => sides[i].commentsAt(n).some(([s, e]) => {
+    for (let l = s; l <= e; l++) if (!changedOn[i].has(l) && pairs[i][l] && !sides[1 - i].commentOnly(pairs[i][l])) return true
+    return false
+  })
+
   // The changed units, from both revisions.
   const changed = []
   const seams = new Set()
   for (const [i, nums] of [lines.removed, lines.added].entries()) {
     const side = sides[i]
     for (const n of nums) {
-      if (side.commentOnly(n)) continue
+      const comment = side.commentOnly(n)
+      if (comment && !movesCode(i, n)) continue
       const u = side.unitAt(n)
       if (!u) {
         every(`line ${n} (${revs[i].name}) is in no function, method or entry`)
         continue
       }
       if (u.dispatch) {
-        const s = dispatchSeams(side, u, n)
+        const s = comment ? null : dispatchSeams(side, u, n)
         if (!s) every(`line ${n} (${revs[i].name}) is ${u.name}'s dispatch outside its reviewed test-seam branches`)
         else for (const x of s) seams.add(x)
         continue
@@ -494,7 +565,7 @@ export function unitSelection({ file, base, head, lines, place, areaSuites }) {
         else for (const x of [...a.filter((v) => !b.includes(v)), ...b.filter((v) => !a.includes(v))]) seams.add(x)
         continue
       }
-      if (!changed.some((c) => c.file === file && c.unit.id === u.id)) changed.push({ file, unit: u })
+      if (!changed.some((c) => c.file === file && c.id === u.id)) changed.push({ file, id: u.id })
     }
   }
   if (all) return result()
@@ -514,9 +585,16 @@ export function unitSelection({ file, base, head, lines, place, areaSuites }) {
   }
   if (all) return result()
 
-  // Each changed unit followed to what names it, in both revisions.
-  const seen = new Set()
-  const queue = [...changed]
+  // A unit as both revisions have it: public if it is public in either (so a change of visibility can't hide callers).
+  const unitIn = (f, id) => {
+    const found = revs.flatMap((r) => {
+      const p = parsedIn(r, f)
+      return p && !p.error ? p.units.filter((u) => u.id === id) : []
+    })
+    if (!found.length) return null
+    return { ...found[0], local: found.every((u) => u.local), exported: found.some((u) => u.exported), alias: found.map((u) => u.alias).find((a) => a && a !== found[0].name) }
+  }
+
   const channelRegistries = SPLIT.filter((s) => Object.values(s.keyed ?? {}).includes('channel')).map((s) => s.file)
   const dynamic = new Map()
   const untraced = new Map()
@@ -528,110 +606,135 @@ export function unitSelection({ file, base, head, lines, place, areaSuites }) {
     }
     return dynamic.get(rev.name)
   }
-  while (queue.length) {
-    if (all) break
-    const { file: uf, unit } = queue.shift()
-    const key = `${uf}#${unit.id}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    const ucfg = splitOf(uf)
-    if (!unit.needle) {
-      every(`${uf}'s ${unit.id} has no name to follow`)
-      break
-    }
-    if (unit.alias && unit.alias !== unit.name) {
-      every(`${uf} exports ${unit.name} as ${unit.alias}`)
-      break
-    }
-    // A file importing the module in a way names can't follow (indexing its namespace, re-exporting it all): every suite.
-    if (unit.kind === 'named' && !unit.local) {
-      for (const rev of revs) {
-        const k = `${rev.name}\0${uf}`
-        if (!untraced.has(k)) {
-          const stem = uf.replace(/^.*\//, '').replace(/\.[^.]+$/, '')
-          untraced.set(k, rev.grep(`/${stem}`, ucfg.scope, false).map((f) => (lower(f) === lower(uf) ? null : untraceable(rev.read(f) ?? '', uf) && `${f} ${untraceable(rev.read(f) ?? '', uf)} (${rev.name})`)).find(Boolean) ?? null)
+  // What names a module's units in a way a name search can't follow (a computed access on what was taken from it,
+  // a re-export of it all), in its scope's files and, for a class's members, `this[…]` in its own: why, or null.
+  const untracedIn = (rev, uf, member) => {
+    const k = `${rev.name}\0${uf}\0${member}`
+    if (!untraced.has(k)) {
+      const stem = uf.replace(/^.*\//, '').replace(/\.[^.]+$/, '')
+      let hit = null
+      for (const f of rev.grep(`/${stem}`, splitOf(uf).scope, false)) {
+        if (lower(f) === lower(uf)) continue
+        const u = untraceable(rev.read(f) ?? '', uf, parsedIn(rev, f), member)
+        if (u) {
+          hit = `${f} ${u} (${rev.name})`
+          break
         }
-        if (untraced.get(k)) every(untraced.get(k))
       }
-      if (all) break
+      if (!hit && member) {
+        const own = parsedIn(rev, uf)
+        const u = own && !own.error ? computedAccess(own, /(?!)/, { member: true, self: true }) : null
+        if (u) hit = `${uf} ${u} (${rev.name})`
+      }
+      untraced.set(k, hit)
     }
-    let named = 0
-    const follow = (f, rev, u) => {
-      if (!queue.some((q) => q.file === f && q.unit.id === u.id)) queue.push({ file: f, unit: u })
-      named++
+    return untraced.get(k)
+  }
+
+  // What names a unit, once each: the units it is followed to (in SPLIT files) and the files that place it.
+  const edgesCache = new Map()
+  const edgesOf = (uf, unit) => {
+    const key = `${uf}#${unit.id}`
+    if (edgesCache.has(key)) return edgesCache.get(key)
+    const edges = { follows: [], placed: [], all: null }
+    edgesCache.set(key, edges)
+    const stop = (reason) => {
+      edges.all ??= reason
     }
+    const follow = (f, id) => {
+      if (!edges.follows.some((x) => x.file === f && x.id === id)) edges.follows.push({ file: f, id })
+    }
+    if (!unit.needle) return stop(`${uf}'s ${unit.id} has no name to follow`), edges
+    if (unit.alias) return stop(`${uf} exports ${unit.name} as ${unit.alias}`), edges
+    if (unit.kind === 'named' && !unit.local) for (const rev of revs) stop(untracedIn(rev, uf, !!unit.member) ?? undefined)
+    if (edges.all) return edges
     for (const rev of revs) {
       // In its own file: the units naming it (a key's own file only defines it: not its caller).
       const own = parsedIn(rev, uf)
       if (own && !own.error && unit.kind === 'named') {
         for (const off of occurrences(own, unit)) {
           const at = own.unitAt(own.lineOf(off))
-          if (at?.id === unit.id) continue
-          if (inImport(own, off)) continue
-          if (!at) {
-            every(`${uf} names ${unit.name} in its module code (line ${own.lineOf(off)}, ${rev.name})`)
-            break
-          }
-          follow(uf, rev, at)
+          if (at?.id === unit.id || inImport(own, off)) continue
+          if (!at) return stop(`${uf} names ${unit.name} in its module code (line ${own.lineOf(off)}, ${rev.name})`), edges
+          follow(uf, at.id)
         }
       }
-      if (all) break
       // Elsewhere: the files in scope that name it (a local unit, its file's alone, has none).
-      const scope = unit.kind === 'key' ? KEY_SCOPE : ucfg.scope
+      const scope = unit.kind === 'key' ? KEY_SCOPE : splitOf(uf).scope
       for (const f of unit.local ? [] : rev.grep(unit.needle, scope, unit.kind === 'named')) {
-        if (lower(f) === lower(uf) || (unit.keyKind === 'channel' && channelRegistries.some((r) => lower(r) === lower(f))) || (unit.keyKind === 'command' && lower(f) === lower(uf))) continue
+        if (lower(f) === lower(uf) || (unit.keyKind === 'channel' && channelRegistries.some((r) => lower(r) === lower(f)))) continue
         const text = rev.read(f) ?? ''
         const p = parsedIn(rev, f)
         if (unit.kind === 'named' && !unit.member && !importsModule(text, uf)) continue
         // A file that doesn't parse: its mention counts.
         const offs = p && !p.error ? occurrences(p, unit) : [0]
         if (!offs.length) continue
-        const fcfg = splitOf(f)
-        if (fcfg && p && !p.error) {
+        if (splitOf(f) && p && !p.error) {
           // A SPLIT file naming it: the units that do (and those naming an alias it imports it as).
           if (unit.kind === 'named') {
             const { locals, reexport } = importNames(p, unit.name)
-            if (reexport) {
-              every(`${f} re-exports ${unit.name} (${rev.name})`)
-              break
-            }
+            if (reexport) return stop(`${f} re-exports ${unit.name} (${rev.name})`), edges
             for (const alias of locals.filter((l) => l !== unit.name)) for (const off of occurrences(p, { kind: 'named', needle: alias })) if (!inImport(p, off)) offs.push(off)
           }
           for (const off of offs) {
             if (inImport(p, off)) continue
             const at = p.unitAt(p.lineOf(off))
-            if (!at || at.dispatch) {
-              every(`${f} names ${unit.name} ${at ? `in ${at.name}'s dispatch` : 'in its module code'} (line ${p.lineOf(off)}, ${rev.name})`)
-              break
-            }
-            follow(f, rev, at)
+            if (!at || at.dispatch) return stop(`${f} names ${unit.name} ${at ? `in ${at.name}'s dispatch` : 'in its module code'} (line ${p.lineOf(off)}, ${rev.name})`), edges
+            follow(f, at.id)
           }
-          for (const s of areaSuites(f)) suites.add(s)
-          if (all) break
+          for (const s of areaSuites(f)) edges.placed.push({ file: f, suites: [s], area: true })
           continue
         }
-        named++
         const placed = place(f)
-        if (placed?.all) {
-          every(`${unit.kind === 'key' ? `${unit.keyKind} ${unit.needle}` : unit.name} is named in ${f}, ${placed.all}`)
-          break
-        }
-        if (placed) {
-          for (const s of placed.suites) suites.add(s)
-          why.push(`${uf}: ${unit.id} → ${f}: ${placed.suites.join(', ') || 'no suite'}`)
-        }
+        if (placed?.all) return stop(`${unit.kind === 'key' ? `${unit.keyKind} ${unit.needle}` : unit.name} is named in ${f}, ${placed.all}`), edges
+        // Docs and unit tests name it, but run no suite: no consumer of it here.
+        if (placed) edges.placed.push({ file: f, suites: placed.suites })
       }
-      if (all) break
       if (unit.keyKind === 'channel') {
         const d = dynamicPrefixes(rev).find((x) => x.prefix && unit.needle.startsWith(x.prefix))
-        if (d) every(`${d.f} builds a channel starting ${d.prefix} at run time (${rev.name}), which ${unit.needle} may be`)
+        if (d) return stop(`${d.f} builds a channel starting ${d.prefix} at run time (${rev.name}), which ${unit.needle} may be`), edges
       }
+    }
+    return edges
+  }
+
+  // Each changed unit, from itself through what names it. A public unit has callers a name search may miss, so its
+  // traversal must reach a file that runs it (a suite, an area); one that reaches none (nothing names it, or only
+  // units that are themselves reached by nothing, a cycle of them included) selects every suite. Only a traversal of
+  // local units alone may end with none: then nothing can run them.
+  for (const root of changed) {
+    const seen = new Set()
+    const queue = [root]
+    let reached = 0
+    let publicUnit = null
+    while (queue.length) {
       if (all) break
+      const { file: uf, id } = queue.shift()
+      const key = `${uf}#${id}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const unit = unitIn(uf, id)
+      if (!unit) {
+        every(`${uf}'s ${id} isn't in either revision`)
+        break
+      }
+      if (!unit.local) publicUnit ??= `${uf === file ? '' : `${uf}'s `}${unit.kind === 'key' ? `${unit.keyKind} ${unit.needle}` : unit.id}`
+      const edges = edgesOf(uf, unit)
+      if (edges.all) {
+        every(edges.all)
+        break
+      }
+      for (const p of edges.placed) {
+        reached++
+        for (const s of p.suites) suites.add(s)
+        if (!p.area) why.push(`${uf}: ${unit.id} → ${p.file}: ${p.suites.join(', ') || 'no suite'}`)
+      }
+      queue.push(...edges.follows)
     }
     if (all) break
-    if (!named) {
-      if (unit.local) why.push(`${uf}: ${unit.id}: local, and nothing names it: no suite`)
-      else every(`nothing names ${unit.kind === 'key' ? `the ${unit.keyKind} ${unit.needle}` : unit.id}, though it is public: it may be reached in a way a name can't show`)
+    if (!reached) {
+      if (publicUnit) every(`nothing that runs ${publicUnit} was found, though it is public: it may be reached in a way a name can't show`)
+      else why.push(`${file}: ${root.id}: local, and nothing that runs it names it: no suite`)
     }
   }
   return result()

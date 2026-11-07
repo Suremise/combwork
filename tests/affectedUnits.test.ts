@@ -220,6 +220,17 @@ describe('a change to a shared file selects by the parts it changed', () => {
     expect(suitesOf(ACTIONS, repo({ [ACTIONS]: tpl('one') }), repo({ [ACTIONS]: tpl('two') }))).toEqual(['side', 'vb'])
   })
 
+  it('comment delimiters added or removed around unchanged code change what runs (HR3 on round 1)', () => {
+    const plain = actionsTs({ f2: "  await call('a:two')\n  return" })
+    const commented = actionsTs({ f2: "  await call('a:two')\n  /*\n  return\n  */" })
+    // Added: f2 no longer returns early; removed: it does again. Both select f2's callers.
+    expect(suitesOf(ACTIONS, repo({ [ACTIONS]: plain }), repo({ [ACTIONS]: commented }))).toEqual(['side', 'vb'])
+    expect(suitesOf(ACTIONS, repo({ [ACTIONS]: commented }), repo({ [ACTIONS]: plain }))).toEqual(['side', 'vb'])
+    // Around a whole function: the delimiters are in no unit (module code), so every suite.
+    const gone = actionsTs().replace('export async function f2', '/*\nexport async function f2').replace('export async function f3', '*/\nexport async function f3')
+    expect(allOf(ACTIONS, repo(), repo({ [ACTIONS]: gone }))).toMatch(/in no function, method or entry/)
+  })
+
   it("the dispatch's reviewed seam branches select the suites that set their seam", () => {
     expect(suitesOf(IPC, repo(), repo({ [IPC]: ipc({ hold: '30' }) }))).toEqual(['holdsuite'])
     expect(suitesOf(IPC, repo(), repo({ [IPC]: ipc({ extra: "      if (take(failing, channel)) throw new Error('failed')\n" }) }))).toEqual(['failsuite'])
@@ -235,7 +246,7 @@ describe('a change to a shared file selects by the parts it changed', () => {
     const r = select(WS, repo(), repo({ [WS]: workspaceTs({ spare: ' return' }) }))
     expect(r.all).toBeNull()
     expect(r.suites).toEqual([])
-    expect(r.why.join('\n')).toMatch(/local, and nothing names it/)
+    expect(r.why.join('\n')).toMatch(/local, and nothing that runs it names it/)
   })
 })
 
@@ -258,15 +269,46 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
   })
 
   it('a public unit nothing in its scope names (it may be reached some other way, or by unit tests alone)', () => {
-    expect(allOf(WS, repo(), repo({ [WS]: workspaceTs({ unused: ' return' }) }))).toMatch(/nothing names WorkspaceService\.unused, though it is public/)
-    expect(allOf(ACTIONS, repo(), repo({ [ACTIONS]: actionsTs({ exp: '3' }) }))).toMatch(/nothing names unusedExport/)
+    expect(allOf(WS, repo(), repo({ [WS]: workspaceTs({ unused: ' return' }) }))).toMatch(/nothing that runs WorkspaceService\.unused was found, though it is public/)
+    expect(allOf(ACTIONS, repo(), repo({ [ACTIONS]: actionsTs({ exp: '3' }) }))).toMatch(/nothing that runs unusedExport was found/)
+  })
+
+  it('public units that only name each other (a cycle, no caller outside it) reach nothing that runs them (HR3 on round 1)', () => {
+    const cyc = (n: string): string => `export function foo(): number {\n  return bar() + ${n}\n}\nexport function bar(): number {\n  return foo()\n}\n`
+    expect(allOf(ACTIONS, repo({ [ACTIONS]: cyc('1') }), repo({ [ACTIONS]: cyc('2') }))).toMatch(/nothing that runs foo was found, though it is public/)
+  })
+
+  it("a unit's visibility changed: public in either revision counts (local → exported, private → public)", () => {
+    const caller = { 'src/renderer/src/views/VA.tsx': "import { foo } from '../actions'\nexport const VA = () => foo()\n" }
+    const fn = (exp: string, n: string): string => `${exp}function foo(): number {\n  return ${n}\n}\n`
+    expect(suitesOf(ACTIONS, repo({ ...caller, [ACTIONS]: fn('', '1') }), repo({ ...caller, [ACTIONS]: fn('export ', '2') }))).toEqual(['va'])
+    expect(suitesOf(ACTIONS, repo({ ...caller, [ACTIONS]: fn('export ', '1') }), repo({ ...caller, [ACTIONS]: fn('', '2') }))).toEqual(['va'])
+    const cls = (priv: string): string => workspaceTs().replace('  private spare(): void {}', `  ${priv}spare(): void {}`).replace('  unused(): void {}', '  unused(): void {}\n')
+    const other = { 'src/main/other.ts': "import { workspace } from './workspace'\nexport const z = () => workspace.spare()\n" }
+    expect(suitesOf(WS, repo({ ...other, [WS]: cls('private ') }), repo({ ...other, [WS]: cls('') }))).toEqual(['other'])
   })
 
   it('a namespace import indexed, or the module re-exported whole', () => {
     const indexed = { 'src/renderer/src/views/X.tsx': "import * as acts from '../actions'\nexport const go = (n: string) => (acts as Record<string, () => void>)[n]()\n" }
-    expect(allOf(ACTIONS, repo(indexed), repo({ ...indexed, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/indexes its namespace import acts/)
+    expect(allOf(ACTIONS, repo(indexed), repo({ ...indexed, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/indexes acts\[…\]/)
     const all = { 'src/renderer/src/views/Y.ts': "export * from '../actions'\n" }
     expect(allOf(ACTIONS, repo(all), repo({ ...all, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/re-exports it all/)
+  })
+
+  it("a computed access on what came from the module, beside a caller that names it (HR3 on round 1)", () => {
+    const change = { [WS]: workspaceTs({ check: '2' }) }
+    // The named import itself, a variable made by its function, a parameter typed as its class.
+    for (const text of [
+      "import { workspace } from './workspace'\nexport const run = (name: string) => (workspace as unknown as Record<string, () => void>)[name]()\n",
+      "import { workspaceOf } from './workspace'\nexport const run = (p: string, name: string) => {\n  const ws = workspaceOf(p)\n  return ws[name]\n}\n",
+      "import type { WorkspaceService } from './workspace'\nexport const run = (ws: WorkspaceService, name: keyof WorkspaceService) => ws[name]\n"
+    ]) {
+      const dyn = { 'src/main/dynamic.ts': text }
+      expect(allOf(WS, repo(dyn), repo({ ...dyn, ...change })), text).toMatch(/dynamic\.ts indexes (workspace|ws)\[…\]/)
+    }
+    // Not a local object of the same name in another scope, nor a value its function returned.
+    const local = { 'src/main/other.ts': "import { workspace, workspaceOf } from './workspace'\nexport const a = () => workspace.setX(1)\nexport const b = (k: string) => {\n  const ws: Record<string, number> = {}\n  return ws[k]\n}\nexport const c = (k: number) => [workspaceOf][k]\n" }
+    expect(select(WS, repo(local), repo({ ...local, ...change })).all).toBeNull()
   })
 
   it('a channel built at run time', () => {
