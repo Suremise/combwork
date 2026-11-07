@@ -2,9 +2,9 @@
 // written into resources/tested-clis.json by `npm run tested-clis`, checked by `npm run release`, and compared with the
 // installed version for Provider Setup, Copy Diagnostics and the Agent API.
 import { execFileSync, spawnSync } from 'child_process'
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, win32 } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { CLI_PROVIDERS, gitReaders, MANIFEST, manifestCheck, manifestFromRecord, manifestFromRecords, manifestStale, testOnlyFiles } from '../scripts/testedClis.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -16,6 +16,7 @@ import { compareVersions } from '../src/main/providers/common'
 import { PROVIDERS } from '../src/shared/providers'
 import { testedComparison, testedNote, testedSummary } from '../src/shared/testedClis'
 import { tempDir } from './tempDir'
+import { createRequire } from 'module'
 
 type Suite = { name: string; needs?: string[]; noCombwork?: string }
 type Cli = { provider: string; version: string; path: string | null; home?: string }
@@ -309,9 +310,40 @@ describe('npm run release: test-only changes since the record, let through on th
     expect((await manifestCheck(null, () => [], same)).stale).toBe('it has no tested version for Claude Code and Codex and GitHub Copilot')
   })
 
+  // Its git runs in the run context's environment (its allowlist, no repository-selection variables), with no global or
+  // system git config: never the shell's GIT_DIR or the user's hooks, signing or identity (HR1's HI-2661 round 1).
+  const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+  const gitEnv = (): NodeJS.ProcessEnv => ({ ...baseEnv(), GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' })
+  const isolatedSpawn = (cmd: string, args: string[], opts: object) => spawnSync(cmd, args, { ...opts, env: gitEnv() })
+
   it("the git readers: suites.mjs and names as they are at a revision; null for what git can't show", async () => {
+    // A hostile shell around it, which must not reach its git: GIT_DIR naming a decoy repository, and a global config
+    // that signs commits and runs a pre-commit hook that fails and leaves a mark.
+    const hostile = tempDir('tested-clis-hostile-')
+    const decoy = join(hostile, 'decoy')
+    mkdirSync(decoy)
+    execFileSync('git', ['init', '-q'], { cwd: decoy, env: gitEnv(), windowsHide: true })
+    const hooks = join(hostile, 'hooks')
+    mkdirSync(hooks)
+    const mark = join(hostile, 'hook-ran')
+    const slashes = (p: string) => p.replace(/\\/g, '/')
+    writeFileSync(join(hooks, 'pre-commit'), `#!/bin/sh\necho ran > "${slashes(mark)}"\nexit 1\n`)
+    writeFileSync(join(hostile, 'gitconfig'), `[commit]\n\tgpgsign = true\n[core]\n\thooksPath = ${slashes(hooks)}\n`)
+    vi.stubEnv('GIT_DIR', join(decoy, '.git'))
+    vi.stubEnv('GIT_WORK_TREE', decoy)
+    vi.stubEnv('GIT_CONFIG_GLOBAL', join(hostile, 'gitconfig'))
+    try {
+      await gitReadersCase()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+    expect(existsSync(mark)).toBe(false)
+    expect(spawnSync('git', ['rev-parse', '--verify', '-q', 'HEAD'], { cwd: decoy, env: gitEnv(), windowsHide: true }).status).not.toBe(0)
+  })
+
+  async function gitReadersCase() {
     const repo = tempDir('tested-clis-git-')
-    const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true }).trim()
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', windowsHide: true, env: gitEnv() }).trim()
     git('init', '-q')
     git('config', 'user.email', 'test@example.com')
     git('config', 'user.name', 'Test')
@@ -331,7 +363,7 @@ describe('npm run release: test-only changes since the record, let through on th
     put('tests/e2e/suites.mjs', "export const SUITES = [{ name: 'advanced' }, { name: 'renamed', needs: ['claude'] }]\n")
     git('add', '-A')
     git('commit', '-qm', 'two')
-    const r = gitReaders(repo, spawnSync)
+    const r = gitReaders(repo, isolatedSpawn)
     expect((await r.suitesAt(one)).map((s: S) => s.name)).toEqual(['advanced', 'claude-real'])
     expect((await r.suitesAt('HEAD')).map((s: S) => s.name)).toEqual(['advanced', 'renamed'])
     expect(await r.namesAt(one, 'advanced.cjs')).toEqual(['tests/e2e/claude-real.cjs'])
@@ -349,7 +381,7 @@ describe('npm run release: test-only changes since the record, let through on th
     git('rm', '-q', 'tests/e2e/suites.mjs')
     git('commit', '-qm', 'none')
     expect(await r.suitesAt('HEAD')).toBeNull()
-  })
+  }
 })
 
 describe('the shipped manifest (#365)', () => {
