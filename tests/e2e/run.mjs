@@ -54,7 +54,7 @@ import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFo
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
 import { endLeftCopies } from './leftCopies.mjs'
 import { SIDE_E2E_JOBS, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from './slots.mjs'
-import { homesOf, leasesEnv, noteConsumers, waitForTestHome } from './testHomeLock.mjs'
+import { consumerHooks, homesOf, leasesEnv, noteConsumers, waitForTestHome } from './testHomeLock.mjs'
 import { freshenHome, freshenedLine, HomeNotReady } from './testHomes.mjs'
 import { autoClean, holdLane } from './clean.mjs'
 import { recycleBinCount, recycleBinLine } from './recycleBin.mjs'
@@ -515,12 +515,7 @@ async function runOnce(k) {
       // themselves there, and their CLIs name it), its process, and after it its recorded copies. A reset waits for each
       // until it proves them gone, after this lease and a crash alike. Its process's start: spawn has just returned, within
       // the 2 s a consumer's start is matched by (testHomes.mjs homeUsers).
-      const uses = leases.length
-        ? {
-            folder: (dir) => dir && leases.forEach((l) => noteConsumers(l, [{ folder: dir }])),
-            spawned: (child) => child.pid && leases.forEach((l) => noteConsumers(l, [{ pid: child.pid, started: Date.now() }]))
-          }
-        : null
+      const uses = consumerHooks(leases)
       const r = await run(s.name, port, leasesEnv(leases), uses)
       if (leases.length && r.dir) for (const l of leases) noteConsumers(l, recordedCopies(r.dir))
       return said.length ? { ...r, out: `${said.join('\n')}\n${r.out}` } : r

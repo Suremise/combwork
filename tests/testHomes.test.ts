@@ -10,7 +10,7 @@ import { assertTestHome, freshenHome, freshenedLine, homeUsers, HomeNotReady, MA
 // @ts-expect-error: plain .mjs module without types
 import { classify, UNCLASSIFIED } from './e2e/testHomeManifest.mjs'
 // @ts-expect-error: plain .mjs module without types
-import { acquireTestHome, holderLiveFor, holderOf, homesOf, leasesEnv, LEASES_VAR, MAX_CONSUMERS, noteConsumers } from './e2e/testHomeLock.mjs'
+import { acquireTestHome, consumerHooks, holderLiveFor, holderOf, homesOf, leasesEnv, LEASES_VAR, MAX_CONSUMERS, noteConsumers } from './e2e/testHomeLock.mjs'
 
 // The CLI test homes start each run fresh, keeping only the sign-in (HI-2606, design s17 with Darren's answers): fake
 // homes with known bytes, the CLIs' sign-in status scripted, nothing real read or signed in.
@@ -526,5 +526,58 @@ describe('signInStatus: what each CLI says of its sign-in', () => {
     expect(signInStatus('claude', 'h', { run: run({ code: 0, stdout: '{"loggedIn": true}' }) })).toBe('in')
     expect(signInStatus('claude', 'h', { run: run({ code: 1, stdout: '{"loggedIn": false}' }) })).toBe('out')
     expect(signInStatus('claude', 'h', { run: run({ code: 0, stdout: 'garbled' }) })).toBe('unknown')
+  })
+})
+
+describe('HR2 on round 1: a scenario trial notes what it uses the home with on the lease, before it starts', () => {
+  it("its folder before its Combwork launches, so a CLI left by a crashed runner (its parent gone) still blocks the reset", async () => {
+    const req = createRequire(import.meta.url)
+    const lib = req('./e2e/lib.cjs')
+    const harness = req('./scenarios/harness.cjs')
+    const p = join(tmp, `locks-r1-${++n}`)
+    const home = join(tmp, `scenario-home-${n}`)
+    const workRoot = join(tmp, `scenarios-${n}`)
+    // The scenarios runner (pid 900) takes the lease, and hands the trial its hooks, as run.mjs does.
+    const lease = await acquireTestHome('claude', home, { poolRoot: p, wait: false, owner: 900, ownerStarted: 9000, alive: () => true })
+    const seenAtLaunch: unknown[] = []
+    const launch = lib.launch
+    lib.launch = async () => {
+      // What the lease state holds as the trial's Combwork would start.
+      seenAtLaunch.push(...holderOf(lease.dir).consumers)
+      throw new Error('stopped at the launch (a test)')
+    }
+    try {
+      const sc = { id: 'leaseprobe', title: 'lease probe', prompt: 'x', checks: [] }
+      await expect(harness.runScenario(sc, 'fake', { workRoot, uses: consumerHooks([lease]) })).rejects.toThrow(/stopped at the launch/)
+    } finally {
+      lib.launch = launch
+    }
+    const folder = join(workRoot, 'leaseprobe-fake')
+    expect(seenAtLaunch).toEqual([{ folder }])
+    // The runner crashes without letting go; the next run takes over from it.
+    const next = await acquireTestHome('claude', home, { poolRoot: p, wait: false, owner: 901, alive: (pid: number) => pid !== 900 })
+    try {
+      expect(next.takeover).toMatchObject({ pid: 900 })
+      expect(holderOf(next.dir).consumers).toContainEqual({ folder })
+      // The trial's Claude Code survived it, its Combwork (pid 940) gone: only its command line ties it to the trial.
+      const orphan = { pid: 950, parent: 940, started: 9500, commandLine: `claude.exe --settings ${join(folder, 'profile', 'claude-settings.json')}` }
+      expect(homeUsers('claude', home, { lease: next, processes: () => [orphan] }).join()).toMatch(/pid 950/)
+    } finally {
+      next.release()
+    }
+  })
+
+  it('the hooks are none without a lease (a fake run), and note each lease held', async () => {
+    expect(consumerHooks([null, undefined])).toBeNull()
+    const p = join(tmp, `locks-r1-${++n}`)
+    const lease = await acquireTestHome('codex', join(tmp, `hooks-${n}`), { poolRoot: p, wait: false, alive: () => true })
+    try {
+      const hooks = consumerHooks([lease])
+      hooks.folder(join(tmp, 'trial'))
+      hooks.spawned({ pid: 4242 })
+      expect(holderOf(lease.dir).consumers).toEqual([{ folder: join(tmp, 'trial') }, { pid: 4242, started: expect.any(Number) }])
+    } finally {
+      lease.release()
+    }
   })
 })

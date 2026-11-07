@@ -43,7 +43,7 @@ import { devBuild, ensureBuildWithSlot } from '../e2e/build.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from '../e2e/lanes.mjs'
 import { buildNeedsCpuSlot, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from '../e2e/slots.mjs'
 import { waitForCodexHome } from '../e2e/codexHomeLock.mjs'
-import { waitForTestHome } from '../e2e/testHomeLock.mjs'
+import { consumerHooks, waitForTestHome } from '../e2e/testHomeLock.mjs'
 import { freshenHome, freshenedLine, HomeNotReady } from '../e2e/testHomes.mjs'
 import { autoClean } from '../e2e/clean.mjs'
 import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
@@ -377,7 +377,8 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
     }
   }
   process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
-  const r = await runScenario(sc, provider, { model, effort, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
+  // What the trial uses the home with, noted on its lease before it starts (HR2 on round 1): kept after a crash too.
+  const r = await runScenario(sc, provider, { model, effort, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000, uses: consumerHooks([realHome?.lease]) })
   r.sample = sample
   if (r.environment) {
     // Not a result of the scenario: no checks, and no cost assumed.

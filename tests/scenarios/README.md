@@ -226,8 +226,9 @@ its Combwork tool does, so a model trial gets the same fixture as a fake (#1545)
     Full access.
   - **Each trial starts from a fresh home** (HI-2606): the run holds the test home's lease, and before each trial resets
     it to its sign-in (tests/e2e/README.md, What they need: memory, transcripts, trust, history go; the sign-in is never
-    touched). `--warm-homes` keeps what earlier runs left, on purpose; the summary says which, and names what a reset
-    kept unclassified.
+    touched). Each trial's folder is noted on the lease before its Combwork starts, and its Combwork once it has: a
+    reset waits for what they still run, even after a run that crashed. `--warm-homes` keeps what earlier runs left, on
+    purpose; the summary says which, and names what a reset kept unclassified.
   - **Without a sign-in**, a trial prints `SKIP all scenarios: … isn't signed in to its test home` and does nothing. It
     never opens a login.
   - **Stopped by the environment** (#302): a sign-in that has expired since (the credentials file is still there),

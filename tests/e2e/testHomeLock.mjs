@@ -252,3 +252,18 @@ export async function waitForTestHome(cli, home, { kind, root, what, argv = proc
 export function homesOf(suite) {
   return HOME_ORDER.filter((cli) => (cli === 'claude' ? suite.claudeHome === 'test' : suite.needs?.includes('codex') || suite.codexHome === 'test'))
 }
+
+/**
+ * What a runner notes on its leases for what it starts (HR1 on s29, HR2 on round 1): `folder(dir)` before anything is
+ * started there (the CLIs Combwork starts name it on their command lines), `spawned(child)` once its process exists
+ * (its start: spawn or the launch has just returned, within the 2 s a consumer's start is matched by). Null without
+ * leases. Used by the e2e runner for each suite and the scenarios runner for each trial alike.
+ */
+export function consumerHooks(leases) {
+  const held = leases.filter(Boolean)
+  if (!held.length) return null
+  return {
+    folder: (dir) => dir && held.forEach((l) => noteConsumers(l, [{ folder: dir }])),
+    spawned: (child) => child?.pid && held.forEach((l) => noteConsumers(l, [{ pid: child.pid, started: Date.now() }]))
+  }
+}
