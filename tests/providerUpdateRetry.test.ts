@@ -6,7 +6,10 @@ vi.mock('../src/main/ptyHost', () => ({
   killPty: vi.fn(), startSize: () => ({ cols: 80, rows: 24 }), writePty: vi.fn()
 }))
 
+vi.mock('../src/main/events', async (actual) => ({ ...(await actual<typeof import('../src/main/events')>()), toast: vi.fn() }))
+
 const { providerService } = await import('../src/main/providerService')
+const { toast } = await import('../src/main/events')
 const { spawnPty, hasPty } = await import('../src/main/ptyHost')
 const { setLanguage } = await import('../src/shared/i18n')
 const svc = providerService as unknown as { set: (id: ProviderId, info: AgentInstallInfo) => void }
@@ -84,5 +87,25 @@ describe('provider update retries (#1101)', () => {
     expect(providerService.info('copilot').updateRetry).toBeUndefined()
     exit(1)
     expect(providerService.info('copilot').updateRetry).toBeUndefined()
+  })
+
+  it.each([-1978335189, 0x8a15002b])('takes WinGet having nothing newer (%i) as an update that ended well, offering no retry (HI-2729)', (code) => {
+    providerService.runProviderTask('copilot', 'update')
+    exit(code)
+    expect(toast).toHaveBeenCalledWith('success', expect.stringContaining('finished'))
+    expect(toast).not.toHaveBeenCalledWith('warning', expect.anything())
+    expect(providerService.info('copilot').updateRetry).toBeUndefined()
+    expect(providerService.refresh).toHaveBeenCalledWith('copilot', true)
+  })
+
+  it('still warns of another failure, and of 0x8A15002B from an install WinGet does not own', () => {
+    providerService.runProviderTask('copilot', 'update')
+    exit(1)
+    expect(toast).toHaveBeenCalledWith('warning', expect.stringContaining('code 1'))
+    svc.set('copilot', { ...base, path: 'C:/Users/me/AppData/Roaming/npm/copilot.cmd' })
+    vi.mocked(toast).mockClear()
+    providerService.runProviderTask('copilot', 'update')
+    exit(-1978335189)
+    expect(toast).toHaveBeenCalledWith('warning', expect.stringContaining('-1978335189'))
   })
 })

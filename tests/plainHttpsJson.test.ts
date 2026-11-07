@@ -173,22 +173,24 @@ describe('the version checks', () => {
       }
     }))
     try {
-      const { claudeCode } = await import('../src/main/providers/claude/adapter')
+      const { claudeLatestVersion } = await import('../src/main/providers/claude/adapter')
       const { codex } = await import('../src/main/providers/codex/adapter')
       const { copilotLatestVersion } = await import('../src/main/providers/copilot/install')
 
-      reply = async () => ({ version: '2.1.300', tag_name: 'rust-v0.130.1' })
-      expect(await claudeCode.latestVersion()).toBe('2.1.300')
+      // Claude Code's channel stubbed: nothing of this PC's settings or policies is read here.
+      const latest = { channel: async () => 'latest' as const }
+      reply = async () => ({ version: '2.1.300', latest: '2.1.300', tag_name: 'rust-v0.130.1' })
+      expect(await claudeLatestVersion(null, latest)).toBe('2.1.300')
       expect(await codex.latestVersion()).toBe('0.130.1')
       expect(await copilotLatestVersion()).toBe('2.1.300')
       expect(calls).toEqual([
-        { url: 'https://registry.npmjs.org/@anthropic-ai/claude-code/latest', opts: { timeoutMs: 6000 } },
+        { url: 'https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags', opts: { timeoutMs: 6000 } },
         { url: 'https://api.github.com/repos/openai/codex/releases/latest', opts: { timeoutMs: 6000, headers: { Accept: 'application/vnd.github+json' } } },
         { url: expect.stringMatching(/^https:\/\/registry\.npmjs\.org\/.+\/latest$/), opts: { timeoutMs: 6000 } }
       ])
 
       reply = () => Promise.reject(new Error('Refused an encoded reply (br)'))
-      expect(await claudeCode.latestVersion()).toBeNull()
+      expect(await claudeLatestVersion(null, latest)).toBeNull()
       expect(await codex.latestVersion()).toBeNull()
       expect(await copilotLatestVersion()).toBeNull()
     } finally {

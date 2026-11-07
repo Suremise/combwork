@@ -13,6 +13,7 @@ import { listOf } from '../../../shared/advanced'
 import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable, updateIssue } from '../common'
 import type { CommandSpec, UpdateRetry } from '../types'
 import { COPILOT_ENV_STRIP, copilotEnv, copilotHome, stripsTokens } from './home'
+import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 
 // The GitHub Copilot CLI's installation and sign-in, for Provider Setup (#452, from the #403 spike on CLI 1.0.93). The
 // adapter delegates locate, readiness and the install, update and sign-in tasks here.
@@ -130,7 +131,7 @@ async function candidates(env: Record<string, string>): Promise<{ path: string; 
 
 /** How it was installed, from its path: an update goes through the same installer. */
 export function installKind(path: string): 'winget' | 'npm' | 'other' {
-  if (/[\\/]Microsoft[\\/]WinGet[\\/](Links|Packages)[\\/]/i.test(path)) return 'winget'
+  if (isWingetPath(path)) return 'winget'
   if (/\.(cmd|bat)$/i.test(path) || /[\\/]node_modules[\\/]/i.test(path)) return 'npm'
   return 'other'
 }
@@ -205,8 +206,12 @@ export function copilotReadiness(info: AgentInstallInfo, combworkEnv: NodeJS.Pro
   return out
 }
 
-/** The newest release on npm (the WinGet package follows it). */
-export async function copilotLatestVersion(): Promise<string | null> {
+/**
+ * The newest release its installer can deliver: a WinGet install's from the WinGet source, which follows npm days later
+ * (HI-2729: npm's would offer an Update that WinGet can't make yet), any other from npm.
+ */
+export async function copilotLatestVersion(executable?: string | null, fromWinget: typeof wingetVersion = wingetVersion): Promise<string | null> {
+  if (executable && installKind(executable) === 'winget') return fromWinget(WINGET_ID)
   try {
     return ((await plainHttpsJson(`https://registry.npmjs.org/${NPM_PACKAGE}/latest`, { timeoutMs: 6000 })) as { version?: string }).version ?? null
   } catch {
@@ -224,7 +229,7 @@ export function copilotInstallCommand(): CommandSpec {
  * executable without updating WinGet's record (#1101). Readiness offers no Update for other installs.
  */
 export function copilotUpdateCommand(executable: string): CommandSpec {
-  if (installKind(executable) === 'winget') return { file: 'winget.exe', args: ['upgrade', '--id', WINGET_ID, '--exact', '--source', 'winget'] }
+  if (installKind(executable) === 'winget') return wingetUpgradeCommand(WINGET_ID)
   if (process.platform === 'win32') return { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', 'npm', 'install', '-g', `${NPM_PACKAGE}@latest`] }
   return { file: '/bin/bash', args: ['-lc', `npm install -g ${NPM_PACKAGE}@latest`] } // i18n-ignore: a command run in a terminal
 }
@@ -240,6 +245,11 @@ export function copilotUpdateRetry(executable: string, exitCode: number): Update
       label: installText(msg({ id: 'providers.copilot.updateAnyway', defaultMessage: 'Update anyway', description: 'Provider Setup button: explicitly retry a failed WinGet Copilot update with --force, replacing the old package despite changed files.' }))
     }
   }
+}
+
+/** WinGet saying its source has nothing newer (0x8A15002B): the install is as new as WinGet can make it, not a failure. */
+export function copilotUpdateUpToDate(executable: string, exitCode: number): boolean {
+  return installKind(executable) === 'winget' && wingetUpToDate(exitCode)
 }
 
 /** `copilot login` in a terminal the user signs in with (Combwork types nothing into it). */

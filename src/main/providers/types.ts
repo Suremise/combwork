@@ -440,12 +440,18 @@ export interface ProviderAdapter {
 
   // Installation
   locate(): Promise<AgentInstallInfo>
-  latestVersion(): Promise<string | null>
+  /**
+   * The newest version the installer of `executable` (the one found) can deliver, which updateCommand installs: its own
+   * source's, never one it can't get yet (HI-2729). Null when it can't say.
+   */
+  latestVersion(executable?: string | null): Promise<string | null>
   isNewer(latest: string, current: string): boolean
   installCommand(): CommandSpec
   updateCommand(executable: string): CommandSpec
   /** A known update failure's explanation and explicit retry, if this installer supports one. */
   updateRetry?(executable: string, exitCode: number): UpdateRetry | null
+  /** An update's exit code that means its installer had nothing newer (HI-2729: WinGet's 0x8A15002B): it ended well. */
+  updateUpToDate?(executable: string, exitCode: number): boolean
   loginCommand(executable: string): CommandSpec
   /**
    * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's

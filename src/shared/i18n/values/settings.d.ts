@@ -262,6 +262,8 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.trust.prompt.title': undefined
   'settings.advanced.claude-code.turnScreen.done.desc': undefined
   'settings.advanced.claude-code.turnScreen.done.title': undefined
+  'settings.advanced.claude-code.update.channelSetting.desc': undefined
+  'settings.advanced.claude-code.update.channelSetting.title': undefined
   'settings.advanced.claudeFooter.desc': { mode: string | number; footer: string | number }
   'settings.advanced.claudeFooter.title': { mode: string | number }
   'settings.advanced.codex.accounts.accountField.desc': undefined
@@ -590,6 +592,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.wait.agentsMaxSeconds.title': undefined
   'settings.advanced.cw.wait.cardMaxSeconds.desc': undefined
   'settings.advanced.cw.wait.cardMaxSeconds.title': undefined
+  'settings.advanced.cw.winget.showSeconds.desc': undefined
+  'settings.advanced.cw.winget.showSeconds.title': undefined
+  'settings.advanced.cw.winget.version.desc': undefined
+  'settings.advanced.cw.winget.version.title': undefined
   'settings.advanced.cw.workflow.enforce.desc': undefined
   'settings.advanced.cw.workflow.enforce.title': undefined
   'settings.advanced.cw.workflow.updateAgentBranch.desc': undefined

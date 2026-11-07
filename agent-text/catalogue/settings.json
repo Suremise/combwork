@@ -744,6 +744,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
+  "settings.advanced.claude-code.update.channelSetting.desc": {
+    "text": "The Claude Code setting that names the release channel `claude update` installs from (stable or latest), which Combwork reads from Claude Code's managed and user settings, never changes, to offer only an update on that channel. Wrong, Combwork compares Claude Code with the latest channel, and may offer an update it can't make.",
+    "note": "What the advanced setting \"Update channel setting\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2729). Keep `claude update` as it is (a command), and stable and latest (the channels' names).",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.update.channelSetting.title": {
+    "text": "Update channel setting",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The release channel Claude Code updates from (stable or latest).",
+    "audience": "both"
+  },
   "settings.advanced.claudeFooter.desc": {
     "text": "Claude Code's footer in the {mode} mode (\"{footer}\"). Combwork reads an agent's permission mode from its footer (the mode found last on screen), and switches modes by pressing Shift+Tab until the footer shows the one wanted; wrong, Combwork doesn't see the agent in {mode}, and can't switch to it without a restart.",
     "note": "What the advanced setting is for (Settings → Advanced, under Claude Code). {mode} is a permission mode's name; {footer} is Claude Code's own footer text, in English: keep it as it is.",
@@ -2382,6 +2392,26 @@
   "settings.advanced.cw.wait.cardMaxSeconds.title": {
     "text": "Card waits: longest",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.winget.showSeconds.desc": {
+    "text": "How long `winget show` may take to say the newest version WinGet has of a coding agent CLI installed with it (it may update its list of packages first). Past it, Combwork offers no update and doesn't say the CLI is up to date.",
+    "note": "What the advanced setting \"WinGet: time to say its version\" does (Settings → Advanced). Keep `winget show` as it is (a command).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.winget.showSeconds.title": {
+    "text": "WinGet: time to say its version",
+    "note": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\"). WinGet is Windows' package manager: keep its name.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.winget.version.desc": {
+    "text": "How Combwork finds the newest version WinGet has of a coding agent CLI installed with it, in what `winget show` prints: a regular expression whose first group is the version. Provider Setup offers such a CLI an update only once WinGet has a newer one. Wrong, Combwork can't tell, and offers no update and doesn't say it is up to date.",
+    "note": "What the advanced setting \"WinGet: version line\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `winget show` as it is (a command).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.winget.version.title": {
+    "text": "WinGet: version line",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork. WinGet is Windows' package manager: keep its name.",
     "audience": "both"
   },
   "settings.advanced.cw.workflow.enforce.desc": {
