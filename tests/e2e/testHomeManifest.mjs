@@ -23,7 +23,7 @@ export const ENTRIES = {
   claude: {
     keep: ['.claude.json', 'settings.json'],
     clear: [
-      '.claude.json.tmp.*', '.claude.json.backup*', '.oauth_refresh.lock*', '.last-cleanup', '.last-update-result.json', 'backups', 'cache',
+      '.claude.json.tmp.*', '.claude.json.backup*', '.claude.json.lock', '.oauth_refresh.lock*', '.last-cleanup', '.last-update-result.json', 'backups', 'cache',
       'file-history', 'history.jsonl', 'mcp-needs-auth-cache.json', 'plugins', 'projects', 'session-env', 'sessions', 'shell-snapshots',
       'skills', 'state', 'statsig', 'todos', 'ide', 'debug', 'downloads'
     ]
