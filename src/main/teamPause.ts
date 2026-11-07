@@ -3,12 +3,13 @@ import { randomUUID } from 'crypto'
 import { join } from 'path'
 import { rm } from 'original-fs/promises'
 import { CW_DIR, projectAgents } from '../shared/defaults'
-import { agentMsg, inDialectOf, say } from '../shared/agentText'
+import { agentMsg, inDialectOf } from '../shared/agentText'
 import { teamPauseLine, type TeamPause } from '../shared/teamPause'
 import { emit } from './events'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { inWorkspace, openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
+import { saidError } from './combworkError'
 
 /**
  * Pausing the team before an update (HI-2081, SPEC §16.10.9; HR1's design checks s8, s10 and s12). A workspace's pause
@@ -139,7 +140,7 @@ async function tellAgents(ws: WorkspaceService, p: TeamPause): Promise<void> {
  * are told once a pause. Returns the pause.
  */
 export async function pauseTeam(ws: WorkspaceService, by: TeamPause['by'], pauseId: string = randomUUID()): Promise<TeamPause> {
-  if (!ws.path) throw new Error(say(T.noWorkspace))
+  if (!ws.path) throw saidError(T.noWorkspace, undefined, { kind: 'conflict' })
   const k = keyOf(ws)
   const p = await withLock(ws, () => {
     const was = teamPauseOf(ws)

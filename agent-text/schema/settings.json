@@ -74,10 +74,34 @@
   "settings.advanced.antigravity.statusLine.knownFields.title": {
     "placeholders": {}
   },
+  "settings.advanced.antigravity.transcript.modelChange.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.modelChange.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.title": {
+    "placeholders": {}
+  },
   "settings.advanced.antigravity.transcript.userRequest.desc": {
     "placeholders": {}
   },
   "settings.advanced.antigravity.transcript.userRequest.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.title": {
     "placeholders": {}
   },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
@@ -188,6 +212,18 @@
     "placeholders": {}
   },
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.localModel.aliases.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.localModel.aliases.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.localModel.spellings.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.localModel.spellings.title": {
     "placeholders": {}
   },
   "settings.advanced.claude-code.memory.realPath.desc": {
@@ -2020,6 +2056,15 @@
   },
   "settings.agent.tool.restart.sessions": {
     "placeholders": {}
+  },
+  "settings.agent.tool.retarget": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "items": "plain",
+      "preview": "plain",
+      "stay": "plural"
+    }
   },
   "settings.agent.tool.switchRefused": {
     "placeholders": {

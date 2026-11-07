@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { FactStore, withWriteFence } from '../src/main/workflow/factStore'
-import { FRAME_MAX, frameOf, FrameDecoder, GitHost, HOST, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind } from '../src/main/workflow/gitHost'
+import { FRAME_MAX, frameOf, FrameDecoder, GitHost, HOST, hostArgs, OUT_CHUNK, REQUEST_MAX, startGitHost, type Frame, type FrameKind } from '../src/main/workflow/gitHost'
 import { endLeaseJob, queueHost } from '../src/main/workflow/queueJobs'
 import { forgetEnded, LeaseLost, QueueRunner } from '../src/main/workflow/queueRunner'
 import { windowsProbe, type Listed } from '../src/main/workflow/queueProcs'
@@ -220,7 +220,8 @@ function vmHost(): { send: (b: Buffer | string) => void; paused: () => boolean; 
       return c
     }
   }
-  const proc = { stdout, stdin, exit: () => undefined }
+  // `node -e HOST …hostArgs()`: its arguments after the executable's own name.
+  const proc = { stdout, stdin, exit: () => undefined, argv: ['node', ...hostArgs()] }
   runInNewContext(HOST, {
     process: proc,
     require: (m: string) => (m === 'child_process' ? cp : req(m)),

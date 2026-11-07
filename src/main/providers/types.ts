@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, LaunchedLimits, LaunchedPicker, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, ServerModel, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
@@ -105,6 +105,12 @@ export interface LaunchContext {
   tempDir?: string | null
   /** The connection's folder this launch runs on (HI-1757: its homeEnv's value in `env`), absent when it runs on the CLI's own home. */
   connectionHome?: string
+  /** A server connection's models as they run now and its name (HI-2682: a local model's limits), absent off one. */
+  server?: { models: ServerModel[]; connection: string }
+  /** What the adapter applied of them (HI-2682), set by prepareLaunch: the launch keeps it for the context meter. */
+  localLimits?: LaunchedLimits | null
+  /** The /model lineup the adapter asked for on a server connection (HI-2684), set by prepareLaunch: kept on the session. */
+  picker?: LaunchedPicker
   /** The user lets sessions move into the CLI's own background service (see capabilities.backgroundSessions). */
   allowBackgroundSessions: boolean
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
@@ -393,6 +399,11 @@ export interface ConversationParserLike {
   /** Bytes consumed, always at a line boundary. */
   offset: number
   feed(buf: Buffer): number
+  /**
+   * Its CLI may write the transcript again in place, not only append (HI-2546: agy): the reader checks the bytes it read are
+   * unchanged whenever the file changes, and reads it again from the start when they aren't.
+   */
+  readonly rewritten?: boolean
 }
 
 /** The answer to a PreToolUse file-lock check, in the provider's hook reply format. */
@@ -722,7 +733,8 @@ export interface ProviderAdapter {
   usageTitle?(sessionId: string): string | null
   conversationParser(projectPath: string): ConversationParserLike
   /** An image's data URL from the transcript line holding it. */
-  imageData(line: Record<string, any>, loc: ImageLocation): string | null
+  /** `transcriptPath`: the transcript the line is from, for an image kept beside it (agy's media files, HI-2546). */
+  imageData(line: Record<string, any>, loc: ImageLocation, transcriptPath: string): string | null | Promise<string | null>
   /** Heading for a Markdown export. */
   exportSubtitle(sessionId: string, project: string): string
 

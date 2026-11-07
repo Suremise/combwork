@@ -19,6 +19,11 @@
     "note": "Provider Setup, under Antigravity CLI, when listing its models failed for a reason other than a known sign-in error (a network or service error, a timeout). {provider} is its name, {text} the CLI's own words (not translated). agy is a command: keep it; Check again is a button.",
     "audience": "both"
   },
+  "providers.antigravity.conversationGone": {
+    "text": "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.",
+    "note": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation's own store in the agent's profile is gone, though its transcript may be left. {provider} is the CLI's name, {conversation} the conversation's id.",
+    "audience": "both"
+  },
   "providers.antigravity.notOwnConversation": {
     "text": "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.",
     "note": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id.",
@@ -32,6 +37,16 @@
   "providers.antigravity.unreadableConfig": {
     "text": "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.",
     "note": "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words.",
+    "audience": "both"
+  },
+  "providers.claude.localLimits.outputNotBelow": {
+    "text": "{agent} wasn’t started: its output budget ({output, number} tokens, {outputFrom}) isn’t below its context size ({context, number} tokens, {contextFrom}). Change one of them, then start it again.",
+    "note": "An error starting an agent on a local model (HI-2682): the output budget Claude Code would get isn't smaller than its context. {agent} is the agent's name; {output} and {context} are numbers of tokens; {outputFrom} and {contextFrom} say where each was set (\"Context size on Local\", \"env in the project's .claude/settings.json\").",
+    "audience": "both"
+  },
+  "providers.claude.localLimits.tooSmall": {
+    "text": "{agent} wasn’t started: its context size ({context, number} tokens, {contextFrom}) is too small for any output budget. Set a larger context size.",
+    "note": "An error starting an agent on a local model (HI-2682): its context is so small that no output budget fits. {agent} is the agent's name; {context} is a number of tokens; {contextFrom} says where it was set.",
     "audience": "both"
   },
   "providers.cmdTooLong": {

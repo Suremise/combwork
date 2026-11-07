@@ -129,6 +129,18 @@ export function say(m: AgentMsg, values?: AgentValues): string {
 }
 
 /**
+ * An agent message said (`say()`), with its id beside the text (HI-2681, HI-2704): a refusal a shared check returns, so the
+ * Agent API's error reply made from it records the message as its reason (metrics.ts reasonOf) rather than none.
+ */
+export interface Said {
+  said: string
+  id: string
+}
+export const sayWithId = (m: AgentMsg, values?: AgentValues): Said => ({ said: say(m, values), id: m.id })
+/** Whether a check's answer is its refusal (a `Said`) rather than what it read. */
+export const isSaid = (v: unknown): v is Said => !!v && typeof v === 'object' && typeof (v as Said).said === 'string' && typeof (v as Said).id === 'string'
+
+/**
  * The current chain's override of a text, formatted with its values; undefined where the chain has none (or one the
  * same as `english`), or one that doesn't format (the dialect's fault: reported once, and the caller says its English).
  * `say()` uses it for agent messages, and `agentText()` (shared/advanced.ts) for the window's messages agents also read.

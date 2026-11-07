@@ -77,7 +77,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     const path = join(base, `ws-${++n}`)
     const alpha = join(path, 'alpha')
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
-    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }], ...cfg }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }], ...cfg }))
     const w = createWorkspaceService()
     await w.open(path)
     return { w, alpha }
@@ -186,6 +186,74 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     expect(st.typed).toHaveLength(1)
     expect(loopWakes.pendingLoopWakes()).toEqual([])
     await disposeWorkspaceService(w)
+  })
+
+  // HI-2664 (HR3's round 2): a reviewer whose running session hasn't loaded a reviewer's tools yet (its role changed, not
+  // restarted since) isn't given its handoff, which is kept, never dropped, and given once, when the tools are there.
+  it.each([
+    ['as the handoff is made', false],
+    ['after its delivery was queued (the reviewer busy first)', true]
+  ])("a lane reviewer's handoff while it can't review yet, %s: kept, and given once it can", async (_when, queuedFirst) => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'r1', cards: [c], by: 'B1 (alpha)' })
+    // Blocked from the start, or only once its delivery was queued (busy then, its tools loaded).
+    const loaded = { r1: queuedFirst }
+    const gate = vi.spyOn(sessions, 'sideAllows').mockImplementation((_p, id) => id !== 'r1' || loaded.r1)
+    try {
+      if (queuedFirst) st.status.set('r1', 'working')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await settled()
+      expect(st.typed).toEqual([])
+      if (queuedFirst) {
+        // Its turn over, its role changed meanwhile: free, but on its old tools.
+        loaded.r1 = false
+        st.status.set('r1', 'finished')
+      } else loaded.r1 = false
+      await settled()
+      await settled()
+      expect(st.typed).toEqual([])
+      expect(loopWakes.pendingLoopWakes()).toEqual([{ agentId: 'r1', n: c, kind: 'review' }])
+      // Restarted with a reviewer's tools: the same handoff, once.
+      loaded.r1 = true
+      await typedUntil(st, 1)
+      expect(st.typed.map((t) => t.agent)).toEqual(['r1'])
+      await drained()
+      await settled()
+      expect(st.typed).toHaveLength(1)
+    } finally {
+      gate.mockRestore()
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  // And one whose role doesn't review (a lane from before roles counted: it pauses, offSide): kept until its role does.
+  it("a lane reviewer's handoff while its role doesn't review: kept, and given once it does", async () => {
+    await loopWakes.clearLoopWakes()
+    const { w, alpha } = await open()
+    const st = fake(alpha)
+    const c = await newCard(w)
+    await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'o1', cards: [c], by: 'B1 (alpha)' })
+    const projects = w.info()!.projects
+    const set = (role: string) => {
+      const p = projects.find((x) => x.name === 'alpha')!
+      p.config.agents = p.config.agents!.map((a) => (a.id === 'o1' ? { ...a, workflowRole: role as never } : a))
+    }
+    try {
+      set('builder')
+      await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
+      await settled()
+      await settled()
+      expect(st.typed).toEqual([])
+      expect(loopWakes.pendingLoopWakes().map((x) => x.agentId)).toEqual(['o1'])
+      set('either')
+      await typedUntil(st, 1)
+      expect(st.typed.map((t) => t.agent)).toEqual(['o1'])
+    } finally {
+      await disposeWorkspaceService(w)
+    }
   })
 
   it('a card nobody reviews wakes no one; its own change wakes no agent; the last reviewer is its reviewer without a lane', async () => {

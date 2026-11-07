@@ -136,6 +136,8 @@ import type {
   TranscriptSearchResult,
   TranscriptTool,
   WorkflowChange,
+  RetargetPreview,
+  RetargetResult,
   WorkflowCheck,
   WorkflowForm,
   PlatformSwitchCheck,
@@ -377,6 +379,8 @@ export interface CombworkRequests {
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
   'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
+  /** HI-2680: moves what a confirmed Retarget preview listed, as the user: each item rechecked; what happened to each. */
+  'workflow:retarget': (projectPath: string, preview: RetargetPreview) => RetargetResult
   /** The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): its merge style and commit message saved, the request answered. */
   'workflow:chooseMerge': (projectPath: string, choice: { card: number; request: string; style: WorkflowOptions['style']; commitMessage: CommitMessage }) => void
   /**
@@ -444,6 +448,8 @@ export interface CombworkRequests {
   'queue:seen': (projectPath: string, target: string, entries: string[]) => void
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
   'queue:pause': (projectPath: string, target: string) => QueueView
+  /** HI-2679: brings `to` up to date with `from` (a forward merge through `to`'s queue), as the user. */
+  'queue:forward': (projectPath: string, from: string, to: string) => { upToDate: boolean; card: number | null; queued: boolean }
   /** Resume: clears the pause once its cause, where Combwork can see it, is gone (`resumed`); else the queue is paused again, saying why. */
   'queue:resume': (projectPath: string, target: string) => QueueResumed
   /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
@@ -1120,6 +1126,8 @@ export interface CombworkRequests {
   'connections:lastCheck': (id: string, model: string) => LastCheck
   /** The context the user says a model has (null: clears it). */
   'connections:setModelContext': (id: string, model: string, tokens: number | null) => void
+  /** HI-2682: a server connection's model's output budget (null: the default). */
+  'connections:setModelOutput': (id: string, model: string, tokens: number | null) => void
   /** Opens the CLI on a connection (a server one, or a sign-in one: HI-1826), for its first-run screens; returns the terminal's key. */
   /** Its terminal's key, and where it opened (HI-1871: a workspace folder or a project's; absent, its own folder). */
   'connections:setUp': (id: string) => { key: string; in?: { folder: string; project?: string; workspace?: true } }
@@ -1160,6 +1168,8 @@ export interface CombworkRequests {
   'connections:switchAffected': () => { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]
   /** Switches one agent to the connection chosen for it now, at its next safe point (HI-1755). */
   'session:switchConnection': (projectPath: string, agentId: string) => 'queued' | 'waiting' | 'notRunning'
+  /** An agent whose role changed (HI-2664): restarted to load its side's tools; `ifIdle` says `busy` rather than wait. */
+  'session:restartForSide': (projectPath: string, agentId: string, when: 'ifIdle' | 'atSafePoint') => 'restarting' | 'busy' | 'same' | 'notRunning'
 
   'api:info': () => AgentApiInfo
   'api:regenerateToken': () => AgentApiInfo

@@ -7,15 +7,19 @@ import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
+import { createRequire } from 'module'
 import { tempDir } from './tempDir'
 
 const base = tempDir('cw-antigravity-')
 process.env.CW_USER_DATA = join(base, 'userdata')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { classifyModels, isEditorCopy, parseAntigravityVersion } = await import('../src/main/providers/antigravity/install')
+const { antigravityCheckEnv, checkModels, classifyModels, isEditorCopy, parseAntigravityVersion, runAgy } = await import('../src/main/providers/antigravity/install')
 const { parseModels } = await import('../src/main/providers/antigravity/models')
-const { ANTIGRAVITY_ENV_STRIP, antigravityEnv, inProfile, brainDir } = await import('../src/main/providers/antigravity/home')
+const { ANTIGRAVITY_ENV_STRIP, antigravityEnv, checkEnv, checkProfile, inProfile, inUserProfile, userProfileFolder, brainDir } = await import('../src/main/providers/antigravity/home')
+// A spawned child's environment: the run context's allowlist, never this shell's (tests/README.md, Isolation).
+const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+const childBase = (): Record<string, string> => runContext.baseEnv() as Record<string, string>
 const { UnreadableConfig, scannedFolders, workspaceServers } = await import('../src/main/providers/antigravity/projectConfig')
 const { agyServer, antigravity, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
 const { advanced } = await import('../src/main/advanced')
@@ -101,6 +105,51 @@ describe('the environment', () => {
     expect(Object.keys(out).filter((k) => k.toUpperCase() === 'USERPROFILE')).toEqual(['USERPROFILE'])
     // A HOME the user's environment sets is kept as it is.
     expect(inProfile({ HOME: '/c/Users/me' }, 'D:\\profile', 'C:\\Users\\other').HOME).toBe('/c/Users/me')
+  })
+})
+
+describe("agy's checks never run in the user's own profile (HI-2698)", () => {
+  // A stand-in agy that notes the profile it was run in (USERPROFILE: agy's home) and answers as 1.5.0 does.
+  const bin = join(base, 'probe-agy')
+  mkdirSync(bin, { recursive: true })
+  const noted = join(bin, 'profile.txt')
+  const agy = join(bin, 'agy.cmd')
+  writeFileSync(agy, `@echo off\r\n>"${noted}" echo %USERPROFILE%\r\nif "%1"=="--version" goto version\r\necho gemini-3.8-flash-low\tGemini 3.8 Flash Low\r\nexit /b 0\r\n:version\r\necho 1.5.0\r\n`)
+  const ranIn = (): string => readFileSync(noted, 'utf8').trim()
+
+  it("the check environment's profile is Combwork's check profile, under its own data, never the user's", () => {
+    const env = antigravityCheckEnv()
+    expect(env.USERPROFILE).toBe(checkProfile())
+    expect(checkProfile().startsWith(join(base, 'userdata'))).toBe(true)
+    expect(inUserProfile(env)).toBe(false)
+    expect(env.AGY_CLI_DISABLE_AUTO_UPDATE).toBe('true')
+  })
+  it("an environment with no profile of its own, or the user's, is the user's", () => {
+    expect(inUserProfile({}, 'C:\\Users\\Ann')).toBe(true)
+    expect(inUserProfile({ USERPROFILE: 'c:\\users\\ann\\' }, 'C:\\Users\\Ann')).toBe(true)
+    expect(inUserProfile({ userprofile: 'C:\\Users\\Ann' }, 'C:\\Users\\Ann')).toBe(true)
+    expect(inUserProfile({ USERPROFILE: 'C:\\Users\\Ann\\AppData\\Local\\Combwork\\antigravity\\check' }, 'C:\\Users\\Ann')).toBe(false)
+  })
+  it('agy --version and agy models run in the check profile (made first)', async () => {
+    expect((await runAgy(agy, ['--version'], 10000, checkEnv(childBase()))).stdout.trim()).toBe('1.5.0')
+    expect(ranIn()).toBe(checkProfile())
+    const listed = await checkModels(agy, checkEnv(childBase()), null)
+    expect(listed.kind).toBe('ok')
+    expect(ranIn()).toBe(checkProfile())
+  })
+  it("a run that would be in the user's own profile is refused, never started", async () => {
+    writeFileSync(noted, 'not run')
+    // The user's own profile, or none of its own: refused before anything starts.
+    await expect(runAgy(agy, ['--version'], 10000, { USERPROFILE: userProfileFolder() })).rejects.toThrow(/user's own profile/)
+    await expect(checkModels(agy, {}, null)).rejects.toThrow(/user's own profile/)
+    expect(ranIn()).toBe('not run')
+  })
+  it("the catalog's read (listModels) runs in the check profile too, never in the launch's own environment as given", async () => {
+    const settings = (await import('../src/main/config')).config.settings
+    settings.providers = { ...settings.providers, antigravity: { ...settings.providers?.antigravity, enabled: true } } as typeof settings.providers
+    // The launch's environment as given (the allowlist's, with the user's own profile): read in the check profile all the same.
+    await antigravity.listModels(agy, { ...childBase(), USERPROFILE: userProfileFolder() })
+    expect(ranIn()).toBe(checkProfile())
   })
 })
 

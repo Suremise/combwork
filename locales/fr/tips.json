@@ -121,6 +121,8 @@
   "tips.branchCards.title": "Vois à quelle carte une branche correspond",
   "tips.branchCleanup.text": "Gestion de versions → Branches et dépôts distants regroupe les branches en Utilisées, Fusionnées et Non fusionnées. Nettoyer les branches fusionnées… supprime les fusionnées que rien n’utilise, et propose à part celles de tes dépôts distants, jamais cochées d’office.",
   "tips.branchCleanup.title": "Nettoyer les branches fusionnées",
+  "tips.bringUpToDate.text": "La carte de file de fusion d’une branche indique quand elle est en retard sur une autre branche du projet. Mettre à jour… y fusionne cette autre branche par sa file, avec ses vérifications de fusion ; l’autre branche ne change pas.",
+  "tips.bringUpToDate.title": "Mettre à jour la prochaine version",
   "tips.cardAttachments.text": "Colle ou dépose des fichiers dans la description ou un commentaire d’une carte : ils sont gardés avec la carte quand tu enregistres ou publies, affichés dedans et listés pour l’agent qui la démarre. L’épingle d’une puce de pièce jointe d’un volet copie un fichier sur la carte de l’agent.",
   "tips.cardAttachments.title": "Garder une capture avec sa carte",
   "tips.cardAttachmentsCleanup.text": "Les fichiers gardés avec une carte vont dans la Corbeille 30 jours après son archivage. Choisis 3, 7 ou 90 jours, ou Jamais, dans Paramètres du projet → Stockage, où Nettoyer maintenant… retire tout de suite ce qui est dû. Les cartes ouvertes et celles en Terminé gardent les leurs.",
@@ -554,5 +556,11 @@
   "tips.perfFailures.title": "Refusé n’est pas cassé",
   "tips.perfFailures.text": "Performances → Échecs trie ce qui n’a pas abouti : les vraies erreurs en rouge, à part des appels refusés par une règle du flux de travail et des appels erronés. Refus et appels erronés par motif montre quelle règle ou quel message revient le plus : une description d’outil à rendre plus claire.",
   "tips.serverDiagnostics.title": "Un agent sur Ollama ne fait qu’écrire du texte ?",
-  "tips.serverDiagnostics.text": "Vérifier le serveur… sur un compte de serveur, dans Paramètres → Comptes et connexions, montre le contexte réel de son modèle et teste un appel d’outil. Un contexte plus petit que le prompt de Claude Code est la raison habituelle pour laquelle un modèle local écrit un appel d’outil au lieu de le faire."
+  "tips.serverDiagnostics.text": "Vérifier le serveur… sur un compte de serveur, dans Paramètres → Comptes et connexions, montre le contexte réel de son modèle et teste un appel d’outil. Un contexte plus petit que le prompt de Claude Code est la raison habituelle pour laquelle un modèle local écrit un appel d’outil au lieu de le faire.",
+  "tips.retargetRelease.title": "Quand une version sort, passe le reste sur la suivante",
+  "tips.retargetRelease.text": "Tu passes Le travail est fusionné dans de 1.1.0 à 1.2.0 ? Enregistrer… liste les cartes Todo et les emplacements libres encore sur 1.1.0 qui peuvent suivre 1.2.0, et ce qui reste, avec la raison. Laisse Recibler aussi ce qui peut passer coché pour les déplacer.",
+  "tips.localModelLimits.text": "Sur les modèles d’un compte de serveur (Paramètres → Comptes et connexions, Modifier le serveur…), définis la taille du contexte et le budget de sortie : les agents démarrés sur ce modèle compactent alors à son contexte réel plutôt qu’à 200 000 supposés.",
+  "tips.localModelPicker.title": "Change de modèle local dans le /model de Claude Code",
+  "tips.localModelPicker.text": "Un agent sur un compte serveur trouve les modèles du compte dans le /model de Claude Code, par leurs ID exacts. Donne à chacun un Libellé dans Modifier le serveur… pour l’y nommer.",
+  "tips.localModelLimits.title": "Indique à Claude Code le vrai contexte de ton modèle local"
 }

@@ -124,7 +124,9 @@ const alive = (pid) => ids.has(pid) && lib.stillSame([ids.get(pid)]).length === 
     check("its watch's wake is held while paused (not typed)", !wakes('Builder').slice(before).some((t) => t.includes('Round 1: one finding')), JSON.stringify(wakes('Builder').slice(before)))
 
     // --- What still runs: Builder's run keeps the team unparked; once it ends, All parked.
-    await until(() => idle(alpha, builder.id), HUNG_MS)
+    // Idle in any of the fake's idle states: the builder still watches its card (its wake held), and idle() leaves
+    // `watching` out, so that wait ran out (HI-2688).
+    await lib.agentIdle(inv, builder.id, HUNG_MS)
     await say(alpha, builder.id, `shell: cw-progress --title "probe run" -- node "${holder}" "${release}"`)
     const named = async () => (await inv('team:state')).workspaces.find((w) => w.workspacePath.toLowerCase() === wsA.toLowerCase())?.items ?? []
     check('the run keeps the team unparked, named', !!(await until(async () => (await named()).some((i) => i.kind === 'run' && i.label === 'probe run'), HUNG_MS)), JSON.stringify(await named()))

@@ -124,6 +124,36 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
+  "settings.advanced.antigravity.transcript.modelChange.desc": {
+    "text": "What agy adds to a prompt when its model changes: the model's name is its first group. Wrong, an agent's usage names no model.",
+    "note": "What the advanced setting \"Transcript: the model picked\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.modelChange.title": {
+    "text": "Transcript: the model picked",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.desc": {
+    "text": "The times agy writes before a tool's result in its transcript, which Combwork leaves out when it shows the result. Wrong, results show with those times.",
+    "note": "What the advanced setting \"Transcript: a tool result's times\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.title": {
+    "text": "Transcript: a tool result's times",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.desc": {
+    "text": "A message in agy's transcript from agy itself or another conversation (a subagent's task or answer): who sent it is its first group, what it says its second. Wrong, those messages aren't shown, and a subagent's conversation isn't found under its parent.",
+    "note": "What the advanced setting \"Transcript: agy's messages\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.title": {
+    "text": "Transcript: agy's messages",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.antigravity.transcript.userRequest.desc": {
     "text": "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.",
     "note": "What the advanced setting \"Transcript: your prompt\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
@@ -131,6 +161,16 @@
   },
   "settings.advanced.antigravity.transcript.userRequest.title": {
     "text": "Transcript: your prompt",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.desc": {
+    "text": "Whether a request's input_tokens in agy's transcript already count its cache_read_tokens. Wrong, Combwork counts cached tokens twice, or leaves them out of the context.",
+    "note": "What the advanced setting \"Usage: input tokens include the cache\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy, input_tokens and cache_read_tokens are names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.title": {
+    "text": "Usage: input tokens include the cache",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
@@ -312,6 +352,26 @@
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": {
     "text": "Hooks: timeout",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.localModel.aliases.desc": {
+    "text": "The model names Claude Code reads as its own aliases (opus, sonnet…), as a regular expression. A server connection's model named so gets no Context size or Output budget from Combwork, as Claude Code sizes it itself. Wrong, a local model with one of these names is launched as if Claude Code knew it, or an alias gets limits Claude Code ignores.",
+    "note": "What the advanced setting \"Local models: Claude Code’s aliases\" is for, and what goes wrong when it is wrong (Settings → Advanced). Context size and Output budget are fields of a server connection’s models: as translated there.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.localModel.aliases.title": {
+    "text": "Local models: Claude Code’s aliases",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI: the model names Claude Code reads as its own aliases (opus, sonnet…).",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.localModel.spellings.desc": {
+    "text": "Model ID spellings Claude Code may resolve to a Claude model or size by its own rules (claude in the ID, a [1m] suffix, a date after @), as a regular expression. A server connection's model spelt so gets no Context size or Output budget from Combwork. Wrong, Combwork passes limits Claude Code doesn't apply, or leaves out a local model it would.",
+    "note": "What the advanced setting \"Local models: IDs Claude Code sizes itself\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep [1m] and @ as they are. Context size and Output budget are fields of a server connection’s models: as translated there.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.localModel.spellings.title": {
+    "text": "Local models: IDs Claude Code sizes itself",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI: model ID spellings (claude-…, [1m], a date suffix) Claude Code applies its own context rules to.",
     "audience": "both"
   },
   "settings.advanced.claude-code.memory.realPath.desc": {
@@ -2908,6 +2968,10 @@
   "settings.agent.tool.restart.sessions": {
     "text": "to sessions started afterwards (running agents show Restart session)",
     "note": "When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it."
+  },
+  "settings.agent.tool.retarget": {
+    "text": "These still on {from} can follow {to} (Todo cards with no work, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.",
+    "note": "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names."
   },
   "settings.agent.tool.switchRefused": {
     "text": "{error} Tell the user, or leave it as it is.",

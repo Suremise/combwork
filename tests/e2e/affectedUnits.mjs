@@ -400,6 +400,8 @@ export function gitRevision(cwd, rev) {
   }
   return {
     name: rev ?? 'the working tree',
+    /** Reads these files of a commit in one git process, ahead of read() (the working tree: nothing to do). */
+    prefetch,
     read(path) {
       if (!cache.has(path)) {
         if (rev) prefetch([path])
@@ -524,6 +526,116 @@ function dispatchSeams(parsed, unit, line) {
 }
 
 /**
+ * The changed lines of a file that change code, each with the unit holding it: [{ side (0: base, 1: head), line,
+ * comment (all comment, but it moves code), unit (unitsOf's, or null: in none) }]. sides: unitsOf of the file in each
+ * revision; lines: { added, removed } (diffLineNumbers). A line of comment alone changes no code unless a comment it is
+ * in now covers, or no longer covers, code: an unchanged line inside that comment that isn't all comment in the other
+ * revision (`/*` and `*\/` added around code).
+ */
+/**
+ * Whether a TypeScript statement is erased before anything runs (HI-2690, D1), node by node, never by a file's
+ * extension: an interface, a type alias, an overload signature (TSDeclareFunction), a type-only import or export, a
+ * `declare` variable with no value, and a `declare` module, namespace or global block holding only such statements. An
+ * enum of any kind (a const enum's values are inlined where it is used, a `.d.ts`'s or an ambient one too) and
+ * everything else (a class, a function, a value) is not.
+ */
+export function erasedStatement(st) {
+  const s = st.type === 'ExportNamedDeclaration' && st.declaration ? st.declaration : st
+  switch (s.type) {
+    case 'TSInterfaceDeclaration':
+    case 'TSTypeAliasDeclaration':
+    case 'TSDeclareFunction':
+      return true
+    case 'ImportDeclaration':
+      return s.importKind === 'type' || (s.specifiers.length > 0 && s.specifiers.every((sp) => sp.importKind === 'type'))
+    case 'ExportNamedDeclaration':
+      return !s.declaration && (s.exportKind === 'type' || (s.specifiers.length > 0 && s.specifiers.every((sp) => sp.exportKind === 'type')))
+    case 'ExportAllDeclaration':
+      return s.exportKind === 'type'
+    case 'VariableDeclaration':
+      return !!s.declare && s.declarations.every((d) => !d.init)
+    case 'TSModuleDeclaration': {
+      if (!s.declare && !s.global && s.kind !== 'global') return false
+      const body = s.body?.type === 'TSModuleBlock' ? s.body.body : s.body ? [s.body] : []
+      return body.every((b) => (b.type === 'TSModuleDeclaration' ? erasedStatement({ ...b, declare: true }) : erasedStatement(b)))
+    }
+    default:
+      return false
+  }
+}
+
+/**
+ * A change to a TypeScript file that only types can see (HI-2690, D1): its reason, or null (selected as usual). Every
+ * changed line that changes code (codeLines), in both revisions, lies in a statement erasedStatement allows, and shares
+ * its line with no other statement. Never for a file that doesn't parse, an added or deleted one, or one read as source
+ * data: its repo path or its name named in a test's or a script's code (tests/e2e, tests/scenarios, scripts: tipwindows
+ * reads tips.ts, viewer servers.ts), selection's own tooling aside. base, head: revisions (gitRevision, memoryRevision);
+ * lines: { added, removed } (diffLineNumbers).
+ */
+export function typeOnlyChange({ file, base, head, lines }) {
+  if (!/\.(ts|tsx|mts|cts)$/i.test(file)) return null
+  const texts = [base.read(file), head.read(file)]
+  if (texts.some((t) => t == null)) return null
+  const name = file.replace(/^.*\//, '')
+  for (const rev of [base, head]) {
+    for (const f of rev.grep(name, ['tests/e2e/', 'tests/scenarios/', 'scripts/'], false)) {
+      if (!/\.(c|m)?[jt]s$/i.test(f) || /^tests\/e2e\/(affected|affectedUnits|relatedTests|typeProvenance)\.mjs$/i.test(f)) continue
+      return null
+    }
+  }
+  const sides = []
+  const stmts = []
+  for (const t of texts) {
+    let parsed
+    try {
+      parsed = unitsOf(t, file, {})
+    } catch {
+      return null
+    }
+    sides.push(parsed)
+    // Each statement's lines, with whether it is erased (export wrappers count as their declaration).
+    stmts.push(parsed.ast.program.body.map((st) => ({ from: st.loc.start.line, to: st.loc.end.line, erased: erasedStatement(st) })))
+  }
+  const changed = codeLines(sides, lines)
+  // Comments alone, none of them now covering code or no longer covering it (codeLines' rule, HI-2659's).
+  if (!changed.length) return (lines.added.length || lines.removed.length) ? `${file}: comments only, so no suite` : null
+  for (const { side, line } of changed) {
+    const on = stmts[side].filter((s) => s.from <= line && line <= s.to)
+    if (!on.length || !on.every((s) => s.erased)) return null
+  }
+  return `${file}: types only (erased before anything runs; typecheck checks them), so no suite`
+}
+
+export function codeLines(sides, lines) {
+  // Unchanged lines paired across the revisions (base's line → head's, and back), from the diff.
+  const changedOn = [new Set(lines.removed), new Set(lines.added)]
+  const pairs = [[], []]
+  for (let i = 1, j = 1; i <= sides[0].lineCount && j <= sides[1].lineCount; ) {
+    if (changedOn[0].has(i)) i++
+    else if (changedOn[1].has(j)) j++
+    else {
+      pairs[0][i] = j
+      pairs[1][j] = i
+      i++
+      j++
+    }
+  }
+  const movesCode = (i, n) => sides[i].commentsAt(n).some(([s, e]) => {
+    for (let l = s; l <= e; l++) if (!changedOn[i].has(l) && pairs[i][l] && !sides[1 - i].commentOnly(pairs[i][l])) return true
+    return false
+  })
+  const out = []
+  for (const [i, nums] of [lines.removed, lines.added].entries()) {
+    for (const n of nums) {
+      const comment = sides[i].commentOnly(n)
+      if (comment && !movesCode(i, n)) continue
+      out.push({ side: i, line: n, comment, unit: sides[i].unitAt(n) })
+    }
+  }
+  return out
+}
+
+/**
  * The suites a change to a SPLIT file needs, by its units: { all: why | null, suites: [...], why: [lines] }.
  * file: its repo path; base, head: revisions (gitRevision, memoryRevision); lines: { added, removed } (diffLineNumbers);
  * place(file): how affected.mjs places a file that names a unit ({ suites, why } | { all: why } | null: no suite);
@@ -564,55 +676,29 @@ export function unitSelection({ file, base, head, lines, place, areaSuites }) {
   for (const [i, s] of sides.entries()) if (s.error) every(`doesn't parse in ${revs[i].name} (${s.error})`)
   if (all) return result()
 
-  // Unchanged lines paired across the revisions (base's line → head's, and back), from the diff.
-  const changedOn = [new Set(lines.removed), new Set(lines.added)]
-  const pairs = [[], []]
-  for (let i = 1, j = 1; i <= sides[0].lineCount && j <= sides[1].lineCount; ) {
-    if (changedOn[0].has(i)) i++
-    else if (changedOn[1].has(j)) j++
-    else {
-      pairs[0][i] = j
-      pairs[1][j] = i
-      i++
-      j++
-    }
-  }
-  // A line of comment alone changes no code unless a comment it is in now covers, or no longer covers, code: an
-  // unchanged line inside that comment that isn't all comment in the other revision (`/*` and `*/` added around code).
-  const movesCode = (i, n) => sides[i].commentsAt(n).some(([s, e]) => {
-    for (let l = s; l <= e; l++) if (!changedOn[i].has(l) && pairs[i][l] && !sides[1 - i].commentOnly(pairs[i][l])) return true
-    return false
-  })
-
   // The changed units, from both revisions.
   const changed = []
   const seams = new Set()
-  for (const [i, nums] of [lines.removed, lines.added].entries()) {
-    const side = sides[i]
-    for (const n of nums) {
-      const comment = side.commentOnly(n)
-      if (comment && !movesCode(i, n)) continue
-      const u = side.unitAt(n)
-      if (!u) {
-        every(`line ${n} (${revs[i].name}) is in no function, method or entry`)
-        continue
-      }
-      if (u.dispatch) {
-        const s = comment ? null : dispatchSeams(side, u, n)
-        if (!s) every(`line ${n} (${revs[i].name}) is ${u.name}'s dispatch outside its reviewed test-seam branches`)
-        else for (const x of s) seams.add(x)
-        continue
-      }
-      if (u.seamTable) {
-        const other = sides[1 - i].units.find((v) => v.id === u.id)
-        const a = seamNames(u.seamTable)
-        const b = other ? seamNames(other.seamTable) : null
-        if (!a || !b) every(`${u.name} isn't a list of seam names in both revisions`)
-        else for (const x of [...a.filter((v) => !b.includes(v)), ...b.filter((v) => !a.includes(v))]) seams.add(x)
-        continue
-      }
-      if (!changed.some((c) => c.file === file && c.id === u.id)) changed.push({ file, id: u.id })
+  for (const { side: i, line: n, comment, unit: u } of codeLines(sides, lines)) {
+    if (!u) {
+      every(`line ${n} (${revs[i].name}) is in no function, method or entry`)
+      continue
     }
+    if (u.dispatch) {
+      const s = comment ? null : dispatchSeams(sides[i], u, n)
+      if (!s) every(`line ${n} (${revs[i].name}) is ${u.name}'s dispatch outside its reviewed test-seam branches`)
+      else for (const x of s) seams.add(x)
+      continue
+    }
+    if (u.seamTable) {
+      const other = sides[1 - i].units.find((v) => v.id === u.id)
+      const a = seamNames(u.seamTable)
+      const b = other ? seamNames(other.seamTable) : null
+      if (!a || !b) every(`${u.name} isn't a list of seam names in both revisions`)
+      else for (const x of [...a.filter((v) => !b.includes(v)), ...b.filter((v) => !a.includes(v))]) seams.add(x)
+      continue
+    }
+    if (!changed.some((c) => c.file === file && c.id === u.id)) changed.push({ file, id: u.id })
   }
   if (all) return result()
   // Its areas' suites, as for any file changed (a change of comments alone needs none).

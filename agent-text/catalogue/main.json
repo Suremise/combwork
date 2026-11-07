@@ -209,6 +209,11 @@
     "note": "Starting an agent ({agent}) is refused: the connection chosen for it ({name}) is off in this workspace and there's no default to use instead. {cli} is the coding agent CLI.",
     "audience": "both"
   },
+  "main.connections.launch.offSide": {
+    "text": "{agent} is the {part, select, builder {builder} other {reviewer}} of lane {lane}, which a {role, select, builder {builder} reviewer {reviewer} other {generalist}} isn't: end the lane or give it another {part, select, builder {builder} other {reviewer}} first, or choose a role that does it (Either does both). Nothing was saved.",
+    "note": "An error saving an agent's role (HI-2664): the new role doesn't do the agent's part in a running lane (an agent's Combwork tools follow its role). {agent} is its name, {lane} the lane's id, {part} builder or reviewer, {role} the new role.",
+    "audience": "both"
+  },
   "main.connections.launch.otherProvider": {
     "text": "The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.",
     "note": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\").",
@@ -507,6 +512,16 @@
   "main.server.notServer": {
     "text": "That connection doesn't get its model from a server.",
     "note": "An error: an action for a server connection (its key, its models, its Set Up) was asked for a connection signed in through its CLI instead.",
+    "audience": "both"
+  },
+  "main.server.output.invalid": {
+    "text": "An output budget is a whole number of tokens, from 1 to {max, number}.",
+    "note": "An error saving the output budget a user typed for a server connection's model (HI-2682): not a whole number in range. {max} is a number.",
+    "audience": "both"
+  },
+  "main.server.output.notBelow": {
+    "text": "The output budget of {model} ({output, number} tokens) must be smaller than its context size ({context, number} tokens). Lower the output budget first, or clear it to use the default.",
+    "note": "An error saving a server connection's model limits (HI-2682): its output budget isn't below its context size, so nothing was saved. {model} is a model's id; {output} and {context} are numbers of tokens. Output budget and context size are fields of the connection's models: as translated there.",
     "audience": "both"
   },
   "main.server.setUp.noKey": {

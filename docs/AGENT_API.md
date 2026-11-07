@@ -78,6 +78,14 @@ Errors return a non-2xx status and `{ "error": "message" }`. The message is in E
 | 500 | Unexpected error; details are in Combwork's log. A refusal by a rule or limit is never a 500 (HI-1952): one is a fault to report |
 | 413 | Body larger than 2 MB, or a skill file larger than 512 KB |
 
+An error's status is decided where Combwork makes it, from the error alone (HI-2704): a name, key, reason or quoted error in its text never changes it, nor does a dialect's wording. Before 1.2.0 an error without a status of its own got one from its English words, so a few statuses change in 1.2.0. If a script relied on the old ones:
+
+- A project, agent or card named with such a word (`busy-work`, `archived-ideas`) no longer turns its "not found" into a 409: it answers **404**, as the same error does for any other name.
+- `{provider} is required to resume this conversation` (the provider isn't installed) answers **409**, as `… is required to run …` already did; it was 500.
+- An error that quotes another error (a template that couldn't be applied, `Nothing was changed: …`; a watch file Combwork couldn't save) answers its own status, whatever the quoted text says. One with none of its own is a **500**, as when it quotes anything else.
+- An internal error whose words read like a refusal (`… command line is too long`) answers **500**, not 400.
+- An agent watch (`"agents"`) naming the calling agent itself answers **400**, as a lane watch's already did; it was 500.
+
 ---
 
 ## Several windows
@@ -585,7 +593,7 @@ The event stream sends `lanes-changed` (`{ workspacePath }`: read the lanes agai
 
 ### Merge queue
 
-From api.version 9 (#1353). With a project's workflow set to **Combwork merges**, Combwork merges each approved card into its target branch through that target's **merge queue**, one card at a time (SPEC §16.9). Anyone who may read the project reads its queues (a project agent its own project's: another's is `403`); pausing, resuming, taking a card out and retrying its merge are the user's (in Combwork's window) and the Assistant's within Settings → Assistant → Control (Control agents): a project agent is refused (`403`, saying whose they are), and so is a script (`403`). Each change the Assistant makes is in its actions (`queue-pause`, `queue-resume`; a card's as `update-task`).
+From api.version 9 (#1353). With a project's workflow set to **Combwork merges**, Combwork merges each approved card into its target branch through that target's **merge queue**, one card at a time (SPEC §16.9). Anyone who may read the project reads its queues (a project agent its own project's: another's is `403`); pausing, resuming, taking a card out and retrying its merge are the user's (in Combwork's window) and the Assistant's within Settings → Assistant → Control (Control agents): a project agent is refused (`403`, saying whose they are), and so is a script (`403`). Each change the Assistant makes is in its actions (`queue-pause`, `queue-resume`, `queue-forward`; a card's as `update-task`).
 
 `GET /v1/queue?project=alpha&target=integration` — the project's queues (`project` is required but for a project agent, whose own project it is; `target` narrows to one), each:
 
@@ -610,6 +618,10 @@ From api.version 9 (#1353). With a project's workflow set to **Combwork merges**
 `POST /v1/queue/remove` — `{ "card": "AL-12", "reason": "The user wants it later." }` (`reason` required): the card leaves the queue (an override, `IntegrationCancelled`), back to Approved, and is never merged, after a restart too; its builder is woken. Refused (`409`, `queue.advancing`) once its merge has begun. Replies as a card intent (`{ ok, card, from, to }`).
 
 `POST /v1/queue/retry` — `{ "card": "AL-12", "reason": "A flaky test, known." }` (`reason` required): Retry merge, an override that queues a card the queue returned (a red check too) with its approved revision unchanged, once per revision (`409`, `move.notFromHere`, otherwise). Replies as a card intent.
+
+`POST /v1/queue/forward` — `{ "project": "alpha", "from": "1.1.0", "to": "1.2.0" }` (HI-2679): brings `to` up to date with `from`, two of the project's targets (its Work merges into and its Other branches work can merge into, both existing, different; else `400`, or `409` for a branch that isn't there). The Assistant's (within Control agents) and the user's: a project agent or a script gets `403`. Combwork makes a card for it ("Bring 1.2.0 up to date with 1.1.0", label `forward`) and queues it in `to`'s queue at once with `from`'s head frozen: tested as a merge commit on `to`'s head, the shared merge checks run, `to` advanced by compare and swap; `from` never changes. A conflict or a red check returns the card (Active) with its reason, both branches as they were; `POST /v1/queue/retry` makes a new attempt with `from` as it is then, and `POST /v1/queue/remove` ends it in Done with nothing merged. Every intent of a project agent on such a card is refused (`forward.notAgents`). Replies `{ upToDate, card, key, queued, from, to }`: `upToDate: true` when `to` has `from`'s head already (nothing made); `queued: false` with the card already open for the pair (nothing new). `cw_queue` `forward` (`from`, `target`) calls it.
+
+`POST /v1/workflow/retarget` — `{ "project": "alpha", "preview": "rt-1a2b3c4d", "items": ["AL-12", "slot-a"] }` (HI-2680): after a project's Work merges into moved on, moves the named Todo cards and free slots of the preview offered as `preview` (`cw_update_setting`'s reply to the target change gives its id), only those it listed and each only as it was seen then, rechecked as it moves: a card from the old target only, a slot only at its folder, recorded target and head (clean, in the old target), the project's target still the new one, Control checked at each move. `{ "project", "from", "to" }` alone makes a new preview, moving nothing: `{ preview, from, to, move: [key | name], stay: [{ key | slot | lane, why }] }`. The Assistant's (within Control agents for a move; a preview at any level) and the user's; a project agent or a script gets `403`; `400` without `preview` and `items`, or `from` and `to`; `409` for a preview no longer known (each is kept for a day, until Combwork restarts). A move replies `{ from, to, moved: { cards: [{ number, key }], slots: [name] }, skipped: [{ key | slot, why, detail? }] }` (`why`: `targetChanged`, `refused`, `changed`, `busy`, `dirty`, `moved`, `unmerged`, `cantCheck`, `gone`, `setAside` (out of the pool until it is removed), `failed`, `notOffered`). `cw_queue` `retarget` (`preview` and `items`, or `from` and `target`) calls it.
 
 The event stream sends `queue-changed` (`{ workspacePath, project, target }`: read the queue again) when a target's queue changes: a card queued, its step, an outcome, a pause.
 
@@ -884,6 +896,8 @@ Nothing private is added: no prompt or message text and no setting's value, the 
 | `lane-fresh-start` | Retried a lane agent's new conversation that Combwork had stopped trying (HI-2034) | `{ "kind": "lane-fresh-start", "ok": true, "lane": "lane-0f89a0", "project": "alpha" }` |
 | `queue-pause` | Paused a project's merge queue | `{ "kind": "queue-pause", "ok": true, "project": "alpha" }` |
 | `queue-resume` | Resumed a project's merge queue (`ok: true` also when it stayed paused for its cause) | `{ "kind": "queue-resume", "ok": true, "project": "alpha" }` |
+| `queue-forward` | Brought one of a project's targets up to date with another (HI-2679): a forward merge queued, or found queued already, or nothing to bring in | `{ "kind": "queue-forward", "ok": true, "project": "alpha", "card": 2601 }` |
+| `retarget` | Moved Todo cards and free slots from a project's finished target to its new one (HI-2680) | `{ "kind": "retarget", "ok": true, "project": "alpha" }` |
 | `team-pause` | Paused its workspace's team before an update (HI-2081) | `{ "kind": "team-pause", "ok": true }` |
 | `team-resume` | Resumed its workspace's team | `{ "kind": "team-resume", "ok": true }` |
 | `release-slot` | Released a slot: a carried slot, or a held writer once the user agreed (`agent`: whose it was) | `{ "kind": "release-slot", "ok": true, "project": "alpha", "agent": { "id": "a-7b21e4aa", "name": "B1" } }` |

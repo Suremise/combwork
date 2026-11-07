@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { CW_GUIDANCE, overrideId } from '../src/shared/advanced'
 import { cleanLaunch, copyAppSwitches, launchesWithoutTools, launchPolicy, MCP_ISOLATION, overrideKeys, plainness, policySummary, terminalPreset } from '../src/shared/launchPolicy'
-import { laneView } from '../src/shared/lanes'
+import { laneStatusText, laneView } from '../src/shared/lanes'
 import type { LaneRecord } from '../src/shared/lanes'
 import type { Connection, TaskCard } from '../src/shared/types'
 import { agentWorkflowRole, buildsWork, inWorkflow, readToolsOffWith, reviewsWork, takesCards } from '../src/shared/workflow/roles'
@@ -130,5 +130,19 @@ describe('the Independent role', () => {
     expect(view.state).toBe('paused')
     expect(view.status).toMatchObject({ reason: 'independent', agent: 'HR1' })
     expect(laneView(rec, cards, undefined, null, undefined, null, undefined, undefined, null, null, undefined, null, false, null, new Set()).status?.reason).not.toBe('independent')
+  })
+
+  // HI-2664 (HR3's round 2): a lane from before roles counted, or a guessed role, whose agent's role doesn't do its part.
+  it("pauses a running lane whose builder or reviewer has a role that doesn't do its part, saying who, which part and what to do", () => {
+    const rec = { id: 'lane-1', project: 'demo', builder: { id: 'b1', name: 'HB1' }, reviewer: { id: 'r1', name: 'Tester' }, cards: [7], state: 'active', startedAt: '2026-11-07T00:00:00.000Z' } as unknown as LaneRecord
+    const cards = new Map<number, TaskCard | null>([[7, { number: 7, title: 'A card', project: 'demo', column: 'doing', agent: 'b1', blocked: null, history: [] } as unknown as TaskCard]])
+    const view = (off: Map<string, 'builder' | 'reviewer'>, out = new Set<string>()) => laneView(rec, cards, undefined, null, undefined, null, undefined, undefined, null, null, undefined, null, false, null, out, off)
+    const paused = view(new Map([['r1', 'reviewer']]))
+    expect([paused.state, paused.status]).toMatchObject(['paused', { reason: 'offSide', agent: 'Tester', part: 'reviewer' }])
+    expect(laneStatusText(paused.status!)).toBe("paused: Tester isn't a reviewer by its role, so it has no reviewer's tools: give the lane another reviewer, or make Tester a reviewer or either-role agent")
+    expect(view(new Map([['b1', 'builder']])).status).toMatchObject({ reason: 'offSide', agent: 'HB1', part: 'builder' })
+    // Independent says more (it takes no part at all); none off its side: no such pause.
+    expect(view(new Map([['r1', 'reviewer']]), new Set(['r1'])).status?.reason).toBe('independent')
+    expect(view(new Map()).status?.reason).not.toBe('offSide')
   })
 })

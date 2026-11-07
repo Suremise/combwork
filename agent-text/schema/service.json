@@ -249,6 +249,28 @@
   "service.files.throughLink": {
     "placeholders": {}
   },
+  "service.forward.missing": {
+    "placeholders": {
+      "unknown": "select",
+      "branch": "plain"
+    }
+  },
+  "service.forward.noGit": {
+    "placeholders": {}
+  },
+  "service.forward.notAgents": {
+    "placeholders": {}
+  },
+  "service.forward.notTargets": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "targets": "plain"
+    }
+  },
+  "service.forward.raced": {
+    "placeholders": {}
+  },
   "service.fsutil.keptBusy": {
     "placeholders": {
       "file": "plain"
@@ -802,6 +824,12 @@
   "service.workflow.inheritor": {
     "placeholders": {
       "project": "plain"
+    }
+  },
+  "service.workflow.targetInUse": {
+    "placeholders": {
+      "branch": "plain",
+      "uses": "plain"
     }
   },
   "service.workspace.advancedNotHere": {

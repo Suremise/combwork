@@ -192,6 +192,30 @@
   "api.attachment.unknown": {
     "text": "{card} has no attachment called \"{name}\"{listed, select, yes {: {choices}} other { (it has none)}}"
   },
+  "api.build.builtAt": {
+    "text": "builtAt is a date and time (ISO).",
+    "note": "A build fact refused: builtAt is not a date and time."
+  },
+  "api.build.by": {
+    "text": "by is dist or release.",
+    "note": "A build fact refused: by is neither dist nor release (keep both as they are)."
+  },
+  "api.build.commit": {
+    "text": "commit is a commit id (7 to 64 hex characters).",
+    "note": "A build fact refused: its commit is not a commit id."
+  },
+  "api.build.installer": {
+    "text": "installer is the installer's path (at most 1,000 characters).",
+    "note": "A build fact refused: no installer path, or a longer one."
+  },
+  "api.build.kind": {
+    "text": "kind is one of: {kinds}.",
+    "note": "A build fact (POST /v1/builds, or a build marker) refused: its kind is none of these. kinds: the kinds, joined with commas."
+  },
+  "api.build.version": {
+    "text": "version is required (at most 100 characters).",
+    "note": "A build fact refused: no version, or a longer one."
+  },
   "api.card.archivedArg": {
     "text": "{arg} must be a whole number from {min}: \"{raw}\"",
     "note": "HI-2641: GET /v1/tasks/{n}/comments/archived's offset (from 0) or limit (from 1, at most 100) was not a whole number in range. arg: offset or limit; raw: what was given."
@@ -363,6 +387,12 @@
   "api.change.endLane": {
     "text": "end lane {lane}"
   },
+  "api.change.forward": {
+    "text": "bring {to} up to date with {from} in {project}"
+  },
+  "api.change.forwardAny": {
+    "text": "bring a branch up to date with another"
+  },
   "api.change.handOver": {
     "text": "hand {from}'s work over to {to} in {project}"
   },
@@ -429,6 +459,12 @@
   },
   "api.change.resumeTeam": {
     "text": "resume the team"
+  },
+  "api.change.retarget": {
+    "text": "move cards and slots from {from} to {to} in {project}"
+  },
+  "api.change.retargetAny": {
+    "text": "move cards and slots to a project's new target"
   },
   "api.change.retryFresh": {
     "text": "retry lane {lane}'s new conversations"
@@ -644,6 +680,12 @@
   "api.done.createdProject": {
     "text": "Created the project {name}"
   },
+  "api.done.forwardQueued": {
+    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}"
+  },
+  "api.done.forwardUpToDate": {
+    "text": "{to} has everything of {from} already: nothing queued"
+  },
   "api.done.freshRetried": {
     "text": "{retried, plural, =0 {Lane {lane}: no new conversation was waiting to be retried} one {Lane {lane}: {total} new conversation tried again} other {Lane {lane}: {total} new conversations tried again}}"
   },
@@ -687,6 +729,9 @@
   "api.done.reordered": {
     "text": "Put {cards} at the top of {column}"
   },
+  "api.done.retargeted": {
+    "text": "Moved {cards} cards and {slots} slots from {from} to {to}; {skipped} left where they were, each with why"
+  },
   "api.done.slotReleased": {
     "text": "Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}"
   },
@@ -711,7 +756,8 @@
     "note": "Each number is twice: as a number for its plural (count, skipped) and as written (total, skippedTotal), so a count over 999 has no comma."
   },
   "api.done.updatedAgent": {
-    "text": "Changed {agent}'s settings in {project}{live, select, yes { (it applies them when restarted)} other {}}"
+    "text": "Changed {agent}'s settings in {project}{live, select, yes { (it applies them when restarted)} restarting { (restarting it now to load its new role's tools, in the same conversation)} busy { (it is working: it keeps its old role's tools, and gets no work needing the new ones, until it restarts: ask the user to restart it)} other {}}",
+    "note": "HI-2664: a role change restarts an idle agent at once; a busy one keeps its old tools until it restarts, which is the user's to choose."
   },
   "api.done.updatedConnection": {
     "text": "Changed the connection {connection} (agents running on it take it when restarted)"
@@ -1025,11 +1071,20 @@
   "api.provider.notInstalled": {
     "text": "not installed"
   },
+  "api.queue.forwardArgs": {
+    "text": "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets"
+  },
   "api.queue.notAgents": {
     "text": "Project agents can't {what}: the merge queue's controls are the user's, and the Assistant's within Settings → Assistant → Control. Tell the user if it should be done."
   },
   "api.queue.projectRequired": {
     "text": "project is required"
+  },
+  "api.queue.retargetArgs": {
+    "text": "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)"
+  },
+  "api.queue.retargetGone": {
+    "text": "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again"
   },
   "api.queue.targetArg": {
     "text": "target is a branch name"

@@ -72,6 +72,15 @@ interface CombworkMessageValues {
   'service.files.notKept': undefined
   'service.files.outside': undefined
   'service.files.throughLink': undefined
+  'service.forward.byAssistant': undefined
+  'service.forward.byUser': undefined
+  'service.forward.description': { from: string | number; source: string | number; to: string | number; by: string | number }
+  'service.forward.missing': { unknown: string; branch: string | number }
+  'service.forward.noGit': undefined
+  'service.forward.notAgents': undefined
+  'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number }
+  'service.forward.raced': undefined
+  'service.forward.title': { to: string | number; from: string | number }
   'service.fsutil.keptBusy': { file: string | number }
   'service.fsutil.keptUnreadable': { file: string | number }
   'service.fsutil.notCopied': { name: string | number }
@@ -238,6 +247,7 @@ interface CombworkMessageValues {
   'service.workflow.changedMeanwhile': undefined
   'service.workflow.closed': undefined
   'service.workflow.inheritor': { project: string | number }
+  'service.workflow.targetInUse': { branch: string | number; uses: string | number }
   'service.workflowNotice.blocked': { card: string | number; reason: string | number }
   'service.workflowNotice.blockedNoReason': { card: string | number }
   'service.workflowNotice.failed': { card: string | number }

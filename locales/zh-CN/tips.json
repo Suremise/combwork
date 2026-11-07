@@ -121,6 +121,8 @@
   "tips.branchCards.title": "查看分支属于哪张卡片",
   "tips.branchCleanup.text": "“版本控制”→“分支与远程仓库”将分支分为“使用中”“已合并”和“未合并”三组。“清理已合并分支…”会删除没有任何东西使用的已合并分支，并单独列出远程上的已合并分支，默认都不勾选。",
   "tips.branchCleanup.title": "清理已合并分支",
+  "tips.bringUpToDate.text": "分支的合并队列卡片会显示它何时落后于项目的另一个分支。“更新到最新…”会通过其队列、经过合并前检查，将那个分支合并进来；那个分支本身不变。",
+  "tips.bringUpToDate.title": "让下一个版本保持最新",
   "tips.cardAttachments.text": "将文件粘贴或拖放到卡片的描述或评论中：保存或发布时随卡片保留，在卡片中显示，并列给启动卡片的智能体。窗格附件标签上的图钉可将文件复制到智能体的卡片。",
   "tips.cardAttachments.title": "将截图随卡片保留",
   "tips.cardAttachmentsCleanup.text": "卡片保留的文件会在卡片归档 30 天后移到回收站。可在“项目设置”→“存储”中选择 3、7 或 90 天，或“从不”；在那里，“立即清理…”会马上删除已到期的内容。未关闭的卡片和“已完成”的卡片保留各自的文件。",
@@ -554,5 +556,11 @@
   "tips.perfFailures.title": "被拒绝不等于出故障",
   "tips.perfFailures.text": "性能 → 失败 会将未成功的内容分类：真正的错误以红色显示，与工作流程规则拒绝的调用和错误调用分开。“按原因列出的拒绝和错误调用”显示哪条规则或哪条消息出现得最多：提示哪个工具说明需要写得更清楚。",
   "tips.serverDiagnostics.title": "Ollama 上的智能体只输出文本？",
-  "tips.serverDiagnostics.text": "在“设置”→“账号与连接”中，服务器账户的“检查服务器…”会显示其模型的实际上下文并测试一次工具调用。本地模型把工具调用写成文本而不是真正调用，通常是因为上下文比 Claude Code 的提示词小。"
+  "tips.serverDiagnostics.text": "在“设置”→“账号与连接”中，服务器账户的“检查服务器…”会显示其模型的实际上下文并测试一次工具调用。本地模型把工具调用写成文本而不是真正调用，通常是因为上下文比 Claude Code 的提示词小。",
+  "tips.retargetRelease.title": "版本发布后，把剩下的移到下一个版本",
+  "tips.retargetRelease.text": "要把“工作合并到”从 1.1.0 改为 1.2.0？“保存…”会列出仍在 1.1.0 上、可以跟随 1.2.0 的 Todo 卡片和空闲槽位，以及保留下来的内容和原因。保持勾选“同时为可移动的内容更改目标”即可移动它们。",
+  "tips.localModelLimits.text": "在服务器账户的模型上（“设置”→“账号与连接”，“编辑服务器…”）设置上下文大小和输出预算：以该模型启动的代理就会按其实际上下文压缩，而不是按假定的 200,000。",
+  "tips.localModelPicker.title": "在 Claude Code 的 /model 中切换本地模型",
+  "tips.localModelPicker.text": "服务器账户上的智能体可以在 Claude Code 的 /model 中找到该账户的模型，按准确的 ID 列出。在编辑服务器…中为每个模型设置标签，即可在那里显示该名称。",
+  "tips.localModelLimits.title": "告诉 Claude Code 本地模型的实际上下文"
 }

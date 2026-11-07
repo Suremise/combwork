@@ -123,6 +123,8 @@ interface CombworkMessageValues {
   'tips.branchCards.title': undefined
   'tips.branchCleanup.text': undefined
   'tips.branchCleanup.title': undefined
+  'tips.bringUpToDate.text': undefined
+  'tips.bringUpToDate.title': undefined
   'tips.cardAttachments.text': undefined
   'tips.cardAttachments.title': undefined
   'tips.cardAttachmentsCleanup.text': undefined
@@ -300,6 +302,10 @@ interface CombworkMessageValues {
   'tips.leftoverProcesses.title': undefined
   'tips.licenceAudit.text': undefined
   'tips.licenceAudit.title': undefined
+  'tips.localModelLimits.text': undefined
+  'tips.localModelLimits.title': undefined
+  'tips.localModelPicker.text': undefined
+  'tips.localModelPicker.title': undefined
   'tips.loopDefaults.text': { rounds: number; hours: number }
   'tips.loopDefaults.title': undefined
   'tips.loopLanes.text': undefined
@@ -432,6 +438,8 @@ interface CombworkMessageValues {
   'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
+  'tips.retargetRelease.text': undefined
+  'tips.retargetRelease.title': undefined
   'tips.retryWait.text': undefined
   'tips.retryWait.title': undefined
   'tips.reviewCopies.text': undefined

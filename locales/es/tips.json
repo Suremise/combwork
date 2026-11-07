@@ -121,6 +121,8 @@
   "tips.branchCards.title": "Mira para qué tarjeta es una rama",
   "tips.branchCleanup.text": "Control de versiones → Ramas y remotos agrupa las ramas en En uso, Fusionadas y Sin fusionar. Limpiar ramas fusionadas… elimina las fusionadas que nada usa, y ofrece aparte las fusionadas de tus remotos, nunca marcadas de antemano.",
   "tips.branchCleanup.title": "Limpiar ramas fusionadas",
+  "tips.bringUpToDate.text": "La tarjeta de la cola de fusión de una rama indica cuándo va por detrás de otra rama del proyecto. Poner al día… fusiona esa otra rama en ella mediante su cola, con sus comprobaciones de fusión; la otra rama no cambia.",
+  "tips.bringUpToDate.title": "Poner al día la próxima versión",
   "tips.cardAttachments.text": "Pega o suelta archivos en la descripción o un comentario de una tarjeta: se conservan con la tarjeta al guardar o publicar, se muestran en ella y se listan para el agente que la inicia. El pin de un chip de adjunto de un panel copia un archivo a la tarjeta del agente.",
   "tips.cardAttachments.title": "Conserva una captura con su tarjeta",
   "tips.cardAttachmentsCleanup.text": "Los archivos guardados con una tarjeta van a la Papelera de reciclaje 30 días después de archivarla. Elige 3, 7 o 90 días, o Nunca, en Configuración del proyecto → Almacenamiento, donde Limpiar ahora… quita al momento lo que ya toca. Las tarjetas abiertas y las de Hecho conservan los suyos.",
@@ -554,5 +556,11 @@
   "tips.perfFailures.title": "Rechazado no es roto",
   "tips.perfFailures.text": "Rendimiento → Fallos clasifica lo que no tuvo éxito: los errores reales en rojo, aparte de las llamadas que rechazó una regla del flujo de trabajo y de las llamadas incorrectas. Rechazos y llamadas incorrectas por motivo muestra qué regla o mensaje salió más: una descripción de herramienta que conviene aclarar.",
   "tips.serverDiagnostics.title": "¿Un agente en Ollama solo escribe texto?",
-  "tips.serverDiagnostics.text": "Comprobar servidor… en una cuenta de servidor, en Configuración → Cuentas y conexiones, muestra el contexto real de su modelo y prueba una llamada a herramienta. Un contexto más pequeño que el prompt de Claude Code es la razón habitual por la que un modelo local escribe una llamada a herramienta en vez de hacerla."
+  "tips.serverDiagnostics.text": "Comprobar servidor… en una cuenta de servidor, en Configuración → Cuentas y conexiones, muestra el contexto real de su modelo y prueba una llamada a herramienta. Un contexto más pequeño que el prompt de Claude Code es la razón habitual por la que un modelo local escribe una llamada a herramienta en vez de hacerla.",
+  "tips.retargetRelease.title": "Cuando sale una versión, pasa lo que queda a la siguiente",
+  "tips.retargetRelease.text": "¿Cambias El trabajo se fusiona en de 1.1.0 a 1.2.0? Guardar… lista las tarjetas Todo y los slots libres que siguen en 1.1.0 y pueden pasar a 1.2.0, y lo que se queda, con el motivo. Deja marcado Redirigir también lo que puede pasar para moverlos.",
+  "tips.localModelLimits.text": "En los modelos de una cuenta de servidor (Configuración → Cuentas y conexiones, Editar servidor…), configura el tamaño de contexto y el presupuesto de salida: los agentes que se inicien en ese modelo compactarán en su contexto real, en vez de en 200.000 supuestos.",
+  "tips.localModelPicker.title": "Cambia de modelo local en el /model de Claude Code",
+  "tips.localModelPicker.text": "Un agente en una cuenta de servidor encuentra los modelos de la cuenta en el /model de Claude Code, por sus ID exactos. Dale a cada uno una Etiqueta en Editar servidor… para nombrarlo ahí.",
+  "tips.localModelLimits.title": "Dile a Claude Code el contexto real de tu modelo local"
 }

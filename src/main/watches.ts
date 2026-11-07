@@ -33,13 +33,14 @@ import { readSavedUsage, usageHits, usageLimitLine, usageWakeLine, usageWatchLab
 import { cancelFromSource, createDelivery, deliveryNow, followAgent, inFlightNow as deliveriesInFlight, load as loadDeliveries, offerNow, registerSource, settled as deliveriesSettled } from './deliveries'
 import { inFlightNow as writerInFlight, onLineComing, settled as writerSettled } from './lineWriter'
 import { readyFor } from './readiness'
-import { CombworkError } from './combworkError'
+import { CombworkError, saidError } from './combworkError'
 import { cardNamesOf, withCardNames } from './projectKeys'
 import { namedBy } from '../shared/projectKeys'
 import { projectPreferences } from './workflow/preferences'
 import { forYouOfCards } from './workflow/cardWork'
 import type { ForYouItem } from '../shared/workflow/workView'
 import { NOTICE_PREFIX } from '../shared/doorbell'
+import { API } from './apiText'
 import { agentMsg, inDialectOf, say, type AgentMsg, type DialectSession } from '../shared/agentText'
 
 /**
@@ -81,6 +82,16 @@ const T = {
   repliesOff: agentMsg({ id: 'inbox.watchEnded.repliesOff', text: "the user's replies are no longer told", note: "#418, #1099: why a wake telling the Assistant a reply of the user's to an agent was cancelled: Settings → Assistant → Tell the Assistant when I reply to an agent was turned off." }),
   notSavedWake: agentMsg({ id: 'inbox.watchEnded.notSaved', text: "cancelled: its watch couldn't be saved", note: "Why a watch's wake was cancelled as it was handed over: the watch could not be saved with it (it fires again)." }),
   againTyping: agentMsg({ id: 'inbox.again.typing', text: 'Combwork restarted while typing it', note: "Why a watch's wake may repeat (#649), after the doorbell (inbox.offer.again): Combwork stopped while typing it." }),
+  // HI-2691: the card watches' own errors, word for word as they were (English literals), so Performance can say them.
+  cardsTooBig: agentMsg({ id: 'wake.watch.cardsTooBig', text: 'The card watches file is too big, and its extra watches could not be set aside', note: 'HI-2691: card watches not loaded: the file holds more than Combwork keeps, and the extra ones could not be moved aside.' }),
+  cardsReadFailed: agentMsg({ id: 'wake.watch.cardsReadFailed', text: 'Could not read the card watches ({error})', note: "HI-2691: the card watches couldn't be read. error: why (the system's or the database's error, as it is)." }),
+  cardsDamaged: agentMsg({ id: 'wake.watch.cardsDamaged', text: "The card watches file is {why} and couldn't be set aside ({error}): it was left as it is", note: "HI-2691: a damaged card watches file that couldn't be moved aside. why: what is wrong with it; error: why it couldn't be moved (as it is)." }),
+  cardsFull: agentMsg({ id: 'wake.watch.cardsFull', text: 'Too many card watches to keep in this workspace', note: 'HI-2691: card watches not saved: they would no longer fit what Combwork keeps.' }),
+  cardsTooMany: agentMsg({ id: 'wake.watch.cardsTooMany', text: 'This workspace already has {max} card watches, the most Combwork keeps: wait for some to end', note: 'HI-2691: a card watch refused: the workspace has as many as Combwork keeps. max: how many.' }),
+  cardsFullWait: agentMsg({ id: 'wake.watch.cardsFullWait', text: 'Too many card watches to keep in this workspace: wait for some to end', note: 'HI-2691: a card watch refused: the watches would no longer fit what Combwork keeps.' }),
+  notAProject: agentMsg({ id: 'wake.watch.notAProject', text: 'Not a project of this workspace: {project}', note: "HI-2691: a watch refused: the project it names (its path or name, as given) isn't one of this workspace's." }),
+  noSuchLane: agentMsg({ id: 'wake.watch.noSuchLane', text: 'No such {count, plural, one {lane} other {lanes}}: {lanes} (cw_lane list gives the lanes and their ids)', note: 'HI-2691: a lane watch refused: lanes it names are not known. count: how many; lanes: their ids, joined with ", ". Answered 404 (its kind).' }),
+  self: agentMsg({ id: 'wake.watch.self', text: "You can't watch yourself: nothing would wake you", note: 'HI-2704: an agent or lane watch refused: it names the calling agent among the agents it watches. Answered 400.' }),
   itsBuilder: agentMsg({ id: 'wake.card.itsBuilder', text: 'its builder', note: 'HI-2143: who submitted a card again after the merge queue returned it, in a wake to whoever watches or reviews it, when the card names no agent.' })
 }
 
@@ -332,8 +343,8 @@ const loading = new Map<string, Promise<Store>>()
  */
 const fileOf = (path: string): string => join(path, CW_DIR, 'watches.json')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
-// agent-protocol: servers.ts gives this reply its status by its words (/workspace was closed/)
-const closedError = (): Error => new Error('The workspace was closed')
+// Its status is its kind (HI-2691; servers.ts no longer reads its words, HI-2704).
+const closedError = (): Error => saidError(API.workspace.closed, undefined, { kind: 'conflict' })
 
 /** What an agent may see of the board: its own project's cards, or every card for the Assistant. */
 const scopeFor = (ws: WorkspaceService, projectPath: string): string | null => (ws.isAssistantHome(projectPath) ? null : basename(resolve(projectPath)))
@@ -454,8 +465,8 @@ function load(ws: WorkspaceService): Promise<Store> {
           over.unshift(list.pop()!)
           sum -= sizes.pop()!
         }
-        // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-        if (over.length && !(await setAside(store, over))) throw new Error('The card watches file is too big, and its extra watches could not be set aside')
+        // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+        if (over.length && !(await setAside(store, over))) throw saidError(T.cardsTooBig, undefined, { kind: 'conflict' })
       }
       store.dirty = true
     }
@@ -524,8 +535,8 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
     got = await readCapped(file, MAX_FILE_BYTES)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-    throw new Error(`Could not read the card watches (${(e as Error).message})`, { cause: e })
+    // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+    throw saidError(T.cardsReadFailed, { error: (e as Error).message }, { kind: 'conflict', cause: e })
   }
   const aside = async (why: string): Promise<Saved> => {
     const to = `${file}.${why}-${Date.now()}`
@@ -534,8 +545,8 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
         if (!open()) throw closedError()
       }, renameOnce)
     } catch (e) {
-      // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-      throw new Error(`The card watches file is ${why} and couldn't be set aside (${(e as Error).message}): it was left as it is`, { cause: e })
+      // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+      throw saidError(T.cardsDamaged, { why, error: (e as Error).message }, { kind: 'conflict', cause: e })
     }
     log.warn(`The watches file was ${why}: set aside as ${userText(to)}`)
     return { watches: [], invalid: [] }
@@ -761,8 +772,8 @@ async function setAside(store: Store, watches: WatchRecord[] = []): Promise<bool
 async function save(store: Store): Promise<void> {
   checkAlive(store)
   const text = fileText(store, store.list)
-  // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error('Too many card watches to keep in this workspace')
+  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw saidError(T.cardsFull, undefined, { kind: 'conflict' })
   await saveTable(store.path, 'watches', store.list.map(entryOf), { invalid: store.invalid.length ? JSON.stringify(store.invalid) : null }, () => checkAlive(store))
   store.dirty = false
 }
@@ -937,8 +948,8 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
   const store = await load(ws)
   // A wake whose line its CLI has taken is received first, so this watch starts from what it told (#649).
   await followAgent(projectPath, agentId)
-  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-  if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
+  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'notFound' })
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
   const result = await locked(store, async (): Promise<WatchResult> => {
@@ -990,8 +1001,8 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
     // The limit holds for what Combwork writes as for what it reads: replacing an agent's watch is always allowed.
-    // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-    if (!already && !old && store.list.length >= MAX_WATCHES) throw new Error(`This workspace already has ${MAX_WATCHES} card watches, the most Combwork keeps: wait for some to end`)
+    // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+    if (!already && !old && store.list.length >= MAX_WATCHES) throw saidError(T.cardsTooMany, { max: String(MAX_WATCHES) }, { kind: 'conflict' })
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     // The Assistant's: the user's replies to its cards' agents from what its last wake told (#418).
     const replySeq = scope === null ? (store.wokeReplies.get(agentKey(projectPath, agentId)) ?? latestReplySeq()) : undefined
@@ -999,15 +1010,15 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     const next = [...store.list.filter((x) => x !== old), ...(rec ? [rec] : [])]
     // Every watch must be able to fire, be typed and end within the file's limit: make room, else refuse.
     if (rec && budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES))
-      // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-      throw new Error('Too many card watches to keep in this workspace: wait for some to end')
+      // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+      throw saidError(T.cardsFullWait, undefined, { kind: 'conflict' })
     store.list = next
     if (old || rec) {
       try {
         await save(store)
       } catch (e) {
         store.list = before
-        throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
+        throw saidError(T.notSaved, { error: (e as Error).message }, { cause: e })
       }
     }
     stopDelivery(store, old)
@@ -1063,7 +1074,7 @@ export async function cancelWatch(ws: WorkspaceService, projectPath: string, age
       await save(store)
     } catch (e) {
       store.list = before
-      throw new Error(say(T.notCancelled, { error: (e as Error).message }), { cause: e })
+      throw saidError(T.notCancelled, { error: (e as Error).message }, { cause: e })
     }
     stopDelivery(store, rec, T.watchCancelled)
     return true
@@ -1096,7 +1107,7 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
       await save(store)
     } catch (e) {
       store.list = before
-      throw new Error(say(T.notEnded, { why, error: (e as Error).message }), { cause: e })
+      throw saidError(T.notEnded, { why, error: (e as Error).message }, { cause: e })
     }
     const d = store.delivering.get(r.id)
     if (d) d.cancelled = true
@@ -1117,7 +1128,7 @@ export async function endWatchOf(projectPath: string, agentId: string, why: stri
         await saveQuietly(store)
       })
       sessions.watchChanged(projectPath, agentId)
-      throw new Error(say(T.wakeNotCancelled, { why, error: (e as Error).message }), { cause: e })
+      throw saidError(T.wakeNotCancelled, { why, error: (e as Error).message }, { cause: e })
     }
   }
   return infoOf(rec).label
@@ -1442,13 +1453,12 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
   // A wake whose line its CLI has taken is received first, so this watch starts from what it told (#649).
   await followAgent(projectPath, agentId)
   const store = await load(ws)
-  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-  if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
+  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'notFound' })
   for (const a of cond.agents) {
-    // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw new Error(`Not a project of this workspace: ${a.project}`)
-    // agent-protocol: servers.ts gives this reply its status by its opening (/^You can't watch yourself/)
-    if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
+    // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project }, { kind: 'notFound' })
+    if (same(a.projectPath, projectPath) && a.agentId === agentId) throw saidError(T.self, undefined, { kind: 'invalid' })
   }
   const result = await locked(store, async (): Promise<AgentWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
@@ -1472,20 +1482,20 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
     }
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
-    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw new Error(say(T.tooMany, { max: String(MAX_WATCHES) }))
+    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw saidError(T.tooMany, { max: String(MAX_WATCHES) })
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     const followed = { ...cond, agents: cond.agents.map((a) => ({ ...a, ...projectIdOf(ws, a.projectPath) })) }
     const rec: WatchRecord | null = already.length ? null : { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope, cond: NO_CARDS, agents: followed, agentMarks, marks: {}, current: {}, since, limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     const next = [...store.list.filter((x) => x !== old), ...(rec ? [rec] : [])]
     if (rec && budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES))
-      throw new Error(say(T.tooBig))
+      throw saidError(T.tooBig)
     store.list = next
     if (old || rec) {
       try {
         await save(store)
       } catch (e) {
         store.list = before
-        throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
+        throw saidError(T.notSaved, { error: (e as Error).message }, { cause: e })
       }
     }
     stopDelivery(store, old)
@@ -1559,14 +1569,14 @@ export type UsageWatchResult = ({ watching: TaskWatchInfo } | { already: string[
 export async function registerUsageWatch(ws: WorkspaceService, projectPath: string, agentId: string, usage: UsageWatch[], limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES): Promise<UsageWatchResult> {
   await followAgent(projectPath, agentId)
   const store = await load(ws)
-  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-  if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
+  // agent-protocol: its status is its kind: 400, as its route answered it before HI-2704
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'invalid' })
   const result = await locked(store, async (): Promise<UsageWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const already = usageHits(usage, (a) => config.get().connectionPlanUsage?.[a]?.limits, Date.now())
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
-    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw new Error(say(T.tooMany, { max: String(MAX_WATCHES) }))
+    if (!already.length && !old && store.list.length >= MAX_WATCHES) throw saidError(T.tooMany, { max: String(MAX_WATCHES) })
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     const rec: WatchRecord | null = already.length ? null : { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope: scopeFor(ws, projectPath), cond: NO_CARDS, usage, marks: {}, current: {}, since: new Date().toISOString(), limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     store.list = [...store.list.filter((x) => x !== old), ...(rec ? [rec] : [])]
@@ -1575,7 +1585,7 @@ export async function registerUsageWatch(ws: WorkspaceService, projectPath: stri
         await save(store)
       } catch (e) {
         store.list = before
-        throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
+        throw saidError(T.notSaved, { error: (e as Error).message }, { cause: e })
       }
     }
     stopDelivery(store, old)
@@ -1940,21 +1950,19 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
   const waitsFrom = latestWaitSeq()
   await followAgent(projectPath, agentId)
   const store = await load(ws)
-  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-  if (!hostedIn(ws, store.path, projectPath)) throw new Error(`Not a project of this workspace: ${projectPath}`)
+  // agent-protocol: its status is its kind: 400, as its route answered it before HI-2704
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'invalid' })
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
   for (const a of extra.agents?.agents ?? []) {
-    // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw new Error(`Not a project of this workspace: ${a.project}`)
-    // agent-protocol: servers.ts gives this reply its status by its opening (/^You can't watch yourself/)
-    if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
+    // agent-protocol: its status is its kind: 400, as its route answered it before HI-2704
+    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project }, { kind: 'invalid' })
+    if (same(a.projectPath, projectPath) && a.agentId === agentId) throw saidError(T.self, undefined, { kind: 'invalid' })
   }
   if (cond.ids !== 'all') {
     const known = (await listLanes(ws, { all: true })).filter((l) => scope === null || same(l.project, scope))
     const unknown = cond.ids.filter((id) => !known.some((l) => l.id === id))
-    // agent-protocol: servers.ts gives this reply its status by its opening (/^No such lane/)
-    if (unknown.length) throw new Error(`No such lane${unknown.length === 1 ? '' : 's'}: ${unknown.join(', ')} (cw_lane list gives the lanes and their ids)`)
+    if (unknown.length) throw saidError(T.noSuchLane, { count: unknown.length, lanes: unknown.join(', ') }, { kind: 'notFound' })
   }
   const result = await locked(store, async (): Promise<LaneWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
@@ -1978,7 +1986,7 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
           await save(store)
         } catch (e) {
           store.list = before
-          throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
+          throw saidError(T.notSaved, { error: (e as Error).message }, { cause: e })
         }
       }
       stopDelivery(store, old)
@@ -2066,17 +2074,17 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
     // call began.
     const waitSeq = (old?.lanes ? old.waitSeq : undefined) ?? told?.waitSeq ?? waitsFrom
     const before = store.list
-    if (!old && store.list.length >= MAX_WATCHES) throw new Error(say(T.tooMany, { max: String(MAX_WATCHES) }))
+    if (!old && store.list.length >= MAX_WATCHES) throw saidError(T.tooMany, { max: String(MAX_WATCHES) })
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     const rec: WatchRecord = { id: randomBytes(6).toString('hex'), projectPath, ...projectIdOf(ws, projectPath), agentId, scope, cond: cardCond, lanes: cond, laneMarks, ...(titles ? { laneTitles: titles } : {}), laneSince, waitSeq, ...(followed.length ? { agents: { ignoreBackground: wanted!.ignoreBackground, agents: followed }, agentMarks } : {}), marks, current, since, ...from, limitMinutes: minutes, limitAt: new Date(Date.now() + minutes * 60_000).toISOString() }
     const next = [...store.list.filter((x) => x !== old), rec]
-    if (budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES)) throw new Error(say(T.tooBig))
+    if (budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES)) throw saidError(T.tooBig)
     store.list = next
     try {
       await save(store)
     } catch (e) {
       store.list = before
-      throw new Error(say(T.notSaved, { error: (e as Error).message }), { cause: e })
+      throw saidError(T.notSaved, { error: (e as Error).message }, { cause: e })
     }
     stopDelivery(store, old)
     if (toldNow.size) noteToldAgents(store, watcher, toldNow)

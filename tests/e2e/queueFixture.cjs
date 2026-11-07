@@ -99,8 +99,8 @@ function launches(fx) {
  * Adds an agent (`worktree`: in a new worktree of its own; `project`: another project of the workspace than alpha),
  * starts it and reads its token: { id, folder, token }.
  */
-async function agent(fx, h, name, { worktree = false, project = fx.alpha } = {}) {
-  const a = await lib.addAgent(h.inv, project, { name, ...(worktree ? { location: 'new-worktree' } : {}) })
+async function agent(fx, h, name, { worktree = false, project = fx.alpha, workflowRole } = {}) {
+  const a = await lib.addAgent(h.inv, project, { name, ...(worktree ? { location: 'new-worktree' } : {}), ...(workflowRole ? { workflowRole } : {}) })
   const folder = a.worktree?.path ?? project
   // The fake trusts the folders it is told of (its trust prompt never shows), the project's slots too (#1567): an agent
   // left at the prompt in one is never quiet, so Combwork never prepares its next card's slot.

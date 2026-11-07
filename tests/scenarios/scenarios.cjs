@@ -38,6 +38,14 @@ const argsOf = (x) => {
 const verdictWatch = (n) => `cw cw_wait_for_tasks {"cards":["#${n}"],"changes":["verdict","column","comment"],"column":"passed","wake":true}`
 const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
 /**
+ * HI-2680: how a session moved Todo cards onto a new target: cw_queue retarget naming a preview and its items, or each
+ * card's own Merges into (cw_update_task with a target; cw_update_tasks with one in its patch). Both worked calls only.
+ */
+const retargetWays = (o) => ({
+  byPreview: ran(o, 'cw_queue').filter((x) => argsOf(x).action === 'retarget' && String(argsOf(x).preview ?? '').startsWith('rt-') && (argsOf(x).items ?? []).length > 0),
+  byCard: [...ran(o, 'cw_update_task').filter((x) => 'target' in argsOf(x)), ...ran(o, 'cw_update_tasks').filter((x) => JSON.stringify(argsOf(x)).includes('"target"'))]
+})
+/**
  * Whether a reply or card puts a decision to the user: a question, or a request without a "?" ("Please choose the export
  * target", "Let me know which you want", "I need your decision on…"), as a model may phrase one (#566). A polite closing
  * ("Please let me know if you need anything else", "Tell me if anything is unclear") puts no decision and doesn't count,
@@ -308,6 +316,11 @@ function handMerged(c, n) {
   c.git('checkout', '-q', base)
   c.git('merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch)
   return { branch, base }
+}
+/** Implementer builds and Coder reviews (HI-2664: the harness saves Coder either and Implementer a reviewer). */
+async function swapRoles(c) {
+  await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
+  await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
 }
 /** Coder builds and Implementer reviews (their workflow roles), in a project whose work an agent reviews (#1527). */
 async function reviewedPair(c) {
@@ -1724,6 +1737,9 @@ module.exports.SCENARIOS = [
   {
     id: 'review-passed',
     title: 'A review that passes: its verdict moves the card to Passed, not to Done (#170; #1536: a project where an agent reviews and merges come after, so a pass stops in Passed)',
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       // A reviewer agent, and merges reported by the builder, not checked: a pass waits in Passed for the merge.
@@ -2810,6 +2826,7 @@ module.exports.SCENARIOS = [
     id: 'card-loop-lane-join',
     title: "A card loop reviewer joins its builder's lane (#483) by the builder's name, then waits for the first card",
     async setup(c) {
+      await swapRoles(c)
       await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', column: 'doing', agent: 'implementer' })
       await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'implementer' })
     },
@@ -3213,6 +3230,9 @@ module.exports.SCENARIOS = [
   {
     id: 'intent-review-request',
     title: "A reviewer starts a review, asks the builder something and fails it (#1267): start review, request to builder and verdict",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -3413,6 +3433,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
+      await swapRoles(c)
       // Implementer starts the card, registers its lane (the subject, Coder, reviewing) and posts its design, with its own
       // token. The start comes before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing this start.
@@ -3483,10 +3504,14 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-follow-up-check',
     title: "A card loop reviewer told of a follow-up to check, on a card in Review (#1467): it answers with cw_loop_step naming it, not a verdict",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
+      await swapRoles(c)
       // Implementer's round 1 sent for review, then its lane (the subject, Coder, reviewing), then its follow-up, with its
       // own token. The moves come before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing the move to Doing.
@@ -3572,6 +3597,9 @@ module.exports.SCENARIOS = [
   {
     id: 'old-move-review',
     title: "A reviewer's review start and failed verdict are start review and a verdict for now (#1268): today's skills, the card back in Doing with its builder",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -4168,6 +4196,43 @@ module.exports.SCENARIOS = [
       ['its Control is still Look and advise', o.settings?.assistant?.control === 'look', String(o.settings?.assistant?.control)],
       ['no change to it worked', !o.combworkCalls.some((x) => x.tool === 'cw_update_setting' && x.ok && /assistant\.control/.test(x.args ?? ''))]
     ]
+  },
+  {
+    id: 'assistant-retarget-release',
+    title: "The Assistant asked to move alpha on to the next release (HI-2680): changes Work merges into, then moves the Todo cards still on the old one, by the preview its reply gave",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    async setup(c) {
+      c.git('branch', '1.1.0')
+      c.git('branch', '1.2.0')
+      // Two Todo cards merging into 1.1.0 of their own (set while it was the other listed branch); alpha then merges into 1.1.0.
+      await pairInProject(c, { target: '1.2.0', otherTargets: ['1.1.0'] })
+      await c.card('a', { title: 'Add a dark mode toggle', description: 'A toggle in the settings page that switches the theme.' })
+      await c.card('b', { title: 'Remember the last opened file', description: 'Reopen the file that was open when the app closed.' })
+      for (const k of ['a', 'b']) await c.inv('tasks:setTarget', c.cards[k], '1.1.0')
+      await pairInProject(c, { target: '1.1.0', otherTargets: ['1.2.0'] })
+    },
+    prompt: "We've just released 1.1.0. Make alpha's work merge into 1.2.0 from now on, and move the Todo cards still set to 1.1.0 over to 1.2.0 too: I've checked them, go ahead.",
+    fake: 'cw cw_update_setting {"id":"project.workflow.target","value":"1.2.0","project":"alpha"} then cw cw_queue {"action":"retarget","project":"alpha","from":"1.1.0","target":"1.2.0"}',
+    expect: (o) => {
+      const { byPreview, byCard } = retargetWays(o)
+      return [
+        ["changed alpha's Work merges into to 1.2.0 with cw_update_setting", ran(o, 'cw_update_setting').some((x) => /workflow\.target/.test(String(argsOf(x).id)) && argsOf(x).value === '1.2.0'), o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        // Either way moves a card as the user's change does (tasks.setTarget, bound to the target it had): cw_queue retarget
+        // by the preview the reply gave (cards and free slots together), or each card's own Merges into (cw_update_task).
+        ['moved them through Combwork: cw_queue retarget by its preview, or each card\'s Merges into', byPreview.length > 0 || byCard.reduce((n, x) => n + (Array.isArray(argsOf(x).numbers) ? argsOf(x).numbers.length : 1), 0) >= 2, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['both cards now follow 1.2.0 (no target of their own)', (o.cards.a?.target ?? null) === null && (o.cards.b?.target ?? null) === null, JSON.stringify([o.cards.a?.target, o.cards.b?.target])]
+      ]
+    },
+    observe: (o) => {
+      const { byPreview, byCard } = retargetWays(o)
+      return [
+        ['used cw_queue retarget by its preview', byPreview.length > 0, byPreview.map((x) => x.args).join(' | ')],
+        ["set each card's Merges into instead", byCard.length > 0, byCard.map((x) => x.args).join(' | ')]
+      ]
+    },
+    fakeSkips: ["moved them through Combwork: cw_queue retarget by its preview, or each card's Merges into", 'both cards now follow 1.2.0 (no target of their own)']
   },
   {
     id: 'assistant-add-agent-connection',
@@ -5513,6 +5578,8 @@ module.exports.SCENARIOS.push({
   files: { 'README.md': '# alpha\n\nA project for the tool sweep.\n' },
   async setup(c) {
     await pairInProject(c)
+    // Both sides' tools (HI-2664: a builder isn't offered cw_request_builder, a reviewer not cw_put_back).
+    await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'either' })
     await c.card('s', { title: 'Sweep the tools', description: 'A card for each tool to name.' })
   },
   prompt: (c) => `Call each Combwork tool once on card #${c.cards.s}.`,
@@ -5533,4 +5600,4 @@ module.exports.SCENARIOS.push({
     })
 })
 
-module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { laneStartLanded, readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

@@ -121,6 +121,8 @@
   "tips.branchCards.title": "Veja de qual cartão é um branch",
   "tips.branchCleanup.text": "Controle de versão → Branches e remotes agrupa os branches em Em uso, Com merge e Sem merge. Limpar branches com merge feito… exclui os com merge que nada usa, e oferece à parte os dos seus remotes, nunca marcados.",
   "tips.branchCleanup.title": "Limpar branches com merge feito",
+  "tips.bringUpToDate.text": "O cartão da fila de merge de um branch mostra quando ele está atrás de outro branch do projeto. Atualizar… faz o merge desse outro branch nele pela fila, com as verificações de merge; o outro branch não muda.",
+  "tips.bringUpToDate.title": "Atualizar a próxima versão",
   "tips.cardAttachments.text": "Cole ou solte arquivos na descrição ou em um comentário de um cartão: eles ficam com o cartão quando você salva ou publica, aparecem nele e são listados para o agente que o inicia. O alfinete no chip de anexo de um painel copia um arquivo para o cartão do agente.",
   "tips.cardAttachments.title": "Mantenha uma captura com seu cartão",
   "tips.cardAttachmentsCleanup.text": "Os arquivos guardados com um cartão vão para a Lixeira 30 dias depois de ele ser arquivado. Escolha 3, 7 ou 90 dias, ou Nunca, em Configurações do projeto → Armazenamento, onde Limpar agora… remove na hora o que já venceu. Cartões abertos e concluídos mantêm os seus.",
@@ -554,5 +556,11 @@
   "tips.perfFailures.title": "Recusado não é quebrado",
   "tips.perfFailures.text": "Desempenho → Falhas classifica o que não deu certo: erros reais em vermelho, à parte das chamadas que uma regra do fluxo de trabalho recusou e das chamadas erradas. Recusas e chamadas erradas por motivo mostra qual regra ou mensagem apareceu mais: uma descrição de ferramenta a deixar mais clara.",
   "tips.serverDiagnostics.title": "Um agente no Ollama só escreve texto?",
-  "tips.serverDiagnostics.text": "Verificar servidor… em uma conta de servidor, em Configurações → Contas e conexões, mostra o contexto real do modelo e testa uma chamada de ferramenta. Um contexto menor que o prompt do Claude Code é o motivo comum para um modelo local escrever uma chamada de ferramenta em vez de fazê-la."
+  "tips.serverDiagnostics.text": "Verificar servidor… em uma conta de servidor, em Configurações → Contas e conexões, mostra o contexto real do modelo e testa uma chamada de ferramenta. Um contexto menor que o prompt do Claude Code é o motivo comum para um modelo local escrever uma chamada de ferramenta em vez de fazê-la.",
+  "tips.retargetRelease.title": "Quando uma versão sai, passe o que sobrou para a próxima",
+  "tips.retargetRelease.text": "Vai mudar O trabalho é mesclado em de 1.1.0 para 1.2.0? Salvar… lista os cartões Todo e os slots livres ainda em 1.1.0 que podem passar para 1.2.0, e o que fica, com o motivo. Deixe Redirecionar também o que pode passar marcado para movê-los.",
+  "tips.localModelLimits.text": "Nos modelos de uma conta de servidor (Configurações → Contas e conexões, Editar servidor…), defina o tamanho do contexto e o orçamento de saída: os agentes iniciados nesse modelo passam a compactar no contexto real dele, em vez de em 200.000 supostos.",
+  "tips.localModelPicker.title": "Troque de modelo local no /model do Claude Code",
+  "tips.localModelPicker.text": "Um agente numa conta de servidor encontra os modelos da conta no /model do Claude Code, pelos IDs exatos. Dê a cada um um Rótulo em Editar servidor… para nomeá-lo lá.",
+  "tips.localModelLimits.title": "Informe ao Claude Code o contexto real do seu modelo local"
 }

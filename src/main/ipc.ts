@@ -22,7 +22,7 @@ import { providerService } from './providerService'
 import { connectionInput, type ConnectionPatch } from '../shared/accounts'
 import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, setUsageMove, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { launchImpact, setConnectionLaunch } from './connectionLaunch'
-import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setServerModelContext, setUpServerConnection } from './serverConnections'
+import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setServerModelContext, setServerModelOutput, setUpServerConnection } from './serverConnections'
 import { cancelServerChecks, lastServerCheck, readServerContext, testServerTools } from './serverDiagnostics'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -145,7 +145,8 @@ import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { copyViews, stopIsolated } from './copiesApp'
-import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
+import { retargetApply, retargetArg } from './workflow/retarget'
+import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -1021,6 +1022,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
+    'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
     'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),
@@ -1053,6 +1055,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
+    'queue:forward': async (p, from, to) => {
+      const r = await forwardMerge(currentWorkspace(), workspace.assertProject(p), queueTarget(from), queueTarget(to), { kind: 'user' })
+      return 'upToDate' in r ? { upToDate: true, card: null, queued: false } : { upToDate: false, card: r.card.number, queued: r.queued }
+    },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
@@ -1825,6 +1831,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:cancelCheck': (id, model, request) => cancelServerChecks(id, String(model), String(request)),
     'connections:lastCheck': (id, model) => lastServerCheck(id, String(model)),
     'connections:setModelContext': (id, model, tokens) => setServerModelContext(id, String(model), typeof tokens === 'number' ? tokens : null),
+    'connections:setModelOutput': (id, model, tokens) => setServerModelOutput(id, String(model), typeof tokens === 'number' ? tokens : null),
     'connections:setUp': async (id) => {
       await refreshPathBeforeStart()
       // A sign-in connection's Set Up (HI-1826): the CLI on its folder, for the first-run screens its sign-in leaves.
@@ -1854,6 +1861,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:dismissNotice': (keys) => dismissMovedNotice(workspace, Array.isArray(keys) ? keys.filter((k) => typeof k === 'string') : []),
     'connections:dismissIntro': () => dismissConnectionsIntro(),
     'session:switchConnection': (p, agentId) => sessions.switchAtSafePoint(p, agentId),
+    // An agent's role changed (HI-2664): restarted to load its side's tools, at once if idle, else when the user says.
+    'session:restartForSide': (p, agentId, when) => sessions.restartForSide(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
 
     'api:info': () => apiInfo(),
     'api:regenerateToken': async () => {

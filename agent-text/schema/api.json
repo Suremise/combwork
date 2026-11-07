@@ -276,6 +276,26 @@
       "choices": "plain"
     }
   },
+  "api.build.builtAt": {
+    "placeholders": {}
+  },
+  "api.build.by": {
+    "placeholders": {}
+  },
+  "api.build.commit": {
+    "placeholders": {}
+  },
+  "api.build.installer": {
+    "placeholders": {}
+  },
+  "api.build.kind": {
+    "placeholders": {
+      "kinds": "plain"
+    }
+  },
+  "api.build.version": {
+    "placeholders": {}
+  },
   "api.card.archivedArg": {
     "placeholders": {
       "arg": "plain",
@@ -502,6 +522,16 @@
       "lane": "plain"
     }
   },
+  "api.change.forward": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.forwardAny": {
+    "placeholders": {}
+  },
   "api.change.handOver": {
     "placeholders": {
       "from": "plain",
@@ -597,6 +627,16 @@
     }
   },
   "api.change.resumeTeam": {
+    "placeholders": {}
+  },
+  "api.change.retarget": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.retargetAny": {
     "placeholders": {}
   },
   "api.change.retryFresh": {
@@ -931,6 +971,20 @@
       "name": "plain"
     }
   },
+  "api.done.forwardQueued": {
+    "placeholders": {
+      "queued": "select",
+      "card": "plain",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
+  "api.done.forwardUpToDate": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain"
+    }
+  },
   "api.done.freshRetried": {
     "placeholders": {
       "retried": "plural",
@@ -1040,6 +1094,15 @@
     "placeholders": {
       "cards": "plain",
       "column": "plain"
+    }
+  },
+  "api.done.retargeted": {
+    "placeholders": {
+      "cards": "plain",
+      "slots": "plain",
+      "from": "plain",
+      "to": "plain",
+      "skipped": "plain"
     }
   },
   "api.done.slotReleased": {
@@ -1471,6 +1534,9 @@
   "api.provider.notInstalled": {
     "placeholders": {}
   },
+  "api.queue.forwardArgs": {
+    "placeholders": {}
+  },
   "api.queue.notAgents": {
     "placeholders": {
       "what": "plain"
@@ -1478,6 +1544,14 @@
   },
   "api.queue.projectRequired": {
     "placeholders": {}
+  },
+  "api.queue.retargetArgs": {
+    "placeholders": {}
+  },
+  "api.queue.retargetGone": {
+    "placeholders": {
+      "preview": "plain"
+    }
   },
   "api.queue.targetArg": {
     "placeholders": {}

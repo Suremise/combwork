@@ -87,7 +87,7 @@ describe('each recorded hook (agy 1.5.0)', () => {
 })
 
 describe("the user's prompts, from the transcript (HI-2410's lesson)", () => {
-  const recorded = readFileSync(join(FIX, 'transcript-antigravity-1.5.0.jsonl'), 'utf8')
+  const recorded = readFileSync(join(__dirname, 'fixtures', 'antigravity', 'plain-1.5.0.jsonl'), 'utf8')
   it("the prompt's text without what agy adds (the advanced pattern)", () => {
     expect(newestUserStep(recorded, 1)).toEqual({ index: 0, text: 'Reply with exactly the word BRAVO and nothing else. Do not use tools.' })
     expect(userRequestText('no wrapper')).toBe('no wrapper')

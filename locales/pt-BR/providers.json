@@ -3,6 +3,7 @@
   "providers.action.signIn": "Entrar",
   "providers.action.update": "Atualizar",
   "providers.antigravity.checkFailed": "Não foi possível verificar o login do {provider}: {text}. Escolha Verificar de novo; se você ainda não entrou, execute agy em um terminal.",
+  "providers.antigravity.conversationGone": "O {provider} não retomou {conversation}: o {provider} não tem mais essa conversa (ele a guarda separada da transcrição, no perfil do agente, e ela foi removida). Inicie uma nova sessão em vez disso.",
   "providers.antigravity.projectServers": "O {provider} não iniciou: {count, plural, one {{files} define} other {{files} definem}} servidores MCP que este agente não recebeu ({servers}), e o {provider} os iniciaria na sessão. O Combwork não consegue mantê-los de fora, então não inicia o {provider} aqui. Remova-os desse arquivo ou dê-os ao agente nos servidores MCP do Combwork.",
   "providers.antigravity.notOwnConversation": "O {provider} não retomou {conversation}: ela não está entre as conversas deste agente (pode ter sido removida ou ser de outro agente). Inicie uma nova sessão.",
   "providers.antigravity.signIn.runs": "**Entrar** executa `agy` em um terminal: entre por lá. O Combwork nunca faz login por você.",
@@ -102,5 +103,16 @@
   "providers.transcript.interrupted": "Interrompido por você",
   "providers.transcript.resumed": "Sessão retomada",
   "providers.transcript.turnEnded": "Turno encerrado: {reason}",
-  "providers.unknown": "Provedor desconhecido “{provider}”. Talvez seja preciso uma versão mais nova do Combwork."
+  "providers.unknown": "Provedor desconhecido “{provider}”. Talvez seja preciso uma versão mais nova do Combwork.",
+  "providers.claude.localLimits.inFile": "env em {file}",
+  "providers.claude.localLimits.oursContext": "Tamanho do contexto em {connection}",
+  "providers.claude.localLimits.oursOutput": "Orçamento de saída em {connection}",
+  "providers.claude.localLimits.outputNotBelow": "{agent} não foi iniciado: o orçamento de saída dele ({output, number} tokens, {outputFrom}) não é menor que o tamanho do contexto ({context, number} tokens, {contextFrom}). Altere um deles e inicie-o de novo.",
+  "providers.claude.localLimits.tooSmall": "{agent} não foi iniciado: o tamanho do contexto dele ({context, number} tokens, {contextFrom}) é pequeno demais para qualquer orçamento de saída. Defina um tamanho de contexto maior.",
+  "providers.localLimits.context": "Tamanho do contexto {value, number} tokens ({from}){estimate, select, yes {: uma estimativa até o Claude Code informar a janela} other {}}",
+  "providers.localLimits.inFile": "env em {file}",
+  "providers.localLimits.notUsed": "{why, select, alias {Tamanho do contexto não usado: o Claude Code lê {model} como um de seus aliases} spelling {Tamanho do contexto não usado: IDs com claude, [1m] ou um sufixo de data não são compatíveis com isso} mapped {Tamanho do contexto não usado: {file} associa {model} a um modelo do Claude} unreadable {Tamanho do contexto não usado: não foi possível ler {file}, então o Combwork não sabe se ele associa {model}} other {Tamanho do contexto não usado: {model} não é um dos modelos de {connection}}}",
+  "providers.localLimits.ours": "definido em {connection}",
+  "providers.localLimits.output": "Orçamento de saída {value, number} tokens ({from}){fallback, select, none {} other {: {fallback} não era menor que o contexto, então o padrão foi usado}}",
+  "providers.localLimits.switched": "Iniciado em {model} com estes valores: eles valem a sessão toda, e o Claude Code informa a janela do modelo que roda agora."
 }

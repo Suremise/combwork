@@ -208,6 +208,15 @@ const namingCopies = () => {
       let askedBeforeEdit = false
       await lib.cliStep(`${r.def.name}'s turn in its review copy`, { session: key }, async () => {
       const sent = await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live(r.def.id))?.status === 'working' || fs.existsSync(built), waitMs: HUNG_MS })
+      if (!sent) {
+        // Kept for the next time a CLI takes none of its attempts (HI-2693: Codex sat 8 min with the prompt in its box, and
+        // sendPrompt's line has only the output's last 300 characters): its whole screen as drawn, and the window.
+        const raw = (await inv('pty:buffer', key).catch(() => '')) ?? ''
+        fs.writeFileSync(at(`${r.key}-not-taken.txt`), lib.plainText(raw).slice(-12000))
+        fs.writeFileSync(at(`${r.key}-not-taken.raw`), raw.slice(-24000))
+        await page.screenshot({ path: at(`${r.key}-not-taken.png`) }).catch(() => undefined)
+        console.log(`INFO ${r.def.name}: took none of its prompt's attempts; its screen is kept in ${at(`${r.key}-not-taken.txt`)}, with .raw and .png`)
+      }
       check(`…${r.def.name} takes the prompt`, sent > 0)
       // Edits there are never asked about (granted); a command may be, and is answered Yes.
       const done = await until(async () => {

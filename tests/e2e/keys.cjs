@@ -98,7 +98,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.keyboard.press('Control+Alt+2'); await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')?.config.layout === 'columns2', HUNG_MS)
   const p = (await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')
   check('Ctrl+Alt+2: two-column layout', p.config.layout === 'columns2', JSON.stringify(p.config.layout))
-  await page.keyboard.press('Control+Alt+1'); await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')?.config.layout === 'single', HUNG_MS)
+  // The layout bravo's agents give is saved as automatic (#134: `auto`, never `single`): that wait ran out, HI-2688.
+  await page.keyboard.press('Control+Alt+1')
+  check('Ctrl+Alt+1: back to one column, the layout its agents give (automatic)', !!(await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')?.config.layout === 'auto', HUNG_MS)), JSON.stringify((await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')?.config.layout))
 
   // Settings → Keyboard Shortcuts
   await page.keyboard.press('Control+,'); await lib.until(async () => (await page.locator('.settings-nav .row', { hasText: 'Keyboard Shortcuts' }).count()) > 0, HUNG_MS)

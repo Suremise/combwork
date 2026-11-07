@@ -487,6 +487,14 @@
     "defaultMessage": "Clean up merged branches",
     "description": "A tip's title."
   },
+  "tips.bringUpToDate.text": {
+    "defaultMessage": "A branch’s merge queue card says when it is behind another of the project’s branches. Bring Up to Date… merges that branch into it through its queue, with its merge checks; the other branch doesn’t change.",
+    "description": "A tip (HI-2679). Bring Up to Date… is a button on a merge queue's card: keep it as Combwork shows it."
+  },
+  "tips.bringUpToDate.title": {
+    "defaultMessage": "Bring the next release up to date",
+    "description": "A tip's title (HI-2679): merging one of a project's branches into another through the merge queue."
+  },
   "tips.cardAttachments.text": {
     "defaultMessage": "Paste or drop files into a card's description or comment: they are kept with the card when you save or post, shown in it, and listed for the agent that starts it. The pin on a pane's attachment chip copies a file to the agent's card.",
     "description": "A tip (HI-1700). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -1195,6 +1203,22 @@
     "defaultMessage": "Audit the licences of what you ship",
     "description": "A tip's title."
   },
+  "tips.localModelLimits.text": {
+    "defaultMessage": "On a server account’s models (Settings → Accounts & Connections, Edit Server…), set Context size and Output budget: agents started on that model then compact at its real context rather than an assumed 200,000.",
+    "description": "A tip (HI-2682). Names of Combwork's menus, views, settings and fields: keep them as Combwork shows them (Edit Server… is a button)."
+  },
+  "tips.localModelLimits.title": {
+    "defaultMessage": "Tell Claude Code your local model’s real context",
+    "description": "A tip's title (HI-2682): a local model on a server account, its context size."
+  },
+  "tips.localModelPicker.text": {
+    "defaultMessage": "An agent on a server account finds the account’s models in Claude Code’s /model, by their exact IDs. Give each a Label in Edit Server… to name it there.",
+    "description": "A tip (HI-2684). /model is a Claude Code command: keep it. Label is a field of a server account's models and Edit Server… a button: keep them as Combwork shows them."
+  },
+  "tips.localModelPicker.title": {
+    "defaultMessage": "Switch local models in Claude Code’s /model",
+    "description": "A tip's title (HI-2684): a server account's models in Claude Code's model picker. /model is a command: keep it."
+  },
   "tips.loopDefaults.text": {
     "defaultMessage": "Rounds and Wait under Card loops in Settings → Version Control set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a workspace and a project can set their own. Saying \"rounds: 3\" when you start one still wins.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {rounds} and {hours} are the defaults (10 and 6). \"rounds: 3\" is what the user types to an agent: keep it in English."
@@ -1722,6 +1746,14 @@
   "tips.resumeAll.title": {
     "defaultMessage": "Resume all agents at once",
     "description": "A tip's title."
+  },
+  "tips.retargetRelease.text": {
+    "defaultMessage": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them.",
+    "description": "A tip (HI-2680). Work merges into, Save… and Also retarget what can move are names in Combwork's window: keep them as Combwork shows them. Keep 1.1.0 and 1.2.0 as they are."
+  },
+  "tips.retargetRelease.title": {
+    "defaultMessage": "When a release ships, move what’s left onto the next",
+    "description": "A tip's title (HI-2680): after a project's Work merges into moves on to the next release's branch."
   },
   "tips.retryWait.text": {
     "defaultMessage": "When a Codex, Claude Code or Copilot agent's requests are refused, often by a rate limit, it waits and tries again while its screen says only Working. Combwork reads the wait from the agent's own records, and its status says so.",

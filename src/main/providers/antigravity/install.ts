@@ -1,5 +1,6 @@
 import { join } from 'path'
 import { existsSync } from 'original-fs'
+import { mkdir } from 'original-fs/promises'
 import { msg } from '../../../shared/i18n'
 import type { AgentInstallInfo, ReadinessIssue } from '../../../shared/types'
 import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR } from '../../../shared/antigravity'
@@ -8,7 +9,7 @@ import { config } from '../../config'
 import { createLogger, userText } from '../../logger'
 import { EDITOR_EXTENSION_PATH, installText, notInstalledIssue, run, signedOutIssue, toSpawnable } from '../common'
 import type { CommandSpec } from '../types'
-import { antigravityEnv } from './home'
+import { checkEnv, inUserProfile } from './home'
 import { parseModels, type CatalogModel } from './models'
 
 // The Antigravity CLI's installation and sign-in, for Provider Setup (HI-2544, against 1.5.0). The adapter delegates
@@ -46,8 +47,21 @@ export function parseAntigravityVersion(text: string): string | null {
   return /^\s*v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]*[0-9A-Za-z])?)\s*$/m.exec(text)?.[1] ?? null
 }
 
-/** The environment agy is checked in: its sessions' (antigravityEnv), so the sign-in shown is the one they use. */
-export const antigravityCheckEnv = (): Record<string, string> => antigravityEnv(process.env as Record<string, string>)
+/**
+ * The environment agy is checked in: its sessions' (antigravityEnv), so the sign-in shown is the one they use, in Combwork's
+ * check profile (HI-2698), never the user's own.
+ */
+export const antigravityCheckEnv = (): Record<string, string> => checkEnv(process.env as Record<string, string>)
+
+/**
+ * Runs agy outside an agent's launch (HI-2698): never in the user's own profile, refused if `env` would be (a bug, not a
+ * state to work around); its profile made first.
+ */
+export async function runAgy(executable: string, args: string[], timeoutMs: number, env: Record<string, string>): ReturnType<typeof run> {
+  if (inUserProfile(env)) throw new Error(`agy would run in the user's own profile: refused (${args.join(' ')})`) // i18n-ignore: an internal check, never shown
+  await mkdir(env.USERPROFILE, { recursive: true })
+  return run(executable, args, timeoutMs, env)
+}
 
 /**
  * What `agy models` says of the sign-in (s17's classification): `ok` with the account's models; `signIn` only when its text
@@ -68,7 +82,7 @@ export function classifyModels(r: { stdout: string; stderr: string; code: number
 }
 
 export async function checkModels(executable: string, env: Record<string, string>, signInNeeded: RegExp | null, timeoutMs = 20000): Promise<ModelsCheck> {
-  return classifyModels(await run(executable, ['models'], timeoutMs, env), signInNeeded)
+  return classifyModels(await runAgy(executable, ['models'], timeoutMs, env), signInNeeded)
 }
 
 export async function locateAntigravity(signInNeeded: RegExp | null): Promise<AgentInstallInfo> {
@@ -80,7 +94,7 @@ export async function locateAntigravity(signInNeeded: RegExp | null): Promise<Ag
       info.rejected!.push(c.path)
       continue
     }
-    const r = await run(c.path, ['--version'], 15000, env)
+    const r = await runAgy(c.path, ['--version'], 15000, env)
     const version = parseAntigravityVersion(r.stdout)
     if (!version) {
       // The path and what the CLI printed are the user's: left out of Copy Diagnostics.

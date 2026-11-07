@@ -215,6 +215,9 @@ export const HEAP_SNAPSHOT_NEAR_LIMIT = 'cw.heapSnapshotNearLimit'
 
 /** Agents resume by themselves after Combwork restarts for an update (HI-1707): read by main's restartResume. */
 export const RESUME_AFTER_UPDATE = 'cw.restart.resumeAfterUpdate'
+/** HI-2682: the model names Claude Code reads as its aliases, and the ID spellings it sizes itself (local-model limits). */
+export const LOCAL_MODEL_ALIASES_ID = 'claude-code.localModel.aliases'
+export const LOCAL_MODEL_SPELLINGS_ID = 'claude-code.localModel.spellings'
 /** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
 export const RESTART_READY_SECONDS = 'cw.restart.resumeReadySeconds'
 
@@ -1695,6 +1698,40 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/ollama-cloud-models-0.33.1.txt`, version: '0.33.1', source: 'Ollama', text: 'gpt-oss:120b-cloud' } // i18n-ignore: a server's recorded text (#367)
     ]
   },
+  // HI-2682: a server connection's model IDs Claude Code reads as its own aliases, so it sizes them itself: Combwork passes
+  // no local-model context or output budget for them.
+  {
+    id: LOCAL_MODEL_ALIASES_ID,
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.localModel.aliases.title', defaultMessage: 'Local models: Claude Code’s aliases', description: "An advanced setting's title (Settings → Advanced), listed under its CLI: the model names Claude Code reads as its own aliases (opus, sonnet…)." }),
+    desc: msg({ id: 'settings.advanced.claude-code.localModel.aliases.desc', defaultMessage: "The model names Claude Code reads as its own aliases (opus, sonnet…), as a regular expression. A server connection's model named so gets no Context size or Output budget from Combwork, as Claude Code sizes it itself. Wrong, a local model with one of these names is launched as if Claude Code knew it, or an alias gets limits Claude Code ignores.", description: 'What the advanced setting "Local models: Claude Code’s aliases" is for, and what goes wrong when it is wrong (Settings → Advanced). Context size and Output budget are fields of a server connection’s models: as translated there.' }),
+    kind: 'pattern',
+    default: String.raw`^(?:default|best|opus|sonnet|haiku|fable|opusplan)(?:\[1m\])?$`,
+    flags: 'i',
+    applies: 'sessions',
+    samples: [
+      { from: `${FIX}/advanced/help-model-claude-2.1.319.txt`, version: '2.1.319', text: 'opus' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-model-claude-2.1.319.txt`, version: '2.1.319', text: 'sonnet' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-model-claude-2.1.319.txt`, version: '2.1.319', text: 'fable' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  // HI-2682: the spellings Claude Code may resolve to a Claude model or size by its own rules (claude in the ID, [1m], a
+  // stripped date suffix): unsupported for Combwork's local-model limits.
+  {
+    id: LOCAL_MODEL_SPELLINGS_ID,
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.localModel.spellings.title', defaultMessage: 'Local models: IDs Claude Code sizes itself', description: "An advanced setting's title (Settings → Advanced), listed under its CLI: model ID spellings (claude-…, [1m], a date suffix) Claude Code applies its own context rules to." }),
+    desc: msg({ id: 'settings.advanced.claude-code.localModel.spellings.desc', defaultMessage: "Model ID spellings Claude Code may resolve to a Claude model or size by its own rules (claude in the ID, a [1m] suffix, a date after @), as a regular expression. A server connection's model spelt so gets no Context size or Output budget from Combwork. Wrong, Combwork passes limits Claude Code doesn't apply, or leaves out a local model it would.", description: 'What the advanced setting "Local models: IDs Claude Code sizes itself" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep [1m] and @ as they are. Context size and Output budget are fields of a server connection’s models: as translated there.' }),
+    kind: 'pattern',
+    default: String.raw`claude|\[1m\]|@`,
+    flags: 'i',
+    applies: 'sessions',
+    samples: [
+      { from: `${FIX}/advanced/model-ids-claude-2.1.319.txt`, version: '2.1.319', text: 'anthropic/claude-opus-4-8' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/model-ids-claude-2.1.319.txt`, version: '2.1.319', text: 'claude-sonnet-4-5@20250929' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/model-ids-claude-2.1.319.txt`, version: '2.1.319', text: 'my-gateway-opus[1m]' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
   {
     id: 'claude-code.statusLine.rateLimits',
     group: 'claude-code',
@@ -2932,6 +2969,64 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/models-signedout-antigravity-1.5.0.txt`, version: '1.5.0', text: 'Error: Please sign in to view available models. Launch the CLI without arguments to sign in.', shows: 'agy models with nobody signed in (a Windows Sandbox, HI-2544)' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // The Antigravity CLI's transcripts (HI-2546): brain\<conversation>\.system_generated\logs\transcript_full.jsonl in the agent's profile.
+  {
+    id: 'antigravity.transcript.userRequest',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.userRequest.title', defaultMessage: 'Transcript: your prompt', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.userRequest.desc', defaultMessage: "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.", description: 'What the advanced setting "Transcript: your prompt" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: '<USER_REQUEST>\\n?([\\s\\S]*?)\\n?</USER_REQUEST>', // i18n-ignore: a CLI's text (#367)
+    applies: 'now',
+    samples: [{ from: `${FIX}/antigravity/plain-1.5.0.jsonl`, version: '1.5.0', text: '<USER_REQUEST>\nReply with exactly the word BRAVO and nothing else. Do not use tools.\n</USER_REQUEST>', shows: 'A prompt as agy recorded it' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.transcript.stepHeader',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.stepHeader.title', defaultMessage: "Transcript: a tool result's times", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.stepHeader.desc', defaultMessage: "The times agy writes before a tool's result in its transcript, which Combwork leaves out when it shows the result. Wrong, results show with those times.", description: 'What the advanced setting "Transcript: a tool result\'s times" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`^Created At: [^\n]*\n(?:Completed At: [^\n]*\n)?`,
+    flags: '',
+    applies: 'now',
+    samples: [{ from: `${FIX}/antigravity/mcp-tools-1.5.0.jsonl`, version: '1.5.0', text: 'Created At: 2026-11-07T02:07:34Z\nCompleted At: 2026-11-07T02:07:35Z\n', shows: "A tool result's first lines" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.transcript.modelChange',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.modelChange.title', defaultMessage: 'Transcript: the model picked', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.modelChange.desc', defaultMessage: "What agy adds to a prompt when its model changes: the model's name is its first group. Wrong, an agent's usage names no model.", description: 'What the advanced setting "Transcript: the model picked" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`changed setting \x60Model Selection\x60 from .*? to (.+?)\.(?:\s|$)`,
+    flags: '',
+    applies: 'now',
+    samples: [{ from: `${FIX}/antigravity/plain-1.5.0.jsonl`, version: '1.5.0', text: 'The user changed setting `Model Selection` from None to Gemini 3.8 Flash (Low). No need', shows: 'The model agy started on' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.usage.inputIncludesCache',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.usage.inputIncludesCache.title', defaultMessage: 'Usage: input tokens include the cache', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.usage.inputIncludesCache.desc', defaultMessage: "Whether a request's input_tokens in agy's transcript already count its cache_read_tokens. Wrong, Combwork counts cached tokens twice, or leaves them out of the context.", description: 'What the advanced setting "Usage: input tokens include the cache" is for, and what goes wrong when it is wrong (Settings → Advanced). agy, input_tokens and cache_read_tokens are names: keep them.' }),
+    kind: 'boolean',
+    // Off (HI-2546's runs): a subagent's first request, whose prompt is the usual ~7,100 tokens, had input_tokens 2198 and cache_read_tokens 5058.
+    default: false,
+    applies: 'now',
+    samples: [{ from: `${FIX}/antigravity/subagent-child-1.5.0.jsonl`, version: '1.5.0', text: '"input_tokens":2198,"cache_read_tokens":5058', shows: 'A request read partly from the cache' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.transcript.systemMessage',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.systemMessage.title', defaultMessage: "Transcript: agy's messages", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.systemMessage.desc', defaultMessage: "A message in agy's transcript from agy itself or another conversation (a subagent's task or answer): who sent it is its first group, what it says its second. Wrong, those messages aren't shown, and a subagent's conversation isn't found under its parent.", description: 'What the advanced setting "Transcript: agy\'s messages" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`\[Message\][^\n]*? sender=(\S+)[^\n]*? content=([\s\S]*?)\s*</SYSTEM_MESSAGE>`,
+    flags: '',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/antigravity/subagent-child-1.5.0.jsonl`, version: '1.5.0', text: '[Message] timestamp=2026-11-07T11:46:52Z sender=f57ee6fa-3d66-4a22-b458-764656e4d25d priority=MESSAGE_PRIORITY_HIGH content=What is 2+2? Reply with just the answer.\n</SYSTEM_MESSAGE>', shows: "A subagent's task from its parent" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/antigravity/tools-resume-compact-1.5.0.jsonl`, version: '1.5.0', text: '[Message] timestamp=2026-11-07T11:47:13Z sender=system priority=MESSAGE_PRIORITY_LOW content=[Notice] All your subagents and background tasks have been stopped due to server restart. If you want a subagent to continue working, it needs to be revived by sending it a new message. If resuming work, please check on status and restart as needed.\n</SYSTEM_MESSAGE>', shows: "agy's own notice on a resume" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
   {
     id: overrideId('antigravity', 'preApproveCombworkTools'),
     group: 'antigravity',
@@ -3225,16 +3320,6 @@ const SOURCES: readonly AdvancedSource[] = [
     default: false,
     applies: 'sessions',
     samples: [{ from: `${FIX}/advanced/hooks-antigravity-1.5.0.json`, version: '1.5.0', text: '"name": "call_mcp_tool"', shows: "agy's hook before a tool call" }] // i18n-ignore: a CLI's recorded text (#367)
-  },
-  {
-    id: 'antigravity.transcript.userRequest',
-    group: 'antigravity',
-    title: msg({ id: 'settings.advanced.antigravity.transcript.userRequest.title', defaultMessage: 'Transcript: your prompt', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
-    desc: msg({ id: 'settings.advanced.antigravity.transcript.userRequest.desc', defaultMessage: "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.", description: 'What the advanced setting "Transcript: your prompt" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
-    kind: 'pattern',
-    default: '<USER_REQUEST>\\n?([\\s\\S]*?)\\n?</USER_REQUEST>', // i18n-ignore: a CLI's text (#367)
-    applies: 'now',
-    samples: [{ from: `${FIX}/advanced/transcript-antigravity-1.5.0.jsonl`, version: '1.5.0', text: '<USER_REQUEST>\nReply with exactly the word BRAVO and nothing else. Do not use tools.\n</USER_REQUEST>', shows: 'A prompt as agy recorded it' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'antigravity.hooks.knownEvents',

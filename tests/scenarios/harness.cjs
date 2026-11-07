@@ -460,6 +460,9 @@ async function runScenario(sc, providerKey, opts = {}) {
   // board can't be read, and takes `<id>-2`… instead).
   const base = path.join(opts.workRoot ?? path.join(lib.WORK, '..', 'scenarios'), id)
   const root = opts.evidence ? freshFolder(base, opts.evidence) : base
+  // Noted on the CLI test home's lease before anything starts here (HI-2606, HR2 on round 1): the CLIs its Combwork
+  // starts name this folder, so a reset waits for them even after this runner has crashed.
+  opts.uses?.folder(root)
   const userData = path.join(root, 'profile')
   const ws = path.join(root, 'ws')
   const alpha = path.join(ws, 'alpha')
@@ -558,6 +561,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
+    opts.uses?.spawned(app.process())
   } catch (e) {
     await standIn?.close().catch(() => undefined)
     throw e
@@ -598,8 +602,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     // The project's agents: the one under test (Coder), and another that did earlier work (Implementer, never started),
     // on a connection with the scenario's extra arguments (HI-2122: a connection's, not the project's).
     const launch = { provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' }
-    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', ...launch })
-    const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', ...launch })
+    // Their roles saved (HI-2664: an agent's tools and lane parts follow its role): Coder, the agent under test, does
+    // whatever its scenario asks (either), and Implementer reviews, unless a scenario changes them.
+    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either', ...launch })
+    const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', workflowRole: 'reviewer', ...launch })
     // The run's dialect in their model slot (HI-2443: their Dialect setting), applied at their launch.
     if (opts.dialect) for (const a of [coder, implementer]) await inv('agents:update', alpha, a.id, { dialect: opts.dialect.path })
     const ctx = {

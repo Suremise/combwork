@@ -323,6 +323,9 @@ interface CombworkMessageValues {
   'agents.picker.showOlder': undefined
   'agents.place.short': { is: string; name: string | number }
   'agents.place.tip': { is: string; name: string | number; path: string | number }
+  'agents.provider.compactDeclared': { provider: string | number; at: number; window: number; output: number; buffer: number; why: string; estimate: string }
+  'agents.provider.compactDeclaredCap': undefined
+  'agents.provider.compactDeclaredWindow': { provider: string | number; at: number; window: number; why: string; declared: number; output: number; buffer: number; estimate: string }
   'agents.provider.compactDefault': { provider: string | number; at: number }
   'agents.provider.compactDefaultFor': { provider: string | number; at: number; why: string; estimate: string }
   'agents.provider.compactOff': { provider: string | number; source: string | number; estimate: string }
@@ -362,6 +365,10 @@ interface CombworkMessageValues {
   'agents.settings.saving': undefined
   'agents.settings.title': { agent: string | number }
   'agents.settings.worktreeOn': { branch: string | number; base: string | number }
+  'agents.side.later': undefined
+  'agents.side.restartMessage': { agent: string | number }
+  'agents.side.restartTitle': { agent: string | number }
+  'agents.side.restartWhenDone': undefined
   'agents.start.exited': { cli: string | number; code: string | number }
   'agents.switch.confirm': undefined
   'agents.switch.detail': undefined

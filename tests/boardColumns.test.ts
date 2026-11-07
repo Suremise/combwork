@@ -125,7 +125,7 @@ describe('waiting on the new columns', () => {
   it('a wait can be for Passed or On Hold; another word is refused, listing the columns', () => {
     expect(readCondition({ cards: [3], column: 'passed', changes: ['verdict', 'column'] })).toEqual({ cards: [3], changes: ['verdict', 'column'], column: 'passed', moveInto: true })
     expect(readCondition({ cards: [3], column: 'hold' })).toEqual({ cards: [3], changes: ['column'], column: 'hold' })
-    expect(readCondition({ cards: [3], column: 'merged' })).toBe(`column must be ${COLUMN_CHOICES}`)
+    expect(readCondition({ cards: [3], column: 'merged' })).toMatchObject({ said: `column must be ${COLUMN_CHOICES}` })
     expect(watchLabel({ cards: [3], column: 'passed' })).toBe('Waiting for #3 → Passed')
   })
 

@@ -34,7 +34,8 @@ const CASES: { name: string; provider: ProviderId; id: string; text: string }[] 
   { name: 'Claude Code', provider: 'claude-code', id: 'c1', text: claude(30) },
   { name: 'Codex', provider: 'codex', id: '01a0f107-1b16-7a81-a829-4af49e744373', text: readFileSync(join(__dirname, 'fixtures', 'codex-0.159.jsonl'), 'utf8') },
   { name: 'Copilot (credits)', provider: 'copilot', id: '5cb5a219-ee72-49a3-b871-cc0c05d27269', text: readFileSync(copilotEventsPath(COPILOT_HOME, '5cb5a219-ee72-49a3-b871-cc0c05d27269'), 'utf8') },
-  { name: 'Copilot (exit and resume)', provider: 'copilot', id: '0cb916db-26aa-40f2-86b5-1ba81b225fd2', text: readFileSync(copilotEventsPath(COPILOT_HOME, '0cb916db-26aa-40f2-86b5-1ba81b225fd2'), 'utf8') }
+  { name: 'Copilot (exit and resume)', provider: 'copilot', id: '0cb916db-26aa-40f2-86b5-1ba81b225fd2', text: readFileSync(copilotEventsPath(COPILOT_HOME, '0cb916db-26aa-40f2-86b5-1ba81b225fd2'), 'utf8') },
+  { name: 'Antigravity', provider: 'antigravity', id: '68222232-2149-4ed1-9493-8134499d0454', text: readFileSync(join(__dirname, 'fixtures', 'antigravity', 'mcp-tools-1.5.0.jsonl'), 'utf8') }
 ]
 
 const whole = (c: (typeof CASES)[number]): SessionUsage => {

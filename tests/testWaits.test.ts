@@ -128,6 +128,8 @@ describe('test waits (#524)', () => {
     mkdirSync(join(repo, 'scripts'))
     mkdirSync(join(repo, 'tests'))
     copyFileSync(join(import.meta.dirname, '..', 'scripts', 'testWaits.mjs'), join(repo, 'scripts', 'testWaits.mjs'))
+    // Its last step, the e2e ready waits (HI-2688), is a script of its own.
+    copyFileSync(join(import.meta.dirname, '..', 'scripts', 'readyWaits.mjs'), join(repo, 'scripts', 'readyWaits.mjs'))
     const git = (...args: string[]) => spawnSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', ...args], { cwd: repo, encoding: 'utf8', env: ctx.baseEnv() })
     expect(git('init', '-q', '-b', 'main').status).toBe(0)
     expect(git('add', 'scripts').status).toBe(0)

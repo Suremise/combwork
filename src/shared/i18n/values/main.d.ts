@@ -71,6 +71,7 @@ interface CombworkMessageValues {
   'main.connections.launch.none': { cli: string | number; agent: string | number }
   'main.connections.launch.offHere': { n: number; cli: string | number; names: string | number; agent: string | number }
   'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
+  'main.connections.launch.offSide': { agent: string | number; part: string; lane: string | number; role: string }
   'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
   'main.connections.launch.projectMissing': { project: string | number }
   'main.connections.launch.projectUnreadable': { project: string | number; error: string | number }
@@ -349,6 +350,8 @@ interface CombworkMessageValues {
   'main.server.key.inField': { field: string }
   'main.server.key.length': { min: number; max: number }
   'main.server.notServer': undefined
+  'main.server.output.invalid': { max: number }
+  'main.server.output.notBelow': { model: string | number; output: number; context: number }
   'main.server.setUp.noKey': { name: string | number }
   'main.server.unsupported': { cli: string | number }
   'main.server.url.extra': undefined

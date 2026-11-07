@@ -477,6 +477,15 @@
   "tool.putBack.description": {
     "placeholders": {}
   },
+  "tool.queue.arg.from": {
+    "placeholders": {}
+  },
+  "tool.queue.arg.items": {
+    "placeholders": {}
+  },
+  "tool.queue.arg.preview": {
+    "placeholders": {}
+  },
   "tool.queue.arg.reason": {
     "placeholders": {}
   },
@@ -496,6 +505,30 @@
   },
   "tool.queue.error.action.assistant": {
     "placeholders": {}
+  },
+  "tool.queue.reply.forward": {
+    "placeholders": {
+      "upToDate": "select",
+      "to": "plain",
+      "from": "plain",
+      "queued": "select",
+      "card": "plain"
+    }
+  },
+  "tool.queue.reply.retarget": {
+    "placeholders": {
+      "to": "plain",
+      "moved": "plain",
+      "skipped": "plain"
+    }
+  },
+  "tool.queue.reply.retargetPreview": {
+    "placeholders": {
+      "preview": "plain",
+      "to": "plain",
+      "move": "plain",
+      "stay": "plain"
+    }
   },
   "tool.readAttachment.arg.name": {
     "placeholders": {}

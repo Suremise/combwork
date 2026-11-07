@@ -4,7 +4,10 @@
 // the agent wasn't given (a sentinel, which marks a file when it is started) is refused before agy starts, as is one whose
 // config can't be read, and the sentinel never starts (agy 1.5.0 can't be kept from starting it: HR1, fail closed); the
 // conversation's id comes from the status line; two new conversations one after the other, then each resumed by its id;
-// a conversation that isn't the agent's is never resumed. The fake proves the adapter's side only (HI-2548 runs the real
+// a conversation that isn't the agent's is never resumed. Its transcript (HI-2546): the conversation view (prompts without
+// what agy adds, replies, tool calls with their results and the image one read, light and dark), its usage (requests, the
+// cache counted once, the model, agy's title), the status line's model and effort, the Sessions tab, and a conversation
+// whose store agy no longer has, refused with why. The fake proves the adapter's side only (HI-2548 runs the real
 // CLI). Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -60,6 +63,10 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const own = accounts.find((a) => a.id === 'antigravity')
   check("Antigravity's PC-wide account is its own", !!own && own.provider === 'antigravity' && own.home === 'cli', JSON.stringify(accounts.map((a) => [a.id, a.provider, a.home])))
 
+  // Its checks (HI-2698): agy's sign-in check ran in Combwork's check profile, under this test copy's data, never the user's.
+  const checks = await until(async () => (entries('models').length ? entries('models') : null), HUNG_MS)
+  check("agy's checks run in Combwork's check profile, never the user's own", !!checks && checks.every((m) => /antigravity[\\/]check$/i.test(m.env?.USERPROFILE ?? '') && m.env.USERPROFILE.toLowerCase().startsWith(userData.toLowerCase())), JSON.stringify(checks?.map((m) => m.env?.USERPROFILE)))
+
   const gem = await lib.addAgent(inv, alpha, { name: 'Gem', provider: 'antigravity' })
   check('an agent is added on Antigravity', gem?.provider === 'antigravity', JSON.stringify(gem))
 
@@ -111,7 +118,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await agTab.waitFor({ timeout: HUNG_MS })
   await agTab.click()
   // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
-  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) >= 2, HUNG_MS)))
+  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 13, HUNG_MS)))
   await shots('advanced')
   await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
@@ -132,7 +139,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   }
   /** A turn in a conversation (its transcript, which a resume needs, in the agent's profile). */
   const say = async (agentId, profile, conv, text) => {
-    const transcript = path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript.jsonl')
+    const transcript = path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript_full.jsonl')
     await inv('pty:write', lib.ptyKey(alpha, agentId), text)
     await inv('pty:write', lib.ptyKey(alpha, agentId), '\r')
     return !!(await until(async () => fs.existsSync(transcript) && fs.readFileSync(transcript, 'utf8').includes(text), HUNG_MS))
@@ -150,6 +157,25 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check("its profile's MCP servers are Combwork's own", 'combwork' in profileMcp && !('sentinel' in profileMcp), JSON.stringify(Object.keys(profileMcp)))
   // A turn: written to its conversation.
   check('its turns are kept in its own conversation, in its profile', await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity'))
+  // --- Its transcript (HI-2546): the conversation view, its usage and the status line's details.
+  check('…and a turn with a tool call', await say(gem.id, e.USERPROFILE, first.conv, 'tool fake result'))
+  check('…and one reading an image', await say(gem.id, e.USERPROFILE, first.conv, 'image'))
+  const shown = await until(async () => {
+    const items = (await inv('transcript:read', alpha, first.conv).catch(() => null))?.items ?? []
+    return items.some((i) => i.kind === 'assistant' && i.text === 'Done: image') ? items : null
+  }, HUNG_MS)
+  const said = (shown ?? []).map((i) => (i.kind === 'tool' ? `tool ${i.tool.name}: ${i.tool.result} (${i.tool.images.length} image)` : `${i.kind} ${i.text}`))
+  check("the conversation view shows the prompts without what agy adds, the replies and the tool calls with their results and image", JSON.stringify(said) === JSON.stringify(['user hello antigravity', 'assistant Done: hello antigravity', 'user tool fake result', 'tool fake · echo: fake result (0 image)', 'assistant Done: tool fake result', 'user image', 'tool read_file: Showing binary file of type image/png (1 image)', 'assistant Done: image']), JSON.stringify(said))
+  const picture = await inv('transcript:image', alpha, first.conv, 0).catch((err) => String(err?.message ?? err))
+  check("…the image from agy's own copy in the conversation's media folder", picture === `data:image/png;base64,${fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'antigravity', 'image-1.5.0-media.png')).toString('base64')}`, String(picture).slice(0, 80))
+  const used = await until(async () => {
+    const u = await inv('session:usage', alpha, first.conv).catch(() => null)
+    return u?.requests === 5 && u.title ? u : null
+  }, HUNG_MS)
+  // The fake's requests: input 3000 + 100 × its step without the cache read (4000 from the second on), output 20.
+  check("its usage counts each request, the cache once, its prompts, model and agy's title", !!used && used.inputTokens === 3100 + 3300 + 3500 + 3700 + 3900 && used.cacheReadTokens === 16000 && used.contextTokens === 3900 + 4000 + 20 && used.outputTokens === 100 && used.userMessages === 3 && used.model === 'Gemini 3.8 Flash (Low)' && used.title === 'Fake: hello antigravity' && used.costUsd === null, JSON.stringify(used && { ...used, days: undefined, timeline: undefined }))
+  const details = await live(gem.id)
+  check("the status line gives the model, its effort and the context window", details?.modelName === 'Gemini 3.8 Flash (Low)' && details?.effort === 'low', JSON.stringify({ modelName: details?.modelName, effort: details?.effort }))
 
   // --- Hooks and the status line (HI-2545): Combwork's hooks in the profile; a turn only for a prompt the user typed.
   const profileHooks = JSON.parse(fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'config', 'hooks.json'), 'utf8')).combwork ?? {}
@@ -157,20 +183,35 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check('…the status line under agy\'s own (stack_with_default)', JSON.parse(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8')).statusLine?.stack_with_default === true)
   const hooksOf = (event) => entries('hook').filter((h) => h.event === event && h.payload.conversationId === first.conv)
   const turnIs = async (id, status = 'finished') => !!(await until(async () => { const s = await live(gem.id); return s?.turn?.id === id && s.turn.state === 'over' && s.status === status }, HUNG_MS))
-  check('a prompt is a turn, named by its step in the transcript (agy sends no prompt hook)', await turnIs(`${first.conv}:u0`), JSON.stringify((await live(gem.id))?.turn))
+  check('a prompt is a turn, named by its step in the transcript (agy sends no prompt hook): the last one typed, image, is step 6', await turnIs(`${first.conv}:u6`), JSON.stringify((await live(gem.id))?.turn))
   // The same words again: a new step, so a new turn.
-  check('the same prompt typed again is a turn of its own', (await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity')) && (await turnIs(`${first.conv}:u2`)), JSON.stringify((await live(gem.id))?.turn))
+  check('the same prompt typed again is a turn of its own', (await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity')) && (await turnIs(`${first.conv}:u10`)), JSON.stringify((await live(gem.id))?.turn))
   // A hook's continuation (another hook's `continue`): agy calls the model again, a new execution with no prompt of its own.
   const calls = hooksOf('PreInvocation').length
-  check('a continuation is no new turn', (await say(gem.id, e.USERPROFILE, first.conv, 'carry on please')) && !!(await until(async () => hooksOf('PreInvocation').length - calls === 2 && hooksOf('Stop').at(-1)?.payload.executionNum === 1, HUNG_MS)) && (await turnIs(`${first.conv}:u4`)), JSON.stringify({ turn: (await live(gem.id))?.turn, calls: hooksOf('PreInvocation').length - calls }))
+  check('a continuation is no new turn', (await say(gem.id, e.USERPROFILE, first.conv, 'carry on please')) && !!(await until(async () => hooksOf('PreInvocation').length - calls === 2 && hooksOf('Stop').at(-1)?.payload.executionNum === 1, HUNG_MS)) && (await turnIs(`${first.conv}:u12`)), JSON.stringify({ turn: (await live(gem.id))?.turn, calls: hooksOf('PreInvocation').length - calls }))
   // A permission prompt only the status line tells of: "waiting for you" until the person answers it in the CLI.
   await inv('pty:write', lib.ptyKey(alpha, gem.id), 'this needs approval')
   await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
   check('a permission prompt shows the agent waiting for you', !!(await until(async () => (await live(gem.id))?.status === 'waiting', HUNG_MS)), (await live(gem.id))?.status)
   await inv('pty:write', lib.ptyKey(alpha, gem.id), 'y')
   await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
-  check('…and, once answered, the turn ends as one turn', await turnIs(`${first.conv}:u8`), JSON.stringify(await live(gem.id)))
+  check('…and, once answered, the turn ends as one turn', await turnIs(`${first.conv}:u16`), JSON.stringify(await live(gem.id)))
   check('it stops', !!(await stop()))
+  const listed = (await inv('session:list', alpha)).find((s) => s.id === first.conv)
+  check("the Sessions list has it, with agy's title", listed?.title === 'Fake: hello antigravity', JSON.stringify(listed && { id: listed.id, title: listed.title }))
+  // What the user sees, light and dark (kept with --keep-files): the Sessions tab, its conversation, the image a tool read.
+  await page.locator('.tabs .tab', { hasText: 'Sessions' }).first().click()
+  const row = page.locator('.session-row', { hasText: 'Fake: hello antigravity' })
+  check('the Sessions tab lists it by its title', !!(await until(async () => (await row.count()) === 1, HUNG_MS)))
+  await row.click()
+  const reading = page.locator('.transcript .tx-tool', { hasText: 'read_file' }).first()
+  await reading.waitFor({ timeout: HUNG_MS })
+  await reading.locator('.tx-fold-head').click()
+  const thumb = reading.locator('.tx-images .thumb img')
+  check('…its conversation shows the tool call and the image it read', !!(await until(async () => ((await thumb.getAttribute('src').catch(() => null)) ?? '').startsWith('data:image/png'), HUNG_MS)))
+  await shots('sessions-transcript', page.locator('.transcript').first())
+  await shots('sessions-list', page.locator('.sessions-tree').first())
+  await page.getByText('alpha', { exact: true }).first().click()
 
   // --- A second new conversation, then each resumed by its own id.
   const second = await startNew()
@@ -187,6 +228,11 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
     check(`…and the session is that conversation`, (await until(async () => ((await live(gem.id))?.sessionId === c ? c : null), HUNG_MS)) === c)
     await stop()
   }
+  // --- A conversation whose store agy no longer has (its transcript kept): refused before agy starts, saying so.
+  fs.rmSync(path.join(e.USERPROFILE, '.gemini', 'antigravity-cli', 'conversations', `${second.conv}.db`))
+  const beforeGone = entries('session').length
+  const gone = await inv('session:start', alpha, { agentId: gem.id, resumeId: second.conv }).then(() => null, (err) => String(err?.message ?? err))
+  check("a conversation agy no longer has isn't resumed, and says why", entries('session').length === beforeGone && /no longer has that conversation/.test(gone ?? ''), gone ?? 'started')
   // --- Another agent's conversation (in its own profile): never resumed by this one, refused before agy starts.
   const other = await lib.addAgent(inv, alpha, { name: 'Ada', provider: 'antigravity' })
   const theirs = await startNew(other.id)

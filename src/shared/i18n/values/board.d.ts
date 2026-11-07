@@ -520,6 +520,7 @@ interface CombworkMessageValues {
   'board.lanes.moveUp': undefined
   'board.lanes.moved': { lane: string | number; at: string | number; n: number }
   'board.lanes.none': undefined
+  'board.lanes.offSide': { agent: string | number; part: string }
   'board.lanes.oldRules': undefined
   'board.lanes.oldRulesTip': { enforced: string }
   'board.lanes.poolLastVerdict': { name: string | number; pass: string }
@@ -665,8 +666,21 @@ interface CombworkMessageValues {
   'board.progress.tabs': undefined
   'board.progress.title': undefined
   'board.progress.waiting': undefined
+  'board.queue.behind': { n: number; to: string | number; from: string | number }
+  'board.queue.behindTip': { from: string | number }
+  'board.queue.behindUnknown': { to: string | number; from: string | number }
   'board.queue.empty': undefined
   'board.queue.filesMore': { n: number }
+  'board.queue.forward': undefined
+  'board.queue.forwardAlready': { to: string | number; from: string | number }
+  'board.queue.forwardAskConfirm': undefined
+  'board.queue.forwardAskMessage': { from: string | number; to: string | number }
+  'board.queue.forwardAskTitle': { to: string | number; from: string | number }
+  'board.queue.forwardCancel': undefined
+  'board.queue.forwardChooseMessage': { to: string | number }
+  'board.queue.forwardChooseTitle': { to: string | number }
+  'board.queue.forwardFailed': undefined
+  'board.queue.forwardUpToDate': { to: string | number; from: string | number }
   'board.queue.inVersionControl': undefined
   'board.queue.merged': { card: string | number; result: string | number }
   'board.queue.moreReturned': { n: number }

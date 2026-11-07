@@ -903,6 +903,24 @@ export interface ServerModel {
    * HI-2683 compares it with the advice; HI-2682 launches with it.
    */
   context?: number
+  /**
+   * The output budget the user sets for this model, in tokens (HI-2682): Claude Code's CLAUDE_CODE_MAX_OUTPUT_TOKENS for a
+   * session started on it, where the ID is one Combwork passes local-model limits for. Kept smaller than `context` (both
+   * set); none: the default (localModelLimits.defaultOutput).
+   */
+  output?: number
+  /**
+   * The name the user gives this model (HI-2684), shown as its row's label in Claude Code's /model picker: display only,
+   * never sent to the server, never used to match it (dialects, the launch, the footer use `id`). Trimmed, at most
+   * MODEL_LABEL_MAX characters, no control characters; none: the picker shows the ID.
+   */
+  label?: string
+  /**
+   * Why Combwork never passes this model's context and output (HI-2682), judged from its ID alone, in what main sends a
+   * window (never saved): Claude Code reads it as one of its aliases, or it is a spelling (claude, [1m], a date) the
+   * control doesn't support.
+   */
+  unsupported?: 'alias' | 'spelling'
 }
 
 /**
@@ -1611,6 +1629,8 @@ export interface WorkflowCheck {
   inFlight: { number: number; key: string; title: string }[]
   /** A change of the target (G7, HI-2674): the cards and lanes that keep merging into another one (absent: no target change). */
   targets?: KeptTargets
+  /** A change of the target (HI-2680): what can follow the new one from the old (Retarget), and what stays. */
+  retarget?: RetargetPreview
 }
 
 /**
@@ -1618,6 +1638,29 @@ export interface WorkflowCheck {
  * (§16.5.4), so a change of the project's target moves neither. `to`: the target now (the default branch for none);
  * `cards` and `lanes`: only those whose own target is another branch, each with it.
  */
+/**
+ * HI-2680: what a change of Work merges into from `from` to `to` would move (Todo cards whose own target is `from` with no
+ * work of their own; free slots recording it, clean, with nothing `from` lacks), and what stays, with why; running lanes
+ * on `from` are never rewritten. A slot is listed as it was seen (its folder, recorded target, head): the apply moves it
+ * only so.
+ */
+export interface RetargetPreview {
+  from: string
+  to: string
+  cards: { move: { number: number; key: string; title: string }[]; keep: { number: number; key: string; title: string; why: 'work' | 'started' | 'cantCheck' }[] }
+  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' }[] }
+  lanes: { id: string; name: string | null; builder: string }[]
+}
+
+/** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
+export interface RetargetResult {
+  from: string
+  to: string
+  moved: { cards: { number: number; key: string }[]; slots: string[] }
+  /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
+  skipped: { card?: number; key?: string; slot?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
+}
+
 export interface KeptTargets {
   to: string
   cards: { number: number; key: string; title: string; target: string }[]
@@ -2551,6 +2594,10 @@ export interface LiveSessionState {
    * login and usage); `connection`, the named connection on it whose values it launched with (HI-2397), is what the
    * window names. `note`: why it isn't the one chosen (its choice was off).
    */
+  /** A local model's limits as this launch applied them (HI-2682), on a server connection: launch-global. */
+  localLimits?: LaunchedLimits
+  /** The /model picker rows this launch asked Claude Code for (HI-2684), on a server connection, or why none. */
+  picker?: LaunchedPicker
   launchedConnection?: {
     id: string
     name: string
@@ -3119,6 +3166,45 @@ export interface CompactionEvent {
 }
 
 /** How a session's CLI was set to compact by itself (#242), as far as Combwork could read at launch. */
+/**
+ * A local model's limits as one launch applied them (HI-2682), after every settings scope's `env` (Claude Code's own
+ * order): launch-global, never read again from the connection. `from` is a settings file's label when one set it, else
+ * null (Combwork's, from the connection's model). Not applied: why, and the file where that is a file's.
+ */
+export interface LaunchedLimits {
+  /** The model the session started on, and its connection's name. */
+  model: string
+  connection: string
+  applied: boolean
+  why?: 'notListed' | 'alias' | 'spelling' | 'mapped' | 'unreadable'
+  whyFile?: string
+  context?: { value: number; from: string | null }
+  /** `fallback`: Combwork's own output that wasn't below the effective context, replaced by the default for it. */
+  output?: { value: number; from: string | null; fallback?: number }
+  /**
+   * The connection's models the launch-wide context also sizes (none mapped in this session's settings, none Claude Code
+   * reads as its own): a switch to one keeps the declared context, an estimate until Claude Code reports (HR1, round 1).
+   */
+  eligible?: string[]
+}
+
+/**
+ * The /model picker lineup a launch on a server connection asked Claude Code for (HI-2684): what was requested, never
+ * what Claude Code shows (an availableModels allowlist still filters the rows, and with none left it keeps its built-in
+ * lineup). `rows`, the exact IDs passed, in order; `omitted`, the connection's IDs left out and why; `replace`, whether
+ * the built-in lineup was asked to be hidden. Absent rows: none was passed, `why` says why (`whyFile`, the scope).
+ */
+export interface LaunchedPicker {
+  connection: string
+  rows?: string[]
+  replace?: boolean
+  omitted?: { id: string; why: 'alias' }[]
+  why?: 'managed' | 'cli' | 'user' | 'unreadable' | 'noRows'
+  whyFile?: string
+  /** A scope with an availableModels allowlist, which may filter the rows (its label). */
+  allowlist?: string
+}
+
 export interface AutoCompactSetting {
   /** 'off': auto-compaction is turned off; a number: the auto-compact window it was set to (tokens); null: the CLI's own default. */
   window: number | 'off' | null
@@ -4063,7 +4149,7 @@ export interface DueDeps {
  * `teamPause` (HI-2081): its workspace's team is paused (before an update): nothing of it starts or is woken until it
  * resumes; it pauses the lane.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause' | 'independent'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause' | 'independent' | 'offSide'
 
 /**
  * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a
@@ -4123,6 +4209,8 @@ export interface LaneStatus {
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
   /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder; slot (`held` session, HI-2466): the agent whose session holds the slot. */
   agent?: string
+  /** offSide (HI-2664): the lane part `agent`'s role doesn't do. */
+  part?: 'builder' | 'reviewer'
   /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
   why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */

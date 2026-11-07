@@ -294,6 +294,31 @@
     "note": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project.",
     "audience": "both"
   },
+  "service.forward.missing": {
+    "text": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",
+    "note": "HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.",
+    "audience": "both"
+  },
+  "service.forward.noGit": {
+    "text": "This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.",
+    "note": "HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.",
+    "audience": "both"
+  },
+  "service.forward.notAgents": {
+    "text": "Only the user or the Assistant brings one branch up to date with another.",
+    "note": "HI-2679: a forward merge refused: asked by a project agent or a script.",
+    "audience": "both"
+  },
+  "service.forward.notTargets": {
+    "text": "{from} and {to} must be two different branches this project merges work into: {targets}.",
+    "note": "HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them.",
+    "audience": "both"
+  },
+  "service.forward.raced": {
+    "text": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
+    "note": "HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.",
+    "audience": "both"
+  },
   "service.fsutil.keptBusy": {
     "text": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
     "note": "An error: one of Combwork's settings or records files ({file}: its path) was still being written by another program (an editor, a script), so Combwork's change to it wasn't made.",
@@ -842,6 +867,11 @@
   "service.workflow.inheritor": {
     "text": "Project {project} inherits these options, and the change would make its options contradict each other:",
     "note": "Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name.",
+    "audience": "both"
+  },
+  "service.workflow.targetInUse": {
+    "text": "{branch} can’t be taken out of Other branches work can merge into while these use it: {uses}. Retarget or finish them first.",
+    "note": "HI-2680: a save of workflow options refused: it takes a branch out of Other branches work can merge into while cards, lanes, queue entries or slots still use it ({uses}: their keys and names). Other branches work can merge into is the option’s name: as translated there.",
     "audience": "both"
   },
   "service.workspace.advancedNotHere": {

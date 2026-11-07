@@ -5,13 +5,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string; cwd?: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[], noCode: [] as number[], lanesOn: false, view: null as unknown, starts: [] as { n: number; agentId: string; note: string; guard?: (now: unknown) => void }[], startRefuses: null as null | string, placementDue: null as unknown, startGuardView: null as unknown }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), oldTools: new Set<string>(), owed: [] as unknown[], noCode: [] as number[], lanesOn: false, view: null as unknown, starts: [] as { n: number; agentId: string; note: string; guard?: (now: unknown) => void }[], startRefuses: null as null | string, placementDue: null as unknown, startGuardView: null as unknown }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
     liveFor: (_p: string, id: string) => state.live.get(id) ?? null,
     // A prompt Combwork typed that its CLI hasn't taken yet (HI-2034): `state.pending`.
     agentNow: (_p: string, id: string) => (state.live.has(id) ? { pending: state.pending.has(id) } : null),
+    // Its session has its role's tools (HI-2664): `state.oldTools` hasn't restarted since its role changed.
+    sideAllows: (_p: string, id: string) => !state.oldTools.has(id),
     start: async (_p: string, o: { agentId: string }) => {
       state.calls.push(`start ${o.agentId}`)
       state.onStart?.(o.agentId)
@@ -133,6 +135,7 @@ const ws = {
 beforeEach(() => {
   state.live.clear()
   state.pending.clear()
+  state.oldTools.clear()
   state.owed.length = 0
   state.calls.length = 0
   state.afterRecord = null
@@ -316,6 +319,18 @@ describe('a lane waiting for a slot, started as Combwork quits (#1628)', () => {
 
   it('not quitting: both are started', async () => {
     waiting()
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
+    expect(state.calls).toEqual(['start b1', 'start r1'])
+  })
+
+  // HI-2664 (HR3's round 1): made the lane's builder or reviewer while running and not restarted since, it has its old
+  // role's tools: the lane keeps waiting, nothing started or typed, and starts once it has restarted with them.
+  it.each(['b1', 'r1'])("%s still on its old role's tools: the lane waits, nothing started, until it has restarted", async (id) => {
+    waiting()
+    state.oldTools.add(id)
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(false)
+    expect(state.calls).toEqual([])
+    state.oldTools.delete(id)
     expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
     expect(state.calls).toEqual(['start b1', 'start r1'])
   })

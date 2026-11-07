@@ -6,7 +6,7 @@ import { liveCardHeads, readTask, scopeOf, type TaskActor } from './tasks'
 import { cardOfRef } from './projectKeys'
 import { cardKeyOf } from './boardStore'
 import type { WorkspaceService } from './workspace'
-import { agentMsg, say } from '../shared/agentText'
+import { agentMsg, say, sayWithId, type Said } from '../shared/agentText'
 
 const T = {
   whilePlaced: agentMsg({ id: 'wake.watch.whilePlaced', text: 'Combwork is giving you {card} in {slot}: end your turn with no watch. The card comes to you as a task; a watch now would hold it off.', note: 'HI-2197: a watch refused while Combwork is placing a card of the agent\'s in a slot (a watch would hold that placement off). card: its key ("HI-12"); slot: the slot\'s name.' }),
@@ -39,7 +39,7 @@ export async function watchWhilePlaced(ws: WorkspaceService, projectPath: string
  * reads as, go on as before. Only cards the agent may see are named: each is read in its scope first (a card outside it
  * is unknown, as before), and the other card only by a key of the agent's own project.
  */
-export async function clashingNumber(ws: WorkspaceService, cards: unknown, actor: TaskActor): Promise<string | null> {
+export async function clashingNumber(ws: WorkspaceService, cards: unknown, actor: TaskActor): Promise<Said | null> {
   if (!Array.isArray(cards)) return null
   for (const v of cards) {
     const plain = typeof v === 'number' ? v : typeof v === 'string' && /^\d{1,9}$/.test(v.trim()) ? Number(v) : null
@@ -49,7 +49,7 @@ export async function clashingNumber(ws: WorkspaceService, cards: unknown, actor
     if (!prefix || card.key === `${prefix}-${plain}`) continue
     const other = cardOfRef(ws, `${prefix}-${plain}`, scopeOf(actor))
     if (other === null || other === plain) continue
-    return say(T.numberClash, { n: String(plain), key: card.key ?? '', prefix })
+    return sayWithId(T.numberClash, { n: String(plain), key: card.key ?? '', prefix })
   }
   return null
 }

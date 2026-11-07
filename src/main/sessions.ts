@@ -21,7 +21,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
-import { assistantTools, isReservedServerName, TOOLS_SERVER } from '../shared/assistantTools'
+import { assistantTools, isReservedServerName, sideAllows, toolSideOf, TOOLS_SERVER } from '../shared/assistantTools'
 import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
@@ -60,6 +60,7 @@ import type {
   ToastTarget,
   SessionRecord,
   SessionSkipReason,
+  CombworkErrorKind,
   SubSession,
   SessionStatus,
   SkillInfo,
@@ -449,6 +450,10 @@ interface LiveSession {
   policy?: LaunchPolicy
   /** This launch's side of the workflow, as its metrics count it (HI-2049): taken once, as it launched. */
   workflow?: LaunchWorkflow
+  /** The side its Combwork tools were offered for (HI-2664, its CW_SIDE): null without Combwork's tools. */
+  side?: string | null
+  /** A restart for its new side is on its way (restartForSide): asked again, it isn't queued twice. */
+  sideRestart?: boolean
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
   readyAt?: number
   /**
@@ -1114,9 +1119,10 @@ const SESSION_WRITING_MS = 5000
 export class SessionInUse extends CombworkError {
   constructor(
     readonly reason: SessionSkipReason,
-    text: Text
+    text: Text,
+    kind?: CombworkErrorKind
   ) {
-    super(text)
+    super(text, kind ? { kind } : undefined)
   }
 }
 
@@ -1727,6 +1733,12 @@ class SessionManager {
     const combwork = this.combworkMcp(projectPath, agent?.id)
     // Its instructions name only the skills the session gets (#1431).
     if (combwork) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...combwork, env: { ...combwork.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : combwork
+    // A project agent's side of the workflow (HI-2664): its tools follow its saved role, never its lanes (HR3's round 1).
+    // Part of the signature, so a role change asks for a restart (restartForSide restarts it).
+    if (mcpServers[TOOLS_SERVER] && !assistant && forAgent) {
+      const side = toolSideOf(agentWorkflowRole(forAgent))
+      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side } }
+    }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an
@@ -2268,7 +2280,7 @@ class SessionManager {
     const resuming = opts.resumeId ? 'yes' : 'no'
     if (!isProviderEnabled(config.settings, providerId)) throw combworkError(msg({ id: 'session.start.providerOff', defaultMessage: '{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}', description: "Starting an agent is refused: its coding agent is turned off in Settings → Providers. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
     const info = providerService.info(providerId)
-    if (!info.found || !info.path) throw combworkError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
+    if (!info.found || !info.path) throw combworkError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
     await workspace.ensureProject(projectPath)
     times.mark('ensureProject')
     // Where it runs (#1434, agentFolders.ts): the Assistant in the workspace folder, where it can read every project; a
@@ -2483,6 +2495,45 @@ class SessionManager {
    * `usage` (HI-2195): a usage move, whose commit writes the agent's connection at the safe point; without, the switch is
    * HI-1755's own. Either joins a switch already waiting (one quit), each kept apart (dropUsageMove).
    */
+  /**
+   * A running agent whose role changed its side of the workflow since it launched (HI-2664, Darren's decision), restarted
+   * to load its new tool list, resuming its conversation, as a connection switch does. Every role change runs it
+   * (projectAgents.updateAgent: Agent Settings, the Agent API, the Assistant's cw_update_agent):
+   * - `ifIdle`: an idle agent at once; a busy one is `busy` (the window asks first; the Agent API's reply says so);
+   * - `atSafePoint`: when its turn is over (the user chose Restart When Its Turn Is Over).
+   * Until it has restarted (Later, a busy agent, a restart that failed), it keeps its old tools and is given no work that
+   * needs the new ones (`sideAllows`). 'same': its side is as it launched (or it has no Combwork tools); 'notRunning':
+   * nothing to restart.
+   */
+  async restartForSide(projectPath: string, agentId: string, o: { when: 'ifIdle' | 'atSafePoint' }): Promise<'restarting' | 'busy' | 'same' | 'notRunning'> {
+    projectPath = workspace.assertSessionHost(projectPath)
+    if (workspace.isAssistantHome(projectPath)) return 'same'
+    const l = this.live.get(liveId(projectPath, agentId))
+    if (!l || l.state.status === 'stopped') return 'notRunning'
+    if (!l.side) return 'same'
+    const { agent } = await this.agentDef(projectPath, agentId)
+    const now = toolSideOf(agentWorkflowRole(agent))
+    if (now === l.side) return 'same'
+    // Asked again (the window's question after the change's own): one restart, already on its way.
+    if (l.sideRestart) return 'restarting'
+    const busy = l.state.status === 'working' || l.state.turn?.state === 'running'
+    if (o.when === 'ifIdle' && busy) return 'busy'
+    log.info(`${userText(this.label(l.state))}: its side of the workflow changed (${l.side} → ${now}), restarting it ${busy ? 'once its turn is over' : 'now'}`)
+    const r = this.switchAtSafePoint(projectPath, agentId)
+    if (r === 'notRunning') return 'notRunning'
+    l.sideRestart = true
+    return 'restarting'
+  }
+
+  /**
+   * Whether a running agent's session has the tools of a part of the workflow (HI-2664, HR3's round 1): false while its
+   * role has changed and it hasn't restarted to load them. Not running: true (it launches with its role's).
+   */
+  sideAllows(projectPath: string, agentId: string, part: 'builder' | 'reviewer'): boolean {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return !l || l.state.status === 'stopped' || sideAllows(l.side, part)
+  }
+
   switchAtSafePoint(projectPath: string, agentId: string, usage?: UsageIntent): 'queued' | 'waiting' | 'notRunning' {
     projectPath = workspace.assertSessionHost(projectPath)
     const id = liveId(projectPath, agentId)
@@ -2786,7 +2837,7 @@ class SessionManager {
     const tempDir = tempSetting ? await prepareAgentTemp({ setting: tempSetting, host: projectPath, agentId: agent.id, assistant: assistantHost, protect: [...(await protectedFolders(openWorkspaces())), projectPath, cwd] }) : null
     times?.mark('tempDir')
     const binPath = (env: Record<string, string>, dir: string | null): Record<string, string> => (policy.tools ? withBinOnPath(env, dir) : env)
-    const ctx = {
+    const ctx: LaunchContext = {
       projectPath,
       agentId: agent.id,
       executable: info.path,
@@ -2822,6 +2873,8 @@ class SessionManager {
       initialPrompt: policy.typing ? l.initialPrompt : undefined,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
       ...(conn ? { connectionHome: conn.folder } : {}),
+      // Its server connection's models (HI-2682): the adapter passes a local model's limits from them.
+      ...(conn?.server ? { server: { models: conn.server.models, connection: (eff.connectionId && eff.connection === conn.id ? eff.connectionName : null) ?? conn.name } } : {}),
       // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
       // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
       tempDir,
@@ -2845,6 +2898,10 @@ class SessionManager {
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
+    // A local model's limits as applied (HI-2682), for its context meter: this launch's, never read again.
+    state.localLimits = ctx.localLimits ?? undefined
+    // The /model lineup it asked Claude Code for (HI-2684), or why none.
+    state.picker = ctx.picker
     l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
@@ -2909,6 +2966,9 @@ class SessionManager {
     const notGiven = Object.fromEntries(Object.entries(eff.skillProblems).map(([name, why]) => [name, { revision: null, problem: inDefaultDialect(() => say(SESSION.skillNotGiven, { why })), lasting: true as const }]))
     const record = launchRecord(eff.skillHashes, { ...delivered, ...notGiven })
     state.launchSignature = this.signature({ ...eff, skillHashes: record.settled })
+    // The side its tools are offered for (HI-2664), to tell when a role or lane change needs it restarted.
+    l.side = (eff.mcpServers[TOOLS_SERVER]?.env?.CW_SIDE as string | undefined) ?? null
+    l.sideRestart = false
     // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it, where a
     // dialect is set (a text overridden, or a file picked). Speaking the Default, its record is as before, but for
     // "model unknown" (decision Q4), said compactly: the status every agent reads carries it (replysize).
@@ -5970,7 +6030,9 @@ class SessionManager {
     if (d.costUsd != null && !onServer) l.reportedCost = d.costUsd
     const reported = d.costUsd != null && !onServer && !usesOwnPrices(st.provider, config.settings)
     const modelSwitch = this.modelSwitchOf(l, d)
-    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
+    // A window is the model's that reported it (HI-2682, HR1 round 1): another model reported without one has none yet.
+    const window = d.contextWindow ?? (d.modelId && st.modelId && d.modelId !== st.modelId ? undefined : st.contextWindow)
+    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: window }
     if (
       next.effort === st.effort &&
       next.modelName === st.modelName &&
@@ -8004,7 +8066,7 @@ class SessionManager {
   async archive(projectPath: string, sessionId: string, archived: boolean): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     assertSessionId(sessionId)
-    if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === sessionId)) throw combworkError(msg({ id: 'session.archive.notKept', defaultMessage: 'Only sessions Combwork keeps can be archived: adopt it first.', description: "Archiving a session is refused: it was started outside Combwork, so Combwork has no copy of it (Adopt keeps one)." }))
+    if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === sessionId)) throw combworkError(msg({ id: 'session.archive.notKept', defaultMessage: 'Only sessions Combwork keeps can be archived: adopt it first.', description: "Archiving a session is refused: it was started outside Combwork, so Combwork has no copy of it (Adopt keeps one)." }), undefined, { kind: 'conflict' })
     const action = archived ? 'archive' : 'unarchive'
     const active = this.backupPath(projectPath, sessionId)
     const arch = this.backupPath(projectPath, sessionId, true)
@@ -8146,7 +8208,7 @@ class SessionManager {
   }
 
   private assertNotLive(sessionId: string, action: 'archive' | 'unarchive' | 'delete'): void {
-    if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', withValues(M.stopFirst, { action }))
+    if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', withValues(M.stopFirst, { action }), 'conflict')
   }
 
   /** When Combwork saw each session's CLI exit (its own sessions): their transcripts are finished. At most 500, the oldest go. */
@@ -8169,7 +8231,7 @@ class SessionManager {
    * of Combwork's another program holds is found when it is moved (inUseOnFail).
    */
   private async inUse(projectPath: string, sessionId: string, opts: { writing: boolean }): Promise<SessionInUse | null> {
-    if (this.liveAnywhere(sessionId)) return new SessionInUse('live', msg({ id: 'session.inUse.running', defaultMessage: 'It is running. Stop it first.', description: 'A session is left alone (archive, delete): it is running.' }))
+    if (this.liveAnywhere(sessionId)) return new SessionInUse('live', msg({ id: 'session.inUse.running', defaultMessage: 'It is running. Stop it first.', description: 'A session is left alone (archive, delete): it is running.' }), 'conflict')
     if (beingRead(projectPath, sessionId)) return new SessionInUse('reading', msg({ id: 'session.inUse.reading', defaultMessage: 'Combwork is reading its transcript (an export or a search). Try again in a moment.', description: "A session is left alone (archive, delete) for a moment: Combwork is reading its transcript." }))
     if (viewingWindows(projectPath, sessionId).length) return new SessionInUse('open', msg({ id: 'session.inUse.open', defaultMessage: 'Its transcript is open in Combwork. Close it, then try again.', description: "A session is left alone (archive, delete): its transcript is open in Combwork's Sessions tab." }))
     const t = await this.providerTranscript(projectPath, sessionId).catch(() => null)
@@ -8186,7 +8248,7 @@ class SessionManager {
   private async assertFree(projectPath: string, sessionId: string, action: 'archive' | 'unarchive' | 'delete'): Promise<void> {
     // Unarchiving moves only Combwork's copy back: the CLI still writing its own transcript doesn't matter to it.
     const why = await this.inUse(projectPath, sessionId, { writing: action !== 'unarchive' })
-    if (why?.reason === 'live') throw new SessionInUse('live', withValues(M.stopFirst, { action }))
+    if (why?.reason === 'live') throw new SessionInUse('live', withValues(M.stopFirst, { action }), 'conflict')
     if (why) throw why
   }
 
@@ -8289,7 +8351,7 @@ class SessionManager {
    */
   whileStopped<T>(projectPath: string, sessionId: string, fn: () => Promise<T>): Promise<T> {
     return this.whileReserved(projectPath, sessionId, async () => {
-      if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', msg({ id: 'session.inUse.attaching', defaultMessage: 'It is running, and may attach more files. Stop it first.', description: "Removing a session's attachments is refused: it is running." }))
+      if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', msg({ id: 'session.inUse.attaching', defaultMessage: 'It is running, and may attach more files. Stop it first.', description: "Removing a session's attachments is refused: it is running." }), 'conflict')
       return fn()
     })
   }
@@ -8317,7 +8379,7 @@ class SessionManager {
    */
   private async assertCleanable(projectPath: string, sessionId: string, expected: string[]): Promise<void> {
     const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-    if (!rec?.archived) throw combworkError(msg({ id: 'session.cleanUp.unarchived', defaultMessage: 'The session is no longer archived.', description: 'Clean Up… left a session alone: it was unarchived since the preview.' }))
+    if (!rec?.archived) throw combworkError(msg({ id: 'session.cleanUp.unarchived', defaultMessage: 'The session is no longer archived.', description: 'Clean Up… left a session alone: it was unarchived since the preview.' }), undefined, { kind: 'conflict' })
     if (this.sessionOpen(projectPath, sessionId)) throw combworkError(M.sessionRunning)
     const want = new Set(expected.map((e) => e.toLowerCase()))
     const has = this.backupFiles(projectPath, sessionId).map((b) => b.toLowerCase())

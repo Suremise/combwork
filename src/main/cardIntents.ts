@@ -56,7 +56,7 @@ export type CardIntent =
   /** The merge queue's controls (#1353): the user's, or the Assistant's with a reason (OP-9); never an agent's. */
   /** `guard`: the Assistant's change boundary, checked again inside the write. */
   | { kind: 'removeFromQueue'; reason: string; guard?: () => void }
-  | { kind: 'retryMerge'; reason: string; guard?: () => void }
+  | { kind: 'retryMerge'; reason: string; guard?: () => void; forward?: { source: string } }
 
 const M = {
   queueNotAgents: msg({ id: 'service.intent.queueNotAgents', defaultMessage: 'Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.', description: "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Combwork Assistant (within its Control setting, a setting name: use it as Combwork shows it) can do." }),
@@ -131,7 +131,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'removeFromQueue':
         return w.removeFromQueue(named, intent.reason, by, intent.guard)
       case 'retryMerge':
-        return w.retryMerge(named, intent.reason, by, intent.guard)
+        return w.retryMerge(named, intent.reason, by, intent.guard, intent.forward)
       default:
         throw new Error(`not an intent here: ${intent.kind}`) // i18n-ignore: a mistake in Combwork's code, never shown
     }

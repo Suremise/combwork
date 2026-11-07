@@ -359,6 +359,13 @@ export interface FactData {
    * user's reason, required). `proposed`: the agent's reason it answers, kept for history only.
    */
   ReviewSkipSet: { skip: boolean; by: 'user' | 'assistant'; reason: string; proposed?: string }
+  /**
+   * HI-2679: this card is a forward merge, bringing `to` up to date with `from` (two of its project's targets), asked by the
+   * user or the Assistant (`by`) through Combwork's forward request alone, never from a card's fields. `source`: `from`'s
+   * head as asked (each attempt's own frozen commit is its entry's `revision`). Written right after its `Started` (whose
+   * line is null: the source is never the card's branch); its authority for the queue in place of a review (§16.9).
+   */
+  ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
@@ -468,6 +475,8 @@ export interface CardState {
   approved: { revision: string | null; base: string | null } | null
   /** A content-stale pass (a new revision that isn't the same change), until the builder submits again or its line returns to the approved revision. */
   stale: FactData['Stale'] | null
+  /** HI-2679: a forward merge's request (its `ForwardRequested`), this cycle's; null for every other card. */
+  forward: FactData['ForwardRequested'] | null
   /** Open requests to the user: For you, each with when it was asked. */
   requests: Request[]
   /** Every request made this cycle, by id (answered or not). */
@@ -536,6 +545,7 @@ export const emptyState = (): CardState => ({
   received: {},
   approved: null,
   stale: null,
+  forward: null,
   staleSince: null,
   requests: [],
   made: {},
@@ -677,6 +687,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         const made = s.made[d.request]
         if (d.answer === 'declined' && (!made || isGateRequest(made))) s.rounds++
         if (d.rounds) s.moreRounds += d.rounds
+        break
+      }
+      case 'ForwardRequested': {
+        s.forward = f.data as FactData['ForwardRequested']
         break
       }
       case 'IntegrationRequested': {

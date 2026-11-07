@@ -2943,6 +2943,10 @@
     "defaultMessage": "Its reason stays as a comment.",
     "description": "What of the Assistant putting a card back stays when it is undone: the reason it gave."
   },
+  "assistant.undo.why.queueForwarded": {
+    "defaultMessage": "A forward merge it asked for isn't taken back: remove it from the merge queue if it shouldn't merge.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2679): it asked for a forward merge, bringing one of a project's branches up to date with another through the merge queue. Remove from queue: the card's command, as translated there."
+  },
   "assistant.undo.why.queuePaused": {
     "defaultMessage": "A merge queue it paused stays paused: resume it if it should run.",
     "description": "Why a change of the Assistant's can't be undone: it paused a project's merge queue."
@@ -2962,6 +2966,10 @@
   "assistant.undo.why.request": {
     "defaultMessage": "Its request to the builder stays as a comment.",
     "description": "What of a request the Assistant made to a card's builder stays when it is undone."
+  },
+  "assistant.undo.why.retargeted": {
+    "defaultMessage": "Cards and slots it moved to a project's new target aren't moved back: set a card's Merges into again if it should go back.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2680): it moved cards and free slots from a project's finished branch to its new Work merges into. Merges into is the card's field: as translated there."
   },
   "assistant.undo.why.retriedMerge": {
     "defaultMessage": "Its Retry merge stays in the card's work.",

@@ -2202,6 +2202,28 @@ describe("assistant-doing-nobody checks each batch by its own reply (HI-2238, HR
   })
 })
 
+describe("assistant-retarget-release takes either way of moving the cards (HI-2680: Codex's trial set each card's Merges into)", () => {
+  const CHECK = "moved them through Combwork: cw_queue retarget by its preview, or each card's Merges into"
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  const check = (combworkCalls: unknown[]) => {
+    const sc = SCENARIOS.find((s) => s.id === 'assistant-retarget-release')!
+    const o = { combworkCalls, tools: [], finalReply: '', cards: { a: { number: 1, key: 'AL-1' }, b: { number: 2, key: 'AL-2' } } }
+    return Object.fromEntries(sc.expect(o, { cards: { a: 1, b: 2 } }).map(([name, ok]) => [name, ok]))[CHECK]
+  }
+
+  it("passes cw_queue retarget by a preview with items, or each card's Merges into set (as Codex's trial did)", () => {
+    expect(check([call('cw_queue', { action: 'retarget', project: 'alpha', preview: 'rt-5385988d', items: ['AL-1', 'AL-2'] })])).toBe(true)
+    expect(check([call('cw_update_task', { number: 'AL-1', target: '1.2.0' }), call('cw_update_task', { number: 'AL-2', target: '1.2.0' })])).toBe(true)
+    expect(check([call('cw_update_tasks', { numbers: ['AL-1', 'AL-2'], target: '1.2.0' })])).toBe(true)
+  })
+
+  it("fails a preview alone (from and target: moves nothing), a failed call, or one card's only", () => {
+    expect(check([call('cw_queue', { action: 'retarget', project: 'alpha', from: '1.1.0', target: '1.2.0' })])).toBe(false)
+    expect(check([call('cw_queue', { action: 'retarget', project: 'alpha', preview: 'rt-5385988d', items: ['AL-1'] }, false)])).toBe(false)
+    expect(check([call('cw_update_task', { number: 'AL-1', target: '1.2.0' })])).toBe(false)
+  })
+})
+
 describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, by the run's own evidence (HI-2571)", () => {
   type Proc = { pid: number; name: string; label: string; created: string; parent: number }
   const h = helpers as unknown as { leftoversByOwner: (o: unknown) => { cli: Proc[]; agent: Proc[]; more: number } }

@@ -210,6 +210,14 @@
       "cli": "plain"
     }
   },
+  "main.connections.launch.offSide": {
+    "placeholders": {
+      "agent": "plain",
+      "part": "select",
+      "lane": "plain",
+      "role": "select"
+    }
+  },
   "main.connections.launch.otherProvider": {
     "placeholders": {
       "agent": "plain",
@@ -478,6 +486,18 @@
   },
   "main.server.notServer": {
     "placeholders": {}
+  },
+  "main.server.output.invalid": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "main.server.output.notBelow": {
+    "placeholders": {
+      "model": "plain",
+      "output": "number",
+      "context": "number"
+    }
   },
   "main.server.setUp.noKey": {
     "placeholders": {
