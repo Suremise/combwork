@@ -341,10 +341,11 @@ export interface FactData {
   MergedInPart: { revision: string; target: string }
   /**
    * HI-2709: a card in Review whose submitted change reached its target through another card's queue merge (`by`, that
-   * card's key; `entry`, the merge's queue entry): a mark, not a move. Its review still decides: the card stays in Review,
+   * card's key; `entry`, the merge's queue entry; `submission`, the card's submission it is about, its fact's seq): a
+   * mark, not a move. Its review still decides: the card stays in Review,
    * never closed as merged outside the rules on that evidence (reconcile's carried-code walk).
    */
-  CarriedIn: { revision: string; target: string; by: string; entry: string }
+  CarriedIn: { revision: string; target: string; by: string; entry: string; submission: number }
   /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */
   LeftTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }

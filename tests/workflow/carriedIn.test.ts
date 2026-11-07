@@ -12,20 +12,24 @@ import { carriedInNow } from '../../src/shared/workflow/workView'
 import type { CardRecord } from '../../src/main/workflow/factStore'
 import { unknown } from '../../src/main/platform/types'
 
-const flags = vi.hoisted(() => ({ ancestorUnknown: false, containsUnknownAt: null as string | null }))
+const flags = vi.hoisted(() => ({ ancestorUnknown: false, ancestorThrows: false, containsUnknownAt: null as string | null, headUnknown: false }))
 vi.mock('../../src/main/platform/git', async (orig) => {
   const actual = (await orig()) as typeof import('../../src/main/platform/git')
+  const unreadable = () => Promise.resolve(unknown({ id: 'test.unknown', text: 'unreadable' } as never))
   return {
     ...actual,
-    isAncestor: (repo: string, a: string, b: string) => (flags.ancestorUnknown ? Promise.resolve(unknown({ id: 'test.unknown', text: 'unreadable' } as never)) : actual.isAncestor(repo, a, b)),
-    contains: (repo: string, target: string, c: { base: string; revision: string; key?: string | null }, at?: string) => (flags.containsUnknownAt && at === flags.containsUnknownAt ? Promise.resolve(unknown({ id: 'test.unknown', text: 'unreadable' } as never)) : actual.contains(repo, target, c, at))
+    isAncestor: (repo: string, a: string, b: string) => (flags.ancestorThrows ? Promise.reject(new Error('git went away')) : flags.ancestorUnknown ? unreadable() : actual.isAncestor(repo, a, b)),
+    contains: (repo: string, target: string, c: { base: string; revision: string; key?: string | null }, at?: string) => (flags.containsUnknownAt && at === flags.containsUnknownAt ? unreadable() : actual.contains(repo, target, c, at)),
+    lineHead: (repo: string, line: string) => (flags.headUnknown ? unreadable() : actual.lineHead(repo, line))
   }
 })
 
 let env: Env | null = null
 beforeEach(() => {
   flags.ancestorUnknown = false
+  flags.ancestorThrows = false
   flags.containsUnknownAt = null
+  flags.headUnknown = false
   forgetCarriedWalks()
 })
 afterEach(() => {
@@ -206,5 +210,68 @@ describe('HI-2709: a card whose code another card carried into its target', () =
     sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', x.line)
     await pass(e, x.card)
     expect(e.wf.state(x.card)).toMatchObject({ stage: 'done', integrated: { by: 'outside' } })
+  })
+
+  it("HR1's round 1 finding 1: a carrier whose history can't be read (unknown, then a throw) is asked about again, never passed over", { timeout: GIT_HEAVY_MS }, async () => {
+    const e = team()
+    const x = await inReview(e, 'Carried', 'src/x.txt')
+    const c = await inReview(e, 'Carrier', 'src/c.txt', x.line)
+    await mergedByQueue(e, c.card)
+    // Its own read fails inside the carrier's row: deferred, and nothing written.
+    flags.ancestorUnknown = true
+    expect(await pass(e, x.card)).toEqual(['unknown'])
+    flags.ancestorUnknown = false
+    flags.ancestorThrows = true
+    await expect(reconcile(e.wf, x.card)).rejects.toThrow('git went away')
+    flags.ancestorThrows = false
+    expect(e.store.facts(x.card.id).some((f) => f.kind === 'CarriedIn' || f.kind === 'Integrated')).toBe(false)
+    // Read again: the carrier is found (not skipped for the cursor's sake, which would have closed it as a hand merge).
+    expect(await pass(e, x.card)).toEqual([])
+    const s = e.wf.state(x.card)
+    expect(s.stage).toBe('review')
+    expect(carriedInNow(s)).toMatchObject({ by: c.card.key })
+  })
+
+  it("HR1's round 1 finding 2: the target's head changed or unreadable at the last read before the write: nothing written; the head recorded is that read", async () => {
+    const e = team()
+    const x = await inReview(e, 'By hand', 'src/x.txt')
+    const before = mainHead(e)
+    sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', x.line)
+    const merged = mainHead(e)
+    // Unreadable at the last read.
+    const again: string[] = []
+    await reconcile(e.wf, x.card, { again: (why) => void again.push(why), afterRead: () => void (flags.headUnknown = true) })
+    flags.headUnknown = false
+    expect(again).toEqual(['unknown'])
+    expect(e.wf.state(x.card).stage).toBe('review')
+    // Reset out of the target after the walk's reads: nothing written; the next pass finds it isn't there.
+    await reconcile(e.wf, x.card, { again: (why) => void again.push(why), afterRead: () => void sh(e.project, 'reset', '-q', '--hard', before) })
+    expect(e.wf.state(x.card).stage).toBe('review')
+    expect(e.store.facts(x.card.id).some((f) => f.kind === 'Integrated')).toBe(false)
+    expect(await pass(e, x.card)).toEqual([])
+    expect(e.wf.state(x.card).stage).toBe('review')
+    // Merged again: Done, recording the head the walk proved it at.
+    sh(e.project, 'reset', '-q', '--hard', merged)
+    expect(await pass(e, x.card)).toEqual([])
+    expect(e.wf.state(x.card)).toMatchObject({ stage: 'done', integrated: { by: 'outside', result: merged } })
+  })
+
+  it("HR1's round 1 finding 3: a resubmission of the same revision between the walk's read and its write: nothing written for the old one; the new one is proved again", { timeout: GIT_HEAVY_MS }, async () => {
+    const e = team()
+    const x = await inReview(e, 'Carried', 'src/x.txt')
+    const c = await inReview(e, 'Carrier', 'src/c.txt', x.line)
+    await mergedByQueue(e, c.card)
+    const resubmit = (): void => {
+      const last = e.store.facts(x.card.id).findLast((f) => f.kind === 'Submitted')!
+      e.store.tx((tx) => void tx.append(x.card.id, { kind: 'Submitted', actor: last.actor, source: 'recorded', ...(last.ruleset ? { ruleset: last.ruleset } : {}), data: last.data as never }))
+    }
+    const first = e.wf.state(x.card).latest!.id
+    await reconcile(e.wf, x.card, { afterRead: resubmit })
+    const s = e.wf.state(x.card)
+    expect(s.latest!.id).not.toBe(first)
+    expect(s.latest!.revision).toBe((e.store.facts(x.card.id).find((f) => f.kind === 'Submitted')!.data as { revision: string }).revision)
+    expect(e.store.facts(x.card.id).some((f) => f.kind === 'CarriedIn')).toBe(false)
+    await pass(e, x.card)
+    expect(carriedInNow(e.wf.state(x.card))).toMatchObject({ by: c.card.key, submission: s.latest!.id })
   })
 })

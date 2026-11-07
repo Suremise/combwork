@@ -87,25 +87,37 @@ export async function carriedProvenance(wf: Workflow, card: CardRecord, s: CardS
   if (isUnknown(now)) return DEFER_UNKNOWN
   if (!now) return { kind: 'notContained' }
   if (mergeInFlight(wf, target)) return DEFER_BUSY
-  const key = `${project.toLowerCase()}|${card.id}|${s.cycle}|${sub.revision}|${sub.base}|${target}`
+  // The exact submission (its fact), not only its revision: a resubmission of the same code is another walk.
+  const key = `${project.toLowerCase()}|${card.id}|${s.cycle}|${sub.id}|${sub.revision}|${sub.base}|${target}`
   const watermark = watermarkOf(wf, target)
   let cur = cursors.get(key)
   if (!cur || cur.snap.head !== head || cur.snap.watermark !== watermark) cur = { snap: { head, watermark }, below: Infinity }
   cursors.set(key, cur)
   const page = wf.store.integratedOn(target, cur.below, CARRIED_PAGE)
   for (const { row, fact } of page) {
-    cur.below = row
     const d = fact.data
+    // A merge is passed only once settled for it (HR1's round 1 finding 1): a deferral, or a read that throws, leaves
+    // the cursor above it, so the next pass asks about it again rather than skip a carrier it couldn't read.
+    const passed = (): void => void (cur.below = row)
     // Not a queue merge (an observed or reported one), nor the card's own: no `expected` to ask before.
-    if (d.by !== 'combwork' || fact.card === card.id || !d.entry) continue
+    if (d.by !== 'combwork' || fact.card === card.id || !d.entry) {
+      passed()
+      continue
+    }
     const started = wf.store.facts(fact.card).findLast((f) => f.kind === 'IntegrationStarted' && (f.data as FactData['IntegrationStarted']).entry === d.entry)?.data as FactData['IntegrationStarted'] | undefined
     if (!started) return DEFER_UNKNOWN
     const kept = await G.isAncestor(project, d.result, head)
     if (isUnknown(kept)) return DEFER_UNKNOWN
-    if (!kept) continue
+    if (!kept) {
+      passed()
+      continue
+    }
     const before = await G.contains(project, target, change, started.expected)
     if (isUnknown(before)) return DEFER_UNKNOWN
-    if (before) continue
+    if (before) {
+      passed()
+      continue
+    }
     const after = await G.contains(project, target, change, d.result)
     if (isUnknown(after)) return DEFER_UNKNOWN
     cursors.delete(key)
@@ -118,11 +130,12 @@ export async function carriedProvenance(wf: Workflow, card: CardRecord, s: CardS
 }
 
 /**
- * In the outcome's write: the card still on the submission and target the walk read, in its cycle, and the target's
- * merges as they were (no newer one, none in flight). The head is checked by the caller just before the write.
+ * In the outcome's write: the card still on the exact submission (its fact, HR1's round 1 finding 3: a resubmission of
+ * the same revision is another) and target the walk read, in its cycle, and the target's merges as they were (no newer
+ * one, none in flight). The target's head is the caller's to check, read after its last await (reconcile).
  */
 export function walkStillHolds(wf: Workflow, w: Write, s: CardState, snap: Snapshot): boolean {
   const now = w.state()
   const target = s.started?.target ?? ''
-  return now.cycle === s.cycle && now.stage === 'review' && now.latest?.revision === s.latest?.revision && now.latest?.base === s.latest?.base && (now.started?.target ?? '') === target && watermarkOf(wf, target) === snap.watermark && !mergeInFlight(wf, target)
+  return now.cycle === s.cycle && now.stage === 'review' && now.latest?.id === s.latest?.id && now.latest?.revision === s.latest?.revision && now.latest?.base === s.latest?.base && (now.started?.target ?? '') === target && watermarkOf(wf, target) === snap.watermark && !mergeInFlight(wf, target)
 }

@@ -392,12 +392,13 @@ export function reviewSkipOf(facts: readonly Fact[]): { skip: ReviewSkip | null;
 
 /** A fact's `platform.unknown`: each field that couldn't be read, and why (text only). */
 /**
- * HI-2709: the card's carried-code mark while it is about what the card is now: its latest submission's revision, into
- * its target; a later submission or another target shows none (the mark stays in its history).
+ * HI-2709: the card's carried-code mark while it is about what the card is now: its latest submission (that very one,
+ * not only its revision), into its target; a later submission or another target shows none (the mark stays in its
+ * history), and reconcile proves it again for that one.
  */
 export function carriedInNow(s: CardState): FactData['CarriedIn'] | null {
   const m = s.marks.carriedIn
-  return m && m.revision === s.latest?.revision && m.target === (s.started?.target ?? null) ? m : null
+  return m && m.submission === s.latest?.id && m.revision === s.latest?.revision && m.target === (s.started?.target ?? null) ? m : null
 }
 
 function unknownOf(platform: Record<string, unknown> | undefined): Record<string, string> {
