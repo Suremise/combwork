@@ -91,6 +91,22 @@ describe('each escape breaks the rule, naming where', () => {
       expect(brokenBy(use(body))).toMatch(/^src\/main\/use\.ts:\d+: /)
     })
   }
+  // HR3's round 1: a member chosen by destructuring, its name never spelled.
+  const destructured: [string, string][] = [
+    ['a computed key in a declaration', 'export function g(ws: WorkspaceService, k: keyof WorkspaceService): unknown {\n  const { [k]: fn } = ws\n  return fn\n}\n'],
+    ["a parameter's computed key", "const key = (): 'setAdvanced' => 'setAdvanced'\nexport function g({ [key()]: fn }: WorkspaceService): unknown {\n  return fn\n}\n"],
+    ['an assignment\'s computed key', "export function g(ws: WorkspaceService, k: 'path'): unknown {\n  let fn: unknown\n  ;({ [k]: fn } = ws)\n  return fn\n}\n"],
+    ['a rest, which copies its members', 'export function g(ws: WorkspaceService): object {\n  const { path, ...rest } = ws\n  void path\n  return rest\n}\n'],
+    ['a computed key in a for-of', "export function g(list: WorkspaceService[], k: 'path'): void {\n  for (const { [k]: v } of list) void v\n}\n"]
+  ]
+  for (const [what, body] of destructured) {
+    it(`destructured by ${what}`, () => {
+      expect(brokenBy(use(body))).toMatch(/is destructured by (a computed key|a rest)/)
+    })
+  }
+  it('destructured by name, or by a literal key: its names are spelled', () => {
+    holds(use("export function g(ws: WorkspaceService): unknown {\n  const { path, ['setAdvanced']: set } = ws\n  return [path, set]\n}\n"))
+  })
   it('the class handing itself on as an object: this, into an object slot', () => {
     const own = CLASS.replace('  path: string | null = null\n', '  path: string | null = null\n  hold(): void {\n    keep({ holder: this })\n  }\n')
     expect(brokenBy({ 'src/main/workspace.ts': `const keep = (o: { holder?: object }): void => void o\n${own}` })).toMatch(/workspace\.ts:\d+: .*this/)
@@ -111,6 +127,21 @@ describe('outside the app: an escape pins its file instead', () => {
   })
   it("the rule's scope alone ('src', for e2e selection) reports no pins", () => {
     expect(run({ 'tests/fake.test.ts': "import { WorkspaceService } from '../src/main/workspace'\nexport const lost: unknown = new WorkspaceService()\n" }, { scope: 'src' }).pinned).toBeNull()
+  })
+})
+
+// HR3's round 1: code outside the program, which the census can't see, loading workspace.ts by an ordinary loader.
+describe('code outside the program that may load workspace.ts', () => {
+  it('a script importing it: the rule fails, naming the script', () => {
+    const script = { 'scripts/consumer.mjs': "import { workspace } from '../src/main/workspace.ts'\nexport const g = () => workspace[['set', 'X'].join('')](1)\n" }
+    expect(brokenBy(script)).toMatch(/scripts\/consumer\.mjs, outside tsconfig\.node\.json's program, loads src\/main\/workspace\.ts/)
+  })
+  it('a loader the graph cannot read, beside its path spelled: the rule fails', () => {
+    const suite = { 'tests/e2e/x.cjs': "const at = '../../src/main/workspace.ts'\nconst m = require(process.env.X ? at : at)\nmodule.exports = m\n" }
+    expect(brokenBy(suite)).toMatch(/tests\/e2e\/x\.cjs, outside .* reaches a loader the graph can't read .* beside a path to src\/main\/workspace\.ts/)
+  })
+  it("selection's own tooling, which reads it as text, and code naming neither: the rule holds", () => {
+    holds({ 'tests/e2e/affected.mjs': "export const SHARED = ['src/main/workspace.ts']\n", 'scripts/other.mjs': "export const n = () => require(process.env.X)\n" })
   })
 })
 

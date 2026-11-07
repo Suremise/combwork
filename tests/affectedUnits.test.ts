@@ -308,6 +308,13 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
       expect(allOf(WS, typed(escaping), typed(member))).toMatch(/doesn't hold: src\/main\/other\.ts:2: .*\(base\)/)
     }
   })
+  // HR3's round 1: a consumer choosing the member by destructuring, and one outside the program by an ordinary import.
+  it('a member destructured by a computed key, or a script importing workspace.ts: every suite, saying why', () => {
+    const destructuring = { 'src/main/other.ts': "import { WorkspaceService } from './workspace'\nexport function g(ws: WorkspaceService, k: keyof WorkspaceService): unknown {\n  const { [k]: fn } = ws\n  return fn\n}\n" }
+    expect(allOf(WS, typed(destructuring), typed({ ...destructuring, ...member }))).toMatch(/src\/main\/other\.ts:3: .* is destructured by a computed key/)
+    const script = { 'scripts/consumer.mjs': "import { workspace } from '../src/main/workspace.ts'\nexport const g = () => workspace[['set', 'X'].join('')](1)\n" }
+    expect(allOf(WS, typed(script), typed({ ...script, ...member }))).toMatch(/scripts\/consumer\.mjs, outside tsconfig\.node\.json's program, loads src\/main\/workspace\.ts/)
+  })
   it('the workspace instance itself: every suite (its Proxy, C3)', () => {
     expect(allOf(WS, typed(), typed({ [WS]: workspaceTs().replace('export const workspace = new WorkspaceService()', 'export const workspace = new WorkspaceService() as WorkspaceService') }))).toMatch(/the workspace instance is a Proxy/)
   })

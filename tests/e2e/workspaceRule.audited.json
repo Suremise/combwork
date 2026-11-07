@@ -2,7 +2,7 @@
   {
     "commit": "22fd88db7^1 (HI-2654's base)",
     "tree": "f2224f3f5310e5b9a3b4de67c275409937e45985",
-    "rule": "98558f86705fec657105fe22a112fd698e61a864",
+    "rule": "09d165ca2694e99fdd244b19d2f130ea72e51731",
     "compiler": "5.9.3 5ec92e32c898625aaecbf9fe71a0d5bdc5f6e63f",
     "types": "26.6.3",
     "escapes": [
@@ -55,7 +55,7 @@
   {
     "commit": "22fd88db7 (HI-2654)",
     "tree": "811360867eb37faf13ce80416aa8c1f4996a041a",
-    "rule": "98558f86705fec657105fe22a112fd698e61a864",
+    "rule": "09d165ca2694e99fdd244b19d2f130ea72e51731",
     "compiler": "5.9.3 5ec92e32c898625aaecbf9fe71a0d5bdc5f6e63f",
     "types": "26.6.3",
     "escapes": [

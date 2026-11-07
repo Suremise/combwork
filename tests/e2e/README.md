@@ -372,18 +372,23 @@ no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines m
 check, the error path) is every suite. **`WorkspaceService`'s members are followed by name because of a rule**
 (HI-2678, Darren's R2; `workspaceRule.mjs`): no value holding a `WorkspaceService` (a view of one, a container, a
 callback returning one) goes where its type is lost (`any`, `unknown`, `object`, an index signature, a cast, a slot whose
-type drops it) or is read by a key the code doesn't spell (a computed key, a spread, `for-in`), the reviewed
+type drops it) or is read by a key the code doesn't spell (a computed key, a destructuring by one or into a rest, a
+spread, `for-in`), and no code outside the program (a script, a suite, a `.mjs` helper) may load `workspace.ts`: by an
+import, or by a loader the import graph can't read beside a path to it (selection's own tooling, which reads it as text,
+aside). The reviewed
 `workspace` Proxy aside (its handlers forward by the name the caller spelled; bound to its tokens, `PROXY_HASH`). With the
 rule holding, every use of a member spells its name, so a name search can only over-select. It is a census of the whole
 `tsconfig.node.json` program with TypeScript 5.9's in-process checker (`typescript-classic`; TypeScript 7's API runs out
-of process and its types weren't reliable for this), about 45 s; anything it can't prove fails closed (any program
+of process and its types weren't reliable for this), about a minute, each revision in a process of its own (the whole
+program's types take about 4 GB: an 8 GB heap) and a picker's two at once; anything it can't prove fails closed (any program
 error, a file of `src/main`, `preload` or `shared` outside the program, a type walk past its budget, a compiler that
 throws). The picker checks it on **both** revisions before following a member (the rule's scope alone, about 30 s each),
 and where it doesn't hold, every suite, naming the escape; check:repo runs it on the merged tree whenever the change
 touches one of its inputs (code, a tsconfig, `package.json` or the lock, its own files: `workspaceRuleCheck.mjs`). A tree
 from before the rule holds only when audited by hand (`workspaceRule.audited.json`: its exact git tree, the rule's and
 the compiler's identity, each escape's proof along its whole flow; `--reaudit <commit>` carries a record to a new rule
-only when the census still finds exactly what was audited). The `workspace` instance itself stays every suite. So
+only when the census still finds exactly what was audited, and never covers code outside the program, a member
+reached without its name or an edited Proxy). The `workspace` instance itself stays every suite. So
 HI-2654's `setAdvanced` selects 50 of 387 suites (`advanced`, `assistantsettings`, `consoletext`, `p7settings` among them;
 its two trees are audited), HI-2652's seam 2 suites, and HI-2653's New Project 28 from `actions.ts` (37 with its
 `Overlays.tsx`) (`tests/affectedUnits.test.ts` checks all three, and the suites they need; `tests/workspaceRule.test.ts`

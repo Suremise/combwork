@@ -18,11 +18,14 @@
 import { parse } from '@babel/parser'
 import { readFileSync } from 'fs'
 import { createHash } from 'crypto'
+import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
+import { importGraph } from './relatedTests.mjs'
 
 const require = createRequire(import.meta.url)
+const runContext = require('./runContext.cjs')
 
 export const CLASS_FILE = 'src/main/workspace.ts'
 export const CLASS_NAME = 'WorkspaceService'
@@ -105,21 +108,48 @@ const censuses = new Map()
  * escape], errors, ms }. root: the checkout, whose node_modules the program resolves. scope: 'all' (the whole program:
  * pins too) or 'src' (the rule's scope alone); budget: the type visits allowed. Memoized per revision (a commit's).
  */
+const censusKey = (rev, root, scope) => `${resolve(root)}\0${rev.commit ?? rev.name}\0${scope}`
+// The whole program's census answers for the rule's scope too.
+const censusDone = (rev, root, scope) => censuses.get(censusKey(rev, root, scope)) ?? (scope === 'src' ? censuses.get(censusKey(rev, root, 'all')) : undefined)
+
 export function census(rev, root, { scope = 'all', budget = WORK_BUDGET } = {}) {
-  const key = (sc) => `${resolve(root)}\0${rev.commit ?? rev.name}\0${sc}`
+  const key = (sc) => censusKey(rev, root, sc)
   if (rev.commit !== undefined) {
-    // The whole program's census answers for the rule's scope too.
-    const done = censuses.get(key(scope)) ?? (scope === 'src' ? censuses.get(key('all')) : undefined)
+    const done = censusDone(rev, root, scope)
     if (done) return done
   }
   let result
   try {
-    result = censusIn(rev, resolve(root), scope, budget)
+    // A repository's revision (a commit, or the working tree) is censused in a process of its own: the whole program's
+    // types take about 4 GB, a default heap's limit, beside whatever the caller holds. A revision in memory (a fixture)
+    // is small, censused here.
+    result = rev.commit !== undefined && rev.root ? censusApart(rev, scope, budget) : censusHere(rev, root, { scope, budget })
   } catch (e) {
     result = { all: `the WorkspaceService census of ${rev.name} failed (${String(e?.message ?? e).split('\n')[0]})` }
   }
   if (rev.commit !== undefined) censuses.set(key(scope), result)
   return result
+}
+
+/** The census in this process (workspaceRuleCheck.mjs's --census runs it for census()). */
+export function censusHere(rev, root, { scope = 'all', budget = WORK_BUDGET } = {}) {
+  return censusIn(rev, resolve(root), scope, budget)
+}
+
+/** Heap for a census apart: the whole program takes about 4 GB (7 Nov). */
+export const CENSUS_HEAP_MB = 8192
+
+/** Several revisions of one checkout, each censused in a process of its own, at the same time. */
+function censusesApart(revs, scope) {
+  const script = fileURLToPath(new URL('./workspaceRuleCheck.mjs', import.meta.url))
+  const out = execFileSync(process.execPath, [script, '--censuses', scope, ...revs.map((r) => r.commit ?? '')], { cwd: revs[0].root, env: runContext.baseEnv(), encoding: 'utf8', maxBuffer: 512 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+  return JSON.parse(out)
+}
+
+function censusApart(rev, scope, budget) {
+  const script = fileURLToPath(new URL('./workspaceRuleCheck.mjs', import.meta.url))
+  const out = execFileSync(process.execPath, [`--max-old-space-size=${CENSUS_HEAP_MB}`, script, '--census', rev.commit ?? '', '--scope', scope, '--budget', String(budget)], { cwd: rev.root, env: runContext.baseEnv(), encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
+  return JSON.parse(out)
 }
 
 function censusIn(rev, root, scope, budget) {
@@ -182,6 +212,10 @@ function censusIn(rev, root, scope, budget) {
   if (json.error) return every(`${TSCONFIG} doesn't parse`)
   const parsed = ts.parseJsonConfigFileContent(json.config, sys, R, undefined, R + TSCONFIG)
   if (parsed.errors.some((d) => d.category === ts.DiagnosticCategory.Error)) return every(`${TSCONFIG} has an error (${ts.flattenDiagnosticMessageText(parsed.errors[0].messageText, ' ')})`)
+  // Code outside the program that may load the class, before the program is built: the import graph and the program
+  // together don't fit in a default heap. Its root files are what the program holds for certain.
+  const rootFiles = new Set(parsed.fileNames.map((f) => slashes(f).slice(R.length)))
+  const outside = outsideLoader(rev, rootFiles)
   const host = ts.createCompilerHost(parsed.options, true)
   Object.assign(host, { readFile, fileExists, directoryExists, getCurrentDirectory: () => R, getDirectories: (p) => entries(p).directories })
   const program = ts.createProgram({ rootNames: parsed.fileNames, options: parsed.options, host })
@@ -316,7 +350,8 @@ function censusIn(rev, root, scope, budget) {
     if (ts.isForOfStatement(p)) return null
     if (ts.isBinaryExpression(p)) {
       const op = p.operatorToken.kind
-      if (op === K.EqualsToken) return p.right === q ? slot(q) : null
+      // A destructuring assignment's source is no slot: its pattern is checked as destructurings are.
+      if (op === K.EqualsToken) return p.right === q && !ts.isObjectLiteralExpression(p.left) && !ts.isArrayLiteralExpression(p.left) ? slot(q) : null
       if ([K.EqualsEqualsEqualsToken, K.ExclamationEqualsEqualsToken, K.EqualsEqualsToken, K.ExclamationEqualsToken].includes(op)) return null
       // Either side of instanceof: the class on its right is read for its prototype alone.
       if (op === K.InstanceOfKeyword) return null
@@ -337,6 +372,18 @@ function censusIn(rev, root, scope, budget) {
   }
   // Every value: an expression, not a name a declaration, member access or property gives, nor in a type.
   const nodes = []
+  // Object destructurings: binding patterns (declarations, parameters, for-of) and assignment targets.
+  const patterns = []
+  const assignedTo = (n) => {
+    const p = n.parent
+    if (!p) return false
+    if (ts.isBinaryExpression(p) && p.operatorToken.kind === ts.SyntaxKind.EqualsToken && p.left === n) return true
+    if ((ts.isForOfStatement(p) || ts.isForInStatement(p)) && p.initializer === n) return true
+    if ((ts.isPropertyAssignment(p) && p.initializer === n) || ts.isShorthandPropertyAssignment(p) || ts.isSpreadAssignment(p)) return assignedTo(p.parent)
+    if (ts.isArrayLiteralExpression(p) || ts.isParenthesizedExpression(p)) return assignedTo(p)
+    if (ts.isSpreadElement(p)) return assignedTo(p.parent)
+    return false
+  }
   // The rule's scope alone ('src', for e2e selection: no pins), or the whole program ('all').
   for (const sf of sources) {
     const file = rel(sf.fileName)
@@ -345,6 +392,7 @@ function censusIn(rev, root, scope, budget) {
       if (ts.isTypeNode(n) || ts.isExpressionWithTypeArguments(n) || ts.isPropertySignature(n) || ts.isInterfaceDeclaration(n) || ts.isTypeAliasDeclaration(n) || ts.isHeritageClause(n) || ts.isImportDeclaration(n) || ts.isImportEqualsDeclaration(n) || ts.isExportDeclaration(n)) return
       const name = ts.isIdentifier(n) && ((ts.isDeclaration(n.parent) && n.parent.name === n) || (ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) || (ts.isPropertyAssignment(n.parent) && n.parent.name === n) || ts.isQualifiedName(n.parent) || ts.isJsxAttribute(n.parent))
       if (ts.isExpression(n) && !name) nodes.push({ file, sf, n })
+      if (ts.isObjectBindingPattern(n) || (ts.isObjectLiteralExpression(n) && assignedTo(n))) patterns.push({ file, sf, n })
       n.forEachChild(walk)
     })
   }
@@ -376,6 +424,19 @@ function censusIn(rev, root, scope, budget) {
       }
       if (!grew) break
     }
+    // Destructuring a tracked object by a key the code doesn't spell (`const { [k]: f } = ws`, a parameter's
+    // `{ [key()]: f }: WorkspaceService`, an assignment's `({ [k]: f } = ws)`), or into a rest that copies its members.
+    for (const { file, sf, n } of patterns) {
+      const by = ts.isObjectBindingPattern(n)
+        ? n.elements.some((el) => el.dotDotDotToken) ? 'a rest' : n.elements.some((el) => el.propertyName && ts.isComputedPropertyName(el.propertyName) && !ts.isStringLiteralLike(el.propertyName.expression)) ? 'a computed key' : null
+        : n.properties.some((p) => ts.isSpreadAssignment(p)) ? 'a rest' : n.properties.some((p) => p.name && ts.isComputedPropertyName(p.name) && !ts.isStringLiteralLike(p.name.expression)) ? 'a computed key' : null
+      if (!by) continue
+      // An assignment's pattern has the type of what is assigned to it, a declaration's the pattern's own.
+      const t = ts.isObjectLiteralExpression(n) ? checker.getTypeOfAssignmentPattern(n) : checker.getTypeAtLocation(n)
+      if (!direct(t) && !(t.flags & F.TypeParameter && direct(checker.getBaseConstraintOfType(t)))) continue
+      const at = n.getStart(sf)
+      escapes.push({ file, line: sf.getLineAndCharacterOfPosition(at).line + 1, text: n.getText(sf).replace(/\s+/g, ' ').slice(0, 80), why: `${short(t)} is destructured by ${by}`, inProxy: file === CLASS_FILE && proxy && at >= proxy.start && at < proxy.end })
+    }
   } catch (e) {
     if (e instanceof OutOfWork) return every(`the census's type walk ran out of its budget (${budget} visits)`)
     throw e
@@ -400,16 +461,64 @@ function censusIn(rev, root, scope, budget) {
   const liveEscapes = inside.filter((e) => !auditedEscapes.has(sig(e)))
   const liveErrors = errors.filter((e) => !auditedErrors.has(`${e.file}\0${e.code}\0${e.text}`))
   const first = liveEscapes[0]
-  const broken = protocol
-    ? `${CLASS_NAME} declares ${protocol.name.getText(classFile)}, which is reached without its name being spelled`
-    : proxyEdited
-      ? `the workspace Proxy in ${CLASS_FILE} isn't its reviewed text (its hash ${proxy?.hash}): review it, then update PROXY_HASH in tests/e2e/workspaceRule.mjs`
-      : liveErrors.length
+  // What no audit covers: code the census can't see, a member reached without its name, the Proxy edited.
+  const structural = outside
+    ? outside
+    : protocol
+      ? `${CLASS_NAME} declares ${protocol.name.getText(classFile)}, which is reached without its name being spelled`
+      : proxyEdited
+        ? `the workspace Proxy in ${CLASS_FILE} isn't its reviewed text (its hash ${proxy?.hash}): review it, then update PROXY_HASH in tests/e2e/workspaceRule.mjs`
+        : null
+  const broken = structural
+    ? structural
+    : liveErrors.length
         ? `${liveErrors[0].file ?? 'the program'} has a type error (TS${liveErrors[0].code}: ${liveErrors[0].text})${liveErrors.length > 1 ? `, and ${liveErrors.length - 1} more` : ''}, so its types can't be trusted`
         : first
           ? `${first.file}:${first.line}: ${first.text} (${first.why})${liveEscapes.length > 1 ? `, and ${liveEscapes.length - 1} more` : ''}`
           : null
-  return { broken: broken ? `${broken} (${rev.name})` : null, escapes: liveEscapes, exempt, audited: audited ? audited.tree : null, pinned: scope === 'all' ? pinned : null, errors: liveErrors, ms, files: sources.length, work, scope }
+  return { broken: broken ? `${broken} (${rev.name})` : null, structural, escapes: liveEscapes, exempt, audited: audited ? audited.tree : null, pinned: scope === 'all' ? pinned : null, errors: liveErrors, ms, files: sources.length, work, scope }
+}
+
+/** Selection's own tooling: it reads workspace.ts as text, to select by it, and never runs it. */
+const TOOLING = ['tests/e2e/affected.mjs', 'tests/e2e/affectedUnits.mjs', 'tests/e2e/relatedTests.mjs', 'tests/e2e/workspaceRule.mjs', 'tests/e2e/workspaceRuleCheck.mjs']
+/** A path to workspace.ts as code spells it to load it (`./workspace`, `../src/main/workspace.ts`…). */
+const SPELLS_CLASS_FILE = /(?:^|[/'"`])(?:src\/)?main\/workspace(?:\.[cm]?[jt]s)?['"`]|['"`]\.{1,2}\/(?:[\w.-]+\/)*workspace(?:\.[cm]?[jt]s)?['"`]/
+
+/**
+ * Code outside the census's program that may load workspace.ts, which the census can't see (a script, an e2e
+ * suite, a .mjs helper): one whose imports reach it (relatedTests' graph), or one reaching a loader the graph can't
+ * read in a file that spells its path. A path built from pieces is a hidden loader, the review's boundary.
+ * Why the rule doesn't hold, or null.
+ */
+function outsideLoader(rev, inProgram) {
+  const files = rev.list().filter((f) => /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/i.test(f) && !f.startsWith('node_modules/') && !TOOLING.includes(f))
+  const outside = files.filter((f) => !inProgram.has(f))
+  if (!outside.length) return null
+  const graph = importGraph(rev.list(), (f) => rev.read(f), rev.prefetch)
+  // What reaches each start, by the imports reversed (no closure is kept per file: there are hundreds outside).
+  const into = new Map()
+  for (const f of files) for (const g of graph.edgesOf(f)) into.set(g, [...(into.get(g) ?? []), f])
+  const reaching = (starts) => {
+    const seen = new Map(starts.map((s) => [s, s]))
+    const queue = [...starts]
+    while (queue.length) {
+      const g = queue.shift()
+      for (const f of into.get(g) ?? []) {
+        if (seen.has(f)) continue
+        seen.set(f, seen.get(g))
+        queue.push(f)
+      }
+    }
+    return seen
+  }
+  const toClass = reaching([CLASS_FILE])
+  const toUnknown = reaching(files.filter((f) => graph.unknownOf(f)))
+  const toSpelling = reaching(files.filter((f) => SPELLS_CLASS_FILE.test(rev.read(f) ?? '')))
+  for (const f of outside) {
+    if (toClass.has(f)) return `${f}, outside ${TSCONFIG}'s program, loads ${CLASS_FILE}: the census can't see how it uses a ${CLASS_NAME}`
+    if (toUnknown.has(f) && toSpelling.has(f)) return `${f}, outside ${TSCONFIG}'s program, reaches a loader the graph can't read (${graph.unknownOf(toUnknown.get(f))}) beside a path to ${CLASS_FILE} (in ${toSpelling.get(f)}): the census can't see what it loads`
+  }
+  return null
 }
 
 /**
@@ -419,6 +528,15 @@ function censusIn(rev, root, scope, budget) {
 export function ruleOn(revs, root, { scope = 'all' } = {}) {
   const pinned = new Set()
   let ms = 0
+  // A repository's revisions not censused yet, at once: each a process of its own (about a minute each).
+  const apart = revs.filter((rev) => rev.commit !== undefined && rev.root && !censusDone(rev, root, scope))
+  if (apart.length > 1) {
+    try {
+      for (const [i, c] of censusesApart(apart, scope).entries()) censuses.set(censusKey(apart[i], root, scope), c)
+    } catch {
+      // Then each in turn, through census(), which says why one fails.
+    }
+  }
   for (const rev of revs) {
     const c = census(rev, root, { scope })
     if (c.all) return { all: c.all }
