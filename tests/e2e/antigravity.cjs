@@ -4,7 +4,9 @@
 // the agent wasn't given (a sentinel, which marks a file when it is started) is refused before agy starts, as is one whose
 // config can't be read, and the sentinel never starts (agy 1.5.0 can't be kept from starting it: HR1, fail closed); the
 // conversation's id comes from the status line; two new conversations one after the other, then each resumed by its id;
-// a conversation that isn't the agent's is never resumed. The fake proves the adapter's side only (HI-2548 runs the real
+// a conversation that isn't the agent's is never resumed. Its transcript (HI-2546): the conversation view (prompts without
+// what agy adds, replies, a tool call and its result), its usage (requests, the cache counted once, the model, agy's title)
+// and the status line's model and effort. The fake proves the adapter's side only (HI-2548 runs the real
 // CLI). Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -115,7 +117,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await agTab.waitFor({ timeout: HUNG_MS })
   await agTab.click()
   // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
-  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 2, HUNG_MS)))
+  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 6, HUNG_MS)))
   await shots('advanced')
   await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
@@ -136,7 +138,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   }
   /** A turn in a conversation (its transcript, which a resume needs, in the agent's profile). */
   const say = async (agentId, profile, conv, text) => {
-    const transcript = path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript.jsonl')
+    const transcript = path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript_full.jsonl')
     await inv('pty:write', lib.ptyKey(alpha, agentId), text)
     await inv('pty:write', lib.ptyKey(alpha, agentId), '\r')
     return !!(await until(async () => fs.existsSync(transcript) && fs.readFileSync(transcript, 'utf8').includes(text), HUNG_MS))
@@ -154,7 +156,25 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check("its profile's MCP servers are Combwork's own", 'combwork' in profileMcp && !('sentinel' in profileMcp), JSON.stringify(Object.keys(profileMcp)))
   // A turn: written to its conversation.
   check('its turns are kept in its own conversation, in its profile', await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity'))
+  // --- Its transcript (HI-2546): the conversation view, its usage and the status line's details.
+  check('…and a turn with a tool call', await say(gem.id, e.USERPROFILE, first.conv, 'tool fake result'))
+  const shown = await until(async () => {
+    const items = (await inv('transcript:read', alpha, first.conv).catch(() => null))?.items ?? []
+    return items.some((i) => i.kind === 'assistant' && i.text === 'Done: tool fake result') ? items : null
+  }, HUNG_MS)
+  const said = (shown ?? []).map((i) => (i.kind === 'tool' ? `tool ${i.tool.name}: ${i.tool.result}` : `${i.kind} ${i.text}`))
+  check("the conversation view shows the prompts without what agy adds, the replies and the tool call with its result", JSON.stringify(said) === JSON.stringify(['user hello antigravity', 'assistant Done: hello antigravity', 'user tool fake result', 'tool fake · echo: fake result', 'assistant Done: tool fake result']), JSON.stringify(said))
+  const used = await until(async () => {
+    const u = await inv('session:usage', alpha, first.conv).catch(() => null)
+    return u?.requests === 3 ? u : null
+  }, HUNG_MS)
+  // The fake's requests: input 7000 + 100 × its step (the cache read among it from the second on: 4000), output 20.
+  check("its usage counts each request, the cache once, its prompts, model and agy's title", !!used && used.inputTokens === 7100 + 7300 + 7500 - 8000 && used.cacheReadTokens === 8000 && used.outputTokens === 60 && used.userMessages === 2 && used.model === 'Gemini 3.8 Flash (Low)' && used.title === 'Fake: hello antigravity' && used.costUsd === null, JSON.stringify(used && { ...used, days: undefined, timeline: undefined }))
+  const details = await live(gem.id)
+  check("the status line gives the model, its effort and the context window", details?.modelName === 'Gemini 3.8 Flash (Low)' && details?.effort === 'low', JSON.stringify({ modelName: details?.modelName, effort: details?.effort }))
   check('it stops', !!(await stop()))
+  const listed = (await inv('session:list', alpha)).find((s) => s.id === first.conv)
+  check("the Sessions list has it, with agy's title", listed?.title === 'Fake: hello antigravity', JSON.stringify(listed && { id: listed.id, title: listed.title }))
 
   // --- A second new conversation, then each resumed by its own id.
   const second = await startNew()

@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { join, resolve } from 'path'
 import { existsSync } from 'original-fs'
-import { cp, mkdir, readdir, stat } from 'original-fs/promises'
+import { cp, mkdir, stat } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PathDataCopy, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
 import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../../../shared/antigravity'
 import { ASSISTANT_AGENT_ID } from '../../../shared/assistant'
@@ -14,11 +14,14 @@ import { launchOverrides } from '../../advancedValues'
 import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
-import { compareVersions, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
+import { compareVersions, exportSubtitleText, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
 import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { antigravityEnv, brainDir, checkEnv, inProfile, inUserProfile, profilesRoot } from './home'
 import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
 import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
+import { agyStatusDetails } from './status'
+import { AntigravityConversationParser, AntigravityUsageParser, parseAgyTranscript } from './transcript'
+import { conversationTitle, isConversationId, listConversations, profileOf, profileOfNow, profileTranscript, transcriptIn } from './conversations'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
@@ -26,7 +29,7 @@ import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './proj
 // MCP servers (Combwork's, with the launch's token). A workspace folder's own MCP servers the agent wasn't given refuse the
 // launch (profileConfig: agy can't be kept from starting them). The user's own global agy customizations (~\.gemini) are
 // never read (Darren, 7 Nov: hidden for now).
-// Hooks, transcripts and usage are HI-2545's and HI-2546's: until they land those parts return nothing.
+// Hooks are HI-2545's: until they land those parts return nothing. Transcripts and usage are HI-2546's (transcript.ts).
 
 const NAME = ANTIGRAVITY_DESCRIPTOR.name
 
@@ -43,7 +46,7 @@ export function profileFolder(agentId: string, workspacePath: string): string {
 }
 
 /** A conversation id agy made: a UUID, safe as a folder name (never a path). */
-export const isConversationId = (id: unknown): id is string => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+export { isConversationId }
 
 /** An MCP server as agy's mcp_config.json has it (1.5.0: stdio command/args/env, or Streamable HTTP url/headers). */
 export function agyServer(def: McpServerDef): Record<string, unknown> | null {
@@ -139,30 +142,6 @@ export function statusLineConversation(body: Record<string, any>): string | null
   const id = body?.conversation_id ?? body?.session_id
   return isConversationId(id) ? id : null
 }
-
-const emptyUsage = (sessionId: string): SessionUsage => ({
-  provider: ANTIGRAVITY,
-  sessionId,
-  title: null,
-  model: null,
-  cliVersion: null,
-  inputTokens: 0,
-  outputTokens: 0,
-  cacheWriteTokens: 0,
-  cacheReadTokens: 0,
-  requests: 0,
-  reasoningTokens: 0,
-  contextTokens: 0,
-  contextWindow: null,
-  compactions: [],
-  cacheTtlSeconds: 0,
-  firstActivity: null,
-  lastActivity: null,
-  userMessages: 0,
-  lastPrompt: null,
-  costUsd: null,
-  costEstimated: false
-})
 
 export class AntigravityAdapter implements ProviderAdapter {
   readonly id = ANTIGRAVITY
@@ -264,10 +243,9 @@ export class AntigravityAdapter implements ProviderAdapter {
     return { file: s.file, args: s.args, env }
   }
 
-  /** Its status line (Combwork's own command): the conversation's id, from the launch it belongs to. Its model and cost come with HI-2546. */
+  /** Its status line (Combwork's own command): the model, its effort and the context window (agyStatusDetails). */
   statusLine(body: Record<string, any>): LiveDetails {
-    void body
-    return {}
+    return agyStatusDetails(body)
   }
 
   /** The conversation the status line names (statusLineConversation), for Combwork to learn a new launch's id. */
@@ -297,31 +275,30 @@ export class AntigravityAdapter implements ProviderAdapter {
     return ANTIGRAVITY_DESCRIPTOR.canSwitchLive(target, current, launched)
   }
 
-  // ---- Transcripts (HI-2546 reads them): where a conversation is, for resume.
-  /** Its transcript: in the profile of the agent it belongs to (`recorded`: the path its hooks or status line gave). */
+  // ---- Transcripts (HI-2546, conversations.ts and transcript.ts).
+  /**
+   * Its transcript: in the profile of the agent it belongs to. `recorded` (the path its hooks gave) only when it is that
+   * conversation's transcript in one of Combwork's profiles (profileTranscript): agy's word never points Combwork elsewhere.
+   */
   async transcriptPath(_folder: string, sessionId: string, recorded?: string): Promise<string | null> {
-    if (recorded && existsSync(recorded)) return recorded
     if (!isConversationId(sessionId)) return null
     const root = profilesRoot()
-    let keys: string[] = []
-    try {
-      keys = await readdir(root)
-    } catch {
-      return null
-    }
-    for (const k of keys) {
-      const p = join(brainDir(join(root, k)), sessionId, '.system_generated', 'logs', 'transcript.jsonl')
-      if (existsSync(p)) return p
-    }
-    return null
+    if (recorded && profileTranscript(recorded, root, sessionId) && existsSync(recorded)) return recorded
+    const profile = await profileOf(root, sessionId)
+    return profile ? transcriptIn(profile, sessionId) : null
   }
 
+  /**
+   * None: agy resumes a conversation from its own store (conversations\<id>.db in the profile), not its transcript, so a
+   * transcript put back from Combwork's backup wouldn't bring a deleted conversation back. Such a session starts afresh.
+   */
   restorePath(): string | null {
     return null
   }
 
-  listSessions(): Promise<ExternalSession[]> {
-    return Promise.resolve([])
+  /** The conversations in the profiles of the agents that ran in `folder` (listConversations). */
+  listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
+    return listConversations(profilesRoot(), folder, skip)
   }
 
   subSessionOf(): Promise<SubSession | null> {
@@ -341,25 +318,33 @@ export class AntigravityAdapter implements ProviderAdapter {
     }
   }
 
-  // ---- Usage (HI-2546): none read yet.
-  parseUsage(_text: string, sessionId: string): SessionUsage {
-    return emptyUsage(sessionId)
+  // ---- Usage (HI-2546): from the transcript (transcript.ts).
+  /** The conversation's title agy made (its annotations), from the profile that has it. */
+  usageTitle(sessionId: string): string | null {
+    const profile = profileOfNow(profilesRoot(), sessionId)
+    return profile ? conversationTitle(profile, sessionId) : null
+  }
+
+  parseUsage(text: string, sessionId: string): SessionUsage {
+    return parseAgyTranscript(text, sessionId, this.usageTitle(sessionId))
   }
 
   usageParser(sessionId: string): UsageParser {
-    return { feed: () => undefined, result: () => emptyUsage(sessionId) }
+    const p = new AntigravityUsageParser(sessionId)
+    return { feed: (text) => p.feed(text), result: () => p.result(this.usageTitle(sessionId)) }
   }
 
-  conversationParser(): ConversationParserLike {
-    return { items: [], images: [], offset: 0, feed: () => 0 }
+  conversationParser(projectPath: string): ConversationParserLike {
+    return new AntigravityConversationParser(projectPath)
   }
 
+  /** None: agy 1.5.0's transcripts recorded so far hold no image data. */
   imageData(): string | null {
     return null
   }
 
-  exportSubtitle(sessionId: string): string {
-    return `${NAME} conversation ${sessionId}` // i18n-ignore: an export's heading, as the other providers word it
+  exportSubtitle(sessionId: string, project: string): string {
+    return exportSubtitleText(this.descriptor.name, sessionId, project)
   }
 
   // ---- Project files.

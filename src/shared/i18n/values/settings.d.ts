@@ -126,6 +126,14 @@ interface CombworkMessageValues {
   'settings.advanced.antigravity.override.stripAccountVars.title': undefined
   'settings.advanced.antigravity.signIn.needed.desc': undefined
   'settings.advanced.antigravity.signIn.needed.title': undefined
+  'settings.advanced.antigravity.transcript.modelChange.desc': undefined
+  'settings.advanced.antigravity.transcript.modelChange.title': undefined
+  'settings.advanced.antigravity.transcript.stepHeader.desc': undefined
+  'settings.advanced.antigravity.transcript.stepHeader.title': undefined
+  'settings.advanced.antigravity.transcript.userRequest.desc': undefined
+  'settings.advanced.antigravity.transcript.userRequest.title': undefined
+  'settings.advanced.antigravity.usage.inputIncludesCache.desc': undefined
+  'settings.advanced.antigravity.usage.inputIncludesCache.title': undefined
   'settings.advanced.claude-code.accounts.dropEnv.desc': undefined
   'settings.advanced.claude-code.accounts.dropEnv.title': undefined
   'settings.advanced.claude-code.accounts.emailField.desc': undefined

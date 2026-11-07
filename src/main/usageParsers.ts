@@ -4,9 +4,11 @@ import type { ProviderId, SessionUsage } from '../shared/types'
 import { CLAUDE_CODE } from '../shared/claude'
 import { CODEX } from '../shared/codex'
 import { COPILOT } from '../shared/copilot'
+import { ANTIGRAVITY } from '../shared/antigravity'
 import { ClaudeUsageParser } from './providers/claude/usage'
 import { CodexUsageParser } from './providers/codex/rollout'
 import { CopilotUsageParser } from './providers/copilot/events'
+import { AntigravityUsageParser } from './providers/antigravity/transcript'
 
 /**
  * The CLIs' usage parsers without their adapters (#1106), for the usage worker, which can't load Electron: a parser
@@ -23,7 +25,8 @@ export interface RawUsageParser {
 const PARSERS: Partial<Record<ProviderId, new (sessionId: string) => { feed(text: string): void; result(title?: string | null): SessionUsage }>> = {
   [CLAUDE_CODE]: ClaudeUsageParser,
   [CODEX]: CodexUsageParser,
-  [COPILOT]: CopilotUsageParser
+  [COPILOT]: CopilotUsageParser,
+  [ANTIGRAVITY]: AntigravityUsageParser
 }
 
 /** A provider's parser for a session, or null for one this Combwork can't read. */

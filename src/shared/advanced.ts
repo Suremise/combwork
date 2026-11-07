@@ -2932,6 +2932,49 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/models-signedout-antigravity-1.5.0.txt`, version: '1.5.0', text: 'Error: Please sign in to view available models. Launch the CLI without arguments to sign in.', shows: 'agy models with nobody signed in (a Windows Sandbox, HI-2544)' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // The Antigravity CLI's transcripts (HI-2546): brain\<conversation>\.system_generated\logs\transcript_full.jsonl in the agent's profile.
+  {
+    id: 'antigravity.transcript.userRequest',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.userRequest.title', defaultMessage: 'Transcript: your prompt', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.userRequest.desc', defaultMessage: "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.", description: 'What the advanced setting "Transcript: your prompt" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: '<USER_REQUEST>\\n?([\\s\\S]*?)\\n?</USER_REQUEST>', // i18n-ignore: a CLI's text (#367)
+    applies: 'now',
+    samples: [{ from: `${FIX}/antigravity/plain-1.5.0.jsonl`, version: '1.5.0', text: '<USER_REQUEST>\nReply with exactly the word BRAVO and nothing else. Do not use tools.\n</USER_REQUEST>', shows: 'A prompt as agy recorded it' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.transcript.stepHeader',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.stepHeader.title', defaultMessage: "Transcript: a tool result's times", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.stepHeader.desc', defaultMessage: "The times agy writes before a tool's result in its transcript, which Combwork leaves out when it shows the result. Wrong, results show with those times.", description: 'What the advanced setting "Transcript: a tool result\'s times" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`^Created At: [^\n]*\n(?:Completed At: [^\n]*\n)?`,
+    flags: '',
+    applies: 'now',
+    samples: [{ from: `${FIX}/antigravity/mcp-tools-1.5.0.jsonl`, version: '1.5.0', text: 'Created At: 2026-11-07T02:07:34Z\nCompleted At: 2026-11-07T02:07:35Z\n', shows: "A tool result's first lines" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.transcript.modelChange',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.modelChange.title', defaultMessage: 'Transcript: the model picked', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.modelChange.desc', defaultMessage: "What agy adds to a prompt when its model changes: the model's name is its first group. Wrong, an agent's usage names no model.", description: 'What the advanced setting "Transcript: the model picked" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`changed setting \x60Model Selection\x60 from .*? to (.+?)\.(?:\s|$)`,
+    flags: '',
+    applies: 'now',
+    samples: [{ from: `${FIX}/antigravity/plain-1.5.0.jsonl`, version: '1.5.0', text: 'The user changed setting `Model Selection` from None to Gemini 3.8 Flash (Low). No need', shows: 'The model agy started on' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.usage.inputIncludesCache',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.usage.inputIncludesCache.title', defaultMessage: 'Usage: input tokens include the cache', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.usage.inputIncludesCache.desc', defaultMessage: "Whether a request's input_tokens in agy's transcript already count its cache_read_tokens. Wrong, Combwork counts cached tokens twice, or leaves them out of the context.", description: 'What the advanced setting "Usage: input tokens include the cache" is for, and what goes wrong when it is wrong (Settings → Advanced). agy, input_tokens and cache_read_tokens are names: keep them.' }),
+    kind: 'boolean',
+    default: true,
+    applies: 'now',
+    samples: [{ from: `${FIX}/antigravity/plain-1.5.0.jsonl`, version: '1.5.0', fields: ['cache_read_tokens', 'content', 'created_at', 'input_tokens', 'output_tokens', 'source', 'status', 'step_index', 'type'] }]
+  },
   {
     id: overrideId('antigravity', 'preApproveCombworkTools'),
     group: 'antigravity',
