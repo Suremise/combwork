@@ -4,6 +4,10 @@
 // once asked (busy, then the window's Later: never; Restart When Its Turn Is Over: atSafePoint, at its turn's end). The
 // work it gets meanwhile is the unit tests' (reviewerPool, laneStart, lanes). The agent is the fake Claude Code; the
 // launch's --mcp-config is read for its combwork env.
+// Tools by workflow (HI-2694, Darren's decision: launch-only): the tools its project's workflow makes unusable are left out
+// too (CW_WORKFLOW_HIDDEN); a workflow change restarts an agent whose list it changes the same way, either way (added or
+// removed): an idle one at once, a busy one once asked; until it has relaunched, it is given no work needing the new
+// tools (a lane naming it as reviewer is refused).
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -29,6 +33,17 @@ const sideOf = (launch) => {
     return null
   }
 }
+/** The tools a launch's project workflow left out (HI-2694), as its combwork server was told them; null: not readable. */
+const hiddenOf = (launch) => {
+  try {
+    const v = JSON.parse(fs.readFileSync(launch.opts['--mcp-config'], 'utf8')).mcpServers.combwork.env.CW_WORKFLOW_HIDDEN
+    return v ? v.split(',') : []
+  } catch {
+    return null
+  }
+}
+const lacksReview = (launch) => ['cw_start_review', 'cw_verdict'].every((t) => (hiddenOf(launch) ?? []).includes(t))
+const hasReview = (launch) => hiddenOf(launch) !== null && !['cw_start_review', 'cw_verdict'].some((t) => hiddenOf(launch).includes(t))
 
 ;(async () => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
@@ -65,7 +80,7 @@ const sideOf = (launch) => {
     check("an idle agent made a reviewer is restarted by the change itself, with a reviewer's tools", !!(await lib.until(async () => launches().length === 2 && sideOf(launches()[1]) === 'reviewer', HUNG_MS)), JSON.stringify(launches().map(sideOf)))
     check('…resuming its conversation', launches()[1].opts['--resume'] === first.sessionId, JSON.stringify(launches()[1].opts['--resume']))
     check('…and running again', !!(await lib.until(async () => (await live())?.status === 'ready', HUNG_MS)))
-    check("the window's question after it finds nothing more to do (one restart, never two)", (await inv('session:restartForSide', alpha, agent.id, 'ifIdle')) === 'same')
+    check("the window's question after it finds nothing more to do (one restart, never two)", (await inv('session:restartForTools', alpha, agent.id, 'ifIdle')) === 'same')
     check('…and none comes after', launches().length === 2)
 
     // --- Busy: its role changed in Agent Settings while it works, the window asks (the question's two answers).
@@ -100,7 +115,7 @@ const sideOf = (launch) => {
     check('Later: the question goes, with Agent Settings', !!(await lib.until(async () => (await later.count()) === 0, HUNG_MS)) && (await settingsClosed()))
     check('…and its turn ends', await lib.agentIdle(inv, agent.id, HUNG_MS))
     check("…and it isn't restarted: still the reviewer's tools it launched with", launches().length === 2 && sideOf(launches().at(-1)) === 'reviewer', JSON.stringify(launches().map(sideOf)))
-    check('…still a restart to make, should it be asked again', (await inv('session:restartForSide', alpha, agent.id, 'ifIdle')) === 'restarting')
+    check('…still a restart to make, should it be asked again', (await inv('session:restartForTools', alpha, agent.id, 'ifIdle')) === 'restarting')
     check("…which loads a builder's tools", !!(await lib.until(async () => launches().length === 3 && sideOf(launches()[2]) === 'builder', HUNG_MS)), JSON.stringify(launches().map(sideOf)))
     check('…in the same conversation', launches()[2].opts['--resume'] === first.sessionId)
     check('…running again', !!(await lib.until(async () => (await live())?.status === 'ready', HUNG_MS)))
@@ -115,6 +130,69 @@ const sideOf = (launch) => {
     check('…in the same conversation', launches()[3].opts['--resume'] === first.sessionId)
     await lib.agentIdle(inv, agent.id, HUNG_MS)
     await inv('session:stop', alpha, agent.id).catch(() => undefined)
+    await lib.until(async () => (await live())?.status === 'stopped' || !(await live()), HUNG_MS)
+
+    // --- Tools by workflow (HI-2694). An either-role agent (both sides' tools) on a project with no review.
+    const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
+    const api = async (method, route, body) => {
+      const r = await fetch(`http://127.0.0.1:${env.CW_API_PORT}${route}`, { method, headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
+      return { status: r.status, body: await r.json().catch(() => null) }
+    }
+    const NO_REVIEW = { preset: null, options: { review: 'none', noSelfReview: false, folder: 'project' } }
+    const REVIEW = { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project' } }
+    await inv('workflow:setOptions', alpha, NO_REVIEW)
+    const both = await lib.addAgent(inv, alpha, { name: 'Both', workflowRole: 'either' })
+    const maker = await lib.addAgent(inv, alpha, { name: 'Maker', workflowRole: 'builder' })
+    const bothKey = lib.ptyKey(alpha, both.id)
+    const bothLive = async () => (await inv('session:live')).find((s) => s.agentId === both.id)
+    const bothLaunches = () => launches().filter((l) => l.env?.CW_AGENT === 'Both')
+    await inv('session:start', alpha, { agentId: both.id })
+    check('an either-role agent starts', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
+    const b0 = bothLaunches().at(-1)
+    check('with no review, its launch leaves out the review tools (CW_WORKFLOW_HIDDEN), its side being both', !!b0 && sideOf(b0) === 'both' && lacksReview(b0), JSON.stringify(b0 && hiddenOf(b0)))
+
+    // Idle: review by an agent turned on, the change itself restarts it with them, in the same conversation.
+    await inv('workflow:setOptions', alpha, REVIEW)
+    check('review turned on: an idle agent is restarted by the change itself, with the review tools', !!(await lib.until(async () => bothLaunches().length === 2 && hasReview(bothLaunches()[1]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
+    check('…resuming its conversation', bothLaunches()[1]?.opts['--resume'] === b0.sessionId, JSON.stringify(bothLaunches()[1]?.opts['--resume']))
+    check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
+    check('…and asked again, nothing more to do', (await inv('session:restartForTools', alpha, both.id, 'ifIdle')) === 'same')
+
+    // Busy, review turned off (tools removed): asked, Restart When Its Turn Is Over: relaunched without them once its turn ends.
+    const bothTurn = async (what) => {
+      const typed = await lib.typeLine(inv, bothKey, claudeHome, null, 'work 12', { live: bothLive })
+      check(`${what}: it starts a turn that takes a while`, typed.attempt > 0, JSON.stringify(typed.lost))
+      return !!(await lib.until(async () => (await bothLive())?.status === 'working', HUNG_MS))
+    }
+    const asked = page.getByText('Restart Both for the new workflow?', { exact: true })
+    await bothTurn('review off while busy')
+    await inv('workflow:setOptions', alpha, NO_REVIEW)
+    check('review turned off while it works: the window asks (Restart When Its Turn Is Over, Later)', !!(await lib.until(async () => (await asked.count()) === 1 && (await whenOver.count()) === 1 && (await later.count()) === 1, HUNG_MS)))
+    check('…its turn goes on, not restarted', (await bothLive())?.status === 'working' && bothLaunches().length === 2)
+    await whenOver.click()
+    check('Restart When Its Turn Is Over: the question goes', !!(await lib.until(async () => (await asked.count()) === 0, HUNG_MS)))
+    check('…relaunched without the review tools once its turn ended', !!(await lib.until(async () => bothLaunches().length === 3 && lacksReview(bothLaunches()[2]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
+    check('…in the same conversation', bothLaunches()[2]?.opts['--resume'] === b0.sessionId)
+    check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
+
+    // Busy, review turned on (tools added), Later: it keeps the tools it launched with, and work needing the new ones
+    // waits for its relaunch: a lane naming it as reviewer is refused, saying to restart it first.
+    const card = (await api('POST', '/v1/tasks', { title: 'Reviewed work', project: 'alpha' })).body?.number
+    await bothTurn('review on while busy')
+    await inv('workflow:setOptions', alpha, REVIEW)
+    check('review turned on while it works: the window asks', !!(await lib.until(async () => (await asked.count()) === 1 && (await later.count()) === 1, HUNG_MS)))
+    await later.click()
+    check('Later: the question goes', !!(await lib.until(async () => (await asked.count()) === 0, HUNG_MS)))
+    check('…and its turn ends', await lib.agentIdle(inv, both.id, HUNG_MS))
+    check("…and it isn't restarted: still without the review tools", bothLaunches().length === 3 && lacksReview(bothLaunches().at(-1)), JSON.stringify(bothLaunches().map(hiddenOf)))
+    const refused = await api('POST', '/v1/lanes', { project: 'alpha', builder: 'Maker', reviewer: 'Both', cards: [card] })
+    check('…a lane naming it as reviewer meanwhile is refused (409), saying to restart it first', refused.status === 409 && /restart/i.test(JSON.stringify(refused.body)), JSON.stringify(refused))
+    check('…a workflow change that leaves its list as it is asks nothing again', (await inv('workflow:setOptions', alpha, { ...REVIEW, options: { ...REVIEW.options, maxAgents: 7 } }), (await asked.count()) === 0))
+    check('…still a restart to make, should it be asked again', (await inv('session:restartForTools', alpha, both.id, 'ifIdle')) === 'restarting')
+    check('…which loads the review tools', !!(await lib.until(async () => bothLaunches().length === 4 && hasReview(bothLaunches()[3]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
+    check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
+    await inv('session:stop', alpha, both.id).catch(() => undefined)
+    void maker
   } finally {
     await app.close().catch(() => undefined)
   }

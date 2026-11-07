@@ -130,10 +130,11 @@ const prose = (seed, n) => {
   }
   /**
    * The tools a role is offered, as the CLI lists them ('assistant+settings': with Change settings on, every one of its own);
-   * `side`, a project agent's side of the workflow (HI-2664: CW_SIDE, builder, reviewer or both).
+   * `side`, a project agent's side of the workflow (HI-2664: CW_SIDE, builder, reviewer or both); `hidden`, the tools its
+   * project's workflow left out of its launch (HI-2694: CW_WORKFLOW_HIDDEN, comma-separated).
    */
-  const toolList = (role = 'agent', side = undefined) => {
-    const extra = { CW_DEV_CONSOLE: '1', ...(side ? { CW_SIDE: side } : {}), ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
+  const toolList = (role = 'agent', side = undefined, hidden = undefined) => {
+    const extra = { CW_DEV_CONSOLE: '1', ...(side ? { CW_SIDE: side } : {}), ...(hidden ? { CW_WORKFLOW_HIDDEN: hidden } : {}), ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, ...extra }),
@@ -194,6 +195,15 @@ const prose = (seed, n) => {
     check('tools by side: a builder is offered no reviewer moves, and keeps its own', !builder.some((n) => ['cw_start_review', 'cw_verdict', 'cw_request_builder', 'cw_focused_skip'].includes(n)) && builder.includes('cw_submit') && builder.includes('cw_loop_step'), builder.join(' '))
     check('…a reviewer no builder moves, and keeps its own', !reviewer.some((n) => ['cw_start_card', 'cw_submit', 'cw_put_back', 'cw_merge_slot', 'cw_report_merge'].includes(n)) && reviewer.includes('cw_verdict') && reviewer.includes('cw_lane') && reviewer.includes('cw_loop_step'), reviewer.join(' '))
     check('…both sides, and no side given, everything an agent has', names(toolList('agent', 'both')).length === all.length && all.includes('cw_verdict') && all.includes('cw_submit'))
+    // HI-2694: the tools a project's workflow makes unusable are left out too (Solo: no review, Committed is done), and
+    // only those; each side's list measured with and without them.
+    const SOLO = 'cw_focused_skip,cw_report_merge,cw_start_review,cw_verdict'
+    for (const side of ['both', 'builder', 'reviewer']) {
+      const full = toolList('agent', side).filter((t) => t.name !== 'cw_console')
+      const solo = toolList('agent', side, SOLO).filter((t) => t.name !== 'cw_console')
+      console.log(`tool list (${side}, Solo): ${solo.length} tools, ${Buffer.byteLength(JSON.stringify(solo), 'utf8')} bytes (with every workflow tool: ${full.length}, ${Buffer.byteLength(JSON.stringify(full), 'utf8')})`)
+      check(`tools by workflow (${side}): Solo leaves out exactly its four, where the side has them`, names(full).filter((n) => !names(solo).includes(n)).join(',') === names(full).filter((n) => SOLO.split(',').includes(n)).join(','), names(solo).join(' '))
+    }
     const assistantNames = names(toolList('assistant+settings'))
     check("the Assistant: none of a worker's tools; cw_ask_user, cw_release_slot and cw_update_task kept", !assistantNames.some((n) => ['cw_submit', 'cw_verdict', 'cw_start_review', 'cw_loop_step', 'cw_put_back', 'cw_request_builder', 'cw_declare_paths', 'cw_focused_skip', 'cw_report_merge', 'cw_cannot_within_rules'].includes(n)) && ['cw_ask_user', 'cw_release_slot', 'cw_update_task'].every((n) => assistantNames.includes(n)), assistantNames.join(' '))
   }

@@ -392,5 +392,9 @@
   "agents.workflowRole.label": "Papel no fluxo de trabalho",
   "agents.workflowRole.needsTools": "Esta conexão inicia sem as ferramentas do Combwork.",
   "agents.workflowRole.reviewer": "Revisor",
-  "agents.workflowRole.reviewerText": "Revisa os cartões dos executores e dá o veredito: bem-sucedido ou reprovado."
+  "agents.workflowRole.reviewerText": "Revisa os cartões dos executores e dá o veredito: bem-sucedido ou reprovado.",
+  "agents.workflowTools.restartTitle": "Reiniciar {agents} para o novo fluxo de trabalho?",
+  "agents.workflowTools.restartMessage": "{count, plural, one {{agents} está trabalhando. As ferramentas que o fluxo de trabalho do projeto agora permite são carregadas quando ele reiniciar; ele continua na mesma conversa.} other {{agents} estão trabalhando. As ferramentas que o fluxo de trabalho do projeto agora permite são carregadas quando reiniciarem; cada um continua na mesma conversa.}}",
+  "agents.workflowTools.restartWhenDone": "{count, plural, one {Reiniciar quando o turno terminar} other {Reiniciar quando os turnos terminarem}}",
+  "agents.workflowTools.later": "Depois"
 }

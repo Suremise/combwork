@@ -392,5 +392,9 @@
   "agents.workflowRole.label": "工作流程中的角色",
   "agents.workflowRole.needsTools": "此连接启动时不带 Combwork 工具。",
   "agents.workflowRole.reviewer": "评审者",
-  "agents.workflowRole.reviewerText": "评审构建者的卡片，给出通过或未通过。"
+  "agents.workflowRole.reviewerText": "评审构建者的卡片，给出通过或未通过。",
+  "agents.workflowTools.restartTitle": "为新的工作流重启 {agents}？",
+  "agents.workflowTools.restartMessage": "{count, plural, other {{agents} 正在工作。项目工作流现在允许的工具会在重启时加载；会在同一对话中继续。}}",
+  "agents.workflowTools.restartWhenDone": "{count, plural, other {回合结束后重启}}",
+  "agents.workflowTools.later": "稍后"
 }

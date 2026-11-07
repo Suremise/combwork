@@ -9,6 +9,7 @@ import { CATEGORY_STAGE, foldCard, STAGE_CATEGORY, ROUND_LIMIT_GATE, type CardKi
 import { forYouItems, kindProposed, reviewSkipOf, workBadge, workView, type ForYouItem, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
+import type { WorkflowToolOptions } from '../../shared/assistantTools'
 
 type Row = Record<string, string | number | null>
 
@@ -170,6 +171,38 @@ export function rulesetStages(ws: WorkspaceService, ids: readonly string[]): Map
     for (const id of new Set(ids)) out.set(id, stages(id))
   })
   return out
+}
+
+/**
+ * What a project's work in flight still works under (HI-2694, HR1's s11 point 1): the options of each distinct ruleset its
+ * cards out of Hold, Todo and Done (not archived) have recorded facts under (every cycle's and override's: a superset of
+ * each card's own), and its running lanes' (`lane_runs`); and the stages those cards are in. One snapshot of combwork.db.
+ * Null when the board has no facts yet or a ruleset can't be read: nothing is known, so nothing is hidden for it.
+ */
+export function workRetained(ws: WorkspaceService, project: string): { options: WorkflowToolOptions[]; stages: string[] } | null {
+  return boardRead(ws, (db) => {
+    if (!hasFacts(db)) return null
+    const cards = prepared(db, "SELECT number, col, stage FROM cards WHERE archived = 0 AND project = ? COLLATE NOCASE AND col NOT IN ('hold', 'todo', 'done')").all(project) as Row[]
+    const stages = [...new Set(cards.map((r) => String(r.stage ?? CATEGORY_STAGE[r.col as Category] ?? '')))].filter((s) => s && s !== 'hold' && s !== 'todo' && s !== 'done')
+    const ids = new Set<string>()
+    if (cards.length) for (const r of prepared(db, 'SELECT DISTINCT ruleset FROM card_facts WHERE ruleset IS NOT NULL AND card IN (SELECT value FROM json_each(?))').all(JSON.stringify(cards.map((c) => c.number))) as Row[]) ids.add(String(r.ruleset))
+    if (prepared(db, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'lane_runs'").get()) {
+      for (const r of prepared(db, "SELECT r.ruleset FROM lane_runs r JOIN lanes l ON l.id = r.lane WHERE l.state = 'active' AND l.project = ? COLLATE NOCASE AND r.ruleset IS NOT NULL").all(project) as Row[]) ids.add(String(r.ruleset))
+    }
+    const options: WorkflowToolOptions[] = []
+    for (const id of ids) {
+      const row = prepared(db, QUERIES['rulesets.byId'].sql).get(id) as { data: string } | undefined
+      let o: Partial<WorkflowToolOptions> | undefined
+      try {
+        o = row ? (JSON.parse(row.data) as { options?: Partial<WorkflowToolOptions> }).options : undefined
+      } catch {
+        o = undefined
+      }
+      if (!o || typeof o.review !== 'string' || typeof o.finish !== 'string') return null
+      options.push({ review: o.review, finish: o.finish, focusedTests: !!o.focusedTests, okBefore: { mode: typeof o.okBefore?.mode === 'string' ? o.okBefore.mode : 'never' } })
+    }
+    return { options, stages }
+  })
 }
 
 /**

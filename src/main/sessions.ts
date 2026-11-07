@@ -21,7 +21,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
-import { assistantTools, isReservedServerName, sideAllows, toolSideOf, TOOLS_SERVER } from '../shared/assistantTools'
+import { assistantTools, hiddenForSide, isReservedServerName, sideAllows, toolSideOf, TOOLS_SERVER, workflowAllows, workflowHiddenOf } from '../shared/assistantTools'
 import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
@@ -461,8 +461,10 @@ interface LiveSession {
   workflow?: LaunchWorkflow
   /** The side its Combwork tools were offered for (HI-2664, its CW_SIDE): null without Combwork's tools. */
   side?: string | null
-  /** A restart for its new side is on its way (restartForSide): asked again, it isn't queued twice. */
+  /** A restart for its new side or workflow tools is on its way (restartForTools): asked again, it isn't queued twice. */
   sideRestart?: boolean
+  /** The tools its project's workflow left out of its launch (HI-2694, its CW_WORKFLOW_HIDDEN): [] for none. */
+  workflowHidden?: string[]
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
   readyAt?: number
   /**
@@ -1746,10 +1748,13 @@ class SessionManager {
     // Its instructions name only the skills the session gets (#1431).
     if (combwork) mcpServers[TOOLS_SERVER] = skillsOff.length ? { ...combwork, env: { ...combwork.env, CW_SKILLS_OFF: skillsOff.sort().join(',') } } : combwork
     // A project agent's side of the workflow (HI-2664): its tools follow its saved role, never its lanes (HR3's round 1).
-    // Part of the signature, so a role change asks for a restart (restartForSide restarts it).
+    // Part of the signature, so a role change asks for a restart (restartForTools restarts it).
     if (mcpServers[TOOLS_SERVER] && !assistant && forAgent) {
       const side = toolSideOf(agentWorkflowRole(forAgent))
-      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side } }
+      // And the tools its project's workflow makes unusable (HI-2694), those its side doesn't already leave out: also in
+      // the signature, so a workflow change that changes its list asks for a restart (restartForTools restarts it).
+      const hidden = this.workflowToolsHidden(projectPath, side, pc)
+      mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_SIDE: side, ...(hidden.length ? { CW_WORKFLOW_HIDDEN: hidden.join(',') } : {}) } }
     }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
@@ -2509,29 +2514,35 @@ class SessionManager {
    * HI-1755's own. Either joins a switch already waiting (one quit), each kept apart (dropUsageMove).
    */
   /**
-   * A running agent whose role changed its side of the workflow since it launched (HI-2664, Darren's decision), restarted
-   * to load its new tool list, resuming its conversation, as a connection switch does. Every role change runs it
-   * (projectAgents.updateAgent: Agent Settings, the Agent API, the Assistant's cw_update_agent):
+   * A running agent whose tool list changed since it launched, restarted to load the new one, resuming its conversation,
+   * as a connection switch does: its role changed its side of the workflow (HI-2664, Darren's decision), or its project's
+   * workflow settings changed the tools they make unusable (HI-2694, the same decision: either way, added or removed). Every
+   * role change runs it (projectAgents.updateAgent: Agent Settings, the Agent API, the Assistant's cw_update_agent), and
+   * every workflow settings change (workflowTools.ts, at any level, and the rules' switch):
    * - `ifIdle`: an idle agent at once; a busy one is `busy` (the window asks first; the Agent API's reply says so);
    * - `atSafePoint`: when its turn is over (the user chose Restart When Its Turn Is Over).
    * Until it has restarted (Later, a busy agent, a restart that failed), it keeps its old tools and is given no work that
-   * needs the new ones (`sideAllows`). 'same': its side is as it launched (or it has no Combwork tools); 'notRunning':
+   * needs the new ones (`sideAllows`). 'same': its list is as it launched (or it has no Combwork tools); 'notRunning':
    * nothing to restart.
    */
-  async restartForSide(projectPath: string, agentId: string, o: { when: 'ifIdle' | 'atSafePoint' }): Promise<'restarting' | 'busy' | 'same' | 'notRunning'> {
+  async restartForTools(projectPath: string, agentId: string, o: { when: 'ifIdle' | 'atSafePoint' }): Promise<'restarting' | 'busy' | 'same' | 'notRunning'> {
     projectPath = workspace.assertSessionHost(projectPath)
     if (workspace.isAssistantHome(projectPath)) return 'same'
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.status === 'stopped') return 'notRunning'
     if (!l.side) return 'same'
-    const { agent } = await this.agentDef(projectPath, agentId)
+    const { agent, cfg: pc } = await this.agentDef(projectPath, agentId)
     const now = toolSideOf(agentWorkflowRole(agent))
-    if (now === l.side) return 'same'
+    const hidden = this.workflowToolsHidden(projectPath, now, pc)
+    const was = l.workflowHidden ?? []
+    const sameHidden = hidden.length === was.length && hidden.every((t, i) => t === was[i])
+    if (now === l.side && sameHidden) return 'same'
     // Asked again (the window's question after the change's own): one restart, already on its way.
     if (l.sideRestart) return 'restarting'
     const busy = l.state.status === 'working' || l.state.turn?.state === 'running'
     if (o.when === 'ifIdle' && busy) return 'busy'
-    log.info(`${userText(this.label(l.state))}: its side of the workflow changed (${l.side} → ${now}), restarting it ${busy ? 'once its turn is over' : 'now'}`)
+    const why = now !== l.side ? `its side of the workflow changed (${l.side} → ${now})` : `its project's workflow changed the tools it can use (left out: ${was.join(', ') || 'none'} → ${hidden.join(', ') || 'none'})` // i18n-ignore: a log line
+    log.info(`${userText(this.label(l.state))}: ${why}, restarting it ${busy ? 'once its turn is over' : 'now'}`)
     const r = this.switchAtSafePoint(projectPath, agentId)
     if (r === 'notRunning') return 'notRunning'
     l.sideRestart = true
@@ -2544,7 +2555,34 @@ class SessionManager {
    */
   sideAllows(projectPath: string, agentId: string, part: 'builder' | 'reviewer'): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
-    return !l || l.state.status === 'stopped' || sideAllows(l.side, part)
+    if (!l || l.state.status === 'stopped') return true
+    if (!sideAllows(l.side, part)) return false
+    // Nor while its launch lacks a tool of the part its project's workflow makes usable now (HI-2694, HR1's s11 point 2):
+    // its own launch's list, so Later, a restart waiting or one that failed all hold until it has really relaunched. What
+    // its project makes usable is read now; unreadable, every tool counts as usable (so a launch lacking one waits).
+    const launched = l.workflowHidden ?? []
+    if (!l.side || !launched.length) return true
+    let now: string[] | null
+    try {
+      now = this.workflowHiddenOf(projectPath)
+    } catch {
+      now = null
+    }
+    return workflowAllows(launched, now, part)
+  }
+
+  /**
+   * The tools its project's workflow makes unusable (HI-2694), for a project agent's launch on `side`: those its side
+   * doesn't already leave out, sorted. Read through workflowHiddenOf (workflowTools.ts sets it at startup); unreadable, none.
+   */
+  private workflowToolsHidden(projectPath: string, side: string, pc: ProjectConfig): string[] {
+    const bySide = hiddenForSide(side)
+    try {
+      return this.workflowHiddenOf(projectPath, pc).filter((t) => !bySide.includes(t))
+    } catch (e) {
+      log.warn('the tools a project\'s workflow hides, not read: none are', e)
+      return []
+    }
   }
 
   switchAtSafePoint(projectPath: string, agentId: string, usage?: UsageIntent): 'queued' | 'waiting' | 'notRunning' {
@@ -2981,6 +3019,7 @@ class SessionManager {
     state.launchSignature = this.signature({ ...eff, skillHashes: record.settled })
     // The side its tools are offered for (HI-2664), to tell when a role or lane change needs it restarted.
     l.side = (eff.mcpServers[TOOLS_SERVER]?.env?.CW_SIDE as string | undefined) ?? null
+    l.workflowHidden = workflowHiddenOf(eff.mcpServers[TOOLS_SERVER]?.env?.CW_WORKFLOW_HIDDEN as string | undefined)
     l.sideRestart = false
     // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it, where a
     // dialect is set (a text overridden, or a file picked). Speaking the Default, its record is as before, but for
@@ -5669,6 +5708,12 @@ class SessionManager {
    * which knows the lanes, at startup before any launch.
    */
   laneParts: (projectPath: string, agentId: string) => Promise<('builder' | 'reviewer')[]> = async () => []
+
+  /**
+   * The tools a project's workflow makes unusable now (HI-2694), its config given or the workspace's copy: set by
+   * workflowTools.ts at startup. Until set (unit tests of the sessions alone): none.
+   */
+  workflowHiddenOf: (projectPath: string, cfg?: Pick<ProjectConfig, 'workflow'>) => string[] = () => []
 
   /**
    * The side of the workflow of an agent's launch `runId` (HI-2049), for what its combwork server reports: `unknown` once

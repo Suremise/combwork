@@ -1,0 +1,125 @@
+/**
+ * The Combwork tools a project's workflow makes unusable (HI-2694, Darren 7 Nov: launch-only): left out of a project
+ * agent's tool list when it launches (CW_WORKFLOW_HIDDEN, beside HI-2664's CW_SIDE), and a workflow settings change
+ * restarts the agents whose list it changes, as a role change does (sessions.restartForTools: idle at once, busy after
+ * asking). Hidden only where every set of rules still in force forbids a tool: the project's options now, and each ruleset
+ * its work in flight still works under (cardWork.workRetained), so a change never takes a tool from work already started.
+ * Nothing is hidden where that can't be known: rules not enforced, no version control recorded, options that don't
+ * resolve, a board not readable.
+ */
+import { basename } from 'path'
+import { advanced } from './advanced'
+import { createLogger, userText } from './logger'
+import { onCombworkEvent } from './events'
+import { sessions } from './sessions'
+import { openWorkspaces, workspaceOf, type WorkspaceService } from './workspace'
+import { boardReadToken } from './boardStore'
+import { config } from './config'
+import { workRetained } from './workflow/cardWork'
+import { resolvedOf } from './workflow/rulesets'
+import { hiddenForWorkflow } from '../shared/assistantTools'
+import { WORKFLOW_ENFORCE } from '../shared/advanced'
+import { projectAgents } from '../shared/defaults'
+import type { ProjectConfig } from '../shared/types'
+
+const log = createLogger('workflowTools')
+
+/** Each project's hidden list, by its path in lower case, with what it was made from (the board's token, the options). */
+const kept = new Map<string, { key: string; hidden: string[] }>()
+
+/**
+ * The tools a project's agents launch without now, sorted; [] when nothing can be hidden or it can't be known. `cfg`: the
+ * project's config (the launch's own read); without, the workspace's copy. Kept per project until the board commits
+ * anything (boardReadToken: any commit, another process's, the database reopened or replaced) or its options or the
+ * enforcement change; read afresh, never kept, inside a write or a read's snapshot (no token).
+ */
+export function workflowHiddenNow(ws: WorkspaceService, projectPath: string, cfg?: Pick<ProjectConfig, 'workflow'>): string[] {
+  if (ws.isAssistantHome(projectPath)) return []
+  const p = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())
+  const platform = p?.platform?.id
+  const c = cfg ?? p?.config
+  if (!p || !platform || !c) return []
+  const enforced = advanced.get<boolean>(WORKFLOW_ENFORCE)
+  if (!enforced) return []
+  const token = boardReadToken(ws)
+  const key = JSON.stringify([token, platform, config.settings.workflow ?? null, ws.config.workflow ?? null, c.workflow?.options ?? null])
+  const was = kept.get(projectPath.toLowerCase())
+  if (token !== null && was?.key === key) return was.hidden
+  let hidden: string[] = []
+  try {
+    const r = resolvedOf(ws, projectPath, platform, c)
+    const retained = r.invalid ? null : workRetained(ws, basename(projectPath))
+    hidden = retained ? hiddenForWorkflow([r.options, ...retained.options], retained.stages) : []
+  } catch (e) {
+    log.warn(`the tools ${userText(basename(projectPath))}'s workflow hides couldn't be read, so none are`, e)
+    hidden = []
+  }
+  if (token !== null) kept.set(projectPath.toLowerCase(), { key, hidden })
+  return hidden
+}
+
+/** Forgets every kept list (tests). */
+export function forgetWorkflowHidden(): void {
+  kept.clear()
+}
+
+/**
+ * Restarts a project's running agents whose tool list its workflow now changes (HI-2694, Darren's decision: as a role
+ * change does, through sessions.restartForTools): an idle one at once; busy ones are asked about in the window, once for
+ * this change (`tools-restart-asked`), and keep their old tools until they restart (sessions.sideAllows holds work that
+ * needs the new ones meanwhile).
+ */
+export async function restartForWorkflow(ws: WorkspaceService, projectPath: string): Promise<void> {
+  if (!ws.path || ws.isAssistantHome(projectPath)) return
+  let cfg: ProjectConfig
+  try {
+    cfg = await ws.projectConfig(projectPath)
+  } catch {
+    return
+  }
+  const busy: { id: string; name: string }[] = []
+  const target = workflowHiddenNow(ws, projectPath, cfg).join(',')
+  for (const a of projectAgents(cfg)) {
+    const live = sessions.liveFor(projectPath, a.id)
+    if (!live) continue
+    const r = await sessions.restartForTools(projectPath, a.id, { when: 'ifIdle' }).catch((e: unknown) => {
+      log.warn(`${userText(a.name)}: not restarted for its project's workflow`, e)
+      return 'same' as const
+    })
+    // Asked once for its launch and this list: a later change that leaves it the same (Maximum agents, say) doesn't ask again.
+    const id = `${projectPath.toLowerCase()}|${a.id}|${live.runId}`
+    if (r === 'busy' && asked.get(id) !== target) {
+      asked.set(id, target)
+      busy.push({ id: a.id, name: a.name })
+    }
+  }
+  if (busy.length) ws.emit({ type: 'tools-restart-asked', workspacePath: ws.path, projectPath, agents: busy })
+}
+
+/** What each busy launch was last asked to restart for (its project, agent and run → the hidden list then). */
+const asked = new Map<string, string>()
+
+let started = false
+let enforcedWas: boolean | null = null
+
+/** Follows workflow settings changes for the restarts (every open workspace's). Once, at startup. */
+export function startWorkflowTools(): void {
+  if (started) return
+  started = true
+  sessions.workflowHiddenOf = (projectPath, cfg) => workflowHiddenNow(workspaceOf(projectPath), projectPath, cfg)
+  // A project's options written, at any level (each project it reaches is told: levels.ts), by the window, the
+  // Assistant, a preset, a platform switch or a template.
+  onCombworkEvent((e) => {
+    if (e.type !== 'workflow-changed') return
+    const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())
+    if (ws) void restartForWorkflow(ws, e.projectPath).catch((err: unknown) => log.warn('restarting agents for a workflow change', err))
+  })
+  // Settings → Advanced → Workflow rules are enforced: every project's list changes with it.
+  enforcedWas = advanced.get<boolean>(WORKFLOW_ENFORCE)
+  advanced.onChange(() => {
+    const now = advanced.get<boolean>(WORKFLOW_ENFORCE)
+    if (now === enforcedWas) return
+    enforcedWas = now
+    for (const ws of openWorkspaces()) for (const p of ws.info()?.projects ?? []) void restartForWorkflow(ws, p.path).catch((err: unknown) => log.warn('restarting agents for the workflow rules switch', err))
+  })
+}
