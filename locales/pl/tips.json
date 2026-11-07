@@ -27,6 +27,8 @@
   "tips.allKeysToCli.title": "Oddaj wszystkie klawisze CLI agenta",
   "tips.alwaysOnTop.text": "Pinezka na pasku tytułu (lub Ctrl+Alt+O) trzyma okno nad innymi aplikacjami, a pod nim mogą działać testy albo emulator. Każde okno ma własne ustawienie, zapamiętane dla jego obszaru roboczego.",
   "tips.alwaysOnTop.title": "Okno Combwork zawsze na wierzchu",
+  "tips.antigravity.text": "Agenci mogą używać Antigravity CLI od Google. Konfiguracja dostawców je instaluje; zaloguj się raz w terminalu, a wszystkie obszary robocze na tym komputerze współdzielą logowanie. Każdy agent działa we własnym prywatnym profilu.",
+  "tips.antigravity.title": "Uruchamiaj agentów w Antigravity CLI",
   "tips.antivirus.text": "W Windows Microsoft Defender skanuje każdy plik, którego dotykają kompilacje, testy i git. Ustawienia → Obszar roboczy → Skanowanie antywirusowe pokazuje, czy skanuje Twój obszar roboczy, i za Twoją zgodą może wykluczyć jego foldery.",
   "tips.antivirus.title": "Antywirus a Twój obszar roboczy",
   "tips.archiveNew.text": "Najtańszy sposób, by kontynuować po długiej sesji: zarchiwizuj ją i zacznij od czystej, żeby nic starego nie trafiało ponownie do pamięci podręcznej. Najpierw napisz przekazanie, żeby nowa sesja wiedziała, gdzie podjąć pracę.",

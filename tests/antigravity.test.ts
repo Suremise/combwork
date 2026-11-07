@@ -1,0 +1,298 @@
+// The Antigravity CLI as a provider (HI-2544, against agy 1.5.0; the runtime facts are HI-2543's and HI-2544's own runs):
+// install and readiness (signed out only on the recorded pattern), the catalog from `agy models`, the environment (account
+// variables, the updater, a private USERPROFILE with HOME kept), the workspace's .agents config (fail closed), each
+// agent's private profile (Combwork's servers; a project's own server not given refuses the launch), the
+// launch settings and arguments, conversation ids, and the PC-wide account.
+import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import { describe, expect, it } from 'vitest'
+import * as electron from 'electron'
+import { tempDir } from './tempDir'
+
+const base = tempDir('cw-antigravity-')
+process.env.CW_USER_DATA = join(base, 'userdata')
+;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+
+const { classifyModels, isEditorCopy, parseAntigravityVersion } = await import('../src/main/providers/antigravity/install')
+const { parseModels } = await import('../src/main/providers/antigravity/models')
+const { ANTIGRAVITY_ENV_STRIP, antigravityEnv, inProfile, brainDir } = await import('../src/main/providers/antigravity/home')
+const { UnreadableConfig, scannedFolders, workspaceServers } = await import('../src/main/providers/antigravity/projectConfig')
+const { agyServer, antigravity, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
+const { advanced } = await import('../src/main/advanced')
+const { ensurePcAccounts, homeAccount, pcAccountId, pcWideSignIn } = await import('../src/shared/connectionDefaults')
+const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
+
+const FIX = join(__dirname, 'fixtures', 'advanced')
+const models = readFileSync(join(FIX, 'models-antigravity-1.5.0.txt'), 'utf8')
+const signedOut = readFileSync(join(FIX, 'models-signedout-antigravity-1.5.0.txt'), 'utf8')
+const signInPattern = () => advanced.pattern('antigravity.signIn.needed')
+const CONV = '12b14cd0-6972-4a51-8d38-f8c898d76659'
+
+describe('install and readiness (agy 1.5.0)', () => {
+  it('its version, as `agy --version` prints it; anything else is none', () => {
+    expect(parseAntigravityVersion('1.5.0\n')).toBe('1.5.0')
+    expect(parseAntigravityVersion('v1.6.0-rc.1\r\n')).toBe('1.6.0-rc.1')
+    expect(parseAntigravityVersion('Usage of agy.exe:')).toBeNull()
+  })
+
+  it("an editor's copy is never used; the standalone CLI is", () => {
+    expect(isEditorCopy('C:\\Users\\d\\.vscode\\extensions\\google.antigravity-1.0\\bin\\agy.exe')).toBe(true)
+    expect(isEditorCopy('C:\\Users\\d\\AppData\\Local\\Programs\\Antigravity\\resources\\app\\bin\\agy.exe')).toBe(true)
+    expect(isEditorCopy('C:\\Users\\d\\AppData\\Local\\agy\\bin\\agy.exe')).toBe(false)
+  })
+
+  it('agy models: signed in lists the models; signed out only on the recorded pattern; any other failure is an error, never a sign-in to do', () => {
+    expect(classifyModels({ stdout: models, stderr: 'Fetching available models...\n', code: 0 }, signInPattern())).toMatchObject({ kind: 'ok', models: expect.arrayContaining([{ value: 'gemini-3.8-flash-low', label: 'Gemini 3.8 Flash (Low)' }]) })
+    expect(classifyModels({ stdout: '', stderr: signedOut, code: 1 }, signInPattern())).toMatchObject({ kind: 'signIn' })
+    for (const text of ['Error: dial tcp: lookup api.example: no such host', 'Error: 503 Service Unavailable', 'context deadline exceeded'])
+      expect(classifyModels({ stdout: '', stderr: text, code: 1 }, signInPattern()), text).toMatchObject({ kind: 'error', text })
+    expect(classifyModels({ stdout: '', stderr: 'still fetching', code: 1, ended: true }, signInPattern())).toMatchObject({ kind: 'error' })
+    // No pattern, or an empty one: never signed out.
+    expect(classifyModels({ stdout: '', stderr: signedOut, code: 1 }, null).kind).toBe('error')
+    expect(classifyModels({ stdout: '', stderr: signedOut, code: 1 }, new RegExp('')).kind).toBe('error')
+    // A run that listed nothing isn't "signed in" either.
+    expect(classifyModels({ stdout: '\n', stderr: '', code: 0 }, signInPattern()).kind).toBe('error')
+  })
+
+  it('readiness: not installed, or signed out; an unclassified failure raises no sign-in issue', () => {
+    const info = { provider: 'antigravity', found: true, path: 'C:\\agy.exe', version: '1.5.0', source: 'installer', latestVersion: null, updateAvailable: false, authMethod: null, account: null, rejected: [] }
+    expect(antigravity.readiness({ ...info, found: false, loggedIn: null }).map((i) => i.id)).toEqual(['not-installed'])
+    expect(antigravity.readiness({ ...info, loggedIn: false }).map((i) => i.level)).toEqual(['error'])
+    expect(antigravity.readiness({ ...info, loggedIn: null })).toEqual([])
+    expect(antigravity.readiness({ ...info, loggedIn: true })).toEqual([])
+  })
+})
+
+describe('the catalog (agy models: id, a tab, its display name)', () => {
+  it('each model by its id, its display name apart; the ids never made from the names', () => {
+    const list = parseModels(models)
+    expect(list.map((m) => m.value)).toEqual(['gemini-3.8-flash-high', 'gemini-3.8-flash-medium', 'gemini-3.8-flash-low', 'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gpt-oss-120b-medium'])
+    expect(list.find((m) => m.value === 'claude-opus-4-6-thinking')?.label).toBe('Claude Opus 4.6 (Thinking)')
+  })
+
+  it('lines it can’t read are skipped; an id of a new shape is kept as it is; no duplicates', () => {
+    expect(parseModels('Fetching available models...\nnew-model.v2:preview\tSomething New\n\ngemini-x\tA\ngemini-x\tA again\n').map((m) => [m.value, m.label])).toEqual([
+      ['new-model.v2:preview', 'Something New'],
+      ['gemini-x', 'A']
+    ])
+  })
+})
+
+describe('the environment', () => {
+  const env = { PATH: 'C:\\bin', GEMINI_API_KEY: 'k', agy_adc_auth: 'true', AGY_ACCOUNT: 'x@y', AGY_CLI_DISABLE_AUTO_UPDATE: 'false', HOME: 'C:\\Users\\me' }
+
+  it('account and provider variables are left out (any case), unless the switch is off; a connection’s own put back', () => {
+    const out = antigravityEnv(env, true, true)
+    for (const k of ANTIGRAVITY_ENV_STRIP) expect(Object.keys(out).some((x) => x.toUpperCase() === k), k).toBe(false)
+    expect(out.PATH).toBe('C:\\bin')
+    expect(antigravityEnv(env, true, false).GEMINI_API_KEY).toBe('k')
+    expect(antigravityEnv(env, true, true, { GEMINI_API_KEY: 'mine' }).GEMINI_API_KEY).toBe('mine')
+  })
+
+  it('never updating itself (AGY_CLI_DISABLE_AUTO_UPDATE=true), unless the switch is off: the user’s own value is left then', () => {
+    expect(antigravityEnv(env, true, true).AGY_CLI_DISABLE_AUTO_UPDATE).toBe('true')
+    expect(antigravityEnv(env, false, true).AGY_CLI_DISABLE_AUTO_UPDATE).toBe('false')
+  })
+
+  it('a private USERPROFILE for agy, and the user’s HOME kept for git, Git Bash and ssh', () => {
+    const out = inProfile({ USERPROFILE: 'C:\\Users\\me', Path: 'x' }, 'D:\\profile', 'C:\\Users\\me')
+    expect(out.USERPROFILE).toBe('D:\\profile')
+    expect(out.HOME).toBe('C:\\Users\\me')
+    expect(Object.keys(out).filter((k) => k.toUpperCase() === 'USERPROFILE')).toEqual(['USERPROFILE'])
+    // A HOME the user's environment sets is kept as it is.
+    expect(inProfile({ HOME: '/c/Users/me' }, 'D:\\profile', 'C:\\Users\\other').HOME).toBe('/c/Users/me')
+  })
+})
+
+describe("the workspace's .agents config (what agy would load from it)", () => {
+  const repo = join(base, 'repo')
+  const sub = join(repo, 'packages', 'app')
+  mkdirSync(join(repo, '.git'), { recursive: true })
+  mkdirSync(join(repo, '.agents'), { recursive: true })
+  mkdirSync(join(sub, '_agent'), { recursive: true })
+  writeFileSync(join(repo, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { sentinel: { command: 'x' }, shared: { url: 'https://x' } } }))
+  writeFileSync(join(sub, '_agent', 'mcp_config.json'), JSON.stringify({ mcpServers: { legacy: { command: 'y' } } }))
+
+  it('each folder up to the repository root (the one with .git), and no further', () => {
+    expect(scannedFolders(sub)).toEqual([sub, join(repo, 'packages'), repo])
+  })
+
+  it('its servers, the legacy folders too, from the folder and each --add-dir, each with its file and definition', async () => {
+    const w = await workspaceServers([sub])
+    expect([...w.keys()].sort()).toEqual(['legacy', 'sentinel', 'shared'])
+    expect(w.get('sentinel')).toEqual([{ file: join(repo, '.agents', 'mcp_config.json'), def: { command: 'x' } }])
+    expect(w.get('legacy')?.[0].file).toBe(join(sub, '_agent', 'mcp_config.json'))
+    const added = join(base, 'added')
+    mkdirSync(join(added, '.git'), { recursive: true })
+    mkdirSync(join(added, '.agents'), { recursive: true })
+    writeFileSync(join(added, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { extra: { command: 'z' } } }))
+    expect([...(await workspaceServers([sub, added])).keys()].sort()).toEqual(['extra', 'legacy', 'sentinel', 'shared'])
+  })
+
+  it('every definition of a name, from each file (which one agy uses isn’t known); own keys only, __proto__ too', async () => {
+    const two = join(base, 'two')
+    mkdirSync(join(two, '.git'), { recursive: true })
+    mkdirSync(join(two, '.agents'), { recursive: true })
+    mkdirSync(join(two, '_agents'), { recursive: true })
+    writeFileSync(join(two, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { s: { command: 'a' } } }))
+    writeFileSync(join(two, '_agents', 'mcp_config.json'), '{ "mcpServers": { "s": { "command": "b" }, "__proto__": { "command": "p" }, "constructor": { "command": "c" } } }')
+    const w = await workspaceServers([two])
+    expect(w.get('s')?.map((x) => x.def)).toEqual([{ command: 'a' }, { command: 'b' }])
+    expect([...w.keys()].sort()).toEqual(['__proto__', 'constructor', 's'])
+  })
+
+  it('a file it can’t read as JSON (or of the wrong shape) refuses: never read as empty', async () => {
+    const bad = join(base, 'bad')
+    mkdirSync(join(bad, '.git'), { recursive: true })
+    mkdirSync(join(bad, '.agents'), { recursive: true })
+    for (const text of ['{ not json', '[1, 2]', JSON.stringify({ mcpServers: ['x'] })]) {
+      writeFileSync(join(bad, '.agents', 'mcp_config.json'), text)
+      await expect(workspaceServers([bad]), text).rejects.toBeInstanceOf(UnreadableConfig)
+    }
+    // An empty file is none.
+    writeFileSync(join(bad, '.agents', 'mcp_config.json'), '')
+    expect((await workspaceServers([bad])).size).toBe(0)
+  })
+})
+
+describe("an agent's private profile, written for each launch", () => {
+  const tools = { command: 'C:\\Program Files\\Combwork\\Combwork.exe', args: ['C:\\Program Files\\Combwork\\resources\\app.asar.unpacked\\out\\main\\cw-mcp.js'], env: { ELECTRON_RUN_AS_NODE: '1', CW_API_TOKEN: 'launch-token', CW_PROJECT: 'alpha' } }
+  const project = join('C:\\repo', '.agents', 'mcp_config.json')
+  const workspace = new Map([['sentinel', [{ file: project, def: { command: 'node', args: ['sentinel.js'] } }]]])
+  const one = (name: string, def: unknown, file = project) => new Map([[name, [{ file, def }]]])
+
+  it("Combwork's servers with their own env (the launch's token)", () => {
+    const made = profileConfig({ [TOOLS_SERVER]: tools, remote: { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer t' } } }, new Map())
+    const servers = made.mcp.mcpServers as Record<string, Record<string, unknown>>
+    expect(servers[TOOLS_SERVER]).toEqual({ command: tools.command, args: tools.args, env: tools.env })
+    expect(servers.remote).toEqual({ url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer t' } })
+    expect(made.refused).toBeUndefined()
+  })
+
+  it("a project server the agent wasn't given refuses the launch, naming its file: nothing stands in for it", () => {
+    const made = profileConfig({ [TOOLS_SERVER]: tools }, workspace)
+    expect(made.refused).toEqual(new Map([['sentinel', project]]))
+    expect(Object.keys(made.mcp.mcpServers as object)).toEqual([TOOLS_SERVER])
+    expect(profileConfig({}, workspace).refused?.has('sentinel')).toBe(true)
+  })
+
+  it('given under its name counts only as the very same server (were the given one to end, agy would start the project’s)', () => {
+    // Identical in every field: allowed (an empty args, env or headers is the same as none).
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'] } }, workspace).refused).toBeUndefined()
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'], env: { M: 'a' } } }, one('sentinel', { command: 'node', args: ['sentinel.js'], env: { M: 'a' } })).refused).toBeUndefined()
+    expect(profileConfig({ r: { url: 'https://mcp.example/mcp' } }, one('r', { url: 'https://mcp.example/mcp', headers: {} })).refused).toBeUndefined()
+    // Other code: other arguments, or the same command and arguments with another environment (HR1: a server that loads
+    // process.env.MODULE runs other code), or an environment only one has.
+    expect(profileConfig({ sentinel: { command: 'node', args: ['other.js'] } }, workspace).refused?.get('sentinel')).toBe(project)
+    expect(profileConfig({ sentinel: { command: 'node', args: ['server.cjs'], env: { MODULE: 'approved.cjs' } } }, one('sentinel', { command: 'node', args: ['server.cjs'], env: { MODULE: 'excluded.cjs' } })).refused?.has('sentinel')).toBe(true)
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'], env: { K: 'v' } } }, workspace).refused?.has('sentinel')).toBe(true)
+    // Another account or scope: the same URL with other headers, or headers only one has.
+    expect(profileConfig({ r: { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer mine' } } }, one('r', { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer other' } })).refused?.has('r')).toBe(true)
+    expect(profileConfig({ r: { url: 'https://mcp.example/mcp' } }, one('r', { url: 'https://mcp.example/mcp', headers: { Authorization: 'Bearer other' } })).refused?.has('r')).toBe(true)
+    // A field Combwork doesn't give (another transport, working folder, anything unrecognised): not the same.
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'] } }, one('sentinel', { command: 'node', args: ['sentinel.js'], cwd: 'C:\\elsewhere' })).refused?.has('sentinel')).toBe(true)
+    expect(profileConfig({ r: { url: 'https://mcp.example/mcp' } }, one('r', { url: 'https://mcp.example/mcp', type: 'sse' })).refused?.has('r')).toBe(true)
+    // Every definition of the name must be the same: one other among several refuses, naming its file.
+    const other = join('C:\\repo', '_agents', 'mcp_config.json')
+    const both = new Map([['sentinel', [{ file: project, def: { command: 'node', args: ['sentinel.js'] } }, { file: other, def: { command: 'node', args: ['evil.js'] } }]]])
+    expect(profileConfig({ sentinel: { command: 'node', args: ['sentinel.js'] } }, both).refused?.get('sentinel')).toBe(other)
+    // Combwork's own server's name in a project's file is refused too, unless it is Combwork's server as given.
+    expect(profileConfig({ [TOOLS_SERVER]: tools }, one(TOOLS_SERVER, { command: 'evil.exe' })).refused?.has(TOOLS_SERVER)).toBe(true)
+    expect(sameServer({ url: 'https://a' }, { command: 'https://a' })).toBe(false)
+    expect(sameServer({}, {})).toBe(false)
+    expect(sameServer({ env: { A: '1' } }, { env: { A: '1' } })).toBe(false)
+  })
+
+  it('a server named __proto__, constructor or toString is an entry like any other; nothing inherited counts as given', () => {
+    const given = JSON.parse('{"__proto__":{"command":"node","args":["p.cjs"]},"constructor":{"command":"node","args":["c.cjs"]},"toString":{"command":"node","args":["t.cjs"]}}')
+    const made = profileConfig(given, new Map())
+    // Serialised as written to the profile: each its own entry (compared as text, as an object literal's __proto__ sets a prototype).
+    expect(JSON.stringify(made.mcp)).toBe('{"mcpServers":{"__proto__":{"command":"node","args":["p.cjs"]},"constructor":{"command":"node","args":["c.cjs"]},"toString":{"command":"node","args":["t.cjs"]}}}')
+    expect(Object.keys(made.mcp.mcpServers as object).sort()).toEqual(['__proto__', 'constructor', 'toString'])
+    // A project's server of such a name, not given: refused, never taken for an inherited property.
+    for (const name of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) expect(profileConfig({}, one(name, { command: 'x' })).refused?.has(name), name).toBe(true)
+    // Given as the very same server under such a name: allowed.
+    expect(profileConfig(JSON.parse('{"constructor":{"command":"x"}}'), one('constructor', { command: 'x' })).refused).toBeUndefined()
+  })
+
+  it('agy’s form of a server: stdio or Streamable HTTP; one with neither is left out', () => {
+    expect(agyServer({ command: 'node', args: [], env: {} })).toEqual({ command: 'node', env: {} })
+    expect(agyServer({ description: 'x' })).toBeNull()
+  })
+
+  it('kept per agent (a moved project finds it unchanged); the Assistant’s per workspace', () => {
+    expect(profileFolder('a-12ab34cd', 'C:\\ws1')).toBe(profileFolder('a-12ab34cd', 'D:\\moved\\ws1'))
+    expect(profileFolder('assistant', 'C:\\ws1')).not.toBe(profileFolder('assistant', 'C:\\ws2'))
+    expect(profileFolder('assistant', 'C:\\WS1')).toBe(profileFolder('assistant', 'c:\\ws1'))
+  })
+})
+
+describe('launch settings and arguments (1.5.0)', () => {
+  const ctx = { hookUrl: 'http://127.0.0.1:47822/hook?run=r1', hookAuthFile: 'C:\\Users\\Jo Smith\\launch\\hook-auth.txt', mcpServers: { [TOOLS_SERVER]: { command: 'c' } }, trustedCombworkTools: undefined }
+
+  it("the status line is Combwork's own command (the run's URL and token), which agy's cmd /c can run", () => {
+    const s = launchSettings(ctx, true) as { statusLine: { type: string; command: string }; permissions?: { allow: string[] } }
+    expect(s.statusLine.type).toBe('command')
+    expect(s.statusLine.command.startsWith('curl')).toBe(true)
+    expect(s.statusLine.command).toContain('run=r1&statusline')
+    expect(s.statusLine.command).toContain('"@C:/Users/Jo Smith/launch/hook-auth.txt"')
+    expect(s.permissions?.allow).toEqual([`mcp(${TOOLS_SERVER})`])
+    expect((launchSettings(ctx, false) as { permissions?: unknown }).permissions).toBeUndefined()
+    expect((launchSettings({ ...ctx, trustedCombworkTools: ['cw_inbox'] }, true) as { permissions: { allow: string[] } }).permissions.allow).toEqual([`mcp(${TOOLS_SERVER}:cw_inbox)`])
+  })
+
+  const launch = { resume: false, sessionId: '', model: 'gemini-3.8-flash-low', effort: 'high', permissionMode: 'accept-edits', extraDirs: ['D:\\review copy'], extraArgs: ['--sandbox'], initialPrompt: 'Read the card' }
+  it('a new launch: its settings, model, effort, mode, extra folders, the user’s arguments, then its first task', () => {
+    expect(antigravityArgs(launch, 'P:\\agy-settings.json')).toEqual(['--settings', 'P:\\agy-settings.json', '--model', 'gemini-3.8-flash-low', '--effort', 'high', '--mode', 'accept-edits', '--add-dir', 'D:\\review copy', '--sandbox', '-i', 'Read the card'])
+  })
+
+  it('each mode’s flag: Ask none, the no-guardrails mode --dangerously-skip-permissions', () => {
+    const flags = (permissionMode: string) => antigravityArgs({ ...launch, permissionMode, extraDirs: [], extraArgs: [], initialPrompt: undefined }, 's').slice(6)
+    expect(flags('ask')).toEqual([])
+    expect(flags('plan')).toEqual(['--mode', 'plan'])
+    expect(flags('auto')).toEqual(['--mode', 'auto'])
+    expect(flags('bypass')).toEqual(['--dangerously-skip-permissions'])
+  })
+
+  it('a resume reopens its conversation by id; anything but a conversation id is refused', () => {
+    expect(antigravityArgs({ ...launch, resume: true, sessionId: CONV, extraDirs: [], extraArgs: [], initialPrompt: undefined }, 's').slice(0, 2)).toEqual(['--conversation', CONV])
+    expect(() => antigravityArgs({ ...launch, resume: true, sessionId: '..\\other' }, 's')).toThrow()
+  })
+})
+
+describe('conversation ids', () => {
+  it("the status line's id, only when it is a conversation id (never a path)", () => {
+    expect(statusLineConversation({ conversation_id: CONV })).toBe(CONV)
+    expect(statusLineConversation({ session_id: CONV })).toBe(CONV)
+    for (const v of ['', '..\\..\\x', 'not-an-id', 42, null]) expect(statusLineConversation({ conversation_id: v }), String(v)).toBeNull()
+    expect(isConversationId(CONV.toUpperCase())).toBe(true)
+  })
+
+  it("a resume reopens only one of the agent's own conversations", async () => {
+    const own = join(brainDir(profileFolder('a-own0001', 'C:\\ws')), CONV)
+    mkdirSync(own, { recursive: true })
+    expect(await antigravity.ownsConversation('a-own0001', 'C:\\ws', CONV)).toBe(true)
+    // Another agent's, a missing one, or not an id at all.
+    expect(await antigravity.ownsConversation('a-other001', 'C:\\ws', CONV)).toBe(false)
+    expect(await antigravity.ownsConversation('a-own0001', 'C:\\ws', '88931470-dbf8-455e-8c2f-76840a752604')).toBe(false)
+    expect(await antigravity.ownsConversation('a-own0001', 'C:\\ws', '..')).toBe(false)
+  })
+})
+
+describe('the PC-wide sign-in (like Copilot’s)', () => {
+  it("its own account, never Copilot's", () => {
+    expect(pcWideSignIn('antigravity')).toBe(true)
+    expect(pcWideSignIn('claude-code')).toBe(false)
+    expect(pcAccountId('antigravity')).toBe('antigravity')
+    expect(pcAccountId('copilot')).toBe('copilot')
+  })
+
+  it('made where missing, once; one already there (Copilot’s) is left as it is', () => {
+    const store = { accounts: [{ id: 'copilot', provider: 'copilot', kind: 'signIn' as const, home: 'cli' as const, name: 'GitHub Copilot', createdAt: 'then' }], connections: [], newId: (() => { let n = 0; return () => `c-${++n}` })() }
+    expect(ensurePcAccounts(store, 'now')).toBe(true)
+    expect(store.accounts.map((a) => [a.id, a.provider, a.home, a.createdAt])).toEqual([['copilot', 'copilot', 'cli', 'then'], ['antigravity', 'antigravity', 'cli', 'now']])
+    expect(store.connections.map((c: { account: string }) => c.account).sort()).toEqual(['antigravity', 'copilot'])
+    expect(ensurePcAccounts(store, 'later')).toBe(false)
+    expect(homeAccount(store, 'antigravity', 'later').createdAt).toBe('now')
+  })
+})

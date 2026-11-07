@@ -8,7 +8,8 @@ import { Icon } from './ui'
 const SHAPES = {
   circle: <circle cx="8" cy="8" r="7.5" />,
   square: <rect x="0.75" y="0.75" width="14.5" height="14.5" rx="3.5" />,
-  diamond: <rect x="2.05" y="2.05" width="11.9" height="11.9" rx="2.6" transform="rotate(45 8 8)" />
+  diamond: <rect x="2.05" y="2.05" width="11.9" height="11.9" rx="2.6" transform="rotate(45 8 8)" />,
+  hexagon: <path d="M8 0.6 L14.4 4.3 L14.4 11.7 L8 15.4 L1.6 11.7 L1.6 4.3 Z" strokeLinejoin="round" />
 }
 
 /** What a badge shows inside its outline: white on the colour, or cut out of the single-colour form. */
@@ -23,7 +24,8 @@ const GLYPHS = {
       strokeLinecap="round"
     />
   ),
-  chevrons: <path d="M4.6 5.3 L7.3 8 L4.6 10.7 M8.4 5.3 L11.1 8 L8.4 10.7" fill="none" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+  chevrons: <path d="M4.6 5.3 L7.3 8 L4.6 10.7 M8.4 5.3 L11.1 8 L8.4 10.7" fill="none" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />,
+  rise: <path d="M8 11.6 L8 4.6 M5.2 7.3 L8 4.5 L10.8 7.3" fill="none" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
 }
 
 /**
@@ -34,7 +36,8 @@ const GLYPHS = {
 const BADGES: Record<string, { shape: keyof typeof SHAPES; glyph: keyof typeof GLYPHS; color: string }> = {
   claude: { shape: 'circle', glyph: 'tilde', color: '#e8705f' },
   codex: { shape: 'square', glyph: 'braces', color: '#14a89a' },
-  copilot: { shape: 'diamond', glyph: 'chevrons', color: '#8b6cf0' }
+  copilot: { shape: 'diamond', glyph: 'chevrons', color: '#8b6cf0' },
+  antigravity: { shape: 'hexagon', glyph: 'rise', color: '#3d8fd6' }
 }
 
 /**

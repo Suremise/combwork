@@ -27,6 +27,8 @@
   "tips.allKeysToCli.title": "Gib jede Taste an die CLI des Agenten",
   "tips.alwaysOnTop.text": "Die Pinnadel in der Titelleiste (oder Strg+Alt+O) hält das Fenster über deinen anderen Apps, sodass darunter ein Testlauf oder ein Emulator arbeiten kann. Jedes Fenster hat eine eigene, gespeichert für seinen Arbeitsbereich.",
   "tips.alwaysOnTop.title": "Ein Combwork-Fenster im Vordergrund halten",
+  "tips.antigravity.text": "Agenten können Googles Antigravity CLI verwenden. Die Anbieter-Einrichtung installiert sie; melde dich einmal in einem Terminal an, und jeder Arbeitsbereich auf diesem PC teilt die Anmeldung. Jeder Agent läuft in einem eigenen privaten Profil.",
+  "tips.antigravity.title": "Agenten mit der Antigravity CLI ausführen",
   "tips.antivirus.text": "Unter Windows prüft Microsoft Defender jede Datei, die Builds, Tests und Git anfassen. Einstellungen → Arbeitsbereich → Virenscan zeigt, ob er deinen Arbeitsbereich prüft, und kann dessen Ordner mit deiner Zustimmung ausschließen.",
   "tips.antivirus.title": "Virenschutz und dein Arbeitsbereich",
   "tips.archiveNew.text": "Der günstigste Weg, nach einer langen Sitzung weiterzumachen: Archiviere sie und beginne neu, damit nichts Altes erneut gecacht wird. Schreib vorher eine Übergabe, damit die neue Sitzung weiß, wo es weitergeht.",

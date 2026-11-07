@@ -5843,6 +5843,32 @@ class SessionManager {
     devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'statusline', name: 'status line', provider: l.state.provider, raw: body, made: d, safe: { raw: STATUSLINE_FIELDS, made: DETAILS_FIELDS }, summary: statusLineSummary(d) }))
     flightRecorder.arrived(l.state, () => this.label(l.state), 'statusline', body)
     this.applyDetails(l, d)
+    // A CLI that names its conversation only after it starts (HI-2544: the Antigravity CLI), in its status line: this
+    // launch's (its run id and token), taken while it has none; a known conversation is never replaced by another.
+    const conv = l.adapter.statusLineSession?.(body) ?? null
+    // Only the current launch's own status line (a stale one of an earlier run of this agent never names this one's).
+    if (conv && runId !== l.state.runId) log.warn(`${userText(this.label(l.state))}: a status line of run ${runId ?? 'none'} named conversation ${conv}: not this launch's (${l.state.runId}), ignored`)
+    else if (conv && !l.state.sessionId) void this.adoptSessionId(l, conv, 'status line') // i18n-ignore: a log line's words
+    else if (conv && conv !== l.state.sessionId) log.warn(`${userText(this.label(l.state))}: its status line named conversation ${conv}, not ${l.state.sessionId}: kept ${l.state.sessionId}`)
+  }
+
+  /** A launch's conversation id, learned after it started (`from`: what said it, for the log): recorded as its session. */
+  private async adoptSessionId(l: LiveSession, id: string, from: string): Promise<void> {
+    const st = l.state
+    const current = (): boolean => this.live.get(liveId(st.projectPath, st.agentId)) === l
+    try {
+      st.sessionId = assertSessionId(id)
+      const { agent } = await this.agentDef(st.projectPath, st.agentId)
+      if (!current()) return
+      await this.recordSession(st.projectPath, agent, l)
+      if (!current()) return
+      this.emitState(st)
+      workspaceOf(st.projectPath).scheduleRefresh()
+      log.info(`${userText(this.label(st))}: its conversation is ${id} (from its ${from})`)
+    } catch (e) {
+      if (!current()) return
+      log.warn(`${userText(this.label(st))}: could not record session ${id}`, e)
+    }
   }
 
   /** `hooks`: details read from the transcript, as it was when the launch had had that many hooks (readDetails). */

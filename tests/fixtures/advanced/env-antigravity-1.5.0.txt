@@ -1,0 +1,7 @@
+The CLI's own log (~\.gemini\antigravity-cli\log\cli-*.log) of a session started with AGY_CLI_DISABLE_AUTO_UPDATE=true (HI-2543):
+auto_updater.go:247] Auto-update disabled via environment variable AGY_CLI_DISABLE_AUTO_UPDATE
+
+Account and provider variables named in the agy 1.5.0 binary (a static scan of agy_cli_windows_x64.zip's antigravity.exe, sha256 48E846B330280CE5FE9550915D8D5DC98FB2C6A307BDC6038562A84192517554; HI-2544):
+GEMINI_API_KEY
+AGY_ADC_AUTH
+AGY_ACCOUNT

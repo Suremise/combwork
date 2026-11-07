@@ -27,6 +27,8 @@
   "tips.allKeysToCli.title": "Donne toutes les touches à la CLI de l’agent",
   "tips.alwaysOnTop.text": "L’épingle de la barre de titre (ou Ctrl+Alt+O) garde la fenêtre au-dessus de tes autres applications, pour qu’une série de tests ou un émulateur tourne en dessous. Chaque fenêtre a la sienne, mémorisée pour son espace de travail.",
   "tips.alwaysOnTop.title": "Garder une fenêtre Combwork au premier plan",
+  "tips.antigravity.text": "Les agents peuvent utiliser l’Antigravity CLI de Google. Configuration des fournisseurs l’installe ; connecte-toi une fois dans un terminal, et chaque espace de travail de ce PC partage la connexion. Chaque agent s’exécute dans un profil privé qui lui est propre.",
+  "tips.antigravity.title": "Exécuter des agents avec l’Antigravity CLI",
   "tips.antivirus.text": "Sous Windows, Microsoft Defender analyse chaque fichier que touchent les builds, les tests et git. Paramètres → Espace de travail → Analyse antivirus indique s’il analyse ton espace de travail et peut en exclure les dossiers, avec ton accord.",
   "tips.antivirus.title": "L’antivirus et ton espace de travail",
   "tips.archiveNew.text": "Le moyen le moins cher de continuer après une longue session : l’archiver et repartir de zéro, pour que rien d’ancien ne soit remis en cache. Écris d’abord une passation pour que la nouvelle session sache où reprendre.",

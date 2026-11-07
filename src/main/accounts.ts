@@ -6,7 +6,7 @@ import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unli
 import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, UsageMoveRule, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
-import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
+import { baseValues, cliDefaults, connectionFor, homeAccount, pcAccountId, pcWideSignIn, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
 import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
 import { launchesWithoutTools } from '../shared/launchPolicy'
@@ -738,14 +738,15 @@ function connectionRows(): ConnectionRow[] {
 }
 
 /**
- * The account a CLI's agents use where they have no other here (decision H): its first on in the workspace; Copilot's
- * sign-in (on everywhere); a test home's (the seam) where none is on; else none.
+ * The account a CLI's agents use where they have no other here (decision H): its first on in the workspace; its PC-wide
+ * sign-in's (Copilot's, the Antigravity CLI's: on everywhere); a test home's (the seam) where none is on; else none.
  */
 export function accountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Account | null {
   const ws = cfg ? workspaceAccounts(cfg, cli, list()) : undefined
   const on = ws?.default ? getAccount(ws.default) : undefined
   if (on) return on
-  if (!providerDescriptor(cli).capabilities.connections) return accountById(COPILOT_ACCOUNT) ?? null
+  // Its own PC-wide sign-in (Copilot's, the Antigravity CLI's): never another CLI's (HI-2544).
+  if (pcWideSignIn(cli)) return accountById(pcAccountId(cli)) ?? null
   return seamOn(cli) ? (accountById(seamAccountId(cli)) ?? null) : null
 }
 

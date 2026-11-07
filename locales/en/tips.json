@@ -111,6 +111,14 @@
     "defaultMessage": "Keep a Combwork window on top",
     "description": "A tip's title."
   },
+  "tips.antigravity.text": {
+    "defaultMessage": "Agents can use Google’s Antigravity CLI. Provider Setup installs it; sign in once in a terminal and every workspace on this PC shares the sign-in. Each agent runs in a private profile of its own.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.antigravity.title": {
+    "defaultMessage": "Run agents on the Antigravity CLI",
+    "description": "A tip's title. Antigravity CLI is a product name."
+  },
   "tips.antivirus.text": {
     "defaultMessage": "On Windows, Microsoft Defender scans every file builds, tests and git touch. Settings → Workspace → Antivirus scanning shows whether it scans your workspace and can exclude its folders, with your consent.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

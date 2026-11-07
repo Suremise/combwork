@@ -58,16 +58,17 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     // The rows on screen: only the tab shown's, each of its group.
     const visibleIds = () => list.locator('.advanced-row').evaluateAll((rows) => rows.filter((r) => r.checkVisibility()).map((r) => r.getAttribute('data-advanced')))
     const t0 = await lib.until(async () => { const t = await tabs(); return t.length ? t : null }, HUNG_MS)
-    check('tabs: Combwork, then each CLI in the providers’ order, Combwork first chosen', JSON.stringify(t0?.map((t) => t.label)) === JSON.stringify(['Combwork', 'Claude Code', 'Codex', 'GitHub Copilot']) && t0[0].selected, JSON.stringify(t0))
+    check('tabs: Combwork, then each CLI in the providers’ order, Combwork first chosen', JSON.stringify(t0?.map((t) => t.label)) === JSON.stringify(['Combwork', 'Claude Code', 'Codex', 'GitHub Copilot', 'Antigravity']) && t0[0].selected, JSON.stringify(t0))
     check('…each with its icon: Combwork’s mark, then each CLI’s own', /tab-hex/.test(t0[0].icon ?? '') && t0.slice(1).every((t) => /provider-icon/.test(t.icon ?? '')), JSON.stringify(t0.map((t) => t.icon)))
     check('…no counts while nothing filters', t0.every((t) => t.count === null))
     const providers = (await inv('settings:get')).providers
     const enabled = (id) => !!providers?.[id]?.enabled
     check('a CLI turned off: its tab dimmed, its name saying so; one on: not', t0.slice(1).every((t) => t.muted === !enabled(t.id) && (!t.muted || /is turned off: these settings apply once you turn it on/.test(t.name ?? ''))), JSON.stringify([t0.map((t) => [t.id, t.muted, t.name]), providers]))
-    const prefix = { cw: 'cw.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.' }
+    // Antigravity's CLI-facing values are two (its switches are on connections, as every CLI's are).
+    const prefix = { cw: 'cw.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.', antigravity: 'antigravity.' }
     for (const t of t0) {
       await tab(t.id).click()
-      check(`the ${t.label} tab shows only its own values`, !!(await lib.until(async () => { const v = await visibleIds(); return (await selectedTab()) === t.id && v.length > 5 && v.every((id) => id.startsWith(prefix[t.id])) }, HUNG_MS)), JSON.stringify((await visibleIds()).slice(0, 5)))
+      check(`the ${t.label} tab shows only its own values`, !!(await lib.until(async () => { const v = await visibleIds(); return (await selectedTab()) === t.id && v.length > (t.id === 'antigravity' ? 1 : 5) && v.every((id) => id.startsWith(prefix[t.id])) }, HUNG_MS)), JSON.stringify((await visibleIds()).slice(0, 5)))
     }
     const muted = t0.find((t) => t.muted)
     if (muted) {
@@ -303,7 +304,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     // Settings' own Modified only, at the top, filters the list too.
     await page.locator('.settings-top').getByLabel('Modified only').check()
     check("Settings' Modified only lists only the changed advanced values", !!(await lib.until(async () => (await ids()) === changedIds, HUNG_MS)), await ids())
-    check('…each tab counting its changed ones (Combwork 2, Claude Code 1, Codex 2, GitHub Copilot 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0]', HUNG_MS)), JSON.stringify(await tabs()))
+    check('…each tab counting its changed ones (Combwork 2, Claude Code 1, Codex 2, GitHub Copilot 0, Antigravity 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0,0]', HUNG_MS)), JSON.stringify(await tabs()))
     await page.locator('.settings-top').getByLabel('Modified only').uncheck()
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await list.getByLabel('Modified only').check()

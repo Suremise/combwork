@@ -14,6 +14,56 @@
     "note": "A setting's title (Settings → Accounts & Connections, HI-2107): the list of accounts, each with its connections.",
     "audience": "both"
   },
+  "settings.advanced.antigravity.models.line.desc": {
+    "text": "One line of agy models' list: the model's id (its first group), then its display name (its second). Combwork passes the id and shows the name.",
+    "note": "What the advanced setting \"A model in agy models\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.models.line.title": {
+    "text": "A model in agy models",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of one line of the CLI's model list. agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.desc": {
+    "text": "Combwork starts agy with AGY_CLI_DISABLE_AUTO_UPDATE=true (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Provider Setup updates it when you choose. Turned off, Combwork doesn't set it and agy updates itself as it would outside Combwork (your own AGY_CLI_DISABLE_AUTO_UPDATE still applies).",
+    "note": "What the advanced setting \"Don't let Antigravity update itself\" does (Settings → Advanced, under Antigravity CLI). agy is a command and AGY_CLI_DISABLE_AUTO_UPDATE=true an environment variable: keep them. Update is a button's name and Provider Setup a dialog's.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.title": {
+    "text": "Don't let Antigravity update itself",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.desc": {
+    "text": "Combwork starts agy with an allow rule for Combwork's tools in its settings for that session (for the Assistant, only those its Control settings let it use without asking), so agy doesn't ask before them. Turned off, agy asks before them as its own permission mode says. What an agent or the Assistant may do with them is still decided by Combwork.",
+    "note": "What the advanced setting \"Pre-approve Combwork's tools\" does (Settings → Advanced, under Antigravity CLI). agy is a command: keep it. Control is the name of the Assistant's settings page.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.title": {
+    "text": "Pre-approve Combwork's tools",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.desc": {
+    "text": "Combwork leaves GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT out of agy's environment (its sessions, and checking its sign-in and models), so a key or account another tool set never switches Antigravity agents away from this PC's sign-in. Turned off, agy gets them from Combwork's environment as it would outside Combwork.",
+    "note": "What the advanced setting \"Keep other accounts' variables from Antigravity\" does (Settings → Advanced, under Antigravity CLI). GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT are environment variables and agy a command: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.title": {
+    "text": "Keep other accounts' variables from Antigravity",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.signIn.needed.desc": {
+    "text": "What agy models prints when the PC isn't signed in to Antigravity. Only this says signed out: any other failure (the network, the service, a timeout) is shown as it is, never as a sign-in to do.",
+    "note": "What the advanced setting \"Not signed in (agy models)\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.signIn.needed.title": {
+    "text": "Not signed in (agy models)",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of the CLI's message when it isn't signed in. agy models is a command: keep it.",
+    "audience": "both"
+  },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "text": "The environment variables Combwork leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",
     "note": "What the advanced setting \"Connections: sign-in variables left out\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
