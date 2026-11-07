@@ -16,6 +16,11 @@ import { acquireTestHome, consumerHooks, holderLiveFor, holderOf, homesOf, lease
 // homes with known bytes, the CLIs' sign-in status scripted, nothing real read or signed in.
 
 const ctx = createRequire(import.meta.url)('./e2e/runContext.cjs')
+/** Test processes are ended by identity, never by a remembered pid (#603, folderProcesses.cjs). */
+const { endExactly, identify } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as {
+  endExactly: (targets: { pid: number; started: number }[]) => number
+  identify: (pids: number[]) => { pid: number; started: number }[]
+}
 const tmp = tempDir('cw-test-homes-')
 /** A process list in which this process is the holder, started at HOLDER_STARTED (its acquisitions pass ownerStarted). */
 const HOLDER_STARTED = 5_000_000
@@ -321,15 +326,10 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
   const lockPool = (): string => join(tmp, `locks-s29-${++n}`)
   // A CLI that knows its home only from its environment: node, given nothing on its command line about the home.
   const SLEEP = 'setInterval(() => {}, 1000)'
-  const spawned: number[] = []
+  const spawned: { pid: number; started: number }[] = []
   afterAll(() => {
-    for (const pid of spawned) {
-      try {
-        process.kill(pid)
-      } catch {
-        // Gone already.
-      }
-    }
+    // Each as identified when it started: one gone already, or a pid reused since, ends nothing.
+    endExactly(spawned)
   })
   /** A parent that starts a detached CLI stand-in (its home only in its environment) and exits: the child's pid. */
   const orphanFrom = (parentOut: string): { parent: { pid: number; started: number }; child: () => number } => {
@@ -353,7 +353,9 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
     noteConsumers(first, [parent])
     await waitFor(() => existsSync(out) && Number(readFileSync(out, 'utf8')) > 0)
     const orphan = child()
-    spawned.push(orphan)
+    // Identified while it is surely this test's (it sleeps until ended).
+    const orphanId = identify([orphan])
+    spawned.push(...orphanId)
     // The suite (its parent) ends; the lease is let go as normal.
     await waitFor(() => {
       try {
@@ -372,7 +374,7 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
       expect((err as Error).message).toMatch(new RegExp(`pid ${orphan}`))
       expect(existsSync(join(h, 'projects'))).toBe(true)
       // Ended: proven gone, the reset goes ahead and lets the consumer go.
-      process.kill(orphan)
+      endExactly(orphanId)
       await waitFor(() => {
         try {
           process.kill(orphan, 0)
@@ -399,14 +401,14 @@ describe('HR1 on s29: consumers noted before use, kept until a reset proves them
     noteConsumers(crashed, [{ folder: suite }])
     // A CLI whose own parent is long gone, launched with a path in the suite's folder (as Combwork passes --settings).
     const cli = spawn(process.execPath, ['-e', SLEEP, join(suite, 'profile', 'settings.json')], { detached: true, stdio: 'ignore', env: ctx.childEnv({}) })
-    spawned.push(cli.pid!)
+    spawned.push(...identify([cli.pid!]))
     const next = await acquireTestHome('claude', lockHome, { poolRoot: p, wait: false, alive: (pid: number) => pid !== 4321 })
     try {
       expect(next.takeover).toMatchObject({ pid: 4321 })
       const err = await freshenHome('claude', claudeHome(), { status: async () => 'in', lease: next, waitMs: 0 }).catch((e: unknown) => e)
       expect((err as Error).message).toMatch(new RegExp(`pid ${cli.pid}.*naming`))
     } finally {
-      process.kill(cli.pid!)
+      cli.kill()
       next.release()
     }
   }, 60000)

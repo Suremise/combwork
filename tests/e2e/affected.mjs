@@ -796,6 +796,8 @@ export const UNIT_SCANS = [
   { test: 'tests/folderProcesses.test.ts', paths: ['tests/', 'scripts/', 'src/'], lines: ['process\\.kill', 'task[k]ill'] },
   // Test tooling starts nothing through the shell (#599).
   { test: 'tests/windowsExits.test.ts', paths: ['tests/', 'scripts/'], lines: ['start-process', 'invoke-item', 'shell\\.open(path|external)', '\\bstart\\b'] },
+  // Every recorded CLI test home listing is classified by the reset's manifest (HI-2606).
+  { test: 'tests/testHomes.test.ts', paths: ['tests/fixtures/testHomes/'] },
   // Tests name the temp folder only through tests/tempDir.ts (#448).
   { test: 'tests/tempDir.test.ts', paths: ['tests/'], lines: ['\\btmpdir\\b', '\\benv\\s*(\\.\\s*|\\[\\s*[\'"`])(temp|tmp)\\b'] },
   // Every e2e suite and scenario starts Combwork with a test profile, quiet.
