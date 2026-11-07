@@ -155,6 +155,68 @@ describe("agy's hooks through sessions (s56)", () => {
     }
   })
 
+  it("a notice not given (past the hook's timeout, or the launch made Independent while it was drafted) isn't counted as told: a later checkpoint tells it (HR1's round 1)", async () => {
+    const { st } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
+    await hook(st, 'PreInvocation', zero(MAIN, 1))
+    const m = await leave(st)
+    const late = vi.spyOn(antigravity, 'noticeDeadlineMs').mockReturnValue(0)
+    try {
+      expect(await hook(st, 'PreInvocation', later(MAIN, 3))).toBeNull()
+    } finally {
+      late.mockRestore()
+    }
+    expect(ephemeral(await hook(st, 'PreInvocation', later(MAIN, 5, 2)))).toContain(m.id)
+    // Made Independent while the notice is drafted: none given, and none counted.
+    const m2 = await leave(st)
+    const real = sessions.inboxNotice!
+    const out = { why: null as 'independent' | 'plain' | null }
+    const keepsOut = vi.spyOn(sessions, 'keepsOut').mockImplementation(() => out.why)
+    try {
+      sessions.inboxNotice = async (state, at) => {
+        const d = await real(state, at)
+        out.why = 'independent'
+        return d
+      }
+      expect(await hook(st, 'PreInvocation', later(MAIN, 7, 3))).toBeNull()
+      sessions.inboxNotice = real
+      out.why = null
+      expect(ephemeral(await hook(st, 'PreInvocation', later(MAIN, 9, 4)))).toContain(m2.id)
+    } finally {
+      sessions.inboxNotice = real
+      keepsOut.mockRestore()
+    }
+  })
+
+  it("a status report queued behind a new turn's start is about the turn it arrived in: it never asks, idles or ends the new one, whose locks stay (HR1's round 1)", async () => {
+    const ordered = sessions as unknown as { inHookOrder: (key: string, fn: () => Promise<void> | void) => Promise<void> }
+    const status = (st: State, o: Record<string, unknown>) => run(() => sessions.handleStatusLine(st.runId, { conversation_id: MAIN, session_id: MAIN, model: null, ...o }))
+    const drain = (st: State) => run(() => ordered.inHookOrder(st.runId, () => undefined))
+    for (const report of [{ agent_state: 'idle' }, { agent_state: 'tool_use', tool_confirmation_pending: true }]) {
+      const { st, l } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
+      await hook(st, 'PreInvocation', zero(MAIN, 1))
+      // Turn A runs; the launch's queue is held while B's start and the report arrive in that order.
+      let release!: () => void
+      const gate = new Promise<void>((r) => (release = r))
+      const held = run(() => ordered.inHookOrder(st.runId, () => gate))
+      const next = hook(st, 'PreInvocation', zero(MAIN, 7))
+      await status(st, report)
+      release()
+      await held
+      await next
+      await drain(st)
+      expect(l.ledger.active?.id).toBe(`${MAIN}:i7`)
+      expect(l.idleGrace, JSON.stringify(report)).toBeUndefined()
+      expect(st.status, JSON.stringify(report)).toBe('working')
+      // B claims a file: another agent's edit of it is still refused (B's claim stands).
+      const edit = recorded('PreToolUse', (q) => q.toolCall.name === 'edit_file')
+      edit.toolCall.args.Path = join(p, `held-${l.state.agentId}.txt`)
+      expect(await hook(st, 'PreToolUse', { ...edit, stepIdx: 9 })).toEqual({ decision: 'allow' })
+      const other = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
+      await hook(other.st, 'PreInvocation', zero(MAIN, 1))
+      expect(((await hook(other.st, 'PreToolUse', edit)) as Record<string, unknown> | null)?.decision).toBe('deny')
+    }
+  })
+
   it("the user's /new: its prompt moves the launch to it; the old conversation's late events carry no notice", async () => {
     const { st } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl'), [NEW]: fixture('run-new-1.5.0.jsonl') })
     // The agent as its project has it (the session it moves to is recorded under it).

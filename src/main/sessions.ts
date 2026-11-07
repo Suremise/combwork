@@ -1268,6 +1268,9 @@ const SIGNED_IN_AGAIN = msg({ id: 'session.status.signedInAgain', defaultMessage
 const CW_SENDER = { kind: 'combwork', name: 'Combwork' } as const // i18n-ignore: the sender's name in deliveries, which agents read
 const CARRY_ON_PROMPT = SESSION.carryOn
 
+/** A notice drafted for a hook's reply (inboxNotices.ts): `commit` counts what it tells as told, once a reply carries it. */
+export type NoticeDraft = { text: string; commit: () => void }
+
 class SessionManager {
   private live = new Map<string, LiveSession>()
   /** Server markers of runs that have ended, held until their record says so or they are kept (HI-1829: serverRunEnding). */
@@ -5938,12 +5941,17 @@ class SessionManager {
       // Anything but idle is news of the turn going on: no silent end stands.
       if (!idle) this.cancelIdleGrace(l)
       if (began || ended || idle) {
+        // About the turn and session as the report arrived (HR1 on HI-2545): hooks queued before it may begin another
+        // turn by the time it is applied, and an old report must never ask, answer or end that one.
+        const turn = l.ledger?.active?.state === 'running' ? l.ledger.active.id : null
+        const session = l.state.sessionId
         void this.inHookOrder(l.state.runId, () => {
-          if (this.live.get(id) !== l || l.ledger?.active?.state !== 'running') return
+          const now = l.ledger?.active
+          if (!turn || this.live.get(id) !== l || l.state.sessionId !== session || now?.id !== turn || now.state !== 'running') return
           // Its prompt, once as it begins; gone without a tool's start or end (answered, or cancelled): no longer asked.
           if (began && ask) this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
           else if (ended) this.carryOut(id, l, hookStep({ kind: 'toolEnd' }, this.statusInput(l)), 'statusline', { kind: 'toolEnd' })
-          if (idle && l.statusIdle && !l.idleGrace) this.startIdleGrace(id, l)
+          if (idle && l.statusIdle && !l.idleGrace) this.startIdleGrace(id, l, turn)
         })
       }
     }
@@ -5953,11 +5961,12 @@ class SessionManager {
    * A running turn its status line says is over with no hook saying so (HI-2545: agy's cancelled permission prompt): the
    * turn is interrupted once idleGraceMs passes with nothing more heard of the launch. Bound to the launch's run, session
    * and turn now; at its end it looks again, in hook order: the same launch, session and turn, still running, and the
-   * status line still idle. Cancelled by any hook or other status of the launch, and by its end.
+   * status line still idle. Cancelled by any hook or other status of the launch, and by its end. `turnId`: the turn the idle
+ * report was about as it arrived, which must still be the running one.
    */
-  private startIdleGrace(id: string, l: LiveSession): void {
+  private startIdleGrace(id: string, l: LiveSession, turnId: string): void {
     const turn = l.ledger?.active
-    if (!turn || turn.state !== 'running' || !l.state.sessionId) return
+    if (!turn || turn.id !== turnId || turn.state !== 'running' || !l.state.sessionId) return
     const grace = { runId: l.state.runId, sessionId: l.state.sessionId, turn: turn.id } as Omit<NonNullable<LiveSession['idleGrace']>, 'timer'>
     const timer = setTimeout(() => {
       void this.inHookOrder(grace.runId, () => {
@@ -6470,7 +6479,7 @@ class SessionManager {
    * the turn on). The turn ledger counts a turn's end only from a Stop answered with nothing, as continuations fire no
    * prompt (#648).
    */
-  inboxNotice: ((state: LiveSessionState, at: 'checkpoint' | 'drain') => Promise<string | null> | string | null) | null = null
+  inboxNotice: ((state: LiveSessionState, at: 'checkpoint' | 'drain') => Promise<NoticeDraft | string | null> | NoticeDraft | string | null) | null = null
 
   /**
    * What Combwork answers a hook call with (the hook server sends it, then calls handleHook with the same body): a
@@ -6667,7 +6676,9 @@ class SessionManager {
     const drain = ev.kind === 'stop'
     if (drain && !(ledger.active && ledger.active.state === 'running' && ledger.active.continued === 0)) return null
     const turn = ledger.active
-    const text = await this.inboxNotice(l.state, drain ? 'drain' : 'checkpoint')
+    // Drafted, not yet told (HI-2545): its deliveries count as told only once a reply below carries it.
+    const drafted = await this.inboxNotice(l.state, drain ? 'drain' : 'checkpoint')
+    const text = typeof drafted === 'string' ? drafted : (drafted?.text ?? null)
     // Still that launch and that turn (the queue holds the rest of the launch's hooks, so only its end can change them),
     // and still one Combwork may add to (HR1 on s44: made Independent while the notice was worked out, it gets none).
     if (!text || this.findLaunch(runId, body.session_id)?.[1] !== l || ledger.active !== turn || this.noticeBarred(l)) return null
@@ -6677,7 +6688,10 @@ class SessionManager {
     const reply = l.adapter.noticeReply(raw, text)
     // A CLI that takes the drain as a new prompt: that prompt is Combwork's own, in the turn it carries on.
     if (reply && drain && l.adapter.drainIsPrompt) expectInjected(ledger, text)
-    if (reply) l.adapter.noticeGiven?.(body, (l.hookMemo ??= {}))
+    if (reply) {
+      l.adapter.noticeGiven?.(body, (l.hookMemo ??= {}))
+      if (drafted && typeof drafted === 'object') drafted.commit()
+    }
     return reply
   }
 

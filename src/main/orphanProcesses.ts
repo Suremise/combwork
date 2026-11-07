@@ -240,20 +240,33 @@ export function markOrphans(runId: string, processes: readonly ActivityProcess[]
 
 /**
  * The agent's line for what its commands left running (HI-2111), in English: each shown orphan it wasn't told of, once,
- * then counted as told. Empty when there's none, or with ORPHAN_NOTICE off (nothing counted as told then).
+ * counted as told by `commit` (HI-2545: once a hook's reply carries it). Empty when there's none, or with ORPHAN_NOTICE
+ * off (nothing counted as told then).
  */
-export function orphanLinesFor(projectPath: string, agentId: string): string {
-  if (!advanced.get<boolean>(ORPHAN_NOTICE)) return ''
+export function orphanDraftFor(projectPath: string, agentId: string): { text: string; commit: () => void } {
+  const none = { text: '', commit: () => undefined }
+  if (!advanced.get<boolean>(ORPHAN_NOTICE)) return none
   const due = orphansOf(projectPath, agentId).filter((o) => o.shown && !o.told)
-  if (!due.length) return ''
-  for (const o of due) o.told = true
-  return inDialectOf({ projectPath, agentId }, () => {
+  if (!due.length) return none
+  // Told only once a reply carries the line (HI-2545: a notice its CLI no longer waits for isn't given).
+  const commit = (): void => {
+    for (const o of due) o.told = true
+  }
+  const text = inDialectOf({ projectPath, agentId }, () => {
     const each = due.map((o) => {
       const command = o.command ?? o.label
       return say(T.process, { pid: String(o.pid), known: command ? 'yes' : 'no', command: command ? cut(command, 200) : '', min: String(Math.round((Date.now() - (filetimeMs(o.created) ?? Date.now())) / 60_000)) })
     })
     return NOTICE_PREFIX + say(T.running, { n: due.length, count: String(due.length), list: each.join('; ') })
   })
+  return { text, commit }
+}
+
+/** The orphan line as orphanDraftFor makes it, counted as told at once (the text only). */
+export function orphanLinesFor(projectPath: string, agentId: string): string {
+  const draft = orphanDraftFor(projectPath, agentId)
+  draft.commit()
+  return draft.text
 }
 
 const T = {
