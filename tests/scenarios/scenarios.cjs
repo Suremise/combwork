@@ -38,6 +38,14 @@ const argsOf = (x) => {
 const verdictWatch = (n) => `cw cw_wait_for_tasks {"cards":["#${n}"],"changes":["verdict","column","comment"],"column":"passed","wake":true}`
 const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
 /**
+ * HI-2680: how a session moved Todo cards onto a new target: cw_queue retarget naming a preview and its items, or each
+ * card's own Merges into (cw_update_task with a target; cw_update_tasks with one in its patch). Both worked calls only.
+ */
+const retargetWays = (o) => ({
+  byPreview: ran(o, 'cw_queue').filter((x) => argsOf(x).action === 'retarget' && String(argsOf(x).preview ?? '').startsWith('rt-') && (argsOf(x).items ?? []).length > 0),
+  byCard: [...ran(o, 'cw_update_task').filter((x) => 'target' in argsOf(x)), ...ran(o, 'cw_update_tasks').filter((x) => JSON.stringify(argsOf(x)).includes('"target"'))]
+})
+/**
  * Whether a reply or card puts a decision to the user: a question, or a request without a "?" ("Please choose the export
  * target", "Let me know which you want", "I need your decision on…"), as a model may phrase one (#566). A polite closing
  * ("Please let me know if you need anything else", "Tell me if anything is unclear") puts no decision and doesn't count,
@@ -4188,14 +4196,23 @@ module.exports.SCENARIOS = [
     prompt: "We've just released 1.1.0. Make alpha's work merge into 1.2.0 from now on, and move the Todo cards still set to 1.1.0 over to 1.2.0 too: I've checked them, go ahead.",
     fake: 'cw cw_update_setting {"id":"project.workflow.target","value":"1.2.0","project":"alpha"} then cw cw_queue {"action":"retarget","project":"alpha","from":"1.1.0","target":"1.2.0"}',
     expect: (o) => {
-      const queue = ran(o, 'cw_queue').filter((x) => argsOf(x).action === 'retarget')
+      const { byPreview, byCard } = retargetWays(o)
       return [
         ["changed alpha's Work merges into to 1.2.0 with cw_update_setting", ran(o, 'cw_update_setting').some((x) => /workflow\.target/.test(String(argsOf(x).id)) && argsOf(x).value === '1.2.0'), o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
-        ['moved them with cw_queue retarget, naming the preview it was given and the items', queue.some((x) => String(argsOf(x).preview ?? '').startsWith('rt-') && (argsOf(x).items ?? []).length >= 2), queue.map((x) => x.args).join(' | ')],
+        // Either way moves a card as the user's change does (tasks.setTarget, bound to the target it had): cw_queue retarget
+        // by the preview the reply gave (cards and free slots together), or each card's own Merges into (cw_update_task).
+        ['moved them through Combwork: cw_queue retarget by its preview, or each card\'s Merges into', byPreview.length > 0 || byCard.reduce((n, x) => n + (Array.isArray(argsOf(x).numbers) ? argsOf(x).numbers.length : 1), 0) >= 2, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['both cards now follow 1.2.0 (no target of their own)', (o.cards.a?.target ?? null) === null && (o.cards.b?.target ?? null) === null, JSON.stringify([o.cards.a?.target, o.cards.b?.target])]
       ]
     },
-    fakeSkips: ['moved them with cw_queue retarget, naming the preview it was given and the items', 'both cards now follow 1.2.0 (no target of their own)']
+    observe: (o) => {
+      const { byPreview, byCard } = retargetWays(o)
+      return [
+        ['used cw_queue retarget by its preview', byPreview.length > 0, byPreview.map((x) => x.args).join(' | ')],
+        ["set each card's Merges into instead", byCard.length > 0, byCard.map((x) => x.args).join(' | ')]
+      ]
+    },
+    fakeSkips: ["moved them through Combwork: cw_queue retarget by its preview, or each card's Merges into", 'both cards now follow 1.2.0 (no target of their own)']
   },
   {
     id: 'assistant-add-agent-connection',
@@ -5561,4 +5578,4 @@ module.exports.SCENARIOS.push({
     })
 })
 
-module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { laneStartLanded, readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
