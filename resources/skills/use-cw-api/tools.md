@@ -84,8 +84,8 @@ Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool
 ## Submitting and reviewing
 
 - `cw_submit` hands a card's committed work to review (a code card in Git needs its work committed; submitting never commits) and it moves on, to Review or past it where there is no review. As a lane's builder, Combwork then watches it for you. Its reply warns of files outside its paths and other agents' changes in a shared folder. `tests`: focused tests its merge runs beyond those its picker chooses (or all, when it can't choose): each a test id, or `{ id, needs }` (needs: unit, fake, real, packaged).
-- `cw_start_review`: you are its reviewer; the reply names the revision, base, files and the review copy, and `checksAtRevision`: the card's checks recorded at that revision, each one's latest counted result (only those checks, never all the change needs).
-- `cw_verdict`: a pass moves it on (to Passed, or to its merge) once its reviews are in; a fail sends it back to Doing, a round counted, and as a lane's reviewer Combwork watches it for its next round. `accept` (a pass only): the `runYourself` tests whose run at this revision by another agent (the builder's) you take as their proof, by test id; each counts only if its latest counted run there passed, and the reply's `accepted` names the runs taken, a warning each one not.
+- `cw_start_review`: you review it; the reply names the revision, base, files, review copy and `checksAtRevision` (checks recorded there).
+- `cw_verdict`: a pass moves it on once its reviews are in; a fail sends it back to Doing, a round counted. `accept` (a pass): `runYourself` tests proved by another's run there.
 - `cw_ask_user` and `cw_cannot_within_rules` count no round and are no stall.
 
 ## Card loop steps (`cw_loop_step`)
