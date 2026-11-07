@@ -2598,6 +2598,8 @@ export interface LiveSessionState {
   contextWindow?: number
   /** costUsd was estimated by Combwork from token counts, not reported by the provider. */
   costEstimated?: boolean
+  /** Some of its tokens have no known price (HI-2675, SessionUsage.costUnpriced): costUsd is only the priced part. */
+  costUnpriced?: boolean
   /** A live permission-mode change Combwork has asked for and is waiting to see confirmed. */
   modeSwitching?: PermissionMode
   /** Codex's Plan mode, which is separate from its permission preset. */

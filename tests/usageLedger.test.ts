@@ -218,6 +218,19 @@ describe("a session's rows", () => {
     expect(usageFrom(u, '2026-11-05')).toMatchObject({ costUsd: expect.closeTo(5, 6), costUnpriced: true })
     expect(usageFrom(u, null)).toMatchObject({ costUnpriced: true })
   })
+
+  it('HI-2675: a row partly covered by a charge, the rest of its tokens without a price, is its charge and a part, never the rest at $0', () => {
+    const r: LedgerRow = { ...emptyRow('2026-11-07', 'unknown-model'), inputTokens: 200, requests: 1, fixedUsd: 1, covered: { inputTokens: 100, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0 } }
+    expect(rowCost(r, 'codex', null)).toEqual({ usd: 1, estimated: false, unpriced: true })
+    const u = usageFromRows(summaryOf({ ...whole(CASES[1]), costReports: undefined, timeline: undefined }), [r], null)
+    expect(u).toMatchObject({ costUsd: 1, costUnpriced: true })
+    expect(u.days?.['2026-11-07']).toMatchObject({ costUsd: 1, costUnpriced: true })
+    // On a card: its known cost, and unknown too.
+    expect(rowsPart([{ ...r, card: 5, role: 'build' }], 'codex', null)).toMatchObject({ cost: 1, priced: 1, unpriced: 1 })
+    // Wholly covered: its charge, complete.
+    const all = { ...r, covered: { ...r.covered, inputTokens: 200 } }
+    expect(rowCost(all, 'codex', null)).toEqual({ usd: 1, estimated: false })
+  })
 })
 
 const card = (number: number, held: TaskCard['held']): TaskCard => ({ number, title: `#${number}`, description: '', project: 'demo', agent: null, column: 'done', order: 1, labels: [], blocked: null, blockedBy: [], links: [], comments: [], history: [], archived: false, createdAt: at(0), createdBy: 'You', updatedAt: at(0), held })

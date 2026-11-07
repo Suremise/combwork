@@ -1589,6 +1589,8 @@ export function PaneFooter({
   const over = threshold > 0 && ctx >= threshold
   const cost = live?.costUsd ?? usage?.costUsd ?? null
   const estimated = live?.costUsd !== undefined ? !!live.costEstimated : !!usage?.costEstimated
+  // Some of its tokens without a price (HI-2675): " + ?", as a total says it.
+  const partUnpriced = live?.costUsd !== undefined ? !!live.costUnpriced : !!usage?.costUnpriced
   const bytes = live?.transcriptBytes
   const sizeLimit = transcriptWarnLimit(project.config, settings?.sessions.transcriptWarnMB ?? 0)
   const long = bytes !== undefined && sizeLimit > 0 && bytes >= sizeLimit * 1024 * 1024
@@ -1718,6 +1720,7 @@ export function PaneFooter({
           <span className="pane-foot-item foot-cost" onClick={costClick}>
             {estimated ? '≈' : ''}
             {moneyLabel(cost)}
+            {partUnpriced ? ' + ?' : ''}
           </span>
         </Tooltip>
       )

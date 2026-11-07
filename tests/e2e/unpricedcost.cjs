@@ -1,6 +1,7 @@
 // A session whose model Combwork has no price for has an unknown cost, never $0: the agent's footer shows "$?", the
 // Overview's running agent and its cost cards "Unknown" (the summary, the provider's, the session's),
-// each naming the model on hover; with a price of the user's they show the estimate. The agent is the fake Claude
+// each naming the model on hover; with a price of the user's they show the estimate. On two models, one without a price
+// (HI-2675), they show the known part + ?, the live estimate too. The agent is the fake Claude
 // Code, whose transcript reports the model "claude-fake" and no cost. Dev build, throwaway profile, workspace and
 // CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
@@ -105,6 +106,26 @@ const until = async (fn, ms = 10000) => {
   check('a click opens the Overview', !!(await until(async () => (await page.locator('.tab.active', { hasText: 'Overview' }).count()) === 1, 5000)))
   check("…at this session's details, in view (its agent picked when there are several)", !!(await until(async () => (await head.count()) === 1 && (await head.evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.top < window.innerHeight - 100 })), 5000)) && ((await head.locator('select').count()) === 0 || (await head.locator('select').inputValue()) === agent.id), await head.innerText().catch(() => ''))
   await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-6-session.png') })
+
+  // --- HI-2675: a session on two models, one without a price, shows the known part + ?, never the rest as $0. The fake
+  // moves to Opus 4.8 (priced) after a safeguard stop, and claude-fake's price is removed again. With my prices (Session
+  // costs), the running session's cost is Combwork's live estimate, the path a CLI without reports (Codex) takes.
+  await inv('settings:setProviderPrices', 'claude-code', {})
+  const s0 = await inv('settings:update', {})
+  await inv('settings:update', { providers: { ...s0.providers, 'claude-code': { ...s0.providers['claude-code'], costSource: 'prices' } } })
+  await page.locator('.tab', { hasText: 'Session' }).first().click()
+  await inv('pty:write', key, 'safeguard fallback')
+  await lib.sleep(100)
+  await inv('pty:write', key, '\r')
+  // "≈ $1.20 + ?", or "≈ < $0.01 + ?" for the fake's few tokens; never $0.00.
+  const part = /^[^$]*≈\s?(<\s?)?\$(?!0\.00\b)\d[\d.,]*\s\+\s\?/
+  check('two models: the live cost is an estimate, priced in part', !!(await until(async () => { const l = await live(); return l?.costEstimated && l.costUnpriced && l.costUsd > 0 }, 20000)), JSON.stringify(await live().then((l) => ({ costUsd: l?.costUsd, costEstimated: l?.costEstimated, costUnpriced: l?.costUnpriced }))))
+  check('…the footer: the known part + ?', !!(await until(async () => part.test(await footer.locator('.foot-cost').innerText().catch(() => '')), 10000)), await footer.innerText().catch(() => ''))
+  await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-7-part-footer.png') })
+  await page.locator('.tab', { hasText: 'Overview' }).click()
+  check('…Running now: the known part + ?', !!(await until(async () => part.test(await running.innerText().catch(() => '')), 10000)), await running.innerText().catch(() => ''))
+  check("…the Overview's cost cards: the known part + ?, none $0", !!(await until(async () => (await values()).length >= 3 && (await values()).every((v) => part.test(v)), 10000)), JSON.stringify(await values()))
+  await page.screenshot({ path: path.join(lib.WORK, 'unpricedcost-8-part-overview.png') })
 
   await inv('session:stop', alpha, agent.id).catch(() => undefined)
   await app.close()

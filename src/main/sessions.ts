@@ -78,6 +78,7 @@ import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/c
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
+import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
 import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
@@ -717,6 +718,8 @@ interface UsageSeen {
   mtime: number
   /** The worker's result, before costs, which follow the prices in the settings. */
   raw: SessionUsage
+  /** A session on more than one model (HI-2675): its rows by day and model, priced a model at a time. */
+  rows?: LedgerRow[]
   /** Read without its CLI's cost reports, priced as free (HI-1772): a read asking otherwise isn't this one. */
   reportsIgnored: boolean
   costFree: boolean
@@ -1824,10 +1827,14 @@ class SessionManager {
    * A result with costs from the current prices: the provider's report, else (or on top) Combwork's estimate, and each day's
    * share. Without its timeline (usageTimeline has it): it stays in the cache, never in the usage passed on.
    */
-  private priced(raw: SessionUsage, costFree = false): SessionUsage {
+  private priced(raw: SessionUsage, costFree = false, rows?: LedgerRow[]): SessionUsage {
     const { timeline: _timeline, ...usage } = raw
     // Free (HI-1772): a known $0, whatever prices the user set; its tokens as read.
-    return costFree ? withCostFree(usage) : priceUsage(usage, config.settings)
+    if (costFree) return withCostFree(usage)
+    // On more than one model (HI-2675): priced a model at a time from its rows, as the history prices it, so a model with
+    // no price leaves the cost a part (costUnpriced), never its tokens at $0 or at another model's price.
+    if (rows?.length) return usageFromRows(summaryOf(usage), rows, config.settings)
+    return priceUsage(usage, config.settings)
   }
 
   /**
@@ -5007,15 +5014,18 @@ class SessionManager {
     // The settings changed while it was read: the read they started decides.
     if ((onServer || usesOwnPrices(l.state.provider, config.settings)) !== own || !usage) return
     // An estimate is Combwork's (the user's prices, or a provider that reports none); anything else is the CLI's report.
-    if (usage.costUsd != null && usage.costEstimated) this.setLiveCost(l, usage.costUsd, true)
+    // Priced only in part (HI-2675: a model with no price beside priced ones): said with the cost, as "+ ?".
+    const part = !!usage.costUnpriced
+    if (usage.costUsd != null && usage.costEstimated) this.setLiveCost(l, usage.costUsd, true, part)
     else if (onServer) this.setLiveCost(l, undefined, false)
-    else if (own) this.setLiveCost(l, l.reportedCost ?? usage.costUsd ?? undefined, false)
-    else this.setLiveCost(l, usage.costUsd ?? undefined, false)
+    else if (own) this.setLiveCost(l, l.reportedCost ?? usage.costUsd ?? undefined, false, l.reportedCost === undefined && part)
+    else this.setLiveCost(l, usage.costUsd ?? undefined, false, part)
   }
 
-  private setLiveCost(l: LiveSession, costUsd: number | undefined, estimated: boolean): void {
-    if (l.state.costUsd === costUsd && !!l.state.costEstimated === estimated) return
-    Object.assign(l.state, { costUsd, costEstimated: estimated })
+  private setLiveCost(l: LiveSession, costUsd: number | undefined, estimated: boolean, unpriced = false): void {
+    const part = costUsd !== undefined && unpriced
+    if (l.state.costUsd === costUsd && !!l.state.costEstimated === estimated && !!l.state.costUnpriced === part) return
+    Object.assign(l.state, { costUsd, costEstimated: estimated, costUnpriced: part || undefined })
     this.emitState(l.state)
   }
 
@@ -7357,14 +7367,14 @@ class SessionManager {
         usageSeen.delete(path)
         usageSeen.set(path, seen)
         // Unchanged since it was read: priced again after a price change, not read.
-        return (seen.usage ??= this.priced(seen.raw, costFree))
+        return (seen.usage ??= this.priced(seen.raw, costFree, seen.rows))
       }
       const r = await usageHistory.read(projectPath, path, sessionId, provider, { noWait: o.noWait, reportsIgnored: reportsIgnored || costFree })
       if (!r) return null
       this.checkUnderstood(provider, r.usage, r.size)
       // The title the CLI's own index gives it (Codex's, Copilot's), which the worker's parsers can't read.
       const raw = this.titled(r.usage)
-      const c: UsageSeen = { sessionId, provider, size: r.size, mtime: r.mtime, raw, usage: this.priced(raw, costFree), reportsIgnored, costFree }
+      const c: UsageSeen = { sessionId, provider, size: r.size, mtime: r.mtime, raw, ...(r.rows ? { rows: r.rows } : {}), usage: this.priced(raw, costFree, r.rows), reportsIgnored, costFree }
       usageSeen.delete(path)
       usageSeen.set(path, c)
       if (usageSeen.size > MAX_USAGE_SEEN) usageSeen.delete(usageSeen.keys().next().value!)

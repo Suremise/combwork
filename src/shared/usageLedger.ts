@@ -489,8 +489,11 @@ export function dominates(rows: LedgerRow[], before: LedgerRow[]): boolean {
   return true
 }
 
-/** A row's cost with today's prices: its known amount, and Combwork's estimate for the tokens it doesn't cover (null: none known). */
-export function rowCost(r: LedgerRow, provider: ProviderId, settings?: Pick<AppSettings, 'providers'> | null): { usd: number | null; estimated: boolean } {
+/**
+ * A row's cost with today's prices: its known amount, and Combwork's estimate for the tokens it doesn't cover (null: none
+ * known). `unpriced` (HI-2675): a known amount, but tokens it doesn't cover have no price, so it is only a part.
+ */
+export function rowCost(r: LedgerRow, provider: ProviderId, settings?: Pick<AppSettings, 'providers'> | null): { usd: number | null; estimated: boolean; unpriced?: true } {
   const model = r.model || null
   const est = (t: UsageTokens): number | null => estimateCost({ provider, model, ...t }, settings)
   const all: UsageTokens = { inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheWriteTokens: r.cacheWriteTokens, cacheReadTokens: r.cacheReadTokens }
@@ -508,7 +511,9 @@ export function rowCost(r: LedgerRow, provider: ProviderId, settings?: Pick<AppS
   }
   if (tokenSum(rest) <= 0) return { usd: r.fixedUsd, estimated: r.fixedEstimated }
   const e = est(rest)
-  return { usd: r.fixedUsd + (e ?? 0), estimated: r.fixedEstimated || (e !== null && e > 0) }
+  // Tokens the known amount doesn't cover, with no price: the amount is a part, never with them at $0.
+  if (e === null) return { usd: r.fixedUsd, estimated: r.fixedEstimated, unpriced: true }
+  return { usd: r.fixedUsd + e, estimated: r.fixedEstimated || e > 0 }
 }
 
 /** The fields of a session's usage that aren't sums of its rows: what the history keeps beside them. */
@@ -541,6 +546,7 @@ export function usageFromRows(summary: UsageSummary, rows: LedgerRow[], settings
     if (c.usd !== null) {
       d.costUsd = (d.costUsd ?? 0) + c.usd
       if (c.estimated) d.costEstimated = true
+      if (c.unpriced) d.costUnpriced = true
     } else if (tokenSum(r) > 0) d.costUnpriced = true
   }
   for (const d of Object.values(days)) {
@@ -583,6 +589,8 @@ export function rowsPart(rows: LedgerRow[], provider: ProviderId, settings?: Pic
       known = true
       out.cost += c.usd
       if (c.estimated || r.shared) out.estimated = true
+      // Priced in part (HI-2675): its known amount, and unknown too.
+      if (c.unpriced) unknown = true
     }
   }
   out.priced = known ? 1 : 0
