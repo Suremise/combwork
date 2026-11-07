@@ -43,7 +43,7 @@ import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
 import { e2eProgress, slotWaitProgress } from '../progressReport.mts'
 import { SUITES } from './suites.mjs'
-import { affectedSuites, changedFiles, mergeBase } from './affected.mjs'
+import { affectedSuites, changedFiles, mergeBase, splitSelections } from './affected.mjs'
 import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf } from './record.mjs'
 import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, packagedPlan, resultLines, selectSuites, suiteLimitMs, suiteOutcome } from './runner.mjs'
 import { devBuild, ensureBuild } from './build.mjs'
@@ -116,7 +116,9 @@ let affected = null
 let changed = []
 if (opts.affected) {
   changed = changedFiles(opts.affected, root)
-  affected = affectedSuites(changed, SUITES.map((s) => s.name), SUITES.filter(isRealCli).map((s) => s.name))
+  // The shared files affectedUnits.mjs splits, by their changed parts since the merge base (uncommitted ones included).
+  const units = splitSelections(changed, { cwd: root, base: mergeBase(opts.affected, root), head: null, suiteNames: SUITES.map((s) => s.name) })
+  affected = affectedSuites(changed, SUITES.map((s) => s.name), SUITES.filter(isRealCli).map((s) => s.name), units)
   if (affected.all) console.log(`Affected since ${opts.affected}: every fake suite (${affected.why[0]})${affected.real.length ? `, and the real tier's ${affected.real.join(', ')}` : ''}`)
   else console.log(`Affected since ${opts.affected}: ${affected.suites.length ? affected.suites.join(', ') : 'none'}`)
   for (const w of affected.all ? affected.why.slice(1) : affected.why) console.log(`  ${w}`)

@@ -210,7 +210,7 @@ describe('the picker on the command line (focused.pick)', () => {
   const run = (input: string, base = 'HEAD') => spawnSync(process.execPath, [join(root, 'tests', 'e2e', 'affected.mjs'), '--pick'], { cwd: root, input, encoding: 'utf8', env: { ...runContext.baseEnv(), CW_FOCUSED_BASE: base } })
 
   it('prints {"every":true} alone for a shared file, nothing for no change, and fails for a base that is no commit', () => {
-    const every = run('src/main/ipc.ts\r\n')
+    const every = run('src/main/sessions.ts\r\n')
     expect(every.status, every.stderr).toBe(0)
     expect(every.stdout.trim()).toBe('{"every":true}')
     const none = run('')
@@ -219,6 +219,15 @@ describe('the picker on the command line (focused.pick)', () => {
     const bad = run('README.md\n', 'no-such-commit-HI-1367')
     expect(bad.status).not.toBe(0)
     expect(bad.stdout).toBe('')
+  })
+
+  it('reads a shared file it splits by its changed parts in the checkout (HI-2659): unchanged since the base, no suite', () => {
+    // ipc.ts is the same in the checkout as at HEAD: none of its parts changed, so no suite (a file-level pick: every).
+    const r = run('src/main/ipc.ts\n')
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout).not.toContain('"every"')
+    expect(r.stdout).not.toMatch(/"needs":\["(fake|real|packaged)"\]/)
+    expect(r.stderr).toContain('src/main/ipc.ts: by its changed parts: no suite')
   })
 
   it('does nothing when imported', () => {
