@@ -9,7 +9,9 @@ import { notify, set, setActivity, useStore } from '../store'
 import { cliReadyOf, connectionCli, connectionOf, firstReadyConnection, firstUsableConnection, offeredConnections, offHereChoice, orderedAccounts, type ConnectionShown } from '@shared/connectionLabel'
 
 export { cliReadyOf, connectionCli, firstReadyConnection, firstUsableConnection, offeredConnections }
-import { Icon, Tooltip } from './ui'
+import { Icon, Tooltip } from './ui'
+import { ServerContextLine } from './ServerDiagnostics'
+import { parseBaseUrl } from '@shared/serverConnection'
 
 /**
  * Which connection an agent or the Assistant runs on (HI-2108; HI-2105's design): a named setup on an account (model,
@@ -346,6 +348,29 @@ export function ConnectionSetupLine({ cli, onOpen }: { cli: ProviderId; onOpen: 
         }}>
         {tr(SETUP.open)}
       </button>
+    </div>
+  )
+}
+
+/**
+ * Provider Setup's server lines (HI-2683): each server connection of this CLI on this PC (a local model server), with
+ * its model's context as last read and Check Server….
+ */
+export function ServerSetupLines({ cli }: { cli: ProviderId }) {
+  const view = useConnections()
+  const local = (view?.connections ?? []).filter((a) => a.provider === cli && a.kind === 'server' && !!a.server && (() => {
+    const b = parseBaseUrl(a.server!.baseUrl)
+    return b.ok && b.local
+  })())
+  if (!local.length) return null
+  return (
+    <div className="server-setup-lines" data-server-setup-lines={cli}>
+      {local.map((a) => (
+        <div key={a.id} className="flex">
+          <span className="muted">{a.name}</span>
+          <ServerContextLine c={a} />
+        </div>
+      ))}
     </div>
   )
 }

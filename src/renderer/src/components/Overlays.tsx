@@ -22,7 +22,7 @@ import { cardLabel } from '@shared/projectKeys'
 import { cardMatches } from '@shared/tasks'
 import type { ConsoleRecordingInfo } from '@shared/devConsole'
 import { ProviderIcon } from './ProviderIcon'
-import { ConnectionSetupLine, useProviderWarnings } from './ConnectionChoice'
+import { ConnectionSetupLine, ServerSetupLines, useProviderWarnings } from './ConnectionChoice'
 import { AgentsDetail, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, type AgentColumn, type AgentTableGroup, type AgentTableRow } from './AgentsTable'
 import { BusyButton, CodeText, CopyableCode, Icon, IconButton, LoadFailed, Modal, SearchInput, STATUS_TEXT, useBackdrop, useBusy } from './ui'
 
@@ -935,6 +935,7 @@ export function AgentSetupDialog() {
         </div>
       )}
       {on && <ConnectionSetupLine cli={tab} onOpen={close} />}
+      {on && <ServerSetupLines cli={tab} />}
       {!info || info.checking ? (
         <div className="setup-status">
           <Icon name="loading" spin />

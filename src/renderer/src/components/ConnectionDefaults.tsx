@@ -11,7 +11,8 @@ import { call, errorMessage } from '../api'
 import { notify, useLanguage, useStore } from '../store'
 import { EffortPicker, ModelPicker } from './ModelPicker'
 import { Icon, Modal } from './ui'
-import { M as CARD } from './accountCard'
+import { M as CARD } from './accountCard'
+import { ServerContextLine } from './ServerDiagnostics'
 
 /**
  * A connection (HI-2106, HI-2107): the named setup on an account that agents and the Assistant choose. Its dialog (Add
@@ -195,6 +196,12 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
       }
     >
       <div className="agent-form connection-form" data-connection-form={row?.id ?? 'new'}>
+        {/* A server account's context as last read, and its diagnostics (HI-2683). */}
+        {server && (
+          <div className="span2">
+            <ServerContextLine c={a} />
+          </div>
+        )}
         <label htmlFor="connection-name">{tr(M.name)}</label>
         <input id="connection-name" className="input" autoFocus value={name} placeholder={tr(M.namePlaceholder)} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void save()} />
         {/* Its tag (HI-2530): free text, only compared by a usage move. */}

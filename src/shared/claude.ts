@@ -364,6 +364,18 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
             remoteModels: 'claude-code.connections.remoteModels',
             contextAdvice: 64_000,
             docs: 'https://docs.ollama.com/integrations/claude-code'
+          },
+          // llama.cpp's llama-server (HI-2683): its Anthropic-compatible Messages API, as HI-2552's spike used it on the test
+          // server (b11608, 7 Nov 2026: structured tool calls through /v1/messages). Port 8080 is llama-server's default; no
+          // key unless it was started with --api-key; its loaded model listed at /v1/models. Tools need its chat template
+          // (llama-server's --jinja): Server diagnostics reads that from /props. No context advice of its own.
+          {
+            id: 'llamacpp',
+            name: 'llama.cpp', // i18n-ignore: a product's name
+            baseUrl: 'http://localhost:8080',
+            keyless: true,
+            listing: { path: '/v1/models', list: 'data', id: 'id' },
+            docs: 'https://github.com/ggml-org/llama.cpp/tree/master/tools/server'
           }
         ]
       }
