@@ -321,6 +321,8 @@
   "agents.picker.showOlder": "Show older versions",
   "agents.place.short": "{is, select, slot {in {name}} carried {carried: {name}} home {home: {name}} other {0.9 worktree: {name}}}",
   "agents.place.tip": "{is, select, slot {Works in {name}: {path}} carried {Works in {name}, the slot kept for it: {path}} home {Works in its retired home {name}: {path}} other {Works in its 0.9 worktree {name}: {path}}}",
+  "agents.provider.compactDeclared": "{provider} compacts by itself at about {at, number}, the local model’s declared context{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}",
+  "agents.provider.compactDeclaredCap": "an estimate: an auto-compact window set too is taken as capped by the declared context",
   "agents.provider.compactDefault": "{provider} compacts by itself at about {at, number} by default (its settings can change this)",
   "agents.provider.compactDefaultFor": "{provider} compacts by itself at about {at, number}, its default for this window{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}",
   "agents.provider.compactOff": "{provider} doesn't compact by itself: auto-compaction is off ({source}){estimate, select, none {} other { ({estimate})}}",

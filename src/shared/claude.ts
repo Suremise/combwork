@@ -338,6 +338,17 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
         modelEnv: 'ANTHROPIC_MODEL',
         aliasEnv: { opus: 'ANTHROPIC_DEFAULT_OPUS_MODEL', sonnet: 'ANTHROPIC_DEFAULT_SONNET_MODEL', haiku: 'ANTHROPIC_DEFAULT_HAIKU_MODEL' },
         subagentEnv: 'CLAUDE_CODE_SUBAGENT_MODEL',
+        // A local model's limits (HI-2682; code.claude.com/docs/en/model-config, "Which IDs CLAUDE_CODE_MAX_CONTEXT_TOKENS
+        // applies to", checked with 2.1.319): the context for an ID it can't resolve, an output budget, effort sent as
+        // none and no thinking field (the server may still reason). The advanced settings: LOCAL_MODEL_ALIASES_ID and
+        // LOCAL_MODEL_SPELLINGS_ID (advanced.ts; a unit test checks they are the same).
+        localLimits: {
+          contextEnv: 'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
+          outputEnv: 'CLAUDE_CODE_MAX_OUTPUT_TOKENS',
+          fixedEnv: { CLAUDE_CODE_EFFORT_LEVEL: 'auto', MAX_THINKING_TOKENS: '0' },
+          aliasSetting: 'claude-code.localModel.aliases',
+          spellingSetting: 'claude-code.localModel.spellings'
+        },
         listing: { path: 'v1/models', list: 'data', id: 'id' },
         presets: [
           // DeepSeek's Claude Code guide (api-docs.deepseek.com/quick_start/agent_integrations/claude_code, 27 Oct 2026):

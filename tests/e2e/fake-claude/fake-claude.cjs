@@ -324,7 +324,8 @@ function runMode() {
 // Agent API token Combwork gave it.
 // A server connection's (HI-1772): its ANTHROPIC_* variables too, a dummy key among them (a disposable test log).
 // Its dialect's file (HI-2443: CW_DIALECT_FILE, CW_DIALECT), which cw-progress in its shell reads.
-const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('CW_API_TOKEN') || k.startsWith('CW_DIALECT') || k === 'CW_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
+// A local model's limits (HI-2682): CLAUDE_CODE_MAX_* above, and MAX_THINKING_TOKENS.
+const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('CW_API_TOKEN') || k.startsWith('CW_DIALECT') || k === 'CW_AGENT' || k === 'CLAUDE_CONFIG_DIR' || k === 'MAX_THINKING_TOKENS'))
 // The agent's own token, as its launch's file held it at the start (HI-2262: the session has the file, never the token
 // in its environment; read now, as the file goes when the run ends). Null without one.
 const launchToken = (() => {
@@ -334,7 +335,15 @@ const launchToken = (() => {
     return null
   }
 })()
-fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv, temp: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(TEMP|TMP)(DIR)?$/i.test(k))), token: launchToken }) + '\n')
+// The /model lineup its --settings gave it (HI-2684), or null.
+const launchPicker = (() => {
+  try {
+    return opts['--settings'] ? (JSON.parse(fs.readFileSync(opts['--settings'], 'utf8')).modelPicker ?? null) : null
+  } catch {
+    return null
+  }
+})()
+fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv, picker: launchPicker, temp: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(TEMP|TMP)(DIR)?$/i.test(k))), token: launchToken }) + '\n')
 // In a connection's folder (HI-1870: its Set Up, or an agent's first launch there): its first-run screens answered at
 // once, as Claude Code records them in the folder's .claude.json (tests/fixtures/advanced/onboarding-claude-2.1.311.jsonl).
 if (accountFolder) {

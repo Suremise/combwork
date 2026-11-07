@@ -102,5 +102,16 @@
   "providers.transcript.interrupted": "Przerwane przez Ciebie",
   "providers.transcript.resumed": "Sesja wznowiona",
   "providers.transcript.turnEnded": "Tura zakończona: {reason}",
-  "providers.unknown": "Nieznany dostawca „{provider}”. Może być potrzebna nowsza wersja Combwork."
+  "providers.unknown": "Nieznany dostawca „{provider}”. Może być potrzebna nowsza wersja Combwork.",
+  "providers.claude.localLimits.inFile": "env w {file}",
+  "providers.claude.localLimits.oursContext": "Rozmiar kontekstu w {connection}",
+  "providers.claude.localLimits.oursOutput": "Budżet wyjścia w {connection}",
+  "providers.claude.localLimits.outputNotBelow": "Nie uruchomiono {agent}: jego budżet wyjścia ({output, number} tokenów, {outputFrom}) nie jest mniejszy niż rozmiar kontekstu ({context, number} tokenów, {contextFrom}). Zmień jedną z tych wartości, a potem uruchom go ponownie.",
+  "providers.claude.localLimits.tooSmall": "Nie uruchomiono {agent}: jego rozmiar kontekstu ({context, number} tokenów, {contextFrom}) jest za mały na jakikolwiek budżet wyjścia. Ustaw większy rozmiar kontekstu.",
+  "providers.localLimits.context": "Rozmiar kontekstu {value, number} tokenów ({from}){estimate, select, yes {: szacunek, dopóki Claude Code nie poda swojego okna} other {}}",
+  "providers.localLimits.inFile": "env w {file}",
+  "providers.localLimits.notUsed": "{why, select, alias {Rozmiar kontekstu nieużyty: Claude Code odczytuje {model} jako jeden ze swoich aliasów} spelling {Rozmiar kontekstu nieużyty: identyfikatory z claude, [1m] lub sufiksem daty nie są do tego obsługiwane} mapped {Rozmiar kontekstu nieużyty: {file} przypisuje {model} do modelu Claude} unreadable {Rozmiar kontekstu nieużyty: nie udało się odczytać {file}, więc Combwork nie wie, czy przypisuje on {model}} other {Rozmiar kontekstu nieużyty: {model} nie jest jednym z modeli {connection}}}",
+  "providers.localLimits.ours": "ustawione w {connection}",
+  "providers.localLimits.output": "Budżet wyjścia {value, number} tokenów ({from}){fallback, select, none {} other {: {fallback} nie było mniejsze niż kontekst, więc użyto domyślnego}}",
+  "providers.localLimits.switched": "Uruchomiono na {model} z tymi wartościami: zostają na całą sesję, a Claude Code podaje okno modelu, którego teraz używa."
 }

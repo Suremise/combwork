@@ -162,6 +162,10 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title': undefined
   'settings.advanced.claude-code.hooks.timeoutSeconds.desc': undefined
   'settings.advanced.claude-code.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.claude-code.localModel.aliases.desc': undefined
+  'settings.advanced.claude-code.localModel.aliases.title': undefined
+  'settings.advanced.claude-code.localModel.spellings.desc': undefined
+  'settings.advanced.claude-code.localModel.spellings.title': undefined
   'settings.advanced.claude-code.memory.realPath.desc': undefined
   'settings.advanced.claude-code.memory.realPath.title': undefined
   'settings.advanced.claude-code.memory.setting.desc': undefined
@@ -923,7 +927,9 @@ interface CombworkMessageValues {
   'settings.connections.server.changeFailed': undefined
   'settings.connections.server.cloud': undefined
   'settings.connections.server.cloudTip': undefined
+  'settings.connections.server.context': undefined
   'settings.connections.server.contextAdvice': { name: string | number; size: number; cli: string | number }
+  'settings.connections.server.contextNone': undefined
   'settings.connections.server.custom': undefined
   'settings.connections.server.docs': { url: string | number }
   'settings.connections.server.edit': undefined
@@ -939,6 +945,8 @@ interface CombworkMessageValues {
   'settings.connections.server.keyLocal': undefined
   'settings.connections.server.keySave': undefined
   'settings.connections.server.keyTitle': { name: string | number }
+  'settings.connections.server.label': undefined
+  'settings.connections.server.limitsHint': undefined
   'settings.connections.server.local': { name: string | number }
   'settings.connections.server.modelId': undefined
   'settings.connections.server.models': undefined
@@ -946,6 +954,10 @@ interface CombworkMessageValues {
   'settings.connections.server.moveWarn': undefined
   'settings.connections.server.needUrl': undefined
   'settings.connections.server.needsKey': undefined
+  'settings.connections.server.notBelow': undefined
+  'settings.connections.server.output': undefined
+  'settings.connections.server.outputDefault': { n: number }
+  'settings.connections.server.pickerHint': undefined
   'settings.connections.server.preset': undefined
   'settings.connections.server.read': undefined
   'settings.connections.server.readAfter': undefined
@@ -963,6 +975,9 @@ interface CombworkMessageValues {
   'settings.connections.server.setKey': undefined
   'settings.connections.server.setUp': undefined
   'settings.connections.server.setUpFailed': undefined
+  'settings.connections.server.tight': undefined
+  'settings.connections.server.tokens': undefined
+  'settings.connections.server.unsupported': { why: string }
   'settings.connections.server.why.failed': { status: string | number }
   'settings.connections.server.why.forbidden': undefined
   'settings.connections.server.why.redirect': { status: string | number }

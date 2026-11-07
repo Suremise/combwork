@@ -321,6 +321,8 @@
   "agents.picker.showOlder": "Pokaż starsze wersje",
   "agents.place.short": "{is, select, slot {w {name}} carried {przejęty: {name}} home {dom: {name}} other {worktree z 0.9: {name}}}",
   "agents.place.tip": "{is, select, slot {Pracuje w {name}: {path}} carried {Pracuje w {name}, slocie przejętym dla niego: {path}} home {Pracuje w swoim dawnym domu {name}: {path}} other {Pracuje w swoim worktree z 0.9 {name}: {path}}}",
+  "agents.provider.compactDeclared": "{provider} sam kompaktuje rozmowę przy około {at, number}, czyli zadeklarowanym kontekście modelu lokalnego{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}",
+  "agents.provider.compactDeclaredCap": "szacunek: przyjęto, że ustawione dodatkowo okno autokompaktowania jest ograniczone zadeklarowanym kontekstem",
   "agents.provider.compactDefault": "{provider} domyślnie sam kompaktuje rozmowę przy około {at, number} (można to zmienić w jego ustawieniach)",
   "agents.provider.compactDefaultFor": "{provider} sam kompaktuje rozmowę przy około {at, number}, domyślnie dla tego okna{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}",
   "agents.provider.compactOff": "{provider} nie kompaktuje rozmowy sam: autokompaktowanie jest wyłączone ({source}){estimate, select, none {} other { ({estimate})}}",

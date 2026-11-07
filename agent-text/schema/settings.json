@@ -148,6 +148,18 @@
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.claude-code.localModel.aliases.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.localModel.aliases.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.localModel.spellings.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.claude-code.localModel.spellings.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claude-code.memory.realPath.desc": {
     "placeholders": {}
   },

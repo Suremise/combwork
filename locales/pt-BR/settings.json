@@ -1511,5 +1511,20 @@
   "settings.connections.diag.why.unexpected": "Uma resposta inesperada.",
   "settings.connections.diag.why.unreachable": "Não foi possível acessar o servidor: verifique a URL base dele e se ele está em execução.",
   "settings.connections.diag.why.wrongArgument": "A chamada do modelo era válida, mas não para o que foi pedido (outra cidade).",
-  "settings.connections.diag.why.wrongTool": "O modelo chamou uma ferramenta que não foi oferecida a ele."
+  "settings.connections.diag.why.wrongTool": "O modelo chamou uma ferramenta que não foi oferecida a ele.",
+  "settings.advanced.claude-code.localModel.aliases.desc": "Os nomes de modelo que o Claude Code lê como seus próprios aliases (opus, sonnet…), como expressão regular. Um modelo de uma conexão de servidor com esse nome não recebe do Combwork tamanho do contexto nem orçamento de saída, pois o Claude Code o dimensiona sozinho. Errada, um modelo local com um desses nomes é iniciado como se o Claude Code o conhecesse, ou um alias recebe limites que o Claude Code ignora.",
+  "settings.advanced.claude-code.localModel.aliases.title": "Modelos locais: aliases do Claude Code",
+  "settings.advanced.claude-code.localModel.spellings.desc": "Grafias de ID de modelo que o Claude Code pode associar a um modelo do Claude ou dimensionar pelas próprias regras (claude no ID, um sufixo [1m], uma data após @), como expressão regular. Um modelo de uma conexão de servidor escrito assim não recebe do Combwork tamanho do contexto nem orçamento de saída. Errada, o Combwork passa limites que o Claude Code não aplica, ou deixa de fora um modelo local ao qual ele os aplicaria.",
+  "settings.advanced.claude-code.localModel.spellings.title": "Modelos locais: IDs que o Claude Code dimensiona sozinho",
+  "settings.connections.server.context": "Tamanho do contexto",
+  "settings.connections.server.contextNone": "Não definido: 200.000 supostos",
+  "settings.connections.server.limitsHint": "O tamanho do contexto e o orçamento de saída são usados quando um agente inicia nesse modelo (não para IDs que o Claude Code lê como próprios, nem onde as configurações da sessão associam o ID a um modelo do Claude). Uma alteração vale na próxima vez que os agentes iniciarem.",
+  "settings.connections.server.label": "Rótulo",
+  "settings.connections.server.pickerHint": "O /model do Claude Code lista esses modelos pelos IDs exatos, com seus rótulos. Se nenhum for um modelo do Claude, as linhas Opus, Sonnet e Haiku dele ficam ocultas. Uma lista de modelos nas suas próprias configurações é usada no lugar.",
+  "settings.connections.server.notBelow": "O orçamento de saída precisa ser menor que o tamanho do contexto.",
+  "settings.connections.server.output": "Orçamento de saída",
+  "settings.connections.server.outputDefault": "Padrão: {n, number}",
+  "settings.connections.server.tight": "Pouco espaço: a primeira solicitação do Claude Code com as ferramentas do Combwork pode ter 14.000–28.000 tokens, então uma sessão pode não iniciar ou compactar logo.",
+  "settings.connections.server.tokens": "tokens",
+  "settings.connections.server.unsupported": "{why, select, alias {Não compatível com este modelo: o Claude Code lê este ID como um de seus aliases.} other {Não compatível com este modelo: IDs com claude, [1m] ou um sufixo de data não são compatíveis aqui.}}"
 }

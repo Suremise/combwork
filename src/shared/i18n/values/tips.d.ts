@@ -302,6 +302,10 @@ interface CombworkMessageValues {
   'tips.leftoverProcesses.title': undefined
   'tips.licenceAudit.text': undefined
   'tips.licenceAudit.title': undefined
+  'tips.localModelLimits.text': undefined
+  'tips.localModelLimits.title': undefined
+  'tips.localModelPicker.text': undefined
+  'tips.localModelPicker.title': undefined
   'tips.loopDefaults.text': { rounds: number; hours: number }
   'tips.loopDefaults.title': undefined
   'tips.loopLanes.text': undefined

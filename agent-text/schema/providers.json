@@ -35,6 +35,22 @@
       "why": "plain"
     }
   },
+  "providers.claude.localLimits.outputNotBelow": {
+    "placeholders": {
+      "agent": "plain",
+      "output": "number",
+      "outputFrom": "plain",
+      "context": "number",
+      "contextFrom": "plain"
+    }
+  },
+  "providers.claude.localLimits.tooSmall": {
+    "placeholders": {
+      "agent": "plain",
+      "context": "number",
+      "contextFrom": "plain"
+    }
+  },
   "providers.cmdTooLong": {
     "placeholders": {
       "file": "plain",

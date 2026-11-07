@@ -514,6 +514,16 @@
     "note": "An error: an action for a server connection (its key, its models, its Set Up) was asked for a connection signed in through its CLI instead.",
     "audience": "both"
   },
+  "main.server.output.invalid": {
+    "text": "An output budget is a whole number of tokens, from 1 to {max, number}.",
+    "note": "An error saving the output budget a user typed for a server connection's model (HI-2682): not a whole number in range. {max} is a number.",
+    "audience": "both"
+  },
+  "main.server.output.notBelow": {
+    "text": "The output budget of {model} ({output, number} tokens) must be smaller than its context size ({context, number} tokens). Lower the output budget first, or clear it to use the default.",
+    "note": "An error saving a server connection's model limits (HI-2682): its output budget isn't below its context size, so nothing was saved. {model} is a model's id; {output} and {context} are numbers of tokens. Output budget and context size are fields of the connection's models: as translated there.",
+    "audience": "both"
+  },
   "main.server.setUp.noKey": {
     "text": "{name} has no key yet. Add its key first, then set it up.",
     "note": "An error opening Set Up for a server connection ({name}, its name in Settings → Accounts & Connections): its server needs an API key and none is saved.",

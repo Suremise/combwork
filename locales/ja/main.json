@@ -348,6 +348,8 @@
   "main.server.key.inField": "キーが{field, select, name {名前} url {ベースURL} other {モデルの一覧}}に含まれています。先にそこから取り除いてください。何も保存していません。",
   "main.server.key.length": "キーの長さは{min, number}～{max, number}文字です。貼り付けた内容を確認してください。",
   "main.server.notServer": "その接続はモデルをサーバーから取得していません。",
+  "main.server.output.invalid": "出力上限は1～{max, number}の整数のトークン数です。",
+  "main.server.output.notBelow": "{model}の出力上限（{output, number}トークン）は、コンテキストサイズ（{context, number}トークン）より小さくする必要があります。先に出力上限を下げるか、空にして既定値を使ってください。",
   "main.server.setUp.noKey": "{name}にはまだキーがありません。先にキーを追加してから、セットアップしてください。",
   "main.server.unsupported": "Combworkでは、{cli}はモデルをサーバーから取得できません。",
   "main.server.url.extra": "URLにはクエリ（?…）やフラグメント（#…）を含められません。キーは専用の欄に入力してください。",

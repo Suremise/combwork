@@ -2835,7 +2835,7 @@ class SessionManager {
     const tempDir = tempSetting ? await prepareAgentTemp({ setting: tempSetting, host: projectPath, agentId: agent.id, assistant: assistantHost, protect: [...(await protectedFolders(openWorkspaces())), projectPath, cwd] }) : null
     times?.mark('tempDir')
     const binPath = (env: Record<string, string>, dir: string | null): Record<string, string> => (policy.tools ? withBinOnPath(env, dir) : env)
-    const ctx = {
+    const ctx: LaunchContext = {
       projectPath,
       agentId: agent.id,
       executable: info.path,
@@ -2871,6 +2871,8 @@ class SessionManager {
       initialPrompt: policy.typing ? l.initialPrompt : undefined,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
       ...(conn ? { connectionHome: conn.folder } : {}),
+      // Its server connection's models (HI-2682): the adapter passes a local model's limits from them.
+      ...(conn?.server ? { server: { models: conn.server.models, connection: (eff.connectionId && eff.connection === conn.id ? eff.connectionName : null) ?? conn.name } } : {}),
       // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
       // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
       tempDir,
@@ -2894,6 +2896,10 @@ class SessionManager {
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
+    // A local model's limits as applied (HI-2682), for its context meter: this launch's, never read again.
+    state.localLimits = ctx.localLimits ?? undefined
+    // The /model lineup it asked Claude Code for (HI-2684), or why none.
+    state.picker = ctx.picker
     l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
@@ -6008,7 +6014,9 @@ class SessionManager {
     if (d.costUsd != null && !onServer) l.reportedCost = d.costUsd
     const reported = d.costUsd != null && !onServer && !usesOwnPrices(st.provider, config.settings)
     const modelSwitch = this.modelSwitchOf(l, d)
-    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
+    // A window is the model's that reported it (HI-2682, HR1 round 1): another model reported without one has none yet.
+    const window = d.contextWindow ?? (d.modelId && st.modelId && d.modelId !== st.modelId ? undefined : st.contextWindow)
+    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: window }
     if (
       next.effort === st.effort &&
       next.modelName === st.modelName &&
