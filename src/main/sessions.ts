@@ -2572,6 +2572,15 @@ class SessionManager {
   }
 
   /**
+   * The tools its project's workflow left out of an agent's running launch (HI-2694): null when it isn't running or was
+   * launched without Combwork's tools.
+   */
+  launchedWorkflowHidden(projectPath: string, agentId: string): string[] | null {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return !l || l.state.status === 'stopped' || !l.side ? null : (l.workflowHidden ?? [])
+  }
+
+  /**
    * The tools its project's workflow makes unusable (HI-2694), for a project agent's launch on `side`: those its side
    * doesn't already leave out, sorted. Read through workflowHiddenOf (workflowTools.ts sets it at startup); unreadable, none.
    */

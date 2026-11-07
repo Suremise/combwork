@@ -10,6 +10,7 @@ import { forYouItems, kindProposed, reviewSkipOf, workBadge, workView, type ForY
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
 import type { WorkflowToolOptions } from '../../shared/assistantTools'
+import { isAllOff, type WorkflowOptions } from '../../shared/workflow/options'
 
 type Row = Record<string, string | number | null>
 
@@ -179,7 +180,7 @@ export function rulesetStages(ws: WorkspaceService, ids: readonly string[]): Map
  * each card's own), and its running lanes' (`lane_runs`); and the stages those cards are in. One snapshot of combwork.db.
  * Null when the board has no facts yet or a ruleset can't be read: nothing is known, so nothing is hidden for it.
  */
-export function workRetained(ws: WorkspaceService, project: string): { options: WorkflowToolOptions[]; stages: string[] } | null {
+export function workRetained(ws: WorkspaceService, project: string): { options: WorkflowToolOptions[]; stages: string[]; allOff: boolean } | null {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return null
     const cards = prepared(db, "SELECT number, col, stage FROM cards WHERE archived = 0 AND project = ? COLLATE NOCASE AND col NOT IN ('hold', 'todo', 'done')").all(project) as Row[]
@@ -190,6 +191,7 @@ export function workRetained(ws: WorkspaceService, project: string): { options: 
       for (const r of prepared(db, "SELECT r.ruleset FROM lane_runs r JOIN lanes l ON l.id = r.lane WHERE l.state = 'active' AND l.project = ? COLLATE NOCASE AND r.ruleset IS NOT NULL").all(project) as Row[]) ids.add(String(r.ruleset))
     }
     const options: WorkflowToolOptions[] = []
+    let off = false
     for (const id of ids) {
       const row = prepared(db, QUERIES['rulesets.byId'].sql).get(id) as { data: string } | undefined
       let o: Partial<WorkflowToolOptions> | undefined
@@ -199,9 +201,15 @@ export function workRetained(ws: WorkspaceService, project: string): { options: 
         o = undefined
       }
       if (!o || typeof o.review !== 'string' || typeof o.finish !== 'string') return null
+      // All off is really off (§16.6.4): its cards move freely, so work under it can use every tool.
+      try {
+        if (isAllOff(o as WorkflowOptions)) off = true
+      } catch {
+        return null
+      }
       options.push({ review: o.review, finish: o.finish, focusedTests: !!o.focusedTests, okBefore: { mode: typeof o.okBefore?.mode === 'string' ? o.okBefore.mode : 'never' } })
     }
-    return { options, stages }
+    return { options, stages, allOff: off }
   })
 }
 

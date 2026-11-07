@@ -17,6 +17,7 @@ import { boardReadToken } from './boardStore'
 import { config } from './config'
 import { workRetained } from './workflow/cardWork'
 import { resolvedOf } from './workflow/rulesets'
+import { isAllOff } from '../shared/workflow/options'
 import { hiddenForWorkflow } from '../shared/assistantTools'
 import { WORKFLOW_ENFORCE } from '../shared/advanced'
 import { projectAgents } from '../shared/defaults'
@@ -48,8 +49,9 @@ export function workflowHiddenNow(ws: WorkspaceService, projectPath: string, cfg
   let hidden: string[] = []
   try {
     const r = resolvedOf(ws, projectPath, platform, c)
-    const retained = r.invalid ? null : workRetained(ws, basename(projectPath))
-    hidden = retained ? hiddenForWorkflow([r.options, ...retained.options], retained.stages) : []
+    // All off is really off (SPEC §16.6.4: cards move freely, Review included), so it hides nothing, as rules not enforced.
+    const retained = r.invalid || isAllOff(r.options) ? null : workRetained(ws, basename(projectPath))
+    hidden = retained && !retained.allOff ? hiddenForWorkflow([r.options, ...retained.options], retained.stages) : []
   } catch (e) {
     log.warn(`the tools ${userText(basename(projectPath))}'s workflow hides couldn't be read, so none are`, e)
     hidden = []
@@ -69,7 +71,7 @@ export function forgetWorkflowHidden(): void {
  * this change (`tools-restart-asked`), and keep their old tools until they restart (sessions.sideAllows holds work that
  * needs the new ones meanwhile).
  */
-export async function restartForWorkflow(ws: WorkspaceService, projectPath: string): Promise<void> {
+export async function restartForWorkflow(ws: WorkspaceService, projectPath: string, only?: (agentId: string) => boolean): Promise<void> {
   if (!ws.path || ws.isAssistantHome(projectPath)) return
   let cfg: ProjectConfig
   try {
@@ -81,7 +83,7 @@ export async function restartForWorkflow(ws: WorkspaceService, projectPath: stri
   const target = workflowHiddenNow(ws, projectPath, cfg).join(',')
   for (const a of projectAgents(cfg)) {
     const live = sessions.liveFor(projectPath, a.id)
-    if (!live) continue
+    if (!live || (only && !only(a.id))) continue
     const r = await sessions.restartForTools(projectPath, a.id, { when: 'ifIdle' }).catch((e: unknown) => {
       log.warn(`${userText(a.name)}: not restarted for its project's workflow`, e)
       return 'same' as const
@@ -99,6 +101,27 @@ export async function restartForWorkflow(ws: WorkspaceService, projectPath: stri
 /** What each busy launch was last asked to restart for (its project, agent and run → the hidden list then). */
 const asked = new Map<string, string>()
 
+/**
+ * A board change that makes a tool usable again with no settings change (HI-2694): a card moved into Review by hand on a
+ * project without review keeps the review tools (WORKFLOW_TOOL_STAGES). The running agents launched without such a tool
+ * are restarted for it, as a settings change does; a tool that only became unusable (a card finished) waits for the next
+ * launch, so finishing work never restarts anyone. Read once a board change has settled, per open workspace, and only for
+ * projects with an agent running without some tool.
+ */
+async function gainsOfBoard(ws: WorkspaceService): Promise<void> {
+  for (const p of ws.info()?.projects ?? []) {
+    const agents = projectAgents(p.config).filter((a) => (sessions.launchedWorkflowHidden(p.path, a.id) ?? []).length)
+    if (!agents.length) continue
+    const now = workflowHiddenNow(ws, p.path)
+    const gains = new Set(agents.filter((a) => (sessions.launchedWorkflowHidden(p.path, a.id) ?? []).some((t) => !now.includes(t))).map((a) => a.id))
+    if (gains.size) await restartForWorkflow(ws, p.path, (id) => gains.has(id))
+  }
+}
+
+/** Workspaces with a board change to look at, by path (one look after a burst of them). */
+const boardChanged = new Map<string, WorkspaceService>()
+let boardLook: ReturnType<typeof setTimeout> | null = null
+
 let started = false
 let enforcedWas: boolean | null = null
 
@@ -110,6 +133,18 @@ export function startWorkflowTools(): void {
   // A project's options written, at any level (each project it reaches is told: levels.ts), by the window, the
   // Assistant, a preset, a platform switch or a template.
   onCombworkEvent((e) => {
+    if (e.type === 'tasks-changed') {
+      const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())
+      if (!ws) return
+      boardChanged.set(e.workspacePath.toLowerCase(), ws)
+      boardLook ??= setTimeout(() => {
+        boardLook = null
+        const all = [...boardChanged.values()]
+        boardChanged.clear()
+        for (const w of all) void gainsOfBoard(w).catch((err: unknown) => log.warn('restarting agents for tools a board change brought back', err))
+      }, 250)
+      return
+    }
     if (e.type !== 'workflow-changed') return
     const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())
     if (ws) void restartForWorkflow(ws, e.projectPath).catch((err: unknown) => log.warn('restarting agents for a workflow change', err))

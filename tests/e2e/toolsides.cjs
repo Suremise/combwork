@@ -138,8 +138,9 @@ const hasReview = (launch) => hiddenOf(launch) !== null && !['cw_start_review', 
       const r = await fetch(`http://127.0.0.1:${env.CW_API_PORT}${route}`, { method, headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: r.status, body: await r.json().catch(() => null) }
     }
-    const NO_REVIEW = { preset: null, options: { review: 'none', noSelfReview: false, folder: 'project' } }
-    const REVIEW = { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project' } }
+    // No review, but not All off (which is really off, SPEC §16.6.4: it hides nothing): dependencies must be done first.
+    const NO_REVIEW = { preset: null, options: { review: 'none', noSelfReview: false, folder: 'project', dependenciesDone: true } }
+    const REVIEW = { preset: null, options: { review: 'agent', noSelfReview: true, folder: 'project', dependenciesDone: true } }
     await inv('workflow:setOptions', alpha, NO_REVIEW)
     const both = await lib.addAgent(inv, alpha, { name: 'Both', workflowRole: 'either' })
     const maker = await lib.addAgent(inv, alpha, { name: 'Maker', workflowRole: 'builder' })
@@ -190,6 +191,14 @@ const hasReview = (launch) => hiddenOf(launch) !== null && !['cw_start_review', 
     check('…a workflow change that leaves its list as it is asks nothing again', (await inv('workflow:setOptions', alpha, { ...REVIEW, options: { ...REVIEW.options, maxAgents: 7 } }), (await asked.count()) === 0))
     check('…still a restart to make, should it be asked again', (await inv('session:restartForTools', alpha, both.id, 'ifIdle')) === 'restarting')
     check('…which loads the review tools', !!(await lib.until(async () => bothLaunches().length === 4 && hasReview(bothLaunches()[3]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
+    check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
+    // A board change that brings a tool back with no settings change: on a project without review, a card moved into
+    // Review by hand keeps the review tools, so a running agent launched without them is restarted with them.
+    await inv('workflow:setOptions', alpha, NO_REVIEW)
+    check('review off again: the idle agent is restarted without the review tools', !!(await lib.until(async () => bothLaunches().length === 5 && lacksReview(bothLaunches()[4]) && (await bothLive())?.status === 'ready', HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
+    const moved = (await api('POST', '/v1/tasks', { title: 'Moved to Review by hand', project: 'alpha' })).body?.number
+    await inv('tasks:update', moved, { column: 'review' }).catch(() => api('PATCH', `/v1/tasks/${moved}`, { column: 'review' }))
+    check('a card moved into Review by hand: the agent is restarted with the review tools, no setting changed', !!(await lib.until(async () => bothLaunches().length === 6 && hasReview(bothLaunches()[5]), HUNG_MS)), JSON.stringify(bothLaunches().map(hiddenOf)))
     check('…running again', !!(await lib.until(async () => (await bothLive())?.status === 'ready', HUNG_MS)))
     await inv('session:stop', alpha, both.id).catch(() => undefined)
     void maker

@@ -64,10 +64,9 @@ describe('tools by workflow (HI-2694): which are hidden', () => {
     expect(hidden({ ...focused, focusedTests: false })).toContain('cw_focused_skip')
   })
 
-  it("None: no merge, so no merge report; its Solo hides the review tools, and All off hides what Solo does", () => {
+  it('None: no merge, so no merge report; its Solo hides the review tools', () => {
     expect(hidden(presetOf('solo', 'none'))).toEqual(['cw_focused_skip', 'cw_report_merge', 'cw_start_review', 'cw_verdict'])
     expect(hidden(presetOf('pair', 'none'))).not.toContain('cw_verdict')
-    expect(hidden(allOff('git'))).toEqual(hidden(allOff('none')))
   })
 
   it('never hides a tool one of whose operations works under any options', () => {
@@ -172,6 +171,15 @@ describe("a project's list from its options and its work in flight (HR1's s11 po
     expect(workflowHiddenNow(w, projectPath(w))).toContain('cw_verdict')
     await cardUnder(w, soloNone, 'review')
     expect(workflowHiddenNow(w, projectPath(w))).not.toContain('cw_verdict')
+  })
+
+  it('All off is really off (SPEC §16.6.4: its cards move freely): nothing hidden, nor while work under it is in flight', async () => {
+    const off = allOff('none')
+    const w = await workspace(off)
+    expect(workflowHiddenNow(w, projectPath(w))).toEqual([])
+    const solo = await workspace(soloNone)
+    await cardUnder(solo, off, 'active')
+    expect(workflowHiddenNow(solo, projectPath(solo))).toEqual([])
   })
 
   it('kept until its options change: a config given with other options reads afresh', async () => {
