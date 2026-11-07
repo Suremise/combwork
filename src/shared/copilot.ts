@@ -274,6 +274,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     lockAsk: true,
     backgroundSessions: false,
     backgroundWakes: false,
+    typedTurnsWithoutPrompt: false,
     // Its interface fills the screen: drawn while its terminal changed size, it can stay at the old width (#486).
     startupSizeRefresh: true,
     // A model call it gave up on ends the turn with a session.error and no Stop (1.0.105, HI-1960).

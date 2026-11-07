@@ -365,6 +365,62 @@ describe('the turn ledger', () => {
     expect(b.stale.slice(13)).toEqual(['a tool start of a turn Combwork saw no prompt for', 'a tool start of an earlier turn'])
   })
 
+  it("a turn the user's typing began with no prompt hook (HI-2673, Claude Code's `!` command): only a tool call the launch never saw opens it, only while typed", () => {
+    const typed = (a: Agent, ev: HookEvent, i: HookIds, yes: boolean) => {
+      const took = admit(a.ledger, ev, i, { typed: yes, now: a.ledger.seq })
+      if (took.verdict === 'apply') applyStep(a, hookStep(took.event, input(a)))
+      else a.stale.push(took.verdict === 'stale' ? took.why : 'continued')
+      return took
+    }
+    const finished = (): Agent => {
+      const a = agent()
+      feed(a, { kind: 'prompt' }, ids('t1'))
+      feed(a, { kind: 'toolStart' }, ids('t1', { call: 'c1' }))
+      feed(a, { kind: 'toolEnd' }, ids('t1', { call: 'c1' }))
+      feed(a, { kind: 'stop', lastMessage: null }, ids('t1'))
+      return a
+    }
+    const a = finished()
+    // Not typed, a call seen before, no call id, a sub-agent's, and a Stop or tool end first: none opens it. Each is
+    // stale; those of the turn never seen say so (`unseen`), the sub-agent's doesn't.
+    expect(typed(a, { kind: 'toolStart' }, ids('t2', { call: 'c2' }), false)).toMatchObject({ verdict: 'stale', unseen: true })
+    expect(typed(a, { kind: 'toolStart' }, ids('t2', { call: 'c1' }), true)).toMatchObject({ verdict: 'stale', unseen: true })
+    expect(typed(a, { kind: 'toolStart' }, ids('t2'), true).verdict).toBe('stale')
+    const sub = typed(a, { kind: 'toolStart' }, ids('t2', { call: 'c3', sub: 'agent-1' }), true)
+    expect(sub.verdict === 'stale' && sub.unseen).toBeFalsy()
+    expect(typed(a, { kind: 'stop', lastMessage: null }, ids('t2'), true)).toMatchObject({ verdict: 'stale', unseen: true })
+    expect(typed(a, { kind: 'toolEnd' }, ids('t2', { call: 'c2' }), true)).toMatchObject({ verdict: 'stale', unseen: true })
+    expect([a.status, a.ledger.active?.id, a.ledger.active?.state]).toEqual(['finished', 't1', 'over'])
+    // Typed, a tool call the launch never saw: that turn begins, and runs to its Stop.
+    expect(typed(a, { kind: 'toolStart' }, ids('t2', { call: 'c2' }), true)).toMatchObject({ verdict: 'apply', note: "a turn the user's typing began with no prompt hook" })
+    expect([a.status, a.ledger.active?.id, a.ledger.active?.state, openCalls(a.ledger)]).toEqual(['working', 't2', 'running', 1])
+    feed(a, { kind: 'toolEnd' }, ids('t2', { call: 'c2' }))
+    feed(a, { kind: 'stop', lastMessage: null }, ids('t2'))
+    expect([a.status, a.ledger.active?.state]).toEqual(['finished', 'over'])
+    // An earlier turn's late hook is stale and not unseen, typed or not.
+    expect(typed(a, { kind: 'toolStart' }, ids('t1', { call: 'c9' }), true)).toEqual({ verdict: 'stale', why: 'a tool start of an earlier turn' })
+    // While a turn runs, a new id opens nothing, typed or not.
+    feed(a, { kind: 'prompt' }, ids('t3'))
+    expect(typed(a, { kind: 'toolStart' }, ids('t4', { call: 'c4' }), true).verdict).toBe('stale')
+    expect([a.ledger.active?.id, a.ledger.active?.state]).toEqual(['t3', 'running'])
+    // Past the bound on turn ids or on call ids (`forgot`): an id not remembered may be an earlier one, so nothing is
+    // unseen and nothing opens.
+    const b: Agent = { status: 'ready', ledger: newLedger(0, { maxSeen: 2 }), stale: [] }
+    for (const t of ['t0', 't1', 't2']) {
+      feed(b, { kind: 'prompt' }, ids(t))
+      feed(b, { kind: 'stop', lastMessage: null }, ids(t))
+    }
+    expect(b.ledger.forgot).toBe(true)
+    for (const t of ['t0', 't-new']) expect(typed(b, { kind: 'toolStart' }, ids(t, { call: 'c-new' }), true), t).toEqual({ verdict: 'stale', why: 'a tool start of a turn Combwork saw no prompt for' })
+    const c: Agent = { status: 'ready', ledger: newLedger(0, { maxSeen: 2 }), stale: [] }
+    feed(c, { kind: 'prompt' }, ids('t1'))
+    for (let n = 0; n <= 20; n++) feed(c, { kind: 'toolStart' }, ids('t1', { call: `c${n}` }))
+    feed(c, { kind: 'stop', lastMessage: null }, ids('t1'))
+    expect([c.ledger.calls.has('c0'), c.ledger.forgot]).toEqual([false, true])
+    for (const call of ['c0', 'c-new']) expect(typed(c, { kind: 'toolStart' }, ids('t2', { call }), true), call).toEqual({ verdict: 'stale', why: 'a tool start of a turn Combwork saw no prompt for' })
+    expect([c.ledger.active?.id, c.ledger.active?.state]).toEqual(['t1', 'over'])
+  })
+
   it('past the bound on remembered ids, a forgotten id is stale, never a new turn, also while the CLI woke (the bound itself: maxSeen)', () => {
     const a: Agent = { status: 'ready', ledger: newLedger(0, { maxSeen: 5 }), stale: [] }
     for (let n = 0; n < 6; n++) {

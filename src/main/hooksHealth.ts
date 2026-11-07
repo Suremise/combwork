@@ -47,8 +47,11 @@ export interface HooksWatch {
   startHook: boolean
   /** From when its start counts: its launch, or the last check that found a question at its start in the way. */
   startFrom: number
-  /** The first prompt since a current turn's hook that was sent while it was idle: when (ms). */
-  submit: { at: number } | null
+  /**
+   * The first prompt since a current turn's hook that was sent while it was idle: when (ms), and `byUser` when it was the
+   * user's own Enter in its terminal (not Combwork's typing): the turn it begins may come with no prompt hook (HI-2673).
+   */
+  submit: { at: number; byUser?: true } | null
   /** When its screen was first seen working on that prompt. */
   workAt: number | null
   /** How its transcript's turns meet its hooks (the adapter's turnsJoin), or null: no transcript turns read. */
@@ -225,13 +228,23 @@ export function turnHeard(w: HooksWatch): void {
   w.workAt = null
 }
 
-/** A prompt was sent (`idle`: while the agent was idle, so a hook should follow). Whether it is the one now watched. */
-export function promptSent(w: HooksWatch, now: number, idle: boolean): boolean {
+/**
+ * A prompt was sent (`idle`: while the agent was idle, so a hook should follow; `byUser`: the user's own Enter in its
+ * terminal). Whether it is the one now watched.
+ */
+export function promptSent(w: HooksWatch, now: number, idle: boolean, byUser = false): boolean {
   if (!idle || w.submit) return false
-  w.submit = { at: now }
+  w.submit = { at: now, ...(byUser ? { byUser: true as const } : {}) }
   w.workAt = null
   return true
 }
+
+/**
+ * Whether the user's own Enter into the idle pane still waits for its hook (HI-2673): the allowance a CLI that may begin
+ * that turn with no prompt hook has, for as long as that submit is watched (a hook taken, or the screen idle again with
+ * nothing seen of it, lets it go; a new launch has a new watch).
+ */
+export const typedPending = (w: HooksWatch | undefined): boolean => !!w?.submit?.byUser
 
 /** What a check sees now. */
 export interface HooksEvidence {

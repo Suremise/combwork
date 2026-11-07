@@ -10,7 +10,7 @@ import type { HookIds, LaunchContext } from '../src/main/providers/types'
 import { claudeTranscriptTurns } from '../src/main/providers/claude/turns'
 import { admit, newLedger } from '../src/main/turnLedger'
 import type { LiveSessionState, TaskCard } from '../src/shared/types'
-import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, type HooksEvidence } from '../src/main/hooksHealth'
+import { HOOKS_GRACE_MS, hookSeen, hookTurn, hooksMissing, hooksMissingFor, newHooksWatch, noteHooksMissing, onHooksHealthChanged, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, typedPending, type HooksEvidence } from '../src/main/hooksHealth'
 import { promptKey } from '../src/main/providers/turns'
 import { readyFor } from '../src/main/readiness'
 import { agentState } from '../src/shared/agentState'
@@ -122,6 +122,28 @@ describe('a prompt', () => {
     expect(hooksMissing(w, { ...quiet, screen: 'working' }, 10_000 + 10 * BOUND, BOUND)).toBeNull()
   })
 
+  it("the user's own Enter (HI-2673) is the typed allowance while it is watched: a hook taken or an idle screen lets it go", () => {
+    const w = started()
+    // Combwork's typing is no allowance.
+    promptSent(w, 10_000, true)
+    expect(typedPending(w)).toBe(false)
+    turnHeard(w)
+    // The user's Enter while it is idle is; while it works (not watched) it isn't.
+    expect(promptSent(w, 11_000, false, true)).toBe(false)
+    expect(typedPending(w)).toBe(false)
+    expect(promptSent(w, 12_000, true, true)).toBe(true)
+    expect(typedPending(w)).toBe(true)
+    // A hook of its turn answers it.
+    turnHeard(w)
+    expect(typedPending(w)).toBe(false)
+    // An Enter that started nothing (a local command, a menu): gone once its screen is idle again, so a later hook of a
+    // turn never seen can't open one.
+    promptSent(w, 20_000, true, true)
+    expect(hooksMissing(w, { ...quiet, screen: 'idle' }, 20_000 + HOOKS_GRACE_MS, BOUND)).toBeNull()
+    expect(typedPending(w)).toBe(false)
+    expect(typedPending(undefined)).toBe(false)
+  })
+
   it("a launch's task, for a CLI whose first hook comes with its first prompt: watched from its start", () => {
     const w = newHooksWatch(0, false)
     expect(promptSent(w, 0, true)).toBe(true)
@@ -182,7 +204,8 @@ describe('what follows', () => {
     expect(hooksMissingNote(live({ hooksMissing: { ...missing, after: 'start' } }), tr)).toContain('None came after it started.')
     expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'off', offIn: 'managed settings' } }), tr)).toContain('managed settings turns hooks off (disableAllHooks).')
     expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'refused' } }), tr)).toContain("Combwork refused its hooks: they didn't carry this session's token.")
-    expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'newer' } }), tr)).toContain('This Claude Code is newer than the version Combwork was tested with')
+    // Only what Combwork knows (HI-2673): the version it was tested with, never a guess at an update during the session.
+    expect(hooksMissingNote(live({ hooksMissing: { ...missing, why: 'newer' } }), tr)).toContain('This Claude Code is newer than the version Combwork was tested with. Until its hooks arrive')
     expect(hooksMissingNote(live(), tr)).toBeNull()
   })
 
@@ -351,6 +374,40 @@ describe("a turn its transcript shows (#1371)", () => {
     expect(hookTurn(w, 11_000, 'N')).toBe(false)
     expect(w.answered).toBe(w.order.get('N'))
     expect(hooksMissing(w, quiet, 70_000, BOUND)).toBeNull()
+  })
+
+  it("Claude Code's system entries of a heard turn, written with no hook (HI-2673: its away summary, 2.1.319): no sign; a turn with no hook still is", () => {
+    const at = (s: number) => new Date(Date.parse('2026-11-06T22:40:00.000Z') + s * 1000).toISOString()
+    const entry = (o: Record<string, unknown>) => JSON.stringify({ isSidechain: false, ...o }) + '\n'
+    const started = Date.parse(at(0))
+    const memo = {}
+    const read = (text: string, now: number) => transcriptTurns(w, claudeTranscriptTurns(text, memo), now, started)
+    const w = newHooksWatch(started, false, 'id')
+    // A turn its hooks named, and its end as 2.1.319 writes it: the Stop hook's summary and the turn's duration.
+    hookTurn(w, Date.parse(at(1)), 'P')
+    read(
+      entry({ type: 'user', uuid: 'u-P', parentUuid: null, promptId: 'P', origin: { kind: 'human' }, timestamp: at(1), message: { role: 'user', content: 'publish it' } }) +
+        entry({ type: 'assistant', uuid: 'a-P', parentUuid: 'u-P', timestamp: at(2), message: { role: 'assistant', content: [{ type: 'text', text: 'Published.' }] } }) +
+        entry({ type: 'system', subtype: 'stop_hook_summary', uuid: 's-P', parentUuid: 'a-P', timestamp: at(3), hookCount: 1 }) +
+        entry({ type: 'system', subtype: 'turn_duration', uuid: 'd-P', parentUuid: 's-P', timestamp: at(3), durationMs: 2000, isMeta: false }),
+      Date.parse(at(4))
+    )
+    // Minutes later, by itself: the away summary, chained to the turn's last entry; then a compaction's boundary.
+    read(
+      entry({ type: 'system', subtype: 'away_summary', uuid: 'w-P', parentUuid: 'd-P', timestamp: at(180), content: 'Combwork 1.1.0 is published…', isMeta: false }) +
+        entry({ type: 'system', subtype: 'compact_boundary', uuid: 'k-P', parentUuid: 'w-P', timestamp: at(181), content: 'Conversation compacted' }),
+      Date.parse(at(181))
+    )
+    expect(w.unheard.size).toBe(0)
+    expect(hooksMissing(w, quiet, Date.parse(at(181)) + 10 * BOUND, BOUND)).toBeNull()
+    // The control: a worked turn no hook named is still flagged.
+    read(
+      entry({ type: 'user', uuid: 'u-X', parentUuid: 'k-P', promptId: 'X', origin: { kind: 'human' }, timestamp: at(200), message: { role: 'user', content: 'go on' } }) +
+        entry({ type: 'assistant', uuid: 'a-X', parentUuid: 'u-X', timestamp: at(201), message: { role: 'assistant', content: [] } }),
+      Date.parse(at(201))
+    )
+    expect(hooksMissing(w, quiet, Date.parse(at(201)) + BOUND, BOUND)).toBe('transcript')
+    expect(w.flagged).toBe('X')
   })
 
   it('answered stays answered (the real Claude reader): a late record of E after N answered it never flags E again; a new turn with no hook after that still does', () => {

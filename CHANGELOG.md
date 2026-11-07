@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **A `!` command typed into Claude Code no longer trips "Combwork isn't hearing from Claude Code's hooks"** (HI-2673). Claude Code 2.1.319 sends the command's output to the model and starts a turn without the hook a prompt sends. Combwork took that turn's hooks as old news, so the agent stayed finished while it worked, then Combwork said its hooks weren't arriving and stopped typing into it. While your Enter in the pane waits for its hook, a turn Combwork has never seen now counts: its first tool call shows the agent working, and its hooks show they arrive. The note's line for a Claude Code newer than Combwork was tested with no longer guesses that an update changed its hooks.
+
 ## 1.1.0 — 2026-11-06
 
 <!-- old-name: begin changelog-upgrade -->
