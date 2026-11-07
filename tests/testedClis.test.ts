@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join, win32 } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
-import { CLI_PROVIDERS, gitReaders, MANIFEST, manifestCheck, manifestFromRecord, manifestFromRecords, manifestStale, testOnlyFiles } from '../scripts/testedClis.mjs'
+import { CLI_PROVIDERS, gitReaders, MANIFEST, manifestCheck, manifestFromRecord, manifestFromRecords, manifestStale, testOnlyFiles, versionOnlyFiles } from '../scripts/testedClis.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -369,6 +369,11 @@ describe('npm run release: test-only changes since the record, let through on th
     expect(await r.namesAt(one, 'advanced.cjs')).toEqual(['tests/e2e/claude-real.cjs'])
     expect(await r.namesAt('HEAD', 'advanced.cjs')).toEqual([])
     expect(await r.namesAt(one, 'shared.test.ts')).toEqual(['tests/fixtures/x.json'])
+    // HI-2676: a file's text at a revision; null for a path or a revision git can't show.
+    expect(await r.fileAt(one, 'tests/e2e/claude-real.cjs')).toBe("require('./advanced.cjs')\n")
+    expect(await r.fileAt('HEAD', 'tests/e2e/claude-real.cjs')).toBe('// alone\n')
+    expect(await r.fileAt(one, 'no/such.file')).toBeNull()
+    expect(await r.fileAt('f'.repeat(40), 'tests/e2e/advanced.cjs')).toBeNull()
     // advanced.cjs was named by a real suite at `one`: stale, though nothing names it now (HEAD's list readable).
     expect((await testOnlyFiles(['tests/e2e/advanced.cjs'], one, { suitesAt: r.suitesAt, namesAt: r.namesAt })).stale).toEqual(['tests/e2e/advanced.cjs'])
     // What git can't show: an unknown commit; a revision without suites.mjs; one whose suites.mjs doesn't load.
@@ -382,6 +387,59 @@ describe('npm run release: test-only changes since the record, let through on th
     git('commit', '-qm', 'none')
     expect(await r.suitesAt('HEAD')).toBeNull()
   }
+})
+
+describe('npm run release: a version-only bump since the record keeps the manifest (HI-2676)', () => {
+  const manifest = manifestFromRecord(fullRecord(), suites).manifest
+  const REC = '0123456789ab'
+  const pkg = (v: string, more: Record<string, unknown> = {}) => JSON.stringify({ name: 'combwork', version: v, scripts: { build: 'x' }, ...more }, null, 2) + '\n'
+  const lock = (v: string, dep = '1.0.0', root = v) => JSON.stringify({ name: 'combwork', version: v, lockfileVersion: 3, packages: { '': { name: 'combwork', version: root }, 'node_modules/x': { version: dep } } }, null, 2) + '\n'
+  const notes = (heading: string, line = '- A change.') => `# Release Notes\r\n\r\n${heading}\r\n\r\n${line}\r\n\r\n## 1.1.0 — 2026-11-06\r\n`
+  const before = { 'package.json': pkg('1.1.0'), 'package-lock.json': lock('1.1.0'), 'CHANGELOG.md': notes('## Unreleased') }
+  const bumped = { 'package.json': pkg('1.2.0'), 'package-lock.json': lock('1.2.0'), 'CHANGELOG.md': notes('## 1.2.0 — 2026-11-20') }
+  const LIST = [{ name: 'advanced' }]
+  const readers = (now: Record<string, string>, then: Record<string, string | null> = before) => ({
+    suitesAt: async () => LIST,
+    namesAt: async () => [],
+    fileAt: async (rev: string, path: string) => (rev === 'HEAD' ? now : rev === REC ? then : {})[path] ?? null
+  })
+  const ALL = ['package.json', 'package-lock.json', 'CHANGELOG.md']
+  const check = (files: string[], now: Record<string, string>, then?: Record<string, string | null>) => manifestCheck(manifest, () => [MANIFEST, ...files], readers(now, then))
+
+  it('lets the bump through, listed with its version for each provider, and a test-only file beside it', async () => {
+    const out = await check([...ALL, 'tests/settingsWorkspace.test.ts'], bumped)
+    expect(out.stale).toBeNull()
+    expect(out.excluded.codex).toEqual({ record: REC, files: [...ALL, 'tests/settingsWorkspace.test.ts'], version: '1.2.0' })
+    expect(Object.keys(out.excluded).sort()).toEqual(['claude-code', 'codex', 'copilot'])
+    // The bump alone, package.json and the lockfile only (no release notes yet): through as well.
+    expect((await check(['package.json', 'package-lock.json'], bumped)).stale).toBeNull()
+  })
+
+  it('keeps the refusals: a source change, a test change off the allowlist, another package.json field', async () => {
+    expect((await check([...ALL, 'src/main/sessions.ts'], bumped)).stale).toContain('(src/main/sessions.ts)')
+    expect((await check([...ALL, 'tests/e2e/lib.cjs'], bumped)).stale).toContain('(tests/e2e/lib.cjs)')
+    expect((await check(ALL, { ...bumped, 'package.json': pkg('1.2.0', { scripts: { build: 'y' } }) })).stale).toContain('(package.json)')
+  })
+
+  it("refuses more than a bump in the lockfile or the release notes, or versions that don't agree", async () => {
+    expect((await check(ALL, { ...bumped, 'package-lock.json': lock('1.2.0', '2.0.0') })).stale).toContain('(package-lock.json)')
+    expect((await check(ALL, { ...bumped, 'CHANGELOG.md': notes('## 1.2.0 — 2026-11-20', '- Another change.') })).stale).toContain('(CHANGELOG.md)')
+    // The heading names another version, or no date, or the record had no Unreleased section to become it.
+    for (const heading of ['## 1.3.0 — 2026-11-20', '## 1.2.0'])
+      expect((await check(ALL, { ...bumped, 'CHANGELOG.md': notes(heading) })).stale, heading).toContain('(CHANGELOG.md)')
+    expect((await check(ALL, bumped, { ...before, 'CHANGELOG.md': notes('## 1.1.1 — 2026-11-10') })).stale).toContain('(CHANGELOG.md)')
+    // The lockfile left behind package.json: every bumped file is stale, as is a lockfile's root left behind.
+    expect((await check(['package.json'], { ...bumped, 'package-lock.json': lock('1.1.0') })).stale).toContain('(package.json)')
+    expect((await check(['package.json', 'package-lock.json'], { ...bumped, 'package-lock.json': lock('1.2.0', '1.0.0', '1.1.0') })).stale).toContain('2 files have changed since (package.json, package-lock.json)')
+  })
+
+  it("can't say, so stale: a file git can't show at either revision, JSON that doesn't parse, no file reader at all", async () => {
+    expect((await check(ALL, bumped, { ...before, 'package.json': null })).stale).toContain('(package.json)')
+    expect((await check(ALL, { ...bumped, 'package-lock.json': '{ not json' })).stale).toContain('3 files have changed since')
+    const noFiles = { suitesAt: async () => LIST, namesAt: async () => [] }
+    expect((await manifestCheck(manifest, () => [MANIFEST, ...ALL], noFiles)).stale).toContain('3 files have changed since')
+    expect(await versionOnlyFiles([], REC, readers(bumped))).toEqual({ exempt: [], stale: [] })
+  })
 })
 
 describe('the shipped manifest (#365)', () => {

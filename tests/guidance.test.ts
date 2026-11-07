@@ -974,7 +974,9 @@ describe('RELEASING.md on the 1.0 path', () => {
     expect(checks).toMatch(/installer's \*\*SHA-256\*\*/)
     expect(checks).toMatch(/\*\*The installer the user installs, and the one `npm run release` uploads, always get rows of their own bytes:\*\*/)
     expect(checks).toMatch(/Without one, or where it is uncertain, the full affected set runs: that is the fallback/)
-    expect(checks).toMatch(/Anything not on it means the real tier runs again\./)
+    // HI-2676: the version-only bump beside the test-only allowlist; anything else asks for the real tier.
+    expect(checks).toMatch(/is either part of a version-only bump or on the test-only allowlist \(`manifestCheck`[^\n]*Anything else means the real tier runs again\./)
+    expect(checks).toMatch(/anything outside `tests\/` other than the version-only bump of those three files, more than that bump in them/)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/The full set is for guidance-wide changes only \(HI-2010, HI-2011, HI-2012\); a publishable RC gets 3 to 5 scenarios picked at random/)
     expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
     // #1534: where each build is recorded.

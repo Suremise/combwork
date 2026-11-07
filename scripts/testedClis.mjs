@@ -157,6 +157,65 @@ export async function testOnlyFiles(files, record, readers) {
   return { exempt, stale }
 }
 
+/** The files a release's version bump changes (RELEASING.md, Steps, step 3). */
+export const VERSION_FILES = ['package.json', 'package-lock.json', 'CHANGELOG.md']
+
+const parseJson = (text) => {
+  try {
+    return text === null || text === undefined ? null : JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+const withoutVersion = (pkg) => {
+  const { version: _v, ...rest } = pkg
+  return JSON.stringify(rest)
+}
+const lockWithoutVersions = (lock) => {
+  const { version: _v, packages, ...rest } = lock
+  const root = packages?.[''] ? (({ version: _r, ...r }) => r)(packages['']) : undefined
+  return JSON.stringify({ ...rest, ...(packages ? { packages: { ...packages, ...(root ? { '': root } : {}) } } : {}) })
+}
+
+/**
+ * HI-2676: which of `files` (package.json, package-lock.json, CHANGELOG.md), changed since a record of commit `record`,
+ * changed by a release's version bump and nothing else, so the record's real tier still stands for the code. The
+ * version V is package.json's at HEAD, and the lockfile's two version fields must say V there too. Then:
+ * - package.json: the same at both revisions but for `version`;
+ * - package-lock.json: the same but for its top `version` and `packages[""].version`;
+ * - CHANGELOG.md: the record's, with its one `## Unreleased` heading become `## V — <date>`, and nothing else.
+ * Fail-closed: a file git can't show at either revision, JSON that doesn't parse, or versions that don't agree make each
+ * of them stale. `readers.fileAt(rev, path)` → the file's text at a revision, or null. `version`: V, when any passed.
+ */
+export async function versionOnlyFiles(files, record, readers) {
+  if (!files.length) return { exempt: [], stale: [] }
+  const at = async (rev, path) => (readers.fileAt ? await readers.fileAt(rev, path) : null)
+  const pkgNow = parseJson(await at('HEAD', 'package.json'))
+  const lockNow = parseJson(await at('HEAD', 'package-lock.json'))
+  const v = typeof pkgNow?.version === 'string' ? pkgNow.version : null
+  if (!v || lockNow?.version !== v || lockNow?.packages?.['']?.version !== v) return { exempt: [], stale: [...files] }
+  const exempt = []
+  const stale = []
+  for (const f of files) {
+    let ok = false
+    if (f === 'package.json') {
+      const then = parseJson(await at(record, f))
+      ok = !!then && withoutVersion(then) === withoutVersion(pkgNow)
+    } else if (f === 'package-lock.json') {
+      const then = parseJson(await at(record, f))
+      ok = !!then && lockWithoutVersions(then) === lockWithoutVersions(lockNow)
+    } else if (f === 'CHANGELOG.md') {
+      const then = (await at(record, f))?.replace(/\r\n/g, '\n')
+      const now = (await at('HEAD', f))?.replace(/\r\n/g, '\n')
+      const escaped = v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const heading = now?.match(new RegExp(`^## ${escaped} — \\d{4}-\\d{2}-\\d{2}$`, 'm'))?.[0]
+      ok = !!then && !!now && !!heading && (then.match(/^## Unreleased$/gm) ?? []).length === 1 && then.replace(/^## Unreleased$/m, heading) === now
+    }
+    ;(ok ? exempt : stale).push(f)
+  }
+  return { exempt, stale, ...(exempt.length ? { version: v } : {}) }
+}
+
 /**
  * HI-2661: manifestStale's check with test-only changes allowed (testOnlyFiles), on the record: `stale` (why the
  * manifest isn't of this code, or null) and `excluded`, per provider id, its record's commit and the files changed since
@@ -174,16 +233,20 @@ export async function manifestCheck(manifest, changedSince, readers) {
     if (!changed) return { stale: `${p.name}'s entry comes from a commit git doesn't know (${e.record})`, excluded }
     const other = changed.filter((f) => f !== MANIFEST)
     if (!other.length) continue
-    const { exempt, stale } = await testOnlyFiles(other, e.record, readers)
+    // HI-2676: a release's version bump since the record; HI-2661: test-only files on the allowlist. Anything else is stale.
+    const bump = await versionOnlyFiles(other.filter((f) => VERSION_FILES.includes(f)), e.record, readers)
+    const tests = await testOnlyFiles(other.filter((f) => !VERSION_FILES.includes(f)), e.record, readers)
+    const stale = [...bump.stale, ...tests.stale]
     if (stale.length) return { stale: changedText(p, e.record, stale), excluded }
-    excluded[p.id] = { record: e.record, files: exempt }
+    excluded[p.id] = { record: e.record, files: [...bump.exempt, ...tests.exempt], ...(bump.version ? { version: bump.version } : {}) }
   }
   return { stale: null, excluded }
 }
 
 /**
- * The git-backed readers for testOnlyFiles, in repository `cwd`: suites.mjs as it is at a revision (loaded as a module of
- * its own: it imports nothing), and `git grep` of a fixed string at a revision under NAMING_DIRS. Null when git can't
+ * The git-backed readers for testOnlyFiles and versionOnlyFiles, in repository `cwd`: suites.mjs as it is at a revision
+ * (loaded as a module of its own: it imports nothing), a file's text at a revision, and `git grep` of a fixed string at
+ * a revision under NAMING_DIRS. Null when git can't
  * say (an unknown revision, a missing or unloadable file).
  */
 export function gitReaders(cwd, spawn) {
@@ -198,6 +261,10 @@ export function gitReaders(cwd, spawn) {
       } catch {
         return null
       }
+    },
+    fileAt(rev, path) {
+      const r = git(['show', `${rev}:${path}`])
+      return r.status === 0 ? r.stdout : null
     },
     namesAt(rev, needle) {
       const r = git(['grep', '-l', '-F', '-e', needle, rev, '--', ...NAMING_DIRS])

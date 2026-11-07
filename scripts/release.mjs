@@ -70,7 +70,7 @@ if (dialectsOnly) {
     console.error(`${MANIFEST} isn't of this code: ${stale}. Run the real tier on this commit (npm run e2e -- --all --only-real <Copilot's suites> --build --record, RELEASING.md Step 4), then npm run tested-clis, and commit the manifest (RELEASING.md).`)
     process.exit(1)
   }
-  for (const [id, { record, files }] of Object.entries(excluded)) console.log(`${MANIFEST}: ${id}'s entry is from ${record}; test-only files changed since, not run by its real tier (for the coverage ledger): ${files.join(', ')}`)
+  for (const [id, { record, files, version }] of Object.entries(excluded)) console.log(`${MANIFEST}: ${id}'s entry is from ${record}; changed since, not run by its real tier (for the coverage ledger)${version ? `, the bump to ${version} among them` : ''}: ${files.join(', ')}`)
 }
 // The committed notices must match what ships (#386): the build would otherwise regenerate them after the clean-tree check.
 if (spawnSync('node', ['scripts/licenses.mjs', '--check'], { stdio: 'inherit', cwd: root }).status !== 0) process.exit(1)
