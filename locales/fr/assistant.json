@@ -735,6 +735,7 @@
   "assistant.undo.why.projectOpened": "Un projet qu’il a ouvert reste ouvert : ferme-le si tu n’en veux pas.",
   "assistant.undo.why.prompt": "Un prompt envoyé ne peut pas être repris.",
   "assistant.undo.why.putBack": "Sa raison reste en commentaire.",
+  "assistant.undo.why.queueForwarded": "Une fusion de mise à jour qu’il a demandée n’est pas annulée : retire-la de la file de fusion si elle ne doit pas fusionner.",
   "assistant.undo.why.queuePaused": "Une file de fusion suspendue reste suspendue : reprends-la si elle doit tourner.",
   "assistant.undo.why.queueResumed": "Une file de fusion reprise n’est pas suspendue à nouveau : suspends-la si elle ne doit pas tourner.",
   "assistant.undo.why.removedFromQueue": "Le retrait de la file de fusion reste dans le travail de la carte : elle n’y revient que par « Réessayer la fusion » ou une nouvelle validation.",

@@ -133,7 +133,7 @@
   },
   "settings.accounts.copilotNotSignedIn": {
     "defaultMessage": "Not signed in: sign in from Provider Setup",
-    "description": "GitHub Copilot's account when it isn't signed in (HI-2107). Provider Setup names a dialog."
+    "description": "GitHub Copilot's or the Antigravity CLI's account when it isn't signed in (HI-2107, HI-2544). Provider Setup names a dialog."
   },
   "settings.accounts.defaults.failed": {
     "defaultMessage": "Couldn't change the connection's defaults",
@@ -401,7 +401,7 @@
   },
   "settings.accounts.thisPc": {
     "defaultMessage": "Signed in for this PC",
-    "description": "On GitHub Copilot's account (Settings → Accounts & Connections, HI-2107): its one sign-in is the PC's, used in every workspace."
+    "description": "On GitHub Copilot's or the Antigravity CLI's account (Settings → Accounts & Connections, HI-2107, HI-2544): its one sign-in is the PC's, used in every workspace."
   },
   "settings.accounts.usageLabel": {
     "defaultMessage": "{window, select, fiveHour {5-hour} weekly {Weekly} other {{label}}}",
@@ -458,6 +458,46 @@
   "settings.accounts.usedBy": {
     "defaultMessage": "{assistant, select, yes {{n, plural, =0 {Assistant} one {Assistant and # agent} other {Assistant and # agents}}} other {{n, plural, =0 {Not used here} one {# agent} other {# agents}}}}",
     "description": "Who uses a connection, on its row (Settings → Accounts & Connections, HI-2107): the Assistant (assistant is yes) and how many agents ({n}) of the open workspaces. Its tooltip names them. \"Not used here\": none in the open workspaces."
+  },
+  "settings.advanced.antigravity.models.line.desc": {
+    "defaultMessage": "One line of agy models' list: the model's id (its first group), then its display name (its second). Combwork passes the id and shows the name.",
+    "description": "What the advanced setting \"A model in agy models\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it."
+  },
+  "settings.advanced.antigravity.models.line.title": {
+    "defaultMessage": "A model in agy models",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of one line of the CLI's model list. agy models is a command: keep it."
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.desc": {
+    "defaultMessage": "Combwork starts agy with AGY_CLI_DISABLE_AUTO_UPDATE=true (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Provider Setup updates it when you choose. Turned off, Combwork doesn't set it and agy updates itself as it would outside Combwork (your own AGY_CLI_DISABLE_AUTO_UPDATE still applies).",
+    "description": "What the advanced setting \"Don't let Antigravity update itself\" does (Settings → Advanced, under Antigravity CLI). agy is a command and AGY_CLI_DISABLE_AUTO_UPDATE=true an environment variable: keep them. Update is a button's name and Provider Setup a dialog's."
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.title": {
+    "defaultMessage": "Don't let Antigravity update itself",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.desc": {
+    "defaultMessage": "Combwork starts agy with an allow rule for Combwork's tools in its settings for that session (for the Assistant, only those its Control settings let it use without asking), so agy doesn't ask before them. Turned off, agy asks before them as its own permission mode says. What an agent or the Assistant may do with them is still decided by Combwork.",
+    "description": "What the advanced setting \"Pre-approve Combwork's tools\" does (Settings → Advanced, under Antigravity CLI). agy is a command: keep it. Control is the name of the Assistant's settings page."
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.title": {
+    "defaultMessage": "Pre-approve Combwork's tools",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.desc": {
+    "defaultMessage": "Combwork leaves GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT out of agy's environment (its sessions, and checking its sign-in and models), so a key or account another tool set never switches Antigravity agents away from this PC's sign-in. Turned off, agy gets them from Combwork's environment as it would outside Combwork.",
+    "description": "What the advanced setting \"Keep other accounts' variables from Antigravity\" does (Settings → Advanced, under Antigravity CLI). GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT are environment variables and agy a command: keep them."
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.title": {
+    "defaultMessage": "Keep other accounts' variables from Antigravity",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.antigravity.signIn.needed.desc": {
+    "defaultMessage": "What agy models prints when the PC isn't signed in to Antigravity. Only this says signed out: any other failure (the network, the service, a timeout) is shown as it is, never as a sign-in to do.",
+    "description": "What the advanced setting \"Not signed in (agy models)\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it."
+  },
+  "settings.advanced.antigravity.signIn.needed.title": {
+    "defaultMessage": "Not signed in (agy models)",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of the CLI's message when it isn't signed in. agy models is a command: keep it."
   },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "defaultMessage": "The environment variables Combwork leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",

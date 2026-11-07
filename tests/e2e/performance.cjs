@@ -38,13 +38,14 @@ const claudeToolList = { ...toolList, provider: 'claude-code', workflow: 'review
 const now = Date.now()
 const hourStart = (t) => Math.floor(t / HOUR) * HOUR
 const bucket = (start, projects, workspace = part()) => ({ start, span: 'hour', projects, workspace, skills: { scans: timed(3, 40), sharedScans: 1, hits: 30, misses: 4, invalidations: 1, tooLarge: 0, files: 40, bytes: 120000, headerBytes: 4000, entries: 60 }, dropped: 0, droppedBy: {} })
+// beta's refusals name a rule and, HI-2681, an agent message (the Agent API's own reply; its count, beside the series', only for the table).
 // The last 24 hours: alpha 30 requests (3 failed), beta 12 (2 refused by a rule), the workspace's own 5 (scripts); 3 days ago alpha 100 more.
 const MORE_TOOLS = ['cw_list_projects', 'cw_project_status', 'cw_session_usage', 'cw_list_shared_notes', 'cw_read_shared_note', 'cw_write_shared_note', 'cw_read_latest_handover', 'cw_create_handover', 'cw_notify', 'cw_list_providers', 'cw_agent_activity']
 const buckets = [
   // …and one request past the histogram's last bound (> 10 s), so latency sorts meet an overflow (#305).
   bucket(hourStart(now - 3 * 24 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 100), apiSeries('/v1/projects', 'agent', 'ok', 1, 20000)], MORE_TOOLS.map((t, i) => mcpSeries(t, 1, 100 + i))) }),
   bucket(hourStart(now - 5 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 20), apiSeries('/v1/tasks/:n', 'agent', 'server-error', 3, 300)], [mcpSeries('cw_list_tasks', 10, 600), mcpSeries('cw_read_task', 4, 2500)], [launch('claude-code', 2)], [toolList, claudeToolList]) }),
-  bucket(hourStart(now - 1 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 7)]), beta: part([apiSeries('/v1/tasks', 'agent', 'ok', 10), { ...apiSeries('/v1/tasks/:n', 'agent', 'refused', 2), reasons: { 'rule:move.doingNobody': 2 } }], [mcpSeries('cw_list_tasks', 2, 600)], [launch('codex', 1)]) }, part([apiSeries('/v1/tasks', 'api', 'ok', 5)]))
+  bucket(hourStart(now - 1 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 7)]), beta: part([apiSeries('/v1/tasks', 'agent', 'ok', 10), { ...apiSeries('/v1/tasks/:n', 'agent', 'refused', 2), reasons: { 'rule:move.doingNobody': 2, 'agent:api.workspace.noneOpen': 1 } }], [mcpSeries('cw_list_tasks', 2, 600)], [launch('codex', 1)]) }, part([apiSeries('/v1/tasks', 'api', 'ok', 5)]))
 ]
 fs.mkdirSync(path.join(ws, '.combwork', 'metrics'), { recursive: true })
 /** Claude Code sessions in a session host's backups (what Provider usage reads), each a request an hour ago. */
@@ -152,6 +153,9 @@ const check = (name, ok, extra = '') => {
   check('the Failures card: the real errors, then refused by a rule and wrong calls', /3 real errors/.test(await failures.innerText()) && /2 refused by a rule · 0 wrong calls/.test(await failures.innerText()) && (await failures.locator('.perf-real-errors').count()) === 1, await failures.innerText())
   const reasonsTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: /^Reason/ }) }).filter({ has: page.locator('th', { hasText: /^Kind/ }) })
   check('…and the refusals by reason: said as its rule’s sentence, the card left out, its id under it (round 1)', /\/v1\/tasks\/:n\s+Refused\s+… would be in … with nobody on it\.\s+rule:move\.doingNobody\s+2/.test(await reasonsTable.locator('tbody').innerText()), await reasonsTable.locator('tbody').innerText().catch(() => ''))
+  // HI-2681: the Agent API's own reply, an agent message: its English, marked as English, its id under it.
+  const agentReason = reasonsTable.locator('tbody tr', { hasText: 'agent:api.workspace.noneOpen' })
+  check('…and an agent message’s reason in its English, marked so (HI-2681)', /No workspace is open\s+agent:api\.workspace\.noneOpen · in English/.test(await agentReason.innerText().catch(() => '')) && (await agentReason.locator('[lang="en"]').count()) === 1, await reasonsTable.locator('tbody').innerText().catch(() => ''))
   await failures.scrollIntoViewIfNeeded()
   await shot('failures')
   check('the Combwork tool list by provider, with Combwork’s estimate if Claude Code defers the tools (round 1: never Codex’s)', /Claude Code\s+Agents\s+Reviewer/.test(await toolRow()) && /Unknown\s+Agents\s+Builder/.test(await toolRow()) && (await toolTable.locator('th', { hasText: 'If deferred' }).count()) === 1 && /Claude Code\s+Agents\s+Reviewer.*≈\s2\.9 KB/.test(await toolRow()), await toolRow())

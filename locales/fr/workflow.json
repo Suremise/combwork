@@ -239,6 +239,8 @@
   "workflow.refused.done.contained.next": "Fusionne la révision {revision} dans la branche {target}, puis signale de nouveau la fusion.",
   "workflow.refused.evidence.changed.message": "Ce que Combwork a lu pour la carte {card} a changé pendant qu’il décidait.",
   "workflow.refused.evidence.changed.next": "Réessaie : Combwork le relit à neuf.",
+  "workflow.refused.forward.notAgents.message": "{card} met une branche à jour avec une autre : seuls l’utilisateur ou l’Assistant agissent dessus.",
+  "workflow.refused.forward.notAgents.next": "Laisse-la à l’utilisateur ou à l’Assistant.",
   "workflow.refused.integrate.approved.message": "La carte {card} à la révision {revision} n’est pas validée : {why}",
   "workflow.refused.integrate.approved.next": "Soumets-la à la relecture.",
   "workflow.refused.integrate.checksPassed.change": "Cette règle se définit dans Gestion de versions → Les vérifications passent sur le résultat fusionné.",

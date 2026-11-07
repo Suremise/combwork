@@ -239,6 +239,8 @@
   "workflow.refused.done.contained.next": "Fusiona la versión {revision} en la rama {target} y vuelve a notificar la fusión.",
   "workflow.refused.evidence.changed.message": "Lo que Combwork leyó para la tarjeta {card} cambió mientras decidía.",
   "workflow.refused.evidence.changed.next": "Vuelve a intentarlo: Combwork lo lee de nuevo.",
+  "workflow.refused.forward.notAgents.message": "{card} pone una rama al día con otra: solo el usuario o el Asistente actúan sobre ella.",
+  "workflow.refused.forward.notAgents.next": "Déjalo en manos del usuario o del Asistente.",
   "workflow.refused.integrate.approved.message": "La tarjeta {card} en la versión {revision} no está aprobada: {why}",
   "workflow.refused.integrate.approved.next": "Envíala a revisión.",
   "workflow.refused.integrate.checksPassed.change": "Esta regla se configura en Control de versiones → Las comprobaciones pasan en el resultado fusionado.",

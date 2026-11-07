@@ -735,6 +735,7 @@
   "assistant.undo.why.projectOpened": "Ein geöffnetes Projekt bleibt offen: Schließe es, wenn es nicht gewünscht ist.",
   "assistant.undo.why.prompt": "Ein gesendeter Prompt lässt sich nicht zurücknehmen.",
   "assistant.undo.why.putBack": "Seine Begründung bleibt als Kommentar.",
+  "assistant.undo.why.queueForwarded": "Ein von ihm angeforderter Forward-Merge wird nicht zurückgenommen: Entferne ihn aus der Merge-Warteschlange, wenn er nicht gemergt werden soll.",
   "assistant.undo.why.queuePaused": "Eine angehaltene Merge-Warteschlange bleibt angehalten: Setze sie fort, wenn sie laufen soll.",
   "assistant.undo.why.queueResumed": "Eine fortgesetzte Merge-Warteschlange wird nicht wieder angehalten: Halte sie an, wenn sie nicht laufen soll.",
   "assistant.undo.why.removedFromQueue": "Das Entfernen aus der Merge-Warteschlange bleibt in der Arbeit der Karte: Sie kommt nur durch „Merge wiederholen“ wieder in die Warteschlange oder wenn sie erneut genehmigt wird.",

@@ -363,6 +363,12 @@
   "api.change.endLane": {
     "text": "end lane {lane}"
   },
+  "api.change.forward": {
+    "text": "bring {to} up to date with {from} in {project}"
+  },
+  "api.change.forwardAny": {
+    "text": "bring a branch up to date with another"
+  },
   "api.change.handOver": {
     "text": "hand {from}'s work over to {to} in {project}"
   },
@@ -643,6 +649,12 @@
   },
   "api.done.createdProject": {
     "text": "Created the project {name}"
+  },
+  "api.done.forwardQueued": {
+    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}"
+  },
+  "api.done.forwardUpToDate": {
+    "text": "{to} has everything of {from} already: nothing queued"
   },
   "api.done.freshRetried": {
     "text": "{retried, plural, =0 {Lane {lane}: no new conversation was waiting to be retried} one {Lane {lane}: {total} new conversation tried again} other {Lane {lane}: {total} new conversations tried again}}"
@@ -1024,6 +1036,9 @@
   },
   "api.provider.notInstalled": {
     "text": "not installed"
+  },
+  "api.queue.forwardArgs": {
+    "text": "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets"
   },
   "api.queue.notAgents": {
     "text": "Project agents can't {what}: the merge queue's controls are the user's, and the Assistant's within Settings → Assistant → Control. Tell the user if it should be done."

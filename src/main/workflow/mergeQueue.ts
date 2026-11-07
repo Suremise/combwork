@@ -1028,7 +1028,10 @@ export class MergeQueue {
         // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read.
         const found = await G.contains(this.project, target, { base, revision, key: s.latest?.key }, head)
         if (!isUnknown(found) && found) {
-          await reconcile(this.wf, card)
+          // A forward merge (HI-2679) has no line to reconcile: its attempt's own frozen commit, proven in the target just
+          // now, is what is recorded (never a newer source head's).
+          if (s.forward) await this.integrated(card, entry, revision, target, head, 'merge', 'outside')
+          else await reconcile(this.wf, card)
           return { card: card.key, entry: entry.id, outcome: 'integratedOutside' }
         }
         expected = head
@@ -1953,8 +1956,9 @@ export class MergeQueue {
       const failed: FactData['IntegrationFailed'] = { entry: entry.id, revision, target, reason, transient, ...why, ...(files ? { files } : {}), ...(log ? { log: keptLog(log) } : {}), ...check, ...(conflicts?.files.length ? { conflicts } : {}), ...(focused ? { focused } : {}) }
       w.fact('IntegrationFailed', failed)
       w.move('active', 'derived')
-      // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded.
-      this.wf.wake(w, w.state().started?.builder, returnedWake(card.key, failed))
+      // What came back and what to do next (#1354): the files, the check, its log and last lines, bounded. A forward
+      // merge (HI-2679) has no builder: its card says it, for the user or the Assistant to Retry merge or Remove.
+      if (!w.state().forward) this.wf.wake(w, w.state().started?.builder, returnedWake(card.key, failed))
       // HI-2087: and on the card, for whoever reads it (its latest comment was the review's pass).
       w.action('comment', { ...returnedComment(card.key, failed) })
       return true

@@ -139,6 +139,8 @@ export const API = {
     messageAgent: agentMsg({ id: 'api.change.messageAgent', text: 'leave {agent} in {project} a message' }),
     onlyAssistant: agentMsg({ id: 'api.change.onlyAssistant', text: 'Only the Assistant can {what} through the Agent API.', note: 'what: what the change is called (api.change.*).' }),
     pauseAQueue: agentMsg({ id: 'api.change.pauseAQueue', text: 'pause a merge queue' }),
+    forwardAny: agentMsg({ id: 'api.change.forwardAny', text: 'bring a branch up to date with another' }),
+    forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}' }),
     pauseQueue: agentMsg({ id: 'api.change.pauseQueue', text: 'pause the merge queue of {project}' }),
     pauseTeam: agentMsg({ id: 'api.change.pauseTeam', text: 'pause the team' }),
     planTemplate: agentMsg({ id: 'api.change.planTemplate', text: 'plan loading a template' }),
@@ -242,6 +244,8 @@ export const API = {
     prompted: agentMsg({ id: 'api.done.prompted', text: 'Gave {agent} in {project} a task{given, select, yes { ({id})} other {}}' }),
     promptedFresh: agentMsg({ id: 'api.done.promptedFresh', text: 'Gave {agent} in {project} a task in a new conversation' }),
     queuePaused: agentMsg({ id: 'api.done.queuePaused', text: 'Paused the merge queue for {target} in {project}' }),
+    forwardUpToDate: agentMsg({ id: 'api.done.forwardUpToDate', text: '{to} has everything of {from} already: nothing queued' }),
+    forwardQueued: agentMsg({ id: 'api.done.forwardQueued', text: "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}" }),
     queueResumed: agentMsg({ id: 'api.done.queueResumed', text: '{resumed, select, yes {Resumed the merge queue for {target} in {project}} other {The merge queue for {target} in {project} is still paused ({hasReason, select, yes {{reason}} other {paused}})}}' }),
     reordered: agentMsg({ id: 'api.done.reordered', text: 'Put {cards} at the top of {column}' }),
     slotReleased: agentMsg({ id: 'api.done.slotReleased', text: 'Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}\'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}' }),
@@ -387,6 +391,7 @@ export const API = {
     notAgents: agentMsg({ id: 'api.queue.notAgents', text: 'Project agents can\'t {what}: the merge queue\'s controls are the user\'s, and the Assistant\'s within Settings → Assistant → Control. Tell the user if it should be done.' }),
     projectRequired: agentMsg({ id: 'api.queue.projectRequired', text: 'project is required' }),
     targetArg: agentMsg({ id: 'api.queue.targetArg', text: 'target is a branch name' }),
+    forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets" }),
     targetRequired: agentMsg({ id: 'api.queue.targetRequired', text: 'target is required: the branch the queue merges into{listed, select, yes { ({targets})} other {}}' })
   },
   settings: {

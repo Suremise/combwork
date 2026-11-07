@@ -1715,14 +1715,44 @@ describe('HI-2553: failures by kind, their reasons, and the tool list by provide
     const { reasonMessages, reasonSentence } = await import('../src/renderer/src/views/perfReasons')
     const { trTemplate, msg } = await import('../src/shared/i18n')
     // A rule's: its refusal's first sentence, the card and stage it was about as "…".
-    expect(reasonSentence('rule:move.doingNobody', {})).toBe('… would be in … with nobody on it.')
+    expect(reasonSentence('rule:move.doingNobody', {})).toEqual({ text: '… would be in … with nobody on it.', english: false })
     // A message's, found by its id in the English catalogue.
     const found = await reasonMessages(['msg:workflow.refused.start.slotAvailable.message', 'msg:no.such.message', 'rule:move.doingNobody'])
     expect(Object.keys(found)).toEqual(['msg:workflow.refused.start.slotAvailable.message'])
-    expect(reasonSentence('msg:workflow.refused.start.slotAvailable.message', found)).toBe("… can't start: no slot is free.")
+    expect(reasonSentence('msg:workflow.refused.start.slotAvailable.message', found)).toEqual({ text: "… can't start: no slot is free.", english: false })
     // One it can't say (unknown here, or `other`): none, so the view says what it is instead.
-    expect([reasonSentence('msg:no.such.message', found), reasonSentence('rule:no.such.rule', found), reasonSentence('other', found)]).toEqual([null, null, null])
+    expect([reasonSentence('msg:no.such.message', found), reasonSentence('rule:no.such.rule', found), reasonSentence('other', found), reasonSentence('agent:no.such.message', found)]).toEqual([null, null, null, null])
     // Plurals, selects, numbers and tags in their general form.
     expect(trTemplate(msg({ id: 'test.template', defaultMessage: '{n, plural, one {# card} other {# cards}} in <b>{name}</b>{kind, select, a {!} other {.}} {size, number}', description: 'test' }))).toBe('2 cards in …. 2')
+  })
+
+  it("the Agent API's own errors keep their message's id (HI-2681): an unknown card's 404 and a bad argument's 400, said in the table, only ids stored", async () => {
+    const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+    const { inWorkspace } = await import('../src/main/workspace')
+    const { reasonMessages, reasonSentence, englishTemplate } = await import('../src/renderer/src/views/perfReasons')
+    const { reasonRows } = await import('../src/shared/metricsView')
+    const { w } = await open()
+    const call = (method: string, template: string, params: string[], body: unknown) => inWorkspace(w, () => apiTextTestHooks.routeHandler(method, template)!({ params, query: new URLSearchParams(), body, signal: new AbortController().signal })).then(() => null, (e: unknown) => e)
+    // cw_read_task of a card there isn't (GET /v1/tasks/:n): its window message; cw_create_task with a column there isn't
+    // (POST /v1/tasks): the Agent API's own agent message, which said() alone used to lose.
+    const unknown = await call('GET', '/v1/tasks/:n', ['9999'], undefined)
+    const badColumn = await call('POST', '/v1/tasks', [], { title: 'A card', column: 'later' })
+    expect([apiErrorReply(unknown).status, apiErrorReply(badColumn).status]).toEqual([404, 400])
+    expect([metrics.reasonOf(unknown), metrics.reasonOf(badColumn)]).toEqual(['msg:tasks.error.unknownTask', 'agent:api.card.unknownColumn'])
+    // Recorded as ids only: nothing it said (the column asked for, the card's number) is kept.
+    const h = metrics.metricsHandle(w)
+    metrics.recordApi(h, 'alpha', api('/v1/tasks/:n', { outcome: 'invalid', reason: metrics.reasonOf(unknown) }))
+    metrics.recordApi(h, 'alpha', api('/v1/tasks', { method: 'POST', outcome: 'invalid', reason: metrics.reasonOf(badColumn) }))
+    const series = Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.api)
+    expect(JSON.stringify(series)).not.toMatch(/later|9999/)
+    const rows = reasonRows(series, 100)
+    expect(rows.map((r) => r.reason).sort()).toEqual(['agent:api.card.unknownColumn', 'msg:tasks.error.unknownTask'])
+    // Each said readably: the window's message in the window's language, the agent message in its English (marked so), values left out.
+    const found = await reasonMessages(rows.map((r) => r.reason))
+    expect(reasonSentence('msg:tasks.error.unknownTask', found)).toEqual({ text: 'Unknown card …', english: false })
+    expect(reasonSentence('agent:api.card.unknownColumn', found)).toEqual({ text: 'Unknown column "…": ….', english: true })
+    // Plurals, selects and numbers in their general form, as trTemplate says a window message.
+    expect(englishTemplate('{n, plural, one {# card} other {# cards}} in {name}{kind, select, a {!} other {.}} {size, number}')).toBe('2 cards in …. 2')
+    await disposeWorkspaceService(w)
   })
 })

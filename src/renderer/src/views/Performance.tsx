@@ -20,7 +20,7 @@ import { AntivirusLine } from '../components/Antivirus'
 import { Card } from './WorkspaceOverview'
 import { CardsTable } from './PerformanceCards'
 import { StallsTable } from './PerformanceStalls'
-import { reasonMessages, reasonSentence } from './perfReasons'
+import { reasonMessages, reasonSentence, type ReasonMessage } from './perfReasons'
 
 /**
  * Performance: what Combwork's own parts cost (shared/metrics.ts, recorded by main/metrics.ts), for the whole workspace (the
@@ -142,11 +142,12 @@ const M = {
   errorsTip: msg({ id: 'performance.failures.errorsTip', defaultMessage: 'Real errors: something went wrong in Combwork (a server error), or, for a tool call, no reply came (a timeout, no connection).', description: 'Info tip of the Errors column (HI-2553).' }),
   unsortedHeader: msg({ id: 'performance.failures.unsorted', defaultMessage: 'Not sorted', description: 'Column header of the Agent API and Combwork tools tables (HI-2553), shown only when there are any: failures recorded before Combwork sorted them by kind.' }),
   reasonsHeading: msg({ id: 'performance.reasons.heading', defaultMessage: 'Refusals and wrong calls by reason', description: "Heading of the Performance page's table of why Agent API requests were refused or were wrong calls (HI-2553)." }),
-  reasonsTip: msg({ id: 'performance.reasons.tip', defaultMessage: 'The most common reasons Combwork gave, by route, as a general sentence: Combwork keeps which rule or message it was, never what it said, so the card, file or name it was about shows as “…”. Under it, the rule’s (rule:) or message’s (msg:) id. A reason that keeps coming back points to a rule or a tool description to make clearer.', description: 'Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule: and msg: as they are (prefixes shown in the table). “…” is how a left-out value shows: keep it.' }),
+  reasonsTip: msg({ id: 'performance.reasons.tip', defaultMessage: 'The most common reasons Combwork gave, by route, as a general sentence: Combwork keeps which rule or message it was, never what it said, so the card, file or name it was about shows as “…”. Under it, the rule’s (rule:) or message’s (msg:) id; an agent message (agent:), such as the Agent API’s own errors, shows in English, as agents read it. A reason that keeps coming back points to a rule or a tool description to make clearer.', description: 'Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule:, msg: and agent: as they are (prefixes shown in the table). “…” is how a left-out value shows: keep it.' }),
   kind: msg({ id: 'performance.reasons.kind', defaultMessage: 'Kind', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): refused or wrong call.' }),
   kindValue: msg({ id: 'performance.reasons.kindValue', defaultMessage: '{kind, select, refused {Refused} other {Wrong call}}', description: "A cell of the Kind column (HI-2553). {kind} is a key (refused or invalid): don't translate the keys, only the texts." }),
   reason: msg({ id: 'performance.reasons.reason', defaultMessage: 'Reason', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): the rule or message id.' }),
   reasonOther: msg({ id: 'performance.reasons.other', defaultMessage: 'No reason recorded (an error without a rule or message id, or past the twelve reasons a route keeps)', description: 'A cell of the Reason column (HI-2553): refusals or wrong calls whose reason Combwork could not tell, or past the twelve reasons kept per route.' }),
+  reasonEnglish: msg({ id: 'performance.reasons.english', defaultMessage: '{id} · in English', description: 'Under a reason in the Reason column (HI-2681): the id of an agent message ({id}: agent:api.card.titleRequired), whose sentence above is shown in English, as agents read it: agent messages are not translated.' }),
   reasonUnknown: msg({ id: 'performance.reasons.unknown', defaultMessage: 'A reason this version of Combwork doesn’t know', description: 'A cell of the Reason column (HI-2553): a rule or message recorded by another version of Combwork, not found in this one. Its id shows under it.' }),
   count: msg({ id: 'performance.reasons.count', defaultMessage: 'Count', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): how many requests.' }),
   refusedLegend: msg({ id: 'performance.trend.refused', defaultMessage: 'Refused or wrong call', description: "Legend of the requests chart (HI-2553): the bars' colour for requests refused by a rule, wrong calls and cancelled ones: not faults." }),
@@ -776,12 +777,14 @@ function RoutesTable({ sel }: { sel: PerfSelection }) {
  * A reason as the table says it (HI-2553 round 1): its sentence (perfReasons.ts, its values left out), else what it
  * is; with its rule's or message's id as a detail under it.
  */
-const reasonShown = (reason: string, messages: Record<string, Msg>): { text: string; id: string } => {
-  if (reason === 'other') return { text: tr(M.reasonOther), id: '' }
-  return { text: reasonSentence(reason, messages) ?? tr(M.reasonUnknown), id: reason }
+const reasonShown = (reason: string, messages: Record<string, ReasonMessage>): { text: string; id: string; english: boolean } => {
+  if (reason === 'other') return { text: tr(M.reasonOther), id: '', english: false }
+  const said = reasonSentence(reason, messages)
+  // An agent message is English only (HI-2681): shown as it is, marked as English.
+  return { text: said?.text ?? tr(M.reasonUnknown), id: said?.english ? tr(M.reasonEnglish, { id: reason }) : reason, english: !!said?.english }
 }
 /** The reasons table's columns, in the window's language (made again when it changes, or the messages load). */
-const reasonColumns = (messages: Record<string, Msg>): DataColumn<ReasonRow>[] => [
+const reasonColumns = (messages: Record<string, ReasonMessage>): DataColumn<ReasonRow>[] => [
   {
     key: 'route',
     header: tr(M.route),
@@ -799,11 +802,11 @@ const reasonColumns = (messages: Record<string, Msg>): DataColumn<ReasonRow>[] =
     key: 'reason',
     header: tr(M.reason),
     cell: (r) => {
-      const { text, id } = reasonShown(r.reason, messages)
-      return <CellLines main={text} sub={id} />
+      const { text, id, english } = reasonShown(r.reason, messages)
+      return <CellLines main={english ? <span lang="en">{text}</span> : text} sub={id} />
     },
     sortValue: (r) => reasonShown(r.reason, messages).text,
-    filter: { kind: 'text', value: (r) => Object.values(reasonShown(r.reason, messages)).join(' ') }
+    filter: { kind: 'text', value: (r) => `${reasonShown(r.reason, messages).text} ${r.reason}` }
   },
   { key: 'count', header: tr(M.count), num: true, descFirst: true, cell: (r) => num(r.count), sortValue: (r) => r.count }
 ]
@@ -813,9 +816,9 @@ const BY_COUNT = { key: 'count', desc: true }
 function ReasonsTable({ sel }: { sel: PerfSelection }) {
   const language = useLanguage()
   const rows = useMemo(() => reasonRows(sel.api), [sel.api])
-  // The messages its `msg:` reasons name, from the English catalogue (loaded only when there are any).
-  const [messages, setMessages] = useState<Record<string, Msg>>({})
-  const wanted = rows.map((r) => r.reason).filter((r) => r.startsWith('msg:') && !messages[r])
+  // The messages its `msg:` and `agent:` reasons name, from the English catalogue (loaded only when there are any).
+  const [messages, setMessages] = useState<Record<string, ReasonMessage>>({})
+  const wanted = rows.map((r) => r.reason).filter((r) => (r.startsWith('msg:') || r.startsWith('agent:')) && !messages[r])
   const wantedKey = [...new Set(wanted)].sort().join('|')
   useEffect(() => {
     if (!wantedKey) return

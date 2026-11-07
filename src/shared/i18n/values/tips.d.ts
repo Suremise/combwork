@@ -29,6 +29,8 @@ interface CombworkMessageValues {
   'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
   'tips.alwaysOnTop.title': undefined
+  'tips.antigravity.text': undefined
+  'tips.antigravity.title': undefined
   'tips.antivirus.text': undefined
   'tips.antivirus.title': undefined
   'tips.archiveNew.text': undefined
@@ -121,6 +123,8 @@ interface CombworkMessageValues {
   'tips.branchCards.title': undefined
   'tips.branchCleanup.text': undefined
   'tips.branchCleanup.title': undefined
+  'tips.bringUpToDate.text': undefined
+  'tips.bringUpToDate.title': undefined
   'tips.cardAttachments.text': undefined
   'tips.cardAttachments.title': undefined
   'tips.cardAttachmentsCleanup.text': undefined
