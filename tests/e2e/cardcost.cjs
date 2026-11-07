@@ -69,9 +69,16 @@ const plain = (s) => (s ?? '').replace(/ /g, ' ')
   const [tb, tr] = [tokenOf(b), tokenOf(r)]
   check('each agent has its token', !!tb && !!tr && tb !== tr)
   /** A turn of an agent: a prompt, answered with some usage, until it has finished. */
+  // A turn of this prompt's own (HI-2700): an agent's second turn starts from `finished` already (its first's), so its
+  // status alone passes before the new turn has run; its status changed since the prompt (statusSince) is the new turn's.
   const turn = async (a) => {
-    await lib.sendPrompt(inv, lib.ptyKey(alpha, a.id), 'hello', { submitted: async () => ['working', 'finished'].includes((await live(a.id))?.status) })
-    return !!(await until(async () => (await live(a.id))?.status === 'finished', HUNG_MS))
+    const before = (await live(a.id))?.statusSince ?? null
+    const moved = async () => {
+      const s = await live(a.id)
+      return !!s && s.statusSince !== before ? s : null
+    }
+    await lib.sendPrompt(inv, lib.ptyKey(alpha, a.id), 'hello', { submitted: async () => ['working', 'finished'].includes((await moved())?.status) })
+    return !!(await until(async () => (await moved())?.status === 'finished', HUNG_MS))
   }
 
   // --- A lane: B1 builds the card, R1 reviews it.
