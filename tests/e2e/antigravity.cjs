@@ -63,18 +63,25 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check('an agent is added on Antigravity', gem?.provider === 'antigravity', JSON.stringify(gem))
 
   // --- First conversation.
-  const startNew = async () => {
+  const startNew = async (agentId = gem.id) => {
     const before = entries('session').length
-    await inv('session:start', alpha, { agentId: gem.id })
+    await inv('session:start', alpha, { agentId })
     await until(async () => entries('session').length > before, HUNG_MS)
-    const conv = await until(async () => (await live(gem.id))?.sessionId || null, HUNG_MS)
+    const conv = await until(async () => (await live(agentId))?.sessionId || null, HUNG_MS)
     // Recorded as the agent's conversation (its Sessions entry) before anything stops it, as a real turn gives it time to.
     await until(async () => (await inv('session:list', alpha)).some((s) => s.id === conv), HUNG_MS)
     return { conv, launch: entries('session').at(-1) }
   }
-  const stop = async () => {
-    await inv('session:stop', alpha, gem.id)
-    return until(async () => !(await live(gem.id)), HUNG_MS)
+  const stop = async (agentId = gem.id) => {
+    await inv('session:stop', alpha, agentId)
+    return until(async () => !(await live(agentId)), HUNG_MS)
+  }
+  /** A turn in a conversation (its transcript, which a resume needs, in the agent's profile). */
+  const say = async (agentId, profile, conv, text) => {
+    const transcript = path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript.jsonl')
+    await inv('pty:write', lib.ptyKey(alpha, agentId), text)
+    await inv('pty:write', lib.ptyKey(alpha, agentId), '\r')
+    return !!(await until(async () => fs.existsSync(transcript) && fs.readFileSync(transcript, 'utf8').includes(text), HUNG_MS))
   }
   const first = await startNew()
   check("the conversation's id comes from its status line", /^[0-9a-f-]{36}$/.test(first.conv ?? '') && first.conv === first.launch?.conversation, JSON.stringify({ conv: first.conv, launch: first.launch?.conversation }))
@@ -94,16 +101,14 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await until(async () => entries('mcp').length > 0, HUNG_MS)
   check("the project's own MCP server was never started", !fs.existsSync(marker), fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8') : '')
   // A turn: written to its conversation.
-  const transcript = path.join(e.USERPROFILE, '.gemini', 'antigravity-cli', 'brain', first.conv, '.system_generated', 'logs', 'transcript.jsonl')
-  await inv('pty:write', lib.ptyKey(alpha, gem.id), 'hello antigravity')
-  await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
-  check('its turns are kept in its own conversation, in its profile', !!(await until(async () => fs.existsSync(transcript) && fs.readFileSync(transcript, 'utf8').includes('hello antigravity'), HUNG_MS)))
+  check('its turns are kept in its own conversation, in its profile', await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity'))
   check('it stops', !!(await stop()))
 
   // --- A second new conversation, then each resumed by its own id.
   const second = await startNew()
   check('a second new launch is a new conversation', !!second.conv && second.conv !== first.conv && second.launch?.resumed === false, JSON.stringify({ first: first.conv, second: second.conv }))
   check('…in the same private profile', second.launch?.env?.USERPROFILE === e.USERPROFILE)
+  check('…with turns of its own', await say(gem.id, e.USERPROFILE, second.conv, 'second conversation'))
   await stop()
   for (const [name, c] of [['the first', first.conv], ['the second', second.conv]]) {
     const before = entries('session').length
@@ -114,10 +119,15 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
     check(`…and the session is that conversation`, (await until(async () => ((await live(gem.id))?.sessionId === c ? c : null), HUNG_MS)) === c)
     await stop()
   }
-  // --- A conversation that isn't the agent's own: refused before agy starts.
+  // --- Another agent's conversation (in its own profile): never resumed by this one, refused before agy starts.
+  const other = await lib.addAgent(inv, alpha, { name: 'Ada', provider: 'antigravity' })
+  const theirs = await startNew(other.id)
+  check('another agent has a private profile of its own', !!theirs.launch?.env?.USERPROFILE && theirs.launch.env.USERPROFILE !== e.USERPROFILE, JSON.stringify(theirs.launch?.env))
+  check('…and its own conversation', await say(other.id, theirs.launch.env.USERPROFILE, theirs.conv, 'hers'))
+  await stop(other.id)
   const before = entries('session').length
-  const refused = await inv('session:start', alpha, { agentId: gem.id, resumeId: '00000000-0000-4000-8000-000000000999' }).then(() => null, (err) => String(err?.message ?? err))
-  check("a conversation that isn't the agent's is never resumed", entries('session').length === before && !(await live(gem.id)) && /isn't in this agent's own conversations/.test(refused ?? ''), refused ?? 'started')
+  const refused = await inv('session:start', alpha, { agentId: gem.id, resumeId: theirs.conv }).then(() => null, (err) => String(err?.message ?? err))
+  check("another agent's conversation is never resumed by this one", entries('session').length === before && !(await live(gem.id)) && /isn't in this agent's own conversations/.test(refused ?? ''), refused ?? 'started')
   check("the project's own MCP server was never started, all along", !fs.existsSync(marker))
 
   await app.close()
