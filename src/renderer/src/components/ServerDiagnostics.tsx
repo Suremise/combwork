@@ -106,33 +106,67 @@ function ContextRow({ label, v, empty }: { label: Msg; v?: ContextValue; empty?:
 export function ServerDiagnosticsDialog({ c, model: first, onClose }: { c: Account; model?: string; onClose: () => void }) {
   const models = c.server?.models ?? []
   const [model, setModel] = useState(first && models.some((m) => m.id === first) ? first : (models[0]?.id ?? ''))
+  const [problem, setProblem] = useState<string | null>(null)
+  return (
+    <Modal
+      title={tr(D.title, { name: c.name })}
+      icon="pulse"
+      wide
+      error={problem}
+      onClose={onClose}
+      footer={<button className="btn subtle" onClick={onClose}>{tr(D.close)}</button>}
+    >
+      <div className="agent-form server-diag" data-server-diag={c.id}>
+        <label htmlFor="diag-model">{tr(D.model)}</label>
+        <select
+          id="diag-model"
+          className="input"
+          value={model}
+          onChange={(e) => {
+            setProblem(null)
+            setModel(e.target.value)
+          }}
+        >
+          {models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.id}
+            </option>
+          ))}
+        </select>
+        {/* Everything of one model's is its own (HR3, round 1): another model starts afresh, and what was asked for the
+            one before is cancelled as it goes. */}
+        {model && <ModelDiagnostics key={`${c.id}\0${model}`} c={c} model={model} setProblem={setProblem} />}
+      </div>
+    </Modal>
+  )
+}
+
+/** One model's diagnostics: its context, the user's own figure, the advice and the tool-call test. */
+function ModelDiagnostics({ c, model, setProblem }: { c: Account; model: string; setProblem: (p: string | null) => void }) {
   const [last, setLast] = useState<LastCheck>({})
   const [reading, setReading] = useState(false)
   const [testing, setTesting] = useState(false)
-  const [problem, setProblem] = useState<string | null>(null)
-  const mineSaved = models.find((m) => m.id === model)?.context
+  const mineSaved = c.server?.models.find((m) => m.id === model)?.context
   const [mine, setMine] = useState(mineSaved ? String(mineSaved) : '')
-  // This dialog's checks in flight, by kind: cancelled by their own ids as it closes or the model changes.
-  const running = useRef<{ read?: string; test?: string }>({})
-  const cancelAll = (m: string): void => {
-    for (const r of Object.values(running.current)) if (r) void call('connections:cancelCheck', c.id, m, r).catch(() => undefined)
-    running.current = {}
-  }
+  // The saved figure changed (saved here, or elsewhere): the field shows it.
+  useEffect(() => setMine(mineSaved ? String(mineSaved) : ''), [mineSaved])
+  // This model's checks in flight, by kind; `live` false once it is gone (a late reply then changes nothing).
+  const running = useRef<{ read?: string; test?: string; live: boolean }>({ live: true })
 
-  const read = async (m: string): Promise<void> => {
+  const read = async (): Promise<void> => {
     const request = newRequest()
     running.current.read = request
     setReading(true)
     setProblem(null)
     try {
-      const r: ContextCheck = await call('connections:readContext', c.id, m, request)
-      if (running.current.read !== request) return
+      const r: ContextCheck = await call('connections:readContext', c.id, model, request)
+      if (!running.current.live || running.current.read !== request) return
       if (r.ok) setLast((l) => ({ ...l, context: r }))
       else setProblem(tr(WHY[r.why]))
     } catch (e) {
-      if (running.current.read === request) setProblem(errorMessage(e))
+      if (running.current.live && running.current.read === request) setProblem(errorMessage(e))
     } finally {
-      if (running.current.read === request) {
+      if (running.current.live && running.current.read === request) {
         running.current.read = undefined
         setReading(false)
       }
@@ -144,30 +178,30 @@ export function ServerDiagnosticsDialog({ c, model: first, onClose }: { c: Accou
     setTesting(true)
     try {
       const r: ToolTest = await call('connections:testTools', c.id, model, request)
-      if (running.current.test !== request) return
+      if (!running.current.live || running.current.test !== request) return
       setLast((l) => ({ ...l, tools: { ...r, at: r.at ?? Date.now() } as LastCheck['tools'] }))
     } catch (e) {
-      if (running.current.test === request) setProblem(errorMessage(e))
+      if (running.current.live && running.current.test === request) setProblem(errorMessage(e))
     } finally {
-      if (running.current.test === request) {
+      if (running.current.live && running.current.test === request) {
         running.current.test = undefined
         setTesting(false)
       }
     }
   }
 
-  // A model's last results, then its context read again (read-only, and asked for by opening this).
+  // Its last results, then its context read again (read-only, and asked for by opening this); its checks cancelled by
+  // their own ids as it goes.
   useEffect(() => {
-    if (!model) return
-    let live = true
-    void call('connections:lastCheck', c.id, model).then((l) => live && setLast(l), () => undefined)
-    void read(model)
+    const own = running.current
+    void call('connections:lastCheck', c.id, model).then((l) => own.live && setLast((now) => ({ ...l, ...now })), () => undefined)
+    void read()
     return () => {
-      live = false
-      cancelAll(model)
+      own.live = false
+      for (const r of [own.read, own.test]) if (r) void call('connections:cancelCheck', c.id, model, r).catch(() => undefined)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [c.id, model])
+  }, [])
 
   const saveMine = async (tokens: number | null): Promise<void> => {
     try {
@@ -187,80 +221,62 @@ export function ServerDiagnosticsDialog({ c, model: first, onClose }: { c: Accou
   const seenBlocks = tools && !tools.ok && tools.seen?.blocks?.length ? tools.seen.blocks.join(', ') : 'none'
 
   return (
-    <Modal
-      title={tr(D.title, { name: c.name })}
-      icon="pulse"
-      wide
-      error={problem}
-      onClose={onClose}
-      footer={<button className="btn subtle" onClick={onClose}>{tr(D.close)}</button>}
-    >
-      <div className="agent-form server-diag" data-server-diag={c.id}>
-        <label htmlFor="diag-model">{tr(D.model)}</label>
-        <select id="diag-model" className="input" value={model} onChange={(e) => setModel(e.target.value)}>
-          {models.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.id}
-            </option>
-          ))}
-        </select>
-
-        <h4 className="span2">
-          {tr(D.context)}{' '}
-          <button className="btn subtle small" data-read-again disabled={reading} onClick={() => void read(model)}>
-            {tr(reading ? D.reading : D.readAgain)}
-          </button>
-        </h4>
-        {ctx && <div className="span2 muted" data-server-kind={ctx.kind}>{ctx.prefixed ? tr(D.prefixed) : tr(D.kind, { kind: ctx.kind })}</div>}
-        {ctx && !ctx.prefixed && (
-          <div className="span2 server-diag-values">
-            <ContextRow label={D.trained} v={ctx.trained} />
-            <ContextRow label={D.configured} v={ctx.configured} />
-            <ContextRow label={D.allocated} v={ctx.allocated} empty={ctx.kind === 'ollama' && ctx.loaded === false ? tr(D.notLoaded) : undefined} />
-          </div>
-        )}
-        {ctx?.kind === 'ollama' && <div className="span2 hint">{tr(D.ollamaDefault)}</div>}
-        {ctx?.kind === 'llamacpp' && <div className="span2 hint" data-template-tools={ctx.templateTools}>{tr(D.templateTools, { state: ctx.templateTools ?? 'notReported' })}</div>}
-
-        <label htmlFor="diag-mine">{tr(D.mine)}</label>
-        <div className="flex">
-          <input id="diag-mine" className="input" inputMode="numeric" value={mine} data-context-mine onChange={(e) => setMine(e.target.value.replace(/[^\d]/g, ''))} />
-          <button className="btn subtle small" data-save-context disabled={!mine || Number(mine) === mineSaved} onClick={() => void saveMine(Number(mine))}>{tr(D.save)}</button>
-          {mineSaved !== undefined && <button className="btn subtle small" data-clear-context onClick={() => void saveMine(null)}>{tr(D.clear)}</button>}
+    <>
+      <h4 className="span2">
+        {tr(D.context)}{' '}
+        <button className="btn subtle small" data-read-again disabled={reading} onClick={() => void read()}>
+          {tr(reading ? D.reading : D.readAgain)}
+        </button>
+      </h4>
+      {ctx && <div className="span2 muted" data-server-kind={ctx.kind}>{ctx.prefixed ? tr(D.prefixed) : tr(D.kind, { kind: ctx.kind })}</div>}
+      {ctx && !ctx.prefixed && (
+        <div className="span2 server-diag-values">
+          <ContextRow label={D.trained} v={ctx.trained} />
+          <ContextRow label={D.configured} v={ctx.configured} />
+          <ContextRow label={D.allocated} v={ctx.allocated} empty={ctx.kind === 'ollama' && ctx.loaded === false ? tr(D.notLoaded) : undefined} />
         </div>
-        <div className="span2 hint">{tr(D.mineHint)}</div>
+      )}
+      {ctx?.kind === 'ollama' && <div className="span2 hint">{tr(D.ollamaDefault)}</div>}
+      {ctx?.kind === 'llamacpp' && <div className="span2 hint" data-template-tools={ctx.templateTools}>{tr(D.templateTools, { state: ctx.templateTools ?? 'notReported' })}</div>}
 
-        {advice && (
-          <div className="span2" data-advice={have !== null && have < advice.size ? 'below' : have !== null ? 'meets' : 'unknown'}>
-            {tr(D.advice, { name: advice.name, size: advice.size, cli })}{' '}
-            {have !== null && (have < advice.size ? <span className="account-warning"><Icon name="warning" /> {tr(D.below, { tokens: have })}</span> : tr(D.meets, { tokens: have }))}
-          </div>
-        )}
-        <div className="span2 hint">{tr(D.measured)}</div>
-
-        <h4 className="span2">{tr(D.tools)}</h4>
-        <div className="span2 hint">{tr(D.toolsWhat)}</div>
-        <div className="span2 flex">
-          <button className="btn small" data-test-tools disabled={testing || !model} onClick={() => void test()}>{tr(testing ? D.testing : D.test)}</button>
-        </div>
-        {tools && (
-          <div className="span2" data-tool-test={tools.ok ? 'passed' : tools.why}>
-            {tools.ok ? (
-              <span>
-                <Icon name="check" /> {tr(D.passed, { ago: timeAgo(new Date(tools.at).toISOString()) })}
-              </span>
-            ) : (
-              <>
-                <div className="account-warning">
-                  <Icon name="warning" /> {tools.step ? tr(D.failedStep, { step: String(tools.step), why: tr(WHY[tools.why]) }) : tr(WHY[tools.why])}
-                </div>
-                {tools.seen && <div className="muted" data-seen>{tr(D.seen, { status: String(tools.seen.status), stop: seenStop, blocks: seenBlocks })}</div>}
-              </>
-            )}
-          </div>
-        )}
+      <label htmlFor="diag-mine">{tr(D.mine)}</label>
+      <div className="flex">
+        <input id="diag-mine" className="input" inputMode="numeric" value={mine} data-context-mine onChange={(e) => setMine(e.target.value.replace(/[^\d]/g, ''))} />
+        <button className="btn subtle small" data-save-context disabled={!mine || Number(mine) === mineSaved} onClick={() => void saveMine(Number(mine))}>{tr(D.save)}</button>
+        {mineSaved !== undefined && <button className="btn subtle small" data-clear-context onClick={() => void saveMine(null)}>{tr(D.clear)}</button>}
       </div>
-    </Modal>
+      <div className="span2 hint">{tr(D.mineHint)}</div>
+
+      {advice && (
+        <div className="span2" data-advice={have !== null && have < advice.size ? 'below' : have !== null ? 'meets' : 'unknown'}>
+          {tr(D.advice, { name: advice.name, size: advice.size, cli })}{' '}
+          {have !== null && (have < advice.size ? <span className="account-warning"><Icon name="warning" /> {tr(D.below, { tokens: have })}</span> : tr(D.meets, { tokens: have }))}
+        </div>
+      )}
+      <div className="span2 hint">{tr(D.measured)}</div>
+
+      <h4 className="span2">{tr(D.tools)}</h4>
+      <div className="span2 hint">{tr(D.toolsWhat)}</div>
+      <div className="span2 flex">
+        <button className="btn small" data-test-tools disabled={testing} onClick={() => void test()}>{tr(testing ? D.testing : D.test)}</button>
+      </div>
+      {tools && (
+        <div className="span2" data-tool-test={tools.ok ? 'passed' : tools.why}>
+          {tools.ok ? (
+            <span>
+              <Icon name="check" /> {tr(D.passed, { ago: timeAgo(new Date(tools.at).toISOString()) })}
+            </span>
+          ) : (
+            <>
+              <div className="account-warning">
+                <Icon name="warning" /> {tools.step ? tr(D.failedStep, { step: String(tools.step), why: tr(WHY[tools.why]) }) : tr(WHY[tools.why])}
+              </div>
+              {tools.seen && <div className="muted" data-seen>{tr(D.seen, { status: String(tools.seen.status), stop: seenStop, blocks: seenBlocks })}</div>}
+            </>
+          )}
+        </div>
+      )}
+    </>
   )
 }
 

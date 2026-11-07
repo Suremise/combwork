@@ -16,7 +16,7 @@
 import type { ServerConnection } from '../shared/types'
 import { parseBaseUrl } from '../shared/serverConnection'
 import { judgeStep1, judgeStep2, llamaProps, llamaTrained, ollamaPs, ollamaShow, step1Body, step2Body, testResult, type ContextCheck, type LastCheck, type ServerContext, type StepReply, type ToolTest } from '../shared/serverDiagnostics'
-import { getAccount } from './accounts'
+import { getAccount, onAccountRemoved } from './accounts'
 import { keyInfo, withKey } from './keyStore'
 import { plainHttpRequest, type PlainReply } from './plainHttpsJson'
 import { checkedUrl, onServerChanged, serverOf } from './serverConnections'
@@ -254,5 +254,6 @@ export const rootOf = (baseUrl: string): boolean => {
   return b.ok && b.url === b.origin
 }
 
-// Told when a server connection's server, key or models change (serverConnections.ts).
+// Told when a server connection's server, key or models change (serverConnections.ts), and when it is removed (accounts.ts).
 onServerChanged(serverChecksChanged)
+onAccountRemoved(serverChecksChanged)

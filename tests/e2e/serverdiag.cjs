@@ -32,6 +32,9 @@ const check = (name, ok, extra = '') => {
   // Messages API, which first writes the tool call out as text, then (once `fixed`) calls it and uses its result.
   const asked = []
   let fixed = false
+  // A model whose Messages requests are held, unanswered, until released (HR3 round 1: switching models while pending).
+  let holdModel = null
+  const held = []
   const message = (content, stop_reason) => ({ id: 'msg_1', type: 'message', role: 'assistant', model: 'devstral:24b', content, stop_reason })
   const stub = http.createServer((req, res) => {
     let body = ''
@@ -47,6 +50,7 @@ const check = (name, ok, extra = '') => {
       if (req.url === '/api/show') return json(200, { model_info: { 'general.architecture': 'mistral3', 'mistral3.context_length': 131072 }, parameters: 'stop "[INST]"' })
       if (req.url === '/v1/messages') {
         const b = JSON.parse(body)
+        if (holdModel && b.model === holdModel) return void held.push(() => json(200, message([{ type: 'text', text: 'late' }], 'end_turn')))
         if (!fixed) return json(200, message([{ type: 'text', text: 'ListFiles.create{"name": "get_weather", "city": "Reykjavik"}' }], 'end_turn'))
         if (b.messages.length === 1) return json(200, message([{ type: 'tool_use', id: 'tu_1', name: 'get_weather', input: { city: 'Reykjavik' } }], 'tool_use'))
         const code = /station code (\d+)/.exec(body)?.[1] ?? '?'
@@ -110,6 +114,36 @@ const check = (name, ok, extra = '') => {
     await shots('passed')
     await page.keyboard.press('Escape')
     await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)
+
+    // --- Two models (HR3, round 1): each its own figure in the field, Save writes only the model chosen, and a test still
+    // pending on one never holds the other's Test button.
+    const two = await inv('connections:addServer', { cli: 'claude-code', name: 'Two', baseUrl: `http://127.0.0.1:${port}`, preset: 'ollama', models: [{ id: 'devstral:24b' }, { id: 'qwen3:8b' }], modelsFrom: 'typed' })
+    await inv('connections:setModelContext', two.id, 'devstral:24b', 8192)
+    await inv('connections:setModelContext', two.id, 'qwen3:8b', 65536)
+    const contexts = async () => Object.fromEntries((await inv('connections:list')).connections.find((a) => a.id === two.id).server.models.map((m) => [m.id, m.context]))
+    const rowTwo = page.locator('.account-row', { has: page.locator('.account-name', { hasText: 'Two' }) })
+    await rowTwo.locator('[data-check-server]').click()
+    const d2 = page.locator(`[data-server-diag="${two.id}"]`)
+    await d2.waitFor({ timeout: HUNG_MS })
+    const field = d2.locator('[data-context-mine]')
+    check("two models: the field shows the first model's own figure", !!(await lib.until(async () => (await field.inputValue()) === '8192', HUNG_MS)), await field.inputValue())
+    holdModel = 'devstral:24b'
+    await d2.locator('[data-test-tools]').click()
+    await lib.until(async () => held.length === 1, HUNG_MS)
+    await d2.locator('#diag-model').selectOption('qwen3:8b')
+    check("…another model shows its own figure, never the one before's", !!(await lib.until(async () => (await field.inputValue()) === '65536', HUNG_MS)), await field.inputValue())
+    check("…and its Test button isn't held by the first model's pending test", !!(await lib.until(async () => !(await d2.locator('[data-test-tools]').isDisabled()), HUNG_MS)) && (await d2.locator('[data-tool-test]').count()) === 0)
+    await field.fill('70000')
+    await d2.locator('[data-save-context]').click()
+    check('…Save writes only the model chosen', !!(await lib.until(async () => JSON.stringify(await contexts()) === JSON.stringify({ 'devstral:24b': 8192, 'qwen3:8b': 70000 }), HUNG_MS)), JSON.stringify(await contexts()))
+    // The held reply, late, for a model no longer shown: nothing in this one.
+    holdModel = null
+    for (const send of held.splice(0)) send()
+    await d2.locator('[data-test-tools]').click()
+    check("…and this model's own test runs and passes", !!(await lib.until(async () => (await d2.locator('[data-tool-test="passed"]').count()) === 1, HUNG_MS)), await d2.innerText().catch(() => ''))
+    await shots('two-models')
+    await page.keyboard.press('Escape')
+    await lib.until(async () => (await d2.count()) === 0, HUNG_MS)
 
     // --- Provider Setup: this PC's server, with its line.
     await inv('connections:setModelContext', ol.id, 'devstral:24b', null)

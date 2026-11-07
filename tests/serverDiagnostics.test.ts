@@ -98,6 +98,8 @@ describe('what a server reports of a context', () => {
     const caps = (c: unknown) => shared.llamaProps({ ...PROPS, chat_template_caps: c })?.templateTools
     // Missing, both false, one false and one missing, the two disagreeing: never taken as "--jinja is off".
     expect([caps(undefined), caps({ supports_tools: false, supports_tool_calls: false }), caps({ supports_tools: false }), caps({ supports_tools: true, supports_tool_calls: false })]).toEqual(['notReported', 'unsupported', 'unsupported', 'inconsistent'])
+    // Both must say so (HR3, round 1): one true with the other missing is too little to call it supported.
+    expect([caps({ supports_tools: true }), caps({ supports_tool_calls: true })]).toEqual(['notReported', 'notReported'])
     // Not llama.cpp's shape; an n_ctx that isn't a context: not reported.
     expect(shared.llamaProps({ models: [] })).toBeNull()
     expect(shared.llamaProps({ default_generation_settings: { n_ctx: -1 } })).toEqual({ nCtx: null, templateTools: 'notReported' })
@@ -147,6 +149,13 @@ describe('the tool-call test, judged from evidence only', () => {
     expect(err(404, '{"error":{"message":"model \'m9\' not found"}}')).toBe('modelRejected')
     expect(err(400, '{"error":"the request exceeds the available context size (8192 tokens)"}')).toBe('promptTooLarge')
     expect(err(400, '{"error":"tools param requires --jinja flag"}')).toBe('toolsUnsupported')
+    // Only an error that says the input exceeds the context is called that (HR3, round 1): an output limit, a body or a
+    // gateway's own limit, or a bare 413, is unexpected.
+    expect(err(400, '{"error":"max_tokens exceeds the output limit"}')).toBe('unexpected')
+    expect(err(413, '{"error":"request body exceeds 4 MB gateway limit"}')).toBe('unexpected')
+    expect(err(413, '')).toBe('unexpected')
+    expect(err(400, '{"type":"error","error":{"message":"prompt is too long: 9000 tokens > 8192 maximum"}}')).toBe('promptTooLarge')
+    expect(err(400, '{"error":"input exceeds the context window (8192)"}')).toBe('promptTooLarge')
     expect(err(500, '{"error":"boom"}')).toBe('unexpected')
     const j = shared.judgeStep1({ status: 500, errorText: 'boom' })
     expect(j.ok ? null : j.seen).toEqual({ status: 500 })
@@ -243,6 +252,29 @@ describe('the checks, against fake servers', () => {
       expect(await test, change).toMatchObject({ ok: false, why: 'stale' })
       expect(s.seen.length, change).toBe(1)
     }
+  })
+
+  it('removing the account stops its checks at once, with no reply ever coming, and drops what was read of it', async () => {
+    const s = await fake((req, _b, res) => {
+      if (req.url === '/props') return json(res, 200, PROPS)
+      if (req.url === '/v1/models') return json(res, 200, { data: [] })
+      // The messages API never answers: only the removal can end the test.
+    })
+    const a = await connect(s.url, { key: KEY })
+    expect(await here(() => diag.readServerContext(a.id, 'm1', 'r1'))).toMatchObject({ ok: true })
+    expect(diag.lastServerCheck(a.id, 'm1').context).toBeTruthy()
+    const test = here(() => diag.testServerTools(a.id, 'm1', 't1'))
+    await vi.waitFor(() => expect(s.seen.some((x) => x.path === '/v1/messages')).toBe(true), { timeout: 10_000 })
+    await here(() => accounts.removeAccount(a.id))
+    // Settled by the removal itself (its deadline is minutes away), and nothing of it kept.
+    expect(await test).toMatchObject({ ok: false, why: 'stale' })
+    expect(diag.lastServerCheck(a.id, 'm1')).toEqual({})
+    // Its slot was freed: CHECKS_MAX more can run.
+    const b = await connect(s.url, { models: [{ id: 'm1' }, { id: 'm2' }, { id: 'm3' }, { id: 'm4' }] })
+    const more = ['m1', 'm2', 'm3', 'm4'].map((m) => here(() => diag.testServerTools(b.id, m, `x-${m}`)))
+    await vi.waitFor(() => expect(s.seen.filter((x) => x.path === '/v1/messages').length).toBe(1 + diag.CHECKS_MAX), { timeout: 10_000 })
+    await here(() => accounts.removeAccount(b.id))
+    expect((await Promise.all(more)).every((r) => !r.ok && r.why === 'stale')).toBe(true)
   })
 
   it('a newer check replaces an older one; cancelling the older one by its id leaves the newer running', async () => {

@@ -57,8 +57,12 @@ export function llamaProps(reply: unknown): { nCtx: number | null; templateTools
   const gen = obj(r?.default_generation_settings)
   if (!r || !gen) return null
   const caps = obj(r.chat_template_caps)
-  const flags = [caps?.supports_tools, caps?.supports_tool_calls].filter((x): x is boolean => typeof x === 'boolean')
-  const templateTools: TemplateTools = !flags.length ? 'notReported' : flags.every(Boolean) ? 'supported' : flags.every((x) => !x) ? 'unsupported' : 'inconsistent'
+  // Supported only when both flags say so (s11); one true and one false disagree; false with the other missing or false,
+  // unsupported; one true with the other missing is too little to say: not reported (HR3, round 1).
+  const tools = caps?.supports_tools
+  const calls = caps?.supports_tool_calls
+  const flags = [tools, calls].filter((x): x is boolean => typeof x === 'boolean')
+  const templateTools: TemplateTools = flags.length === 2 && flags.every(Boolean) ? 'supported' : flags.includes(true) && flags.includes(false) ? 'inconsistent' : flags.includes(false) ? 'unsupported' : 'notReported'
   // n_ctx is in default_generation_settings (b11608), or its params in some builds.
   return { nCtx: tokensOf(gen.n_ctx) ?? tokensOf(obj(gen.params)?.n_ctx), templateTools }
 }
@@ -193,6 +197,18 @@ export interface StepReply {
   errorText?: string
 }
 
+/**
+ * Whether a server's error says the input prompt is larger than the model's context (HR3, round 1): it must name the
+ * prompt, the input or the context and say it is exceeded, and say nothing of the output, a request body or a gateway's
+ * own limit (an HTTP 413 alone, `max_tokens exceeds the output limit`, `request body exceeds 4 MB`: none of them is it).
+ */
+export function promptTooLarge(error: string): boolean {
+  if (/max_tokens|output|completion|request body|payload|body size|entity|gateway|upload/i.test(error)) return false
+  const subject = /\b(?:prompt|input|context|n_ctx|num_ctx)\b/i.test(error)
+  const exceeded = /exceed|too (?:long|large|many tokens)|longer than|larger than|more than|over the|beyond|limit of|maximum/i.test(error)
+  return subject && exceeded
+}
+
 /** A server's error, as evidence: the start of its body, matched (never shown or logged). */
 function errorWhy(status: number, error: string): ToolTestFailure | null {
   if (status === 401) return 'refused'
@@ -200,7 +216,7 @@ function errorWhy(status: number, error: string): ToolTestFailure | null {
   if (status === 404 && !/model/i.test(error)) return 'endpoint'
   if (status === 405) return 'endpoint'
   if (/\bmodel\b/i.test(error) && /not found|does not exist|doesn['’]t exist|unknown|no such|not available|is not loaded|pull/i.test(error)) return 'modelRejected'
-  if (status === 413 || /context (?:length|size|window)|too (?:long|large|many tokens)|exceeds?|n_ctx|maximum (?:context|prompt)|prompt is too long/i.test(error)) return 'promptTooLarge'
+  if (promptTooLarge(error)) return 'promptTooLarge'
   if (/tool/i.test(error) && /not supported|unsupported|does not support|doesn['’]t support|jinja/i.test(error)) return 'toolsUnsupported'
   return null
 }
