@@ -767,6 +767,10 @@
   "api.inbox.readArg": {
     "text": "read is true or false"
   },
+  "api.intent.acceptArg": {
+    "text": "accept must be a list of at most {max} test ids.",
+    "note": "HI-2660: a verdict's accept that isn't a list of focused test ids, or is too long. {max}: the limit."
+  },
   "api.intent.actionsArg": {
     "text": "actions is a list of 1 to {max} actions, each '{'kind: {kinds}; reason?: text of at most {reasonMax} characters'}', each kind once."
   },

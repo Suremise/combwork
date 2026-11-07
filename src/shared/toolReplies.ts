@@ -584,7 +584,10 @@ export function intentText(d: IntentDone): string {
   const where = d.from && d.to ? (d.from === d.to ? say(R.intentStill, { stage: d.to }) : `${d.from} → ${d.to}`) : say(R.intentDone)
   // A list's item: a changed file as git's letter and its path ("M greet.js", #1444: start review's files read
   // [object Object]), anything else as it is.
-  const item = (x: unknown): string => (x && typeof x === 'object' && typeof (x as { path?: unknown }).path === 'string' ? `${(x as { status?: string }).status ? `${(x as { status: string }).status} ` : ''}${(x as { path: string }).path}` : typeof x === 'object' ? JSON.stringify(x) : String(x))
+  // A recorded check (HI-2660, start review's checksAtRevision) as its name and result ("typecheck passed"), a name with a
+  // separator or space quoted, so it stays data.
+  const check = (x: { name: string; result: string }): string => `${/^[\w.:@/+-]+$/.test(x.name) ? x.name : JSON.stringify(x.name)} ${x.result}`
+  const item = (x: unknown): string => (x && typeof x === 'object' && typeof (x as { path?: unknown }).path === 'string' ? `${(x as { status?: string }).status ? `${(x as { status: string }).status} ` : ''}${(x as { path: string }).path}` : x && typeof x === 'object' && typeof (x as { name?: unknown }).name === 'string' && typeof (x as { result?: unknown }).result === 'string' ? check(x as { name: string; result: string }) : typeof x === 'object' ? JSON.stringify(x) : String(x))
   const value = (v: unknown): string =>
     Array.isArray(v) ? (v.length > INTENT_LIST_MAX ? say(R.listMore, { items: v.slice(0, INTENT_LIST_MAX).map(item).join(', '), n: v.length - INTENT_LIST_MAX }) : v.map(item).join(', ') || say(R.listNone)) : typeof v === 'object' ? JSON.stringify(v) : String(v)
   const facts = Object.entries(d.data ?? {})

@@ -52,7 +52,7 @@
     "note": "Why the focused-test picker couldn't choose, when it gave no reason."
   },
   "runtime.review.runYourself": {
-    "text": "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, cw-progress --check \"{check}\" --card <card> -- <its command>",
+    "text": "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, cw-progress --check \"{check}\" --card <card> -- <its command>, or from another's run of it there that your pass accepts (cw_verdict's accept)",
     "note": "G20 (HI-1367): start review's runYourself: focused tests the merge queue won't run, which count only from the reviewer's own run. {tests}: their ids. {check}: the check's name pattern (focused:<test>)."
   },
   "runtime.start.blocked": {
@@ -82,6 +82,26 @@
   "runtime.submit.unclaimed": {
     "text": "Changed in the project since {card} started, in neither its paths nor what it recorded as its agents' edits: {files}. Not part of its revision: to include any, submit with paths listing every file of its work; else leave them.",
     "note": "A submit's warning (HI-2339): files changed in the project that are neither its paths nor its agents' edits."
+  },
+  "runtime.verdict.acceptFailed": {
+    "text": "accept: {test}'s latest counted run at this revision failed, so it isn't accepted",
+    "note": "HI-2660: the standing run of focused:<test> at the passed revision didn't pass; an earlier pass never stands behind it. {test}: the test id."
+  },
+  "runtime.verdict.acceptInvalid": {
+    "text": "accept: {test} isn't a test id, so it isn't accepted",
+    "note": "HI-2660: an accept entry that isn't a valid focused test id. {test}: what was given, quoted, short."
+  },
+  "runtime.verdict.acceptNone": {
+    "text": "accept: {test} has no counted run at this revision (or its command changed since), so it isn't accepted",
+    "note": "HI-2660: no standing run of focused:<test> at the passed revision to accept. {test}: the test id."
+  },
+  "runtime.verdict.acceptOnPass": {
+    "text": "accept is taken only with a pass: nothing accepted",
+    "note": "HI-2660: cw_verdict's accept given with a fail. Agent-facing."
+  },
+  "runtime.verdict.acceptTooMany": {
+    "text": "accept: only the first {max} tests are taken",
+    "note": "HI-2660: more than ACCEPT_MAX tests in cw_verdict's accept. {max}: the limit."
   },
   "runtime.wake.aheadInLane": {
     "text": "{card} is in Review ahead of {cards}, earlier in its lane, which nobody has started: Combwork moved it before them in the lane. Review {card} now; the lane goes on to {next} after it",

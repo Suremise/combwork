@@ -13,4 +13,4 @@ If the card leaves Review while you review it (taken back to Doing for more work
 
 ## Reviewing again
 
-When the card comes back after fixes, review what changed since your last verdict: the new revision's changes, the comments after yours, and any decision recorded since (a reply flags a new one). Re-run a check only when what it covers has changed, and confirm each earlier finding is fixed or still open.
+When the card comes back after fixes, review what changed since your last verdict: the new revision's changes, the comments after yours, and any decision recorded since (a reply flags a new one). Re-run a check only when what it covers has changed, or for a doubt you name, and confirm each earlier finding is fixed or still open.

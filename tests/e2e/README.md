@@ -304,14 +304,15 @@ same code while every required check still runs:
   from it (#365, RELEASING.md). The runner itself never starts a CLI.
 - **The reviewer** checks the record instead of repeating it (#533): its fingerprint is the code it's reviewing
   (`npm run e2e -- --fingerprint` in the builder's folder), it's recent, the suites the change needs ran, and each
-  failure in it is explained. It then runs the quick checks (`npm run typecheck`, `npm run lint`), the unit tests the
-  change affects (`npx vitest run --changed <base>`, where `<base>` is the commit the card's work started from;
-  uncommitted changes count too; it follows imports, so add the tests that read a changed file, such as a skill's
-  Markdown or a fixture), not the whole unit suite, and only the new or changed suites and those it doubts
-  (the one or two closest to the riskiest change), saying which on the card, and spends the rest of its time on its own probes. It reruns a whole suite or set only when there's no record, the
-  fingerprint differs or the record is stale, a result looks wrong, or the change is to shared test infrastructure (the
-  runner, `lib.cjs`, the run context, the scenario harness, `vitest.config.ts` or a helper in `tests/`), and says in
-  its verdict which and why.
+  failure in it is explained. A valid result stands (HI-2660; the `review-agent-work` skill, §3): the card's checks
+  recorded at the revision (`cw_start_review`'s `checksAtRevision`) and the suites in the record are not run again. It
+  runs what no record covers (a check the change needs that didn't run, or whose command, test or CLI changed since),
+  the `runYourself` tests the merge needs from it (realProof = review) unless it accepts the builder's run of each at
+  the revision (`cw_verdict`'s `accept`), and its own probes, and spends its time on those.
+  It reruns a suite, a set or a unit test only for a doubt it names in its verdict ("reran X because Y"): the record is
+  missing or for other code, a result looks wrong, or the change is to shared test infrastructure (the runner,
+  `lib.cjs`, the run context, the scenario harness, `vitest.config.ts` or a helper in `tests/`). Normally at most one
+  focused rerun.
 - **Follow-up rounds** run only the suites that failed plus those the fixes touch, by name (`--affected` can help pick
   them). **Before a card passes**, every suite it names has run on its final code (the builder's last record). How
   narrow a round's tests are, and what never runs on a card unless it asks, is AGENTS.md's **Tests per card**.

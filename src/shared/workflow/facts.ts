@@ -261,7 +261,11 @@ export interface FactData {
    * dispatch lease, its role no longer reviews, it left the project). The submission waits for the pool again.
    */
   ReviewerReleased: { reviewer: string; submission: number; why: 'leased' | 'notReviewer' | 'gone'; design?: true }
-  Verdict: { reviewer: string; submission: number; revision: string | null; pass: boolean; failKind?: 'content' | 'explanation'; round: number; generation: number; comment: string }
+  /**
+   * `accepted` (HI-2660, a pass only): others' focused-test runs at its revision that the reviewer accepts as review
+   * evidence (realProof = review): each test, the original run's id and the agent that ran it, never relabelled.
+   */
+  Verdict: { reviewer: string; submission: number; revision: string | null; pass: boolean; failKind?: 'content' | 'explanation'; round: number; generation: number; comment: string; accepted?: { test: string; run: string; agent?: string }[] }
   CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
   Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
@@ -328,8 +332,10 @@ export interface FactData {
   /**
    * G20, realProof = review (the user's decision, 28 Oct): a real-CLI or packaged test accepted as proved by its reviewer's
    * counted run at the submitted revision (`run`), review evidence at that revision, never a run at the merged result.
+   * HI-2660: or another agent's run there that its reviewer's pass accepted (`acceptedBy`, that reviewer; `run` the
+   * original run, its agent its own).
    */
-  FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string }
+  FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string; acceptedBy?: string }
   Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }

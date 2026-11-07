@@ -16,7 +16,7 @@ import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, 
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import { reviewsInProgress, submissionReviewers } from '../../shared/workflow/reviewerPool'
-import { chosenTests, focusedCheckName, reviewProved, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
+import { ACCEPT_MAX, chosenTests, focusedCheckName, reviewProved, standingFocusedRun, validTestId, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
@@ -127,6 +127,47 @@ function focusedForReview(f: FocusedChoice | undefined): Record<string, string |
     ...(f.source === 'manual' ? { focusedChosenBy: say(W.focusedChosenBy, { why: f.state === 'tooBroad' ? say(W.everyTest) : (f.why ?? say(W.pickFailed)) }) } : {}),
     ...(yours.length ? { runYourself: say(W.runYourself, { tests: yours.map((t) => t.id).join(', '), check: focusedCheckName('<test>') }) } : {})
   }
+}
+
+/**
+ * HI-2660: the card's checks recorded at a revision, for its reviewer to reuse: the latest counted run of each name there
+ * (a failure after a pass says failed), not the merge queue's own runs (`entry`), and not a configured check whose command
+ * has changed since (an old command doesn't prove the check as it is now). Names are data, never a command. Only these:
+ * what else the change needs is the reviewer's to judge. Empty: none, and the reply leaves the field out.
+ */
+export function checksAtRevision(checks: readonly FactData['CheckRan'][], revision: string, commands: Readonly<Record<string, string>>): { name: string; result: FactData['CheckRan']['result'] }[] {
+  const latest = new Map<string, FactData['CheckRan']>()
+  for (const c of checks) if (c.counted && !c.entry && c.revision === revision) latest.set(c.name, c)
+  return [...latest.values()].filter((c) => commands[c.name] === undefined || commands[c.name] === c.command).map((c) => ({ name: c.name, result: c.result }))
+}
+
+/**
+ * HI-2660: the focused-test runs a reviewer's pass accepts (`cw_verdict`'s `accept`), each the standing run of that test
+ * at the passed revision (`standingFocusedRun`: its latest counted run there, not the queue's, its command unchanged)
+ * when that run passed; its own id and agent kept. Anything else is a warning and accepts nothing, whoever calls: a bad
+ * id, beyond ACCEPT_MAX, no standing run, or one that failed (an earlier pass never stands behind it).
+ */
+export function acceptedRuns(checks: readonly FactData['CheckRan'][], revision: string | null, accept: readonly unknown[], commands: Readonly<Record<string, string>>): { accepted: NonNullable<FactData['Verdict']['accepted']>; warnings: string[] } {
+  const accepted: NonNullable<FactData['Verdict']['accepted']> = []
+  const warnings: string[] = []
+  const seen = new Set<string>()
+  for (const [i, test] of accept.entries()) {
+    if (i >= ACCEPT_MAX) {
+      warnings.push(say(W.acceptTooMany, { max: ACCEPT_MAX }))
+      break
+    }
+    if (!validTestId(test)) {
+      warnings.push(say(W.acceptInvalid, { test: JSON.stringify(String(test)).slice(0, 80) }))
+      continue
+    }
+    if (seen.has(test)) continue
+    seen.add(test)
+    const run = revision ? standingFocusedRun(checks, test, revision, commands) : undefined
+    if (!run) warnings.push(say(W.acceptNone, { test }))
+    else if (run.result !== 'passed') warnings.push(say(W.acceptFailed, { test }))
+    else accepted.push({ test, run: run.run, ...(run.agent ? { agent: run.agent } : {}) })
+  }
+  return { accepted, warnings }
 }
 
 export interface WorkflowConfig {
@@ -266,7 +307,12 @@ const W = {
   focusedChosenBy: agentMsg({ id: 'runtime.review.focusedChosenBy', text: "its builder, as its picker couldn't choose ({why}): check they cover the change", note: "G20 (HI-1367): start review's focusedChosenBy, when the builder named the focused tests itself. {why}: the picker's reason (runtime.review.everyTest, or its own words)." }),
   everyTest: agentMsg({ id: 'runtime.review.everyTest', text: 'it said every test', note: "Why the focused-test picker couldn't choose: it named every test." }),
   pickFailed: agentMsg({ id: 'runtime.review.pickFailed', text: 'failed', note: "Why the focused-test picker couldn't choose, when it gave no reason." }),
-  runYourself: agentMsg({ id: 'runtime.review.runYourself', text: "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, cw-progress --check \"{check}\" --card <card> -- <its command>", note: "G20 (HI-1367): start review's runYourself: focused tests the merge queue won't run, which count only from the reviewer's own run. {tests}: their ids. {check}: the check's name pattern (focused:<test>)." }),
+  runYourself: agentMsg({ id: 'runtime.review.runYourself', text: "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, cw-progress --check \"{check}\" --card <card> -- <its command>, or from another's run of it there that your pass accepts (cw_verdict's accept)", note: "G20 (HI-1367): start review's runYourself: focused tests the merge queue won't run, which count only from the reviewer's own run. {tests}: their ids. {check}: the check's name pattern (focused:<test>)." }),
+  acceptOnPass: agentMsg({ id: 'runtime.verdict.acceptOnPass', text: "accept is taken only with a pass: nothing accepted", note: "HI-2660: cw_verdict's accept given with a fail. Agent-facing." }),
+  acceptInvalid: agentMsg({ id: 'runtime.verdict.acceptInvalid', text: "accept: {test} isn't a test id, so it isn't accepted", note: "HI-2660: an accept entry that isn't a valid focused test id. {test}: what was given, quoted, short." }),
+  acceptTooMany: agentMsg({ id: 'runtime.verdict.acceptTooMany', text: 'accept: only the first {max} tests are taken', note: "HI-2660: more than ACCEPT_MAX tests in cw_verdict's accept. {max}: the limit." }),
+  acceptNone: agentMsg({ id: 'runtime.verdict.acceptNone', text: "accept: {test} has no counted run at this revision (or its command changed since), so it isn't accepted", note: "HI-2660: no standing run of focused:<test> at the passed revision to accept. {test}: the test id." }),
+  acceptFailed: agentMsg({ id: 'runtime.verdict.acceptFailed', text: "accept: {test}'s latest counted run at this revision failed, so it isn't accepted", note: "HI-2660: the standing run of focused:<test> at the passed revision didn't pass; an earlier pass never stands behind it. {test}: the test id." }),
   questionDone: agentMsg({ id: 'runtime.wake.questionDone', text: '{card}: your question "{question}" no longer stands: the card is in Done.', note: "An asker's wake when the card reached Done with its question open. {question}: the question, quoted short (#1626)." }),
   boardDone: agentMsg({ id: 'runtime.repair.boardDone', text: 'the board had it in Done while its stage was {stage}', note: "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id." }),
   laneStarted: agentMsg({ id: 'runtime.start.laneStarted', text: "Combwork started {card} for you, as your lane's next card: carry on with it.", note: "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning." }),
@@ -1625,7 +1671,9 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, actor, 'start review', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused) })
+    // A no-code card's submission has no revision: nothing recorded at one.
+    const recorded = sub.revision ? checksAtRevision(this.state(card).checks, sub.revision, r.options.commands) : []
+    return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused), ...(recorded.length ? { checksAtRevision: recorded } : {}) })
   }
 
   /**
@@ -1659,7 +1707,7 @@ export class Workflow {
   }
 
   /** verdict (§16.7.2): always recorded; a pass may finish, ask the user, or go stale at once if the head moved to another change. */
-  async verdict(ref: unknown, actor: Actor, args: { submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string; startReview?: boolean }): Promise<Reply> {
+  async verdict(ref: unknown, actor: Actor, args: { submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string; startReview?: boolean; accept?: readonly unknown[] }): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -1681,6 +1729,8 @@ export class Workflow {
     const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key }) : null
     const nothingToMerge = !!merged && !isUnknown(merged)
     const present = args.startReview ? await this.reviewersPresent(actor) : null
+    // HI-2660: what the pass accepts of others' focused-test runs, worked out in the write on the card's facts then.
+    let acceptance: ReturnType<typeof acceptedRuns> = { accepted: [], warnings: [] }
     await this.cfg.hooks?.beforeWrite?.('verdict')
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
     const out = await this.writeWhole(card, r, actor, (w) => {
@@ -1697,7 +1747,8 @@ export class Workflow {
       // Refused after the review it started: undone whole (writeWhole), the review start too.
       if (bad) return args.startReview ? undo(bad) : bad
       const st = w.state()
-      w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment }) // i18n-ignore: a fact's kind and codes, not text
+      acceptance = args.accept?.length ? (args.pass ? acceptedRuns(st.checks, sub?.revision ?? null, args.accept, r.options.commands) : { accepted: [], warnings: [say(W.acceptOnPass)] }) : { accepted: [], warnings: [] }
+      w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment, ...(acceptance.accepted.length ? { accepted: acceptance.accepted } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       // HI-1734: a code card passing with nothing to merge is proposed no code, as an agent's proposal is (the user
       // confirms; then it finishes with nothing to merge). HI-1449 sat in Approved for two days. Once only: not after a
       // proposal or a decision of its kind (`merged` was only read without either).
@@ -1730,7 +1781,7 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, actor, 'verdict', out)
-    return this.ok(card, 'review', this.state(card).stage)
+    return this.ok(card, 'review', this.state(card).stage, acceptance.accepted.length ? { accepted: acceptance.accepted } : undefined, acceptance.warnings)
   }
 
   /**

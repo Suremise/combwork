@@ -32,6 +32,7 @@ import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 import { toolListSize } from '../../shared/toolListSize'
 import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint } from '../../shared/combworkToolLoad'
 import { agentMsg, say } from '../../shared/agentText'
+import { ACCEPT_MAX } from '../../shared/workflow/focused'
 
 /**
  * What this server says to agents (dialects, HI-2065; HI-2434): its tools' descriptions, its replies and its errors, each
@@ -459,9 +460,9 @@ function intentTools(): Tool[] {
       'cw_verdict',
       'verdict',
       say(T['verdict.description']),
-      { pass: { type: 'boolean' }, comment: { type: 'string', description: say(T['verdict.arg.comment']) }, failKind: { type: 'string', enum: ['content', 'explanation'], description: say(T['verdict.arg.failKind']) }, submission },
+      { pass: { type: 'boolean' }, comment: { type: 'string', description: say(T['verdict.arg.comment']) }, failKind: { type: 'string', enum: ['content', 'explanation'], description: say(T['verdict.arg.failKind']) }, accept: { type: 'array', items: { type: 'string' }, maxItems: ACCEPT_MAX }, submission },
       ['pass', 'comment'],
-      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
+      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, accept: a.accept, submission: a.submission })
     ),
     intent(
       'cw_focused_skip',

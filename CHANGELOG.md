@@ -15,6 +15,9 @@
 - **Changing Work merges into says what keeps the old target** (HI-2674). A card's target branch is set as it starts, and a running lane's as the lane starts, so a change of **Version Control → Workflow → Work merges into** didn't move cards in flight or a running lane's next cards, although the Assistant's reply said it applied now. Save… now lists each card and lane that keeps merging into another branch, and which. The Assistant's reply names them too, as it now does the lanes and cards that keep the old rules after a switch of version control (it had left them out).
 - **Codex prices checked again** (7 Nov 2026) against OpenAI's published API prices: unchanged, with GPT-6.1 Terra added. Settings → Codex → API prices says when Codex's were checked, apart from the other providers'.
 - **A session priced only in part shows as such.** When a session used a model Combwork has no price for beside models it has, its cost and the totals that include it show the known part with **+ ?**, rather than counting the rest as $0.
+### Changed
+
+- **Reviewers reuse the builder's recorded checks instead of running them again** (HI-2660). Start review now tells the reviewer which of the card's checks passed or failed at the revision it reviews, and the review skill makes those results stand: a reviewer runs what no record covers, its own probes, and a test again only for a doubt it names in its verdict ("reran X because Y"). A reviewer can also accept the builder's run of a test that needs a real CLI or the installed app (`cw_verdict`'s `accept`), so the merge takes it as proof without the reviewer running it again; its latest run at that revision must have passed. Reviews take less time, and say what they relied on.
 
 ## 1.1.0 — 2026-11-06
 

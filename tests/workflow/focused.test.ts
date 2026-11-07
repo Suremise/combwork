@@ -9,10 +9,10 @@ import { join } from 'path'
 import { tempDir } from '../tempDir'
 import { B1, commit, GIT_HEAVY_MS, moved, R1, refusedBy, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
-import { changedSince, chosenTests, choiceStands, parsePick, readResults, testsGiven, validTestId, type FocusedChoice, type FocusedNeed, type FocusedTest } from '../../src/shared/workflow/focused'
+import { ACCEPT_MAX, changedSince, chosenTests, choiceStands, parsePick, readResults, testsGiven, validTestId, type FocusedChoice, type FocusedNeed, type FocusedTest } from '../../src/shared/workflow/focused'
 import { parseRaw, pathChanges } from '../../src/main/workflow/focusedRun'
 import { queueChecks } from '../../src/main/workflow/queueChecks'
-import { isRefusal } from '../../src/main/workflow/runtime'
+import { acceptedRuns, isRefusal } from '../../src/main/workflow/runtime'
 
 let env: Env | null = null
 afterEach(() => {
@@ -538,4 +538,144 @@ describe("HR4's round 1: what the merge takes as proof, decisions and results", 
       expect(e.wf.state(card).focusedAccepted).toEqual([])
     })
   }
+})
+
+// HI-2660 (the user's decision, 7 Nov: B): the reviewer's pass may accept another agent's run of a real-CLI or packaged
+// test at the submitted revision as its proof, by that run's id, the run keeping its own agent. The run that stands is
+// the test's latest counted run there (never the queue's, its command unchanged), and it must have passed: an earlier
+// pass never stands behind a later counted failure, at the verdict or at the merge.
+describe("HI-2660: a reviewer's pass accepting another agent's focused-test run", () => {
+  type Ran = { result?: 'passed' | 'failed'; counted?: boolean; command?: string; revision?: string }
+  /** A run of a focused test's check by `agent`, counted and passed unless said. */
+  async function ran(e: Env, card: { id: number }, revision: string, test: string, agent: string, run: string, more: Ran = {}) {
+    const c = e.store.card(card.id)
+    await e.wf.write(c, e.wf.rulesetOf(c, e.wf.state(c)), `agent:${agent}`, (w) => w.fact('CheckRan', { name: `focused:${test}`, command: more.command ?? 'its command', revision: more.revision ?? revision, tested: more.revision ?? revision, result: more.result ?? 'passed', run, durationMs: 1, by: agent, agent, counted: more.counted ?? true }))
+  }
+  /** Submitted, then passed by R1 accepting `accept`: the verdict's reply. */
+  async function passAccepting(e: Env, card: { key: string }, accept: unknown[]) {
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    const v = await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok', accept })
+    moved(v)
+    return v
+  }
+  const REAL = [{ test: 'claude-real', needs: ['real'] }, { test: 'board', needs: ['fake'] }]
+
+  it("the builder's run, accepted: the merge takes it as proof, its run and agent kept, and doesn't run it", async () => {
+    const run = runner()
+    const e = team(picker(REAL), run.command)
+    const { card, revision } = await built(e)
+    await ran(e, card, revision, 'claude-real', 'B1', 'b1-run')
+    const v = await passAccepting(e, card, ['claude-real'])
+    expect(v.data).toEqual({ accepted: [{ test: 'claude-real', run: 'b1-run', agent: 'B1' }] })
+    expect(v.warnings ?? []).toEqual([])
+    expect(e.wf.state(card).verdicts.at(-1)?.accepted).toEqual([{ test: 'claude-real', run: 'b1-run', agent: 'B1' }])
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'integrated' })
+    expect(JSON.parse(readFileSync(run.seen, 'utf8')).ids).toEqual(['board'])
+    expect(e.wf.state(card).focusedAccepted).toEqual([expect.objectContaining({ test: 'claude-real', revision, run: 'b1-run', acceptedBy: 'R1' })])
+    // Never relabelled: the run is still the builder's.
+    expect(e.wf.state(card).checks.find((c) => c.run === 'b1-run')?.agent).toBe('B1')
+  })
+
+  it("accepts nothing it can't stand behind, each with a warning, and the merge returns the card for its proof", async () => {
+    const e = team(picker([{ test: 'a', needs: ['real'] }, { test: 'b', needs: ['real'] }, { test: 'c', needs: ['real'] }, { test: 'd', needs: ['real'] }]), runner().command)
+    const { card, revision } = await built(e)
+    await ran(e, card, revision, 'b', 'B1', 'b-failed', { result: 'failed' })
+    await ran(e, card, revision, 'c', 'B1', 'c-uncounted', { counted: false })
+    await ran(e, card, revision, 'd', 'B1', 'd-elsewhere', { revision: 'f'.repeat(40) })
+    const v = await passAccepting(e, card, ['a', 'b', 'c', 'd', '', 'x\u0000y'])
+    expect(v.data).toBeUndefined()
+    expect(v.warnings).toEqual([
+      expect.stringContaining('accept: a has no counted run at this revision'),
+      expect.stringContaining("accept: b's latest counted run at this revision failed"),
+      expect.stringContaining('accept: c has no counted run at this revision'),
+      expect.stringContaining('accept: d has no counted run at this revision'),
+      expect.stringContaining("isn't a test id"),
+      expect.stringContaining("isn't a test id")
+    ])
+    expect(e.wf.state(card).verdicts.at(-1)).not.toHaveProperty('accepted')
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
+    expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'noProof', tests: ['a', 'b', 'c', 'd'] } })
+  })
+
+  it('pass then a counted failure: not accepted; failure then a pass: the later run is the one accepted', async () => {
+    const e = team(picker([{ test: 'claude-real', needs: ['real'] }, { test: 'codex-real', needs: ['real'] }]), runner().command)
+    const { card, revision } = await built(e)
+    await ran(e, card, revision, 'claude-real', 'B1', 'passed-first')
+    await ran(e, card, revision, 'claude-real', 'B1', 'failed-later', { result: 'failed' })
+    await ran(e, card, revision, 'codex-real', 'B1', 'failed-first', { result: 'failed' })
+    await ran(e, card, revision, 'codex-real', 'B1', 'passed-later')
+    const v = await passAccepting(e, card, ['claude-real', 'codex-real'])
+    expect(v.data).toEqual({ accepted: [{ test: 'codex-real', run: 'passed-later', agent: 'B1' }] })
+    expect(v.warnings).toEqual([expect.stringContaining("claude-real's latest counted run at this revision failed")])
+  })
+
+  it('an accepted pass followed by a counted failure before the merge: the merge takes no proof from it', async () => {
+    const e = team(picker([{ test: 'claude-real', needs: ['real'] }]), runner().command)
+    const { card, revision } = await built(e)
+    await ran(e, card, revision, 'claude-real', 'B1', 'accepted-run')
+    await passAccepting(e, card, ['claude-real'])
+    await ran(e, card, revision, 'claude-real', 'B1', 'failed-since', { result: 'failed' })
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
+    expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'noProof', tests: ['claude-real'] } })
+    expect(e.wf.state(card).focusedAccepted).toEqual([])
+  })
+
+  it('a configured command changed since the run: neither the verdict nor the merge takes it', async () => {
+    const e = team(picker([{ test: 'claude-real', needs: ['real'] }]), runner().command)
+    e.options.commands['focused:claude-real'] = 'npm run e2e -- claude-real --new'
+    const { card, revision } = await built(e)
+    await ran(e, card, revision, 'claude-real', 'B1', 'old-command', { command: 'npm run e2e -- claude-real' })
+    const v = await passAccepting(e, card, ['claude-real'])
+    expect(v.data).toBeUndefined()
+    expect(v.warnings).toEqual([expect.stringContaining('or its command changed since')])
+    const [o] = await queue(e).drain('main')
+    expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
+  })
+
+  // HR3's round 1: evidence that arrives after the checks (just after them, or while the queue waits for the repository's
+  // lock) is read again before the target moves, at the last check and in IntegrationStarted's write.
+  const queueWith = (e: Env, extra: Pick<NonNullable<Parameters<Env['queue']>[0]>, 'hooks' | 'lock'>) => {
+    const run = queueChecks({ env: base, logDir: tempDir('focused-logs-'), timeoutMs: () => 60_000, setupCommand: () => '' })
+    return e.queue({ runCheck: run.runCheck, manifests: [], focused: { env: base, pickTimeoutMs: () => 30_000, jobs: () => 3, dir: tempDir('focused-files-') }, ...extra })
+  }
+  for (const when of ['afterChecks', 'lock'] as const)
+    it(`an accepted run that fails again ${when === 'lock' ? 'while the queue waits for the lock' : 'just after the checks'}: the target doesn't move, the card goes back for its proof`, async () => {
+      const e = team(picker([{ test: 'claude-real', needs: ['real'] }]), runner().command)
+      const { card, revision } = await built(e)
+      await ran(e, card, revision, 'claude-real', 'B1', 'accepted-run')
+      await passAccepting(e, card, ['claude-real'])
+      const before = sh(e.project, 'rev-parse', 'main')
+      let failed = false
+      const fail = async () => {
+        if (failed) return
+        failed = true
+        await ran(e, card, revision, 'claude-real', 'B1', 'failed-before-integration', { result: 'failed' })
+      }
+      const q = when === 'lock' ? queueWith(e, { lock: async (fn) => (await fail(), fn()) }) : queueWith(e, { hooks: { afterChecks: fail } })
+      const [o] = await q.drain('main')
+      expect(failed).toBe(true)
+      expect(o).toMatchObject({ outcome: 'returned', reason: 'focused' })
+      expect(e.wf.state(card).entries.at(-1)?.failure).toMatchObject({ focused: { why: 'noProof', tests: ['claude-real'] } })
+      expect(sh(e.project, 'rev-parse', 'main')).toBe(before)
+      expect(e.kinds(card.id)).not.toContain('IntegrationStarted')
+    })
+
+  it('a fail accepts nothing, and says so; more than ACCEPT_MAX ids are cut there', async () => {
+    const e = team(picker([{ test: 'claude-real', needs: ['real'] }]), runner().command)
+    const { card, revision } = await built(e)
+    await ran(e, card, revision, 'claude-real', 'B1', 'b1-run')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.startReview(card.key, R1))
+    const f = await e.wf.verdict(card.key, R1, { pass: false, failKind: 'content', comment: 'Round 1: FAILED. 1. x', accept: ['claude-real'] })
+    moved(f)
+    expect(f.warnings).toEqual([expect.stringContaining('accept is taken only with a pass')])
+    expect(e.wf.state(card).verdicts.at(-1)).not.toHaveProperty('accepted')
+    const many = acceptedRuns([], revision, Array.from({ length: ACCEPT_MAX + 5 }, (_, i) => `t${i}`), {})
+    expect(many.warnings.filter((w) => /only the first 50 tests/.test(w))).toHaveLength(1)
+    expect(many.warnings).toHaveLength(ACCEPT_MAX + 1)
+  })
 })

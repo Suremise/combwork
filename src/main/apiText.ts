@@ -295,6 +295,7 @@ export const API = {
     testsArg: agentMsg({ id: 'api.intent.testsArg', text: 'tests: {problem}. Give the test ids the change needs, each a string or \'{\' id, needs \'}\' (needs: unit, fake, real, packaged).' }),
     unknownAskKind: agentMsg({ id: 'api.intent.unknownAskKind', text: 'Unknown kind "{value}": {kinds}.' }),
     unknownFailKind: agentMsg({ id: 'api.intent.unknownFailKind', text: 'Unknown failKind "{value}": content or explanation.' }),
+    acceptArg: agentMsg({ id: 'api.intent.acceptArg', text: 'accept must be a list of at most {max} test ids.', note: "HI-2660: a verdict's accept that isn't a list of focused test ids, or is too long. {max}: the limit." }),
     unknownStep: agentMsg({ id: 'api.intent.unknownStep', text: 'Unknown step "{value}": {steps}.' })
   },
   journal: {

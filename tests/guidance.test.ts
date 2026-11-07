@@ -548,8 +548,10 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     expect(text).toMatch(/run every command with the review copy as its working directory: change into it first/)
     // #1443: a pooled reviewer's start is its assignment, no lane to join.
     expect(text).toMatch(/A reviewer from the project's pool is told of each card it is given in its inbox: that is its start/)
-    // #533: the run records Combwork keeps of the revision are checked, not repeated.
-    expect(text).toMatch(/the runs recorded as the card's checks of that revision/)
+    // #533, HI-2660: the run records of the revision are reused, not repeated; a rerun names its doubt.
+    expect(text).toMatch(/\*\*Reuse the builder's run, don't repeat it\*\*: a result recorded at the exact revision you review stands \(`cw_start_review`'s `checksAtRevision`/)
+    expect(text).toMatch(/\*\*Missing\*\*, so run it: [^\n]*Missing never counts as a pass/)
+    expect(text).toMatch(/\*\*A doubt you name\*\*[^\n]*the verdict says "reran X because Y"\. No doubt, no rerun\./)
   })
 
   it("say where the rules decide, never one case as the rule: self-review, the latest submission, a second reviewer, the user's OK", () => {
