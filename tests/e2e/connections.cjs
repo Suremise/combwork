@@ -205,7 +205,8 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     const connRowEl = page.locator(`.tab-body:visible .split-list .row[data-path="${connFile.replace(/\\/g, '\\\\')}"]`).first()
     await connRowEl.click({ timeout: HUNG_MS })
     const starter = await lib.until(async () => {
-      const t = await page.locator('.tab-body:visible .split-main').innerText().catch(() => '')
+      // The editor draws spaces as non-breaking ones.
+      const t = (await page.locator('.tab-body:visible .split-main').innerText().catch(() => '')).replace(/ /g, ' ')
       return /# Max 1/.test(t) && /Instructions for Claude Code agents on this connection, in every project\./.test(t) ? t : null
     }, HUNG_MS)
     check('…opened new, it starts under the connection’s name, for its agents in every project', !!starter, await page.locator('.tab-body:visible .split-main').innerText().catch(() => ''))
