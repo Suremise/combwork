@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "The panes can't be placed like that in this layout.",
-  "worktrees.agent.badWorkflowRole": "A role in the workflow is builder, reviewer, either or generalist.",
+  "worktrees.agent.badWorkflowRole": "A role in the workflow is builder, reviewer, either, generalist or independent.",
   "worktrees.agent.chooseMove": "Choose where to move the agent.",
   "worktrees.agent.effortRefused": "{chosen, select, yes {{model}} other {The CLI's default model}} doesn't take {effort} effort. Choose one of the levels it takes.",
   "worktrees.agent.enterName": "Enter a name.",

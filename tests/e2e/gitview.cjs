@@ -186,15 +186,8 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   await page.locator('select.changes-picker').selectOption('')
   check('its project folder shows the working tree', !!(await lib.until(async () => (await page.locator('.split-list .pane-header', { hasText: 'Changes' }).count()) === 1, HUNG_MS)))
 
-  // --- A project without git.
-  await page.getByText('beta', { exact: true }).first().click()
-  await page.locator('.tabs .tab', { hasText: 'Version Control' }).click()
-  const notes = page.locator('[data-vc-init]')
-  check('a project without git (None) says so, with only Workflow and no Initialise repository… (HI-1905: Git’s)', !!(await lib.until(async () => /has no version control/.test(await text(page.locator('[data-vc-fact]'))) && JSON.stringify(await page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))) === '["workflow"]', HUNG_MS)) && (await notes.count()) === 0, await text(page.locator('.vc-view')))
-  check('and has no status bar item', (await item.count()) === 0)
-  await shot(page, '5-no-git')
-  await page.locator('[data-vc-head] [data-platform="git"]').click()
-  check('Git chosen there: Initialise repository…', !!(await lib.until(async () => (await notes.locator('[data-git-init]').count()) === 1, HUNG_MS)), await text(page.locator('.vc-view')))
+  // A project without git (None: Workflow only, no Initialise repository…, no status bar item; Git chosen there offers
+  // Initialise repository…) is versioncontrol's and gitinit's: here too until HI-2663.
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

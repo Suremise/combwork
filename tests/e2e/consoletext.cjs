@@ -70,11 +70,12 @@ const check = (name, ok, extra = '') => {
     dc.on('pageerror', (e) => check('no console page errors', false, e.message))
     await dc.locator('.dc-source').waitFor({ timeout: HUNG_MS })
     const source = await lib.until(async () => (await inv('console:sources')).find((s) => s.agentId === b1.id)?.id, HUNG_MS)
-    await lib.until(async () => (await dc.locator(`.dc-source option[value="${source}"]`).count()) > 0, HUNG_MS)
+    // By the options' values, not a CSS selector: a source's id can hold characters a selector can't match as written.
+    await lib.until(async () => await dc.locator('.dc-source option').evaluateAll((os, id) => os.some((o) => o.value === id), source), HUNG_MS)
     await dc.locator('.dc-source').selectOption(source)
     await lib.until(async () => (await inv('console:sources')).find((s) => s.agentId === b1.id)?.capturing, HUNG_MS)
     await inv('session:start', alpha, { agentId: b1.id })
-    await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    await lib.agentIdle(inv, b1.id, HUNG_MS)
 
     const rows = () => dc.locator('.dc-row').evaluateAll((els) => els.map((e) => ({ seq: Number(e.dataset.seq), name: e.querySelector('.dc-name').textContent })))
     const promptRow = (after) => lib.until(async () => (await rows()).find((r) => r.name === 'UserPromptSubmit' && r.seq > after) ?? null, HUNG_MS)
@@ -101,7 +102,7 @@ const check = (name, ok, extra = '') => {
     const hidden = await promptShown(0)
     check("…the prompt's words are hidden, only its length shown", hidden.raw.includes('<text:') && !hidden.raw.includes(HIDDEN), hidden.raw.slice(0, 300))
     check('…and a recording starts with its text box unticked', (await recordBoxTicked()) === false)
-    await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    await lib.agentIdle(inv, b1.id, HUNG_MS)
 
     // --- On in Settings → Advanced: the open console says so at once.
     await page.locator('.activity-btn[aria-label="Settings"]').click()
@@ -120,13 +121,13 @@ const check = (name, ok, extra = '') => {
     check("the live view shows the prompt's text", shown.raw.includes(SHOWN), shown.raw.slice(0, 300))
     const ringText = JSON.stringify(await ring())
     check("…with the key, the option's value and the device code in it masked", LEAKS.every((s) => !shown.raw.includes(s) && !ringText.includes(s)) && shown.raw.includes('--api-key <redacted>') && shown.raw.includes('enter <redacted>'), shown.raw.slice(0, 400))
-    await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    await lib.agentIdle(inv, b1.id, HUNG_MS)
 
     // --- Paused, then resumed: what came meanwhile is filled in with its text.
     await dc.locator('.dc-pause').click()
     await lib.until(async () => (await dc.locator('.dc-live').textContent()).includes('Paused'), HUNG_MS)
     await lib.sendPrompt(inv, key, `edit a.ts ${HELD}`, { submitted: async () => /\(\d+ new\)/.test(await dc.locator('.dc-live').textContent()) })
-    await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    await lib.agentIdle(inv, b1.id, HUNG_MS)
     await dc.locator('.dc-pause').click()
     const held = await promptShown(shown.seq)
     check('resume fills in what came while paused, with its text', held.raw.includes(HELD), held.raw.slice(0, 300))

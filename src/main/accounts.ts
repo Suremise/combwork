@@ -9,6 +9,7 @@ import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, homeAccount, pcAccountId, pcWideSignIn, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
 import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
+import { launchesWithoutTools } from '../shared/launchPolicy'
 import { profileFolder } from '../shared/appName'
 import { localProfileInUse } from './profileFolders'
 import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
@@ -549,7 +550,7 @@ export function connectionWith(accountId: string, values: LaunchValues, label?: 
   return out!
 }
 
-const NO_CONNECTION = msg({ id: 'main.connections.notFound', defaultMessage: 'There is no such connection.', description: 'An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).' })
+export const NO_CONNECTION = msg({ id: 'main.connections.notFound', defaultMessage: 'There is no such connection.', description: 'An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).' })
 const NO_CONNECTION_NAME = msg({ id: 'main.connections.noName', defaultMessage: 'Give the connection a name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): its name is empty.' })
 const NAME_TAKEN = msg({ id: 'main.connections.nameTaken', defaultMessage: '{account} already has a connection named {name}. Choose another name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): another connection on the same account ({account}, its name) has this name ({name}).' })
 const BAD_MODE = msg({ id: 'main.connections.badMode', defaultMessage: "{cli} has no permission mode {mode}.", description: 'An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI\'s ({cli}: "Codex").' })
@@ -625,7 +626,7 @@ export function addConnection(accountId: string, input: ConnectionPatch & { name
 export function updateConnection(id: string, patch: ConnectionPatch): Connection {
   const { c, a } = mustConnection(id)
   const name = patch.name === undefined ? c.name : assertNameFree(a, patch.name, id)
-  const next: Connection = { id, account: a.id, name, ...savedValues(a, c, patch), ...savedTag(c.tag, patch) }
+  const next: Connection = { id, account: a.id, name, ...savedValues(a, c, patch), ...savedTag(c.tag, patch), ...(c.launch ? { launch: c.launch } : {}) }
   changeConnections((all) => {
     const i = all.findIndex((x) => x.id === id)
     if (i >= 0) all[i] = next
@@ -640,7 +641,7 @@ export function duplicateConnection(id: string): Connection {
   const taken = new Set(connectionsOn(a.id, allConnections()).map((x) => x.name.trim().toLowerCase()))
   let n = 2
   while (taken.has(`${c.name} (${n})`.toLowerCase())) n++
-  const made: Connection = { ...valuesOf(c), ...(c.tag ? { tag: c.tag } : {}), id: newConnectionId(), account: a.id, name: `${c.name} (${n})` }
+  const made: Connection = { ...valuesOf(c), ...(c.tag ? { tag: c.tag } : {}), ...(c.launch ? { launch: structuredClone(c.launch) } : {}), id: newConnectionId(), account: a.id, name: `${c.name} (${n})` }
   changeConnections((all) => {
     const i = all.findIndex((x) => x.id === id)
     all.splice(i + 1, 0, made)
@@ -1703,7 +1704,8 @@ export function agentLaunchView(a: AgentDef, cfg: Pick<ProjectConfig, 'migration
   // Not migrated yet, or no connection yet (its CLI has no account: its own, as kept): as it is.
   if (!cfg.migrations?.accounts1 || !a.connection) return {}
   const c = getConnection(a.connection)
-  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode }
+  // Its connection launches without Combwork's tools (HI-2670): Independent, as the window reads its role.
+  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode, ...(launchesWithoutTools(c) ? { toolsOff: true as const } : {}) }
 }
 
 // ---------------------------------------------------------------------------

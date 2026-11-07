@@ -703,6 +703,38 @@
     "defaultMessage": "{who, select, self {{from} writes it with Combwork's handover tool; {from} continues in a new conversation when it's done.} other {{from} writes it with Combwork's handover tool; {other} starts when it's done.} none {{from} writes it with Combwork's handover tool; the other agent starts when it's done.}}",
     "description": "Under Ask … to write a handover first: the agent ({from}) writes the handover, then it carries on itself (self), the chosen agent ({other}) starts, or one not chosen yet (none)."
   },
+  "agents.independent.card": {
+    "defaultMessage": "{card} in {column}",
+    "description": "One of what an agent is part of, in the confirmation before it is made Independent (HI-2670): a card ({card}: its key, HI-12) and its board column ({column}: Doing or Review)."
+  },
+  "agents.independent.confirm": {
+    "defaultMessage": "Make Independent",
+    "description": "The button of the confirmation (HI-2670) before agents on lanes or holding cards are made Independent. Short. Glossary: independent."
+  },
+  "agents.independent.confirmLine": {
+    "defaultMessage": "{agent} ({project}): {parts}",
+    "description": "One line of the confirmation (HI-2670) before agents are made Independent: the agent, its project, and what it is part of ({parts}: its lanes and cards, listed)."
+  },
+  "agents.independent.confirmText": {
+    "defaultMessage": "Combwork gives them nothing more: their lanes pause until you give them another agent or end them, and their cards stay where they are for you to give to someone else.",
+    "description": "The confirmation (HI-2670) before agents on lanes or holding cards are made Independent."
+  },
+  "agents.independent.confirmTitle": {
+    "defaultMessage": "{n, plural, one {Make # agent Independent?} other {Make # agents Independent?}}",
+    "description": "Title of the confirmation (HI-2670) before a change makes agents that are on lanes or hold cards Independent (no part in the workflow). Glossary: independent."
+  },
+  "agents.independent.doing": {
+    "defaultMessage": "Doing",
+    "description": "A board column, in the confirmation before agents are made Independent (HI-2670)."
+  },
+  "agents.independent.lane": {
+    "defaultMessage": "lane {lane}",
+    "description": "One of what an agent is part of, in the confirmation before it is made Independent (HI-2670): a running lane, by its id."
+  },
+  "agents.independent.review": {
+    "defaultMessage": "Review",
+    "description": "A board column, in the confirmation before agents are made Independent (HI-2670)."
+  },
   "agents.installSource.native": {
     "defaultMessage": "native install",
     "description": "Where Combwork found a coding agent's CLI: the folder its native installer puts it in. Shown as \"found via native install\" (Provider Setup), in Help → About and in Settings."
@@ -1491,9 +1523,21 @@
     "defaultMessage": "Does whatever you ask in its pane; takes no side in the workflow.",
     "description": "Under the Generalist choice of an agent's role in the workflow: it isn't a builder or a reviewer of lanes; it works for the user in its own pane."
   },
+  "agents.workflowRole.independent": {
+    "defaultMessage": "Independent",
+    "description": "A choice of an agent's role in the workflow (HI-2670): it takes no part in the workflow at all; Combwork never gives it cards, wakes it or types into it. Glossary: independent."
+  },
+  "agents.workflowRole.independentText": {
+    "defaultMessage": "Works only with you, in its pane: Combwork never gives it cards, wakes it or types into it.",
+    "description": "Under the Independent choice of an agent's role in the workflow (HI-2670): no lane, reviewer pool, card or message of Combwork's reaches it."
+  },
   "agents.workflowRole.label": {
     "defaultMessage": "Role in the workflow",
     "description": "A heading in Add Agent and Agent Settings, above the choice of builder, reviewer or either: which side of the workflow the agent takes (#1430). Glossary: workflow role."
+  },
+  "agents.workflowRole.needsTools": {
+    "defaultMessage": "This connection launches without Combwork's tools.",
+    "description": "Beside the greyed-out choices of an agent's role (Builder, Reviewer, Either, Generalist) in Add Agent and Agent Settings (HI-2670): the agent's connection is set to launch without Combwork's tools, so it can only be Independent."
   },
   "agents.workflowRole.reviewer": {
     "defaultMessage": "Reviewer",

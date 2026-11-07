@@ -59,15 +59,25 @@ interface CombworkMessageValues {
   'main.connections.choice.off': { name: string | number; agent: string | number }
   'main.connections.choice.otherCli': { name: string | number; agent: string | number }
   'main.connections.inUse': { name: string | number; users: string | number }
+  'main.connections.launch.agentChanged': { agent: string | number }
+  'main.connections.launch.busy': undefined
   'main.connections.launch.changedAgain': { agent: string | number }
+  'main.connections.launch.changedMeanwhile': { name: string | number }
   'main.connections.launch.changing': { name: string | number; agent: string | number }
+  'main.connections.launch.confirm': { agents: string | number; fingerprint: string | number }
   'main.connections.launch.deleted': { agent: string | number }
+  'main.connections.launch.impactChanged': { agents: string | number; fingerprint: string | number }
   'main.connections.launch.noKey': { name: string | number; agent: string | number }
   'main.connections.launch.none': { cli: string | number; agent: string | number }
   'main.connections.launch.offHere': { n: number; cli: string | number; names: string | number; agent: string | number }
   'main.connections.launch.offNoDefault': { agent: string | number; name: string | number; cli: string | number }
   'main.connections.launch.otherProvider': { agent: string | number; cli: string | number }
+  'main.connections.launch.projectMissing': { project: string | number }
+  'main.connections.launch.projectUnreadable': { project: string | number; error: string | number }
+  'main.connections.launch.projectUnusable': { project: string | number }
+  'main.connections.launch.projectsUnread': { workspace: string | number }
   'main.connections.launch.signedOut': { name: string | number; agent: string | number }
+  'main.connections.launch.unreadable': { error: string | number }
   'main.connections.moveFailed': { project: string | number }
   'main.connections.nameTaken': { account: string | number; name: string | number }
   'main.connections.noName': undefined

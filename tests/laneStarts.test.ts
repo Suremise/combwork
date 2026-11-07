@@ -460,6 +460,14 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
       expect([now.state, now.reviewer?.id, now.cards.map((c) => c.number), now.queued]).toEqual(['active', 'r1', [x1, x2], null])
     })
 
+    it('HI-2556: a Merges into it refuses is refused before its card in flight is put back, changing nothing', async () => {
+      const { cards: [x1, x2] } = await inFlight('d1', ['T one', 'T two'])
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true, target: 'typo' })).rejects.toThrow()
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'D1 (alpha)', applyNow: true, ownBuilder: true, target: 'typo' })).rejects.toThrow()
+      expect(await columnOf(x1)).toBe('doing')
+      expect((await lanes.laneOf(w, 'alpha', 'd1'))!.cards.map((c) => c.number)).toEqual([x1, x2])
+    })
+
     it('refuses while its builder is in a turn, or its card is in Review, changing nothing', async () => {
       const { cards: [x1, x2], st } = await inFlight('d1', ['W one', 'W two'])
       st.status = 'working'

@@ -497,6 +497,11 @@
     "note": "Starting an agent is refused while something changes its project. {why} says what, as a sentence without its full stop (\"This project is being removed\").",
     "audience": "both"
   },
+  "session.start.independentTask": {
+    "text": "{agent} is Independent: Combwork gives it no tasks. Start it and work with it in its pane.",
+    "note": "Starting an agent on a task is refused (HI-2670): the agent's role is Independent (its own, or its connection launches it without Combwork's tools), so Combwork never types a task into it. {agent} is the agent's name.",
+    "audience": "both"
+  },
   "session.start.moveFailed": {
     "text": "Combwork couldn't move {project}'s model settings to its agents: {error}. Start it again.",
     "note": "Starting an agent is refused (HI-1770): moving its project's own model, effort and context settings onto the project's agents (connections now hold the defaults) failed. {project} is the project's name, {error} why (often in English). It is tried again at the next start.",
@@ -515,6 +520,11 @@
   "session.start.otherFolder": {
     "text": "This session ran in {folder}. Resume it with the agent that works in that folder.",
     "note": "Resuming a session is refused: it ran in another folder (another agent's worktree). {folder} is that folder's path.",
+    "audience": "both"
+  },
+  "session.start.plainTask": {
+    "text": "{agent}'s connection launches it without Combwork typing into it, so it can't be given a task as it starts.",
+    "note": "Starting an agent on a task is refused (HI-2670): its connection's launch settings have \"Combwork types into the agent\" off. {agent} is the agent's name.",
     "audience": "both"
   },
   "session.start.projectRunning": {

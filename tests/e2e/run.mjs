@@ -44,7 +44,7 @@ import { createRequire } from 'module'
 import { e2eProgress, slotWaitProgress } from '../progressReport.mts'
 import { SUITES } from './suites.mjs'
 import { affectedSuites, changedFiles, mergeBase, splitSelections } from './affected.mjs'
-import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf } from './record.mjs'
+import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf, waitsLine, waitsRanOut } from './record.mjs'
 import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, packagedPlan, resultLines, selectSuites, suiteLimitMs, suiteOutcome } from './runner.mjs'
 import { devBuild, ensureBuild } from './build.mjs'
 import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFor, markRunFailed, newRunDir, omittedLine, pruneRunDirsReleasing } from './logs.mjs'
@@ -62,7 +62,16 @@ const root = join(here, '..', '..')
 const lib = createRequire(import.meta.url)('./lib.cjs')
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 const { claimedByRuns, clearDir, evidenceFor, findBoard, finishSuiteDir, freshFolder, recordKept, releaseKept } = createRequire(import.meta.url)('./evidence.cjs')
-const { stopProcessesIn, endChildTree, endCopies } = createRequire(import.meta.url)('./folderProcesses.cjs')
+const { stopProcessesIn, endChildTree, endCopies, processes } = createRequire(import.meta.url)('./folderProcesses.cjs')
+/** The machine's processes now, or null (off Windows, or the listing failed): each user of it lists again when null. */
+const listOnce = () => {
+  if (process.platform !== 'win32') return null
+  try {
+    return processes()
+  } catch {
+    return null
+  }
+}
 const { describeExit, windowsCodesIn } = createRequire(import.meta.url)('./windowsExits.cjs')
 
 const args = process.argv.slice(2)
@@ -337,9 +346,12 @@ const run = (name, port) =>
       // the folder and outlive the run: stopped, by command line (its folder, started since the suite did), never by name.
       // Its test copies of Combwork first (HI-1453): those it recorded, as the processes recorded. One not recorded is the
       // folder's sweep's below (#542), which takes what names the folder and started since the suite did.
-      const copies = dir ? endCopies([dir]).ended : 0
+      // One listing for both when the first ends nothing (HI-2663: each costs about a second, on the runner's thread);
+      // after an ending, the sweep lists again, so it sees what is left, by pid and start time as always.
+      const list = dir ? listOnce() : null
+      const copies = dir ? endCopies([dir], { list: list ?? undefined }).ended : 0
       if (copies) out += `\n(${copies} process(es) of its test copies of Combwork still running after it ended were ended, HI-1453)\n`
-      const stopped = dir ? stopProcessesIn(dir, started) : 0
+      const stopped = dir ? stopProcessesIn(dir, started, [], copies || !list ? {} : { list }) : 0
       if (stopped) out += `\n(${stopped} process(es) still running from its folder after it ended were stopped, #542)\n`
       // --keep-files: a passed suite's own files (screenshots, reports) go into the run's log folder before its folder
       // does, as a failed one's do at the end (#304): a new place every run, pruned with the logs.
@@ -508,6 +520,9 @@ async function runOnce(k) {
   const summary = `${results.filter((r) => r.ok).length} passed, ${failed.length} failed, ${results.filter((r) => r.skipped).length} skipped${devOnly.size ? `, ${devOnly.size} not run (they need the dev build)` : ''} in ${minutes} min`
   console.log(`\n${repeat > 1 ? `Run ${k} of ${repeat}: ` : ''}${summary}. Logs: ${logDir}`)
   if (filesKept.length) console.log(`Kept the screenshots and files of ${filesKept.join(', ')} in ${filesKept.length === 1 ? `${logDir}\\${filesKept[0]}` : `${logDir}\\<suite>`} (--keep-files).`)
+  // Waits that ran out (HI-2663), most time first, with where: a run measures what they cost.
+  const waits = waitsRanOut(results)
+  if (waits.length) console.log(`${waitsLine(waits)}\n${waits.map((w) => `  ${w.name}: ${w.at.join(', ')}`).join('\n')}`)
   // React's commit bursts, recorded only (HI-1387): each suite's largest, the largest first.
   const bursts = results.map((r) => ({ name: r.name, n: Number(/^INFO React commit burst: the largest was (\d+)/m.exec(r.out ?? '')?.[1] ?? 0) })).filter((b) => b.n)
   if (bursts.length) console.log(`React commit bursts (most commits within 250 ms, recorded only, HI-1387): ${bursts.sort((a, b) => b.n - a.n).map((b) => `${b.name} ${b.n}`).join(', ')}`)

@@ -1155,6 +1155,14 @@
     "defaultMessage": "Combwork in your language",
     "description": "A tip's title."
   },
+  "tips.launchSettings.text": {
+    "defaultMessage": "A connection's ⋯ → Launch Settings… → Launch as from a terminal starts its agents with none of Combwork's guidance, tools or typing, as if you had opened the CLI in that folder yourself. They are Independent: in the team, but out of the workflow.",
+    "description": "A tip (HI-2670). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Launch Settings… is a menu entry, Launch as from a terminal a switch). Glossary: independent."
+  },
+  "tips.launchSettings.title": {
+    "defaultMessage": "An agent as if from a terminal",
+    "description": "A tip's title (HI-2670): a connection whose sessions start with none of Combwork's additions."
+  },
   "tips.leftRunning.text": {
     "defaultMessage": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
     "description": "A tip (HI-2111). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Left running is a row's label; End It a button)."
@@ -1346,6 +1354,14 @@
   "tips.mergeStrict.title": {
     "defaultMessage": "Work up to date before it merges",
     "description": "A tip's title: the workflow option that has Combwork's merge queue bring a card's work up to date with its target branch first (G8, strict)."
+  },
+  "tips.mergesInto.text": {
+    "defaultMessage": "List a branch such as 1.2.0 under Version Control → Workflow → Other branches work can merge into, then pick it as a lane’s Merges into in Start Lane…, or a card’s in its dialog. Its cards are made from it and merge into it through its own queue.",
+    "description": "A tip (HI-2556). Names of Combwork's menus, views, settings and fields: keep them as Combwork shows them. Keep 1.2.0 as it is."
+  },
+  "tips.mergesInto.title": {
+    "defaultMessage": "Work on the next release beside this one",
+    "description": "A tip's title (HI-2556): lanes and cards that merge into another branch than the project's."
   },
   "tips.messageReceipts.text": {
     "defaultMessage": "Every message the Assistant leaves an agent has an id and is kept, even across a restart: it is received once the agent reads its inbox, and acked once the agent acted on it. One not acked within {minutes, plural, one {# minute} other {# minutes}} shows as overdue (✉) in its pane.",

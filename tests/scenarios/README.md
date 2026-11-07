@@ -166,6 +166,13 @@ npm run scenarios -- --dialect "Opus 5.5 v2.json" --provider claude-code --model
 node tests/scenarios/measure.cjs              # what sessions are given about Combwork, measured from real launches
 ```
 
+**When a model trial runs** is AGENTS.md's rule (HI-2662, the user's decision, 7 Nov): a card that changes agent-facing
+text runs the scenarios that text affects on each model it reaches, before and after, on the same provider, model,
+effort and dialect, and names them on the card; a release gets 3 to 5 at random (RELEASING.md). A detector or a
+fixture's premise is fixed with a unit test of its actual failure (`tests/scenarioObserve.test.ts` and the like), never
+with a model run: HI-2560's alarms were mostly detector errors. Which fakes run which scenarios is `fakeScope.cjs`'s
+(below, HI-2663).
+
 **A dialect** (HI-2439; plans/2026-11-03-dialects-design.md, section 6): `--dialect <file>` puts a dialect file in the
 model slot of every agent of the provider's CLI, as a test copy in each scenario workspace's `.combwork/dialects/<CLI>/`.
 The file is checked against the schema first, as Combwork checks one (`src/main/dialects/format.ts`): one that isn't a
@@ -202,6 +209,16 @@ its Combwork tool does, so a model trial gets the same fixture as a fake (#1545)
   in a home of the run's own: a scripted stand-in model (`tests/e2e/fake-copilot-api.cjs`) turns the same commands into
   Copilot's own tool calls (its skill tool, the Combwork MCP server's tools), so its hooks, skills and transcript are
   Copilot's. It needs the Copilot CLI installed (the run is skipped without it) and no sign-in.
+  - **Which fakes run a scenario** (HI-2663, `fakeScope.cjs`): every fake reaches Combwork through the same MCP server,
+    so all three run only the scenarios whose script exercises what differs per CLI (skill delivery, launch guidance and
+    modes, the shell, lines Combwork types in, hooks, slot and copy folders), and loss of work, crash and settings
+    races. Those whose checks read only the board and Combwork's records after the server run on `fake` alone
+    (`FAKE_CLAUDE_ONLY`); those whose checks hold by construction on a fake run as model trials only
+    (`MODEL_TRIALS_ONLY`). `tool-sweep` calls, through each CLI, the tools only the fake-alone ones use. A scenario not
+    named there runs on all three. A run says what it leaves out: with `--only`, `NOT RUN <id>: runs on fake only …:
+    --provider fake` (or "model trials only"), and a run left with nothing to run exits 2 without a result, so the
+    provider to name for a regression is in that line. A full set on `fake-codex` or `fake-copilot` runs about a third of
+    the scenarios: the per-CLI ones.
 - **Model trials** cost tokens, and run only in the providers' **test homes**: never the user's own `~/.claude` or
   `~/.codex`, and never a copy of their credentials (refreshing a copy could sign the user out).
   - **Claude Code** uses `%LOCALAPPDATA%\combwork-test\claude` (`CW_TEST_CLAUDE_HOME` overrides it). Sign in to it once, by

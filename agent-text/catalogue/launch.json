@@ -1,0 +1,14 @@
+{
+  "launch.summary.all": {
+    "text": "everything on",
+    "note": "A connection's launch settings in short (HI-2670), when nothing is turned off."
+  },
+  "launch.summary.partly": {
+    "text": "partly plain: {off} off",
+    "note": "An agent's or connection's launch settings in short (HI-2670): {off} lists what is turned off (guidance, tools, typing, an override's key)."
+  },
+  "launch.summary.plain": {
+    "text": "plain: launched as from a terminal",
+    "note": "An agent's or connection's launch settings in short (HI-2670), in project status and the Agent API: none of Combwork's additions."
+  }
+}

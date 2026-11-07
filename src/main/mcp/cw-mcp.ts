@@ -45,7 +45,7 @@ const T = {
   'arg.agent': agentMsg({ id: 'tool.arg.agent', text: 'Its name or id; optional when the project has one agent.' }),
   'arg.mcpServers': agentMsg({ id: 'tool.arg.mcpServers', text: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). combwork is always given.' }),
   'arg.connection': agentMsg({ id: 'tool.arg.connection', text: 'Its connection, by id or name (cw_connection): its model, effort, mode and CLI. Default: the first usable here.' }),
-  'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }),
+  'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), generalist (never in a lane), or independent (no part in the workflow). Default: from its name.' }),
   'arg.override': agentMsg({ id: 'tool.arg.override', text: "Moves it past the rules the move skips: reason is the user's own why, never made up." }),
   'intent.arg.revision': agentMsg({ id: 'tool.intent.arg.revision', text: "Default: the card's current revision (its commit, or its files' hash). A commit's short id (7+ characters) will do." }),
   'intent.arg.submission': agentMsg({ id: 'tool.intent.arg.submission', text: 'Default: the latest.' }),
@@ -98,6 +98,9 @@ const T = {
   'connection.arg.account': agentMsg({ id: 'tool.connection.arg.account', text: 'add: its account, by id or name, from list.' }),
   'connection.arg.model': agentMsg({ id: 'tool.connection.arg.model', text: 'Empty: the CLI decides (each value below too).' }),
   'connection.arg.mode': agentMsg({ id: 'tool.connection.arg.mode', text: 'Permission mode.' }),
+  'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: what of Combwork its sessions get. guidance, tools, typing (false: off; tools off makes its agents Independent), overrides by key; preset "terminal": all off; an empty object: all on.' }),
+  'updateAgent.arg.confirm': agentMsg({ id: 'tool.updateAgent.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make this agent Independent (its role, or a connection without Combwork tools) while it is on a lane or holds a card.' }),
+  'connection.arg.confirm': agentMsg({ id: 'tool.connection.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make those agents Independent.' }),
   'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
   'promptAgent.description': agentMsg({ id: 'tool.promptAgent.description', text: 'Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use cw_start_task.' }),
   'messageAgent.description': agentMsg({ id: 'tool.messageAgent.description', text: "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-cw-api, tools.md)" }),
@@ -121,6 +124,7 @@ const T = {
   'lane.arg.builderJoin': agentMsg({ id: 'tool.lane.arg.builderJoin', text: "join: the builder's name." }),
   'lane.arg.reviewer': agentMsg({ id: 'tool.lane.arg.reviewer', text: 'Agent name or id.' }),
   'lane.arg.name': agentMsg({ id: 'tool.lane.arg.name', text: 'A short label for the lane.' }),
+  'arg.target': agentMsg({ id: 'tool.arg.target', text: "Merges into: one of the project's Other branches work can merge into, or \"\" for its Work merges into. A lane's is fixed once started; a card's changes only while its branch has no work." }),
   'lane.arg.brief': agentMsg({ id: 'tool.lane.arg.brief', text: "start: the builder's brief (at most 4000 characters)." }),
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
@@ -410,7 +414,7 @@ const settingsArgs = {
   mcpServers: { type: 'array', items: { type: 'string' }, description: say(T['arg.mcpServers']) },
   connection: { type: 'string', description: say(T['arg.connection']) }
 }
-const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: say(T['arg.workflowRole']) }
+const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist', 'independent'], description: say(T['arg.workflowRole']) }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Combwork fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
@@ -764,8 +768,8 @@ const tools: Tool[] = [
   {
     name: 'cw_update_agent',
     description: say(T['updateAgent.description']),
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs }, required: ['project', 'agent'] },
-    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, ...legacyAgentArgs(a) })
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs, confirm: { type: 'string', description: say(T['updateAgent.arg.confirm']) } }, required: ['project', 'agent'] },
+    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, confirm: a.confirm, ...legacyAgentArgs(a) })
   },
   {
     name: 'cw_connection',
@@ -783,13 +787,15 @@ const tools: Tool[] = [
         mode: { type: 'string', description: say(T['connection.arg.mode']) },
         context200k: { type: 'string', enum: ['on', 'off', ''] },
         extraArgs: { type: 'string' },
-        tag: { type: 'string' }
+        tag: { type: 'string' },
+        launch: { type: 'object', description: say(T['connection.arg.launch']) },
+        confirm: { type: 'string', description: say(T['connection.arg.confirm']) }
       },
       required: ['action']
     },
     run: async (a) => {
       if (a.action === 'list') return connectionListText((await api('GET', '/v1/connections')) as Parameters<typeof connectionListText>[0])
-      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag', 'launch', 'confirm'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
       // agent-protocol: connectionChangedText's verb, which it words (shared/toolReplies.ts)
       if (a.action === 'add') return connectionChangedText('Made', (await api('POST', '/v1/connections', body)) as ConnectionPublic)
       if (a.action !== 'update') throw new Error(say(T['connection.error.action']))
@@ -928,7 +934,7 @@ const tools: Tool[] = [
       properties: {
         action: { type: 'string', enum: ['start', 'join', 'next', 'end', 'list'] },
         cards: cardsArg(say(T['lane.arg.cards'])),
-        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: say(T['lane.arg.builder']) }, pool: { type: 'boolean', description: say(T['lane.arg.pool']) } } : { builder: { type: 'string', description: say(T['lane.arg.builderJoin']) } }),
+        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: say(T['lane.arg.builder']) }, pool: { type: 'boolean', description: say(T['lane.arg.pool']) }, target: { type: 'string', description: say(T['arg.target']) } } : { builder: { type: 'string', description: say(T['lane.arg.builderJoin']) } }),
         reviewer: { type: 'string', description: say(T['lane.arg.reviewer']) },
         rounds: { type: 'number' },
         waitMinutes: { type: 'number' },
@@ -952,7 +958,7 @@ const tools: Tool[] = [
       }
       // An agent's lane is its project's, with itself as the builder (start) or the reviewer (join).
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.CW_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.CW_AGENT_ID } : {}) }
-      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow']), ...me })) as LaneChange, laneChangeText)
+      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow', 'target']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
       if (a.action !== 'end') throw new Error(say(T['lane.error.action']))
@@ -1117,6 +1123,7 @@ const tools: Tool[] = [
         context: contextArg,
         kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? say(T['createTask.arg.kind.assistant']) : say(T['createTask.arg.kind']) },
         skipReview: { type: 'string', description: ASSISTANT ? say(T['createTask.arg.skipReview.assistant']) : say(T['createTask.arg.skipReview']) },
+        ...(ASSISTANT ? { target: { type: 'string', description: say(T['arg.target']) } } : {}),
         attachments: attachmentsArg('description'),
         lane: {
           type: ['string', 'object'],
@@ -1126,7 +1133,7 @@ const tools: Tool[] = [
       },
       required: ['title']
     },
-    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
+    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.target !== undefined ? { target: a.target } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
   },
   {
     name: 'cw_update_task',
@@ -1160,7 +1167,8 @@ const tools: Tool[] = [
               kind: { type: 'string', enum: ['code', 'no-code'], description: say(T['updateTask.arg.kind']) },
               confirmKind: { type: 'boolean', description: say(T['updateTask.arg.confirmKind']) },
               answers: { type: 'array', items: { type: 'string' }, description: say(T['updateTask.arg.answers']) },
-              skipReview: { type: ['string', 'boolean'], description: say(T['updateTask.arg.skipReview']) }
+              skipReview: { type: ['string', 'boolean'], description: say(T['updateTask.arg.skipReview']) },
+              target: { type: 'string', description: say(T['arg.target']) }
             }
           : { review: { type: 'string', enum: ['start', 'passed', 'failed'], description: say(T['updateTask.arg.review']) } })
       },
@@ -1168,7 +1176,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'waitingFor', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'waitingFor', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'target', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\n${say(T['updateTask.reply.journalNote'])}` : text

@@ -115,12 +115,27 @@ function tokenFile(token, dir = probeDir('token')) {
  */
 const port = (fallback) => process.env.CW_E2E_PORT || String(fallback)
 
-/** Waits until fn() returns something truthy (checking every interval ms), up to ms; returns its last value. */
+/** A wait this long that ran out is worth a line: a check of its result, or a wait for what never comes, costs it whole. */
+const WAIT_NOTED_MS = 10000
+
+/**
+ * Waits until fn() returns something truthy (checking every interval ms), up to ms; returns its last value. A wait of
+ * WAIT_NOTED_MS or more that ran out says so, with its caller ("WAIT ran out after …"), and the runner lists them per
+ * suite (HI-2663: three suites spent 420 of their 623 s in waits that ran out and that nothing checked).
+ */
 async function until(fn, ms = 10000, interval = 100) {
   const t = Date.now()
   let v
   while (!(v = await fn()) && Date.now() - t < ms) await sleep(interval)
+  if (!v && Date.now() - t >= WAIT_NOTED_MS) console.log(`WAIT ran out after ${Date.now() - t} ms at ${waitCaller(new Error().stack)}`)
   return v
+}
+
+/** The suite's line a wait was called from: the first frame outside lib.cjs, repo-relative. */
+function waitCaller(stack) {
+  const frames = (stack ?? '').split('\n').slice(1).map((l) => /\(?([A-Za-z]:[^():]+|\/[^():]+):(\d+):\d+\)?$/.exec(l.trim())).filter(Boolean)
+  const own = frames.find((m) => path.resolve(m[1]) !== __filename) ?? frames[0]
+  return own ? `${path.relative(ROOT, own[1]).replace(/\\/g, '/')}:${own[2]}` : 'an unknown caller'
 }
 
 /**
@@ -1169,6 +1184,14 @@ const TURN_HUNG_MS = 60000
 const FAKE_IDLE = (s) => ['ready', 'finished', 'watching', 'background'].includes(s?.status) && s?.turn?.state !== 'running'
 
 /**
+ * Waits until an agent's fake Claude Code is idle again (FAKE_IDLE), up to ms; whether it is. After a turn its status is
+ * `finished`, not `ready`: a wait for `ready` there runs out (HI-2663).
+ */
+async function agentIdle(inv, agentId, ms = TURN_HUNG_MS) {
+  return !!(await until(async () => FAKE_IDLE((await inv('session:live')).find((s) => s.agentId === agentId)), ms, 200))
+}
+
+/**
  * Turns on the fake Claude Code's input log in its home (CLAUDE_CONFIG_DIR): each read of its input goes into
  * fake-input.jsonl there (#1286), which typeLine() reads. Before the fake starts: it looks for the switch only then.
  */
@@ -1783,4 +1806,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

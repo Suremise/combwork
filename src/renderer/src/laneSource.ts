@@ -41,6 +41,8 @@ export interface Lane {
   status: LaneInfo['status']
   /** Running under old rules (#1421): its project's options changed since it started. */
   oldRules: boolean
+  /** Its Merges into (HI-2556), when it isn't the project's: LaneInfo's. */
+  target?: string
   /** A running lane's own stages (its recorded ruleset's, #1421), which its cards in Todo take; null: its project's now. */
   stages: LaneInfo['stages']
   /** A list change queued behind its card in flight (#1270), as main has it: shown in the Lanes tab (HI-2151); null: none. */
@@ -102,7 +104,7 @@ export function useLanes(load = true): Lane[] {
     const lanes = raw.flatMap((d): Lane[] => {
       const project = pathOf.get(d.project.toLowerCase())
       const frozen = d.state === 'ended' || d.state === 'abandoned' ? d.cards : null
-      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, poolReview: d.poolReview ?? null, slot: d.slotInfo ?? null, name: d.name, cards: d.cards.map((c) => c.number), info: d.cards, state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, stages: d.stages ?? null, queued: d.queued ?? null }] : []
+      return project ? [{ id: d.id, project, builder: who(d.builder), reviewer: d.reviewer ? who(d.reviewer) : null, pool: !!d.pool, poolReview: d.poolReview ?? null, slot: d.slotInfo ?? null, name: d.name, cards: d.cards.map((c) => c.number), info: d.cards, state: d.state, frozen, startedAt: d.startedAt, endedAt: d.endedAt, mergeCommit: d.mergeCommit, status: d.status ?? null, oldRules: !!d.oldRules, ...(d.target ? { target: d.target } : {}), stages: d.stages ?? null, queued: d.queued ?? null }] : []
     })
     return lanes.length ? panelOrder(lanes, order) : NO_LANES
   }, [raw, projects, order])

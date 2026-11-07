@@ -3195,6 +3195,17 @@ const SOURCES: readonly AdvancedSource[] = [
 // window: the English kept beside the messages is Settings → Advanced's search; agents read the settings catalogue's rows, said with agentText (settingsCatalog.ts agentSetting)
 export const ADVANCED_DEFS: readonly AdvancedDef[] = SOURCES.map((d) => ({ ...d, title: englishText(d.title), desc: englishText(d.desc), text: { title: d.title, desc: d.desc } }))
 
+/**
+ * A connection's switch now (HI-2670), no longer an app-wide one: Combwork's guidance and every override of a CLI. Its
+ * definition stays here for its words, default and samples; Settings → Advanced and the settings catalogue no longer list
+ * it, a value in advanced.json is read only by the one-time copy onto the connections (main's launchPolicyMigration), and
+ * it reads as its default everywhere else (a launch reads its connection's, shared/launchPolicy.ts).
+ */
+export const onConnection = (d: Pick<AdvancedDef, 'id' | 'override'>): boolean => !!d.override || d.id === CW_GUIDANCE
+
+/** The advanced values Settings → Advanced and the settings catalogue list: all but a connection's switches. */
+export const LISTED_ADVANCED: readonly AdvancedDef[] = ADVANCED_DEFS.filter((d) => !onConnection(d))
+
 const BY_ID = new Map(ADVANCED_DEFS.map((d) => [d.id, d]))
 
 export function advancedDef(id: string): AdvancedDef | undefined {
@@ -3390,6 +3401,8 @@ export interface AdvancedRow {
 
 /** A value used: the workspace's own (if the def takes one and it checks out), else the override, else the default. */
 export function advancedRow(def: AdvancedDef, state: Pick<AdvancedState, 'values' | 'madeFor' | 'workspace' | 'cli'> | null): AdvancedRow {
+  // A connection's switch (HI-2670): its default here, whatever advanced.json still has from before.
+  if (onConnection(def)) return { def, value: def.default, override: undefined, workspaceValue: undefined, problem: null, problemText: null, miss: null, missText: null, madeForOther: null }
   const override = state?.values[def.id]
   const own = def.workspace ? state?.workspace?.[def.id] : undefined
   const checked = override === undefined ? null : checkAdvanced(def, override)

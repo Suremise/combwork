@@ -177,6 +177,14 @@ interface CombworkMessageValues {
   'agents.handOver.stopped': { who: string; from: string | number; other: string | number }
   'agents.handOver.title': { agent: string | number }
   'agents.handOver.writes': { who: string; from: string | number; other: string | number }
+  'agents.independent.card': { card: string | number; column: string | number }
+  'agents.independent.confirm': undefined
+  'agents.independent.confirmLine': { agent: string | number; project: string | number; parts: string | number }
+  'agents.independent.confirmText': undefined
+  'agents.independent.confirmTitle': { n: number }
+  'agents.independent.doing': undefined
+  'agents.independent.lane': { lane: string | number }
+  'agents.independent.review': undefined
   'agents.installSource.native': undefined
   'agents.installSource.settings': undefined
   'agents.installSource.standalone': undefined
@@ -374,7 +382,10 @@ interface CombworkMessageValues {
   'agents.workflowRole.eitherText': undefined
   'agents.workflowRole.generalist': undefined
   'agents.workflowRole.generalistText': undefined
+  'agents.workflowRole.independent': undefined
+  'agents.workflowRole.independentText': undefined
   'agents.workflowRole.label': undefined
+  'agents.workflowRole.needsTools': undefined
   'agents.workflowRole.reviewer': undefined
   'agents.workflowRole.reviewerText': undefined
 }

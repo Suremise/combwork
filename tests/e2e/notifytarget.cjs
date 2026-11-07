@@ -62,10 +62,12 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 200)
       for (const b of await page.locator('.toasts .toast .icon-btn').all()) await b.click().catch(() => {})
       await until(async () => (await page.locator('.toasts .toast').count()) === 0)
     }
-    // Away from alpha's panes: the board.
+    // Away from alpha's panes: the board, shown, with no toast left in the corner, so the next step's toast is the only
+    // one. (Waiting for no pane toolbar at all ran out every time, and its 30 s let an earlier toast expire, HI-2663.)
     const toBoard = async () => {
       await page.locator('.activity-btn[aria-label="Task Board"]').click()
-      await until(async () => (await page.locator('.session-toolbar').count()) === 0)
+      await until(async () => (await page.locator('.board-toolbar').count()) === 1 && (await page.locator('.session-toolbar:visible').count()) === 0, HUNG_MS)
+      await closeToasts()
     }
     const shoot = async (name, show) => {
       for (const theme of ['dark', 'light']) {

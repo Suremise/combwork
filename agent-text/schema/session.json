@@ -405,6 +405,11 @@
       "why": "plain"
     }
   },
+  "session.start.independentTask": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
   "session.start.moveFailed": {
     "placeholders": {
       "project": "plain",
@@ -422,6 +427,11 @@
   "session.start.otherFolder": {
     "placeholders": {
       "folder": "plain"
+    }
+  },
+  "session.start.plainTask": {
+    "placeholders": {
+      "agent": "plain"
     }
   },
   "session.start.projectRunning": {

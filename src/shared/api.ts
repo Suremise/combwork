@@ -7,12 +7,14 @@ import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { ConnectionPatch, ConnectionsView } from './accounts'
+import type { LaunchImpact } from './launchPolicy'
 import type { ServerModelsRead } from './serverConnection'
 import type { MovedNotice } from './connectionDefaults'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
   Connection,
+  ConnectionLaunch,
   CopyView,
   SlotTestOp,
   SlotOptions,
@@ -496,13 +498,15 @@ export interface CombworkRequests {
   'tasks:setAside': () => SetAsideCard[]
   'tasks:addSetAside': (file: string) => TaskCard
   'tasks:discardSetAside': (file: string) => void
-  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code'; skipReview?: string }, drafts?: CardDrafts) => TaskCard
+  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code'; skipReview?: string; target?: string | null }, drafts?: CardDrafts) => TaskCard
   /** Changes a card's kind after it was made (#1277): an override, asked first (`ask`) unless `confirm`, with its reason. */
   'tasks:setKind': (n: number, kind: 'code' | 'no-code', opts?: { confirm?: boolean; reason?: string }) => { ask: true } | TaskCard
   /** Answers an agent's proposed kind (#1277): `accept` makes it the card's kind, else the card stays code. */
   'tasks:confirmKind': (n: number, accept: boolean) => TaskCard
   /** Makes a card skip review, or review it after all (#1625), answering an agent's proposal too: `reason`, the user's optional note. */
   'tasks:setReviewSkip': (n: number, skip: boolean, opts?: { reason?: string }) => TaskCard
+  /** Sets the branch a card merges into (HI-2556, its Merges into): one the project lists, or null for its own. */
+  'tasks:setTarget': (n: number, target: string | null) => TaskCard
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
   /** A change; with `more`, its comment and the dialog's drafts (HI-1700) in the same change. */
@@ -649,7 +653,10 @@ export interface CombworkRequests {
   'agents:memory': () => { running: { agents: number; bytes: number } | null; total: number; free: number }
   /** Changing provider clears the agent's model, effort and mode, and its session to resume (conversations can't move between providers). */
   /** Changes an agent's name and settings; for the Combwork Assistant's home, its settings for this workspace (mode too). */
-  'agents:update': (projectPath: string, agentId: string, patch: AgentPatch) => AgentDef
+  /** `confirmed` (HI-2670): agents:impact's fingerprint, when the change takes the agent off its lanes or cards. */
+  'agents:update': (projectPath: string, agentId: string, patch: AgentPatch, confirmed?: string | null) => AgentDef
+  /** What a change of an agent (its connection or role) would take out of the workflow (HI-2670); null: nothing. */
+  'agents:impact': (projectPath: string, agentId: string, patch: AgentPatch) => LaunchImpact | null
   /**
    * Removes an agent (its session must be stopped). deleteWorktree also removes its worktree and branch; 'merged-clean'
    * only when they are fully merged into the main branch (`mergedInto`, the one the user was shown) and clean then,
@@ -1119,6 +1126,13 @@ export interface CombworkRequests {
   'connection:add': (account: string, input: ConnectionPatch & { name: string }) => Connection
   /** Changes a connection's name or values (each null leaves it to the CLI); running agents on it are offered Restart or Switch Now. */
   'connection:update': (id: string, patch: ConnectionPatch) => Connection
+  /**
+   * What saving these launch settings (HI-2670) would take out of the workflow: agents on running lanes or holding cards
+   * in Doing or Review, made Independent by its Combwork tools going off. Null: nothing to confirm.
+   */
+  'connection:launchImpact': (id: string, launch: ConnectionLaunch | null) => LaunchImpact | null
+  /** Saves a connection's launch settings (HI-2670); `confirmed`, launchImpact's fingerprint, when it has one. */
+  'connection:setLaunch': (id: string, launch: ConnectionLaunch | null, confirmed?: string | null) => Connection
   /** A copy of a connection, after it. */
   'connection:duplicate': (id: string) => Connection
   /** Removes a connection; refused while an agent or the Assistant in an open workspace uses it, naming them. */

@@ -1,7 +1,7 @@
 // A process that fails to start is reported with its code (#599): what a Windows exit code means (windowsExits.cjs),
 // the e2e runner's record of it, and the rule that test tooling starts nothing through the shell, so every child keeps
 // Node's error mode (which keeps away the dialogs it governs; not every dialog under real load: windowsExits.cjs).
-import { execFileSync } from 'child_process'
+import { execFileSync, spawnSync } from 'child_process'
 import { readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
@@ -12,6 +12,8 @@ import { recordJson, recordMarkdown } from './e2e/record.mjs'
 import { resultLines } from './e2e/runner.mjs'
 
 const { ntstatus, describeExit, exitText, windowsCodesIn } = createRequire(import.meta.url)('./e2e/windowsExits.cjs')
+const { baseEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
+const childEnv = baseEnv
 const root = join(__dirname, '..')
 
 describe('what a Windows exit code means', () => {
@@ -32,6 +34,16 @@ describe('what a Windows exit code means', () => {
     expect(windowsCodesIn(out.join('\n'))).toEqual([describeExit(0xc0000142), describeExit(0xc0000005)])
     expect(windowsCodesIn('')).toEqual([])
     expect(windowsCodesIn(undefined)).toEqual([])
+  })
+
+  // A real child, not a number (the failfast suite's check until HI-2663): a child that has started ends with the
+  // status a process that can't initialise ends with, so nothing unsigned runs and no dialog can show; its parent sees
+  // that code as it ends, and it reads as the startup failure.
+  it.runIf(process.platform === 'win32')("a child ending with STATUS_DLL_INIT_FAILED: its parent sees the code, and it reads as a startup failure", () => {
+    const r = spawnSync(process.execPath, ['-e', 'process.exit(-1073741502)'], { stdio: 'ignore', windowsHide: true, timeout: 30000, env: childEnv() })
+    expect(r.error).toBeUndefined()
+    expect(r.status).toBe(0xc0000142)
+    expect(describeExit(r.status)).toMatch(/^0xc0000142: a DLL failed to initialise/)
   })
 })
 

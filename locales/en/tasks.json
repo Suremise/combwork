@@ -311,6 +311,34 @@
     "defaultMessage": "Cards stay in your project ({project}).",
     "description": "An error: an agent tried to move a card to another project, or to the whole workspace; its cards stay in its own project ({project}, its folder name)."
   },
+  "tasks.error.targetCheckedOut": {
+    "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}",
+    "description": "HI-2556: an error changing a card’s Merges into: its old branch (which has no work of its own and would be removed so its next start begins fresh) is still checked out in a folder. {card} is the card’s key (HI-12), {folder} a folder’s path. unknown yes: git couldn’t say. Keep the select keys."
+  },
+  "tasks.error.targetHasWork": {
+    "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}",
+    "description": "HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys."
+  },
+  "tasks.error.targetLane": {
+    "defaultMessage": "{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.",
+    "description": "HI-2556: an error setting a card’s Merges into to another branch than its lane’s. {card} is the card’s key (HI-12), {builder} the lane’s builder agent, {target} the lane’s branch."
+  },
+  "tasks.error.targetMissing": {
+    "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}",
+    "description": "HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys."
+  },
+  "tasks.error.targetMoved": {
+    "defaultMessage": "{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.",
+    "description": "HI-2556: an error changing a card’s Merges into: its old branch, found with no work of its own, moved (a commit arrived) before Combwork could remove it, so nothing was changed. {card} is the card’s key (HI-12)."
+  },
+  "tasks.error.targetNotAgents": {
+    "defaultMessage": "Only the user or the Assistant sets which branch a card merges into.",
+    "description": "HI-2556: an error, an agent tried to set a card’s Merges into (the branch its work merges into); only the user or the Combwork Assistant can."
+  },
+  "tasks.error.targetNotListed": {
+    "defaultMessage": "{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}",
+    "description": "HI-2556: an error setting a card’s or lane’s Merges into to a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys."
+  },
   "tasks.error.tooLong": {
     "defaultMessage": "{what, select, title {The title is too long (at most {max, number} characters).} description {The description is too long (at most {max, number} characters).} comment {The comment is too long (at most {max, number} characters).} decision {The decision is too long (at most {max, number} characters).} other {The blocked reason is too long (at most {max, number} characters).}}",
     "description": "An error: a card's field is longer than it may be ({what}, select: its title, description, comment, decision or blocked reason; translate each sentence); {max} is the most characters it takes."
@@ -642,6 +670,10 @@
   "tasks.history.takenFromOfWorkspace": {
     "defaultMessage": "Taken from {agent} of the workspace",
     "description": "A line in a card's history: the card was moved to a project, so it no longer belongs to {agent} (an agent's name) of the workspace."
+  },
+  "tasks.history.target": {
+    "defaultMessage": "{own, select, yes {Merges into {target}} other {Merges into the project’s branch}}",
+    "description": "A line in a card's history (HI-2556): the branch its work merges into (its Merges into) was set: own yes, to {target} (a branch); else back to the project's Work merges into. Keep the select keys."
   },
   "tasks.history.toProject": {
     "defaultMessage": "Moved to {project}",

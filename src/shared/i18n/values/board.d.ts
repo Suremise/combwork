@@ -488,6 +488,8 @@ interface CombworkMessageValues {
   'board.laneStart.started': { pair: string | number }
   'board.laneStart.startedText': { n: number }
   'board.laneStart.starting': undefined
+  'board.laneStart.target': undefined
+  'board.laneStart.targetDefault': { branch: string | number }
   'board.laneStart.title': undefined
   'board.laneStart.up': { card: string | number }
   'board.laneStart.waitAndStart': undefined
@@ -543,6 +545,8 @@ interface CombworkMessageValues {
   'board.lanes.stalled': undefined
   'board.lanes.start': undefined
   'board.lanes.state': { state: string }
+  'board.lanes.target': { branch: string | number }
+  'board.lanes.targetTip': { branch: string | number }
   'board.lanes.teamPause': undefined
   'board.lanes.title': undefined
   'board.lanes.took': { time: string | number }
@@ -892,6 +896,11 @@ interface CombworkMessageValues {
   'board.strip.count': { state: string; n: number }
   'board.strip.oneRun': { state: string }
   'board.strip.runs': { n: number; states: string | number }
+  'board.target.failed': undefined
+  'board.target.field': undefined
+  'board.target.mark': { branch: string | number }
+  'board.target.markTip': { branch: string | number }
+  'board.target.own': { branch: string | number }
   'board.team.cw': undefined
   'board.team.endDetail': undefined
   'board.team.endFailed': { label: string | number }
