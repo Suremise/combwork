@@ -250,7 +250,7 @@ describe('a module the graph resolves, or loads it cannot know (HR3, round 1)', 
     expect(narrow(base, { ...base, 'src/main/data/a.json': '{"a":1}' }).keep).toContain('tests/globbed.test.ts')
   })
   it("a file it loads that can't be read keeps the test", () => {
-    const head = { ...base, 'src/main/lib.ts': LIB_FA }
+    const head: Files = { ...base, 'src/main/lib.ts': LIB_FA }
     const graph = importGraph([...Object.keys(head), 'src/main/useB.ts'], (f: string) => (f === 'src/main/useB.ts' ? null : head[f] ?? null))
     expect(graph.unknownOf('src/main/useB.ts')).toMatch(/couldn't be read/)
     const r = narrowRelated({ related: ['tests/otherComputed.test.ts'], changes: { 'src/main/lib.ts': change('src/main/lib.ts', base, head) }, graph, read: (f: string) => head[f] ?? null }) as Narrowed
