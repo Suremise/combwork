@@ -109,7 +109,13 @@ export function importGraph(files, read, prefetch) {
     if (closures.has(start)) return closures.get(start)
     const seen = new Set([start])
     const queue = [start]
-    while (queue.length) for (const g of edges(queue.shift())) if (!seen.has(g)) seen.add(g), queue.push(g)
+    while (queue.length) {
+      for (const g of edges(queue.shift())) {
+        if (seen.has(g)) continue
+        seen.add(g)
+        queue.push(g)
+      }
+    }
     closures.set(start, seen)
     return seen
   }
@@ -154,7 +160,7 @@ export function narrowChange({ file, base, head, lines }) {
       if (imp && isTypeImport(imp)) continue
       return every(`line ${line} (${revs[i].name}) is in no function, method or entry`)
     }
-    if (unit.member && /Property$/.test(unit.node.type)) return every(`line ${line} (${revs[i].name}) is ${unit.id}, a field, set as an instance is made`)
+    if (unit.member && unit.node.type.endsWith('Property')) return every(`line ${line} (${revs[i].name}) is ${unit.id}, a field, set as an instance is made`)
     for (const u of s.units) if (u.startLine <= line && line <= u.endLine) ids.add(u.id)
   }
   if (!ids.size) return { needles: [], why: `${file}: only comments or type-only imports changed` }
@@ -180,18 +186,23 @@ export function narrowChange({ file, base, head, lines }) {
     return (off) => offs.has(off) || ranges.some(([a, b]) => off >= a && off < b)
   })
   const queue = [...ids]
+  const add = (id) => {
+    if (ids.has(id)) return
+    ids.add(id)
+    queue.push(id)
+  }
   while (queue.length) {
     const id = queue.shift()
     for (const s of sides) {
       for (const unit of s.units.filter((u) => u.id === id)) {
         const cls = classOf(unit)
-        if (cls && !ids.has(cls)) ids.add(cls), queue.push(cls)
+        if (cls) add(cls)
         if (!unit.needle) return every(`${unit.id} has no name to search`)
         for (const off of namesOf(s, unit)) {
           if (s.imports.some((st) => off >= st.start && off < st.end) || declared[sides.indexOf(s)](off)) continue
           const at = s.unitAt(s.lineOf(off))
           if (!at) return every(`its module code names ${unit.name} (line ${s.lineOf(off)}, ${revs[sides.indexOf(s)].name}), which runs as it loads`)
-          if (!ids.has(at.id)) ids.add(at.id), queue.push(at.id)
+          add(at.id)
         }
       }
     }
