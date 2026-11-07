@@ -239,6 +239,8 @@
   "workflow.refused.done.contained.next": "Faça o merge da versão {revision} no branch {target} e informe o merge de novo.",
   "workflow.refused.evidence.changed.message": "O que o Combwork leu para o cartão {card} mudou enquanto ele decidia.",
   "workflow.refused.evidence.changed.next": "Tente de novo: o Combwork lê tudo outra vez.",
+  "workflow.refused.forward.notAgents.message": "{card} atualiza um branch com outro: só o usuário ou o Assistente age nele.",
+  "workflow.refused.forward.notAgents.next": "Deixe isso para o usuário ou o Assistente.",
   "workflow.refused.integrate.approved.message": "O cartão {card} na versão {revision} não está aprovado: {why}",
   "workflow.refused.integrate.approved.next": "Envie-o para revisão.",
   "workflow.refused.integrate.checksPassed.change": "Esta regra é definida em Controle de versão → As verificações passam no resultado mesclado.",

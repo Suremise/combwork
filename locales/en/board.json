@@ -2655,6 +2655,18 @@
     "defaultMessage": "waiting",
     "description": "A run's state on its bar (accessible value) and in a list of runs (build (waiting)), lower case: it waits (for a test slot, say)."
   },
+  "board.queue.behind": {
+    "defaultMessage": "{n, plural, one {{to} is # commit behind {from}} other {{to} is # commits behind {from}}}",
+    "description": "HI-2679: on a merge queue’s card: its branch {to} lacks {n} commits of another of the project’s branches {from}, counted along {from}’s history (each merged card once). Branch names."
+  },
+  "board.queue.behindTip": {
+    "defaultMessage": "Counted along {from}’s history: a card merged with a merge commit or squashed counts once; a rebased card counts each of its commits.",
+    "description": "HI-2679: tooltip of a merge queue card’s “N commits behind” line: what is counted. {from} is a branch name."
+  },
+  "board.queue.behindUnknown": {
+    "defaultMessage": "Can’t tell how far {to} is behind {from}: a branch can’t be read",
+    "description": "HI-2679: on a merge queue’s card: how far its branch {to} is behind {from} couldn’t be read (a branch missing or git couldn’t say)."
+  },
   "board.queue.empty": {
     "defaultMessage": "Nothing queued.",
     "description": "A merge queue's card in the Progress panel when no card is waiting or being merged."
@@ -2662,6 +2674,46 @@
   "board.queue.filesMore": {
     "defaultMessage": "{n, plural, one {# more} other {# more}}",
     "description": "The last item of a list of the files a merge conflict named, when there are more than shown: how many more ({n}). The list joins it to the first few as your language joins a list (HI-1585: no \"and\" written around a list)."
+  },
+  "board.queue.forward": {
+    "defaultMessage": "Bring Up to Date…",
+    "description": "HI-2679: a button on a merge queue’s card: merges another of the project’s branches into this one through its queue (asks which first)."
+  },
+  "board.queue.forwardAlready": {
+    "defaultMessage": "{to} is being brought up to date with {from} already",
+    "description": "HI-2679: a notification: a forward merge for this pair is queued or waiting already; nothing new was queued."
+  },
+  "board.queue.forwardAskConfirm": {
+    "defaultMessage": "Queue It",
+    "description": "HI-2679: the confirm button of the question before a forward merge."
+  },
+  "board.queue.forwardAskMessage": {
+    "defaultMessage": "{from} as it is now is merged into {to} through {to}’s merge queue, with its merge checks, as a merge commit. {from} itself doesn’t change. If it conflicts or a check fails, its card comes back for you to Retry merge or Remove.",
+    "description": "HI-2679: the question before a forward merge: what it does. Retry merge and Remove are the card’s commands: as translated there."
+  },
+  "board.queue.forwardAskTitle": {
+    "defaultMessage": "Bring {to} up to date with {from}?",
+    "description": "HI-2679: the title of the question before a forward merge. Branch names."
+  },
+  "board.queue.forwardCancel": {
+    "defaultMessage": "Cancel",
+    "description": "HI-2679: the choice that cancels the forward merge."
+  },
+  "board.queue.forwardChooseMessage": {
+    "defaultMessage": "The branch is merged into {to} as it is now, through {to}’s merge queue, with its merge checks. It doesn’t change itself.",
+    "description": "HI-2679: the message of the choice of branch for a forward merge into {to}."
+  },
+  "board.queue.forwardChooseTitle": {
+    "defaultMessage": "Bring {to} up to date with…",
+    "description": "HI-2679: the title of the choice of branch for a forward merge into {to}."
+  },
+  "board.queue.forwardFailed": {
+    "defaultMessage": "Couldn’t bring the branch up to date",
+    "description": "HI-2679: an error’s title: the forward merge couldn’t be queued. Its text says why."
+  },
+  "board.queue.forwardUpToDate": {
+    "defaultMessage": "{to} already has everything of {from}",
+    "description": "HI-2679: a notification: nothing to bring in, so nothing was queued."
   },
   "board.queue.inVersionControl": {
     "defaultMessage": "Queue in Version Control",

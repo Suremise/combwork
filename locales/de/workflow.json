@@ -239,6 +239,8 @@
   "workflow.refused.done.contained.next": "Merge {revision} in {target} und melde den Merge dann erneut.",
   "workflow.refused.evidence.changed.message": "Was Combwork für {card} gelesen hat, hat sich während der Entscheidung geändert.",
   "workflow.refused.evidence.changed.next": "Versuch es noch einmal: Combwork liest es neu.",
+  "workflow.refused.forward.notAgents.message": "{card} bringt einen Branch auf den Stand eines anderen: Nur der Benutzer oder der Assistent bearbeitet sie.",
+  "workflow.refused.forward.notAgents.next": "Überlass das dem Benutzer oder dem Assistenten.",
   "workflow.refused.integrate.approved.message": "{card} (Revision {revision}) ist nicht genehmigt: {why}",
   "workflow.refused.integrate.approved.next": "Reiche die Karte zum Review ein.",
   "workflow.refused.integrate.checksPassed.change": "Diese Regel wird hier festgelegt: Versionsverwaltung → Checks bestehen auf dem gemergten Ergebnis.",

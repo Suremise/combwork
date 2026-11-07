@@ -479,6 +479,14 @@
     "defaultMessage": "Clean up merged branches",
     "description": "A tip's title."
   },
+  "tips.bringUpToDate.text": {
+    "defaultMessage": "A branch’s merge queue card says when it is behind another of the project’s branches. Bring Up to Date… merges that branch into it through its queue, with its merge checks; the other branch doesn’t change.",
+    "description": "A tip (HI-2679). Bring Up to Date… is a button on a merge queue's card: keep it as Combwork shows it."
+  },
+  "tips.bringUpToDate.title": {
+    "defaultMessage": "Bring the next release up to date",
+    "description": "A tip's title (HI-2679): merging one of a project's branches into another through the merge queue."
+  },
   "tips.cardAttachments.text": {
     "defaultMessage": "Paste or drop files into a card's description or comment: they are kept with the card when you save or post, shown in it, and listed for the agent that starts it. The pin on a pane's attachment chip copies a file to the agent's card.",
     "description": "A tip (HI-1700). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

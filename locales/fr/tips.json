@@ -119,6 +119,8 @@
   "tips.branchCards.title": "Vois à quelle carte une branche correspond",
   "tips.branchCleanup.text": "Gestion de versions → Branches et dépôts distants regroupe les branches en Utilisées, Fusionnées et Non fusionnées. Nettoyer les branches fusionnées… supprime les fusionnées que rien n’utilise, et propose à part celles de tes dépôts distants, jamais cochées d’office.",
   "tips.branchCleanup.title": "Nettoyer les branches fusionnées",
+  "tips.bringUpToDate.text": "La carte de file de fusion d’une branche indique quand elle est en retard sur une autre branche du projet. Mettre à jour… y fusionne cette autre branche par sa file, avec ses vérifications de fusion ; l’autre branche ne change pas.",
+  "tips.bringUpToDate.title": "Mettre à jour la prochaine version",
   "tips.cardAttachments.text": "Colle ou dépose des fichiers dans la description ou un commentaire d’une carte : ils sont gardés avec la carte quand tu enregistres ou publies, affichés dedans et listés pour l’agent qui la démarre. L’épingle d’une puce de pièce jointe d’un volet copie un fichier sur la carte de l’agent.",
   "tips.cardAttachments.title": "Garder une capture avec sa carte",
   "tips.cardAttachmentsCleanup.text": "Les fichiers gardés avec une carte vont dans la Corbeille 30 jours après son archivage. Choisis 3, 7 ou 90 jours, ou Jamais, dans Paramètres du projet → Stockage, où Nettoyer maintenant… retire tout de suite ce qui est dû. Les cartes ouvertes et celles en Terminé gardent les leurs.",

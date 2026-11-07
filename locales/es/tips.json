@@ -119,6 +119,8 @@
   "tips.branchCards.title": "Mira para qué tarjeta es una rama",
   "tips.branchCleanup.text": "Control de versiones → Ramas y remotos agrupa las ramas en En uso, Fusionadas y Sin fusionar. Limpiar ramas fusionadas… elimina las fusionadas que nada usa, y ofrece aparte las fusionadas de tus remotos, nunca marcadas de antemano.",
   "tips.branchCleanup.title": "Limpiar ramas fusionadas",
+  "tips.bringUpToDate.text": "La tarjeta de la cola de fusión de una rama indica cuándo va por detrás de otra rama del proyecto. Poner al día… fusiona esa otra rama en ella mediante su cola, con sus comprobaciones de fusión; la otra rama no cambia.",
+  "tips.bringUpToDate.title": "Poner al día la próxima versión",
   "tips.cardAttachments.text": "Pega o suelta archivos en la descripción o un comentario de una tarjeta: se conservan con la tarjeta al guardar o publicar, se muestran en ella y se listan para el agente que la inicia. El pin de un chip de adjunto de un panel copia un archivo a la tarjeta del agente.",
   "tips.cardAttachments.title": "Conserva una captura con su tarjeta",
   "tips.cardAttachmentsCleanup.text": "Los archivos guardados con una tarjeta van a la Papelera de reciclaje 30 días después de archivarla. Elige 3, 7 o 90 días, o Nunca, en Configuración del proyecto → Almacenamiento, donde Limpiar ahora… quita al momento lo que ya toca. Las tarjetas abiertas y las de Hecho conservan los suyos.",

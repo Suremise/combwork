@@ -735,6 +735,7 @@
   "assistant.undo.why.projectOpened": "它打开的项目保持打开：如不需要，请关闭。",
   "assistant.undo.why.prompt": "已发送的提示词无法收回。",
   "assistant.undo.why.putBack": "它的理由保留为评论。",
+  "assistant.undo.why.queueForwarded": "它请求的更新合并不会被撤回：如果不应合并，请将其移出合并队列。",
   "assistant.undo.why.queuePaused": "已暂停的合并队列保持暂停：如需运行，请恢复它。",
   "assistant.undo.why.queueResumed": "已恢复的合并队列不会再次暂停：如不应运行，请暂停它。",
   "assistant.undo.why.removedFromQueue": "移出合并队列的记录保留在卡片的工作记录中：只有“重试合并”或新的批准才会让它重新进入队列。",

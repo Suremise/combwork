@@ -735,6 +735,7 @@
   "assistant.undo.why.projectOpened": "Un proyecto que abrió sigue abierto: ciérralo si no lo quieres.",
   "assistant.undo.why.prompt": "Un prompt enviado no se puede retirar.",
   "assistant.undo.why.putBack": "Su motivo se queda como comentario.",
+  "assistant.undo.why.queueForwarded": "Una fusión de actualización que pidió no se deshace: quítala de la cola de fusión si no debe fusionarse.",
   "assistant.undo.why.queuePaused": "Una cola de fusión pausada sigue pausada: reanúdala si debe funcionar.",
   "assistant.undo.why.queueResumed": "Una cola de fusión reanudada no se vuelve a pausar: páusala si no debe funcionar.",
   "assistant.undo.why.removedFromQueue": "Haberla quitado de la cola de fusión se queda en el trabajo de la tarjeta: solo vuelve a la cola con “Reintentar la fusión” o una nueva aprobación.",

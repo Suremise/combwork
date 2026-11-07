@@ -2943,6 +2943,10 @@
     "defaultMessage": "Its reason stays as a comment.",
     "description": "What of the Assistant putting a card back stays when it is undone: the reason it gave."
   },
+  "assistant.undo.why.queueForwarded": {
+    "defaultMessage": "A forward merge it asked for isn't taken back: remove it from the merge queue if it shouldn't merge.",
+    "description": "Why a change of the Assistant's can't be undone (HI-2679): it asked for a forward merge, bringing one of a project's branches up to date with another through the merge queue. Remove from queue: the card's command, as translated there."
+  },
   "assistant.undo.why.queuePaused": {
     "defaultMessage": "A merge queue it paused stays paused: resume it if it should run.",
     "description": "Why a change of the Assistant's can't be undone: it paused a project's merge queue."

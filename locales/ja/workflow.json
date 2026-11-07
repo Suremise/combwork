@@ -239,6 +239,8 @@
   "workflow.refused.done.contained.next": "{revision}を{target}にマージしてから、もう一度マージを報告してください。",
   "workflow.refused.evidence.changed.message": "Combworkが判断している間に、{card}について読み取った内容が変わりました。",
   "workflow.refused.evidence.changed.next": "もう一度試してください。Combworkが改めて読み取ります。",
+  "workflow.refused.forward.notAgents.message": "{card}はブランチを別のブランチで最新にするカードです。操作できるのはユーザーかアシスタントだけです。",
+  "workflow.refused.forward.notAgents.next": "ユーザーかアシスタントに任せてください。",
   "workflow.refused.integrate.approved.message": "{card}のリビジョン{revision}は承認されていません：{why}",
   "workflow.refused.integrate.approved.next": "レビューに提出してください。",
   "workflow.refused.integrate.checksPassed.change": "このルールは「バージョン管理」→「マージ結果でチェックに合格する」で設定します。",
