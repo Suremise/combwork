@@ -12,6 +12,7 @@ import './commitLoop'
 import { startWindowHealth } from './windowHealth'
 import { initTeamPause } from './teamPause'
 import { upgradeActivityViews } from './activityView'
+import { readToolsOffWith } from '@shared/workflow/roles'
 
 // The same page is the developer console's window when opened with #console (#637).
 const isConsole = location.hash === '#console'
@@ -19,6 +20,8 @@ const isConsole = location.hash === '#console'
 // The language first, so the first render is in it (#767).
 await initLanguage()
 initTeamPause()
+// An agent whose connection launches without Combwork's tools is Independent (HI-2670): main says so on its AgentInfo.
+readToolsOffWith((a) => (a as { toolsOff?: boolean }).toolsOff === true)
 // The Activity tabs' views kept before 1.1, under their new keys before any is read (HI-2610).
 upgradeActivityViews()
 

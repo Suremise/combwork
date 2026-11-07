@@ -142,9 +142,22 @@
       "users": "plain"
     }
   },
+  "main.connections.launch.agentChanged": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.connections.launch.busy": {
+    "placeholders": {}
+  },
   "main.connections.launch.changedAgain": {
     "placeholders": {
       "agent": "plain"
+    }
+  },
+  "main.connections.launch.changedMeanwhile": {
+    "placeholders": {
+      "name": "plain"
     }
   },
   "main.connections.launch.changing": {
@@ -153,9 +166,21 @@
       "agent": "plain"
     }
   },
+  "main.connections.launch.confirm": {
+    "placeholders": {
+      "agents": "plain",
+      "fingerprint": "plain"
+    }
+  },
   "main.connections.launch.deleted": {
     "placeholders": {
       "agent": "plain"
+    }
+  },
+  "main.connections.launch.impactChanged": {
+    "placeholders": {
+      "agents": "plain",
+      "fingerprint": "plain"
     }
   },
   "main.connections.launch.noKey": {
@@ -191,10 +216,36 @@
       "cli": "plain"
     }
   },
+  "main.connections.launch.projectMissing": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "main.connections.launch.projectUnreadable": {
+    "placeholders": {
+      "project": "plain",
+      "error": "plain"
+    }
+  },
+  "main.connections.launch.projectUnusable": {
+    "placeholders": {
+      "project": "plain"
+    }
+  },
+  "main.connections.launch.projectsUnread": {
+    "placeholders": {
+      "workspace": "plain"
+    }
+  },
   "main.connections.launch.signedOut": {
     "placeholders": {
       "name": "plain",
       "agent": "plain"
+    }
+  },
+  "main.connections.launch.unreadable": {
+    "placeholders": {
+      "error": "plain"
     }
   },
   "main.connections.nameTaken": {

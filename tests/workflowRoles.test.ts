@@ -68,9 +68,9 @@ describe('agentWorkflowRole (#1430)', () => {
     expect(cleanWorkflowRole('either')).toBe('either')
     expect(cleanWorkflowRole('generalist')).toBe('generalist')
     expect(agentWorkflowRole({ name: 'HR1', workflowRole: 'generalist' })).toBe('generalist')
-    expect(WORKFLOW_ROLES).toEqual(['builder', 'reviewer', 'either', 'generalist'])
-    expect(() => cleanWorkflowRole('Reviewer')).toThrow(/builder, reviewer, either or generalist/)
-    expect(() => cleanWorkflowRole('')).toThrow(/builder, reviewer, either or generalist/)
+    expect(WORKFLOW_ROLES).toEqual(['builder', 'reviewer', 'either', 'generalist', 'independent'])
+    expect(() => cleanWorkflowRole('Reviewer')).toThrow(/builder, reviewer, either, generalist or independent/)
+    expect(() => cleanWorkflowRole('')).toThrow(/builder, reviewer, either, generalist or independent/)
   })
 
   it('a generalist is never a builder of a pair by name, nor its reviewer (HI-686)', () => {

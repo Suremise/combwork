@@ -133,7 +133,7 @@
     "note": "What a watch waits for, when it has no label."
   },
   "api.agent.workflowRoleArg": {
-    "text": "workflowRole is \"builder\", \"reviewer\", \"either\" or \"generalist\"."
+    "text": "workflowRole is \"builder\", \"reviewer\", \"either\", \"generalist\" or \"independent\"."
   },
   "api.agentMcp.notAServer": {
     "text": "\"{name}\" isn't an MCP server's name{reserved, select, yes { (the built-in {server} server is always given)} other {}}.",
@@ -492,6 +492,9 @@
   "api.connection.controlOff": {
     "text": "The user's settings don't let you change connections (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in Settings → Accounts & Connections, or that turning Change settings on lets you."
   },
+  "api.connection.launchArg": {
+    "text": "launch is an object: guidance, tools and typing (false turns one off) and overrides (its CLI overrides by key, each true or false), or preset \"terminal\" for all off; an empty object turns everything on again."
+  },
   "api.connection.nameAccount": {
     "text": "Name the account it goes on (account: its id or name, from cw_connection list). Adding an account is the user's, in Settings → Accounts & Connections."
   },
@@ -517,7 +520,7 @@
     "text": "No connection named \"{name}\" is usable in this workspace, and none has that id."
   },
   "api.connection.nothingToChange": {
-    "text": "Nothing to change: give name, model, effort, mode, context200k, extraArgs or tag."
+    "text": "Nothing to change: give name, model, effort, mode, context200k, extraArgs, tag or launch."
   },
   "api.connection.oldFields": {
     "text": "An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} cw_connection lists every one, and makes one when the user agrees."
@@ -655,6 +658,9 @@
   "api.done.laneStarted": {
     "text": "Lane {lane} {did} in {project}: {builder} / {hasReviewer, select, yes {{reviewer}} other {no reviewer}}, {cards}{putBack, select, yes { ({note})} other {}}",
     "note": "did: started or changed. note: the card a reorder applied now put back."
+  },
+  "api.done.launchedConnection": {
+    "text": "Changed the launch settings of {connection}: {how} (agents running on it take them when restarted)"
   },
   "api.done.messaged": {
     "text": "{typed, select, yes {Gave} other {Left}} {agent} in {project} a message ({id}){tied, select, yes { for {card} round {round}} other {}}{typed, select, yes {} other { (queued)}}"

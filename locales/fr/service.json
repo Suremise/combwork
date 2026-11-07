@@ -7,6 +7,7 @@
   "service.advanced.notJson": "advanced.json n’est pas du JSON valide ({error}).",
   "service.advanced.notObject": "advanced.json devrait contenir un objet : {example}.",
   "service.advanced.notValues": "Dans advanced.json, « values » devrait être un objet paramètre → valeur.",
+  "service.advanced.onConnection": "« {id} » se règle désormais sur chaque connexion : Paramètres → Comptes et connexions, le menu ⋯ d’une connexion, Paramètres de lancement.",
   "service.advanced.unknown": "Aucun paramètre avancé « {id} ».",
   "service.answerRelay.title": "{card} : personne d’autre n’a ta réponse",
   "service.assistantAsk.title": "{card} : l’Assistant n’a pas reçu la demande d’un agent",

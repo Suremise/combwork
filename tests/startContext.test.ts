@@ -95,6 +95,35 @@ describe('the start context in the hook replies (#1065)', () => {
     await disposeWorkspaceService(w)
   })
 
+  it('HI-2670 (HR1 on s44): made Independent while its view is being made, the session gets none of it', async () => {
+    const saved = sessions.startContext
+    let release!: () => void
+    const made = new Promise<void>((r) => (release = r))
+    let asked!: () => void
+    const askedP = new Promise<void>((r) => (asked = r))
+    const out = { why: null as 'independent' | 'plain' | null }
+    const keepsOut = vi.spyOn(sessions, 'keepsOut').mockImplementation(() => out.why)
+    sessions.startContext = async () => {
+      asked()
+      await made
+      return '[CW] view (startup)'
+    }
+    try {
+      const st = agent(codex)
+      const reply = replay(st, [codexHooks.hooks[0]])
+      await askedP
+      out.why = 'independent'
+      release()
+      expect((await reply)[0]).toBeNull()
+      // Its own role again: given, as before.
+      out.why = null
+      expect(((await replay(st, [codexHooks.hooks[0]]))[0]?.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext).toBe('[CW] view (startup)')
+    } finally {
+      keepsOut.mockRestore()
+      sessions.startContext = saved
+    }
+  })
+
   it('Codex: the view at each SessionStart, and nothing on its other hooks', async () => {
     given.length = 0
     const replies = await replay(agent(codex), codexHooks.hooks)

@@ -7,6 +7,7 @@
   "service.advanced.notJson": "advanced.json no es un JSON válido ({error}).",
   "service.advanced.notObject": "advanced.json debe contener un objeto: {example}.",
   "service.advanced.notValues": "El campo “values” de advanced.json debe ser un objeto de configuración → valor.",
+  "service.advanced.onConnection": "“{id}” se configura ahora en cada conexión: Configuración → Cuentas y conexiones, el menú ⋯ de una conexión, Configuración de inicio.",
   "service.advanced.unknown": "No existe la configuración avanzada “{id}”.",
   "service.answerRelay.title": "{card}: nadie más tiene tu respuesta",
   "service.assistantAsk.title": "{card}: el Asistente no recibió la petición de un agente",

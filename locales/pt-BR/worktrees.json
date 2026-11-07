@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Os painéis não podem ser posicionados assim neste layout.",
-  "worktrees.agent.badWorkflowRole": "Um papel no fluxo de trabalho é builder, reviewer, either ou generalist.",
+  "worktrees.agent.badWorkflowRole": "Um papel no fluxo de trabalho é builder, reviewer, either, generalist ou independent.",
   "worktrees.agent.chooseMove": "Escolha para onde mover o agente.",
   "worktrees.agent.effortRefused": "{chosen, select, yes {{model}} other {O modelo padrão da CLI}} não aceita o esforço {effort}. Escolha um dos níveis que ele aceita.",
   "worktrees.agent.enterName": "Digite um nome.",

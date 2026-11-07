@@ -1,3 +1,4 @@
+import { launchesWithoutTools } from '../shared/launchPolicy'
 import { randomBytes } from 'crypto'
 import { basename } from 'path'
 import type { Account, AgentDef, PlanLimit, ProviderId, UsageMoveRecord, UsageMoveRule } from '../shared/types'
@@ -261,6 +262,8 @@ async function fire(acc: Account, rule: UsageMoveRule, l: PlanLimit, now: number
         if (movedOffWithinPeriod(key, target.id, records(), now)) continue
         const match = matchConnection(choice.connection, target.id, allConnections())
         if (!match) continue
+        // Never onto a connection whose Combwork tools differ (HI-2670): a usage move doesn't change an agent's role.
+        if (launchesWithoutTools(match.connection) !== launchesWithoutTools(choice.connection)) continue
         const m: Pending = { ws, projectPath, agentId: a.id, name: a.name, account: acc.id, limit: l.id, firing: rec.firing, rule: { ...rule }, to: match.connection.id, by: match.by, ...(match.by === 'tag' && match.connection.tag ? { tag: match.connection.tag } : {}), saved: a.connection ?? undefined, savedProvider: a.provider || undefined, ...(ws.isAssistantHome(projectPath) && !a.provider && !a.connection ? { pin: acc.provider } : {}), count: choiceCount(projectPath, a.id) }
         keys.set(m, key)
         pending.set(key, m)

@@ -231,17 +231,37 @@
     "defaultMessage": "Still in use, so {name} was kept: {users}. Choose another connection for them first, then remove it.",
     "description": "An error removing a connection (Settings → Accounts & Connections, HI-2107): agents or the Assistant use it ({users}: their names, listed, each with its project)."
   },
+  "main.connections.launch.agentChanged": {
+    "defaultMessage": "{agent}'s role or connection was changed meanwhile: nothing was saved. Try again.",
+    "description": "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change of its role or connection was being checked, so nothing was saved. {agent} is its name."
+  },
+  "main.connections.launch.busy": {
+    "defaultMessage": "The board kept changing while Combwork worked out what this change affects. Try again.",
+    "description": "An error saving a connection's launch settings or an agent's role or connection (HI-2670): cards, lanes or agents changed every time Combwork read which of them the change would take out of the workflow, so nothing was saved."
+  },
   "main.connections.launch.changedAgain": {
     "defaultMessage": "{agent}'s connection was changed again while it was starting. Start it again.",
     "description": "Starting an agent ({agent}, its name) failed: the connection chosen for it was changed while it was starting, and again while Combwork started it once more on the new choice. A connection is how a coding agent CLI signs in or reaches its model (Settings → Accounts & Connections)."
+  },
+  "main.connections.launch.changedMeanwhile": {
+    "defaultMessage": "{name}'s launch settings were changed meanwhile: nothing was saved. Look at them again.",
+    "description": "An error saving a connection's launch settings (HI-2670): something else changed them while this change was being checked, so nothing was saved. {name} is the connection's name."
   },
   "main.connections.launch.changing": {
     "defaultMessage": "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.",
     "description": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Combwork checked who it is signed in as."
   },
+  "main.connections.launch.confirm": {
+    "defaultMessage": "This makes agents Independent while they are on lanes or hold cards: {agents}. Their lanes pause and their cards stay. Confirm it first (confirm: {fingerprint}).",
+    "description": "An error saving a connection's launch settings or an agent's connection (HI-2670), from a caller that didn't confirm (the Agent API, the Assistant): it would make agents on lanes or holding cards Independent. {agents}: each agent with its lanes and cards; {fingerprint} is a code to send back as confirm: keep it and the word confirm."
+  },
   "main.connections.launch.deleted": {
     "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.",
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog."
+  },
+  "main.connections.launch.impactChanged": {
+    "defaultMessage": "What this change takes out of the workflow has changed since you were asked: {agents}. Look at it again (confirm: {fingerprint}).",
+    "description": "An error saving a connection's launch settings or an agent's connection (HI-2670): the agents, lanes or cards it would take out of the workflow ({agents}: each agent with its lanes and cards) changed after the user confirmed, so nothing was saved. {fingerprint} is a code a script sends back to confirm: keep it and the word confirm."
   },
   "main.connections.launch.noKey": {
     "defaultMessage": "{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.",
@@ -263,9 +283,29 @@
     "defaultMessage": "The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.",
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\")."
   },
+  "main.connections.launch.projectMissing": {
+    "defaultMessage": "{project}'s project.json is missing",
+    "description": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) isn't there. {project} is the project's name. Lower case, no full stop."
+  },
+  "main.connections.launch.projectUnreadable": {
+    "defaultMessage": "{project}'s project.json can't be read ({error})",
+    "description": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) can't be read. {project} is the project's name, {error} the system's reason. Lower case, no full stop."
+  },
+  "main.connections.launch.projectUnusable": {
+    "defaultMessage": "{project}'s project.json doesn't hold a list of agents Combwork can read",
+    "description": "Why Combwork couldn't read what a change of launch settings or an agent's role affects (HI-2670), put into a longer error in place of {error}: an open project's settings file (project.json: a file name, keep it) doesn't parse, or its agents aren't in the shape Combwork writes. {project} is the project's name. Lower case, no full stop."
+  },
+  "main.connections.launch.projectsUnread": {
+    "defaultMessage": "the projects of {workspace} aren't read yet",
+    "description": "Why Combwork couldn't read what a change of a connection's launch settings affects (HI-2670), put into a longer error in place of {error}: an open workspace's projects ({workspace}: its folder) haven't been read yet. Lower case, no full stop."
+  },
   "main.connections.launch.signedOut": {
     "defaultMessage": "{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.",
     "description": "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in."
+  },
+  "main.connections.launch.unreadable": {
+    "defaultMessage": "Combwork couldn't read which agents, lanes and cards this change affects ({error}), so nothing was saved. Try again.",
+    "description": "An error saving a connection's launch settings or an agent's role or connection (HI-2670): reading the board, the lanes or a project's agents failed, so Combwork can't tell whether the change takes agents out of the workflow, and saves nothing. {error} is why, as the system said it."
   },
   "main.connections.moveFailed": {
     "defaultMessage": "Combwork couldn't move {project}'s model settings to its agents",

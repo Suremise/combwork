@@ -286,6 +286,8 @@
   "tips.lanesLegend.title": "What a lane’s colours mean",
   "tips.language.text": "Combwork follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
   "tips.language.title": "Combwork in your language",
+  "tips.launchSettings.text": "A connection's ⋯ → Launch Settings… → Launch as from a terminal starts its agents with none of Combwork's guidance, tools or typing, as if you had opened the CLI in that folder yourself. They are Independent: in the team, but out of the workflow.",
+  "tips.launchSettings.title": "An agent as if from a terminal",
   "tips.leftRunning.text": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
   "tips.leftRunning.title": "Spot what a command left running",
   "tips.leftoverBranches.text": "Version Control → Changes lists leftover branches: a superseded or archived card’s, an agent’s from before slots. Compare one with your target first, then Delete… it; one with commits of its own lists them before it goes.",

@@ -7,6 +7,7 @@
   "service.advanced.notJson": "advanced.jsonは有効なJSONではありません（{error}）。",
   "service.advanced.notObject": "advanced.jsonにはオブジェクトが必要です：{example}。",
   "service.advanced.notValues": "advanced.jsonの「values」は、設定と値の組のオブジェクトである必要があります。",
+  "service.advanced.onConnection": "「{id}」は接続ごとに設定するようになりました：「設定」→「アカウントと接続」で接続の⋯メニューの「起動設定」。",
   "service.advanced.unknown": "詳細設定「{id}」はありません。",
   "service.answerRelay.title": "{card}：回答はほかの誰にも届いていません",
   "service.assistantAsk.title": "{card}：エージェントの依頼がアシスタントに届いていません",
