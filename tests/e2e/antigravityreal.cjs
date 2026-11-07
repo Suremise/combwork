@@ -130,10 +130,10 @@ function changes(before, after) {
   const screen = lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '')
   check('…asking no trust question and showing no first-run screen', !/trust this folder|terms of service|colou?r scheme/i.test(screen), screen.slice(-300))
 
-  // --- One prompt (Darren's (b)): a turn from agy's hooks, the reply in the transcript, its usage. Typed again only when
-  // agy didn't take it (no turn began), so it is never sent twice.
+  // --- One prompt (Darren's (b)): a turn from agy's hooks, the reply in the transcript, its usage. Typed once only, whatever
+  // Combwork shows (HI-2548's first run: its hooks failing, the turn went unseen and a second attempt sent it again).
   const prompt = 'Reply with just: OK'
-  const taken = await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live(gem.id))?.status === 'working' || ((await inv('transcript:read', alpha, conv).catch(() => null))?.items ?? []).some((i) => i.kind === 'user'), tries: 2, waitMs: HUNG_MS })
+  const taken = await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live(gem.id))?.status === 'working' || ((await inv('transcript:read', alpha, conv).catch(() => null))?.items ?? []).some((i) => i.kind === 'user'), tries: 1, waitMs: HUNG_MS })
   check('the prompt starts a turn (agy sends no prompt hook: its invocation zero and its transcript)', taken > 0, (await live(gem.id))?.status)
   const items = await until(async () => {
     const t = (await inv('transcript:read', alpha, conv).catch(() => null))?.items ?? []

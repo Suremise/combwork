@@ -101,6 +101,9 @@ const write = (o) => {
 }
 log({ kind: 'session', args: argv, cwd: process.cwd(), conversation: conv, resumed: !!resumed, env: pick() })
 
+// A hook's or the status line's command as agy 1.5.0 runs it (HI-2548's probe of the real CLI recorded the command line):
+// `cmd /c "<command>"`, each " in the command escaped as \" (Go's argument escaping, which cmd doesn't undo).
+const asAgy = (command) => `/c "${command.replace(/"/g, '\\"')}"`
 // The status line, per --settings (never saved), through cmd /c as agy runs it.
 let settings = {}
 try {
@@ -115,8 +118,7 @@ function statusLine(state, extra = {}) {
   if (!cmd) return
   const model = flag('--model') || 'Gemini 3.8 Flash (Low)'
   const input = JSON.stringify({ conversation_id: conv, session_id: conv, transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: { id: model, display_name: model, effort: flag('--effort') || 'low' }, context_window: { context_window_size: 1048576 }, product: 'antigravity', ...extra })
-  // Through cmd, the command line as given (Node quotes it for cmd's /s /c, so its own quotes reach it unchanged).
-  spawnSync(cmd, [], { shell: true, input, timeout: 5000, windowsHide: true })
+  spawnSync(process.env.ComSpec || 'cmd.exe', [asAgy(cmd)], { windowsVerbatimArguments: true, input, timeout: 5000, windowsHide: true })
   log({ kind: 'status', state, ...extra })
 }
 
@@ -144,7 +146,7 @@ function fire(event, extra = {}) {
   const payload = { conversationId: conv, workspacePaths: [process.cwd().replace(/\\/g, '/')], transcriptPath: full.replace(/\\/g, '/'), artifactDirectoryPath: brain.replace(/\\/g, '/'), modelName: flag('--model') || 'auto', lastUserInput, ...extra }
   const reply = {}
   for (const h of handlers(event)) {
-    const r = spawnSync(h.command, [], { shell: true, input: JSON.stringify(payload), timeout: (h.timeout || 30) * 1000, windowsHide: true, encoding: 'utf8' })
+    const r = spawnSync(process.env.ComSpec || 'cmd.exe', [asAgy(h.command)], { windowsVerbatimArguments: true, input: JSON.stringify(payload), timeout: (h.timeout || 30) * 1000, windowsHide: true, encoding: 'utf8' })
     try {
       Object.assign(reply, JSON.parse(r.stdout || '{}'))
     } catch {}

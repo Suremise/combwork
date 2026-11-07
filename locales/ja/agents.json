@@ -16,7 +16,7 @@
   "agents.antigravity.ask": "確認する",
   "agents.antigravity.askDescription": "編集、コマンド、実行を許可されていないその他のツールの前に確認します。",
   "agents.antigravity.auto": "自動",
-  "agents.antigravity.autoDescription": "確認せずにコマンドを実行します（Antigravity自身のサンドボックス内）。Windows 11 24H2以降と2026年8月の更新プログラムが必要で、ビジネスアカウントやエンタープライズアカウントでは使えません。",
+  "agents.antigravity.autoDescription": "Antigravity独自のサンドボックス内で、確認せずにコマンドを実行します。Windows 11 24H2以降が必要で、ビジネスアカウントやエンタープライズアカウントでは使用できません。",
   "agents.antigravity.bypass": "すべての権限をスキップ",
   "agents.antigravity.bypassDescription": "すべてのツール、コマンド、ファイル変更を、場所を問わず確認せずに承認します。無人での変更が許容される場合にのみ使用してください。",
   "agents.antigravity.extensionNote": "エディター内にAntigravityのエージェントがあります。Combworkはエディターのコピーを使用しません。単体のAntigravity CLIをインストールしてください。エディターはこれまでどおり動作します。",

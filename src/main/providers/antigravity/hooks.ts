@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { open, stat } from 'original-fs/promises'
 import { advanced } from '../../advanced'
-import { hookForwardCommand, readFirstLine } from '../common'
+import { readFirstLine } from '../common'
 import type { Ask, HookEvent, LockDecision, NormalizedHook } from '../types'
 import { TRANSCRIPT_FILE, isConversationId, logsDir, trustedTranscript } from './conversations'
 import { knownStep, parentOf, parseStep, userRequestText, type AgyStep } from './transcript'
@@ -26,19 +26,39 @@ const TOOL_EVENTS = new Set<string>(['PreToolUse', 'PostToolUse'])
 /** The reply that lets a tool run under agy's own permission check (1.5.0: `allow` defers to it; `{}` denies the tool). */
 export const AGY_ALLOW = { decision: 'allow' } as const
 
+/** The launch's environment variables its hook and status-line commands read (agyHookEnv): the auth header's file, and PreToolUse's fallback reply. */
+export const AGY_HOOK_AUTH_VAR = 'CW_AGY_HOOK_AUTH'
+export const AGY_HOOK_ALLOW_VAR = 'CW_AGY_HOOK_ALLOW'
+
+/**
+ * A command agy runs (a hook's, its status line's) that posts its payload to Combwork's hook server with the launch's
+ * token. agy 1.5.0 runs it as `cmd /c "<command>"` with each `"` in it escaped as `\"` (HI-2548's probe of the real CLI:
+ * Go's argument escaping, which cmd doesn't undo), so the command holds no quote at all: what needs one (the auth file's
+ * path, which may have spaces) comes from the launch's environment (agyHookEnv), which cmd expands before it reads quotes,
+ * and the URL's `&` is escaped for cmd. Run the same way by Node's cmd (the fake agy). The token stays in its file.
+ */
+export function agyForwardCommand(url: string, seconds: number): string {
+  return `curl.exe -s -m ${seconds} -X POST -H %${AGY_HOOK_AUTH_VAR}% -H Content-Type:application/json --data-binary @- ${url.replace(/[\^&|<>()]/g, '^$&')}` // i18n-ignore: a hook command the CLI runs
+}
+
+/** What a launch's environment gives its hook and status-line commands (agyForwardCommand): the auth header's file, quoted; the fallback reply. */
+export function agyHookEnv(authFile: string): Record<string, string> {
+  return { [AGY_HOOK_AUTH_VAR]: `"@${authFile.split('\\').join('/')}"`, [AGY_HOOK_ALLOW_VAR]: JSON.stringify(AGY_ALLOW) }
+}
+
 /**
  * Combwork's named hook for the profile's hooks.json (hooks.md's format: SessionStart, Pre/PostInvocation and Stop flat,
  * the tool events under a matcher). Each forwards its payload to Combwork's hook server with the launch's token
- * (hookForwardCommand, run by agy through `cmd /c`), naming its event in the URL, as agy's payloads don't. PreToolUse's
- * answers allow when Combwork can't be reached (agy takes no answer as a denial: a closed Combwork would stop every tool).
- * `toolHooks` off: no tool events (no file locks).
+ * (agyForwardCommand), naming its event in the URL, as agy's payloads don't. PreToolUse's answers allow when Combwork
+ * can't be reached (agy takes no answer as a denial: a closed Combwork would stop every tool). `toolHooks` off: no tool
+ * events (no file locks).
  */
-export function agyHooks(hookUrl: string, authFile: string, toolHooks: boolean): Record<string, unknown> {
+export function agyHooks(hookUrl: string, toolHooks: boolean): Record<string, unknown> {
   const handler = (event: string): Record<string, unknown> => {
     const seconds = advanced.number(event === 'PreToolUse' ? 'antigravity.hooks.preToolUseTimeoutSeconds' : 'antigravity.hooks.timeoutSeconds')
-    const forward = hookForwardCommand(`${hookUrl}&event=${event}`, authFile, seconds)
+    const forward = agyForwardCommand(`${hookUrl}&event=${event}`, seconds)
     // agy's own limit a little past curl's, so curl's ends first and agy never kills it mid-reply.
-    return { type: 'command', command: event === 'PreToolUse' ? `${forward} || echo ${JSON.stringify(AGY_ALLOW)}` : forward, timeout: seconds + 2 } // i18n-ignore: a hook command the CLI runs
+    return { type: 'command', command: event === 'PreToolUse' ? `${forward} || echo %${AGY_HOOK_ALLOW_VAR}%` : forward, timeout: seconds + 2 } // i18n-ignore: a hook command the CLI runs
   }
   const hook: Record<string, unknown> = {}
   for (const event of AGY_EVENTS) {
