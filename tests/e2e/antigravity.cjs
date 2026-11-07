@@ -281,6 +281,9 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await row.click()
   const reading = page.locator('.transcript .tx-tool', { hasText: 'read_file' }).first()
   await reading.waitFor({ timeout: HUNG_MS })
+  // From the transcript's top, the fold opens with its image just below what shows (HI-2726: where the view sat decided
+  // it, the image loading only once on screen); a thumb that near loads without scrolling.
+  await page.locator('.transcript').first().evaluate((el) => { el.scrollTop = 0 })
   await reading.locator('.tx-fold-head').click()
   const thumb = reading.locator('.tx-images .thumb img')
   check('…its conversation shows the tool call and the image it read', !!(await until(async () => ((await thumb.getAttribute('src').catch(() => null)) ?? '').startsWith('data:image/png'), HUNG_MS)))
