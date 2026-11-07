@@ -156,6 +156,11 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
                   {q.key}
                 </button>
                 <span className="progress-queue-title faint">{q.title}</span>
+                {q.waitingOn?.length ? (
+                  <span className="progress-queue-waiting" data-waiting-on={q.waitingOn.join(' ')}>
+                    {tr(WAITING_ON, { cards: q.waitingOn.join(', ') })}
+                  </span>
+                ) : null}
                 <RevisionButton revision={q.revision} />
                 <button type="button" className="btn small subtle progress-queue-remove" aria-label={tr(msg({ id: 'board.queue.removeNamed', defaultMessage: 'Remove {card} from the queue', description: "Accessible name of Remove from queue on a queued card ({card}: its key) on a merge queue's card in the Progress panel." }), { card: q.key })} onClick={() => void removeFromQueue(q.card, q.key)}>
                   {tr(msg({ id: 'board.queue.remove', defaultMessage: 'Remove', description: "A button beside a queued card on a merge queue's card in the Progress panel: Remove from queue (asks first). Keep it short." }))}
@@ -337,6 +342,7 @@ const H = {
   still: msg({ id: 'board.queue.recent.stillPaused', defaultMessage: 'still paused', description: "Beside a pause in the Progress panel's Recent merges: the merge queue is paused now (the pause hasn't ended). Lower case." })
 }
 
+const WAITING_ON = msg({ id: 'board.queue.waitingOn', defaultMessage: 'Waiting for {cards}', description: "HI-2709: beside a queued card on a merge queue's card in the Progress panel: it is blocked by these cards ({cards}: their keys, joined with commas), which aren't Done yet; the queue merges the cards behind it meanwhile, and this one once they are Done. Keep it short." })
 const OPEN_NAMED = msg({ id: 'board.queue.openNamed', defaultMessage: 'Open {card}', description: "Tooltip of a queued card's key on a merge queue's card in the Progress panel: opens the card ({card}: its key)." })
 
 /**

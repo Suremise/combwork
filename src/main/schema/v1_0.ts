@@ -1024,8 +1024,24 @@ export const CARD_REVS_STEP: SchemaStep = {
   ]
 }
 
+/**
+ * HI-2709: a target's queue merges, newest first, a page at a time (reconcile's carried-code walk): an index of the
+ * `Integrated` facts by their target alone (its rowid, as every index's last key, orders a page and bounds it), so a page
+ * is a range of that target's rows, never a scan of other targets'.
+ */
+export const INTEGRATED_TARGET_STEP: SchemaStep = {
+  name: 'integrations by target',
+  ddl: ["CREATE INDEX IF NOT EXISTS card_facts_integrated_target ON card_facts (json_extract(data, '$.target')) WHERE kind = 'Integrated'"]
+}
+
+/**
+ * HI-2709: a page of a project's merges into a target (`Integrated` facts, any writer's), newest first, below a rowid:
+ * arguments target, project, below, limit. The expression and the kind are the index's own, so it is that index's range.
+ */
+export const INTEGRATED_ON_SQL = "SELECT f.rowid AS row_id, f.* FROM card_facts f JOIN cards c ON c.number = f.card WHERE f.kind = 'Integrated' AND json_extract(f.data, '$.target') = ? AND c.project = ? AND f.rowid < ? ORDER BY f.rowid DESC LIMIT ?"
+
 /** The 1.0 group's steps (P3's, then P4's, then P5's, then P7's), in the order they are registered. */
-export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP, SESSION_LEASES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP]
+export const V1_0_STEPS: SchemaStep[] = [CARDS_STEP, SESSIONS_DELIVERIES, LANES_WATCHES_METRICS, FACTS_STEP, KEYS, LANE_RECORD, ACTIONS_DELIVERED_STEP, CARD_SEARCH_STEP, ASSISTANT_CHANGES_STEP, UNDO_OUTCOMES_STEP, QUEUE_RUNNERS_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_SEEN_STEP, SLOTS_STEP, COPIES_STEP, SKILL_COPIES_STEP, SESSION_LEASES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, INTEGRATED_TARGET_STEP]
 
 /** A module's query against the 1.0 tables, the index it must use, and sample arguments for EXPLAIN. */
 export interface SchemaQuery {
@@ -1102,6 +1118,9 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'facts.nextSeq': { sql: 'SELECT max(seq) FROM card_facts WHERE card = ?', args: [1], index: 'sqlite_autoindex_card_facts_1' },
   'facts.dedupe': { sql: 'SELECT 1 FROM card_facts WHERE card = ? AND kind = ? AND dedupe = ?', args: [1, 'HeadMoved', 'prev:1'], index: 'card_facts_dedupe' },
   'facts.ofKind': { sql: 'SELECT card, seq FROM card_facts WHERE kind = ? ORDER BY rowid', args: ['IntegrationRequested'], index: 'card_facts_kind' },
+  // HI-2709: a page of a target's queue merges, newest first, below a rowid (reconcile's carried-code walk).
+  'facts.integratedOn': { sql: INTEGRATED_ON_SQL, args: ['main', 'p', 1e15, 10], index: 'card_facts_integrated_target' },
+  'links.dependents': { sql: "SELECT card FROM card_links WHERE target = ? AND kind = 'blockedBy' ORDER BY card", args: [1], index: 'card_links_target' },
   // cardWork.ts: the live cards' facts for the board's badges (#1223), an archived card's never read.
   'facts.live': { sql: 'SELECT f.* FROM cards c JOIN card_facts f ON f.card = c.number WHERE c.archived = 0 ORDER BY f.card, f.seq', args: [], index: 'sqlite_autoindex_card_facts_1' },
   'actions.pending': { sql: "SELECT * FROM card_actions WHERE state = 'pending' ORDER BY id", args: [], index: 'card_actions_pending' },

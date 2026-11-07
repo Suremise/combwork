@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "Fila de merge · {target}",
   "board.queue.transient": "{why} (temporário)",
+  "board.queue.waitingOn": "Aguardando {cards}",
   "board.readOnly.newer": "Este quadro foi salvo por uma versão mais nova do Combwork: aqui ele fica só para leitura.",
   "board.restore09.done": "O quadro 0.9 está de volta",
   "board.restore09.doneDetail": "O quadro 1.0 está guardado como {file}.",
@@ -961,6 +962,7 @@
   "board.work.badgeStale": "Desatualizada: a revisão bem-sucedida não vale mais para a versão atual",
   "board.work.base": "Base",
   "board.work.branch": "Branch",
+  "board.work.carriedIn": "O código chegou a {target} por meio de {card}: quem decide ainda é a própria revisão.",
   "board.work.carriedOver": "A revisão bem-sucedida de {from} continua valendo para {to}: a mesma alteração.",
   "board.work.check": "{name}: {result, select, passed {passou} failed {falhou} other {parou}}{counted, select, no { (não conta)} other {}}",
   "board.work.failed": "Não foi possível ler o trabalho do cartão: {error}",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} está em",
   "board.workQueue.testing": "Testando agora: {step}",
   "board.workQueue.unreadRef": "não lido",
+  "board.workQueue.waiting": "Na fila de {target}, aguardando {cards} ficar Concluído",
   "board.workflows": "Fluxos de trabalho"
 }

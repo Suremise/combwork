@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "Cola de fusión · {target}",
   "board.queue.transient": "{why} (temporal)",
+  "board.queue.waitingOn": "Esperando a {cards}",
   "board.readOnly.newer": "Este tablero lo guardó una versión más reciente de Combwork: aquí está en solo lectura.",
   "board.restore09.done": "El tablero 0.9 ha vuelto",
   "board.restore09.doneDetail": "El tablero 1.0 se guarda como {file}.",
@@ -961,6 +962,7 @@
   "board.work.badgeStale": "Caducada: su revisión superada ya no cuenta para su versión",
   "board.work.base": "Base",
   "board.work.branch": "Rama",
+  "board.work.carriedIn": "Su código llegó a {target} a través de {card}: aun así decide su propia revisión.",
   "board.work.carriedOver": "La revisión superada de {from} se mantiene para {to}: el mismo cambio.",
   "board.work.check": "{name}: {result, select, passed {superada} failed {fallida} other {detenida}}{counted, select, no { (no cuenta)} other {}}",
   "board.work.failed": "No se pudo leer el trabajo de la tarjeta: {error}",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} está en",
   "board.workQueue.testing": "Probando ahora: {step}",
   "board.workQueue.unreadRef": "no leído",
+  "board.workQueue.waiting": "En cola para {target}, esperando a que {cards} esté en Hecho",
   "board.workflows": "Flujos de trabajo"
 }

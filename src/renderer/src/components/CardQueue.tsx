@@ -32,6 +32,7 @@ const TAIL_LINES = 12
 const M = {
   heading: msg({ id: 'board.workQueue.heading', defaultMessage: 'Merge queue', description: "A sub-heading in the card dialog's Work section: where the card stands in the merge queue follows. Glossary 2.5: merge queue." }),
   queued: msg({ id: 'board.workQueue.queued', defaultMessage: 'Queued for {target}: {position, selectordinal, one {#st} two {#nd} few {#rd} other {#th}} in line', description: "The card dialog's Work section: the card waits in the merge queue for the branch {target}, at place {position} (1st: next; the card testing now counts). Glossary 2.5: merge queue." }),
+  waiting: msg({ id: 'board.workQueue.waiting', defaultMessage: 'Queued for {target}, waiting for {cards} to be Done', description: "HI-2709: the card dialog's Work section: the card is in the merge queue for the branch {target} but is blocked by {cards} (their keys, joined with commas), which aren't Done yet; the queue merges the cards behind it meanwhile, and this one once they are. Glossary 2.5: merge queue." }),
   queuedNoPlace: msg({ id: 'board.workQueue.queuedNoPlace', defaultMessage: 'Queued for {target}', description: "The card dialog's Work section: the card waits in the merge queue for the branch {target} (its place isn't known here: another Combwork runs the queue)." }),
   approved: msg({ id: 'board.workQueue.approved', defaultMessage: 'Approved revision', description: "A label in the card dialog's Work section's merge queue part: the revision that was approved and is merged follows (a short commit id). Glossary: revision." }),
   testing: msg({ id: 'board.workQueue.testing', defaultMessage: 'Testing now: {step}', description: "The card dialog's Work section: the merge queue is testing the card now, at a step ({step}: test merge, merge checks, check: unit, merging into main). Glossary 2.5: merge queue." }),
@@ -130,12 +131,19 @@ export function CardQueue({ card, view: w, projectPath, short, reveal = 0 }: { c
   const testing = open && queue?.testing?.entry === q.entry ? queue.testing : null
   const run = testing?.run ? (runs.find((r) => r.id === testing.run) ?? null) : null
   const place = open && !testing ? placeOf(queue, q.entry) : null
+  // HI-2709: blocked by cards that aren't Done, it waits in the queue for them (the queue's list says which, as it is now).
+  const waitingOn = open ? (queue?.queued.find((x) => x.entry === q.entry)?.waitingOn ?? null) : null
   return (
     <div ref={part} className="card-work-queue" data-work-queue={q?.state ?? 'stuck'}>
       <div className="card-work-sub">{tr(M.heading)}</div>
-      {q && open && q.state === 'open' && !testing && (
+      {q && open && q.state === 'open' && !testing && !waitingOn?.length && (
         <div className="card-work-queue-line">
           <Icon name="list-ordered" /> <span>{place !== null ? tr(M.queued, { target: q.target, position: place }) : tr(M.queuedNoPlace, { target: q.target })}</span>
+        </div>
+      )}
+      {q && open && q.state === 'open' && !testing && !!waitingOn?.length && (
+        <div className="card-work-queue-line" data-waiting-on={waitingOn.join(' ')}>
+          <Icon name="watch" /> <span>{tr(M.waiting, { target: q.target, cards: waitingOn.join(', ') })}</span>
         </div>
       )}
       {q && testing && (

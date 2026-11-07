@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "La décision est vide : retire-la plutôt.",
   "tasks.error.decisionGone": "Cette décision n’est plus sur la carte {card}.",
   "tasks.error.decisionsUsers": "Seul l’utilisateur modifie ou retire les décisions d’une carte.",
+  "tasks.error.dependencyTooLate": "{card} est en cours de fusion dans {target} : elle ne peut plus attendre {cards}. Ses dépendances n’ont pas changé.",
   "tasks.error.doingNobodyNew": "Une carte créée à l’étape En cours a besoin d’un agent dessus (agent). Demande à l’utilisateur ce qu’il veut : un agent dessus, un agent qui la démarre (crée-la dans À faire, puis cw_start_task), ou personne dessus (crée-la dans À faire, puis déplace-la avec override et sa raison).",
   "tasks.error.emptyComment": "Le commentaire est vide.",
   "tasks.error.emptyDecision": "La décision est vide.",

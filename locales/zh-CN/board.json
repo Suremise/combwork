@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "合并队列 · {target}",
   "board.queue.transient": "{why}（临时）",
+  "board.queue.waitingOn": "等待 {cards}",
   "board.readOnly.newer": "此看板由更新版本的 Combwork 保存：它在这里是只读的。",
   "board.restore09.done": "0.9 看板已恢复",
   "board.restore09.doneDetail": "1.0 看板已保留为 {file}。",
@@ -961,6 +962,7 @@
   "board.work.badgeStale": "已失效：其通过结论对当前修订版本不再有效",
   "board.work.base": "基准",
   "board.work.branch": "分支",
+  "board.work.carriedIn": "其代码已通过 {card} 进入 {target}：仍由它自己的评审决定。",
   "board.work.carriedOver": "{from} 的通过结论对 {to} 继续有效：属于相同的变更。",
   "board.work.check": "{name}：{result, select, passed {通过} failed {失败} other {已停止}}{counted, select, no {（不计入）} other {}}",
   "board.work.failed": "无法读取卡片的工作记录：{error}",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} 位于",
   "board.workQueue.testing": "正在测试：{step}",
   "board.workQueue.unreadRef": "未读取",
+  "board.workQueue.waiting": "在 {target} 的队列中，等待 {cards} 进入已完成",
   "board.workflows": "工作流程"
 }

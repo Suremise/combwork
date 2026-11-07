@@ -113,6 +113,13 @@
   "tasks.error.decisionsUsers": {
     "placeholders": {}
   },
+  "tasks.error.dependencyTooLate": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "cards": "plain"
+    }
+  },
   "tasks.error.doingNobodyNew": {
     "placeholders": {}
   },

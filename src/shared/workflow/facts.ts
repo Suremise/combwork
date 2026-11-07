@@ -339,6 +339,12 @@ export interface FactData {
   Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
+  /**
+   * HI-2709: a card in Review whose submitted change reached its target through another card's queue merge (`by`, that
+   * card's key; `entry`, the merge's queue entry): a mark, not a move. Its review still decides: the card stays in Review,
+   * never closed as merged outside the rules on that evidence (reconcile's carried-code walk).
+   */
+  CarriedIn: { revision: string; target: string; by: string; entry: string }
   /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */
   LeftTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
@@ -504,7 +510,7 @@ export interface CardState {
   checks: FactData['CheckRan'][]
   /** G20 (HI-1367): real-CLI and packaged focused tests accepted from their review at the merge (realProof = review). */
   focusedAccepted: FactData['FocusedAccepted'][]
-  marks: { mergedInPart?: FactData['MergedInPart']; leftTarget?: FactData['LeftTarget']; outsideRules?: string[] }
+  marks: { mergedInPart?: FactData['MergedInPart']; carriedIn?: FactData['CarriedIn']; leftTarget?: FactData['LeftTarget']; outsideRules?: string[] }
   blocked: string | null
   /**
    * A card loop's step waiting on the other side (#1382, #1467): the builder's design or follow-up posted for its
@@ -737,6 +743,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'MergedInPart':
         s.marks.mergedInPart = f.data as FactData['MergedInPart']
+        break
+      case 'CarriedIn':
+        s.marks.carriedIn = f.data as FactData['CarriedIn']
         break
       case 'LeftTarget':
         s.marks.leftTarget = f.data as FactData['LeftTarget']

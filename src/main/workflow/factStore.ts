@@ -15,6 +15,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import { openDb, type Db } from '../db'
 import { BOARD_MIGRATIONS, boardChanged, boardRead, boardReadToken, boardWriteOp, takeNumberIn } from '../boardStore'
 import { decomposeCard, writeCardRows } from '../schema/cardRows'
+import { INTEGRATED_ON_SQL } from '../schema/v1_0'
 import { cardKeys, cardOfKey, currentKeys, keysHeld } from '../schema/keysStep'
 import { KEY_FORM, normalKey } from '../../shared/projectKeys'
 import type { WorkspaceService } from '../workspace'
@@ -401,6 +402,20 @@ export class FactStore {
     if (keyed) return keyed.card === null ? null : ofThis(keyed.card)
     if (!this.scope.key || prefix.toLowerCase() !== this.scope.key.toLowerCase()) return null
     return ofThis(Number(m[2]))
+  }
+
+  /**
+   * HI-2709: a page of this project's merges into a target (`Integrated` facts), newest first, with their rowids: those
+   * below `below` (the walk's cursor; Infinity for the newest), at most `limit`. Its index's range (INTEGRATED_ON_SQL).
+   */
+  integratedOn(target: string, below: number, limit: number): { row: number; fact: Fact<'Integrated'> }[] {
+    const rows = this.conn.read((db) => db.prepare(INTEGRATED_ON_SQL).all(target, this.scope.project, Number.isFinite(below) ? below : Number.MAX_SAFE_INTEGER, limit) as Record<string, string | number | null>[])
+    return rows.map((r) => ({ row: Number(r.row_id), fact: factOf(r) as Fact<'Integrated'> }))
+  }
+
+  /** HI-2709: the cards blocked by a card (their `blockedBy` names it), by number, any project's: the links' own index. */
+  dependents(id: number): number[] {
+    return this.conn.read((db) => (db.prepare("SELECT card FROM card_links WHERE target = ? AND kind = 'blockedBy' ORDER BY card").all(id) as { card: number }[]).map((r) => r.card))
   }
 
   /** Whether a card is archived (a gone card counts as archived: its pins may go). */

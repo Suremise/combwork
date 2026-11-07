@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "マージキュー · {target}",
   "board.queue.transient": "{why}（一時的）",
+  "board.queue.waitingOn": "{cards} を待機中",
   "board.readOnly.newer": "このボードは新しいバージョンのCombworkで保存されています。ここでは読み取り専用です。",
   "board.restore09.done": "0.9のボードを復元しました",
   "board.restore09.doneDetail": "1.0のボードは{file}として保存されています。",
@@ -961,6 +962,7 @@
   "board.work.badgeStale": "失効：合格は現在のリビジョンには無効です",
   "board.work.base": "ベース",
   "board.work.branch": "ブランチ",
+  "board.work.carriedIn": "このコードは {card} を通じて{target}に入りました：判断するのは引き続きこのカード自身のレビューです。",
   "board.work.carriedOver": "{from}の合格は{to}に引き継がれます：同じ変更です。",
   "board.work.check": "{name}：{result, select, passed {成功} failed {失敗} other {停止}}{counted, select, no {（対象外）} other {}}",
   "board.work.failed": "カードの作業を読み込めませんでした：{error}",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target}の位置",
   "board.workQueue.testing": "テスト中：{step}",
   "board.workQueue.unreadRef": "読み取れません",
+  "board.workQueue.waiting": "{target}のキューで、{cards} の完了を待機中",
   "board.workflows": "ワークフロー"
 }

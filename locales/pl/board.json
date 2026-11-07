@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "Kolejka scalania · {target}",
   "board.queue.transient": "{why} (tymczasowo)",
+  "board.queue.waitingOn": "Czeka na {cards}",
   "board.readOnly.newer": "Tę tablicę zapisała nowsza wersja Combwork: jest tu tylko do odczytu.",
   "board.restore09.done": "Tablica z 0.9 wróciła",
   "board.restore09.doneDetail": "Tablica z 1.0 jest zachowana jako {file}.",
@@ -961,6 +962,7 @@
   "board.work.badgeStale": "Nieaktualna: jej zaliczenie nie liczy się już dla jej rewizji",
   "board.work.base": "Baza",
   "board.work.branch": "Gałąź",
+  "board.work.carriedIn": "Jej kod trafił do {target} przez {card}: o karcie i tak decyduje jej własna recenzja.",
   "board.work.carriedOver": "Zaliczenie dla {from} pozostaje ważne dla {to}: ta sama zmiana.",
   "board.work.check": "{name}: {result, select, passed {udane} failed {nieudane} other {zatrzymane}}{counted, select, no { (nie liczy się)} other {}}",
   "board.work.failed": "Nie udało się odczytać pracy karty: {error}",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} wskazuje na",
   "board.workQueue.testing": "Trwa testowanie: {step}",
   "board.workQueue.unreadRef": "nie odczytano",
+  "board.workQueue.waiting": "W kolejce do {target}, czeka, aż {cards} trafi do Gotowe",
   "board.workflows": "Przepływy pracy"
 }

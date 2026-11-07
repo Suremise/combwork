@@ -751,6 +751,7 @@ interface CombworkMessageValues {
   'board.queue.testingNoHead': { card: string | number; target: string | number; step: string | number }
   'board.queue.title': { target: string | number }
   'board.queue.transient': { why: string | number }
+  'board.queue.waitingOn': { cards: string | number }
   'board.readOnly.newer': undefined
   'board.restore09.done': undefined
   'board.restore09.doneDetail': { file: string | number }
@@ -963,6 +964,7 @@ interface CombworkMessageValues {
   'board.work.badgeStale': undefined
   'board.work.base': undefined
   'board.work.branch': undefined
+  'board.work.carriedIn': { target: string | number; card: string | number }
   'board.work.carriedOver': { from: string | number; to: string | number }
   'board.work.check': { name: string | number; result: string; counted: string }
   'board.work.failed': { error: string | number }
@@ -1041,5 +1043,6 @@ interface CombworkMessageValues {
   'board.workQueue.stuckRef': { target: string | number }
   'board.workQueue.testing': { step: string | number }
   'board.workQueue.unreadRef': undefined
+  'board.workQueue.waiting': { target: string | number; cards: string | number }
   'board.workflows': undefined
 }

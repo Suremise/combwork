@@ -46,7 +46,7 @@ describe("a card's work view (#1223)", () => {
   it('a card with no facts (before 1.0): its stage and nothing invented', () => {
     const v = workView({ card: 3, stage: 'done', preWorkflow: true }, [])
     expect(v).toMatchObject({ card: 3, stage: 'done', preWorkflow: true, adopted: false, kind: null, folder: null, line: null, base: null, target: null, revisions: [], verdicts: [], checks: [], integration: null, queue: null, rounds: 0, forYou: 0, lastSeq: 0 })
-    expect(v.marks).toEqual({ carriedOver: [], stale: null, outsideRules: [], mergedInPart: null, leftTarget: null, overridden: false, override: null })
+    expect(v.marks).toEqual({ carriedOver: [], stale: null, outsideRules: [], mergedInPart: null, carriedIn: null, leftTarget: null, overridden: false, override: null })
     expect(workBadge(v)).toMatchObject({ card: 3, preWorkflow: true, revision: null, verdict: null, checks: { passed: 0, failed: 0, notCounted: 0 }, stale: false, decisionSince: false })
   })
 

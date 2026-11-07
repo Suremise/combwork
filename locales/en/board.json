@@ -2999,6 +2999,10 @@
     "defaultMessage": "{why} (temporary)",
     "description": "A merge queue return that was the environment's failure, not the work's (a check that couldn't start, a network error): its reason ({why}) and that it was temporary."
   },
+  "board.queue.waitingOn": {
+    "defaultMessage": "Waiting for {cards}",
+    "description": "HI-2709: beside a queued card on a merge queue's card in the Progress panel: it is blocked by these cards ({cards}: their keys, joined with commas), which aren't Done yet; the queue merges the cards behind it meanwhile, and this one once they are Done. Keep it short."
+  },
   "board.readOnly.newer": {
     "defaultMessage": "This board was saved by a newer version of Combwork: it is read-only here.",
     "description": "Tooltip on what changes cards (the board's add-card buttons, the card dialog's Save, comments and decisions), disabled while the board was saved by a newer Combwork (whose format this one can't change); also a banner in the card dialog."
@@ -3847,6 +3851,10 @@
     "defaultMessage": "Branch",
     "description": "A label in the card dialog's Work section: the git branch the card's work is on follows."
   },
+  "board.work.carriedIn": {
+    "defaultMessage": "Its code reached {target} through {card}: its own review still decides.",
+    "description": "HI-2709: a mark in the card dialog's Work section: the card's submitted work is already in its target ({target}, a branch such as main) because the merge queue merged another card ({card}, its key, such as HI-12) that included it. This card stays in Review, and isn't taken as merged until its own review passes."
+  },
   "board.work.carriedOver": {
     "defaultMessage": "The pass for {from} carries over to {to}: the same change.",
     "description": "A mark in the card dialog's Work section: a pass for an earlier revision ({from}) still counts for a later one ({to}) with exactly the same changes. Glossary: carries over, same change."
@@ -4158,6 +4166,10 @@
   "board.workQueue.unreadRef": {
     "defaultMessage": "not read",
     "description": "In the card dialog's Work section: where the branch points couldn't be read."
+  },
+  "board.workQueue.waiting": {
+    "defaultMessage": "Queued for {target}, waiting for {cards} to be Done",
+    "description": "HI-2709: the card dialog's Work section: the card is in the merge queue for the branch {target} but is blocked by {cards} (their keys, joined with commas), which aren't Done yet; the queue merges the cards behind it meanwhile, and this one once they are. Glossary 2.5: merge queue."
   },
   "board.workflows": {
     "defaultMessage": "Workflows",

@@ -41,6 +41,8 @@ export interface QueueQueued {
   revision: string
   /** When it was queued (ISO). */
   at: string
+  /** HI-2709: the cards it waits for (keys), blocked by them while they aren't Done: the queue goes on without it. */
+  waitingOn?: string[]
 }
 
 /** An entry's outcome, kept for the panel: merged (with the result), returned to its builder (why, the log, the files), cancelled. */

@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "Merge queue · {target}",
   "board.queue.transient": "{why} (temporary)",
+  "board.queue.waitingOn": "Waiting for {cards}",
   "board.readOnly.newer": "This board was saved by a newer version of Combwork: it is read-only here.",
   "board.restore09.done": "The 0.9 board is back",
   "board.restore09.doneDetail": "The 1.0 board is kept as {file}.",
@@ -961,6 +962,7 @@
   "board.work.badgeStale": "Stale: its pass no longer counts for its revision",
   "board.work.base": "Base",
   "board.work.branch": "Branch",
+  "board.work.carriedIn": "Its code reached {target} through {card}: its own review still decides.",
   "board.work.carriedOver": "The pass for {from} carries over to {to}: the same change.",
   "board.work.check": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
   "board.work.failed": "Couldn’t read the card’s work: {error}",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} is at",
   "board.workQueue.testing": "Testing now: {step}",
   "board.workQueue.unreadRef": "not read",
+  "board.workQueue.waiting": "Queued for {target}, waiting for {cards} to be Done",
   "board.workflows": "Workflows"
 }

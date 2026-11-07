@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "Merge-Warteschlange · {target}",
   "board.queue.transient": "{why} (vorübergehend)",
+  "board.queue.waitingOn": "Wartet auf {cards}",
   "board.readOnly.newer": "Dieses Board wurde von einer neueren Version von Combwork gespeichert: Es ist hier schreibgeschützt.",
   "board.restore09.done": "Das 0.9-Board ist zurück",
   "board.restore09.doneDetail": "Das 1.0-Board ist als {file} aufbewahrt.",
@@ -961,6 +962,7 @@
   "board.work.badgeStale": "Veraltet: Das bestandene Review gilt nicht mehr für ihre Revision",
   "board.work.base": "Basis",
   "board.work.branch": "Branch",
+  "board.work.carriedIn": "Ihr Code ist über {card} in {target} gelangt: Über sie entscheidet trotzdem ihr eigenes Review.",
   "board.work.carriedOver": "Das bestandene Review für {from} bleibt für {to} gültig: dieselbe Änderung.",
   "board.work.check": "{name}: {result, select, passed {bestanden} failed {fehlgeschlagen} other {gestoppt}}{counted, select, no { (nicht gezählt)} other {}}",
   "board.work.failed": "Die Arbeit der Karte konnte nicht gelesen werden: {error}",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} steht auf",
   "board.workQueue.testing": "Wird gerade getestet: {step}",
   "board.workQueue.unreadRef": "nicht gelesen",
+  "board.workQueue.waiting": "In der Warteschlange für {target}, wartet darauf, dass {cards} in Erledigt ist",
   "board.workflows": "Workflows"
 }

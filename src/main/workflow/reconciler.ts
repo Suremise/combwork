@@ -40,6 +40,8 @@ interface Followed {
   alive: () => boolean
   watch: Disposable
   timer: NodeJS.Timeout | null
+  /** HI-2709: the next pass a deferred carried-code walk asked for (CARRIED_AGAIN_MS), at most one. */
+  later: NodeJS.Timeout | null
   /** Lines (Git branches) that moved since the last run: their Done cards are looked at too. */
   lines: Set<string>
   /** Cards asked for (a Work section read) since the last run, besides the unfinished ones. */
@@ -74,6 +76,7 @@ function follow(): void {
       alive: () => !life.aborted && n.ws.lifetime === life && n.ws.path === wsPath,
       watch: { dispose: () => undefined },
       timer: null,
+      later: null,
       lines: new Set(),
       cards: new Set(),
       running: null,
@@ -90,6 +93,7 @@ function drop(k: string): void {
   followed.delete(k)
   f.watch.dispose()
   if (f.timer) clearTimeout(f.timer)
+  if (f.later) clearTimeout(f.later)
 }
 
 function onObserved(f: Followed, e: ObserveEvent): void {
@@ -165,6 +169,8 @@ async function reconcileProject(f: Followed): Promise<void> {
   }
   // Targets whose Done cards weren't all reconciled this run (a read unknown, a failure): their checkpoint stays.
   const unsettled = new Set<string>()
+  // HI-2709: a card's carried-code walk that deferred: another pass later, one for the project, however many deferred.
+  let deferred = false
   for (const { card, s } of cards) {
     if (!f.alive()) return
     if (!s.started) continue
@@ -175,7 +181,7 @@ async function reconcileProject(f: Followed): Promise<void> {
       if (card.stage === 'done' && target) unsettled.add(target)
     }
     try {
-      await reconcile(wf, card, { unknown: settle })
+      await reconcile(wf, card, { unknown: settle, again: () => (deferred = true) })
     } catch (e) {
       settle()
       if (!f.alive()) return
@@ -189,6 +195,20 @@ async function reconcileProject(f: Followed): Promise<void> {
     if (unsettled.has(t)) continue
     if (wf.store.meta(`target:${t}`) !== th) await wf.locked(() => wf.store.setMeta(`target:${t}`, th))
   }
+  if (deferred) later(f)
+}
+
+/** HI-2709: how long a deferred carried-code walk waits for its next pass (a page, or a read that failed: never a hot loop). */
+export const CARRIED_AGAIN_MS = 5_000
+
+/** Another run of the project after CARRIED_AGAIN_MS, once (a pending one stands), ended with the project's following. */
+function later(f: Followed): void {
+  if (!f.alive() || f.later) return
+  f.later = setTimeout(() => {
+    f.later = null
+    void runFor(f)
+  }, CARRIED_AGAIN_MS)
+  f.later.unref?.()
 }
 
 /** Waits for a workspace's reconciliation runs under way (#1305: Repair renames lines once none reads them; new runs wait for it). */

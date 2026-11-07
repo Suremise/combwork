@@ -212,6 +212,8 @@ export type QueueOutcome =
   | { card: string; entry: string; outcome: 'paused'; reason: PauseReason; files?: string[]; message?: string }
   | { card: string; entry: string; outcome: 'skipped'; why: 'notApproved' | 'cancelled' | 'declined' }
   | { card: string; entry: string; outcome: 'integratedOutside' }
+  /** HI-2709: blocked by cards that aren't Done (`on`, their keys): the entry stays open, and the queue goes on without it. */
+  | { card: string; entry: string; outcome: 'waiting'; on: string[] }
 
 /** How much of a failure's output its card keeps (`IntegrationFailed.log`), and how much of that is its start. */
 export const KEPT_LOG = 4000
@@ -311,7 +313,7 @@ interface EntryReads {
 }
 
 /** What an advance came to (advanceRef, advanceCheckedOut); `again` only before anything was touched. */
-type Advance = 'done' | 'moved' | 'denied' | 'held' | 'retest' | Again | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck } | { outcome: QueueOutcome }
+type Advance = 'done' | 'moved' | 'denied' | 'held' | 'waiting' | 'retest' | Again | { pause: PauseReason; files?: string[]; message?: string; stuck?: QueueStuck } | { residue: QueueStuck } | { outcome: QueueOutcome }
 
 /** The state a checked-out target's begun advance is found in (§16.9.2's recovery table), and what it calls for. */
 type Found = 'integrated' | 'residue' | 'rerun' | 'swap' | 'rollback' | 'requeue' | 'stuck'
@@ -691,15 +693,21 @@ export class MergeQueue {
     }, fn)
   }
 
-  /** The queue's entries for a target, in the order they were requested: open, or recovered to run again. */
-  entries(target?: string): { card: CardRecord; entry: QueueEntry }[] {
+  /**
+   * The queue's entries for a target, in the order they were requested: open, or recovered to run again. `runnable`
+   * (HI-2709): without the open ones whose card waits for a blocker that isn't Done (a begun one recovered to run again
+   * stays: its advance began, at the advance's authority, before any blocker it has now).
+   */
+  entries(target?: string, runnable = false): { card: CardRecord; entry: QueueEntry }[] {
     const out: { card: CardRecord; entry: QueueEntry }[] = []
     for (const f of this.wf.store.factsOfKind('IntegrationRequested')) {
       const d = f.data as FactData['IntegrationRequested']
       if (target && d.target !== target) continue
       const s = this.wf.state(f.card)
       const e = s.entries.find((x) => x.id === d.entry)
-      if (e && (e.state === 'open' || (e.state === 'started' && this.rerun.has(e.id)))) out.push({ card: this.wf.store.card(f.card), entry: e })
+      if (!e || !(e.state === 'open' || (e.state === 'started' && this.rerun.has(e.id)))) continue
+      if (runnable && e.state === 'open' && this.wf.queueWaitingOn(f.card).length) continue
+      out.push({ card: this.wf.store.card(f.card), entry: e })
     }
     return out
   }
@@ -736,7 +744,7 @@ export class MergeQueue {
       // A push owed by an earlier merge goes first (G18: after a restart or a Resume), and the next entry waits for it.
       const owed = await this.settlePush(target)
       if (owed) return owed
-      const next = this.entries(target)[0]
+      const next = this.entries(target, true)[0]
       if (!next) return null
       return this.thenPush(target, await this.process(next.card, next.entry))
     }).catch(lostIsNull)
@@ -932,7 +940,7 @@ export class MergeQueue {
    * The queue paused by now (Pause queue): none begins either, `held`, the entry left open. A focused test's review
    * proof gone since its checks (HI-2660): none begins, `proofGone`, and the entry goes round again.
    */
-  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff' | 'held' | 'ask' | 'proofGone'> {
+  private startAdvance(card: CardRecord, entry: QueueEntry, data: FactData['IntegrationStarted']): Promise<'started' | 'denied' | 'rulesOff' | 'held' | 'ask' | 'proofGone' | 'waiting'> {
     return this.write(card, (w) => {
       const s = w.state()
       const e = s.entries.find((x) => x.id === entry.id)
@@ -940,6 +948,10 @@ export class MergeQueue {
       const r = w.ruleset!
       const approved = r.options.review === 'none' ? !s.stale : !notApproved(s, r, card.labels)
       if (!open || s.stage !== 'merging' || !approved) return 'denied' as const
+      // HI-2709: the advance's authority over the card's blockers (SPEC §16.9.1): its blocked-by list and their stages as
+      // this write reads them. One that isn't Done (or can't be read) holds it: nothing begins, the entry stays open, and
+      // it is tested again once unblocked. A dependency added after this write is refused (tasks.ts: too late to hold it).
+      if (this.wf.queueWaitingOn(card.id, w.tx).length) return 'waiting' as const
       // HI-2660: the focused tests' review proof read again here, in the lock, on the facts as they are now: one that no
       // longer stands sends the entry round again, whose checks then return the card for its proof (`noProof`).
       if (focusedProofGone(s, r.options.commands, proofReviewers(this.wf.store.card(card.id).reviewer, s), entry, data.result).length) return 'proofGone' as const
@@ -1001,6 +1013,9 @@ export class MergeQueue {
       const check = this.stillApproved(card, entry)
       if (!check.ok) return this.skip(card, entry, check.cancelled)
       const s = check.s
+      // HI-2709: blocked by a card that isn't Done: no test merge for it now (decided again at the advance's authority).
+      const blockers = this.wf.queueWaitingOn(card.id)
+      if (blockers.length) return this.waiting(card, entry, blockers)
       // OP-29's backstop (#1419): inside a larger repository, only into a branch the project itself named in the card's
       // ruleset (`targetOwn`, kept with a lane's rules too), never one inherited from the workspace's or Combwork's defaults.
       if (!this.wf.rulesetOf(card, s).options.targetOwn && this.cfg.subfolder?.()) return this.pause(target, card, entry, 'subfolderTarget')
@@ -1089,6 +1104,9 @@ export class MergeQueue {
       // Paused meanwhile (Pause queue): the entry's checks are done, and it waits, open, for Resume (from its test merge).
       const held = this.paused(target)
       if (held) return this.held(card, entry, held.reason)
+      // HI-2709: a dependency added (or a blocker reopened) while it was tested: it waits, open. An early-out: startAdvance decides.
+      const blocked = this.wf.queueWaitingOn(card.id)
+      if (blocked.length) return this.waiting(card, entry, blocked)
       step('advance', expected)
       const now = await G.lineHead(this.project, target)
       if (isUnknown(now) || now !== expected) {
@@ -1134,6 +1152,7 @@ export class MergeQueue {
       }
       if (adv === 'denied') return this.skip(card, entry, this.stillApproved(card, entry).cancelled)
       if (adv === 'held') return this.held(card, entry, this.paused(target)?.reason ?? 'user')
+      if (adv === 'waiting') return this.waiting(card, entry, this.wf.queueWaitingOn(card.id))
       if (typeof adv === 'object') {
         // Every advance settles its pauses in the lock; one that didn't is settled here.
         const s2 = await this.settle(card, entry, target, adv, integrate)
@@ -1153,6 +1172,11 @@ export class MergeQueue {
   private isOpen(w: Write, entry: QueueEntry): boolean {
     const e = w.state().entries.find((x) => x.id === entry.id)
     return !!e && (e.state === 'open' || e.state === 'started')
+  }
+
+  /** HI-2709: blocked by cards that aren't Done: it stays open, and the queue goes on with the entries behind it. */
+  private waiting(card: CardRecord, entry: QueueEntry, on: string[]): QueueOutcome {
+    return { card: card.key, entry: entry.id, outcome: 'waiting', on }
   }
 
   /** Paused by someone while the entry ran (Pause queue): it stays open, and the pause as it is. */
@@ -1705,7 +1729,7 @@ export class MergeQueue {
       if (where[target]) return 'retest'
       const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: null })
       if (started === 'rulesOff') return this.settle(card, entry, target, { pause: 'rulesOff' })
-      if (started === 'denied' || started === 'held' || started === 'ask' || started === 'proofGone') return started === 'ask' || started === 'proofGone' ? 'retest' : started
+      if (started === 'denied' || started === 'held' || started === 'waiting' || started === 'ask' || started === 'proofGone') return started === 'ask' || started === 'proofGone' ? 'retest' : started
       await this.cfg.hooks?.afterStarted?.(entry.id)
       if (this.cfg.holds && !this.cfg.holds()) throw new LeaseLost(target)
       if ((await this.git(this.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok) return 'done'
@@ -1808,7 +1832,7 @@ export class MergeQueue {
     // Ask each time, as the setting is now: asked here, before the lock is released.
     if (started === 'ask') return { outcome: await this.askAdvance(card, entry, target, expected, result, folder) }
     if (started === 'proofGone') return 'retest'
-    if (started === 'denied' || started === 'held') return started
+    if (started === 'denied' || started === 'held' || started === 'waiting') return started
     await this.cfg.hooks?.afterStarted?.(entry.id)
 
     // 1. The files: index and the listed files to the result. git refuses, writing nothing, rather than overwrite a file

@@ -675,7 +675,10 @@ export class Workflow {
         const written = fn(w, prepared)
         this.closeSettled(w)
         // Into Done by whatever route: its finish, once, in the move's own transaction (HI-2014).
-        if (w.current === 'done' && w.was !== 'done') recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
+        if (w.current === 'done' && w.was !== 'done') {
+          recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
+          this.kickDependents(w)
+        }
         return written
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
@@ -1172,6 +1175,42 @@ export class Workflow {
   doneByFacts(id: number): boolean {
     const s = this.state(id)
     return s.stage === 'done' && (!!s.integrated || !!s.accepted)
+  }
+
+  /**
+   * HI-2709: the cards a card in the merge queue waits for, by key: those it is blocked by that aren't Done. Read in a
+   * write (`tx`, the advance's `IntegrationStarted` one), they are that write's: its blocked-by list and each blocker's
+   * stage as they are then, never a record read before. A blocker that can't be read counts as waited for (by its number):
+   * a card is never merged on doubt.
+   */
+  queueWaitingOn(id: number, tx?: Tx): string[] {
+    const read = (n: number): CardRecord | null => {
+      try {
+        return tx ? tx.card(n) : this.store.card(n)
+      } catch {
+        return null
+      }
+    }
+    const card = read(id)
+    if (!card) return []
+    const out: string[] = []
+    for (const b of card.blockedBy) {
+      const dep = read(b)
+      if (!dep) out.push(`#${b}`)
+      else if (dep.stage !== 'done') out.push(dep.key)
+    }
+    return out
+  }
+
+  /**
+   * HI-2709: a card into Done, in its write: each card it blocks that waits in a merge queue gets that queue run again
+   * (`enqueue`, its entry's target), so a queue that went idle with only waiting entries takes it, with no new approval.
+   */
+  private kickDependents(w: Write): void {
+    for (const dep of this.store.dependents(w.card.id)) {
+      const e = openEntry(foldCard(w.tx.facts(dep), w.tx.card(dep).stage))
+      if (e) w.tx.action(dep, 'enqueue', { target: e.target }, null)
+    }
   }
 
   /**

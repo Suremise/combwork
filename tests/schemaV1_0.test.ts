@@ -58,7 +58,7 @@ describe('the 1.0 schema', () => {
     for (const t of ['cards', 'card_labels', 'card_links', 'card_context', 'card_comments', 'card_history', 'card_decisions', 'card_holds', 'sessions', 'session_cards', 'sessions_deleted', 'sessions_deleted_usage', 'deliveries', 'lanes', 'lane_cards', 'lane_frozen', 'watches', 'watch_cards', 'metrics_buckets', 'metrics_series', 'card_facts', 'card_actions', 'rulesets', 'folder_commits', 'project_keys', 'project_counters', 'card_aliases', 'lane_runs', 'lane_pending', 'assistant_changes', 'assistant_change_values', 'assistant_change_outcomes', 'queue_runners', 'queue_runner_procs', 'queue_worktrees', 'slots', 'slot_leases', 'copies', 'copy_leases', 'skill_copies']) expect(tables).toContain(t)
     // One lane record (#1291): the runtime's own lane tables are gone.
     for (const t of ['workflow_lanes', 'workflow_lane_cards']) expect(tables).not.toContain(t)
-    expect(V1_0_STEPS.map((s) => s.name)).toEqual(['cards in tables', 'sessions and deliveries in tables', 'lanes, watches and metrics in tables', 'facts', 'project keys', 'one lane record', 'actions delivered by deliveries, lane notices', 'card search', 'assistant changes', 'undo outcomes', 'queue runners', 'queue pause messages', 'queue pause by', 'queue pause state', 'queue seen', 'slots', 'copies', 'skill copies', 'session leases', 'card attachments', 'card revisions'])
+    expect(V1_0_STEPS.map((s) => s.name)).toEqual(['cards in tables', 'sessions and deliveries in tables', 'lanes, watches and metrics in tables', 'facts', 'project keys', 'one lane record', 'actions delivered by deliveries, lane notices', 'card search', 'assistant changes', 'undo outcomes', 'queue runners', 'queue pause messages', 'queue pause by', 'queue pause state', 'queue seen', 'slots', 'copies', 'skill copies', 'session leases', 'card attachments', 'card revisions', 'integrations by target'])
     db.close()
   })
 
@@ -68,6 +68,15 @@ describe('the 1.0 schema', () => {
     db.close()
     const uses = [q.index].flat().map((i) => (i === 'INTEGER PRIMARY KEY' || i === 'PRIMARY KEY' ? ` USING ${i} ` : ` INDEX ${i} `))
     expect(plan.some((d) => uses.some((u) => `${d} `.includes(u))), plan.join('\n')).toBe(true)
+  })
+
+  it("HI-2709: a page of a target's merges is a range of its index, never a scan of other targets' facts, nor a sort", () => {
+    const db = schemaDb()
+    const q = QUERIES['facts.integratedOn']
+    const plan = (db.prepare(`EXPLAIN QUERY PLAN ${q.sql}`).all(...q.args) as { detail: string }[]).map((r) => r.detail)
+    db.close()
+    expect(plan.some((d) => /SEARCH f USING INDEX card_facts_integrated_target \(<expr>=\? AND rowid<\?\)/.test(d)), plan.join('\n')).toBe(true)
+    expect(plan.some((d) => /SCAN f\b|TEMP B-TREE/.test(d)), plan.join('\n')).toBe(false)
   })
 
   it("keeps a key's case out of the way, and a card's facts go with the card", () => {

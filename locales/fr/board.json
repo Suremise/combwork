@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "File de fusion · {target}",
   "board.queue.transient": "{why} (temporaire)",
+  "board.queue.waitingOn": "Attend {cards}",
   "board.readOnly.newer": "Ce tableau a été enregistré par une version plus récente de Combwork : il est en lecture seule ici.",
   "board.restore09.done": "Le tableau 0.9 est de retour",
   "board.restore09.doneDetail": "Le tableau 1.0 est conservé sous {file}.",
@@ -961,6 +962,7 @@
   "board.work.badgeStale": "Périmée : sa validation ne compte plus pour sa révision",
   "board.work.base": "Base",
   "board.work.branch": "Branche",
+  "board.work.carriedIn": "Son code est arrivé dans {target} via {card} : c’est tout de même sa propre revue qui décide.",
   "board.work.carriedOver": "La validation de {from} reste valable pour {to} : la même modification.",
   "board.work.check": "{name} : {result, select, passed {réussie} failed {échouée} other {arrêtée}}{counted, select, no { (non comptée)} other {}}",
   "board.work.failed": "Impossible de lire le travail de la carte : {error}",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} est à",
   "board.workQueue.testing": "En test : {step}",
   "board.workQueue.unreadRef": "non lu",
+  "board.workQueue.waiting": "En file pour {target}, en attente que {cards} soit dans Terminé",
   "board.workflows": "Flux de travail"
 }
