@@ -4,7 +4,7 @@
 // until it has relaunched; and the project's list read from the board, kept until anything it is made of changes.
 import { mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { BUILDER_ONLY_TOOLS, CW_TOOLS, REVIEWER_ONLY_TOOLS, WORKFLOW_TOOL_STAGES, WORKFLOW_TOOLS, hiddenForWorkflow, workflowAllows, workflowHiddenOf } from '../src/shared/assistantTools'
@@ -20,7 +20,8 @@ const tasks = await import('../src/main/tasks')
 const store = await import('../src/main/boardStore')
 const { FactStore } = await import('../src/main/workflow/factStore')
 const { workRetained } = await import('../src/main/workflow/cardWork')
-const { workflowHiddenNow, forgetWorkflowHidden } = await import('../src/main/workflowTools')
+const { workflowHiddenNow, forgetWorkflowHidden, restartForWorkflow, forgetAskedRestarts } = await import('../src/main/workflowTools')
+const { sessions } = await import('../src/main/sessions')
 const { advanced } = await import('../src/main/advanced')
 const { WORKFLOW_ENFORCE } = await import('../src/shared/advanced')
 
@@ -210,5 +211,76 @@ describe("a project's list from its options and its work in flight (HR1's s11 po
     await cardUnder(w, pairNone, 'active')
     expect(store.boardReadToken(w)).not.toBe(before)
     expect(workflowHiddenNow(w, projectPath(w))).not.toContain('cw_verdict')
+  })
+})
+
+describe("a busy agent's restart question (HR1's round 1): once while it still needs that restart, again once it didn't", () => {
+  /** A project p whose config the change sets, one running agent whose restart says `outcome`, and the questions emitted. */
+  async function busyAgent() {
+    const w = await workspace(presetOf('solo', 'none'))
+    const p = projectPath(w)
+    let cfg = await w.projectConfig(p)
+    let run = 'run-1'
+    let outcome: 'busy' | 'same' | 'restarting' = 'busy'
+    forgetAskedRestarts()
+    const spies = [
+      vi.spyOn(w, 'projectConfig').mockImplementation(async () => cfg),
+      vi.spyOn(sessions, 'liveFor').mockImplementation(() => ({ runId: run }) as never),
+      vi.spyOn(sessions, 'restartForTools').mockImplementation(async () => outcome)
+    ]
+    const emitted = vi.spyOn(w, 'emit')
+    spies.push(emitted)
+    return {
+      /** The project's options set to `o`, its agent's restart saying `r`, as a settings write runs it. */
+      change: async (o: WorkflowOptions, r: typeof outcome) => {
+        cfg = { ...cfg, workflow: { platform: 'none', options: o } } as never
+        outcome = r
+        await restartForWorkflow(w, p)
+      },
+      relaunch: (id: string) => (run = id),
+      asked: () => emitted.mock.calls.filter(([e]) => e.type === 'tools-restart-asked').length,
+      done: () => spies.forEach((x) => x.mockRestore())
+    }
+  }
+  const solo = presetOf('solo', 'none')
+  const pair = presetOf('pair', 'none')
+
+  it('Solo → Pair (Later), back to Solo, Pair again: asked both times', async () => {
+    const a = await busyAgent()
+    try {
+      await a.change(pair, 'busy')
+      expect(a.asked()).toBe(1)
+      await a.change(solo, 'same')
+      await a.change(pair, 'busy')
+      expect(a.asked()).toBe(2)
+    } finally {
+      a.done()
+    }
+  })
+
+  it('a change that leaves the list it would get the same asks nothing again; a restart on its way forgets it', async () => {
+    const a = await busyAgent()
+    try {
+      await a.change(pair, 'busy')
+      await a.change({ ...pair, maxAgents: 7 }, 'busy')
+      expect(a.asked()).toBe(1)
+      await a.change(pair, 'restarting')
+      await a.change(solo, 'busy')
+      expect(a.asked()).toBe(2)
+    } finally {
+      a.done()
+    }
+  })
+
+  it('a new launch of the agent is asked afresh', async () => {
+    const a = await busyAgent()
+    try {
+      await a.change(pair, 'busy')
+      a.relaunch('run-2')
+      await a.change(pair, 'busy')
+      expect(a.asked()).toBe(2)
+    } finally {
+      a.done()
+    }
   })
 })

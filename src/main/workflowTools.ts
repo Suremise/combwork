@@ -81,25 +81,44 @@ export async function restartForWorkflow(ws: WorkspaceService, projectPath: stri
   }
   const busy: { id: string; name: string }[] = []
   const target = workflowHiddenNow(ws, projectPath, cfg).join(',')
-  for (const a of projectAgents(cfg)) {
+  const agents = projectAgents(cfg)
+  // Its ended launches and removed agents are forgotten: a question is only ever about a launch still running.
+  for (const [id, was] of asked) {
+    const [project, agentId] = id.split('|')
+    if (project !== projectPath.toLowerCase()) continue
+    const live = agents.some((a) => a.id === agentId) ? sessions.liveFor(projectPath, agentId) : null
+    if (!live || live.runId !== was.run) asked.delete(id)
+  }
+  for (const a of agents) {
     const live = sessions.liveFor(projectPath, a.id)
     if (!live || (only && !only(a.id))) continue
     const r = await sessions.restartForTools(projectPath, a.id, { when: 'ifIdle' }).catch((e: unknown) => {
       log.warn(`${userText(a.name)}: not restarted for its project's workflow`, e)
       return 'same' as const
     })
-    // Asked once for its launch and this list: a later change that leaves it the same (Maximum agents, say) doesn't ask again.
-    const id = `${projectPath.toLowerCase()}|${a.id}|${live.runId}`
-    if (r === 'busy' && asked.get(id) !== target) {
-      asked.set(id, target)
-      busy.push({ id: a.id, name: a.name })
+    // Asked once while it still needs this restart: a later change leaving the list it would get the same (Maximum agents,
+    // say) doesn't ask again. Once it no longer needs one (changed back, restarted, restarting), it's forgotten, so a change
+    // to that list again asks again (HR1's round 1).
+    const id = `${projectPath.toLowerCase()}|${a.id}`
+    if (r !== 'busy') {
+      asked.delete(id)
+      continue
     }
+    const was = asked.get(id)
+    if (was?.run === live.runId && was.target === target) continue
+    asked.set(id, { run: live.runId, target })
+    busy.push({ id: a.id, name: a.name })
   }
   if (busy.length) ws.emit({ type: 'tools-restart-asked', workspacePath: ws.path, projectPath, agents: busy })
 }
 
-/** What each busy launch was last asked to restart for (its project, agent and run → the hidden list then). */
-const asked = new Map<string, string>()
+/** Each busy launch's question while it still needs that restart: its project and agent → its run and the hidden list then. */
+const asked = new Map<string, { run: string; target: string }>()
+
+/** Forgets every question asked (tests). */
+export function forgetAskedRestarts(): void {
+  asked.clear()
+}
 
 /**
  * A board change that makes a tool usable again with no settings change (HI-2694): a card moved into Review by hand on a
