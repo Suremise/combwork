@@ -93,7 +93,8 @@ const check = (name, ok, extra = '') => {
   fs.writeFileSync(path.join(memDir, 'MEMORY.md'), '- kept\n')
   await view.getByRole('button', { name: 'Refresh' }).click()
   await until(async () => JSON.stringify(await rows()) === JSON.stringify(['MEMORY.md']), HUNG_MS)
-  await inv('settings:update', { assistant: { provider: 'codex' } })
+  // As the Assistant panel's provider choice saves it: its agent's own provider, in its home.
+  await inv('agents:update', path.join(ws, '.combwork', 'assistant'), 'assistant', { provider: 'codex' })
   await inv('workspace:refresh')
   const unsupported = await until(async () => (await view.locator('.assistant-memory-unsupported').count()) === 1, HUNG_MS)
   check("on Codex: the view says it shows saved memory for Claude Code only, Codex's isn't shown here", !!unsupported && /shows saved memory for Claude Code only: Codex's, if it keeps any, isn't shown here/.test(await view.innerText()), await view.innerText())
