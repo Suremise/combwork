@@ -33,6 +33,7 @@ const NAME = ANTIGRAVITY_DESCRIPTOR.name
 
 const REFUSED = {
   unreadable: msg({ id: 'providers.antigravity.unreadableConfig', defaultMessage: "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.", description: "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words." }),
+  notOwn: msg({ id: 'providers.antigravity.notOwnConversation', defaultMessage: "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id." }),
   noInert: msg({ id: 'providers.antigravity.noInert', defaultMessage: "{provider} didn't start: the project has its own MCP servers ({servers}), and Combwork can't keep them out of the agent without its own MCP server. Turn Combwork's tools on for this agent, or remove the servers from the project's .agents folder.", description: "Why an Antigravity CLI agent didn't start (its pane): the project defines MCP servers the agent wasn't given, and Combwork's own MCP server (needed to stand in for them) isn't available. {provider} is the CLI's name, {servers} their names. .agents is a folder's name: keep it." })
 }
 
@@ -212,6 +213,8 @@ export class AntigravityAdapter implements ProviderAdapter {
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
+    // A resume reopens only one of this agent's own conversations (in its profile), never another's or a missing one.
+    if (ctx.resume && !(await this.ownsConversation(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.notOwn, { provider: NAME, conversation: ctx.sessionId })
     const delivered = await syncAgentsSkills(ctx, NAME)
     let workspace: Awaited<ReturnType<typeof workspaceCustomizations>>
     try {

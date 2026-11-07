@@ -3,7 +3,7 @@ import { connectionCells, currentLimits, planName, resetText, usageLevel, window
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Account, PlanLimit, ProviderId } from '@shared/types'
 import { accountState, connectionReadiness, duplicateLogins, type AccountView, type ConnectionRow, type ConnectionsView, type ConnectionState } from '@shared/accounts'
-import { COPILOT_ACCOUNT } from '@shared/connectionDefaults'
+import { pcAccountId, pcWideSignIn } from '@shared/connectionDefaults'
 import { connectionOf } from '@shared/connectionLabel'
 import { isProviderEnabled, providerDescriptor } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -56,8 +56,8 @@ const M = {
   removing: msg({ id: 'settings.accounts.removing', defaultMessage: 'Removing…', description: 'The confirm button of the dialog removing a connection, while it removes it.' }),
   onHere: msg({ id: 'settings.accounts.onHereShort', defaultMessage: 'On here', description: 'The switch on an account (Settings → Accounts & Connections, HI-2107): whether it is on in the open workspace. Keep it short.' }),
   onHereTip: msg({ id: 'settings.accounts.onHere', defaultMessage: 'On in this workspace', description: 'The switch on a connection (Settings → Accounts & Connections): whether it is on in the open workspace.' }),
-  thisPc: msg({ id: 'settings.accounts.thisPc', defaultMessage: 'Signed in for this PC', description: "On GitHub Copilot's account (Settings → Accounts & Connections, HI-2107): its one sign-in is the PC's, used in every workspace." }),
-  copilotNotSignedIn: msg({ id: 'settings.accounts.copilotNotSignedIn', defaultMessage: 'Not signed in: sign in from Provider Setup', description: "GitHub Copilot's account when it isn't signed in (HI-2107). Provider Setup names a dialog." }),
+  thisPc: msg({ id: 'settings.accounts.thisPc', defaultMessage: 'Signed in for this PC', description: "On GitHub Copilot's or the Antigravity CLI's account (Settings → Accounts & Connections, HI-2107, HI-2544): its one sign-in is the PC's, used in every workspace." }),
+  copilotNotSignedIn: msg({ id: 'settings.accounts.copilotNotSignedIn', defaultMessage: 'Not signed in: sign in from Provider Setup', description: "GitHub Copilot's or the Antigravity CLI's account when it isn't signed in (HI-2107, HI-2544). Provider Setup names a dialog." }),
   providerSetup: msg({ id: 'settings.accounts.providerSetup', defaultMessage: 'Open Provider Setup', description: "The only entry of GitHub Copilot's account's ⋯ menu (HI-2107): opens the Provider Setup dialog, where its sign-in is." }),
   more: msg({ id: 'settings.accounts.more', defaultMessage: 'More for {name}', description: "The ⋯ button of an account or a connection (Settings → Accounts & Connections), for screen readers and its tooltip ({name}, its name)." }),
   move: msg({ id: 'settings.accounts.moveAccount', defaultMessage: 'Drag to change the order of {name}, or press Alt+Up or Alt+Down', description: "The tooltip and label of an account's drag handle (Settings → Accounts & Connections, HI-2107): it moves the account in the one order of accounts. Alt+Up and Alt+Down name keys." }),
@@ -177,7 +177,8 @@ export function AccountsSettings() {
   const projects = useStore((s) => s.workspace?.projects)
   const settings = useStore((s) => s.settings)
   const usage = useStore((s) => s.connectionPlanUsage)
-  const copilotInfo = useStore((s) => s.providers.copilot)
+  // Each PC-wide sign-in's install info (Copilot's, the Antigravity CLI's): who is signed in.
+  const providerInfo = useStore((s) => s.providers)
   const menu = useContextMenu()
   const [view, setView] = useState<ConnectionsView | null>(null)
   const [terminal, setTerminal] = useState<Terminal | null>(null)
@@ -211,9 +212,10 @@ export function AccountsSettings() {
   const affected = (projects ?? []).flatMap((p) => p.agents).filter((a) => a.live?.launchedConnection && !a.live.switchPending && connectionOf(a.connection, a.live.provider, a.live.launchedConnection, view)?.other).length
   const dups = duplicateLogins(view.connections)
   const nameOf = (id: string): string => view.connections.find((a) => a.id === id)?.name ?? id
-  // One list in the one order (decision A): Combwork's accounts of the CLIs turned on, and Copilot's sign-in while it is on.
+  // One list in the one order (decision A): Combwork's accounts of the CLIs turned on, and each PC-wide sign-in (Copilot's,
+  // the Antigravity CLI's: HI-2544) while its CLI is on.
   const byId = new Map<string, AccountView | Account>([...view.connections, ...view.homes].map((a) => [a.id, a]))
-  const shown = view.order.map((id) => byId.get(id)).filter((a): a is AccountView | Account => !!a && (a.home ? a.id === COPILOT_ACCOUNT && isProviderEnabled(settings, a.provider) : view.providers.includes(a.provider)))
+  const shown = view.order.map((id) => byId.get(id)).filter((a): a is AccountView | Account => !!a && (a.home ? pcWideSignIn(a.provider) && a.id === pcAccountId(a.provider) && isProviderEnabled(settings, a.provider) : view.providers.includes(a.provider)))
   // Its place in the one order, every account counted (those hidden here too): what a move names.
   const placeOf = (id: string): number => view.order.indexOf(id)
   const move = (id: string, index: number): Promise<void> => act(M.moveFailed, () => call('connections:move', id, Math.max(0, index)))
@@ -392,9 +394,13 @@ export function AccountsSettings() {
     )
   }
 
-  /** GitHub Copilot's one sign-in for the PC (decision C): no folder, sign-in or removal of Combwork's; its ⋯ opens Provider Setup. */
-  const copilotRow = (a: Account) => {
-    const who = copilotInfo?.account
+  /**
+   * A CLI's one sign-in for the PC (decision C: GitHub Copilot's; the Antigravity CLI's, HI-2544): no folder, sign-in or
+   * removal of Combwork's; its ⋯ opens Provider Setup.
+   */
+  const pcRow = (a: Account) => {
+    const info = providerInfo[a.provider]
+    const who = info?.account
     return (
       <div key={a.id} className="account-block" data-account={a.id} data-cli={a.provider} data-home>
         <div className={cx('account-row', dragging === a.id && 'dragging', dropAt === a.id && 'drop-target')} {...dropProps(a.id)}>
@@ -408,7 +414,7 @@ export function AccountsSettings() {
             </div>
             <div className="account-facts">
               <Fact label={tr(M.factSignedInAs)} data="email">
-                <span data-copilot-identity>{who ?? (copilotInfo?.loggedIn === false ? tr(M.copilotNotSignedIn) : <span className="faint">—</span>) /* i18n-ignore: not read yet, a dash */}</span>
+                <span data-copilot-identity>{who ?? (info?.loggedIn === false ? tr(M.copilotNotSignedIn) : <span className="faint">—</span>) /* i18n-ignore: not read yet, a dash */}</span>
               </Fact>
               <Fact label={tr(M.factSignIn)} data="sign-in">
                 {tr(M.thisPc)}
@@ -511,7 +517,7 @@ export function AccountsSettings() {
       <div className="accounts-provider">
         {shown.length === 0 && <div className="faint">{tr(M.none)}</div>}
         {shown.map((x, place) => {
-          if (x.home) return copilotRow(x)
+          if (x.home) return pcRow(x)
           const a = x as AccountView
           const ws = view.workspace[a.provider]
           const server = a.kind === 'server'

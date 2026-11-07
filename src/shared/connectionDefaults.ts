@@ -213,6 +213,15 @@ export function legacyEffective(agent: AgentDef, pc: ProjectConfig, assistant: b
 /** Copilot's one PC-wide sign-in as an account (decision C): made by Combwork, never removed, on the CLI's own home. */
 export const COPILOT_ACCOUNT = 'copilot'
 
+/**
+ * A CLI's one PC-wide sign-in as an account (decision C, HI-2544): for each CLI without connections (Copilot, the
+ * Antigravity CLI), its own, named by the CLI's id: Copilot's is COPILOT_ACCOUNT. Never another CLI's.
+ */
+export const pcAccountId = (cli: ProviderId): string => cli
+
+/** Whether a CLI signs in once for the PC (no connections of its own): its account is pcAccountId's. */
+export const pcWideSignIn = (cli: ProviderId): boolean => !providerDescriptor(cli).capabilities.connections
+
 /** A test copy's CLI test home as an account (the seam, connectionSeam.ts): its id. */
 export const seamAccountId = (cli: ProviderId): string => `cli-${cli}`
 
@@ -225,7 +234,7 @@ export interface AccountStore {
 
 /** An account of the CLI's own home (Copilot's sign-in, a test home): made in the store if it isn't there. */
 export function homeAccount(store: AccountStore, cli: ProviderId, at: string): Account {
-  const id = cli === 'copilot' ? COPILOT_ACCOUNT : seamAccountId(cli)
+  const id = pcWideSignIn(cli) ? pcAccountId(cli) : seamAccountId(cli)
   let a = store.accounts.find((x) => x.id === id)
   if (!a) {
     a = { id, provider: cli, kind: 'signIn', home: 'cli', name: providerDescriptor(cli).name, createdAt: at }
@@ -275,9 +284,28 @@ export function seededLegacy(connections: readonly LegacyConnection[], settings:
 export function migrateAccounts(old: readonly LegacyConnection[], settings: Pick<AppSettings, 'providers' | 'defaultProvider'>, at: string, newId: () => string): { accounts: Account[]; connections: Connection[]; migration: AccountsMigration } {
   const legacy = seededLegacy(old, settings)
   const store: AccountStore = { accounts: legacy.map(({ defaults: _d, defaultsFrom: _f, ...a }) => a), connections: [], newId }
-  homeAccount(store, 'copilot', at)
+  for (const p of PROVIDERS) if (pcWideSignIn(p.id)) homeAccount(store, p.id, at)
   for (const a of store.accounts) connectionFor(store, a.id, baseValues(a, settings, legacy.find((c) => c.id === a.id)?.defaults ?? {}))
   return { accounts: store.accounts, connections: store.connections, migration: { at, legacy } }
+}
+
+/**
+ * Each PC-wide sign-in's account (pcWideSignIn) and its base connection, made where missing: a CLI added after the accounts
+ * migration (HI-2544: the Antigravity CLI) gets its own then, and one already there is left as it is. Whether it added any.
+ */
+export function ensurePcAccounts(store: AccountStore, at: string): boolean {
+  let added = false
+  for (const p of PROVIDERS) {
+    if (!pcWideSignIn(p.id)) continue
+    const before = store.accounts.length
+    const a = homeAccount(store, p.id, at)
+    if (store.accounts.length !== before) added = true
+    if (!baseConnection(a.id, store.connections)) {
+      connectionFor(store, a.id, {})
+      added = true
+    }
+  }
+  return added
 }
 
 /**
