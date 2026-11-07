@@ -59,14 +59,14 @@ const allOf = (file: string, base: Files, head: Files): string => {
 
 // --- Fixtures: small versions of the SPLIT files and their callers.
 const IPC = 'src/main/ipc.ts'
-const ipc = ({ one = '1', win = '1', access = "'Not allowed'", hold = '20', extra = '' } = {}): string => `import { workspace } from './workspace'
+const ipc = ({ one = '1', win = '1', access = "'Not allowed'", hold = '20', extra = '' } = {}): string => `import { withX } from './workspace'
 // The window's calls.
 export function registerIpc(): void {
   const win = (): number => ${win}
   const impl = {
     'a:one': () => ${one},
     'a:two': () => win(),
-    'x:set': (v: number) => workspace.setX(v)
+    'x:set': (v: number) => withX(v)
   }
   type TestCalls = { from: string }
   const holding = (channel: string): boolean => !app.isPackaged && (process.env.CW_TEST_HOLD_IPC ?? '') === channel
@@ -83,23 +83,27 @@ ${extra}      if (holding(channel)) await hold(channel)
 }
 `
 const WS = 'src/main/workspace.ts'
-const workspaceTs = ({ check = '1', y = 'this.getZ()', unused = '', spare = '' } = {}): string => `export class WorkspaceService {
+// Its class's members and instance select every suite (HI-2659, C3); its top-level functions are traced.
+const workspaceTs = ({ member = '1', check = '1', y = 'getZ()', unused = '', spare = '', spareExport = '' } = {}): string => `export class WorkspaceService {
   setX(v: number): number {
-    return this.check(v)
+    return v + ${member}
   }
-  private check(v: number): number {
-    return v + ${check}
-  }
-  getY(): number {
-    return ${y}
-  }
-  getZ(): number {
-    return this.getY()
-  }
-  unused(): void {${unused}}
-  private spare(): void {${spare}}
 }
 export const workspace = new WorkspaceService()
+export function withX(v: number): number {
+  return check(v)
+}
+function check(v: number): number {
+  return v + ${check}
+}
+export function getY(): number {
+  return ${y}
+}
+export function getZ(): number {
+  return getY()
+}
+export function unused(): void {${unused}}
+${spareExport}function spare(): void {${spare}}
 `
 const ACTIONS = 'src/renderer/src/actions.ts'
 const actionsTs = ({ f1 = 'f1', one = "'a:one'", f2 = "  await call('a:two')", f3 = true, exp = '2', head = "import { call } from './api'" } = {}): string => `${head}
@@ -133,8 +137,8 @@ const callers: Files = {
   'src/renderer/src/views/A.tsx': "import { call } from '../api'\nexport const A = () => call('a:one')\n",
   'src/renderer/src/views/B.tsx': "import { call } from '../api'\nexport const B = () => call('a:two')\n",
   'src/renderer/src/views/C.tsx': "import { call } from '../api'\nexport const C = () => call('x:set', 1)\n",
-  'src/main/settingsTools.ts': "import { workspace } from './workspace'\nexport const set = () => workspace.setX(2)\n",
-  'src/main/other.ts': "import { workspace } from './workspace'\nexport const z = () => workspace.getZ()\n",
+  'src/main/settingsTools.ts': "import { withX } from './workspace'\nexport const set = () => withX(2)\n",
+  'src/main/other.ts': "import { getZ } from './workspace'\nexport const z = () => getZ()\n",
   'src/renderer/src/views/VA.tsx': "import * as actions from '../actions'\nexport const VA = () => <button onClick={actions.f1}>One</button>\n",
   'src/renderer/src/views/VB.tsx': "import { f2 } from '../actions'\nexport const handlers = { f2 }\n",
   'src/renderer/src/components/Side.tsx': "import { runCommand } from '../commands'\nexport const S = () => runCommand('p.second')\n",
@@ -151,7 +155,7 @@ describe('the units of a shared file', () => {
   it('are its IPC handlers, class methods, functions and commands one by one, not the object, class or array holding them', () => {
     const ids = (file: string, text: string): string[] => (unitsOf(text, file).units as { id: string }[]).map((u) => u.id)
     expect(ids(IPC, ipc())).toEqual(expect.arrayContaining(["'a:one'", "'a:two'", "'x:set'", 'registerIpc.win', 'registerIpc']))
-    expect(ids(WS, workspaceTs())).toEqual(expect.arrayContaining(['WorkspaceService.setX', 'WorkspaceService.check', 'WorkspaceService.getY', 'workspace']))
+    expect(ids(WS, workspaceTs())).toEqual(expect.arrayContaining(['WorkspaceService.setX', 'workspace', 'withX', 'check', 'getY']))
     expect(ids(ACTIONS, actionsTs())).toEqual(expect.arrayContaining(['f1', 'f2', 'f3', 'unusedExport']))
     expect(ids(COMMANDS, commandsTs())).toEqual(expect.arrayContaining(["command 'p.second'", "command 'p.other'", 'runCommand']))
     // The real files too: each handler, method and action its own unit.
@@ -189,12 +193,12 @@ describe('a change to a shared file selects by the parts it changed', () => {
     expect(suitesOf('src/shared/api.ts', repo({ 'src/shared/api.ts': api('number') }), repo({ 'src/shared/api.ts': api('string') }))).toEqual(['b', 'failsuite', 'side', 'vb'])
   })
 
-  it('a private method: followed through the methods calling it, then an IPC handler calling that, to its callers', () => {
+  it('a local function: followed through the exported one calling it, then an IPC handler calling that, to its callers', () => {
     expect(suitesOf(WS, repo(), repo({ [WS]: workspaceTs({ check: '2' }) }))).toEqual(['c', 'settings'])
   })
 
-  it('methods calling each other end, with the callers outside', () => {
-    expect(suitesOf(WS, repo(), repo({ [WS]: workspaceTs({ y: 'this.getZ() + 1' }) }))).toEqual(['other'])
+  it('functions calling each other end, with the callers outside', () => {
+    expect(suitesOf(WS, repo(), repo({ [WS]: workspaceTs({ y: 'getZ() + 1' }) }))).toEqual(['other'])
   })
 
   it('an action: what names it, a callback and a property shorthand included', () => {
@@ -242,7 +246,7 @@ describe('a change to a shared file selects by the parts it changed', () => {
     expect(suitesOf(RUNNER, repo(), repo({ [RUNNER]: runnerMjs("'CW_TEST_B', 'CW_TEST_A'") }))).toEqual([])
   })
 
-  it('an unused private method selects nothing', () => {
+  it('an unused local function selects nothing', () => {
     const r = select(WS, repo(), repo({ [WS]: workspaceTs({ spare: ' return' }) }))
     expect(r.all).toBeNull()
     expect(r.suites).toEqual([])
@@ -269,46 +273,92 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
   })
 
   it('a public unit nothing in its scope names (it may be reached some other way, or by unit tests alone)', () => {
-    expect(allOf(WS, repo(), repo({ [WS]: workspaceTs({ unused: ' return' }) }))).toMatch(/nothing that runs WorkspaceService\.unused was found, though it is public/)
+    expect(allOf(WS, repo(), repo({ [WS]: workspaceTs({ unused: ' return' }) }))).toMatch(/nothing that runs unused was found, though it is public/)
     expect(allOf(ACTIONS, repo(), repo({ [ACTIONS]: actionsTs({ exp: '3' }) }))).toMatch(/nothing that runs unusedExport was found/)
   })
 
   it('public units that only name each other (a cycle, no caller outside it) reach nothing that runs them (HR3 on round 1)', () => {
     const cyc = (n: string): string => `export function foo(): number {\n  return bar() + ${n}\n}\nexport function bar(): number {\n  return foo()\n}\n`
-    expect(allOf(ACTIONS, repo({ [ACTIONS]: cyc('1') }), repo({ [ACTIONS]: cyc('2') }))).toMatch(/nothing that runs foo was found, though it is public/)
+    expect(allOf(ACTIONS, repo({ [ACTIONS]: actionsTs() + cyc('1') }), repo({ [ACTIONS]: actionsTs() + cyc('2') }))).toMatch(/nothing that runs foo was found, though it is public/)
   })
 
-  it("a unit's visibility changed: public in either revision counts (local → exported, private → public)", () => {
+  it("a unit's visibility changed: public in either revision counts (local → exported, and back)", () => {
     const caller = { 'src/renderer/src/views/VA.tsx': "import { foo } from '../actions'\nexport const VA = () => foo()\n" }
     const fn = (exp: string, n: string): string => `${exp}function foo(): number {\n  return ${n}\n}\n`
     expect(suitesOf(ACTIONS, repo({ ...caller, [ACTIONS]: fn('', '1') }), repo({ ...caller, [ACTIONS]: fn('export ', '2') }))).toEqual(['va'])
     expect(suitesOf(ACTIONS, repo({ ...caller, [ACTIONS]: fn('export ', '1') }), repo({ ...caller, [ACTIONS]: fn('', '2') }))).toEqual(['va'])
-    const cls = (priv: string): string => workspaceTs().replace('  private spare(): void {}', `  ${priv}spare(): void {}`).replace('  unused(): void {}', '  unused(): void {}\n')
-    const other = { 'src/main/other.ts': "import { workspace } from './workspace'\nexport const z = () => workspace.spare()\n" }
-    expect(suitesOf(WS, repo({ ...other, [WS]: cls('private ') }), repo({ ...other, [WS]: cls('') }))).toEqual(['other'])
+    const other = { 'src/main/other.ts': "import { spare } from './workspace'\nexport const z = () => spare()\n" }
+    expect(suitesOf(WS, repo({ ...other, [WS]: workspaceTs() }), repo({ ...other, [WS]: workspaceTs({ spareExport: 'export ' }) }))).toEqual(['other'])
+  })
+
+  it("WorkspaceService's members and its instance select every suite: its instances flow where the tracer can't follow (C3)", () => {
+    expect(allOf(WS, repo(), repo({ [WS]: workspaceTs({ member: '2' }) }))).toMatch(/WorkspaceService\.setX: WorkspaceService's instances flow where the tracer can't follow them/)
+    // Whatever reaches them, a literal bracket access or an instance of an imported class among them.
+    for (const text of ["import { workspace } from './workspace'\nexport const b = () => workspace['setX'](1)\n", "import { WorkspaceService } from './workspace'\nexport const b = (name: 'setX') => new WorkspaceService()[name](1)\n"]) {
+      const dyn = { 'src/main/other.ts': text, 'src/main/settingsTools.ts': "import { workspace } from './workspace'\nexport const set = () => workspace.setX(2)\n" }
+      expect(allOf(WS, repo(dyn), repo({ ...dyn, [WS]: workspaceTs({ member: '2' }) }))).toMatch(/WorkspaceService's instances/)
+    }
   })
 
   it('a namespace import indexed, or the module re-exported whole', () => {
     const indexed = { 'src/renderer/src/views/X.tsx': "import * as acts from '../actions'\nexport const go = (n: string) => (acts as Record<string, () => void>)[n]()\n" }
-    expect(allOf(ACTIONS, repo(indexed), repo({ ...indexed, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/indexes acts\[…\]/)
+    expect(allOf(ACTIONS, repo(indexed), repo({ ...indexed, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/indexes acts /)
     const all = { 'src/renderer/src/views/Y.ts': "export * from '../actions'\n" }
     expect(allOf(ACTIONS, repo(all), repo({ ...all, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/re-exports it all/)
   })
 
-  it("a computed access on what came from the module, beside a caller that names it (HR3 on round 1)", () => {
-    const change = { [WS]: workspaceTs({ check: '2' }) }
-    // The named import itself, a variable made by its function, a parameter typed as its class.
-    for (const text of [
-      "import { workspace } from './workspace'\nexport const run = (name: string) => (workspace as unknown as Record<string, () => void>)[name]()\n",
-      "import { workspaceOf } from './workspace'\nexport const run = (p: string, name: string) => {\n  const ws = workspaceOf(p)\n  return ws[name]\n}\n",
-      "import type { WorkspaceService } from './workspace'\nexport const run = (ws: WorkspaceService, name: keyof WorkspaceService) => ws[name]\n"
-    ]) {
-      const dyn = { 'src/main/dynamic.ts': text }
-      expect(allOf(WS, repo(dyn), repo({ ...dyn, ...change })), text).toMatch(/dynamic\.ts indexes (workspace|ws)\[…\]/)
+  // What a file does with the module's values (HR3 on rounds 1 and 2, design s42/s46), each beside a caller that names
+  // the changed action statically (VB.tsx's f2), so the "nothing names it" fallback can't be what catches it.
+  const f2Changed = { [ACTIONS]: actionsTs({ f2: "  await call('a:two', 1)" }) }
+  const using = (text: string): Selection => select(ACTIONS, repo({ 'src/renderer/src/views/X.tsx': text }), repo({ 'src/renderer/src/views/X.tsx': text, ...f2Changed }))
+
+  it('a literal bracket access names the unit: a reference, its file placed (A)', () => {
+    PLACES['src/renderer/src/views/X.tsx'] = { suites: ['x'] }
+    try {
+      expect(using("import * as actions from '../actions'\nexport const go = () => actions['f2']()\n").suites).toEqual(['side', 'vb', 'x'])
+    } finally {
+      delete PLACES['src/renderer/src/views/X.tsx']
     }
-    // Not a local object of the same name in another scope, nor a value its function returned.
-    const local = { 'src/main/other.ts': "import { workspace, workspaceOf } from './workspace'\nexport const a = () => workspace.setX(1)\nexport const b = (k: string) => {\n  const ws: Record<string, number> = {}\n  return ws[k]\n}\nexport const c = (k: number) => [workspaceOf][k]\n" }
-    expect(select(WS, repo(local), repo({ ...local, ...change })).all).toBeNull()
+  })
+
+  it('a computed access, an enumeration or an escape of the module, or of a variable holding it, selects every suite (B, C2)', () => {
+    const cases: [string, RegExp][] = [
+      ["import * as actions from '../actions'\nexport const go = (k: string) => (actions as Record<string, () => void>)[k]()\n", /indexes actions/],
+      ["import * as actions from '../actions'\nlet a: unknown = {}\na = actions\nexport const go = (k: string) => (a as Record<string, () => void>)[k]()\n", /indexes a /],
+      ["import * as actions from '../actions'\nexport const keys = () => Object.keys(actions)\n", /enumerates \(Object\.keys\) actions/],
+      ["import * as actions from '../actions'\nexport const all = () => ({ ...actions })\n", /lets out .* actions/],
+      ["import * as actions from '../actions'\nimport { foreignLookup } from './lookup'\nexport const go = (k: string) => foreignLookup(actions)[k]()\n", /passes on \(to foreignLookup\) actions/],
+      ["import * as actions from '../actions'\nexport const box = { actions }\n", /lets out .* actions/]
+    ]
+    for (const [text, why] of cases) {
+      const r = using(text)
+      expect(r.all, text).toMatch(why)
+    }
+  })
+
+  it('provenance followed further than its bound, or round a cycle with no other source, is unresolved: every suite (C1)', () => {
+    const chain = ['actions', ...Array.from({ length: 10 }, (_, i) => `a${i}`)]
+    const aliases = chain.slice(1).map((n, i) => `const ${n} = ${chain[i]}`).join('\n')
+    expect(using(`import * as actions from '../actions'\n${aliases}\nexport const go = (k: string) => (a9 as Record<string, () => void>)[k]()\n`).all).toMatch(/provenance isn't resolved/)
+    // a and b only take each other's values after their start: no source of their own but the module's.
+    expect(using("import * as actions from '../actions'\nlet a: unknown = actions\nlet b: unknown = a\na = b\nb = a\nexport const go = (k: string) => (a as Record<string, () => void>)[k]()\n").all).toMatch(/indexes a /)
+  })
+
+  it('a receiver proved foreign is no fallback: a literal, a cycle whose only source is a literal, a parameter where nothing lets the module out', () => {
+    for (const text of [
+      "import * as actions from '../actions'\nexport const a = () => actions.f2()\nexport const b = (k: string) => {\n  const o: Record<string, number> = {}\n  return o[k]\n}\n",
+      "import * as actions from '../actions'\nexport const a = () => actions.f2()\nexport const b = (k: string) => {\n  let x: Record<string, number> = {}\n  let y = x\n  x = y\n  return x[k]\n}\n",
+      "import * as actions from '../actions'\nexport const a = () => actions.f2()\nexport const b = (o: Record<string, number>, k: string) => o[k]\n",
+      // A number made from a counter, handed on: its `++` makes a number, not the module.
+      "import * as actions from '../actions'\nexport const a = () => {\n  let n = 1\n  n++\n  return String(n) + actions.f2.name\n}\n"
+    ]) {
+      PLACES['src/renderer/src/views/X.tsx'] = { suites: ['x'] }
+      try {
+        expect(using(text).all, text).toBeNull()
+      } finally {
+        delete PLACES['src/renderer/src/views/X.tsx']
+      }
+    }
   })
 
   it('a channel built at run time', () => {
@@ -331,8 +381,15 @@ describe('real changes: before every suite, now the suites their parts need (git
   const changes = [
     { card: 'HI-2652', commit: 'dba04a0f7c73d8515ded18f5e0a59ec93c4b242b', needs: ['activityworkspace'] },
     { card: 'HI-2653', commit: '475897343681d7b3570ca04d5fdb97b6862aee42', needs: ['keysui', 'startbusy', 'agents-ui', 'keys'] },
-    { card: 'HI-2654', commit: '22fd88db7a58f978d7059d3f21298d89a6fc2667', needs: ['advanced', 'assistantsettings', 'consoletext', 'p7settings'] }
   ]
+  // HI-2654 changed WorkspaceService.setAdvanced: a member, so still every suite (C3), saying why.
+  it('HI-2654: still every suite, its change being a WorkspaceService member', () => {
+    const commit = '22fd88db7a58f978d7059d3f21298d89a6fc2667'
+    const files = execFileSync('git', ['diff', '--name-only', `${commit}^1`, commit], { cwd: root, encoding: 'utf8', env: runContext.baseEnv() }).split(/\r?\n/).filter(Boolean)
+    const after = affectedSuites(files, names, realNames, splitSelections(files, { cwd: root, base: `${commit}^1`, head: commit, suiteNames: names }))
+    expect(after.all).toBe(true)
+    expect(after.why[0]).toMatch(/WorkspaceService\.setAdvanced: WorkspaceService's instances flow where the tracer can't follow them/)
+  })
   for (const c of changes) {
     it(`${c.card}: a named handful, with ${c.needs.join(', ')}`, () => {
       const base = `${c.commit}^1`

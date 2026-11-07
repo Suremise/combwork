@@ -358,22 +358,29 @@ real suites.
 
 A few of those shared files are selected by **the parts of them a change touches** instead (HI-2659, `SPLIT` in
 `affectedUnits.mjs`): `ipc.ts` and `shared/api.ts` by IPC channel, `actions.ts` by action, `commands.ts` by command,
-`workspace.ts` by `WorkspaceService` method or function, and `runner.mjs`'s seam tables by the seam names added or
-removed. Each changed part is followed to what names it (a channel's callers, an action's, a method's, and theirs while
-they are in those files too), and a file that names it counts as it would changed: its own suite, its area's suites, or
-every suite when it is itself shared by everything (`store.ts`, `sessions.ts`…) or in no area. A part public in either
-revision counts as public, and a public part's trail must reach a file that runs it. Lines that are only comments select
-nothing, unless a comment they're in now covers code, or no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines map only for its test seams' branches (`CW_TEST_SLOW_IPC`,
-`FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access check, the error path) is
-every suite. So a one-file fix to one of them selects the suites that reach what it changed: HI-2652's seam, 2 suites;
-HI-2653's New Project, 28 from `actions.ts` (37 with its `Overlays.tsx`); HI-2654's `setAdvanced`, about 50, through
-`advanced:set`, which many suites call (`tests/affectedUnits.test.ts` checks these three keep the suites they need).
+`workspace.ts` by its top-level functions, and `runner.mjs`'s seam tables by the seam names added or removed. Each
+changed part is followed to what names it (a channel's callers, an action's, a function's, and theirs while they are in
+those files too; its name spelled in a string, `x['f']`, counts too), and a file that names it counts as it would
+changed: its own suite, its area's suites, or every suite when it is itself shared by everything (`store.ts`,
+`sessions.ts`…) or in no area. A command is also reached by the generic dispatch (palette, menus, shortcuts), mapped to
+`commands.ts`'s own areas' suites. A part public in either revision counts as public, and a public part's trail must
+reach a file that runs it. Lines that are only comments select nothing, unless a comment they're in now covers code, or
+no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines map only for its test seams' branches
+(`CW_TEST_SLOW_IPC`, `FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access
+check, the error path) is every suite. **Workspace settings and the rest of `WorkspaceService` stay every suite**: its
+members and the `workspace` instance are never narrowed, since its instances flow where the tracer can't follow (passed
+on 2,150 times in `src/main`, 234 of them to callees it can't resolve). So HI-2654's `setAdvanced` is still every suite,
+unchanged; HI-2652's seam selects 2 suites, and HI-2653's New Project 28 from `actions.ts` (37 with its `Overlays.tsx`)
+(`tests/affectedUnits.test.ts` checks all three, and the suites the two narrowed ones need). Narrowing
+`WorkspaceService`'s members is HI-2678.
 **The escape hatch** errs towards more, each time with a reason in the selection's output: whatever it can't follow
 selects every suite (a line in no function or entry, such as an import or module code; a file it can't parse or read in
-either revision; a public part whose trail reaches nothing that runs it, a cycle of public parts included; a computed
-access (`x[k]`) on what a file took from the module, by its binding: the import itself, a variable made from it, a
-parameter typed as its class; a module re-exported whole; a channel built at run time), the files still in `EVERYTHING` but not `SPLIT` select every suite as before (each with its
-reason there), and a change you know is cross-cutting though it touches only a few parts (a behaviour every handler
+either revision; a public part whose trail reaches nothing that runs it, a cycle of public parts included; a value a
+file took from the module, or a variable holding it, indexed with a computed key (`x[k]`), enumerated (`Object.keys`,
+`for…in`, a spread) or let out where the tracer doesn't follow (passed to a callee not from the module, stored,
+returned, exported); a value whose provenance isn't resolved within a few bindings, or only goes round a cycle; a module
+re-exported whole; a channel built at run time; a `WorkspaceService` member), the files still in `EVERYTHING` but not
+`SPLIT` select every suite as before (each with its reason there), and a change you know is cross-cutting though it touches only a few parts (a behaviour every handler
 relies on, a type's meaning) runs `--all`, said on the card. Add an area to `affected.mjs` when you add a
 suite or a source file; `tests/e2esuites.test.ts` checks every suite and source file is covered. What only the unit
 tests use (`tests/*.test.ts` and their helpers in `tests/`, `vitest.config.ts`, CI's workflow: `UNIT_ONLY`) selects no
