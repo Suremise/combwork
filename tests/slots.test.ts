@@ -15,7 +15,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
 import { admitted } from './admitted'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
+import { asideKey, fileSlotConn, IDLE_MS, INTERRUPTED, lockHash, nextSlotName, PORT_FLOOR, quiet, refusalText, setBuilderCount, builderCountOf, SlotPool, slotEnv, slotName, slotOptionsOf, SlotStore, type OpHolder, type SlotRefusal, type SlotRun, type SlotRunEnd } from '../src/main/slots'
 import { BoundedLog, execCommand, FILE_IO } from '../src/main/workflow/queueChecks'
 import { say } from '../src/shared/agentText'
 import { claimIn, type ClaimRefused } from '../src/main/agentFolders'
@@ -1606,6 +1606,35 @@ describe('moving a free slot onto another target (HI-2680)', { timeout: 90_000 }
     expect(await w.pool.remove(name)).toBeNull()
     expect(w.store.asideOf(name)).toBeNull()
     expect((await lent(w, { agent: 'a2', card: 2 })).slot.name).toBe(name)
+  })
+
+  it('one set aside is never renamed; a set-aside a rename did meet follows it to its new name (HR2, round 2)', async () => {
+    const w = world({ builders: 1 })
+    const { name, expect: was } = await free(w)
+    release(w, true)
+    commit(was.folder, { 'stray.txt': 'work\n' }, 'stray')
+    expect(await w.pool.retarget(name, was, 'main', '1.2.0', ok)).toMatchObject({ kind: 'setAside' })
+    // Refused at the rename's reservation (the pool's rename, or the store's step itself): it keeps its name and its set-aside.
+    expect(await w.store.startRename(name, 'dirty', 'review-rename', { pid: 11, started: 1011 }, w.root, 'tree')).toBeNull()
+    expect(await w.pool.rename(name)).toBeNull()
+    await w.pool.refresh()
+    expect(w.store.slot(name)).toMatchObject({ state: 'dirty', op: null })
+    expect(w.store.asideOf(name)).toMatchObject({ to: '1.2.0' })
+    expect((await w.pool.lend({ agent: 'a2', card: 2, slot: name })).ok).toBe(false)
+    expect((await w.pool.lend({ agent: 'a2', card: 2 })).ok).toBe(false)
+    // A rename that met one anyway (reserved before it was set aside): finished, the set-aside is the new name's.
+    const v = world({ builders: 1 })
+    const b = await free(v)
+    const intent = await v.store.startRename(b.name, 'ready', 'a-rename', { pid: 12, started: 1012 }, v.root, 'tree')
+    expect(intent).not.toBeNull()
+    await v.store.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(asideKey(v.store.project, b.name), JSON.stringify({ to: '1.2.0', seen: 'other', at: '' })))
+    sh(v.project, 'worktree', 'move', b.expect.folder, intent!.to)
+    await v.store.finishRename(b.name, 'a-rename', intent!)
+    expect(v.store.asideOf(b.name)).toBeNull()
+    expect(v.store.asideOf(intent!.toName)).toMatchObject({ to: '1.2.0' })
+    await v.pool.refresh()
+    expect((await v.pool.lend({ agent: 'a2', card: 2, slot: intent!.toName })).ok).toBe(false)
+    expect(await v.pool.carry('a2', { name: intent!.toName, folder: intent!.to, target: b.expect.target })).toBeNull()
   })
 
   it('a failure part way is never thrown: settled from the folder, or left recorded for the next look (HR1, round 1 finding 3)', async () => {

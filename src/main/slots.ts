@@ -699,6 +699,8 @@ export class SlotStore {
    */
   async startRename(name: string, from: SlotState, token: string, holder: Holder, root: string, tree: string): Promise<RenameIntent | null> {
     return this.conn.write((db) => {
+      // Set aside by a retarget (HI-2680, HR2's round 2): keeps its name, so nothing it records is lost under another.
+      if (db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(asideKey(this.project, name))) return null
       if (Number(db.prepare(`UPDATE slots SET state = 'removing', op = ?, op_kind = 'remove', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = ? AND state <> 'removing' AND ${FREE}`).run(token, holder.pid, holder.started, this.project, name, from).changes) !== 1) return null
       const taken = new Set(this.slotsIn(db).map((x) => x.name.toLowerCase()))
       for (const r of this.renamesIn(db)) taken.add(r.intent.toName.toLowerCase())
@@ -745,6 +747,8 @@ export class SlotStore {
       db.prepare('UPDATE slots SET name = ?, folder = ?, state = ?, op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND name = ?').run(intent.toName, intent.to, intent.was, this.project, name)
       db.prepare('UPDATE slot_leases SET slot = ? WHERE project = ? AND slot = ?').run(intent.toName, this.project, name)
       db.prepare('DELETE FROM board_meta WHERE key = ?').run(renameKey(this.project, name))
+      // A set-aside (HI-2680) follows the slot to its new name, in the same write (none is renamed: belt and braces).
+      db.prepare('UPDATE board_meta SET key = ? WHERE key = ?').run(asideKey(this.project, intent.toName), asideKey(this.project, name))
     })
   }
 

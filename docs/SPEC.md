@@ -2346,7 +2346,7 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   checked, the intent marked `switched`; every exit, a crash's recovery too, settles it from the folder against the
   intent: clean at `B`'s head once switched → `B`; clean at its old head, not switched → its recorded target (none stays
   none); gone → `gone`; anything else → `dirty`, set aside (`board_meta` `slot_aside:`, with what it was moving to and
-  what was found): no later look makes it ready, and it is never lent or carried, until it is removed. A store failure
+  what was found): no later look makes it ready, and it is never lent, carried or renamed (a rename that met one carries it to the new name), until it is removed. A store failure
   at its end leaves its operation and intent recorded, settled by the next refresh's recovery. A branch taken out of G7b is refused while anything records
   it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, slots),
   checked under the lanes' lock and in the board's write, so a lane start on it (which picks again under the lanes'
