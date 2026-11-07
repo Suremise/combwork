@@ -115,6 +115,19 @@ describe("what agents read stays English, whatever the window's language", () =>
     expect(instructionsStarter('alpha', providerName('claude-code'))).toBe('# alpha\n\nInstructions for Claude Code in this project.\n')
     expect(Object.keys(CATALOGUE).some((id) => /Instructions for/.test(CATALOGUE[id].defaultMessage))).toBe(false)
   })
+
+  it('its first lines name whom the file applies to (HI-2667): the project, a connection in every project, or every project', () => {
+    setLanguage('pl', {}, 'pl-PL')
+    const claude = providerName('claude-code')
+    // A project's file (CLAUDE.md, .claude/CLAUDE.md, CLAUDE.local.md, AGENTS.md): its project.
+    expect(instructionsStarter('hive', claude)).toBe('# hive\n\nInstructions for Claude Code in this project.\n')
+    // A connection's (its home's CLAUDE.md or AGENTS.md): its name, never the project's.
+    expect(instructionsStarter('hive', claude, { connection: 'Anthropic-1' })).toBe('# Anthropic-1\n\nInstructions for Claude Code agents on this connection, in every project.\n')
+    expect(instructionsStarter('hive', providerName('codex'), { connection: 'Work' })).toBe('# Work\n\nInstructions for Codex agents on this connection, in every project.\n')
+    // The user's own (~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, Copilot's copilot-instructions.md): every project.
+    expect(instructionsStarter('hive', claude, 'user')).toBe('# All projects\n\nInstructions for Claude Code in every project.\n')
+    expect(instructionsStarter('hive', providerName('copilot'), 'user')).toBe('# All projects\n\nInstructions for GitHub Copilot in every project.\n')
+  })
 })
 
 describe('costs', () => {

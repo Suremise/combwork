@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **A new connection or user instructions file says whom it's for** (HI-2667). When Memory opens a file that doesn't exist yet, it used to start every one with the project's name and "Instructions for Claude Code in this project.", even a connection's `CLAUDE.md`, which applies to that connection's agents in every project. Now a connection's file starts with the connection's name and "Instructions for Claude Code agents on this connection, in every project.", and your own user file (`~/.claude/CLAUDE.md`, Codex's `AGENTS.md`, Copilot's `copilot-instructions.md`) with "All projects" and "Instructions for Claude Code in every project." A project's files are unchanged.
 - **A `!` command typed into Claude Code no longer trips "Combwork isn't hearing from Claude Code's hooks"** (HI-2673). Claude Code 2.1.319 sends the command's output to the model and starts a turn without the hook a prompt sends. Combwork took that turn's hooks as old news, so the agent stayed finished while it worked, then Combwork said its hooks weren't arriving and stopped typing into it. While your Enter in the pane waits for its hook, a turn Combwork has never seen now counts: its first tool call shows the agent working, and its hooks show they arrive. The note's line for a Claude Code newer than Combwork was tested with no longer guesses that an update changed its hooks.
 
 ## 1.1.0 — 2026-11-06

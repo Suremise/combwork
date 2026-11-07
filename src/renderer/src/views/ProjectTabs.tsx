@@ -1404,7 +1404,7 @@ export function MemoryTab({ project }: { project: ProjectInfo }) {
           key={sel.path}
           path={sel.path}
           title={sel.label}
-          createIfMissing={sel.exists ? undefined : instructionsStarter(project.name, providerName(sel.provider))}
+          createIfMissing={sel.exists ? undefined : instructionsStarter(project.name, providerName(sel.provider), sel.scope)}
           onSaved={load}
         />
       ) : (

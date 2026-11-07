@@ -3437,6 +3437,11 @@ export interface MemorySource {
   path: string
   kind: 'claude-md' | 'local-md' | 'auto-memory'
   exists: boolean
+  /**
+   * Whom it applies to (HI-2667): the project's agents (the default), a connection's agents in every project (`connection`,
+   * its name), or the user's in every project. A new file's first lines say so (instructionsStarter).
+   */
+  scope?: { connection: string } | 'user'
 }
 
 export interface GitFileChange {

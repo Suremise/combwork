@@ -1612,7 +1612,7 @@ A project's **Memory** tab shows what each provider its agents use reads about i
 - **Claude Code:** `CLAUDE.md` (project instructions read at the start of every session, usually committed), `CLAUDE.local.md` (your personal project instructions, not committed), the **User CLAUDE.md** (for all your projects) and **Auto memory** (facts Claude Code chose to remember about this project).
 - **Codex:** `AGENTS.md` (project instructions) and the **User AGENTS.md** (for all your projects).
 
-All of them can be edited here.
+All of them can be edited here. One that doesn't exist yet opens with a heading and a line saying whom it's for, and is created when you save it: the project's name and "Instructions for Claude Code in this project." for a project's file, the connection's name and "…agents on this connection, in every project." for a connection's, and "All projects" for your own user file.
 
 **One set of instructions for both.** When a project has Claude Code and Codex agents, each reads its own file. **Share one AGENTS.md…** at the top of the list makes `AGENTS.md` the shared file: `CLAUDE.md` gets an `@AGENTS.md` line, which makes Claude Code read it too. Anything else in `CLAUDE.md` stays and applies to Claude Code only. If there's no `AGENTS.md` yet, what's in `CLAUDE.md` moves into it, so nothing is lost.
 
