@@ -101,7 +101,110 @@ export function manifestStale(manifest, changedSince) {
     const changed = changedSince(e.record)
     if (!changed) return `${p.name}'s entry comes from a commit git doesn't know (${e.record})`
     const other = changed.filter((f) => f !== MANIFEST)
-    if (other.length) return `${p.name}'s entry was tested on ${e.record}, and ${other.length} file${other.length === 1 ? ' has' : 's have'} changed since (${other.slice(0, 3).join(', ')}${other.length > 3 ? ', …' : ''})`
+    if (other.length) return changedText(p, e.record, other)
   }
   return null
+}
+
+const changedText = (p, record, files) => `${p.name}'s entry was tested on ${record}, and ${files.length} file${files.length === 1 ? ' has' : 's have'} changed since (${files.slice(0, 3).join(', ')}${files.length > 3 ? ', …' : ''})`
+
+/** A unit test file (HI-2661): never run by the real tier. */
+const UNIT_TEST = /^tests\/(?:[^/]+\/)*[^/]+\.test\.ts$/
+/** An e2e suite's own file, by its name in suites.mjs. */
+const SUITE_FILE = /^tests\/e2e\/([a-z0-9][a-z0-9-]*)\.cjs$/
+/** Where a file the real tier reads can be named from: the e2e suites and helpers, and the fixtures they read. */
+export const NAMING_DIRS = ['tests/e2e', 'tests/fixtures']
+
+/** A suite of the real tier's record: one that needs a real CLI (`needs` naming a key of CLI_PROVIDERS). */
+const realSuite = (s) => (s.needs ?? []).some((n) => Object.prototype.hasOwnProperty.call(CLI_PROVIDERS, n))
+
+/**
+ * HI-2661: which of `files`, changed since a real-tier record of commit `record`, can't change what that record's real
+ * tier ran or the app: an allowlist, everything else stale (fail-closed). Exempt only:
+ * - a unit test file (`tests/**\/*.test.ts`) that no file under NAMING_DIRS names, at the record's commit or at HEAD;
+ * - a fake e2e suite's own file (`tests/e2e/<name>.cjs`), `<name>` a suite in suites.mjs at both revisions needing no
+ *   real CLI at either, that no other file under NAMING_DIRS names (`<name>.cjs`) at either.
+ * Fixtures, helpers, the harness, suites.mjs (so a suite added, renamed, deleted or reclassified), scenarios, the
+ * Sandbox's tests and anything outside tests/ are stale, as is everything when a reader can't answer (an unknown commit,
+ * an unreadable or unloadable suites.mjs). `readers`: `suitesAt(rev)` → the SUITES list, or null; `namesAt(rev, needle)`
+ * → the paths under NAMING_DIRS whose text has `needle`, or null.
+ */
+export async function testOnlyFiles(files, record, readers) {
+  const then = await readers.suitesAt(record)
+  const now = await readers.suitesAt('HEAD')
+  const unnamed = async (file, needle) => {
+    for (const rev of [record, 'HEAD']) {
+      const named = await readers.namesAt(rev, needle)
+      if (!named || named.some((p) => p !== file)) return false
+    }
+    return true
+  }
+  const fakeIn = (list, name) => {
+    const s = list.find((x) => x.name === name)
+    return !!s && !realSuite(s)
+  }
+  const exempt = []
+  const stale = []
+  for (const f of files) {
+    let ok = false
+    if (Array.isArray(then) && Array.isArray(now)) {
+      const suite = SUITE_FILE.exec(f)?.[1]
+      if (UNIT_TEST.test(f)) ok = await unnamed(f, f.split('/').pop())
+      else if (suite) ok = fakeIn(then, suite) && fakeIn(now, suite) && (await unnamed(f, `${suite}.cjs`))
+    }
+    ;(ok ? exempt : stale).push(f)
+  }
+  return { exempt, stale }
+}
+
+/**
+ * HI-2661: manifestStale's check with test-only changes allowed (testOnlyFiles), on the record: `stale` (why the
+ * manifest isn't of this code, or null) and `excluded`, per provider id, its record's commit and the files changed since
+ * it that were let through, for `npm run release` to print and the release's coverage ledger to keep. Record validity
+ * and the other refusals are manifestStale's, unchanged.
+ */
+export async function manifestCheck(manifest, changedSince, readers) {
+  const excluded = {}
+  const entries = Object.entries(CLI_PROVIDERS).map(([, p]) => [p, manifest?.[p.id]])
+  const missing = entries.filter(([, e]) => !e?.version).map(([p]) => p.name)
+  if (missing.length) return { stale: `it has no tested version for ${missing.join(' and ')}`, excluded }
+  for (const [p, e] of entries) {
+    if (!/^[0-9a-f]{7,40}$/.test(String(e.record ?? ''))) return { stale: `${p.name}'s entry comes from a run on uncommitted changes (${e.record})`, excluded }
+    const changed = changedSince(e.record)
+    if (!changed) return { stale: `${p.name}'s entry comes from a commit git doesn't know (${e.record})`, excluded }
+    const other = changed.filter((f) => f !== MANIFEST)
+    if (!other.length) continue
+    const { exempt, stale } = await testOnlyFiles(other, e.record, readers)
+    if (stale.length) return { stale: changedText(p, e.record, stale), excluded }
+    excluded[p.id] = { record: e.record, files: exempt }
+  }
+  return { stale: null, excluded }
+}
+
+/**
+ * The git-backed readers for testOnlyFiles, in repository `cwd`: suites.mjs as it is at a revision (loaded as a module of
+ * its own: it imports nothing), and `git grep` of a fixed string at a revision under NAMING_DIRS. Null when git can't
+ * say (an unknown revision, a missing or unloadable file).
+ */
+export function gitReaders(cwd, spawn) {
+  const git = (args) => spawn('git', args, { cwd, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true })
+  return {
+    async suitesAt(rev) {
+      const r = git(['show', `${rev}:tests/e2e/suites.mjs`])
+      if (r.status !== 0 || !r.stdout) return null
+      try {
+        const mod = await import(`data:text/javascript;base64,${Buffer.from(r.stdout, 'utf8').toString('base64')}`)
+        return Array.isArray(mod.SUITES) ? mod.SUITES : null
+      } catch {
+        return null
+      }
+    },
+    namesAt(rev, needle) {
+      const r = git(['grep', '-l', '-F', '-e', needle, rev, '--', ...NAMING_DIRS])
+      // git grep: 0 found, 1 none, anything else an error (an unknown revision).
+      if (r.status === 1) return []
+      if (r.status !== 0) return null
+      return r.stdout.split(/\r?\n/).filter(Boolean).map((l) => l.slice(rev.length + 1))
+    }
+  }
 }
