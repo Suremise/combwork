@@ -172,7 +172,8 @@ describe('protectedFolders', () => {
     expect(list).toEqual(expect.arrayContaining(['D:\\w1', 'E:\\w2', 'D:\\w1\\a', 'D:\\w1\\h', 'D:\\w1.worktrees', join('D:\\w1', '.combwork', 'assistant'), join('D:\\w1', '.combwork'), 'E:\\w2\\a', 'E:\\w2.worktrees']))
   })
   it('skips a workspace with no folder (closing) and one whose list fails', async () => {
-    const failing = { ...fakeWs('F:\\w3', []), listProjectPaths: async () => Promise.reject(new Error('closed')) } as unknown as FakeWs
+    const failing = fakeWs('F:\\w3', [])
+    failing.listProjectPaths = async () => Promise.reject(new Error('closed'))
     const list = await protectedFolders([{ path: null } as unknown as FakeWs, failing])
     expect(list).toEqual(['F:\\w3', 'F:\\w3.worktrees', join('F:\\w3', '.combwork', 'assistant'), join('F:\\w3', '.combwork')])
   })

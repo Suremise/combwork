@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import type { PurgeTarget, SessionUsage } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-purge-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -67,10 +68,10 @@ const runningOn = (id: string, host = p): void => {
 }
 
 // The CLI's transcripts, from a folder of the test's (never ~/.claude).
-const realTranscript = sessions.providerTranscript.bind(sessions)
+const realTranscript = bound(sessions, sessions.providerTranscript)
 const cliLookup = vi.spyOn(sessions, 'providerTranscript')
 const lookup = async (_p: string, id: string) => (existsSync(join(cli, `${id}.jsonl`)) ? { path: join(cli, `${id}.jsonl`), provider: 'claude-code' as const } : null)
-const realRecord = usageHistory.recordNow.bind(usageHistory)
+const realRecord = bound(usageHistory, usageHistory.recordNow)
 
 /**
  * Previews, then purges what it listed; `meanwhile` runs between the two, in the removal's last lookup of the target
@@ -331,7 +332,7 @@ describe('Purge', () => {
   it('a last copy whose record fails to go is put back, permanently too (all or nothing)', async () => {
     for (const permanent of [false, true]) {
       const id = await session(false)
-      const real = w.mutateSessions.bind(w)
+      const real = bound(w, w.mutateSessions)
       vi.spyOn(w, 'mutateSessions').mockImplementation((pp, fn) => (pp === p ? Promise.reject(new Error('EIO')) : real(pp, fn)))
       const { result } = await purgeWith({ kind: 'session', projectPath: p, sessionId: id }, { permanent })
       vi.mocked(w.mutateSessions).mockRestore?.()

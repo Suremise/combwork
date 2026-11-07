@@ -51,10 +51,11 @@ vi.mock('../src/main/workspace', () => ({
   setWorkspaceFallback: () => {}
 }))
 // A 0.9 board (#1451): no slots, so each agent's 0.9 worktree is what is measured.
-vi.mock('../src/main/agentFolders', async (original) => ({
-  ...(await original<typeof import('../src/main/agentFolders')>()),
+const { mockFactory } = await vi.hoisted(() => import('./keepType'))
+vi.mock('../src/main/agentFolders', mockFactory<typeof import('../src/main/agentFolders')>(async (original) => ({
+  ...(await original()),
   folderFacts: async (projectPath: string) => ({ projectPath, migrated: false, migratedAgents: [], homes: [], slots: [] })
-}))
+})))
 
 const { StorageStopped, abandonStorage, abandonWindowStorage, projectStorage, workspaceStorage } = await import('../src/main/storage')
 const { workspace } = await import('../src/main/workspace')

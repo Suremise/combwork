@@ -4,7 +4,7 @@
 // sessions are stand-ins here (the e2e agentwatch suite runs real ones).
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs'
 import { basename, join } from 'path'
-import { afterAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, describe, expect, it, vi, type MockInstance } from 'vitest'
 import * as electron from 'electron'
 import { agentBusy, agentEvent, agentLimitLine, agentPart, agentWakeLine, agentWatchLabel, readSavedAgentCondition, type AgentNow } from '../src/shared/agentWatch'
 import { WAKE_MAX_BYTES, cardChange, cardWakeLine, readCondition, userNameOf, wakeAbout, type WatchCondition } from '../src/shared/watch'
@@ -663,7 +663,7 @@ describe('agent watches (main/watches.ts)', async () => {
     mkdirSync(home, { recursive: true })
     const { a, restore } = assistantOf(home)
     let go = (): void => undefined
-    let spy: ReturnType<typeof vi.spyOn> | undefined
+    let spy: MockInstance<typeof tasks.getTask> | undefined
     try {
       // The Assistant remembers Reviewer's card: a card watch on it woke it.
       const c = await inWorkspace(w, () => tasks.createTask({ title: 'Remembered card', project: 'alpha', agent: 'a2', column: 'doing' }, { kind: 'user' }))

@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-root-watcher-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -16,7 +17,6 @@ const { createWorkspaceService, disposeWorkspaceService } = await import('../src
 /** Bounds a hung run; the tests wait for what they expect, never for a time. */
 const HUNG_MS = 15_000
 
-type Internals = { rootWatcher: unknown; rootRetry: unknown; watcher: { close: () => Promise<void> } | null; scheduleRefresh: () => void }
 
 describe("the workspace root's watch (#964)", () => {
   let w: ReturnType<typeof createWorkspaceService>
@@ -27,9 +27,8 @@ describe("the workspace root's watch (#964)", () => {
     mkdirSync(join(wsPath, 'alpha'), { recursive: true })
     w = createWorkspaceService()
     await w.open(wsPath)
-    const internals = w as unknown as Internals
-    const schedule = internals.scheduleRefresh.bind(w)
-    internals.scheduleRefresh = () => {
+    const schedule = bound(w, w.scheduleRefresh)
+    w.scheduleRefresh = () => {
       refreshes++
       schedule()
     }
@@ -45,18 +44,17 @@ describe("the workspace root's watch (#964)", () => {
   })
 
   it('the workspace folder deleted ends the watch (Windows then sends events without end), and made again it is watched again', { timeout: 60_000 }, async () => {
-    const internals = w as unknown as Internals
-    expect(internals.rootWatcher).not.toBeNull()
+    expect(w['rootWatcher']).not.toBeNull()
     // .combwork's own watcher holds its folders: closed, so the whole workspace folder can go, as when deleted with Combwork's window showing another.
-    await internals.watcher?.close()
-    internals.watcher = null
+    await w['watcher']?.close()
+    w['watcher'] = null
     await vi.waitFor(() => rmSync(wsPath, { recursive: true, force: true }), { timeout: HUNG_MS })
-    await vi.waitFor(() => expect(internals.rootWatcher).toBeNull(), { timeout: HUNG_MS })
-    expect(internals.rootRetry).not.toBeNull()
+    await vi.waitFor(() => expect(w['rootWatcher']).toBeNull(), { timeout: HUNG_MS })
+    expect(w['rootRetry']).not.toBeNull()
     // Made again (Windows may refuse it while the old watch is still closing): watched again, which reads the folder again.
     refreshes = 0
     await vi.waitFor(() => void mkdirSync(join(wsPath, 'gamma'), { recursive: true }), { timeout: HUNG_MS })
-    await vi.waitFor(() => expect(internals.rootWatcher).not.toBeNull(), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(w['rootWatcher']).not.toBeNull(), { timeout: HUNG_MS })
     await vi.waitFor(() => expect(refreshes).toBeGreaterThan(0), { timeout: HUNG_MS })
     // And the new watch sees what changes in it.
     refreshes = 0
@@ -69,14 +67,13 @@ describe("the workspace root's watch (#964)", () => {
     const otherPath = join(base, 'other')
     mkdirSync(otherPath, { recursive: true })
     await other.open(otherPath)
-    const internals = other as unknown as Internals
-    expect(internals.rootWatcher).not.toBeNull()
-    await internals.watcher?.close()
-    internals.watcher = null
+    expect(other['rootWatcher']).not.toBeNull()
+    await other['watcher']?.close()
+    other['watcher'] = null
     await vi.waitFor(() => rmSync(otherPath, { recursive: true, force: true }), { timeout: HUNG_MS })
-    await vi.waitFor(() => expect(internals.rootRetry).not.toBeNull(), { timeout: HUNG_MS })
+    await vi.waitFor(() => expect(other['rootRetry']).not.toBeNull(), { timeout: HUNG_MS })
     await disposeWorkspaceService(other)
-    expect(internals.rootWatcher).toBeNull()
-    expect(internals.rootRetry).toBeNull()
+    expect(other['rootWatcher']).toBeNull()
+    expect(other['rootRetry']).toBeNull()
   })
 })

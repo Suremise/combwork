@@ -8,6 +8,7 @@ import * as electron from 'electron'
 import { DEFAULT_CLEANUP } from '../src/shared/storage'
 import type { CleanupOptions } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-cleanup-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -56,7 +57,7 @@ async function oldSession(inCli: boolean): Promise<string> {
 }
 
 // The CLI's transcripts, from a folder of the test's (never ~/.claude).
-const realTranscript = sessions.providerTranscript.bind(sessions)
+const realTranscript = bound(sessions, sessions.providerTranscript)
 const cliLookup = vi.spyOn(sessions, 'providerTranscript')
 const lookup = async (_p: string, id: string) => (existsSync(join(cli, `${id}.jsonl`)) ? { path: join(cli, `${id}.jsonl`), provider: 'claude-code' as const } : null)
 
@@ -76,7 +77,7 @@ async function cleanupWith(target: string, opts: CleanupOptions, meanwhile: () =
   return { listed, result }
 }
 /** Recording what this session used fails (the others' still works). */
-const realRecord = usageHistory.recordNow.bind(usageHistory)
+const realRecord = bound(usageHistory, usageHistory.recordNow)
 const failUsage = (target: string, fail: () => Promise<boolean>) =>
   vi.spyOn(usageHistory, 'recordNow').mockImplementation((pp, id) => (id === target ? fail() : realRecord(pp, id)))
 const totalTokens = async (id: string): Promise<number | undefined> => {
@@ -212,7 +213,7 @@ describe('Clean Up while sessions change', () => {
   it("a session's only copy stays when what it used can't be saved", async () => {
     const id = await oldSession(false)
     const before = await totalTokens(id)
-    const real = w.mutateSessions.bind(w)
+    const real = bound(w, w.mutateSessions)
     vi.spyOn(w, 'mutateSessions').mockImplementation(() => Promise.reject(new Error('EIO')))
     const { result } = await cleanupWith(id, { ...DEFAULT_CLEANUP, archivedAttachmentsDays: null, goneBackups: true }, async () => undefined)
     vi.mocked(w.mutateSessions).mockImplementation(real)
@@ -224,7 +225,7 @@ describe('Clean Up while sessions change', () => {
   it('a deletion that fails after its copy went puts the copy back (all or nothing) and still counts what the session used', async () => {
     const id = await oldSession(false)
     const before = await totalTokens(id)
-    const real = w.mutateSessions.bind(w)
+    const real = bound(w, w.mutateSessions)
     let calls = 0
     // Deleting the record fails (what it used is in the usage history by then).
     vi.spyOn(w, 'mutateSessions').mockImplementation((pp, fn) => (++calls === 1 ? Promise.reject(new Error('EIO')) : real(pp, fn)))

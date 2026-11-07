@@ -12,6 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFinished, 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { StoredAgent } from '../src/shared/agentFolders'
+import { bound } from './keepType'
 
 const base = tempDir('cw-template-api-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -317,7 +318,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
       if (revoked) throw new Error('Not allowed by Settings → Assistant → Control')
     }
     // The guard turns down just before the options' write takes the project file's lock.
-    const mutate = w.mutateProjectConfig.bind(w)
+    const mutate = bound(w, w.mutateProjectConfig)
     w.mutateProjectConfig = ((...a: Parameters<typeof mutate>) => {
       revoked = true
       return mutate(...a)

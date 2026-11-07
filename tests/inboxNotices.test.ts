@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { inboxNotice, noticeCounts } from '../src/shared/doorbell'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-inbox-notices-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -441,20 +442,23 @@ describe('notices in the hook replies (#650)', () => {
     const s3 = sessions as unknown as { recordSession: (p: string, a: { id: string; name: string }, l: unknown) => Promise<void> }
     const lastSession = async (agentId: string) => projectAgents(await run(() => w.projectConfig(p))).find((a) => a.id === agentId)?.lastSessionId
     const record = async (id: string) => (await run(() => w.sessionsFile(p))).sessions.find((x) => x.id === id)
-    /** Holds the next call of a workspace method (its real work waits) until released; says when it is reached. */
+    /** Holds the next call of a workspace method (its real work waits) until released; says when it is reached. Each
+     *  method by its name, not read by a computed key, which loses the workspace's type. */
     const holdNext = (name: 'ensureProject' | 'mutateSessions', skip = 0) => {
-      const real = (w[name] as (...a: unknown[]) => Promise<unknown>).bind(w)
+      type Call = (...a: unknown[]) => Promise<unknown>
+      const real = (name === 'ensureProject' ? bound(w, w.ensureProject) : bound(w, w.mutateSessions)) as Call
       let release = (): void => undefined
       const gate = new Promise<void>((r) => (release = r))
       const at = { reached: false }
       let calls = 0
-      const spy = vi.spyOn(w as unknown as Record<typeof name, (...a: unknown[]) => Promise<unknown>>, name).mockImplementation(async (...a: unknown[]) => {
+      const holding: Call = async (...a) => {
         if (calls++ === skip) {
           at.reached = true
           await gate
         }
         return real(...a)
-      })
+      }
+      const spy = name === 'ensureProject' ? vi.spyOn(w, 'ensureProject').mockImplementation(holding as typeof w.ensureProject) : vi.spyOn(w, 'mutateSessions').mockImplementation(holding as typeof w.mutateSessions)
       return { at, release, spy }
     }
     for (const where of ['config', 'cards'] as const) {

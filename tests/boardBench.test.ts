@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { tempDir } from './tempDir'
+import type { WorkspaceService } from '../src/main/workspace'
 
 const source = process.env.CW_BOARD_BENCH_DB
 const base = tempDir('cw-board-bench-')
@@ -83,7 +84,7 @@ describe('the board on a real board’s copy', () => {
     }
     const medianSync = (fn: () => number, times: number): number => Array.from({ length: times }, fn).sort((a, b) => a - b)[Math.floor(times / 2)]
     const held = (await inWorkspace(w, () => tasks.cardHolds(w))).filter((c) => c.held?.length).map((c) => c.number)
-    const costCards = (tasks as { costCards?: (ws: unknown, n: number[]) => Promise<unknown> }).costCards
+    const costCards = (tasks as { costCards?: (ws: WorkspaceService, n: number[]) => Promise<unknown> }).costCards
     const results: Record<string, number> = {
       'allTasks (the whole board)': await median(() => tasks.allTasks(w), 7),
       'allTasks, live cards only': await median(() => tasks.allTasks(w, { archived: false }), 7),

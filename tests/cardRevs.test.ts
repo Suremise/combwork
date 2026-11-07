@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import type { TaskChanges, TaskCursor } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-card-revs-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -199,7 +200,7 @@ describe('tasks:changes (HI-1715)', () => {
 
   it('is stale when the board is opened again while the project ids are read', async () => {
     const first = await read(null)
-    const real = w.projectIds.bind(w)
+    const real = bound(w, w.projectIds)
     w.projectIds = async (o) => {
       const ids = await real(o)
       store.closeBoard(wsPath)

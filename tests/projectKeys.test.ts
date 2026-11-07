@@ -15,6 +15,7 @@ import { inboxText } from '../src/shared/deliveries'
 import { taskPrompt } from '../src/shared/tasks'
 import { taskRow, taskRowText } from '../src/shared/toolReplies'
 import { unexpectedCloseText } from '../src/shared/unexpectedClose'
+import { bound } from './keepType'
 
 const base = tempDir('cw-keys-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -153,10 +154,9 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     // since HI-1705's parallel reads): the refresh hands back the list from before (#999), and New Project waits for the
     // one that write scheduled. Before the fix the reply had no project, and the window stayed on the one shown.
     const raced = join(ws, 'raced')
-    const svc = w as unknown as { projectInfo: (...a: unknown[]) => Promise<{ path: string }> }
-    const read = svc.projectInfo.bind(w)
+    const read = bound(w, w.projectInfo)
     let wrote = false
-    svc.projectInfo = async (...a) => {
+    w.projectInfo = async (...a) => {
       const p = await read(...a)
       if (!wrote && p.path.toLowerCase() === raced.toLowerCase()) {
         wrote = true
@@ -171,17 +171,17 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
   })
 
   it('New Project… made while its workspace gives way to another (one with a project of the same name) is refused, never answered with that one (HI-1760, HR5 round 1)', async () => {
-    type Svc = { projectIds: (o?: { fresh?: boolean }) => Promise<unknown>; refreshesSettled: () => Promise<void>; projectInfo: (...a: unknown[]) => Promise<{ path: string }> }
-    /** Holds the next call of `method` until released; `reached` resolves once it is held. */
+    type Call = (...a: unknown[]) => Promise<unknown>
+    /** Holds the next call of `method` until released; `reached` resolves once it is held. Each method by its name, not
+     *  read by a computed key, which loses the workspace's type. */
     const hold = (w: WS, method: 'projectIds' | 'refreshesSettled', when: (a: unknown[]) => boolean = () => true) => {
-      const svc = w as unknown as Svc
-      const real = (svc[method] as (...a: unknown[]) => Promise<unknown>).bind(w)
+      const real = (method === 'projectIds' ? bound(w, w.projectIds) : bound(w, w.refreshesSettled)) as Call
       let release!: () => void
       let reached!: () => void
       const gate = new Promise<void>((r) => (release = r))
       const at = new Promise<void>((r) => (reached = r))
       let held = false
-      ;(svc as unknown as Record<string, unknown>)[method] = async (...a: unknown[]) => {
+      const holding: Call = async (...a) => {
         if (!held && when(a)) {
           held = true
           reached()
@@ -189,6 +189,8 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
         }
         return real(...a)
       }
+      if (method === 'projectIds') w.projectIds = holding as typeof w.projectIds
+      else w.refreshesSettled = holding as typeof w.refreshesSettled
       return { reached: at, release: () => release() }
     }
     // Held at its id; meanwhile the window opens B, which has a "fresh" of its own.
@@ -204,10 +206,9 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     // Held where it waits for the refresh a write meanwhile scheduled (its reply was the list from before).
     const c = workspace(['hike'])
     await w.open(c)
-    const svc = w as unknown as Svc
-    const read = svc.projectInfo.bind(w)
+    const read = bound(w, w.projectInfo)
     let wrote = false
-    svc.projectInfo = async (...args) => {
+    w.projectInfo = async (...args) => {
       const p = await read(...args)
       if (!wrote && p.path.toLowerCase() === join(c, 'fresh').toLowerCase()) {
         wrote = true
@@ -230,7 +231,7 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
     const w = await open(ws)
     await keys.keyProjects(w)
     // web-app's folder is made only when the test says so.
-    const make = w.createProject.bind(w)
+    const make = bound(w, w.createProject)
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
     w.createProject = async (name: string) => {
@@ -253,9 +254,12 @@ describe('a new workspace: keys at its first open, cards numbered per project', 
 
   it('a reservation is its workspace’s own: another workspace changes a key to it, or makes a project with it, meanwhile (round 2, finding 1)', async () => {
     const [wsA, wsB, wsC] = [workspace(['hike']), workspace(['hike']), workspace(['hike'])]
-    const [a, b, c] = [await open(wsA), await open(wsB), await open(wsC)]
+    // Declared one by one: destructured from an array literal, their slot is any, which loses their type.
+    const a = await open(wsA)
+    const b = await open(wsB)
+    const c = await open(wsC)
     for (const w of [a, b, c]) await keys.keyProjects(w)
-    const make = a.createProject.bind(a)
+    const make = bound(a, a.createProject)
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
     a.createProject = async (name: string) => {
@@ -355,7 +359,7 @@ describe("key writes stay in the workspace they began in (round 1, finding 1)", 
     // The projects' ids are read, and held there while the window opens the other workspace.
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
-    const read = w.projectIds.bind(w)
+    const read = bound(w, w.projectIds)
     w.projectIds = (async () => (await held, idsOfA)) as typeof w.projectIds
     const giving = keys.keyProjects(w)
     const changing = keys.changeProjectKey(w, join(a, 'hike'), 'HV')
@@ -459,7 +463,8 @@ describe('wakes, the inbox and replies name cards by key (round 1, finding 3)', 
 
   it("a crash notice's merges name their cards as each one's workspace does (HI-1661 round 1, finding 4)", async () => {
     // Two workspaces, each with its card #1, under different keys: one notice, told outside both.
-    const [w1, w2] = [await open(workspace(['hike'])), await open(workspace(['ambrosia']))]
+    const w1 = await open(workspace(['hike']))
+    const w2 = await open(workspace(['ambrosia']))
     for (const w of [w1, w2]) await keys.keyProjects(w)
     const [c1, c2] = [await inWorkspace(w1, () => tasks.createTask({ title: 'H', project: 'hike' }, user)), await inWorkspace(w2, () => tasks.createTask({ title: 'A', project: 'ambrosia' }, user))]
     expect([c1.number, c2.number]).toEqual([1, 1])
