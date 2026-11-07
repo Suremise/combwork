@@ -1637,7 +1637,8 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, actor, 'start review', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    const recorded = checksAtRevision(this.state(card).checks, sub.revision, r.options.commands)
+    // A no-code card's submission has no revision: nothing recorded at one.
+    const recorded = sub.revision ? checksAtRevision(this.state(card).checks, sub.revision, r.options.commands) : []
     return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused), ...(recorded.length ? { checksAtRevision: recorded } : {}) })
   }
 

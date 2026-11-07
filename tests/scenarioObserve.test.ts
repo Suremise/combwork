@@ -1758,7 +1758,7 @@ describe('the fixtures fail when nothing was done', () => {
     const run = (...calls: [string, string][]) => check([DOUBT], calls)
     // As Combwork's transcripts give them: Claude Code's Bash and Codex's shell as the command itself; a Codex script's cmd.
     expect(run(['Bash', 'node --test "greet.test.js"'])).toEqual([])
-    expect(run(['Shell', 'node --test .\greet.test.js'])).toEqual([])
+    expect(run(['Shell', 'node --test .\\greet.test.js'])).toEqual([])
     expect(run(['Script', 'text(await tools.exec_command({cmd:"git rev-parse --short HEAD; node --test greet.test.js"}))'])).toEqual([])
     expect(run(['Script', 'text(await tools.exec_command({"cmd":"node --test \\"greet.test.js\\""}))'])).toEqual([])
     // And as JSON, should a tool's input come that way: its command only, never its description.
