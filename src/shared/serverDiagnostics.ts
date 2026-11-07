@@ -249,7 +249,8 @@ export function judgeStep1(reply: StepReply): StepJudgement {
   if (call.name !== TEST_TOOL) return { ok: false, why: 'wrongTool', seen }
   const input = obj(call.input)
   if (!input || typeof input.city !== 'string' || !input.city.trim() || typeof call.id !== 'string' || !call.id) return { ok: false, why: 'invalidArguments', seen }
-  const asked = input.city.trim().toLowerCase().replace(/[^a-z]/g, '')
+  // The city as asked for, whatever its case, accents or a country after it ("reykjavík, Iceland").
+  const asked = input.city.trim().toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z]/g, '')
   if (!asked.startsWith(TEST_CITY.toLowerCase())) return { ok: false, why: 'wrongArgument', seen }
   return { ok: true, toolUse: { id: call.id, input } }
 }
