@@ -350,6 +350,27 @@ describe('the lanes service', () => {
     await lanes.endLane(w, kept.lane.id, { abandoned: true })
   })
 
+  // HI-2664 (HR3's round 1): an agent whose role changed while it ran keeps its old side's tools until it restarts.
+  it("an agent still on its old role's tools isn't given a lane part needing the new ones: refused, saying to restart it, nothing changed", async () => {
+    const [c1] = [await make('Old tools')]
+    const oldTools = /R1's role changed while it was running, and it still has its old role's tools: .*Restart it first/
+    lanes.setPartToolsCheck((_p, id, part) => !(id === 'r1' && part === 'reviewer'))
+    try {
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'the Assistant' })).rejects.toMatchObject({ status: 409, message: expect.stringMatching(oldTools) })
+      expect((await lanes.listLanes(w)).filter((l) => l.builder.id === 'b2' && l.state === 'active')).toEqual([])
+      const kept = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, pool: true, cards: [c1.number], by: 'the Assistant' })
+      await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'R1 (alpha)' })).rejects.toMatchObject({ status: 409, message: expect.stringMatching(oldTools) })
+      expect((await lanes.listLanes(w)).find((l) => l.id === kept.lane.id)?.reviewer ?? null).toBe(null)
+      await lanes.endLane(w, kept.lane.id, { abandoned: true })
+    } finally {
+      lanes.setPartToolsCheck(() => true)
+    }
+    // Restarted with its tools: the same start goes ahead.
+    const started = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'the Assistant' })
+    expect(started.lane.reviewer?.id).toBe('r1')
+    await lanes.endLane(w, started.lane.id, { abandoned: true })
+  })
+
   it('starts a lane, updates it when started again with a card in common, and starts anew with none', async () => {
     // A list sharing no card is another loop, as with workflow rules off: with them on it edits the running lane (#1270).
     await rulesOff()
