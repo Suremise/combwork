@@ -529,10 +529,15 @@ function progressOf(projectPath: string, agentId: string) {
   return { title: r.title, ...(r.total !== null ? { step: r.step ?? 0, total: r.total } : {}), ...(r.stepName ? { stepName: r.stepName } : {}), ...(r.waiting ? { waiting: r.waiting } : {}), ...(etaMs !== null ? { etaMs } : {}), ...(r.state === 'stale' ? { stale: true } : {}) }
 }
 
-/** What of Combwork's an agent's connection launches it with (HI-2670), in short; null: everything. */
+/**
+ * What of Combwork's an agent launches with (HI-2670), in short; null: everything. Its connection's, or, Independent, as
+ * from a terminal whatever its connection says (HI-2731).
+ */
 const launchSummaryOf = (a: AgentInfo): string | null => {
   const c = getConnection(a.connection)
-  const cli = accountById(c?.account)?.provider
+  const cli = accountById(c?.account)?.provider ?? a.provider
+  // Its own role (one a tools-off connection makes Independent launches as that connection says).
+  if (cli && a.workflowRole === 'independent') return policySummary({ launch: terminalPreset(cli) }, cli)
   return c && cli ? policySummary(c, cli) : null
 }
 

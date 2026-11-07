@@ -141,7 +141,7 @@ describe('a launch', () => {
     }
   })
 
-  it('tells the combwork server each role’s side, Independent its own; the workspace’s servers and skills stay as for any role (HI-2731)', async () => {
+  it('launches an Independent agent as from a terminal, whatever its connection says; every other role with its side (HI-2731)', async () => {
     // A workspace of its own: two servers on, a skill of its own, one agent per role.
     const home = join(base, 'ws-roles')
     const project = join(home, 'proj')
@@ -164,16 +164,24 @@ describe('a launch', () => {
     try {
       const eff = async (r: (typeof roles)[number]) => sessions.effective(project, agents.find((a) => a.workflowRole === r) as never)
       const sides: Record<string, unknown> = {}
-      for (const r of roles) {
+      for (const r of roles.filter((x) => x !== 'independent')) {
         const e = await eff(r)
         sides[r] = e.mcpServers.combwork?.env?.CW_SIDE
-        expect(e.launch.tools && e.launch.guidance, r).toBe(true)
+        expect(e.launch.tools && e.launch.guidance && e.launch.typing, r).toBe(true)
         expect(e.skills.map((s) => s.name), r).toContain('house-style')
         expect(Object.keys(e.mcpServers).sort(), r).toEqual(['combwork', 'notes', 'sandbox'])
       }
-      expect(sides).toEqual({ builder: 'builder', reviewer: 'reviewer', either: 'both', generalist: 'both', independent: 'independent' })
+      expect(sides).toEqual({ builder: 'builder', reviewer: 'reviewer', either: 'both', generalist: 'both' })
+      // Darren's 22:15 decision: "Independent behaves as if connection level switches are off": the terminal preset.
+      const { launchPolicy, terminalPreset } = await import('../src/shared/launchPolicy')
+      const ind = await eff('independent')
+      expect(ind.launch).toEqual(launchPolicy({ launch: terminalPreset('claude-code') }, 'claude-code'))
+      expect([ind.launch.tools, ind.launch.guidance, ind.launch.typing, ...Object.values(ind.launch.overrides)].every((v) => v === false)).toBe(true)
+      expect(ind.mcpServers).toEqual({})
+      expect(ind.skills).toEqual([])
+      expect(ind.skillHashes).toEqual({})
       // A role change to or from Independent changes the signature, so a running agent restarts for it.
-      expect(sessions.signature(await eff('independent'))).not.toBe(sessions.signature(await eff('either')))
+      expect(sessions.signature(ind)).not.toBe(sessions.signature(await eff('either')))
     } finally {
       sessions.combworkMcp = was
       await disposeWorkspaceService(w)

@@ -5,7 +5,7 @@ import { randomUUID, randomBytes } from 'crypto'
 import { StepTimes } from './stepTimes'
 import { fmt, msg, onLanguageChange, tr } from '../shared/i18n'
 import { COPIES_REVIEW, PROMPT_AS_TYPED, PROMPT_CLEAR_DRAFT, drawnWaitId, englishText, overrideId, shownText, withValues, type Text, type TextPart } from '../shared/advanced'
-import { launchPolicy, MCP_ISOLATION, type LaunchPolicy } from '../shared/launchPolicy'
+import { launchPolicy, MCP_ISOLATION, terminalPreset, type LaunchPolicy } from '../shared/launchPolicy'
 import { capturedText, errorText, combworkError, CombworkError, shownError } from './combworkError'
 import { assertUpgraded } from './boardStore'
 import { advanced } from './advanced'
@@ -21,7 +21,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
-import { assistantTools, isReservedServerName, sideAllows, sideOffers, toolSideOf, TOOLS_SERVER, workflowAllows, workflowHiddenOf } from '../shared/assistantTools'
+import { assistantTools, hiddenForSide, isReservedServerName, sideAllows, toolSideOf, TOOLS_SERVER, workflowAllows, workflowHiddenOf } from '../shared/assistantTools'
 import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
@@ -1773,7 +1773,12 @@ class SessionManager {
     // Its connection's launch policy (HI-2670): without Combwork's tools, no combwork server and none of Combwork's or the
     // workspace's skills; with its MCP isolation off too, none of the workspace's servers either (the CLI's own config
     // decides, as in a terminal). Part of the signature, so a change of it asks running agents for a restart.
-    const launch = launchPolicy(choice.ok ? choice.connection : null, l.provider, { assistant })
+    // An agent whose role is Independent launches as if its connection's switches were all off (HI-2731, Darren's 7 Nov
+    // 22:15 decision: "Independent behaves as if connection level switches are off"): the "Launch as from a terminal"
+    // preset, whatever its connection says. Its role is in the signature too, so a role change restarts it. Its own saved
+    // role: an agent a tools-off connection makes Independent launches as that connection says (its other switches).
+    const independent = !assistant && forAgent?.workflowRole === 'independent'
+    const launch = launchPolicy(independent ? { launch: terminalPreset(l.provider) } : choice.ok ? choice.connection : null, l.provider, { assistant })
     const delivered = launch.tools ? skills : []
     if (!launch.tools) {
       delete mcpServers[TOOLS_SERVER]
@@ -2585,8 +2590,9 @@ class SessionManager {
    * doesn't already leave out, sorted. Read through workflowHiddenOf (workflowTools.ts sets it at startup); unreadable, none.
    */
   private workflowToolsHidden(projectPath: string, side: string, pc: ProjectConfig): string[] {
+    const bySide = hiddenForSide(side)
     try {
-      return this.workflowHiddenOf(projectPath, pc).filter((t) => sideOffers(side, t))
+      return this.workflowHiddenOf(projectPath, pc).filter((t) => !bySide.includes(t))
     } catch (e) {
       log.warn('the tools a project\'s workflow hides, not read: none are', e)
       return []
