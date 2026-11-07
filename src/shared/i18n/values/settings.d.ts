@@ -148,6 +148,18 @@ interface CombworkMessageValues {
   'settings.advanced.antigravity.statusLine.idleGraceSeconds.title': undefined
   'settings.advanced.antigravity.statusLine.knownFields.desc': undefined
   'settings.advanced.antigravity.statusLine.knownFields.title': undefined
+  'settings.advanced.antigravity.statusLine.otherModels.desc': undefined
+  'settings.advanced.antigravity.statusLine.otherModels.title': undefined
+  'settings.advanced.antigravity.statusLine.planTier.desc': undefined
+  'settings.advanced.antigravity.statusLine.planTier.title': undefined
+  'settings.advanced.antigravity.statusLine.quota.desc': undefined
+  'settings.advanced.antigravity.statusLine.quota.title': undefined
+  'settings.advanced.antigravity.statusLine.remainingFraction.desc': undefined
+  'settings.advanced.antigravity.statusLine.remainingFraction.title': undefined
+  'settings.advanced.antigravity.statusLine.resetTime.desc': undefined
+  'settings.advanced.antigravity.statusLine.resetTime.title': undefined
+  'settings.advanced.antigravity.statusLine.weeklySuffix.desc': undefined
+  'settings.advanced.antigravity.statusLine.weeklySuffix.title': undefined
   'settings.advanced.antigravity.transcript.modelChange.desc': undefined
   'settings.advanced.antigravity.transcript.modelChange.title': undefined
   'settings.advanced.antigravity.transcript.stepHeader.desc': undefined
@@ -410,6 +422,22 @@ interface CombworkMessageValues {
   'settings.advanced.copilot.question.field.title': undefined
   'settings.advanced.copilot.question.tool.desc': undefined
   'settings.advanced.copilot.question.tool.title': undefined
+  'settings.advanced.copilot.quota.entitlementField.desc': undefined
+  'settings.advanced.copilot.quota.entitlementField.title': undefined
+  'settings.advanced.copilot.quota.event.desc': undefined
+  'settings.advanced.copilot.quota.event.title': undefined
+  'settings.advanced.copilot.quota.premiumKey.desc': undefined
+  'settings.advanced.copilot.quota.premiumKey.title': undefined
+  'settings.advanced.copilot.quota.remainingPercentField.desc': undefined
+  'settings.advanced.copilot.quota.remainingPercentField.title': undefined
+  'settings.advanced.copilot.quota.resetField.desc': undefined
+  'settings.advanced.copilot.quota.resetField.title': undefined
+  'settings.advanced.copilot.quota.snapshotsField.desc': undefined
+  'settings.advanced.copilot.quota.snapshotsField.title': undefined
+  'settings.advanced.copilot.quota.unlimitedField.desc': undefined
+  'settings.advanced.copilot.quota.unlimitedField.title': undefined
+  'settings.advanced.copilot.quota.usedField.desc': undefined
+  'settings.advanced.copilot.quota.usedField.title': undefined
   'settings.advanced.copilot.ready.footer.desc': undefined
   'settings.advanced.copilot.ready.footer.title': undefined
   'settings.advanced.copilot.retry.context.desc': undefined

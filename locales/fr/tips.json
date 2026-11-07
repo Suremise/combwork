@@ -386,6 +386,8 @@
   "tips.performance.title": "Ce que coûte Combwork lui-même",
   "tips.permissionMode.text": "Clique sur le mode dans le pied d’un agent, ou appuie sur {key}, pour alterner entre demander d’abord, accepter les modifications et planifier.",
   "tips.permissionMode.title": "Changer de mode d’autorisation",
+  "tips.planLimitsProviders.text": "La barre d’état montre aussi la part utilisée de ton forfait pour Antigravity et Copilot : les quotas hebdomadaires d’Antigravity pour Gemini et pour les autres modèles, les requêtes premium et les chats mensuels de Copilot. Survole-la pour voir quand chacun est remis à zéro.",
+  "tips.planLimitsProviders.title": "Les limites de chaque forfait dans la barre d’état",
   "tips.progressCard.text": "Une exécution du panneau Progression montre sous l’agent la carte et la révision sur laquelle elle a tourné, par exemple #1061 · a3f2c1d : clique sur la carte pour l’ouvrir, ou sur la révision pour la copier.",
   "tips.progressCard.title": "Pour quelle carte était cette exécution ?",
   "tips.progressCheck.text": "Une exécution pour une carte est enregistrée comme vérification de la révision de la carte. Ses détails dans le panneau Progression indiquent « Compte comme vérification », ou pourquoi pas : elle n’a pas été lancée comme cette vérification, le dossier avait des modifications non commitées, ou des fichiers ont changé pendant l’exécution.",

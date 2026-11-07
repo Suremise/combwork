@@ -51,6 +51,7 @@ import { MergeSlotList, projectSlots, useMergeSlots } from '../components/MergeS
 import { cx, formatDuration, formatNumber, formatTokens, resetsIn, timeAgo } from '../util'
 import { useLiveUsage, useNow } from '../usage'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
+import { limitName, limitWindow } from '@shared/planLimits'
 import { samePath } from '@shared/movePaths'
 import { agentFolder, awayFromProject, legacyOf, placeText, workFolderOf } from '../agentPlace'
 
@@ -159,6 +160,10 @@ const M = {
   limitTipConnection: msg({ id: 'project.limit.tipConnection', defaultMessage: "How much of the plan’s {window, select, fiveHour {5-hour} weekly {weekly} other {{label}}} allowance is used on {name}, across all its sessions (not just Combwork's).", description: 'The (i) beside a plan limit of one connection (HI-1756): {name} is the connection, a sign-in the user named ("Max 1").' }),
   noConnectionLimits: msg({ id: 'project.limit.noneConnection', defaultMessage: 'Its limits appear after the next message in a session on {name}.', description: 'Under a connection ({name}: "Max 1", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported.' }),
   noConnectionsOn: msg({ id: 'project.limit.noConnections', defaultMessage: 'No {provider} account is on in this workspace. Turn one on in Settings → Accounts & Connections to see its plan limits here.', description: 'In place of the plan limits (HI-1756) when the workspace has no account on for the coding agent ({provider}). Settings → Accounts & Connections names a section.' }),
+  limitUnlimited: msg({ id: 'project.limit.unlimited', defaultMessage: 'Unlimited', description: "A plan limit's figure when the plan has no limit on it (HI-2734: Copilot reports some quotas as unlimited), in place of a percent." }),
+  limitUnlimitedSub: msg({ id: 'project.limit.unlimitedSub', defaultMessage: '{hasReset, select, yes {no limit · period resets {when}} other {no limit}}', description: 'Under an unlimited plan limit (HI-2734). {when} is when its period resets: "in 3 days", or a day and time.' }),
+  limitCounts: msg({ id: 'project.limit.counts', defaultMessage: '{used, number} of {entitlement, number} used', description: "In the (i) of a plan limit whose provider says its counts (HI-2734: Copilot's requests): how many of how many were used." }),
+  planOnly: msg({ id: 'project.limit.planOnly', defaultMessage: "Your plan: {plan}. {provider} hasn’t reported this plan’s limits yet.", description: "In place of the plan limits when the provider said the plan's name but no limits (HI-2734: Antigravity's plan tier). {plan} is the plan's name as the provider says it." }),
   noLimits: msg({ id: 'project.limit.none', defaultMessage: "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.", description: 'In place of the plan limits before any were reported.' })
 }
 
@@ -313,8 +318,8 @@ const S = {
   noMatch: msg({ id: 'project.settings.noMatch', defaultMessage: 'No settings match.', description: "Project Settings when the search finds nothing." })
 }
 
-/** A plan limit's window as the messages select on: the 5-hour and weekly windows Combwork knows, else its own label. */
-export const limitWindow = (l: PlanLimit): string => (l.windowMinutes === 300 ? 'fiveHour' : l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other')
+/** A plan limit's window as the messages select on, and its name for the others (shared/planLimits.ts, HI-2734). */
+export { limitName, limitWindow }
 
 // ---------------------------------------------------------------------------
 // Overview
@@ -917,37 +922,50 @@ export function PlanLimits({ provider }: { provider: ProviderId }) {
                 <strong>{name}</strong>
                 {email && <span className="faint"> {email}</span>}
               </div>
-              <LimitCards kept={byConnection[id]} now={now} tip={(l) => tr(M.limitTipConnection, { window: limitWindow(l), label: l.label, name })} none={tr(M.noConnectionLimits, { name })} />
+              <LimitCards kept={byConnection[id]} now={now} provider={p.name} tip={(l) => tr(M.limitTipConnection, { window: limitWindow(l), label: limitName(l), name })} none={tr(M.noConnectionLimits, { name })} />
             </div>
           )
         })}
       </>
     )
   }
-  return <LimitCards kept={kept} now={now} tip={(l) => tr(M.limitTip, { window: limitWindow(l), label: l.label, provider: providerName(provider) })} none={tr(M.noLimits, { provider: p.name })} />
+  return <LimitCards kept={kept} now={now} tip={(l) => tr(M.limitTip, { window: limitWindow(l), label: limitName(l), provider: providerName(provider) })} none={tr(M.noLimits, { provider: p.name })} provider={p.name} />
 }
 
 /** A CLI's or a connection's limits as cards, or `none` before any is current. */
-function LimitCards({ kept, now, tip, none }: { kept: PlanUsage | undefined; now: number; tip: (l: PlanLimit) => string; none: string }) {
+function LimitCards({ kept, now, tip, none, provider }: { kept: PlanUsage | undefined; now: number; tip: (l: PlanLimit) => string; none: string; provider: string }) {
   // A limit whose reset has passed with no new report isn't shown as it was (#383).
   const usage = kept && { ...kept, limits: kept.limits.filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now) }
-  const card = (l: PlanLimit): React.ReactNode => (
-    <Card key={l.id} title={tr(M.limitTitle, { window: limitWindow(l), label: `${l.label.charAt(0).toUpperCase()}${l.label.slice(1)}` })} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tip(l)} accent={l.usedPercent >= 80}>
-      <div className={cx('meter', l.usedPercent >= 95 ? 'danger' : l.usedPercent >= 80 && 'caution')}>
-        <div style={{ width: `${Math.min(100, l.usedPercent)}%` }} />
-      </div>
-    </Card>
-  )
-  return usage?.limits.length ? (
-    <>
-      <div className="faint small overview-plan">
-        {tr(M.planLimits, { plan: usage.plan || 'none', when: timeAgo(usage.updatedAt) })}
-      </div>
-      <div className="cards">{usage.limits.map(card)}</div>
-    </>
-  ) : (
-    <p className="hint">{none}</p>
-  )
+  const title = (l: PlanLimit): string => {
+    const name = limitName(l)
+    return tr(M.limitTitle, { window: limitWindow(l), label: `${name.charAt(0).toUpperCase()}${name.slice(1)}` })
+  }
+  // Its counts, where the provider says them (HI-2734: Copilot's requests), in its (i).
+  const tipOf = (l: PlanLimit): string => (l.used !== undefined && l.entitlement !== undefined ? `${tip(l)}
+${tr(M.limitCounts, { used: l.used, entitlement: l.entitlement })}` : tip(l))
+  const card = (l: PlanLimit): React.ReactNode =>
+    l.unlimited ? (
+      // An unlimited one (HI-2734): said so, with no meter and no percent.
+      <Card key={l.id} title={title(l)} value={tr(M.limitUnlimited)} sub={tr(M.limitUnlimitedSub, { hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' })} tip={tipOf(l)} />
+    ) : (
+      <Card key={l.id} title={title(l)} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tipOf(l)} accent={l.usedPercent >= 80}>
+        <div className={cx('meter', l.usedPercent >= 95 ? 'danger' : l.usedPercent >= 80 && 'caution')}>
+          <div style={{ width: `${Math.min(100, l.usedPercent)}%` }} />
+        </div>
+      </Card>
+    )
+  if (usage?.limits.length)
+    return (
+      <>
+        <div className="faint small overview-plan">
+          {tr(M.planLimits, { plan: usage.plan || 'none', when: timeAgo(usage.updatedAt) })}
+        </div>
+        <div className="cards">{usage.limits.map(card)}</div>
+      </>
+    )
+  // The plan's name alone (HI-2734): said as it is, with no meter made up.
+  if (usage?.plan) return <p className="hint" data-plan-only="">{tr(M.planOnly, { plan: usage.plan, provider })}</p>
+  return <p className="hint">{none}</p>
 }
 
 // ---------------------------------------------------------------------------

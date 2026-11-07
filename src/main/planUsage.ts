@@ -3,6 +3,7 @@ import { msg, tr } from '../shared/i18n'
 import { createHash } from 'crypto'
 import type { ConnectionPlanUsage, PlanLimit, PlanUsage, ProviderId } from '../shared/types'
 import { providerName } from '../shared/providers'
+import { limitName } from '../shared/planLimits'
 import { formatTime, formatWeekdayTime } from '../shared/dates'
 import { config } from './config'
 import { emit } from './events'
@@ -32,14 +33,32 @@ const resetPassed = (l: Pick<PlanLimit, 'resetsAt'>, now: number): boolean => !!
  * the new reading when none is kept or the kept one's period is over; nothing from a period already over (a resumed
  * rollout's); the later period's when they differ; within one period the higher, as reported, with the later reset time
  * (they wobble by seconds). With no reset time to tell periods apart, the latest report, as before.
+ * What the plan allows changing (HI-2734: unlimited now or no longer, another entitlement) makes the two readings
+ * incomparable: the one reported later is what it is now, whatever its figure, and never a mix of the two.
  */
 function mergeLimit(kept: PlanLimit | undefined, next: PlanLimit, now: number): PlanLimit | undefined {
   if (resetPassed(next, now)) return kept && !resetPassed(kept, now) ? kept : undefined
-  if (!kept || resetPassed(kept, now) || !kept.resetsAt || !next.resetsAt) return next
+  if (!kept || resetPassed(kept, now)) return next
+  if (allowanceChanged(kept, next)) return reportedLater(kept, next)
+  if (!kept.resetsAt || !next.resetsAt) return next
   if (!samePeriod(kept.resetsAt, next.resetsAt)) return Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next : kept
   const resetsAt = Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next.resetsAt : kept.resetsAt
-  return { ...(next.usedPercent >= kept.usedPercent ? next : kept), resetsAt }
+  if (next.usedPercent >= kept.usedPercent) return { ...next, resetsAt }
+  // The higher reading kept, its figures and who reported them; what the limit is (its name, window, models) the latest
+  // report's (HI-2734).
+  const out: PlanLimit = { ...next, usedPercent: kept.usedPercent, resetsAt, reportedAt: kept.reportedAt, reportedBy: kept.reportedBy }
+  if (kept.used === undefined) delete out.used
+  else out.used = kept.used
+  if (out.reportedAt === undefined) delete out.reportedAt
+  if (out.reportedBy === undefined) delete out.reportedBy
+  return out
 }
+
+/** Whether what the plan allows differs between two readings of a limit (HI-2734): unlimited in one, or two entitlements. */
+const allowanceChanged = (a: PlanLimit, b: PlanLimit): boolean => !!a.unlimited !== !!b.unlimited || (a.entitlement !== undefined && b.entitlement !== undefined && a.entitlement !== b.entitlement)
+
+/** Of two readings, the one reported later (the new one when either's time is unknown or they are the same). */
+const reportedLater = (kept: PlanLimit, next: PlanLimit): PlanLimit => (kept.reportedAt && next.reportedAt && Date.parse(kept.reportedAt) > Date.parse(next.reportedAt) ? kept : next)
 
 /**
  * What to keep of a provider's plan usage after a report: each limit merged by its id (mergeLimit), limits the report
@@ -53,7 +72,10 @@ export function mergePlanUsage(kept: PlanUsage | undefined, report: PlanUsage, n
     ...stamped.map((l) => mergeLimit(kept?.limits.find((k) => k.id === l.id), l, now)),
     ...(kept?.limits ?? []).filter((k) => !ids.has(k.id) && !resetPassed(k, now))
   ].filter((l): l is PlanLimit => !!l)
-  return { ...report, plan: report.plan ?? kept?.plan ?? null, limits }
+  // A report of the plan's name alone (HI-2734: agy's plan_tier without its quota) says nothing new of the figures: they
+  // stay as of when they were reported.
+  const updatedAt = report.limits.length || !kept ? report.updatedAt : kept.updatedAt
+  return { ...report, plan: report.plan ?? kept?.plan ?? null, limits, updatedAt }
 }
 
 /**
@@ -90,8 +112,8 @@ function saveSoon(): void {
 const USED = msg({ id: 'main.plan.used', defaultMessage: '{share, number, ::percent} of your {provider} {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used', description: "A notice: how much of a plan's usage limit is used ({share}: \"85%\"). {provider} is the coding agent. The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)." })
 
 /** A limit's window as main.plan.used selects on: a whole number of hours (the 5-hour window), the weekly one, else its label. */
-const usedWindow = (l: Pick<PlanLimit, 'windowMinutes'>): { window: 'hours' | 'weekly' | 'other'; hours: number } =>
-  l.windowMinutes === 7 * 24 * 60 ? { window: 'weekly', hours: 0 } : l.windowMinutes && l.windowMinutes % 60 === 0 ? { window: 'hours', hours: l.windowMinutes / 60 } : { window: 'other', hours: 0 }
+const usedWindow = (l: Pick<PlanLimit, 'windowMinutes' | 'models'>): { window: 'hours' | 'weekly' | 'other'; hours: number } =>
+  l.models ? { window: 'other', hours: 0 } : l.windowMinutes === 7 * 24 * 60 ? { window: 'weekly', hours: 0 } : l.windowMinutes && l.windowMinutes % 60 === 0 ? { window: 'hours', hours: l.windowMinutes / 60 } : { window: 'other', hours: 0 }
 
 const USED_ON = msg({ id: 'main.plan.usedOn', defaultMessage: '{share, number, ::percent} of the {window, select, hours {{hours, plural, one {#-hour limit} other {#-hour limit}}} weekly {weekly limit} other {{label} limit}} used on {connection}', description: "A notice (HI-1756): how much of a plan's usage limit is used ({share}: \"85%\") on one connection, a sign-in the user named ({connection}: \"Max 1\"). The limit is a rolling window of {hours} hours (the 5-hour one), the weekly one, or another the provider names itself ({label}, in English as the provider says it)." })
 
@@ -99,8 +121,8 @@ const USED_ON = msg({ id: 'main.plan.usedOn', defaultMessage: '{share, number, :
  * The notice that a limit is `level`% used: in the language shown, its title in English for the Agent API too. On a
  * connection (HI-1756), it names the connection, whose own limit it is. Exported for tests.
  */
-export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes'>, level: number, connection?: string): { title: string; body: string; apiTitle: string; apiTitleText: TextPart } {
-  const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: l.label, connection: connection ?? '' }
+export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes' | 'models'>, level: number, connection?: string): { title: string; body: string; apiTitle: string; apiTitleText: TextPart } {
+  const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: limitName(l), connection: connection ?? '' }
   const m = connection ? USED_ON : USED
   const body = `${level >= 95 ? tr(msg({ id: 'main.plan.pause', defaultMessage: 'Sessions will pause when it runs out.', description: 'A plan-usage notice, at 95% used or more.' })) : tr(msg({ id: 'main.plan.close', defaultMessage: 'You are getting close to the limit.', description: 'A plan-usage notice, below 95% used.' }))}${resetText(l.resetsAt)}`
   // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
@@ -111,7 +133,8 @@ export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent
  * What the windows are told: the kept values as they are (#383 round 4: a rounded figure hid 94.9% → 95.1%, which the
  * status bar's warning colour goes by), the reset times and who reported them. Only the report times aren't a change.
  */
-const shownValues = (u: PlanUsage | null | undefined): string => JSON.stringify([u?.plan ?? null, (u?.limits ?? []).map((l) => [l.id, l.usedPercent, l.resetsAt, l.reportedBy ?? null])])
+const shownValues = (u: PlanUsage | null | undefined): string =>
+  JSON.stringify([u?.plan ?? null, (u?.limits ?? []).map((l) => [l.id, l.usedPercent, l.resetsAt, l.reportedBy ?? null, l.label, l.windowMinutes, l.models ?? null, !!l.unlimited, l.used ?? null, l.entitlement ?? null])])
 
 /**
  * Providers report plan usage often (Claude Code with every status-line update, many times a minute while
@@ -144,6 +167,8 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
   }
 
   for (const l of usage.limits) {
+    // Unlimited (HI-2734): nothing to warn of.
+    if (l.unlimited) continue
     const key = warningKey(provider, l.id, connection?.id)
     const level = nextWarning(l, config.get().planWarnings[key])
     if (level === null) continue

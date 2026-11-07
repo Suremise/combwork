@@ -386,6 +386,8 @@
   "tips.performance.title": "Quanto o próprio Combwork custa",
   "tips.permissionMode.text": "Clique no modo, no rodapé de um agente, ou pressione {key}, para alternar entre perguntar antes, aceitar edições e planejar.",
   "tips.permissionMode.title": "Troque o modo de permissão",
+  "tips.planLimitsProviders.text": "A barra de status mostra quanto do seu plano foi usado também para o Antigravity e o Copilot: as cotas semanais do Antigravity para o Gemini e para outros modelos, e as solicitações premium e os chats mensais do Copilot. Passe o mouse sobre ela para ver quando cada um renova.",
+  "tips.planLimitsProviders.title": "Os limites de cada plano na barra de status",
   "tips.progressCard.text": "Uma execução no painel Progresso mostra, abaixo do agente, o cartão e a versão em que rodou, como #1061 · a3f2c1d: clique no cartão para abri-lo, ou na versão para copiá-la.",
   "tips.progressCard.title": "Para qual cartão foi essa execução?",
   "tips.progressCheck.text": "Uma execução para um cartão é registrada como verificação da versão do cartão. Os detalhes dela no painel Progresso dizem “Conta como verificação” ou por que não: não foi iniciada como essa verificação, a pasta tinha alterações não commitadas ou arquivos mudaram durante a execução.",

@@ -386,6 +386,8 @@
   "tips.performance.title": "Combwork自体のコスト",
   "tips.permissionMode.text": "エージェントのフッターのモードをクリックするか{key}を押すと、先に確認するモード、編集を承認するモード、計画モードを切り替えられます。",
   "tips.permissionMode.title": "権限モードを切り替える",
+  "tips.planLimitsProviders.text": "ステータスバーには、AntigravityとCopilotのプランの使用量も表示されます。AntigravityのGeminiとその他のモデルの週間クォータ、Copilotの月間のプレミアムリクエストとチャットです。ポイントすると、それぞれがいつリセットされるかが表示されます。",
+  "tips.planLimitsProviders.title": "すべてのプランの制限をステータスバーに",
   "tips.progressCard.text": "進捗パネルの実行には、エージェント名の下に対象のカードと実行したリビジョンが表示されます（例：#1061 · a3f2c1d）。カードをクリックすると開き、リビジョンをクリックするとコピーします。",
   "tips.progressCard.title": "その実行はどのカードのため？",
   "tips.progressCheck.text": "カードの実行は、カードのリビジョンのチェックとして記録されます。進捗パネルの詳細には「チェックとして有効」か、そうでない理由が表示されます。そのチェックとして開始されていない、フォルダーに未コミットの変更があった、実行中にファイルが変更された、などです。",

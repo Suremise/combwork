@@ -19,7 +19,8 @@
 // - it starts the MCP servers of <USERPROFILE>\.gemini\config\mcp_config.json and of each workspace folder's
 //   .agents\mcp_config.json (the cwd and each --add-dir), a server named in the profile replacing the project's of that
 //   name, and keeps them running (one that ends falls back to the project's, as the real CLI's does);
-// - each line typed is a turn: written to the transcript, answered "Done: <line>", the status line run again; a line
+// - each line typed is a turn: written to the transcript, answered "Done: <line>", the status line run again ("quota G O"
+//   also puts the plan's quota in it from then on, HI-2734: Gemini's share left G, the other models' O); a line
 //   "tool <text>" also calls an MCP tool (call_mcp_tool) whose result is <text>, and "image" reads an image (read_file, its
 //   result naming a copy in logs\media); a resume needs the conversation's store (conversations\<id>.db), as 1.5.0's does.
 // Every launch is logged to FAKE_AGY_LOG (a JSON line: its arguments, cwd, and the environment the adapter sets).
@@ -117,9 +118,13 @@ try {
   process.stderr.write(`Error: --settings: ${e.message}\n`)
   process.exit(1)
 }
+// The plan's quota and name its status line carries (HI-2734), once a turn "quota G O" set them: Gemini's share left G and
+// the other models' O, as 1.5.0 sends them (tests/fixtures/advanced/statusline-run-antigravity-1.5.0.jsonl).
+let quota = null
 function statusLine(state, extra = {}) {
   const cmd = settings.statusLine?.command
   if (!cmd) return
+  if (quota) extra = { ...quota, ...extra }
   const model = flag('--model') || 'Gemini 3.8 Flash (Low)'
   const input = JSON.stringify({ conversation_id: named ? conv : '', session_id: named ? conv : '', transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: { id: model, display_name: model, effort: flag('--effort') || 'low' }, context_window: { context_window_size: 1048576 }, product: 'antigravity', ...extra })
   spawnSync(process.env.ComSpec || 'cmd.exe', [asAgy(cmd)], { windowsVerbatimArguments: true, input, timeout: 5000, windowsHide: true })
@@ -353,6 +358,11 @@ async function turn(text) {
     await body()
     fire('PostInvocation', { invocationNum: invocation, initialNumSteps: at })
     invocation++
+  }
+  const q = /^quota ([\d.]+) ([\d.]+)$/.exec(text)
+  if (q) {
+    const week = new Date(Date.now() + 5 * 86400e3).toISOString().replace(/\.\d+Z$/, 'Z')
+    quota = { quota: { '3p-weekly': { remaining_fraction: Number(q[2]), reset_time: week, reset_in_seconds: 432000 }, 'gemini-weekly': { remaining_fraction: Number(q[1]), reset_time: week, reset_in_seconds: 432000 } }, plan_tier: 'Antigravity Starter Quota' }
   }
   let carried = /carry on/i.test(text)
   // Combwork's doorbell (#650): it reads its inbox as a model does (and acks what it read, following notices); new work

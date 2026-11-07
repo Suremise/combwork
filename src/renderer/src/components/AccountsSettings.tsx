@@ -1,4 +1,5 @@
 import { ConnectionDialog, MovedNoticeBanner, connectionSummary, connectionUsers, effortUnusableText } from './ConnectionDefaults'
+import { limitName } from '@shared/planLimits'
 import { connectionCells, currentLimits, planName, resetText, usageLevel, windowOf, type ConnectionCell } from './accountCard'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Account, PlanLimit, ProviderId } from '@shared/types'
@@ -138,8 +139,8 @@ function UsageBars({ limits }: { limits: readonly PlanLimit[] | undefined }) {
     <div className="account-usage" data-usage>
       {shown.map((l) => (
         <div key={l.id} className="account-usage-row" data-limit={l.id}>
-          <span className="account-usage-label">{tr(M.usageLabel, { window: windowOf(l), label: l.label })}</span>
-          <span className={cx('account-usage-bar', usageLevel(l.usedPercent))} role="meter" aria-label={tr(M.usageLabel, { window: windowOf(l), label: l.label })} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(l.usedPercent)}>
+          <span className="account-usage-label">{tr(M.usageLabel, { window: windowOf(l), label: limitName(l) })}</span>
+          <span className={cx('account-usage-bar', usageLevel(l.usedPercent))} role="meter" aria-label={tr(M.usageLabel, { window: windowOf(l), label: limitName(l) })} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(l.usedPercent)}>
             <i style={{ width: `${Math.max(0, Math.min(100, l.usedPercent))}%` }} />
           </span>
           <span className="account-usage-pct">{fmt.percent(l.usedPercent / 100)}</span>

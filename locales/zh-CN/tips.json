@@ -386,6 +386,8 @@
   "tips.performance.title": "Combwork 本身的开销",
   "tips.permissionMode.text": "点击智能体底部栏中的模式，或按 {key}，即可在先询问、接受编辑和计划之间切换。",
   "tips.permissionMode.title": "切换权限模式",
+  "tips.planLimitsProviders.text": "状态栏也会显示 Antigravity 和 Copilot 的套餐用量：Antigravity 的 Gemini 和其他模型的每周配额，以及 Copilot 每月的高级请求和聊天次数。将鼠标悬停在上面即可查看各项的重置时间。",
+  "tips.planLimitsProviders.title": "状态栏显示每个套餐的限额",
   "tips.progressCard.text": "进度面板中的运行会在智能体下方显示它对应的卡片和运行时的修订版本，例如 #1061 · a3f2c1d：点击卡片可打开它，点击修订版本可复制它。",
   "tips.progressCard.title": "那次运行是为哪张卡片？",
   "tips.progressCheck.text": "为卡片进行的运行会被记录为对卡片修订版本的检查。进度面板中它的详情会显示“计为检查”，或说明原因：它不是作为该检查启动的、文件夹有未提交的更改，或运行期间文件发生了变化。",

@@ -1579,6 +1579,14 @@
     "defaultMessage": "Switch permission mode",
     "description": "A tip's title."
   },
+  "tips.planLimitsProviders.text": {
+    "defaultMessage": "The status bar shows how much of your plan is used for Antigravity and Copilot too: Antigravity's weekly quotas for Gemini and for other models, Copilot's monthly premium requests and chats. Hover it for when each resets.",
+    "description": "A tip (HI-2734). Antigravity and Copilot are products' names; Gemini is Google's models' name."
+  },
+  "tips.planLimitsProviders.title": {
+    "defaultMessage": "Every plan's limits in the status bar",
+    "description": "A tip's title (HI-2734)."
+  },
   "tips.progressCard.text": {
     "defaultMessage": "A run in the Progress panel shows the card and the revision it ran on under the agent, such as #1061 · a3f2c1d: click the card to open it, or the revision to copy it.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. #1061 is a card's number and a3f2c1d a commit's short id: keep them as they are."

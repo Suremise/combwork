@@ -126,7 +126,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await agTab.waitFor({ timeout: HUNG_MS })
   await agTab.click()
   // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
-  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 18, HUNG_MS)))
+  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 24, HUNG_MS)))
   await shots('advanced')
   await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
@@ -333,6 +333,19 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await until(async () => (await live(other.id))?.status === 'finished', HUNG_MS)
   check('…and, once her turn is over, it runs', (await say(gem.id, e.USERPROFILE, gem2.conv, 'edit notes.txt now')) && !!(await until(async () => transcriptOf(e.USERPROFILE, gem2.conv).includes('Made 1 replacement'), HUNG_MS)))
   await stop(other.id)
+
+  // --- The plan's limits (HI-2734): agy's status line with its quota (Gemini's 90% left, the other models' 75%) and the
+  // plan's name. The status bar names each by its models; the Overview shows them as cards under the plan's name.
+  await say(gem.id, e.USERPROFILE, gem2.conv, 'quota 0.9 0.75')
+  const planItem = page.locator('.statusbar .status-item[data-plan="antigravity"]')
+  const planText = async () => (await planItem.innerText().catch(() => '')).replace(/\s+/g, ' ')
+  check("the status bar shows Antigravity's weekly quotas, each by its models", !!(await until(async () => /Other wk 25%/.test(await planText()) && /Gemini wk 10%/.test(await planText()), HUNG_MS)), await planText())
+  const kept = (await inv('app:planUsage')).antigravity
+  check("…kept as the CLI's, with the plan's name", kept?.plan === 'Antigravity Starter Quota' && kept.limits.map((l) => l.models).sort().join() === 'gemini,otherModels', JSON.stringify(kept))
+  await planItem.click()
+  const plan = page.locator('.overview-plan', { hasText: 'Antigravity Starter Quota' })
+  check('…and the Overview shows them as cards, under the plan', !!(await until(async () => (await plan.count()) > 0 && (await page.getByText('Gemini models, weekly limit').count()) > 0 && (await page.getByText('Other models, weekly limit').count()) > 0, HUNG_MS)))
+  await page.screenshot({ path: path.join(lib.WORK, 'antigravity-plan-limits.png') })
   await stop()
   void ada
   check('the sentinel was never started, all along', !fs.existsSync(marker))
