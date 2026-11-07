@@ -117,6 +117,17 @@ export interface PlainGetOptions {
   signal?: AbortSignal
 }
 
+export interface PlainRequestOptions extends PlainGetOptions {
+  method?: 'GET' | 'POST'
+  /** A request body, sent as it is (the caller sets its Content-Type). */
+  body?: string
+  /**
+   * How much of a non-2xx reply's body to read, in bytes (HI-2683: a server's error, to classify it): at most this, cut
+   * there (`errorText`), an encoded one not read. 0, the default: none, as plainHttpGet.
+   */
+  errorBytes?: number
+}
+
 /** A reply as plainHttpGet read it: `text` only for a 2xx whose body was read whole and unencoded. */
 export interface PlainReply {
   status: number
@@ -124,6 +135,8 @@ export interface PlainReply {
   text: string
   /** Why a 2xx reply's body wasn't read: over maxBytes, or encoded (refused, never decoded). */
   refused?: 'tooBig' | 'encoded'
+  /** A non-2xx reply's body, its first `errorBytes` at most (only when asked for, HI-2683). */
+  errorText?: string
 }
 
 /**
@@ -132,9 +145,18 @@ export interface PlainReply {
  * model listing, HI-1836). Rejects only when there is no reply (unreachable, the signal, a reply cut short).
  */
 export function plainHttpGet(url: string, opts: PlainGetOptions = {}): Promise<PlainReply> {
-  const { maxBytes = 4 * 1024 * 1024, signal } = opts
+  return plainHttpRequest(url, { ...opts, method: 'GET' })
+}
+
+/**
+ * plainHttpGet's request with any method and a body (HI-2683: a server's tool-call test is a POST): the same rules, no
+ * redirect followed, unencoded only, a 2xx body within `maxBytes`, and of a non-2xx one only its first `errorBytes`.
+ */
+export function plainHttpRequest(url: string, opts: PlainRequestOptions = {}): Promise<PlainReply> {
+  const { maxBytes = 4 * 1024 * 1024, signal, method = 'GET', body, errorBytes = 0 } = opts
   const own = Object.entries(opts.headers ?? {}).filter(([k]) => k.toLowerCase() !== 'accept-encoding')
-  const headers = { ...DEFAULT_HEADERS, ...Object.fromEntries(own), 'Accept-Encoding': 'identity' }
+  const headers: Record<string, string> = { ...DEFAULT_HEADERS, ...Object.fromEntries(own), 'Accept-Encoding': 'identity' }
+  if (body !== undefined) headers['Content-Length'] = String(Buffer.byteLength(body, 'utf8'))
   return new Promise((resolve, reject) => {
     let req: ReturnType<typeof httpsRequest> | null = null
     let done = false
@@ -161,26 +183,31 @@ export function plainHttpGet(url: string, opts: PlainGetOptions = {}): Promise<P
       const target = new URL(url)
       if (target.protocol !== 'https:' && target.protocol !== 'http:') return fail(new Error(`Not an http(s) URL: ${target.protocol}`))
       const send = target.protocol === 'https:' ? httpsRequest : httpRequest
-      req = send(target, { method: 'GET', headers }, (res) => {
+      req = send(target, { method, headers }, (res) => {
         if (done) return void res.destroy()
         const status = res.statusCode ?? 0
-        if (status < 200 || status >= 300) return settle({ status, text: '' }, res)
-        if (encodingOf(res)) return settle({ status, text: '', refused: 'encoded' }, res)
+        const ok = status >= 200 && status < 300
+        if (!ok && (errorBytes <= 0 || (status >= 300 && status < 400) || encodingOf(res))) return settle({ status, text: '' }, res)
+        if (ok && encodingOf(res)) return settle({ status, text: '', refused: 'encoded' }, res)
         const chunks: Buffer[] = []
         let size = 0
         res.on('data', (c: Buffer) => {
           size += c.length
-          if (size > maxBytes) return settle({ status, text: '', refused: 'tooBig' }, res)
+          if (ok && size > maxBytes) return settle({ status, text: '', refused: 'tooBig' }, res)
           chunks.push(c)
+          // An error's body: its first errorBytes only, the rest not read.
+          if (!ok && size >= errorBytes) settle({ status, text: '', errorText: Buffer.concat(chunks).subarray(0, errorBytes).toString('utf8') }, res)
         })
         res.on('end', () => {
-          if (finish()) resolve({ status, text: Buffer.concat(chunks).toString('utf8') })
+          if (!finish()) return
+          const all = Buffer.concat(chunks)
+          resolve(ok ? { status, text: all.toString('utf8') } : { status, text: '', errorText: all.subarray(0, errorBytes).toString('utf8') })
         })
         res.on('error', fail)
         res.on('aborted', () => fail(new Error('Reply cut short')))
       })
       req.on('error', fail)
-      req.end()
+      req.end(body)
     } catch (e) {
       fail(e as Error)
     }

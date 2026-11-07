@@ -8,6 +8,7 @@ import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { ConnectionPatch, ConnectionsView } from './accounts'
 import type { ServerModelsRead } from './serverConnection'
+import type { ContextCheck, LastCheck, ToolTest } from './serverDiagnostics'
 import type { MovedNotice } from './connectionDefaults'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
@@ -1102,6 +1103,16 @@ export interface CombworkRequests {
   /** Reads a server connection's models from its server (`request`: this reading's id, for cancelling it and telling a stale reply). */
   'connections:readModels': (id: string, request: string) => ServerModelsRead
   'connections:cancelModels': (id: string, request: string) => void
+  /** A server connection's diagnostics (HI-2683): one model's context as its server reports it (`request`: this check's id). */
+  'connections:readContext': (id: string, model: string, request: string) => ContextCheck
+  /** The tool-call test, one model's (`request`: this check's id). */
+  'connections:testTools': (id: string, model: string, request: string) => ToolTest
+  /** Ends a check, that one only (a newer one for the same model stays). */
+  'connections:cancelCheck': (id: string, model: string, request: string) => void
+  /** The last results of a model's checks, kept while Combwork runs. */
+  'connections:lastCheck': (id: string, model: string) => LastCheck
+  /** The context the user says a model has (null: clears it). */
+  'connections:setModelContext': (id: string, model: string, tokens: number | null) => void
   /** Opens the CLI on a connection (a server one, or a sign-in one: HI-1826), for its first-run screens; returns the terminal's key. */
   /** Its terminal's key, and where it opened (HI-1871: a workspace folder or a project's; absent, its own folder). */
   'connections:setUp': (id: string) => { key: string; in?: { folder: string; project?: string; workspace?: true } }

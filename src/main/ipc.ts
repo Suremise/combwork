@@ -21,7 +21,8 @@ import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { connectionInput, type ConnectionPatch } from '../shared/accounts'
 import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, setUsageMove, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
-import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
+import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setServerModelContext, setUpServerConnection } from './serverConnections'
+import { cancelServerChecks, lastServerCheck, readServerContext, testServerTools } from './serverDiagnostics'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
 import { maskDeep, maskKeys } from './keyMatcher'
@@ -1815,6 +1816,12 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:removeKey': (id) => removeServerKey(id),
     'connections:readModels': (id, request) => readServerModels(id, String(request)),
     'connections:cancelModels': (id, request) => cancelServerModels(id, String(request)),
+    // Its diagnostics (HI-2683): read-only, asked for by the user; the key stays in main.
+    'connections:readContext': (id, model, request) => readServerContext(id, String(model), String(request)),
+    'connections:testTools': (id, model, request) => testServerTools(id, String(model), String(request)),
+    'connections:cancelCheck': (id, model, request) => cancelServerChecks(id, String(model), String(request)),
+    'connections:lastCheck': (id, model) => lastServerCheck(id, String(model)),
+    'connections:setModelContext': (id, model, tokens) => setServerModelContext(id, String(model), typeof tokens === 'number' ? tokens : null),
     'connections:setUp': async (id) => {
       await refreshPathBeforeStart()
       // A sign-in connection's Set Up (HI-1826): the CLI on its folder, for the first-run screens its sign-in leaves.

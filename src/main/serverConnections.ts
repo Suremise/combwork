@@ -2,7 +2,8 @@ import type { Account, ProviderId, ServerConnection, ServerModel } from '../shar
 import type { ServerCaps, ServerListing } from '../shared/providers'
 import { providerDescriptor } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
-import { keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, mergeListed, parseBaseUrl, type BaseUrlProblem, type ServerModelsRead } from '../shared/serverConnection'
+import { cleanModels, keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, mergeListed, parseBaseUrl, type BaseUrlProblem, type ServerModelsRead } from '../shared/serverConnection'
+import { CONTEXT_MAX, tokensOf } from '../shared/serverDiagnostics'
 import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, readSetUp, rereadTrust, serverEnv } from './accounts'
 import { hasPty } from './ptyHost'
 import { emit } from './events'
@@ -24,6 +25,25 @@ import { providerService } from './providerService'
 
 const log = createLogger('servers')
 const { locked, mustGet, change } = connectionInternals
+
+/**
+ * What else follows a server connection (HI-2683: its diagnostics, main/serverDiagnostics.ts, which registers here rather
+ * than this module importing it): told when its server, key or models change, so what was asked for them stops and what
+ * was read of them is dropped.
+ */
+const changedHooks: ((id: string) => void)[] = []
+export function onServerChanged(fn: (id: string) => void): void {
+  changedHooks.push(fn)
+}
+function serverChanged(id: string): void {
+  for (const fn of changedHooks) {
+    try {
+      fn(id)
+    } catch (e) {
+      log.warn('a server connection hook failed', e)
+    }
+  }
+}
 
 /** How long a model listing may take, and how much of its reply is read. */
 const LIST_TIMEOUT_MS = 10_000
@@ -50,13 +70,13 @@ function capsOf(cli: ProviderId): ServerCaps {
   return caps
 }
 
-function serverOf(id: string): { a: Account; server: ServerConnection; caps: ServerCaps } {
+export function serverOf(id: string): { a: Account; server: ServerConnection; caps: ServerCaps } {
   const a = mustGet(id)
   if (!isServer(a) || !a.server) throw combworkError(NOT_SERVER, undefined, { kind: 'invalid' })
   return { a, server: a.server, caps: capsOf(a.provider) }
 }
 
-function checkedUrl(raw: string): { url: string; origin: string; local: boolean } {
+export function checkedUrl(raw: string): { url: string; origin: string; local: boolean } {
   const b = parseBaseUrl(raw)
   if (!b.ok) throw combworkError(URL_PROBLEM[b.why], undefined, { kind: 'invalid' })
   return b
@@ -127,6 +147,8 @@ export async function editServerConnection(id: string, patch: { baseUrl?: string
     const b = patch.baseUrl !== undefined ? checkedUrl(patch.baseUrl) : null
     // A reading of its models under way was for the server as it was: ended (and its reply stale anyway).
     if (b || patch.preset !== undefined) cancelServerModels(id)
+    // Its diagnostics were for the server and models as they were (HI-2683).
+    serverChanged(id)
     const before = parseBaseUrl(server.baseUrl)
     const moved = !!b && (!before.ok || before.origin !== b.origin)
     let keyCleared = false
@@ -159,8 +181,9 @@ export async function setServerKey(id: string, key: string): Promise<{ last4: st
       const { a, server } = serverOf(id)
       const b = checkedUrl(server.baseUrl)
       assertKeyNotIn(key, { name: a.name, url: b.url, models: server.models })
-      // A reading of its models under way used the key before: ended.
+      // A reading of its models under way used the key before: ended; and its diagnostics (HI-2683).
       cancelServerModels(id)
+      serverChanged(id)
       const info = await saveKey(id, b.origin, key)
       emit({ type: 'connections-changed' })
       // Agents a refused key stopped can carry on (Resume), as after signing in again.
@@ -170,10 +193,30 @@ export async function setServerKey(id: string, key: string): Promise<{ last4: st
   }
 }
 
+/**
+ * Sets the context the user says one of its models has (HI-2683, `ServerModel.context`, shared with HI-2682), or clears
+ * it (null). Only ever the user's: a server's reported values never come here.
+ */
+export async function setServerModelContext(id: string, model: string, tokens: number | null): Promise<void> {
+  serverOf(id)
+  const value = tokens === null ? null : tokensOf(tokens)
+  if (tokens !== null && !value) throw combworkError(CONTEXT_PROBLEM, { max: CONTEXT_MAX }, { kind: 'invalid' })
+  await locked(id, async () => {
+    const { server } = serverOf(id)
+    if (!server.models.some((m) => m.id === model)) throw combworkError(NO_MODEL, { model }, { kind: 'notFound' })
+    change(id, (a) => (a.server = { ...a.server!, models: cleanModels(a.server!.models.map(({ context: _c, ...m }) => (m.id === model && value ? { ...m, context: value } : m.id === model ? m : { ...m, ...(_c ? { context: _c } : {}) }))) }))
+  })
+  emit({ type: 'connections-changed' })
+}
+
+const CONTEXT_PROBLEM = msg({ id: 'main.server.context.invalid', defaultMessage: 'A context size is a whole number of tokens, from 1 to {max, number}.', description: "An error saving the context size a user typed for a server connection's model (its Server diagnostics): not a whole number in range. {max} is a number." })
+const NO_MODEL = msg({ id: 'main.server.context.noModel', defaultMessage: 'The connection has no model {model} now.', description: "An error saving a server connection's model context: the model was removed from the connection meanwhile. {model} is a model's id." })
+
 /** Removes a server connection's key (Remove Key): it then has none, and a launch needing one is refused. */
 export async function removeServerKey(id: string): Promise<void> {
   serverOf(id)
   cancelServerModels(id)
+  serverChanged(id)
   await locked(id, () => removeKey(id))
   emit({ type: 'connections-changed' })
 }
