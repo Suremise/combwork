@@ -601,7 +601,12 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   else if (mode === 'check' && !args.includes('--no-base')) {
     const ref = valueOf('--base') ?? defaultBaseRef(root)
     const b = baseLists(root, ref)
-    if (!b) console.log(`(no merge base with ${ref} to compare the allowlists with)`)
+    // CI checks out the history (fetch-depth 0), so it always has a base: none there fails the check, as the unit test
+    // over the whole source did until HI-2663 (this command is that check now: check:repo and CI run it).
+    if (!b && process.env.CI) {
+      console.log(`No merge base with ${ref}: CI checks out the history, so the allowlists can't be compared and the check fails.`)
+      process.exit(1)
+    } else if (!b) console.log(`(no merge base with ${ref} to compare the allowlists with)`)
     else if (!b.lists) console.log(`(the merge base with ${ref}, ${b.base.slice(0, 8)}, has no allowlists: nothing to compare with)`)
     else against = b.lists
   }
