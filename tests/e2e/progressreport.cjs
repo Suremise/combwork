@@ -175,19 +175,8 @@ const check = (name, ok, extra = '') => {
   const end1 = await stepped()
   check('…and it passes', end1?.code === 0 && (await until(async () => (await runs()).find((r) => r.id === live1?.id)?.state === 'passed', 10000)), JSON.stringify(end1))
 
-  // --- A total printed after the wrapper's first 2 seconds (#145): the run starts without steps and takes it once.
-  known = (await runs()).map((r) => r.id)
-  const lateCmd = await startShell(builder.id, `cw-progress --title "Late total" -- node -e "setTimeout(() => console.log('##cw-progress step=2 total=4 name=late'), 3500); setTimeout(() => console.log('##cw-progress step=3 total=9 name=later'), 5500); setTimeout(() => process.exit(0), 8000)"`)
-  const live2 = await newRun(known, (r) => r.title === 'Late total')
-  const lateRow = panel.locator(`.progress-run[data-run="${live2?.id}"]`)
-  const lateText = async () => (await lateRow.textContent().catch(() => '')) ?? ''
-  check('a run whose total comes late starts without steps', !!live2 && live2.total === null, JSON.stringify(live2))
-  check('…then shows the late total as steps', !!(await until(async () => /2 of 4: late/.test(await lateText()), 10000)), await lateText())
-  await page.screenshot({ path: path.join(lib.WORK, 'progressreport-late-total.png') })
-  check('…and keeps it when another total comes', !!(await until(async () => /3 of 4: later/.test(await lateText()), 10000)), await lateText())
-  const end2 = await lateCmd()
-  const late2 = await until(async () => (await runs()).find((r) => r.id === live2?.id && r.state === 'passed'), 10000)
-  check('…and it passes with its bar full', end2?.code === 0 && late2?.total === 4 && late2?.step === 4, JSON.stringify({ end2, late2 }))
+  // A total printed late (#145) is the wrapper's and the store's (progressReport.test.ts: a late total sent once, kept
+  // within it; progress.test.ts: taken once): checked here until HI-2663, whose row's "n of m" the Stepped demo shows.
 
   // --- A run for a card (#1220): it defaults to the agent's card in Doing and what's checked out in its folder; the row
   // shows "#N · a3f2c1d" under the agent (the card opens it), and its details the card and the whole revision.
@@ -275,8 +264,7 @@ const check = (name, ok, extra = '') => {
   check('…and its details say why', !!(await until(async () => (await editDetails()).includes("Doesn't count as check edit: files changed in the folder while it ran"), 10000)), await editDetails())
   for (const theme of ['light', 'dark']) await themedShot(theme, `progressreport-check-${theme}.png`)
 
-  const unknown = await shell(builder.id, 'cw-progress --check lint')
-  check('…and with no command for the name, runs nothing and says so', unknown?.code === 2 && /no command configured for the check "lint"/.test(unknown?.stderr ?? ''), JSON.stringify(unknown))
+  // `--check` with no command for the name runs nothing and says so: progressReport.test.ts's (HI-2663).
   await inv('tasks:update', card.number, { column: 'todo' }).catch(() => undefined)
 
   // --- Combwork's own runners in an agent's session: shown in this Combwork's panel as the agent's, with steps and estimates.
@@ -291,10 +279,7 @@ const check = (name, ok, extra = '') => {
   await shell(builder.id, unitCmd, 120000)
   const u2 = (await runs()).find((r) => !known.includes(r.id) && /^unit: 2 files$/.test(r.title))
   check('…and the next time, with an estimate', u2?.state === 'passed' && lib.hadEstimate(u2), JSON.stringify(u2))
-  known = (await runs()).map((r) => r.id)
-  const off = await shell(builder.id, `set CW_PROGRESS=0&& ${unitCmd}`, 120000)
-  await lib.sleep(1500) // A fixed wait on purpose: this checks that nothing is reported.
-  check('CW_PROGRESS=0: the tests run, nothing is reported', off?.code === 0 && (await runs()).every((r) => known.includes(r.id)), JSON.stringify((await runs()).filter((r) => !known.includes(r.id))))
+  // CW_PROGRESS=0 turns reporting off: progressReport.test.ts's (progressTarget null, the wrapper and e2e progress off), HI-2663.
 
   // An earlier run of the suite, its time kept; then the run checked, with its estimate from that one.
   const aboutCmd = `${withTimings}cd /d "${root}" && node tests/e2e/run.mjs about`

@@ -1,7 +1,5 @@
 // The workflow rules #1425's options table found with no test of them acting in the app (#1507), each with fake Claude
 // Code agents acting by their own tokens (queueFixture.cjs: alpha is "Combwork merges" into `integration`, one merge check):
-// - G1b two reviewers: one pass leaves the card in Review, the same reviewer again doesn't count, a second reviewer's
-//   pass approves it (S57's quorum), then it is merged;
 // - G13 stop own runs: the builder's own Progress run still open refuses its submit, naming the run; once it ends, the
 //   submit goes through; with G13 off, an open run refuses nothing;
 // - G9's `mergeInstall: always`: the queue installs from scratch before every entry's checks, also in its warm worktree
@@ -54,9 +52,8 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
     }
     const setOptions = (over) => inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, over) })
     const r1 = await q.agent(fx, h, 'R1')
-    const r2 = await q.agent(fx, h, 'R2')
     const b1 = await q.agent(fx, h, 'B1')
-    check('the agents have their tokens', !!(r1.token && r2.token && b1.token))
+    check('the agents have their tokens', !!(r1.token && b1.token))
     /** A card of B1's: started on the slot its start lends (#1578), `files` committed there. */
     const started = async (title, files) => {
       const n = (await inv('tasks:create', { title, project: 'alpha' })).number
@@ -66,20 +63,8 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
       return { n, start: s }
     }
 
-    // ===== G1b: two reviewers must pass the same change.
-    await setOptions({ reviewers: 2 })
-    const g1 = await started('Quorum', { 'quorum.txt': 'two reviewers\n' })
-    const g1sub = await q.intent(h, b1, g1.n, 'submit', { summary: 'quorum: ready' })
-    check('G1b: started and submitted', g1.start.status === 200 && g1sub.status === 200, JSON.stringify({ start: g1.start.body, sub: g1sub.body }))
-    const pass = async (r) => [await q.intent(h, r, g1.n, 'start-review'), await q.intent(h, r, g1.n, 'verdict', { pass: true, comment: `quorum: passed by ${r.name}` })]
-    const first = await pass(r1)
-    check("G1b: R1's pass is taken, and the card stays in Review", first.every((x) => x.status === 200) && (await column(g1.n)) === 'review', JSON.stringify(first.map((x) => [x.status, x.body?.rule ?? x.body?.to])))
-    const again = await pass(r1)
-    check('…R1 again: not a second pass, still in Review', (await column(g1.n)) === 'review' && !(await h.kinds(g1.n)).includes('IntegrationRequested'), JSON.stringify(again.map((x) => [x.status, x.body?.rule ?? x.body?.to])))
-    const second = await pass(r2)
-    check("…R2's pass approves it: queued and merged, Done", second.every((x) => x.status === 200) && (await done(g1.n)), JSON.stringify({ second: second.map((x) => [x.status, x.body?.rule ?? x.body?.to]), kinds: await h.kinds(g1.n) }))
-    const verdicts = (await h.facts(g1.n)).filter((x) => x.kind === 'Verdict' && x.data?.pass)
-    check('…its passes: R1 and R2, each its own', new Set(verdicts.map((v) => v.data.reviewer)).size === 2, JSON.stringify(verdicts.map((v) => v.data.reviewer)))
+    // G1b (two reviewers must pass the same change) is tests/workflow/scenarios.git.test.ts's S57(c); in the app, with
+    // pooled reviewers and Combwork merging, p7lane's pool. Run here too until HI-2663.
 
     // ===== G13: the builder's own run still going refuses its submit; ended, it goes through; off, nothing is refused.
     await setOptions({ stopOwnRuns: true })

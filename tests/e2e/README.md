@@ -685,8 +685,8 @@ in the run record. Seeing 0xc0000142, run fewer test runs at once rather than lo
 Windows' "Application Error" dialog even for processes that had the error mode (children of Vitest workers during full
 unit runs beside e2e runs), and the process waits behind it until someone clicks OK. Fewer heavy runs at once makes it
 rarer (a full unit run is a heavy run, above); only a machine-wide setting, left to the machine's owner, would stop it.
-The `failfast` suite checks the reporting (a child ending with 0xc0000142 is seen at once, and said), not that a real
-startup failure shows no dialog.
+`tests/windowsExits.test.ts` checks the reporting (a real child ending with 0xc0000142 is seen at once, and said: the
+`failfast` suite's checks until HI-2663), not that a real startup failure shows no dialog.
 
 ## Housekeeping
 

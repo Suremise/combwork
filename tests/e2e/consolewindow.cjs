@@ -138,7 +138,7 @@ const check = (name, ok, extra = '') => {
     check('a picked event shows its raw payload beside what Combwork made of it', raw.includes('hook_event_name') && raw.includes('"SessionStart"') && made.includes('event') && made.includes('"start"'), `${raw.slice(0, 200)} | ${made.slice(0, 200)}`)
     await dc.screenshot({ path: path.join(lib.WORK, 'consolewindow-detail.png') })
     await detail.locator('.icon-btn[aria-label="Close (Esc)"]').click()
-    await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    await lib.agentIdle(inv, b1.id, HUNG_MS)
 
     // --- Filters: event type, provider and search.
     await dc.locator('.dc-kind[data-kind="hook"]').click()
@@ -162,7 +162,7 @@ const check = (name, ok, extra = '') => {
     await lib.until(async () => (await dc.locator('.dc-live').textContent()).includes('Paused'), HUNG_MS)
     const key = lib.ptyKey(alpha, b1.id)
     await lib.sendPrompt(inv, key, `edit a.ts ${PRIVATE}`, { submitted: async () => /\(\d+ new\)/.test(await dc.locator('.dc-live').textContent()) })
-    await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    await lib.agentIdle(inv, b1.id, HUNG_MS)
     const held = await dc.locator('.dc-live').textContent()
     await dc.screenshot({ path: path.join(lib.WORK, 'consolewindow-paused.png') })
     check('paused: the list holds, and the indicator counts what came', /Paused \(\d+ new\)/.test(held) && (await rows()).length === before, `${held}; ${(await rows()).length} vs ${before}`)
@@ -182,10 +182,12 @@ const check = (name, ok, extra = '') => {
     // --- Clear while paused: a whole turn held back goes too, resume brings none of it back, and what comes after shows.
     await dc.locator('.dc-pause').click()
     await lib.until(async () => (await dc.locator('.dc-live').textContent()).includes('Paused'), HUNG_MS)
-    const lastShown = Math.max(0, ...(await rows()).map((r) => r.seq))
-    await lib.sendPrompt(inv, key, 'edit a.ts', { submitted: async () => /\(\d+ new\)/.test(await dc.locator('.dc-live').textContent()) })
-    await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    // The ring's latest event at the pause, not the list's: the list was just cleared, so its rows held almost nothing
+    // and every earlier event counted as held, more than the indicator could reach (its wait ran out, HI-2663).
     const ring = () => dc.evaluate((src) => window.combwork.invoke('console:snapshot', src, 0), b1Option)
+    const lastShown = Math.max(0, ...(await ring()).map((e) => e.seq))
+    await lib.sendPrompt(inv, key, 'edit a.ts', { submitted: async () => /\(\d+ new\)/.test(await dc.locator('.dc-live').textContent()) })
+    await lib.agentIdle(inv, b1.id, HUNG_MS)
     const heldTurn = await lib.until(async () => {
       const r = (await ring()).filter((e) => e.seq > lastShown)
       return r.some((e) => e.name === 'Stop') ? r : null
@@ -201,13 +203,13 @@ const check = (name, ok, extra = '') => {
     const heldMax = Math.max(...heldTurn.map((e) => e.seq))
     const afterClear = await rows()
     check('…resume brings none of the cleared turn back; the next turn shows', afterClear.filter((r) => r.name === 'UserPromptSubmit').length === 1 && afterClear.filter((r) => r.name === 'Stop').length === 1 && afterClear.every((r) => r.seq > heldMax), JSON.stringify(afterClear))
-    await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    await lib.agentIdle(inv, b1.id, HUNG_MS)
 
     // --- Recording to a file (#638): redacted by default, text only when ticked for that recording.
     const recordingsDir = path.join(userData, 'console-recordings')
     const readRecording = (name) => fs.readFileSync(path.join(recordingsDir, name), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l))
     const recordingText = async () => (await dc.locator('.dc-status .dc-recording').textContent().catch(() => '')) ?? ''
-    const bReady = () => lib.until(async () => (await inv('session:live')).find((s) => s.agentId === b1.id)?.status === 'ready', HUNG_MS)
+    const bReady = () => lib.agentIdle(inv, b1.id, HUNG_MS)
     /** Records one turn of B1 ("text": with the box ticked), stops, and returns the file's lines and what the bar said. */
     let menuShot = false
     const recordTurn = async (turn, text) => {

@@ -79,11 +79,8 @@ const check = (name, ok, extra = '') => {
   await lib.sleep(1500) // A fixed wait on purpose: this checks that the tip does NOT show again, which no condition can show.
   check('only once', (await card.count()) === 0)
 
-  // --- Reloading the window the same day: no tip again.
-  await lib.sleep(800)
-  await page.reload()
-  await lib.sleep(6000) // A fixed wait on purpose: this checks that no tip shows after a reload (one would within 4 s of loading), which no condition can show.
-  check('one tip a day: none after a reload', (await card.count()) === 0)
+  // Reloading the window the same day shows no tip again: tips.test.ts ("shows one a day", today's shownOn), and below the
+  // same start path with today's shownOn (#295). Checked here too until HI-2663, with its own 6 s wait.
 
   // --- Help → Tips….
   await page.locator('.menubar-item', { hasText: 'Help' }).first().click()

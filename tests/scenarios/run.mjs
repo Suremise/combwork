@@ -72,6 +72,7 @@ const { runScenario, dialectForRun, dialectRecord, sourceFingerprint, claudeSign
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')
 const { parseRandom, parseSeed, pickRandom } = require('./randomPick.cjs')
+const { selectFor } = require('./fakeScope.cjs')
 const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, releaseResults, writeResults, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
 
 const argv = process.argv.slice(2)
@@ -139,7 +140,26 @@ if (notSignedIn) {
   process.exit(0)
 }
 
-const listed = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
+const unknown = (only ?? []).filter((id) => !SCENARIOS.some((s) => s.id === id))
+if (unknown.length) {
+  console.error(`No such scenario: ${unknown.join(', ')}.`)
+  process.exit(2)
+}
+// Which of them this provider runs (fakeScope.cjs, HI-2663): those it leaves out are said, each with where it does run.
+const scoped = selectFor(
+  SCENARIOS.filter((s) => !only?.length || only.includes(s.id)),
+  provider
+)
+if (scoped.excluded.length) {
+  if (only?.length) for (const x of scoped.excluded) console.log(`NOT RUN ${x.id}: ${x.why}`)
+  else console.log(`Not run on ${provider} (tests/scenarios/fakeScope.cjs): ${scoped.excluded.length} scenario(s), on another provider or as model trials only.`)
+}
+// Nothing left to run is no result, never a clean pass: no results are written.
+if (!scoped.run.length) {
+  console.error(`No scenario to run on ${provider}${only?.length ? ` of those asked for (${only.join(', ')})` : ''}: see NOT RUN above.`)
+  process.exit(2)
+}
+const listed = scoped.run
 const chosen = random ? pickRandom(listed, random.count, random.seed) : listed
 if (random) console.log(`Picked ${chosen.length} of ${listed.length} at random (seed ${random.seed}): ${chosen.map((s) => s.id).join(', ')}. Again: --random ${random.count} --seed ${random.seed}${only?.length ? ` --only ${only.join(',')}` : ''}, or --only ${chosen.map((s) => s.id).join(',')}`)
 // More than a few scenarios (or --repeat) is a heavy run: it waits for a test slot, as the e2e runner's do
