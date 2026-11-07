@@ -119,11 +119,15 @@ const hooksOff = (agent, off) => {
     const mark = (await raw(builder)).length
     check('a prompt with its hooks off, held at work on screen', (await say(builder, 'holduntil hh-go')) > 0 && /esc to interrupt/.test(lib.plainText((await raw(builder)).slice(mark))))
     const gone = await until(async () => (await live(builder))?.hooksMissing, HUNG_MS)
-    // A late hook of a turn that is over (a tool's end of the earlier turn) says nothing of this prompt: it stays missing.
-    const lh = lib.launchHook(userData, gone ? (await live(builder)).runId : '')
-    const stale = lh && (await fetch(lh.url, { method: 'POST', headers: { Authorization: `Bearer ${lh.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ hook_event_name: 'PostToolUse', session_id: (await live(builder)).sessionId, cwd: alpha, tool_name: 'Read', tool_use_id: 'toolu_old', tool_input: {}, prompt_id: 'old-turn' }) }).then((r) => r.ok, () => false))
-    const journaled = await until(() => fs.existsSync(path.join(userData, 'logs', 'hooks.log')) && fs.readFileSync(path.join(userData, 'logs', 'hooks.log'), 'utf8').split('\n').some((x) => x.includes(`run=${runBefore} `) && /PostToolUse .*stale/.test(x)), HUNG_MS)
-    check("a late hook of a turn that is over (the ledger's stale) leaves its hooks missing", !!stale && !!journaled && !!(await live(builder))?.hooksMissing, JSON.stringify({ stale, journaled, missing: (await live(builder))?.hooksMissing }))
+    // A late hook of a turn that is over (a tool's end of the earlier turn, by that turn's own id as its prompt hook named
+    // it) says nothing of this prompt: it stays missing. Its id must be the earlier turn's: one the launch never saw is a
+    // turn this prompt may have begun with no prompt hook (HI-2673), so it would show its hooks arrive.
+    const hooksLog = () => (fs.existsSync(path.join(userData, 'logs', 'hooks.log')) ? fs.readFileSync(path.join(userData, 'logs', 'hooks.log'), 'utf8').split('\n') : [])
+    const earlier = hooksLog().filter((x) => x.includes(`run=${runBefore} `) && / UserPromptSubmit turn=/.test(x)).map((x) => / turn=(\S+)/.exec(x)[1]).at(-1)
+    const lh = lib.launchHook(userData, gone && earlier ? (await live(builder)).runId : '')
+    const stale = lh && (await fetch(lh.url, { method: 'POST', headers: { Authorization: `Bearer ${lh.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ hook_event_name: 'PostToolUse', session_id: (await live(builder)).sessionId, cwd: alpha, tool_name: 'Read', tool_use_id: 'toolu_old', tool_input: {}, prompt_id: earlier }) }).then((r) => r.ok, () => false))
+    const journaled = await until(() => hooksLog().some((x) => x.includes(`run=${runBefore} `) && /PostToolUse .*stale/.test(x)), HUNG_MS)
+    check("a late hook of a turn that is over (the ledger's stale) leaves its hooks missing", !!stale && !!journaled && !!(await live(builder))?.hooksMissing, JSON.stringify({ earlier, stale, journaled, missing: (await live(builder))?.hooksMissing }))
     // Its turn ends once that is seen: this prompt's own end, after the mark.
     fs.writeFileSync(path.join(claudeHome, 'hh-go'), '')
     check('this turn ends on screen', !!(await until(async () => /Worked for/.test(lib.plainText((await raw(builder)).slice(mark))), HUNG_MS)))

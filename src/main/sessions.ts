@@ -89,7 +89,7 @@ import { createLogger, hookJournal, userText } from './logger'
 import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
-import { admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
+import { acceptTurn, admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
 import { lastTitle } from './terminalTitle'
 import { asksYou } from '../shared/inbox'
@@ -146,7 +146,7 @@ import { journalSettingsOf } from './journalService'
 import { endAgentToken, newAgentToken } from './agentTokens'
 import { endHookToken, hooksRefused, newHookToken } from './hookTokens'
 import { lookAtTurns, type TurnsReading } from './turnsReader'
-import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, type HooksWatch } from './hooksHealth'
+import { hookSeen, hookTurn, hooksMissing, newHooksWatch, noteHooksMissing, promptSent, SeenOnce, transcriptReset, transcriptTurns, turnHeard, typedPending, type HooksWatch } from './hooksHealth'
 import { beingRead, viewingWindows } from './transcriptReads'
 import { trash } from './trash'
 import { attachmentName, attachmentsDir, freeName, ownAttachmentsFolder } from './attachmentsFolder'
@@ -3697,14 +3697,17 @@ class SessionManager {
       this.userEnter.set(key, Date.now())
       // A prompt of the user's, perhaps (#1336): a hook should follow it if it starts a turn.
       const l = [...this.live.values()].find((x) => this.key(x.state.projectPath, x.state.agentId) === key)
-      if (l) this.notePrompt(l)
+      if (l) this.notePrompt(l, false, true)
     }
   }
 
-  /** A prompt was sent to an agent (#1336): while it is idle (or as its launch's task, `launch`), a hook should follow it. */
-  private notePrompt(l: LiveSession, launch = false): void {
+  /**
+   * A prompt was sent to an agent (#1336): while it is idle (or as its launch's task, `launch`), a hook should follow it.
+   * `byUser`: the user's own Enter in its terminal (HI-2673: the turn it begins may come with no prompt hook).
+   */
+  private notePrompt(l: LiveSession, launch = false, byUser = false): void {
     const idle = launch || ['ready', 'finished', 'watching', 'background'].includes(l.state.status)
-    if (l.hooksWatch) promptSent(l.hooksWatch, Date.now(), idle)
+    if (l.hooksWatch) promptSent(l.hooksWatch, Date.now(), idle, byUser)
   }
 
   /**
@@ -6394,12 +6397,12 @@ class SessionManager {
    * own tool call; the drain at a Stop of the running turn that Combwork hasn't carried on yet (the ledger's own count, so at
    * most once a turn, whatever a Stop says of it). Null when there is nothing to tell.
    */
-  private async noticeIn(runId: string | null, l: LiveSession, ledger: TurnLedger, body: Record<string, any>, woke: boolean, at: number): Promise<Record<string, unknown> | null> {
+  private async noticeIn(runId: string | null, l: LiveSession, ledger: TurnLedger, body: Record<string, any>, woke: boolean, typed: boolean, at: number): Promise<Record<string, unknown> | null> {
     if (!this.inboxNotice) return null
     const hook = l.adapter.normalizeHook(body)
     const ev = hook.event
     // What the ledger would make of it (a copy: it is admitted below, with what it was told).
-    if (admit(structuredClone(ledger), ev, hook.ids, { woke, now: at }).verdict === 'stale') return null
+    if (admit(structuredClone(ledger), ev, hook.ids, { woke, typed, now: at }).verdict === 'stale') return null
     const drain = ev.kind === 'stop'
     if (drain && !(ledger.active && ledger.active.state === 'running' && ledger.active.continued === 0)) return null
     const turn = ledger.active
@@ -6509,9 +6512,12 @@ class SessionManager {
     // (never merely because one runs), a tool call it never saw may open that turn should its prompt hook be lost
     // (turnLedger rule 1).
     const woke = l.adapter.descriptor.capabilities.backgroundWakes && !!l.woke
+    // A CLI that may begin the turn the user's typing starts with no prompt hook (HI-2673, Claude Code's `!` command): while
+    // the user's Enter into the idle pane waits for its hook, a new tool call of a turn never seen may open that turn.
+    const typed = l.adapter.descriptor.capabilities.typedTurnsWithoutPrompt && typedPending(l.hooksWatch)
     // Its notice (#650), from the ledger as it is now, before it is admitted with what it was told.
     if (decide) {
-      reply = await this.noticeIn(runId, l, ledger, body, woke, at).catch((e) => {
+      reply = await this.noticeIn(runId, l, ledger, body, woke, typed, at).catch((e) => {
         log.warn(`${userText(label)}: no inbox notice`, e)
         return null
       })
@@ -6520,7 +6526,7 @@ class SessionManager {
     }
     const continued = hook.event.kind === 'stop' && !hook.event.failed && !!reply && typeof reply === 'object' && l.adapter.stopContinues(reply as Record<string, unknown>)
     const was = ledger.active
-    const took = admit(ledger, hook.event, ids, { combworkContinued: continued, woke, now: at })
+    const took = admit(ledger, hook.event, ids, { combworkContinued: continued, woke, typed, now: at })
     if (ledger.active !== was) l.woke = false
     // Its CLI tries a failed model request again (HI-1973: Copilot's recoverable error): the turn's wait, kept from try to
     // try while nothing else is heard (its first try's time, the tries counted). The CLI says neither when it tries again
@@ -6548,12 +6554,18 @@ class SessionManager {
     const kind = hook.event.kind
     if (b && ((kind === 'toolEnd' && !!b.toolUseId && ids.call === b.toolUseId) || (took.verdict !== 'stale' && ['prompt', 'stop', 'signIn', 'interrupt', 'end'].includes(kind)))) l.hookBlock = undefined
     // A current turn's hook (#1336): the prompt watched is answered, and missing hooks are back. A late hook of a turn
-    // that is over says nothing of a prompt sent since.
+    // that is over says nothing of a prompt sent since. While the user's typed prompt waits (HI-2673), a hook of a turn
+    // never seen (the ledger's `unseen`: no earlier turn's, none let go past its bound, no sub-agent's) can't be late
+    // news: its turn is the one that prompt began, with no prompt hook, so it answers the prompt too.
     if (l.hooksWatch) {
-      if (took.verdict !== 'stale') turnHeard(l.hooksWatch)
+      const accepted = took.verdict === 'stale' && typed && !!took.unseen
+      // Remembered once accepted (HR2's round 1): the same turn's hook again is an earlier turn's, never a later prompt's.
+      if (accepted && ids.turn) acceptTurn(ledger, ids.turn)
+      const ofPrompt = took.verdict !== 'stale' || accepted
+      if (ofPrompt) turnHeard(l.hooksWatch)
       // A flag a transcript turn raised (#1371) is answered only by that turn's hooks or a newer turn's, by identity (above):
       // the ledger's current turn may be older than it (its hooks are what went missing), so the ledger's verdict doesn't count.
-      const back = st.hooksMissing?.after === 'transcript' ? answered : !!st.hooksMissing && took.verdict !== 'stale'
+      const back = st.hooksMissing?.after === 'transcript' ? answered : !!st.hooksMissing && ofPrompt
       if (back) this.hooksBack(l)
     }
     let actions: readonly string[] = [took.verdict === 'stale' ? 'stale' : 'continued']

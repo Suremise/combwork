@@ -307,6 +307,7 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     lockAsk: true,
     backgroundSessions: true,
     backgroundWakes: true,
+    typedTurnsWithoutPrompt: true,
     // SessionStart comes as it starts (once its folder is trusted), before any prompt.
     startHook: true,
     startupSizeRefresh: false,

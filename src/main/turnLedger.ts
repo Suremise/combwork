@@ -25,7 +25,11 @@ import type { HookEvent, HookIds } from './providers/types'
  *    - **a background task's wake** (Darren's decision, 12 Oct): it sends its prompt hook (a `<task-notification>`), so it
  *      opens like any prompt. Should that hook be lost, a tool start whose call id the launch never saw opens the turn,
  *      only while the CLI's transcript says a task of it just ended (`woke`), never merely because a task runs.
- *    Past the bound on the ids kept (`forgot`), neither opens anything: an id not remembered may be an earlier one.
+ *    - **a turn the user's typing began** (HI-2673: Claude Code 2.1.319 runs the model on a `!` command's output, under
+ *      the command's promptId, with no prompt hook): while the user's own Enter into the idle pane waits for its hook
+ *      (`typed`, hooksHealth's pending submit, for a CLI whose capabilities say so), a tool start whose call id the
+ *      launch never saw opens the turn, as a wake's does. A Stop or a tool end alone opens nothing.
+ *    Past the bound on the ids kept (`forgot`), none of them opens anything: an id not remembered may be an earlier one.
  * 2. **No screen timing decides a continuation**: rule 1 decides it from the ids alone, so a hook reaching Combwork before the
  *    CLI redraws changes nothing.
  * 3. **Times are when a hook reached Combwork** (`now`, taken before it waits its turn in the launch's queue), not when it
@@ -96,8 +100,11 @@ export type ScreenReading = 'idle' | 'working' | null
 export type Admitted =
   /** The hook goes to the status rules (as `event`, which may say more than the adapter's: resumes, injected). */
   | { verdict: 'apply'; event: HookEvent; note?: string }
-  /** Old news of a turn that is over, or of another turn: the status rules don't see it. */
-  | { verdict: 'stale'; why: string }
+  /**
+   * Old news of a turn that is over, or of another turn: the status rules don't see it. `unseen`: it names a turn the
+   * launch has never seen (not an earlier one, nor one let go past the bound, nor a sub-agent's), so it can't be late news.
+   */
+  | { verdict: 'stale'; why: string; unseen?: true }
   /** A Stop Combwork answered with a continuation: the turn goes on. */
   | { verdict: 'continued' }
 
@@ -174,10 +181,11 @@ function what(ev: HookEvent): string {
 /**
  * Takes a hook in: what the status rules should make of it. `combworkContinued`: Combwork answered this Stop with a
  * continuation. `woke`: the CLI's transcript says a background task of it just ended, so it may begin a turn by itself.
- * `now`: when the hook reached Combwork (before it waited its turn in the launch's queue). Counts it (seq) and that the CLI
- * was heard.
+ * `typed`: the user's own Enter into the idle pane still waits for its hook, and the CLI may begin that turn with no
+ * prompt hook (HI-2673). `now`: when the hook reached Combwork (before it waited its turn in the launch's queue). Counts
+ * it (seq) and that the CLI was heard.
  */
-export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { combworkContinued?: boolean; woke?: boolean; now?: number } = {}): Admitted {
+export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { combworkContinued?: boolean; woke?: boolean; typed?: boolean; now?: number } = {}): Admitted {
   const now = opts.now ?? Date.now()
   ledger.seq++
   ledger.heard = Math.max(ledger.heard, now)
@@ -218,12 +226,14 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { c
         ledger.compaction = { id: turn, open: true }
         return { verdict: 'apply', event: ev, note: 'a compaction the CLI began itself, under its own id' } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
       }
-      if (ev.kind === 'toolStart' && opts.woke && !running && ids.call && !ledger.calls.has(ids.call)) {
+      if (ev.kind === 'toolStart' && (opts.woke || opts.typed) && !running && ids.call && !ledger.calls.has(ids.call)) {
         addCall(ledger, begin(ledger, turn, now), ids.call)
-        return { verdict: 'apply', event: { ...ev, resumes: true }, note: "a turn the CLI began by itself: its background task's wake (no prompt hook)" } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+        const note = opts.woke ? "a turn the CLI began by itself: its background task's wake (no prompt hook)" : "a turn the user's typing began with no prompt hook" // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+        return { verdict: 'apply', event: { ...ev, resumes: true }, note }
       }
     }
-    return { verdict: 'stale', why: `${what(ev)} ${earlier ? 'of an earlier turn' : 'of a turn Combwork saw no prompt for'}` } // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+    const why = `${what(ev)} ${earlier ? 'of an earlier turn' : 'of a turn Combwork saw no prompt for'}` // i18n-ignore: the turn ledger's reasons, for the log and the developer console's event data (recorded like a log), stay English (#1104)
+    return !earlier && !ledger.forgot && !ids.sub ? { verdict: 'stale', why, unseen: true } : { verdict: 'stale', why }
   }
   // Launch-wide hooks (naming the latest turn, or none); the CLI's session ending is the launch's.
   if (launchWide) {
@@ -306,6 +316,15 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { c
     default:
       return { verdict: 'apply', event: ev }
   }
+}
+
+/**
+ * A turn never seen that Combwork took as the one a typed prompt began, without opening it (HI-2673: a stale hook the
+ * health allowance accepted, a Stop alone): remembered from now, like any turn seen, so its hook again (a duplicate, a
+ * late one) is an earlier turn's and answers no later prompt. Past the bound it is let go as any turn is (`forgot`).
+ */
+export function acceptTurn(ledger: TurnLedger, turn: string): void {
+  if (!ledger.seen.has(turn)) remember(ledger, ledger.seen, turn, ledger.maxSeen)
 }
 
 /** The CLI was heard from outside its hooks (its transcript grew, its screen shows it at work). */

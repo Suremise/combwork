@@ -117,6 +117,12 @@ export interface ProviderCapabilities {
    */
   backgroundWakes: boolean
   /**
+   * A turn the user's typing begins may come with no prompt hook (HI-2673: Claude Code 2.1.319 runs the model on a `!`
+   * command's output and sends no UserPromptSubmit): while the user's Enter into the idle pane waits for its hook, a hook
+   * of a turn never seen shows its hooks arrive, and its first new tool call opens that turn (turnLedger rule 1).
+   */
+  typedTurnsWithoutPrompt: boolean
+  /**
    * The CLI sends a hook as it starts, before any prompt (Claude Code's SessionStart; Codex's and Copilot's come with the
    * first prompt): none within a while of its start means its hooks aren't reaching Combwork (#1336).
    */
