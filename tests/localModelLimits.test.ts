@@ -203,6 +203,9 @@ describe("a model's limits in the window (HI-2682)", () => {
     // An output budget over Claude Code's usual reserve: only 20,000 of it kept free.
     expect(autoCompactLine('claude-code', 200000, { window: null, source: null }, tr, { declared: { output: 64000 } })).toMatch(/at about 167,000: an estimate, the local model’s declared context 200,000 less its output budget 20,000/)
     expect(autoCompactLine('claude-code', 32768, { window: 200000, source: 'autoCompactWindow in your settings' }, tr, { declared: { output: 4096 } })).toMatch(/at about 15,672.*\(autoCompactWindow in your settings\) \(an estimate: an auto-compact window set too is taken as capped by the declared context\)$/)
+    // An auto-compact window below the declared context (HI-2710): named as that window, the declared context beside it.
+    expect(autoCompactLine('claude-code', 65536, { window: 30000, source: 'autoCompactWindow in your settings' }, tr, { declared: { output: 6000 } })).toBe('Claude Code compacts by itself at about 11,000: an estimate, its auto-compact window 30,000 (autoCompactWindow in your settings), below the local model’s declared context 65,536, less its output budget 6,000 and a 13,000-token buffer')
+    expect(autoCompactLine('claude-code', 65536, { window: 30000, source: 'autoCompactWindow in your settings' }, tr, { declared: { output: 6000 } })).not.toMatch(/declared context 30,000/)
     expect(autoCompactLine('claude-code', 32768, { window: null, percent: 40, source: 'CLAUDE_AUTOCOMPACT_PCT_OVERRIDE' }, tr, { declared: { output: 4096 } })).toMatch(/at about 13,107: an estimate.*\(CLAUDE_AUTOCOMPACT_PCT_OVERRIDE, at 40% of it\)/)
     expect(autoCompactLine('claude-code', 32768, { window: 'off', source: 'DISABLE_AUTO_COMPACT' }, tr, { declared: { output: 4096 } })).toMatch(/doesn't compact by itself: auto-compaction is off \(DISABLE_AUTO_COMPACT\)/)
     // A context smaller than the room kept: no figure.

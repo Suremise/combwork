@@ -378,6 +378,8 @@ export function autoCompactAt(id: ProviderId | null | undefined, window: number 
 const COMPACT_PERCENT = msg({ id: 'agents.provider.compactPercent', defaultMessage: 'at {share, number, ::percent} of it', description: "Part of a context tooltip: a setting brings the CLI's compaction to a percentage ({share}: \"80%\") of its context window. Lower case: it follows a settings file's name." })
 /** HI-2682: a local model's compaction at its declared window, and the estimate where an auto-compact window caps it. */
 const DECLARED_LINE = msg({ id: 'agents.provider.compactDeclared', defaultMessage: '{provider} compacts by itself at about {at, number}: an estimate, the local model’s declared context {window, number} less its output budget {output, number} and a {buffer, number}-token buffer{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}', description: "A context tooltip (HI-2682): where the CLI ({provider}) compacts the conversation of a local model whose context Combwork declared, in tokens ({at}): its declared context ({window}) less the output budget it keeps room for ({output}) and a buffer ({buffer}), all numbers of tokens. {why}: what brings it earlier (a settings file, a percentage), none: leave it empty; {estimate}: why else it is an estimate, none: leave it empty." })
+/** HI-2710: the same, where an auto-compact window set below the declared context is the window it compacts in. */
+const DECLARED_WINDOW_LINE = msg({ id: 'agents.provider.compactDeclaredWindow', defaultMessage: '{provider} compacts by itself at about {at, number}: an estimate, its auto-compact window {window, number}{why, select, none {} other { ({why})}}, below the local model’s declared context {declared, number}, less its output budget {output, number} and a {buffer, number}-token buffer{estimate, select, none {} other { ({estimate})}}', description: "A context tooltip (HI-2710): where the CLI ({provider}) compacts the conversation of a local model whose context Combwork declared ({declared}), when a setting gives it a smaller auto-compact window ({window}): that window less the output budget it keeps room for ({output}) and a buffer ({buffer}), all numbers of tokens ({at}: the result). {why}: what set the window or brings it earlier (a settings file, a percentage), none: leave it empty; {estimate}: why else it is an estimate, none: leave it empty." })
 const DECLARED_CAP = msg({ id: 'agents.provider.compactDeclaredCap', defaultMessage: 'an estimate: an auto-compact window set too is taken as capped by the declared context', description: "Part of a context tooltip (HI-2682), in brackets: why where a local model compacts is an estimate: an auto-compact window is set as well, and Combwork assumes the CLI caps it at the declared context." })
 
 /**
@@ -398,8 +400,14 @@ export function autoCompactLine(provider: ProviderId, contextWindow: number | nu
     if (window <= reserve) return null
     const at = auto?.percent ? Math.min(window - reserve, Math.round((window * auto.percent) / 100)) : window - reserve
     const why = [auto?.source, auto?.percent ? tr(COMPACT_PERCENT, { share: auto.percent / 100 }) : null].filter(Boolean).join(', ')
+    const output = Math.min(o.declared.output ?? parts.outputMax, parts.outputMax)
+    // An auto-compact window below the declared context is the window it compacts in (HI-2710): named as that, the
+    // declared context beside it; one at or above it is taken as capped by the declared context.
+    if (contextWindow && window < contextWindow) {
+      return tr(DECLARED_WINDOW_LINE, { provider: name, at, window, declared: contextWindow, output, buffer: parts.buffer, why: why || 'none', estimate: auto?.estimate || 'none' }) // i18n-ignore: select keys, not text
+    }
     const est = [typeof auto?.window === 'number' ? tr(DECLARED_CAP) : null, auto?.estimate || null].filter(Boolean).join('; ')
-    return tr(DECLARED_LINE, { provider: name, at, window, output: Math.min(o.declared.output ?? parts.outputMax, parts.outputMax), buffer: parts.buffer, why: why || 'none', estimate: est || 'none' }) // i18n-ignore: select keys, not text
+    return tr(DECLARED_LINE, { provider: name, at, window, output, buffer: parts.buffer, why: why || 'none', estimate: est || 'none' }) // i18n-ignore: select keys, not text
   }
   let at = auto?.window === 'off' ? null : autoCompactAt(provider, window)
   if (auto?.window !== 'off' && (at === null || !window)) return null

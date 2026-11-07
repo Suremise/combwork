@@ -1295,6 +1295,10 @@
     "defaultMessage": "an estimate: an auto-compact window set too is taken as capped by the declared context",
     "description": "Part of a context tooltip (HI-2682), in brackets: why where a local model compacts is an estimate: an auto-compact window is set as well, and Combwork assumes the CLI caps it at the declared context."
   },
+  "agents.provider.compactDeclaredWindow": {
+    "defaultMessage": "{provider} compacts by itself at about {at, number}: an estimate, its auto-compact window {window, number}{why, select, none {} other { ({why})}}, below the local model’s declared context {declared, number}, less its output budget {output, number} and a {buffer, number}-token buffer{estimate, select, none {} other { ({estimate})}}",
+    "description": "A context tooltip (HI-2710): where the CLI ({provider}) compacts the conversation of a local model whose context Combwork declared ({declared}), when a setting gives it a smaller auto-compact window ({window}): that window less the output budget it keeps room for ({output}) and a buffer ({buffer}), all numbers of tokens ({at}: the result). {why}: what set the window or brings it earlier (a settings file, a percentage), none: leave it empty; {estimate}: why else it is an estimate, none: leave it empty."
+  },
   "agents.provider.compactDefault": {
     "defaultMessage": "{provider} compacts by itself at about {at, number} by default (its settings can change this)",
     "description": "A context tooltip for a session that isn't running: where the CLI ({provider}) compacts its conversation by itself by default, in tokens ({at})."

@@ -325,6 +325,7 @@ interface CombworkMessageValues {
   'agents.place.tip': { is: string; name: string | number; path: string | number }
   'agents.provider.compactDeclared': { provider: string | number; at: number; window: number; output: number; buffer: number; why: string; estimate: string }
   'agents.provider.compactDeclaredCap': undefined
+  'agents.provider.compactDeclaredWindow': { provider: string | number; at: number; window: number; why: string; declared: number; output: number; buffer: number; estimate: string }
   'agents.provider.compactDefault': { provider: string | number; at: number }
   'agents.provider.compactDefaultFor': { provider: string | number; at: number; why: string; estimate: string }
   'agents.provider.compactOff': { provider: string | number; source: string | number; estimate: string }
