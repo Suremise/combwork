@@ -3466,6 +3466,16 @@ export interface MemorySource {
   scope?: { connection: string } | 'user'
 }
 
+/**
+ * The Assistant's own memory (HI-2666): what its CLI (`provider`) saved for the workspace's folder. `folder`: where it
+ * keeps it (there or not yet); null when Combwork doesn't show what this CLI saves.
+ */
+export interface AssistantMemory {
+  provider: ProviderId
+  folder: string | null
+  files: MemorySource[]
+}
+
 export interface GitFileChange {
   path: string
   status: string

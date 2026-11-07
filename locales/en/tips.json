@@ -223,6 +223,14 @@
     "defaultMessage": "MCP servers for the Assistant only",
     "description": "A tip's title. MCP is a protocol's name: keep it."
   },
+  "tips.assistantMemory.text": {
+    "defaultMessage": "Besides its journal, the Assistant's coding agent saves notes of its own about working with you. Memory in the Assistant view on the activity bar lists them, MEMORY.md first: open one to read or correct it.",
+    "description": "A tip (HI-2666). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. MEMORY.md is a file's name: keep it."
+  },
+  "tips.assistantMemory.title": {
+    "defaultMessage": "See what the Assistant's coding agent remembers",
+    "description": "A tip's title (HI-2666)."
+  },
   "tips.assistantMessages.text": {
     "defaultMessage": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

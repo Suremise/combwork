@@ -57,6 +57,8 @@ interface CombworkMessageValues {
   'tips.assistantLanes.title': undefined
   'tips.assistantMcp.textAdded': undefined
   'tips.assistantMcp.title': undefined
+  'tips.assistantMemory.text': undefined
+  'tips.assistantMemory.title': undefined
   'tips.assistantMessages.text': undefined
   'tips.assistantMessages.title': undefined
   'tips.assistantNoticeOpens.text': undefined

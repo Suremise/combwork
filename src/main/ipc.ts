@@ -69,6 +69,7 @@ import * as tasks from './tasks'
 import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
+import { assistantMemoryFor } from './assistantMemory'
 import { finalWhys } from '../shared/assistantActivity'
 import { changeGroups } from './assistantChanges'
 import { UndoNotFound, userUndo } from './assistantUndo'
@@ -1702,6 +1703,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'file:read': async (p) => readFile(guardFile(p), 'utf8').catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? '' : Promise.reject(e))),
     'file:write': (p, content, expected) => writeTextUnlessChanged(guardFile(p, true), content, expected),
 
+    'assistant:memory': (id) => (workspace.path ? assistantMemoryFor(workspace.path, knownProvider(id)) : { provider: knownProvider(id), folder: null, files: [] }),
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
       return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()

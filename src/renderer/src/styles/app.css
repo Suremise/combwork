@@ -9328,6 +9328,22 @@ button.mode-badge.badge:hover {
 }
 .memory-share .codicon { color: var(--info); vertical-align: -2px; }
 .memory-share .btn { margin-top: 6px; display: flex; }
+/* The Assistant's memory folder (HI-2666): its path, cut with "…" (all of it in its hover), and Copy Path and Open Folder. */
+.assistant-memory-folder {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 6px 6px 4px 14px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.assistant-memory-folder .path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ---------- Combwork Assistant: the workspace's overseer, in a panel on the right ---------- */
 .assistant-panel {

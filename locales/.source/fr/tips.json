@@ -55,6 +55,8 @@
   "tips.assistantLanes.title": "A new conversation for each lane",
   "tips.assistantMcp.textAdded": "The Assistant gets a workspace MCP server only once you add it for it, as for a project: + in MCP Servers in its view on the activity bar, or tick Assistant in Add to… in the MCP view. A server with your own notes can reach it and no project.",
   "tips.assistantMcp.title": "MCP servers for the Assistant only",
+  "tips.assistantMemory.text": "Besides its journal, the Assistant's coding agent saves notes of its own about working with you. Memory in the Assistant view on the activity bar lists them, MEMORY.md first: open one to read or correct it.",
+  "tips.assistantMemory.title": "See what the Assistant's coding agent remembers",
   "tips.assistantMessages.text": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
   "tips.assistantMessages.title": "The Assistant can reach a busy agent",
   "tips.assistantNoticeOpens.text": "A notification from the Assistant or an agent about one agent or one card opens it when you click it: the agent's pane, or the card. Older ones are in the Notifications panel, and open from there too.",

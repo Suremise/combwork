@@ -55,6 +55,8 @@
   "tips.assistantLanes.title": "Une nouvelle conversation pour chaque couloir",
   "tips.assistantMcp.textAdded": "L’Assistant reçoit un serveur MCP de l’espace de travail seulement quand tu l’ajoutes pour lui, comme pour un projet : avec + dans Serveurs MCP de sa vue, dans la barre d’activité, ou en cochant Assistant dans Ajouter à… de la vue MCP. Un serveur avec tes propres notes peut atteindre l’Assistant et aucun projet.",
   "tips.assistantMcp.title": "Serveurs MCP pour l’Assistant uniquement",
+  "tips.assistantMemory.text": "En plus de son journal, l’agent de code de l’Assistant enregistre ses propres notes sur la façon de travailler avec toi. Mémoire, dans la vue Assistant de la barre d’activité, les liste, MEMORY.md en premier : ouvre-en une pour la lire ou la corriger.",
+  "tips.assistantMemory.title": "Voir ce dont se souvient l’agent de code de l’Assistant",
   "tips.assistantMessages.text": "L’Assistant ne peut pas confier un nouveau travail à un agent en attente ou au travail, mais il peut lui laisser un message, comme ta réponse : il est remis dès que l’agent peut le prendre. Son volet l’affiche comme non lu (✉) jusque-là ; clique dessus pour l’annuler.",
   "tips.assistantMessages.title": "L’Assistant peut joindre un agent occupé",
   "tips.assistantNoticeOpens.text": "Une notification de l’Assistant ou d’un agent au sujet d’un agent ou d’une carte l’ouvre quand tu cliques dessus : le volet de l’agent, ou la carte. Les plus anciennes sont dans le panneau Notifications et s’ouvrent aussi depuis là.",

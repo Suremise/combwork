@@ -12,6 +12,7 @@ import { MODES_TIP, ModeList, ModeView, createMode } from './Modes'
 import { Section } from './Sidebar'
 import { Icon, IconButton, InfoTip, OneLineDesc, Tooltip } from './ui'
 import { JournalView } from './JournalView'
+import { ASSISTANT_MEMORY_TEXT, AssistantMemoryView } from './AssistantMemory'
 import { msg, tr } from '@shared/i18n'
 
 /**
@@ -100,6 +101,10 @@ export function AssistantSidePanel() {
             <Section title={tr(M.attachments)}>
               <NavRow section="images" shown={section} icon="attach" label={tr(M.allAttachments)} />
             </Section>
+            {/* Its own memory (HI-2666): what its coding agent saved for the workspace's folder. */}
+            <Section title={tr(ASSISTANT_MEMORY_TEXT.section)} tip={tr(ASSISTANT_MEMORY_TEXT.tip)}>
+              <NavRow section="memory" shown={section} icon="lightbulb" label={tr(ASSISTANT_MEMORY_TEXT.row)} />
+            </Section>
           </>
         )}
       </div>
@@ -138,7 +143,7 @@ function AssistantMcpList() {
   )
 }
 
-type ViewSection = 'conversations' | 'modes' | 'images' | 'journal' | 'digests'
+type ViewSection = 'conversations' | 'modes' | 'images' | 'journal' | 'digests' | 'memory'
 
 /** A row that shows a section in the main area: a tab stop, Enter or Space shows it, the one shown is the current page (#1033 round 2). */
 function NavRow({ section, shown, icon, label }: { section: ViewSection; shown: ViewSection; icon: string; label: string }) {
@@ -211,6 +216,7 @@ export function AssistantMain() {
   if (section === 'modes') return <ModeView />
   if (section === 'journal' || section === 'digests') return <JournalView key={section} digests={section === 'digests'} />
   if (section === 'images' && a) return <AttachmentsTab project={a} assistant />
+  if (section === 'memory' && a?.agents[0]) return <AssistantMemoryView agent={a.agents[0]} />
   if (!a) {
     return (
       <div className="empty-state" style={{ paddingTop: '18vh' }}>

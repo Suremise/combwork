@@ -483,6 +483,58 @@
     "defaultMessage": "{where, select, header {header} other {env}} \"{key}\" looks like a literal secret. Use an environment variable reference such as \"{ref}\".",
     "description": "A warning on an MCP server's definition: an environment variable (env) or HTTP header of that name holds what looks like a password or token. Keep env and header as they are (the definition's fields); {ref} is the reference to use instead, such as ${GITHUB_TOKEN}."
   },
+  "assistant.memory.choose": {
+    "defaultMessage": "Choose a file on the left.",
+    "description": "The Assistant's memory view's main area before a file is chosen (HI-2666)."
+  },
+  "assistant.memory.copied": {
+    "defaultMessage": "Path copied",
+    "description": "A notification (HI-2666): the path of the Assistant's memory folder was copied."
+  },
+  "assistant.memory.copyPath": {
+    "defaultMessage": "Copy Path",
+    "description": "A button beside the folder of the Assistant's memory (HI-2666): copies its path."
+  },
+  "assistant.memory.empty": {
+    "defaultMessage": "No memory yet: {provider} saves what it learns about working with you here.",
+    "description": "The Assistant's memory list when its folder has no files yet (HI-2666). {provider}: the coding agent's name (Claude Code)."
+  },
+  "assistant.memory.heading": {
+    "defaultMessage": "The Assistant's Memory · This Workspace",
+    "description": "The heading of the list of the Assistant's own memory files (HI-2666), as against a project's Memory tab."
+  },
+  "assistant.memory.loading": {
+    "defaultMessage": "Loading…",
+    "description": "The Assistant's memory list while it reads the files (HI-2666)."
+  },
+  "assistant.memory.openFolder": {
+    "defaultMessage": "Open Folder",
+    "description": "A button beside the folder of the Assistant's memory (HI-2666): opens it in File Explorer (disabled while there is none yet)."
+  },
+  "assistant.memory.refresh": {
+    "defaultMessage": "Refresh",
+    "description": "A button on the Assistant's memory list (HI-2666): reads the files again."
+  },
+  "assistant.memory.row": {
+    "defaultMessage": "Its Memory",
+    "description": "The Assistant view (HI-2666): the row that shows the Assistant's own memory files in the main area."
+  },
+  "assistant.memory.section": {
+    "defaultMessage": "Memory",
+    "description": "The Assistant view (HI-2666): the section of the Assistant's own memory (what its coding agent saved about working with you)."
+  },
+  "assistant.memory.target": {
+    "defaultMessage": "the Assistant's memory",
+    "description": "What failed to load, in \"Couldn't load {what}\" (HI-2666): the Assistant's own memory files."
+  },
+  "assistant.memory.tip": {
+    "defaultMessage": "What the Assistant's coding agent saved about working with you, in its memory for the workspace's folder (where the Assistant's sessions run). A project whose folder is the workspace's own reads the same memory.",
+    "description": "The Assistant view (HI-2666): the info tip of its Memory section. It says whose memory it is and where it is kept, and makes no promise about who else can read it."
+  },
+  "assistant.memory.unsupported": {
+    "defaultMessage": "This view shows saved memory for Claude Code only: {provider}'s, if it keeps any, isn't shown here.",
+    "description": "The Assistant's memory view when the Assistant runs on a coding agent ({provider}: Codex, GitHub Copilot) whose saved memory Combwork doesn't show (HI-2666). It says nothing of whether that agent keeps any."
+  },
   "assistant.modes.create": {
     "defaultMessage": "Create",
     "description": "The New Mode dialog: its button."
