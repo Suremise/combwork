@@ -239,8 +239,10 @@ interface CombworkMessageValues {
   'project.limit.heading': { plan: string; when: string | number }
   'project.limit.models': { models: string; window: string }
   'project.limit.noConnections': { provider: string | number }
-  'project.limit.none': { provider: string | number }
   'project.limit.noneConnection': { name: string | number }
+  'project.limit.notIncluded': undefined
+  'project.limit.notIncludedSub': undefined
+  'project.limit.notReported': { provider: string | number }
   'project.limit.planOnly': { plan: string | number; provider: string | number }
   'project.limit.resets': { when: string | number }
   'project.limit.tip': { window: string; label: string | number; provider: string | number }

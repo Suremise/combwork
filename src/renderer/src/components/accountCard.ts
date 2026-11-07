@@ -1,5 +1,5 @@
 import type { Account, AppSettings, Connection, PlanLimit } from '../../../shared/types'
-import { limitWindow } from '../../../shared/planLimits'
+import { hasShare, limitWindow } from '../../../shared/planLimits'
 import { permissionLabel, providerDescriptor } from '../../../shared/providers'
 import { effortName } from '../../../shared/models'
 import { modelLabel } from '../../../shared/defaults'
@@ -23,7 +23,7 @@ export const M = {
 /** An account's plan limits that haven't reset yet (an expired reading says nothing of now), in the order reported. */
 export function currentLimits(limits: readonly PlanLimit[] | undefined, now = Date.now()): PlanLimit[] {
   // An unlimited one (HI-2734) has no share to draw: accounts' bars and usage moves are of shares only.
-  return (limits ?? []).filter((l) => !l.unlimited && (!l.resetsAt || Date.parse(l.resetsAt) > now))
+  return (limits ?? []).filter((l) => hasShare(l) && (!l.resetsAt || Date.parse(l.resetsAt) > now))
 }
 
 /** A limit's window for its label: the 5-hour or the weekly one, else the provider's own name for it. */

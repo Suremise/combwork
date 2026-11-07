@@ -85,15 +85,16 @@ describe("Antigravity's plan limits (agy's status line)", () => {
 })
 
 describe("Copilot's plan limits (a model call's quota snapshots)", () => {
-  it('reads the recorded snapshots: chat and completions with their counts; no premium requests on a plan without them', () => {
+  it('reads the recorded snapshots: chat and completions with their counts; premium requests not in this plan', () => {
     const u = copilotPlanUsage(copilotSnapshots, '2026-10-20T10:00:00Z')!
     expect(u.provider).toBe('copilot')
     expect(u.updatedAt).toBe('2026-10-20T10:00:00.000Z')
-    expect(u.limits.map((l) => [l.id, l.models, l.windowMinutes, l.used, l.entitlement])).toEqual([['chat', 'chat', null, 2, 200], ['completions', 'completions', null, 0, 2000]])
+    expect(u.limits.map((l) => [l.id, l.models, l.windowMinutes, l.used, l.entitlement])).toEqual([['chat', 'chat', null, 2, 200], ['completions', 'completions', null, 0, 2000], ['premium_interactions', 'premium', null, undefined, 0]])
     expect(u.limits[0].usedPercent).toBeCloseTo(0.8, 6)
     expect(u.limits[0].resetsAt).toBe('2026-11-01T00:00:00.000Z')
-    // premium_interactions: entitlement 0, 0% left. Shown, it would read all used and warn.
-    expect(u.limits.some((l) => l.id === 'premium_interactions')).toBe(false)
+    // premium_interactions: entitlement 0, 0% left: known (not in the plan), never a share (it would read all used and warn).
+    expect(u.limits[2]).toMatchObject({ notIncluded: true, entitlement: 0, usedPercent: 0 })
+    expect(u.limits[2].unlimited).toBeUndefined()
   })
 
   it('an unlimited quota is reported as unlimited, not as a figure or as nothing', () => {
@@ -113,7 +114,7 @@ describe("Copilot's plan limits (a model call's quota snapshots)", () => {
 
   it("the session file's event carries it to the session; Copilot's offline run ({}) carries none", () => {
     const line = JSON.stringify({ ...JSON.parse(copilotLine), timestamp: '2026-10-20T10:00:00Z' })
-    expect(eventsDetails(line).planUsage?.limits.map((l) => l.id)).toEqual(['chat', 'completions'])
+    expect(eventsDetails(line).planUsage?.limits.map((l) => l.id)).toEqual(['chat', 'completions', 'premium_interactions'])
     expect(eventsDetails(readFileSync(join(FIX, 'copilot', 'compaction-1.0.98.jsonl'), 'utf8')).planUsage).toBeUndefined()
   })
 })
@@ -126,7 +127,6 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
   it('merges each limit by its id: a lower reading later keeps the higher; one left out stays until its reset', () => {
     let kept = mergePlanUsage(undefined, agy(0.9, 0.8), AT)
     kept = mergePlanUsage(kept, agy(0.95, 0.6, AT + 60e3), AT + 60e3)
-    expect(pct(kept, 'gemini-weekly')).toBeCloseTo(10, 6)
     expect(pct(kept, 'gemini-weekly')).toBeCloseTo(10, 6)
     expect(pct(kept, '3p-weekly')).toBeCloseTo(40, 6)
     const onlyGemini = { ...agy(0.85), limits: agy(0.85).limits.filter((l) => l.id === 'gemini-weekly') }
@@ -158,6 +158,19 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
     const g = next.limits.find((l) => l.id === 'gemini-weekly')!
     expect(g.usedPercent).toBeCloseTo(50, 6)
     expect(g.models).toBe('gemini-pro')
+  })
+
+  it('a delayed report never rolls back what a later one said the limit is, whether its share is lower or higher', () => {
+    const named = (models: string, gemini: number, at: number) => ({ ...agy(gemini, 1, at), limits: agy(gemini, 1, at).limits.map((l) => (l.id === 'gemini-weekly' ? { ...l, models } : l)) })
+    const g = (u: PlanUsage) => u.limits.find((l) => l.id === 'gemini-weekly')!
+    // A at t0 (50% used); C at t2 (40%: lower, kept share A's) says gemini-pro; B from t1 arrives last.
+    const afterC = mergePlanUsage(mergePlanUsage(undefined, named('gemini', 0.5, AT), AT), named('gemini-pro', 0.6, AT + 120e3), AT + 120e3)
+    expect([Math.round(g(afterC).usedPercent), g(afterC).models]).toEqual([50, 'gemini-pro'])
+    for (const left of [0.55, 0.45]) {
+      const afterB = mergePlanUsage(afterC, named('gemini', left, AT + 60e3), AT + 130e3)
+      expect(g(afterB).models, `B at ${left}`).toBe('gemini-pro')
+      expect(Math.round(g(afterB).usedPercent), `B at ${left}`).toBe(Math.max(50, Math.round((1 - left) * 100)))
+    }
   })
 
   describe('what the plan allows changing within a period (unlimited now or no longer, another entitlement)', () => {
@@ -193,6 +206,14 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
       expect([upgraded.entitlement, Math.round(upgraded.usedPercent)]).toEqual([1500, 16])
       const late = merged([metered(1500, 84, AT + 60e3), AT + 60e3], [metered(300, 20, AT), AT + 60e3])
       expect([late.entitlement, Math.round(late.usedPercent)]).toEqual([1500, 16])
+    })
+
+    it('not in the plan, then in it (a plan changed): the later reading, either way and out of order', () => {
+      const none = (at: number) => premium({ isUnlimitedEntitlement: false, entitlementRequests: 0, remainingPercentage: 0 }, at)
+      const l = merged([none(AT), AT], [metered(300, 90, AT + 60e3), AT + 60e3])
+      expect([l.notIncluded, Math.round(l.usedPercent)]).toEqual([undefined, 10])
+      expect(merged([metered(300, 90, AT + 60e3), AT + 60e3], [none(AT), AT + 60e3]).notIncluded).toBeUndefined()
+      expect(merged([metered(300, 90, AT), AT], [none(AT + 60e3), AT + 60e3])).toMatchObject({ notIncluded: true, entitlement: 0 })
     })
 
     it('the same entitlement: the higher share within the period, as before', () => {
@@ -242,6 +263,11 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
         const u = copilotPlanUsage(snapshot(true), new Date().toISOString())!
         reportPlanUsage('copilot', { ...u, limits: u.limits.map((l) => ({ ...l, usedPercent: 99 })) })
         expect(config.get().planWarnings[key]).toBeUndefined()
+        // Nor of one the plan doesn't include (its allowance 0), whatever its placeholder says.
+        delete config.get().planUsage.copilot
+        const none = copilotPlanUsage({ premium_interactions: { isUnlimitedEntitlement: false, entitlementRequests: 0, usedRequests: 0, remainingPercentage: 0, resetDate: '2099-12-01T00:00:00Z' } }, new Date().toISOString())!
+        reportPlanUsage('copilot', { ...none, limits: none.limits.map((l) => ({ ...l, usedPercent: 100 })) })
+        expect(config.get().planWarnings[key]).toBeUndefined()
         delete config.get().planUsage.copilot
         reportPlanUsage('copilot', copilotPlanUsage(snapshot(false), new Date().toISOString())!)
         expect(config.get().planWarnings[key]?.level).toBe(95)
@@ -259,7 +285,7 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
     expect(limitName(other)).toBe('Other models, weekly')
     expect(limitWindow(gemini)).toBe('other')
     const copilot = copilotPlanUsage(copilotSnapshots, '2026-10-20T10:00:00Z')!.limits
-    expect(copilot.map(limitName)).toEqual(['Chat messages', 'Code completions'])
+    expect(copilot.map(limitName)).toEqual(['Chat messages', 'Code completions', 'Premium requests'])
     expect(limitName({ label: 'x', models: 'flash', windowMinutes: null })).toBe('flash')
     expect(limitName({ label: 'weekly', windowMinutes: WEEK })).toBe('weekly')
     expect(limitWindow({ windowMinutes: WEEK })).toBe('weekly')

@@ -164,7 +164,9 @@ const M = {
   limitUnlimitedSub: msg({ id: 'project.limit.unlimitedSub', defaultMessage: '{hasReset, select, yes {no limit · period resets {when}} other {no limit}}', description: 'Under an unlimited plan limit (HI-2734). {when} is when its period resets: "in 3 days", or a day and time.' }),
   limitCounts: msg({ id: 'project.limit.counts', defaultMessage: '{used, number} of {entitlement, number} used', description: "In the (i) of a plan limit whose provider says its counts (HI-2734: Copilot's requests): how many of how many were used." }),
   planOnly: msg({ id: 'project.limit.planOnly', defaultMessage: "Your plan: {plan}. {provider} hasn’t reported this plan’s limits yet.", description: "In place of the plan limits when the provider said the plan's name but no limits (HI-2734: Antigravity's plan tier). {plan} is the plan's name as the provider says it." }),
-  noLimits: msg({ id: 'project.limit.none', defaultMessage: "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.", description: 'In place of the plan limits before any were reported.' })
+  noLimits: msg({ id: 'project.limit.notReported', defaultMessage: "{provider} hasn’t reported your plan’s limits in its sessions so far. Its sessions report them as they run; accounts that use an API key have none.", description: 'In place of the plan limits while none is known (HI-2734): no session of the coding agent ({provider}) has reported any yet.' }),
+  limitNotIncluded: msg({ id: 'project.limit.notIncluded', defaultMessage: 'Not in your plan', description: "A plan limit's figure when the provider says the plan's allowance for it is 0 (HI-2734: Copilot Free has no premium requests), in place of a percent." }),
+  limitNotIncludedSub: msg({ id: 'project.limit.notIncludedSub', defaultMessage: 'an allowance of 0', description: 'Under a plan limit the plan does not include (HI-2734): its allowance, as the provider reported it, is 0.' })
 }
 
 const C = {
@@ -941,12 +943,14 @@ function LimitCards({ kept, now, tip, none, provider }: { kept: PlanUsage | unde
     return tr(M.limitTitle, { window: limitWindow(l), label: `${name.charAt(0).toUpperCase()}${name.slice(1)}` })
   }
   // Its counts, where the provider says them (HI-2734: Copilot's requests), in its (i).
-  const tipOf = (l: PlanLimit): string => (l.used !== undefined && l.entitlement !== undefined ? `${tip(l)}
-${tr(M.limitCounts, { used: l.used, entitlement: l.entitlement })}` : tip(l))
+  const tipOf = (l: PlanLimit): string => (l.used !== undefined && l.entitlement !== undefined ? `${tip(l)}\n${tr(M.limitCounts, { used: l.used, entitlement: l.entitlement })}` : tip(l))
   const card = (l: PlanLimit): React.ReactNode =>
     l.unlimited ? (
       // An unlimited one (HI-2734): said so, with no meter and no percent.
       <Card key={l.id} title={title(l)} value={tr(M.limitUnlimited)} sub={tr(M.limitUnlimitedSub, { hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' })} tip={tipOf(l)} />
+    ) : l.notIncluded ? (
+      // One the plan doesn't include (HI-2734: an allowance of 0): said so, never a share (it would read all used).
+      <Card key={l.id} title={title(l)} value={tr(M.limitNotIncluded)} sub={tr(M.limitNotIncludedSub)} tip={tip(l)} />
     ) : (
       <Card key={l.id} title={title(l)} value={fmt.percent(l.usedPercent / 100)} sub={l.resetsAt ? tr(M.limitResets, { when: resetsIn(l.resetsAt) }) : tr(M.limitUsed)} tip={tipOf(l)} accent={l.usedPercent >= 80}>
         <div className={cx('meter', l.usedPercent >= 95 ? 'danger' : l.usedPercent >= 80 && 'caution')}>

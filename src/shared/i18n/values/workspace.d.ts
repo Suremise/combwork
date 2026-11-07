@@ -475,6 +475,7 @@ interface CombworkMessageValues {
   'workspace.statusBar.keepAwake': { working: number }
   'workspace.statusBar.limitLine': { window: string; label: string | number; used: number; hasReset: string; when: string | number }
   'workspace.statusBar.more': { count: string | number }
+  'workspace.statusBar.notIncludedLine': { label: string | number }
   'workspace.statusBar.notInstalled': undefined
   'workspace.statusBar.notInstalledTip': { provider: string | number }
   'workspace.statusBar.notInstalledUnused': { provider: string | number }

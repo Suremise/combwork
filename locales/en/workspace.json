@@ -1895,6 +1895,10 @@
     "defaultMessage": "and {count} more",
     "description": "Under the running agents' table in the status bar's tooltip: agents not listed."
   },
+  "workspace.statusBar.notIncludedLine": {
+    "defaultMessage": "{label}: not in your plan",
+    "description": "A line of the status bar's plan limits tooltip (HI-2734) for a limit the plan doesn't include (its allowance is 0): its name ({label}: \"Premium requests\")."
+  },
   "workspace.statusBar.notInstalled": {
     "defaultMessage": "not installed",
     "description": "A coding agent's status bar item, after its icon: it isn't installed. Lower case; keep it short."

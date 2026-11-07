@@ -282,7 +282,11 @@ describe("agy's status line", () => {
   it('gives the model by its name, its effort and the context window (1.5.0, recorded)', () => {
     const lines = readFileSync(join(__dirname, 'fixtures', 'advanced', 'statusline-antigravity-1.5.0.jsonl'), 'utf8').trim().split(/\r?\n/).map((l) => JSON.parse(l))
     expect(antigravity.statusLine(lines[0])).toEqual({})
-    expect(antigravity.statusLine(lines[1])).toEqual({ modelName: 'Gemini 3.8 Flash (Low)', effort: 'low', contextWindow: 1048576 })
+    const { planUsage, ...rest } = antigravity.statusLine(lines[1])
+    expect(rest).toEqual({ modelName: 'Gemini 3.8 Flash (Low)', effort: 'low', contextWindow: 1048576 })
+    // And the plan's limits it carries (HI-2734: planLimitsProviders.test.ts reads them in full).
+    expect(planUsage?.plan).toBe('Antigravity Starter Quota')
+    expect(planUsage?.limits.map((l) => l.id).sort()).toEqual(['3p-weekly', 'gemini-weekly'])
   })
 })
 

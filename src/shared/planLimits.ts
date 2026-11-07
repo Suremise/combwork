@@ -29,6 +29,9 @@ export function limitName(l: Pick<PlanLimit, 'label' | 'models' | 'windowMinutes
   return tr(MODELS_NAME, { models: l.models, window: l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other' })
 }
 
+/** Whether a limit has a share used to show and warn of (HI-2734): not an unlimited one, nor one the plan doesn't include. */
+export const hasShare = (l: Pick<PlanLimit, 'unlimited' | 'notIncluded'>): boolean => !l.unlimited && !l.notIncluded
+
 /** A limit's window as the plan-limit messages select on: the 5-hour and weekly ones, else "other" (named by limitName). */
 export function limitWindow(l: Pick<PlanLimit, 'windowMinutes' | 'models'>): 'fiveHour' | 'weekly' | 'other' {
   if (l.models) return 'other'

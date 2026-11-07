@@ -473,6 +473,7 @@
   "workspace.statusBar.keepAwake": "PC activo: {working, plural, one {# agente trabajando} many {# agentes trabajando} other {# agentes trabajando}}",
   "workspace.statusBar.limitLine": "{window, select, fiveHour {Límite de 5 horas} weekly {Límite semanal} other {Límite de {label}}}: {used, number, ::percent} usado{hasReset, select, yes {, se restablece {when}} other {}}",
   "workspace.statusBar.more": "y {count} más",
+  "workspace.statusBar.notIncludedLine": "{label}: no incluido en tu plan",
   "workspace.statusBar.notInstalled": "no instalado",
   "workspace.statusBar.notInstalledTip": "{provider} no está instalado.",
   "workspace.statusBar.notInstalledUnused": "{provider} no está instalado. Nada lo usa: los agentes nuevos usan otro proveedor.",

@@ -473,6 +473,7 @@
   "workspace.statusBar.keepAwake": "PCのスリープを防止中：{working, plural, other {#個のエージェント}}が作業中",
   "workspace.statusBar.limitLine": "{window, select, fiveHour {5時間の上限} weekly {週間の上限} other {{label}の上限}}：{used, number, ::percent}使用{hasReset, select, yes {、{when}にリセット} other {}}",
   "workspace.statusBar.more": "ほか{count}個",
+  "workspace.statusBar.notIncludedLine": "{label}：プランに含まれていません",
   "workspace.statusBar.notInstalled": "未インストール",
   "workspace.statusBar.notInstalledTip": "{provider}はインストールされていません。",
   "workspace.statusBar.notInstalledUnused": "{provider}はインストールされていません。使っているものはありません（新しいエージェントは別のプロバイダーを使います）。",

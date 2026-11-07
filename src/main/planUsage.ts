@@ -3,7 +3,7 @@ import { msg, tr } from '../shared/i18n'
 import { createHash } from 'crypto'
 import type { ConnectionPlanUsage, PlanLimit, PlanUsage, ProviderId } from '../shared/types'
 import { providerName } from '../shared/providers'
-import { limitName } from '../shared/planLimits'
+import { hasShare, limitName } from '../shared/planLimits'
 import { formatTime, formatWeekdayTime } from '../shared/dates'
 import { config } from './config'
 import { emit } from './events'
@@ -40,22 +40,40 @@ function mergeLimit(kept: PlanLimit | undefined, next: PlanLimit, now: number): 
   if (resetPassed(next, now)) return kept && !resetPassed(kept, now) ? kept : undefined
   if (!kept || resetPassed(kept, now)) return next
   if (allowanceChanged(kept, next)) return reportedLater(kept, next)
-  if (!kept.resetsAt || !next.resetsAt) return next
+  if (!kept.resetsAt || !next.resetsAt) return described(next, kept)
   if (!samePeriod(kept.resetsAt, next.resetsAt)) return Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next : kept
   const resetsAt = Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next.resetsAt : kept.resetsAt
-  if (next.usedPercent >= kept.usedPercent) return { ...next, resetsAt }
-  // The higher reading kept, its figures and who reported them; what the limit is (its name, window, models) the latest
-  // report's (HI-2734).
+  if (next.usedPercent >= kept.usedPercent) return described({ ...next, resetsAt }, kept)
+  // The higher reading kept, its figures and who reported them.
   const out: PlanLimit = { ...next, usedPercent: kept.usedPercent, resetsAt, reportedAt: kept.reportedAt, reportedBy: kept.reportedBy }
   if (kept.used === undefined) delete out.used
   else out.used = kept.used
   if (out.reportedAt === undefined) delete out.reportedAt
   if (out.reportedBy === undefined) delete out.reportedBy
+  return described(out, kept, next.describedAt ?? next.reportedAt)
+}
+
+/** The fields that say what a limit is, rather than how much of it is used (HI-2734). */
+const DESCRIPTION = ['label', 'windowMinutes', 'models'] as const
+
+/**
+ * A merged reading, saying what the limit is as the latest report to say it did (HI-2734): the new report's, unless the
+ * kept one's description was taken from a later report than it (a delayed report never rolls a name or models back).
+ * `newAt` is when the new description was reported (by default the merged reading's own report time).
+ */
+function described(merged: PlanLimit, kept: PlanLimit, newAt = merged.describedAt ?? merged.reportedAt): PlanLimit {
+  const keptAt = kept.describedAt ?? kept.reportedAt
+  const out: PlanLimit = { ...merged }
+  if (keptAt && newAt && Date.parse(keptAt) > Date.parse(newAt)) {
+    for (const k of DESCRIPTION) (out as unknown as Record<string, unknown>)[k] = kept[k]
+    if (kept.models === undefined) delete out.models
+    out.describedAt = keptAt
+  } else if (newAt) out.describedAt = newAt
   return out
 }
 
 /** Whether what the plan allows differs between two readings of a limit (HI-2734): unlimited in one, or two entitlements. */
-const allowanceChanged = (a: PlanLimit, b: PlanLimit): boolean => !!a.unlimited !== !!b.unlimited || (a.entitlement !== undefined && b.entitlement !== undefined && a.entitlement !== b.entitlement)
+const allowanceChanged = (a: PlanLimit, b: PlanLimit): boolean => !!a.unlimited !== !!b.unlimited || !!a.notIncluded !== !!b.notIncluded || (a.entitlement !== undefined && b.entitlement !== undefined && a.entitlement !== b.entitlement)
 
 /** Of two readings, the one reported later (the new one when either's time is unknown or they are the same). */
 const reportedLater = (kept: PlanLimit, next: PlanLimit): PlanLimit => (kept.reportedAt && next.reportedAt && Date.parse(kept.reportedAt) > Date.parse(next.reportedAt) ? kept : next)
@@ -134,7 +152,7 @@ export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent
  * status bar's warning colour goes by), the reset times and who reported them. Only the report times aren't a change.
  */
 const shownValues = (u: PlanUsage | null | undefined): string =>
-  JSON.stringify([u?.plan ?? null, (u?.limits ?? []).map((l) => [l.id, l.usedPercent, l.resetsAt, l.reportedBy ?? null, l.label, l.windowMinutes, l.models ?? null, !!l.unlimited, l.used ?? null, l.entitlement ?? null])])
+  JSON.stringify([u?.plan ?? null, (u?.limits ?? []).map((l) => [l.id, l.usedPercent, l.resetsAt, l.reportedBy ?? null, l.label, l.windowMinutes, l.models ?? null, !!l.unlimited, !!l.notIncluded, l.used ?? null, l.entitlement ?? null])])
 
 /**
  * Providers report plan usage often (Claude Code with every status-line update, many times a minute while
@@ -167,8 +185,8 @@ export function reportPlanUsage(provider: ProviderId, report: PlanUsage, reporte
   }
 
   for (const l of usage.limits) {
-    // Unlimited (HI-2734): nothing to warn of.
-    if (l.unlimited) continue
+    // Unlimited, or not in the plan (HI-2734): nothing to warn of.
+    if (!hasShare(l)) continue
     const key = warningKey(provider, l.id, connection?.id)
     const level = nextWarning(l, config.get().planWarnings[key])
     if (level === null) continue

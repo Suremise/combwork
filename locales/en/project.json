@@ -951,13 +951,21 @@
     "defaultMessage": "No {provider} account is on in this workspace. Turn one on in Settings → Accounts & Connections to see its plan limits here.",
     "description": "In place of the plan limits (HI-1756) when the workspace has no account on for the coding agent ({provider}). Settings → Accounts & Connections names a section."
   },
-  "project.limit.none": {
-    "defaultMessage": "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.",
-    "description": "In place of the plan limits before any were reported."
-  },
   "project.limit.noneConnection": {
     "defaultMessage": "Its limits appear after the next message in a session on {name}.",
     "description": "Under a connection ({name}: \"Max 1\", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported."
+  },
+  "project.limit.notIncluded": {
+    "defaultMessage": "Not in your plan",
+    "description": "A plan limit's figure when the provider says the plan's allowance for it is 0 (HI-2734: Copilot Free has no premium requests), in place of a percent."
+  },
+  "project.limit.notIncludedSub": {
+    "defaultMessage": "an allowance of 0",
+    "description": "Under a plan limit the plan does not include (HI-2734): its allowance, as the provider reported it, is 0."
+  },
+  "project.limit.notReported": {
+    "defaultMessage": "{provider} hasn’t reported your plan’s limits in its sessions so far. Its sessions report them as they run; accounts that use an API key have none.",
+    "description": "In place of the plan limits while none is known (HI-2734): no session of the coding agent ({provider}) has reported any yet."
   },
   "project.limit.planOnly": {
     "defaultMessage": "Your plan: {plan}. {provider} hasn’t reported this plan’s limits yet.",

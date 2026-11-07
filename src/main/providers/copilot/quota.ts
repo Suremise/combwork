@@ -12,8 +12,8 @@ import { advancedValues as advanced } from '../../advancedValues'
  *
  * Each quota with a finite entitlement above 0 and a percent left from 0 to 100 is a limit by its key, the percent used,
  * with its counts and its reset (no window: Copilot gives none, only the date); an unlimited one is a limit that says so,
- * never warned of. One with no entitlement (0: a plan without it, Copilot Free's premium requests) or no valid figures is
- * left out, so it never shows as all used. `{}` (a custom provider's model: no quota) and nothing valid are no report.
+ * never warned of; one whose entitlement is 0 (a plan without it: Copilot Free's premium requests) is a limit that says
+ * it isn't in the plan, never a share (it would read all used). One with no valid figures is left out. `{}` (a custom provider's model: no quota) and nothing valid are no report.
  * `models` names the quota: `premium` for premium requests, else Copilot's own key. Field names are advanced settings (#367).
  */
 export function copilotPlanUsage(snapshots: unknown, at: string): PlanUsage | null {
@@ -35,6 +35,10 @@ export function copilotPlanUsage(snapshots: unknown, at: string): PlanUsage | nu
     const resetsAt = isoTime(s[f.reset])
     if (s[f.unlimited] === true || entitlement === -1) {
       limits.push({ id: key, label: key, windowMinutes: null, usedPercent: 0, resetsAt, models, unlimited: true })
+      continue
+    }
+    if (entitlement === 0) {
+      limits.push({ id: key, label: key, windowMinutes: null, usedPercent: 0, resetsAt, models, notIncluded: true, entitlement: 0 })
       continue
     }
     const left = s[f.left]

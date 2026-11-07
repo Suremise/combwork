@@ -710,8 +710,15 @@ export interface PlanLimit {
    * `gemini`, `otherModels` (agy's third-party models), `premium` (Copilot's premium requests), else the provider's own word.
    */
   models?: string
-  /** An unlimited entitlement the provider reported (HI-2734: Copilot): shown as such, no meter, never warned of. */
+  /**
+   * An unlimited entitlement the provider reported (HI-2734: Copilot): shown as such, no meter, never warned of. Its
+   * usedPercent is 0, a placeholder, never a measured 0: every reader checks hasShare() (shared/planLimits.ts) first.
+   */
   unlimited?: true
+  /** An allowance of 0 the provider reported (HI-2734: Copilot Free's premium requests): not in the plan, no meter, never warned of; usedPercent a placeholder as for unlimited. */
+  notIncluded?: true
+  /** When what the limit is (label, window, models) was taken from a report (HI-2734): a delayed report never rolls it back. */
+  describedAt?: string
   /** What was used of how much, in the provider's own units, where it says (Copilot's requests). */
   used?: number
   entitlement?: number

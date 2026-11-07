@@ -473,6 +473,7 @@
   "workspace.statusBar.keepAwake": "Komputer nie usypia: {working, plural, one {# agent pracuje} few {# agentów pracuje} many {# agentów pracuje} other {# agenta pracuje}}",
   "workspace.statusBar.limitLine": "{window, select, fiveHour {Limit 5-godzinny} weekly {Limit tygodniowy} other {Limit {label}}}: wykorzystano {used, number, ::percent}{hasReset, select, yes {, odnowi się {when}} other {}}",
   "workspace.statusBar.more": "i jeszcze {count}",
+  "workspace.statusBar.notIncludedLine": "{label}: poza Twoim planem",
   "workspace.statusBar.notInstalled": "niezainstalowany",
   "workspace.statusBar.notInstalledTip": "{provider} nie jest zainstalowany.",
   "workspace.statusBar.notInstalledUnused": "{provider} nie jest zainstalowany. Nic go nie używa: nowi agenci używają innego dostawcy.",

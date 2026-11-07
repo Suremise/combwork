@@ -401,6 +401,25 @@ const check = (name, ok, extra = '') => {
       check('A: its error hooks, recoverable, kept for the record', hooks.length > 0 && hooks.every((h) => h?.recoverable === true), `${hooks.length} hook(s)`)
     }
 
+    // The plan's limits (HI-2734): Copilot offline (a custom provider) records no quota ({}), so the model call's quota
+    // event recorded from Copilot 1.0.93 (tests/fixtures/copilot/quota-snapshots-1.0.93.jsonl: chat 2 of 200, completions
+    // 0 of 2000, premium requests an allowance of 0) is appended to B's own events.jsonl while it is idle, its reset moved
+    // a month on. Combwork reads it as it reads the file's growth, through the same events → details → plan usage path.
+    await reach(b.id, ['ready', 'finished'])
+    const quota = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'copilot', 'quota-snapshots-1.0.93.jsonl'), 'utf8'))
+    const nextMonth = new Date(Date.now() + 30 * 86400e3).toISOString()
+    for (const snapshot of Object.values(quota.data.quotaSnapshots)) snapshot.resetDate = nextMonth
+    fs.appendFileSync(bEvents, JSON.stringify({ ...quota, id: 'hi-2734-quota', timestamp: new Date().toISOString(), parentId: null }) + '\n')
+    const planItem = page.locator('.statusbar .status-item[data-plan="copilot"]')
+    const planText = async () => (await planItem.innerText().catch(() => '')).replace(/\s+/g, ' ')
+    check("the status bar shows Copilot's quotas from its session file: chats and completions, not the premium requests it doesn't include", !!(await lib.until(async () => /Chat 1%/.test(await planText()) && /Completions 0%/.test(await planText()), 20000, 300)) && !/Premium/.test(await planText()), await planText())
+    const kept = (await inv('app:planUsage')).copilot
+    const premium = kept?.limits.find((l) => l.id === 'premium_interactions')
+    check('…kept with its counts, the premium requests as not in the plan', kept?.limits.find((l) => l.id === 'chat')?.used === 2 && premium?.notIncluded === true && premium.entitlement === 0, JSON.stringify(kept))
+    await planItem.click()
+    check('…and the Overview shows them, the premium requests as Not in your plan', !!(await lib.until(async () => (await page.getByText('Chat messages limit').count()) > 0 && (await page.getByText('Premium requests limit').count()) > 0 && (await page.getByText('Not in your plan').count()) > 0, 20000, 300)))
+    await page.screenshot({ path: path.join(lib.WORK, 'copilot-plan-limits.png') })
+
     // B stopped from Combwork in the middle of a turn: the turn is cancelled and Copilot still exits by itself, with its totals.
     await send(b.id, 'work 20 then say Never said.', ['working'])
     await inv('session:stop', proj, b.id)

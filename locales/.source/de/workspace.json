@@ -473,6 +473,7 @@
   "workspace.statusBar.keepAwake": "Keeping the PC awake: {working, plural, one {# agent} other {# agents}} working",
   "workspace.statusBar.limitLine": "{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}: {used, number, ::percent} used{hasReset, select, yes {, resets {when}} other {}}",
   "workspace.statusBar.more": "and {count} more",
+  "workspace.statusBar.notIncludedLine": "{label}: not in your plan",
   "workspace.statusBar.notInstalled": "not installed",
   "workspace.statusBar.notInstalledTip": "{provider} is not installed.",
   "workspace.statusBar.notInstalledUnused": "{provider} isn't installed. Nothing uses it: new agents use another provider.",
