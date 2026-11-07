@@ -4951,7 +4951,10 @@ repeating them (#533) [note §8].
   none of Combwork's guidance, skills or typing, every CLI override off, so none of the workspace's servers either (the
   CLI's own config decides). The Agent API's `launch` for it says so (plain). An agent a tools-off connection makes
   Independent launches as that connection's switches say, as before. The role is in the launch's signature, so a change
-  to or from Independent restarts it. Its lanes never change it (HR3's round 1), and an either-role agent keeps both sets on any
+  to or from Independent restarts it: `restartForTools` compares what of Combwork's the session launched with
+  (`launchKeyOf`: its policy and whether it got the combwork server) as well as its side and workflow tools, so a running
+  agent made Independent or made a worker again restarts like any role change (idle at once; busy, asked first), and
+  until it has, a session launched without Combwork's tools is given no part's work (`sideAllows`). Its lanes never change it (HR3's round 1), and an either-role agent keeps both sets on any
   lane. A lane part is only for a role that does it, however the lane is started or joined (the Assistant's (A), 7 Nov:
   the Agent API, cw_lane and the Assistant, as Start Lane… offers them): its builder `buildsWork`, its reviewer
   `reviewsWork`, else `400` `lane.refused.wrongSide` ("X is a builder by its role, so it has no reviewer's tools…

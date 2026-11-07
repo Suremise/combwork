@@ -463,6 +463,11 @@ interface LiveSession {
   side?: string | null
   /** A restart for its new side or workflow tools is on its way (restartForTools): asked again, it isn't queued twice. */
   sideRestart?: boolean
+  /**
+   * What of Combwork's this launch had (HI-2731, launchKeyOf): its launch policy and whether it got the combwork server, so
+   * a role change to or from Independent, which changes them and not its side, restarts it too.
+   */
+  launchKey?: string
   /** The tools its project's workflow left out of its launch (HI-2694, its CW_WORKFLOW_HIDDEN): [] for none. */
   workflowHidden?: string[]
   /** When this launch first became ready (or watching, or finished), in ms (#865). */
@@ -1066,6 +1071,13 @@ interface PinnedDialect {
 }
 
 /** A pinned chain as its launch record shows it (LiveSessionState.launched.dialect). */
+/**
+ * What of Combwork's a launch has, in short (HI-2731): its launch policy (its connection's switches, or the terminal preset
+ * of an Independent agent's) and whether it gets the combwork server. Two launches with the same key differ in nothing a
+ * role change to or from Independent changes.
+ */
+export const launchKeyOf = (eff: Pick<EffectiveSettings, 'launch' | 'mcpServers'>): string => JSON.stringify({ launch: eff.launch, tools: !!eff.mcpServers[TOOLS_SERVER] })
+
 function launchDialectOf(d: PinnedDialect, guidance: string): LaunchDialect {
   const { chain, input } = d
   return {
@@ -2535,18 +2547,27 @@ class SessionManager {
     if (workspace.isAssistantHome(projectPath)) return 'same'
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.status === 'stopped') return 'notRunning'
-    if (!l.side) return 'same'
     const { agent, cfg: pc } = await this.agentDef(projectPath, agentId)
+    // What of Combwork's it would launch with now (HI-2731): a role change to or from Independent changes that (the
+    // terminal preset, its connection's switches), not its side, and from a launch with no combwork server too.
+    let keyNow: string | undefined
+    try {
+      keyNow = launchKeyOf(await this.effective(projectPath, agent, undefined, pc))
+    } catch (e) {
+      log.warn(`${userText(this.label(l.state))}: what it would launch with now, not read: its side alone decides`, e)
+    }
+    const launchChanged = keyNow !== undefined && l.launchKey !== undefined && keyNow !== l.launchKey
+    if (!l.side && !launchChanged) return 'same'
     const now = toolSideOf(agentWorkflowRole(agent))
-    const hidden = this.workflowToolsHidden(projectPath, now, pc)
+    const hidden = l.side ? this.workflowToolsHidden(projectPath, now, pc) : []
     const was = l.workflowHidden ?? []
     const sameHidden = hidden.length === was.length && hidden.every((t, i) => t === was[i])
-    if (now === l.side && sameHidden) return 'same'
+    if (now === l.side && sameHidden && !launchChanged) return 'same'
     // Asked again (the window's question after the change's own): one restart, already on its way.
     if (l.sideRestart) return 'restarting'
     const busy = l.state.status === 'working' || l.state.turn?.state === 'running'
     if (o.when === 'ifIdle' && busy) return 'busy'
-    const why = now !== l.side ? `its side of the workflow changed (${l.side} → ${now})` : `its project's workflow changed the tools it can use (left out: ${was.join(', ') || 'none'} → ${hidden.join(', ') || 'none'})` // i18n-ignore: a log line
+    const why = launchChanged ? 'what of Combwork\'s it launches with changed (its role to or from Independent)' : now !== l.side ? `its side of the workflow changed (${l.side} → ${now})` : `its project's workflow changed the tools it can use (left out: ${was.join(', ') || 'none'} → ${hidden.join(', ') || 'none'})` // i18n-ignore: a log line
     log.info(`${userText(this.label(l.state))}: ${why}, restarting it ${busy ? 'once its turn is over' : 'now'}`)
     const r = this.switchAtSafePoint(projectPath, agentId)
     if (r === 'notRunning') return 'notRunning'
@@ -2561,6 +2582,9 @@ class SessionManager {
   sideAllows(projectPath: string, agentId: string, part: 'builder' | 'reviewer'): boolean {
     const l = this.live.get(liveId(projectPath, agentId))
     if (!l || l.state.status === 'stopped') return true
+    // Launched without Combwork's tools (Independent then, HI-2731, or its connection's off): no part's work until it has
+    // relaunched with them, whatever its role says now.
+    if (l.launchKey !== undefined && !l.side) return false
     if (!sideAllows(l.side, part)) return false
     // Nor while its launch lacks a tool of the part its project's workflow makes usable now (HI-2694, HR1's s11 point 2):
     // its own launch's list, so Later, a restart waiting or one that failed all hold until it has really relaunched. What
@@ -3034,6 +3058,7 @@ class SessionManager {
     // The side its tools are offered for (HI-2664), to tell when a role or lane change needs it restarted.
     l.side = (eff.mcpServers[TOOLS_SERVER]?.env?.CW_SIDE as string | undefined) ?? null
     l.workflowHidden = workflowHiddenOf(eff.mcpServers[TOOLS_SERVER]?.env?.CW_WORKFLOW_HIDDEN as string | undefined)
+    l.launchKey = launchKeyOf(eff)
     l.sideRestart = false
     // Its dialect chain (HI-2443): each layer's file, "model unknown", and the guidance revision as said in it, where a
     // dialect is set (a text overridden, or a file picked). Speaking the Default, its record is as before, but for
