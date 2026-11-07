@@ -966,6 +966,15 @@ describe('RELEASING.md on the 1.0 path', () => {
     expect(checks).toMatch(/\*\*The first release candidate\*\*, about \*\*2–3 hours\*\*/)
     expect(checks).toMatch(/\*\*An RC fix round\*\*, \*\*15–45 min\*\*/)
     expect(checks).toMatch(/\*\*The release of the tested candidate\*\*, \*\*15–30 min\*\*/)
+    // HI-2661: the coverage ledger: a fix round reruns what its changes invalidate, a path in no class everything, and
+    // the installers' own bytes are checked; the manifest's allowlist is fail-closed.
+    expect(checks).toMatch(/### The coverage ledger/)
+    expect(checks).toMatch(/\*\*A fix round reruns the invalidated slices and nothing else\.\*\*/)
+    expect(checks).toMatch(/A path in no class invalidates everything, as for a first RC\./)
+    expect(checks).toMatch(/installer's \*\*SHA-256\*\*/)
+    expect(checks).toMatch(/\*\*The installer the user installs, and the one `npm run release` uploads, always get rows of their own bytes:\*\*/)
+    expect(checks).toMatch(/Without one, or where it is uncertain, the full affected set runs: that is the fallback/)
+    expect(checks).toMatch(/Anything not on it means the real tier runs again\./)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/The full set is for guidance-wide changes only \(HI-2010, HI-2011, HI-2012\); a publishable RC gets 3 to 5 scenarios picked at random/)
     expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
     // #1534: where each build is recorded.
