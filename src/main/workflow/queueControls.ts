@@ -11,6 +11,12 @@
 // first, and paused again, saying so, when it still holds.
 
 import { app } from 'electron'
+import { CombworkError } from '../combworkError'
+import { fmt, msg, tr } from '../../shared/i18n'
+import { withValues } from '../../shared/advanced'
+import { forwardOf } from '../../shared/workflow/compile'
+import { projectTargets } from './targets'
+import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { boardRevision } from '../boardStore'
@@ -366,13 +372,94 @@ export async function mergedOutsideQueue(ws: WorkspaceService, projectPath: stri
  * with its reason: the card's intent (cardIntents.ts), then its target's queue told of it (Retry's requeue runs it).
  */
 export async function queueCardChange(ws: WorkspaceService, n: number, actor: TaskActor, kind: 'removeFromQueue' | 'retryMerge', reason: string, guard?: () => void): Promise<{ done: IntentDone; card: TaskCard }> {
-  const r = await runCardIntent({ n, plain: false }, actor, { kind, reason, ...(guard ? { guard } : {}) })
+  // A forward merge's Retry (HI-2679): its source frozen again, at its head now, for the new attempt.
+  const forward = kind === 'retryMerge' ? await forwardSourceNow(ws, n) : null
+  const r = await runCardIntent({ n, plain: false }, actor, { kind, reason, ...(guard ? { guard } : {}), ...(forward ? { forward } : {}) })
   const projectPath = ws.path && r.card.project ? join(ws.path, r.card.project) : null
   const wf = projectPath ? await workflowFor(ws, projectPath).catch(() => null) : null
   const target = wf ? wf.state(wf.store.card(n)).entries.at(-1)?.target : undefined
   if (projectPath && target) queueChanged(ws, projectPath, target)
   return r
 }
+
+/** A forward merge card's source head now (HI-2679), for its Retry; null for any other card, or one that can't be read. */
+async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ source: string } | null> {
+  for (const p of ws.info()?.projects ?? []) {
+    const wf = await workflowFor(ws, p.path).catch(() => null)
+    const rec = wf?.store.cards().find((c) => c.id === n)
+    const f = rec ? wf!.state(rec).forward : null
+    if (!f) continue
+    const head = await G.lineHead(p.path, f.from)
+    return head && !isUnknown(head) ? { source: head } : null
+  }
+  return null
+}
+
+/** What a forward request did (HI-2679): the card it made or found already open for that pair, or nothing to do. */
+export type ForwardDone = { upToDate: true; from: string; to: string } | { card: TaskCard; queued: boolean; from: string; to: string }
+
+/** Thrown for a forward request that can't be made: why, as a message (the caller's window or tool says it). */
+export class ForwardRefused extends CombworkError {}
+
+const FORWARD_TEXT = {
+  title: msg({ id: 'service.forward.title', defaultMessage: 'Bring {to} up to date with {from}', description: 'HI-2679: the title of the card Combwork makes for a forward merge: it merges branch {from} into branch {to} through {to}’s merge queue. Branch names.' }),
+  description: msg({ id: 'service.forward.description', defaultMessage: 'Combwork merges {from} ({source}) into {to} through {to}’s merge queue, with its merge checks, as a merge commit. Asked by {by}. If it comes back (a conflict or a red check), Retry merge tries again with {from} as it is then; Remove from queue ends it, nothing merged.', description: 'HI-2679: the description of the card Combwork makes for a forward merge. {from} and {to} are branch names, {source} a short commit id, {by} who asked (you, or the Assistant). Retry merge and Remove from queue are the card’s commands: as translated there.' }),
+  byUser: msg({ id: 'service.forward.byUser', defaultMessage: 'you', description: 'HI-2679: who asked for a forward merge, in its card’s description: the user.' }),
+  byAssistant: msg({ id: 'service.forward.byAssistant', defaultMessage: 'the Assistant', description: 'HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant.' }),
+  notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} and {to} must be two different branches this project merges work into: {targets}.', description: 'HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them.' }),
+  missing: msg({ id: 'service.forward.missing', defaultMessage: '{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}', description: 'HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.' }),
+  noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
+}
+
+/** One forward request at a time per project (HI-2679): the open-card check and its creation, in order. */
+const forwardTurns = new Map<string, Promise<unknown>>()
+
+/**
+ * Brings `to` up to date with `from` (HI-2679, SPEC §16.9): a forward merge, the user's or the Assistant's alone (`actor`;
+ * the Assistant's guard checked again inside each write). Both must be the project's existing targets, and different.
+ * Already contained: nothing is made. One open for the pair already: that card. Else a card of Combwork's, started on its
+ * forward rules (`forwardOf`) and queued in `to`'s queue with `from`'s head frozen.
+ */
+export async function forwardMerge(ws: WorkspaceService, projectPath: string, from: string, to: string, actor: TaskActor, guard?: () => void): Promise<ForwardDone> {
+  if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new ForwardRefused(M_FORWARD_AGENTS, { kind: 'forbidden' })
+  const t = await projectTargets(ws, projectPath)
+  const wf = await workflowFor(ws, projectPath)
+  if (!t || !wf || wf.currentRuleset(false).options.finish !== 'combworkMerges') throw new ForwardRefused(FORWARD_TEXT.noGit, { kind: 'invalid' })
+  const all = [t.default, ...t.others]
+  if (from === to || !all.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, targets: fmt.list(all) }), { kind: 'invalid' })
+  const key = projectPath.toLowerCase()
+  const turn = (forwardTurns.get(key) ?? Promise.resolve()).catch(() => undefined).then(async (): Promise<ForwardDone> => {
+    const [source, dest] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+    for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
+    const contained = await G.isAncestor(projectPath, source as string, dest as string)
+    if (contained === true) return { upToDate: true, from, to }
+    // One open for this pair: that one (not Done: queued, advancing, or returned for a Retry).
+    const open = wf.store.cards().find((c) => {
+      const s = wf.state(c)
+      return !!s.forward && s.forward.from === from && s.forward.to === to && s.stage !== 'done'
+    })
+    const { readTask, createTask, runIntent } = await import('../tasks')
+    if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to }
+    guard?.()
+    const by = actor.kind === 'assistant' ? 'assistant' : 'user'
+    const base = await G.mergeBase(projectPath, source as string, dest as string)
+    const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
+    const ruleset = forwardOf(wf.currentRuleset(), to)
+    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string) }, by, ruleset, guard), undefined, guard)
+    if (isRefusal(r.reply)) throw new ForwardRefused({ lines: [r.reply.message] }, { kind: 'conflict' })
+    queueChanged(ws, projectPath, to)
+    return { card: r.saved ?? made, queued: true, from, to }
+  })
+  forwardTurns.set(key, turn)
+  try {
+    return await turn
+  } finally {
+    if (forwardTurns.get(key) === turn) forwardTurns.delete(key)
+  }
+}
+
+/** HI-2679: a forward merge asked by a project agent (or a script): the user's and the Assistant's alone. */
+const M_FORWARD_AGENTS = msg({ id: 'service.forward.notAgents', defaultMessage: 'Only the user or the Assistant brings one branch up to date with another.', description: 'HI-2679: a forward merge refused: asked by a project agent or a script.' })
 
 async function needWorkflow(ws: WorkspaceService, projectPath: string): Promise<Workflow> {
   const wf = await workflowFor(ws, projectPath)

@@ -517,7 +517,10 @@ export class Workflow {
     const p = parseCardRef(ref)
     if (!p.ok) return refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
     const c = 'key' in p.ref ? this.store.cardByKey(p.ref.key) : this.store.cards().find((x) => x.id === (p.ref as { alias: number }).alias)
-    return c ?? refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
+    if (!c) return refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
+    // A forward merge (HI-2679) is the user's and the Assistant's alone: every intent of an agent on it is refused here.
+    if (agentOf(actor) && this.state(c).forward) return refusal('forward.notAgents', { card: c.key }, null)
+    return c
   }
 
   /**
@@ -1309,6 +1312,39 @@ export class Workflow {
   /** The reviewer to wake: the card's (a lane's), else the pool. */
   reviewerOf(card: CardRecord): string {
     return card.reviewer ?? 'reviewers'
+  }
+
+  /**
+   * Starts a forward merge (HI-2679) on its card, made for it a moment ago: `Started` with no line (the source is never
+   * the card's branch), then its authority (`ForwardRequested`), then straight to Merging with its first entry, the
+   * source frozen at `d.source`. Under its own rules (`forwardOf`), recorded with these facts. Only from the forward
+   * request (queueControls' `forwardMerge`), as the user or the Assistant: refused for a card started before.
+   */
+  async forwardStart(ref: unknown, d: { from: string; to: string; source: string; base: string }, by: 'user' | 'assistant', ruleset: Ruleset, guard?: () => void): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const out = await this.write(card, ruleset, by, (w) => {
+      guard?.()
+      const now = w.state()
+      if (now.started || now.stage !== 'todo') return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'start', moves: '' } } as GuardRefusal // i18n-ignore: intent names
+      w.fact('Started', { folder: 'project', line: null, base: d.base, target: d.to, builder: 'combwork', cardKind: 'code' }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('ForwardRequested', { from: d.from, to: d.to, source: d.source, by }) // i18n-ignore: a fact's kind and codes, not text
+      w.move('active', 'intent')
+      this.enqueueForward(w, d.source)
+      return null
+    })
+    if (out) return this.refuse(card, by, 'start', out)
+    return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /** A forward merge's entry (HI-2679): its source's frozen commit, into its destination, as a merge commit. */
+  private enqueueForward(w: Write, source: string, requeue?: 'retry'): void {
+    const s = w.state()
+    const target = s.started?.target ?? ''
+    w.fact('IntegrationRequested', { entry: `${w.card.key}/e${s.lastSeq + 1}`, revision: source, key: null, target, style: 'merge', ...(requeue ? { requeue } : {}) })
+    w.move('merging', 'derived')
+    w.action('enqueue', { target })
   }
 
   /** Puts a card in the merge queue: a new entry (`IntegrationRequested`). */
@@ -2556,6 +2592,15 @@ export class Workflow {
       const changed = this.stillAt(w, s, 'remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
       const e = openEntry(w.state())
+      // A forward merge (HI-2679), queued or returned: it ends, not merged (Done with no `Integrated`), unless it is
+      // advancing now (whose outcome the queue records, in the same lock).
+      if (w.state().forward && w.state().stage !== 'done') {
+        if (e?.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
+        w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
+        if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
+        w.move('done', 'user')
+        return null
+      }
       if (!e) return null
       if (e.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
       w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
@@ -2570,13 +2615,23 @@ export class Workflow {
   }
 
   /** Retry merge (the user's override, or the Assistant's with a reason): requeues an unchanged revision once, even after a red check (§16.8.1). */
-  async retryMerge(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user', guard?: () => void): Promise<Reply> {
+  async retryMerge(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user', guard?: () => void, forward?: { source: string }): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
     const out = await this.write(card, r, by, (w) => {
       guard?.()
+      // A forward merge (HI-2679) the queue returned: a new attempt, its source frozen again at `forward.source` (read by
+      // the caller just before), each time asked; never one still queued or advancing.
+      const fs = w.state()
+      if (fs.forward) {
+        const last = fs.entries.at(-1)
+        if (fs.stage !== 'active' || last?.state !== 'failed' || !forward?.source) return { rule: 'move.notFromHere', values: { card: card.key, stage: fs.stage, move: 'retry merge', moves: this.movesFrom(fs.stage, r, fs).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+        w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by, reason }) // i18n-ignore: a fact's kind and codes, not text
+        this.enqueueForward(w, forward.source, 'retry')
+        return null
+      }
       // For a card the queue returned (Active, its last entry failed), once per revision; or one waiting in Approved
       // where Combwork merges with no entry (taken out of the queue, #1623) and no follow-up waiting: approved and unstale.
       const st = w.state()

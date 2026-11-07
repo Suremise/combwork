@@ -181,19 +181,22 @@ export const baseRulesetId = (id: string): string => (id.endsWith(REVIEW_SKIPPED
  */
 export const TARGETED = '~target:'
 
+/** An id with a forward merge's mark (HI-2679) taken off: its base's. */
+const unforwarded = (id: string): string => (id.endsWith('~forward') ? id.slice(0, -'~forward'.length) : id)
+
 /**
  * A ruleset's rules for old rules (§16.5.4, HI-2556): its id with neither a review skip nor another target marked, so a
  * lane merging into another branch under the options in force is on today's rules.
  */
 export const rulesBaseId = (id: string): string => {
-  const base = baseRulesetId(id)
+  const base = unforwarded(baseRulesetId(id))
   const at = base.indexOf(TARGETED)
   return at < 0 ? base : base.slice(0, at)
 }
 
 /** The other target a ruleset's id marks (HI-2556), or null: the one its options name (G7) is its own. */
 export function targetOfRulesetId(id: string): string | null {
-  const base = baseRulesetId(id)
+  const base = unforwarded(baseRulesetId(id))
   const at = base.indexOf(TARGETED)
   if (at < 0) return null
   try {
@@ -212,6 +215,21 @@ export function targetedOf(r: Ruleset, target: string | null | undefined): Rules
   const base = r.id.indexOf(TARGETED) < 0 ? r.id : r.id.slice(0, r.id.indexOf(TARGETED))
   const c = mustCompile({ ...r.options, target })
   return { ...c, id: base + TARGETED + encodeURIComponent(target) }
+}
+
+/** What marks a forward merge's rules (HI-2679): its id is its base's (`targetedOf` the destination's) with this after it. */
+export const FORWARD = '~forward'
+
+/**
+ * The rules a forward merge (HI-2679) runs under: its base's merging into `to` (G7), with no review (its authority is
+ * its `ForwardRequested`), a merge commit always (G6: never squashing or rebasing a release's history), the source never
+ * brought up to date with the destination (G8 off: that would change the source), and the shared merge checks alone (no
+ * focused tests, G20: they read a card's own change). Found again by its id (`rulesBaseId`).
+ */
+export function forwardOf(r: Ruleset, to: string): Ruleset {
+  const base = targetedOf(r, to)
+  const c = mustCompile({ ...base.options, target: to, review: 'none', reviewers: 1, reviewerMode: 'lane', style: 'merge', strict: false, focusedTests: false })
+  return { ...c, id: base.id + FORWARD }
 }
 
 /**
