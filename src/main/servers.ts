@@ -47,7 +47,7 @@ import { providerService } from './providerService'
 import { agentInstallInfo } from './providers/common'
 import { config } from './config'
 import { refusal, refusalBody } from '../shared/workflow/refusals'
-import { testsGiven, type FocusedTest } from '../shared/workflow/focused'
+import { ACCEPT_MAX, testsGiven, validTestId, type FocusedTest } from '../shared/workflow/focused'
 import { askAssistant, AskRefused } from './assistantAsk'
 import { agentWorkflowRole, isWorkflowRole, workflowPairs, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
@@ -3734,6 +3734,14 @@ function testsField(body: any): FocusedTest[] | undefined {
   return t.tests
 }
 
+/** A verdict body's accept (HI-2660): at most ACCEPT_MAX focused test ids, when given; the runtime checks each again. */
+function acceptField(body: any): string[] | undefined {
+  const v = body?.accept
+  if (v === undefined || v === null) return undefined
+  if (!Array.isArray(v) || v.length > ACCEPT_MAX || !v.every(validTestId)) throw new HttpError(400, say(API.intent.acceptArg, { max: ACCEPT_MAX }))
+  return v
+}
+
 /** A body's submission number (start-review, verdict), when given. */
 function submissionField(body: any): number | undefined {
   const v = body?.submission
@@ -3789,7 +3797,8 @@ export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
     if (body?.pass !== true && body?.pass !== false) throw new HttpError(400, say(API.intent.passArg))
     const failKind = body?.failKind ?? undefined
     if (failKind !== undefined && failKind !== 'content' && failKind !== 'explanation') throw new HttpError(400, say(API.intent.unknownFailKind, { value: String(failKind) }))
-    return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind }
+    const accept = acceptField(body)
+    return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind, ...(accept ? { accept } : {}) }
   },
   'report-merge': (body) => ({ kind: 'reportMerge', result: textField(body, 'result') }),
   'focused-skip': (body) => {

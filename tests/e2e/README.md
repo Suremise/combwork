@@ -307,7 +307,8 @@ same code while every required check still runs:
   failure in it is explained. A valid result stands (HI-2660; the `review-agent-work` skill, §3): the card's checks
   recorded at the revision (`cw_start_review`'s `checksAtRevision`) and the suites in the record are not run again. It
   runs what no record covers (a check the change needs that didn't run, or whose command, test or CLI changed since),
-  the `runYourself` tests the merge needs from it (realProof = review), and its own probes, and spends its time on those.
+  the `runYourself` tests the merge needs from it (realProof = review) unless it accepts the builder's run of each at
+  the revision (`cw_verdict`'s `accept`), and its own probes, and spends its time on those.
   It reruns a suite, a set or a unit test only for a doubt it names in its verdict ("reran X because Y"): the record is
   missing or for other code, a result looks wrong, or the change is to shared test infrastructure (the runner,
   `lib.cjs`, the run context, the scenario harness, `vitest.config.ts` or a helper in `tests/`). Normally at most one

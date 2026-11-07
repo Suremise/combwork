@@ -702,6 +702,9 @@
   "tool.updateTasks.description.assistant": {
     "text": "Change up to 100 cards at once, each the same way (column, position, blocked, labels, agent), each as cw_update_task would; one it can't change is left and the rest change. Order cards with cw_reorder_tasks."
   },
+  "tool.verdict.arg.accept": {
+    "text": "A pass only: runYourself tests whose run at this revision you accept as proof (another agent's). Each test's id."
+  },
   "tool.verdict.arg.comment": {
     "text": "A line first; findings numbered."
   },

@@ -3422,10 +3422,15 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      exact identity only). Every other path is picked again in the queue's folder at the result, under a check's bracket
      (one that writes there proves nothing: `uncounted`), as `FocusedPicked`; a pick there that can't choose returns the
      card (`focused`, `repick`, naming the paths), and needs are combined by id (a test that needs more there is new). Real-CLI and packaged tests
-     never run in the queue (realProof = review, the user's decision): each counts from a counted run at the
-     submitted revision by the card's lane reviewer or an agent whose pass approved it (`CheckRan.agent`; a builder's own
-     never counts), `CheckRan` named `focused:<test>` (`cw-progress --check "focused:<test>" -- <command>`), accepted as review evidence (`FocusedAccepted`), never a run
-     at the result; one missing returns the card (`noProof`, which may go back unchanged once that run exists), and one
+     never run in the queue (realProof = review, the user's decision): each counts from its standing run at the
+     submitted revision, `CheckRan` named `focused:<test>` (`cw-progress --check "focused:<test>" -- <command>`): its latest
+     counted run there, not the queue's, its configured command (if any) unchanged, which must have passed (an earlier
+     pass never stands behind a later counted failure; HI-2660). That run is by the card's lane reviewer or an agent whose
+     pass approved it (`CheckRan.agent`), or (HI-2660, the user's decision, 7 Nov) another agent's (the builder's) that
+     such a pass accepted by its run id (`cw_verdict`'s `accept`, at most 50 test ids, each checked at the verdict the
+     same way: `Verdict.accepted`, `{ test, run, agent }`, the original run and its agent, never relabelled; an id it
+     can't stand behind is a warning, accepting nothing). A builder's own run never counts unaccepted. It is accepted as
+     review evidence (`FocusedAccepted`, with `acceptedBy` when it came by acceptance), never a run at the result; one missing returns the card (`noProof`, which may go back unchanged once that run exists), and one
      only the merge's pick adds returns it (`newProof`). The rest run once as the check `focused tests`, bracketed like a
      G9 check, the list in a file (`CW_FOCUSED_TESTS`), the results written to another (`CW_FOCUSED_RESULTS`), and
      Advanced `cw.queue.focusedJobs` (2) as `CW_FOCUSED_JOBS`: green only when the runner exited 0, it counted, and the results (read at most 1 MB) hold
@@ -5421,8 +5426,8 @@ to reuse instead of running them again: the latest counted run of each name ther
 failed), never an uncounted attempt, another revision's run, the merge queue's own (`entry`), or a configured check
 whose command has changed since its run. Names are data, as `checks` are (HI-2276). Only those checks: what else the
 change needs is the reviewer's to judge (review-agent-work), and a record in a summary's text is checked by the
-reviewer, never read by Combwork. A focused test proved by review (G20, realProof = review) still counts only from the
-reviewer's own run.
+reviewer, never read by Combwork. A focused test proved by review (G20, realProof = review) counts from the reviewer's
+own run, or from another agent's run that its pass accepts (below).
 
 **When a run counts for a revision** [P1, answering HR2's round 1 finding 5 and round 2 finding 2, HB3's F]: a green
 run proves something only about content it ran on. A run records its **tested checkout** (the revision checked out

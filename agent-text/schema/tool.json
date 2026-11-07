@@ -782,6 +782,9 @@
   "tool.updateTasks.description.assistant": {
     "placeholders": {}
   },
+  "tool.verdict.arg.accept": {
+    "placeholders": {}
+  },
   "tool.verdict.arg.comment": {
     "placeholders": {}
   },

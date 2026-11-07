@@ -1167,6 +1167,11 @@
   "api.inbox.readArg": {
     "placeholders": {}
   },
+  "api.intent.acceptArg": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
   "api.intent.actionsArg": {
     "placeholders": {
       "max": "plain",

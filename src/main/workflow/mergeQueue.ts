@@ -18,7 +18,7 @@ import { onOutputSettled, withLauncherEnv } from '../gitWorker'
 import { gitExe } from '../gitTool'
 import { endTree } from '../progressReporters/wrapper'
 import { FOCUSED_SKIP_GATE, MERGE_CHOICE_GATE, MERGE_CHOICE_KEY, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, type CardState, type Fact, type FactData, type FocusedReturn, type QueueEntry } from '../../shared/workflow/facts'
-import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, focusedCheckName, readResults, reviewProved, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
+import { changedSince, changePaths, choiceStands, chosenTests, FOCUSED_CHECK, FOCUSED_MAX_RESULTS_BYTES, readResults, reviewProved, standingFocusedRun, type FocusedResult, type FocusedTest } from '../../shared/workflow/focused'
 import { FOCUSED_PICK, FOCUSED_RUN } from '../../shared/workflow/options'
 import { boundedRead, pathChanges, runPick } from './focusedRun'
 import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, type PushPending, type PushSettled } from './queueLogs'
@@ -1490,16 +1490,33 @@ export class MergeQueue {
       if (unproved.length) return { kind: 'focused', focused: { why: 'newProof', tests: unproved.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
       tests = chosenTests({ ...choice, source: 'picked', picked: approved, added: p.tests })
     }
-    // Proof is its reviewer's (finding 1): a counted, passing run of that test's check at the submitted revision, by the
-    // card's lane reviewer or an agent whose pass approved the submission. A builder's own run never counts.
+    // Proof is its review's (finding 1): the test's standing run at the submitted revision (its latest counted run there,
+    // not the queue's, its command unchanged: HI-2660, so a later counted failure is never hidden by an earlier pass),
+    // passed, and either run by the card's lane reviewer or an agent whose pass approved the submission, or another
+    // agent's run (the builder's) that such a pass accepted by its run id (HI-2660, the user's decision, 7 Nov). A
+    // builder's own run never counts unaccepted.
     const reviewers = new Set([card.reviewer, ...passingReviewers(s)].filter((x): x is string => !!x))
+    const accepts = new Map<string, string>()
+    for (const v of s.verdicts) if (v.pass && v.submission === s.latest?.id && v.generation === s.generation && reviewers.has(v.reviewer)) for (const a of v.accepted ?? []) accepts.set(`${a.test}
+${a.run}`, v.reviewer)
     const proved = tests.filter(reviewProved)
-    const runOf = (t: FocusedTest): FactData['CheckRan'] | undefined => s.checks.findLast((c) => c.name === focusedCheckName(t.id) && c.revision === entry.revision && c.result === 'passed' && c.counted && !!c.agent && reviewers.has(c.agent))
+    const proofOf = (t: FocusedTest): { run: FactData['CheckRan']; acceptedBy?: string } | undefined => {
+      const c = standingFocusedRun(s.checks, t.id, entry.revision, o.commands)
+      if (!c || c.result !== 'passed') return undefined
+      if (c.agent && reviewers.has(c.agent)) return { run: c }
+      const by = accepts.get(`${t.id}
+${c.run}`)
+      return by ? { run: c, acceptedBy: by } : undefined
+    }
+    const runOf = (t: FocusedTest): FactData['CheckRan'] | undefined => proofOf(t)?.run
     const missing = proved.filter((t) => !runOf(t))
     if (missing.length) return { kind: 'focused', focused: { why: 'noProof', tests: missing.map((t) => t.id) } } // i18n-ignore: codes (a why, a check name), never shown as text
     if (proved.length) {
       await this.write(card, (w) => {
-        for (const t of proved) if (!w.state().focusedAccepted.some((a) => a.entry === entry.id && a.result === result && a.test === t.id)) w.fact('FocusedAccepted', { entry: entry.id, revision: entry.revision, result, test: t.id, run: runOf(t)!.run })
+        for (const t of proved) {
+          const p = proofOf(t)!
+          if (!w.state().focusedAccepted.some((a) => a.entry === entry.id && a.result === result && a.test === t.id)) w.fact('FocusedAccepted', { entry: entry.id, revision: entry.revision, result, test: t.id, run: p.run.run, ...(p.acceptedBy ? { acceptedBy: p.acceptedBy } : {}) })
+        }
       })
     }
     const ids = tests.filter((t) => !reviewProved(t)).map((t) => t.id)

@@ -4,7 +4,7 @@
 
 ### Changed
 
-- **Reviewers reuse the builder's recorded checks instead of running them again** (HI-2660). Start review now tells the reviewer which of the card's checks passed or failed at the revision it reviews, and the review skill makes those results stand: a reviewer runs what no record covers, its own probes, and a test again only for a doubt it names in its verdict ("reran X because Y"). Reviews take less time, and say what they relied on.
+- **Reviewers reuse the builder's recorded checks instead of running them again** (HI-2660). Start review now tells the reviewer which of the card's checks passed or failed at the revision it reviews, and the review skill makes those results stand: a reviewer runs what no record covers, its own probes, and a test again only for a doubt it names in its verdict ("reran X because Y"). A reviewer can also accept the builder's run of a test that needs a real CLI or the installed app (`cw_verdict`'s `accept`), so the merge takes it as proof without the reviewer running it again; its latest run at that revision must have passed. Reviews take less time, and say what they relied on.
 
 ## 1.1.0 — 2026-11-06
 

@@ -32,6 +32,7 @@ import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 import { toolListSize } from '../../shared/toolListSize'
 import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint } from '../../shared/combworkToolLoad'
 import { agentMsg, say } from '../../shared/agentText'
+import { ACCEPT_MAX } from '../../shared/workflow/focused'
 
 /**
  * What this server says to agents (dialects, HI-2065; HI-2434): its tools' descriptions, its replies and its errors, each
@@ -56,6 +57,7 @@ const T = {
   'submit.arg.tests': agentMsg({ id: 'tool.submit.arg.tests', text: "Focused tests its merge runs beyond those picked: test ids, or '{ id, needs }'." }),
   'verdict.arg.comment': agentMsg({ id: 'tool.verdict.arg.comment', text: 'A line first; findings numbered.' }),
   'verdict.arg.failKind': agentMsg({ id: 'tool.verdict.arg.failKind', text: 'A fail of the work (content) or only of how it was explained.' }),
+  'verdict.arg.accept': agentMsg({ id: 'tool.verdict.arg.accept', text: "A pass only: runYourself tests whose run at this revision you accept as proof (another agent's). Each test's id." }),
   'focusedSkip.arg.request': agentMsg({ id: 'tool.focusedSkip.arg.request', text: 'As Combwork named it ("HI-12/r40").' }),
   'focusedSkip.arg.why': agentMsg({ id: 'tool.focusedSkip.arg.why', text: 'Why, in a sentence.' }),
   'reportMerge.arg.result': agentMsg({ id: 'tool.reportMerge.arg.result', text: 'The merge commit.' }),
@@ -441,9 +443,9 @@ function intentTools(): Tool[] {
       'cw_verdict',
       'verdict',
       say(T['verdict.description']),
-      { pass: { type: 'boolean' }, comment: { type: 'string', description: say(T['verdict.arg.comment']) }, failKind: { type: 'string', enum: ['content', 'explanation'], description: say(T['verdict.arg.failKind']) }, submission },
+      { pass: { type: 'boolean' }, comment: { type: 'string', description: say(T['verdict.arg.comment']) }, failKind: { type: 'string', enum: ['content', 'explanation'], description: say(T['verdict.arg.failKind']) }, accept: { type: 'array', items: { type: 'string' }, maxItems: ACCEPT_MAX, description: say(T['verdict.arg.accept']) }, submission },
       ['pass', 'comment'],
-      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
+      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, accept: a.accept, submission: a.submission })
     ),
     intent(
       'cw_focused_skip',
