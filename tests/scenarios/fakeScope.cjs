@@ -6,7 +6,7 @@
 // and copy folders. A model trial (claude-code, codex) tests what agents do, and runs every scenario, whatever is here.
 //
 // A scenario not named here runs on all three fakes: a new one keeps every provider until it is placed. The lists come
-// from HI-2663's per-scenario ownership matrix (its card has the table: each live check's owner, or why it holds by
+// from HI-2663's per-scenario ownership matrix (fakeScope-matrix.md: each live check's owner, or why it holds by
 // construction on a fake). tests/scenarioScope.test.ts checks every name is a scenario and the selection rules.
 //
 // - FAKE_CLAUDE_ONLY: their checks read the board, facts, lanes, the MCP log or Combwork's own records, after the
