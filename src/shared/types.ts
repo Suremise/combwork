@@ -1580,6 +1580,19 @@ export interface WorkflowCheck {
   lanes: { id: string; name: string | null; builder: string }[]
   /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
   inFlight: { number: number; key: string; title: string }[]
+  /** A change of the target (G7, HI-2674): the cards and lanes that keep merging into another one (absent: no target change). */
+  targets?: KeptTargets
+}
+
+/**
+ * HI-2674: a target is decided as a card starts (its `Started` fact) and a lane's cards start under the lane's rules
+ * (§16.5.4), so a change of the project's target moves neither. `to`: the target now (the default branch for none);
+ * `cards` and `lanes`: only those whose own target is another branch, each with it.
+ */
+export interface KeptTargets {
+  to: string
+  cards: { number: number; key: string; title: string; target: string }[]
+  lanes: { id: string; name: string | null; builder: string; target: string }[]
 }
 
 /**

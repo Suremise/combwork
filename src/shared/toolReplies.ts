@@ -167,7 +167,7 @@ const R = {
   settingReadOnly: agentMsg({ id: 'reply.setting.readOnly', text: 'Read-only to you: {why}', note: "cw_read_setting: the Assistant can't change it, and why." }),
   settingDocs: agentMsg({ id: 'reply.setting.docs', text: 'User guide: "{docs}".', note: "cw_read_setting: the user guide's section on it." }),
   settingSame: agentMsg({ id: 'reply.setting.same', text: '{path}{hasProject, select, yes { ({project})} other {}} was already {value}: nothing changed.', note: 'cw_update_setting when the value was already so.' }),
-  settingChanged: agentMsg({ id: 'reply.setting.changed', text: "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {It applies now.}} The user can undo it in your panel's list.", note: "cw_update_setting's reply: what changed, old → new, and when it applies." }),
+  settingChanged: agentMsg({ id: 'reply.setting.changed', text: "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {{hasNote, select, yes {{note}} other {It applies now.}}}} The user can undo it in your panel's list.", note: "cw_update_setting's reply: what changed, old → new, and when it applies. {note}: what it leaves as it was (a version control switch's or a target change's lanes and cards in flight, HI-2674), in its place of \"It applies now\"." }),
   journalNoMatch: agentMsg({ id: 'reply.journal.noMatch', text: 'No entries match "{query}".', note: 'cw_journal_recall with a query nothing matches (#1031).' }),
   journalNone: agentMsg({ id: 'reply.journal.none', text: 'No entries.', note: 'cw_journal_recall with no entries.' }),
   markEssential: agentMsg({ id: 'reply.journal.mark.essential', text: 'essential', note: "A journal entry's mark: importance 3." }),
@@ -1121,9 +1121,9 @@ export function settingText(d: SettingDetail): string {
 }
 
 /** cw_update_setting's reply: what changed, old → new, and when it applies. */
-export function settingChangedText(c: { title: string; id: string; path: string; project?: string; changed?: boolean; old: string; new: string; restart?: string }): string {
+export function settingChangedText(c: { title: string; id: string; path: string; project?: string; changed?: boolean; old: string; new: string; restart?: string; note?: string }): string {
   if (c.changed === false || (c.changed === undefined && c.old === c.new)) return say(R.settingSame, { path: c.path, hasProject: yn(c.project), project: c.project ?? '', value: c.new })
-  return say(R.settingChanged, { path: c.path, hasProject: yn(c.project), project: c.project ?? '', id: c.id, old: c.old, new: c.new, hasRestart: yn(c.restart), restart: c.restart ?? '' })
+  return say(R.settingChanged, { path: c.path, hasProject: yn(c.project), project: c.project ?? '', id: c.id, old: c.old, new: c.new, hasRestart: yn(c.restart), restart: c.restart ?? '', hasNote: yn(c.note), note: c.note ?? '' })
 }
 
 // The Assistant's journal (#1031): a recall is a line an entry; an entry in full on request.

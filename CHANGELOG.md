@@ -1,5 +1,11 @@
 # Release Notes
 
+## Unreleased
+
+### Fixed
+
+- **Changing Work merges into says what keeps the old target** (HI-2674). A card's target branch is set as it starts, and a running lane's as the lane starts, so a change of **Version Control → Workflow → Work merges into** didn't move cards in flight or a running lane's next cards, although the Assistant's reply said it applied now. Save… now lists each card and lane that keeps merging into another branch, and which. The Assistant's reply names them too, as it now does the lanes and cards that keep the old rules after a switch of version control (it had left them out).
+
 ## 1.1.0 — 2026-11-06
 
 <!-- old-name: begin changelog-upgrade -->

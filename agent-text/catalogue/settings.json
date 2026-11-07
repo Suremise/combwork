@@ -2721,6 +2721,18 @@
     "text": "a whole number from {min} to {max}",
     "note": "What a number workflow option takes. {min} and {max} are numbers as written."
   },
+  "settings.agent.tool.keptCard": {
+    "text": "{card} into {target}",
+    "note": "HI-2674: a card in flight keeping its target. {card} is its key (HI-12); {target} a branch."
+  },
+  "settings.agent.tool.keptLane": {
+    "text": "lane {named, select, yes {\"{name}\" } other {}}({builder}) and its cards still to start, into {target}",
+    "note": "HI-2674: a running lane keeping its target. {builder} is its builder agent's name; {target} a branch."
+  },
+  "settings.agent.tool.keptTargets": {
+    "text": "It applies to cards started from now on outside running lanes. A target is set as a card or lane starts, so these keep merging into their own: {list}.",
+    "note": "HI-2674: a change of a project's target (G7), in place of \"It applies now\". {list}: settings.agent.tool.keptLane and keptCard items, joined with \"; \"."
+  },
   "settings.agent.tool.levelsRefused": {
     "text": "These workflow defaults can't be saved: {problems} Change the other options first, or tell the user.",
     "note": "A workflow default at Combwork's or the workspace's level that contradicts the others (#1422). {problems} are the reasons, each a sentence."

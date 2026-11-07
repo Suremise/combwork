@@ -723,6 +723,67 @@ describe("the Assistant's settings tool (#1278)", () => {
   })
 })
 
+describe('a change of the target says what keeps its own (HI-2674)', () => {
+  /**
+   * A Pair project merging into rel1 (rel2 beside it), with a card in flight there, a running lane whose card is still to
+   * start, and a card outside it in Todo.
+   */
+  async function onRel1() {
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const { w, repo } = await workspace({ project: { ...pair, target: 'rel1' }, preset: 'pair' })
+    git(repo, 'branch', 'rel1')
+    git(repo, 'branch', 'rel2')
+    const card = await inWorkspace(w, () => tasks.createTask({ title: 'Waits to merge', project: 'p' }, user))
+    const later = await inWorkspace(w, () => tasks.createTask({ title: 'Lane card still to start', project: 'p' }, user))
+    const outside = await inWorkspace(w, () => tasks.createTask({ title: 'Outside the lane', project: 'p' }, user))
+    const wf = (await workflowFor(w, repo))!
+    expect(await store.boardWrite(w, async () => wf.start(`#${card.number}`, agentActor('b1')))).toMatchObject({ ok: true })
+    expect(wf.state(wf.store.card(card.number)).started?.target).toBe('rel1')
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [later.number], name: 'next', by: 'B1 (p)' })
+    return { w, repo, card, later, outside, pair }
+  }
+  /** The target a card's entry takes once it is queued (`enqueue`, as a Passed card's merge is). */
+  async function queuedTarget(w: WS, repo: string, number: number): Promise<string> {
+    const wf = (await workflowFor(w, repo))!
+    const rec = wf.store.card(number)
+    await store.boardWrite(w, async () => wf.write(rec, wf.rulesetOf(rec), 'combwork', (x) => wf.enqueue(x)))
+    return wf.state(wf.store.card(number)).entries.at(-1)!.target
+  }
+
+  it("the settings tool's reply names the lane and the card in flight that keep rel1; a card started outside the lane takes rel2", async () => {
+    const { w, repo, card, later, outside } = await onRel1()
+    const r = await inWorkspace(w, () => settingsTools.applySetting(settingEntry('project.workflow.target')!, 'rel2', repo))
+    expect(r).toMatchObject({ old: 'rel1', new: 'rel2' })
+    expect(r.note).toMatch(/^It applies to cards started from now on outside running lanes\. A target is set as a card or lane starts, so these keep merging into their own: lane "next" \(B1\) and its cards still to start, into rel1; .+ into rel1\.$/)
+    expect(r.note).toContain(`${cardLabel(card)} into rel1`)
+    const wf = (await workflowFor(w, repo))!
+    // The lane's card still to start, under the lane's rules; the card outside it, under the new ones.
+    expect(wf.rulesetOf(wf.store.card(later.number)).options.target).toBe('rel1')
+    expect(wf.rulesetOf(wf.store.card(outside.number)).options.target).toBe('rel2')
+    // The card in flight merges into the target it started with, as the reply said.
+    expect(await queuedTarget(w, repo, card.number)).toBe('rel1')
+    // Changed back: nothing keeps another target now, so no note (it applies now).
+    const back = await inWorkspace(w, () => settingsTools.applySetting(settingEntry('project.workflow.target')!, 'rel1', repo))
+    expect(back.note).toBeUndefined()
+  })
+
+  it("the form's warning lists them with their targets, and applying the change to the card in flight leaves its target", async () => {
+    const { w, repo, card, pair } = await onRel1()
+    const change = { preset: 'pair', options: { ...pair, target: 'rel2' } }
+    const check = await form.checkWorkflowChange(w, repo, change)
+    expect(check.changed).toEqual(['target'])
+    expect(check.targets).toEqual({ to: 'rel2', cards: [{ number: card.number, key: cardLabel(card), title: 'Waits to merge', target: 'rel1' }], lanes: [expect.objectContaining({ name: 'next', builder: 'B1', target: 'rel1' })] })
+    await form.setWorkflowOptions(w, repo, change, { applyTo: [card.number] })
+    const wf = (await workflowFor(w, repo))!
+    // The Override recorded, its ruleset the new one; the start's target kept, which its merge takes.
+    expect(wf.rulesetOf(wf.store.card(card.number)).options.target).toBe('rel2')
+    expect(wf.state(wf.store.card(card.number)).started?.target).toBe('rel1')
+    expect(await queuedTarget(w, repo, card.number)).toBe('rel1')
+    // Another change than the target lists none.
+    expect((await form.checkWorkflowChange(w, repo, { preset: null, options: { ...pair, target: 'rel2', strict: true } })).targets).toBeUndefined()
+  })
+})
+
 describe('the one-time presets notice (#1278, §16.17)', () => {
   it('is due after an upgrade from 0.9 for projects with no preset, once; never on a board made by 1.0', async () => {
     const { w, repo } = await workspace({ project: allOff('git') })

@@ -28,7 +28,7 @@ import { allOff, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameO
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
+import type { KeptTargets, ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
 import { compile, mustCompile, type Ruleset } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
@@ -253,7 +253,42 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   // Names alone (N5) aren't rules: they apply at once, so no lane or card keeps old rules over them.
   const appliesNow = namesOnly(c.changed)
   const lanes = appliesNow ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
-  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [] }
+  const targets = c.changed.includes('target') ? await keptTargets(ws, project, c.options.target ?? '') : null
+  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}) }
+}
+
+/**
+ * HI-2674: the cards and lanes a change of the project's target to `to` leaves on another target, each with its own. A
+ * card's is the one its start recorded (`Started.target`, what its queue entry takes: an Override doesn't change it); a
+ * running lane's, the one its ruleset gives the cards it has still to start (`baseRulesetOf`, §16.5.4). Cards committed
+ * where they are (G6 Committed is done) merge nowhere, so are left out.
+ */
+export async function keptTargets(ws: WorkspaceService, project: { path: string; name: string }, to: string): Promise<KeptTargets> {
+  // As a start resolves an empty one: the default branch (gitPlatform.start).
+  let fallback: Promise<string> | null = null
+  const resolved = (t: string | null | undefined): Promise<string> =>
+    t ? Promise.resolve(t) : (fallback ??= G.defaultBranch(project.path).then((d) => (d && !isUnknown(d) ? d : ''), () => ''))
+  const now = await resolved(to)
+  const out: KeptTargets = { to: now, cards: [], lanes: [] }
+  const wf = await workflowFor(ws, project.path)
+  if (!wf) return out
+  const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
+  const cards = store.cards().flatMap((c) => {
+    const s = wf.state(c)
+    const target = s.started && IN_FLIGHT.has(s.stage) && wf.rulesetOf(c, s).options.finish !== 'committed' ? s.started.target : null
+    return target && target !== now ? [{ c, target }] : []
+  })
+  const keys = cardKeys(ws, cards.map((x) => x.c.id))
+  out.cards = cards.map(({ c, target }) => ({ number: c.id, key: cardLabel({ number: c.id, key: keys.get(c.id) }), title: c.title, target }))
+  for (const l of (await listLanes(ws, { project: project.name })).filter((x) => x.state === 'active' || x.state === 'paused')) {
+    const rec = wf.lane(l.id)
+    if (!rec || rec.ended || !rec.ruleset) continue
+    const options = wf.store.ruleset(rec.ruleset).options
+    if (options.finish === 'committed') continue
+    const target = await resolved(options.target)
+    if (target && target !== now) out.lanes.push({ id: l.id, name: l.name, builder: l.builder.name, target })
+  }
+  return out
 }
 
 /** Options that can't be saved: refused with every reason, each a whole sentence of its own (in the window's language there). */
