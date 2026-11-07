@@ -8,7 +8,12 @@
 
 /** Settings → General → Language: the row, with its picker and the notes under it. */
 async function languageSetting({ page, command, lib }) {
-  await command('settings.open')
+  // Settings opens on the section shown last (HI-2708's connections case leaves it on accounts), and settings.open
+  // toggles the view: opened only when it isn't shown, then on General.
+  if (!(await page.locator('.settings').count())) await command('settings.open')
+  const general = page.locator('.settings-nav [data-section="general"]').first()
+  if (!(await lib.until(async () => (await general.count()) > 0, 25000))) throw new Error("Settings' General section did not show in its list")
+  await general.click()
   const picker = page.locator('.language-picker').first()
   if (!(await lib.until(async () => (await picker.count()) > 0, 25000))) throw new Error('the language picker did not show')
   await picker.scrollIntoViewIfNeeded()
