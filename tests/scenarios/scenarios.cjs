@@ -5513,6 +5513,8 @@ module.exports.SCENARIOS.push({
   files: { 'README.md': '# alpha\n\nA project for the tool sweep.\n' },
   async setup(c) {
     await pairInProject(c)
+    // Both sides' tools (HI-2664: a builder isn't offered cw_request_builder, a reviewer not cw_put_back).
+    await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'either' })
     await c.card('s', { title: 'Sweep the tools', description: 'A card for each tool to name.' })
   },
   prompt: (c) => `Call each Combwork tool once on card #${c.cards.s}.`,
