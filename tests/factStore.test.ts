@@ -592,8 +592,8 @@ describe('the actions worker, who a run belongs to (#1215 round 2)', () => {
 
   // HR4's #1215 round 3 (#1240): one requester per window and lifetime, however often it asks while a run goes on.
   /** A handler that holds the first action until released, recording which window ran each. */
-  function holdFirst(first: number): { ran: { id: number; ws: unknown }[]; entered: Promise<void>; release: () => void } {
-    const ran: { id: number; ws: unknown }[] = []
+  function holdFirst(first: number): { ran: { id: number; ws: WS }[]; entered: Promise<void>; release: () => void } {
+    const ran: { id: number; ws: WS }[] = []
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
     let inside!: () => void

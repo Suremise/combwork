@@ -53,7 +53,7 @@ describe('project-config write stamps (#1498)', async () => {
     return path
   }
   type Service = ReturnType<typeof createWorkspaceService>
-  const writes = (w: Service): Map<string, unknown> => (w as unknown as { configWrites: Map<string, unknown> }).configWrites
+  const writes = (w: Service): Map<string, unknown> => w['configWrites']
   const kept = (w: Service): number => writes(w).size
 
   it('a write is a change; a snapshot taken after it is not, until the next one', async () => {

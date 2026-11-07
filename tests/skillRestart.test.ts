@@ -7,6 +7,7 @@ import { join, resolve } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-skill-restart-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
@@ -38,7 +39,7 @@ async function needsRestart(): Promise<boolean> {
 
 /** The refreshes the workspace runs from now, by itself (its watches, its writes' asks): none run by the test. */
 function refreshesRun(): { count: () => number; restore: () => void } {
-  const real = w.refresh.bind(w)
+  const real = bound(w, w.refresh)
   let n = 0
   const spy = vi.spyOn(w, 'refresh').mockImplementation(async () => {
     n++

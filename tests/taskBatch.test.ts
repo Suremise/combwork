@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import * as electron from 'electron'
 import type { TaskCard } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-task-batch-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -381,7 +382,7 @@ describe("the Combwork Assistant's batch (through its change boundary)", () => {
     const arrived = new Promise<void>((r) => (reached = r))
     let release: () => void = () => undefined
     const gate = new Promise<void>((r) => (release = r))
-    const original = w.projectConfig.bind(w)
+    const original = bound(w, w.projectConfig)
     const spy = vi.spyOn(w, 'projectConfig').mockImplementationOnce(async (p: string) => {
       reached()
       await gate

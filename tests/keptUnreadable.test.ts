@@ -252,7 +252,7 @@ describe("workspace.json unreadable when its workspace opens (HI-2414, HR3's rou
     expect(bytes(file)).toEqual(before)
     // Read again by the workspace (workspace.json changed on disk): saved as usual, its server kept.
     writeFileSync(file, JSON.stringify(saved))
-    await (w as unknown as { reloadConfig: () => Promise<void> }).reloadConfig()
+    await w['reloadConfig']()
     await w.saveWorkspaceConfig()
     expect(JSON.parse(readFileSync(file, 'utf8')).mcp.enabled).toEqual(['saved-server'])
   })
@@ -272,7 +272,7 @@ describe("workspace.json unreadable when its workspace opens (HI-2414, HR3's rou
     reads.locked.clear()
     // Another program saves it in place: read by the workspace part way (the .bak's value again), then finished.
     savingNow(file, '{')
-    await (w as unknown as { reloadConfig: () => Promise<void> }).reloadConfig()
+    await w['reloadConfig']()
     writeFileSync(file, pretty(saved))
     // Refused, unless the workspace's watcher has read the finished file meanwhile (then it saves what it read): either
     // way the server stays on, in the file and its .bak.

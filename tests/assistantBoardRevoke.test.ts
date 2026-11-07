@@ -7,6 +7,7 @@ import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-assistrevoke-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -65,7 +66,7 @@ function holdBoard(w: WS): { release: () => void; done: Promise<void> } {
  * once it waits there, until released. Only that read, so the change's checks before it have all run.
  */
 function holdSave(w: WS): { reached: Promise<void>; release: () => void; restore: () => void } {
-  const original = w.projectIds.bind(w)
+  const original = bound(w, w.projectIds)
   let reach!: () => void
   let release!: () => void
   const reached = new Promise<void>((r) => (reach = r))

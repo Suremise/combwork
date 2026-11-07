@@ -18,8 +18,9 @@ const base = tempDir('cw-board-events-')
 // Every read of the whole board that recording the running agents' cards makes, counted (the reads themselves unchanged):
 // the board's cards in full, or the live cards' heads (HI-1690).
 const boardReads = vi.hoisted(() => ({ n: 0 }))
-vi.mock('../src/main/tasks', async (importOriginal) => {
-  const orig = await importOriginal<typeof import('../src/main/tasks')>()
+const { mockFactory } = await vi.hoisted(() => import('./keepType'))
+vi.mock('../src/main/tasks', mockFactory<typeof import('../src/main/tasks')>(async (importOriginal) => {
+  const orig = await importOriginal()
   return {
     ...orig,
     allTasks: (...a: Parameters<typeof orig.allTasks>) => {
@@ -31,7 +32,7 @@ vi.mock('../src/main/tasks', async (importOriginal) => {
       return orig.liveCardHeads(...a)
     }
   }
-})
+}))
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')

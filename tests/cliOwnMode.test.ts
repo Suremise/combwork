@@ -166,7 +166,7 @@ describe('a resumed launch on it', () => {
 describe('a running session on it', () => {
   const wsPath = join(base, 'ws')
   const p = join(wsPath, 'own')
-  let w: { open: (p: string) => Promise<void>; assistantHome: string }
+  let w: { open: (p: string) => Promise<unknown>; assistantHome: string }
   let sessions: typeof import('../src/main/sessions').sessions
   let run: <T>(fn: () => Promise<T> | T) => Promise<T>
   beforeAll(async () => {
@@ -177,7 +177,7 @@ describe('a running session on it', () => {
     sessions = (await import('../src/main/sessions')).sessions
     const svc = ws.createWorkspaceService()
     await svc.open(wsPath)
-    w = svc as never
+    w = svc
     run = (fn) => ws.inWorkspace(svc, async () => fn())
   })
   afterAll(() => (sessions as unknown as { live: Map<string, unknown> }).live.clear())

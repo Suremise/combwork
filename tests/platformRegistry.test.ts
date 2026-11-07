@@ -14,6 +14,7 @@ import { checkGit } from '../src/main/gitTool'
 import { excludeCopies } from '../src/main/providers/common'
 import { onCombworkEvent } from '../src/main/events'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-platform-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -219,12 +220,11 @@ describe('in ProjectInfo', () => {
     const p = await project('epsilon', gitInit)
     renameSync(join(p, '.git'), join(p, 'moved.git'))
     // The old workspace's read of epsilon holds once it has read its config, while the window opens another workspace.
-    const service = w as unknown as { projectConfig: (path: string) => Promise<ProjectConfig> }
-    const real = service.projectConfig.bind(w)
+    const real = bound(w, w.projectConfig)
     let release: () => void = () => undefined
     const released = new Promise<void>((r) => (release = r))
     let held = false
-    const spy = vi.spyOn(service, 'projectConfig').mockImplementation(async (path: string) => {
+    const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (path: string) => {
       const cfg = await real(path)
       if (path === p && !held) {
         held = true

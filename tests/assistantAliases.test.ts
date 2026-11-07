@@ -10,6 +10,7 @@ import { tempDir } from './tempDir'
 import { junction, shortPath } from './pathAliases'
 import { moveFolder } from './moveFolder'
 import { DEFAULT_JOURNAL, type JournalSettings } from '../src/shared/journal'
+import { bound, spyOnPrivate } from './keepType'
 
 const base = tempDir('cw-assistant-aliases-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -68,7 +69,6 @@ async function moves(ws: string): Promise<void> {
   await moveFolder(ws, `${ws}-moved`)
 }
 
-const inner = usageHistory as unknown as { closeInProcess: (() => void) | null }
 let closeAll: (() => void) | null = null
 
 describe("the Assistant's journal and usage.db under another name for their workspace (#1456)", () => {
@@ -78,14 +78,14 @@ describe("the Assistant's journal and usage.db under another name for their work
     // As a worker thread does: its files stay open until it's told to close them (in-process it closes them when idle).
     const w = await open(workspace())
     await useUsage(w.path!)
-    closeAll = inner.closeInProcess
+    closeAll = usageHistory['closeInProcess']
     expect(closeAll).toBeTypeOf('function')
-    inner.closeInProcess = null
+    usageHistory['closeInProcess'] = null
     await w.close()
   })
   afterAll(async () => {
     for (const w of opened) await disposeWorkspaceService(w)
-    inner.closeInProcess = closeAll
+    usageHistory['closeInProcess'] = closeAll
     closeAll?.()
     await usageHistory.stop()
     journal.closeAllJournals()
@@ -200,9 +200,8 @@ describe("the Assistant's journal and usage.db under another name for their work
     const via = aliasOf('junction', a)!
     const wa = await open(a)
     const wb = await open(b)
-    const hist = usageHistory as unknown as { transport: () => Promise<unknown> }
-    const transport = hist.transport.bind(hist)
-    const spy = vi.spyOn(hist, 'transport').mockImplementationOnce(async () => {
+    const transport = bound(usageHistory, usageHistory['transport'])
+    const spy = spyOnPrivate(usageHistory, 'transport', usageHistory['transport']).mockImplementationOnce(async () => {
       via.drop()
       junction(b, via.path)
       return transport()

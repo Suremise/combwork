@@ -27,12 +27,13 @@ const ctx = vi.hoisted(() => ({
   routed: 0
 }))
 vi.mock('../../src/main/workflow/service', () => ({ workflowFor: async () => (ctx.workflowsAsked++, ctx.wf), workflowEnforced: () => ctx.enforced }))
-vi.mock('../../src/main/boardStore', async (original) => ({
-  ...(await original<typeof import('../../src/main/boardStore')>()),
+const { mockFactory } = await vi.hoisted(() => import('../keepType'))
+vi.mock('../../src/main/boardStore', mockFactory<typeof import('../../src/main/boardStore')>(async (original) => ({
+  ...(await original()),
   boardReadOnly: () => ctx.readOnly,
   onBoardUpgraded: (fn: (ws: WorkspaceService) => void) => (ctx.upgraded.add(fn), () => ctx.upgraded.delete(fn))
-}))
-vi.mock('../../src/main/workspace', async (original) => ({ ...(await original<typeof import('../../src/main/workspace')>()), openWorkspaces: () => ctx.open }))
+})))
+vi.mock('../../src/main/workspace', mockFactory<typeof import('../../src/main/workspace')>(async (original) => ({ ...(await original()), openWorkspaces: () => ctx.open })))
 vi.mock('../../src/main/agentProcesses', () => ({ processSupervisor: () => ({}), setCombworkIdentity: () => undefined }))
 vi.mock('../../src/main/workflow/queueChecksApp', () => ({ appQueueChecks: () => ({ runCheck: async () => ({ ok: true, output: '' }) }) }))
 vi.mock('../../src/main/repoLock', () => ({ withRepoLock: async (_p: string, fn: () => Promise<unknown>) => fn() }))

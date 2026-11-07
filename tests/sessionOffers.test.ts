@@ -46,7 +46,7 @@ describe("a notice's button acts for its own offer only", () => {
     const workspace = await import('../src/main/workspace')
     const w = workspace.createWorkspaceService()
     w.path = ws
-    service = w as never
+    service = w
     dispose = () => workspace.disposeWorkspaceService(w)
     sessions = (await import('../src/main/sessions')).sessions
     s = sessions as unknown as Internals

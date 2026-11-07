@@ -11,6 +11,7 @@ import * as electron from 'electron'
 import type { ProjectConfig } from '../src/shared/types'
 import { tempDir } from './tempDir'
 import { legacyWorktree } from '../src/shared/agentFolders'
+import { bound } from './keepType'
 
 const base = tempDir('cw-worktreeroots-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -44,12 +45,11 @@ describe("agents' worktrees follow the newest config read, in whatever order rea
   const mine = new AsyncLocalStorage<string>()
   const older = <T>(fn: () => Promise<T>): Promise<T> => mine.run('older', () => run(fn))
   const holdOlderRead = (target: string) => {
-    const service = w as unknown as { projectConfig: (p: string) => Promise<ProjectConfig> }
-    const real = service.projectConfig.bind(w)
+    const real = bound(w, w.projectConfig)
     const gate: { open: () => void } = { open: () => undefined }
     const released = new Promise<void>((r) => (gate.open = r))
     const state = { holding: true }
-    const spy = vi.spyOn(service, 'projectConfig').mockImplementation(async (p: string) => {
+    const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p: string) => {
       const cfg = await real(p)
       if (state.holding && p === target && mine.getStore() === 'older') {
         state.holding = false
