@@ -11,7 +11,7 @@
  * the JSON tab its whole text, which must read as a dialect file before the Texts tab takes it.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { isKnownProvider, providerDescriptor } from '@shared/providers'
+import { PROVIDERS, isKnownProvider, providerDescriptor } from '@shared/providers'
 import { fmt, msg, tr } from '@shared/i18n'
 import {
   changedAnywhere,
@@ -426,7 +426,8 @@ function DialectListRow({ row, selected, users }: { row: DialectRow; selected: b
 async function importDialect(): Promise<void> {
   const picked = await call('dialects:pickImport')
   if (!picked) return
-  const folders = ['claude-code', 'codex', 'copilot', 'api']
+  // Every CLI's folder, then the API's: a new provider is listed with no change here (HI-2720).
+  const folders = [...PROVIDERS.map((p) => p.id), 'api']
   let folder = 'claude-code'
   let label = picked.label
   for (;;) {
