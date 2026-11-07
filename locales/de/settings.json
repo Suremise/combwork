@@ -1517,7 +1517,7 @@
   "settings.advanced.claude-code.localModel.spellings.desc": "Schreibweisen von Modell-IDs, die Claude Code einem Claude-Modell zuordnen oder nach eigenen Regeln bemessen kann (claude in der ID, ein [1m]-Suffix, ein Datum nach @), als regulärer Ausdruck. Ein so geschriebenes Modell einer Server-Verbindung erhält von Combwork keine Kontextgröße und kein Ausgabebudget. Falsch: Combwork übergibt Grenzen, die Claude Code nicht anwendet, oder lässt ein lokales Modell aus, bei dem es sie anwenden würde.",
   "settings.advanced.claude-code.localModel.spellings.title": "Lokale Modelle: IDs, die Claude Code selbst bemisst",
   "settings.connections.server.context": "Kontextgröße",
-  "settings.connections.server.contextNone": "Nicht festgelegt: Claude Code nimmt 200.000 an",
+  "settings.connections.server.contextNone": "Nicht festgelegt: 200.000 angenommen",
   "settings.connections.server.limitsHint": "Kontextgröße und Ausgabebudget werden verwendet, wenn ein Agent mit diesem Modell startet (nicht für IDs, die Claude Code als seine eigenen liest, und nicht, wo die Einstellungen der Sitzung die ID einem Claude-Modell zuordnen). Eine Änderung gilt beim nächsten Start seiner Agenten.",
   "settings.connections.server.notBelow": "Das Ausgabebudget muss kleiner als die Kontextgröße sein.",
   "settings.connections.server.output": "Ausgabebudget",

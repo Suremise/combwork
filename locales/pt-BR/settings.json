@@ -1517,7 +1517,7 @@
   "settings.advanced.claude-code.localModel.spellings.desc": "Grafias de ID de modelo que o Claude Code pode associar a um modelo do Claude ou dimensionar pelas próprias regras (claude no ID, um sufixo [1m], uma data após @), como expressão regular. Um modelo de uma conexão de servidor escrito assim não recebe do Combwork tamanho do contexto nem orçamento de saída. Errada, o Combwork passa limites que o Claude Code não aplica, ou deixa de fora um modelo local ao qual ele os aplicaria.",
   "settings.advanced.claude-code.localModel.spellings.title": "Modelos locais: IDs que o Claude Code dimensiona sozinho",
   "settings.connections.server.context": "Tamanho do contexto",
-  "settings.connections.server.contextNone": "Não definido: o Claude Code supõe 200.000",
+  "settings.connections.server.contextNone": "Não definido: 200.000 supostos",
   "settings.connections.server.limitsHint": "O tamanho do contexto e o orçamento de saída são usados quando um agente inicia nesse modelo (não para IDs que o Claude Code lê como próprios, nem onde as configurações da sessão associam o ID a um modelo do Claude). Uma alteração vale na próxima vez que os agentes iniciarem.",
   "settings.connections.server.notBelow": "O orçamento de saída precisa ser menor que o tamanho do contexto.",
   "settings.connections.server.output": "Orçamento de saída",

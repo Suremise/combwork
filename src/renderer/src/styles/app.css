@@ -15336,5 +15336,5 @@ button.progress-lane-retry {
 .server-model-limits { flex-basis: 100%; padding: 2px 0 6px 0; }
 .server-model-limits > .flex { gap: 16px; flex-wrap: wrap; }
 .server-model-limit { gap: 6px; align-items: center; }
-.server-model-limit .input { width: 9em; }
+.server-model-limit .input { width: 13em; }
 .server-model-limits .hint.warn { color: var(--warning); }

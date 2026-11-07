@@ -927,7 +927,7 @@
   "settings.connections.server.cloudTip": "Runs in the cloud, not on this PC: its sessions aren't free (local).",
   "settings.connections.server.context": "Context size",
   "settings.connections.server.contextAdvice": "{name} recommends a context length of {size, number} tokens or more for {cli}, especially in larger repositories. Set it in {name}'s own settings: Combwork doesn't change them.",
-  "settings.connections.server.contextNone": "Not set: Claude Code assumes 200,000",
+  "settings.connections.server.contextNone": "Not set: 200,000 assumed",
   "settings.connections.server.custom": "Custom",
   "settings.connections.server.docs": "Its setup is documented at {url}.",
   "settings.connections.server.edit": "Edit Server…",

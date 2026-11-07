@@ -44,7 +44,7 @@ const M = {
   context: msg({ id: 'settings.connections.server.context', defaultMessage: 'Context size', description: "A field on a server connection's model (HI-2682): the context the model has on this server, in tokens. The same value as Server diagnostics' context size." }),
   output: msg({ id: 'settings.connections.server.output', defaultMessage: 'Output budget', description: "A field on a server connection's model (HI-2682): the most tokens the model may write in one reply." }),
   tokens: msg({ id: 'settings.connections.server.tokens', defaultMessage: 'tokens', description: "Beside a server connection's model's Context size and Output budget fields (HI-2682): the unit." }),
-  contextNone: msg({ id: 'settings.connections.server.contextNone', defaultMessage: 'Not set: Claude Code assumes 200,000', description: "The placeholder of a server connection's model's empty Context size field (HI-2682): with none set, Claude Code assumes a 200K context." }),
+  contextNone: msg({ id: 'settings.connections.server.contextNone', defaultMessage: 'Not set: 200,000 assumed', description: "The placeholder of a server connection's model's empty Context size field (HI-2682): with none set, Claude Code assumes a 200K context." }),
   outputDefault: msg({ id: 'settings.connections.server.outputDefault', defaultMessage: 'Default: {n, number}', description: "The placeholder of a server connection's model's empty Output budget field (HI-2682): the budget used when none is set. {n} is a number of tokens." }),
   notBelow: msg({ id: 'settings.connections.server.notBelow', defaultMessage: 'The output budget must be smaller than the context size.', description: "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved." }),
   tight: msg({ id: 'settings.connections.server.tight', defaultMessage: 'Little room: Claude Code’s first request with Combwork’s tools can be 14,000–28,000 tokens, so a session may not start, or may compact at once.', description: "A warning under a server connection's model's fields (HI-2682): its context minus its output budget is small. Advice: saving is allowed." }),
@@ -432,7 +432,15 @@ function EditServerDialog({ c, onClose }: { c: Account; onClose: () => void }) {
         <input id="edit-url" className="input" value={baseUrl} disabled={busy} spellCheck={false} onChange={(e) => setBaseUrl(e.target.value)} />
         {moves && <div className="account-warning span2"><Icon name="warning" /> {tr(M.moveWarn)}</div>}
         <label>{tr(M.models)}</label>
-        <ServerModelsEditor models={models} onChange={setModels} disabled={busy} />
+        <ServerModelsEditor
+          models={models}
+          onChange={(m) => {
+            setModels(m)
+            // A refusal was for the models as they were.
+            setError(null)
+          }}
+          disabled={busy}
+        />
       </div>
     </Modal>
   )

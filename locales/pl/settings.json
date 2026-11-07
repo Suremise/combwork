@@ -1517,7 +1517,7 @@
   "settings.advanced.claude-code.localModel.spellings.desc": "Zapisy identyfikatorów modeli, które Claude Code może przypisać do modelu Claude lub wymiarować według własnych reguł (claude w identyfikatorze, sufiks [1m], data po @), jako wyrażenie regularne. Model połączenia z serwerem zapisany w ten sposób nie dostaje od Combwork rozmiaru kontekstu ani budżetu wyjścia. Błędne: Combwork przekazuje limity, których Claude Code nie stosuje, albo pomija model lokalny, do którego by je zastosował.",
   "settings.advanced.claude-code.localModel.spellings.title": "Modele lokalne: identyfikatory, które Claude Code wymiaruje sam",
   "settings.connections.server.context": "Rozmiar kontekstu",
-  "settings.connections.server.contextNone": "Nie ustawiono: Claude Code przyjmuje 200 000",
+  "settings.connections.server.contextNone": "Nie ustawiono: przyjęto 200 000",
   "settings.connections.server.limitsHint": "Rozmiar kontekstu i budżet wyjścia są używane, gdy agent startuje na tym modelu (nie dla identyfikatorów, które Claude Code odczytuje jako własne, ani gdy ustawienia sesji przypisują identyfikator do modelu Claude). Zmiana działa od następnego uruchomienia jego agentów.",
   "settings.connections.server.notBelow": "Budżet wyjścia musi być mniejszy niż rozmiar kontekstu.",
   "settings.connections.server.output": "Budżet wyjścia",

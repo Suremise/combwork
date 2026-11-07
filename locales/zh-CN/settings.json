@@ -1517,7 +1517,7 @@
   "settings.advanced.claude-code.localModel.spellings.desc": "Claude Code 可能映射到 Claude 模型或按自己的规则确定大小的模型 ID 写法（ID 中含 claude、[1m] 后缀、@ 后的日期），以正则表达式表示。这样写的服务器连接模型不会从 Combwork 获得上下文大小或输出预算。设置错误时，Combwork 会传递 Claude Code 不会应用的限制，或漏掉本该应用限制的本地模型。",
   "settings.advanced.claude-code.localModel.spellings.title": "本地模型：Claude Code 自行确定大小的 ID",
   "settings.connections.server.context": "上下文大小",
-  "settings.connections.server.contextNone": "未设置：Claude Code 假定为 200,000",
+  "settings.connections.server.contextNone": "未设置：假定为 200,000",
   "settings.connections.server.limitsHint": "上下文大小和输出预算会在代理以该模型启动时使用（不适用于 Claude Code 读作自身的 ID，也不适用于会话设置将 ID 映射到 Claude 模型的情况）。更改会在其代理下次启动时生效。",
   "settings.connections.server.notBelow": "输出预算必须小于上下文大小。",
   "settings.connections.server.output": "输出预算",

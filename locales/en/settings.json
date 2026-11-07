@@ -3712,7 +3712,7 @@
     "description": "Under a server connection's preset (Add Connection): the service ({name}: \"Ollama\") recommends a context window of at least {size} tokens (64,000) for the coding agent CLI ({cli}: \"Claude Code\"). Advice, not a requirement Combwork enforces."
   },
   "settings.connections.server.contextNone": {
-    "defaultMessage": "Not set: Claude Code assumes 200,000",
+    "defaultMessage": "Not set: 200,000 assumed",
     "description": "The placeholder of a server connection's model's empty Context size field (HI-2682): with none set, Claude Code assumes a 200K context."
   },
   "settings.connections.server.custom": {
