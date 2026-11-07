@@ -529,13 +529,23 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check('…the retries a warning (failed, then passed), the failed run a failure', (await group(a.number).locator('.progress-run-group').filter({ hasText: 'unit: 6 files' }).locator('.progress-group-head .codicon-warning').count()) === 1 && (await group(a.number).locator('.progress-recent-item[data-run="a-cardloop"] .progress-recent .codicon-error').count()) === 1)
     const reviewRow = group(a.number).locator('.progress-recent-item[data-run="a-review"] .progress-recent > .tip-wrap').first()
     const tipText = async () => (await page.locator('body > .tip').allTextContents().catch(() => [])).join(' | ')
+    // Whether the pointer is on the row, and whether something else (a notice) is over its middle.
+    const rowState = () => reviewRow.evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      return { hovered: el.matches(':hover'), covered: !at || !el.contains(at) }
+    }).catch(() => ({ hovered: false, covered: true }))
     check('…its card, revision and copy in the hover', !!(await until(async () => {
       if ((await tipText()).includes(`${a.key} · e2d018f · in copy-5`)) return true
-      // The runs are docked at the bottom (HI-1925), where the window's notices show: those first.
-      for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click().catch(() => undefined)
+      // HI-2703: the tip shows 350 ms after the pointer enters, and leaving cancels it. While the pointer is on the row
+      // and nothing covers it, it stays there: a dismissal's click or another hover would move it away and start again.
+      const s = await rowState()
+      if (s.hovered && !s.covered) return false
+      // The runs are docked at the bottom (HI-1925), where the window's notices show: those over the row go first.
+      if (s.covered) for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click().catch(() => undefined)
       await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)
       return false
-    }, HUNG_MS)), await tipText())
+    }, HUNG_MS)), `${await tipText()} (row ${JSON.stringify(await rowState())}, notices ${await page.locator('.toasts .toast').count()})`)
     await page.mouse.move(5, 5)
     await shoot('runs-by-card')
     // A card whose runs all passed shows its run too (HI-1925: nothing folded but details); a click on a heading folds nothing.
