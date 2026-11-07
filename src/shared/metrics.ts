@@ -60,9 +60,10 @@ export function failureKind(outcome: MetricOutcome | ToolOutcome): FailureKind |
 
 /**
  * A reason Combwork gave for a refusal or a wrong call (HI-2553): a workflow rule's id (`rule:<id>`) or its message's id
- * (`msg:<id>`), never its text; `other` when it had neither, or past REASONS_MAX in a series.
+ * (`msg:<id>`; an agent message's, `agent:<id>`: HI-2681), never its text; `other` when it had neither, or past
+ * REASONS_MAX in a series.
  */
-export const REASON_LABEL = /^(?:(?:rule|msg):[A-Za-z0-9_.-]{1,96}|other)$/
+export const REASON_LABEL = /^(?:(?:rule|msg|agent):[A-Za-z0-9_.-]{1,96}|other)$/
 
 /** At most this many reasons a series keeps; the rest are counted as `other`. */
 export const REASONS_MAX = 12

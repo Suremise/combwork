@@ -992,21 +992,27 @@ export function apiOutcome(r: { finished: boolean; status: number; waiting: bool
   return s < 400 ? 'ok' : s === 401 || s === 403 ? 'denied' : s === 409 ? 'refused' : s < 500 ? 'invalid' : 'server-error'
 }
 
-/** The label of a refusal's or a wrong call's reason (HI-2553): its rule's id or its message's, never its text; `other` without either. */
+/**
+ * The label of a refusal's or a wrong call's reason (HI-2553): its rule's id or its message's, never its text; `other`
+ * without either. A window message is `msg:<id>`; an agent message (the Agent API's own errors, `HttpError`'s
+ * `saidId`, or a text's `said` part: HI-2681) is `agent:<id>`, English only, which the view says from its catalogue.
+ */
 export function reasonOf(e: unknown): string {
   const rule = (e as { refusal?: { rule?: unknown } })?.refusal?.rule
   if (typeof rule === 'string') return `rule:${rule}`
   const id = messageId((e as { text?: unknown })?.text)
-  return id ? `msg:${id}` : 'other'
+  if (id) return id
+  const said = (e as { saidId?: unknown })?.saidId
+  return typeof said === 'string' ? `agent:${said}` : 'other'
 }
 
-/** The id of a text's message (a Text's own, or its first part's), if it has one. */
-function messageId(t: unknown, depth = 0): string | null {
+/** The label of a text's message (a Text's own, or its first part's), if it has one: `msg:` a window message's, `agent:` an agent message's. */
+function messageId(t: unknown, depth = 0, prefix = 'msg'): string | null {
   if (!t || typeof t !== 'object' || depth > 3) return null
   const o = t as Record<string, unknown>
-  if (typeof o.id === 'string') return o.id
-  for (const k of ['m', 'said', 'shown', 'cap'] as const) if (o[k]) return messageId(o[k], depth + 1)
-  for (const k of ['lines', 'list'] as const) if (Array.isArray(o[k]) && o[k].length) return messageId(o[k][0], depth + 1)
+  if (typeof o.id === 'string') return `${prefix}:${o.id}`
+  for (const k of ['m', 'said', 'shown', 'cap'] as const) if (o[k]) return messageId(o[k], depth + 1, k === 'said' ? 'agent' : prefix)
+  for (const k of ['lines', 'list'] as const) if (Array.isArray(o[k]) && o[k].length) return messageId(o[k][0], depth + 1, prefix)
   return null
 }
 

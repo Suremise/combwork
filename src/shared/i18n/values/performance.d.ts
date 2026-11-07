@@ -354,6 +354,7 @@ interface CombworkMessageValues {
   'performance.range.label': undefined
   'performance.range.name': { range: string }
   'performance.reasons.count': undefined
+  'performance.reasons.english': { id: string | number }
   'performance.reasons.heading': undefined
   'performance.reasons.kind': undefined
   'performance.reasons.kindValue': { kind: string }
