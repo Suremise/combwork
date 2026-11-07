@@ -983,6 +983,10 @@
     "defaultMessage": "Project {project} inherits these options, and the change would make its options contradict each other:",
     "description": "Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name."
   },
+  "service.workflow.targetInUse": {
+    "defaultMessage": "{branch} can’t be taken out of Other branches work can merge into while these use it: {uses}. Retarget or finish them first.",
+    "description": "HI-2680: a save of workflow options refused: it takes a branch out of Other branches work can merge into while cards, lanes, queue entries or slots still use it ({uses}: their keys and names). Other branches work can merge into is the option’s name: as translated there."
+  },
   "service.workflowNotice.blocked": {
     "defaultMessage": "{card} is blocked: {reason}",
     "description": "A line of a lane's notification: a card (its key, e.g. HI-12) was marked blocked, with the reason given ({reason}, the user's or an agent's own words)."

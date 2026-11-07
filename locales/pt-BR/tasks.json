@@ -77,6 +77,7 @@
   "tasks.error.reviewTaken": "O agente {agent} já está revisando {card} (desde {since} UTC).",
   "tasks.error.setAsideGone": "Esse cartão deixado de lado não existe mais, ou não é um cartão: ele só pode ser descartado.",
   "tasks.error.staysInProject": "Os cartões ficam no seu projeto ({project}).",
+  "tasks.error.targetChanged": "O Mescla em de {card} mudou desde que ele foi listado, então ele fica como está.",
   "tasks.error.targetCheckedOut": "{unknown, select, yes {O Combwork não consegue saber se o branch antigo de {card} ainda está em uso, então seu “Mescla em” continua igual.} other {O branch antigo de {card} ainda está em checkout em {folder}, então seu “Mescla em” continua igual. Tente de novo quando essa pasta tiver seguido adiante.}}",
   "tasks.error.targetHasWork": "{unknown, select, yes {O Combwork não consegue saber se o cartão {card} tem trabalho no seu branch, então o “Mescla em” dele continua como está.} other {O cartão {card} tem trabalho no seu branch criado a partir de {target}, então continua sendo mesclado lá. Para movê-lo, crie um novo cartão para ele no outro branch e copie a alteração.}}",
   "tasks.error.targetLane": "O cartão {card} está na raia de {builder}, que é mesclada em {target}: os cartões de uma raia são mesclados onde ela é. Tire-o da raia primeiro.",
@@ -194,5 +195,6 @@
   "tasks.error.waitingNotYours": "Só o próprio agente de {card}, o usuário ou o Assistente pode marcá-lo como aguardando ou encerrar isso.",
   "tasks.error.waitingTooLong": "O motivo da espera é longo demais (no máximo {max, number} caracteres).",
   "tasks.history.notWaiting": "Não está mais aguardando",
-  "tasks.history.waiting": "Aguardando: {reason}"
+  "tasks.history.waiting": "Aguardando: {reason}",
+  "tasks.error.targetDefaultMoved": "O trabalho é mesclado em mudou de novo enquanto {card} era movido, então ele fica como está."
 }

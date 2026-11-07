@@ -364,9 +364,19 @@
     "note": "An error: an agent tried to move a card to another project, or to the whole workspace; its cards stay in its own project ({project}, its folder name).",
     "audience": "both"
   },
+  "tasks.error.targetChanged": {
+    "text": "{card}’s Merges into changed since it was listed, so it stays as it is.",
+    "note": "HI-2680: a card left out of a retarget: its Merges into changed between the preview and the move. {card} is its key (HI-12).",
+    "audience": "both"
+  },
   "tasks.error.targetCheckedOut": {
     "text": "{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}",
     "note": "HI-2556: an error changing a card’s Merges into: its old branch (which has no work of its own and would be removed so its next start begins fresh) is still checked out in a folder. {card} is the card’s key (HI-12), {folder} a folder’s path. unknown yes: git couldn’t say. Keep the select keys.",
+    "audience": "both"
+  },
+  "tasks.error.targetDefaultMoved": {
+    "text": "Work merges into changed again while {card} was being moved, so it stays as it is.",
+    "note": "HI-2680: a card left out of a retarget: the project’s Work merges into (an option’s name: as translated there) changed again between the preview and the move. {card} is its key (HI-12).",
     "audience": "both"
   },
   "tasks.error.targetHasWork": {

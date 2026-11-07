@@ -741,6 +741,7 @@
   "assistant.undo.why.removedFromQueue": "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.",
   "assistant.undo.why.reportMerge": "The merge it reported stays in the card's work.",
   "assistant.undo.why.request": "Its request to the builder stays as a comment.",
+  "assistant.undo.why.retargeted": "Cards and slots it moved to a project's new target aren't moved back: set a card's Merges into again if it should go back.",
   "assistant.undo.why.retriedMerge": "Its Retry merge stays in the card's work.",
   "assistant.undo.why.slotReleased": "A slot it released isn't kept or held again: the next work that needs a slot may take it.",
   "assistant.undo.why.start": "Its start stays in the card's work: undo moves the card back, it doesn't unstart it.",

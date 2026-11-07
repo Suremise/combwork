@@ -480,6 +480,12 @@
   "tool.queue.arg.from": {
     "placeholders": {}
   },
+  "tool.queue.arg.items": {
+    "placeholders": {}
+  },
+  "tool.queue.arg.preview": {
+    "placeholders": {}
+  },
   "tool.queue.arg.reason": {
     "placeholders": {}
   },
@@ -507,6 +513,21 @@
       "from": "plain",
       "queued": "select",
       "card": "plain"
+    }
+  },
+  "tool.queue.reply.retarget": {
+    "placeholders": {
+      "to": "plain",
+      "moved": "plain",
+      "skipped": "plain"
+    }
+  },
+  "tool.queue.reply.retargetPreview": {
+    "placeholders": {
+      "preview": "plain",
+      "to": "plain",
+      "move": "plain",
+      "stay": "plain"
     }
   },
   "tool.readAttachment.arg.name": {

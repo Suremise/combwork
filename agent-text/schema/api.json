@@ -609,6 +609,16 @@
   "api.change.resumeTeam": {
     "placeholders": {}
   },
+  "api.change.retarget": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.retargetAny": {
+    "placeholders": {}
+  },
   "api.change.retryFresh": {
     "placeholders": {
       "lane": "plain"
@@ -1066,6 +1076,15 @@
       "column": "plain"
     }
   },
+  "api.done.retargeted": {
+    "placeholders": {
+      "cards": "plain",
+      "slots": "plain",
+      "from": "plain",
+      "to": "plain",
+      "skipped": "plain"
+    }
+  },
   "api.done.slotReleased": {
     "placeholders": {
       "slot": "plain",
@@ -1505,6 +1524,14 @@
   },
   "api.queue.projectRequired": {
     "placeholders": {}
+  },
+  "api.queue.retargetArgs": {
+    "placeholders": {}
+  },
+  "api.queue.retargetGone": {
+    "placeholders": {
+      "preview": "plain"
+    }
   },
   "api.queue.targetArg": {
     "placeholders": {}

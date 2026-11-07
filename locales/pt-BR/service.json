@@ -245,6 +245,7 @@
   "service.workflow.changedMeanwhile": "As opções do fluxo de trabalho mudaram nesse meio-tempo (em outra janela ou pelo Assistente), então nada foi salvo. A seção as mostra como estão agora.",
   "service.workflow.closed": "O espaço de trabalho deste cartão foi fechado",
   "service.workflow.inheritor": "O projeto {project} herda essas opções, e a mudança faria as opções dele se contradizerem:",
+  "service.workflow.targetInUse": "{branch} não pode sair de Outros branches em que o trabalho pode ser mesclado enquanto estes o usam: {uses}. Redirecione-os ou conclua-os primeiro.",
   "service.workflowNotice.blocked": "{card} está bloqueado: {reason}",
   "service.workflowNotice.blockedNoReason": "{card} está bloqueado",
   "service.workflowNotice.failed": "{card}: revisão reprovada",

@@ -436,6 +436,12 @@
   "api.change.resumeTeam": {
     "text": "resume the team"
   },
+  "api.change.retarget": {
+    "text": "move cards and slots from {from} to {to} in {project}"
+  },
+  "api.change.retargetAny": {
+    "text": "move cards and slots to a project's new target"
+  },
   "api.change.retryFresh": {
     "text": "retry lane {lane}'s new conversations"
   },
@@ -698,6 +704,9 @@
   },
   "api.done.reordered": {
     "text": "Put {cards} at the top of {column}"
+  },
+  "api.done.retargeted": {
+    "text": "Moved {cards} cards and {slots} slots from {from} to {to}; {skipped} left where they were, each with why"
   },
   "api.done.slotReleased": {
     "text": "Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}"
@@ -1045,6 +1054,12 @@
   },
   "api.queue.projectRequired": {
     "text": "project is required"
+  },
+  "api.queue.retargetArgs": {
+    "text": "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)"
+  },
+  "api.queue.retargetGone": {
+    "text": "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again"
   },
   "api.queue.targetArg": {
     "text": "target is a branch name"

@@ -129,6 +129,10 @@ const T = {
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
   'queue.arg.target': agentMsg({ id: 'tool.queue.arg.target', text: 'The target branch.' }),
+  'queue.arg.items': agentMsg({ id: 'tool.queue.arg.items', text: 'retarget: the card keys and slot names to move, from the preview named.' }),
+  'queue.arg.preview': agentMsg({ id: 'tool.queue.arg.preview', text: "retarget: the preview id a target change's reply gave. Without it, from (the finished target) and target (the new one) give a new preview, moving nothing." }),
+  'queue.reply.retargetPreview': agentMsg({ id: 'tool.queue.reply.retargetPreview', text: 'Preview {preview}: can follow {to}: {move}. Stay: {stay}. To move them, ask the user, then retarget with preview and items.', note: 'HI-2680: cw_queue retarget\'s reply without a preview. {move} and {stay} are lists ("-" for none).' }),
+  'queue.reply.retarget': agentMsg({ id: 'tool.queue.reply.retarget', text: 'Moved to {to}: {moved}. Left where they were: {skipped}.', note: 'HI-2680: cw_queue retarget\'s reply. {moved} and {skipped} are lists ("-" for none).' }),
   'queue.arg.from': agentMsg({ id: 'tool.queue.arg.from', text: 'forward: the branch to bring in; target is the one brought up to date. Both the project\'s targets.' }),
   'queue.reply.forward': agentMsg({ id: 'tool.queue.reply.forward', text: "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}}", note: 'HI-2679: cw_queue forward\'s reply.' }),
   'queue.arg.reason': agentMsg({ id: 'tool.queue.arg.reason', text: "remove, retry: the user's reason, recorded with the override." }),
@@ -975,10 +979,10 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry', 'forward'] : ['list'] },
+        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry', 'forward', 'retarget'] : ['list'] },
         ...(ASSISTANT ? { project: projectArg } : {}),
         target: { type: 'string', description: say(T['queue.arg.target']) },
-        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) }, from: { type: 'string', description: say(T['queue.arg.from']) } } : {})
+        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) }, from: { type: 'string', description: say(T['queue.arg.from']) }, items: { type: 'array', items: { type: 'string' }, description: say(T['queue.arg.items']) }, preview: { type: 'string', description: say(T['queue.arg.preview']) } } : {})
       },
       required: ['action']
     },
@@ -996,6 +1000,15 @@ const tools: Tool[] = [
       if (a.action === 'forward') {
         const r = (await api('POST', '/v1/queue/forward', { project, from: a.from, to: a.target })) as { upToDate: boolean; key: string | null; card: number | null; queued: boolean; from: string; to: string }
         return say(T['queue.reply.forward'], { upToDate: r.upToDate ? 'yes' : 'no', queued: r.queued ? 'yes' : 'no', card: r.key ?? (r.card !== null ? `#${r.card}` : ''), from: r.from, to: r.to })
+      }
+      // HI-2680: after a project's target moved on, move the named cards and slots from `from` to `target`.
+      if (a.action === 'retarget') {
+        if (!a.preview) {
+          const v = (await api('POST', '/v1/workflow/retarget', { project, from: a.from, to: a.target })) as { preview: string; to: string; move: string[]; stay: { key?: string; slot?: string; lane?: string; why: string }[] }
+          return say(T['queue.reply.retargetPreview'], { preview: v.preview, to: v.to, move: v.move.join(', ') || '-', stay: v.stay.map((s) => `${s.key ?? s.slot ?? s.lane} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
+        }
+        const r = (await api('POST', '/v1/workflow/retarget', { project, preview: a.preview, items: a.items })) as { moved: { cards: { key: string }[]; slots: string[] }; skipped: { key?: string; slot?: string; why: string }[]; to: string }
+        return say(T['queue.reply.retarget'], { moved: [...r.moved.cards.map((c) => c.key), ...r.moved.slots].join(', ') || '-', to: r.to, skipped: r.skipped.map((s) => `${s.key ?? s.slot} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
       }
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error(say(T['queue.error.action.assistant']))
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)

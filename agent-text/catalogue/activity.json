@@ -139,6 +139,10 @@
     "text": "Its request to the builder stays as a comment.",
     "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
   },
+  "activity.undo.retargeted": {
+    "text": "Cards and slots it moved to a project's new target aren't moved back: set a card's Merges into again if it should go back.",
+    "note": "Why undo leaves this (#1282, HI-2680). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."
+  },
   "activity.undo.retriedMerge": {
     "text": "Its Retry merge stays in the card's work.",
     "note": "Why undo leaves this (#1282). Stored with the change in the Default's English, which finalWhys reads its code back from: keep ICU syntax out of it."

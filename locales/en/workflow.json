@@ -479,6 +479,38 @@
     "defaultMessage": "Remove",
     "description": "The tooltip of the button removing a check from “Checks pass before review”."
   },
+  "workflow.form.retargetCard": {
+    "defaultMessage": "{card} {title}: to the new branch",
+    "description": "HI-2680: a card the retarget moves to the new Work merges into, in the dialog before saving. {card} is its key (HI-12)."
+  },
+  "workflow.form.retargetChoice": {
+    "defaultMessage": "Also retarget what can move from {from} to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# free slot} other {# free slots}}",
+    "description": "HI-2680: a tick box in the dialog before saving workflow options that change Work merges into: after saving, move the Todo cards with no work of their own and the free slots still on the old branch {from} to the new one {to}. Card and slot counts."
+  },
+  "workflow.form.retargetDone": {
+    "defaultMessage": "{skipped, plural, =0 {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}} other {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}; # left where they were}}",
+    "description": "HI-2680: a notification after the retarget: how many cards and slots moved to the new branch {to}, and how many were left (each listed with why in its text)."
+  },
+  "workflow.form.retargetFailed": {
+    "defaultMessage": "The options were saved, but nothing was retargeted",
+    "description": "HI-2680: an error’s title: the workflow options were saved, but the retarget that should follow failed. Its text says why."
+  },
+  "workflow.form.retargetKeep": {
+    "defaultMessage": "{what}: {why, select, work {it has work on its branch} started {already started} lane {a running lane keeps its branch until it ends} lent {lent} dirty {it has changes not committed} busy {in use} unmerged {it holds commits {from} lacks} targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} moved {it moved meanwhile} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}",
+    "description": "HI-2680: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name."
+  },
+  "workflow.form.retargetSkipped": {
+    "defaultMessage": "{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside until you remove it: look at its folder first} failed {it couldn’t be moved; Combwork looks at it again} other {Combwork can’t tell}}",
+    "description": "HI-2680: a line of the notification after the retarget: a card or slot left where it was ({what}: its key or name), and why (a select: keep the keys)."
+  },
+  "workflow.form.retargetSlot": {
+    "defaultMessage": "{slot}: free, to the new branch",
+    "description": "HI-2680: a free slot the retarget moves to the new Work merges into (its folder detached at the new branch), in the dialog before saving. {slot} is its name (slot-a)."
+  },
+  "workflow.form.retargetStays": {
+    "defaultMessage": "These stay on {from}:",
+    "description": "HI-2680: in the dialog before saving workflow options, above what the retarget leaves on the old branch {from}, each with why."
+  },
   "workflow.form.save": {
     "defaultMessage": "Save…",
     "description": "The button saving the workflow options (it shows what changes first)."

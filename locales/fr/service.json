@@ -245,6 +245,7 @@
   "service.workflow.changedMeanwhile": "Les options du flux de travail ont changé entre-temps (dans une autre fenêtre, ou par l’Assistant), donc rien n’a été enregistré. La section les affiche telles qu’elles sont maintenant.",
   "service.workflow.closed": "L’espace de travail de cette carte a été fermé",
   "service.workflow.inheritor": "Le projet {project} hérite de ces options, et la modification rendrait ses options contradictoires :",
+  "service.workflow.targetInUse": "La branche {branch} ne peut pas être retirée de l’option Autres branches dans lesquelles le travail peut être fusionné tant que ceux-ci l’utilisent : {uses}. Recible-les ou termine-les d’abord.",
   "service.workflowNotice.blocked": "La carte {card} est bloquée : {reason}",
   "service.workflowNotice.blockedNoReason": "La carte {card} est bloquée",
   "service.workflowNotice.failed": "{card} : relecture refusée",

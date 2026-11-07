@@ -337,6 +337,16 @@ export async function legacyLanes(ws: WorkspaceService): Promise<{ name: string;
 }
 
 /** Changes a workspace's lanes under its lock: fn changes the list it is given (or throws), and says whether it did. */
+/**
+ * HI-2680: runs `fn` holding the lanes' file lock, which every lane start and list change holds while it decides: a
+ * save taking a branch out of the project's targets holds it around its board write, so a lane start on that branch
+ * and the removal are serial (the one that comes second is refused).
+ */
+export function withLanesLock<T>(ws: WorkspaceService, fn: () => Promise<T>): Promise<T> {
+  if (!ws.path) return fn()
+  return withFileLock(fileOf(ws), fn)
+}
+
 async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[], checks: (() => void)[], also: ((db: Writer) => void)[]) => T | Promise<T>): Promise<T> {
   if (!ws.path) throw new LaneError(409, M.noWorkspace)
   const result = await readAgain(() => withFileLock(fileOf(ws), async () => {
@@ -1230,6 +1240,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
   const decide = () => mutate(ws, async (lanes, checks, also) => {
     if (s.commit) checks.push(s.commit)
+    // HI-2680: the picked branch read again under the lanes' lock, against the options as they are now: a removal from
+    // the project's targets that came first refuses this start (`withLanesLock`).
+    if (pick) await lanePick(ws, s.project, pick)
     queuedAfter = null
     ended.length = 0
     carried = null

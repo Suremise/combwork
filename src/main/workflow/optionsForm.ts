@@ -17,7 +17,7 @@ import { config } from '../config'
 import { CombworkError, combworkError } from '../combworkError'
 import { projectPlatform } from '../platform/registry'
 import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
-import { listLanes } from '../lanes'
+import { listLanes, withLanesLock } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
 import { agentText, linesOf, withValues, type Text } from '../../shared/advanced'
@@ -28,7 +28,7 @@ import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESET
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { KeptTargets, ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
+import type { KeptTargets, RetargetPreview, ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
 import { compile, mustCompile, type Ruleset } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
@@ -37,6 +37,8 @@ import { workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
+import { refuseRemovedTargets, retargetPreview, slotTargets } from './retarget'
+import { projectTargets } from './targets'
 import { workflowWrite } from './writes'
 import { withRepoLocks } from '../repoLock'
 import { exitBy } from '../exitLog'
@@ -254,7 +256,9 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   const appliesNow = namesOnly(c.changed)
   const lanes = appliesNow ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
   const targets = c.changed.includes('target') ? await keptTargets(ws, project, c.options.target ?? '') : null
-  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}) }
+  // HI-2680: what can follow the new target (Retarget), read while the old one is the project's.
+  const retarget = targets ? await retargetOf(ws, project, targets.to) : null
+  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
 }
 
 /**
@@ -305,6 +309,14 @@ export async function keptTargets(ws: WorkspaceService, project: { path: string;
     for (const target of targets) out.lanes.push({ id: l.id, name: l.name, builder: l.builder.name, target })
   }
   return out
+}
+
+/** HI-2680: a change of the project's target to `to`: what can follow it from the target in force now (null: none to say). */
+async function retargetOf(ws: WorkspaceService, project: { path: string }, to: string): Promise<RetargetPreview | null> {
+  const from = (await projectTargets(ws, project.path).catch(() => null))?.default
+  if (!from || from === to) return null
+  const p = await retargetPreview(ws, project.path, from, to)
+  return p.cards.move.length + p.cards.keep.length + p.slots.move.length + p.slots.keep.length + p.lanes.length ? p : null
 }
 
 /** Options that can't be saved: refused with every reason, each a whole sentence of its own (in the window's language there). */
@@ -373,11 +385,29 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   const plan = planOptions(ws, project, cfg, change, asking && !!o.answer)
   let target = change.options.target ?? ''
   if (!plan.chosen) {
-    await ws.mutateProjectConfig(project.path, (c) => {
-      // The caller's own check (HI-1502: the Assistant's guard), at the write itself: under the project file's lock.
-      o.check?.()
-      return { workflow: planOptions(ws, project, c, change, false).workflow, ...LEGACY_CONSUMED }
-    })
+    const write = () =>
+      ws.mutateProjectConfig(project.path, (c) => {
+        // The caller's own check (HI-1502: the Assistant's guard), at the write itself: under the project file's lock.
+        o.check?.()
+        return { workflow: planOptions(ws, project, c, change, false).workflow, ...LEGACY_CONSUMED }
+      })
+    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, checked in
+    // the board's write (serial with every writer of those), the file written in it.
+    const was = resolvedOf(ws, project.path, project.platform, cfg).options
+    const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
+    if ((was.otherTargets ?? []).some((b) => !(will.otherTargets ?? []).includes(b) && b !== will.target)) {
+      const slots = await slotTargets(ws, project.path)
+      await withLanesLock(ws, () =>
+        boardWrite(ws, async () => {
+          await refuseRemovedTargets(ws, project.path, was.otherTargets ?? [], will.otherTargets ?? [], will.target || null, slots)
+          await write()
+        })
+      )
+    } else if ((was.target || null) !== (will.target || null)) {
+      // HI-2680: Work merges into written in the board's write too, so a retarget's move (which checks it under the
+      // board's lock, `tasks.setTarget`'s `expectDefault`) and this change are serial.
+      await boardWrite(ws, write)
+    } else await write()
     if (!namesOnly(plan.changed) && o.applyTo?.length && plan.changed.length) await applyToInFlight(ws, project, [...new Set(o.applyTo)], plan.changed)
   } else {
     const store = FactStore.forBoard(ws, { project: project.name, key: project.name })

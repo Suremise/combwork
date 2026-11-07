@@ -245,6 +245,7 @@
   "service.workflow.changedMeanwhile": "Die Workflow-Optionen haben sich inzwischen geändert (in einem anderen Fenster oder durch den Assistenten), daher wurde nichts gespeichert. Der Abschnitt zeigt sie jetzt so, wie sie sind.",
   "service.workflow.closed": "Der Arbeitsbereich dieser Karte wurde geschlossen",
   "service.workflow.inheritor": "Das Projekt {project} erbt diese Optionen, und die Änderung würde dazu führen, dass sich seine Optionen widersprechen:",
+  "service.workflow.targetInUse": "{branch} kann nicht aus „Weitere Branches, in die Arbeit gemergt werden kann“ entfernt werden, solange diese ihn nutzen: {uses}. Stelle sie zuerst um oder schließe sie ab.",
   "service.workflowNotice.blocked": "{card} ist blockiert: {reason}",
   "service.workflowNotice.blockedNoReason": "{card} ist blockiert",
   "service.workflowNotice.failed": "{card} hat das Review nicht bestanden",

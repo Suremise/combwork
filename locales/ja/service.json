@@ -245,6 +245,7 @@
   "service.workflow.changedMeanwhile": "その間にワークフローのオプションが変更されたため（別のウィンドウ、またはアシスタントによる変更）、何も保存されませんでした。このセクションには現在のオプションが表示されています。",
   "service.workflow.closed": "このカードのワークスペースは閉じられました",
   "service.workflow.inheritor": "プロジェクト{project}はこれらのオプションを継承しており、この変更でオプション同士が矛盾します：",
+  "service.workflow.targetInUse": "{branch}は次の項目が使用中のため、「その他のマージ先ブランチ」から外せません：{uses}。先にそれらのマージ先を移すか、完了させてください。",
   "service.workflowNotice.blocked": "{card}はブロックされています：{reason}",
   "service.workflowNotice.blockedNoReason": "{card}はブロックされています",
   "service.workflowNotice.failed": "{card}はレビュー不合格です",
