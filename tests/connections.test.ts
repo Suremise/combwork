@@ -1578,3 +1578,47 @@ describe("HI-2670 (HR3 on s45): an agent's change to Independent is checked at i
     }
   })
 })
+
+describe('HI-2670 (HR3 on s46): lock order, and what a change affects read as the file is', () => {
+  it('a rename with a role change takes the names lock before the board lock', async () => {
+    const p = join(wsPath, 'api1')
+    const names = await import('../src/main/agentNames')
+    const boards = await import('../src/main/boardStore')
+    const actual = names.withAgentNames
+    let boardHeldAtNames: boolean | null = null
+    const spy = vi.spyOn(names, 'withAgentNames').mockImplementationOnce(async (host, fn) => {
+      boardHeldAtNames = boards.inBoardWrite(wsPath)
+      return actual(host, fn)
+    })
+    try {
+      await here(() => updateAgent(p, 'k', { name: 'Renamed K', workflowRole: 'reviewer' }))
+      expect(boardHeldAtNames).toBe(false)
+      expect((await w.projectConfig(p)).agents?.find((x) => x.id === 'k')).toMatchObject({ name: 'Renamed K', workflowRole: 'reviewer' })
+    } finally {
+      spy.mockRestore()
+      await here(() => updateAgent(p, 'k', { name: 'Api K' }))
+    }
+  })
+
+  it("a project.json being written (its .bak older) refuses turning a connection's tools off, never reading its agents as gone", async () => {
+    const account = await signedInConnection('Probe', 'probe@example.com')
+    const conn = baseOf(account.id)
+    const p = join(wsPath, 'alpha')
+    const file = join(p, '.combwork', 'project.json')
+    await here(() => w.updateAgent(p, 'a-one', { connection: conn, workflowRole: 'builder' }))
+    const tasks = await import('../src/main/tasks')
+    const launch = await import('../src/main/connectionLaunch')
+    await here(() => tasks.createTask({ title: 'Held while config is unsettled', project: 'alpha', agent: 'a-one', column: 'doing' }, { kind: 'user' }))
+    const original = readFileSync(file, 'utf8')
+    writeFileSync(`${file}.bak`, JSON.stringify({ version: 2, agents: [] }))
+    writeFileSync(file, '{')
+    try {
+      await expect(launch.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/couldn't read which agents, lanes and cards/)
+      expect(accounts.getConnection(conn)?.launch).toBeUndefined()
+    } finally {
+      writeFileSync(file, original)
+    }
+    // Readable again: it names a-one's card, and asks for confirmation.
+    await expect(launch.setConnectionLaunch(conn, { tools: false })).rejects.toThrow(/One \(.*doing\).*confirm: [0-9a-f]+/)
+  })
+})

@@ -527,21 +527,24 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // Read before the board's lock (the lanes can't be read inside a board write), then checked inside it: the snapshot
   // still current there, and held so through the save.
   let independentCheck: ((current: AgentDef) => void) | null = null
+  // The locks in their one order (HR3 on s46): the names', then the board's, then the project file's (mutateProjectConfig's).
+  const save = (): Promise<AgentDef> => workspace.updateAgent(projectPath, agentId, clean, check)
+  const fencedSave = (): Promise<AgentDef> => (fenced ? boardWrite(workspaceOf(projectPath), save) : save())
   const write = async (): Promise<AgentDef> => {
     return name !== undefined
       ? withAgentNames(projectPath, async () => {
           const now = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === agentId)
           if (!now || !sameAgentName(now.name, name)) await assertNameFree(projectPath, name, { self: agentId })
-          return workspace.updateAgent(projectPath, agentId, clean, check)
+          return fencedSave()
         })
-      : workspace.updateAgent(projectPath, agentId, clean, check)
+      : fencedSave()
   }
   const fencedWrite = async (): Promise<AgentDef> => {
     // Something written between the read and the board's lock (any card, on a busy board): read again, a few times.
     for (let i = 0; i < 3; i++) {
       independentCheck = await agentChangeCheck(workspaceOf(projectPath), projectPath, basename(projectPath), before!, roleChange, opts.confirmed)
       try {
-        return await boardWrite(workspaceOf(projectPath), write)
+        return await write()
       } catch (e) {
         if (!(e instanceof ImpactMoved)) throw e
       }

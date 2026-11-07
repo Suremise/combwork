@@ -24,7 +24,8 @@ import { advanced } from './advanced'
 import { config } from './config'
 import { combworkError } from './combworkError'
 import { emit } from './events'
-import { hashText, readKeptJson, withFileLock } from './fsutil'
+import { readFile } from 'original-fs/promises'
+import { hashText, withFileLock } from './fsutil'
 import { rawLanes } from './lanes'
 import { createLogger } from './logger'
 import { agentCards } from './tasks'
@@ -109,7 +110,7 @@ async function connectionImpact(id: string): Promise<LaunchImpact> {
     if (!info) throw combworkError(PROJECTS_UNREAD, { workspace: ws.path })
     for (const p of info.projects) {
       const file = join(p.path, CW_DIR, 'project.json')
-      const cfg = await withFileLock(file, () => readKeptJson<Partial<ProjectConfig>>(file, {}))
+      const cfg = await withFileLock(file, () => projectFileAsIs(file))
       for (const a of cfg.agents ?? []) {
         // Already out of the workflow by its own role: the change takes nothing from it.
         if (a.connection !== id || (a.workflowRole === 'independent')) continue
@@ -122,6 +123,22 @@ async function connectionImpact(id: string): Promise<LaunchImpact> {
 }
 
 const PROJECTS_UNREAD = msg({ id: 'main.connections.launch.projectsUnread', defaultMessage: "the projects of {workspace} aren't read yet", description: "Why Combwork couldn't read what a change of a connection's launch settings affects (HI-2670), put into a longer error in place of {error}: an open workspace's projects ({workspace}: its folder) haven't been read yet. Lower case, no full stop." })
+
+/**
+ * A project's project.json exactly as it is (HR3 on s46), for what a change affects: never a kept file's stand-in (its
+ * .bak while it is being saved, or the default for one damaged), which would read agents that are there as gone. None
+ * there: no agents. One that can't be read or doesn't parse throws, and the change is refused.
+ */
+async function projectFileAsIs(file: string): Promise<Partial<ProjectConfig>> {
+  let text: string
+  try {
+    text = await readFile(file, 'utf8')
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return {}
+    throw e
+  }
+  return JSON.parse(text) as Partial<ProjectConfig>
+}
 
 /** Whether a launch change turns a connection's Combwork tools off. */
 const turnsToolsOff = (was: ConnectionLaunch | undefined, next: ConnectionLaunch | undefined): boolean => was?.tools !== false && next?.tools === false

@@ -73,10 +73,14 @@ vi.mock('../src/main/workspace', () => ({
 }))
 vi.mock('../src/main/fsutil', async (orig) => ({
   ...(await orig<typeof import('../src/main/fsutil')>()),
-  withFileLock: async (_f: string, fn: () => unknown) => fn(),
-  readKeptJson: async (file: string) => {
-    if (state.failProject && file.includes(state.failProject)) throw new Error('project.json unreadable')
-    return { agents: file.includes('demo') ? state.agents : [] }
+  withFileLock: async (_f: string, fn: () => unknown) => fn()
+}))
+// Each project's project.json as it is (HR3 on s46: read as the file is, never a kept file's stand-in).
+vi.mock('original-fs/promises', async (orig) => ({
+  ...(await orig<typeof import('original-fs/promises')>()),
+  readFile: async (file: string) => {
+    if (state.failProject && file.includes(state.failProject)) throw Object.assign(new Error('project.json unreadable'), { code: 'EBUSY' })
+    return JSON.stringify({ agents: file.includes('demo') ? state.agents : [] })
   }
 }))
 
