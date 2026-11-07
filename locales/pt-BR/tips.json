@@ -350,6 +350,8 @@
   "tips.noCodeCards.title": "Cartões sem código",
   "tips.off.message": "Ajuda → Dicas… continua com elas, e Configurações → Geral as reativa.",
   "tips.off.title": "Dicas desativadas",
+  "tips.oneAgent.text": "O ▾ ao lado de Retomar (n) e Parar (n) no cabeçalho do projeto lista esses agentes: escolha um para agir só nele. Agentes ▾ e o menu de clique direito de um projeto oferecem o mesmo para Começar de novo, Arquivar e começar de novo, Retomar todos os agentes e Parar todos os agentes.",
+  "tips.oneAgent.title": "Retomar ou parar só um agente",
   "tips.outageResume.text": "Ative Configurações → Avançado → Retomar os agentes após uma queda de conexão, e um agente parado por um reinício do roteador ou uma oscilação do Wi-Fi aguarda a conexão e depois executa de novo, sozinho, o que foi interrompido. Nunca para um limite de uso ou um login expirado.",
   "tips.outageResume.title": "Os agentes podem continuar após uma queda de conexão",
   "tips.overview.text": "A Visão geral do espaço de trabalho mostra o que cada projeto usou, o que está rodando agora e o quadro, por dia. {key}",

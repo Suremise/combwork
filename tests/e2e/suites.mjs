@@ -222,6 +222,7 @@ export const SUITES = [
   { name: 'notifytarget' },
   { name: 'numbers' },
   { name: 'onclose' },
+  { name: 'oneagent' },
   { name: 'onelinedesc' },
   { name: 'onopen' },
   { name: 'openguard' },

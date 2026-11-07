@@ -5,6 +5,7 @@ import { cliReadyOf, connectionCli, firstReadyConnection } from '@shared/connect
 import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume, stalledOnSignIn } from '@shared/resumeAll'
 import { batchCounts } from '@shared/startAll'
+import { ONE_AGENT_TEXT, oneAgentEntries, oneAgentMore } from '../oneAgentMenu'
 import { hooksMissingNote } from '@shared/runtime'
 import { MAIN_TABS, MORE_TABS, tabCommand } from '@shared/projectTabs'
 import { allStopped, mostUrgent, projectAgentStates, projectStateShort, projectStateSummary } from '@shared/agentState'
@@ -394,6 +395,9 @@ export function ProjectView({ visible }: { visible: boolean }) {
   const runningActions = useStore((s) => s.running)
   const menu = useContextMenu()
   const agentsMenu = useContextMenu()
+  // Resume (n)'s and Stop (n)'s ▾ (HI-2665): the menu of those agents, under the ▾ that opened it.
+  const oneMenu = useContextMenu()
+  const oneMenuFor = useRef<'resume' | 'stop' | null>(null)
   const project = workspace?.projects.find((p) => p.path === selected) ?? null
   const tab = (project && tabs[project.path]) || 'session'
   // The Session tab's view (#975): Panes shows the terminals; Tiles hides them (they keep running) for a tile each (#976).
@@ -500,15 +504,26 @@ export function ProjectView({ visible }: { visible: boolean }) {
   const yes = many ? 'yes' : 'no'
   // Agents ▾ (#974): every agent at once, after one confirmation (#216), Remove All last after a line (#291); with one
   // agent, no count. In ⋯ when cramped.
-  const batch: MenuEntry[] = [
-    ...(counts.startNew ? [{ label: tr(M.startNew, { many: yes, count: counts.startNew }), icon: 'add', action: 'start' as const, disabled: startingAll || anyStarting, onClick: () => void actions.startNewAll(project.path) }] : []),
+  // Each with its one-agent menu after it (HI-2665), opened in the menu's place (`sub`).
+  type Sub = (items: MenuEntry[], keyboard: boolean) => void
+  const batchWith = (sub: Sub): MenuEntry[] => [
+    ...(counts.startNew ? [{ label: tr(M.startNew, { many: yes, count: counts.startNew }), icon: 'add', action: 'start' as const, disabled: startingAll || anyStarting, onClick: () => void actions.startNewAll(project.path) }, ...oneAgentMore('startNew', project, sub, { disabled: startingAll || anyStarting })] : []),
     // Start Fresh (Idle Agents) (#1437): only the idle running ones, after one question saying who and why not.
     ...(running.length ? [{ label: tr(M.startFreshIdle), icon: 'refresh', action: 'start' as const, disabled: !!runningActions[`startFreshIdle:${project.path}`] || anyStarting, onClick: () => void actions.startFreshIdle(project.path) }] : []),
-    ...(counts.archive ? [{ label: tr(M.archiveNew, { many: yes, count: counts.archive }), icon: 'archive', action: 'archive-start' as const, disabled: archivingAll || anyStarting, onClick: () => void actions.startNewAll(project.path, true) }] : []),
+    ...(counts.archive ? [{ label: tr(M.archiveNew, { many: yes, count: counts.archive }), icon: 'archive', action: 'archive-start' as const, disabled: archivingAll || anyStarting, onClick: () => void actions.startNewAll(project.path, true) }, ...oneAgentMore('archive', project, sub, { disabled: archivingAll || anyStarting })] : []),
     ...(project.agents.length
       ? [...(counts.startNew || counts.archive ? [{ separator: true as const }] : []), { label: tr(M.removeAllMenu, { many: yes, count: project.agents.length }), icon: 'trash', action: 'remove' as const, disabled: removingAll, onClick: () => void actions.removeAllAgents(project.path) }]
       : [])
   ]
+  // Whether Agents ▾ has anything (its one-agent entries open nothing here).
+  const batch = batchWith(() => undefined)
+  // The one-agent menus of Resume (n) and Stop (n) (HI-2665): offered with two agents or more to choose from.
+  const resumeOnes = oneAgentEntries('resume', project)
+  const stopOnes = oneAgentEntries('stop', project)
+  const openOnes = (kind: 'resume' | 'stop', el: Element, keyboard: boolean): void => {
+    oneMenuFor.current = kind
+    oneMenu.openAt(...menuBelow(el), kind === 'resume' ? resumeOnes : stopOnes, keyboard)
+  }
   const dangerous = settings
     ? project.agents.flatMap((a) => {
         const l = agentLaunchSettings(agentProviderOf(a), a, settings)
@@ -555,27 +570,55 @@ export function ProjectView({ visible }: { visible: boolean }) {
             </Tooltip>
           )}
           {resumable.length > 0 && !runInMenu && (
-            <Tooltip content={resumeTip}>
-              <button className="btn act-resume quiet" disabled={resuming || anyStarting} aria-busy={resuming || undefined} aria-label={resumeTip} onClick={() => void actions.resumeAllAgents(project.path)}>
-                <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} />
-                {!tight && ` ${resuming ? tr(M.resuming) : resumeLabel}`}
-                {tight && resumable.length > 1 && <span className="btn-count">{resumable.length}</span>}
-              </button>
-            </Tooltip>
+            <span className={cx('split-btn', resumeOnes.length > 0 && 'has-arrow')}>
+              <Tooltip content={resumeTip}>
+                <button className="btn act-resume quiet" disabled={resuming || anyStarting} aria-busy={resuming || undefined} aria-label={resumeTip} onClick={() => void actions.resumeAllAgents(project.path)}>
+                  <Icon name={resuming ? 'loading' : 'debug-continue'} spin={resuming} />
+                  {!tight && ` ${resuming ? tr(M.resuming) : resumeLabel}`}
+                  {tight && resumable.length > 1 && <span className="btn-count">{resumable.length}</span>}
+                </button>
+              </Tooltip>
+              {/* One of them (HI-2665): its own button, opening the menu of those agents. */}
+              {resumeOnes.length > 0 && (
+                <Tooltip content={tr(ONE_AGENT_TEXT.chooseResume)}>
+                  <button className="btn quiet split-arrow act-resume-one" disabled={resuming || anyStarting} aria-label={tr(ONE_AGENT_TEXT.chooseResume)} aria-haspopup="menu" aria-expanded={oneMenu.shown && oneMenuFor.current === 'resume'} onClick={(e) => openOnes('resume', e.currentTarget, e.detail === 0)}>
+                    <Icon name="chevron-down" />
+                  </button>
+                </Tooltip>
+              )}
+            </span>
           )}
           {running.length > 0 && !runInMenu && (
-            <Tooltip content={stopTip}>
-              <button className="btn act-stop quiet" aria-label={stopTip} onClick={() => void actions.stopAllAgents(project.path)}>
-                <Icon name="stop-circle" />
-                {!tight && ` ${stopLabel}`}
-                {tight && running.length > 1 && <span className="btn-count">{running.length}</span>}
-              </button>
-            </Tooltip>
+            <span className={cx('split-btn', stopOnes.length > 0 && 'has-arrow')}>
+              <Tooltip content={stopTip}>
+                <button className="btn act-stop quiet" aria-label={stopTip} onClick={() => void actions.stopAllAgents(project.path)}>
+                  <Icon name="stop-circle" />
+                  {!tight && ` ${stopLabel}`}
+                  {tight && running.length > 1 && <span className="btn-count">{running.length}</span>}
+                </button>
+              </Tooltip>
+              {stopOnes.length > 0 && (
+                <Tooltip content={tr(ONE_AGENT_TEXT.chooseStop)}>
+                  <button className="btn quiet split-arrow act-stop-one" aria-label={tr(ONE_AGENT_TEXT.chooseStop)} aria-haspopup="menu" aria-expanded={oneMenu.shown && oneMenuFor.current === 'stop'} onClick={(e) => openOnes('stop', e.currentTarget, e.detail === 0)}>
+                    <Icon name="chevron-down" />
+                  </button>
+                </Tooltip>
+              )}
+            </span>
           )}
           {/* Every agent at once, after one confirmation (#216): in Agents ▾ (#974), in ⋯ when even its icon doesn't fit. */}
           {batch.length > 0 && !cramped && (
             <Tooltip content={tr(M.agentsMenuTip)}>
-              <button className="btn agents-menu" aria-haspopup="menu" aria-expanded={agentsMenu.shown} aria-label={tight ? tr(M.agentsMenu) : undefined} onClick={(e) => agentsMenu.openAt(...menuBelow(e.currentTarget), batch, e.detail === 0)}>
+              <button
+                className="btn agents-menu"
+                aria-haspopup="menu"
+                aria-expanded={agentsMenu.shown}
+                aria-label={tight ? tr(M.agentsMenu) : undefined}
+                onClick={(e) => {
+                  const [x, y] = menuBelow(e.currentTarget)
+                  agentsMenu.openAt(x, y, batchWith((items, k) => agentsMenu.openAt(x, y, items, k)), e.detail === 0)
+                }}
+              >
                 <Icon name="organization" />
                 {!tight && ` ${tr(M.agentsMenu)}`}
                 <Icon name="chevron-down" />
@@ -586,21 +629,24 @@ export function ProjectView({ visible }: { visible: boolean }) {
             icon="ellipsis"
             title={tr(M.more)}
             action="project-menu"
-            onClick={(e) =>
+            onClick={(e) => {
+              // A one-agent menu opens in this one's place (HI-2665).
+              const [x, y] = [e.clientX, e.clientY]
+              const sub = (items: MenuEntry[], k: boolean): void => menu.openAt(x, y, items, k)
               menu.open(e, [
                 // At the narrowest (#1051), what folded away, in the header's order: Active, Resume, Stop, Agents ▾'s.
                 ...(activeInMenu ? [{ label: tr(M.active), icon: project.active ? 'check' : undefined, detail: tr(project.active ? M.workingOn : M.notWorkingOn), onClick: () => void actions.setProjectActive(project.path, !project.active) }] : []),
-                ...(runInMenu && resumable.length ? [{ label: resumeTip, icon: 'debug-continue', action: 'resume' as const, disabled: resuming || anyStarting, onClick: () => void actions.resumeAllAgents(project.path) }] : []),
-                ...(runInMenu && running.length ? [{ label: stopTip, icon: 'stop-circle', action: 'stop' as const, onClick: () => void actions.stopAllAgents(project.path) }] : []),
+                ...(runInMenu && resumable.length ? [{ label: resumeTip, icon: 'debug-continue', action: 'resume' as const, disabled: resuming || anyStarting, onClick: () => void actions.resumeAllAgents(project.path) }, ...oneAgentMore('resume', project, sub, { disabled: resuming || anyStarting })] : []),
+                ...(runInMenu && running.length ? [{ label: stopTip, icon: 'stop-circle', action: 'stop' as const, onClick: () => void actions.stopAllAgents(project.path) }, ...oneAgentMore('stop', project, sub)] : []),
                 ...(activeInMenu ? [{ separator: true as const }] : []),
-                ...(cramped && batch.length ? [...batch, { separator: true as const }] : []),
+                ...(cramped && batch.length ? [...batchWith(sub), { separator: true as const }] : []),
                 // Each with its command's keys, where it has some (HI-2551). Project Settings is under More ▾ on the tabs' row.
                 { label: tr(M.explorer), icon: 'folder-opened', keybinding: shownKeys('project.openExplorer'), onClick: () => void call('project:openInExplorer', project.path) },
                 { label: tr(M.terminal), icon: 'terminal', keybinding: shownKeys('project.openTerminal'), onClick: () => void call('project:openTerminal', project.path) },
                 { separator: true },
                 { label: tr(M.removeProject), icon: 'trash', keybinding: shownKeys('project.remove'), onClick: () => set({ removeProjectFor: project.path }) }
               ])
-            }
+            }}
           />
         </div>
       </div>
@@ -675,6 +721,7 @@ export function ProjectView({ visible }: { visible: boolean }) {
       </div>
       {menu.element}
       {agentsMenu.element}
+      {oneMenu.element}
     </div>
   )
 }

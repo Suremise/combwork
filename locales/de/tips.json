@@ -350,6 +350,8 @@
   "tips.noCodeCards.title": "Karten ohne Code",
   "tips.off.message": "Unter Hilfe → Tipps… findest du sie weiterhin, und Einstellungen → Allgemein schaltet sie wieder ein.",
   "tips.off.title": "Tipps sind aus",
+  "tips.oneAgent.text": "Das ▾ neben Fortsetzen (n) und Stoppen (n) in der Projektkopfzeile listet diese Agenten auf: Wähle einen aus, um nur ihn zu bedienen. Agenten ▾ und das Rechtsklickmenü eines Projekts bieten dasselbe für Neu beginnen, Archivieren und neu beginnen, Alle Agenten fortsetzen und Alle Agenten stoppen.",
+  "tips.oneAgent.title": "Nur einen Agenten fortsetzen oder stoppen",
   "tips.outageResume.text": "Schalte Einstellungen → Erweitert → Agenten nach einem Verbindungsabbruch fortsetzen ein, und ein Agent, den ein Router-Neustart oder ein kurzer WLAN-Aussetzer gestoppt hat, wartet auf die Verbindung und wiederholt dann von selbst, was abgebrochen wurde. Nie bei einem Nutzungslimit oder einer abgelaufenen Anmeldung.",
   "tips.outageResume.title": "Agenten können nach einem Verbindungsabbruch weitermachen",
   "tips.overview.text": "Die Arbeitsbereichsübersicht zeigt, was jedes Projekt verbraucht hat, was gerade läuft und das Board, nach Tag. {key}",

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- **Resume or stop just one agent from the project header** (HI-2665). Resume (n) and Stop (n) get a narrow ▾ on their right listing those agents, each with its state and role: choose one to resume or stop it alone, as its pane would (asking first when its pane does). An agent whose sign-in was refused says Resume tells it to carry on, and one that can't resume where it ran just now is greyed out with why. Agents ▾ gets Start New for One Agent ▸ and Archive and Start New for One Agent ▸, the narrow header's ⋯ gets Resume One Agent ▸ and Stop One Agent ▸, and so does a project's right-click menu in the sidebar, under Resume All and Stop All.
+
 ### Fixed
 
 - **A short commit id names a revision** (HI-2671). `cw_submit`'s `revision` and a check's took only a commit's full 40-character id, so the short id agents see in `git log --oneline` was refused as "isn't what's checked out here", although it was. Now a commit's id or a start of it of 7 or more characters works, in any case. A revision that isn't the checkout is refused naming the commit that is checked out, and a short id git finds more than one commit for asks for more of it.

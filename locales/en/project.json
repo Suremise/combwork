@@ -1179,6 +1179,38 @@
     "defaultMessage": "Select a project from the sidebar.",
     "description": "Shown when the workspace has projects but none is selected."
   },
+  "project.oneAgent.archiveOne": {
+    "defaultMessage": "Archive and Start New for One Agent",
+    "description": "Menu item in the project header's Agents ▾, after Archive and Start New (n): opens a menu of the agents with a session to archive, to archive one's and start it new. Title case."
+  },
+  "project.oneAgent.carryOn": {
+    "defaultMessage": "Its sign-in was refused: Resume tells it to carry on",
+    "description": "In Resume (n)'s menu of agents, beside a running agent whose turn stopped when its coding agent's sign-in was refused: choosing it tells it to carry on (it may need signing in first). It doesn't say the sign-in worked."
+  },
+  "project.oneAgent.chooseResume": {
+    "defaultMessage": "Choose an agent to resume",
+    "description": "Tooltip and accessible name of the narrow ▾ beside the project header's Resume (n) button: opens a menu of those agents, to resume one."
+  },
+  "project.oneAgent.chooseStop": {
+    "defaultMessage": "Choose an agent to stop",
+    "description": "Tooltip and accessible name of the narrow ▾ beside the project header's Stop (n) button: opens a menu of the running agents, to stop one."
+  },
+  "project.oneAgent.resumeOne": {
+    "defaultMessage": "Resume One Agent",
+    "description": "Menu item (the project header's ⋯ when narrow, a project's right-click menu): opens a menu of the agents Resume All would resume, to resume one. Title case, as the menu's other items."
+  },
+  "project.oneAgent.startNewOne": {
+    "defaultMessage": "Start New for One Agent",
+    "description": "Menu item in the project header's Agents ▾, after Start New (n): opens a menu of the project's agents, to start a new session for one. Title case."
+  },
+  "project.oneAgent.stopOne": {
+    "defaultMessage": "Stop One Agent",
+    "description": "Menu item (the project header's ⋯ when narrow, a project's right-click menu): opens a menu of the running agents, to stop one. Title case."
+  },
+  "project.oneAgent.stopped": {
+    "defaultMessage": "Stopped",
+    "description": "In the menu of agents an all-agents action would act on (Resume (n)'s ▾…), beside a stopped agent's name: it isn't running."
+  },
   "project.overview.byAgent": {
     "defaultMessage": "By agent",
     "description": "Heading in the Overview: a table of what each agent used."

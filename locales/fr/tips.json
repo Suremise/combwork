@@ -350,6 +350,8 @@
   "tips.noCodeCards.title": "Cartes sans code",
   "tips.off.message": "Elles restent dans Aide → Astuces…, et Paramètres → Général les réactive.",
   "tips.off.title": "Astuces désactivées",
+  "tips.oneAgent.text": "Le ▾ à côté de Reprendre (n) et Arrêter (n) dans l’en-tête du projet liste ces agents : choisis-en un pour n’agir que sur lui. Agents ▾ et le menu contextuel d’un projet offrent la même chose pour Nouvelle session, Archiver et repartir, Reprendre tous les agents et Arrêter tous les agents.",
+  "tips.oneAgent.title": "Reprendre ou arrêter un seul agent",
   "tips.outageResume.text": "Active Paramètres → Avancé → Reprendre les agents après une coupure de connexion, et un agent arrêté par un redémarrage du routeur ou une micro-coupure du Wi-Fi attend la connexion, puis relance de lui-même ce qui a été interrompu. Jamais pour une limite d’utilisation ou une connexion au compte expirée.",
   "tips.outageResume.title": "Les agents peuvent continuer après une coupure de connexion",
   "tips.overview.text": "La Vue d’ensemble de l’espace de travail montre ce que chaque projet a utilisé, ce qui tourne en ce moment et le tableau, jour par jour. {key}",

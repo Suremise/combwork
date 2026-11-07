@@ -1411,6 +1411,14 @@
     "defaultMessage": "Tips are off",
     "description": "A notice after \"Don't show tips\" on the tip card."
   },
+  "tips.oneAgent.text": {
+    "defaultMessage": "The ▾ beside Resume (n) and Stop (n) in the project header lists those agents: choose one to act on it alone. Agents ▾ and a project's right-click menu have the same for Start New, Archive and Start New, Resume All and Stop All.",
+    "description": "A tip (HI-2665). ▾ is the narrow arrow button beside the project header's Resume (n) and Stop (n): keep it. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.oneAgent.title": {
+    "defaultMessage": "Resume or stop just one agent",
+    "description": "A tip's title (HI-2665)."
+  },
   "tips.outageResume.text": {
     "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

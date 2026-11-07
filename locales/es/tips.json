@@ -350,6 +350,8 @@
   "tips.noCodeCards.title": "Tarjetas sin código",
   "tips.off.message": "Ayuda → Consejos… los sigue teniendo, y Configuración → General los vuelve a activar.",
   "tips.off.title": "Consejos desactivados",
+  "tips.oneAgent.text": "El ▾ junto a Reanudar (n) y Detener (n) en la cabecera del proyecto lista esos agentes: elige uno para actuar solo sobre él. Agentes ▾ y el menú contextual de un proyecto ofrecen lo mismo para Empezar de nuevo, Archivar y empezar de nuevo, Reanudar todos los agentes y Detener todos los agentes.",
+  "tips.oneAgent.title": "Reanudar o detener un solo agente",
   "tips.outageResume.text": "Activa Configuración → Avanzado → Reanudar los agentes tras una caída de la conexión, y un agente detenido por un reinicio del router o un corte breve del Wi-Fi espera a la conexión y luego vuelve a ejecutar por sí solo lo que se cortó. Nunca por un límite de uso o un inicio de sesión caducado.",
   "tips.outageResume.title": "Los agentes pueden continuar tras una caída de la conexión",
   "tips.overview.text": "El Resumen del espacio de trabajo muestra lo que usó cada proyecto, lo que se ejecuta ahora y el tablero, por día. {key}",
