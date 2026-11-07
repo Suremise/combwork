@@ -45,14 +45,14 @@ async function namesIn(file: string, key: string | null): Promise<string[]> {
   if (!text.trim()) return []
   let j: unknown
   try {
-    j = JSON.parse(text.replace(/^﻿/, ''))
+    j = JSON.parse(text.replace(/^\uFEFF/, ''))
   } catch (e) {
     throw new UnreadableConfig(file, e instanceof Error ? e.message : String(e))
   }
-  if (j === null || typeof j !== 'object' || Array.isArray(j)) throw new UnreadableConfig(file, 'not a JSON object')
+  if (j === null || typeof j !== 'object' || Array.isArray(j)) throw new UnreadableConfig(file, 'not a JSON object') // i18n-ignore: a parse diagnostic, shown inside the window's own message like an error's own words
   const obj = key ? (j as Record<string, unknown>)[key] : j
   if (obj === undefined) return []
-  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) throw new UnreadableConfig(file, `${key} is not an object`)
+  if (obj === null || typeof obj !== 'object' || Array.isArray(obj)) throw new UnreadableConfig(file, `${key} is not an object`) // i18n-ignore: a parse diagnostic, shown inside the window's own message like an error's own words
   return Object.keys(obj)
 }
 

@@ -1,5 +1,5 @@
 import type { ModeOption, ModelGroup, ProviderDescriptor } from './providers'
-import { EFFORT_TEXT } from './claude'
+import { COPILOT_DESCRIPTOR } from './copilot'
 import { withCliOwn } from './cliOwnMode'
 import { msg } from './i18n/msg'
 import { agentMsg, say } from './agentText'
@@ -136,14 +136,8 @@ export const ANTIGRAVITY_DESCRIPTOR: ProviderDescriptor = {
   defaultPermissionMode: 'accept-edits',
   // Combwork's own tools are pre-approved for its sessions (the Assistant's: trustedCombworkTools); the rest asks.
   assistantMode: 'ask',
-  // 1.5.0's --effort: low|medium|high|xhigh|max.
-  effortLevels: [
-    { value: 'low', label: 'Low', text: EFFORT_TEXT.low }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'medium', label: 'Medium', text: EFFORT_TEXT.medium }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'high', label: 'High', text: EFFORT_TEXT.high }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'xhigh', label: 'Extra high', text: EFFORT_TEXT.xhigh }, // i18n-ignore: agent-facing English (text is the window's)
-    { value: 'max', label: 'Max', text: EFFORT_TEXT.max } // i18n-ignore: agent-facing English (text is the window's)
-  ],
+  // 1.5.0's --effort: low|medium|high|xhigh|max (the levels Combwork already names for the other CLIs).
+  effortLevels: COPILOT_DESCRIPTOR.effortLevels.filter((e) => ['low', 'medium', 'high', 'xhigh', 'max'].includes(e.value)),
   modelGroups: ANTIGRAVITY_MODEL_GROUPS,
   modelPlaceholder: 'Model ID, e.g. gemini-3.8-flash-medium', // i18n-ignore: English (text.modelPlaceholder is the window's)
   capabilities: {

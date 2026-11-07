@@ -14,6 +14,26 @@
     "note": "Provider Setup's button: updates the coding agent's CLI in a terminal.",
     "audience": "both"
   },
+  "providers.antigravity.checkFailed": {
+    "text": "Couldn't check {provider}'s sign-in: {text}. Choose Check again; if you haven't signed in yet, run agy in a terminal.",
+    "note": "Provider Setup, under Antigravity CLI, when listing its models failed for a reason other than a known sign-in error (a network or service error, a timeout). {provider} is its name, {text} the CLI's own words (not translated). agy is a command: keep it; Check again is a button.",
+    "audience": "both"
+  },
+  "providers.antigravity.noInert": {
+    "text": "{provider} didn't start: the project has its own MCP servers ({servers}), and Combwork can't keep them out of the agent without its own MCP server. Turn Combwork's tools on for this agent, or remove the servers from the project's .agents folder.",
+    "note": "Why an Antigravity CLI agent didn't start (its pane): the project defines MCP servers the agent wasn't given, and Combwork's own MCP server (needed to stand in for them) isn't available. {provider} is the CLI's name, {servers} their names. .agents is a folder's name: keep it.",
+    "audience": "both"
+  },
+  "providers.antigravity.notOwnConversation": {
+    "text": "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.",
+    "note": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id.",
+    "audience": "both"
+  },
+  "providers.antigravity.unreadableConfig": {
+    "text": "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.",
+    "note": "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words.",
+    "audience": "both"
+  },
   "providers.cmdTooLong": {
     "text": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
     "note": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are.",

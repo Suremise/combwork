@@ -29,6 +29,8 @@ interface CombworkMessageValues {
   'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
   'tips.alwaysOnTop.title': undefined
+  'tips.antigravity.text': undefined
+  'tips.antigravity.title': undefined
   'tips.antivirus.text': undefined
   'tips.antivirus.title': undefined
   'tips.archiveNew.text': undefined

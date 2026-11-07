@@ -27,6 +27,8 @@
   "tips.allKeysToCli.title": "Give every key to the agent's CLI",
   "tips.alwaysOnTop.text": "The pin in the title bar (or Ctrl+Alt+O) keeps the window above your other apps, so a test run or an emulator can work underneath. Each window has its own, remembered for its workspace.",
   "tips.alwaysOnTop.title": "Keep a Combwork window on top",
+  "tips.antigravity.text": "Agents can use Google’s Antigravity CLI. Provider Setup installs it; sign in once in a terminal and every workspace on this PC shares the sign-in. Each agent runs in a private profile of its own.",
+  "tips.antigravity.title": "Run agents on the Antigravity CLI",
   "tips.antivirus.text": "On Windows, Microsoft Defender scans every file builds, tests and git touch. Settings → Workspace → Antivirus scanning shows whether it scans your workspace and can exclude its folders, with your consent.",
   "tips.antivirus.title": "Antivirus and your workspace",
   "tips.archiveNew.text": "The cheapest way to carry on after a long session: archive it and start clean, so nothing old is re-cached. Write a handover first so the new one knows where to pick up.",

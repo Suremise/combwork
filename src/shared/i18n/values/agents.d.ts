@@ -13,6 +13,20 @@ interface CombworkMessageValues {
   'agents.add.useSuggestion': { name: string | number }
   'agents.add.where': undefined
   'agents.add.whereNote': undefined
+  'agents.antigravity.acceptEdits': undefined
+  'agents.antigravity.acceptEditsDescription': undefined
+  'agents.antigravity.ask': undefined
+  'agents.antigravity.askDescription': undefined
+  'agents.antigravity.auto': undefined
+  'agents.antigravity.autoDescription': undefined
+  'agents.antigravity.bypass': undefined
+  'agents.antigravity.bypassDescription': undefined
+  'agents.antigravity.extensionNote': undefined
+  'agents.antigravity.installNote': undefined
+  'agents.antigravity.modelPlaceholder': undefined
+  'agents.antigravity.plan': undefined
+  'agents.antigravity.planDescription': undefined
+  'agents.antigravity.signInHelp': undefined
   'agents.batch.busy': { status: string }
   'agents.batch.outcome': { kind: string }
   'agents.batch.stoppedThen': { note: string; kind: string }

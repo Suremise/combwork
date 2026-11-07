@@ -8,6 +8,31 @@
   "providers.action.update": {
     "placeholders": {}
   },
+  "providers.antigravity.checkFailed": {
+    "placeholders": {
+      "provider": "plain",
+      "text": "plain"
+    }
+  },
+  "providers.antigravity.noInert": {
+    "placeholders": {
+      "provider": "plain",
+      "servers": "plain"
+    }
+  },
+  "providers.antigravity.notOwnConversation": {
+    "placeholders": {
+      "provider": "plain",
+      "conversation": "plain"
+    }
+  },
+  "providers.antigravity.unreadableConfig": {
+    "placeholders": {
+      "provider": "plain",
+      "file": "plain",
+      "why": "plain"
+    }
+  },
   "providers.cmdTooLong": {
     "placeholders": {
       "file": "plain",

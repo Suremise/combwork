@@ -8,6 +8,36 @@
   "settings.accounts.list.title": {
     "placeholders": {}
   },
+  "settings.advanced.antigravity.models.line.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.models.line.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.signIn.needed.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.signIn.needed.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "placeholders": {}
   },

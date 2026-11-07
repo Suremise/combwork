@@ -5795,7 +5795,7 @@ class SessionManager {
     const conv = l.adapter.statusLineSession?.(body) ?? null
     // Only the current launch's own status line (a stale one of an earlier run of this agent never names this one's).
     if (conv && runId !== l.state.runId) log.warn(`${userText(this.label(l.state))}: a status line of run ${runId ?? 'none'} named conversation ${conv}: not this launch's (${l.state.runId}), ignored`)
-    else if (conv && !l.state.sessionId) void this.adoptSessionId(l, conv, 'status line')
+    else if (conv && !l.state.sessionId) void this.adoptSessionId(l, conv, 'status line') // i18n-ignore: a log line's words
     else if (conv && conv !== l.state.sessionId) log.warn(`${userText(this.label(l.state))}: its status line named conversation ${conv}, not ${l.state.sessionId}: kept ${l.state.sessionId}`)
   }
 

@@ -1,4 +1,34 @@
 {
+  "mode.antigravity.acceptEdits.desc": {
+    "placeholders": {}
+  },
+  "mode.antigravity.acceptEdits.label": {
+    "placeholders": {}
+  },
+  "mode.antigravity.ask.desc": {
+    "placeholders": {}
+  },
+  "mode.antigravity.ask.label": {
+    "placeholders": {}
+  },
+  "mode.antigravity.auto.desc": {
+    "placeholders": {}
+  },
+  "mode.antigravity.auto.label": {
+    "placeholders": {}
+  },
+  "mode.antigravity.bypass.desc": {
+    "placeholders": {}
+  },
+  "mode.antigravity.bypass.label": {
+    "placeholders": {}
+  },
+  "mode.antigravity.plan.desc": {
+    "placeholders": {}
+  },
+  "mode.antigravity.plan.label": {
+    "placeholders": {}
+  },
   "mode.claude.acceptEdits.desc": {
     "placeholders": {}
   },

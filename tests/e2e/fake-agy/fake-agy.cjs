@@ -97,20 +97,20 @@ function servers() {
   return { own, project }
 }
 const running = []
-function start(name, def, fallback) {
+function start(def, fallback) {
   if (!def?.command) return
-  const p = spawn(def.command, def.args || [], { env: { ...process.env, ...(def.env || {}) }, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
+  const p = spawn(def.command, def.args || [], { env: { ...process.env, ...def.env }, stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true })
   running.push(p)
   p.on('error', () => undefined)
   p.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } }) + '\n')
   // One that ends: the project's of that name instead (the real CLI's fallback, HI-2544's sentinel runs).
   p.on('exit', () => {
-    if (fallback) start(name, fallback, null)
+    if (fallback) start(fallback, null)
   })
 }
 const { own, project } = servers()
-for (const [name, def] of Object.entries(own)) start(name, def, project[name])
-for (const [name, def] of Object.entries(project)) if (!own[name]) start(name, def, null)
+for (const [name, def] of Object.entries(own)) start(def, project[name])
+for (const [name, def] of Object.entries(project)) if (!own[name]) start(def, null)
 log({ kind: 'mcp', conversation: conv, own: Object.keys(own), project: Object.keys(project) })
 
 process.stdout.write(`Antigravity CLI 1.5.0 (fake) · conversation ${conv}\n> `)

@@ -11,6 +11,30 @@
     "defaultMessage": "Update",
     "description": "Provider Setup's button: updates the coding agent's CLI in a terminal."
   },
+  "providers.antigravity.checkFailed": {
+    "defaultMessage": "Couldn't check {provider}'s sign-in: {text}. Choose Check again; if you haven't signed in yet, run agy in a terminal.",
+    "description": "Provider Setup, under Antigravity CLI, when listing its models failed for a reason other than a known sign-in error (a network or service error, a timeout). {provider} is its name, {text} the CLI's own words (not translated). agy is a command: keep it; Check again is a button."
+  },
+  "providers.antigravity.noInert": {
+    "defaultMessage": "{provider} didn't start: the project has its own MCP servers ({servers}), and Combwork can't keep them out of the agent without its own MCP server. Turn Combwork's tools on for this agent, or remove the servers from the project's .agents folder.",
+    "description": "Why an Antigravity CLI agent didn't start (its pane): the project defines MCP servers the agent wasn't given, and Combwork's own MCP server (needed to stand in for them) isn't available. {provider} is the CLI's name, {servers} their names. .agents is a folder's name: keep it."
+  },
+  "providers.antigravity.notOwnConversation": {
+    "defaultMessage": "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.",
+    "description": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id."
+  },
+  "providers.antigravity.signIn.runs": {
+    "defaultMessage": "**Sign in** runs `agy` in a terminal: sign in there. Combwork never signs in for you.",
+    "description": "Provider Setup, under Antigravity CLI's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
+  },
+  "providers.antigravity.signIn.shared": {
+    "defaultMessage": "The sign-in is this PC’s: every workspace’s Antigravity agents use it, and signing out signs them all out.",
+    "description": "Provider Setup, under Antigravity CLI's Sign in: its sign-in is shared by every workspace on this PC."
+  },
+  "providers.antigravity.unreadableConfig": {
+    "defaultMessage": "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.",
+    "description": "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words."
+  },
   "providers.autoCompact.autoIn": {
     "defaultMessage": "{key}: \"auto\" in {scope}",
     "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file sets it to auto. {key} is the setting as written (autoCompactWindow), {scope} the file. \"auto\" is its value: keep it."
