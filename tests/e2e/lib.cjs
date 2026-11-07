@@ -657,9 +657,50 @@ function transcriptText(file) {
 // the run context's environment (combworkEnv): without one, Playwright would pass on the suite's own.
 const apps = new Set()
 const launchElectron = _electron.launch.bind(_electron)
+
+// The user's own Antigravity CLI home (HI-2698): agy reads its home from USERPROFILE and has no test-home variable, so a
+// test Combwork that ran agy in the user's profile would write there (its logs, conversation index, onboarding state). It is
+// listed (names, sizes and times; never read) when a suite starts its first Combwork, and again as the suite ends: any
+// change fails the suite. (agy run by hand, or by another lane's Combwork without HI-2698, meanwhile would too: say so.)
+const AGY_USER_HOME = path.join(require('os').homedir(), '.gemini', 'antigravity-cli')
+let agyHomeBefore = null
+function agyHomeListing() {
+  const out = []
+  const walk = (dir) => {
+    let names = []
+    try {
+      names = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const d of names) {
+      const p = path.join(dir, d.name)
+      if (d.isDirectory()) walk(p)
+      else {
+        try {
+          const s = fs.statSync(p)
+          out.push(`${path.relative(AGY_USER_HOME, p)}|${s.size}|${s.mtimeMs}`)
+        } catch {}
+      }
+    }
+  }
+  walk(AGY_USER_HOME)
+  return out.sort()
+}
+process.on('exit', () => {
+  if (!agyHomeBefore) return
+  const after = agyHomeListing()
+  const before = new Set(agyHomeBefore)
+  const now = new Set(after)
+  const changed = [...after.filter((x) => !before.has(x)).map((x) => `+ ${x.split('|')[0]}`), ...agyHomeBefore.filter((x) => !now.has(x)).map((x) => `- ${x.split('|')[0]}`)]
+  if (!changed.length) return
+  console.log(`FAIL the user's own Antigravity home is untouched (HI-2698: agy ran in the user's profile; or agy was run by hand, or by a Combwork without HI-2698, meanwhile): ${changed.slice(0, 8).join(', ')}`)
+  process.exitCode = 1
+})
 _electron.launch = async (...args) => {
   const env = args[0]?.env
   if (!isCombworkEnv(env)) throw new Error("Start a test Combwork with lib.combworkEnv({ CW_USER_DATA, … }) as its env (tests/e2e/runContext.cjs), never the suite's own environment")
+  if (!agyHomeBefore) agyHomeBefore = agyHomeListing()
   // The CLI homes, test folders (#382, #452): Combwork looks for the CLIs when it starts, and their sign-in checks read these.
   for (const k of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'COPILOT_HOME', 'GH_CONFIG_DIR']) {
     if (!env[k]) throw new Error(`A test Combwork needs ${k} (combworkEnv gives an empty one of the suite's; a suite may give a test home, never none): without it the CLI reads the user's own home (#382)`)
@@ -1483,6 +1524,19 @@ function gitEnv(vars = {}) {
  * layout and pane placement), which the test profile's ui-state.json keeps by the project's id (else its folder), not
  * project.json. A view saved shows here a moment after Combwork has it (ui-state.json is written about 300 ms later).
  */
+/**
+ * Sets an agent's connection's launch settings (HI-2670: Combwork's guidance and its overrides of the CLI are each
+ * connection's now, no longer Settings → Advanced's), as its Launch Settings dialog saves them: `settings` whole, e.g.
+ * `{ overrides: { terminalTitle: false } }`, `{ guidance: false }`, or `{}` for everything on. Returns the connection's id.
+ */
+async function setAgentLaunch(inv, projectPath, agentId, settings) {
+  const cfg = JSON.parse(fs.readFileSync(path.join(projectPath, '.combwork', 'project.json'), 'utf8'))
+  const id = (cfg.agents ?? []).find((a) => a.id === agentId)?.connection
+  if (!id) throw new Error(`agent ${agentId} has no connection in ${projectPath}`)
+  await inv('connection:setLaunch', id, settings, null)
+  return id
+}
+
 function projectConfig(userData, projectPath) {
   const cfg = JSON.parse(fs.readFileSync(path.join(projectPath, '.combwork', 'project.json'), 'utf8'))
   let views = {}
@@ -1806,4 +1860,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

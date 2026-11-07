@@ -16,7 +16,7 @@ import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
 import { compareVersions, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
 import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
-import { antigravityEnv, brainDir, inProfile, profilesRoot } from './home'
+import { antigravityEnv, brainDir, checkEnv, inProfile, inUserProfile, profilesRoot } from './home'
 import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
 import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
 
@@ -213,7 +213,8 @@ export class AntigravityAdapter implements ProviderAdapter {
   /** The account's models, read in the launch's environment (no model turn). */
   async listModels(executable: string, env: Record<string, string>): Promise<CatalogRead | null> {
     if (!isProviderEnabled(config.settings, this.id)) return null
-    const r = await checkModels(executable, antigravityEnv(env), this.signInPattern())
+    // In the check profile (HI-2698): never the user's own, nor an agent's.
+    const r = await checkModels(executable, checkEnv(env), this.signInPattern())
     return r.kind === 'ok' ? { models: r.models } : null
   }
 
@@ -258,6 +259,8 @@ export class AntigravityAdapter implements ProviderAdapter {
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec {
     const s = toSpawnable(executable, antigravityArgs(ctx, join(ctx.privateDir, 'agy-settings.json')))
     const env = inProfile(antigravityEnv(ctx.env, launchOverrides(ctx.overrides, ANTIGRAVITY, 'noAutoUpdate'), launchOverrides(ctx.overrides, ANTIGRAVITY, 'stripAccountVars')), profileFolder(ctx.agentId, ctx.workspacePath))
+    // An agent runs in its own profile, never the user's (HI-2698): a bug if it would, so refused.
+    if (inUserProfile(env)) throw new Error("an Antigravity agent would run in the user's own profile: refused") // i18n-ignore: an internal check, never shown
     return { file: s.file, args: s.args, env }
   }
 

@@ -460,6 +460,9 @@ async function runScenario(sc, providerKey, opts = {}) {
   // board can't be read, and takes `<id>-2`… instead).
   const base = path.join(opts.workRoot ?? path.join(lib.WORK, '..', 'scenarios'), id)
   const root = opts.evidence ? freshFolder(base, opts.evidence) : base
+  // Noted on the CLI test home's lease before anything starts here (HI-2606, HR2 on round 1): the CLIs its Combwork
+  // starts name this folder, so a reset waits for them even after this runner has crashed.
+  opts.uses?.folder(root)
   const userData = path.join(root, 'profile')
   const ws = path.join(root, 'ws')
   const alpha = path.join(ws, 'alpha')
@@ -558,6 +561,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
+    opts.uses?.spawned(app.process())
   } catch (e) {
     await standIn?.close().catch(() => undefined)
     throw e
