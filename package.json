@@ -1,7 +1,7 @@
 {
   "name": "combwork",
   "productName": "Combwork",
-  "version": "1.1.0",
+  "version": "1.2.0-beta.1",
   "description": "Combwork — a streamlined, agent-first desktop workspace for AI-assisted coding.",
   "main": "./out/main/index.js",
   "author": "Darren Marshall",
