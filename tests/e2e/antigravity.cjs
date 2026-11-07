@@ -111,7 +111,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await agTab.waitFor({ timeout: HUNG_MS })
   await agTab.click()
   // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
-  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 2, HUNG_MS)))
+  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) >= 2, HUNG_MS)))
   await shots('advanced')
   await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
@@ -150,6 +150,26 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check("its profile's MCP servers are Combwork's own", 'combwork' in profileMcp && !('sentinel' in profileMcp), JSON.stringify(Object.keys(profileMcp)))
   // A turn: written to its conversation.
   check('its turns are kept in its own conversation, in its profile', await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity'))
+
+  // --- Hooks and the status line (HI-2545): Combwork's hooks in the profile; a turn only for a prompt the user typed.
+  const profileHooks = JSON.parse(fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'config', 'hooks.json'), 'utf8')).combwork ?? {}
+  check("Combwork's hooks are in the agent's profile, each naming its event for Combwork", ['SessionStart', 'PreInvocation', 'PostInvocation', 'Stop'].every((k) => JSON.stringify(profileHooks[k] ?? '').includes(`event=${k}`)), JSON.stringify(Object.keys(profileHooks)))
+  check('…the status line under agy\'s own (stack_with_default)', JSON.parse(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8')).statusLine?.stack_with_default === true)
+  const hooksOf = (event) => entries('hook').filter((h) => h.event === event && h.payload.conversationId === first.conv)
+  const turnIs = async (id, status = 'finished') => !!(await until(async () => { const s = await live(gem.id); return s?.turn?.id === id && s.turn.state === 'over' && s.status === status }, HUNG_MS))
+  check('a prompt is a turn, named by its step in the transcript (agy sends no prompt hook)', await turnIs(`${first.conv}:u0`), JSON.stringify((await live(gem.id))?.turn))
+  // The same words again: a new step, so a new turn.
+  check('the same prompt typed again is a turn of its own', (await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity')) && (await turnIs(`${first.conv}:u2`)), JSON.stringify((await live(gem.id))?.turn))
+  // A hook's continuation (another hook's `continue`): agy calls the model again, a new execution with no prompt of its own.
+  const calls = hooksOf('PreInvocation').length
+  check('a continuation is no new turn', (await say(gem.id, e.USERPROFILE, first.conv, 'carry on please')) && !!(await until(async () => hooksOf('PreInvocation').length - calls === 2 && hooksOf('Stop').at(-1)?.payload.executionNum === 1, HUNG_MS)) && (await turnIs(`${first.conv}:u4`)), JSON.stringify({ turn: (await live(gem.id))?.turn, calls: hooksOf('PreInvocation').length - calls }))
+  // A permission prompt only the status line tells of: "waiting for you" until the person answers it in the CLI.
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), 'this needs approval')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
+  check('a permission prompt shows the agent waiting for you', !!(await until(async () => (await live(gem.id))?.status === 'waiting', HUNG_MS)), (await live(gem.id))?.status)
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), 'y')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
+  check('…and, once answered, the turn ends as one turn', await turnIs(`${first.conv}:u8`), JSON.stringify(await live(gem.id)))
   check('it stops', !!(await stop()))
 
   // --- A second new conversation, then each resumed by its own id.

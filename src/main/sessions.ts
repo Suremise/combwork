@@ -410,6 +410,8 @@ interface LiveSession {
    * the transcript is dropped if one came after the read began, as that hook says something newer (#475).
    */
   hooksSeen?: number
+  /** Whether its status line last said a permission prompt is showing (statusLineAsk, HI-2545): an ask applies once. */
+  statusAsk?: boolean
   /** Whether its hooks are reaching Combwork (#1336, hooksHealth.ts): what the check reads of the launch. */
   hooksWatch?: HooksWatch
   /**
@@ -5850,6 +5852,20 @@ class SessionManager {
     if (conv && runId !== l.state.runId) log.warn(`${userText(this.label(l.state))}: a status line of run ${runId ?? 'none'} named conversation ${conv}: not this launch's (${l.state.runId}), ignored`)
     else if (conv && !l.state.sessionId) void this.adoptSessionId(l, conv, 'status line') // i18n-ignore: a log line's words
     else if (conv && conv !== l.state.sessionId) log.warn(`${userText(this.label(l.state))}: its status line named conversation ${conv}, not ${l.state.sessionId}: kept ${l.state.sessionId}`)
+    // A permission prompt only the status line tells of (HI-2545): as a hook's ask, once as it begins, in hook order; the
+    // current launch's own only. Its end needs nothing: the tool's start or end, or the turn's Stop, answers it.
+    if (l.adapter.statusLineAsk && runId === l.state.runId) {
+      const ask = l.adapter.statusLineAsk(body)
+      const began = !!ask && !l.statusAsk
+      l.statusAsk = !!ask
+      if (began && ask) {
+        const id = liveId(l.state.projectPath, l.state.agentId)
+        void this.inHookOrder(l.state.runId, () => {
+          if (this.live.get(id) !== l) return
+          this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
+        })
+      }
+    }
   }
 
   /** A launch's conversation id, learned after it started (`from`: what said it, for the log): recorded as its session. */
@@ -6583,6 +6599,11 @@ class SessionManager {
     if (!found) return
     const [id, l] = found
     const st = l.state
+    // What the hook needs from the CLI's own records first (HI-2545: the Antigravity CLI's user prompt), in this order.
+    if (l.adapter.prepareHook) {
+      await l.adapter.prepareHook(body, { agentId: st.agentId, workspacePath: workspaceOf(st.projectPath).path!, sessionId: st.sessionId }).catch((e) => log.warn(`${userText(this.label(st))}: could not read what its hook needs`, e))
+      if (this.live.get(id) !== l) return
+    }
     const hook = l.adapter.normalizeHook(body)
     const label = this.label(st)
     flightRecorder.arrived(st, () => label, 'hook', body)

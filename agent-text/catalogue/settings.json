@@ -14,6 +14,56 @@
     "note": "A setting's title (Settings → Accounts & Connections, HI-2107): the list of accounts, each with its connections.",
     "audience": "both"
   },
+  "settings.advanced.antigravity.hooks.knownEvents.desc": {
+    "text": "The hook events Combwork knows agy sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
+    "note": "What the advanced setting \"Hooks: known events\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownEvents.title": {
+    "text": "Hooks: known events",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownFields.desc": {
+    "text": "The top-level fields Combwork knows agy sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that an agy update changed something. Add a field here once you know it is harmless.",
+    "note": "What the advanced setting \"Hooks: known fields\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownFields.title": {
+    "text": "Hooks: known fields",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.desc": {
+    "text": "How long agy waits for Combwork's answer before a tool runs (an edit waits for a file lock). Too short, an edit of a locked file can go ahead before Combwork refuses it.",
+    "note": "What the advanced setting \"Hooks: before a tool, timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.title": {
+    "text": "Hooks: before a tool, timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.desc": {
+    "text": "How long agy waits for Combwork to take one of its hooks. Too short, Combwork misses what agy reports and an agent may look stuck.",
+    "note": "What the advanced setting \"Hooks: timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.title": {
+    "text": "Hooks: timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.desc": {
+    "text": "Whether Combwork's hooks run before and after each of agy's tool calls: they show an agent working on a tool, and refuse an edit of a file another agent has locked. Turned off, Combwork follows agy's tools only by its status line, and file locks don't apply to Antigravity agents.",
+    "note": "What the advanced setting \"Hooks: before and after each tool\" does (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.title": {
+    "text": "Hooks: before and after each tool",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.antigravity.models.line.desc": {
     "text": "One line of agy models' list: the model's id (its first group), then its display name (its second). Combwork passes the id and shows the name.",
     "note": "What the advanced setting \"A model in agy models\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it.",
@@ -62,6 +112,26 @@
   "settings.advanced.antigravity.signIn.needed.title": {
     "text": "Not signed in (agy models)",
     "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of the CLI's message when it isn't signed in. agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.desc": {
+    "text": "The top-level fields Combwork knows agy sends in its status line. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a status line with a field outside this list saves a capture of the agent's recent events. Add a field here once you know it is harmless.",
+    "note": "What the advanced setting \"Status line: known fields\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.title": {
+    "text": "Status line: known fields",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.userRequest.desc": {
+    "text": "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.",
+    "note": "What the advanced setting \"Transcript: your prompt\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.userRequest.title": {
+    "text": "Transcript: your prompt",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {

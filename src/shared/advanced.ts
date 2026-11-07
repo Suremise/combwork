@@ -3188,6 +3188,92 @@ const SOURCES: readonly AdvancedSource[] = [
     max: 80,
     applies: 'now',
     samples: [{ from: `${FIX}/console/copilot.json`, version: '1.0.105', fields: ['cwd', 'hook_event_name', 'session_id', 'timestamp', 'tool_input', 'tool_name'] }, { from: `${FIX}/console/copilot.json`, version: '1.0.105', fields: ['cwd', 'hook_event_name', 'session_id', 'stop_hook_active', 'stop_reason', 'timestamp', 'transcript_path'] }]
+  },
+  // The Antigravity CLI's hooks (HI-2545): Combwork's own in each agent's profile, forwarded with the launch's token.
+  {
+    id: 'antigravity.hooks.timeoutSeconds',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.hooks.timeoutSeconds.title', defaultMessage: 'Hooks: timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.hooks.timeoutSeconds.desc', defaultMessage: 'How long agy waits for Combwork to take one of its hooks. Too short, Combwork misses what agy reports and an agent may look stuck.', description: 'What the advanced setting "Hooks: timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'number',
+    default: 5,
+    min: 1,
+    max: 60,
+    unit: 's',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/hooks-antigravity-1.5.0.json`, version: '1.5.0', text: '"invocationNum": 0', shows: 'agy running a hook command with its payload' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.hooks.preToolUseTimeoutSeconds',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.title', defaultMessage: 'Hooks: before a tool, timeout', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.desc', defaultMessage: "How long agy waits for Combwork's answer before a tool runs (an edit waits for a file lock). Too short, an edit of a locked file can go ahead before Combwork refuses it.", description: 'What the advanced setting "Hooks: before a tool, timeout" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'number',
+    default: 10,
+    min: 1,
+    max: 60,
+    unit: 's',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/hooks-antigravity-1.5.0.json`, version: '1.5.0', text: '"name": "call_mcp_tool"', shows: "agy's hook before a tool call" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.hooks.toolHooks',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.hooks.toolHooks.title', defaultMessage: 'Hooks: before and after each tool', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.hooks.toolHooks.desc', defaultMessage: "Whether Combwork's hooks run before and after each of agy's tool calls: they show an agent working on a tool, and refuse an edit of a file another agent has locked. Turned off, Combwork follows agy's tools only by its status line, and file locks don't apply to Antigravity agents.", description: 'What the advanced setting "Hooks: before and after each tool" does (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'boolean',
+    default: false,
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/hooks-antigravity-1.5.0.json`, version: '1.5.0', text: '"name": "call_mcp_tool"', shows: "agy's hook before a tool call" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.transcript.userRequest',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.transcript.userRequest.title', defaultMessage: 'Transcript: your prompt', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.transcript.userRequest.desc', defaultMessage: "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.", description: 'What the advanced setting "Transcript: your prompt" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.' }),
+    kind: 'pattern',
+    default: '<USER_REQUEST>\\n?([\\s\\S]*?)\\n?</USER_REQUEST>', // i18n-ignore: a CLI's text (#367)
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/transcript-antigravity-1.5.0.jsonl`, version: '1.5.0', text: '<USER_REQUEST>\nReply with exactly the word BRAVO and nothing else. Do not use tools.\n</USER_REQUEST>', shows: 'A prompt as agy recorded it' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.hooks.knownEvents',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.hooks.knownEvents.title', defaultMessage: 'Hooks: known events', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.hooks.knownEvents.desc', defaultMessage: "The hook events Combwork knows agy sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.", description: 'What the advanced setting "Hooks: known events" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it. agy is a command: keep it.' }),
+    kind: 'list',
+    default: ['SessionStart', 'PreToolUse', 'PostToolUse', 'PreInvocation', 'PostInvocation', 'Stop'], // i18n-ignore: a CLI's hook event names (#698)
+    max: 20,
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/hooks-antigravity-1.5.0.json`, version: '1.5.0', text: '"PostInvocation"' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.hooks.knownFields',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.hooks.knownFields.title', defaultMessage: 'Hooks: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.hooks.knownFields.desc', defaultMessage: "The top-level fields Combwork knows agy sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that an agy update changed something. Add a field here once you know it is harmless.", description: 'What the advanced setting "Hooks: known fields" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it. agy is a command: keep it.' }),
+    kind: 'list',
+    // The fields agy's hooks.md and its recorded hooks name, and the two Combwork adds (the event, from the URL; the prompt).
+    default: ['hook_event_name', 'combworkUserStep', 'conversationId', 'workspacePaths', 'transcriptPath', 'artifactDirectoryPath', 'modelName', 'lastUserInput', 'toolCall', 'stepIdx', 'error', 'invocationNum', 'initialNumSteps', 'executionNum', 'terminationReason', 'fullyIdle'], // i18n-ignore: a CLI's hook field names (#698)
+    max: 80,
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/hooks-antigravity-1.5.0.json`, version: '1.5.0', fields: ['artifactDirectoryPath', 'conversationId', 'initialNumSteps', 'invocationNum', 'lastUserInput', 'modelName', 'transcriptPath', 'workspacePaths'] },
+      { from: `${FIX}/advanced/hooks-antigravity-1.5.0.json`, version: '1.5.0', fields: ['artifactDirectoryPath', 'conversationId', 'error', 'executionNum', 'fullyIdle', 'lastUserInput', 'modelName', 'terminationReason', 'transcriptPath', 'workspacePaths'] },
+      { from: `${FIX}/advanced/hooks-antigravity-1.5.0.json`, version: '1.5.0', fields: ['artifactDirectoryPath', 'conversationId', 'error', 'lastUserInput', 'modelName', 'stepIdx', 'toolCall', 'transcriptPath', 'workspacePaths'] }
+    ]
+  },
+  {
+    id: 'antigravity.statusLine.knownFields',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.statusLine.knownFields.title', defaultMessage: 'Status line: known fields', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.statusLine.knownFields.desc', defaultMessage: "The top-level fields Combwork knows agy sends in its status line. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a status line with a field outside this list saves a capture of the agent's recent events. Add a field here once you know it is harmless.", description: 'What the advanced setting "Status line: known fields" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting\'s title: use it as Settings shows it. agy is a command: keep it.' }),
+    kind: 'list',
+    // The status-line docs' fields (all of them), which the recorded ones are among.
+    default: ['cwd', 'session_id', 'conversation_id', 'conversation_title', 'transcript_path', 'model', 'workspace', 'version', 'context_window', 'exceeds_200k_tokens', 'agent', 'product', 'quota', 'agent_state', 'vcs', 'cycle_mode', 'sandbox', 'subagents', 'artifact_count', 'plan_tier', 'email', 'pending_input_count', 'tool_confirmation_pending', 'task_count', 'terminal_width', 'vim', 'cost'], // i18n-ignore: a CLI's status-line field names (#698)
+    max: 80,
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/statusline-antigravity-1.5.0.jsonl`, version: '1.5.0', fields: ['agent_state', 'context_window', 'conversation_id', 'cwd', 'email', 'exceeds_200k_tokens', 'model', 'plan_tier', 'product', 'quota', 'sandbox', 'session_id', 'terminal_width', 'transcript_path', 'vcs', 'version', 'workspace'] }]
   }
 ]
 

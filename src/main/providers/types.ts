@@ -559,6 +559,19 @@ export interface ProviderAdapter {
    */
   statusLineSession?(body: Record<string, any>): string | null
   /**
+   * A permission prompt the CLI's status line says it shows, for a CLI that sends no hook for one (HI-2545: the Antigravity
+   * CLI's `tool_confirmation_pending`): the blocking ask, or null when none is pending. Combwork applies it as a hook's ask,
+   * in order with the launch's hooks, once when it begins (Combwork never answers it: the person does, in the CLI).
+   */
+  statusLineAsk?(body: Record<string, any>): Ask | null
+  /**
+   * Reads, before the hook is normalized, what it needs from the CLI's own records (HI-2545: the Antigravity CLI's user
+   * prompt, from its transcript, as its hooks carry none), adding it to `body`. Called in the launch's hook order, off
+   * main's thread for its reads and bounded in time; `launch` says whose hook it is (only that agent's own records are
+   * read). Absent: the hook is normalized as it came.
+   */
+  prepareHook?(body: Record<string, any>, launch: { agentId: string; workspacePath: string; sessionId: string | null }): Promise<void>
+  /**
    * How a launch's CLI will compact by itself, read from its command, environment and the CLI's settings files (never
    * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Combwork doesn't know.
    */

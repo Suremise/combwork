@@ -15,10 +15,11 @@ import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
 import { compareVersions, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
-import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import type { Ask, CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { antigravityEnv, brainDir, inProfile, profilesRoot } from './home'
 import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
 import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
+import { addUserStep, agyHooks, agyLockReply, agyNoticeReply, agyStartContextReply, agyStatusAsk, agyStatusDetails, agyStopContinues, isConversationId, normalizeAgyHook, UserSteps } from './hooks'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
@@ -42,8 +43,7 @@ export function profileFolder(agentId: string, workspacePath: string): string {
   return join(profilesRoot(), key)
 }
 
-/** A conversation id agy made: a UUID, safe as a folder name (never a path). */
-export const isConversationId = (id: unknown): id is string => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+export { isConversationId }
 
 /** An MCP server as agy's mcp_config.json has it (1.5.0: stdio command/args/env, or Streamable HTTP url/headers). */
 export function agyServer(def: McpServerDef): Record<string, unknown> | null {
@@ -107,12 +107,14 @@ export function sameServer(a: unknown, b: unknown): boolean {
 
 /**
  * agy's settings for one launch only (--settings, never saved): the status line that tells Combwork the conversation's id
- * (Combwork's own command, posting to the hook server with the launch's token), and Combwork's own tools allowed.
+ * and the session's state (Combwork's own command, posting to the hook server with the launch's token; shown under agy's
+ * own line, as Combwork's reply is empty), and Combwork's own tools allowed (agy's rule form, its permissions docs:
+ * `mcp(<server>/<tool>)`, or `mcp(<server>/*)` for all of a server's).
  */
 export function launchSettings(ctx: Pick<LaunchContext, 'hookUrl' | 'hookAuthFile' | 'mcpServers' | 'trustedCombworkTools'>, preApprove: boolean): Record<string, unknown> {
-  const allow = !Object.hasOwn(ctx.mcpServers, TOOLS_SERVER) || !preApprove ? [] : ctx.trustedCombworkTools ? ctx.trustedCombworkTools.map((t) => `mcp(${TOOLS_SERVER}:${t})`) : [`mcp(${TOOLS_SERVER})`]
+  const allow = !Object.hasOwn(ctx.mcpServers, TOOLS_SERVER) || !preApprove ? [] : ctx.trustedCombworkTools ? ctx.trustedCombworkTools.map((t) => `mcp(${TOOLS_SERVER}/${t})`) : [`mcp(${TOOLS_SERVER}/*)`]
   return {
-    statusLine: { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile) },
+    statusLine: { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile), stack_with_default: true },
     ...(allow.length ? { permissions: { allow } } : {})
   }
 }
@@ -251,6 +253,8 @@ export class AntigravityAdapter implements ProviderAdapter {
     await mkdir(join(profile, '.gemini', 'config'), { recursive: true })
     // The servers' env (and the launch's token) stays in the profile, under Combwork's own data: never the project.
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'mcp_config.json'), made.mcp)
+    // Combwork's hooks, for this launch (its URL and token file): agy reads the profile's hooks.json, never the project's.
+    await writeJsonAtomic(join(profile, '.gemini', 'config', 'hooks.json'), agyHooks(ctx.hookUrl, ctx.hookAuthFile, advanced.get<boolean>('antigravity.hooks.toolHooks')))
     await writeJsonAtomic(join(ctx.privateDir, 'agy-settings.json'), launchSettings(ctx, launchOverrides(ctx.overrides, ANTIGRAVITY, 'preApproveCombworkTools')))
     return delivered
   }
@@ -261,10 +265,14 @@ export class AntigravityAdapter implements ProviderAdapter {
     return { file: s.file, args: s.args, env }
   }
 
-  /** Its status line (Combwork's own command): the conversation's id, from the launch it belongs to. Its model and cost come with HI-2546. */
+  /** Its status line (Combwork's own command): the model and context window (agyStatusDetails). Usage and cost are HI-2546's. */
   statusLine(body: Record<string, any>): LiveDetails {
-    void body
-    return {}
+    return agyStatusDetails(body)
+  }
+
+  /** A permission prompt only its status line tells of (agy sends no hook for one). */
+  statusLineAsk(body: Record<string, any>): Ask | null {
+    return agyStatusAsk(body)
   }
 
   /** The conversation the status line names (statusLineConversation), for Combwork to learn a new launch's id. */
@@ -272,22 +280,33 @@ export class AntigravityAdapter implements ProviderAdapter {
     return statusLineConversation(body)
   }
 
-  // ---- Hooks (HI-2545): none yet.
-  normalizeHook(): NormalizedHook {
-    return { event: { kind: 'ignore' }, sessionId: null, transcriptPath: null, mode: null, editedPaths: [], ids: { turn: null, call: null, sub: null, continued: false } }
+  // ---- Hooks (HI-2545, hooks.ts).
+  /** The user's prompts taken, per conversation (a step seen again is no new prompt). */
+  private readonly userSteps = new UserSteps()
+
+  /** The user's prompt that began an execution, read from this agent's own transcript (agy's hooks carry none). */
+  prepareHook(body: Record<string, any>, launch: { agentId: string; workspacePath: string; sessionId: string | null }): Promise<void> {
+    return addUserStep(body, profileFolder(launch.agentId, launch.workspacePath), launch.sessionId, this.userSteps)
+  }
+
+  normalizeHook(body: Record<string, any>): NormalizedHook {
+    return normalizeAgyHook(body)
   }
 
   lockReply(d: LockDecision): Record<string, unknown> {
-    void d
-    return {}
+    return agyLockReply(d)
   }
 
-  noticeReply(): Record<string, unknown> | null {
-    return null
+  noticeReply(event: string, text: string): Record<string, unknown> | null {
+    return agyNoticeReply(event, text)
   }
 
-  stopContinues(): boolean {
-    return false
+  startContextReply(text: string): Record<string, unknown> {
+    return agyStartContextReply(text)
+  }
+
+  stopContinues(reply: Record<string, any>): boolean {
+    return agyStopContinues(reply)
   }
 
   canSwitchLive(target: PermissionMode, current: PermissionMode | undefined, launched: PermissionMode | null | undefined): boolean {

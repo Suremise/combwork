@@ -116,6 +116,16 @@ interface CombworkMessageValues {
   'settings.accounts.usageMove.weekly': undefined
   'settings.accounts.usageNone': undefined
   'settings.accounts.usedBy': { assistant: string; n: number }
+  'settings.advanced.antigravity.hooks.knownEvents.desc': undefined
+  'settings.advanced.antigravity.hooks.knownEvents.title': undefined
+  'settings.advanced.antigravity.hooks.knownFields.desc': undefined
+  'settings.advanced.antigravity.hooks.knownFields.title': undefined
+  'settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.desc': undefined
+  'settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.title': undefined
+  'settings.advanced.antigravity.hooks.timeoutSeconds.desc': undefined
+  'settings.advanced.antigravity.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.antigravity.hooks.toolHooks.desc': undefined
+  'settings.advanced.antigravity.hooks.toolHooks.title': undefined
   'settings.advanced.antigravity.models.line.desc': undefined
   'settings.advanced.antigravity.models.line.title': undefined
   'settings.advanced.antigravity.override.noAutoUpdate.desc': undefined
@@ -126,6 +136,10 @@ interface CombworkMessageValues {
   'settings.advanced.antigravity.override.stripAccountVars.title': undefined
   'settings.advanced.antigravity.signIn.needed.desc': undefined
   'settings.advanced.antigravity.signIn.needed.title': undefined
+  'settings.advanced.antigravity.statusLine.knownFields.desc': undefined
+  'settings.advanced.antigravity.statusLine.knownFields.title': undefined
+  'settings.advanced.antigravity.transcript.userRequest.desc': undefined
+  'settings.advanced.antigravity.transcript.userRequest.title': undefined
   'settings.advanced.claude-code.accounts.dropEnv.desc': undefined
   'settings.advanced.claude-code.accounts.dropEnv.title': undefined
   'settings.advanced.claude-code.accounts.emailField.desc': undefined

@@ -5,6 +5,12 @@
 // - a session reads its home from USERPROFILE (never HOME); it reopens `--conversation <id>`, else makes a new id;
 //   it keeps the conversation in <USERPROFILE>\.gemini\antigravity-cli\brain\<id>\.system_generated\logs\transcript.jsonl;
 // - it runs the `--settings` file's statusLine command (through cmd /c, as agy does) with the session's state on stdin;
+// - it runs the hooks of <USERPROFILE>\.gemini\config\hooks.json (through cmd /c, the payload on stdin, the reply read
+//   from stdout), as agy 1.5.0's hooks.md has them: SessionStart with the first prompt; per execution PreInvocation
+//   (invocationNum 0), the tool hooks around a tool call, PostInvocation and Stop. A Stop answered `continue` (or a
+//   prompt with "carry on", as another hook's continuation) runs another execution with no new user step; a PreToolUse
+//   answered `deny` is refused. A prompt with "needs approval" pauses on a permission prompt the status line alone tells
+//   of (tool_confirmation_pending), until the next line typed; "edit <file>" writes the file through the tool hooks;
 // - it starts the MCP servers of <USERPROFILE>\.gemini\config\mcp_config.json and of each workspace folder's
 //   .agents\mcp_config.json (the cwd and each --add-dir), a server named in the profile replacing the project's of that
 //   name, and keeps them running (one that ends falls back to the project's, as the real CLI's does);
@@ -61,8 +67,14 @@ if (resumed && !fs.existsSync(brain)) {
 }
 fs.mkdirSync(logs, { recursive: true })
 const transcript = path.join(logs, 'transcript.jsonl')
-let step = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter(Boolean).length : 0
-const write = (o) => fs.appendFileSync(transcript, JSON.stringify({ step_index: step++, created_at: new Date().toISOString(), ...o }) + '\n')
+// agy keeps both: transcript_full.jsonl (its hooks' transcriptPath) and transcript.jsonl.
+const full = path.join(logs, 'transcript_full.jsonl')
+let step = fs.existsSync(full) ? fs.readFileSync(full, 'utf8').split('\n').filter(Boolean).length : 0
+const write = (o) => {
+  const line = JSON.stringify({ step_index: step++, created_at: new Date().toISOString(), ...o }) + '\n'
+  fs.appendFileSync(full, line)
+  fs.appendFileSync(transcript, line)
+}
 log({ kind: 'session', args: argv, cwd: process.cwd(), conversation: conv, resumed: !!resumed, env: pick() })
 
 // The status line, per --settings (never saved), through cmd /c as agy runs it.
@@ -74,12 +86,47 @@ try {
   process.stderr.write(`Error: --settings: ${e.message}\n`)
   process.exit(1)
 }
-function statusLine(state) {
+function statusLine(state, extra = {}) {
   const cmd = settings.statusLine?.command
   if (!cmd) return
-  const input = JSON.stringify({ conversation_id: conv, session_id: conv, transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: { id: flag('--model') || null }, product: 'antigravity' })
+  const name = flag('--model') || null
+  const input = JSON.stringify({ conversation_id: conv, session_id: conv, transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: name ? { id: name, display_name: name } : null, context_window: { context_window_size: 1048576 }, product: 'antigravity', ...extra })
   // Through cmd, the command line as given (Node quotes it for cmd's /s /c, so its own quotes reach it unchanged).
   spawnSync(cmd, [], { shell: true, input, timeout: 5000, windowsHide: true })
+  log({ kind: 'status', state, ...extra })
+}
+
+// Hooks: the profile's hooks.json (read each time, as a launch rewrites it), each handler run through cmd with the payload.
+const TOOL_EVENTS = new Set(['PreToolUse', 'PostToolUse'])
+function handlers(event) {
+  let defs = {}
+  try {
+    defs = JSON.parse(fs.readFileSync(path.join(home, '.gemini', 'config', 'hooks.json'), 'utf8'))
+  } catch {
+    return []
+  }
+  const out = []
+  for (const named of Object.values(defs)) {
+    if (!named || named.enabled === false) continue
+    for (const entry of named[event] ?? []) {
+      if (TOOL_EVENTS.has(event)) for (const h of entry.hooks ?? []) out.push(h)
+      else out.push(entry)
+    }
+  }
+  return out
+}
+let lastUserInput = ''
+function fire(event, extra = {}) {
+  const payload = { conversationId: conv, workspacePaths: [process.cwd().replace(/\\/g, '/')], transcriptPath: full.replace(/\\/g, '/'), artifactDirectoryPath: brain.replace(/\\/g, '/'), modelName: flag('--model') || 'auto', lastUserInput, ...extra }
+  const reply = {}
+  for (const h of handlers(event)) {
+    const r = spawnSync(h.command, [], { shell: true, input: JSON.stringify(payload), timeout: (h.timeout || 30) * 1000, windowsHide: true, encoding: 'utf8' })
+    try {
+      Object.assign(reply, JSON.parse(r.stdout || '{}'))
+    } catch {}
+  }
+  log({ kind: 'hook', event, payload: { ...payload, lastUserInput: undefined }, reply })
+  return reply
 }
 
 // MCP servers: the profile's, then each workspace folder's .agents (a name in the profile wins).
@@ -115,15 +162,58 @@ log({ kind: 'mcp', conversation: conv, own: Object.keys(own), project: Object.ke
 
 process.stdout.write(`Antigravity CLI 1.5.0 (fake) · conversation ${conv}\n> `)
 statusLine('idle')
-const turn = (text) => {
-  write({ source: 'USER_EXPLICIT', type: 'USER_INPUT', status: 'DONE', content: text })
-  statusLine('working')
-  write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', content: `Done: ${text}` })
+// Lines typed, taken in order: a turn's own (an approval) or the next prompt.
+let waiting = null
+const nextLine = () => new Promise((r) => (waiting = r))
+let started = false
+async function turn(text) {
+  lastUserInput = text
+  if (!started) {
+    started = true
+    fire('SessionStart')
+  }
+  // As agy records a prompt: the user's words wrapped with its own metadata.
+  write({ source: 'USER_EXPLICIT', type: 'USER_INPUT', status: 'DONE', content: `<USER_REQUEST>\n${text}\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nThe current local time is: ${new Date().toISOString()}.\n</ADDITIONAL_METADATA>` })
+  let carried = /carry on/i.test(text)
+  for (let execution = 0; execution < 4; execution++) {
+    statusLine('working')
+    fire('PreInvocation', { invocationNum: 0, initialNumSteps: step })
+    if (execution === 0 && /needs approval/i.test(text)) {
+      // A permission prompt: no hook, only the status line, until the person answers (the next line typed).
+      statusLine('tool_use', { tool_confirmation_pending: true })
+      await nextLine()
+      statusLine('working')
+    }
+    const edit = execution === 0 ? /edit (\S+)/i.exec(text) : null
+    if (edit) {
+      const target = path.resolve(process.cwd(), edit[1])
+      const call = { name: 'write_to_file', args: { TargetFile: target, CodeContent: 'edited' } }
+      const at = step
+      const pre = fire('PreToolUse', { stepIdx: at, toolCall: call })
+      if (pre.decision === 'deny') write({ source: 'SYSTEM', type: 'GENERIC', status: 'DONE', content: `Denied: ${pre.reason ?? ''}` })
+      else {
+        fs.writeFileSync(target, 'edited')
+        write({ source: 'MODEL', type: 'CODE_ACTION', status: 'DONE', content: target })
+      }
+      fire('PostToolUse', { stepIdx: at, toolCall: call, error: pre.decision === 'deny' ? 'denied' : '' })
+    }
+    write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', content: `Done: ${text}` })
+    fire('PostInvocation', { invocationNum: 0, initialNumSteps: step })
+    const stop = fire('Stop', { executionNum: execution, terminationReason: 'NO_TOOL_CALL', fullyIdle: true, error: '' })
+    // Carried on (Combwork's reply, or another hook's continuation): a system message, then another execution.
+    if (stop.decision === 'continue' || carried) {
+      carried = false
+      write({ source: 'SYSTEM', type: 'SYSTEM_MESSAGE', status: 'DONE', content: stop.reason || 'continue' })
+      continue
+    }
+    break
+  }
   process.stdout.write(`Done: ${text}\n> `)
   statusLine('idle')
 }
+let queue = Promise.resolve()
 const first = flag('-i')
-if (first) turn(first)
+if (first) queue = queue.then(() => turn(first))
 let line = ''
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (d) => {
@@ -133,7 +223,12 @@ process.stdin.on('data', (d) => {
       line = ''
       if (!t) continue
       if (t === '/exit') return quit()
-      turn(t)
+      // A turn waiting for its answer takes this line; else it is the next prompt.
+      if (waiting) {
+        const w = waiting
+        waiting = null
+        w(t)
+      } else queue = queue.then(() => turn(t))
     } else line += c
   }
 })

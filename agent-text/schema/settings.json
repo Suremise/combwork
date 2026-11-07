@@ -8,6 +8,36 @@
   "settings.accounts.list.title": {
     "placeholders": {}
   },
+  "settings.advanced.antigravity.hooks.knownEvents.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.knownEvents.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.knownFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.knownFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.title": {
+    "placeholders": {}
+  },
   "settings.advanced.antigravity.models.line.desc": {
     "placeholders": {}
   },
@@ -36,6 +66,18 @@
     "placeholders": {}
   },
   "settings.advanced.antigravity.signIn.needed.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.userRequest.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.userRequest.title": {
     "placeholders": {}
   },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
