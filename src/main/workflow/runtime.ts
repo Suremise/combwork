@@ -129,6 +129,18 @@ function focusedForReview(f: FocusedChoice | undefined): Record<string, string |
   }
 }
 
+/**
+ * HI-2660: the card's checks recorded at a revision, for its reviewer to reuse: the latest counted run of each name there
+ * (a failure after a pass says failed), not the merge queue's own runs (`entry`), and not a configured check whose command
+ * has changed since (an old command doesn't prove the check as it is now). Names are data, never a command. Only these:
+ * what else the change needs is the reviewer's to judge. Empty: none, and the reply leaves the field out.
+ */
+export function checksAtRevision(checks: readonly FactData['CheckRan'][], revision: string, commands: Readonly<Record<string, string>>): { name: string; result: FactData['CheckRan']['result'] }[] {
+  const latest = new Map<string, FactData['CheckRan']>()
+  for (const c of checks) if (c.counted && !c.entry && c.revision === revision) latest.set(c.name, c)
+  return [...latest.values()].filter((c) => commands[c.name] === undefined || commands[c.name] === c.command).map((c) => ({ name: c.name, result: c.result }))
+}
+
 export interface WorkflowConfig {
   store: FactStore
   /** The project folder. */
@@ -1625,7 +1637,8 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, actor, 'start review', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused) })
+    const recorded = checksAtRevision(this.state(card).checks, sub.revision, r.options.commands)
+    return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused), ...(recorded.length ? { checksAtRevision: recorded } : {}) })
   }
 
   /**

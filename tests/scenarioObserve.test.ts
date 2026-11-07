@@ -2270,3 +2270,22 @@ describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, 
     expect(scenario.observe(run([], []))[0][1]).toBe(false)
   })
 })
+
+describe("review-record-trusted's reuse check (HI-2660)", () => {
+  // The record covers every test, so any test run is a rerun: it passes with none, or with a doubt the verdict names.
+  const NAME = 'ran no recorded test again, or the verdict names its doubt (reran … because …)'
+  const scenario = SCENARIOS.find((s) => s.id === 'review-record-trusted')!
+  const shell = (command: string) => ({ name: 'Bash', input: JSON.stringify({ command }), result: '', isError: false })
+  const check = (tools: unknown[], verdict: string) =>
+    scenario.expect({ skillsRead: ['review-agent-work'], combworkCalls: [], combworkMentions: [], replies: [], finalReply: '', tools, gitStatus: '', cards: { b: { history: [{ what: 'Review passed' }], comments: [{ by: 'Coder (alpha)', text: verdict }] } }, allCards: [], notes: [], live: [], tokenLeak: false }, {}).find(([n]) => n === NAME)?.[1]
+  it('passes with no rerun', () => {
+    expect(check([shell('git rev-parse --short HEAD')], 'Round 1: PASSED. Reused the record of this revision.')).toBe(true)
+  })
+  it('passes with a rerun whose doubt the verdict names', () => {
+    expect(check([shell('node --test greet.test.js')], 'Round 1: PASSED. Reran greet.test.js because the record shows 2 tests where the change adds one.')).toBe(true)
+  })
+  it('fails with a rerun and no named doubt', () => {
+    expect(check([shell('node --test greet.test.js')], 'Round 1: PASSED. Reran greet.test.js: 1 passed.')).toBe(false)
+    expect(check([shell('npm test')], 'Round 1: PASSED.')).toBe(false)
+  })
+})

@@ -27,7 +27,14 @@ Read the whole change, and the code around it where needed. In order of importan
 4. **Tests**: new behaviour without tests, or tests that don't test it. A new or changed test that sleeps and then checks, reads state once just after an action, depends on another test's leftovers, or raises a timeout with no stated reason is a blocking finding: it fails on a loaded or slower machine.
 5. **Clarity**: only where it will cause real trouble later.
 
-**Don't repeat the builder's run**: check its run record (the summary's, and the runs recorded as the card's checks of that revision): for this code, recent, the checks the change needs, every failure explained. Rerun only what the project's notes ask of a reviewer (else typecheck, lint and the tests the change affects), plus your own probes of the riskiest parts, in the review copy (§1), changing nothing. Note what you ran.
+**Reuse the builder's run; don't repeat it.** What you run is one of four kinds, in the review copy (§1), changing nothing:
+
+- **Reused** (the default): a result stands when its record names the exact revision you review, the check's command or suite, and the real CLIs' versions where real ones ran, with every failure explained. `cw_start_review`'s `checksAtRevision` lists the card's checks recorded at that revision: those stand. It lists only them, never all the change needs. A record in the summary's text (an e2e or scenario run) is the builder's word: check its fingerprint and that it covers the change.
+- **Missing**: a check the change needs that no record covers, or one whose command, test or CLI changed since its record (the revision alone doesn't cover that), is run. Missing evidence never counts as a pass. So are the runs the workflow asks of you (`runYourself`: a builder's own run of those doesn't count for the merge, so yours is required even when the builder ran it).
+- **A rerun for a doubt you name**: a result that doesn't fit the change, a pass that looks flaky, a change to shared test infrastructure. Any kind of test, normally at most one, focused. Your verdict says "reran X because Y". A rerun with no named doubt is duplication: don't.
+- **Your own probes** of the riskiest parts: new evidence, not a rerun.
+
+The project's notes may ask more of a reviewer. Note what you ran, as which kind.
 
 ## 4. Report
 

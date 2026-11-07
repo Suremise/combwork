@@ -5415,6 +5415,15 @@ agree by construction. Its end reads the folder again before the write (the watc
 come after cw-progress has exited: a submit waits for its project's records still being written, and a check that
 passed counts the moment its run finishes [#1651].
 
+**Reused at review** [HI-2660]. Start review's reply names the card's checks recorded at the reviewed submission's
+revision (`checksAtRevision`: an earlier submission chosen with `submission` has its own revision's), for its reviewer
+to reuse instead of running them again: the latest counted run of each name there (a failure after a pass says
+failed), never an uncounted attempt, another revision's run, the merge queue's own (`entry`), or a configured check
+whose command has changed since its run. Names are data, as `checks` are (HI-2276). Only those checks: what else the
+change needs is the reviewer's to judge (review-agent-work), and a record in a summary's text is checked by the
+reviewer, never read by Combwork. A focused test proved by review (G20, realProof = review) still counts only from the
+reviewer's own run.
+
 **When a run counts for a revision** [P1, answering HR2's round 1 finding 5 and round 2 finding 2, HB3's F]: a green
 run proves something only about content it ran on. A run records its **tested checkout** (the revision checked out
 where it ran) and counts for a card's submission only if all of these hold; otherwise it is recorded with

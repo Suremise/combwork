@@ -531,7 +531,7 @@
     "text": "Start work on a card in Todo yourself: it moves to Doing and is yours. Replies with its folder, and its line, base and target where it has them."
   },
   "tool.startReview.description": {
-    "text": "Start reviewing a card in Review (it stays there). Replies with what to review and the review copy to work in, when there is one."
+    "text": "Start reviewing a card in Review (it stays there). Replies with what to review, the review copy to work in when there is one, and the card's checks recorded at that revision (only those)."
   },
   "tool.startTask.arg.connection": {
     "text": "A new agent's connection, by id or name (cw_connection): model, effort, mode and CLI. Default: the first usable here."
