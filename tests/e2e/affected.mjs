@@ -101,6 +101,9 @@ export const EVERYTHING = [
   'tests/e2e/runContext.cjs',
   'tests/e2e/slots.mjs',
   'tests/e2e/codexHomeLock.mjs',
+  'tests/e2e/testHomeLock.mjs',
+  'tests/e2e/testHomes.mjs',
+  'tests/e2e/testHomeManifest.mjs',
   'tests/e2e/clean.mjs',
   'tests/e2e/evidence.cjs',
   'tests/e2e/boardRows.cjs',
@@ -663,7 +666,11 @@ export const REAL_TIER = [
   'tests/e2e/lib.cjs',
   // The environment the real CLIs are started in.
   'tests/e2e/runContext.cjs',
-  'tests/e2e/codexHomeLock.mjs'
+  'tests/e2e/codexHomeLock.mjs',
+  // Each real CLI's test home, reset before its run (HI-2606).
+  'tests/e2e/testHomeLock.mjs',
+  'tests/e2e/testHomes.mjs',
+  'tests/e2e/testHomeManifest.mjs'
 ]
 const PROVIDER_OWN = ['src/main/providers/claude/', 'src/main/providers/codex/', 'src/main/providers/copilot/']
 
@@ -795,6 +802,8 @@ export const UNIT_SCANS = [
   { test: 'tests/folderProcesses.test.ts', paths: ['tests/', 'scripts/', 'src/'], lines: ['process\\.kill', 'task[k]ill'] },
   // Test tooling starts nothing through the shell (#599).
   { test: 'tests/windowsExits.test.ts', paths: ['tests/', 'scripts/'], lines: ['start-process', 'invoke-item', 'shell\\.open(path|external)', '\\bstart\\b'] },
+  // Every recorded CLI test home listing is classified by the reset's manifest (HI-2606).
+  { test: 'tests/testHomes.test.ts', paths: ['tests/fixtures/testHomes/'] },
   // Tests name the temp folder only through tests/tempDir.ts (#448).
   { test: 'tests/tempDir.test.ts', paths: ['tests/'], lines: ['\\btmpdir\\b', '\\benv\\s*(\\.\\s*|\\[\\s*[\'"`])(temp|tmp)\\b'] },
   // Every e2e suite and scenario starts Combwork with a test profile, quiet.

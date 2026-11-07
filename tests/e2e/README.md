@@ -599,6 +599,25 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   when `--affected` needs them. Run them when what they test can't be done with the fake Claude Code (below), and
   prefer the fake where it covers the case. Warn the user first if one could
   reach a sign-in screen; never send key presses to one.
+- **The CLI test homes start each run fresh** (HI-2606; `testHomes.mjs`, `testHomeManifest.mjs`, `testHomeLock.mjs`).
+  Before each suite that uses Claude Code's signed-in test home (`claudeHome: 'test'`) or Codex's (`needs: ['codex']`,
+  `codexHome: 'test'`), and before each real model trial, the runner takes the home's lease (one run at a time per
+  home, machine-wide; Claude Code's before Codex's, reused by what a holder starts, `CW_TEST_HOME_LEASES`) and resets it
+  to its sign-in: memory, transcripts, per-folder trust, MCP servers in `config.toml`, history, skill use, the CLIs' own
+  databases, caches and temp leftovers go; the sign-in (`.credentials.json`, `auth.json`), the PC's Codex sandbox
+  setup, Codex's downloaded packages, and `.claude.json`'s and `config.toml`'s account and onboarding fields stay (runs
+  start signed in and onboarded). The sign-in is never copied, written or put back: copies of a home would share a
+  rotating refresh token and sign each other out. A home that isn't signed in skips the suite for its environment; one
+  still in use is waited for, then refused, never ended: in use means what used it under the lease (the test copies of
+  Combwork a suite started there, noted in the lease's holder record, `holder.state`) or, after taking over from a run
+  that didn't let the home go, what that run left, and every CLI those started; a nested run reusing its parent's lease
+  never resets. One
+  whose status can't be read stops the suite. An entry `testHomeManifest.mjs` doesn't classify (a new CLI version's new
+  file) is kept, never deleted, and named in the suite's log (Darren, 7 Nov): classify it there. `--warm-homes` (e2e
+  and scenarios) skips the reset, keeping what earlier runs left, on purpose; a suite needing state from an earlier,
+  separate run says so with `home: 'warm'` in `suites.mjs` (none does today). Copilot has no long-lived test home: its
+  suites make theirs each run, and its sign-in is in Windows Credential Manager. A suite run on its own (`node
+  tests/e2e/<suite>.cjs`) takes no lease and resets nothing.
 - **`claudehome`** (#345) runs the real Claude Code in a home of its own (`claudeHome: 'own'` in `suites.mjs`), never
   the default one: a new folder each run with onboarding done and a made-up API key approved in its `.claude.json`, so
   Claude Code starts at its prompt with no sign-in, and is sent nothing (no tokens, nothing reaches Anthropic). It
