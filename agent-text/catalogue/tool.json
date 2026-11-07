@@ -119,7 +119,7 @@
     "text": "update: its id or name."
   },
   "tool.connection.arg.launch": {
-    "text": "update: guidance, tools, typing, overrides by key (false: off); preset: \"terminal\" sets all off; an empty object, all on."
+    "text": "update: guidance, tools, typing, overrides by key (false: off); preset: \"terminal\" turns all off; empty object: all on."
   },
   "tool.connection.arg.mode": {
     "text": "Permission mode."
