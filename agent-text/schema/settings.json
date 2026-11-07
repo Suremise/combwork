@@ -8,6 +8,18 @@
   "settings.accounts.list.title": {
     "placeholders": {}
   },
+  "settings.advanced.antigravity.hooks.editPathField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.editPathField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.editTools.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.editTools.title": {
+    "placeholders": {}
+  },
   "settings.advanced.antigravity.hooks.knownEvents.desc": {
     "placeholders": {}
   },
@@ -38,6 +50,12 @@
   "settings.advanced.antigravity.hooks.toolHooks.title": {
     "placeholders": {}
   },
+  "settings.advanced.antigravity.hooks.userStepWaitSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.hooks.userStepWaitSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.antigravity.models.line.desc": {
     "placeholders": {}
   },
@@ -66,6 +84,18 @@
     "placeholders": {}
   },
   "settings.advanced.antigravity.signIn.needed.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.confirmField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.confirmField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.idleGraceSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.idleGraceSeconds.title": {
     "placeholders": {}
   },
   "settings.advanced.antigravity.statusLine.knownFields.desc": {

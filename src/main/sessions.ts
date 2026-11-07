@@ -413,6 +413,16 @@ interface LiveSession {
   hooksSeen?: number
   /** Whether its status line last said a permission prompt is showing (statusLineAsk, HI-2545): an ask applies once. */
   statusAsk?: boolean
+  /** What its CLI's adapter keeps for this launch while preparing its hooks (prepareHook's memo, HI-2545): dropped with it. */
+  hookMemo?: Record<string, unknown>
+  /**
+   * A status line said idle while its turn ran (HI-2545: agy sends no hook when its permission prompt is cancelled): the
+   * turn is taken as interrupted once idleGraceMs passes with nothing else heard. Bound to the launch's run, session and
+   * turn as it began; anything heard of the launch meanwhile cancels it.
+   */
+  idleGrace?: { timer: ReturnType<typeof setTimeout>; runId: string; sessionId: string; turn: string }
+  /** Whether the latest status line said idle with no prompt pending (statusLineIdle), for the grace's last look. */
+  statusIdle?: boolean
   /** Whether its hooks are reaching Combwork (#1336, hooksHealth.ts): what the check reads of the launch. */
   hooksWatch?: HooksWatch
   /**
@@ -2400,6 +2410,7 @@ class SessionManager {
     // Its slot's writer (#1434): released now if no process of it ran, else once they are known to have ended.
     if (l) this.settleWriterOf(l.state.runId)
     if (l?.state.hooksMissing) noteHooksMissing(l.state.projectPath, l.state.agentId, false)
+    if (l) this.cancelIdleGrace(l)
     this.live.delete(id)
     this.recheckTools(id)
     // A start given up before its process spawned has no exit to wait for.
@@ -4862,6 +4873,7 @@ class SessionManager {
     if (l) {
       if (l.backupTimer) clearInterval(l.backupTimer)
       l.compacting?.end()
+      this.cancelIdleGrace(l)
       await this.backup(projectPath, agentId, true).catch(() => undefined)
       // Its CLI has exited: its transcript is finished (archiving it at once is fine, inUse).
       this.noteExit(l.state.sessionId)
@@ -5912,20 +5924,61 @@ class SessionManager {
     if (conv && runId !== l.state.runId) log.warn(`${userText(this.label(l.state))}: a status line of run ${runId ?? 'none'} named conversation ${conv}: not this launch's (${l.state.runId}), ignored`)
     else if (conv && !l.state.sessionId) void this.adoptSessionId(l, conv, 'status line') // i18n-ignore: a log line's words
     else if (conv && conv !== l.state.sessionId) log.warn(`${userText(this.label(l.state))}: its status line named conversation ${conv}, not ${l.state.sessionId}: kept ${l.state.sessionId}`)
-    // A permission prompt only the status line tells of (HI-2545): as a hook's ask, once as it begins, in hook order; the
-    // current launch's own only. Its end needs nothing: the tool's start or end, or the turn's Stop, answers it.
-    if (l.adapter.statusLineAsk && runId === l.state.runId) {
-      const ask = l.adapter.statusLineAsk(body)
+    // What only the status line tells of (HI-2545, agy): its permission prompt and a turn ended with no hook. The current
+    // launch's own only, about the conversation it runs, applied in hook order and only to a turn that runs then.
+    if ((l.adapter.statusLineAsk || l.adapter.statusLineIdle) && runId === l.state.runId) {
+      const id = liveId(l.state.projectPath, l.state.agentId)
+      const own = !conv || !l.state.sessionId || conv === l.state.sessionId
+      const ask = own ? (l.adapter.statusLineAsk?.(body) ?? null) : null
+      const idle = own && !!l.adapter.statusLineIdle?.(body)
       const began = !!ask && !l.statusAsk
+      const ended = !ask && !!l.statusAsk
       l.statusAsk = !!ask
-      if (began && ask) {
-        const id = liveId(l.state.projectPath, l.state.agentId)
+      l.statusIdle = idle
+      // Anything but idle is news of the turn going on: no silent end stands.
+      if (!idle) this.cancelIdleGrace(l)
+      if (began || ended || idle) {
         void this.inHookOrder(l.state.runId, () => {
-          if (this.live.get(id) !== l) return
-          this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
+          if (this.live.get(id) !== l || l.ledger?.active?.state !== 'running') return
+          // Its prompt, once as it begins; gone without a tool's start or end (answered, or cancelled): no longer asked.
+          if (began && ask) this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
+          else if (ended) this.carryOut(id, l, hookStep({ kind: 'toolEnd' }, this.statusInput(l)), 'statusline', { kind: 'toolEnd' })
+          if (idle && l.statusIdle && !l.idleGrace) this.startIdleGrace(id, l)
         })
       }
     }
+  }
+
+  /**
+   * A running turn its status line says is over with no hook saying so (HI-2545: agy's cancelled permission prompt): the
+   * turn is interrupted once idleGraceMs passes with nothing more heard of the launch. Bound to the launch's run, session
+   * and turn now; at its end it looks again, in hook order: the same launch, session and turn, still running, and the
+   * status line still idle. Cancelled by any hook or other status of the launch, and by its end.
+   */
+  private startIdleGrace(id: string, l: LiveSession): void {
+    const turn = l.ledger?.active
+    if (!turn || turn.state !== 'running' || !l.state.sessionId) return
+    const grace = { runId: l.state.runId, sessionId: l.state.sessionId, turn: turn.id } as Omit<NonNullable<LiveSession['idleGrace']>, 'timer'>
+    const timer = setTimeout(() => {
+      void this.inHookOrder(grace.runId, () => {
+        if (l.idleGrace?.timer !== timer) return
+        l.idleGrace = undefined
+        const now = l.ledger?.active
+        if (this.live.get(id) !== l || l.state.runId !== grace.runId || l.state.sessionId !== grace.sessionId || !l.statusIdle || now?.id !== grace.turn || now.state !== 'running') return
+        endRunning(l.ledger!, 'interrupt')
+        this.carryOut(id, l, hookStep({ kind: 'interrupt' }, this.statusInput(l)), 'statusline', { kind: 'interrupt' })
+        this.noteTurn(l)
+      })
+    }, l.adapter.idleGraceMs?.() ?? 3000)
+    timer.unref?.()
+    l.idleGrace = { ...grace, timer }
+  }
+
+  /** Ends a launch's idle grace, if any (something was heard of it, or it ended). */
+  private cancelIdleGrace(l: LiveSession): void {
+    if (!l.idleGrace) return
+    clearTimeout(l.idleGrace.timer)
+    l.idleGrace = undefined
   }
 
   /** A launch's conversation id, learned after it started (`from`: what said it, for the log): recorded as its session. */
@@ -6441,10 +6494,18 @@ class SessionManager {
     if (body.hook_event_name === 'SessionStart') return this.startReply(runId, body)
     const afterCompaction = this.compactionContextReply(runId, body)
     if (afterCompaction) return afterCompaction
-    const lock = body.hook_event_name === 'PreToolUse' ? this.preToolUse(runId, body) : null
-    if (lock || !this.inboxNotice) return Promise.resolve(lock)
+    if (body.hook_event_name === 'PreToolUse') {
+      const lock = this.preToolUse(runId, body)
+      // A CLI that takes no answer as a denial (HI-2545: agy) gets its own allow for a tool Combwork doesn't refuse.
+      return Promise.resolve(lock ?? this.findLaunch(runId, body.session_id)?.[1]?.adapter.preToolUseDefault?.() ?? null)
+    }
+    if (!this.inboxNotice) return Promise.resolve(null)
     const l = this.findLaunch(runId, body.session_id)?.[1]
     if (!l) return Promise.resolve(null)
+    const raw = String(body.hook_event_name ?? '')
+    // A CLI whose events say what they are only once prepared (HI-2545: agy's PreInvocation and Stop): its reply is
+    // decided in the launch's order (noticeIn, after prepareHook), and always settled there.
+    if (l.adapter.noticeEvents?.includes(raw)) return new Promise((settle) => this.noticeReplies.set(body, settle))
     const hook = l.adapter.normalizeHook(body)
     const ev = hook.event
     // Never a sub-agent's (its context isn't the agent's), nor a Stop that follows a continuation (stop_hook_active).
@@ -6591,6 +6652,16 @@ class SessionManager {
     if (this.noticeBarred(l)) return null
     const hook = l.adapter.normalizeHook(body)
     const ev = hook.event
+    const raw = String(body.hook_event_name ?? '')
+    // A notice event as prepared (HI-2545, agy): never a sub-agent's, a turn's start, or one its CLI says carries none (a
+    // place that had one already).
+    if (l.adapter.noticeEvents?.includes(raw)) {
+      if (hook.ids.sub || ev.kind === 'prompt' || (ev.kind === 'stop' && (ev.failed || hook.ids.continued))) return null
+      if (ev.kind !== 'stop' && ev.kind !== 'ignore') return null
+      // A checkpoint between a turn's model calls: only in that very turn, while it runs (its id the active one).
+      if (ev.kind === 'ignore' && (!hook.ids.turn || ledger.active?.id !== hook.ids.turn || ledger.active.state !== 'running')) return null
+      if (l.adapter.noticeWanted && !l.adapter.noticeWanted(body, (l.hookMemo ??= {}))) return null
+    }
     // What the ledger would make of it (a copy: it is admitted below, with what it was told).
     if (admit(structuredClone(ledger), ev, hook.ids, { woke, typed, now: at }).verdict === 'stale') return null
     const drain = ev.kind === 'stop'
@@ -6600,9 +6671,13 @@ class SessionManager {
     // Still that launch and that turn (the queue holds the rest of the launch's hooks, so only its end can change them),
     // and still one Combwork may add to (HR1 on s44: made Independent while the notice was worked out, it gets none).
     if (!text || this.findLaunch(runId, body.session_id)?.[1] !== l || ledger.active !== turn || this.noticeBarred(l)) return null
-    const reply = l.adapter.noticeReply(String(body.hook_event_name ?? ''), text)
+    // Past the time its CLI waits for this reply (HI-2545): the reply never reaches it, so the notice isn't given.
+    const deadline = l.adapter.noticeDeadlineMs?.(raw)
+    if (deadline != null && Date.now() - at >= deadline) return null
+    const reply = l.adapter.noticeReply(raw, text)
     // A CLI that takes the drain as a new prompt: that prompt is Combwork's own, in the turn it carries on.
     if (reply && drain && l.adapter.drainIsPrompt) expectInjected(ledger, text)
+    if (reply) l.adapter.noticeGiven?.(body, (l.hookMemo ??= {}))
     return reply
   }
 
@@ -6662,8 +6737,10 @@ class SessionManager {
     const [id, l] = found
     const st = l.state
     // What the hook needs from the CLI's own records first (HI-2545: the Antigravity CLI's user prompt), in this order.
+    // Any hook of the launch is news of it: a status line's idle no longer stands for a silent end (idleGrace).
+    this.cancelIdleGrace(l)
     if (l.adapter.prepareHook) {
-      await l.adapter.prepareHook(body, { agentId: st.agentId, workspacePath: workspaceOf(st.projectPath).path!, sessionId: st.sessionId }).catch((e) => log.warn(`${userText(this.label(st))}: could not read what its hook needs`, e))
+      await l.adapter.prepareHook(body, { agentId: st.agentId, workspacePath: workspaceOf(st.projectPath).path!, sessionId: st.sessionId, memo: (l.hookMemo ??= {}), alive: () => this.live.get(id) === l }).catch((e) => log.warn(`${userText(this.label(st))}: could not read what its hook needs`, e))
       if (this.live.get(id) !== l) return
     }
     const hook = l.adapter.normalizeHook(body)

@@ -116,6 +116,10 @@ interface CombworkMessageValues {
   'settings.accounts.usageMove.weekly': undefined
   'settings.accounts.usageNone': undefined
   'settings.accounts.usedBy': { assistant: string; n: number }
+  'settings.advanced.antigravity.hooks.editPathField.desc': undefined
+  'settings.advanced.antigravity.hooks.editPathField.title': undefined
+  'settings.advanced.antigravity.hooks.editTools.desc': undefined
+  'settings.advanced.antigravity.hooks.editTools.title': undefined
   'settings.advanced.antigravity.hooks.knownEvents.desc': undefined
   'settings.advanced.antigravity.hooks.knownEvents.title': undefined
   'settings.advanced.antigravity.hooks.knownFields.desc': undefined
@@ -126,6 +130,8 @@ interface CombworkMessageValues {
   'settings.advanced.antigravity.hooks.timeoutSeconds.title': undefined
   'settings.advanced.antigravity.hooks.toolHooks.desc': undefined
   'settings.advanced.antigravity.hooks.toolHooks.title': undefined
+  'settings.advanced.antigravity.hooks.userStepWaitSeconds.desc': undefined
+  'settings.advanced.antigravity.hooks.userStepWaitSeconds.title': undefined
   'settings.advanced.antigravity.models.line.desc': undefined
   'settings.advanced.antigravity.models.line.title': undefined
   'settings.advanced.antigravity.override.noAutoUpdate.desc': undefined
@@ -136,6 +142,10 @@ interface CombworkMessageValues {
   'settings.advanced.antigravity.override.stripAccountVars.title': undefined
   'settings.advanced.antigravity.signIn.needed.desc': undefined
   'settings.advanced.antigravity.signIn.needed.title': undefined
+  'settings.advanced.antigravity.statusLine.confirmField.desc': undefined
+  'settings.advanced.antigravity.statusLine.confirmField.title': undefined
+  'settings.advanced.antigravity.statusLine.idleGraceSeconds.desc': undefined
+  'settings.advanced.antigravity.statusLine.idleGraceSeconds.title': undefined
   'settings.advanced.antigravity.statusLine.knownFields.desc': undefined
   'settings.advanced.antigravity.statusLine.knownFields.title': undefined
   'settings.advanced.antigravity.transcript.modelChange.desc': undefined

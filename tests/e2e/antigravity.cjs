@@ -118,7 +118,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await agTab.waitFor({ timeout: HUNG_MS })
   await agTab.click()
   // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
-  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 13, HUNG_MS)))
+  check('Settings → Advanced has an Antigravity tab with its values', !!(await until(async () => (await page.locator('.advanced-row[data-advanced^="antigravity."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)) === 18, HUNG_MS)))
   await shots('advanced')
   await page.keyboard.press('Escape')
   await page.getByText('alpha', { exact: true }).first().click()
@@ -177,25 +177,53 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const details = await live(gem.id)
   check("the status line gives the model, its effort and the context window", details?.modelName === 'Gemini 3.8 Flash (Low)' && details?.effort === 'low', JSON.stringify({ modelName: details?.modelName, effort: details?.effort }))
 
-  // --- Hooks and the status line (HI-2545): Combwork's hooks in the profile; a turn only for a prompt the user typed.
+  // --- Hooks and the status line (HI-2545, s56): Combwork's hooks in the profile; a turn per invocation zero, named by
+  // the steps before it (agy sends no prompt hook); a continuation none; the prompt only the status line tells of.
   const profileHooks = JSON.parse(fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'config', 'hooks.json'), 'utf8')).combwork ?? {}
-  check("Combwork's hooks are in the agent's profile, each naming its event for Combwork", ['SessionStart', 'PreInvocation', 'PostInvocation', 'Stop'].every((k) => JSON.stringify(profileHooks[k] ?? '').includes(`event=${k}`)), JSON.stringify(Object.keys(profileHooks)))
+  check("Combwork's hooks are in the agent's profile, each naming its event for Combwork, the tool hooks included", ['SessionStart', 'PreToolUse', 'PostToolUse', 'PreInvocation', 'PostInvocation', 'Stop'].every((k) => JSON.stringify(profileHooks[k] ?? '').includes(`event=${k}`)), JSON.stringify(Object.keys(profileHooks)))
   check('…the status line under agy\'s own (stack_with_default)', JSON.parse(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8')).statusLine?.stack_with_default === true)
   const hooksOf = (event) => entries('hook').filter((h) => h.event === event && h.payload.conversationId === first.conv)
+  /** The turn the conversation's latest prompt began: its step + 1 (the invocation zero's initialNumSteps). */
+  const latestTurn = (conv) => {
+    const steps = fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript_full.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+    return `${conv}:i${steps.filter((x) => x.type === 'USER_INPUT').at(-1).step_index + 1}`
+  }
   const turnIs = async (id, status = 'finished') => !!(await until(async () => { const s = await live(gem.id); return s?.turn?.id === id && s.turn.state === 'over' && s.status === status }, HUNG_MS))
-  check('a prompt is a turn, named by its step in the transcript (agy sends no prompt hook): the last one typed, image, is step 6', await turnIs(`${first.conv}:u6`), JSON.stringify((await live(gem.id))?.turn))
+  check('a prompt is a turn, named by the steps before its first model call (agy sends no prompt hook)', await turnIs(latestTurn(first.conv)), JSON.stringify([(await live(gem.id))?.turn, latestTurn(first.conv)]))
   // The same words again: a new step, so a new turn.
-  check('the same prompt typed again is a turn of its own', (await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity')) && (await turnIs(`${first.conv}:u10`)), JSON.stringify((await live(gem.id))?.turn))
-  // A hook's continuation (another hook's `continue`): agy calls the model again, a new execution with no prompt of its own.
+  const turnBefore = latestTurn(first.conv)
+  await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity')
+  // Its words are in the transcript already (the first time): wait for its new step instead.
+  check('the same prompt typed again is a turn of its own', !!(await until(async () => latestTurn(first.conv) !== turnBefore, HUNG_MS)) && (await turnIs(latestTurn(first.conv))), JSON.stringify([(await live(gem.id))?.turn, latestTurn(first.conv)]))
+  // A hook's continuation (another hook's `continue`): agy calls the model again, counting on (invocationNum 1).
   const calls = hooksOf('PreInvocation').length
-  check('a continuation is no new turn', (await say(gem.id, e.USERPROFILE, first.conv, 'carry on please')) && !!(await until(async () => hooksOf('PreInvocation').length - calls === 2 && hooksOf('Stop').at(-1)?.payload.executionNum === 1, HUNG_MS)) && (await turnIs(`${first.conv}:u12`)), JSON.stringify({ turn: (await live(gem.id))?.turn, calls: hooksOf('PreInvocation').length - calls }))
+  check('a continuation is no new turn', (await say(gem.id, e.USERPROFILE, first.conv, 'carry on please')) && !!(await until(async () => hooksOf('PreInvocation').length - calls === 2 && hooksOf('PreInvocation').at(-1)?.payload.invocationNum === 1 && hooksOf('Stop').at(-1)?.payload.executionNum === 1, HUNG_MS)) && (await turnIs(latestTurn(first.conv))), JSON.stringify({ turn: (await live(gem.id))?.turn, calls: hooksOf('PreInvocation').length - calls }))
+  // An edit nobody holds: Combwork's PreToolUse answers allow (agy 1.5.0 would deny on no answer), and it runs.
+  check('an edit runs (Combwork allows what it doesn\'t refuse)', (await say(gem.id, e.USERPROFILE, first.conv, 'edit notes.txt')) && !!(await until(async () => entries('hook').some((h) => h.event === 'PreToolUse' && h.reply?.decision === 'allow') && entries('hook').some((h) => h.event === 'PostToolUse'), HUNG_MS)), JSON.stringify(entries('hook').filter((h) => h.event === 'PreToolUse').map((h) => h.reply)))
+  await turnIs(latestTurn(first.conv))
   // A permission prompt only the status line tells of: "waiting for you" until the person answers it in the CLI.
   await inv('pty:write', lib.ptyKey(alpha, gem.id), 'this needs approval')
   await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
   check('a permission prompt shows the agent waiting for you', !!(await until(async () => (await live(gem.id))?.status === 'waiting', HUNG_MS)), (await live(gem.id))?.status)
   await inv('pty:write', lib.ptyKey(alpha, gem.id), 'y')
   await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
-  check('…and, once answered, the turn ends as one turn', await turnIs(`${first.conv}:u16`), JSON.stringify(await live(gem.id)))
+  check('…and, once answered, the turn ends as one turn', await turnIs(latestTurn(first.conv)), JSON.stringify(await live(gem.id)))
+  // Cancelled instead: agy sends no hook at all; its status line idle, the turn is interrupted after the grace.
+  const hooksBefore = entries('hook').length
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), 'this needs approval again')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
+  await until(async () => (await live(gem.id))?.status === 'waiting', HUNG_MS)
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), 'n')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
+  check('a cancelled permission prompt (no hook): the turn is interrupted, the agent ready again', await turnIs(latestTurn(first.conv), 'ready'), JSON.stringify(await live(gem.id)))
+  check('…with no Stop sent for it', !entries('hook').slice(hooksBefore).some((h) => h.event === 'Stop'))
+  // The user's /new: a new conversation, followed at its first prompt.
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), '/new')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), 'hello new conversation')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
+  const moved = await until(async () => { const id = (await live(gem.id))?.sessionId; return id && id !== first.conv ? id : null }, HUNG_MS)
+  check("the user's /new moves the agent to the new conversation at its first prompt", !!moved && (await turnIs(latestTurn(moved))), JSON.stringify({ moved, turn: (await live(gem.id))?.turn }))
   check('it stops', !!(await stop()))
   const listed = (await inv('session:list', alpha)).find((s) => s.id === first.conv)
   check("the Sessions list has it, with agy's title", listed?.title === 'Fake: hello antigravity', JSON.stringify(listed && { id: listed.id, title: listed.title }))
@@ -242,6 +270,23 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const before = entries('session').length
   const refused = await inv('session:start', alpha, { agentId: gem.id, resumeId: theirs.conv }).then(() => null, (err) => String(err?.message ?? err))
   check("another agent's conversation is never resumed by this one", entries('session').length === before && !(await live(gem.id)) && /isn't in this agent's own conversations/.test(refused ?? ''), refused ?? 'started')
+
+  // --- File locks (HI-2545): Ada edits notes.txt and waits on a permission prompt, her turn running, her claim held;
+  // Gem's edit of the same file is refused, saying why (1.5.0: only a deny stops an edit), and goes ahead once Ada is done.
+  const ada = await startNew(other.id)
+  const gem2 = await startNew()
+  const transcriptOf = (profile, conv) => fs.readFileSync(path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript_full.jsonl'), 'utf8')
+  await inv('pty:write', lib.ptyKey(alpha, other.id), 'edit notes.txt then needs approval')
+  await inv('pty:write', lib.ptyKey(alpha, other.id), '\r')
+  check("Ada's edit runs and her turn waits on its prompt", !!(await until(async () => (await live(other.id))?.status === 'waiting', HUNG_MS)), (await live(other.id))?.status)
+  check("…Gem's edit of the file she holds is refused, saying it is held", (await say(gem.id, e.USERPROFILE, gem2.conv, 'edit notes.txt')) && !!(await until(async () => /tool call denied by pre-tool hook: .*notes\.txt/.test(transcriptOf(e.USERPROFILE, gem2.conv)), HUNG_MS)), transcriptOf(e.USERPROFILE, gem2.conv).slice(-400))
+  await inv('pty:write', lib.ptyKey(alpha, other.id), 'y')
+  await inv('pty:write', lib.ptyKey(alpha, other.id), '\r')
+  await until(async () => (await live(other.id))?.status === 'finished', HUNG_MS)
+  check('…and, once her turn is over, it runs', (await say(gem.id, e.USERPROFILE, gem2.conv, 'edit notes.txt now')) && !!(await until(async () => transcriptOf(e.USERPROFILE, gem2.conv).includes('Made 1 replacement'), HUNG_MS)))
+  await stop(other.id)
+  await stop()
+  void ada
   check('the sentinel was never started, all along', !fs.existsSync(marker))
 
   await app.close()

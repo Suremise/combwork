@@ -22,7 +22,7 @@ import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './proj
 import { agyStatusDetails } from './status'
 import { AntigravityConversationParser, AntigravityUsageParser, parseAgyTranscript } from './transcript'
 import { isConversationId, knownTitle, learnTitle, listConversations, mediaData, profileOf, subOf, trustedTranscript } from './conversations'
-import { addUserStep, agyHooks, agyLockReply, agyNoticeReply, agyStartContextReply, agyStatusAsk, agyStopContinues, normalizeAgyHook, UserSteps } from './hooks'
+import { AGY_ALLOW, agyHooks, agyLockReply, agyNoticeGiven, agyNoticeReply, agyNoticeWanted, agyStartContextReply, agyStatusAsk, agyStatusIdle, agyStopContinues, normalizeAgyHook, prepareAgyHook } from './hooks'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
@@ -266,13 +266,42 @@ export class AntigravityAdapter implements ProviderAdapter {
     return statusLineConversation(body)
   }
 
-  // ---- Hooks (HI-2545, hooks.ts).
-  /** The user's prompts taken, per conversation (a step seen again is no new prompt). */
-  private readonly userSteps = new UserSteps()
+  /** Whether its status line says agy is idle with no prompt pending (a cancelled prompt sends no hook: idleGrace). */
+  statusLineIdle(body: Record<string, any>): boolean {
+    return agyStatusIdle(body)
+  }
 
-  /** The user's prompt that began an execution, read from this agent's own transcript (agy's hooks carry none). */
-  prepareHook(body: Record<string, any>, launch: { agentId: string; workspacePath: string; sessionId: string | null }): Promise<void> {
-    return addUserStep(body, profileFolder(launch.agentId, launch.workspacePath), launch.sessionId, this.userSteps)
+  /** How long an idle status line waits for a hook to end the turn before the turn is taken as interrupted. */
+  idleGraceMs(): number {
+    return advanced.number('antigravity.statusLine.idleGraceSeconds') * 1000
+  }
+
+  // ---- Hooks (HI-2545, hooks.ts).
+  /** What each hook is, decided once in the launch's order from its raw fields and this agent's own transcript (s56). */
+  prepareHook(body: Record<string, any>, launch: { agentId: string; workspacePath: string; sessionId: string | null; memo: Record<string, unknown>; alive: () => boolean }): Promise<void> {
+    return prepareAgyHook(body, { profile: profileFolder(launch.agentId, launch.workspacePath), root: profilesRoot(), sessionId: launch.sessionId, memo: launch.memo, alive: launch.alive })
+  }
+
+  /** The events whose reply can carry a notice (recorded: PreInvocation's ephemeral message, Stop's continue). */
+  readonly noticeEvents = ['PreInvocation', 'Stop'] as const // i18n-ignore: a CLI's hook event names
+
+  /** Whether a PreInvocation may carry a checkpoint (prepared as one, not given one at its position yet). */
+  noticeWanted(body: Record<string, any>, memo: Record<string, unknown>): boolean {
+    return body.hook_event_name !== 'PreInvocation' || agyNoticeWanted(body, memo)
+  }
+
+  noticeGiven(body: Record<string, any>, memo: Record<string, unknown>): void {
+    agyNoticeGiven(body, memo)
+  }
+
+  /** How long agy waits for a hook's reply: a notice decided after it never counts as given (it never reached agy). */
+  noticeDeadlineMs(event: string): number | null {
+    return event === 'PreInvocation' || event === 'Stop' ? advanced.number('antigravity.hooks.timeoutSeconds') * 1000 : null
+  }
+
+  /** A tool Combwork doesn't refuse runs under agy's own permission check: `allow` (no answer denies it in 1.5.0). */
+  preToolUseDefault(): Record<string, unknown> {
+    return { ...AGY_ALLOW }
   }
 
   normalizeHook(body: Record<string, any>): NormalizedHook {

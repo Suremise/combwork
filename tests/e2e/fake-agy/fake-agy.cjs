@@ -8,11 +8,14 @@
 //   in annotations\<id>.pbtxt and the folder's last conversation in cache\last_conversations.json;
 // - it runs the `--settings` file's statusLine command (through cmd /c, as agy does) with the session's state on stdin;
 // - it runs the hooks of <USERPROFILE>\.gemini\config\hooks.json (through cmd /c, the payload on stdin, the reply read
-//   from stdout), as agy 1.5.0's hooks.md has them: SessionStart with the first prompt; per execution PreInvocation
-//   (invocationNum 0), the tool hooks around a tool call, PostInvocation and Stop. A Stop answered `continue` (or a
-//   prompt with "carry on", as another hook's continuation) runs another execution with no new user step; a PreToolUse
-//   answered `deny` is refused. A prompt with "needs approval" pauses on a permission prompt the status line alone tells
-//   of (tool_confirmation_pending), until the next line typed; "edit <file>" writes the file through the tool hooks;
+//   from stdout), as agy 1.5.0 ran them in HI-2545's recorded runs: SessionStart with a conversation's first prompt; each
+//   model call between a PreInvocation and a PostInvocation (invocationNum counted across the turn, a continuation's
+//   included; initialNumSteps the steps before it), the tool hooks around a tool call, and Stop. A Stop answered `continue`
+//   (or a prompt with "carry on", as another hook's continuation) runs another execution with no new user step. A
+//   PreToolUse answered `deny`, or with no decision, is refused (the tool's step an error, no PostToolUse); `allow` runs
+//   it. A prompt with "needs approval" pauses on a permission prompt the status line alone tells of
+//   (tool_confirmation_pending) until the next line typed: "n" cancels it, ending the turn with no hook at all;
+//   "edit <file>" edits the file (edit_file, its Path) through the tool hooks; "/new" starts another conversation;
 // - it starts the MCP servers of <USERPROFILE>\.gemini\config\mcp_config.json and of each workspace folder's
 //   .agents\mcp_config.json (the cwd and each --add-dir), a server named in the profile replacing the project's of that
 //   name, and keeps them running (one that ends falls back to the project's, as the real CLI's does);
@@ -62,17 +65,32 @@ function pick() {
 
 // --- A session.
 const resumed = flag('--conversation')
-const conv = resumed || crypto.randomUUID()
-const brain = path.join(home, '.gemini', 'antigravity-cli', 'brain', conv)
-const logs = path.join(brain, '.system_generated', 'logs')
-if (resumed && !fs.existsSync(brain)) {
+// The conversation it runs: the one resumed, else a new one; `/new` starts another (1.5.0: SessionStart at its prompt).
+let conv, brain, logs, transcript, short, full, step
+const cli = path.join(home, '.gemini', 'antigravity-cli')
+const keep = (rel, text) => {
+  fs.mkdirSync(path.dirname(path.join(cli, rel)), { recursive: true })
+  fs.writeFileSync(path.join(cli, rel), text)
+}
+function openConversation(id) {
+  conv = id
+  brain = path.join(home, '.gemini', 'antigravity-cli', 'brain', conv)
+  logs = path.join(brain, '.system_generated', 'logs')
+  fs.mkdirSync(logs, { recursive: true })
+  transcript = path.join(logs, 'transcript_full.jsonl')
+  short = path.join(logs, 'transcript.jsonl')
+  // The transcript its hooks name (transcriptPath).
+  full = transcript
+  step = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter(Boolean).length : 0
+  keep(path.join('cache', 'last_conversations.json'), JSON.stringify({ [process.cwd()]: conv }))
+  // The conversation's own store, which a resume reads (1.5.0: conversations\<id>.db; the fake's is empty).
+  if (!fs.existsSync(path.join(cli, 'conversations', `${conv}.db`))) keep(path.join('conversations', `${conv}.db`), '')
+}
+if (resumed && !fs.existsSync(path.join(cli, 'brain', resumed))) {
   process.stderr.write(`Error: conversation ${resumed} not found\n`)
   process.exit(1)
 }
-fs.mkdirSync(logs, { recursive: true })
-const transcript = path.join(logs, 'transcript_full.jsonl')
-const short = path.join(logs, 'transcript.jsonl')
-let step = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter(Boolean).length : 0
+openConversation(resumed || crypto.randomUUID())
 const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z')
 // transcript.jsonl has each tool argument encoded again, as 1.5.0's does.
 const encoded = (o) => (o.tool_calls ? { ...o, tool_calls: o.tool_calls.map((c) => ({ ...c, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, JSON.stringify(v)])) })) } : o)
@@ -81,16 +99,6 @@ const write = (o) => {
   fs.appendFileSync(transcript, JSON.stringify(s) + '\n')
   fs.appendFileSync(short, JSON.stringify(encoded(s)) + '\n')
 }
-const cli = path.join(home, '.gemini', 'antigravity-cli')
-const keep = (rel, text) => {
-  fs.mkdirSync(path.dirname(path.join(cli, rel)), { recursive: true })
-  fs.writeFileSync(path.join(cli, rel), text)
-}
-keep(path.join('cache', 'last_conversations.json'), JSON.stringify({ [process.cwd()]: conv }))
-// The conversation's own store, which a resume reads (1.5.0: conversations\<id>.db; the fake's is empty).
-if (!fs.existsSync(path.join(cli, 'conversations', `${conv}.db`))) keep(path.join('conversations', `${conv}.db`), '')
-// The transcript its hooks name (transcriptPath).
-const full = transcript
 log({ kind: 'session', args: argv, cwd: process.cwd(), conversation: conv, resumed: !!resumed, env: pick() })
 
 // The status line, per --settings (never saved), through cmd /c as agy runs it.
@@ -185,6 +193,14 @@ let waiting = null
 const nextLine = () => new Promise((r) => (waiting = r))
 let started = false
 async function turn(text) {
+  // The user's /new: another conversation, its SessionStart with its first prompt (1.5.0's).
+  if (text === '/new') {
+    openConversation(crypto.randomUUID())
+    started = false
+    process.stdout.write('> ')
+    statusLine('idle')
+    return
+  }
   lastUserInput = text
   if (!started) {
     started = true
@@ -194,49 +210,81 @@ async function turn(text) {
   const picked = step === 0 ? `\n<USER_SETTINGS_CHANGE>\nThe user changed setting \`Model Selection\` from None to ${flag('--model') || 'Gemini 3.8 Flash (Low)'}. No need to comment on this change if the user doesn't ask about it.\n</USER_SETTINGS_CHANGE>` : ''
   write({ source: 'USER_EXPLICIT', type: 'USER_INPUT', status: 'DONE', content: `<USER_REQUEST>\n${text}\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nThe current local time is: ${now()}.\n</ADDITIONAL_METADATA>${picked}` })
   if (!fs.existsSync(path.join(cli, 'annotations', `${conv}.pbtxt`))) keep(path.join('annotations', `${conv}.pbtxt`), `title:${JSON.stringify(`Fake: ${text}`)}\n`)
+  // Its model calls, counted across the turn (1.5.0: a continuation doesn't start the count again), each between a
+  // PreInvocation and a PostInvocation naming the steps before it.
+  let invocation = 0
+  const call = (body) => {
+    const at = step
+    fire('PreInvocation', { invocationNum: invocation, initialNumSteps: at })
+    body()
+    fire('PostInvocation', { invocationNum: invocation, initialNumSteps: at })
+    invocation++
+  }
   let carried = /carry on/i.test(text)
   for (let execution = 0; execution < 4; execution++) {
     statusLine('working')
-    fire('PreInvocation', { invocationNum: 0, initialNumSteps: step })
-    if (execution === 0 && /needs approval/i.test(text)) {
-      // A permission prompt: no hook, only the status line, until the person answers (the next line typed).
-      statusLine('tool_use', { tool_confirmation_pending: true })
-      await nextLine()
-      statusLine('working')
-    }
     const tool = execution === 0 ? /^tool (.+)$/.exec(text) : null
     if (tool) {
-      write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'call_mcp_tool', args: { Arguments: {}, ServerName: 'fake', ToolName: 'echo' } }] })
-      write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\n${tool[1]}` })
+      call(() => {
+        write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'call_mcp_tool', args: { Arguments: {}, ServerName: 'fake', ToolName: 'echo' } }] })
+        write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\n${tool[1]}` })
+      })
     }
     if (execution === 0 && text === 'image') {
-      // read_file of an image: its result names the copy agy keeps in logs\media (1.5.0's media entry).
-      write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'read_file', args: { Path: path.join(process.cwd(), 'red.png') } }] })
-      const media = path.join(logs, 'media', `step_${step}_media_0.png`)
-      fs.mkdirSync(path.dirname(media), { recursive: true })
-      fs.copyFileSync(path.join(__dirname, '..', '..', 'fixtures', 'antigravity', 'image-1.5.0-media.png'), media)
-      write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\nShowing binary file of type image/png`, media: [{ mime_type: 'image/png', uri: `file:///${media.replace(/\\/g, '/')}` }] })
+      call(() => {
+        // read_file of an image: its result names the copy agy keeps in logs\media (1.5.0's media entry).
+        write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'read_file', args: { Path: path.join(process.cwd(), 'red.png') } }] })
+        const media = path.join(logs, 'media', `step_${step}_media_0.png`)
+        fs.mkdirSync(path.dirname(media), { recursive: true })
+        fs.copyFileSync(path.join(__dirname, '..', '..', 'fixtures', 'antigravity', 'image-1.5.0-media.png'), media)
+        write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\nShowing binary file of type image/png`, media: [{ mime_type: 'image/png', uri: `file:///${media.replace(/\\/g, '/')}` }] })
+      })
     }
     const edit = execution === 0 ? /edit (\S+)/i.exec(text) : null
     if (edit) {
-      const target = path.resolve(process.cwd(), edit[1])
-      const call = { name: 'write_to_file', args: { TargetFile: target, CodeContent: 'edited' } }
-      const at = step
-      const pre = fire('PreToolUse', { stepIdx: at, toolCall: call })
-      if (pre.decision === 'deny') write({ source: 'SYSTEM', type: 'GENERIC', status: 'DONE', content: `Denied: ${pre.reason ?? ''}` })
-      else {
+      call(() => {
+        const target = path.resolve(process.cwd(), edit[1])
+        const toolCall = { name: 'edit_file', args: { Path: target, Target: 'x', Replacement: 'edited' } }
+        write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [toolCall] })
+        const at = step
+        const pre = fire('PreToolUse', { stepIdx: at, toolCall })
+        // 1.5.0: deny, or no decision at all, refuses the tool; allow (and ask, force_ask) leave it to the mode.
+        if (pre.decision === 'deny' || !pre.decision) {
+          const why = `tool call denied by pre-tool hook: ${pre.reason ?? ''}`
+          write({ source: 'MODEL', type: 'GENERIC', status: 'ERROR', error: why, content: `Created At: ${now()}\nCompleted At: ${now()}\nEncountered error in step execution: ${why}` })
+          process.stdout.write(`Denied: ${pre.reason ?? ''}\n`)
+          return
+        }
         fs.writeFileSync(target, 'edited')
-        write({ source: 'MODEL', type: 'CODE_ACTION', status: 'DONE', content: target })
-      }
-      fire('PostToolUse', { stepIdx: at, toolCall: call, error: pre.decision === 'deny' ? 'denied' : '' })
+        write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\nMade 1 replacement in ${target}` })
+        fire('PostToolUse', { stepIdx: at, toolCall, error: '' })
+      })
     }
-    write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), content: `Done: ${text}` })
-    fire('PostInvocation', { invocationNum: 0, initialNumSteps: step })
+    if (execution === 0 && /needs approval/i.test(text)) {
+      // A command the model calls, which agy asks about: no hook, only the status line, until the person answers (the next
+      // line typed). Cancelled ("n"), the turn ends with no hook at all (1.5.0's: no result, PostInvocation or Stop), its
+      // status line idle.
+      const at = step
+      fire('PreInvocation', { invocationNum: invocation, initialNumSteps: at })
+      write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'run_command', args: { CommandLine: 'echo hi', WaitMsBeforeAsync: 5000, toolSummary: 'Echo hi' } }] })
+      statusLine('tool_use', { tool_confirmation_pending: true })
+      const answer = await nextLine()
+      if (/^n/i.test(answer)) {
+        process.stdout.write('Interrupted\n> ')
+        statusLine('idle')
+        return
+      }
+      statusLine('working')
+      write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\nhi` })
+      fire('PostInvocation', { invocationNum: invocation, initialNumSteps: at })
+      invocation++
+    }
+    call(() => write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), content: `Done: ${text}` }))
     const stop = fire('Stop', { executionNum: execution, terminationReason: 'NO_TOOL_CALL', fullyIdle: true, error: '' })
     // Carried on (Combwork's reply, or another hook's continuation): a system message, then another execution.
     if (stop.decision === 'continue' || carried) {
       carried = false
-      write({ source: 'SYSTEM', type: 'SYSTEM_MESSAGE', status: 'DONE', content: stop.reason || 'continue' })
+      write({ source: 'SYSTEM', type: 'SYSTEM_MESSAGE', status: 'DONE', content: `The following is a <SYSTEM_MESSAGE> not actually sent by the user.\n\n<SYSTEM_MESSAGE>\nStop hook blocked termination: ${stop.reason || 'continue'}\n</SYSTEM_MESSAGE>` })
       continue
     }
     break
