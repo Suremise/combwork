@@ -411,8 +411,12 @@ interface LiveSession {
    * the transcript is dropped if one came after the read began, as that hook says something newer (#475).
    */
   hooksSeen?: number
-  /** Whether its status line last said a permission prompt is showing (statusLineAsk, HI-2545): an ask applies once. */
-  statusAsk?: boolean
+  /**
+   * The turn and session whose permission prompt the status line says is showing, as last applied (statusLineAsk, HI-2545):
+   * an ask applies once per prompt. Only a report accepted in hook order for its own turn sets or clears it, so a report
+   * about an earlier turn never stands for (or hides) the running one's prompt.
+   */
+  statusAsk?: { turn: string; session: string }
   /** What its CLI's adapter keeps for this launch while preparing its hooks (prepareHook's memo, HI-2545): dropped with it. */
   hookMemo?: Record<string, unknown>
   /**
@@ -5934,23 +5938,29 @@ class SessionManager {
       const own = !conv || !l.state.sessionId || conv === l.state.sessionId
       const ask = own ? (l.adapter.statusLineAsk?.(body) ?? null) : null
       const idle = own && !!l.adapter.statusLineIdle?.(body)
-      const began = !!ask && !l.statusAsk
-      const ended = !ask && !!l.statusAsk
-      l.statusAsk = !!ask
       l.statusIdle = idle
       // Anything but idle is news of the turn going on: no silent end stands.
       if (!idle) this.cancelIdleGrace(l)
-      if (began || ended || idle) {
-        // About the turn and session as the report arrived (HR1 on HI-2545): hooks queued before it may begin another
-        // turn by the time it is applied, and an old report must never ask, answer or end that one.
+      if (ask || l.statusAsk || idle) {
+        // About the turn and session as the report arrived (HR1 and HR2 on HI-2545): hooks queued before it may begin
+        // another turn by the time it is applied, and an old report must never ask, answer or end that one, nor change
+        // what the running turn's own prompt is known as.
         const turn = l.ledger?.active?.state === 'running' ? l.ledger.active.id : null
         const session = l.state.sessionId
         void this.inHookOrder(l.state.runId, () => {
           const now = l.ledger?.active
-          if (!turn || this.live.get(id) !== l || l.state.sessionId !== session || now?.id !== turn || now.state !== 'running') return
+          if (!turn || !session || this.live.get(id) !== l || l.state.sessionId !== session || now?.id !== turn || now.state !== 'running') return
           // Its prompt, once as it begins; gone without a tool's start or end (answered, or cancelled): no longer asked.
-          if (began && ask) this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
-          else if (ended) this.carryOut(id, l, hookStep({ kind: 'toolEnd' }, this.statusInput(l)), 'statusline', { kind: 'toolEnd' })
+          const asked = l.statusAsk?.turn === turn && l.statusAsk.session === session
+          // One known of an earlier turn or session is over: forgotten.
+          if (l.statusAsk && !asked) l.statusAsk = undefined
+          if (ask && !asked) {
+            l.statusAsk = { turn, session }
+            this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
+          } else if (!ask && asked) {
+            l.statusAsk = undefined
+            this.carryOut(id, l, hookStep({ kind: 'toolEnd' }, this.statusInput(l)), 'statusline', { kind: 'toolEnd' })
+          }
           if (idle && l.statusIdle && !l.idleGrace) this.startIdleGrace(id, l, turn)
         })
       }

@@ -207,6 +207,14 @@ describe("agy's hooks through sessions (s56)", () => {
       expect(l.ledger.active?.id).toBe(`${MAIN}:i7`)
       expect(l.idleGrace, JSON.stringify(report)).toBeUndefined()
       expect(st.status, JSON.stringify(report)).toBe('working')
+      // B's own prompt, reported after the rejected one, is put to the person (HR2's round 2: never hidden by it).
+      await status(st, { agent_state: 'tool_use', tool_confirmation_pending: true })
+      await drain(st)
+      expect(st.status, JSON.stringify(report)).toBe('waiting')
+      // Answered (its falling edge): working again.
+      await status(st, { agent_state: 'working' })
+      await drain(st)
+      expect(st.status, JSON.stringify(report)).toBe('working')
       // B claims a file: another agent's edit of it is still refused (B's claim stands).
       const edit = recorded('PreToolUse', (q) => q.toolCall.name === 'edit_file')
       edit.toolCall.args.Path = join(p, `held-${l.state.agentId}.txt`)
