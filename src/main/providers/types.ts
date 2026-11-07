@@ -450,6 +450,11 @@ export interface ProviderAdapter {
   updateCommand(executable: string): CommandSpec
   /** A known update failure's explanation and explicit retry, if this installer supports one. */
   updateRetry?(executable: string, exitCode: number): UpdateRetry | null
+  /**
+   * What this CLI keeps for one agent of Combwork's (Antigravity's private profile, HI-2731), sent to the Recycle Bin once
+   * the agent is removed, so it is never left behind nor reused. CLIs whose homes are a connection's have none.
+   */
+  agentRemoved?(agentId: string, workspacePath: string): Promise<void>
   /** An update's exit code that means its installer had nothing newer (HI-2729: WinGet's 0x8A15002B): it ended well. */
   updateUpToDate?(executable: string, exitCode: number): boolean
   loginCommand(executable: string): CommandSpec

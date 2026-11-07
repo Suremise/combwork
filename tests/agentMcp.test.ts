@@ -1,9 +1,9 @@
 // Per-agent MCP server access (#537): an agent gets all of its project's MCP servers (the default) or only those its
 // settings name. A launch passes only those, for every provider; the built-in combwork server isn't affected; templates
 // keep the choice; the Agent API reads it.
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { agentChoosesMcp, agentGetsMcp, agentMcpText, cleanMcpServers, isMcpServerName } from '../src/shared/agentMcp'
 import { isAgentTemplate, readTemplate, templateFrom } from '../src/shared/templates'
@@ -137,6 +137,152 @@ describe('a launch', () => {
       const copilotArgs = copilot.buildCommand('C:\\bin\\copilot.exe', copilotCtx).args
       expect(copilotArgs.flatMap((a, i) => (a === '--disable-mcp-server' ? [copilotArgs[i + 1]] : []))).toEqual(['notes'])
     } finally {
+      await disposeWorkspaceService(w)
+    }
+  })
+
+  it('launches an Independent agent as from a terminal, whatever its connection says; every other role with its side (HI-2731)', async () => {
+    // A workspace of its own: two servers on, a skill of its own, one agent per role.
+    const home = join(base, 'ws-roles')
+    const project = join(home, 'proj')
+    mkdirSync(join(project, '.combwork'), { recursive: true })
+    mkdirSync(join(home, '.combwork', 'mcp'), { recursive: true })
+    for (const n of ['notes', 'sandbox']) writeFileSync(join(home, '.combwork', 'mcp', `${n}.json`), JSON.stringify(server(n)))
+    writeFileSync(join(home, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'] } }))
+    const roles = ['builder', 'reviewer', 'either', 'generalist', 'independent'] as const
+    const agents = roles.map((r) => ({ id: `a-${r}`, name: r, provider: 'claude-code', workflowRole: r }))
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
+    mkdirSync(join(home, '.combwork', 'skills', 'house-style'), { recursive: true })
+    writeFileSync(join(home, '.combwork', 'skills', 'house-style', 'SKILL.md'), '---\nname: house-style\ndescription: How we write.\n---\n\nWrite plainly.\n')
+    const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
+    const { sessions } = await import('../src/main/sessions')
+    const w = createWorkspaceService()
+    await w.open(home)
+    // Combwork's own server, as the Agent API gives it when it runs.
+    const was = sessions.combworkMcp
+    sessions.combworkMcp = () => ({ command: 'node', args: ['cw-mcp.js'], env: {} })
+    try {
+      const eff = async (r: (typeof roles)[number]) => sessions.effective(project, agents.find((a) => a.workflowRole === r) as never)
+      const sides: Record<string, unknown> = {}
+      for (const r of roles.filter((x) => x !== 'independent')) {
+        const e = await eff(r)
+        sides[r] = e.mcpServers.combwork?.env?.CW_SIDE
+        expect(e.launch.tools && e.launch.guidance && e.launch.typing, r).toBe(true)
+        expect(e.skills.map((s) => s.name), r).toContain('house-style')
+        expect(Object.keys(e.mcpServers).sort(), r).toEqual(['combwork', 'notes', 'sandbox'])
+      }
+      expect(sides).toEqual({ builder: 'builder', reviewer: 'reviewer', either: 'both', generalist: 'both' })
+      // Darren's 22:15 decision: "Independent behaves as if connection level switches are off": the terminal preset.
+      const { launchPolicy, terminalPreset } = await import('../src/shared/launchPolicy')
+      const ind = await eff('independent')
+      expect(ind.launch).toEqual(launchPolicy({ launch: terminalPreset('claude-code') }, 'claude-code'))
+      expect([ind.launch.tools, ind.launch.guidance, ind.launch.typing, ...Object.values(ind.launch.overrides)].every((v) => v === false)).toBe(true)
+      expect(ind.mcpServers).toEqual({})
+      expect(ind.skills).toEqual([])
+      expect(ind.skillHashes).toEqual({})
+      // A role change to or from Independent changes the signature, so a running agent restarts for it.
+      expect(sessions.signature(ind)).not.toBe(sessions.signature(await eff('either')))
+
+      // HR1's round 1: a running agent whose role changes to or from Independent restarts (its side alone is `both`
+      // either way, and an Independent launch has no combwork server), idle at once, busy only when asked, and does no
+      // part's work until it has relaunched. The session is put in as a launch leaves it; the restart itself is stubbed.
+      const { launchKeyOf } = await import('../src/main/sessions')
+      const s = sessions as unknown as { live: Map<string, unknown>; switchAtSafePoint: (p: string, id: string) => string }
+      const switched: string[] = []
+      const stub = vi.spyOn(s, 'switchAtSafePoint').mockImplementation((_p, id) => {
+        switched.push(id)
+        return 'queued'
+      })
+      const running = async (id: string, status: 'ready' | 'working') => {
+        const e = await sessions.effective(project, agents.find((a) => a.id === id) as never)
+        s.live.set(`${project.toLowerCase()}#${id}`, { state: { provider: 'claude-code', runId: `r-${id}`, projectPath: project, agentId: id, agentName: id, cwd: project, status }, side: (e.mcpServers.combwork?.env?.CW_SIDE as string | undefined) ?? null, workflowHidden: [], launchKey: launchKeyOf(e), sideRestart: false })
+      }
+      const role = (id: string, r: string) => w.updateAgent(project, id, { workflowRole: r as never })
+      try {
+        // Unchanged: nothing to do.
+        await running('a-either', 'ready')
+        expect(await sessions.restartForTools(project, 'a-either', { when: 'ifIdle' })).toBe('same')
+        // Either → Independent, idle: restarts at once.
+        await role('a-either', 'independent')
+        expect(await sessions.restartForTools(project, 'a-either', { when: 'ifIdle' })).toBe('restarting')
+        expect(switched).toEqual(['a-either'])
+        // Independent → Either (launched with no combwork server), idle: restarts too, and meanwhile does no part's work.
+        await running('a-independent', 'ready')
+        await role('a-independent', 'either')
+        expect(sessions.sideAllows(project, 'a-independent', 'builder')).toBe(false)
+        expect(sessions.sideAllows(project, 'a-independent', 'reviewer')).toBe(false)
+        expect(await sessions.restartForTools(project, 'a-independent', { when: 'ifIdle' })).toBe('restarting')
+        expect(switched).toEqual(['a-either', 'a-independent'])
+        // Busy: not at once (the window asks: Later leaves it as it is), at its safe point once asked.
+        await running('a-builder', 'working')
+        await role('a-builder', 'independent')
+        expect(await sessions.restartForTools(project, 'a-builder', { when: 'ifIdle' })).toBe('busy')
+        expect(switched).toHaveLength(2)
+        expect(await sessions.restartForTools(project, 'a-builder', { when: 'atSafePoint' })).toBe('restarting')
+        expect(switched).toEqual(['a-either', 'a-independent', 'a-builder'])
+        // Relaunched as an Either agent (its new launch), it does its parts again.
+        await running('a-independent', 'ready')
+        expect(sessions.sideAllows(project, 'a-independent', 'builder')).toBe(true)
+      } finally {
+        stub.mockRestore()
+        for (const id of ['a-either', 'a-independent', 'a-builder']) s.live.delete(`${project.toLowerCase()}#${id}`)
+      }
+
+      // HR1's round 1, point 2: per CLI, one agent Either → Independent → Either (a launch each), beside a fresh agent only
+      // ever Independent: what each CLI's own launch delivers (its combwork server, Combwork's guidance, the skill
+      // copies) is there for Either, retired for Independent, and back for Either. Antigravity's is antigravity.test's.
+      const { claudeCode } = await import('../src/main/providers/claude/adapter')
+      const { codex } = await import('../src/main/providers/codex/adapter')
+      const { copilot } = await import('../src/main/providers/copilot/adapter')
+      mkdirSync(process.env.CODEX_HOME!, { recursive: true })
+      mkdirSync(process.env.COPILOT_HOME!, { recursive: true })
+      const configKeys = (args: string[]): string[] => args.filter((_a, i) => args[i - 1] === '-c').map((v) => v.split('=')[0])
+      let run = 0
+      const launchOf = async (agent: { id: string }): Promise<Record<string, boolean>> => {
+        const e = await sessions.effective(project, (await w.projectConfig(project)).agents.find((a) => a.id === agent.id) as never)
+        const r = `cycle-${++run}`
+        const ctx: LaunchContext = {
+          projectPath: project, agentId: agent.id, executable: 'C:\\bin\\x.exe', cwd: project, workspacePath: home, runId: r, sessionId: '0cb916db-26aa-40f2-86b5-1ba81b225fd2',
+          resume: false, name: '', skills: e.skills, mcpServers: e.mcpServers, model: null, effort: null, permissionMode: null, extraArgs: [], hookUrl: `http://127.0.0.1:1/hook?run=${r}`,
+          hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${r}`), guidance: e.launch.guidance ? 'Combwork guidance' : '', notes: e.launch.guidance ? 'Workspace notes' : '', overrides: e.launch.overrides,
+          env: { CW_HOOK_TOKEN: 't' }, allowBackgroundSessions: false, use200kContext: false
+        }
+        const provider = (await w.projectConfig(project)).agents.find((a) => a.id === agent.id)!.provider
+        if (provider === 'claude-code') {
+          await claudeCode.prepareLaunch(ctx)
+          const args = claudeCode.buildCommand('C:\\bin\\claude.exe', ctx).args
+          const plugin = args[args.indexOf('--plugin-dir') + 1]
+          return { server: 'combwork' in JSON.parse(readFileSync(join(ctx.privateDir, 'mcp.json'), 'utf8')).mcpServers, guidance: args.includes('--append-system-prompt-file'), skill: existsSync(join(plugin, 'skills', 'house-style')) }
+        }
+        if (provider === 'codex') {
+          await codex.prepareLaunch(ctx)
+          // Codex asked which developer_instructions of its own apply (there's no Codex here): none, as a new home has.
+          ;(codex as unknown as { developerByRun: Map<string, string | null> }).developerByRun.set(r, '')
+          const keys = configKeys(codex.buildCommand('C:\\bin\\codex.exe', ctx).args)
+          return { server: keys.includes('mcp_servers.combwork'), guidance: keys.includes('developer_instructions'), skill: existsSync(join(project, '.agents', 'skills', 'cw-house-style')) }
+        }
+        await copilot.prepareLaunch(ctx)
+        const cmd = copilot.buildCommand('C:\\bin\\copilot.exe', ctx)
+        return { server: 'combwork' in JSON.parse(readFileSync(join(ctx.privateDir, 'mcp.json'), 'utf8')).mcpServers, guidance: !!cmd.env?.COPILOT_CUSTOM_INSTRUCTIONS_DIRS, skill: existsSync(join(project, '.agents', 'skills', 'cw-house-style')) }
+      }
+      const all = { server: true, guidance: true, skill: true }
+      const none = { server: false, guidance: false, skill: false }
+      for (const cli of ['claude-code', 'codex', 'copilot'] as const) {
+        const cycler = { id: `a-cycle-${cli}`, name: `cycle-${cli}`, provider: cli, workflowRole: 'either' }
+        const fresh = { id: `a-fresh-${cli}`, name: `fresh-${cli}`, provider: cli, workflowRole: 'independent' }
+        await w.mutateProjectConfig(project, (now) => ({ agents: [...now.agents, cycler, fresh] as never }))
+        expect(await launchOf(cycler), `${cli} as Either`).toEqual(all)
+        await role(cycler.id, 'independent')
+        expect(await launchOf(cycler), `${cli} made Independent`).toEqual(none)
+        await role(cycler.id, 'either')
+        expect(await launchOf(cycler), `${cli} made Either again`).toEqual(all)
+        expect(await launchOf(fresh), `${cli}, a fresh Independent agent`).toEqual(none)
+        // Nothing of the cycle's left for the next CLI's (the skill copies are the project's, shared by Codex and Copilot).
+        await role(cycler.id, 'independent')
+        await launchOf(cycler)
+      }
+    } finally {
+      sessions.combworkMcp = was
       await disposeWorkspaceService(w)
     }
   })

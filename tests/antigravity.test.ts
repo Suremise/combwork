@@ -499,3 +499,57 @@ describe("Combwork's guidance in the agent's own GEMINI.md (HI-2547's listing ch
     expect(existsSync(profileFolder((probe.ctx as { agentId: string }).agentId, probe.profile))).toBe(false)
   })
 })
+
+describe('an Independent launch in a profile a role agent used (HI-2731)', () => {
+  it("leaves no Combwork guidance, server or agy's cache of the server; a role agent's launch has them", async () => {
+    const { agyServerCache } = await import('../src/main/providers/antigravity/adapter')
+    const ws = tempDir('agy-roles-')
+    const ctx = (mcpServers: Record<string, unknown>) => ({ agentId: 'a-switch01', workspacePath: ws, cwd: ws, privateDir: ws, resume: false, guidance: 'Combwork guidance: cw_inbox', instructions: '', notes: '', mcpServers, permissionMode: 'accept-edits', skills: [], extraDirs: [], hookUrl: 'http://127.0.0.1:1/hook', hookAuthFile: 'auth', overrides: {}, env: {} }) as never
+    const profile = profileFolder('a-switch01', ws)
+    const cache = agyServerCache(profile, TOOLS_SERVER)
+    const servers = (): string[] => Object.keys(JSON.parse(readFileSync(join(profile, '.gemini', 'config', 'mcp_config.json'), 'utf8')).mcpServers)
+    // As Either: the guidance, the server, and agy's cache of it as agy would leave it.
+    await antigravity.prepareLaunch(ctx({ [TOOLS_SERVER]: { command: 'node', args: ['cw-mcp.js'] } }))
+    mkdirSync(cache, { recursive: true })
+    writeFileSync(join(cache, 'instructions.md'), 'Combwork guidance: cw_inbox')
+    writeFileSync(join(cache, 'cw_inbox.json'), '{}')
+    expect(readFileSync(join(profile, GUIDANCE_FILE), 'utf8')).toMatch(/cw_inbox/)
+    expect(servers()).toEqual([TOOLS_SERVER])
+    // As Independent (no combwork server: sessions.effective's): none of it is left for agy to load or find.
+    await antigravity.prepareLaunch(ctx({}))
+    expect(readFileSync(join(profile, GUIDANCE_FILE), 'utf8')).toBe('')
+    expect(servers()).toEqual([])
+    expect(existsSync(cache)).toBe(false)
+    // As Either again: the guidance and server are back (agy rebuilds its cache itself).
+    await antigravity.prepareLaunch(ctx({ [TOOLS_SERVER]: { command: 'node', args: ['cw-mcp.js'] } }))
+    expect(readFileSync(join(profile, GUIDANCE_FILE), 'utf8')).toMatch(/cw_inbox/)
+    expect(servers()).toEqual([TOOLS_SERVER])
+  })
+})
+
+describe("a removed agent's profile (HI-2731, Darren's decision)", () => {
+  it('goes to the Recycle Bin (a test copy’s trash folder), whole, and only its own', async () => {
+    const was = process.env.CW_TEST_TRASH_DIR
+    const bin = join(base, 'trash')
+    process.env.CW_TEST_TRASH_DIR = bin
+    try {
+      const gone = profileFolder('a-gone0001', 'C:\\ws')
+      const other = profileFolder('a-kept0001', 'C:\\ws')
+      for (const p of [gone, other]) {
+        mkdirSync(join(p, '.gemini', 'config'), { recursive: true })
+        writeFileSync(join(p, GUIDANCE_FILE), 'guidance')
+      }
+      await antigravity.agentRemoved('a-gone0001', 'C:\\ws')
+      expect(existsSync(gone)).toBe(false)
+      expect(existsSync(join(other, GUIDANCE_FILE))).toBe(true)
+      const moved = readFileSync(join(bin, 'trash.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { from: string; to: string })
+      expect(moved.map((m) => m.from)).toEqual([gone])
+      expect(readFileSync(join(moved[0].to, GUIDANCE_FILE), 'utf8')).toBe('guidance')
+      // An agent that never ran on Antigravity has none: nothing to do.
+      await expect(antigravity.agentRemoved('a-never001', 'C:\\ws')).resolves.toBeUndefined()
+    } finally {
+      if (was === undefined) delete process.env.CW_TEST_TRASH_DIR
+      else process.env.CW_TEST_TRASH_DIR = was
+    }
+  })
+})

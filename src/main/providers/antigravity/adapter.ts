@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
 import { dirname, join, resolve } from 'path'
 import { existsSync, mkdirSync, writeFileSync } from 'original-fs'
-import { cp, mkdir, stat, writeFile } from 'original-fs/promises'
+import { cp, mkdir, rm, stat, writeFile } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PathDataCopy, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
 import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../../../shared/antigravity'
 import { ASSISTANT_AGENT_ID } from '../../../shared/assistant'
@@ -16,6 +16,7 @@ import { launchOverrides } from '../../advancedValues'
 import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
+import { trash } from '../../trash'
 import { compareVersions, exportSubtitleText, installText, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
 import type { Ask, CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { antigravityEnv, brainDir, checkEnv, checkProfile, inProfile, inUserProfile, profilesRoot } from './home'
@@ -84,6 +85,9 @@ export const isLegacySse = (def: McpServerDef): boolean => typeof def.type === '
 
 /** The agent's servers agy can't use (legacy HTTP+SSE): left out of its profile, and the user told why (launchNotice). */
 export const legacySseServers = (given: Record<string, McpServerDef>): string[] => Object.entries(given).filter(([, d]) => isLegacySse(d)).map(([n]) => n)
+
+/** Where agy 1.5.0 keeps a server's instructions.md and tool schemas, in a profile (seen in agents' profiles, HI-2731). */
+export const agyServerCache = (profile: string, server: string): string => join(profile, '.gemini', 'antigravity-cli', 'mcp', server)
 
 /** The rules file agy auto-loads from its home (HI-2547: `/context` lists ~\.gemini\GEMINI.md as a system file). */
 export const GUIDANCE_FILE = join('.gemini', 'GEMINI.md')
@@ -319,6 +323,16 @@ export class AntigravityAdapter implements ProviderAdapter {
     return antigravityInstallCommand()
   }
 
+  /**
+   * A removed agent's private profile goes to the Recycle Bin (HI-2731, Darren's decision of 7 Nov): its rules, MCP config
+   * and conversations are its alone, and no new agent has its id. Agents a template load replaced keep theirs, which the
+   * load's undo gives back with their ids.
+   */
+  async agentRemoved(agentId: string, workspacePath: string): Promise<void> {
+    const profile = profileFolder(agentId, workspacePath)
+    if (existsSync(profile)) await trash(profile)
+  }
+
   updateCommand(executable: string): CommandSpec {
     return antigravityUpdateCommand(executable)
   }
@@ -385,6 +399,9 @@ export class AntigravityAdapter implements ProviderAdapter {
     await writeFile(join(profile, GUIDANCE_FILE), guidance)
     // The servers' env (and the launch's token) stays in the profile, under Combwork's own data: never the project.
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'mcp_config.json'), made.mcp)
+    // agy keeps each server's instructions and tool schemas as files it reads lazily (antigravity-cli\mcp\<server>): a
+    // launch without Combwork's server (an Independent agent, HI-2731) leaves none of an earlier launch's for it to find.
+    if (!Object.hasOwn(made.mcp.mcpServers as Record<string, unknown>, TOOLS_SERVER)) await rm(agyServerCache(profile, TOOLS_SERVER), { recursive: true, force: true })
     // Combwork's hooks, for this launch (its URL; its token file in its environment, agyHookEnv): agy reads the profile's
     // hooks.json, never the project's.
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'hooks.json'), agyHooks(ctx.hookUrl, advanced.get<boolean>('antigravity.hooks.toolHooks')))
