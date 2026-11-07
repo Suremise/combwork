@@ -10,6 +10,7 @@ import { createRequire } from 'module'
 import path from 'path'
 import { afterAll, beforeAll, test } from 'vitest'
 import { tempDir } from './tempDir'
+import { PROVIDERS } from '../src/shared/providers'
 
 const require = createRequire(import.meta.url)
 // What the runner and the fakes read and write is plain JSON.
@@ -32,7 +33,8 @@ const OLD_DIR = 'Hive'
 const saved = { WSB_STUB: process.env.WSB_STUB, WSB_STUB_STATE: process.env.WSB_STUB_STATE, WSB_STOP_RETRY_MS: process.env.WSB_STOP_RETRY_MS }
 process.env.WSB_STOP_RETRY_MS = '10'
 process.env.WSB_STUB = STUB
-const { buildRoot, plan, inSandbox, sacState, blockedReason, cmpVersion, serverCandidates, mainCheckout, setLogSink } = require('./sandbox/checks.cjs')
+const { buildRoot, plan, inSandbox, sacState, blockedReason, cmpVersion, previousEra, ERA_EXE, serverCandidates, mainCheckout, setLogSink } = require('./sandbox/checks.cjs')
+const { evaluate, required, REQUIRED, UPGRADE_IDS } = require('./sandbox/report.cjs')
 const logged: string[] = []
 beforeAll(() => setLogSink((line: string) => logged.push(line)))
 afterAll(() => {
@@ -170,9 +172,9 @@ const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error
 const SAC_ON = '\r\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\CI\\Policy\r\n    VerifiedAndReputablePolicyState    REG_DWORD    0x1\r\n'
 
 /** Runs the checks on the fakes with these guest commands scripted: two installers in one build folder. */
-function runChecks(name: string, guest: Json[], extra: string[] = [], vars: Json = {}, fail: Json = {}) {
+function runChecks(name: string, guest: Json[], extra: string[] = [], vars: Json = {}, fail: Json = {}, previousName = 'Combwork-Setup-0.5.1.exe') {
   const s = scratch(name, { guest, ...fail })
-  const previous = path.join(s.dir, 'builds', 'app', 'previous', 'Combwork-Setup-0.5.1.exe')
+  const previous = path.join(s.dir, 'builds', 'app', 'previous', previousName)
   fs.mkdirSync(path.dirname(previous))
   fs.writeFileSync(previous, 'MZ')
   // Git for Windows' folder, for the clean install's git project (HI-2592): mapped, never run.
@@ -309,6 +311,149 @@ test('--previous-rc (HI-2587): a 1.1 release candidate adds scenario 10 beside t
   assert.throws(() => plan(['--only', 'upgrade-rc', '--installer', installer, '--repo', repo, '--server', FAKE_SERVER]), /--only upgrade-rc needs --previous-rc/)
 })
 
+// HI-2727: what the upgrade seeds and checks follows the release it starts from, by its version.
+test('the previous release\'s era: 1.0 below 1.1.0\'s prereleases, rc for a 1.1.0 prerelease, combwork from 1.1.0 on', () => {
+  for (const [v, era] of [['0.9.0', '1.0'], ['1.0.0', '1.0'], ['1.0.1-rc.1', '1.0'], ['1.1.0-beta.1', 'rc'], ['1.1.0-rc.2', 'rc'], ['1.1.0', 'combwork'], ['1.1.3', 'combwork'], ['1.2.0-beta.1', 'combwork'], ['2.0.0', 'combwork']]) assert.strictEqual(previousEra(v), era, v)
+  // What start-app.ps1 starts before the upgrade: 1.0's exe only from 1.0 (the beta.1 run started 1.0's exe from 1.1.0).
+  assert.match(ERA_EXE['1.0'], new RegExp(`\\\\${OLD_DIR}\\.exe$`))
+  assert.strictEqual(ERA_EXE.combwork, '%LOCALAPPDATA%\\Programs\\Combwork\\Combwork.exe')
+  assert.strictEqual(ERA_EXE.rc, ERA_EXE.combwork)
+})
+
+test('from a 1.1+ previous: the profile move (1.0\'s) is left out with a note, --only profile-move and edges refused, Git mapped for the upgrade', () => {
+  const s = scratch('previous-11')
+  const repo = path.join(s.dir, 'builds', 'app')
+  const dist = path.join(repo, 'dist')
+  fs.mkdirSync(dist)
+  for (const v of [`${OLD_SETUP}-1.0.0`, 'Combwork-Setup-1.1.0', 'Combwork-Setup-1.2.0-beta.1']) fs.writeFileSync(path.join(dist, `${v}.exe`), 'MZ')
+  const git = path.join(s.dir, 'git')
+  fs.mkdirSync(path.join(git, 'cmd'), { recursive: true })
+  fs.writeFileSync(path.join(git, 'cmd', 'git.exe'), 'MZ')
+  const installer = path.join(dist, 'Combwork-Setup-1.2.0-beta.1.exe')
+  const base = ['--installer', installer, '--repo', repo, '--server', FAKE_SERVER, '--git', git]
+  // By default the newest other release in dist: 1.1.0.
+  const p = plan(base)
+  assert.strictEqual(path.basename(p.previous), 'Combwork-Setup-1.1.0.exe')
+  assert.strictEqual(p.previousEra, 'combwork')
+  assert.deepStrictEqual(p.ran, ['fresh', 'upgrade', 'clean'])
+  assert.match(p.skipped['profile-move'], /^not run: the profile move \(scenario 11\) is 1\.0's, and the previous release is 1\.1\.0; run it with --only profile-move --previous /)
+  assert.strictEqual(p.git, git)
+  // Only the upgrade asked for: Git still mapped (its seeded project), as the clean install's is.
+  assert.strictEqual(plan([...base, '--only', 'upgrade']).git, git)
+  assert.throws(() => plan([...base, '--only', 'profile-move']), /--only profile-move needs a 1\.0 previous release .*Combwork-Setup-1\.1\.0\.exe is 1\.1\.0/)
+  assert.throws(() => plan([...base, '--only', 'edges', '--short', installer]), /--only edges needs a 1\.0 previous release/)
+  // From 1.0, as before: the profile move runs, nothing left out, and Git only for the clean install.
+  const old = plan([...base, '--previous', path.join(dist, `${OLD_SETUP}-1.0.0.exe`)])
+  assert.strictEqual(old.previousEra, '1.0')
+  assert.deepStrictEqual(old.ran, ['fresh', 'upgrade', 'clean', 'profile-move'])
+  assert.deepStrictEqual(old.skipped, {})
+  assert.strictEqual(plan([...base, '--previous', path.join(dist, `${OLD_SETUP}-1.0.0.exe`), '--only', 'upgrade']).git, null)
+})
+
+test('the run from a 1.1+ previous: Combwork.exe started before the upgrade, the era passed to the driver, Git in its Sandbox, scenario 11 noted not run', () => {
+  const run = runChecks('run-from-11', [], [], {}, {}, 'Combwork-Setup-1.1.0.exe')
+  const { r, json, md, guests, starts, log } = run
+  assert.strictEqual(r.status, 1, r.stdout + r.stderr) // the fake drivers write no results: checks fail
+  assert.deepStrictEqual(json.meta.ran, ['fresh', 'upgrade', 'clean'])
+  assert.strictEqual(json.meta.previousEra, 'combwork')
+  assert.ok(!guests.some((g) => /profile-move\.ps1/.test(g)), 'the profile move ran')
+  const started = guests.filter((g) => /start-app\.ps1/.test(g))
+  assert.strictEqual(started.length, 1)
+  assert.match(started[0], /-Exe "%LOCALAPPDATA%\\Programs\\Combwork\\Combwork\.exe" -Name s4-prev-started/)
+  assert.deepStrictEqual(guests.filter((g) => /drive\.cjs (mark|after-upgrade) /.test(g)).map((g) => g.split('drive.cjs ')[1]), ['mark s4-mark combwork', 'after-upgrade s4-after combwork'])
+  // Git in the upgrade's Sandbox (its seeded git project) and the clean install's; none in the fresh install's.
+  assert.deepStrictEqual(starts.map((a) => a.tools.includes('git')), [false, true, true])
+  // The installer's state judged as a 1.1 install's (the next test has the ids each era requires).
+  assert.ok(!json.checks.some((c: Json) => c.name === "The installer's record is in %LOCALAPPDATA%\\Combwork"), 'a 1.0 check')
+  assert.match(md, /- \*\*profile-move\*\* not run: the profile move \(scenario 11\) is 1\.0's, and the previous release is 1\.1\.0/)
+  assert.match(md, /The upgrade starts from \*\*1\.1\.0\*\*, already under Combwork's names/)
+  assert.match(log, /profile-move: not run: the profile move/)
+  // And from 0.5.1 (1.0's era), as before: 1.0's exe, no era passed to the driver as anything but 1.0, the profile move run.
+  const old = runChecks('run-from-10', [])
+  assert.match(old.guests.find((g) => /start-app\.ps1/.test(g)) ?? '', new RegExp(`\\\\${OLD_DIR}\\\\${OLD_DIR}\\.exe"`))
+  assert.ok(old.guests.some((g) => g.endsWith('drive.cjs mark s4-mark 1.0')), old.guests.join('\n'))
+  assert.ok(old.guests.some((g) => /profile-move\.ps1/.test(g)))
+})
+
+test("the report's upgrade requirements follow the era: from 1.0 as before, from 1.1+ the carried-over workspace's, the installer's record not required", () => {
+  assert.deepStrictEqual(required('upgrade', { previousEra: '1.0' }), REQUIRED.upgrade)
+  assert.deepStrictEqual(required('upgrade', {}), REQUIRED.upgrade)
+  assert.deepStrictEqual(required('upgrade-rc', { previousEra: 'combwork' }), REQUIRED['upgrade-rc'])
+  const from11 = required('upgrade', { previousEra: 'combwork' })
+  assert.deepStrictEqual(from11.drivers['s4-mark'].ids, UPGRADE_IDS.combwork.mark)
+  assert.deepStrictEqual(from11.drivers['s4-after'].ids, UPGRADE_IDS.combwork.after)
+  assert.deepStrictEqual(required('manual', { previousEra: 'combwork' }).drivers['s7-after'].ids, UPGRADE_IDS.combwork.after)
+  // The installer's own state, from a 1.1 install over which nothing was moved: no record wanted, none of 1.0's made.
+  const state = { uninstallEntries: [{ displayName: 'Combwork 1.2.0', key: '10a7595a-0e90-558c-b6b6-ae33bdd80748' }], shortcuts: [], installs: { combwork: { hasExe: true, appAsarSha256: 'x' }, old: { exists: false } }, profiles: { roamingCombwork: { exists: true }, localCombwork: { exists: true, record: null }, roamingOld: { exists: false }, localOld: { exists: false } }, run: [] }
+  const names = (era: string) => evaluate({ ran: ['upgrade'], installerVersion: '1.2.0', previousEra: era, previousVersion: era === '1.0' ? '1.0.0' : '1.1.0', steps: [], shots: [] }, { 's4-new-state': state }).checks.filter((c: Json) => /^(The profile folders|No profile move|The installer's record)/.test(c.name)).map((c: Json) => [c.name, c.ok])
+  assert.deepStrictEqual(names('combwork'), [["The profile folders kept where they were: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app's made", true], ["No profile move by the installer (nothing of 1.0's to move): no record in %LOCALAPPDATA%\\Combwork", true]])
+  assert.deepStrictEqual(names('1.0'), [["The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app's left", true], ["The installer's record is in %LOCALAPPDATA%\\Combwork", false]])
+})
+
+// HR1's HI-2727 round 1: the seeded connection and skill copy compared by content, never by their files' names alone.
+test('the kept connection and skill copy are compared by content: emptied or changed files that keep their names fail', () => {
+  const { connectionSnapshot, connectionDiffers, copyDiffers } = require('./sandbox/inside/kept.cjs')
+  const folders = ['C:/Sandbox/trusted', 'C:/Sandbox/untrusted']
+  const list = { connections: [{ id: 'a-1', provider: 'claude-code', name: 'Sandbox', kind: 'signIn' }, { id: 'a-2', provider: 'codex', name: 'Sandbox' }] }
+  const claude = { oauthAccount: { emailAddress: 'fake@example.com' }, projects: { 'C:/Sandbox/trusted': { hasTrustDialogAccepted: true }, 'C:/Sandbox/untrusted': { hasTrustDialogAccepted: false } } }
+  const files = { 'fake-account.json': JSON.stringify({ email: 'fake@example.com', orgId: 'org-fake' }), '.claude.json': JSON.stringify(claude) }
+  const before = connectionSnapshot(list, 'a-1', files, folders)
+  assert.deepStrictEqual(connectionDiffers(before, before), [])
+  // The CLI trusting a folder of its own as it runs (the lane's slot) is no change to what was seeded.
+  const ran = { ...files, '.claude.json': JSON.stringify({ ...claude, hasCompletedOnboarding: true, projects: { ...claude.projects, 'C:/Users/x/Kept.worktrees/demo/slot-a': { hasTrustDialogAccepted: true } } }) }
+  assert.deepStrictEqual(connectionDiffers(before, connectionSnapshot(list, 'a-1', ran, folders)), [])
+  const after = (l: Json, f: Json) => connectionDiffers(before, connectionSnapshot(l, 'a-1', f, folders))
+  // Every file still there by name, its content lost or changed: each is a difference.
+  assert.deepStrictEqual(after(list, { ...files, 'fake-account.json': '' }), ['its sign-in (fake-account.json) changed'])
+  assert.deepStrictEqual(after(list, { ...files, 'fake-account.json': null }), ['its sign-in (fake-account.json) is gone'])
+  assert.deepStrictEqual(after(list, { ...files, '.claude.json': '{}' }), ['the account .claude.json names: {"emailAddress":"fake@example.com"} → null', 'the trust answer for C:/Sandbox/trusted: true → none', 'the trust answer for C:/Sandbox/untrusted: false → none'])
+  assert.deepStrictEqual(after(list, { ...files, '.claude.json': JSON.stringify({ ...claude, projects: { ...claude.projects, 'C:/Sandbox/untrusted': { hasTrustDialogAccepted: true } } }) }), ['the trust answer for C:/Sandbox/untrusted: false → true'])
+  // The row read by its id, not found somewhere in the list's text: another connection with its name isn't it.
+  assert.deepStrictEqual(after({ connections: [list.connections[1]] }, files), ["connection a-1 isn't listed"])
+  assert.deepStrictEqual(after({ connections: [{ ...list.connections[0], name: 'Renamed' }] }, files), ['its name: Sandbox → Renamed'])
+  // A seed that wrote nothing can't pass.
+  assert.deepStrictEqual(connectionDiffers(connectionSnapshot({}, 'a-1', {}, folders), connectionSnapshot({}, 'a-1', {}, folders)), ['no connection was seeded', 'no sign-in was seeded', 'no account was seeded in .claude.json', "the trust answers weren't all seeded"])
+  // The skill copy: SKILL.md by its content.
+  const skill = '---\nname: cw-sandbox-check\n---\n'
+  assert.deepStrictEqual(copyDiffers({ 'SKILL.md': skill }, { 'SKILL.md': skill }), [])
+  assert.deepStrictEqual(copyDiffers({ 'SKILL.md': skill }, { 'SKILL.md': '' }), ['SKILL.md changed'])
+  assert.deepStrictEqual(copyDiffers({ 'SKILL.md': skill }, { 'SKILL.md': null }), ['SKILL.md is gone'])
+  // The driver uses them for 4.connection-kept and 4.copy-marker, from its seeded content.
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  assert.match(drive, /const differs = connectionDiffers\(c\?\.kept, now\)/)
+  assert.match(drive, /copyDiffers\(\{ 'SKILL\.md': COPY_SKILL \}/)
+  assert.ok(drive.includes(`const COPY_SKILL = '${skill.replace(/\n/g, '\\n')}'`))
+  assert.doesNotMatch(drive, /JSON\.stringify\(list\)\.includes/)
+})
+
+test("the driver's provider ids are the descriptors' (2.api-providers checks by id, not a count)", () => {
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const ids = JSON.parse((/const PROVIDER_IDS = (\[[^\]]*\])/.exec(drive)?.[1] ?? '[]').replace(/'/g, '"'))
+  assert.deepStrictEqual(ids, PROVIDERS.map((p) => p.id))
+  assert.doesNotMatch(drive, /list\.length === 3/)
+})
+
+// The 1.1+ mark step drives the release before (1.1) through its own surface: what it calls is checked against 1.1.0's
+// tag when this checkout has it (a shallow clone may not); after-upgrade's against this checkout, as the window test does.
+test('what the 1.1+ seeding calls is in 1.1.0 (its IPC channels and routes), and what after-upgrade reads is here', () => {
+  const root = path.resolve(__dirname, '..')
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  const seeding = ['settings:update', 'provider:info', 'connections:add', 'connections:signIn', 'connections:setOn', 'workspace:open', 'workflow:setPlatform', 'workflow:form', 'workflow:setOptions', 'tasks:create', 'tasks:setKind', 'tasks:update', 'tasks:comment', 'advanced:set', 'agents:add']
+  const reading = ['connections:list', 'advanced:state', 'tasks:facts', 'workspace:open']
+  for (const c of [...seeding, ...reading]) assert.ok(drive.includes(`'${c}'`), c)
+  for (const r of ["'/v1/lanes'", '/v1/lanes?project=demo', '/v1/tasks/']) assert.ok(drive.includes(r), r)
+  const api = fs.readFileSync(path.join(root, 'src', 'shared', 'api.ts'), 'utf8')
+  assert.deepStrictEqual(reading.filter((c) => !api.includes(`'${c}'`)), [], 'channels after-upgrade reads, missing from src/shared/api.ts')
+  const show = (f: string) => spawnSync('git', ['show', `v1.1.0:${f}`], { cwd: root, env: baseEnv(), encoding: 'utf8', windowsHide: true, timeout: 30_000, maxBuffer: 64 * 1024 * 1024 })
+  const api11 = show('src/shared/api.ts')
+  if (api11.status !== 0) return // no 1.1.0 tag here
+  assert.deepStrictEqual(seeding.filter((c) => !api11.stdout.includes(`'${c}'`)), [], "channels the seeding calls, missing from 1.1.0's src/shared/api.ts")
+  const servers11 = show('src/main/servers.ts').stdout
+  for (const r of ["route('POST', '/v1/lanes'", "route('GET', '/v1/lanes'", "route('GET', '/v1/tasks/:n'"]) assert.ok(servers11.includes(r), r)
+  // The preset that puts each card in a slot, by 1.1.0's options.
+  assert.match(show('src/shared/workflow/options.ts').stdout, /if \(id === 'pairAgent'\)\s*return \{[^}]*folder: 'slots'/)
+})
+
 test('--smart-app-control: only "off"; anything else is refused before anything runs', () => {
   assert.throws(() => plan(['--smart-app-control', 'on', '--installer', 'x']), /--smart-app-control takes only "off" .*, not "on"/)
   assert.throws(() => plan(['--installer', 'x', '--smart-app-control']), /--smart-app-control takes only "off" .*, not nothing$/)
@@ -407,7 +552,7 @@ test("the driver's Launch at login reading keeps the 1.0 exe's and Combwork.exe'
 // what the app writes: the record of a move (its file name, by, signInChecked) and the sign-in check's log lines
 // (profileNotices.ts). When one changes, the script must change with it, not fail at the next release candidate.
 test("the profile move's script records the report's check ids, and reads the record and log lines the app writes", () => {
-  const { PROFILE_MOVE_IDS, REQUIRED } = require('./sandbox/report.cjs')
+  const { PROFILE_MOVE_IDS } = require('./sandbox/report.cjs')
   const script = fs.readFileSync(path.join(SANDBOX, 'inside', 'profile-move.ps1'), 'utf8')
   const ids = [...script.matchAll(/^\s*Check '([^']+)'/gm)].map((m) => m[1])
   assert.deepStrictEqual(ids.filter((id) => id !== '11.error'), PROFILE_MOVE_IDS)

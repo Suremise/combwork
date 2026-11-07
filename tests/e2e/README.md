@@ -589,7 +589,12 @@ Then the profile move the installer couldn't make (scenario 11, `--only profile-
 open while the new installer runs (it moves the roaming folder and leaves the local one, its record in it), Combwork
 started with the file still held (refused, with its error box, nothing made under Combwork's name), then let go and
 started again (it moves the folder itself, its record arriving with it, and checks the sign-ins once: not again at the
-next start). Four throwaway Sandboxes, about 20 minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or
+next start). What the upgrade (scenario 4) seeds and checks follows the previous release's version (HI-2727): from
+1.0, its names moved and the profile move run; from 1.1 on, a real workspace made through that release's own window
+and Agent API (a git project on the Pair (agent merges) preset, two cards labelled, linked and commented, a Claude Code
+connection, advanced overrides at both levels, a skill copy, and a lane over an agent, lent a slot), each read back after
+the upgrade by its id and unchanged, with Git mapped for it. The profile move is 1.0's: from a later previous it isn't
+run (the report says so; `--only profile-move --previous <1.0's installer>` runs it). Four throwaway Sandboxes, about 20 minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or
 credential goes in. It writes `report.md` (pass or fail per check, with screenshots) and passes only with every check run.
 
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the

@@ -14,6 +14,11 @@
  * --previous-rc (HI-2587): a 1.1 release candidate (RC2), partly converted to Combwork's names, for scenario 10: the upgrade
  * from it, run beside 1.0.0's (scenario 4) whenever it is given, so the names upgrade is checked from both.
  *
+ * --previous's version decides what scenario 4 seeds and checks (HI-2727, previousEra): from 1.0, its names moved; from
+ * 1.1 on, a real workspace (a git project, cards, a lane and its slot, a connection, advanced overrides) carried over as
+ * it was, with Git mapped for it. The profile move (scenario 11) is 1.0's: from a later release it isn't run (the
+ * report notes it), and --only profile-move or edges then refuses.
+ *
  * --repo (or CW_REPO; default this checkout) is where --previous is looked for: the newest Combwork-Setup-*.exe (or 1.0's installer) in
  * <repo>\dist other than --installer, so pass the main checkout from a worktree. Both installers must sit under one
  * folder (not a drive root), which is mapped read-only at C:\build. This checkout's tests folder (the scripts in
@@ -80,6 +85,7 @@ function serverCandidates(repo) {
 // old-name: begin checks-inputs
 const versionOf = f => (/(?:Combwork|Hive)-Setup-(\d+\.\d+\.\d+(?:-[\w.]+)?)\.exe$/i.exec(f) || [])[1]
 const OLD_EXE = '%LOCALAPPDATA%\\Programs\\Hive\\Hive.exe'
+const OLD_SETUP = 'Hive-Setup'
 // old-name: end checks-inputs
 /**
  * Semver order: major.minor.patch, then a release above its prereleases (0.9.0 > 0.9.0-rc.1 > 0.9.0-beta.1), whose
@@ -102,6 +108,18 @@ function splitVersion(v) {
   const i = v.indexOf('-')
   return [(i < 0 ? v : v.slice(0, i)).split('.').map(Number), i < 0 ? null : v.slice(i + 1).split('.')]
 }
+/**
+ * What the release an upgrade starts from left behind (HI-2727), by its version: '1.0' below 1.1.0's prereleases (the
+ * app, its profile and its workspaces under the old names, for the names upgrade to move); 'rc' a 1.1.0 prerelease
+ * (partly converted, HI-2587); 'combwork' 1.1.0 and later (Combwork's names already: the upgrade keeps them and carries
+ * the data over as it is). The profile move (scenario 11) is 1.0's alone.
+ */
+function previousEra(version) {
+  if (cmpVersion(version, '1.1.0-0') < 0) return '1.0'
+  return cmpVersion(version, '1.1.0') < 0 ? 'rc' : 'combwork'
+}
+/** Where each era's installer puts the app's exe, which start-app.ps1 starts before the upgrade. */
+const ERA_EXE = { '1.0': OLD_EXE, rc: '%LOCALAPPDATA%\\Programs\\Combwork\\Combwork.exe', combwork: '%LOCALAPPDATA%\\Programs\\Combwork\\Combwork.exe' }
 /** Git for Windows' folder (the one with cmd\git.exe): --git, else that of the git.exe on the PATH; null without one. */
 function gitRoot(opt) {
   const ok = d => !!d && fs.existsSync(path.join(d, 'cmd', 'git.exe'))
@@ -190,6 +208,15 @@ function plan(argv) {
     if (!previous) throw new Error(`No previous installer in ${dist}: pass --previous`)
   }
   if (previous && (!fs.existsSync(previous) || !versionOf(previous))) throw new Error("--previous must name an existing Combwork-Setup-<version>.exe (or 1.0's name for it, before HI-2458)")
+  const era = previous ? previousEra(versionOf(previous)) : null
+  // The profile move is 1.0 → 1.1's (HI-2602): from a later release there is no 1.0 profile to move, so it isn't run.
+  const skipped = {}
+  if (era && era !== '1.0' && ran.includes('profile-move')) {
+    if (only === 'profile-move') throw new Error(`--only profile-move needs a 1.0 previous release (${OLD_SETUP}-1.0.0.exe): the profile move is 1.0's, and ${path.basename(previous)} is ${versionOf(previous)}`)
+    ran.splice(ran.indexOf('profile-move'), 1)
+    skipped['profile-move'] = `not run: the profile move (scenario 11) is 1.0's, and the previous release is ${versionOf(previous)}; run it with --only profile-move --previous ${OLD_SETUP}-1.0.0.exe`
+  }
+  if (era && era !== '1.0' && ran.includes('edges')) throw new Error(`--only edges needs a 1.0 previous release (${OLD_SETUP}-1.0.0.exe): its cases are over the 1.0 app, and ${path.basename(previous)} is ${versionOf(previous)}`)
   const upgrade = overOld
   const fromRc = ran.includes('upgrade-rc')
   const root = buildRoot(installer, upgrade ? previous : null, fromRc ? previousRc : null)
@@ -203,6 +230,8 @@ function plan(argv) {
     ran,
     installer,
     previous: upgrade ? previous : null,
+    previousEra: upgrade ? era : null,
+    skipped,
     root,
     buildInfo,
     app: appNames(),
@@ -215,7 +244,8 @@ function plan(argv) {
     report: path.resolve(opt('--report', path.join(process.env.LOCALAPPDATA, 'combwork-test', 'sandbox-reports', stamp))),
     waitMin: Number(opt('--wait-min', 0)),
     sacOff: sac === 'off',
-    git: ran.includes('clean') ? gitRoot(opt('--git')) : null
+    // Git for the clean install's project, and for the git project (and its slot) an upgrade from 1.1 on seeds.
+    git: ran.includes('clean') || (upgrade && era === 'combwork' && (ran.includes('upgrade') || ran.includes('manual'))) ? gitRoot(opt('--git')) : null
   }
 }
 
@@ -276,7 +306,8 @@ function steps(srv, ctx) {
     return r
   }
   const ps = (scenario, what, script, args, o) => run(scenario, what, `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ${INSIDE}\\${script} ${args}`, o)
-  const drive = (scenario, what, step, prefix, timeoutSec = 420) => run(scenario, what, `C:\\tools\\node\\node.exe ${INSIDE}\\drive.cjs ${step} ${prefix}`, { timeoutSec })
+  // `era`: what the release before the upgrade left (previousEra), for the upgrade's steps.
+  const drive = (scenario, what, step, prefix, timeoutSec = 420, era = '') => run(scenario, what, `C:\\tools\\node\\node.exe ${INSIDE}\\drive.cjs ${step} ${prefix}${era ? ` ${era}` : ''}`, { timeoutSec })
   /** Smart App Control's state in this Sandbox, read only; logged and kept for the reason if an install is blocked. */
   const readSac = async () => {
     const r = await srv.call('sandbox_run', { command: SAC_QUERY, as: 'user', timeoutSec: 30 }).catch(e => ({ text: e.message }))
@@ -332,7 +363,8 @@ async function main(argv) {
   logFile = path.join(p.report, 'run.log')
   const problem = hostProblem()
   if (problem) { log('NOT RUN:', problem); return 2 }
-  log(`installer ${p.installer} (${versionOf(p.installer)}); previous ${p.previous || '-'}; build folder ${p.root}; server ${p.serverJs}; report ${p.report}${p.sacOff ? '; Smart App Control: off inside the Sandbox, by option' : ''}`)
+  for (const [kind, why] of Object.entries(p.skipped)) log(`${kind}: ${why}`)
+  log(`installer ${p.installer} (${versionOf(p.installer)}); previous ${p.previous ? `${p.previous} (${p.previousEra})` : '-'}; build folder ${p.root}; server ${p.serverJs}; report ${p.report}${p.sacOff ? '; Smart App Control: off inside the Sandbox, by option' : ''}`)
   for (const t0w = Date.now(); ;) {
     let ids
     try { ids = await list() } catch (e) { log('NOT RUN:', e.message); return 2 }
@@ -358,17 +390,19 @@ async function main(argv) {
   const ctx = { report: p.report, files: {}, shots: [], steps: [], timings: {}, leftRunning: [], notRun: {}, sac: null, sacOff: p.sacOff }
   const start = { build: p.root, network: false, session: true, tools: ['node', 'playwright', 'combwork-tests'], maxMinutes: 30, ...(p.sacOff ? { smartAppControl: 'off' } : {}) }
   const time = async (k, fn) => { const t = Date.now(); const r = await fn(); ctx.timings[k] = `${((Date.now() - t) / 1000).toFixed(1)} s`; return r }
-  const overPrevious = async (srv, n, pre, args, from = { installer: p.guestPrevious, exe: OLD_EXE }) => {
+  const overPrevious = async (srv, n, pre, args, from = { installer: p.guestPrevious, era: p.previousEra }) => {
     const s = steps(srv, ctx)
     await s.readSac()
+    // From 1.1 on, the seeded workspace's project is a git repository (its slot a worktree): this machine's Git, mapped.
+    if (from.era === 'combwork' && !p.git) s.record(n, `${n}. Git for the seeded git project, mapped from this machine`, false, 'no Git for Windows found here (git.exe on the PATH, or --git <its folder>)')
     await time(`${n}. previous release install`, () => s.install(n, `${n}. install previous`, from.installer, `-Arguments "/S" -Name ${pre}-prev`, { timeoutSec: 300 }))
-    await s.drive(n, `${n}. change settings`, 'mark', `${pre}-mark`)
+    await s.drive(n, `${n}. change settings`, 'mark', `${pre}-mark`, 600, from.era)
     await s.desktop(n, `${pre}-desktop-before`)
     // The previous release running as the new installer starts, as when its updater runs it (or a user didn't quit it):
     // its exact main process up with a window first (start-app.ps1 fails the step otherwise), then the installer.
-    await s.ps(n, `${n}. start the previous release, running with a window`, 'start-app.ps1', `-Exe "${from.exe}" -Name ${pre}-prev-started`, { timeoutSec: 120 })
+    await s.ps(n, `${n}. start the previous release, running with a window`, 'start-app.ps1', `-Exe "${ERA_EXE[from.era]}" -Name ${pre}-prev-started`, { timeoutSec: 120 })
     await time(`${n}. install over it (${args})`, () => s.install(n, `${n}. install new`, p.guestInstaller, `-Arguments "${args}" -Name ${pre}-new`, { timeoutSec: 300 }))
-    await s.drive(n, `${n}. after the upgrade`, 'after-upgrade', `${pre}-after`)
+    await s.drive(n, `${n}. after the upgrade`, 'after-upgrade', `${pre}-after`, 420, from.era)
     await s.desktop(n, `${pre}-desktop-after`)
     // A notification from the upgraded app, its banner on the desktop (HI-2460: it shows Combwork's name and icon).
     await s.drive(n, `${n}. a notification`, 'notify', `${pre}-notify`)
@@ -397,7 +431,7 @@ async function main(argv) {
     upgrade: srv => overPrevious(srv, 4, 's4', '--updated /S --force-run'),
     manual: srv => overPrevious(srv, 7, 's7', '/S --force-run'),
     // Over a 1.1 release candidate (HI-2587), installed as Combwork already: the names upgrade from a partly converted install.
-    'upgrade-rc': srv => overPrevious(srv, 10, 's10', '--updated /S --force-run', { installer: p.guestPreviousRc, exe: '%LOCALAPPDATA%\\Programs\\Combwork\\Combwork.exe' }),
+    'upgrade-rc': srv => overPrevious(srv, 10, 's10', '--updated /S --force-run', { installer: p.guestPreviousRc, era: 'rc' }),
     // The installer's edge cases over the 1.0 app (edges.ps1), then a notification under the new app ID (HI-2460).
     // HI-2592, the rename's acceptance test: a Windows that never had Combwork or the app before it, the build installed, used as a new
     // user would (drive.cjs clean), quit, then every place it wrote or shows searched for the old name (inside/clean-scan.cjs).
@@ -443,7 +477,8 @@ async function main(argv) {
       continue
     }
     try {
-      await inSandbox(srvOpts, kind, kind === 'clean' && p.git ? { ...start, tools: [...start.tools, 'git'] } : start, bodies[kind], [p.root])
+      const withGit = !!p.git && (kind === 'clean' || ((kind === 'upgrade' || kind === 'manual') && p.previousEra === 'combwork'))
+      await inSandbox(srvOpts, kind, withGit ? { ...start, tools: [...start.tools, 'git'] } : start, bodies[kind], [p.root])
     } catch (e) {
       if (e instanceof NotRun) {
         // Its steps so far go too: the scenarios weren't checked, so nothing in them passed or failed.
@@ -469,6 +504,8 @@ async function main(argv) {
     app: p.app,
     previous: p.previous && path.relative(p.root, p.previous),
     previousVersion: p.previous && versionOf(p.previous),
+    previousEra: p.previousEra,
+    skipped: p.skipped,
     previousRc: p.previousRc && path.relative(p.root, p.previousRc),
     previousRcVersion: p.previousRc && versionOf(p.previousRc),
     sameInstaller: p.sameInstaller,
@@ -495,4 +532,4 @@ if (require.main === module) {
   main(process.argv.slice(2)).then(code => { process.exitCode = code }, e => { log('ERROR:', e.stack || e); process.exitCode = 2 })
 }
 // For tests.
-module.exports = { buildRoot, plan, main, serverCandidates, mainCheckout, inSandbox, sacState, blockedReason, cmpVersion, setLogSink: fn => { logSink = fn } }
+module.exports = { buildRoot, plan, main, serverCandidates, mainCheckout, inSandbox, sacState, blockedReason, cmpVersion, previousEra, ERA_EXE, setLogSink: fn => { logSink = fn } }
