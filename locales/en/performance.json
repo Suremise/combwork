@@ -1411,6 +1411,10 @@
     "defaultMessage": "Count",
     "description": "Column header of the Refusals and wrong calls by reason table (HI-2553): how many requests."
   },
+  "performance.reasons.english": {
+    "defaultMessage": "{id} · in English",
+    "description": "Under a reason in the Reason column (HI-2681): the id of an agent message ({id}: agent:api.card.titleRequired), whose sentence above is shown in English, as agents read it: agent messages are not translated."
+  },
   "performance.reasons.heading": {
     "defaultMessage": "Refusals and wrong calls by reason",
     "description": "Heading of the Performance page's table of why Agent API requests were refused or were wrong calls (HI-2553)."
@@ -1432,8 +1436,8 @@
     "description": "Column header of the Refusals and wrong calls by reason table (HI-2553): the rule or message id."
   },
   "performance.reasons.tip": {
-    "defaultMessage": "The most common reasons Combwork gave, by route, as a general sentence: Combwork keeps which rule or message it was, never what it said, so the card, file or name it was about shows as “…”. Under it, the rule’s (rule:) or message’s (msg:) id. A reason that keeps coming back points to a rule or a tool description to make clearer.",
-    "description": "Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule: and msg: as they are (prefixes shown in the table). “…” is how a left-out value shows: keep it."
+    "defaultMessage": "The most common reasons Combwork gave, by route, as a general sentence: Combwork keeps which rule or message it was, never what it said, so the card, file or name it was about shows as “…”. Under it, the rule’s (rule:) or message’s (msg:) id; an agent message (agent:), such as the Agent API’s own errors, shows in English, as agents read it. A reason that keeps coming back points to a rule or a tool description to make clearer.",
+    "description": "Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule:, msg: and agent: as they are (prefixes shown in the table). “…” is how a left-out value shows: keep it."
   },
   "performance.reasons.unknown": {
     "defaultMessage": "A reason this version of Combwork doesn’t know",
