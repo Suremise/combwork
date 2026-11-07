@@ -60,7 +60,8 @@ const check = (name, ok, extra = '') => {
   const menuLabels = async () => (await menuItems().allInnerTexts()).map((t) => t.split('\n')[0].trim())
   const menuOpen = () => until(async () => (await menuItems().count()) > 0, 5000)
   const menuClosed = () => until(async () => (await page.locator('.menu').count()) === 0, 5000)
-  const pick = (label) => menuItems().filter({ hasText: new RegExp(`^\\s*${label}\\b`) }).first().click()
+  // By its label exactly (an agent's row has its status words under its name).
+  const pick = (label) => menuItems().filter({ has: page.getByText(label, { exact: true }) }).first().click()
   const running = async (agents) => Object.fromEntries(await Promise.all(agents.map(async (a) => [a.name, !!(await live(a.id))])))
   const focused = () => page.evaluate(() => document.activeElement?.getAttribute('aria-label') ?? document.activeElement?.tagName)
 
