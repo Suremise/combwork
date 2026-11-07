@@ -129,7 +129,9 @@ describe.runIf(windows)('starting one', () => {
     const cmd = join(dir, 'agy.cmd')
     writeFileSync(cmd, '@node "%~dp0echo.cjs" --own %*\r\n')
     expect(runsThroughCmd(cmd)).toBe(true)
-    const args = ['--settings', join(dir, 'agy settings.json'), 'plain', '', 'with "quotes" inside', 'a&b|c<d>e^f', 'tail\\', 'ä ö · 日本', promptArg(cmd, 'Fix "the" tests & 100%')]
+    const args = ['--settings', join(dir, 'agy settings.json'), 'plain', '', 'with "quotes" inside', 'a&b|c<d>e^f', 'tail\\', 'ä ö · 日本', promptArg(cmd, 'Fix "the" tests & 100%'),
+      // Quotes and cmd.exe's characters together (HR1): `\"` turned cmd.exe's quoting off, and `&b` ran as a command.
+      'with "a&b" inside', 'after space', '"', '"&echo odd', '""&echo pair', 'x\\"y', 'a\\\\"&b', 'C:\\a b\\', '%PATH%', '100%', '%', '!x!', '(x86)', 'k=v;w,z']
     const s = toSpawnable(cmd, args)
     expect(s.file).toMatch(/cmd\.exe$/i)
     expect(s.line).toBe(`/d /s /c "${[cmd, ...args].map(cmdArg).join(' ')}"`)
@@ -159,9 +161,12 @@ describe('an argument of the line cmd.exe runs', () => {
     expect(cmdArg('C:\\a b\\x.cmd')).toBe('"C:\\a b\\x.cmd"')
     expect(cmdArg('a&b')).toBe('"a&b"')
     expect(cmdArg('k=v')).toBe('"k=v"')
-    expect(cmdArg('say "hi"')).toBe('"say \\"hi\\""')
+    // A quote inside is doubled, so cmd.exe's quoting never turns off inside it; backslashes before it doubled.
+    expect(cmdArg('say "hi"')).toBe('"say ""hi"""')
     expect(cmdArg('C:\\a b\\')).toBe('"C:\\a b\\\\"')
-    expect(cmdArg('x\\"y')).toBe('"x\\\\\\"y"')
+    expect(cmdArg('x\\"y')).toBe('"x\\\\""y"')
+    // No %NAME% is expanded.
+    expect(cmdArg('%PATH%')).toBe('"%%cd:~,%PATH%%cd:~,%"')
   })
 
   it('a list without a command line is spawned as it is', () => {

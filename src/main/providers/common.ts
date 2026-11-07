@@ -164,18 +164,24 @@ export function ptyArgs(s: { args: string[]; line?: string }): string[] | string
 }
 
 /**
- * One argument of the line cmd.exe runs, quoted as a program's arguments are read (backslashes before a quote doubled,
- * the quote escaped): quoted when it is empty or has a space, a quote or a character cmd.exe would act on outside quotes,
- * so cmd.exe passes it on as it is and the program reads it whole. `%` can't be kept from cmd.exe: promptArg drops it.
+ * One argument of the line cmd.exe runs, quoted when it is empty or has a space, a quote or a character cmd.exe acts on,
+ * so that both cmd.exe (the line, then the launcher's own line holding it as %*) and the program read it whole. cmd.exe
+ * turns its quoting on and off at every `"`, `\"` too, so a quote inside is doubled (`""`, which a program reads as one
+ * quote inside quotes) and every `&|<>^` stays inside cmd.exe's quotes, never a command of its own (HI-2722, HR1). A `%`
+ * is followed by `%cd:~,%`, which cmd.exe expands to nothing, so no `%NAME%` in it is expanded. Backslashes before a
+ * quote are doubled, as a program reads them.
  */
 export function cmdArg(arg: string): string {
-  if (arg && !/[\s"&|<>^(),;=]/.test(arg)) return arg
+  if (arg && !/[\s"&|<>^(),;=%!]/.test(arg)) return arg
   let out = '"'
   let slashes = 0
   for (const ch of arg) {
     if (ch === '\\') slashes++
     else if (ch === '"') {
-      out += `${'\\'.repeat(slashes * 2 + 1)}"`
+      out += `${'\\'.repeat(slashes * 2)}""`
+      slashes = 0
+    } else if (ch === '%') {
+      out += `${'\\'.repeat(slashes)}%%cd:~,%`
       slashes = 0
     } else {
       out += '\\'.repeat(slashes) + ch
