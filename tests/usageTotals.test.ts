@@ -105,6 +105,18 @@ describe('period totals', () => {
     const stacked = stackedDaily([{ key: 'a', label: 'a', items: [session({ '2026-10-01': 1000 })] }, { key: 'b', label: 'b', items: [unpriced({ '2026-10-01': 500 })] }], '2026-10-01', NOW)
     expect(costText(stacked.days[0])).toBe('≈ $1.00 + ?')
   })
+
+  it('HI-2675: a session priced only in part (a model with no price beside priced ones) is its known part + ?, never with the rest as $0', () => {
+    const part = session({ '2026-10-01': 1000 }, 'codex')
+    Object.assign(part.usage!, { costUnpriced: true })
+    Object.assign(part.usage!.days!['2026-10-01'], { costUnpriced: true })
+    const subtotal = '≈ $1.00 + ?'
+    const t = sumUsage([part], periodFrom('all', NOW))
+    expect(t).toMatchObject({ priced: 1, unpriced: 1 })
+    expect(costText(t)).toBe(subtotal)
+    expect(costText(sumUsage([part], periodFrom('today', NOW)))).toBe(subtotal)
+    expect(costText(dailyTotals([part], '2026-10-01', NOW)[0])).toBe(subtotal)
+  })
 })
 
 describe('chart stacked by project', () => {

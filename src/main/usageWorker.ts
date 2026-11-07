@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { open, stat } from 'original-fs/promises'
 import { dirname, join } from 'path'
 import type { AppSettings, ProviderId, SessionUsage } from '../shared/types'
-import { baselineOfRows, baselineOfUsage, baselineAsFree, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsAsFree, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type SessionHold } from '../shared/usageLedger'
+import { baselineOfRows, baselineOfUsage, baselineAsFree, baselineWithoutReports, dominates, ledgerRows, mergeBaselines, reshareRows, rowsAsFree, rowsWithoutReports, sessionRows, summaryOf, unknownOnCards, type LedgerRow, type SessionHold } from '../shared/usageLedger'
 import { OPENABLE_WAIT_MS, openableNow, openDb, untilOpenable, type Db } from './db'
 import { advancedValues, readAdvancedFrom, valuesReader } from './advancedValues'
 import type { DatabaseSync } from 'node:sqlite'
@@ -84,6 +84,8 @@ export interface ReadResult {
   usage: SessionUsage
   size: number
   mtime: number
+  /** A session on more than one model (HI-2675): its rows (shared/usageLedger.ts), by day and model, for pricing it. */
+  rows?: LedgerRow[]
 }
 
 export type WorkerReply = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string } | { log: 'info' | 'warn'; text: string; path?: string }
@@ -312,8 +314,12 @@ async function takeUp(cur: ReturnType<typeof cursorOf>, path: string, size: numb
  * for a session that ran on a server connection (HI-1772, `reportsIgnored`).
  */
 const readResult = (c: ReadEntry, reportsIgnored = false): ReadResult => {
-  const { timeline: _timeline, ...usage } = reportsIgnored ? withoutCostReports(c.raw!) : c.raw!
-  return { usage, size: c.size, mtime: c.mtime }
+  const raw = reportsIgnored ? withoutCostReports(c.raw!) : c.raw!
+  const { timeline: _timeline, ...usage } = raw
+  // A session on more than one model (HI-2675): its rows by day and model too, so main prices it a model at a time, as
+  // the history does (a model with no price leaves the cost a part), not every token at the session's model's price.
+  const models = new Set([...(raw.timeline?.models ?? []), raw.model ?? ''].filter(Boolean))
+  return { usage, size: c.size, mtime: c.mtime, ...(models.size > 1 ? { rows: ledgerRows(raw, [], providers ? { providers } : null) } : {}) }
 }
 
 /**

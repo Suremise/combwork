@@ -7,8 +7,8 @@ import { brotliDecompressSync } from 'zlib'
 import { describe, expect, it } from 'vitest'
 import { newUsageParser, parserShape, restoreParser, saveParser } from '../src/main/usageParsers'
 import { copilotEventsPath } from '../src/main/providers/copilot/events'
-import { cardHoldsKey, holdIndex, holdIsSessions, holdsOfCard, keptRows, ledgerRows, rowCost, rowsPart, sessionHolds, summaryOf, usageFromRows, type LedgerRow, type SessionHold, type SessionWho } from '../src/shared/usageLedger'
-import { priceUsage } from '../src/shared/usageDays'
+import { cardHoldsKey, emptyRow, holdIndex, holdIsSessions, holdsOfCard, keptRows, ledgerRows, rowCost, rowsPart, sessionHolds, summaryOf, usageFromRows, type LedgerRow, type SessionHold, type SessionWho } from '../src/shared/usageLedger'
+import { priceUsage, usageFrom } from '../src/shared/usageDays'
 import { mergeSpans, sliceSession, sharedSpans } from '../src/shared/cardCosts'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
 import type { AppSettings, ProviderId, SessionUsage, TaskCard } from '../src/shared/types'
@@ -189,6 +189,47 @@ describe("a session's rows", () => {
     const rows = ledgerRows(raw, [], SETTINGS)
     expect(rows.every((r) => rowCost(r, 'claude-code', SETTINGS).usd === null || r.inputTokens + r.outputTokens === 0)).toBe(true)
     expect(usageFromRows(summaryOf(raw), rows, SETTINGS).costUsd).toBeNull()
+  })
+
+  it('HI-2675: a Codex row with a shipped price is priced; a model with none beside it leaves the cost a part, never its $0', () => {
+    const row = (day: string, model: string, input: number, read: number, output: number): LedgerRow => ({ ...emptyRow(day, model), inputTokens: input, cacheReadTokens: read, outputTokens: output, requests: 1 })
+    const sol = row('2026-11-05', 'gpt-6.1-sol', 1_000_000, 10_000_000, 100_000)
+    const terra = row('2026-11-05', 'gpt-6.1-terra', 1_000_000, 0, 0)
+    const review = row('2026-11-05', 'codex-auto-review', 500_000, 0, 1000)
+    const later = row('2026-11-06', 'codex-auto-review', 500_000, 0, 1000)
+    // OpenAI's prices (7 Nov 2026): sol $2 in, $0.10 cached, $10 out; terra $1 in.
+    expect(rowCost(sol, 'codex', null)).toEqual({ usd: expect.closeTo(2 + 1 + 1, 6), estimated: true })
+    expect(rowCost(terra, 'codex', null).usd).toBeCloseTo(1, 6)
+    expect(rowCost(review, 'codex', null).usd).toBeNull()
+    const raw = { ...whole(CASES[1]), costReports: undefined, timeline: undefined }
+    const u = usageFromRows(summaryOf(raw), [sol, terra, review, later], null)
+    expect(u.costUsd).toBeCloseTo(5, 6)
+    expect(u.costUnpriced).toBe(true)
+    expect(u.days?.['2026-11-05']).toMatchObject({ costUnpriced: true })
+    expect(u.days?.['2026-11-06']).toMatchObject({ costUsd: null })
+    expect(u.days?.['2026-11-06'].costUnpriced).toBeUndefined()
+    // All priced: no flag. None priced: unknown, not a part.
+    expect(usageFromRows(summaryOf(raw), [sol, terra], null).costUnpriced).toBeUndefined()
+    const none = usageFromRows(summaryOf(raw), [review, later], null)
+    expect(none.costUsd).toBeNull()
+    expect(none.costUnpriced).toBeUndefined()
+    // A period from the second day: only the unpriced day, so unknown; from the first, the part.
+    expect(usageFrom(u, '2026-11-06').costUsd).toBeNull()
+    expect(usageFrom(u, '2026-11-05')).toMatchObject({ costUsd: expect.closeTo(5, 6), costUnpriced: true })
+    expect(usageFrom(u, null)).toMatchObject({ costUnpriced: true })
+  })
+
+  it('HI-2675: a row partly covered by a charge, the rest of its tokens without a price, is its charge and a part, never the rest at $0', () => {
+    const r: LedgerRow = { ...emptyRow('2026-11-07', 'unknown-model'), inputTokens: 200, requests: 1, fixedUsd: 1, covered: { inputTokens: 100, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0 } }
+    expect(rowCost(r, 'codex', null)).toEqual({ usd: 1, estimated: false, unpriced: true })
+    const u = usageFromRows(summaryOf({ ...whole(CASES[1]), costReports: undefined, timeline: undefined }), [r], null)
+    expect(u).toMatchObject({ costUsd: 1, costUnpriced: true })
+    expect(u.days?.['2026-11-07']).toMatchObject({ costUsd: 1, costUnpriced: true })
+    // On a card: its known cost, and unknown too.
+    expect(rowsPart([{ ...r, card: 5, role: 'build' }], 'codex', null)).toMatchObject({ cost: 1, priced: 1, unpriced: 1 })
+    // Wholly covered: its charge, complete.
+    const all = { ...r, covered: { ...r.covered, inputTokens: 200 } }
+    expect(rowCost(all, 'codex', null)).toEqual({ usd: 1, estimated: false })
   })
 })
 

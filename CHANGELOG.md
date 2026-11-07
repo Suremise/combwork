@@ -6,6 +6,8 @@
 
 - **A `!` command typed into Claude Code no longer trips "Combwork isn't hearing from Claude Code's hooks"** (HI-2673). Claude Code 2.1.319 sends the command's output to the model and starts a turn without the hook a prompt sends. Combwork took that turn's hooks as old news, so the agent stayed finished while it worked, then Combwork said its hooks weren't arriving and stopped typing into it. While your Enter in the pane waits for its hook, a turn Combwork has never seen now counts: its first tool call shows the agent working, and its hooks show they arrive. The note's line for a Claude Code newer than Combwork was tested with no longer guesses that an update changed its hooks.
 - **Changing Work merges into says what keeps the old target** (HI-2674). A card's target branch is set as it starts, and a running lane's as the lane starts, so a change of **Version Control → Workflow → Work merges into** didn't move cards in flight or a running lane's next cards, although the Assistant's reply said it applied now. Save… now lists each card and lane that keeps merging into another branch, and which. The Assistant's reply names them too, as it now does the lanes and cards that keep the old rules after a switch of version control (it had left them out).
+- **Codex prices checked again** (7 Nov 2026) against OpenAI's published API prices: unchanged, with GPT-6.1 Terra added. Settings → Codex → API prices says when Codex's were checked, apart from the other providers'.
+- **A session priced only in part shows as such.** When a session used a model Combwork has no price for beside models it has, its cost and the totals that include it show the known part with **+ ?**, rather than counting the rest as $0.
 
 ## 1.1.0 — 2026-11-06
 

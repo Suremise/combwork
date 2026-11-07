@@ -10,7 +10,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DatabaseSync } from 'node:sqlite'
 import { handleRequest, logInProcess, openableWaits, openFiles, type IngestJob, type IngestResult, type WorkerReply, type WorkerRequest } from '../src/main/usageWorker'
 import { cursorOf, writeSession, type StoredSession } from '../src/main/usageDb'
-import { rowsPart, summaryOf, usageFromRows } from '../src/shared/usageLedger'
+import { rowsPart, summaryOf, usageFromRows, type LedgerRow } from '../src/shared/usageLedger'
 import { priceUsage } from '../src/shared/usageDays'
 import { newUsageParser } from '../src/main/usageParsers'
 import { DEFAULT_SETTINGS } from '../src/shared/defaults'
@@ -426,6 +426,28 @@ describe('the usage worker reading a transcript for main', () => {
       expect(context(got), provider).toEqual(context(want))
       expect(got.contextTokens, provider).toBeGreaterThan(0)
     }
+    await t.close()
+  })
+
+  it('HI-2675: a running session on two models, one without a price, comes with its rows, priced a model at a time as a part', async () => {
+    const t = await setup()
+    const text = readFileSync(join(__dirname, 'fixtures', 'codex-0.159.jsonl'), 'utf8')
+    const lines = text.split(/(?<=\n)/)
+    const half = Math.floor(lines.length / 2)
+    // Its second half on a model Combwork has no price for.
+    const two = lines.slice(0, half).join('') + lines.slice(half).join('').replaceAll('"gpt-6-luna"', '"gpt-unpriced-x"')
+    const path = join(t.transcript, '..', 'two.jsonl')
+    writeFileSync(path, two)
+    const got = (await call({ type: 'read', path, session: 'abc', provider: 'codex', seed: null })) as { usage: SessionUsage; rows?: LedgerRow[] }
+    expect(new Set(got.rows?.map((r) => r.model))).toEqual(new Set(['gpt-6-luna', 'gpt-unpriced-x']))
+    const priced = usageFromRows(summaryOf(got.usage), got.rows!, DEFAULT_SETTINGS)
+    expect(priced.costUsd).toBeGreaterThan(0)
+    expect(priced.costUnpriced).toBe(true)
+    expect(priced.outputTokens).toBe(got.usage.outputTokens)
+    // On one model: no rows, priced as it always was.
+    const one = join(t.transcript, '..', 'one.jsonl')
+    writeFileSync(one, text)
+    expect(((await call({ type: 'read', path: one, session: 'abc', provider: 'codex', seed: null })) as { rows?: LedgerRow[] }).rows).toBeUndefined()
     await t.close()
   })
 
