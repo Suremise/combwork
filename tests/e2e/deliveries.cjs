@@ -96,11 +96,20 @@ async function start() {
   const sessionId = (await live(alpha, builder.id)).sessionId
 
   const asTokenFile = path.join(userData, 'assistant-api', `${createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
+  const tokenNow = () => {
+    try {
+      return JSON.parse(fs.readFileSync(asTokenFile, 'utf8')).token
+    } catch {
+      return null
+    }
+  }
   const startAssistant = async () => {
     const home = (await inv('workspace:refresh')).assistant.path
+    const before = tokenNow()
     await inv('session:start', home, { agentId: 'assistant' })
-    // On the fake the Assistant's start is a turn of its own: idle once it is over (`finished`, never `ready`: HI-2688).
-    check('the Assistant starts', await lib.agentIdle(inv, 'assistant', HUNG_MS))
+    // On the fake the Assistant stops at Claude Code's folder-trust question, so it never turns ready or idle (that wait
+    // ran out each time, unchecked: HI-2688). What the suite uses is its launch, with a token of its own for its tools.
+    check('the Assistant is launched, with a token of its own', !!(await until(() => { const t = tokenNow(); return !!t && t !== before }, HUNG_MS)))
     return home
   }
   let home = await startAssistant()

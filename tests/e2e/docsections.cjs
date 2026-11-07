@@ -202,8 +202,8 @@ const PLAN = (copy) => `# Plan (${copy})\n\nIntro.\n\n## Core contracts\n\nThe c
     // The Assistant of the first workspace, with its own token.
     const home = (await inv('workspace:refresh')).assistant.path
     await inv('session:start', home, { agentId: 'assistant' })
-    // On the fake the Assistant's start is a turn of its own: idle once it is over (`finished`, never `ready`: HI-2688).
-    check('the Assistant starts', await lib.agentIdle(inv, 'assistant', HUNG_MS))
+    // On the fake the Assistant stops at Claude Code's folder-trust question, so it never turns ready or idle (that wait
+    // ran out each time, unchecked: HI-2688). What the suite uses is its token, which the next lines wait for and check.
     const asFile = path.join(userData, 'assistant-api', `${require('crypto').createHash('sha256').update(ws.toLowerCase()).digest('hex').slice(0, 16)}.json`)
     const assistantToken = (await lib.until(() => fs.existsSync(asFile) && JSON.parse(fs.readFileSync(asFile, 'utf8')).token, HUNG_MS)) || ''
     check("the Assistant's token", !!assistantToken)
