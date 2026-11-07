@@ -6,7 +6,7 @@ import type { CatalogModel } from '../../../shared/types'
 import { copilotModelLabel } from '../../../shared/copilot'
 import { removePath } from '../../fsutil'
 import { createLogger } from '../../logger'
-import { toSpawnable } from '../common'
+import { childArgs, toSpawnable } from '../common'
 import type { CatalogRead } from '../types'
 import { copilotEnv, copilotHome, noAutoUpdateArgs } from './home'
 
@@ -57,7 +57,8 @@ export function readCopilotModels(executable: string, env: Record<string, string
   const childEnv = copilotEnv(env)
   return new Promise((resolve) => {
     const s = toSpawnable(executable, catalogArgs())
-    const p = spawn(s.file, s.args, { cwd: dir, env: childEnv, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
+    const a = childArgs(s)
+    const p = spawn(s.file, a.args, { cwd: dir, env: childEnv, windowsHide: true, windowsVerbatimArguments: a.windowsVerbatimArguments, stdio: ['pipe', 'pipe', 'ignore'] })
     let buf = ''
     let sessionId: string | null = null
     let settled = false

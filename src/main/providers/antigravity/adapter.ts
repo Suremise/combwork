@@ -416,7 +416,7 @@ export class AntigravityAdapter implements ProviderAdapter {
     const env = inProfile(antigravityEnv(ctx.env, launchOverrides(ctx.overrides, ANTIGRAVITY, 'noAutoUpdate'), launchOverrides(ctx.overrides, ANTIGRAVITY, 'stripAccountVars'), agyHookEnv(ctx.hookAuthFile)), profileFolder(ctx.agentId, ctx.workspacePath))
     // An agent runs in its own profile, never the user's (HI-2698): a bug if it would, so refused.
     if (inUserProfile(env)) throw new Error("an Antigravity agent would run in the user's own profile: refused") // i18n-ignore: an internal check, never shown
-    return { file: s.file, args: s.args, env }
+    return { ...s, env }
   }
 
   /** Its status line (Combwork's own command): the model, its effort and the context window (agyStatusDetails). */

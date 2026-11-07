@@ -3,7 +3,7 @@ import { mkdirSync } from 'original-fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import type { CatalogModel } from '../../../shared/types'
-import { toSpawnable } from '../common'
+import { childArgs, toSpawnable } from '../common'
 import type { CatalogRead } from '../types'
 
 /**
@@ -119,7 +119,8 @@ export function readClaudeModels(executable: string, env: Record<string, string>
     }
     const timer = setTimeout(() => finish(null), timeoutMs)
     try {
-      p = spawn(s.file, s.args, { cwd, env, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'] })
+      const a = childArgs(s)
+      p = spawn(s.file, a.args, { cwd, env, windowsHide: true, windowsVerbatimArguments: a.windowsVerbatimArguments, stdio: ['pipe', 'pipe', 'ignore'] })
     } catch {
       finish(null)
       return

@@ -75,7 +75,7 @@ import { agentLaunchView, allAccounts, allConnections, checkAccount, firstUsable
 import { effortUsable, ensureMigrated, migrationDue } from './connectionMoves'
 import { resolveAgentConnection } from '../shared/accounts'
 import { connectionSwitchDue } from '../shared/connectionLabel'
-import { recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
+import { ptyArgs, recacheEstimate, withoutAccountEnv, withServerEnv } from './providers/common'
 import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcriptFiles'
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
@@ -3068,7 +3068,7 @@ class SessionManager {
     spawnPty(key, {
       ...size,
       file: cmd.file,
-      args: cmd.args,
+      args: ptyArgs(cmd),
       cwd,
       env: cmd.env ?? ctx.env,
       // After a worktree's setup command, its output stays at the top of the terminal.

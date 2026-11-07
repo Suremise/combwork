@@ -20,7 +20,7 @@ import { createLogger, userText } from '../../logger'
 import { combworkError } from '../../combworkError'
 import { plainHttpsJson } from '../../plainHttpsJson'
 import { findSecretWarnings } from '../../mcpSecrets'
-import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { AGENTS_SKILLS, EDITOR_EXTENSION_PATH, EDITOR_ROOTS, agentsSkillCopyPath, childArgs, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, installText, keepBounded, notInstalledIssue, readFirstLine, run, signedOutIssue, syncAgentsSkills, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
 import { storePwshFirst, storePwshIssue } from './storePwsh'
 import type { BackgroundTaskEvent, CatalogRead, CommandSpec, ConnectionStatus, TrustReading, TrustTarget, ExternalSession, KeySteps, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn, UsageParser } from '../types'
 import { codexBackgroundMemo, codexBackgroundTasks, type CodexBackgroundMemo } from './background'
@@ -400,7 +400,8 @@ export function developerInstructionsOf(as: readonly string[] | null, cleared: r
 function promptDeveloper(executable: string, cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string[] | null> {
   return new Promise((resolveP) => {
     const s = toSpawnable(executable, [...args, 'debug', 'prompt-input'])
-    const p = spawn(s.file, s.args, { cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'], ...(env ? { env } : {}) })
+    const a = childArgs(s)
+    const p = spawn(s.file, a.args, { cwd, windowsHide: true, windowsVerbatimArguments: a.windowsVerbatimArguments, stdio: ['ignore', 'pipe', 'ignore'], ...(env ? { env } : {}) })
     let out = ''
     const timer = setTimeout(() => (p.kill(), resolveP(null)), advanced.number('codex.promptInput.timeoutSeconds') * 1000)
     p.stdout.on('data', (d) => (out += d))
@@ -442,7 +443,8 @@ function askAppServer(executable: string, args: string[], cwd: string, method: s
  */
 function appServerAnswer(executable: string, args: string[], cwd: string, method: string, params: unknown, env: NodeJS.ProcessEnv | undefined, timeoutMs: number): Promise<CheckAnswer> {
   const s = toSpawnable(executable, ['app-server', ...args])
-  return ownedAppServerRequest({ command: s.file, args: s.args, cwd, env: env ?? process.env, method, params, timeoutMs })
+  const a = childArgs(s)
+  return ownedAppServerRequest({ command: s.file, args: a.args, verbatim: a.windowsVerbatimArguments, cwd, env: env ?? process.env, method, params, timeoutMs })
 }
 
 /**
@@ -1062,7 +1064,7 @@ export class CodexAdapter implements ProviderAdapter {
     // Codex takes a first prompt as its last argument (after "resume <id>" too) and starts on it.
     if (ctx.initialPrompt) args.push(...taskArgs(executable, ctx.initialPrompt))
     const s = toSpawnable(executable, args)
-    return { file: s.file, args: s.args, env: ctx.env }
+    return { ...s, env: ctx.env }
   }
 
   /** Each launch's config overrides as buildCommand gave them (HI-982), until launchHooks takes them. */

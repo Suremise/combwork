@@ -130,15 +130,29 @@ export function runsThroughCmd(file: string): boolean {
 }
 
 /**
+ * A program and its arguments as a list (quoted by whatever starts it), and on Windows maybe `line`: the command line to
+ * start it with instead, passed on as it is, as cmd.exe needs it (toSpawnable). node-pty takes it as a string
+ * (`ptyArgs`); a child process as its one verbatim argument (`childArgs`).
+ */
+export interface Spawnable {
+  file: string
+  args: string[]
+  line?: string
+}
+
+/**
  * How to start a CLI with node-pty: an .exe as it is; a Node CLI's .cmd launcher as its node and script (shimTarget);
  * any other .cmd/.bat through cmd.exe, refused with a clear error when the command line is longer than cmd.exe takes.
+ * cmd.exe's command line (`line`) is `/d /s /c "<launcher> <arguments>"`, each quoted where it needs it (HI-2722): `/s`
+ * strips the line's first and last quote, so the extra pair keeps a quoted path (one with spaces) and quoted arguments
+ * whole; passed on as a string, nothing quotes or escapes it again. Its `args` say the same as a list, for what reads them.
  */
-export function toSpawnable(file: string, args: string[]): { file: string; args: string[] } {
+export function toSpawnable(file: string, args: string[]): Spawnable {
   if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(file)) {
     const direct = shimTarget(file)
     if (direct) return { file: direct.node, args: [direct.script, ...args] }
-    const out = { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', file, ...args] }
-    const length = commandLineLength(out.file, out.args)
+    const out = { file: process.env.ComSpec || 'cmd.exe', args: ['/d', '/s', '/c', file, ...args], line: `/d /s /c "${[file, ...args].map(cmdArg).join(' ')}"` }
+    const length = commandLineLength(out.file, out.line)
     if (length > CMD_MAX_CHARS) {
       throw combworkError(CMD_TOO_LONG, { file: basename(file), max: CMD_MAX_CHARS, length })
     }
@@ -147,9 +161,51 @@ export function toSpawnable(file: string, args: string[]): { file: string; args:
   return { file, args }
 }
 
-/** About how long a Windows command line is with these arguments, quoted as CreateProcess needs (an estimate, on the long side). */
-export function commandLineLength(file: string, args: string[]): number {
+/** A Spawnable's arguments for node-pty: its command line where it has one (passed on as it is), else its list. */
+export function ptyArgs(s: { args: string[]; line?: string }): string[] | string {
+  return s.line ?? s.args
+}
+
+/**
+ * One argument of the line cmd.exe runs, quoted when it is empty or has a space, a quote or a character cmd.exe acts on,
+ * so that both cmd.exe (the line, then the launcher's own line holding it as %*) and the program read it whole. cmd.exe
+ * turns its quoting on and off at every `"`, `\"` too, so a quote inside is doubled (`""`, which a program reads as one
+ * quote inside quotes) and every `&|<>^` stays inside cmd.exe's quotes, never a command of its own (HI-2722, HR1). A `%`
+ * is followed by `%cd:~,%`, which cmd.exe expands to nothing, so no `%NAME%` in it is expanded. Backslashes before a
+ * quote are doubled, as a program reads them.
+ */
+export function cmdArg(arg: string): string {
+  if (arg && !/[\s"&|<>^(),;=%!]/.test(arg)) return arg
+  let out = '"'
+  let slashes = 0
+  for (const ch of arg) {
+    if (ch === '\\') slashes++
+    else if (ch === '"') {
+      out += `${'\\'.repeat(slashes * 2)}""`
+      slashes = 0
+    } else if (ch === '%') {
+      out += `${'\\'.repeat(slashes)}%%cd:~,%`
+      slashes = 0
+    } else {
+      out += '\\'.repeat(slashes) + ch
+      slashes = 0
+    }
+  }
+  return `${out}${'\\'.repeat(slashes * 2)}"`
+}
+
+/** A Spawnable's arguments for child_process.spawn: its command line as its one argument, passed on verbatim, else its list. */
+export function childArgs(s: Spawnable): { args: string[]; windowsVerbatimArguments: boolean } {
+  return s.line !== undefined ? { args: [s.line], windowsVerbatimArguments: true } : { args: s.args, windowsVerbatimArguments: false }
+}
+
+/**
+ * About how long a Windows command line is with these arguments, quoted as CreateProcess needs (an estimate, on the long
+ * side); a command line given as a string is counted as it is.
+ */
+export function commandLineLength(file: string, args: string[] | string): number {
   const quoted = (a: string): number => (/[\s"]/.test(a) || !a ? a.length + 2 + (a.match(/["\\]/g)?.length ?? 0) : a.length)
+  if (typeof args === 'string') return quoted(file) + 1 + args.length
   return [file, ...args].reduce((n, a) => n + quoted(a) + 1, 0)
 }
 

@@ -95,6 +95,7 @@ export const SUITES = [
   { name: 'cliownmode' },
   { name: 'cliquit', needs: ['claude', 'codex'], claudeHome: 'own' },
   { name: 'closewindow' },
+  { name: 'cmdlauncher' },
   { name: 'codex', needs: ['codex'] },
   { name: 'codex-appserver', needs: ['codex'], noCombwork: 'runs codex app-server and its TUI itself (#653)' },
   { name: 'codex-background', needs: ['codex'] },

@@ -3,7 +3,7 @@ import { app } from 'electron'
 import type { AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
 import { observedEffortKey } from '../shared/models'
 import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
-import { shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
+import { ptyArgs, shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
 import { allProviders, provider } from './providers'
 import type { KeySteps, UpdateRetry } from './providers/types'
 import { msg, onLanguageChange, tr } from '../shared/i18n'
@@ -269,10 +269,11 @@ class ProviderService {
     return next
   }
 
-  private runTask(id: ProviderId, task: ProviderTask, file: string, args: string[], label: string, typed?: { keys: KeySteps; ready?: RegExp; busyTitle?: RegExp; busyScreen?: (screen: string) => boolean; done?: () => boolean }, shown: () => string = () => label, onExit?: (code: number) => void, place?: { env?: Record<string, string>; cwd?: string }): string {
+  private runTask(id: ProviderId, task: ProviderTask, cmd: { file: string; args: string[]; line?: string }, label: string, typed?: { keys: KeySteps; ready?: RegExp; busyTitle?: RegExp; busyScreen?: (screen: string) => boolean; done?: () => boolean }, shown: () => string = () => label, onExit?: (code: number) => void, place?: { env?: Record<string, string>; cwd?: string }): string {
     const key = `task:${id}:${task}`
     if (hasPty(key)) return key
-    const s = toSpawnable(file, args)
+    // A command toSpawnable already gave its command line (an adapter's) is started as it is.
+    const s = cmd.line !== undefined ? cmd : toSpawnable(cmd.file, cmd.args)
     let sent = !typed
     let finished = false
     // Typed once its screen shows it ready (typeWhenIdle).
@@ -339,7 +340,7 @@ class ProviderService {
     if (typed) setTimeout(() => void type(), 30000)
     spawnPty(key, {
       file: s.file,
-      args: s.args,
+      args: ptyArgs(s),
       // A setup task's own folder and environment (HI-2547: agy's first-run setup in Combwork's check profile), else the user's.
       cwd: place?.cwd ?? homedir(),
       env: place?.env ?? childEnv(),
@@ -375,9 +376,9 @@ class ProviderService {
     // screens: the user answers them in the CLI's own way.
     const home = env[adapter.descriptor.capabilities.connections?.homeEnv ?? '']
     const cmd = setUp ? { file: info.path, args: (home && adapter.connectionSetUpArgs?.(home)) || [] } : (adapter.accountLoginCommand?.(info.path) ?? adapter.loginCommand(info.path))
-    const s = toSpawnable(cmd.file, cmd.args)
+    const s = cmd.line !== undefined ? cmd : toSpawnable(cmd.file, cmd.args)
     log.info(`${adapter.descriptor.name} ${setUp ? 'set-up' : 'sign-in'} for account ${accountId}`)
-    spawnPty(key, { file: s.file, args: s.args, cwd: setUp?.cwd ?? homedir(), env: withServerEnv(setUp?.env, withoutAccountEnv(adapter, childEnv(env))), onExit })
+    spawnPty(key, { file: s.file, args: ptyArgs(s), cwd: setUp?.cwd ?? homedir(), env: withServerEnv(setUp?.env, withoutAccountEnv(adapter, childEnv(env))), onExit })
     return key
   }
 
@@ -390,7 +391,7 @@ class ProviderService {
     const shown = (): string => tr(TASK, { task, cli: name })
     if (task === 'install') {
       const cmd = adapter.installCommand()
-      return this.runTask(id, task, cmd.file, cmd.args, `${name} install`, undefined, shown) // i18n-ignore: the task's name in the log
+      return this.runTask(id, task, cmd, `${name} install`, undefined, shown) // i18n-ignore: the task's name in the log
     }
     if (!info.path) throw combworkError(msg({ id: 'service.providers.notInstalled', defaultMessage: '{cli} is not installed.', description: 'An error running a coding agent CLI\'s task (update, sign-in, setup): the CLI {cli} ("Codex") is not installed.' }), { cli: name }, { kind: 'conflict' })
     if (task === 'update') {
@@ -399,7 +400,7 @@ class ProviderService {
       if (retryUpdate && (!pending || pending.path !== info.path || pending.version !== info.version)) throw combworkError(msg({ id: 'service.providers.retryUnavailable', defaultMessage: 'This update retry is no longer available. Check again, then try Update.', description: 'Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.' }), undefined, { kind: 'conflict' })
       if (hasPty(`task:${id}:${task}`)) return `task:${id}:${task}`
       const cmd = retryUpdate ? pending!.retry.command : adapter.updateCommand(info.path)
-      const key = this.runTask(id, task, cmd.file, cmd.args, `${name} update`, undefined, shown, (code) => { // i18n-ignore: the task's name in the log
+      const key = this.runTask(id, task, cmd, `${name} update`, undefined, shown, (code) => { // i18n-ignore: the task's name in the log
         const retry = adapter.updateRetry?.(info.path!, code)
         if (retry && this.info(id).path === info.path && this.info(id).version === info.version) this.updateRetries.set(id, { path: info.path!, version: info.version, retry })
         this.set(id, this.info(id))
@@ -412,11 +413,11 @@ class ProviderService {
       // Signed in per connection (HI-1755): its sign-in is Settings → Accounts & Connections', never ~/.claude's.
       if (connectionsManaged(id)) throw combworkError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} signs in per account: sign in from Settings → Accounts & Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are accounts (Settings → Accounts & Connections names a section).' }), { cli: name }, { kind: 'conflict' })
       const cmd = adapter.loginCommand(info.path)
-      return this.runTask(id, task, cmd.file, cmd.args, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
+      return this.runTask(id, task, cmd, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
     }
     if (!adapter.setupCommand) throw combworkError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Combwork to run.' }), { cli: name }, { kind: 'invalid' })
     const cmd = adapter.setupCommand(info.path)
-    return this.runTask(id, task, cmd.file, cmd.args, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown, undefined, { env: cmd.env, cwd: cmd.cwd })
+    return this.runTask(id, task, cmd, `${name} setup`, cmd.keys ? { keys: cmd.keys, ready: cmd.readyPattern, busyTitle: cmd.busyTitle, busyScreen: cmd.busyScreen, done: cmd.done } : undefined, shown, undefined, { env: cmd.env, cwd: cmd.cwd })
   }
 }
 

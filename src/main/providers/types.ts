@@ -181,6 +181,11 @@ export type TrustReading = boolean | null | { at: string }
 export interface CommandSpec {
   file: string
   args: string[]
+  /**
+   * The command line to start it with instead of `args`, passed on as it is (a .cmd/.bat through cmd.exe, HI-2722:
+   * toSpawnable, whose `args` then say what it runs). Whatever starts the command uses it when it is there.
+   */
+  line?: string
   env?: Record<string, string>
   /** The folder a setup task runs in (HI-2547: agy's first-run setup, in Combwork's check profile); absent: the user's home. */
   cwd?: string

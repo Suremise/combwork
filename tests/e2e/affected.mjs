@@ -218,6 +218,8 @@ export const AREAS = [
   { paths: ['src/main/idleWatch.ts', 'src/shared/idleWatch.ts'], suites: ['replysize', 'cardloop', 'lanewatch'] },
   // Combwork's skill copies per folder and the skills delivered (#1431).
   { paths: ['src/main/skillCopies.ts', 'src/shared/skillDelivery.ts', 'src/main/providers/common.ts'], suites: ['skilldelivery', 'skills'] },
+  // A .cmd/.bat launcher through cmd.exe (HI-2722): its command line, as tasks, sign-ins and agents start it.
+  { paths: ['src/main/providers/common.ts', 'src/main/launchGate.ts', 'src/main/ptyHost.ts'], suites: ['cmdlauncher'] },
   { paths: ['src/main/workspaceNotes.ts', 'src/shared/workspaceNotes.ts', 'src/renderer/src/components/WorkspaceNotes.tsx', 'src/main/providers/claude/adapter.ts', 'src/main/providers/codex/adapter.ts', 'src/main/providers/copilot/adapter.ts'], suites: ['workspacenotes'] },
   { paths: ['src/main/cardSessions.ts', 'src/renderer/src/components/CardChip.tsx'], suites: ['cardchip', 'sessionorigin'] },
   { paths: ['src/main/cardAttachments.ts', 'src/shared/cardAttachments.ts', 'src/renderer/src/components/CardAttachments.tsx', 'src/renderer/src/cardAttachLinks.ts', 'src/main/attachmentsFolder.ts', 'src/main/cardAttachmentCleanup.ts', 'src/main/cardCleanupFs.ts', 'src/shared/cardCleanup.ts', 'tests/e2e/cardattach.cjs'], suites: ['cardattach', 'storage', 'files', 'carddialog', 'attachread'] },

@@ -332,7 +332,7 @@ export class CopilotAdapter implements ProviderAdapter {
       if (theirs) delete env[theirs[0]]
       env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = theirs?.[1] ? `${theirs[1]},${own}` : own
     }
-    return { file: s.file, args: s.args, env }
+    return { ...s, env }
   }
 
   /** Accept edits in a folder whose path has parentheses approves no edits (copilotCanApproveEdits): the user is told. */
