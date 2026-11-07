@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import type { Account, ModelAlias, ProviderId, ServerModel } from '@shared/types'
 import { providerDescriptor, type ServerPreset } from '@shared/providers'
-import { MODEL_ALIASES, parseBaseUrl, type ServerModelsRead } from '@shared/serverConnection'
+import { MODEL_ALIASES, MODEL_LABEL_MAX, parseBaseUrl, type ServerModelsRead } from '@shared/serverConnection'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { serverModelLabel } from '@shared/models'
 import { defaultOutput, outputFits, tightFit } from '@shared/localModelLimits'
@@ -50,6 +50,9 @@ const M = {
   tight: msg({ id: 'settings.connections.server.tight', defaultMessage: 'Little room: Claude Code’s first request with Combwork’s tools can be 14,000–28,000 tokens, so a session may not start, or may compact at once.', description: "A warning under a server connection's model's fields (HI-2682): its context minus its output budget is small. Advice: saving is allowed." }),
   unsupported: msg({ id: 'settings.connections.server.unsupported', defaultMessage: '{why, select, alias {Not supported for this model: Claude Code reads this ID as one of its aliases.} other {Not supported for this model: IDs with claude, [1m] or a date suffix aren’t supported here.}}', description: "Under a server connection's model whose Context size and Output budget fields are off (HI-2682), why. Keep [1m] and the select keys." }),
   limitsHint: msg({ id: 'settings.connections.server.limitsHint', defaultMessage: 'Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.', description: "Under a server connection's model list (HI-2682): when the models' Context size and Output budget fields are used. Context size and Output budget are the fields' names." }),
+  // HI-2684: a model's name in Claude Code's /model picker.
+  label: msg({ id: 'settings.connections.server.label', defaultMessage: 'Label', description: "A field on a server connection's model (HI-2684): the name shown for it in Claude Code's /model picker. Its placeholder is the model's ID." }),
+  pickerHint: msg({ id: 'settings.connections.server.pickerHint', defaultMessage: 'Claude Code’s /model lists these models by their exact IDs, under their labels. With no Claude model among them, its own Opus, Sonnet and Haiku rows are hidden. A lineup in your own settings is used instead.', description: "Under a server connection's model list (HI-2684): what Claude Code's model picker (/model, a command: keep it) shows on this connection. Label names the field. Opus, Sonnet and Haiku are Claude's model names: keep them." }),
   modelsHint: msg({ id: 'settings.connections.server.modelsHint', defaultMessage: "Each Claude name (Opus, Sonnet, Haiku) runs the model ticked for it. A model can stand in for several.", description: "Under a server connection's model list: the CLI asks for Claude models by name, and each name runs the server model ticked for it." }),
   modelId: msg({ id: 'settings.connections.server.modelId', defaultMessage: 'Model id', description: "Placeholder of a model's id box in a server connection's model list (\"deepseek-flash\")." }),
   addModel: msg({ id: 'settings.connections.server.addModel', defaultMessage: 'Add Model', description: "Button under a server connection's model list: adds a row." }),
@@ -161,6 +164,7 @@ export function ServerModelsEditor({ models, onChange, disabled }: { models: Ser
       </button>
       <div className="hint">{tr(M.modelsHint)}</div>
       <div className="hint">{tr(M.limitsHint)}</div>
+      <div className="hint" data-picker-hint>{tr(M.pickerHint)}</div>
     </div>
   )
 }
@@ -201,6 +205,22 @@ function ModelLimits({ m, disabled, onChange }: { m: ServerModel; disabled?: boo
   return (
     <div className="server-model-limits" data-model-limits={m.id}>
       <div className="flex">
+        {/* Its name in Claude Code's /model (HI-2684): display only, the ID as its placeholder. An alias isn't listed there. */}
+        <label className="flex server-model-limit" data-limit="label">
+          {tr(M.label)}
+          <input
+            className="input"
+            disabled={disabled || m.unsupported === 'alias'}
+            value={m.label ?? ''}
+            maxLength={MODEL_LABEL_MAX}
+            placeholder={m.id}
+            aria-label={`${tr(M.label)} (${m.id})`}
+            onChange={(e) => {
+              const { label: _drop, ...rest } = m
+              onChange(e.target.value ? { ...rest, label: e.target.value } : rest)
+            }}
+          />
+        </label>
         {field('context', M.context, tr(M.contextNone))}
         {field('output', M.output, out ? tr(M.outputDefault, { n: out }) : '')}
       </div>

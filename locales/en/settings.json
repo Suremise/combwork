@@ -3775,6 +3775,10 @@
     "defaultMessage": "{name}'s API key",
     "description": "Title of the dialog asking a server connection's API key ({name}, its name)."
   },
+  "settings.connections.server.label": {
+    "defaultMessage": "Label",
+    "description": "A field on a server connection's model (HI-2684): the name shown for it in Claude Code's /model picker. Its placeholder is the model's ID."
+  },
   "settings.connections.server.limitsHint": {
     "defaultMessage": "Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.",
     "description": "Under a server connection's model list (HI-2682): when the models' Context size and Output budget fields are used. Context size and Output budget are the fields' names."
@@ -3818,6 +3822,10 @@
   "settings.connections.server.outputDefault": {
     "defaultMessage": "Default: {n, number}",
     "description": "The placeholder of a server connection's model's empty Output budget field (HI-2682): the budget used when none is set. {n} is a number of tokens."
+  },
+  "settings.connections.server.pickerHint": {
+    "defaultMessage": "Claude Code’s /model lists these models by their exact IDs, under their labels. With no Claude model among them, its own Opus, Sonnet and Haiku rows are hidden. A lineup in your own settings is used instead.",
+    "description": "Under a server connection's model list (HI-2684): what Claude Code's model picker (/model, a command: keep it) shows on this connection. Label names the field. Opus, Sonnet and Haiku are Claude's model names: keep them."
   },
   "settings.connections.server.preset": {
     "defaultMessage": "Preset",

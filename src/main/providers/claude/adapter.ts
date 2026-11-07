@@ -31,6 +31,7 @@ import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
 import { lastModelArg, localLimitsFor } from './localLimits'
+import { pickerFor } from './modelPicker'
 import { localLimitsTest } from '../../localLimitsTest'
 import { ClaudeUsageParser, encodeProjectPath, parseTranscript, transcriptSubSession } from './usage'
 import { atMost } from '../../../shared/atMost'
@@ -582,6 +583,13 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // The user's --settings merged in: Combwork passes only this file (#330).
     const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'CW_HOOK_TOKEN' })
     if (memoryDir) settings[field] = memoryDir
+    // A server connection's models in /model (HI-2684): their exact IDs and labels, unless a lineup of the user's wins.
+    if (ctx.server && test) {
+      const got = pickerFor({ models: ctx.server.models, connection: ctx.server.connection, scopes, test, owns: (id) => this.ownsModel(id) })
+      if (got.picker) settings.modelPicker = got.picker
+      ctx.picker = got.record
+      log.info(`${userText(ctx.agentId)}'s /model lineup: ${got.picker ? `${got.record.rows!.length} row(s)${got.record.replace ? ', replacing the built-in ones' : ''}` : `none (${got.record.why})`}${got.record.omitted ? `, ${got.record.omitted.length} left out` : ''}`)
+    }
     // Its offer to teach auto mode about the environment, turned off for this launch when the user said so (HI-1959,
     // Settings → Advanced): the skill's override in Combwork's settings file, never where their own --settings name it.
     if (!advanced.get<boolean>('claude-code.autoModeSetup.offer')) {

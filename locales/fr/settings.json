@@ -1519,6 +1519,8 @@
   "settings.connections.server.context": "Taille du contexte",
   "settings.connections.server.contextNone": "Non définie : 200 000 supposés",
   "settings.connections.server.limitsHint": "La taille du contexte et le budget de sortie sont utilisés quand un agent démarre sur ce modèle (pas pour les ID que Claude Code lit comme les siens, ni quand les paramètres de la session associent l’ID à un modèle Claude). Un changement s’applique au prochain démarrage de ses agents.",
+  "settings.connections.server.label": "Libellé",
+  "settings.connections.server.pickerHint": "Le /model de Claude Code liste ces modèles par leurs ID exacts, sous leurs libellés. Si aucun n’est un modèle Claude, ses propres lignes Opus, Sonnet et Haiku sont masquées. Une liste de modèles dans tes propres paramètres est utilisée à la place.",
   "settings.connections.server.notBelow": "Le budget de sortie doit être inférieur à la taille du contexte.",
   "settings.connections.server.output": "Budget de sortie",
   "settings.connections.server.outputDefault": "Par défaut : {n, number}",

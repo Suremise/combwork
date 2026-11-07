@@ -1519,6 +1519,8 @@
   "settings.connections.server.context": "Rozmiar kontekstu",
   "settings.connections.server.contextNone": "Nie ustawiono: przyjęto 200 000",
   "settings.connections.server.limitsHint": "Rozmiar kontekstu i budżet wyjścia są używane, gdy agent startuje na tym modelu (nie dla identyfikatorów, które Claude Code odczytuje jako własne, ani gdy ustawienia sesji przypisują identyfikator do modelu Claude). Zmiana działa od następnego uruchomienia jego agentów.",
+  "settings.connections.server.label": "Etykieta",
+  "settings.connections.server.pickerHint": "/model w Claude Code pokazuje te modele pod ich dokładnymi identyfikatorami, z etykietami. Gdy żaden nie jest modelem Claude, jego własne wiersze Opus, Sonnet i Haiku są ukryte. Jeśli Twoje własne ustawienia mają listę modeli, używana jest ona.",
   "settings.connections.server.notBelow": "Budżet wyjścia musi być mniejszy niż rozmiar kontekstu.",
   "settings.connections.server.output": "Budżet wyjścia",
   "settings.connections.server.outputDefault": "Domyślnie: {n, number}",

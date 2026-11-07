@@ -560,5 +560,7 @@
   "tips.retargetRelease.title": "Quando uma versão sai, passe o que sobrou para a próxima",
   "tips.retargetRelease.text": "Vai mudar O trabalho é mesclado em de 1.1.0 para 1.2.0? Salvar… lista os cartões Todo e os slots livres ainda em 1.1.0 que podem passar para 1.2.0, e o que fica, com o motivo. Deixe Redirecionar também o que pode passar marcado para movê-los.",
   "tips.localModelLimits.text": "Nos modelos de uma conta de servidor (Configurações → Contas e conexões, Editar servidor…), defina o tamanho do contexto e o orçamento de saída: os agentes iniciados nesse modelo passam a compactar no contexto real dele, em vez de em 200.000 supostos.",
+  "tips.localModelPicker.title": "Troque de modelo local no /model do Claude Code",
+  "tips.localModelPicker.text": "Um agente numa conta de servidor encontra os modelos da conta no /model do Claude Code, pelos IDs exatos. Dê a cada um um Rótulo em Editar servidor… para nomeá-lo lá.",
   "tips.localModelLimits.title": "Informe ao Claude Code o contexto real do seu modelo local"
 }

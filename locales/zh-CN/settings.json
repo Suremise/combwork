@@ -1519,6 +1519,8 @@
   "settings.connections.server.context": "上下文大小",
   "settings.connections.server.contextNone": "未设置：假定为 200,000",
   "settings.connections.server.limitsHint": "上下文大小和输出预算会在代理以该模型启动时使用（不适用于 Claude Code 读作自身的 ID，也不适用于会话设置将 ID 映射到 Claude 模型的情况）。更改会在其代理下次启动时生效。",
+  "settings.connections.server.label": "标签",
+  "settings.connections.server.pickerHint": "Claude Code 的 /model 会按准确的 ID 列出这些模型，并显示它们的标签。如果其中没有 Claude 模型，它自带的 Opus、Sonnet 和 Haiku 行会被隐藏。若你自己的设置中有模型列表，则使用那个列表。",
   "settings.connections.server.notBelow": "输出预算必须小于上下文大小。",
   "settings.connections.server.output": "输出预算",
   "settings.connections.server.outputDefault": "默认：{n, number}",

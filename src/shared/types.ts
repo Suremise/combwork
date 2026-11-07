@@ -910,6 +910,12 @@ export interface ServerModel {
    */
   output?: number
   /**
+   * The name the user gives this model (HI-2684), shown as its row's label in Claude Code's /model picker: display only,
+   * never sent to the server, never used to match it (dialects, the launch, the footer use `id`). Trimmed, at most
+   * MODEL_LABEL_MAX characters, no control characters; none: the picker shows the ID.
+   */
+  label?: string
+  /**
    * Why Combwork never passes this model's context and output (HI-2682), judged from its ID alone, in what main sends a
    * window (never saved): Claude Code reads it as one of its aliases, or it is a spelling (claude, [1m], a date) the
    * control doesn't support.
@@ -2590,6 +2596,8 @@ export interface LiveSessionState {
    */
   /** A local model's limits as this launch applied them (HI-2682), on a server connection: launch-global. */
   localLimits?: LaunchedLimits
+  /** The /model picker rows this launch asked Claude Code for (HI-2684), on a server connection, or why none. */
+  picker?: LaunchedPicker
   launchedConnection?: {
     id: string
     name: string
@@ -3178,6 +3186,23 @@ export interface LaunchedLimits {
    * reads as its own): a switch to one keeps the declared context, an estimate until Claude Code reports (HR1, round 1).
    */
   eligible?: string[]
+}
+
+/**
+ * The /model picker lineup a launch on a server connection asked Claude Code for (HI-2684): what was requested, never
+ * what Claude Code shows (an availableModels allowlist still filters the rows, and with none left it keeps its built-in
+ * lineup). `rows`, the exact IDs passed, in order; `omitted`, the connection's IDs left out and why; `replace`, whether
+ * the built-in lineup was asked to be hidden. Absent rows: none was passed, `why` says why (`whyFile`, the scope).
+ */
+export interface LaunchedPicker {
+  connection: string
+  rows?: string[]
+  replace?: boolean
+  omitted?: { id: string; why: 'alias' }[]
+  why?: 'managed' | 'cli' | 'user' | 'unreadable' | 'noRows'
+  whyFile?: string
+  /** A scope with an availableModels allowlist, which may filter the rows (its label). */
+  allowlist?: string
 }
 
 export interface AutoCompactSetting {

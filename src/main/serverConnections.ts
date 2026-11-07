@@ -90,9 +90,9 @@ function checkedKey(key: string): string {
   return key
 }
 
-/** Refuses a key that also appears in a field kept unencrypted (its name, base URL or a model id). */
+/** Refuses a key that also appears in a field kept unencrypted (its name, base URL, a model's id or label). */
 function assertKeyNotIn(key: string, fields: { name: string; url: string; models: readonly ServerModel[] }): void {
-  const field = fields.name.includes(key) ? 'name' : fields.url.includes(key) ? 'url' : fields.models.some((m) => m.id.includes(key)) ? 'models' : null
+  const field = fields.name.includes(key) ? 'name' : fields.url.includes(key) ? 'url' : fields.models.some((m) => m.id.includes(key) || !!m.label?.includes(key)) ? 'models' : null
   if (field) throw combworkError(KEY_IN, { field }, { kind: 'invalid' })
 }
 

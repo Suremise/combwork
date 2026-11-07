@@ -1519,6 +1519,8 @@
   "settings.connections.server.context": "Tamaño de contexto",
   "settings.connections.server.contextNone": "Sin configurar: se suponen 200.000",
   "settings.connections.server.limitsHint": "El tamaño de contexto y el presupuesto de salida se usan cuando un agente se inicia en ese modelo (no para ID que Claude Code lee como propios, ni donde los ajustes de la sesión asignan el ID a un modelo de Claude). Un cambio se aplica la próxima vez que se inicien sus agentes.",
+  "settings.connections.server.label": "Etiqueta",
+  "settings.connections.server.pickerHint": "El /model de Claude Code muestra estos modelos por sus ID exactos, con sus etiquetas. Si ninguno es un modelo de Claude, se ocultan sus propias filas Opus, Sonnet y Haiku. Si tus propios ajustes tienen una lista de modelos, se usa esa.",
   "settings.connections.server.notBelow": "El presupuesto de salida debe ser menor que el tamaño de contexto.",
   "settings.connections.server.output": "Presupuesto de salida",
   "settings.connections.server.outputDefault": "Predeterminado: {n, number}",

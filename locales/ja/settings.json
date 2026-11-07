@@ -1519,6 +1519,8 @@
   "settings.connections.server.context": "コンテキストサイズ",
   "settings.connections.server.contextNone": "未設定：200,000とみなします",
   "settings.connections.server.limitsHint": "コンテキストサイズと出力上限は、エージェントがそのモデルで開始したときに使われます（Claude Codeが自身のものとして読むIDや、セッションの設定がIDをClaudeのモデルに対応付けている場合は除く）。変更は、そのエージェントの次回の開始時に適用されます。",
+  "settings.connections.server.label": "ラベル",
+  "settings.connections.server.pickerHint": "Claude Codeの/modelには、これらのモデルが正確なIDでラベル付きで表示されます。Claudeのモデルが1つもなければ、Claude Code自身のOpus、Sonnet、Haikuの行は表示されません。自分の設定にモデル一覧がある場合はそちらが使われます。",
   "settings.connections.server.notBelow": "出力上限はコンテキストサイズより小さくする必要があります。",
   "settings.connections.server.output": "出力上限",
   "settings.connections.server.outputDefault": "既定値：{n, number}",

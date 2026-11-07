@@ -75,6 +75,20 @@ export function keyProblem(key: string): KeyProblem | null {
   return null
 }
 
+/** The longest name a user gives a server's model (HI-2684, `ServerModel.label`). */
+export const MODEL_LABEL_MAX = 80
+
+/**
+ * A model's label as kept (HI-2684): a string with its control characters taken out, trimmed, cut to MODEL_LABEL_MAX
+ * characters; undefined for anything else or nothing left.
+ */
+export function labelOf(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined
+  // eslint-disable-next-line no-control-regex
+  const s = [...v.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim()].slice(0, MODEL_LABEL_MAX).join('').trim()
+  return s || undefined
+}
+
 /** A model id as a server names it: letters, digits and `_.:/@+[]-`, at most MODEL_ID_MAX. */
 export function validModelId(id: string): boolean {
   return id.length > 0 && id.length <= MODEL_ID_MAX && /^[\w.:/@+[\]-]+$/.test(id)
@@ -99,7 +113,9 @@ export function cleanModels(models: readonly ServerModel[]): ServerModel[] {
     // Its output budget (HI-2682), the same whole number of tokens; kept as stored (its fit with the context is checked
     // where it is set and where a launch uses it, never by dropping it here).
     const output = tokensOf(m.output)
-    out.push({ id, ...(as.length ? { as } : {}), ...(m.remote === true ? { remote: true as const } : {}), ...(context ? { context } : {}), ...(output ? { output } : {}) })
+    // The user's name for it (HI-2684), cleaned (labelOf).
+    const label = labelOf(m.label)
+    out.push({ id, ...(as.length ? { as } : {}), ...(m.remote === true ? { remote: true as const } : {}), ...(context ? { context } : {}), ...(output ? { output } : {}), ...(label ? { label } : {}) })
   }
   return out
 }
@@ -199,7 +215,9 @@ export function mergeListed(before: readonly ServerModel[], ids: readonly string
     // never sets them.
     const context = was.get(id)?.context
     const output = was.get(id)?.output
-    return { id, ...(as ? { as } : {}), ...(isRemote(id) ? { remote: true as const } : {}), ...(context ? { context } : {}), ...(output ? { output } : {}) }
+    // And its label (HI-2684): a listing never names a model.
+    const label = was.get(id)?.label
+    return { id, ...(as ? { as } : {}), ...(isRemote(id) ? { remote: true as const } : {}), ...(context ? { context } : {}), ...(output ? { output } : {}), ...(label ? { label } : {}) }
   })
   return { models: cleanModels(models), dropped: before.map((m) => m.id).filter((id) => !ids.includes(id)) }
 }

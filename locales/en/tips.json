@@ -1211,6 +1211,14 @@
     "defaultMessage": "Tell Claude Code your local model’s real context",
     "description": "A tip's title (HI-2682): a local model on a server account, its context size."
   },
+  "tips.localModelPicker.text": {
+    "defaultMessage": "An agent on a server account finds the account’s models in Claude Code’s /model, by their exact IDs. Give each a Label in Edit Server… to name it there.",
+    "description": "A tip (HI-2684). /model is a Claude Code command: keep it. Label is a field of a server account's models and Edit Server… a button: keep them as Combwork shows them."
+  },
+  "tips.localModelPicker.title": {
+    "defaultMessage": "Switch local models in Claude Code’s /model",
+    "description": "A tip's title (HI-2684): a server account's models in Claude Code's model picker. /model is a command: keep it."
+  },
   "tips.loopDefaults.text": {
     "defaultMessage": "Rounds and Wait under Card loops in Settings → Version Control set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a workspace and a project can set their own. Saying \"rounds: 3\" when you start one still wins.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {rounds} and {hours} are the defaults (10 and 6). \"rounds: 3\" is what the user types to an agent: keep it in English."

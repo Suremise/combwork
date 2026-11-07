@@ -2898,6 +2898,8 @@ class SessionManager {
     times?.mark('prepareLaunch')
     // A local model's limits as applied (HI-2682), for its context meter: this launch's, never read again.
     state.localLimits = ctx.localLimits ?? undefined
+    // The /model lineup it asked Claude Code for (HI-2684), or why none.
+    state.picker = ctx.picker
     l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))

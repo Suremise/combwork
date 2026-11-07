@@ -1519,6 +1519,8 @@
   "settings.connections.server.context": "Kontextgröße",
   "settings.connections.server.contextNone": "Nicht festgelegt: 200.000 angenommen",
   "settings.connections.server.limitsHint": "Kontextgröße und Ausgabebudget werden verwendet, wenn ein Agent mit diesem Modell startet (nicht für IDs, die Claude Code als seine eigenen liest, und nicht, wo die Einstellungen der Sitzung die ID einem Claude-Modell zuordnen). Eine Änderung gilt beim nächsten Start seiner Agenten.",
+  "settings.connections.server.label": "Bezeichnung",
+  "settings.connections.server.pickerHint": "Claude Codes /model listet diese Modelle mit ihren genauen IDs unter ihren Bezeichnungen. Ist kein Claude-Modell darunter, werden seine eigenen Zeilen Opus, Sonnet und Haiku ausgeblendet. Eine Modellauswahl in deinen eigenen Einstellungen wird stattdessen verwendet.",
   "settings.connections.server.notBelow": "Das Ausgabebudget muss kleiner als die Kontextgröße sein.",
   "settings.connections.server.output": "Ausgabebudget",
   "settings.connections.server.outputDefault": "Standard: {n, number}",

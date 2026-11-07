@@ -560,5 +560,7 @@
   "tips.retargetRelease.title": "リリースが出たら、残りを次のブランチへ移す",
   "tips.retargetRelease.text": "「マージ先」を 1.1.0 から 1.2.0 に変えますか？「保存…」に、1.1.0 のまま 1.2.0 へ移せるTodoのカードと空きスロット、そして残るものとその理由が表示されます。移すには「移せるもののマージ先も移す」をオンのままにしてください。",
   "tips.localModelLimits.text": "サーバーアカウントのモデル（「設定」→「アカウントと接続」、「サーバーを編集…」）でコンテキストサイズと出力上限を設定すると、そのモデルで開始したエージェントは、想定の200,000ではなく実際のコンテキストで圧縮します。",
+  "tips.localModelPicker.title": "Claude Codeの/modelでローカルモデルを切り替える",
+  "tips.localModelPicker.text": "サーバーアカウントのエージェントは、Claude Codeの/modelでそのアカウントのモデルを正確なIDで選べます。サーバーを編集…で各モデルにラベルを付けると、その名前で表示されます。",
   "tips.localModelLimits.title": "ローカルモデルの実際のコンテキストをClaude Codeに伝える"
 }

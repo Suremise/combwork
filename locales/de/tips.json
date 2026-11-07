@@ -560,5 +560,7 @@
   "tips.retargetRelease.title": "Wenn ein Release erscheint, das Übrige aufs nächste umstellen",
   "tips.retargetRelease.text": "„Arbeit wird gemergt in“ von 1.1.0 auf 1.2.0 ändern? „Speichern…“ listet die Todo-Karten und freien Slots auf 1.1.0, die 1.2.0 folgen können, und was bleibt, jeweils mit Grund. Lass „Auch umstellen, was wechseln kann“ angehakt, um sie umzustellen.",
   "tips.localModelLimits.text": "Lege bei den Modellen eines Server-Kontos (Einstellungen → Konten & Verbindungen, Server bearbeiten…) Kontextgröße und Ausgabebudget fest: Agenten, die mit diesem Modell starten, komprimieren dann bei seinem echten Kontext statt bei angenommenen 200.000.",
+  "tips.localModelPicker.title": "Lokale Modelle in Claude Codes /model wechseln",
+  "tips.localModelPicker.text": "Ein Agent auf einem Server-Konto findet die Modelle des Kontos in Claude Codes /model, mit ihren genauen IDs. Gib jedem unter Server bearbeiten… eine Bezeichnung, um es dort zu benennen.",
   "tips.localModelLimits.title": "Sag Claude Code den echten Kontext deines lokalen Modells"
 }
