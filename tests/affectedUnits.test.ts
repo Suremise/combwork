@@ -291,13 +291,58 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
     expect(suitesOf(WS, repo({ ...other, [WS]: workspaceTs() }), repo({ ...other, [WS]: workspaceTs({ spareExport: 'export ' }) }))).toEqual(['other'])
   })
 
-  it("WorkspaceService's members and its instance select every suite: its instances flow where the tracer can't follow (C3)", () => {
-    expect(allOf(WS, repo(), repo({ [WS]: workspaceTs({ member: '2' }) }))).toMatch(/WorkspaceService\.setX: WorkspaceService's instances flow where the tracer can't follow them/)
-    // Whatever reaches them, a literal bracket access or an instance of an imported class among them.
-    for (const text of ["import { workspace } from './workspace'\nexport const b = () => workspace['setX'](1)\n", "import { WorkspaceService } from './workspace'\nexport const b = (name: 'setX') => new WorkspaceService()[name](1)\n"]) {
-      const dyn = { 'src/main/other.ts': text, 'src/main/settingsTools.ts': "import { workspace } from './workspace'\nexport const set = () => workspace.setX(2)\n" }
-      expect(allOf(WS, repo(dyn), repo({ ...dyn, [WS]: workspaceTs({ member: '2' }) }))).toMatch(/WorkspaceService's instances/)
+  // WorkspaceService's members (HI-2678): followed by name while the WorkspaceService rule holds in both revisions
+  // (tests/workspaceRule.test.ts has its own cases), on a typed project the rule's census reads.
+  const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ES2023', lib: ['ES2023'], module: 'ESNext', moduleResolution: 'bundler', strict: true, noEmit: true, types: [] }, include: ['src/main/**/*'] })
+  const typed = (over: Files = {}): Files => ({ 'tsconfig.node.json': TSCONFIG, [WS]: workspaceTs(), 'src/main/settingsTools.ts': "import { workspace } from './workspace'\nexport const set = (): number => workspace.setX(2)\n", 'src/main/other.ts': 'export const z = (): number => 1\n', ...over })
+  const member = { [WS]: workspaceTs({ member: '2' }) }
+  it("WorkspaceService's members, while its rule holds: the files naming them, a literal key among them", () => {
+    expect(suitesOf(WS, typed(), typed(member))).toEqual(['settings'])
+    const literal = { 'src/main/other.ts': "import { workspace } from './workspace'\nexport const b = (): number => workspace['setX'](1)\n" }
+    expect(suitesOf(WS, typed(literal), typed({ ...literal, ...member }))).toEqual(['other', 'settings'])
+  })
+  it("…but where the rule doesn't hold, in either revision, every suite, naming the escape", () => {
+    for (const text of ["import { WorkspaceService } from './workspace'\nexport const b = (name: 'setX'): number => new WorkspaceService()[name](1)\n", "import { workspace } from './workspace'\nexport const lost: unknown = workspace\n"]) {
+      const escaping = { 'src/main/other.ts': text }
+      expect(allOf(WS, typed(escaping), typed({ ...escaping, ...member }))).toMatch(/WorkspaceService\.setX can't be followed by name: the WorkspaceService rule doesn't hold: src\/main\/other\.ts:2/)
+      expect(allOf(WS, typed(escaping), typed(member))).toMatch(/doesn't hold: src\/main\/other\.ts:2: .*\(base\)/)
     }
+  })
+  // HR3's round 1: a consumer choosing the member by destructuring, and one outside the program by an ordinary import.
+  it('a member destructured by a computed key, or a script importing workspace.ts: every suite, saying why', () => {
+    const destructuring = { 'src/main/other.ts': "import { WorkspaceService } from './workspace'\nexport function g(ws: WorkspaceService, k: keyof WorkspaceService): unknown {\n  const { [k]: fn } = ws\n  return fn\n}\n" }
+    expect(allOf(WS, typed(destructuring), typed({ ...destructuring, ...member }))).toMatch(/src\/main\/other\.ts:3: .* is destructured by a computed key/)
+    const script = { 'scripts/consumer.mjs': "import { workspace } from '../src/main/workspace.ts'\nexport const g = () => workspace[['set', 'X'].join('')](1)\n" }
+    expect(allOf(WS, typed(script), typed({ ...script, ...member }))).toMatch(/scripts\/consumer\.mjs, outside tsconfig\.node\.json's program, loads src\/main\/workspace\.ts/)
+  })
+  // HR3's round 2: the same, reached through another type of WorkspaceService, in either revision.
+  it('a computed key through an intersection, a constrained or unconstrained generic, a subclass or sub-interface: every suite', () => {
+    const forms = [
+      'export function g(ws: WorkspaceService & { tag: boolean }, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n',
+      'export function g(ws: WorkspaceService & { tag: boolean }, k: keyof WorkspaceService): unknown {\n  const { [k]: fn } = ws\n  return fn\n}\n',
+      'export function g<T extends WorkspaceService>(ws: T, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n',
+      'interface View extends WorkspaceService {\n  tag: boolean\n}\nexport function g(ws: View, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n',
+      'export class View extends WorkspaceService {\n  tag = true\n}\nexport function g(ws: View, k: keyof WorkspaceService): unknown {\n  return ws[k]\n}\n',
+      'function pick<T>(x: T, k: keyof T): unknown {\n  return x[k]\n}\nexport const g = (ws: WorkspaceService, k: keyof WorkspaceService): unknown => pick(ws, k)\n'
+    ]
+    for (const body of forms) {
+      const other = { 'src/main/other.ts': `import { WorkspaceService } from './workspace'\n${body}` }
+      expect(allOf(WS, typed(other), typed({ ...other, ...member })), body).toMatch(/the WorkspaceService rule doesn't hold: src\/main\/other\.ts:\d+: .*(read|destructured) by a computed key.*\(base\)/)
+      expect(allOf(WS, typed(), typed({ ...other, ...member })), body).toMatch(/doesn't hold: src\/main\/other\.ts:\d+: .*\(head\)/)
+    }
+  })
+  // HR3's round 3: a helper declared in a .d.ts, its code a .js file outside the program.
+  it('a member handed to a declared helper whose code the census cannot read: every suite, in either revision', () => {
+    const helper = {
+      'src/main/helper.d.ts': 'export declare function pick<T>(x: T, k: keyof T): T[keyof T]\n',
+      'src/main/helper.js': 'exports.pick = (x, k) => x[k]\n',
+      'src/main/other.ts': "import { WorkspaceService } from './workspace'\nimport { pick } from './helper.js'\nexport function g(ws: WorkspaceService, k: keyof WorkspaceService): unknown {\n  return pick(ws, k)\n}\n"
+    }
+    expect(allOf(WS, typed(helper), typed({ ...helper, ...member }))).toMatch(/doesn't hold: src\/main\/other\.ts:4: .*goes to pick \(src\/main\/helper\.d\.ts\), declared without a body the census reads.*\(base\)/)
+    expect(allOf(WS, typed(), typed({ ...helper, ...member }))).toMatch(/goes to pick .*\(head\)/)
+  })
+  it('the workspace instance itself: every suite (its Proxy, C3)', () => {
+    expect(allOf(WS, typed(), typed({ [WS]: workspaceTs().replace('export const workspace = new WorkspaceService()', 'export const workspace = new WorkspaceService() as WorkspaceService') }))).toMatch(/the workspace instance is a Proxy/)
   })
 
   it('a namespace import indexed, or the module re-exported whole', () => {
@@ -440,7 +485,8 @@ describe('a change of types only selects nothing, proved node by node (HI-2690, 
 describe('real changes: before every suite, now the suites their parts need (git history)', () => {
   // HI-2690 (the RC4 rounds, HI-2661's table): the suite counts stay (each still has a shared file's every-suite
   // reason), but the reasons D1 and D3 cleared are gone: RC4 3's types.ts, values/*.d.ts and tests/sandbox files.
-  it('RC4 and HI-2654: every suite still, by the reasons left (App.tsx, servers.ts, workspace.ts members)', () => {
+  // RC4 3 and 4's workspace.ts members: their trees predate the WorkspaceService rule and aren't audited (HI-2678).
+  it('RC4: every suite still, by the reasons left (App.tsx, servers.ts, workspace.ts members before the rule)', () => {
     const names = SUITES.map((s: { name: string }) => s.name)
     const real = SUITES.filter(isRealCli).map((s: { name: string }) => s.name)
     const ranges: [string, string, string, string[]][] = [
@@ -458,8 +504,10 @@ describe('real changes: before every suite, now the suites their parts need (git
         for (const f of ['src/shared/types.ts', 'src/shared/i18n/values/main.d.ts']) expect(units[f]?.typeOnly, f).toBeTruthy()
         expect(affectedSuites(files.filter((f: string) => f.startsWith('tests/sandbox/')), names, real, units).suites).toEqual([])
       }
+      if (label === 'RC4 3' || label === 'RC4 4') expect(units['src/main/workspace.ts']?.all, label).toMatch(/WorkspaceService rule doesn't hold/)
     }
-  }, 120_000)
+    // RC4 3 and 4's base trees censused (the rule stops at the first tree it doesn't hold in): about 30 s each.
+  }, 300_000)
 
   const names = (SUITES as { name: string }[]).map((s) => s.name)
   const realNames = (SUITES as { name: string; needs?: string[] }[]).filter(isRealCli).map((s) => s.name)
@@ -468,14 +516,18 @@ describe('real changes: before every suite, now the suites their parts need (git
     { card: 'HI-2652', commit: 'dba04a0f7c73d8515ded18f5e0a59ec93c4b242b', needs: ['activityworkspace'] },
     { card: 'HI-2653', commit: '475897343681d7b3570ca04d5fdb97b6862aee42', needs: ['keysui', 'startbusy', 'agents-ui', 'keys'] },
   ]
-  // HI-2654 changed WorkspaceService.setAdvanced: a member, so still every suite (C3), saying why.
-  it('HI-2654: still every suite, its change being a WorkspaceService member', () => {
+  // HI-2654 changed WorkspaceService.setAdvanced: a member, followed by name because the WorkspaceService rule holds in
+  // both its trees (HI-2678: each audited, tests/e2e/workspaceRule.audited.json), so the suites reaching setAdvanced.
+  it('HI-2654: a named set, with advanced, assistantsettings, consoletext and p7settings', () => {
     const commit = '22fd88db7a58f978d7059d3f21298d89a6fc2667'
     const files = execFileSync('git', ['diff', '--name-only', `${commit}^1`, commit], { cwd: root, encoding: 'utf8', env: runContext.baseEnv() }).split(/\r?\n/).filter(Boolean)
     const after = affectedSuites(files, names, realNames, splitSelections(files, { cwd: root, base: `${commit}^1`, head: commit, suiteNames: names }))
-    expect(after.all).toBe(true)
-    expect(after.why[0]).toMatch(/WorkspaceService\.setAdvanced: WorkspaceService's instances flow where the tracer can't follow them/)
-  })
+    expect(after.all, after.why?.[0]).toBeFalsy()
+    expect(after.suites).toEqual(expect.arrayContaining(['advanced', 'assistantsettings', 'consoletext', 'p7settings']))
+    expect(after.suites.length).toBeLessThan(names.length / 5)
+    expect(after.why.join('\n')).toMatch(/WorkspaceService\.setAdvanced → src\/main\/settingsTools\.ts/)
+    // Two censuses of the rule's scope, each its own tree read from git: about 30 s each.
+  }, 300_000)
   for (const c of changes) {
     it(`${c.card}: a named handful, with ${c.needs.join(', ')}`, () => {
       const base = `${c.commit}^1`

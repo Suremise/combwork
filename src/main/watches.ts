@@ -850,7 +850,7 @@ export function watchKnown(projectPath: string, agentId: string): TaskWatchInfo 
   if (!ws?.path) return 'unknown'
   const store = storeFor(projectPath)
   if (!store) {
-    inBackground('loading watches', load(ws))
+    inBackground('loading watches', load(ws).then(() => undefined))
     return 'unknown'
   }
   const r = recordOf(store, projectPath, agentId)
@@ -863,7 +863,7 @@ export function watchFor(projectPath: string, agentId: string): TaskWatchInfo | 
   if (!ws?.path) return null
   const store = storeFor(projectPath)
   if (!store) {
-    inBackground('loading watches', load(ws))
+    inBackground('loading watches', load(ws).then(() => undefined))
     return null
   }
   const r = recordOf(store, projectPath, agentId)
