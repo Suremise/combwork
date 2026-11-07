@@ -228,7 +228,7 @@
   "workflow.refused.approval.given.next": "等待批准，可在卡片上或“待你处理”中给出。",
   "workflow.refused.card.plainNumber.message": "单独的数字不是卡片引用。",
   "workflow.refused.card.plainNumber.next": "请用卡片的键指定卡片：{key}。",
-  "workflow.refused.check.revisionMismatch.message": "{revision} 不是此处检出的修订版本。",
+  "workflow.refused.check.revisionMismatch.message": "{why, select, ambiguous {{revision} 在此处是多个提交的开头：请给出更多字符。检出的是 {head}。} other {{revision} 不是此处检出的修订版本：检出的是 {head}。}}",
   "workflow.refused.check.revisionMismatch.next": "在检出 {revision} 的位置运行检查，或不指定修订版本运行。",
   "workflow.refused.done.contained.change": "此规则在“版本控制”→“由谁合并”中设置。",
   "workflow.refused.done.contained.message": "{card} 的修订版本 {revision} 不在 {target} 中。",

@@ -228,7 +228,7 @@
   "workflow.refused.approval.given.next": "Wait for the OK, given on the card or in For you.",
   "workflow.refused.card.plainNumber.message": "A plain number is not a card reference.",
   "workflow.refused.card.plainNumber.next": "Name the card by its key: {key}.",
-  "workflow.refused.check.revisionMismatch.message": "{revision} isn't what's checked out here.",
+  "workflow.refused.check.revisionMismatch.message": "{why, select, ambiguous {{revision} is the start of more than one commit here: give more of it. {head} is checked out.} other {{revision} isn't what's checked out here: {head} is.}}",
   "workflow.refused.check.revisionMismatch.next": "Run the check where {revision} is checked out, or without a revision.",
   "workflow.refused.done.contained.change": "This rule is set in Version Control → Who merges.",
   "workflow.refused.done.contained.message": "{card} at {revision} isn't in {target}.",

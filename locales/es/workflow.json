@@ -228,7 +228,7 @@
   "workflow.refused.approval.given.next": "Espera la aprobación, que se da en la tarjeta o en Para ti.",
   "workflow.refused.card.plainNumber.message": "Un número solo no es una referencia de tarjeta.",
   "workflow.refused.card.plainNumber.next": "Indica la tarjeta por su clave: {key}.",
-  "workflow.refused.check.revisionMismatch.message": "La versión {revision} no es la que está extraída aquí.",
+  "workflow.refused.check.revisionMismatch.message": "{why, select, ambiguous {{revision} es aquí el inicio de más de un commit: indica más caracteres. La extraída es {head}.} other {La versión {revision} no es la que está extraída aquí: lo está {head}.}}",
   "workflow.refused.check.revisionMismatch.next": "Ejecuta la comprobación donde está extraída la versión {revision}, o sin indicar versión.",
   "workflow.refused.done.contained.change": "Esta regla se configura en Control de versiones → Quién fusiona.",
   "workflow.refused.done.contained.message": "La tarjeta {card} en la versión {revision} no está en la rama {target}.",

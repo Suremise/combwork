@@ -228,7 +228,7 @@
   "workflow.refused.approval.given.next": "Attends l’accord, donné sur la carte ou dans Pour toi.",
   "workflow.refused.card.plainNumber.message": "Un simple numéro n’est pas une référence de carte.",
   "workflow.refused.card.plainNumber.next": "Désigne la carte par sa clé : {key}.",
-  "workflow.refused.check.revisionMismatch.message": "La révision {revision} n’est pas celle qui est extraite ici.",
+  "workflow.refused.check.revisionMismatch.message": "{why, select, ambiguous {{revision} est ici le début de plusieurs commits : donnes-en davantage. C’est {head} qui est extraite.} other {La révision {revision} n’est pas celle qui est extraite ici : c’est {head}.}}",
   "workflow.refused.check.revisionMismatch.next": "Lance la vérification là où la révision {revision} est extraite, ou sans révision.",
   "workflow.refused.done.contained.change": "Cette règle se définit dans Gestion de versions → Qui fusionne.",
   "workflow.refused.done.contained.message": "La carte {card} à la révision {revision} n’est pas dans la branche {target}.",

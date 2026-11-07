@@ -59,6 +59,26 @@ interface Locked {
 }
 
 /** Whether a path is `p` or inside it. */
+/** A commit id an agent can name: its full 40 hex characters, or at least 7 of them from the start (HI-2671). */
+const COMMIT_ID = /^[0-9a-f]{7,40}$/
+
+/**
+ * HI-2671: why a revision an agent named (cw_submit's, a check's) isn't the head `h` checked out in `folder`, or null
+ * when it is: the head's full id, or an unambiguous start of it (as `git log --oneline` shows it), in any case. A start
+ * of it that git finds more commits for is refused as ambiguous; anything else (non-hex, too short, another commit)
+ * names the head that is checked out.
+ */
+export async function notTheHead(folder: string, named: string, h: string): Promise<GuardRefusal | null> {
+  const n = named.trim().toLowerCase()
+  if (n === h) return null
+  const shown = n.length > 12 ? `${n.slice(0, 12)}…` : n
+  const refusal = (why: 'ambiguous' | 'other'): GuardRefusal => ({ rule: 'check.revisionMismatch', values: { revision: shown || named, head: h.slice(0, 12), why } }) // i18n-ignore: a refusal's code and values
+  if (!COMMIT_ID.test(n) || !h.startsWith(n)) return refusal('other')
+  // A start of the head: git's own answer says whether it names only that commit here.
+  const id = await G.resolve(folder, n)
+  return id === h ? null : refusal(isUnknown(id) || id === null ? 'ambiguous' : 'other')
+}
+
 const under = (f: string, p: string): boolean => f === p || f.startsWith(`${p}/`)
 
 /** G16: files of the change that another agent's current card locked (a warning, never a refusal), each with that card. */
@@ -314,7 +334,8 @@ export class GitPlatform implements PlatformAdapter {
       const read = got ? null : await G.heads(folder, target)
       const h = got ? got.head! : read!.head
       if (isUnknown(h)) return { ok: false, refusal: unknownRefusal(card, h, 'submit') }
-      if (args.revision && args.revision !== h) return { ok: false, refusal: { rule: 'check.revisionMismatch', values: { revision: args.revision.slice(0, 7) } } }
+      const mismatch = args.revision ? await notTheHead(folder, args.revision, h) : null
+      if (mismatch) return { ok: false, refusal: mismatch }
       revision = h
       dirty = got?.dirty
       // The change's base: the merge base with the target at this moment, fixed with the submission.
@@ -586,7 +607,8 @@ export class GitPlatform implements PlatformAdapter {
     const [before, ls] = await Promise.all([G.worktreeNow(folder), git(folder, ['ls-files', '-z'])])
     const h = !isUnknown(before) && before.head ? before.head : await G.head(folder)
     if (isUnknown(rev) || !rev || isUnknown(h)) return unknownRefusal(card, unknown(UNREADABLE.revisionIn, { folder }), 'submit.checksPassed')
-    if (run.revision && run.revision !== h) return { rule: 'check.revisionMismatch', values: { revision: run.revision.slice(0, 7) } }
+    const mismatch = run.revision ? await notTheHead(folder, run.revision, h) : null
+    if (mismatch) return mismatch
     const files = ls.out.split('\0').filter(Boolean)
     const gitDir = G.gitDirSync(folder) ?? (await git(folder, ['rev-parse', '--absolute-git-dir']).then((r) => (r.ok ? r.out.trim() : null)))
     const dirtyA = isUnknown(before) ? before : before.dirty

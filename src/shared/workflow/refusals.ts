@@ -260,7 +260,7 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.evidence.changed.next', defaultMessage: 'Try again: Combwork reads it afresh.', description: 'The next step after a refusal because what a rule read changed meanwhile.' })
   ),
   'check.revisionMismatch': r(
-    msg({ id: 'workflow.refused.check.revisionMismatch.message', defaultMessage: "{revision} isn't what's checked out here.", description: 'A refused check run: the revision named is not the checked-out one.' }),
+    msg({ id: 'workflow.refused.check.revisionMismatch.message', defaultMessage: "{why, select, ambiguous {{revision} is the start of more than one commit here: give more of it. {head} is checked out.} other {{revision} isn't what's checked out here: {head} is.}}", description: 'A refused check run or submission (HI-2671): the revision named ({revision}, as given, a commit id or its start) is not the checked-out commit ({head}, its first 12 characters). why=ambiguous: {revision} is the start of the checked-out commit but also of another one, so more of its characters are needed.' }),
     msg({ id: 'workflow.refused.check.revisionMismatch.next', defaultMessage: 'Run the check where {revision} is checked out, or without a revision.', description: 'The next step after a check run named the wrong revision.' })
   )
 }

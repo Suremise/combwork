@@ -46,7 +46,7 @@ const T = {
   'arg.connection': agentMsg({ id: 'tool.arg.connection', text: 'Its connection, by id or name (cw_connection): its model, effort, mode and CLI. Default: the first usable here.' }),
   'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }),
   'arg.override': agentMsg({ id: 'tool.arg.override', text: "Moves it past the rules the move skips: reason is the user's own why, never made up." }),
-  'intent.arg.revision': agentMsg({ id: 'tool.intent.arg.revision', text: "Default: the card's current revision (its commit, or its files' hash)." }),
+  'intent.arg.revision': agentMsg({ id: 'tool.intent.arg.revision', text: "Default: the card's current revision (its commit, or its files' hash). A commit's short id (7+ characters) will do." }),
   'intent.arg.submission': agentMsg({ id: 'tool.intent.arg.submission', text: 'Default: the latest.' }),
   'putBack.arg.why': agentMsg({ id: 'tool.putBack.arg.why', text: 'Why it goes back.' }),
   'submit.arg.summary': agentMsg({ id: 'tool.submit.arg.summary', text: 'What was done, a line first.' }),

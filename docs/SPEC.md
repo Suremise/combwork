@@ -5432,7 +5432,9 @@ where it ran) and counts for a card's submission only if all of these hold; othe
 - **the tested checkout contains the card's revision:** for a card with its own line, it *is* the revision; in a
   shared folder, the card's revision is an ancestor of it (other cards' later commits may be in it too, which the
   option's description says). An explicit `--revision` must equal the checkout at the start (else refused at once,
-  "a3f2c1d isn't what's checked out here"; None: the card's paths' hash, its tested checkout);
+  "a3f2c1d isn't what's checked out here: b71e09a4c3d2 is"; None: the card's paths' hash, its tested checkout). As for
+  `cw_submit`'s `revision`, a start of the commit's id of 7 or more hex characters names it, any case, where git finds
+  only that commit for it (HI-2671: one it finds more for is refused as ambiguous, asking for more of it);
 - the folder was clean when it started (§16.3.2's dirty), and is clean and at the same checkout when it ends;
 - **nothing changed in between**: the watcher (§16.3.2 observe) saw no write to a tracked file in the folder and no
   HEAD reflog entry during the run (a checkout and back, a reset to the same commit, an edit undone all show), and no
