@@ -1,0 +1,127 @@
+// The Antigravity CLI as a provider (HI-2544), through Combwork with a stand-in agy (fake-agy/: no sign-in, no model):
+// an agent on its PC-wide account launches in a private profile of its own (USERPROFILE; HOME left the user's), with
+// auto-update off and an account variable of Combwork's own environment left out; the project's own MCP server (a
+// sentinel, which marks a file when it is started) is never started, Combwork's inert server running in its place; the
+// conversation's id comes from the status line; two new conversations one after the other, then each resumed by its id;
+// a conversation that isn't the agent's is never resumed. The fake proves the adapter's side only (HI-2548 runs the real
+// CLI). Dev build, throwaway profile and workspace.
+const lib = require('./lib.cjs')
+const { _electron } = require('playwright-core')
+const fs = require('fs')
+const path = require('path')
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 20000
+
+const userData = path.join(lib.WORK, 'antigravity-profile')
+const ws = path.join(lib.WORK, 'antigravity-ws')
+const alpha = path.join(ws, 'alpha')
+const agyLog = path.join(lib.WORK, 'antigravity-fake-agy.jsonl')
+const marker = path.join(lib.WORK, 'antigravity-sentinel-started.txt')
+let failed = 0
+const check = (name, ok, extra = '') => {
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
+}
+const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)).filter((e) => e.kind === kind) : [])
+
+;(async () => {
+  for (const d of [userData, ws]) fs.rmSync(d, { recursive: true, force: true })
+  for (const f of [agyLog, marker]) fs.rmSync(f, { force: true })
+  lib.gitProject(alpha)
+  // The project's own MCP server, which no agent was given: a sentinel that marks a file the moment it is started.
+  const sentinel = path.join(lib.WORK, 'antigravity-sentinel.cjs')
+  fs.writeFileSync(sentinel, `require('fs').appendFileSync(${JSON.stringify(marker)}, 'started\\n'); setInterval(() => {}, 1000)\n`)
+  fs.mkdirSync(path.join(alpha, '.agents'), { recursive: true })
+  fs.writeFileSync(path.join(alpha, '.agents', 'mcp_config.json'), JSON.stringify({ mcpServers: { sentinel: { command: process.execPath, args: [sentinel] } } }))
+  fs.writeFileSync(path.join(alpha, '.agents', 'hooks.json'), JSON.stringify({ 'project-hook': { SessionStart: [{ type: 'command', command: 'exit 0' }] } }))
+  lib.enableProviders(userData, ['claude-code', 'antigravity'])
+  const cfgFile = path.join(userData, 'config.json')
+  const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
+  cfg.settings.providers.antigravity = { ...cfg.settings.providers.antigravity, executablePath: path.join(__dirname, 'fake-agy', 'agy.cmd') }
+  cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never' }
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
+
+  // An account variable in Combwork's own environment, which Antigravity agents mustn't get.
+  const env = lib.combworkEnv({ CW_USER_DATA: userData, CW_API_PORT: lib.port(47901), FAKE_AGY_LOG: agyLog, GEMINI_API_KEY: 'not-for-agy' })
+  const app = await _electron.launch({ executablePath: lib.ELECTRON, args: [lib.ROOT], cwd: lib.ROOT, env })
+  const page = await app.firstWindow()
+  page.on('pageerror', (e) => check('no page errors', false, e.message))
+  await lib.fitWindow(app, page, { width: 1500, height: 900 })
+  await lib.appReady(page)
+  const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
+  await lib.openWorkspace(inv, page, ws)
+  const live = async (id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === alpha.toLowerCase() && s.agentId === id)
+  const { until } = lib
+  await page.getByText('alpha', { exact: true }).first().click()
+
+  // --- Its PC-wide account, its own (never Copilot's).
+  const accounts = (await inv('connections:list')).accounts ?? (await inv('connections:list')).connections ?? []
+  const own = accounts.find((a) => a.id === 'antigravity')
+  check("Antigravity's PC-wide account is its own", !!own && own.provider === 'antigravity' && own.home === 'cli', JSON.stringify(accounts.map((a) => [a.id, a.provider, a.home])))
+
+  const gem = await lib.addAgent(inv, alpha, { name: 'Gem', provider: 'antigravity' })
+  check('an agent is added on Antigravity', gem?.provider === 'antigravity', JSON.stringify(gem))
+
+  // --- First conversation.
+  const startNew = async () => {
+    const before = entries('session').length
+    await inv('session:start', alpha, { agentId: gem.id })
+    await until(async () => entries('session').length > before, HUNG_MS)
+    const conv = await until(async () => (await live(gem.id))?.sessionId || null, HUNG_MS)
+    return { conv, launch: entries('session').at(-1) }
+  }
+  const stop = async () => {
+    await inv('session:stop', alpha, gem.id)
+    return until(async () => !(await live(gem.id)), HUNG_MS)
+  }
+  const first = await startNew()
+  check("the conversation's id comes from its status line", /^[0-9a-f-]{36}$/.test(first.conv ?? '') && first.conv === first.launch?.conversation, JSON.stringify({ conv: first.conv, launch: first.launch?.conversation }))
+  const e = first.launch?.env ?? {}
+  check('it runs in a private profile of its own (USERPROFILE), outside the workspace', !!e.USERPROFILE && !e.USERPROFILE.toLowerCase().startsWith(ws.toLowerCase()) && /antigravity[\\/]profiles[\\/]/i.test(e.USERPROFILE), JSON.stringify(e))
+  check("…with HOME left the user's own (not the profile)", !!e.HOME && e.HOME !== e.USERPROFILE, JSON.stringify(e))
+  check('…auto-update off', e.AGY_CLI_DISABLE_AUTO_UPDATE === 'true', JSON.stringify(e))
+  check("…and Combwork's environment's GEMINI_API_KEY left out", e.GEMINI_API_KEY === undefined, JSON.stringify(e))
+  const args = first.launch?.args ?? []
+  check('it is given its settings for this launch only (--settings), the status line among them', args.includes('--settings') && /"statusLine"/.test(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8')), JSON.stringify(args))
+  const mcp = entries('mcp').at(-1)
+  check("the project's server is replaced in the profile by Combwork's inert one", !!mcp && mcp.project.includes('sentinel') && mcp.own.includes('sentinel'), JSON.stringify(mcp))
+  const profileMcp = JSON.parse(fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'config', 'mcp_config.json'), 'utf8')).mcpServers
+  check("…which carries no launch token, and runs Combwork's own server in inert mode", profileMcp.sentinel?.env?.CW_MCP_INERT === '1' && Object.keys(profileMcp.sentinel.env).every((k) => ['CW_MCP_INERT', 'ELECTRON_RUN_AS_NODE'].includes(k)), JSON.stringify(profileMcp.sentinel))
+  check("…and the project's hook is switched off", JSON.parse(fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'config', 'hooks.json'), 'utf8'))['project-hook']?.enabled === false)
+  // The inert server is up (the fake falls back to the project's if it ends, as agy does): the sentinel never starts.
+  await until(async () => entries('mcp').length > 0, HUNG_MS)
+  check("the project's own MCP server was never started", !fs.existsSync(marker), fs.existsSync(marker) ? fs.readFileSync(marker, 'utf8') : '')
+  // A turn: written to its conversation.
+  const transcript = path.join(e.USERPROFILE, '.gemini', 'antigravity-cli', 'brain', first.conv, '.system_generated', 'logs', 'transcript.jsonl')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), 'hello antigravity')
+  await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
+  check('its turns are kept in its own conversation, in its profile', !!(await until(async () => fs.existsSync(transcript) && fs.readFileSync(transcript, 'utf8').includes('hello antigravity'), HUNG_MS)))
+  check('it stops', !!(await stop()))
+
+  // --- A second new conversation, then each resumed by its own id.
+  const second = await startNew()
+  check('a second new launch is a new conversation', !!second.conv && second.conv !== first.conv && second.launch?.resumed === false, JSON.stringify({ first: first.conv, second: second.conv }))
+  check('…in the same private profile', second.launch?.env?.USERPROFILE === e.USERPROFILE)
+  await stop()
+  for (const [name, c] of [['the first', first.conv], ['the second', second.conv]]) {
+    const before = entries('session').length
+    await inv('session:start', alpha, { agentId: gem.id, resumeId: c })
+    await until(async () => entries('session').length > before, HUNG_MS)
+    const l = entries('session').at(-1)
+    check(`${name} conversation resumes by its id (--conversation)`, l?.resumed === true && l.conversation === c && l.args.includes('--conversation'), JSON.stringify(l))
+    check(`…and the session is that conversation`, (await until(async () => ((await live(gem.id))?.sessionId === c ? c : null), HUNG_MS)) === c)
+    await stop()
+  }
+  // --- A conversation that isn't the agent's own: refused before agy starts.
+  const before = entries('session').length
+  const refused = await inv('session:start', alpha, { agentId: gem.id, resumeId: '00000000-0000-4000-8000-000000000999' }).then(() => null, (err) => String(err?.message ?? err))
+  check("a conversation that isn't the agent's is never resumed", entries('session').length === before && !(await live(gem.id)) && /isn't in this agent's own conversations/.test(refused ?? ''), refused ?? 'started')
+  check("the project's own MCP server was never started, all along", !fs.existsSync(marker))
+
+  await app.close()
+  console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
+  process.exit(failed ? 1 : 0)
+})().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

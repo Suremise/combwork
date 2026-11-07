@@ -30,6 +30,7 @@ export const SUITES = [
   { name: 'agenttemp' },
   { name: 'agentview', needs: ['claude'], claudeHome: 'own' },
   { name: 'agentwatch' },
+  { name: 'antigravity' },
   { name: 'antivirus' },
   { name: 'asarfiles' },
   { name: 'assistant' },
