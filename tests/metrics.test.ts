@@ -1684,12 +1684,17 @@ describe('HI-2553: failures by kind, their reasons, and the tool list by provide
     expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { ...list, upfrontBytes: 25000 }, 'codex')).toBe(false)
     const catalog = Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.catalog)
     const rows = Object.fromEntries(toolListRows(catalog).map((r) => [r.provider, r]))
-    // Claude Code defers: its up-front part; Codex doesn't: the whole list; a provider not known: not known.
+    // An estimate if deferred, for a CLI that can defer (Claude Code) only: never for Codex (it gets the whole list, Bytes),
+    // nor a provider not known (round 1: whether a launch deferred isn't observable, so it is never shown as what it got).
     expect(rows['claude-code']).toMatchObject({ starts: 2, bytes: 24000, upfront: 3100 })
-    expect(rows.codex).toMatchObject({ starts: 1, bytes: 24000, upfront: 24000 })
+    expect(rows.codex).toMatchObject({ starts: 1, bytes: 24000, upfront: null })
     expect(rows.unknown).toMatchObject({ starts: 1, upfront: null })
     const t = totals({ api: [], mcp: [], guidance: [], catalog, providers: [], safeguards: [] })
-    expect([t.toolListStarts, t.avgToolListBytes, t.avgToolListUpfrontBytes]).toEqual([4, 24000, (3000 + 3200 + 24000) / 3])
+    expect([t.toolListStarts, t.avgToolListBytes, t.avgToolListUpfrontBytes]).toEqual([4, 24000, (3000 + 3200) / 2])
+    // The provider filter offers the tool list's providers, though no launch or usage has them; never `unknown` (round 1).
+    const { providersIn } = await import('../src/shared/metricsView')
+    const report = { scope: { kind: 'workspace' }, providers: [], projects: {}, workspace: { api: [], mcp: [], guidance: [], catalog: [{ provider: 'codex', starts: 1 }, { provider: 'unknown', starts: 1 }] } } as unknown as Parameters<typeof providersIn>[0]
+    expect(providersIn(report)).toEqual(['codex'])
     // The provider filter narrows the tool list too.
     const codexOnly = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, provider: 'codex', from: new Date(T0 - HOUR).toISOString() })
     expect(Object.values(codexOnly.projects).flatMap((p) => p.catalog).map((c) => c.provider)).toEqual(['codex'])
@@ -1705,5 +1710,19 @@ describe('HI-2553: failures by kind, their reasons, and the tool list by provide
     const [c] = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' }, from: new Date(T0 - 2 * HOUR).toISOString() }).projects.alpha.catalog
     expect(c).toMatchObject({ provider: 'unknown', starts: 2, upfrontStarts: 0, upfrontBytes: 0 })
     await disposeWorkspaceService(w)
+  })
+  it('a reason is said as its sentence, its values left out, never echoing its id alone (round 1)', async () => {
+    const { reasonMessages, reasonSentence } = await import('../src/renderer/src/views/perfReasons')
+    const { trTemplate, msg } = await import('../src/shared/i18n')
+    // A rule's: its refusal's first sentence, the card and stage it was about as "…".
+    expect(reasonSentence('rule:move.doingNobody', {})).toBe('… would be in … with nobody on it.')
+    // A message's, found by its id in the English catalogue.
+    const found = await reasonMessages(['msg:workflow.refused.start.slotAvailable.message', 'msg:no.such.message', 'rule:move.doingNobody'])
+    expect(Object.keys(found)).toEqual(['msg:workflow.refused.start.slotAvailable.message'])
+    expect(reasonSentence('msg:workflow.refused.start.slotAvailable.message', found)).toBe("… can't start: no slot is free.")
+    // One it can't say (unknown here, or `other`): none, so the view says what it is instead.
+    expect([reasonSentence('msg:no.such.message', found), reasonSentence('rule:no.such.rule', found), reasonSentence('other', found)]).toEqual([null, null, null])
+    // Plurals, selects, numbers and tags in their general form.
+    expect(trTemplate(msg({ id: 'test.template', defaultMessage: '{n, plural, one {# card} other {# cards}} in <b>{name}</b>{kind, select, a {!} other {.}} {size, number}', description: 'test' }))).toBe('2 cards in …. 2')
   })
 })

@@ -131,8 +131,8 @@ export interface PerfTotals {
   /** Tool calls' failures by kind (HI-2553). */
   toolFailures: FailureCounts
   /**
-   * Per tool list start, on average: its bytes, and what the CLIs were given at the start (loadedAtStart: of the starts
-   * where that is known; null where none is).
+   * Per tool list start, on average: its bytes, and Combwork's estimate of what a CLI that defers tools got at the start
+   * (deferredEstimate: of the starts of such CLIs that reported it; null where none did).
    */
   avgToolListBytes: number
   avgToolListUpfrontBytes: number | null
@@ -184,7 +184,7 @@ export function totals(s: PerfSelection): PerfTotals {
   const launches = sum(s.guidance, (g) => g.launches)
   const per = (n: number): number => (launches ? n / launches : 0)
   const toolListStarts = sum(s.catalog, (c) => c.starts)
-  const loaded = s.catalog.map(loadedAtStart).filter((x): x is { starts: number; bytes: number } => !!x)
+  const loaded = s.catalog.map(deferredEstimate).filter((x): x is { starts: number; bytes: number } => !!x)
   const loadedStarts = sum(loaded, (x) => x.starts)
   return {
     requests: latency.count,
@@ -222,14 +222,16 @@ export function totals(s: PerfSelection): PerfTotals {
 }
 
 /**
- * What a catalog series' CLI was given at its starts (HI-2553), in all: a CLI that defers tools, the up-front part its
- * starts reported (null for starts that reported none); one that doesn't, the whole list; a provider not known, null.
+ * Combwork's estimate of what a catalog series' CLI got at the start if it deferred the tools (HI-2553 round 1), in all:
+ * the up-front part its starts reported (the tools sent in full and the others' names), for a CLI that can defer MCP
+ * tools only; null for one that doesn't (it gets the whole list), a provider not known, or starts that reported none.
+ * An estimate, never an observation: whether that launch's CLI deferred (Claude Code's tool search can be off, a model
+ * or gateway can turn it off) and how it worded the list aren't observable.
  */
-export function loadedAtStart(c: CatalogSeries): { starts: number; bytes: number } | null {
+export function deferredEstimate(c: CatalogSeries): { starts: number; bytes: number } | null {
   const p = PROVIDERS.find((x) => x.id === c.provider)
-  if (!p) return null
-  if (!p.capabilities.defersMcpTools) return { starts: c.starts, bytes: c.toolsBytes }
-  return c.upfrontStarts ? { starts: c.upfrontStarts, bytes: c.upfrontBytes } : null
+  if (!p?.capabilities.defersMcpTools || !c.upfrontStarts) return null
+  return { starts: c.upfrontStarts, bytes: c.upfrontBytes }
 }
 
 export interface RouteRow {
@@ -343,7 +345,7 @@ export interface ToolListRow {
   starts: number
   tools: number
   bytes: number
-  /** What the CLI was given at the start, per start (loadedAtStart); null where that isn't known. */
+  /** Combwork's estimate of what the CLI got at the start if it deferred the tools, per start (deferredEstimate); null where none applies. */
   upfront: number | null
   chars: number | null
   descriptionChars: number | null
@@ -362,7 +364,7 @@ export function toolListRows(catalog: CatalogSeries[]): ToolListRow[] {
   }
   const per = (n: number, of: number): number | null => (of ? n / of : null)
   return [...by.values()].map((t) => {
-    const loaded = loadedAtStart(t)
+    const loaded = deferredEstimate(t)
     return {
     provider: t.provider,
     role: t.role,
@@ -383,6 +385,9 @@ export function providersIn(r: MetricsReport, chosen = ''): string[] {
   const ids = new Set<string>()
   for (const p of r.providers) ids.add(p.provider)
   for (const part of partsOf(r, '')) for (const g of part.guidance) ids.add(g.provider)
+  // The tool list's providers too (HI-2553: recorded apart from launches, in buckets of their own). `unknown` (starts
+  // from before Combwork recorded it) is no provider to choose: those rows show under All providers only.
+  for (const part of partsOf(r, '')) for (const c of part.catalog) if (c.provider && c.provider !== 'unknown') ids.add(c.provider)
   if (chosen) ids.add(chosen)
   return [...ids].filter((p) => p !== '(other)').sort()
 }

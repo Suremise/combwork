@@ -360,6 +360,7 @@ interface CombworkMessageValues {
   'performance.reasons.other': undefined
   'performance.reasons.reason': undefined
   'performance.reasons.tip': undefined
+  'performance.reasons.unknown': undefined
   'performance.refresh': undefined
   'performance.role.agent': undefined
   'performance.role.all': undefined

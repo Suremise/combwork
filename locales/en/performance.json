@@ -44,8 +44,8 @@
     "description": "Tooltip of the Guidance per launch card. core and catalog are words of the card: keep them as there."
   },
   "performance.card.guidanceTools": {
-    "defaultMessage": "Tool list {tools} a start, {upfront} up front",
-    "description": "A second line under the Guidance per launch card (HI-2553): the Combwork tools' definitions each session's CLI got, on average, and how much of them it put in the prompt at the start (Claude Code defers tools). {tools} and {upfront} are sizes such as \"24 KB\"."
+    "defaultMessage": "Tool list {tools} a start, ≈ {upfront} if deferred",
+    "description": "A second line under the Guidance per launch card (HI-2553): the Combwork tools' definitions each session's CLI got, on average, and Combwork's estimate (≈) of what a CLI that defers tools (Claude Code) gets at the start if it does. {tools} and {upfront} are sizes such as \"24 KB\"."
   },
   "performance.card.guidanceToolsAll": {
     "defaultMessage": "Tool list {tools} a start",
@@ -1424,16 +1424,20 @@
     "description": "A cell of the Kind column (HI-2553). {kind} is a key (refused or invalid): don't translate the keys, only the texts."
   },
   "performance.reasons.other": {
-    "defaultMessage": "Other",
-    "description": "A cell of the Reason column (HI-2553): no rule or message id, or past the twelve reasons a route keeps."
+    "defaultMessage": "No reason recorded (an error without a rule or message id, or past the twelve reasons a route keeps)",
+    "description": "A cell of the Reason column (HI-2553): refusals or wrong calls whose reason Combwork could not tell, or past the twelve reasons kept per route."
   },
   "performance.reasons.reason": {
     "defaultMessage": "Reason",
     "description": "Column header of the Refusals and wrong calls by reason table (HI-2553): the rule or message id."
   },
   "performance.reasons.tip": {
-    "defaultMessage": "The most common reasons Combwork gave, by route: a workflow rule’s name (rule:) or the message’s id (msg:), never its text. A reason that keeps coming back points to a rule or a tool description to make clearer. Other: no rule or message id, or past the twelve a route keeps.",
-    "description": "Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule: and msg: as they are (prefixes shown in the table). Other is a value of the Reason column."
+    "defaultMessage": "The most common reasons Combwork gave, by route, as a general sentence: Combwork keeps which rule or message it was, never what it said, so the card, file or name it was about shows as “…”. Under it, the rule’s (rule:) or message’s (msg:) id. A reason that keeps coming back points to a rule or a tool description to make clearer.",
+    "description": "Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule: and msg: as they are (prefixes shown in the table). “…” is how a left-out value shows: keep it."
+  },
+  "performance.reasons.unknown": {
+    "defaultMessage": "A reason this version of Combwork doesn’t know",
+    "description": "A cell of the Reason column (HI-2553): a rule or message recorded by another version of Combwork, not found in this one. Its id shows under it."
   },
   "performance.refresh": {
     "defaultMessage": "Refresh",
@@ -1704,8 +1708,8 @@
     "description": "Column header of the Combwork tool list table: how many session starts were given the list."
   },
   "performance.toolList.tip": {
-    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, by provider (Unknown: starts from before Combwork recorded it). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. Up front is what the CLI puts in the prompt at the start: Claude Code defers MCP tools, so its model sees their names, and in full only the few Combwork marks; it loads another’s definition when it uses it, which isn’t observable. Codex and Copilot get the whole list. Either way the list sits at the start of the prompt, so it is cached after the first turn. A dash: not measured (sessions from before Combwork measured it).",
-    "description": "Tooltip of the Combwork tool list table on the Performance page (HI-2063, HI-2553). Descriptions, Parameters, Schemas and Up front are its columns: name them as there. Keep Combwork, Claude Code, Codex and Copilot (names)."
+    "defaultMessage": "The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, by provider (Unknown: starts from before Combwork recorded it). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. If deferred is an estimate, not a measurement: what Claude Code puts in its prompt at the start when it defers MCP tools (their names, and in full only the few Combwork marks). Whether a launch deferred them isn’t observable. Codex and Copilot get the whole list. The list sits at the start of the prompt, where a provider’s prompt cache can keep it after the first turn; whether it did isn’t measured here. A dash: not measured (sessions from before Combwork measured it).",
+    "description": "Tooltip of the Combwork tool list table on the Performance page (HI-2063, HI-2553). Descriptions, Parameters, Schemas and If deferred are its columns: name them as there. Keep Combwork, Claude Code, Codex and Copilot (names)."
   },
   "performance.toolList.tools": {
     "defaultMessage": "Tools",
@@ -1716,12 +1720,12 @@
     "description": "A cell of the Combwork tool list table's Provider column (HI-2553): starts recorded before Combwork recorded their CLI."
   },
   "performance.toolList.upfront": {
-    "defaultMessage": "Up front",
-    "description": "Column header of the Combwork tool list table (HI-2553): the bytes of the list a CLI puts in its prompt at the start, a start, on average (for Claude Code, which defers tools, only part of it)."
+    "defaultMessage": "If deferred",
+    "description": "Column header of the Combwork tool list table (HI-2553): Combwork's estimate of the bytes a CLI that defers MCP tools (Claude Code) puts in its prompt at the start, if it does, a start, on average. Shown with ≈."
   },
   "performance.toolList.upfrontTip": {
-    "defaultMessage": "What the CLI puts in the prompt at the start: for Claude Code, which defers MCP tools, the tools Combwork marks to be sent in full and the others’ names (its own wording of them isn’t observable); for Codex and Copilot, the whole list. A dash: not known.",
-    "description": "Info tip of the Up front column of the Combwork tool list table (HI-2553). Keep Combwork, Claude Code, Codex and Copilot (names)."
+    "defaultMessage": "Combwork’s estimate, not a measurement: what a CLI that defers MCP tools gets at the start if it does, the tools Combwork marks to be sent in full and the others’ names. Claude Code defers them unless its tool search is off (a setting, a model or a gateway can turn it off); whether a launch did, and how the CLI words the list, aren’t observable. A dash: a CLI that doesn’t defer (Codex and Copilot get the whole list: Bytes), or not known.",
+    "description": "Info tip of the If deferred column of the Combwork tool list table (HI-2553). Keep Combwork, Claude Code, Codex and Copilot (names); Bytes is a column: name it as there."
   },
   "performance.tools.calls": {
     "defaultMessage": "Calls",

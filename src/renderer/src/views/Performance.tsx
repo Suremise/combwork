@@ -1,4 +1,4 @@
-import { Children, useCallback, useEffect, useMemo, useRef } from 'react'
+import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { providerDescriptor, providerName } from '@shared/providers'
@@ -20,6 +20,7 @@ import { AntivirusLine } from '../components/Antivirus'
 import { Card } from './WorkspaceOverview'
 import { CardsTable } from './PerformanceCards'
 import { StallsTable } from './PerformanceStalls'
+import { reasonMessages, reasonSentence } from './perfReasons'
 
 /**
  * Performance: what Combwork's own parts cost (shared/metrics.ts, recorded by main/metrics.ts), for the whole workspace (the
@@ -86,7 +87,7 @@ const M = {
   toolRepliesTip: msg({ id: 'performance.card.toolRepliesTip', defaultMessage: "The text Combwork's tools gave the models (what goes into their context), exactly: characters (UTF-16 code units) and UTF-8 bytes. Not tokens.", description: 'Tooltip of the Tool replies card. Keep UTF-16 and UTF-8.' }),
   guidance: msg({ id: 'performance.card.guidance', defaultMessage: 'Guidance per launch', description: 'Title of a Performance card: the size of what Combwork gave each session at launch, on average.' }),
   guidanceSub: msg({ id: 'performance.card.guidanceSub', defaultMessage: '{launches, plural, one {# launch} other {# launches}} · core {core} · catalog {catalog}', description: "Under the Guidance per launch card's size. {core} and {catalog} are sizes such as \"4 KB\": Combwork's session contract and its skills' catalog." }),
-  guidanceTools: msg({ id: 'performance.card.guidanceTools', defaultMessage: 'Tool list {tools} a start, {upfront} up front', description: "A second line under the Guidance per launch card (HI-2553): the Combwork tools' definitions each session's CLI got, on average, and how much of them it put in the prompt at the start (Claude Code defers tools). {tools} and {upfront} are sizes such as \"24 KB\"." }),
+  guidanceTools: msg({ id: 'performance.card.guidanceTools', defaultMessage: 'Tool list {tools} a start, ≈ {upfront} if deferred', description: "A second line under the Guidance per launch card (HI-2553): the Combwork tools' definitions each session's CLI got, on average, and Combwork's estimate (≈) of what a CLI that defers tools (Claude Code) gets at the start if it does. {tools} and {upfront} are sizes such as \"24 KB\"." }),
   guidanceToolsAll: msg({ id: 'performance.card.guidanceToolsAll', defaultMessage: 'Tool list {tools} a start', description: "A second line under the Guidance per launch card (HI-2553), when how much was put in the prompt at the start isn't known: the Combwork tools' definitions each session's CLI got, on average. {tools} is a size such as \"24 KB\"." }),
   guidanceTip: msg({ id: 'performance.card.guidanceTip', defaultMessage: "What Combwork gave each session at launch, on average: its session contract (core), what it adds for the project, the Assistant's role and mode, and its skills' catalog (names and descriptions). Skill bodies are separate: a model reads one only when it uses it. The tool list (its Combwork tools' definitions) is apart: the Combwork tool list table has it by provider.", description: 'Tooltip of the Guidance per launch card. core and catalog are words of the card: keep them as there.' }),
   limits: msg({ id: 'performance.limits.heading', defaultMessage: 'What isn’t measured', description: 'A folded section at the end of the Performance page: what its numbers leave out.' }),
@@ -141,11 +142,12 @@ const M = {
   errorsTip: msg({ id: 'performance.failures.errorsTip', defaultMessage: 'Real errors: something went wrong in Combwork (a server error), or, for a tool call, no reply came (a timeout, no connection).', description: 'Info tip of the Errors column (HI-2553).' }),
   unsortedHeader: msg({ id: 'performance.failures.unsorted', defaultMessage: 'Not sorted', description: 'Column header of the Agent API and Combwork tools tables (HI-2553), shown only when there are any: failures recorded before Combwork sorted them by kind.' }),
   reasonsHeading: msg({ id: 'performance.reasons.heading', defaultMessage: 'Refusals and wrong calls by reason', description: "Heading of the Performance page's table of why Agent API requests were refused or were wrong calls (HI-2553)." }),
-  reasonsTip: msg({ id: 'performance.reasons.tip', defaultMessage: 'The most common reasons Combwork gave, by route: a workflow rule’s name (rule:) or the message’s id (msg:), never its text. A reason that keeps coming back points to a rule or a tool description to make clearer. Other: no rule or message id, or past the twelve a route keeps.', description: 'Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule: and msg: as they are (prefixes shown in the table). Other is a value of the Reason column.' }),
+  reasonsTip: msg({ id: 'performance.reasons.tip', defaultMessage: 'The most common reasons Combwork gave, by route, as a general sentence: Combwork keeps which rule or message it was, never what it said, so the card, file or name it was about shows as “…”. Under it, the rule’s (rule:) or message’s (msg:) id. A reason that keeps coming back points to a rule or a tool description to make clearer.', description: 'Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule: and msg: as they are (prefixes shown in the table). “…” is how a left-out value shows: keep it.' }),
   kind: msg({ id: 'performance.reasons.kind', defaultMessage: 'Kind', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): refused or wrong call.' }),
   kindValue: msg({ id: 'performance.reasons.kindValue', defaultMessage: '{kind, select, refused {Refused} other {Wrong call}}', description: "A cell of the Kind column (HI-2553). {kind} is a key (refused or invalid): don't translate the keys, only the texts." }),
   reason: msg({ id: 'performance.reasons.reason', defaultMessage: 'Reason', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): the rule or message id.' }),
-  reasonOther: msg({ id: 'performance.reasons.other', defaultMessage: 'Other', description: 'A cell of the Reason column (HI-2553): no rule or message id, or past the twelve reasons a route keeps.' }),
+  reasonOther: msg({ id: 'performance.reasons.other', defaultMessage: 'No reason recorded (an error without a rule or message id, or past the twelve reasons a route keeps)', description: 'A cell of the Reason column (HI-2553): refusals or wrong calls whose reason Combwork could not tell, or past the twelve reasons kept per route.' }),
+  reasonUnknown: msg({ id: 'performance.reasons.unknown', defaultMessage: 'A reason this version of Combwork doesn’t know', description: 'A cell of the Reason column (HI-2553): a rule or message recorded by another version of Combwork, not found in this one. Its id shows under it.' }),
   count: msg({ id: 'performance.reasons.count', defaultMessage: 'Count', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): how many requests.' }),
   refusedLegend: msg({ id: 'performance.trend.refused', defaultMessage: 'Refused or wrong call', description: "Legend of the requests chart (HI-2553): the bars' colour for requests refused by a rule, wrong calls and cancelled ones: not faults." }),
   errorsLegend: msg({ id: 'performance.trend.errors', defaultMessage: 'Real errors', description: "Legend of the requests chart (HI-2553): the bars' colour for requests that failed for a real error (a server error)." }),
@@ -163,9 +165,9 @@ const M = {
   providerNote: msg({ id: 'performance.provider.note', defaultMessage: 'Launches, the Combwork tool list and the providers’ usage: the only parts recorded per provider.', description: "Beside the Performance page's Provider filter: what it changes (HI-2553: the tool list too). Combwork tool list is a table's heading: name it as there." }),
   providerNothing: msg({ id: 'performance.provider.nothing', defaultMessage: 'Nothing from {provider} in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}{filtered, select, yes { for this filter} other {}}.', description: "The Performance page's provider box when the provider chosen has nothing. {provider} is its name (Claude Code, Codex, Copilot); {filtered} is yes when the Who filter is set; {range} (24h, 7d or 30d) is a key: don't translate the keys, only the texts." }),
   toolListHeading: msg({ id: 'performance.toolList.heading', defaultMessage: 'Combwork tool list', description: "Heading of the Performance page's table of the Combwork tools' list each session was given (HI-2063). Keep Combwork (the app's name)." }),
-  toolListTip: msg({ id: 'performance.toolList.tip', defaultMessage: 'The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, by provider (Unknown: starts from before Combwork recorded it). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. Up front is what the CLI puts in the prompt at the start: Claude Code defers MCP tools, so its model sees their names, and in full only the few Combwork marks; it loads another’s definition when it uses it, which isn’t observable. Codex and Copilot get the whole list. Either way the list sits at the start of the prompt, so it is cached after the first turn. A dash: not measured (sessions from before Combwork measured it).', description: "Tooltip of the Combwork tool list table on the Performance page (HI-2063, HI-2553). Descriptions, Parameters, Schemas and Up front are its columns: name them as there. Keep Combwork, Claude Code, Codex and Copilot (names)." }),
-  toolListUpfront: msg({ id: 'performance.toolList.upfront', defaultMessage: 'Up front', description: "Column header of the Combwork tool list table (HI-2553): the bytes of the list a CLI puts in its prompt at the start, a start, on average (for Claude Code, which defers tools, only part of it)." }),
-  toolListUpfrontTip: msg({ id: 'performance.toolList.upfrontTip', defaultMessage: 'What the CLI puts in the prompt at the start: for Claude Code, which defers MCP tools, the tools Combwork marks to be sent in full and the others’ names (its own wording of them isn’t observable); for Codex and Copilot, the whole list. A dash: not known.', description: "Info tip of the Up front column of the Combwork tool list table (HI-2553). Keep Combwork, Claude Code, Codex and Copilot (names)." }),
+  toolListTip: msg({ id: 'performance.toolList.tip', defaultMessage: 'The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, by provider (Unknown: starts from before Combwork recorded it). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. If deferred is an estimate, not a measurement: what Claude Code puts in its prompt at the start when it defers MCP tools (their names, and in full only the few Combwork marks). Whether a launch deferred them isn’t observable. Codex and Copilot get the whole list. The list sits at the start of the prompt, where a provider’s prompt cache can keep it after the first turn; whether it did isn’t measured here. A dash: not measured (sessions from before Combwork measured it).', description: "Tooltip of the Combwork tool list table on the Performance page (HI-2063, HI-2553). Descriptions, Parameters, Schemas and If deferred are its columns: name them as there. Keep Combwork, Claude Code, Codex and Copilot (names)." }),
+  toolListUpfront: msg({ id: 'performance.toolList.upfront', defaultMessage: 'If deferred', description: "Column header of the Combwork tool list table (HI-2553): Combwork's estimate of the bytes a CLI that defers MCP tools (Claude Code) puts in its prompt at the start, if it does, a start, on average. Shown with ≈." }),
+  toolListUpfrontTip: msg({ id: 'performance.toolList.upfrontTip', defaultMessage: 'Combwork’s estimate, not a measurement: what a CLI that defers MCP tools gets at the start if it does, the tools Combwork marks to be sent in full and the others’ names. Claude Code defers them unless its tool search is off (a setting, a model or a gateway can turn it off); whether a launch did, and how the CLI words the list, aren’t observable. A dash: a CLI that doesn’t defer (Codex and Copilot get the whole list: Bytes), or not known.', description: "Info tip of the If deferred column of the Combwork tool list table (HI-2553). Keep Combwork, Claude Code, Codex and Copilot (names); Bytes is a column: name it as there." }),
   unknownProvider: msg({ id: 'performance.toolList.unknownProvider', defaultMessage: 'Unknown', description: "A cell of the Combwork tool list table's Provider column (HI-2553): starts recorded before Combwork recorded their CLI." }),
   toolListEmpty: msg({ id: 'performance.toolList.empty', defaultMessage: 'No tool lists.', description: 'The Combwork tool list table when it has no rows.' }),
   toolListStarts: msg({ id: 'performance.toolList.starts', defaultMessage: 'Starts', description: 'Column header of the Combwork tool list table: how many session starts were given the list.' }),
@@ -509,7 +511,7 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
                     sub={
                       <>
                         {tr(M.guidanceSub, { launches: t.launches, core: formatBytes(t.avgGuidanceBytes), catalog: formatBytes(t.avgSkillCatalogBytes) })}
-                        {/* The tool list beside it (HI-2553): a start's, and what the CLIs put in the prompt at the start. */}
+                        {/* The tool list beside it (HI-2553): a start's, and Combwork's estimate of what a CLI that defers tools gets at the start. */}
                         {t.toolListStarts > 0 && (
                           <div>{t.avgToolListUpfrontBytes !== null ? tr(M.guidanceTools, { tools: formatBytes(t.avgToolListBytes), upfront: formatBytes(t.avgToolListUpfrontBytes) }) : tr(M.guidanceToolsAll, { tools: formatBytes(t.avgToolListBytes) })}</div>
                         )}
@@ -770,9 +772,16 @@ function RoutesTable({ sel }: { sel: PerfSelection }) {
 }
 
 /** A reason's label as the table shows it: a rule's or message's id as it is (code), Other in the window's language. */
-const reasonLabel = (reason: string): string => (reason === 'other' ? tr(M.reasonOther) : reason)
-/** The reasons table's columns, in the window's language (made again when it changes). */
-const reasonColumns = (): DataColumn<ReasonRow>[] => [
+/**
+ * A reason as the table says it (HI-2553 round 1): its sentence (perfReasons.ts, its values left out), else what it
+ * is; with its rule's or message's id as a detail under it.
+ */
+const reasonShown = (reason: string, messages: Record<string, Msg>): { text: string; id: string } => {
+  if (reason === 'other') return { text: tr(M.reasonOther), id: '' }
+  return { text: reasonSentence(reason, messages) ?? tr(M.reasonUnknown), id: reason }
+}
+/** The reasons table's columns, in the window's language (made again when it changes, or the messages load). */
+const reasonColumns = (messages: Record<string, Msg>): DataColumn<ReasonRow>[] => [
   {
     key: 'route',
     header: tr(M.route),
@@ -786,7 +795,16 @@ const reasonColumns = (): DataColumn<ReasonRow>[] => [
     filter: { kind: 'text', value: (r) => `${r.method} ${r.route}` }
   },
   { key: 'kind', header: tr(M.kind), className: 'nowrap', cell: (r) => tr(M.kindValue, { kind: r.kind }), sortValue: (r) => r.kind },
-  { key: 'reason', header: tr(M.reason), cell: (r) => <code>{reasonLabel(r.reason)}</code>, sortValue: (r) => r.reason, filter: { kind: 'text', value: (r) => reasonLabel(r.reason) } },
+  {
+    key: 'reason',
+    header: tr(M.reason),
+    cell: (r) => {
+      const { text, id } = reasonShown(r.reason, messages)
+      return <CellLines main={text} sub={id} />
+    },
+    sortValue: (r) => reasonShown(r.reason, messages).text,
+    filter: { kind: 'text', value: (r) => Object.values(reasonShown(r.reason, messages)).join(' ') }
+  },
   { key: 'count', header: tr(M.count), num: true, descFirst: true, cell: (r) => num(r.count), sortValue: (r) => r.count }
 ]
 const BY_COUNT = { key: 'count', desc: true }
@@ -795,8 +813,22 @@ const BY_COUNT = { key: 'count', desc: true }
 function ReasonsTable({ sel }: { sel: PerfSelection }) {
   const language = useLanguage()
   const rows = useMemo(() => reasonRows(sel.api), [sel.api])
+  // The messages its `msg:` reasons name, from the English catalogue (loaded only when there are any).
+  const [messages, setMessages] = useState<Record<string, Msg>>({})
+  const wanted = rows.map((r) => r.reason).filter((r) => r.startsWith('msg:') && !messages[r])
+  const wantedKey = [...new Set(wanted)].sort().join('|')
+  useEffect(() => {
+    if (!wantedKey) return
+    let live = true
+    void reasonMessages(wantedKey.split('|')).then((found) => {
+      if (live && Object.keys(found).length) setMessages((had) => ({ ...had, ...found }))
+    })
+    return () => {
+      live = false
+    }
+  }, [wantedKey])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const columns = useMemo(() => reasonColumns(), [language])
+  const columns = useMemo(() => reasonColumns(messages), [language, messages])
   if (!rows.length) return null
   return (
     <>
@@ -860,7 +892,7 @@ const toolListColumns = (): DataColumn<ToolListRow>[] => [
   charsColumn('params', tr(M.toolListParams), (r) => r.paramChars),
   charsColumn('schemas', tr(M.toolListSchemas), (r) => r.schemaChars),
   { key: 'bytes', header: tr(M.toolListBytes), num: true, descFirst: true, cell: (r) => formatBytes(r.bytes), sortValue: (r) => r.bytes },
-  { key: 'upfront', header: tr(M.toolListUpfront), headerTip: tr(M.toolListUpfrontTip), num: true, descFirst: true, cell: (r) => (r.upfront === null ? '—' : formatBytes(r.upfront)), sortValue: (r) => r.upfront }
+  { key: 'upfront', header: tr(M.toolListUpfront), headerTip: tr(M.toolListUpfrontTip), num: true, descFirst: true, cell: (r) => (r.upfront === null ? '—' : `≈ ${formatBytes(r.upfront)}`), sortValue: (r) => r.upfront }
 ]
 
 /** The Combwork tools' list as each session got it, a start (HI-2063), by provider and with what its CLI got up front (HI-2553). */
