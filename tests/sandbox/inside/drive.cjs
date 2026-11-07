@@ -214,16 +214,7 @@ async function laneView(id) {
 
 async function providerSetup() {
   const dialog = page.locator('.dialog', { hasText: 'Provider Setup' })
-  if (!(await dialog.count())) {
-    await page.keyboard.press('Escape')
-    await page.keyboard.press('Control+Shift+P')
-    // Typed only once the palette's box has the focus, and Enter only once Provider Setup's command is the one chosen.
-    const typing = await until(async () => page.evaluate(() => !!document.activeElement?.closest('.palette')), 10_000)
-    if (typing) {
-      await page.keyboard.type('Provider Setup')
-      if (await until(async () => (await page.locator('.palette-item.active[data-command="help.agentSetup"]').count()) === 1, 10_000)) await page.keyboard.press('Enter')
-    }
-  }
+  if (!(await dialog.count())) await paletteCommand('help.agentSetup', 'Provider Setup')
   return (await until(async () => (await dialog.count()) === 1, 10_000)) ? dialog : null
 }
 
@@ -239,19 +230,53 @@ function runValues() {
   }
 }
 
+/** What the window shows around the palette, for a palette wait that failed: the focus, the box, its rows, the dialogs. */
+const paletteState = () => page.evaluate(() => {
+  const a = document.activeElement
+  const box = document.querySelector('.palette input')
+  return {
+    focused: a ? `${a.tagName.toLowerCase()}${a.className ? '.' + String(a.className).trim().split(/\s+/).join('.') : ''}${a.closest('.palette') ? ' (in the palette)' : ''}` : null,
+    palette: !!document.querySelector('.palette'),
+    box: box ? box.value : null,
+    active: document.querySelector('.palette-item.active')?.getAttribute('data-command') ?? null,
+    rows: [...document.querySelectorAll('.palette-item')].slice(0, 8).map((e) => e.getAttribute('data-command') || e.textContent.trim().slice(0, 60)),
+    noMatch: !!document.querySelector('.palette-list .pane-empty'),
+    dialogs: [...document.querySelectorAll('.dialog')].map((e) => e.innerText.trim().split('\n')[0].slice(0, 80))
+  }
+}).catch((e) => ({ unread: String(e.message).slice(0, 200) }))
+
 /**
  * Runs a command from the palette as a user does: Ctrl+Shift+P, its name typed, Enter only once the command `id` is the
- * one chosen. False when the palette or the command didn't come.
+ * one chosen. False when the palette or the command didn't come; then res.facts.palette[id] says which wait failed, what
+ * the window showed (paletteState), and its screenshot, <prefix>-palette-<id>.png.
+ * HI-2728: the palette keeps what was typed last while it is closed, takes the focus showing it when it opens again, and
+ * clears it a task later: keys typed in between went onto the last command's name ("No matching commands"). So it types
+ * only once the box is empty, and waits for the box to hold what it typed, before it waits for the command to be chosen.
  */
 async function paletteCommand(id, typed) {
+  const failed = async (wait) => {
+    const state = await paletteState()
+    ;(res.facts.palette ||= {})[id] = { failed: wait, ...state }
+    await shot(`palette-${id}`).catch((e) => { res.facts.palette[id].shotError = String(e.message).slice(0, 200) })
+    save()
+    return false
+  }
+  // The previous step's overlay (a dialog, or the palette itself) closed first: Ctrl+Shift+P reaches nothing behind a
+  // dialog. Escape each time one is still open (a palette's first Escape clears its box, the next closes it).
   await page.keyboard.press('Escape')
+  const clear = async () => (await page.locator('.dialog, .palette').count()) === 0 || (await page.keyboard.press('Escape'), false)
+  if (!(await until(clear, 10_000))) return failed("the previous step's dialog or palette to close")
   await page.keyboard.press('Control+Shift+P')
-  if (!(await until(async () => page.evaluate(() => !!document.activeElement?.closest('.palette')), 10_000))) return false
+  if (!(await until(async () => page.evaluate(() => !!document.activeElement?.closest('.palette') && document.activeElement.value === ''), 10_000))) return failed('the palette to have the focus, its box empty')
   await page.keyboard.type(typed)
-  if (!(await until(async () => (await page.locator(`.palette-item.active[data-command="${id}"]`).count()) === 1, 10_000))) return false
+  if (!(await until(async () => (await page.locator('.palette input').inputValue().catch(() => null)) === typed, 10_000))) return failed(`the box to hold "${typed}"`)
+  if (!(await until(async () => (await page.locator(`.palette-item.active[data-command="${id}"]`).count()) === 1, 10_000))) return failed(`${id} to be the chosen row`)
   await page.keyboard.press('Enter')
   return true
 }
+
+/** The detail of a palette command that didn't run: which wait failed, and what the window showed. */
+const paletteFailure = (id, name) => `the palette found no ${name}: ${JSON.stringify(res.facts.palette?.[id] ?? null)}`
 
 /** All the text the window shows a user: its title, the page's text, and the titles, labels and placeholders on hover. */
 const windowText = async () => {
@@ -789,7 +814,7 @@ const steps = {
     if (ready) await copy.click()
     const diag = ready && (await until(async () => (await app.evaluate(({ clipboard }) => clipboard.readText())) || false, 10_000))
     if (diag) fs.writeFileSync(path.join(OUT, `${prefix}-diagnostics.txt`), diag)
-    check('9.diagnostics', 'Copy Diagnostics copies its text', !!diag, diagOpen ? 'nothing copied' : 'the palette found no Copy Diagnostics')
+    check('9.diagnostics', 'Copy Diagnostics copies its text', !!diag, diagOpen ? 'nothing copied' : paletteFailure('help.diagnostics', 'Copy Diagnostics'))
 
     // Export Board to JSON, into a folder of Documents (Windows' folder picker answered with it).
     const exportDir = path.join(process.env.USERPROFILE, 'Documents', 'Board export')
@@ -798,7 +823,7 @@ const steps = {
     await app.evaluate(({ dialog }, dir) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [dir] }) }, exportDir)
     const exportRan = await paletteCommand('task.exportBoard', 'Export Board')
     const exported = exportRan && (await until(async () => fs.readdirSync(exportDir).some((d) => fs.statSync(path.join(exportDir, d)).isDirectory() && fs.readdirSync(path.join(exportDir, d)).length > 0), 20_000))
-    check('9.export', 'Export Board to JSON writes the board', !!exported, exportRan ? JSON.stringify(fs.readdirSync(exportDir)) : 'the palette found no Export Board')
+    check('9.export', 'Export Board to JSON writes the board', !!exported, exportRan ? JSON.stringify(fs.readdirSync(exportDir)) : paletteFailure('task.exportBoard', 'Export Board'))
     await keep('after the export')
 
     // Quit, as a user does (the app's own quit), and wait for it to end.

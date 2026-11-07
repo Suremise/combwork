@@ -509,7 +509,7 @@ test('what the Sandbox driver relies on in Combwork\'s window, IPC and Agent API
   const servers = fs.readFileSync(path.join(root, 'src', 'main', 'servers.ts'), 'utf8')
   const texts = ['Provider Setup', 'Choose providers', 'Check again', 'No coding agents are turned on', 'No coding agent CLI is installed', '{provider} is not installed', '— found via {source}', 'Use {name}', 'Workspace Overview', 'Task Board', 'Shared Notes', 'MCP Servers', 'Assistant']
   // Selectors, and the palette command it waits for before pressing Enter.
-  const classes = ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git', 'palette-item', 'data-command', "'help.agentSetup'"]
+  const classes = ['providers-banner', 'setup-tab', 'welcome', 'workbench', 'statusbar', 'status-item', 'data-git', 'palette-item', 'palette-list', 'data-command', "'help.agentSetup'", "'help.diagnostics'", "'task.exportBoard'"]
   const channels = ['provider:info', 'settings:update', 'workspace:open']
   const routes = ['/v1/health', '/v1/providers', '/v1/status', '/v1/projects']
   const missing = [
@@ -521,7 +521,8 @@ test('what the Sandbox driver relies on in Combwork\'s window, IPC and Agent API
   assert.deepStrictEqual(missing, [])
   // What is checked is what the driver uses: each IPC channel and route above is in it.
   for (const x of [...channels, ...routes]) assert.ok(drive.includes(`'${x}'`), x)
-  for (const x of ['.palette-item.active[data-command="help.agentSetup"]', '.providers-banner', '.setup-tab', '[data-git]']) assert.ok(drive.includes(x), x)
+  // Its palette commands run through paletteCommand (HI-2728), which waits for the box empty, then holding what it typed, then the command chosen.
+  for (const x of ['.palette-item.active[data-command="${id}"]', '.palette input', "paletteCommand('help.agentSetup'", "paletteCommand('help.diagnostics'", "paletteCommand('task.exportBoard'", '.providers-banner', '.setup-tab', '[data-git]']) assert.ok(drive.includes(x), x)
   // The stand-in installer copies the e2e fake Claude Code from where the driver's scenario 3 expects it.
   for (const f of ['fake-claude/fake-claude.cjs', 'fake-bridge.cjs']) assert.ok(fs.existsSync(path.join(__dirname, 'e2e', f)), f)
 })
