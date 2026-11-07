@@ -72,7 +72,9 @@ export function toolListLine(label: string, rows: ToolListRow[]): string {
   const row = (r: ToolListRow): string => {
     const parts = r.descriptionChars === null || r.paramChars === null || r.schemaChars === null ? 'parts not measured' : `descriptions ${n(r.descriptionChars)}, parameters ${n(r.paramChars)}, schemas ${n(r.schemaChars)}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
     const chars = r.chars === null ? 'characters not measured' : `${n(r.chars)} chars a start (${parts})` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
-    return `${r.role === 'assistant' ? 'assistant' : 'agents'} · ${r.workflow}: ${n(r.tools)} tools, ${chars}, ${n(r.bytes)} bytes, ${r.starts} start${r.starts === 1 ? '' : 's'}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    // Its provider (HI-2553: `unknown` before it), and what that CLI put in the prompt at the start where that is known.
+    const upfront = r.upfront === null ? '' : `, ${n(r.upfront)} up front` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+    return `${r.provider} ${r.role === 'assistant' ? 'assistant' : 'agents'} · ${r.workflow}: ${n(r.tools)} tools, ${chars}, ${n(r.bytes)} bytes${upfront}, ${r.starts} start${r.starts === 1 ? '' : 's'}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
   }
   return `- ${label} Combwork tool list (24 h): ${rows.map(row).join('; ')}` // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 }

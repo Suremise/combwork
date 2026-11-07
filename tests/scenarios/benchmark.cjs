@@ -39,7 +39,8 @@ function metricsTotals(r, role) {
     for (const m of part.mcp ?? []) {
       if (!theirs(m)) continue
       t.toolCalls += m.count
-      if (m.outcome === 'error') t.toolErrors += m.count
+      // Every failed call, whatever its kind (HI-2553: refused, invalid, failed, or error from before them).
+      if (m.outcome !== 'ok') t.toolErrors += m.count
       if (m.mode === 'detail') t.toolDetailCalls += m.count
       t.toolChars += m.chars
       t.toolBytes += m.bytes

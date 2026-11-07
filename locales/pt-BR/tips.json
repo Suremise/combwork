@@ -540,5 +540,7 @@
   "tips.modelSwitched.title": "Um agente em outro modelo fica marcado",
   "tips.modelSwitched.text": "Se um agente acabar em outro modelo diferente do que a conexão deu (a oferta do Codex de um modelo mais barato perto do seu limite, ou /model), o rodapé marca o modelo com um aviso e Atividade mostra Modelo trocado. Reinicie o agente para voltar.",
   "tips.waitingOnPurpose.title": "Um cartão que aguarda de propósito",
-  "tips.waitingOnPurpose.text": "Um cartão em Fazendo espera um momento tranquilo ou uma resposta? Clique nele com o botão direito, Marcar como aguardando…, e diga por quê: o Combwork deixa de marcá-lo como travado até você encerrar a espera ou ele sair de Fazendo. O agente continua rodando."
+  "tips.waitingOnPurpose.text": "Um cartão em Fazendo espera um momento tranquilo ou uma resposta? Clique nele com o botão direito, Marcar como aguardando…, e diga por quê: o Combwork deixa de marcá-lo como travado até você encerrar a espera ou ele sair de Fazendo. O agente continua rodando.",
+  "tips.perfFailures.title": "Recusado não é quebrado",
+  "tips.perfFailures.text": "Desempenho → Falhas classifica o que não deu certo: erros reais em vermelho, à parte das chamadas que uma regra do fluxo de trabalho recusou e das chamadas erradas. Recusas e chamadas erradas por motivo mostra qual regra ou mensagem apareceu mais: uma descrição de ferramenta a deixar mais clara."
 }

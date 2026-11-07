@@ -540,5 +540,7 @@
   "tips.modelSwitched.title": "Un agente con otro modelo queda marcado",
   "tips.modelSwitched.text": "Si un agente acaba con otro modelo distinto del que le dio su conexión (la oferta de Codex de un modelo más barato cerca de tu límite, o /model), su pie marca el modelo con un aviso y Actividad dice Modelo cambiado. Reinicia el agente para volver.",
   "tips.waitingOnPurpose.title": "Una tarjeta que espera a propósito",
-  "tips.waitingOnPurpose.text": "¿Una tarjeta En curso espera un momento tranquilo o una respuesta? Haz clic derecho en ella, Marcar como en espera…, y di por qué: Combwork deja de marcarla como estancada hasta que lo quites o salga de En curso. Su agente sigue funcionando."
+  "tips.waitingOnPurpose.text": "¿Una tarjeta En curso espera un momento tranquilo o una respuesta? Haz clic derecho en ella, Marcar como en espera…, y di por qué: Combwork deja de marcarla como estancada hasta que lo quites o salga de En curso. Su agente sigue funcionando.",
+  "tips.perfFailures.title": "Rechazado no es roto",
+  "tips.perfFailures.text": "Rendimiento → Fallos clasifica lo que no tuvo éxito: los errores reales en rojo, aparte de las llamadas que rechazó una regla del flujo de trabajo y de las llamadas incorrectas. Rechazos y llamadas incorrectas por motivo muestra qué regla o mensaje salió más: una descripción de herramienta que conviene aclarar."
 }

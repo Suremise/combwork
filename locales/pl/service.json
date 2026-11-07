@@ -192,7 +192,7 @@
   "service.metrics.droppedPerProject": "Odrzucone pomiary są liczone dla projektu, nie dla roli ani dostawcy.",
   "service.metrics.notCliContext": "Kontekst, który CLI dodaje sam (własny prompt systemowy, definicje narzędzi, czytane pliki).",
   "service.metrics.notNetwork": "Ruch sieciowy dostawców: Combwork uruchamia CLI, ale nie pośredniczy między nimi a ich dostawcami.",
-  "service.metrics.notPerProvider": "Żądania do Agent API, wywołania narzędzi i lista narzędzi nie są zapisywane dla każdego dostawcy osobno: dotyczą wszystkich.",
+  "service.metrics.notPerProvider": "Żądania do Agent API i wywołania narzędzi nie są rejestrowane według dostawcy: należą do wszystkich dostawców.",
   "service.metrics.notSkillReads": "Czy model przeczytał umiejętność: liczone są dostarczone umiejętności, a samego czytania nie da się zaobserwować.",
   "service.metrics.notTokens": "Tokeny dostawcy na narzędzie Combwork lub część wskazówek: dostawcy podają użycie sesji, a nie koszt każdej części jej kontekstu.",
   "service.metrics.notTransport": "Nagłówki HTTP i transport: rozmiar żądania to odebrane bajty treści, a rozmiar odpowiedzi to zapisana treść JSON (przerwana odpowiedź mogła nie zostać wysłana w całości).",

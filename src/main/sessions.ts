@@ -5550,6 +5550,12 @@ class SessionManager {
     return l && runId && l.state.runId === runId && l.workflow ? l.workflow : 'unknown'
   }
 
+  /** The CLI of an agent's launch `runId` (HI-2553), for the tool list its combwork server reports; null once it has ended or another took its place. */
+  launchProvider(projectPath: string, agentId: string, runId: string | null): ProviderId | null {
+    const l = this.live.get(liveId(projectPath, agentId))
+    return l && runId && l.state.runId === runId ? l.state.provider : null
+  }
+
   /** Whether the agent may hand over to a new conversation of its own now (#1057): set by handOverCheck.ts, which knows the lanes. */
   handOverAllowed: (projectPath: string, agentId: string, turnOver?: boolean) => Promise<boolean> = async (projectPath, agentId, turnOver) => {
     const st = this.liveFor(projectPath, agentId)

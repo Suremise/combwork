@@ -158,7 +158,12 @@ const prose = (seed, n) => {
     for (const [role, list] of [['agent', 'agent'], ['assistant', 'assistant+settings']]) {
       const over = []
       let total = 0
-      for (const t of toolList(list)) {
+      const tools = toolList(list)
+      // The whole list as the CLI gets it, in bytes (HI-2553), cw_console left out as in the totals below.
+      const listBytes = Buffer.byteLength(JSON.stringify(tools.filter((t) => t.name !== 'cw_console')), 'utf8')
+      console.log(`tool list (${role}): ${listBytes} bytes`)
+      check(`tool list (${role}): ${listBytes} bytes, within ${limits.listBytes[role]} (raise it only on purpose: toolLimits.cjs)`, listBytes <= limits.listBytes[role])
+      for (const t of tools) {
         const ex = limits.exceptions[t.name] ?? {}
         const descMax = ex.description ?? limits.description
         const paramMax = ex.parameter ?? limits.parameter
@@ -794,7 +799,8 @@ const prose = (seed, n) => {
   for (const [name, args] of [['cw_list_tasks', {}], ['cw_list_tasks', { details: true }], ['cw_read_task', { number: unicode }], ['cw_read_task', { number: 999999 }]]) {
     const r = asCoder('tools/call', { name, arguments: args })
     const text = r.content[0].text
-    const key = `${name} ${args.details ? 'detail' : 'compact'} ${r.isError ? 'error' : 'ok'}`
+    // A failed call by its kind (HI-2553): an unknown card is a wrong call (the API's 404).
+    const key = `${name} ${args.details ? 'detail' : 'compact'} ${r.isError ? 'invalid' : 'ok'}`
     const e = (expected[key] ??= { count: 0, chars: 0, bytes: 0 })
     e.count++
     e.chars += text.length
@@ -810,7 +816,7 @@ const prose = (seed, n) => {
   check("metrics: each tool call's reported size is the text the model got, by mode and outcome", JSON.stringify(Object.fromEntries(Object.entries(got).filter(([k]) => k in expected).sort())) === JSON.stringify(Object.fromEntries(Object.entries(expected).sort())), JSON.stringify({ got, expected }))
   // Each launch's side of the workflow its own series (HI-2049): summed here.
   const cats = (alphaPart?.catalog ?? []).filter((c) => c.role === 'agent')
-  const cat = cats.reduce((a, c) => Object.fromEntries(Object.keys(a).map((k) => [k, a[k] + c[k]])), { starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 })
+  const cat = cats.reduce((a, c) => Object.fromEntries(Object.keys(a).map((k) => [k, a[k] + c[k]])), { starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0, upfrontStarts: 0, upfrontBytes: 0 })
   // Once a start: the coder's, and the agent a card was started on, whose fake reads its inbox when its task's doorbell
   // rings (#650: through the Combwork MCP server, which it starts for that call, with a tool list of its own). The catalog sums
   // them: the coder's list as it got it, and the other's.
@@ -824,6 +830,11 @@ const prose = (seed, n) => {
   const listParams = list.reduce((n, t) => n + paramsOf(t.inputSchema), 0)
   check("metrics: the tool list's descriptions and parameters' descriptions, a part of its characters", cat.partStarts === 2 && cat.partToolsChars === cat.toolsChars && cat.descriptionChars >= listDescriptions && cat.descriptionChars < listDescriptions * 3 && cat.paramChars >= listParams && cat.paramChars < listParams * 3 && cat.descriptionChars + cat.paramChars < cat.toolsChars, JSON.stringify({ cat, listDescriptions, listParams }))
   check("metrics: each tool list on the side of the launch whose Combwork MCP server sent it", cats.length > 0 && cats.every((c) => ['builder', 'reviewer', 'either', 'none'].includes(c.workflow)), JSON.stringify(cats.map((c) => [c.workflow, c.starts])))
+  // HI-2553: on its launch's provider (the fake Claude Code), and what a CLI that defers tools got up front: the tools
+  // marked to be sent in full and the others' names, as the coder's list has them.
+  const marked = list.filter((t) => t._meta)
+  const upfront = Buffer.byteLength(JSON.stringify(marked), 'utf8') + Buffer.byteLength(JSON.stringify(list.filter((t) => !t._meta).map((t) => t.name)), 'utf8')
+  check('metrics: each tool list on its launch\'s provider, with its up-front part', cats.every((c) => ['claude-code', 'unknown'].includes(c.provider)) && cats.some((c) => c.provider === 'claude-code') && cat.upfrontStarts === 2 && cat.upfrontBytes >= upfront && cat.upfrontBytes < upfront * 3 && cat.upfrontBytes < cat.toolsBytes, JSON.stringify({ cats: cats.map((c) => [c.provider, c.workflow, c.starts, c.upfrontBytes]), upfront }))
   check("metrics: the Assistant's tool calls are the workspace's own, with detail mode counted", (report.workspace?.mcp ?? []).some((sr) => sr.role === 'assistant' && sr.tool === 'cw_agent_activity' && sr.mode === 'detail'), JSON.stringify(report.workspace?.mcp?.slice(0, 3)))
   const routes = [...Object.values(report.projects), report.workspace].flatMap((pt) => pt.api.map((sr) => sr.route))
   check('metrics: API routes are templates, never paths asked for', routes.includes('/v1/tasks/:n') && !routes.some((r) => /\/\d/.test(r)), routes.join(' '))

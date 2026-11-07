@@ -192,7 +192,7 @@
   "service.metrics.droppedPerProject": "Las mediciones descartadas se cuentan por proyecto, no por rol ni por proveedor.",
   "service.metrics.notCliContext": "El contexto que agrega la propia CLI (su prompt de sistema, las definiciones de herramientas, los archivos que lee).",
   "service.metrics.notNetwork": "El tráfico de red de los proveedores: Combwork inicia las CLI, pero no es un proxy entre ellas y sus proveedores.",
-  "service.metrics.notPerProvider": "Las solicitudes a la Agent API, las llamadas a herramientas y la lista de herramientas no se registran por proveedor: son de todos los proveedores.",
+  "service.metrics.notPerProvider": "Las solicitudes a la API de agentes y las llamadas a herramientas no se registran por proveedor: son de todos los proveedores.",
   "service.metrics.notSkillReads": "Si un modelo leyó una habilidad: se cuentan las habilidades entregadas, pero no se puede observar si se leen.",
   "service.metrics.notTokens": "Los tokens del proveedor por herramienta de Combwork o por parte de las indicaciones: los proveedores informan del uso de una sesión, no de lo que costó cada parte de su contexto.",
   "service.metrics.notTransport": "Los encabezados HTTP y el transporte: el tamaño de una solicitud son los bytes del cuerpo recibidos, y el de una respuesta, el cuerpo JSON escrito (puede que una respuesta interrumpida no se enviara entera).",

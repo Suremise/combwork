@@ -350,7 +350,13 @@ const notices = new AsyncLocalStorage<Set<string>>()
 async function api(method: string, path: string, body?: unknown, replyMs?: number): Promise<unknown> {
   // agent-protocol: an HTTP header
   const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}) }
-  const res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
+  let res: Awaited<ReturnType<typeof agentApiCall>>
+  try {
+    res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
+  } catch (e) {
+    // No reply (no connection, a timeout): a real error, whatever its message (HI-2553).
+    throw Object.assign(e instanceof Error ? e : new Error(String(e)), { noReply: true })
+  }
   if (res.notice) {
     try {
       notices.getStore()?.add(decodeURIComponent(res.notice))
@@ -365,8 +371,20 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
   } catch {
     // keep text
   }
-  if (res.status < 200 || res.status >= 300) throw new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : say(T['call.error.http'], { status: res.status }))
+  if (res.status < 200 || res.status >= 300) throw Object.assign(new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : say(T['call.error.http'], { status: res.status })), { status: res.status })
   return data
+}
+
+/**
+ * A failed call's kind (HI-2553): by the Agent API's status (409, 401 and 403 refused; another 4xx a wrong call; 5xx a
+ * real error); no reply, a real error; the bridge's own check of the arguments (a plain Error it threw), a wrong call;
+ * anything else (a TypeError, a RangeError: a fault), a real error.
+ */
+function failureOf(e: unknown): 'refused' | 'invalid' | 'failed' {
+  const status = (e as { status?: unknown })?.status
+  if (typeof status === 'number') return status === 409 || status === 401 || status === 403 ? 'refused' : status >= 500 ? 'failed' : 'invalid'
+  if ((e as { noReply?: unknown })?.noReply) return 'failed'
+  return e instanceof Error && e.constructor === Error ? 'invalid' : 'failed'
 }
 
 /** How long a wait's reply may take: the wait as Combwork will hold it (at most `max`), and a minute to spare. */
@@ -1408,8 +1426,8 @@ function testLog(name: string, args: unknown, error: string | null, size: { mode
 }
 
 /** Tests only: the tool list as this server first sent it (HI-2186), once a server, as `kind: 'list'` (not a call). */
-function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number }): string | undefined {
-  return testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars })
+function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number; upfrontBytes: number }): string | undefined {
+  return testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars, upfrontBytes: size.upfrontBytes })
 }
 
 let testSeq = 0
@@ -1450,6 +1468,8 @@ interface CallReport {
   tool: string
   mode: 'compact' | 'detail'
   ok: boolean
+  /** A failed call's kind (HI-2553, failureOf). */
+  kind?: 'refused' | 'invalid' | 'failed'
   chars: number
   bytes: number
   ms: number
@@ -1457,7 +1477,7 @@ interface CallReport {
   testId?: string
 }
 const pending: CallReport[] = []
-let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number; testId?: string } | null = null
+let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number; upfrontBytes: number; testId?: string } | null = null
 let flushTimer: NodeJS.Timeout | null = null
 /** At most this many calls in one report (the API's limit), sent at most every 2 seconds. */
 const REPORT_MAX = 50
@@ -1473,8 +1493,8 @@ function flushReports(): void {
   flushTimer = null
   if (sending || (!pending.length && !catalog)) return
   const batch = pending.splice(0, REPORT_MAX)
-  const calls = batch.map((c) => ({ tool: c.tool, mode: c.mode, ok: c.ok, chars: c.chars, bytes: c.bytes, ms: c.ms }))
-  const listed = catalog ? { tools: catalog.tools, toolsBytes: catalog.toolsBytes, toolsChars: catalog.toolsChars, descriptionChars: catalog.descriptionChars, paramChars: catalog.paramChars } : null
+  const calls = batch.map((c) => ({ tool: c.tool, mode: c.mode, ok: c.ok, ...(c.kind ? { kind: c.kind } : {}), chars: c.chars, bytes: c.bytes, ms: c.ms }))
+  const listed = catalog ? { tools: catalog.tools, toolsBytes: catalog.toolsBytes, toolsChars: catalog.toolsChars, descriptionChars: catalog.descriptionChars, paramChars: catalog.paramChars, upfrontBytes: catalog.upfrontBytes } : null
   // Tests only: the test log's lines this report carries, and when it went and when Combwork had taken it (HI-2186).
   const testIds = [...batch.map((c) => c.testId), catalog?.testId].filter((x): x is string => !!x)
   const sentAt = new Date().toISOString()
@@ -1565,8 +1585,12 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       if (!listed) {
         listed = true
         const size = { tools: list.length, toolsBytes: Buffer.byteLength(JSON.stringify(list), 'utf8'), ...toolListSize(list) }
-        const testId = testLogList(size)
-        catalog = { ...size, ...(testId ? { testId } : {}) }
+        // What a CLI that defers tools gets at the start (HI-2553): those marked to be sent in full, and the rest's names.
+        const full = list.filter((t) => FULL.has(t.name))
+        const names = list.filter((t) => !FULL.has(t.name)).map((t) => t.name)
+        const upfrontBytes = Math.min(size.toolsBytes, Buffer.byteLength(JSON.stringify(full), 'utf8') + Buffer.byteLength(JSON.stringify(names), 'utf8'))
+        const testId = testLogList({ ...size, upfrontBytes })
+        catalog = { ...size, upfrontBytes, ...(testId ? { testId } : {}) }
         scheduleReports()
       }
       return
@@ -1579,6 +1603,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       calling++
       let text: string
       let ok = true
+      let kind: CallReport['kind']
       let testId: string | undefined
       const said = new Set<string>()
       try {
@@ -1591,6 +1616,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         reply(id, { content: [{ type: 'text', text }] })
       } catch (e) {
         ok = false
+        kind = failureOf(e)
         // A call that gave arguments its tool doesn't take, or left a required one out, is told what it takes (HI-2229).
         const hint = argumentHint(tool.name, tool.inputSchema, args)
         text = `${say(T['call.error'], { message: (e as Error).message })}${hint ? `\n${hint}` : ''}`
@@ -1599,7 +1625,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
       calling--
-      reportCall({ tool: tool.name, mode: modeOf(args), ok, chars: text.length, bytes: Buffer.byteLength(text, 'utf8'), ms: performance.now() - started, ...(testId ? { testId } : {}) })
+      reportCall({ tool: tool.name, mode: modeOf(args), ok, ...(kind ? { kind } : {}), chars: text.length, bytes: Buffer.byteLength(text, 'utf8'), ms: performance.now() - started, ...(testId ? { testId } : {}) })
       return
     }
     default:

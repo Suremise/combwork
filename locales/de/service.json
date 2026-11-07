@@ -192,7 +192,7 @@
   "service.metrics.droppedPerProject": "Verworfene Messungen werden pro Projekt gezählt, nicht pro Rolle oder Anbieter.",
   "service.metrics.notCliContext": "Kontext, den eine CLI selbst hinzufügt (ihr eigener Systemprompt, Tool-Definitionen, Dateien, die sie liest).",
   "service.metrics.notNetwork": "Netzwerkverkehr der Anbieter: Combwork startet die CLIs, ist aber kein Proxy zwischen ihnen und ihren Anbietern.",
-  "service.metrics.notPerProvider": "Anfragen an die Agent API, Tool-Aufrufe und die Tool-Liste werden nicht pro Anbieter erfasst: Sie gelten für alle Anbieter.",
+  "service.metrics.notPerProvider": "Anfragen an die Agent API und Tool-Aufrufe werden nicht pro Anbieter aufgezeichnet: Sie gehören allen Anbietern.",
   "service.metrics.notSkillReads": "Ob ein Modell einen Skill gelesen hat: Gelieferte Skills werden gezählt, das Lesen ist nicht beobachtbar.",
   "service.metrics.notTokens": "Tokens der Anbieter pro Combwork-Tool oder Teil der Anleitung: Anbieter melden die Nutzung einer Sitzung, nicht, was jeder Teil ihres Kontexts gekostet hat.",
   "service.metrics.notTransport": "HTTP-Header und Transport: Anfragegrößen sind die empfangenen Body-Bytes, Antwortgrößen der geschriebene JSON-Body (eine abgebrochene Antwort wurde eventuell nicht vollständig gesendet).",

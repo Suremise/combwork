@@ -1491,6 +1491,14 @@
     "defaultMessage": "Which agent a change came from",
     "description": "A tip's title."
   },
+  "tips.perfFailures.text": {
+    "defaultMessage": "Performance → Failures sorts what didn’t succeed: real errors in red, apart from calls a workflow rule refused and wrong calls. Refusals and wrong calls by reason shows which rule or message came up most: a tool description to make clearer.",
+    "description": "A tip (HI-2553). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Failures is a card, Refusals and wrong calls by reason a table of the Performance view)."
+  },
+  "tips.perfFailures.title": {
+    "defaultMessage": "Refused is not broken",
+    "description": "A tip's title (HI-2553): a request refused by a workflow rule isn't a fault."
+  },
   "tips.performance.text": {
     "defaultMessage": "Performance, in the activity bar, shows what Combwork's API, tools and guidance cost for the last day, week or month: the whole workspace or one project. Each project has its own Performance tab too.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

@@ -462,7 +462,7 @@ describe('the advanced store', () => {
       const reply = apiErrorReply(refused)
       expect(reply.status, String(refused)).toBe(409)
       expect(reply.body.error).toMatch(/^advanced\.json isn't valid JSON.*Fix (or delete )?advanced\.json/s)
-      expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
+      expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('refused')
     }
     // No setting by that id: 404.
     expect(apiErrorReply(await s.set('acme.nope', 1).catch((e: unknown) => e)).status).toBe(404)

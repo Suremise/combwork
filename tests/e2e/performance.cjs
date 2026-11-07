@@ -33,16 +33,18 @@ const launch = (provider, launches) => ({ provider, role: 'agent', workflow: 'bu
 const part = (api = [], mcp = [], guidance = [], catalog = []) => ({ api: Object.fromEntries(api.map((s, i) => [String(i), s])), mcp: Object.fromEntries(mcp.map((s, i) => [String(i), s])), guidance: Object.fromEntries(guidance.map((s, i) => [String(i), s])), catalog: Object.fromEntries(catalog.map((s, i) => [String(i), s])) })
 // Two builder starts' tool lists (HI-2063): 50,000 characters a start, 20,000 of them descriptions and 8,000 parameters'.
 const toolList = { role: 'agent', workflow: 'builder', starts: 2, tools: 80, toolsBytes: 102000, toolsChars: 100000, charStarts: 2, partStarts: 2, partToolsChars: 100000, descriptionChars: 40000, paramChars: 16000 }
+// The same list to Claude Code reviewers (HI-2553): 3,000 bytes of it up front (deferred tools).
+const claudeToolList = { ...toolList, provider: 'claude-code', workflow: 'reviewer', upfrontStarts: 2, upfrontBytes: 6000 }
 const now = Date.now()
 const hourStart = (t) => Math.floor(t / HOUR) * HOUR
 const bucket = (start, projects, workspace = part()) => ({ start, span: 'hour', projects, workspace, skills: { scans: timed(3, 40), sharedScans: 1, hits: 30, misses: 4, invalidations: 1, tooLarge: 0, files: 40, bytes: 120000, headerBytes: 4000, entries: 60 }, dropped: 0, droppedBy: {} })
-// The last 24 hours: alpha 30 requests (3 failed), beta 12, the workspace's own 5 (scripts); 3 days ago alpha 100 more.
+// The last 24 hours: alpha 30 requests (3 failed), beta 12 (2 refused by a rule), the workspace's own 5 (scripts); 3 days ago alpha 100 more.
 const MORE_TOOLS = ['cw_list_projects', 'cw_project_status', 'cw_session_usage', 'cw_list_shared_notes', 'cw_read_shared_note', 'cw_write_shared_note', 'cw_read_latest_handover', 'cw_create_handover', 'cw_notify', 'cw_list_providers', 'cw_agent_activity']
 const buckets = [
   // …and one request past the histogram's last bound (> 10 s), so latency sorts meet an overflow (#305).
   bucket(hourStart(now - 3 * 24 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 100), apiSeries('/v1/projects', 'agent', 'ok', 1, 20000)], MORE_TOOLS.map((t, i) => mcpSeries(t, 1, 100 + i))) }),
-  bucket(hourStart(now - 5 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 20), apiSeries('/v1/tasks/:n', 'agent', 'server-error', 3, 300)], [mcpSeries('cw_list_tasks', 10, 600), mcpSeries('cw_read_task', 4, 2500)], [launch('claude-code', 2)], [toolList]) }),
-  bucket(hourStart(now - 1 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 7)]), beta: part([apiSeries('/v1/tasks', 'agent', 'ok', 12)], [mcpSeries('cw_list_tasks', 2, 600)], [launch('codex', 1)]) }, part([apiSeries('/v1/tasks', 'api', 'ok', 5)]))
+  bucket(hourStart(now - 5 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 20), apiSeries('/v1/tasks/:n', 'agent', 'server-error', 3, 300)], [mcpSeries('cw_list_tasks', 10, 600), mcpSeries('cw_read_task', 4, 2500)], [launch('claude-code', 2)], [toolList, claudeToolList]) }),
+  bucket(hourStart(now - 1 * HOUR), { alpha: part([apiSeries('/v1/tasks', 'agent', 'ok', 7)]), beta: part([apiSeries('/v1/tasks', 'agent', 'ok', 10), { ...apiSeries('/v1/tasks/:n', 'agent', 'refused', 2), reasons: { 'rule:move.doingNobody': 2 } }], [mcpSeries('cw_list_tasks', 2, 600)], [launch('codex', 1)]) }, part([apiSeries('/v1/tasks', 'api', 'ok', 5)]))
 ]
 fs.mkdirSync(path.join(ws, '.combwork', 'metrics'), { recursive: true })
 /** Claude Code sessions in a session host's backups (what Provider usage reads), each a request an hour ago. */
@@ -122,10 +124,10 @@ const check = (name, ok, extra = '') => {
   await tools.locator('th button', { hasText: 'Calls' }).click()
   check('…until it goes back to its default (characters), which keeps nothing', (await firstCells(tools)) === 'cw_read_task,cw_list_tasks' && !Object.keys((await inv('ui:get'))?.panes ?? {}).some((k) => k.startsWith('table-sort:perf-tools:')), await firstCells(tools))
   const routes = perfTable('Route')
-  await routes.locator('th button', { hasText: 'Failed' }).click()
-  check('the routes table sorts by Failed', /\/v1\/tasks\/:n/.test((await routes.locator('tbody tr').first().innerText()) ?? ''), await routes.locator('tbody tr').first().innerText())
-  await routes.locator('th button', { hasText: 'Failed' }).click()
-  await routes.locator('th button', { hasText: 'Failed' }).click()
+  await routes.locator('th button', { hasText: 'Errors' }).click()
+  check('the routes table sorts by Errors (real ones, HI-2553)', /\/v1\/tasks\/:n/.test((await routes.locator('tbody tr').first().innerText()) ?? ''), await routes.locator('tbody tr').first().innerText())
+  await routes.locator('th button', { hasText: 'Errors' }).click()
+  await routes.locator('th button', { hasText: 'Errors' }).click()
   const launches = perfTable('Launches')
   await launches.locator('th button', { hasText: 'Launches' }).click()
   await launches.locator('th button', { hasText: 'Launches' }).click()
@@ -145,6 +147,13 @@ const check = (name, ok, extra = '') => {
   const toolRow = async () => ((await toolTable.locator('tbody tr').allInnerTexts()).join('|')).replace(/\s+/g, ' ')
   check('the Combwork tool list a start, by workflow role, in its parts (HI-2063)', (await toolTable.count()) === 1 && /Builder 2 40 50,000 20,000 8,000 22,000/.test(await toolRow()), await toolRow())
   check('…and each launch’s workflow role (HI-2049)', (await guidanceTable.count()) === 1 && (await guidanceTable.locator('tbody tr', { hasText: 'Builder' }).count()) >= 1, (await page.locator('.table-wrap th').allInnerTexts()).join('|'))
+  // HI-2553: failures by kind. Real errors stand out; refusals by a rule read as normal, with their reasons.
+  const failures = page.locator('.performance-page:visible .card', { has: page.locator('h3', { hasText: 'Failures' }) })
+  check('the Failures card: the real errors, then refused by a rule and wrong calls', /3 real errors/.test(await failures.innerText()) && /2 refused by a rule · 0 wrong calls/.test(await failures.innerText()) && (await failures.locator('.perf-real-errors').count()) === 1, await failures.innerText())
+  const reasonsTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: 'Reason' }) })
+  check('…and the refusals by reason: its rule, never its text', /\/v1\/tasks\/:n\s+Refused\s+rule:move\.doingNobody\s+2/.test(await reasonsTable.locator('tbody').innerText()), await reasonsTable.locator('tbody').innerText().catch(() => ''))
+  check('the Combwork tool list by provider, with what Claude Code got up front', /Claude Code\s+Agents\s+Reviewer/.test(await toolRow()) && /Unknown\s+Agents\s+Builder/.test(await toolRow()) && (await toolTable.locator('th', { hasText: 'Up front' }).count()) === 1, await toolRow())
+  check('…the Guidance per launch card has the tool list beside it', /Tool list .* a start/.test(await page.locator('.performance-page:visible .card', { hasText: 'Guidance per launch' }).innerText()), await page.locator('.performance-page:visible .card', { hasText: 'Guidance per launch' }).innerText())
   check('cancelled requests are shown apart from failures', /cancelled/.test(await page.locator('.performance-page:visible .card', { hasText: 'API requests' }).innerText()))
   await shot('wide-dark')
 

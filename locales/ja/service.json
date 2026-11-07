@@ -192,7 +192,7 @@
   "service.metrics.droppedPerProject": "破棄された計測はプロジェクトごとに数えられ、ロールやプロバイダーごとには数えられません。",
   "service.metrics.notCliContext": "CLIが自分で追加するコンテキスト（独自のシステムプロンプト、ツール定義、読み込むファイル）。",
   "service.metrics.notNetwork": "プロバイダーとのネットワーク通信：CombworkはCLIを起動するだけで、CLIとプロバイダーの間のプロキシではありません。",
-  "service.metrics.notPerProvider": "Agent APIのリクエスト、ツール呼び出し、ツール一覧は、プロバイダーごとには記録されません。すべてのプロバイダーに共通です。",
+  "service.metrics.notPerProvider": "Agent API リクエストとツール呼び出しはプロバイダー別には記録されず、すべてのプロバイダーのものです。",
   "service.metrics.notSkillReads": "モデルがスキルを読んだかどうか：渡したスキルは数えられますが、読んだかどうかは観測できません。",
   "service.metrics.notTokens": "Combworkのツールやガイダンスの各部分ごとのプロバイダーのトークン：プロバイダーが報告するのはセッションの使用量で、コンテキストの各部分のコストではありません。",
   "service.metrics.notTransport": "HTTPヘッダーと転送：リクエストのサイズは受信した本文のバイト数、レスポンスのサイズは書き込んだJSON本文です（中断された応答は、すべて送信されていない場合があります）。",
