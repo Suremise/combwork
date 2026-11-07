@@ -1374,7 +1374,7 @@ A light theme uses the same accent with VS Code Light neutrals.
 18. Workspace skills and MCP servers are shared by every provider; user-level MCP servers load for none, and a project's own servers follow the same rule for each CLI.
 19. Fresh installs start with every provider disabled; upgrades from 0.1 keep Claude Code enabled. No enabled provider is a valid state.
 20. Codex defaults to Approve for me; Full access is opt-in like Bypass. Combwork drives Codex's `/permissions` menu for live changes.
-21. Cost for providers that don't report it is estimated from a shipped, user-editable price table and always marked as an estimate.
+21. Cost for providers that don't report it is estimated from a shipped, user-editable price table and always marked as an estimate. Each provider's table carries the date it was last checked against the published prices (`PRICES_CHECKED`), and a model with no published price (Codex's `codex-auto-review`) has no row. Tokens with no price are never $0: a session or day with none priced is **Unknown**, and one priced only in part (a model with no price beside priced ones, HI-2675: `costUnpriced`) shows its known part with **+ ?**, and counts as without a price in totals too. So does a row whose known charge leaves tokens with no price, and a running session's cost (its footer, Running now, its session card): a session on more than one model is priced a model at a time from its rows, as the history prices it, and its live state carries `costUnpriced`.
 22. Conversations never move between providers: a resume reopens one in the provider that recorded it, whatever its agent runs now (#506); **Hand Over to…** moves work through a handover. Projects that mix providers can share one `AGENTS.md`, imported by `CLAUDE.md`.
 23. Agents are all equal and a project starts with none; the provider is stored on each agent. Upgrading from 0.1 clears existing agents (their sessions stay).
 24. Combwork keeps a last good copy of its own JSON files and never silently replaces a damaged one.
@@ -2266,6 +2266,12 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   and through approvals and quorum.
 - **Every card keeps the ruleset it started with** (`Started.ruleset`) until it's Done; a card in Todo uses the current
   one. A lane started under the old options keeps its ruleset until it ends ("old rules") [#1112 UI, #1122 c].
+- **A card's target is its start's** (`Started.target`, HI-2674): its queue entry takes that one, and neither a change of
+  G7 nor applying the options to the card (an Override) moves it; a running lane's cards still to start take what a
+  start under its ruleset, for its builder, would (`startTarget`: an empty G7 can give a builder worktree's base).
+  So a change of the target says which cards in flight and running lanes keep another one, with it: Workflow's Save…
+  dialog (`WorkflowCheck.targets`) and the settings tool's reply (`keptTargets` in `optionsForm.ts`). Moving them onto the
+  new target is HI-2556's.
 - A ruleset can't run arbitrary code: pieces are looked up by id, and an unknown id or parameter refuses to compile
   (a ruleset from a newer Combwork opens read-only, like `combwork.db`, §4) [#1112 D].
 

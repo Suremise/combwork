@@ -556,8 +556,8 @@
     "note": "A card row (cw_list_tasks, HI-2618): the card in Doing waits on purpose, and why (its own words)."
   },
   "reply.setting.changed": {
-    "text": "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {It applies now.}} The user can undo it in your panel's list.",
-    "note": "cw_update_setting's reply: what changed, old → new, and when it applies."
+    "text": "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {{hasNote, select, yes {{note}} other {It applies now.}}}} The user can undo it in your panel's list.",
+    "note": "cw_update_setting's reply: what changed, old → new, and when it applies. {note}: what it leaves as it was (a version control switch's or a target change's lanes and cards in flight, HI-2674), in its place of \"It applies now\"."
   },
   "reply.setting.docs": {
     "text": "User guide: \"{docs}\".",

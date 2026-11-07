@@ -148,6 +148,7 @@ function replies(): { name: string; text: string }[] {
   add('setting default', R.settingText({ ...detail, value: 'off', project: undefined }))
   add('setting changed', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', project: 'alpha', old: 'on', new: 'off', restart: 'at the next launch' }))
   add('setting changed now', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', old: 'on', new: 'off' }))
+  add('setting changed with a note', R.settingChangedText({ title: 'x', id: 'project.workflow.target', path: 'Version Control → Workflow → Work merges into', project: 'alpha', old: '1.1.0', new: '1.2.0', note: 'It applies to cards started from now on outside running lanes.' }))
   add('setting same', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', project: 'alpha', old: 'on', new: 'on' }))
   const entry = (o: Partial<R.JournalEntryDetail>): R.JournalEntryDetail => ({ id: 12, at: '2026-10-18T00:00:00Z', kind: 'decision', project: 'alpha', summary: 'summary text', importance: 3, source: 'combwork', supersededBy: 13, hasDetail: true, detail: 'detail text', why: 'why text', digestOf: 'x', updatedAt: 'x', links: [{ type: 'card', ref: '12' }], tags: ['lane'], supersedes: [1], ...o })
   add('recall', R.journalRecallText([entry({}), entry({ importance: 2, source: 'agent', hasDetail: false, supersededBy: null, project: null })]))

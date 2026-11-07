@@ -72,6 +72,9 @@ interface CombworkMessageValues {
   'workflow.form.inheritTip': { value: string | number }
   'workflow.form.inheritor': { project: string | number }
   'workflow.form.invalid': undefined
+  'workflow.form.keptCard': { card: string | number; title: string | number; target: string | number }
+  'workflow.form.keptLane': { named: string; name: string | number; builder: string | number; target: string | number }
+  'workflow.form.keptTargets': { n: number }
   'workflow.form.labels': undefined
   'workflow.form.labelsValue': { labels: string | number }
   'workflow.form.lane': { builder: string | number; name: string | number }

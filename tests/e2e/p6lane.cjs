@@ -437,6 +437,21 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
       return saveDialog
     }
     await cancelSave(save, 'en')
+    // HI-2674: the target changed too, the warning names the lane and Two (in flight), each keeping main even if ticked;
+    // put back as it was before the shots.
+    git(alpha, 'branch', 'hi2674-other')
+    const targetInput = row('target').locator('input')
+    const targetWas = await targetInput.inputValue()
+    await targetInput.fill('hi2674-other')
+    await targetInput.press('Enter')
+    const keptSave = await openSave()
+    const keptList = keptSave.locator('[data-kept-targets]')
+    check("HI-2674: with the target changed, the save's warning names the running lane and Two, each merging into main still", !!(await waitHung(async () => { const x = await text(keptList); return /even if you tick/.test(x) && /Lane .*into main/.test(x) && /Two: into main/.test(x) })), await text(keptSave))
+    await cancelSave(keptSave, 'en')
+    await targetInput.fill(targetWas)
+    await targetInput.press('Enter')
+    await waitHung(async () => (await targetInput.inputValue()) === targetWas)
+    git(alpha, 'branch', '-D', 'hi2674-other')
     await shoot('6-save-old-rules', {
       open: async () => {
         const d = await openSave()

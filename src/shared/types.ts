@@ -1580,6 +1580,19 @@ export interface WorkflowCheck {
   lanes: { id: string; name: string | null; builder: string }[]
   /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
   inFlight: { number: number; key: string; title: string }[]
+  /** A change of the target (G7, HI-2674): the cards and lanes that keep merging into another one (absent: no target change). */
+  targets?: KeptTargets
+}
+
+/**
+ * HI-2674: a target is decided as a card starts (its `Started` fact) and a lane's cards start under the lane's rules
+ * (§16.5.4), so a change of the project's target moves neither. `to`: the target now (the default branch for none);
+ * `cards` and `lanes`: only those whose own target is another branch, each with it.
+ */
+export interface KeptTargets {
+  to: string
+  cards: { number: number; key: string; title: string; target: string }[]
+  lanes: { id: string; name: string | null; builder: string; target: string }[]
 }
 
 /**
@@ -2598,6 +2611,8 @@ export interface LiveSessionState {
   contextWindow?: number
   /** costUsd was estimated by Combwork from token counts, not reported by the provider. */
   costEstimated?: boolean
+  /** Some of its tokens have no known price (HI-2675, SessionUsage.costUnpriced): costUsd is only the priced part. */
+  costUnpriced?: boolean
   /** A live permission-mode change Combwork has asked for and is waiting to see confirmed. */
   modeSwitching?: PermissionMode
   /** Codex's Plan mode, which is separate from its permission preset. */
@@ -3120,6 +3135,11 @@ export interface SessionUsage {
   costUsd: number | null
   costEstimated: boolean
   /**
+   * Some of its tokens have no known price (HI-2675: a model with none beside priced ones, or a day without a price):
+   * costUsd is only the priced part, shown "+ ?" and counted as unpriced too, never as their $0.
+   */
+  costUnpriced?: true
+  /**
    * Tokens used after the provider last reported the cost (Claude Code writes it only at some turns' ends):
    * Combwork adds its estimate for them to the reported cost.
    */
@@ -3175,6 +3195,8 @@ export interface DayUsage extends UsageTokens {
   /** The day's API-equivalent cost: its share of the reported cost, else Combwork's estimate; null when no price is known. */
   costUsd: number | null
   costEstimated: boolean
+  /** Some of the day's tokens have no known price (HI-2675): costUsd is only the priced part, shown "+ ?", never as their $0. */
+  costUnpriced?: true
 }
 
 export interface RecacheEstimate {

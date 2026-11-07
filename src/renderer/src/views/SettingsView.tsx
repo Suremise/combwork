@@ -186,7 +186,7 @@ function PriceTable({ provider }: { provider: ProviderId }) {
           </span>
         </div>
       )}
-      <div className="fallback-source faint">{tr(msg({ id: 'settings.prices.checked', defaultMessage: "Combwork's starting prices, checked {checked}: edit them if they are out of date.", description: "Above a provider's price table. {checked} is a date." }), { checked: PRICES_CHECKED })}</div>
+      <div className="fallback-source faint">{tr(msg({ id: 'settings.prices.checked', defaultMessage: "Combwork's starting prices, checked {checked}: edit them if they are out of date.", description: "Above a provider's price table. {checked} is a date." }), { checked: PRICES_CHECKED[p.id] })}</div>
       {/* Narrower than the table even with its boxes narrowed, it scrolls sideways in its own box (#887). */}
       <div className="price-table-wrap">
       <table className="table price-table">

@@ -13,13 +13,16 @@ import { msg, tr } from './i18n'
  * for sessions without one, unless the user chooses their prices over the report (`costSource`, #436). Each table also
  * lists the models the CLI has (its model list), priced or not, so a model a CLI update adds shows without a Combwork release.
  *
- * Sources (checked 30 Sep 2026): Anthropic's model table (Claude API docs; cache writes 1.25× input and
- * cache reads 0.1× input unless listed) and OpenAI's API pricing page (standard tier).
+ * Sources, each provider's checked on its date in PRICES_CHECKED: Anthropic's model table (Claude API docs; cache writes
+ * 1.25× input and cache reads 0.1× input unless listed) and OpenAI's API pricing page (developers.openai.com/api/docs/pricing,
+ * standard tier). A model with no published price (Codex's own `codex-auto-review`, its approval reviewer) has no row:
+ * its sessions show as unpriced, never $0.
  */
 const claude = (input: number, output: number, cachedInput = input / 10): ModelPrice => ({ input, output, cachedInput, cacheWrite: input * 1.25 })
 const openai = (input: number, cachedInput: number, output: number, cacheWrite?: number): ModelPrice => ({ input, cachedInput, output, ...(cacheWrite !== undefined ? { cacheWrite } : {}) })
 
-export const PRICES_CHECKED = '2026-09-30'
+/** When each provider's shipped prices were last checked against its published ones (Settings → <provider> → API prices says so). */
+export const PRICES_CHECKED: Record<ProviderId, string> = { [CLAUDE_CODE]: '2026-09-30', [CODEX]: '2026-11-07', [COPILOT]: '2026-09-30' }
 
 export const SHIPPED_PRICES: Record<ProviderId, Record<string, ModelPrice>> = {
   [CLAUDE_CODE]: {
@@ -42,10 +45,13 @@ export const SHIPPED_PRICES: Record<ProviderId, Record<string, ModelPrice>> = {
     'claude-haiku-4-5': claude(1, 5)
   },
   [CODEX]: {
+    // All checked against OpenAI's pricing page on 7 Nov 2026 (HI-2675): unchanged but for gpt-6.1-terra, added. Prompts
+    // over 272K input tokens cost more (2× input and cached, 1.5× output); not modelled. GPT-5.6 Sol's is a promotional
+    // price, to 30 Nov 2026 by that page.
     // Codex's default from 0.160 (Oct 2026): OpenAI's model page (developers.openai.com/api/docs/models/gpt-6.1-sol),
-    // checked 5 Oct 2026, with cache writes at $2.50 (Codex reports none today). Prompts over 272K input tokens cost
-    // more (2× input and cached, 1.5× output); not modelled.
+    // checked 5 Oct 2026, with cache writes at $2.50 (Codex reports none today).
     'gpt-6.1-sol': openai(2, 0.1, 10, 2.5),
+    'gpt-6.1-terra': openai(1, 0.05, 5),
     'gpt-6-astra': openai(10, 1, 50),
     'gpt-6-sol': openai(2, 0.2, 10),
     'gpt-6-luna': openai(0.1, 0.01, 0.5),

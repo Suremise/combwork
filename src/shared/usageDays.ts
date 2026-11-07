@@ -134,13 +134,15 @@ export function priceUsage(raw: SessionUsage, settings?: Pick<AppSettings, 'prov
 }
 
 /** A session's usage from a day on (null: all of it), and whether it was active then at all. */
-export function usageFrom(usage: SessionUsage, fromDay: string | null): (UsageTokens & { requests: number; prompts: number; compactions: number; costUsd: number | null; costEstimated: boolean; active: boolean }) {
+export function usageFrom(usage: SessionUsage, fromDay: string | null): (UsageTokens & { requests: number; prompts: number; compactions: number; costUsd: number | null; costEstimated: boolean; costUnpriced?: true; active: boolean }) {
   if (!fromDay || !usage.days) {
     const active = !fromDay || localDay(usage.lastActivity) >= fromDay
-    return { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, cacheWriteTokens: usage.cacheWriteTokens, cacheReadTokens: usage.cacheReadTokens, requests: usage.requests, prompts: usage.userMessages, compactions: usage.compactions.length, costUsd: usage.costUsd, costEstimated: usage.costEstimated, active }
+    return { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens, cacheWriteTokens: usage.cacheWriteTokens, cacheReadTokens: usage.cacheReadTokens, requests: usage.requests, prompts: usage.userMessages, compactions: usage.compactions.length, costUsd: usage.costUsd, costEstimated: usage.costEstimated, ...(usage.costUnpriced && usage.costUsd !== null ? { costUnpriced: true as const } : {}), active }
   }
-  const out = { ...emptyDay(), costUsd: 0 as number | null, active: false }
+  const out: DayUsage & { active: boolean } = { ...emptyDay(), costUsd: 0, active: false }
   let priced = false
+  // Tokens in the period with no price (HI-2675): a day without one, or one priced only in part.
+  let unpriced = false
   for (const [day, d] of Object.entries(usage.days)) {
     if (day < fromDay) continue
     out.active = true
@@ -152,8 +154,10 @@ export function usageFrom(usage: SessionUsage, fromDay: string | null): (UsageTo
       priced = true
       out.costUsd! += d.costUsd
       if (d.costEstimated) out.costEstimated = true
-    }
+      if (d.costUnpriced) unpriced = true
+    } else if (tokenCount(d) > 0) unpriced = true
   }
   if (!priced && tokenCount(out) > 0) out.costUsd = null
+  else if (unpriced && out.costUsd !== null) out.costUnpriced = true
   return out
 }

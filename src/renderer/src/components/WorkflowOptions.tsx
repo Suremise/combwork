@@ -108,6 +108,9 @@ const T = {
   lane: msg({ id: 'workflow.form.lane', defaultMessage: 'Builder {builder}: {name}', description: 'A running lane in the dialog before saving workflow options: its builder agent and its name.' }),
   laneUnnamed: msg({ id: 'workflow.form.laneUnnamed', defaultMessage: 'Builder {builder}', description: 'A running lane without a name in the dialog before saving workflow options: its builder agent.' }),
   inFlight: msg({ id: 'workflow.form.inFlight', defaultMessage: '{n, plural, one {This card in flight keeps the old rules. Tick it to apply the new options to it now.} other {These cards in flight keep the old rules. Tick one to apply the new options to it now.}}', description: 'In the dialog before saving workflow options, above the cards already started (glossary 2.1: old rules). Ticking a card records an override on it.' }),
+  keptTargets: msg({ id: 'workflow.form.keptTargets', defaultMessage: '{n, plural, one {A target is set as a card or lane starts. This one keeps merging into its own, even if you tick it:} other {A target is set as a card or lane starts. These keep merging into their own, even if you tick them:}}', description: 'HI-2674: in the dialog before saving workflow options that change Work merges into (the target branch), above the lanes and cards in flight that keep their own target. Ticking is the cards’ checkboxes above, which apply the other options.' }),
+  keptLane: msg({ id: 'workflow.form.keptLane', defaultMessage: '{named, select, yes {Lane {name} (builder {builder}), its cards still to start too: into {target}} other {Lane of builder {builder}, its cards still to start too: into {target}}}', description: 'HI-2674: a running lane keeping its target branch, in the dialog before saving workflow options. {builder} is an agent’s name, {target} a branch name.' }),
+  keptCard: msg({ id: 'workflow.form.keptCard', defaultMessage: '{card} {title}: into {target}', description: 'HI-2674: a card in flight keeping its target branch, in the dialog before saving workflow options. {card} is its key (HI-12), {target} a branch name.' }),
   fromTemplate: msg({ id: 'workflow.form.fromTemplateDraft', defaultMessage: 'Filled in from the template {template}: these options aren’t saved yet. Check them, then Save… (they apply from the next card), or Discard Changes.', description: "A note atop the Workflow section (HI-1910, HI-2083) after loading a template whose workflow was applied and saved nothing of it: its options are filled in but not saved. Save… and Discard Changes are the buttons below: as translated there." }),
   fromTemplateMax: msg({ id: 'workflow.form.fromTemplateMax', defaultMessage: 'Filled in from the template {template}. Its Maximum agents ({max, number}) is saved already, with its agents; the other options aren’t saved yet. Check them, then Save… (they apply from the next card), or Discard Changes.', description: "A note atop the Workflow section (HI-2083) after loading a template whose workflow was applied: the load saved its Maximum agents ({max}) with its agents (HI-2058), the rest is filled in but not saved. Maximum agents, Save… and Discard Changes are names in the form: as translated there." }),
   templateNoCommand: msg({ id: 'workflow.form.templateNoCommand', defaultMessage: '{count, plural, one {This project has no command for the check {checks} yet: add it under Checks before cards need it.} other {This project has no commands for the checks {checks} yet: add them under Checks before cards need them.}}', description: "A note atop the Workflow section (HI-1910), with the template's options filled in: checks ({checks}, a list of names; {count} of them) have no command in this project. Checks is the group below: as translated there. Glossary: check." }),
@@ -924,6 +927,19 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
             </label>
           ))}
         </>
+      )}
+      {'targets' in check && check.targets && check.targets.lanes.length + check.targets.cards.length > 0 && (
+        <div data-kept-targets="">
+          <p>{tr(T.keptTargets, { n: check.targets.lanes.length + check.targets.cards.length })}</p>
+          <ul>
+            {check.targets.lanes.map((l) => (
+              <li key={`${l.id}\n${l.target}`}>{tr(T.keptLane, { named: l.name ? 'yes' : 'no', name: l.name ?? '', builder: l.builder, target: l.target })}</li>
+            ))}
+            {check.targets.cards.map((c) => (
+              <li key={c.number}>{tr(T.keptCard, { card: cardLabelOf({ tasks }, c.number), title: c.title, target: c.target })}</li>
+            ))}
+          </ul>
+        </div>
       )}
       {'projects' in check && (
         <div className="workflow-heirs" data-heirs="">

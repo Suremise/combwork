@@ -156,6 +156,11 @@ export interface PlatformAdapter {
    * start is refused as evidence that changed.
    */
   planCovered(primed: unknown, plan: StartPlan): boolean
+  /**
+   * The target a start of the card for `builder` would record under `o`, by the start's own rule (HI-2674: what a change of
+   * the target says a running lane's cards still to start keep). Absent: a platform with no targets.
+   */
+  startTarget?(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>>
   evidence(card: CardRecord, s: CardState, o: WorkflowOptions, primed: unknown): string | null
   /**
    * The platform's own answer about the same evidence, by content (#1206), read with processes (never in the
