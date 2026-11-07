@@ -10,9 +10,9 @@ import type { DatabaseSync } from 'node:sqlite'
 import { baselineOf, cardRows, cursorOf, fileSpace, getMeta, giveSpaceBack, markLocality, replaceRows, rollUpCandidates, rollUpSession, sessionIds, setMeta, storedSession, storedSessions, storedTimelines, updateMeta, USAGE_MIGRATIONS, writeSession, type SessionMeta, type SessionWrite } from './usageDb'
 import { COARSE_STEP, coarsenTimeline } from '../shared/usageTimeline'
 import { USAGE_TIMELINE_DETAIL_DAYS } from '../shared/advanced'
-import { isGz, readTranscript } from './transcriptFiles'
+import { fileIdentity, isGz, readTranscript } from './transcriptFiles'
 import { withoutCostReports } from '../shared/usageDays'
-import { newUsageParser, parserShape, restoreParser, saveParser, type RawUsageParser } from './usageParsers'
+import { newUsageParser, parserShape, rereadsWhole, restoreParser, saveParser, type RawUsageParser } from './usageParsers'
 
 /**
  * The usage worker (#1106): a thread of its own that keeps each workspace's usage history (usageDb.ts), so reading the
@@ -243,6 +243,8 @@ interface ReadEntry {
   offset: number
   size: number
   mtime: number
+  /** The file's identity when read (fileIdentity): a file put in its place with the same size and time is another. */
+  ident: string
   raw: SessionUsage | null
 }
 const reads = new Map<string, ReadEntry>()
@@ -280,7 +282,7 @@ function keep(path: string, c: ReadEntry): void {
 /** The file's entry, when its parser can go on from where it stopped: the same session and provider, a file that only grew. */
 function goOn(path: string, session: string, provider: ProviderId, size: number, mtime: number): ReadEntry | null {
   const c = touch(path)
-  if (!c?.parser || c.session !== session || c.provider !== provider || isGz(path) || size < c.offset || (size === c.size && mtime !== c.mtime)) return null
+  if (!c?.parser || c.session !== session || c.provider !== provider || isGz(path) || rereadsWhole(provider) || size < c.offset || (size === c.size && mtime !== c.mtime)) return null
   return c
 }
 
@@ -303,7 +305,7 @@ function inTurn<T>(path: string, fn: () => Promise<T>): Promise<T> {
  * A compressed backup (#1110) is finished and read whole: no state for it.
  */
 async function takeUp(cur: ReturnType<typeof cursorOf>, path: string, size: number, provider: ProviderId, session: string): Promise<{ parser: RawUsageParser; from: number } | null> {
-  if (isGz(path) || !cur?.state || !cur.path || cur.path.toLowerCase() !== path.toLowerCase() || cur.stateOffset === null || cur.stateOffset > size || cur.stateVersion !== appVersion || !cur.stateShape) return null
+  if (isGz(path) || rereadsWhole(provider) || !cur?.state || !cur.path || cur.path.toLowerCase() !== path.toLowerCase() || cur.stateOffset === null || cur.stateOffset > size || cur.stateVersion !== appVersion || !cur.stateShape) return null
   if (cur.stateCheck !== (await bytesBefore(path, cur.stateOffset))) return null
   const parser = restoreParser(provider, session, cur.state, cur.stateShape)
   return parser ? { parser, from: cur.stateOffset } : null
@@ -339,7 +341,8 @@ async function readUsage(path: string, session: string, provider: ProviderId, se
       return null
     }
     const had = touch(path)
-    if (had?.raw && had.size === st.size && had.mtime === st.mtimeMs && had.session === session && had.provider === provider) return readResult(had, reportsIgnored)
+    // A provider whose transcripts may be written again (rereadsWhole) also by the file's identity: a replacement keeping size and time is another file.
+    if (had?.raw && had.size === st.size && had.mtime === st.mtimeMs && had.session === session && had.provider === provider && (!rereadsWhole(provider) || had.ident === fileIdentity(st))) return readResult(had, reportsIgnored)
     let c = goOn(path, session, provider, st.size, st.mtimeMs)
     if (!c) {
       let taken: Awaited<ReturnType<typeof takeUp>> = null
@@ -355,7 +358,7 @@ async function readUsage(path: string, session: string, provider: ProviderId, se
       }
       const parser = taken?.parser ?? newUsageParser(provider, session)
       if (!parser) return null
-      c = { parser, session, provider, offset: taken?.from ?? 0, size: 0, mtime: 0, raw: null }
+      c = { parser, session, provider, offset: taken?.from ?? 0, size: 0, mtime: 0, ident: '', raw: null }
     }
     try {
       if (isGz(path) || st.size > c.offset) c.offset = await feed(path, c.parser!, c.offset)
@@ -367,6 +370,7 @@ async function readUsage(path: string, session: string, provider: ProviderId, se
     }
     c.size = st.size
     c.mtime = st.mtimeMs
+    c.ident = fileIdentity(st)
     c.raw = c.parser!.result()
     keep(path, c)
     return readResult(c, reportsIgnored)
@@ -418,7 +422,9 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   }
   if (!st.isFile()) return cur ? unchanged() : { status: 'missing' }
   const samePath = !!cur?.path && cur.path.toLowerCase() === job.path.toLowerCase()
-  if (!changed && cur && samePath && cur.size === st.size && cur.mtime === st.mtimeMs) return unchanged()
+  // Its history keeps no file identity: a provider whose transcripts may be written again in place (rereadsWhole) is read
+  // whole every time instead, so a replacement keeping size and time is never taken as unchanged.
+  if (!changed && cur && samePath && cur.size === st.size && cur.mtime === st.mtimeMs && !rereadsWhole(job.provider)) return unchanged()
   // The parser this run read the file with (a running session's footer, an earlier job), when it is at least as far on as
   // the saved state; else the saved state taken up (takeUp), else a new parser from the start.
   let parser: RawUsageParser | null = null
@@ -448,7 +454,7 @@ async function ingest(file: string, job: IngestJob): Promise<IngestResult> {
   // What it read is kept for the next read of a running session (the footer's, the next tick's); a session that ended
   // has its state saved below, and its parser is let go.
   if (job.keepState === 'now') reads.delete(readKey(job.path))
-  else if (live?.parser === parser || job.keepState === 'running') keep(job.path, { parser, session: job.session, provider: job.provider, offset, size: st.size, mtime: st.mtimeMs, raw: read0 })
+  else if (live?.parser === parser || job.keepState === 'running') keep(job.path, { parser, session: job.session, provider: job.provider, offset, size: st.size, mtime: st.mtimeMs, ident: fileIdentity(st), raw: read0 })
   // Read again after the awaits: what another writer recorded meanwhile is checked in the write.
   const now = cursorOf(db, job.scope, job.session)
   const settings = providers ? { providers } : null

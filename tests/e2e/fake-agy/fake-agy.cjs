@@ -3,12 +3,16 @@
 // - `agy --version` prints 1.5.0; `agy models` prints the recorded list (tests/fixtures/advanced/models-antigravity-1.5.0.txt),
 //   or, with FAKE_AGY_SIGNED_OUT=1, the recorded signed-out error (exit 1);
 // - a session reads its home from USERPROFILE (never HOME); it reopens `--conversation <id>`, else makes a new id;
-//   it keeps the conversation in <USERPROFILE>\.gemini\antigravity-cli\brain\<id>\.system_generated\logs\transcript.jsonl;
+//   it keeps the conversation in <USERPROFILE>\.gemini\antigravity-cli\brain\<id>\.system_generated\logs\transcript_full.jsonl
+//   (and transcript.jsonl, each argument encoded again), as 1.5.0's steps (HI-2546: tests/fixtures/antigravity), its title
+//   in annotations\<id>.pbtxt and the folder's last conversation in cache\last_conversations.json;
 // - it runs the `--settings` file's statusLine command (through cmd /c, as agy does) with the session's state on stdin;
 // - it starts the MCP servers of <USERPROFILE>\.gemini\config\mcp_config.json and of each workspace folder's
 //   .agents\mcp_config.json (the cwd and each --add-dir), a server named in the profile replacing the project's of that
 //   name, and keeps them running (one that ends falls back to the project's, as the real CLI's does);
-// - each line typed is a turn: written to the transcript, answered "Done: <line>", the status line run again.
+// - each line typed is a turn: written to the transcript, answered "Done: <line>", the status line run again; a line
+//   "tool <text>" also calls an MCP tool (call_mcp_tool) whose result is <text>, and "image" reads an image (read_file, its
+//   result naming a copy in logs\media); a resume needs the conversation's store (conversations\<id>.db), as 1.5.0's does.
 // Every launch is logged to FAKE_AGY_LOG (a JSON line: its arguments, cwd, and the environment the adapter sets).
 const fs = require('fs')
 const path = require('path')
@@ -60,9 +64,25 @@ if (resumed && !fs.existsSync(brain)) {
   process.exit(1)
 }
 fs.mkdirSync(logs, { recursive: true })
-const transcript = path.join(logs, 'transcript.jsonl')
+const transcript = path.join(logs, 'transcript_full.jsonl')
+const short = path.join(logs, 'transcript.jsonl')
 let step = fs.existsSync(transcript) ? fs.readFileSync(transcript, 'utf8').split('\n').filter(Boolean).length : 0
-const write = (o) => fs.appendFileSync(transcript, JSON.stringify({ step_index: step++, created_at: new Date().toISOString(), ...o }) + '\n')
+const now = () => new Date().toISOString().replace(/\.\d+Z$/, 'Z')
+// transcript.jsonl has each tool argument encoded again, as 1.5.0's does.
+const encoded = (o) => (o.tool_calls ? { ...o, tool_calls: o.tool_calls.map((c) => ({ ...c, args: Object.fromEntries(Object.entries(c.args).map(([k, v]) => [k, JSON.stringify(v)])) })) } : o)
+const write = (o) => {
+  const s = { step_index: step++, created_at: now(), ...o }
+  fs.appendFileSync(transcript, JSON.stringify(s) + '\n')
+  fs.appendFileSync(short, JSON.stringify(encoded(s)) + '\n')
+}
+const cli = path.join(home, '.gemini', 'antigravity-cli')
+const keep = (rel, text) => {
+  fs.mkdirSync(path.dirname(path.join(cli, rel)), { recursive: true })
+  fs.writeFileSync(path.join(cli, rel), text)
+}
+keep(path.join('cache', 'last_conversations.json'), JSON.stringify({ [process.cwd()]: conv }))
+// The conversation's own store, which a resume reads (1.5.0: conversations\<id>.db; the fake's is empty).
+if (!fs.existsSync(path.join(cli, 'conversations', `${conv}.db`))) keep(path.join('conversations', `${conv}.db`), '')
 log({ kind: 'session', args: argv, cwd: process.cwd(), conversation: conv, resumed: !!resumed, env: pick() })
 
 // The status line, per --settings (never saved), through cmd /c as agy runs it.
@@ -77,7 +97,8 @@ try {
 function statusLine(state) {
   const cmd = settings.statusLine?.command
   if (!cmd) return
-  const input = JSON.stringify({ conversation_id: conv, session_id: conv, transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: { id: flag('--model') || null }, product: 'antigravity' })
+  const model = flag('--model') || 'Gemini 3.8 Flash (Low)'
+  const input = JSON.stringify({ conversation_id: conv, session_id: conv, transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: { id: model, display_name: model, effort: flag('--effort') || 'low' }, context_window: { context_window_size: 1048576 }, product: 'antigravity' })
   // Through cmd, the command line as given (Node quotes it for cmd's /s /c, so its own quotes reach it unchanged).
   spawnSync(cmd, [], { shell: true, input, timeout: 5000, windowsHide: true })
 }
@@ -115,10 +136,28 @@ log({ kind: 'mcp', conversation: conv, own: Object.keys(own), project: Object.ke
 
 process.stdout.write(`Antigravity CLI 1.5.0 (fake) · conversation ${conv}\n> `)
 statusLine('idle')
+// Each request's tokens: its input without the cache read (4000 from the second request on), as 1.5.0 records them.
+const tokens = () => ({ input_tokens: 3000 + 100 * step, cache_read_tokens: step > 1 ? 4000 : 0, output_tokens: 20 })
 const turn = (text) => {
-  write({ source: 'USER_EXPLICIT', type: 'USER_INPUT', status: 'DONE', content: text })
+  // The first prompt says the model it starts on, as 1.5.0's does.
+  const picked = step === 0 ? `\n<USER_SETTINGS_CHANGE>\nThe user changed setting \`Model Selection\` from None to ${flag('--model') || 'Gemini 3.8 Flash (Low)'}. No need to comment on this change if the user doesn't ask about it.\n</USER_SETTINGS_CHANGE>` : ''
+  write({ source: 'USER_EXPLICIT', type: 'USER_INPUT', status: 'DONE', content: `<USER_REQUEST>\n${text}\n</USER_REQUEST>\n<ADDITIONAL_METADATA>\nThe current local time is: ${now()}.\n</ADDITIONAL_METADATA>${picked}` })
+  if (!fs.existsSync(path.join(cli, 'annotations', `${conv}.pbtxt`))) keep(path.join('annotations', `${conv}.pbtxt`), `title:${JSON.stringify(`Fake: ${text}`)}\n`)
   statusLine('working')
-  write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', content: `Done: ${text}` })
+  const tool = /^tool (.+)$/.exec(text)
+  if (tool) {
+    write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'call_mcp_tool', args: { Arguments: {}, ServerName: 'fake', ToolName: 'echo' } }] })
+    write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\n${tool[1]}` })
+  }
+  if (text === 'image') {
+    // read_file of an image: its result names the copy agy keeps in logs\media (1.5.0's media entry).
+    write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'read_file', args: { Path: path.join(process.cwd(), 'red.png') } }] })
+    const media = path.join(logs, 'media', `step_${step}_media_0.png`)
+    fs.mkdirSync(path.dirname(media), { recursive: true })
+    fs.copyFileSync(path.join(__dirname, '..', '..', 'fixtures', 'antigravity', 'image-1.5.0-media.png'), media)
+    write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\nShowing binary file of type image/png`, media: [{ mime_type: 'image/png', uri: `file:///${media.replace(/\\/g, '/')}` }] })
+  }
+  write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), content: `Done: ${text}` })
   process.stdout.write(`Done: ${text}\n> `)
   statusLine('idle')
 }

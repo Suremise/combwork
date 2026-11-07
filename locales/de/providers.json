@@ -3,6 +3,7 @@
   "providers.action.signIn": "Anmelden",
   "providers.action.update": "Aktualisieren",
   "providers.antigravity.checkFailed": "Die Anmeldung von {provider} konnte nicht geprüft werden: {text}. Wähle „Erneut prüfen“; falls du dich noch nicht angemeldet hast, führe agy in einem Terminal aus.",
+  "providers.antigravity.conversationGone": "{provider} hat {conversation} nicht fortgesetzt: {provider} hat diese Unterhaltung nicht mehr (es bewahrt sie getrennt von ihrem Transkript im Profil des Agenten auf, und sie wurde entfernt). Starte stattdessen eine neue Sitzung.",
   "providers.antigravity.projectServers": "{provider} wurde nicht gestartet: {count, plural, one {{files} definiert} other {{files} definieren}} MCP-Server, die dieser Agent nicht erhalten hat ({servers}), und {provider} würde sie in seiner Sitzung starten. Combwork kann sie nicht fernhalten und startet {provider} hier deshalb nicht. Entferne sie aus dieser Datei oder gib sie dem Agenten in den MCP-Servern von Combwork.",
   "providers.antigravity.notOwnConversation": "{provider} hat {conversation} nicht fortgesetzt: Sie gehört nicht zu den eigenen Unterhaltungen dieses Agenten (sie wurde vielleicht entfernt oder gehört einem anderen Agenten). Starte stattdessen eine neue Sitzung.",
   "providers.antigravity.signIn.runs": "**Anmelden** führt `agy` in einem Terminal aus: Melde dich dort an. Combwork meldet dich nie selbst an.",

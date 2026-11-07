@@ -38,6 +38,36 @@
   "settings.advanced.antigravity.signIn.needed.title": {
     "placeholders": {}
   },
+  "settings.advanced.antigravity.transcript.modelChange.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.modelChange.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.userRequest.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.transcript.userRequest.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.title": {
+    "placeholders": {}
+  },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "placeholders": {}
   },

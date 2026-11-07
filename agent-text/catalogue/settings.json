@@ -64,6 +64,56 @@
     "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of the CLI's message when it isn't signed in. agy models is a command: keep it.",
     "audience": "both"
   },
+  "settings.advanced.antigravity.transcript.modelChange.desc": {
+    "text": "What agy adds to a prompt when its model changes: the model's name is its first group. Wrong, an agent's usage names no model.",
+    "note": "What the advanced setting \"Transcript: the model picked\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.modelChange.title": {
+    "text": "Transcript: the model picked",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.desc": {
+    "text": "The times agy writes before a tool's result in its transcript, which Combwork leaves out when it shows the result. Wrong, results show with those times.",
+    "note": "What the advanced setting \"Transcript: a tool result's times\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.title": {
+    "text": "Transcript: a tool result's times",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.desc": {
+    "text": "A message in agy's transcript from agy itself or another conversation (a subagent's task or answer): who sent it is its first group, what it says its second. Wrong, those messages aren't shown, and a subagent's conversation isn't found under its parent.",
+    "note": "What the advanced setting \"Transcript: agy's messages\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.title": {
+    "text": "Transcript: agy's messages",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.userRequest.desc": {
+    "text": "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.",
+    "note": "What the advanced setting \"Transcript: your prompt\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.userRequest.title": {
+    "text": "Transcript: your prompt",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.desc": {
+    "text": "Whether a request's input_tokens in agy's transcript already count its cache_read_tokens. Wrong, Combwork counts cached tokens twice, or leaves them out of the context.",
+    "note": "What the advanced setting \"Usage: input tokens include the cache\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy, input_tokens and cache_read_tokens are names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.title": {
+    "text": "Usage: input tokens include the cache",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "text": "The environment variables Combwork leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",
     "note": "What the advanced setting \"Connections: sign-in variables left out\" is for, and what goes wrong when it is wrong (Settings → Advanced).",

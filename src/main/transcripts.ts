@@ -12,7 +12,8 @@ import type { ConversationParserLike } from './providers/types'
 import { sessions } from './sessions'
 import { setViewing, whileReading } from './transcriptReads'
 import { workspace } from './workspace'
-import { isGz, readBytes, readTranscript } from './transcriptFiles'
+import { fileIdentity, isGz, prefixHash, readBytes, readTranscript } from './transcriptFiles'
+import { createHash, type Hash } from 'crypto'
 import { toolForDisplay } from './transcriptDisplay'
 
 /** The Sessions tab's refusals, in the window's language (#850). */
@@ -34,10 +35,18 @@ interface Entry {
   /** A compressed backup's identity when read (size, modified time, file id): it is replaced whole, never appended to. */
   stamp: string
   used: number
+  /**
+   * For a CLI that may write its transcript again in place (the parser's `rewritten`, HI-2546): a running hash of the
+   * bytes the parser read, and the file's time when last read. A change of either size or time is checked against it.
+   */
+  read?: Hash
+  mtime?: number
+  /** The file's identity when read (fileIdentity), for the same: another file in its place is read from the start. */
+  ident?: string
 }
 
 /** What the viewer passes back to learn nothing changed: a plain file's size read, a compressed one's identity. */
-const versionOf = (e: Entry): string => (isGz(e.path) ? `gz:${e.stamp}` : String(e.size))
+const versionOf = (e: Entry): string => (isGz(e.path) ? `gz:${e.stamp}` : e.parser.rewritten ? `${e.size}:${e.mtime ?? 0}:${e.ident ?? ''}` : String(e.size))
 
 const MAX_CACHED = 6
 /** How much of a transcript is read at a time. */
@@ -92,7 +101,13 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
   let e = cache.get(key)
   // A different file (the provider deleted it and Combwork's backup is used), a shorter one or another compressed one means
   // start again.
-  if (!e || e.path !== path || (isGz(path) ? stamp !== e.stamp : size < e.parser.offset)) {
+  // One its CLI may write again in place (HI-2546): a change of size or time whose bytes read before aren't the same any
+  // more (an equal-length rewrite, a rewritten start that grew) is read again from the start too.
+  // Another file put in its place (its identity differs), even of the same size and time, is read from the start too.
+  const ident = fileIdentity(st)
+  const replaced = !!e && !isGz(path) && e.path === path && !!e.parser.rewritten && e.ident !== undefined && e.ident !== ident
+  const rewritten = replaced || (!!e && !isGz(path) && e.path === path && !!e.parser.rewritten && (size !== e.size || st.mtimeMs !== e.mtime) && e.parser.offset > 0 && size >= e.parser.offset && (await prefixHash(path, e.parser.offset)) !== e.read?.copy().digest('hex'))
+  if (!e || rewritten || e.path !== path || (isGz(path) ? stamp !== e.stamp : size < e.parser.offset)) {
     const id = await sessions.sessionProvider(projectPath, sessionId)
     e = { path, provider: id, parser: provider(id).conversationParser(projectPath), size: 0, stamp: '', used: 0 }
     cache.set(key, e)
@@ -106,19 +121,24 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
       e.size = size
       e.stamp = stamp
     }
-  } else if (size !== e.size) {
+  } else if (size !== e.size || (e.parser.rewritten && (st.mtimeMs !== e.mtime || e.ident !== ident))) {
     // In pieces, so a long transcript opened for the first time doesn't take its whole size in memory at once.
     let chunk = READ_CHUNK
+    if (e.parser.rewritten) e.read ??= createHash('sha1')
     while (e.parser.offset < size) {
       const before = e.parser.offset
       const end = Math.min(size, before + chunk)
-      e.parser.feed(await readRange(path, before, end))
+      const buf = await readRange(path, before, end)
+      e.parser.feed(buf)
+      e.read?.update(buf.subarray(0, e.parser.offset - before))
       if (e.parser.offset > before) continue
       // One line longer than the piece (a large image): read a bigger piece; at the end, a line still being written.
       if (end === size) break
       chunk *= 2
     }
     e.size = size
+    e.mtime = st.mtimeMs
+    e.ident = ident
   }
   if (cache.size > MAX_CACHED) {
     const oldest = [...cache.entries()].sort((a, b) => a[1].used - b[1].used)[0]
@@ -183,7 +203,7 @@ export const transcripts = {
     const loc = e.parser.images[imageId]
     if (!loc) throw combworkError(msg({ id: 'service.transcripts.noImage', defaultMessage: 'No such image', description: "An error in the Sessions tab: the image asked for isn't in the conversation (any more)." }), undefined, { kind: 'notFound' })
     const entry = JSON.parse((await readBytes(e.path, loc.offset, loc.offset + loc.length)).toString('utf8'))
-    const url = provider(e.provider).imageData(entry, loc)
+    const url = await provider(e.provider).imageData(entry, loc, e.path)
     if (!url) throw combworkError(msg({ id: 'service.transcripts.imageNotKept', defaultMessage: 'The image is not stored in the transcript', description: "An error in the Sessions tab: the conversation's file mentions the image but doesn't hold it." }), undefined, { kind: 'notFound' })
     return url
   },

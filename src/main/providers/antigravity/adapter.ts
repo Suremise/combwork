@@ -1,7 +1,7 @@
 import { createHash } from 'crypto'
-import { join, resolve } from 'path'
+import { dirname, join, resolve } from 'path'
 import { existsSync } from 'original-fs'
-import { cp, mkdir, readdir, stat } from 'original-fs/promises'
+import { cp, mkdir, stat } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PathDataCopy, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
 import { ANTIGRAVITY, ANTIGRAVITY_DESCRIPTOR, antigravityModeFlags } from '../../../shared/antigravity'
 import { ASSISTANT_AGENT_ID } from '../../../shared/assistant'
@@ -14,11 +14,14 @@ import { launchOverrides } from '../../advancedValues'
 import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
-import { compareVersions, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
-import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import { compareVersions, exportSubtitleText, hookForwardCommand, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
+import type { CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { antigravityEnv, brainDir, checkEnv, inProfile, inUserProfile, profilesRoot } from './home'
 import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
 import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
+import { agyStatusDetails } from './status'
+import { AntigravityConversationParser, AntigravityUsageParser, parseAgyTranscript } from './transcript'
+import { isConversationId, knownTitle, learnTitle, listConversations, mediaData, profileOf, subOf, trustedTranscript } from './conversations'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
@@ -26,12 +29,13 @@ import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './proj
 // MCP servers (Combwork's, with the launch's token). A workspace folder's own MCP servers the agent wasn't given refuse the
 // launch (profileConfig: agy can't be kept from starting them). The user's own global agy customizations (~\.gemini) are
 // never read (Darren, 7 Nov: hidden for now).
-// Hooks, transcripts and usage are HI-2545's and HI-2546's: until they land those parts return nothing.
+// Hooks are HI-2545's: until they land those parts return nothing. Transcripts and usage are HI-2546's (transcript.ts).
 
 const NAME = ANTIGRAVITY_DESCRIPTOR.name
 
 const REFUSED = {
   unreadable: msg({ id: 'providers.antigravity.unreadableConfig', defaultMessage: "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.", description: "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words." }),
+  gone: msg({ id: 'providers.antigravity.conversationGone', defaultMessage: "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation's own store in the agent's profile is gone, though its transcript may be left. {provider} is the CLI's name, {conversation} the conversation's id." }),
   notOwn: msg({ id: 'providers.antigravity.notOwnConversation', defaultMessage: "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id." }),
   projectServers: msg({ id: 'providers.antigravity.projectServers', defaultMessage: "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.", description: "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork." })
 }
@@ -43,7 +47,7 @@ export function profileFolder(agentId: string, workspacePath: string): string {
 }
 
 /** A conversation id agy made: a UUID, safe as a folder name (never a path). */
-export const isConversationId = (id: unknown): id is string => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+export { isConversationId }
 
 /** An MCP server as agy's mcp_config.json has it (1.5.0: stdio command/args/env, or Streamable HTTP url/headers). */
 export function agyServer(def: McpServerDef): Record<string, unknown> | null {
@@ -140,30 +144,6 @@ export function statusLineConversation(body: Record<string, any>): string | null
   return isConversationId(id) ? id : null
 }
 
-const emptyUsage = (sessionId: string): SessionUsage => ({
-  provider: ANTIGRAVITY,
-  sessionId,
-  title: null,
-  model: null,
-  cliVersion: null,
-  inputTokens: 0,
-  outputTokens: 0,
-  cacheWriteTokens: 0,
-  cacheReadTokens: 0,
-  requests: 0,
-  reasoningTokens: 0,
-  contextTokens: 0,
-  contextWindow: null,
-  compactions: [],
-  cacheTtlSeconds: 0,
-  firstActivity: null,
-  lastActivity: null,
-  userMessages: 0,
-  lastPrompt: null,
-  costUsd: null,
-  costEstimated: false
-})
-
 export class AntigravityAdapter implements ProviderAdapter {
   readonly id = ANTIGRAVITY
   readonly descriptor = ANTIGRAVITY_DESCRIPTOR
@@ -235,6 +215,8 @@ export class AntigravityAdapter implements ProviderAdapter {
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
     // A resume reopens only one of this agent's own conversations (in its profile), never another's or a missing one.
     if (ctx.resume && !(await this.ownsConversation(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.notOwn, { provider: NAME, conversation: ctx.sessionId })
+    // Its transcript alone (the brain folder) isn't the conversation: agy resumes from its store, conversations\<id>.db.
+    if (ctx.resume && !(await this.hasConversationStore(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.gone, { provider: NAME, conversation: ctx.sessionId })
     const delivered = await syncAgentsSkills(ctx, NAME)
     let workspace: Map<string, WorkspaceServer[]>
     try {
@@ -264,10 +246,9 @@ export class AntigravityAdapter implements ProviderAdapter {
     return { file: s.file, args: s.args, env }
   }
 
-  /** Its status line (Combwork's own command): the conversation's id, from the launch it belongs to. Its model and cost come with HI-2546. */
+  /** Its status line (Combwork's own command): the model, its effort and the context window (agyStatusDetails). */
   statusLine(body: Record<string, any>): LiveDetails {
-    void body
-    return {}
+    return agyStatusDetails(body)
   }
 
   /** The conversation the status line names (statusLineConversation), for Combwork to learn a new launch's id. */
@@ -297,35 +278,38 @@ export class AntigravityAdapter implements ProviderAdapter {
     return ANTIGRAVITY_DESCRIPTOR.canSwitchLive(target, current, launched)
   }
 
-  // ---- Transcripts (HI-2546 reads them): where a conversation is, for resume.
-  /** Its transcript: in the profile of the agent it belongs to (`recorded`: the path its hooks or status line gave). */
+  // ---- Transcripts (HI-2546, conversations.ts and transcript.ts).
+  /**
+   * Its transcript: in the profile of the agent it belongs to. `recorded` (the path its hooks gave) only when it is that
+   * conversation's transcript in one of Combwork's profiles (profileTranscript): agy's word never points Combwork elsewhere.
+   */
   async transcriptPath(_folder: string, sessionId: string, recorded?: string): Promise<string | null> {
-    if (recorded && existsSync(recorded)) return recorded
     if (!isConversationId(sessionId)) return null
     const root = profilesRoot()
-    let keys: string[] = []
-    try {
-      keys = await readdir(root)
-    } catch {
-      return null
-    }
-    for (const k of keys) {
-      const p = join(brainDir(join(root, k)), sessionId, '.system_generated', 'logs', 'transcript.jsonl')
-      if (existsSync(p)) return p
-    }
-    return null
+    const found = await profileOf(root, sessionId)
+    if (!found) return null
+    // Its title, for a usage asked for without waiting (usageTitle).
+    await learnTitle(root, found.profile, sessionId)
+    const reported = recorded ? await trustedTranscript(recorded, root, sessionId) : null
+    return reported ?? found.transcript
   }
 
+  /**
+   * None: agy resumes a conversation from its own store (conversations\<id>.db in the profile), not its transcript, so a
+   * transcript put back from Combwork's backup wouldn't bring a deleted conversation back. Such a session starts afresh.
+   */
   restorePath(): string | null {
     return null
   }
 
-  listSessions(): Promise<ExternalSession[]> {
-    return Promise.resolve([])
+  /** The conversations in the profiles of the agents that ran in `folder` (listConversations). */
+  listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
+    return listConversations(profilesRoot(), folder, skip)
   }
 
-  subSessionOf(): Promise<SubSession | null> {
-    return Promise.resolve(null)
+  /** A subagent's conversation, from its first step (subOf); a transcript of Combwork's profiles only. */
+  subSessionOf(path: string, _sessionId: string, mtimeMs?: number): Promise<SubSession | null> {
+    return subOf(path, mtimeMs)
   }
 
   /**
@@ -341,25 +325,52 @@ export class AntigravityAdapter implements ProviderAdapter {
     }
   }
 
-  // ---- Usage (HI-2546): none read yet.
-  parseUsage(_text: string, sessionId: string): SessionUsage {
-    return emptyUsage(sessionId)
+  /** Whether agy's own store of the conversation (conversations\<id>.db in the agent's profile), which a resume reads, is there. */
+  async hasConversationStore(agentId: string, workspacePath: string, sessionId: string): Promise<boolean> {
+    if (!isConversationId(sessionId)) return false
+    try {
+      return (await stat(join(dirname(brainDir(profileFolder(agentId, workspacePath))), 'conversations', `${sessionId}.db`))).isFile()
+    } catch {
+      return false
+    }
+  }
+
+  // ---- Usage (HI-2546): from the transcript (transcript.ts).
+  /** The conversation's title agy made (its annotations), from the profile that has it. */
+  usageTitle(sessionId: string): string | null {
+    const known = knownTitle(sessionId)
+    // Never read here, on the caller's thread: one not read yet is looked up meanwhile, for the next ask.
+    if (known === undefined && isConversationId(sessionId)) {
+      const root = profilesRoot()
+      void profileOf(root, sessionId)
+        .then((f) => (f ? learnTitle(root, f.profile, sessionId) : null))
+        .catch(() => null)
+    }
+    return known ?? null
+  }
+
+  parseUsage(text: string, sessionId: string): SessionUsage {
+    return parseAgyTranscript(text, sessionId, this.usageTitle(sessionId))
   }
 
   usageParser(sessionId: string): UsageParser {
-    return { feed: () => undefined, result: () => emptyUsage(sessionId) }
+    const p = new AntigravityUsageParser(sessionId)
+    return { feed: (text) => p.feed(text), result: () => p.result(this.usageTitle(sessionId)) }
   }
 
-  conversationParser(): ConversationParserLike {
-    return { items: [], images: [], offset: 0, feed: () => 0 }
+  conversationParser(projectPath: string): ConversationParserLike {
+    return new AntigravityConversationParser(projectPath)
   }
 
-  imageData(): string | null {
-    return null
+  /** An image a tool read (its result step's `media`, a file in the conversation's logs\media): mediaData. */
+  imageData(line: Record<string, any>, loc: ImageLocation, transcriptPath: string): Promise<string | null> {
+    let v: any = line
+    for (const k of loc.path) v = v?.[k]
+    return mediaData(v, transcriptPath, profilesRoot())
   }
 
-  exportSubtitle(sessionId: string): string {
-    return `${NAME} conversation ${sessionId}` // i18n-ignore: an export's heading, as the other providers word it
+  exportSubtitle(sessionId: string, project: string): string {
+    return exportSubtitleText(this.descriptor.name, sessionId, project)
   }
 
   // ---- Project files.

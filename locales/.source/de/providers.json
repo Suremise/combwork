@@ -3,6 +3,7 @@
   "providers.action.signIn": "Sign in",
   "providers.action.update": "Update",
   "providers.antigravity.checkFailed": "Couldn't check {provider}'s sign-in: {text}. Choose Check again; if you haven't signed in yet, run agy in a terminal.",
+  "providers.antigravity.conversationGone": "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.",
   "providers.antigravity.notOwnConversation": "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.",
   "providers.antigravity.projectServers": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.",
   "providers.antigravity.signIn.runs": "**Sign in** runs `agy` in a terminal: sign in there. Combwork never signs in for you.",
