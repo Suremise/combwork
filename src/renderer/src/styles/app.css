@@ -12164,6 +12164,28 @@ textarea.input.task-blocked-input {
 .perf-coverage {
   margin: 0 0 12px;
 }
+/* Server diagnostics (HI-2683): a model's three context values, a label and its value a row; its line elsewhere. */
+.server-diag-values {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+}
+.server-context-line {
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.server-setup-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.server-setup-lines > .flex {
+  align-items: center;
+  gap: 8px;
+}
+
 /* Real errors stand out from refusals and wrong calls (HI-2553). */
 .perf-real-errors {
   color: var(--error);
