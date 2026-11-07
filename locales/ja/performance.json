@@ -333,7 +333,7 @@
   "performance.provider.all": "すべてのプロバイダー",
   "performance.provider.groupLabel": "プロバイダーで絞り込み",
   "performance.provider.label": "プロバイダー",
-  "performance.provider.note": "起動とプロバイダーの使用量：プロバイダーごとに記録されるのはこれだけです。",
+  "performance.provider.note": "起動、Combwork ツール一覧、プロバイダーの使用量: プロバイダー別に記録される部分はこれだけです。",
   "performance.provider.nothing": "過去{range, select, 24h {24時間} 7d {7日間} other {30日間}}{filtered, select, yes {、このフィルターでは} other {}}{provider}のデータはありません。",
   "performance.providersNote.assistant": "アシスタントのセッションはワークスペースのもので、プロジェクトのものではありません。",
   "performance.providersNote.scripts": "スクリプトはセッションを起動しないため、プロバイダーの使用量はありません。",

@@ -333,7 +333,7 @@
   "performance.provider.all": "所有提供方",
   "performance.provider.groupLabel": "按提供方筛选",
   "performance.provider.label": "提供方",
-  "performance.provider.note": "启动次数和提供方用量：只有这些部分按提供方记录。",
+  "performance.provider.note": "启动、Combwork 工具列表和提供方的用量：仅这些部分按提供方记录。",
   "performance.provider.nothing": "最近 {range, select, 24h {24 小时} 7d {7 天} other {30 天}}内{filtered, select, yes {此筛选条件下} other {}}没有来自 {provider} 的数据。",
   "performance.providersNote.assistant": "助手的会话属于工作区，而不属于某个项目。",
   "performance.providersNote.scripts": "脚本不启动会话，因此没有提供方用量。",

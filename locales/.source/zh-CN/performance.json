@@ -345,7 +345,7 @@
   "performance.provider.all": "All providers",
   "performance.provider.groupLabel": "Filtered by provider",
   "performance.provider.label": "Provider",
-  "performance.provider.note": "Launches and the providers’ usage: the only parts recorded per provider.",
+  "performance.provider.note": "Launches, the Combwork tool list and the providers’ usage: the only parts recorded per provider.",
   "performance.provider.nothing": "Nothing from {provider} in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}{filtered, select, yes { for this filter} other {}}.",
   "performance.providersNote.assistant": "The Assistant’s sessions are the workspace’s, not a project’s.",
   "performance.providersNote.scripts": "Scripts start no sessions, so they have no provider usage.",

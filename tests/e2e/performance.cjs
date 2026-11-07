@@ -152,6 +152,8 @@ const check = (name, ok, extra = '') => {
   check('the Failures card: the real errors, then refused by a rule and wrong calls', /3 real errors/.test(await failures.innerText()) && /2 refused by a rule · 0 wrong calls/.test(await failures.innerText()) && (await failures.locator('.perf-real-errors').count()) === 1, await failures.innerText())
   const reasonsTable = page.locator('.performance-page:visible .table-wrap', { has: page.locator('th', { hasText: /^Reason/ }) }).filter({ has: page.locator('th', { hasText: /^Kind/ }) })
   check('…and the refusals by reason: its rule, never its text', /\/v1\/tasks\/:n\s+Refused\s+rule:move\.doingNobody\s+2/.test(await reasonsTable.locator('tbody').innerText()), await reasonsTable.locator('tbody').innerText().catch(() => ''))
+  await failures.scrollIntoViewIfNeeded()
+  await shot('failures')
   check('the Combwork tool list by provider, with what Claude Code got up front', /Claude Code\s+Agents\s+Reviewer/.test(await toolRow()) && /Unknown\s+Agents\s+Builder/.test(await toolRow()) && (await toolTable.locator('th', { hasText: 'Up front' }).count()) === 1, await toolRow())
   check('…the Guidance per launch card has the tool list beside it', /Tool list .* a start/.test(await page.locator('.performance-page:visible .card', { hasText: 'Guidance per launch' }).innerText()), await page.locator('.performance-page:visible .card', { hasText: 'Guidance per launch' }).innerText())
   check('cancelled requests are shown apart from failures', /cancelled/.test(await page.locator('.performance-page:visible .card', { hasText: 'API requests' }).innerText()))

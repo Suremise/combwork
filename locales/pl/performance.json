@@ -333,7 +333,7 @@
   "performance.provider.all": "Wszyscy dostawcy",
   "performance.provider.groupLabel": "Filtrowane według dostawcy",
   "performance.provider.label": "Dostawca",
-  "performance.provider.note": "Uruchomienia i użycie dostawców: jedyne części zapisywane osobno dla każdego dostawcy.",
+  "performance.provider.note": "Uruchomienia, Lista narzędzi Combwork i użycie dostawców: jedyne części rejestrowane według dostawcy.",
   "performance.provider.nothing": "Brak danych od dostawcy {provider} w ciągu ostatnich {range, select, 24h {24 godzin} 7d {7 dni} other {30 dni}}{filtered, select, yes { dla tego filtra} other {}}.",
   "performance.providersNote.assistant": "Sesje Asystenta należą do obszaru roboczego, a nie do projektu.",
   "performance.providersNote.scripts": "Skrypty nie uruchamiają sesji, więc nie mają użycia dostawców.",

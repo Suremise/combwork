@@ -333,7 +333,7 @@
   "performance.provider.all": "Todos los proveedores",
   "performance.provider.groupLabel": "Filtrado por proveedor",
   "performance.provider.label": "Proveedor",
-  "performance.provider.note": "Los inicios y el uso de los proveedores: las únicas partes que se registran por proveedor.",
+  "performance.provider.note": "Los inicios, la Lista de herramientas de Combwork y el uso de los proveedores: las únicas partes que se registran por proveedor.",
   "performance.provider.nothing": "Nada de {provider} en {range, select, 24h {las últimas 24 horas} 7d {los últimos 7 días} other {los últimos 30 días}}{filtered, select, yes { para este filtro} other {}}.",
   "performance.providersNote.assistant": "Las sesiones del Asistente son del espacio de trabajo, no de un proyecto.",
   "performance.providersNote.scripts": "Los scripts no inician sesiones, así que no tienen uso de proveedores.",

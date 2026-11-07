@@ -333,7 +333,7 @@
   "performance.provider.all": "Alle Anbieter",
   "performance.provider.groupLabel": "Nach Anbieter gefiltert",
   "performance.provider.label": "Anbieter",
-  "performance.provider.note": "Starts und die Nutzung der Anbieter: die einzigen Teile, die pro Anbieter erfasst werden.",
+  "performance.provider.note": "Starts, die Combwork-Tool-Liste und die Nutzung der Anbieter: die einzigen Teile, die pro Anbieter erfasst werden.",
   "performance.provider.nothing": "Nichts von {provider} {range, select, 24h {in den letzten 24 Stunden} 7d {in den letzten 7 Tagen} other {in den letzten 30 Tagen}}{filtered, select, yes { für diesen Filter} other {}}.",
   "performance.providersNote.assistant": "Die Sitzungen des Assistenten gehören zum Arbeitsbereich, nicht zu einem Projekt.",
   "performance.providersNote.scripts": "Skripte starten keine Sitzungen und haben daher keine Nutzung bei Anbietern.",

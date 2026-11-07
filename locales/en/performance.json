@@ -1384,8 +1384,8 @@
     "description": "Label of the Performance page's provider filter, and a column header: the CLI (Claude Code, Codex, Copilot)."
   },
   "performance.provider.note": {
-    "defaultMessage": "Launches and the providers’ usage: the only parts recorded per provider.",
-    "description": "Beside the Performance page's Provider filter: what it changes."
+    "defaultMessage": "Launches, the Combwork tool list and the providers’ usage: the only parts recorded per provider.",
+    "description": "Beside the Performance page's Provider filter: what it changes (HI-2553: the tool list too). Combwork tool list is a table's heading: name it as there."
   },
   "performance.provider.nothing": {
     "defaultMessage": "Nothing from {provider} in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}{filtered, select, yes { for this filter} other {}}.",
