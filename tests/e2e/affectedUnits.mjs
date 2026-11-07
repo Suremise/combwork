@@ -532,6 +532,80 @@ function dispatchSeams(parsed, unit, line) {
  * in now covers, or no longer covers, code: an unchanged line inside that comment that isn't all comment in the other
  * revision (`/*` and `*\/` added around code).
  */
+/**
+ * Whether a TypeScript statement is erased before anything runs (HI-2690, D1), node by node, never by a file's
+ * extension: an interface, a type alias, an overload signature (TSDeclareFunction), a type-only import or export, a
+ * `declare` variable with no value, and a `declare` module, namespace or global block holding only such statements. An
+ * enum of any kind (a const enum's values are inlined where it is used, a `.d.ts`'s or an ambient one too) and
+ * everything else (a class, a function, a value) is not.
+ */
+export function erasedStatement(st) {
+  const s = st.type === 'ExportNamedDeclaration' && st.declaration ? st.declaration : st
+  switch (s.type) {
+    case 'TSInterfaceDeclaration':
+    case 'TSTypeAliasDeclaration':
+    case 'TSDeclareFunction':
+      return true
+    case 'ImportDeclaration':
+      return s.importKind === 'type' || (s.specifiers.length > 0 && s.specifiers.every((sp) => sp.importKind === 'type'))
+    case 'ExportNamedDeclaration':
+      return !s.declaration && (s.exportKind === 'type' || (s.specifiers.length > 0 && s.specifiers.every((sp) => sp.exportKind === 'type')))
+    case 'ExportAllDeclaration':
+      return s.exportKind === 'type'
+    case 'VariableDeclaration':
+      return !!s.declare && s.declarations.every((d) => !d.init)
+    case 'TSModuleDeclaration': {
+      if (!s.declare && !s.global && s.kind !== 'global') return false
+      const body = s.body?.type === 'TSModuleBlock' ? s.body.body : s.body ? [s.body] : []
+      return body.every((b) => (b.type === 'TSModuleDeclaration' ? erasedStatement({ ...b, declare: true }) : erasedStatement(b)))
+    }
+    default:
+      return false
+  }
+}
+
+/**
+ * A change to a TypeScript file that only types can see (HI-2690, D1): its reason, or null (selected as usual). Every
+ * changed line that changes code (codeLines), in both revisions, lies in a statement erasedStatement allows, and shares
+ * its line with no other statement. Never for a file that doesn't parse, an added or deleted one, or one read as source
+ * data: its repo path or its name named in a test's or a script's code (tests/e2e, tests/scenarios, scripts: tipwindows
+ * reads tips.ts, viewer servers.ts), selection's own tooling aside. base, head: revisions (gitRevision, memoryRevision);
+ * lines: { added, removed } (diffLineNumbers).
+ */
+export function typeOnlyChange({ file, base, head, lines }) {
+  if (!/\.(ts|tsx|mts|cts)$/i.test(file)) return null
+  const texts = [base.read(file), head.read(file)]
+  if (texts.some((t) => t == null)) return null
+  const name = file.replace(/^.*\//, '')
+  for (const rev of [base, head]) {
+    for (const f of rev.grep(name, ['tests/e2e/', 'tests/scenarios/', 'scripts/'], false)) {
+      if (!/\.(c|m)?[jt]s$/i.test(f) || /^tests\/e2e\/(affected|affectedUnits|relatedTests|typeProvenance)\.mjs$/i.test(f)) continue
+      return null
+    }
+  }
+  const sides = []
+  const stmts = []
+  for (const t of texts) {
+    let parsed
+    try {
+      parsed = unitsOf(t, file, {})
+    } catch {
+      return null
+    }
+    sides.push(parsed)
+    // Each statement's lines, with whether it is erased (export wrappers count as their declaration).
+    stmts.push(parsed.ast.program.body.map((st) => ({ from: st.loc.start.line, to: st.loc.end.line, erased: erasedStatement(st) })))
+  }
+  const changed = codeLines(sides, lines)
+  // Comments alone, none of them now covering code or no longer covering it (codeLines' rule, HI-2659's).
+  if (!changed.length) return (lines.added.length || lines.removed.length) ? `${file}: comments only, so no suite` : null
+  for (const { side, line } of changed) {
+    const on = stmts[side].filter((s) => s.from <= line && line <= s.to)
+    if (!on.length || !on.every((s) => s.erased)) return null
+  }
+  return `${file}: types only (erased before anything runs; typecheck checks them), so no suite`
+}
+
 export function codeLines(sides, lines) {
   // Unchanged lines paired across the revisions (base's line → head's, and back), from the diff.
   const changedOn = [new Set(lines.removed), new Set(lines.added)]

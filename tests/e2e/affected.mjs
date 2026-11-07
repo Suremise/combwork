@@ -15,7 +15,7 @@ import { execFileSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
 import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
-import { gitChangedLines, gitRevision, splitOf, unitSelection } from './affectedUnits.mjs'
+import { gitChangedLines, gitRevision, splitOf, typeOnlyChange, unitSelection } from './affectedUnits.mjs'
 import { narrowRelatedInTree } from './relatedTests.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
@@ -36,6 +36,8 @@ export const EVERYTHING = [
   'src/main/windows.ts',
   'src/main/workspace.ts',
   'src/main/sessions.ts',
+  // The Agent API (HI-2690 measured why it isn't split by route): 109 files hold a request, most through a helper whose
+  // path is `BASE + path` (lib.cjs's, every suite's own), which no selection can follow to the routes it reaches.
   'src/main/servers.ts',
   // Every Agent API route is matched through it (HI-2258).
   'src/main/routePattern.ts',
@@ -52,6 +54,8 @@ export const EVERYTHING = [
   'src/main/testQuiet.ts',
   // Every IPC call's errors and the Agent API's go through it (#845).
   'src/main/combworkError.ts',
+  // The Agent API's status of plain errors that aren't messages (HI-2704), beside it.
+  'src/shared/kindedError.ts',
   // The language (#767): chosen before every window starts, and every translated text goes through it.
   'src/main/i18n.ts',
   'src/renderer/src/i18n.ts',
@@ -129,12 +133,9 @@ export const EVERYTHING = [
  */
 export const AREAS = [
   { paths: ['tests/e2e/codexDiagnostics.cjs'], suites: ['codex-background'] },
-  { paths: ['src/main/ptyHost.ts', 'src/main/sessions.ts'], suites: ['stopswitch', 'replysize', 'quit', 'copilotsize', 'termsize'] },
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts', 'src/main/ptyHost.ts', 'src/shared/agentProcesses.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/linger.cjs'], suites: ['leftovers', 'leftovers-restart', 'unexpectedclose-leftovers'] },
-  { paths: ['tests/e2e/fake-claude/devapp/'], suites: ['leftovers-restart'] },
   { paths: ['tests/scenarios/harness.cjs', 'tests/e2e/folderProcesses.cjs', 'tests/e2e/fake-claude/linger.cjs', 'src/main/progressReporters/'], suites: ['scenarioteardown'] },
   { paths: ['tests/e2e/folderProcesses.cjs', 'tests/e2e/leftCopies.mjs', 'tests/e2e/lanes.mjs'], suites: ['harnessleftovers'] },
-  { paths: ['src/renderer/src/commitWatch.ts', 'src/renderer/src/commitLoop.tsx', 'src/shared/commitWatch.ts'], suites: ['commitburst'] },
   // HI-2379: a shared folder's attribution of a burst of merged commits, and main's stall while it runs.
   { paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/platform/observe.ts'], suites: ['mergeburst'] },
   // The real CLIs' background processes (#515): only when what tracks them changes, not with every sessions.ts change.
@@ -155,6 +156,7 @@ export const AREAS = [
   { paths: ['src/main/advanced.ts'], suites: ['replysize', 'assistantsettings'] },
   // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
+  { paths: ['tests/e2e/toolsides.cjs', 'src/shared/assistantTools.ts', 'src/main/mcp/cw-mcp.ts', 'src/main/sessions.ts', 'src/shared/workflow/roles.ts', 'src/main/launchSides.ts', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['toolsides', 'replysize'] },
   { paths: ['src/main/providers/antigravity/', 'src/shared/antigravity.ts', 'tests/e2e/fake-agy/'], suites: ['antigravity'] },
   { paths: ['src/main/assistantMemory.ts', 'src/shared/assistantMemory.ts', 'src/renderer/src/components/AssistantMemory.tsx', 'src/renderer/src/components/AssistantView.tsx'], suites: ['assistantmemory', 'assistantimages'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
@@ -324,6 +326,7 @@ export const AREAS = [
   // P5's acceptance (#1358): S55's lane, the scenarios first proven in the app, one queue runner across copies of Combwork.
   { paths: ['tests/e2e/p5lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/lineUpdates.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p5lane'] },
   // P6's acceptance (#1425): a project from added to Done through the Version Control tab, Solo, all off, S19 and S20.
+  { paths: ['src/main/workflow/retarget.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/retarget.cjs'], suites: ['retarget'] },
   { paths: ['tests/e2e/p6lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/workflow/presetStep.ts', 'src/renderer/src/components/PresetStep.tsx', 'src/main/workflow/platformSwitch.ts', 'src/renderer/src/boardStages.ts', 'src/main/laneStart.ts', 'src/main/workflow/optionsForm.ts'], suites: ['p6lane'] },
   // P7's acceptance (#1448): Team 6×6 on slots with review copies, two lanes, S42, S43, the pool, Resume All and restart.
   { paths: ['tests/e2e/p7lane.cjs', 'tests/e2e/queueFixture.cjs', 'src/main/laneStart.ts', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotCards.ts', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/reviewCopies.ts', 'src/main/agentFolders.ts'], suites: ['p7lane'] },
@@ -570,8 +573,6 @@ export const AREAS = [
   { paths: ['src/main/codexChecks.ts'], suites: ['connections-codex', 'codexownhooks'] },
   // The CLI's own setting and the Assistant's other MCP servers (#1284).
   { paths: ['src/shared/cliOwnMode.ts', 'src/renderer/src/components/PermissionMode.tsx', 'src/main/providers/claude/', 'tests/e2e/cliownmode.cjs'], suites: ['cliownmode'] },
-  // The run context: every suite (above); isolation checks what it gives a test Combwork and the children a suite starts.
-  { paths: ['tests/e2e/runContext.cjs', 'src/main/testQuiet.ts'], suites: ['isolation'] },
   // A typed prompt's line breaks for Codex (HI-1327): the fake Codex's (codexnewline) and the real one's (codex-newline).
   { paths: ['tests/e2e/codexnewline.cjs', 'tests/e2e/codex-newline.cjs', 'src/shared/terminalInput.ts', 'src/main/providers/codex/'], suites: ['codexnewline', 'codex-newline'] },
   // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
@@ -606,8 +607,6 @@ export const AREAS = [
   { paths: ['src/main/workerThreads.ts', 'src/main/places.ts', 'src/main/usageWorker.ts', 'src/main/gitWorker.ts', 'src/main/repoLockWorker.ts', 'src/main/walCheckpointWorker.ts', 'src/main/codexLogWorker.ts', 'src/main/noneBaselineWorker.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/packaged-workers.cjs'], suites: ['packaged-workers'] },
   // Session records in the workspace's database (#1061): the suites that read or write them, Remove from Combwork and Repair.
   { paths: ['src/main/sessionStore.ts', 'tests/e2e/storeDocs.cjs', 'src/main/schema/sessionDeliveryTables.ts', 'src/main/schema/sessionDeliveryCodec.ts', 'tests/e2e/sessionDeliveryCodec.cjs'], suites: ['agents', 'assistantimages', 'assistantmode', 'cardchip', 'overview', 'providerdetect', 'quit', 'restart', 'resume', 'review', 'safeguards', 'sessionname', 'sessioncleanup', 'sessionorigin', 'sessionsize', 'sessiontree', 'wtrecreate', 'storage', 'transcript', 'wsmove', 'changespicker', 'dialogs', 'files', 'i18nlive', 'performance', 'projectrename', 'wsoverview', 'removeall', 'codex', 'codex-handover'] },
-  // Background tasks read from Claude Code's transcript (#640: one the agent stopped wakes nothing).
-  { paths: ['src/main/providers/claude/background.ts'], suites: ['background', 'turnledger', 'idlestatus'] }
 ]
 
 /** Whether a repo path is under one of these paths (a file, or a folder ending in /). Case-insensitive, / separators. */
@@ -633,7 +632,7 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * What only the unit tests use (#390): Vitest's config, CI's workflow (it runs npm test, lint and typecheck, never an e2e
  * suite) and the unit tests' helpers in tests/ (electron-stub.ts, tempDir.ts…; no e2e suite or scenario loads a .ts
  * file from there, which tests/e2esuites.test.ts checks), and the sleeps checker (npm run test:waits: its unit test
- * and a scenario use it, no e2e suite). The i18n tooling too (#768): extracting, checking and counting translations and
+ * and a scenario use it, no e2e suite), with its ready-waits rule (readyWaits.mjs, HI-2688). The i18n tooling too (#768): extracting, checking and counting translations and
  * the guard against new hard-coded text (npm test and CI run them; the app never reads them, nor the guard's allowlists
  * in i18n/allow/), and each area's i18n unit tests (tests/i18n/). Agent text's extract script and guard likewise
  * (HI-2065), with the guard's lists in agent-text/allow/. tests/progressReport.mts and tests/runTemp.mts are the runners' and in
@@ -642,8 +641,10 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * board's since its cards step, #1209, as the fact store and the actions worker do since #1215). The dialects service
  * (src/main/dialects) has its area since card 6b (HI-2443) wired it into sessions. The dialect-only release's rules
  * (scripts/dialectRelease.mjs, HI-2442: release.mjs runs them, tests/dialectRelease.test.ts tests them) are unit-only.
+ * So are the Windows Sandbox checks' own files (tests/sandbox/, HI-2690): no e2e suite or scenario loads or reads them
+ * (tests/e2esuites.test.ts checks), the Sandbox runs them on a packaged build, and UNIT_SCANS selects their unit tests.
  */
-export const UNIT_ONLY = ['scripts/dialectRelease.mjs', 'tests/oldNames.mjs', 'tests/oldNamesAllow.json', 'tests/presenceChecks.mjs', 'tests/presenceAllow.json', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
+export const UNIT_ONLY = ['tests/sandbox/', 'scripts/dialectRelease.mjs', 'tests/oldNames.mjs', 'tests/oldNamesAllow.json', 'tests/presenceChecks.mjs', 'tests/presenceAllow.json', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/readyWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
 
 /** Whether a file is a unit test (tests/*.test.ts, their helpers and fixtures, UNIT_ONLY): npm test covers it, no e2e suite. */
 export const unitTest = (f) => /^tests\/[^/]+\.ts$/i.test(f) || under(f, UNIT_ONLY) || (/^tests\/fixtures\//i.test(f) && !FAKE_FIXTURES.includes(f))
@@ -674,22 +675,43 @@ export const REAL_TIER = [
 ]
 const PROVIDER_OWN = ['src/main/providers/claude/', 'src/main/providers/codex/', 'src/main/providers/copilot/']
 
+/** At most this many reasons a suite (`because`, HI-2690's D5): the first ones, in the changed files' order. */
+export const REASONS_PER_SUITE = 3
+
+/** affectedSuites' reasons as lines, `suite: reason; reason`, in the suites' order (none for every suite). */
+export const becauseLines = (affected) => (affected.all ? [] : affected.suites.map((s) => `${s}: ${(affected.because?.[s] ?? []).join('; ') || 'picked'}`))
+
 /**
  * The suites a set of changed files needs, from the known suite names (realNames: those that start a real CLI):
  * { all: true, why, real } when every fake suite is needed (real: the real-CLI suites also needed), else
- * { suites, why } (why: a line per reason). A real-CLI suite is needed when an area names it, its own file changed, or
- * a file in REAL_TIER (or one no area names) changed. Only DOCS_ONLY files and unit tests select nothing.
+ * { suites, why, because } (why: a line per reason; because: { suite: up to REASONS_PER_SUITE reasons it was picked,
+ * deduplicated, in the files' order }, for a ledger's boundary analysis to cite). A real-CLI suite is needed when an
+ * area names it, its own file changed, or a file in REAL_TIER (or one no area names) changed. DOCS_ONLY files, unit
+ * tests and a change of types only (units[file].typeOnly, splitSelections: HI-2690's D1) select nothing.
  */
 export function affectedSuites(files, suiteNames, realNames = [], units = {}) {
   const picked = new Set()
+  const because = new Map()
   const why = []
   let all = null
   let allReal = null
+  const pick = (s, reason) => {
+    picked.add(s)
+    if (!because.has(s)) because.set(s, [])
+    const r = because.get(s)
+    if (r.length < REASONS_PER_SUITE && !r.includes(reason)) r.push(reason)
+  }
   for (const raw of files) {
     const file = raw.replace(/\\/g, '/')
+    const u = units[file]
+    // Types only: erased before anything runs, so no suite, the real tier's included.
+    if (u?.typeOnly) {
+      why.push(u.typeOnly)
+      continue
+    }
     const own = /^tests\/e2e\/([^/]+)\.cjs$/i.exec(file)
     if (own && suiteNames.includes(own[1])) {
-      picked.add(own[1])
+      pick(own[1], `${file}: its own suite`)
       why.push(`${file}: its own suite`)
       continue
     }
@@ -697,11 +719,17 @@ export function affectedSuites(files, suiteNames, realNames = [], units = {}) {
     const areas = AREAS.filter((a) => under(file, a.paths))
     // A SPLIT file (affectedUnits.mjs), by the units its change touches, when the caller worked them out (its areas'
     // suites are in that, when its change needs them).
-    const u = units[file]
-    if (!u || u.all) for (const a of areas) for (const s of a.suites) picked.add(s)
+    if (!u || u.all) for (const a of areas) for (const s of a.suites) pick(s, `${file} (its area)`)
     if (under(file, EVERYTHING)) {
       if (u && !u.all) {
-        for (const s of u.suites) picked.add(s)
+        // Each suite's trail from unitSelection's lines (`file: unit → consumer: suites`); else the file's changed parts.
+        const trails = new Map()
+        for (const w of u.why) {
+          const m = /^(.*): ([^:]*)$/.exec(w)
+          if (!m || !m[1].includes(' → ')) continue
+          for (const s of m[2].split(', ')) if (!trails.has(s)) trails.set(s, m[1])
+        }
+        for (const s of u.suites) pick(s, trails.get(s) ?? `${file}: by its changed parts (its areas or a seam)`)
         why.push(`${file}: by its changed parts: ${u.suites.length ? [...new Set(u.suites)].join(', ') : 'no suite'}`, ...u.why.map((w) => `  ${w}`))
         continue
       }
@@ -719,7 +747,9 @@ export function affectedSuites(files, suiteNames, realNames = [], units = {}) {
   }
   const real = realNames.filter((n) => allReal || picked.has(n))
   if (all) return { all: true, why: [all, ...(allReal ? [allReal] : [])], real }
-  return { suites: suiteNames.filter((n) => picked.has(n) || (allReal && realNames.includes(n))), why: [...why, ...(allReal ? [allReal] : [])] }
+  const suites = suiteNames.filter((n) => picked.has(n) || (allReal && realNames.includes(n)))
+  if (allReal) for (const s of realNames) if (!picked.has(s)) pick(s, allReal)
+  return { suites, why: [...why, ...(allReal ? [allReal] : [])], because: Object.fromEntries(suites.map((s) => [s, because.get(s) ?? []])) }
 }
 
 /**
@@ -745,10 +775,22 @@ export function placeReference(file, suiteNames) {
  */
 export function splitSelections(files, { cwd = process.cwd(), base, head = null, suiteNames }) {
   const out = {}
-  const split = [...new Set(files.map((f) => f.replace(/\\/g, '/')))].filter((f) => splitOf(f))
-  if (!split.length) return out
+  const all = [...new Set(files.map((f) => f.replace(/\\/g, '/')))]
+  const typed = all.filter((f) => /\.(ts|tsx|mts|cts)$/i.test(f))
+  const split = all.filter((f) => splitOf(f))
+  if (!split.length && !typed.length) return out
   const revs = { base: gitRevision(cwd, base), head: gitRevision(cwd, head) }
+  // A TypeScript file changed in its types alone selects nothing (HI-2690's D1); one this can't tell about, as usual.
+  for (const file of typed) {
+    try {
+      const t = typeOnlyChange({ file, ...revs, lines: gitChangedLines(cwd, base, head, file) })
+      if (t) out[file] = { typeOnly: t, all: null, suites: [], why: [] }
+    } catch {
+      // As usual: its selection below, or its areas'.
+    }
+  }
   for (const file of split) {
+    if (out[file]?.typeOnly) continue
     try {
       out[file] = unitSelection({ file, ...revs, lines: gitChangedLines(cwd, base, head, file), place: (f) => placeReference(f, suiteNames), areaSuites: (f) => [...new Set(AREAS.filter((a) => under(f, a.paths)).flatMap((a) => a.suites))] })
     } catch (e) {
@@ -777,6 +819,21 @@ export function changedFiles(base = 'main', cwd = process.cwd()) {
 // changed part (relatedTests.mjs, HI-2677: every related test where it can't tell); and UNIT_SCANS, for the tests that read the
 // repository by `git ls-files`, folder scans or file reads rather than imports, which the import graph can't see.
 // The e2e suites are affectedSuites' (above): a change it can't place means every test.
+
+/**
+ * The test files `npm run check:repo` runs by test name (its `vitest run … -t "…"` run), from package.json, as
+ * tests/checkRepo.test.ts reads its script: null when it isn't in that form (the caller then takes every test file).
+ */
+export function checkRepoNamed(packageText = null) {
+  try {
+    const text = packageText ?? readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+    const script = JSON.parse(text).scripts?.['check:repo'] ?? ''
+    const m = /vitest run ((?:tests\/\S+\.test\.ts\s+)+)-t "/.exec(script)
+    return m ? m[1].trim().split(/\s+/) : null
+  } catch {
+    return null
+  }
+}
 
 /**
  * The unit tests that read the repository rather than import it, and the changes that can break them. Each entry:
@@ -840,9 +897,9 @@ export const UNIT_SCANS = [
   { test: 'tests/i18nCatalogues.test.ts', paths: ['src/'], lines: ['msg\\(', '\\btr\\(', 'tRich\\(', 'defaultMessage', 'description', '\\bid:'] },
   // A real file and its allowlist (Board.tsx's); the whole source is the CLI's (check:repo, CI), not this test's (HI-2663).
   { test: 'tests/i18nGuard.test.ts', paths: ['src/renderer/src/components/Board.tsx', 'i18n/allow/'] },
-  // Agent text (HI-2065): the guard against new hard-coded agent text over src/ and its lists; the catalogue and schema
-  // extracted from the agentMsg() descriptors, current.
-  { test: 'tests/agentTextGuard.test.ts', paths: ['src/', 'agent-text/allow/'] },
+  // Agent text (HI-2065): two real files and their lists; the whole source is the CLI's (check:repo, CI), not this
+  // test's (HI-2689). The catalogue and schema extracted from the agentMsg() descriptors, current.
+  { test: 'tests/agentTextGuard.test.ts', paths: ['src/shared/combworkGuidance.ts', 'src/shared/toolReplies.ts', 'agent-text/allow/'] },
   { test: 'tests/agentText.test.ts', paths: ['agent-text/catalogue/', 'agent-text/schema/'] },
   // HI-2457: agentTextSchema() against the schema area files on disk; each glob user's source read (none imported but schema.ts).
   { test: 'tests/globCache.test.ts', paths: ['agent-text/schema/', 'src/main/installDir.ts', 'src/shared/i18n/catalogues.ts'] },
@@ -875,11 +932,19 @@ export const UNIT_SCANS = [
   // The clean-install check's step (HI-2592): the English text, IPC channels, palette commands and Settings selectors it
   // uses, and StartOptions' prompt, which gives the agent its first task.
   { test: 'tests/sandboxClean.test.ts', paths: ['locales/en/', 'src/shared/api.ts', 'src/renderer/src/commands.ts', 'src/renderer/src/components/ui.tsx', 'src/main/sessions.ts'] },
+  // The Windows Sandbox checks' own files (HI-2690's D3: no e2e suite runs them): their unit tests load them by
+  // require, which Vitest's graph may not follow, and read the scripts inside as text.
+  { test: 'tests/sandboxChecks.test.ts', paths: ['tests/sandbox/'] },
+  { test: 'tests/sandboxClean.test.ts', paths: ['tests/sandbox/'] },
+  { test: 'tests/sandboxCompare.test.ts', paths: ['tests/sandbox/'] },
+  { test: 'tests/sandboxReport.test.ts', paths: ['tests/sandbox/'] },
   // The bundled skills and modes (resources/), and the guidance that names them.
   { test: 'tests/assistant.test.ts', paths: ['resources/modes/'] },
   { test: 'tests/modeDescriptions.test.ts', paths: ['resources/modes/'] },
   { test: 'tests/skills.test.ts', paths: ['resources/skills/'] },
   { test: 'tests/retention.test.ts', paths: ['resources/skills/'] },
+  // Each side's skill files name only the tools offered to that side (HI-2664).
+  { test: 'tests/toolSides.test.ts', paths: ['resources/skills/'] },
   { test: 'tests/bundled.test.ts', paths: ['resources/', 'src/main/bundledHistory.json'] },
   { test: 'tests/bundledrace.test.ts', paths: ['resources/'] },
   // The shipped dialect files (HI-2442): each one's form, model and schema, and their sync into a workspace.
@@ -894,8 +959,12 @@ export const UNIT_SCANS = [
   // deleted, or a describe or test renamed in a file it runs by name.
   { test: 'tests/checkRepo.test.ts', paths: ['package.json'] },
   { test: 'tests/checkRepo.test.ts', paths: ['tests/'], adds: true },
-  { test: 'tests/checkRepo.test.ts', paths: ['tests/admission.test.ts', 'tests/bundled.test.ts', 'tests/e2esuites.test.ts', 'tests/folderProcesses.test.ts', 'tests/i18nCatalogues.test.ts'], lines: ['\\bdescribe\\(', '\\bit\\('] },
+  // The files check:repo runs by test name (its `-t` run), read from package.json as checkRepo.test.ts reads them
+  // (HI-2689): unreadable there, every test file.
+  { test: 'tests/checkRepo.test.ts', paths: checkRepoNamed() ?? ['tests/'], lines: ['\\bdescribe\\(', '\\bit\\('] },
   // This table's own check: a test file added, or one starting to scan the repository.
+  // The hubs most tests reach must stay known to the unit picker's gate (HI-2697): their text, not their imports.
+  { test: 'tests/relatedTests.test.ts', paths: ['src/main/workflow/launcher.ts', 'src/main/workflow/gitHost.ts', 'src/main/mcp/cw-mcp.ts', 'src/renderer/src/commitLoop.tsx', 'src/renderer/src/commitWatch.ts', 'src/renderer/src/windowHealth.ts'] },
   { test: 'tests/focusedPick.test.ts', paths: ['tests/'], adds: true },
   { test: 'tests/focusedPick.test.ts', paths: ['tests/'], lines: ['ls-files', 'readdir', '\\bglob'] }
 ]
@@ -937,7 +1006,8 @@ export function pickTests({ paths, added = [], deleted = [], diffLines = {}, sui
   ]
   const ids = tests.map((t) => t.test)
   if (ids.some((id) => !id) || new Set(ids).size !== ids.length) throw new Error(`picked an empty or repeated test id: ${ids.join(', ')}`)
-  return { tests, why: [...unit.values(), ...affected.why] }
+  // Its stderr lines: the unit tests' reasons, the suites', then why each suite (HI-2690: stdout stays the JSON lines).
+  return { tests, why: [...unit.values(), ...affected.why, ...becauseLines(affected).map((l) => `why ${l}`)] }
 }
 
 /**

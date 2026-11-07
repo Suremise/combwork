@@ -107,6 +107,9 @@
   "activity.undo.request": {
     "placeholders": {}
   },
+  "activity.undo.retargeted": {
+    "placeholders": {}
+  },
   "activity.undo.retriedMerge": {
     "placeholders": {}
   },

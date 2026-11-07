@@ -123,7 +123,10 @@ own, or one under 5 s with no comment, and sleeps that a check follows within th
 above saying why. A change anywhere in a multiline wait counts, including removing its timeout. Existing findings
 are left to the full audit (HI-2491), so unrelated cards can run this lean builder check. It exits 1 when there is a
 new or changed finding, and 2 when it can't compare (no `main`, a bad `--base`, git failing): nothing was
-checked, so that isn't a pass. Only the first check after a sleep counts, and the sleep is let through only when that
+checked, so that isn't a pass. Its last step (`scripts/readyWaits.mjs`, HI-2688) finds an e2e suite's new or changed
+wait for an agent's `status === 'ready'` with no comment: after a turn a fake is `finished`, so that wait runs out at its
+bound, unchecked; use `lib.agentIdle(inv, agentId, ms)`, and say in a comment why `ready` is right where it is (before
+any turn). Only the first check after a sleep counts, and the sleep is let through only when that
 check itself waits (`until`, `waitFor`, `poll`): a wait in a later check doesn't cover an earlier one. A short sleep
 needs its comment like a long one. A pause inside a loop that polls state is the loop's way of
 waiting for its condition, so it isn't counted: one whose `while` (or `do…while`) condition reads state, or whose body
@@ -157,6 +160,8 @@ The waits found along the way cost more than any duplicate: `lib.until` now says
 | Test harness | the runner's second process listing after each suite | `stopProcessesIn` takes `endCopies`' listing when nothing was ended; listed again after an ending (each still by pid and start time) | **measured** per listing 0.9–1.0 s: about 1 s a suite, ~6 min of the runner's thread per full set |
 | Test harness | `failfast.cjs` | `windowsExits.test.ts`: the reporting it checked, and its one real-child check (0xc0000142, Windows only) | **measured** 1 s, one suite slot |
 | Repository guards | `i18nGuard.test.ts`'s scan of the whole source against its merge base | `node scripts/i18nGuard.mjs` (check:repo, CI's `i18n:guard`), which now also fails on CI without a merge base, the test's one extra assertion | **measured** about 11 s a full unit run, and one per change to `src/` it picked |
+| Repository guards | `agentTextGuard.test.ts`'s scan of the whole source against its merge base (HI-2689) | `node scripts/agentTextGuard.mjs` (check:repo, and CI's new `agent-text:guard` step); the test keeps its rules' cases and two real files | **measured** about 7 s a full unit run, and one per change to `src/` it picked |
+| Test harness | 5 AREAS entries whose paths are all in EVERYTHING and whose suites are all fake (they selected nothing: any change there runs every suite) (HI-2689) | EVERYTHING; `commitburst` and `isolation`, left in no area, say what of it they cover (`everything` in suites.mjs) | upkeep only, no run time |
 | Git and the merge queue | `mergestrict.cjs` (S55's strict part) | `p5lane` Lane A (strict's update, carried, both trailers, the slot untouched, notUpToDate, resumed), with mergestrict's two checks moved there (the update ref dropped; the Work section's hunks, the card's side first); `queueStrict.test.ts` | **measured** 22 s |
 | Workflow and lanes | `p7lane`'s part C (everyone in the project folder with the pool) | `reviewerpool` section 2, with its checks moved there (no slot lent, the builder's and the reviewer's folder); `reviewcopies` (a Codex reviewer's copy at the revision) | estimated 15–20 s |
 | Usage and progress | `progresstabs`' real one-minute wait for the "long" lane wait | the same rendered transition, the window's clock moved on past the bound (`page.clock`); `laneBar.test.ts` the bound's arithmetic | **measured** 154 → 97 s |

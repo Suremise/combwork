@@ -33,6 +33,8 @@ const state = vi.hoisted(() => ({
   pending: new Set<string>(),
   /** Running agents whose hooks aren't arriving: `readyFor` refuses them a line (HI-2333). */
   hooksMissing: new Set<string>(),
+  /** Running with its old side's tools (HI-2664: made a reviewer, not restarted since): sessions.sideAllows false. */
+  oldTools: new Set<string>(),
   deliveries: [] as { id: string; agentId: string; source?: string; ref?: string; state: string; body: string }[],
   /** The next deliveries: given, or not (its agent got busy: cancelled). */
   next: [] as ('given' | 'notGiven')[],
@@ -67,6 +69,7 @@ vi.mock('../src/main/projectKeys', async (orig) => ({ ...(await orig<object>()),
 vi.mock('../src/main/sessions', async (orig) => {
   const actual = await orig<typeof import('../src/main/sessions')>()
   const stub = {
+    sideAllows: (_p: string, a: string) => !state.oldTools.has(a),
     liveFor: (_p: string, a: string) => (state.running.has(a) ? { status: state.status.get(a) ?? (state.busy.has(a) ? 'working' : 'ready'), sessionId: `s-${a}`, cwd: '', ...(state.hooksMissing.has(a) ? { hooksMissing: true } : {}) } : null),
     agentNow: (_p: string, a: string) => (state.running.has(a) ? { status: state.status.get(a) ?? (state.busy.has(a) ? 'working' : 'ready'), pending: false, backgroundTasks: state.background.has(a) ? 1 : 0 } : null),
     // As the real one: its `allowed` just before it spawns, after its own awaits (HI-2046).
@@ -115,7 +118,7 @@ afterEach(() => {
   lives.clear()
   env?.close()
   env = null
-  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null, manualBoard: null })
+  Object.assign(state, { enforced: true, wf: null, lanes: [], busy: new Set(), running: new Set(), status: new Map(), background: new Set(), runs: new Set(), pending: new Set(), hooksMissing: new Set(), oldTools: new Set(), deliveries: [], next: [], refuse: new Set(), onRefused: null, calls: [], beforeSpawn: null, manualBoard: null })
   // Nothing armed by this test outlives it (HI-2360).
   expect(poolTestHooks.retriesPending()).toBe(0)
 })
@@ -1021,7 +1024,9 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
     ['watching, with background tasks', () => (state.status.set('R1', 'watching'), state.background.add('R1'))],
     ['watching, with a run going', () => (state.status.set('R1', 'watching'), state.runs.add('R1'))],
     // The delivery would refuse it a line (readyFor): never given, so no pass tries again at once (HI-2333's e2e loop).
-    ['watching, its hooks not arriving', () => (state.status.set('R1', 'watching'), state.hooksMissing.add('R1'))]
+    ['watching, its hooks not arriving', () => (state.status.set('R1', 'watching'), state.hooksMissing.add('R1'))],
+    // Made a reviewer while it ran and not restarted since (HI-2664, HR3's round 1: Later): no reviewer's tools yet.
+    ['made a reviewer while running, its builder tools still loaded', () => (state.status.set('R1', 'watching'), state.oldTools.add('R1'))]
   ])('a reviewer %s is still not free: given the card once that ends', async (_what, hold) => {
     const e = (env = setup({ ...optionsFor(1, 'pool', 'project'), platform: 'git' }, { autoRun: false }))
     state.wf = e.wf
@@ -1032,7 +1037,7 @@ describe('a reviewer watching a card is free for the pool (HI-2333): only what i
     await pass(e, ONE)
     expect(assignedTo(e, a.id)).toEqual([])
     expect(state.calls).toEqual([])
-    Object.assign(state, { status: new Map([['R1', 'watching']]), pending: new Set(), background: new Set(), runs: new Set(), hooksMissing: new Set() })
+    Object.assign(state, { status: new Map([['R1', 'watching']]), pending: new Set(), background: new Set(), runs: new Set(), hooksMissing: new Set(), oldTools: new Set() })
     await pass(e, ONE)
     await pass(e, ONE)
     expect(assignedTo(e, a.id)).toEqual(['R1'])

@@ -63,7 +63,7 @@ const check = (name, ok, extra = '') => {
     const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
     const staleAgent = await lib.addAgent(inv, alpha, { name: 'Stale' })
     await lib.addAgent(inv, alpha, { name: 'Reviewer' })
-    await lib.addAgent(inv, alpha, { name: 'Checker' })
+    await lib.addAgent(inv, alpha, { name: 'Checker', workflowRole: 'reviewer' })
     const running = [idle, busy, builder, staleAgent]
     for (const a of running) await inv('session:start', alpha, { agentId: a.id })
     const statuses = async () => (await Promise.all(running.map((a) => live(a.id)))).map((s) => s?.status)

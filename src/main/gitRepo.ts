@@ -675,7 +675,7 @@ async function changeFolder<T>(projectPath: string, action: GitFolderAction, bra
         // The slot is this action's own now (asUser refuses when anyone else holds or waits for it); without a branch to
         // hold it for (a detached HEAD), the slots are checked again too.
         const now = folderBusyData(await folderAgents(projectPath), branch ? [] : folderSlots(projectPath), action)
-        if (now) throw new CombworkError(now)
+        if (now) throw new CombworkError(now, { kind: 'conflict' })
         return fn()
       }), { project: projectPath }
     )

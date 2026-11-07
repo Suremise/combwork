@@ -46,7 +46,7 @@ import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
 import { e2eProgress, slotWaitProgress } from '../progressReport.mts'
 import { SUITES } from './suites.mjs'
-import { affectedSuites, changedFiles, mergeBase, splitSelections } from './affected.mjs'
+import { affectedSuites, becauseLines, changedFiles, mergeBase, splitSelections } from './affected.mjs'
 import { CLI_LOG, fingerprint, readCliLog, realCliHomes, realCliVersions, recordJson, recordMarkdown, selectionOf, waitsLine, waitsRanOut } from './record.mjs'
 import { LANG_SUITE, isRealCli, keepLimits, needsDevBuild, packagedStatus, parentSuite, parseArgs, portBase, realNotRun, repeatStatus, packagedPlan, resultLines, selectSuites, suiteLimitMs, suiteOutcome } from './runner.mjs'
 import { devBuild, ensureBuild } from './build.mjs'
@@ -137,6 +137,11 @@ if (opts.affected) {
   if (affected.all) console.log(`Affected since ${opts.affected}: every fake suite (${affected.why[0]})${affected.real.length ? `, and the real tier's ${affected.real.join(', ')}` : ''}`)
   else console.log(`Affected since ${opts.affected}: ${affected.suites.length ? affected.suites.join(', ') : 'none'}`)
   for (const w of affected.all ? affected.why.slice(1) : affected.why) console.log(`  ${w}`)
+  // Why each suite was picked (HI-2690): a line a suite, for a coverage ledger's boundary analysis to cite.
+  if (!affected.all && affected.suites.length) {
+    console.log('Why each suite:')
+    for (const l of becauseLines(affected)) console.log(`  ${l}`)
+  }
 }
 const chosen = selectSuites(SUITES, opts, affected)
 // How they were picked, for the record (#628): the full set, or what --affected selected and why.

@@ -58,9 +58,11 @@ const until = (fn, ms = 10000) => lib.until(fn, ms, 150)
   await lib.openWorkspace(inv, page, ws)
   await page.getByText('alpha', { exact: true }).first().click()
   await lib.waitForProvider(inv)
-  const b1 = await lib.addAgent(inv, alpha, { name: 'B1', location: 'new-worktree' })
-  const r1 = await lib.addAgent(inv, alpha, { name: 'R1' })
-  const b3 = await lib.addAgent(inv, alpha, { name: 'B3', location: 'new-worktree' })
+  // Roles explicit (HI-2705): a lane's parts follow them (HI-2664's (A)). R1 reviews B1's and B3's lanes and builds
+  // one of its own (no reviewer), so it is an either-role agent; a reviewer-role R1 is refused that lane.
+  const b1 = await lib.addAgent(inv, alpha, { name: 'B1', location: 'new-worktree', workflowRole: 'builder' })
+  const r1 = await lib.addAgent(inv, alpha, { name: 'R1', workflowRole: 'either' })
+  const b3 = await lib.addAgent(inv, alpha, { name: 'B3', location: 'new-worktree', workflowRole: 'builder' })
   const live = async (id) => (await inv('session:live')).find((s) => s.agentId === id)
   // Their folders trusted, so the fake Claude Code starts at its prompt.
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha, b1.worktree?.path, b3.worktree?.path].filter(Boolean).map((d) => d.toLowerCase())))

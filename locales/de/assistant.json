@@ -741,6 +741,7 @@
   "assistant.undo.why.removedFromQueue": "Das Entfernen aus der Merge-Warteschlange bleibt in der Arbeit der Karte: Sie kommt nur durch „Merge wiederholen“ wieder in die Warteschlange oder wenn sie erneut genehmigt wird.",
   "assistant.undo.why.reportMerge": "Der gemeldete Merge bleibt in der Arbeit der Karte.",
   "assistant.undo.why.request": "Seine Anfrage an den Bearbeiter bleibt als Kommentar.",
+  "assistant.undo.why.retargeted": "Karten und Slots, die er auf das neue Ziel eines Projekts umgestellt hat, werden nicht zurückgestellt: Setze „Wird gemergt in“ einer Karte erneut, wenn sie zurück soll.",
   "assistant.undo.why.retriedMerge": "Sein „Merge wiederholen“ bleibt in der Arbeit der Karte.",
   "assistant.undo.why.slotReleased": "Ein freigegebener Slot wird nicht wieder behalten oder belegt: Die nächste Arbeit, die einen Slot braucht, kann ihn nehmen.",
   "assistant.undo.why.start": "Der Start bleibt in der Arbeit der Karte: Rückgängig verschiebt die Karte zurück, macht den Start aber nicht ungeschehen.",

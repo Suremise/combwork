@@ -629,7 +629,9 @@ describe('the other bundled skills follow the gates (#1526)', () => {
       if (name === 'use-cw-api') expect(skill.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size + 250)
       else expect(text.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size)
     }
-    expect(catalog.get('use-cw-api')!.refs.get('tools.md')!.replace(/\r/g, '').length).toBeLessThanOrEqual(23000)
+    // 24,000 since HI-2696: 1.2.0's had reached 23,015 (HI-2556's targets, HI-2670's roles and launch settings), and the
+    // detail of six parameters' descriptions moved here to keep the tools' budgets (toolLimits.cjs), about 750 more.
+    expect(catalog.get('use-cw-api')!.refs.get('tools.md')!.replace(/\r/g, '').length).toBeLessThanOrEqual(24000)
   })
 
   it("split-work plans by files around the project's own option for where cards are built, and leaves the order to blockedBy", () => {

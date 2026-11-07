@@ -869,6 +869,11 @@
     "note": "Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name.",
     "audience": "both"
   },
+  "service.workflow.targetInUse": {
+    "text": "{branch} can’t be taken out of Other branches work can merge into while these use it: {uses}. Retarget or finish them first.",
+    "note": "HI-2680: a save of workflow options refused: it takes a branch out of Other branches work can merge into while cards, lanes, queue entries or slots still use it ({uses}: their keys and names). Other branches work can merge into is the option’s name: as translated there.",
+    "audience": "both"
+  },
   "service.workspace.advancedNotHere": {
     "text": "{setting} can't be set for a workspace.",
     "note": "An error: the advanced setting {setting} (its title, or its id) has no value of its own for a workspace, only for Combwork.",

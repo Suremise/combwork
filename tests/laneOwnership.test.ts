@@ -98,7 +98,7 @@ describe('Combwork owns the lane (lanes.ts, #1270)', () => {
   beforeAll(async () => {
     mkdirSync(join(project, '.combwork'), { recursive: true })
     writeFileSync(join(project, 'a.txt'), 'a\n')
-    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1' }] }))
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1', workflowRole: 'either' }] }))
     // Another project, for a card moved there and back (HI-1821).
     mkdirSync(join(wsPath, 'beta', '.combwork'), { recursive: true })
     writeFileSync(join(wsPath, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'c1', name: 'C1' }] }))

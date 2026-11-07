@@ -17,7 +17,7 @@ import * as actions from '../actions'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { call, errorMessage } from '../api'
 import { projectMergeChoice } from '../mergeChoice'
-import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
+import { agentProviderOf, bumpUnused, choose as askChoice, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
 import { msg, tr, tRich } from '@shared/i18n'
 import { ProviderIcon } from './ProviderIcon'
 import { cliReadyOf, ConnectionChoice, connectionCli, firstReadyConnection, noAccountHere, noAccountText, offeredConnections, useConnections } from './ConnectionChoice'
@@ -661,6 +661,22 @@ export function AgentSettingsDialog() {
           confirmed.current
         )
         await actions.refreshWorkspace()
+        // A new role gives it another side's tools (HI-2664, Darren's decision): restarted to load them, at once if it is
+        // idle; busy, asked first (restart when its turn is over, or later: it keeps its old tools until it restarts).
+        if (f.workflowRole !== initial.workflowRole) {
+          const r = await call('session:restartForSide', project.path, agent.id, 'ifIdle').catch(() => 'same' as const)
+          if (r === 'busy') {
+            const choice = await askChoice({
+              title: tr(msg({ id: 'agents.side.restartTitle', defaultMessage: 'Restart {agent} for its new role?', description: "Title of the question after an agent's workflow role was changed while it is working (HI-2664): it needs a restart to get its new role's tools. {agent} is its name." }), { agent: agent.name }),
+              message: tr(msg({ id: 'agents.side.restartMessage', defaultMessage: "{agent} is working. Its new role's tools load when it restarts; it carries on in the same conversation.", description: "The question after an agent's role was changed while it is working (HI-2664). {agent} is its name." }), { agent: agent.name }),
+              choices: [
+                { label: tr(msg({ id: 'agents.side.restartWhenDone', defaultMessage: 'Restart When Its Turn Is Over', description: 'Button (HI-2664): the agent restarts once its turn is over, in the same conversation, with its new role\'s tools.' })), value: 'restart' },
+                { label: tr(msg({ id: 'agents.side.later', defaultMessage: 'Later', description: 'Button (HI-2664): the agent keeps its old tools until it restarts.' })), value: 'later' }
+              ]
+            })
+            if (choice === 'restart') await call('session:restartForSide', project.path, agent.id, 'atSafePoint').catch(() => undefined)
+          }
+        }
       }}
       onClose={close}
     />

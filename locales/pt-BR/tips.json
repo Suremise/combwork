@@ -556,5 +556,7 @@
   "tips.perfFailures.title": "Recusado não é quebrado",
   "tips.perfFailures.text": "Desempenho → Falhas classifica o que não deu certo: erros reais em vermelho, à parte das chamadas que uma regra do fluxo de trabalho recusou e das chamadas erradas. Recusas e chamadas erradas por motivo mostra qual regra ou mensagem apareceu mais: uma descrição de ferramenta a deixar mais clara.",
   "tips.serverDiagnostics.title": "Um agente no Ollama só escreve texto?",
-  "tips.serverDiagnostics.text": "Verificar servidor… em uma conta de servidor, em Configurações → Contas e conexões, mostra o contexto real do modelo e testa uma chamada de ferramenta. Um contexto menor que o prompt do Claude Code é o motivo comum para um modelo local escrever uma chamada de ferramenta em vez de fazê-la."
+  "tips.serverDiagnostics.text": "Verificar servidor… em uma conta de servidor, em Configurações → Contas e conexões, mostra o contexto real do modelo e testa uma chamada de ferramenta. Um contexto menor que o prompt do Claude Code é o motivo comum para um modelo local escrever uma chamada de ferramenta em vez de fazê-la.",
+  "tips.retargetRelease.title": "Quando uma versão sai, passe o que sobrou para a próxima",
+  "tips.retargetRelease.text": "Vai mudar O trabalho é mesclado em de 1.1.0 para 1.2.0? Salvar… lista os cartões Todo e os slots livres ainda em 1.1.0 que podem passar para 1.2.0, e o que fica, com o motivo. Deixe Redirecionar também o que pode passar marcado para movê-los."
 }

@@ -362,6 +362,10 @@ interface CombworkMessageValues {
   'agents.settings.saving': undefined
   'agents.settings.title': { agent: string | number }
   'agents.settings.worktreeOn': { branch: string | number; base: string | number }
+  'agents.side.later': undefined
+  'agents.side.restartMessage': { agent: string | number }
+  'agents.side.restartTitle': { agent: string | number }
+  'agents.side.restartWhenDone': undefined
   'agents.start.exited': { cli: string | number; code: string | number }
   'agents.switch.confirm': undefined
   'agents.switch.detail': undefined

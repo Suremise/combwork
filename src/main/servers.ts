@@ -33,7 +33,7 @@ import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalle
 import type { HandoverAuthor } from '../shared/combworkGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
-import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { isSaid, say, sayWithId, type AgentMsg, type AgentValues, type Said as SaidText } from '../shared/agentText'
 import { API } from './apiText'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
@@ -93,6 +93,7 @@ import type { DeliverySender, InboxItem } from '../shared/deliveries'
 import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import { armIntentWatch } from './intentWatch'
+import { offeredItems, offeredRetarget, offerRetarget, retargetApply, retargetPreview } from './workflow/retarget'
 import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
@@ -131,7 +132,8 @@ import { hookTokenMatches, refusedHookNote } from './hookTokens'
 import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
-import { agentError, CombworkError, shownError } from './combworkError'
+import { agentError, CombworkError, SaidError, shownError } from './combworkError'
+import { KindedError } from '../shared/kindedError'
 import { agentField, agentText, type TextPart } from '../shared/advanced'
 import { storedForAgents } from '../shared/taskHistory'
 import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
@@ -167,11 +169,8 @@ function readBody(req: IncomingMessage, onChunk?: (bytes: number) => void): Prom
 }
 
 /** An agent message said for an error reply, with its id kept beside the text (HI-2681): what Performance records as its reason. */
-interface ApiSaid {
-  said: string
-  id: string
-}
-const apiSaid = (m: AgentMsg, values?: AgentValues): ApiSaid => ({ said: say(m, values), id: m.id })
+type ApiSaid = SaidText
+const apiSaid = (m: AgentMsg, values?: AgentValues): ApiSaid => sayWithId(m, values)
 
 class HttpError extends Error {
   /** The agent message it says, by id (HI-2681, metrics.ts reasonOf): never its text. */
@@ -190,7 +189,12 @@ class HttpError extends Error {
 }
 
 /** An error answered with another status: its message, and a CombworkError's text, so the reply says it in the caller's dialect. */
-const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => new HttpError(status, (e as Error).message, extra, e instanceof CombworkError ? e.text : undefined)
+const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => {
+  const h = new HttpError(status, (e as Error).message, extra, e instanceof CombworkError ? e.text : undefined)
+  // An agent message's id (HI-2691, combworkError.ts SaidError): Performance's reason for it, the status still this one.
+  if (e instanceof SaidError) h.saidId = e.saidId
+  return h
+}
 
 /** A reply's body as sent: its JSON as it is, whatever names its data uses (a console event's raw payload, #845). */
 export const replyText = (body: unknown): string => (body === undefined ? '' : JSON.stringify(body))
@@ -715,6 +719,7 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'queue-pause': UNDO_FINAL.queuePaused,
   'queue-resume': UNDO_FINAL.queueResumed,
   'queue-forward': UNDO_FINAL.queueForwarded,
+  retarget: UNDO_FINAL.retargeted,
   'team-pause': UNDO_FINAL.teamPaused,
   'team-resume': UNDO_FINAL.teamResumed,
   'release-slot': UNDO_FINAL.slotReleased,
@@ -1512,7 +1517,9 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     })
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
-    return { done: [API.done.updatedAgent, { agent: def.name, project: basename(p), live: live ? 'yes' : 'no' }], act: { agent: actAgent(def) }, result: def }
+    // A role change (HI-2664): updateAgent restarted it if idle; asked again, what became of it (one restart, never two).
+    const side = live && body?.workflowRole !== undefined ? await sessions.restartForSide(p, agentId, { when: 'ifIdle' }).catch(() => 'same' as const) : 'same'
+    return { done: [API.done.updatedAgent, { agent: def.name, project: basename(p), live: side === 'restarting' || side === 'busy' ? side : live ? 'yes' : 'no' }], act: { agent: actAgent(def) }, result: def }
   })
 })
 
@@ -2098,13 +2105,13 @@ function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?:
   const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string; target?: string | null } = {}
   if (body?.cards !== undefined) {
     const c = laneCards(cardRefsIn(body.cards))
-    if (typeof c === 'string') throw new HttpError(400, c)
+    if (isSaid(c)) throw new HttpError(400, c)
     out.cards = c
   }
   for (const k of ['rounds', 'waitMinutes'] as const) {
     if (body?.[k] === undefined) continue
     const v = laneNumber(body[k], k, 0)
-    if (typeof v === 'string') throw new HttpError(400, v)
+    if (isSaid(v)) throw new HttpError(400, v)
     out[k] = v
   }
   if (body?.name !== undefined) out.name = laneName(body.name)
@@ -2537,6 +2544,36 @@ async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Pro
 }
 
 route('POST', '/v1/queue/remove', async ({ body }) => queueCard(body, 'removeFromQueue'))
+// HI-2680: after a project's target moved on, what can follow the new one: the Assistant's (within Control agents) and
+// the user's, never a project agent's or a script's. With `preview` (the id a target change's reply, or a preview here,
+// offered): only the items named that the offered preview listed, each as it was seen then (HR1's round 1, finding 4),
+// rechecked as it moves, Control asked at each move. Without: a preview (from, to), offered and listed, moving nothing.
+route('POST', '/v1/workflow/retarget', async ({ body }) => {
+  notAgents([API.change.retargetAny])
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  const id = typeof body?.preview === 'string' ? body.preview.trim().slice(0, 40) : ''
+  const items = Array.isArray(body?.items) ? (body.items as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 500) : []
+  if (!id) {
+    // A preview is the Assistant's too (the user's is the window's): never a script's.
+    if (!assistantCaller()) throw new HttpError(403, apiSaid(API.change.onlyAssistant, { what: sayNow([API.change.retargetAny]) }))
+    const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
+    const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
+    if (!from || !to) throw new HttpError(400, say(API.queue.retargetArgs))
+    const preview = await retargetPreview(ws, p, from, to)
+    return { preview: offerRetarget(p, preview), from, to, move: [...preview.cards.move.map((c) => c.key), ...preview.slots.move.map((s) => s.name)], stay: [...preview.cards.keep.map((c) => ({ key: c.key, why: c.why })), ...preview.slots.keep.map((s) => ({ slot: s.name, why: s.why })), ...preview.lanes.map((l) => ({ lane: l.name ?? l.builder, why: 'running' }))] }
+  }
+  if (!items.length) throw new HttpError(400, say(API.queue.retargetArgs))
+  const offered = offeredRetarget(id, p)
+  if (!offered) throw new HttpError(409, say(API.queue.retargetGone, { preview: id }))
+  const { from, to } = offered
+  return assistantChange('agents', [API.change.retarget, { project: basename(p), from, to }], { kind: 'retarget', project: basename(p) }, async (guard) => {
+    const { confirmed, unknown } = offeredItems(offered, items)
+    const r = await retargetApply(ws, p, confirmed, await taskActor(), guard)
+    const result = { ...r, skipped: [...r.skipped, ...unknown.map((x) => ({ key: x, why: 'notOffered' as const }))] }
+    return { done: [API.done.retargeted, { from, to, cards: String(r.moved.cards.length), slots: String(r.moved.slots.length), skipped: String(result.skipped.length) }], result }
+  })
+})
 // HI-2679: bring one of a project's targets up to date with another (a forward merge), the Assistant's (within Control
 // agents) and the user's: never a project agent's or a script's.
 route('POST', '/v1/queue/forward', async ({ body }) => {
@@ -2634,11 +2671,11 @@ async function docOf(query: URLSearchParams): Promise<{ ref: string; text: strin
   const r = await readDoc(root, rel)
   if (r.ok) return { ref: path, text: r.text }
   const why = {
-    outside: say(API.doc.outside, { path, where: path.startsWith(SHARED_PREFIX) ? 'shared' : 'project' }),
-    hidden: say(API.doc.hidden, { path }),
-    notMarkdown: say(API.doc.notMarkdown, { path }),
-    notFound: say(API.doc.notFound, { path }),
-    tooBig: say(API.doc.tooBig, { path, megabytes: String(Math.round(DOC_MAX / 1048576)) })
+    outside: apiSaid(API.doc.outside, { path, where: path.startsWith(SHARED_PREFIX) ? 'shared' : 'project' }),
+    hidden: apiSaid(API.doc.hidden, { path }),
+    notMarkdown: apiSaid(API.doc.notMarkdown, { path }),
+    notFound: apiSaid(API.doc.notFound, { path }),
+    tooBig: apiSaid(API.doc.tooBig, { path, megabytes: String(Math.round(DOC_MAX / 1048576)) })
   }[r.code]
   throw new HttpError(r.code === 'notFound' ? 404 : 400, why)
 }
@@ -3250,7 +3287,13 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     return c
   }
   const nudge = patch.title === undefined ? null : titleNudge(patch.title, actor, titleKeys())
-  const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(nudge ? { nudge } : {}) })
+  // A lane's card moved (HI-2664: the Assistant's move to Todo, now that cw_put_back is a worker's): its lane keeps its own
+  // order and takes it again in it, said as a put-back says it (HI-2267).
+  const reply = async (c: TaskCard) => {
+    const held = patch.column !== undefined ? await lanes.lanesHolding(requireWorkspace(), [c.number]).catch(() => []) : []
+    const notes = [nudge, ...held.map(laneOrderNote)].filter(Boolean).join('\n')
+    return { ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
+  }
   if (actor.kind !== 'assistant') {
     const c = await apply()
     const copy = await reviewCopyAfter(actor, c, { start: patch.review === 'start', verdict: patch.review === 'passed' || patch.review === 'failed' || patch.column === 'passed' })
@@ -3471,7 +3514,7 @@ const WAITS_PER_CALLER = 2
  * the default) }. A project agent names only accounts on in its workspace.
  */
 function readUsageWatch(v: unknown, ws: WorkspaceService): UsageWatch[] {
-  const shape = say(API.watch.usageShape)
+  const shape = apiSaid(API.watch.usageShape)
   if (!Array.isArray(v) || !v.length) throw new HttpError(400, shape)
   if (v.length > USAGE_WATCH_MAX) throw new HttpError(400, apiSaid(API.watch.usageMax, { max: String(USAGE_WATCH_MAX) }))
   const seen = agentCaller() ? combworkAccounts().filter((a) => accountOnIn(ws.config, a, allAccounts())) : combworkAccounts()
@@ -3524,8 +3567,8 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
     if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, apiSaid(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const r = await registerUsageWatch(ws, who!.projectPath, who!.agentId, usage, limit).catch((e: Error) => {
-      // agent-protocol: the start of the usage watch's own refusal (usageWatch.ts), matched for its status
-      throw httpFrom(e.message.startsWith('Not a project') ? 400 : 409, e)
+      // Its refusal's own status (HI-2704: not its words), else 409.
+      throw httpFrom(ownStatus(e) ?? 409, e)
     })
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
     if ('already' in r) return { usageAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}), ...left }
@@ -3537,9 +3580,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   if (body?.lanes !== undefined) {
     if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, apiSaid(API.watch.lanesAlone))
     const lc = readLaneCondition(body)
-    if (typeof lc === 'string') throw new HttpError(400, lc)
+    if (isSaid(lc)) throw new HttpError(400, lc)
     const extra = readLaneCards(body)
-    if (typeof extra === 'string') throw new HttpError(400, extra)
+    if (isSaid(extra)) throw new HttpError(400, extra)
     if (body.wake !== true || !who) throw new HttpError(400, apiSaid(API.watch.laneWakes))
     // Agents beside the lanes (HI-1987): each { project, agent }; left out, the last lane watch's are kept, [] drops them.
     let laneAgents: WatchedAgent[] | undefined
@@ -3564,7 +3607,8 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       stillOpen()
     }
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
-      throw e instanceof HttpError ? e : httpFrom(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e)
+      // A refusal's own status (HI-2704: not its words: an unknown lane or card 404, a project or agent it can't watch 400), else 409.
+      throw e instanceof HttpError ? e : httpFrom(ownStatus(e) ?? 409, e)
     })
     // HI-2521: a named lane that has already ended is the answer at once; no watch started, so no usage beside it.
     if ('already' in r) return { lanesAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}) }
@@ -3572,7 +3616,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   }
   if (body?.agents !== undefined) throw new HttpError(400, apiSaid(API.watch.agentsWithLanes))
   const cond = readCondition(body ?? {})
-  if (typeof cond === 'string') throw new HttpError(400, cond)
+  if (isSaid(cond)) throw new HttpError(400, cond)
   // Each card must be one the caller may see (a project agent: its project's; others are unknown to it), and stays so:
   // the caller's scope goes with the wait, and every later read is checked against it.
   const actor = await taskActor()
@@ -4744,20 +4788,36 @@ const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409
 
 /**
  * The status the Agent API answers an error with. The session and workspace services don't know about HTTP: a
- * CombworkError's kind says it, else its English message does (statusFor).
+ * Combwork error's kind says it (CombworkError, SaidError, KindedError), given where it is thrown from its message
+ * alone, never from a name or a quoted value in it (HI-2704). Errors that aren't Combwork's own go by statusFor().
  */
 function errorStatus(e: unknown): number {
-  if (e instanceof CombworkError && e.kind) return KIND_STATUS[e.kind]
+  const own = ownStatus(e)
+  if (own !== undefined) return own ?? 500
   return e instanceof HttpError ? e.status : e instanceof tasks.TaskPermissionError ? 403 : e instanceof tasks.TaskConflictError ? 409 : statusFor(e as Error)
 }
 
+/**
+ * A Combwork error's own status: its kind's, null for one with none (it answers 500, whatever its words), undefined for
+ * an error that isn't Combwork's. A route that wraps a service's refusals keeps it (HI-2704), its own status only for one
+ * with none.
+ */
+function ownStatus(e: unknown): number | null | undefined {
+  if (!(e instanceof CombworkError || e instanceof SaidError || e instanceof KindedError)) return undefined
+  return e.kind ? KIND_STATUS[e.kind] : null
+}
+
+/**
+ * The status of an error that isn't Combwork's own, by its words; anything else with no kind answers 500. Combwork's
+ * own errors give theirs as a kind where they are thrown (HI-2704: the English patterns this held for them are gone, so
+ * a name such as "busy" in a message no longer changes its status).
+ * - `URI malformed`: decodeURIComponent's error, for a request path that doesn't decode (400).
+ * - `EBUSY`: Node's, for a file another program holds open (409, as before HI-2704).
+ */
 function statusFor(e: Error): number {
   const m = String(e?.message ?? '')
-  if (/Invalid session id|URI malformed|Unknown provider|Project names cannot|pinned to worktrees/i.test(m)) return 400
-  if (/already running|already open|already being opened|is starting|Stop it first|Stop the|archived|No session is running|ran in .* Resume it|is required to run|is turned off|no agents yet|No workspace|busy|no handover|changed while the cards|workspace was closed|card watches|not a conversation/i.test(m)) return 409
-  if (/several agents: choose/i.test(m)) return 400
-  if (/Not a project|Unknown (project|agent|task)|no longer exists/i.test(m)) return 404
-  if (/is archived|is done\.|has no project|needs a title|is too long|Unknown column|labels must|up to \d+ labels|^(blockedBy|links):|Choose a project|comment is empty|Unknown position|before or position|can't go before|, not in (On Hold|Todo|Doing|Review|Passed|Done)|A failed review leaves|There is no card #|^cards:|other project first/i.test(m)) return 400
+  if (/URI malformed/.test(m)) return 400
+  if (/^EBUSY\b/.test(m)) return 409
   return 500
 }
 
@@ -4905,4 +4965,6 @@ onWatchPlacing(watchWhilePlaced)
 /** For unit tests: request parts whose refusals tests say through the canary (tests/agentTextApi.test.ts, HI-2436). */
 /** A route's handler by its method and template (HI-2681: tests run a route's real errors through metrics.ts reasonOf). */
 const routeHandler = (method: string, template: string): Handler | undefined => routes.find((r) => r.method === method && r.template === template)?.handler
-export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler }
+/** Runs fn as a project agent's request (HI-2691: tests run its routes' real errors), as serveApi's caller scope does. */
+const asAgent = <T>(workspacePath: string, projectPath: string, agentId: string, fn: () => T): T => callerStore.run({ kind: 'agent', runId: 'test', workspace: workspacePath, projectPath, agentId }, () => inRequestScope({ projectPath, agentId }, fn))
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, httpFrom }

@@ -284,7 +284,8 @@ const check = (name, ok, extra = '') => {
   check('…its tooltip has the whole line', !!(await lib.until(async () => (await page.locator('.tip:visible').allInnerTexts()).join(' ').includes(`Status: Waiting for ${L1}, ${L2} → Review (watch until`), HUNG_MS)))
   await page.mouse.move(0, 0)
   await head.click()
-  await lib.until(async () => (await rows.count()) === 3, HUNG_MS)
+  // The list is the newest message's changes: by now the stop of Fixer, one row (a wait for three ran out, HI-2688).
+  check('…opened again, narrow: its newest message’s change, the stop', !!(await lib.until(async () => (await rows.count()) === 1 && (await texts())[0].includes('Stop Fixer in alpha'), HUNG_MS)), JSON.stringify(await texts()))
   await shots('narrow')
   await head.click()
   await lib.until(async () => (await head.getAttribute('aria-expanded')) === 'false', HUNG_MS)

@@ -45,7 +45,8 @@ process.stdin.on('data', (d) => {
   c.on('exit', (code, signal) => {
     if (code !== null) return end(code)
     require('fs').writeSync(2, '\\n' + spec.nonce + ':signal:' + String(signal || 'unknown') + '\\n')
-    end(${SIGNALLED})
+    // SIGNALLED, as its argument (startLauncher), so its text is fixed: the focused-test picker reads it (HI-2697).
+    end(Number(process.argv[1]))
   })
 })
 process.stdin.on('end', () => { if (!started) end(70) })
@@ -64,7 +65,7 @@ export function startLauncher(spec: { command: string; args: readonly string[]; 
   if (env.ELECTRON_RUN_AS_NODE !== undefined) launchEnv.CW_QUEUE_RUN_AS_NODE = env.ELECTRON_RUN_AS_NODE
   else delete launchEnv.CW_QUEUE_RUN_AS_NODE
   const after = Date.now()
-  const child = spawn(process.execPath, ['-e', LAUNCHER], { cwd: opts.cwd, env: launchEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: true })
+  const child = spawn(process.execPath, ['-e', LAUNCHER, String(SIGNALLED)], { cwd: opts.cwd, env: launchEnv, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true, detached: true })
   return { child, after, before: Date.now(), nonce }
 }
 

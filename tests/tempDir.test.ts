@@ -1,6 +1,7 @@
 // Tests' temp folders (#448): every test makes them with tempDir() (tests/tempDir.ts), by their long, real paths, never
 // under os.tmpdir() itself, whose path is the 8.3 short form on GitHub's runner (C:\Users\RUNNER~1\…). A test that wants
 // another name for a folder makes one on purpose (tests/pathAliases.ts): checked here on this machine.
+import { parse } from '@babel/parser'
 import { spawnSync } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
@@ -41,8 +42,6 @@ const ALLOWED: Record<string, string[]> = {
   'e2e/build.mjs': ["import { tmpdir } from 'os'", "export const BUILD_LOCKS = join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'build-locks')"],
   'progressReport.mts': ["import { tmpdir } from 'node:os'", "const timings = (): string => process.env.CW_TEST_PROGRESS_TIMINGS || join(process.env.LOCALAPPDATA || tmpdir(), 'combwork-test', 'progress-timings.json')"],
   // npm run e2e -- --clear-dir: a folder the user names may be in the temp folder (one nothing here made).
-  // The focused tests' picker's check (HI-1367) reads a binding naming the temp folder as not the repository's.
-  'focusedPick.test.ts': ['if (bound.has(name) || !exprs.every((e) => !/tempDir|tmpdir|mkdtemp/.test(e) && names(e))) continue'],
   'e2e/evidence.cjs': ['function clearDir(target, { board = {}, temp = os.tmpdir(), testRoot = runContext.TEST_ROOT, homes = [runContext.CODEX_HOME, runContext.CLAUDE_TEST_HOME] } = {}) {']
 }
 const OWN = ['tempDir.ts', 'runTemp.mts', 'tempDir.test.ts']
@@ -50,12 +49,29 @@ const OWN = ['tempDir.ts', 'runTemp.mts', 'tempDir.test.ts']
 // the data they check, never where they put files (those come from tempDir() and lib.WORK).
 const DATA = ['agentTemp.test.ts', 'e2e/agenttemp.cjs']
 
+/** A file's text with its regular expression literals blanked (same length, lines kept); as it is when it doesn't parse. */
+function withoutRegexes(name: string, text: string): string {
+  try {
+    const ast = parse(text, { sourceType: 'unambiguous', plugins: [...(/\.(ts|mts|cts)$/.test(name) ? ['typescript' as const] : []), ...(/\.(c|m)?js$/.test(name) ? ['jsx' as const] : [])], tokens: true, errorRecovery: false, allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true })
+    let out = text
+    for (const t of ast.tokens ?? []) {
+      if ((t as { type?: { label?: string } }).type?.label !== 'regexp') continue
+      out = out.slice(0, t.start) + out.slice(t.start, t.end).replace(/[^\r\n]/g, ' ') + out.slice(t.end)
+    }
+    return out
+  } catch {
+    return text
+  }
+}
+
 /** Where these files name the temp folder themselves (os.tmpdir, TEMP or TMP), other than ALLOWED: `file:line` each. */
 function rawTempUses(files: { name: string; text: string }[]): string[] {
   const found: string[] = []
   for (const { name, text } of files) {
     if (OWN.includes(name) || DATA.includes(name)) continue
-    text.split(/\r?\n/).forEach((line, i) => {
+    // A regular expression literal is a pattern, never a use (HI-2689: focusedPick.test.ts's `/tempDir|tmpdir|mkdtemp/`).
+    // Strings stay: `env['TEMP']` is a use by its string.
+    withoutRegexes(name, text).split(/\r?\n/).forEach((line, i) => {
       if (/^\s*(\/\/|\*|\/\*)/.test(line)) return
       if (!/\btmpdir\b|\benv\s*(\.\s*(TEMP|TMP)\b|\[\s*['"`](TEMP|TMP)['"`])/i.test(line)) return
       if (ALLOWED[name]?.includes(line.trim())) return

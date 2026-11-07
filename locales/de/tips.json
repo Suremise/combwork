@@ -556,5 +556,7 @@
   "tips.perfFailures.title": "Abgelehnt heißt nicht kaputt",
   "tips.perfFailures.text": "Leistung → Fehlschläge sortiert, was nicht erfolgreich war: echte Fehler in Rot, getrennt von Aufrufen, die eine Workflow-Regel abgelehnt hat, und falschen Aufrufen. Ablehnungen und falsche Aufrufe nach Grund zeigt, welche Regel oder Meldung am häufigsten kam: eine Tool-Beschreibung, die klarer werden sollte.",
   "tips.serverDiagnostics.title": "Ein Agent auf Ollama gibt nur Text aus?",
-  "tips.serverDiagnostics.text": "Server prüfen… bei einem Server-Konto unter Einstellungen → Konten & Verbindungen zeigt den echten Kontext seines Modells und testet einen Tool-Aufruf. Ein Kontext, der kleiner ist als der Prompt von Claude Code, ist der übliche Grund, warum ein lokales Modell einen Tool-Aufruf ausschreibt, statt ihn zu machen."
+  "tips.serverDiagnostics.text": "Server prüfen… bei einem Server-Konto unter Einstellungen → Konten & Verbindungen zeigt den echten Kontext seines Modells und testet einen Tool-Aufruf. Ein Kontext, der kleiner ist als der Prompt von Claude Code, ist der übliche Grund, warum ein lokales Modell einen Tool-Aufruf ausschreibt, statt ihn zu machen.",
+  "tips.retargetRelease.title": "Wenn ein Release erscheint, das Übrige aufs nächste umstellen",
+  "tips.retargetRelease.text": "„Arbeit wird gemergt in“ von 1.1.0 auf 1.2.0 ändern? „Speichern…“ listet die Todo-Karten und freien Slots auf 1.1.0, die 1.2.0 folgen können, und was bleibt, jeweils mit Grund. Lass „Auch umstellen, was wechseln kann“ angehakt, um sie umzustellen."
 }

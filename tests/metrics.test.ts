@@ -1755,4 +1755,200 @@ describe('HI-2553: failures by kind, their reasons, and the tool list by provide
     expect(englishTemplate('{n, plural, one {# card} other {# cards}} in {name}{kind, select, a {!} other {.}} {size, number}')).toBe('2 cards in …. 2')
     await disposeWorkspaceService(w)
   })
+
+  describe("HI-2691: the services' errors on Agent API paths keep their agent message's id, with statuses and text as before", () => {
+    // An agent message as the catalogue has it (its id and English): what say() and saidError() read of it.
+    // The areas of the messages these tests name (named files: no scan of the folder).
+    const catalogue = Object.assign({}, ...['api', 'inbox', 'notice', 'wake'].map((a) => JSON.parse(readFileSync(join(import.meta.dirname, '..', 'agent-text', 'catalogue', `${a}.json`), 'utf8')))) as Record<string, { text: string }>
+    const agentMsgOf = (id: string) => ({ id, text: catalogue[id].text })
+    const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409 } as const
+    afterEach(async () => (await import('../src/shared/agentText')).setChainResolver(null))
+
+    it('an unknown lane through its real route, wrapped by httpFrom (404), and a project outside the workspace thrown as it is (404): each its id, its text unchanged', async () => {
+      const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+      const { inWorkspace } = await import('../src/main/workspace')
+      const { w, path } = await open()
+      mkdirSync(join(path, 'alpha'))
+      const call = (who: string | null, method: string, template: string, body: unknown) =>
+        inWorkspace(w, () => {
+          const run = () => apiTextTestHooks.routeHandler(method, template)!({ params: [], query: new URLSearchParams(), body, signal: new AbortController().signal })
+          return who ? apiTextTestHooks.asAgent(path, who, 'a-test', run) : run()
+        }).then(() => null, (e: unknown) => e)
+      // cw_wait_for_tasks on lanes Combwork doesn't know: watches.ts's error, wrapped by the route (httpFrom, its own 404).
+      for (const [lanes, text] of [[['nope'], 'No such lane: nope (cw_lane list gives the lanes and their ids)'], [['a', 'b'], 'No such lanes: a, b (cw_lane list gives the lanes and their ids)']] as const) {
+        const e = await call(join(path, 'alpha'), 'POST', '/v1/tasks/wait', { lanes, wake: true })
+        expect([apiErrorReply(e).status, metrics.reasonOf(e), apiErrorReply(e).body.error]).toEqual([404, 'agent:wake.watch.noSuchLane', text])
+      }
+      // Thrown as it is: a card watch from a project that isn't the workspace's (watches.ts, as a route's caller would
+      // reach it once its cards are read), its status the fallback's 404 (untyped: the path is a value), what the API's
+      // catch answers (apiErrorReply) and records (reasonOf).
+      const { registerWatch } = await import('../src/main/watches')
+      const outside = join(base, 'elsewhere')
+      const e = await inWorkspace(w, () => registerWatch(w, outside, 'a-test', { cards: [1] } as never)).then(() => null, (x: unknown) => x)
+      expect([apiErrorReply(e).status, metrics.reasonOf(e), apiErrorReply(e).body.error]).toEqual([404, 'agent:wake.watch.notAProject', `Not a project of this workspace: ${outside}`])
+      await disposeWorkspaceService(w)
+    })
+
+    it('each typed one gives its kind\'s status, and its id: the statuses HI-2704 pins by message are in its tests below', async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { SaidError } = await import('../src/main/combworkError')
+      const typed: [string, Record<string, string> | undefined, keyof typeof KIND_STATUS][] = [
+        ['inbox.create.badKey', undefined, 'invalid'],
+        ['inbox.create.tooLong', { length: '5000', max: '4000' }, 'invalid'],
+        ['notice.team.noWorkspace', undefined, 'conflict'],
+        ['api.workspace.closed', undefined, 'conflict'],
+        ['api.workspace.noneOpen', undefined, 'conflict'],
+        ['wake.watch.cardsTooBig', undefined, 'conflict'],
+        ['wake.watch.cardsFull', undefined, 'conflict'],
+        ['wake.watch.cardsTooMany', { max: '500' }, 'conflict'],
+        ['wake.watch.cardsFullWait', undefined, 'conflict']
+      ]
+      for (const [id, values, kind] of typed) {
+        const e = new SaidError(agentMsgOf(id), values, { kind })
+        expect([id, apiErrorReply(e).status, metrics.reasonOf(e)]).toEqual([id, KIND_STATUS[kind], `agent:${id}`])
+      }
+    })
+
+    it("in a dialect without the English words: a typed error keeps its status, an untyped one answers 500 as in English, each reply its dialect's text", async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { SaidError } = await import('../src/main/combworkError')
+      const { say, setChainResolver } = await import('../src/shared/agentText')
+      const { inRequestScope } = await import('../src/shared/agentText/asyncScope')
+      setChainResolver(() => ({ texts: { 'api.workspace.closed': 'Workspace gone', 'wake.watch.notAProject': 'Projekt fehlt: {project}' }, files: ['test.json'], hash: 'test-2691' }))
+      inRequestScope(null, () => {
+        const closed = agentMsgOf('api.workspace.closed')
+        const typed = apiErrorReply(new SaidError(closed, undefined, { kind: 'conflict' }))
+        // Its words gone, the fallback would say 500; its kind keeps 409, and the reply is the dialect's text, byte for byte.
+        expect(apiErrorReply(new Error(say(closed))).status).toBe(500)
+        expect([typed.status, typed.body.error]).toEqual([409, say(closed)])
+        expect(typed.body.error).toBe('Workspace gone')
+        const notAProject = agentMsgOf('wake.watch.notAProject')
+        const untyped = apiErrorReply(new SaidError(notAProject, { project: 'alpha' }))
+        expect([untyped.status, untyped.body.error]).toEqual([apiErrorReply(new Error(say(notAProject, { project: 'alpha' }))).status, 'Projekt fehlt: alpha'])
+      })
+    })
+  })
+
+  describe("HI-2704: a Combwork error's status is its message's, given as a kind where it is thrown; statusFor() reads only other errors", () => {
+    const read = (dir: string, areas: string[]) => Object.assign({}, ...areas.map((a) => JSON.parse(readFileSync(join(import.meta.dirname, '..', dir, `${a}.json`), 'utf8'))))
+    // The messages these tests name, from their catalogues (named files: no scan of a folder).
+    const agentTexts = read('agent-text/catalogue', ['api', 'wake']) as Record<string, { text: string }>
+    const windowTexts = read('locales/en', ['session', 'content', 'tasks', 'git']) as Record<string, { defaultMessage: string }>
+    const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409 } as const
+    type Kind = keyof typeof KIND_STATUS
+    const src = (f: string) => readFileSync(join(import.meta.dirname, '..', 'src', 'main', f), 'utf8').split(/\r?\n/)
+    // The kind a throw gives: `{ kind: '…' }`, or the last argument of a constructor or helper that takes it alone.
+    const kindAt = (line: string): string | undefined => line.match(/kind: '(\w+)'/)?.[1] ?? line.match(/, '(invalid|forbidden|notFound|conflict)'\)\s*$/)?.[1]
+
+    // Each message converted, where it is thrown (`at`: every such line, `count` of them), its kind there, and the status
+    // it answers (the Assistant's decision on HI-2704/s8: the status its plain English had, except the git.busy ones,
+    // 400 → 409). `values` hold the words the old patterns matched ("busy", "archived", "Unknown agent"): they no longer
+    // change it.
+    // `kinds`: where one message's throws differ (the watches' notAProject: the status each one's route answered before).
+    const rows: { id: string; file: string; at: RegExp; count: number; kind: Kind; kinds?: Kind[]; status: number; values?: Record<string, string> }[] = [
+      { id: 'session.start.providerMissing', file: 'sessions.ts', at: /id: 'session\.start\.providerMissing'/, count: 1, kind: 'conflict', status: 409, values: { resuming: 'yes', provider: 'Codex', agent: 'Unknown agent' } },
+      { id: 'session.archive.notKept', file: 'sessions.ts', at: /id: 'session\.archive\.notKept'/, count: 1, kind: 'conflict', status: 409 },
+      { id: 'session.cleanUp.unarchived', file: 'sessions.ts', at: /id: 'session\.cleanUp\.unarchived'/, count: 1, kind: 'conflict', status: 409 },
+      { id: 'session.inUse.running', file: 'sessions.ts', at: /id: 'session\.inUse\.running'/, count: 1, kind: 'conflict', status: 409 },
+      { id: 'session.inUse.attaching', file: 'sessions.ts', at: /id: 'session\.inUse\.attaching'/, count: 1, kind: 'conflict', status: 409 },
+      { id: 'session.error.stopFirst', file: 'sessions.ts', at: /new SessionInUse\('live', withValues\(M\.stopFirst/, count: 2, kind: 'conflict', status: 409, values: { action: 'delete' } },
+      { id: 'content.skill.noLocalFolder', file: 'skills.ts', at: /id: 'content\.skill\.noLocalFolder'/, count: 1, kind: 'invalid', status: 400, values: { cli: 'busy' } },
+      { id: 'tasks.error.batchGone', file: 'tasks.ts', at: /id: 'tasks\.error\.batchGone'/, count: 1, kind: 'conflict', status: 409 },
+      // folderBusyData's refusals (shared/gitRepo.ts), thrown in one place: 400 by "is done." before (the decision's B).
+      { id: 'git.busy.slotHeld', file: 'gitRepo.ts', at: /throw new CombworkError\(now\b/, count: 1, kind: 'conflict', status: 409, values: { agent: 'HB1', branch: 'main', action: 'switch' } },
+      { id: 'git.busy.yourMerge', file: 'gitRepo.ts', at: /throw new CombworkError\(now\b/, count: 1, kind: 'conflict', status: 409, values: { branch: 'main', action: 'pull' } },
+      // The card and agent watches' 404; the usage and lane watches' 400 (their routes answered it so before, by its words).
+      { id: 'wake.watch.notAProject', file: 'watches.ts', at: /saidError\(T\.notAProject\b/, count: 6, kind: 'notFound', kinds: ['notFound', 'notFound', 'notFound', 'invalid', 'invalid', 'invalid'], status: 404, values: { project: 'busy-work' } },
+      { id: 'wake.watch.notAProject', file: 'watches.ts', at: /saidError\(T\.notAProject\b/, count: 6, kind: 'invalid', kinds: ['notFound', 'notFound', 'notFound', 'invalid', 'invalid', 'invalid'], status: 400, values: { project: 'archived-ideas' } },
+      { id: 'wake.watch.noSuchLane', file: 'watches.ts', at: /saidError\(T\.noSuchLane\b/, count: 1, kind: 'notFound', status: 404, values: { count: 1, lanes: 'busy' } as never },
+      { id: 'wake.watch.self', file: 'watches.ts', at: /saidError\(T\.self\b/, count: 2, kind: 'invalid', status: 400 },      { id: 'wake.watch.cardsReadFailed', file: 'watches.ts', at: /saidError\(T\.cardsReadFailed\b/, count: 1, kind: 'conflict', status: 409, values: { error: 'Unknown agent: x' } },
+      { id: 'wake.watch.cardsDamaged', file: 'watches.ts', at: /saidError\(T\.cardsDamaged\b/, count: 1, kind: 'conflict', status: 409, values: { why: 'damaged', error: 'EPERM: operation not permitted' } }
+    ]
+
+    it.each(rows)('$id: thrown with its kind ($status), whatever its values, recorded by its id', async ({ id, file, at, count, kind, kinds, status, values }) => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { CombworkError, SaidError } = await import('../src/main/combworkError')
+      const { withValues } = await import('../src/shared/advanced')
+      const lines = src(file).filter((l) => at.test(l))
+      expect(lines.map(kindAt)).toEqual(kinds ?? Array.from({ length: count }, () => kind))
+      const agent = agentTexts[id]
+      const e = agent ? new SaidError({ id, text: agent.text }, values, { kind }) : new CombworkError(withValues({ id, defaultMessage: windowTexts[id].defaultMessage } as never, values ?? {}), { kind })
+      expect([apiErrorReply(e).status, metrics.reasonOf(e)]).toEqual([status, `${agent ? 'agent' : 'msg'}:${id}`])
+      // Its words alone no longer give a status: the same text with no kind answers 500.
+      expect(apiErrorReply(new Error(e.message)).status).toBe(500)
+    })
+
+    it("plain errors: Combwork's own say theirs with a KindedError; Node's are still read by their words, and nothing else is", async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { assertSessionId } = await import('../src/shared/defaults')
+      const thrown = (fn: () => unknown): unknown => {
+        try {
+          fn()
+        } catch (e) {
+          return e
+        }
+        return null
+      }
+      // Its real producer: a session id that could be a path.
+      expect(apiErrorReply(thrown(() => assertSessionId('../x'))).status).toBe(400)
+      expect(src('metricsUsage.ts').some((l) => l.includes("new KindedError('The workspace was closed while its metrics were read', 'conflict')"))).toBe(true)
+      expect(src('ptyHost.ts').some((l) => l.includes("new KindedError(`A process is already running for ${key}`, 'conflict')"))).toBe(true)
+      // Combwork's own with no kind: 500, even where a value or a cause reads like Node's (HR2, HI-2704/r1).
+      const { CombworkError, SaidError } = await import('../src/main/combworkError')
+      const notSaved = { id: 'wake.watch.notSaved', text: 'Could not save the watch: {error}' }
+      for (const e of [new SaidError(notSaved, { error: 'URI malformed' }), new SaidError(notSaved, { error: 'EBUSY: resource busy or locked' }), new CombworkError({ lines: ['Failed to read URI malformed'] })]) expect([e.message, apiErrorReply(e).status]).toEqual([e.message, 500])
+      // What isn't Combwork's: decodeURIComponent's error on a bad path (400), Node's EBUSY (409).
+      expect(apiErrorReply(thrown(() => decodeURIComponent('%'))).status).toBe(400)
+      expect(apiErrorReply(Object.assign(new Error("EBUSY: resource busy or locked, rename 'C:\\x'"), { code: 'EBUSY' })).status).toBe(409)
+      // Words the old patterns read, in an error with no kind: 500 now. processSupervisor's line (400 by "is too long",
+      // the decision's B) and a name.
+      for (const m of ['the helper’s command line is too long', 'Unknown project "busy"', 'Not a project of this workspace: archived']) expect([m, apiErrorReply(new Error(m)).status]).toEqual([m, 500])
+    })
+
+    it('the lane watch route keeps its refusal\'s own status, in English and in a dialect without the English words', async () => {
+      const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+      const { inWorkspace } = await import('../src/main/workspace')
+      const { setChainResolver } = await import('../src/shared/agentText')
+      const { inRequestScope } = await import('../src/shared/agentText/asyncScope')
+      const { w, path } = await open()
+      mkdirSync(join(path, 'alpha'))
+      const call = (body: unknown) =>
+        inWorkspace(w, () => apiTextTestHooks.asAgent(path, join(path, 'alpha'), 'a-test', () => apiTextTestHooks.routeHandler('POST', '/v1/tasks/wait')!({ params: [], query: new URLSearchParams(), body, signal: new AbortController().signal }))).then(
+          () => null,
+          (e: unknown) => e
+        )
+      const english = await call({ lanes: ['nope'], wake: true })
+      expect([apiErrorReply(english).status, metrics.reasonOf(english), apiErrorReply(english).body.error]).toEqual([404, 'agent:wake.watch.noSuchLane', 'No such lane: nope (cw_lane list gives the lanes and their ids)'])
+      setChainResolver(() => ({ texts: { 'wake.watch.noSuchLane': 'Unbekannte Spur: {lanes}' }, files: ['test.json'], hash: 'test-2704' }))
+      try {
+        const said = await inRequestScope(null, () => call({ lanes: ['nope'], wake: true }))
+        expect([apiErrorReply(said).status, metrics.reasonOf(said), apiErrorReply(said).body.error]).toEqual([404, 'agent:wake.watch.noSuchLane', 'Unbekannte Spur: nope'])
+      } finally {
+        setChainResolver(null)
+      }
+      await disposeWorkspaceService(w)
+    })
+
+    it("the shared checks' refusals through their real routes: each records its message's id, its status and text as before", async () => {
+      const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+      const { inWorkspace } = await import('../src/main/workspace')
+      const { w } = await open()
+      const call = (method: string, template: string, body: unknown) =>
+        inWorkspace(w, () => apiTextTestHooks.routeHandler(method, template)!({ params: [], query: new URLSearchParams(), body, signal: new AbortController().signal })).then(
+          () => null,
+          (e: unknown) => e
+        )
+      const cases: [string, string, unknown, string, string][] = [
+        // readCondition (shared/watch.ts), for a card watch.
+        ['POST', '/v1/tasks/wait', { cards: [] }, 'wake.condition.cards', agentTexts['wake.condition.cards'].text],
+        // buildFactOf (shared/buildFacts.ts), its English made agent messages word for word.
+        ['POST', '/v1/builds', { kind: 'nightly' }, 'api.build.kind', 'kind is one of: beta, baseline, rc, release.']
+      ]
+      for (const [method, template, body, id, text] of cases) {
+        const e = await call(method, template, body)
+        expect([template, apiErrorReply(e).status, metrics.reasonOf(e), apiErrorReply(e).body.error]).toEqual([template, 400, `agent:${id}`, text])
+      }
+      await disposeWorkspaceService(w)
+    })
+  })
 })

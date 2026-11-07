@@ -79,7 +79,9 @@ export class TerminalScreen {
 
   /**
    * The visible lines with dim cells blanked (HI-1959): what the user or Combwork typed, without a CLI's dim hint where
-   * nothing is typed (Claude Code 2.1.312's empty input shows `Try "how does <filepath> work?"`, dim).
+   * nothing is typed (Claude Code 2.1.312's empty input shows `Try "how does <filepath> work?"`, dim). The hint's first
+   * letter under the CLI's own cursor (inverse, not dim, followed by the dim rest: Claude Code while its terminal
+   * reports the focus, HI-2692) is the hint too, and is blanked; an inverse letter in a draft is followed by the draft.
    */
   textWithoutDim(): string {
     const buf = this.term?.buffer.active
@@ -93,7 +95,8 @@ export class TerminalScreen {
         const cell = line!.getCell(x)
         // The second half of a wide character: drawn with the first.
         if (!cell || cell.getWidth() === 0) continue
-        row += cell.isDim() ? ' '.repeat(cell.getWidth()) : cell.getChars() || ' '
+        const cursorOnHint = !!cell.isInverse() && !!line!.getCell(x + cell.getWidth())?.isDim()
+        row += cell.isDim() || cursorOnHint ? ' '.repeat(cell.getWidth()) : cell.getChars() || ' '
       }
       lines.push(row.trimEnd())
     }

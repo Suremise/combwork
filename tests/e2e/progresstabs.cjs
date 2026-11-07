@@ -532,7 +532,9 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check('…its card, revision and copy in the hover', !!(await until(async () => {
       if ((await tipText()).includes(`${a.key} · e2d018f · in copy-5`)) return true
       // The runs are docked at the bottom (HI-1925), where the window's notices show: those first.
-      for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click().catch(() => undefined)
+      // Each click is bounded like the hover (HI-2703): a notice whose button can't be clicked
+      // held click()'s default 30 s, the whole of this wait, so the hover never came.
+      for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click({ timeout: 2000 }).catch(() => undefined)
       await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)
       return false
     }, HUNG_MS)), await tipText())

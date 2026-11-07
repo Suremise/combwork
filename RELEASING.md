@@ -111,7 +111,7 @@ The slices are:
 
 - **Shipped app code:** `src/**`, and `resources/**` except the dialects and the manifest.
   - Its unit tests: the changed files and the files that import them.
-  - Its fake e2e suites. `--affected` finds the candidates. For a file it calls shared by every part (`App.tsx`, `servers.ts`, `workspace.ts`, `ipc.ts`), that is every suite. A **boundary analysis** in the ledger row can narrow them: what the change does, the owners of the behaviour it leaves alone, and the suites that cover what it changes. The reviewer can check that analysis against the diff. Without one, or where it is uncertain, the full affected set runs: that is the fallback, not a rule that a shared filename needs every suite.
+  - Its fake e2e suites. `--affected` finds the candidates, and its "Why each suite" lines say why each was picked, for the row to cite (HI-2690). `ipc.ts`, `shared/api.ts`, `actions.ts`, `commands.ts` and `workspace.ts`'s top-level functions select by their changed parts (HI-2659), and a change of types or comments alone selects nothing (HI-2690). For a file it still calls shared by every part (`App.tsx`, `servers.ts`, `workspace.ts`'s members), that is every suite. A **boundary analysis** in the ledger row can narrow them: what the change does, the owners of the behaviour it leaves alone, and the suites that cover what it changes. The reviewer can check that analysis against the diff. Without one, or where it is uncertain, the full affected set runs: that is the fallback, not a rule that a shared filename needs every suite.
   - A provider, session, hook or transcript change adds its CLI's real tier.
   - Guidance, a skill or tool text adds its named scenarios, and the model sample where it could change what agents do.
   - Then the artifact rules below.
@@ -161,7 +161,7 @@ So these stale the manifest: a fixture or helper a suite reads, the harness, `su
 The net, from the records' times, as estimates and not measurements:
 - **Saved:** the release commit's fake set (about 51 min, 65.7 − 14.3), and the non-`fresh` Sandbox kinds at ac8e5773a (about 10–15 min; the reports give build-to-report time, not per kind).
 - **Added:** the fake set at ac8e5773a (about 52 min), and the 1.1.0 installer's packaged, `fresh` and `upgrade` rows (about 15–20 min).
-- **About zero overall for RC4.** Most of RC4's rounds touched code `--affected` treats as shared, and no round had a written boundary analysis. The ledger pays where a fix is test-only or version-only, or where a boundary analysis is written. Better automatic boundary selection is HI-2690's.
+- **About zero overall for RC4.** Most of RC4's rounds touched code `--affected` treats as shared, and no round had a written boundary analysis. The ledger pays where a fix is test-only or version-only, or where a boundary analysis is written. HI-2690 measured these rounds again with its rules: each still selects every suite, by `App.tsx` (RC4 1), `servers.ts` (RC4 2) and `workspace.ts`'s members (RC4 3 and 4, HI-2678's), though RC4 3 no longer does so for `shared/types.ts`, its `values/*.d.ts` or its `tests/sandbox` files.
 
 A release has **no known gaps**: a card showing that one of the release's features is unfinished joins the release's path before the RC, or the user moves it out of the release.
 

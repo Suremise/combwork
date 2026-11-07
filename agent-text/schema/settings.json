@@ -1979,6 +1979,15 @@
   "settings.agent.tool.restart.sessions": {
     "placeholders": {}
   },
+  "settings.agent.tool.retarget": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain",
+      "items": "plain",
+      "preview": "plain",
+      "stay": "plural"
+    }
+  },
   "settings.agent.tool.switchRefused": {
     "placeholders": {
       "error": "plain"

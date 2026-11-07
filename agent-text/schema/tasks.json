@@ -319,11 +319,21 @@
       "project": "plain"
     }
   },
+  "tasks.error.targetChanged": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "tasks.error.targetCheckedOut": {
     "placeholders": {
       "unknown": "select",
       "card": "plain",
       "folder": "plain"
+    }
+  },
+  "tasks.error.targetDefaultMoved": {
+    "placeholders": {
+      "card": "plain"
     }
   },
   "tasks.error.targetHasWork": {

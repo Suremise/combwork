@@ -556,5 +556,7 @@
   "tips.perfFailures.title": "Refusé n’est pas cassé",
   "tips.perfFailures.text": "Performances → Échecs trie ce qui n’a pas abouti : les vraies erreurs en rouge, à part des appels refusés par une règle du flux de travail et des appels erronés. Refus et appels erronés par motif montre quelle règle ou quel message revient le plus : une description d’outil à rendre plus claire.",
   "tips.serverDiagnostics.title": "Un agent sur Ollama ne fait qu’écrire du texte ?",
-  "tips.serverDiagnostics.text": "Vérifier le serveur… sur un compte de serveur, dans Paramètres → Comptes et connexions, montre le contexte réel de son modèle et teste un appel d’outil. Un contexte plus petit que le prompt de Claude Code est la raison habituelle pour laquelle un modèle local écrit un appel d’outil au lieu de le faire."
+  "tips.serverDiagnostics.text": "Vérifier le serveur… sur un compte de serveur, dans Paramètres → Comptes et connexions, montre le contexte réel de son modèle et teste un appel d’outil. Un contexte plus petit que le prompt de Claude Code est la raison habituelle pour laquelle un modèle local écrit un appel d’outil au lieu de le faire.",
+  "tips.retargetRelease.title": "Quand une version sort, passe le reste sur la suivante",
+  "tips.retargetRelease.text": "Tu passes Le travail est fusionné dans de 1.1.0 à 1.2.0 ? Enregistrer… liste les cartes Todo et les emplacements libres encore sur 1.1.0 qui peuvent suivre 1.2.0, et ce qui reste, avec la raison. Laisse Recibler aussi ce qui peut passer coché pour les déplacer."
 }

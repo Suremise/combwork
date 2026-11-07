@@ -285,6 +285,11 @@
       "project": "plain"
     }
   },
+  "lane.refused.oldTools": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
   "lane.refused.poolReviewer": {
     "placeholders": {}
   },
@@ -317,6 +322,12 @@
     "placeholders": {
       "name": "plain",
       "project": "plain"
+    }
+  },
+  "lane.refused.wrongSide": {
+    "placeholders": {
+      "agent": "plain",
+      "part": "select"
     }
   },
   "lane.reorder.itsBranch": {
@@ -480,6 +491,12 @@
   "lane.status.notMerged": {
     "placeholders": {
       "card": "plain"
+    }
+  },
+  "lane.status.offSide": {
+    "placeholders": {
+      "agent": "plain",
+      "part": "select"
     }
   },
   "lane.status.preparing": {

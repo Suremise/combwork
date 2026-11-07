@@ -263,7 +263,7 @@ function stream(token) {
   check('the stream says a message waits, from whom, not what it says', !!waitingFor && waitingFor.data.state.inbox.unread[0].from !== undefined && !('text' in waitingFor.data.state.inbox.unread[0]), JSON.stringify(waitingFor?.data?.state?.inbox))
   const left = await seen(viewerStream, 'assistant-activity', (d) => /Left Ann in alpha a message/.test(d.action.text))
   check("the Assistant's action arrives, without the message", !!left && !left.data.action.text.includes(SECRET), JSON.stringify(left?.data))
-  const added = await api('POST', '/v1/projects/alpha/agents', { name: 'Runner' }, assistantToken)
+  const added = await api('POST', '/v1/projects/alpha/agents', { name: 'Runner', workflowRole: 'reviewer' }, assistantToken)
   check('agent-added arrives for the agent the Assistant adds', added.status === 200 && !!(await seen(viewerStream, 'agent-added', (d) => d.agentId === added.body?.agent?.id)), JSON.stringify(added.body?.agent ?? added))
 
   // --- #763: each action says what it was with fields (kind and targets), so a viewer needn't read its line.

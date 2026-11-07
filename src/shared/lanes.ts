@@ -4,7 +4,7 @@ import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
 import { rulesBaseId, targetOfRulesetId } from './workflow/compile'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
-import { agentMsg, say, type AgentMsg } from './agentText'
+import { agentMsg, say, sayWithId, type AgentMsg, type Said } from './agentText'
 
 /**
  * Lanes (#483): a builder and a reviewer taking a project's cards in order, as the card-loop skill registers them. What
@@ -268,7 +268,7 @@ const unrecordedCard = (n: number, card: TaskCard | null): LaneCard => ({ number
  * (currentCard); an ended lane without its record has none. A card held elsewhere (HI-1821: another agent's, or, given
  * to none, another lane's: `owners`, main's owner lane by card) is never its current card nor why it waits.
  */
-export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false, dueDeps?: DueDeps | null, outOfWorkflow?: ReadonlySet<string>): LaneInfo {
+export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | null>, names?: ReadonlyMap<string, string>, facts?: ReadonlyMap<number, LaneCardFacts> | null, atLimit?: ReadonlySet<number>, line?: number | null, hooksOut?: ReadonlySet<string>, rulesetNow?: string | null, rulesetStages?: StageId[] | null, slot?: { slot: string | null; waiting: boolean; info?: LaneSlotInfo | null; held?: LaneSlotHeld | null } | null, owners?: ReadonlyMap<number, string | null>, startWait?: LaneStartWait | null, teamPaused = false, dueDeps?: DueDeps | null, outOfWorkflow?: ReadonlySet<string>, offSide?: ReadonlyMap<string, 'builder' | 'reviewer'>): LaneInfo {
   const unrecorded = !running(rec) && !rec.frozen
   // A card at its round limit waits for the user's answer (§16.11.4, `atLimit`: the main side's facts): it pauses the lane.
   const live = (n: number): LaneCard => ({ ...laneCard(n, cards.get(n) ?? null, { lane: rec.id, builder: rec.builder.id, owner: owners?.get(n) }), ...(atLimit?.has(n) ? { roundLimit: true } : {}) })
@@ -286,6 +286,11 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   // connection launching without Combwork's tools): it pauses until the user gives the lane another agent or ends it.
   const outAgent = running(rec) && !unrecorded ? [rec.builder, rec.reviewer].find((a): a is LaneAgent => !!a && !!outOfWorkflow?.has(a.id)) : undefined
   const independent = outAgent ? { reason: 'independent' as const, card: current, agent: named(outAgent).name } : null
+  // Its builder or reviewer by a role that doesn't do its part (HI-2664, `offSide`: main's, by agent id: a lane from
+  // before roles counted, or an agent's guessed role): its tools follow its role, so it pauses until the user gives the
+  // lane another agent or that agent a role that does it. Its work in flight stays as it is.
+  const offAgent = running(rec) && !unrecorded && !outAgent ? [rec.builder, rec.reviewer].find((a): a is LaneAgent => !!a && !!offSide?.has(a.id)) : undefined
+  const wrongSide = offAgent ? { reason: 'offSide' as const, card: current, agent: named(offAgent).name, part: offSide!.get(offAgent.id)! } : null
   // Waiting for a slot (#1438, `slot`: the main side's): lent none yet, so nothing of it can start; only what already
   // waits for the user, or its hooks, says more. A free slot held (HI-2466): which, and what holds it.
   const held = slot?.held ?? null
@@ -308,7 +313,7 @@ export function laneView(rec: LaneRecord, cards: ReadonlyMap<number, TaskCard | 
   const fresh = owed ? { reason: 'startWait' as const, card: current, why: 'fresh' as const, agent: freshName, ...(owed.blocked ? { freshBlocked: owed.blocked.why, ...(owed.blocked.message ? { freshWhy: owed.blocked.message } : {}) } : {}) } : null
   // Its workspace's team paused (HI-2081, `teamPaused`: main's): before anything else, as nothing of it moves until it resumes.
   const pausedTeam = running(rec) && !unrecorded && teamPaused ? { reason: 'teamPause' as const, card: current } : null
-  const status = running(rec) ? (pausedTeam ?? independent ?? hooks ?? noSlot ?? (fresh?.freshBlocked ? fresh : null) ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? fresh ?? depsWait ?? waitsStart ?? preparing) : null
+  const status = running(rec) ? (pausedTeam ?? independent ?? wrongSide ?? hooks ?? noSlot ?? (fresh?.freshBlocked ? fresh : null) ?? found ?? (line != null ? { reason: 'lineUpdate' as const, card: line } : null) ?? fresh ?? depsWait ?? waitsStart ?? preparing) : null
   // Reviewed by the pool (#1443): who gave its current card's last verdict, and who reviews it now (#1446), by name.
   const now = rec.pool && running(rec) && current !== null ? facts?.get(current) : undefined
   const agentName = (id: string): string => names?.get(id) ?? (rec.builder.id === id ? rec.builder.name : id)
@@ -369,7 +374,7 @@ export interface LaneCardFacts {
 }
 
 /** The reasons that pause a lane: it can't go on to its next card until they clear. */
-const PAUSING: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit', 'notMerged', 'merging', 'hooks', 'slot', 'teamPause', 'independent'])
+const PAUSING: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit', 'notMerged', 'merging', 'hooks', 'slot', 'teamPause', 'independent', 'offSide'])
 /** The reasons that already wait for the user: they say more than an agent's hooks not arriving (#1336). */
 const USERS: ReadonlySet<LaneWaitReason> = new Set(['blocked', 'hold', 'you', 'roundLimit'])
 
@@ -457,6 +462,7 @@ const L = {
   lineUpdate: agentMsg({ id: 'lane.status.lineUpdate', text: "waiting: bringing the builder's branch up to date before {card}", note: "A lane's next card waits while its builder's branch is brought up to date (§16.19.2)." }),
   listChanges: agentMsg({ id: 'lane.status.listChanges', text: 'list changes after {card}', note: "A change of the lane's card list is queued: it applies once {card}, the card in flight, is Done." }),
   independent: agentMsg({ id: 'lane.status.independent', text: "paused: {agent} is Independent now (its connection launches it without Combwork's tools, or its role was changed): give the lane another agent, or end it", note: "A lane pauses while its builder or reviewer is Independent (HI-2670): Combwork gives that agent nothing. The user gives the lane another agent or ends it." }),
+  offSide: agentMsg({ id: 'lane.status.offSide', text: "paused: {agent} isn't a {part, select, builder {builder} other {reviewer}} by its role, so it has no {part, select, builder {builder's} other {reviewer's}} tools: give the lane another {part, select, builder {builder} other {reviewer}}, or make {agent} a {part, select, builder {builder} other {reviewer}} or either-role agent", note: "A lane pauses while its builder or reviewer has a role that doesn't do its part (HI-2664: an agent's Combwork tools follow its role): nothing new is given to it for the lane; its work in flight stays." }),
   hooks: agentMsg({ id: 'lane.status.hooks', text: "paused: {agent}'s hooks aren't arriving", note: "A lane pauses while its builder's or reviewer's hooks aren't arriving (#1336): nothing is typed into that agent." }),
   checkCopy: agentMsg({ id: 'lane.status.checkCopy', text: 'waiting for a check copy for {card}', note: "A lane waits for a check copy (a copy at the card's revision for its checks)." }),
   slot: agentMsg({ id: 'lane.status.slot', text: 'waiting for a slot', note: 'A lane started with no slot free waits for one to be lent to it (#1438).' }),
@@ -554,6 +560,8 @@ export function laneStatusText(s: LaneStatus): string {
       return say(L.hooks, { agent: s.agent ?? say(L.anAgent) })
     case 'independent':
       return say(L.independent, { agent: s.agent ?? say(L.anAgent) })
+    case 'offSide':
+      return say(L.offSide, { agent: s.agent ?? say(L.anAgent), part: s.part ?? 'reviewer' })
     case 'checkCopy':
       return say(L.checkCopy, { card })
     case 'slot':
@@ -670,19 +678,19 @@ export function readLanes(data: unknown): LaneRecord[] {
 }
 
 /** A lane's cards, from untrusted arguments: whole card numbers, in order, no repeats, at least one. */
-export function laneCards(v: unknown): number[] | string {
-  if (!Array.isArray(v) || !v.length) return say(L.cardsNone)
-  if (v.length > LANE_MAX_CARDS) return say(L.cardsMax, { max: LANE_MAX_CARDS })
-  if (!v.every((n) => whole(n, 1e9))) return say(L.cardsNumbers)
-  if (new Set(v).size !== v.length) return say(L.cardsRepeat)
+export function laneCards(v: unknown): number[] | Said {
+  if (!Array.isArray(v) || !v.length) return sayWithId(L.cardsNone)
+  if (v.length > LANE_MAX_CARDS) return sayWithId(L.cardsMax, { max: LANE_MAX_CARDS })
+  if (!v.every((n) => whole(n, 1e9))) return sayWithId(L.cardsNumbers)
+  if (new Set(v).size !== v.length) return sayWithId(L.cardsRepeat)
   return v as number[]
 }
 
-/** A number of rounds or minutes from untrusted arguments (undefined: the default); a string says what's wrong. */
-export function laneNumber(v: unknown, what: 'rounds' | 'waitMinutes', fallback: number): number | string {
+/** A number of rounds or minutes from untrusted arguments (undefined: the default), or what's wrong. */
+export function laneNumber(v: unknown, what: 'rounds' | 'waitMinutes', fallback: number): number | Said {
   if (v === undefined || v === null) return fallback
   const max = what === 'rounds' ? LANE_MAX_ROUNDS : LANE_MAX_WAIT_MINUTES
-  if (typeof v !== 'number' || !Number.isFinite(v) || Math.round(v) < 1 || Math.round(v) > max) return say(L.numberRange, { what, max })
+  if (typeof v !== 'number' || !Number.isFinite(v) || Math.round(v) < 1 || Math.round(v) > max) return sayWithId(L.numberRange, { what, max })
   return Math.round(v)
 }
 

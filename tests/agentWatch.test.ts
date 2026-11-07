@@ -178,7 +178,7 @@ describe('agent watches (main/watches.ts)', async () => {
     const beta = join(path, 'beta')
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
     mkdirSync(join(beta, '.combwork'), { recursive: true })
-    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder' }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Second' }] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Builder', workflowRole: 'either' }, { id: 'a2', name: 'Reviewer', workflowRole: 'either' }, { id: 'a3', name: 'Second' }] }))
     writeFileSync(join(beta, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'Other' }] }))
     const w = createWorkspaceService()
     await w.open(path)

@@ -245,6 +245,7 @@
   "service.workflow.changedMeanwhile": "工作流程选项在此期间已更改（在另一个窗口中，或由助手更改），因此没有保存任何内容。此部分显示的是它们现在的状态。",
   "service.workflow.closed": "此卡片所属的工作区已关闭",
   "service.workflow.inheritor": "项目 {project} 继承这些选项，此更改会使它的选项相互矛盾：",
+  "service.workflow.targetInUse": "{branch} 正被以下各项使用，无法从“工作可合并到的其他分支”中移除：{uses}。请先为它们更改目标或完成它们。",
   "service.workflowNotice.blocked": "{card} 受阻：{reason}",
   "service.workflowNotice.blockedNoReason": "{card} 受阻",
   "service.workflowNotice.failed": "{card} 评审未通过",

@@ -40,7 +40,7 @@ const toolReplies = await import('../src/shared/toolReplies')
 const { checksView, intentText } = toolReplies
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
-const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
+const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, INTENT_TOOLS, WORKER_ONLY_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -74,7 +74,7 @@ async function workspace(options: object = PAIR): Promise<{ w: WS; repo: string;
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
-  const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Other' }]
+  const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Other', workflowRole: 'either' }]
   writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
@@ -970,14 +970,17 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(checksView(names, 'AL-1', true)).toEqual({ checks: names, checksHint: hint(true) })
   })
 
-  it('every agent has the intent tools, Codex too (#913: enabled_tools is CW_TOOLS); the Assistant at Control agents, never start_card', () => {
+  it('every agent has the intent tools, Codex too (#913: enabled_tools is CW_TOOLS); the Assistant only cw_ask_user of them (HI-2664), never start_card', () => {
     for (const t of [...INTENT_TOOLS, 'cw_start_card']) {
       expect(CW_TOOLS).toContain(t)
       expect(ASSISTANT_ONLY_TOOLS).not.toContain(t)
     }
     expect(AGENT_ONLY_TOOLS).toContain('cw_start_card')
     expect(assistantTools('look')).not.toContain('cw_verdict')
-    expect(assistantTools('agents')).toEqual(expect.arrayContaining(INTENT_TOOLS))
+    // The Assistant coordinates cards and never builds or reviews them (HI-2664): of the intents, only asking the user.
+    expect(assistantTools('agents')).toContain('cw_ask_user')
+    for (const t of WORKER_ONLY_TOOLS) expect(assistantTools('projects', true, true)).not.toContain(t)
+    expect(WORKER_ONLY_TOOLS).toEqual(['cw_put_back', 'cw_submit', 'cw_declare_paths', 'cw_start_review', 'cw_verdict', 'cw_report_merge', 'cw_cannot_within_rules', 'cw_request_builder', 'cw_loop_step', 'cw_focused_skip'])
     expect(assistantTools('projects')).not.toContain('cw_start_card')
   })
 })

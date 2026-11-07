@@ -98,7 +98,7 @@ describe('board events (#1011)', () => {
 
   beforeAll(async () => {
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
-    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2', workflowRole: 'either' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     off = onCombworkEvent((e: CombworkEvent) => {
