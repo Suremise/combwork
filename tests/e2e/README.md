@@ -407,7 +407,10 @@ a Vitest loader, the `module` module, `eval`, `vi` other than its calls that loa
 list makes its file unknown with no rule of its own. A worker or a node process is unknown outside `src/` (a test
 running or naming a script); in `src/` it runs one of the build's entries (`electron.vite.config.ts`'s main input), so
 it counts only when the change is in what an entry loads, or the entries can't be read; a `node -e` script is read as a
-file of its own. External programs (git, the CLIs) are the boundary. A changed `import type` counts for nothing. A
+file of its own. External programs (git, the CLIs) are the boundary, and so is a loader deliberately hidden (eval or
+`Function` reached through globals or built keys, a loader chosen through an environment variable): the gate covers
+the forms this repository's tests use or would plausibly write (Darren's review bar for HI-2677), still catching any
+`eval`, `Function` or `constructor` reference, and a guard can refuse hidden ones in tests if they ever appear. A changed `import type` counts for nothing. A
 `WorkspaceService` member keeps nearly every test of main, since nearly every one names `workspace`: narrowing those
 by which receivers can be one is HI-2678. Measured at 1.2.0's head (HI-2677, round 5): 370 files are unknown (six in
 `src/`: the queue's launcher and git host, whose `node -e` scripts are built from text, `cw-mcp.ts`, and three renderer

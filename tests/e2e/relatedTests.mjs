@@ -36,6 +36,12 @@
 // run code is on the allowlist; a test's closure only when every file in it is known; a worker entry's closure, the
 // same (else every starter counts); the global object only as `G.name`.
 //
+// The review bar (Darren, 7 Nov, HI-2677/r96: "(a)"): the gate covers the ways this repository's code and tests load
+// modules, or would plausibly write. A loader deliberately hidden (eval or Function reached through globals or built
+// keys, a loader or its path chosen through an environment variable, code assembled from strings to evade a token) is
+// the documented boundary, not a gap to close here: the gate still catches the forms it names (any eval, Function or
+// constructor reference among them), and a guard can refuse such code in tests if it ever appears.
+//
 // Whatever it can't tell keeps every related test, with a reason. For a changed file (narrowChange's `all`): not code,
 // added or deleted, unparseable in either revision, a changed line outside every unit (module code, an import that
 // isn't type-only, a constructor) or in a class's field (set as an instance is made), its own module code naming a
