@@ -3430,7 +3430,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      such a pass accepted by its run id (`cw_verdict`'s `accept`, at most 50 test ids, each checked at the verdict the
      same way: `Verdict.accepted`, `{ test, run, agent }`, the original run and its agent, never relabelled; an id it
      can't stand behind is a warning, accepting nothing). A builder's own run never counts unaccepted. It is accepted as
-     review evidence (`FocusedAccepted`, with `acceptedBy` when it came by acceptance), never a run at the result; one missing returns the card (`noProof`, which may go back unchanged once that run exists), and one
+     review evidence (`FocusedAccepted`, with `acceptedBy` when it came by acceptance), never a run at the result, and read again from the card's facts at the queue's last check and in `IntegrationStarted`'s write (HI-2660: a proof gone since, by a counted failure or its acceptance gone, sends the entry round again, whose checks return the card for it); one missing returns the card (`noProof`, which may go back unchanged once that run exists), and one
      only the merge's pick adds returns it (`newProof`). The rest run once as the check `focused tests`, bracketed like a
      G9 check, the list in a file (`CW_FOCUSED_TESTS`), the results written to another (`CW_FOCUSED_RESULTS`), and
      Advanced `cw.queue.focusedJobs` (2) as `CW_FOCUSED_JOBS`: green only when the runner exited 0, it counted, and the results (read at most 1 MB) hold
