@@ -3,7 +3,9 @@
 // (the fake Claude Code signs in, no browser); agents of one workspace on different connections at once (each launch
 // logged in its own connection's folder); a second window's workspace on its own connection; a connection turned off
 // moves its agent to the default at its next safe point (its turn over, its exit typed once, resumed in the same
-// conversation); a signed-out connection is refused. The footer names the connection. Screenshots in both themes.
+// conversation); a signed-out connection is refused. The footer names the connection. A connection's own CLAUDE.md,
+// opened new in Memory, starts under the connection's name for its agents in every project (HI-2667). Screenshots in
+// both themes.
 // Nothing is turned on by itself (HI-2650): a connection added is on nowhere, a new workspace starts with none on, and
 // where connections exist but are off here the refusal and the banners say so: one off, Turn On Here (a project with no
 // agents too), which turns it on in this window's workspace only and is kept on reopening; several, Choose in Settings.
@@ -193,6 +195,26 @@ const launchedIn = (id) => lines(path.join(accountsRoot, id, 'fake-launches.json
     check('…and its run says so', (await live('a-two'))?.launchedConnection?.id === max2.id && (await live('a-one'))?.launchedConnection?.id === max1.id)
     check('the footer names the connection', !!(await lib.until(async () => (await page.locator(`.foot-connection[data-connection="${max1.id}"]`).count()) >= 1, HUNG_MS)))
     await shots('running')
+
+    // --- A connection's own instructions file (HI-2667): listed as that connection's, and opened new under its name,
+    // saying it applies to that connection's agents in every project (never the project's name).
+    const connFile = path.join(accountsRoot, max1.id, 'CLAUDE.md')
+    const connRow = (await inv('memory:list', alpha)).find((s) => s.provider === 'claude-code' && s.path.toLowerCase() === connFile.toLowerCase())
+    check("Max 1's CLAUDE.md is listed as that connection's", !!connRow && !connRow.exists && JSON.stringify(connRow.scope) === JSON.stringify({ connection: 'Max 1' }), JSON.stringify(connRow))
+    await lib.openMoreTab(page, 'Memory')
+    const connRowEl = page.locator(`.tab-body:visible .split-list .row[data-path="${connFile.replace(/\\/g, '\\\\')}"]`).first()
+    await connRowEl.click({ timeout: HUNG_MS })
+    const starter = await lib.until(async () => {
+      // The editor draws spaces as non-breaking ones.
+      const t = (await page.locator('.tab-body:visible .split-main').innerText().catch(() => '')).replace(/ /g, ' ')
+      return /# Max 1/.test(t) && /Instructions for Claude Code agents on this connection, in every project\./.test(t) ? t : null
+    }, HUNG_MS)
+    check('…opened new, it starts under the connection’s name, for its agents in every project', !!starter, await page.locator('.tab-body:visible .split-main').innerText().catch(() => ''))
+    await shots('memory-connection-starter')
+    await page.locator('.tab-body:visible .split-main .editor-toolbar button.primary').first().click({ timeout: HUNG_MS })
+    const written = await lib.until(() => (fs.existsSync(connFile) ? fs.readFileSync(connFile, 'utf8').replace(/\r\n/g, '\n') : null), HUNG_MS)
+    check('…and saved, the file has those lines', written === '# Max 1\n\nInstructions for Claude Code agents on this connection, in every project.\n', JSON.stringify(written))
+    await page.locator('.tabs .tab').filter({ has: page.locator('.tab-label', { hasText: /^Session$/ }) }).first().click({ timeout: HUNG_MS })
 
     // --- A second window: its workspace runs on its own connection.
     const next = app.waitForEvent('window')

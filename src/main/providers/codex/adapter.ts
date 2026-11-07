@@ -1454,8 +1454,8 @@ export class CodexAdapter implements ProviderAdapter {
     const p = this.id
     // The user's own file: each connection's on in the workspace (HI-1757: each is its own home), else ~/.codex's.
     const users: MemorySource[] = homes
-      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('AGENTS.md', h.name), path: join(h.home, 'AGENTS.md'), kind: 'claude-md', exists: false })) // i18n-ignore: a file's name
-      : [{ provider: p, id: 'user', label: userMemoryLabel('AGENTS.md'), path: join(codexHome(), 'AGENTS.md'), kind: 'claude-md', exists: false }] // i18n-ignore: a file's name
+      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('AGENTS.md', h.name), path: join(h.home, 'AGENTS.md'), kind: 'claude-md', exists: false, scope: { connection: h.name } })) // i18n-ignore: a file's name
+      : [{ provider: p, id: 'user', label: userMemoryLabel('AGENTS.md'), path: join(codexHome(), 'AGENTS.md'), kind: 'claude-md', exists: false, scope: 'user' }] // i18n-ignore: a file's name
     const sources: MemorySource[] = [{ provider: p, id: 'project', label: 'AGENTS.md', path: join(projectPath, 'AGENTS.md'), kind: 'claude-md', exists: false }, ...users] // i18n-ignore: a file's name
     for (const s of sources) s.exists = existsSync(s.path)
     return sources

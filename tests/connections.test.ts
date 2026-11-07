@@ -375,6 +375,9 @@ describe('what is read from a connection’s home', () => {
     const users = sources.filter((s) => s.id.startsWith('user'))
     expect(users.map((s) => s.path)).toEqual([join(accounts.accountFolder(a.id), 'CLAUDE.md')])
     expect(users[0].label).toContain('Personal')
+    // Its scope (HI-2667): that connection's, by its name, so a new file is headed with it; the project's files have none.
+    expect(users[0].scope).toEqual({ connection: 'Personal' })
+    expect(sources.filter((s) => s.kind !== 'auto-memory' && !s.id.startsWith('user')).map((s) => s.scope)).toEqual([undefined, undefined, undefined])
   })
 
   it('files: a connection’s memory and skills allowed, never its login or settings, never another home', async () => {
