@@ -388,7 +388,9 @@ const cliPath = (cmd, places) => {
 const cliInstalled = {
   claude: () => cliPath('claude', [join(process.env.USERPROFILE || '', '.local', 'bin', 'claude.exe')]),
   codex: () => cliPath('codex', [join(process.env.APPDATA || '', 'npm', 'codex.cmd')]),
-  copilot: () => cliPath('copilot', [join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links', 'copilot.exe'), join(process.env.APPDATA || '', 'npm', 'copilot.cmd')])
+  copilot: () => cliPath('copilot', [join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links', 'copilot.exe'), join(process.env.APPDATA || '', 'npm', 'copilot.cmd')]),
+  // Google's installer's place (Combwork looks there too).
+  agy: () => cliPath('agy', [join(process.env.LOCALAPPDATA || '', 'agy', 'bin', 'agy.exe')])
 }
 /**
  * False only when Claude Code itself says it isn't signed in to its test home (`claude auth status --json`, with
@@ -421,6 +423,8 @@ function skipReason(s) {
   if (needs.includes('codex') && !lib.codexSignedIn()) return `environment: Codex isn't signed in to ${lib.CODEX_HOME}`
   // Offline against the stand-in model: no sign-in to ask about.
   if (needs.includes('copilot') && !cliInstalled.copilot()) return "environment: the GitHub Copilot CLI isn't installed (copilot)"
+  // The PC's own sign-in (agy has no test home): the suite itself skips, saying so, when it isn't signed in.
+  if (needs.includes('agy') && !cliInstalled.agy()) return "environment: the Antigravity CLI isn't installed (agy)"
   return null
 }
 
@@ -428,11 +432,11 @@ function skipReason(s) {
 // Code or use the Codex test home share those with each other (not with the rest), so they run one at a time, in one
 // slot beside the side-by-side ones. Last, alone: those marked serial (window focus…) and the installer's.
 // With --jobs 1 everything runs one after another, as before.
-const NEEDS = ['claude', 'codex', 'packaged']
+const NEEDS = ['claude', 'codex', 'agy', 'packaged']
 const rank = (s) => Math.max(-1, ...(s.needs ?? []).map((n) => NEEDS.indexOf(n)))
 const needs = (s, n) => (s.needs ?? []).includes(n)
 const isLast = (s) => !!s.serial || needs(s, 'packaged')
-const isCli = (s) => !isLast(s) && (needs(s, 'claude') || needs(s, 'codex'))
+const isCli = (s) => !isLast(s) && (needs(s, 'claude') || needs(s, 'codex') || needs(s, 'agy'))
 const sideBySide = jobs === 1 ? [] : runnable.filter((s) => !isLast(s) && !isCli(s))
 const cliLane = jobs === 1 ? [] : runnable.filter(isCli).sort((a, b) => rank(a) - rank(b))
 const last = jobs === 1 ? [...runnable].sort((a, b) => rank(a) - rank(b)) : runnable.filter(isLast).sort((a, b) => rank(a) - rank(b))

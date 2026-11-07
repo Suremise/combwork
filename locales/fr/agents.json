@@ -16,7 +16,7 @@
   "agents.antigravity.ask": "Demander",
   "agents.antigravity.askDescription": "Demande avant les modifications, les commandes et les autres outils qu’il n’a pas le droit d’exécuter.",
   "agents.antigravity.auto": "Auto",
-  "agents.antigravity.autoDescription": "Exécute les commandes sans demander, dans le propre bac à sable d’Antigravity. Nécessite Windows 11 24H2 ou une version ultérieure avec la mise à jour d’août 2026, et n’est pas disponible pour les comptes professionnels ou d’entreprise.",
+  "agents.antigravity.autoDescription": "Exécute les commandes sans demander, dans le propre bac à sable d’Antigravity. Nécessite Windows 11 24H2 ou une version ultérieure, et n’est pas disponible pour les comptes professionnels ou d’entreprise.",
   "agents.antigravity.bypass": "Ignorer toutes les autorisations",
   "agents.antigravity.bypassDescription": "Approuve chaque outil, commande et modification de fichier sans demander, partout. À utiliser uniquement là où des modifications sans surveillance sont acceptables.",
   "agents.antigravity.extensionNote": "Tu as l’agent d’Antigravity dans un éditeur. Combwork n’utilise pas la copie de l’éditeur. Installe l’Antigravity CLI autonome ; ton éditeur continue de fonctionner comme avant.",

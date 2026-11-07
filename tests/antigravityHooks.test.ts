@@ -6,6 +6,9 @@
 // /rewind another of its own), the replies as 1.5.0 takes them, and the status line.
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { createServer } from 'http'
+import type { AddressInfo } from 'net'
+import { spawn } from 'child_process'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -14,7 +17,7 @@ const base = tempDir('cw-agy-hooks-')
 process.env.CW_USER_DATA = join(base, 'userdata')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const { AGY_EVENTS, PREPARED, agyHooks, agyLockReply, agyNoticeGiven, agyNoticeReply, agyNoticeWanted, agyStartContextReply, agyStatusAsk, agyStatusIdle, agyStopContinues, editedPaths, memoOf, normalizeAgyHook, prepareAgyHook, stepAt, AgyLaunchMemo } = await import('../src/main/providers/antigravity/hooks')
+const { AGY_EVENTS, AGY_HOOK_ALLOW_VAR, AGY_HOOK_AUTH_VAR, PREPARED, agyHookEnv, agyHooks, agyLockReply, agyNoticeGiven, agyNoticeReply, agyNoticeWanted, agyStartContextReply, agyStatusAsk, agyStatusIdle, agyStopContinues, editedPaths, memoOf, normalizeAgyHook, prepareAgyHook, stepAt, AgyLaunchMemo } = await import('../src/main/providers/antigravity/hooks')
 const { profilesRoot } = await import('../src/main/providers/antigravity/home')
 const { launchSettings } = await import('../src/main/providers/antigravity/adapter')
 const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
@@ -46,31 +49,74 @@ const fixture = (name: string): string => readFileSync(join(T, name), 'utf8').re
 describe("Combwork's hooks in the agent's profile", () => {
   const url = 'http://127.0.0.1:47822/hook?run=r-1'
   it('one named hook with each event agy has, the tool events under a matcher, each forwarding with the launch token', () => {
-    const h = agyHooks(url, 'C:\\data\\launches\\r-1\\hook-auth.txt', true).combwork as Record<string, any[]>
+    const h = agyHooks(url, true).combwork as Record<string, any[]>
     expect(Object.keys(h)).toEqual([...AGY_EVENTS])
     expect(h.SessionStart[0].type).toBe('command')
     expect(h.PreToolUse[0].matcher).toBe('*')
     const cmd = h.PreToolUse[0].hooks[0].command as string
-    expect(cmd).toContain('"http://127.0.0.1:47822/hook?run=r-1&event=PreToolUse"')
-    expect(cmd).toContain('-H "@C:/data/launches/r-1/hook-auth.txt"')
+    expect(cmd).toContain(' http://127.0.0.1:47822/hook?run=r-1^&event=PreToolUse')
+    expect(cmd).toContain(`-H %${AGY_HOOK_AUTH_VAR}%`)
+    expect(agyHookEnv('C:\\data\\launches\\r-1\\hook-auth.txt')[AGY_HOOK_AUTH_VAR]).toBe('"@C:/data/launches/r-1/hook-auth.txt"')
     expect(cmd).not.toMatch(/Bearer/)
     // agy's limit past curl's own, so curl ends first.
     expect(h.Stop[0].timeout).toBeGreaterThan(Number(/-m (\d+)/.exec(h.Stop[0].command)![1]))
   })
   it("a tool's hook answers allow when Combwork can't be reached (1.5.0 takes no answer as a denial); the others don't", () => {
-    const h = agyHooks(url, 'a.txt', true).combwork as Record<string, any[]>
-    expect(h.PreToolUse[0].hooks[0].command).toMatch(/ \|\| echo \{"decision":"allow"\}$/)
+    const h = agyHooks(url, true).combwork as Record<string, any[]>
+    expect(h.PreToolUse[0].hooks[0].command).toMatch(new RegExp(` \\|\\| echo %${AGY_HOOK_ALLOW_VAR}%$`))
+    expect(agyHookEnv('a.txt')[AGY_HOOK_ALLOW_VAR]).toBe('{"decision":"allow"}')
     expect(h.Stop[0].command).not.toContain('||')
   })
   it('without the tool hooks (its switch): the other events only', () => {
-    expect(Object.keys(agyHooks(url, 'a.txt', false).combwork as object)).toEqual(['SessionStart', 'PreInvocation', 'PostInvocation', 'Stop'])
+    expect(Object.keys(agyHooks(url, false).combwork as object)).toEqual(['SessionStart', 'PreInvocation', 'PostInvocation', 'Stop'])
   })
-  it('quoting on Windows: a path with spaces and non-ASCII letters stays one argument for cmd /c', () => {
-    const auth = 'C:\\Users\\Zoë Ångström\\AppData\\Local\\Combwork\\launches\\r 1\\hook-auth.txt'
-    const cmd = (agyHooks(url, auth, true).combwork as Record<string, any[]>).Stop[0].command as string
-    expect(cmd).toContain('-H "@C:/Users/Zoë Ångström/AppData/Local/Combwork/launches/r 1/hook-auth.txt"')
-    // Nothing cmd would split or expand outside quotes: the URL's & is inside its quotes, and no %.
-    expect(cmd.replace(/"[^"]*"/g, '')).not.toMatch(/[&%^|<>]/)
+  // HI-2548's run of the real agy 1.5.0: it runs a hook's command as `cmd /c "<command>"` with each `"` escaped as `\"`
+  // (its probe recorded the command line), so a quoted argument reached curl with its backslashes (exit 3: malformed URL)
+  // and no hook ever reached Combwork. The command holds no quote; its quoted values come from the launch's environment.
+  it('a command agy can run: no quote in it, every hook and the status line', () => {
+    const h = agyHooks(url, true).combwork as Record<string, any[]>
+    const commands = [...Object.values(h).flatMap((x) => x.flatMap((y) => (y.hooks ?? [y]).map((z: { command: string }) => z.command))), (launchSettings({ hookUrl: url, hookAuthFile: 'a.txt', mcpServers: {}, trustedCombworkTools: undefined }, true) as any).statusLine.command]
+    expect(commands).toHaveLength(7)
+    for (const c of commands) expect(c, c).not.toContain('"')
+  })
+  it.runIf(process.platform === 'win32')('…which, run as agy runs it, posts to Combwork with the token file, a path with spaces and non-ASCII letters, and the URL whole', async () => {
+    const dir = join(tempDir('cw-agy-hookcmd-'), 'Zoë Ångström', 'launches', 'r 1')
+    mkdirSync(dir, { recursive: true })
+    const auth = join(dir, 'hook-auth.txt')
+    writeFileSync(auth, 'Authorization: Bearer launch-token\n')
+    const got: { url: string; auth: string; body: string }[] = []
+    const server = createServer((req, res) => {
+      let posted = ''
+      req.on('data', (d) => (posted += d))
+      req.on('end', () => {
+        got.push({ url: req.url ?? '', auth: String(req.headers.authorization ?? ''), body: posted })
+        res.end('{"decision":"allow"}')
+      })
+    })
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()))
+    const port = (server.address() as AddressInfo).port
+    try {
+      const hookUrl = `http://127.0.0.1:${port}/hook?run=r-1`
+      const cmd = (agyHooks(hookUrl, true).combwork as Record<string, any[]>).Stop[0].command as string
+      // agy's command line, as its probe recorded it: cmd /c, the command quoted, each " in it escaped as \".
+      const asAgy = (c: string) =>
+        new Promise<{ code: number | null; out: string }>((resolve) => {
+          const p = spawn(process.env.ComSpec || 'cmd.exe', [`/c "${c.replace(/"/g, '\\"')}"`], { windowsVerbatimArguments: true, env: { ...process.env, ...agyHookEnv(auth) }, windowsHide: true })
+          let out = ''
+          p.stdout.on('data', (d) => (out += d))
+          p.on('close', (code) => resolve({ code, out }))
+          p.stdin.end('{"conversationId":"c-1"}')
+        })
+      const r = await asAgy(cmd)
+      expect(r.code).toBe(0)
+      expect(got).toEqual([{ url: '/hook?run=r-1&event=Stop', auth: 'Bearer launch-token', body: '{"conversationId":"c-1"}' }])
+      // PreToolUse's fallback, with Combwork gone: agy reads allow.
+      server.close()
+      const pre = (agyHooks(`http://127.0.0.1:${port}/hook?run=r-1`, true).combwork as Record<string, any[]>).PreToolUse[0].hooks[0].command as string
+      expect(JSON.parse((await asAgy(pre)).out.trim())).toEqual({ decision: 'allow' })
+    } finally {
+      server.close()
+    }
   })
   it("the status line runs under agy's own (stack_with_default), and Combwork's tools are allowed as agy writes rules", () => {
     const ctx = { hookUrl: url, hookAuthFile: 'a.txt', mcpServers: { [TOOLS_SERVER]: { command: 'x' } }, trustedCombworkTools: undefined as string[] | undefined }

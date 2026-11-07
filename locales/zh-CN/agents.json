@@ -16,7 +16,7 @@
   "agents.antigravity.ask": "询问",
   "agents.antigravity.askDescription": "在编辑、命令以及不允许它运行的其他工具之前询问。",
   "agents.antigravity.auto": "自动",
-  "agents.antigravity.autoDescription": "在 Antigravity 自己的沙盒中运行命令，无需询问。需要 Windows 11 24H2 或更高版本并安装 2026 年 8 月更新，且不适用于企业或商业账户。",
+  "agents.antigravity.autoDescription": "在 Antigravity 自己的沙盒中运行命令，无需询问。需要 Windows 11 24H2 或更高版本，企业和商业账户不可用。",
   "agents.antigravity.bypass": "跳过所有权限",
   "agents.antigravity.bypassDescription": "在任何位置都无需询问即批准每个工具、命令和文件更改。仅在可以接受无人值守更改的地方使用。",
   "agents.antigravity.extensionNote": "你在编辑器中有 Antigravity 的智能体。Combwork 不使用编辑器中的副本。请安装独立的 Antigravity CLI；你的编辑器会照常工作。",

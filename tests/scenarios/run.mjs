@@ -3,6 +3,7 @@
 //   npm run scenarios                                     # the fake Claude Code: free, deterministic, every check
 //   npm run scenarios -- --provider fake-codex            # the fake Codex, the same
 //   npm run scenarios -- --provider fake-copilot          # the real Copilot CLI offline against a scripted model: the same
+//   npm run scenarios -- --provider fake-antigravity      # the fake Antigravity CLI (tests/e2e/fake-agy): the same
 //   npm run scenarios -- --provider claude-code --model haiku --budget 2      # model trials (opt-in, cost tokens)
 //   npm run scenarios -- --provider codex --model gpt-5.6-luna --only work-on-card,review-card
 //   npm run scenarios -- --dialect "my/Opus 5.5 v2.json" --only work-on-card   # a dialect file in the model slot (HI-2439)
@@ -109,7 +110,7 @@ const repeats = Math.max(1, Math.min(20, Number(arg('repeat', '1')) || 1))
 const baselineName = arg('save-baseline', '')
 const fake = !!PROVIDERS[provider]?.fake
 if (!PROVIDERS[provider]) {
-  console.error(`Unknown provider "${provider}": fake, fake-codex, fake-copilot, claude-code or codex.`)
+  console.error(`Unknown provider "${provider}": fake, fake-codex, fake-copilot, fake-antigravity, claude-code or codex.`)
   process.exit(2)
 }
 // --dialect <file> (HI-2439): a dialect file in the model slot of every agent of the provider's CLI, its chain recorded

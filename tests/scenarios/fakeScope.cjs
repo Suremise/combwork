@@ -1,4 +1,4 @@
-// Which fake providers run each scenario (HI-2663). A fake run (fake, fake-codex, fake-copilot) tests Combwork's
+// Which fake providers run each scenario (HI-2663). A fake run (fake, fake-codex, fake-copilot, fake-antigravity) tests Combwork's
 // machinery: each fake sends `cw TOOL {json}` to the same Combwork MCP server (tests/e2e/fake-bridge.cjs; Copilot's own
 // MCP client, tests/e2e/fake-copilot-api.cjs), so what a call does after the server is the same for every provider.
 // Running a scenario on all three proves something only where its fake script exercises what differs per CLI: skill
@@ -48,7 +48,7 @@ const MODEL_TRIALS_ONLY = [
 
 const NOT_A_TRIAL = ['tool-sweep']
 
-const FAKES = ['fake', 'fake-codex', 'fake-copilot']
+const FAKES = ['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity']
 
 /** The fakes a scenario runs on: every fake, ['fake'], or [] (model trials only). */
 function fakesFor(id) {
@@ -68,7 +68,7 @@ function scopeProblems(ids) {
 }
 
 /**
- * The scenarios a run takes, for a provider (its key: fake, fake-codex, fake-copilot, claude-code, codex): { run, excluded }.
+ * The scenarios a run takes, for a provider (its key: fake, fake-codex, fake-copilot, fake-antigravity, claude-code, codex): { run, excluded }.
  * listed: the scenarios asked for (all, or --only's). excluded: [{ id, why }], those a run of this provider leaves out,
  * each to be said (never silently dropped), with where it does run.
  */
