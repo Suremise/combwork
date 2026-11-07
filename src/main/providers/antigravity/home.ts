@@ -2,7 +2,7 @@ import { homedir } from 'os'
 import { app } from 'electron'
 import { profileFolder } from '../../../shared/appName'
 import { localProfileInUse } from '../../profileFolders'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { ANTIGRAVITY } from '../../../shared/antigravity'
 import { overrides } from '../../advancedValues'
 
@@ -67,6 +67,27 @@ export function localDataRoot(): string {
  * launches: agy keeps the agent's conversations in it.
  */
 export const profilesRoot = (): string => join(localDataRoot(), 'antigravity', 'profiles')
+
+/**
+ * The profile agy's checks run in (HI-2698): its version, sign-in and models, everything Combwork runs outside an agent's
+ * launch. Under Combwork's own local data (a test copy's under its test data), never the user's own: agy writes its home
+ * (logs, its conversation index, its onboarding state) on every run, and Combwork never writes the user's ~\.gemini. The
+ * sign-in is Windows Credential Manager's, so a check here sees the same account an agent does.
+ */
+export const checkProfile = (): string => join(localDataRoot(), 'antigravity', 'check')
+
+/** An environment for agy outside an agent's launch: its own (antigravityEnv) in the check profile. */
+export const checkEnv = (env: Record<string, string>): Record<string, string> => inProfile(antigravityEnv(env), checkProfile())
+
+/** The user's own profile folder (agy's home when nothing else is given): never one Combwork runs agy in. */
+export const userProfileFolder = (): string => resolve(homedir())
+
+/** Whether an environment would run agy in the user's own profile (no USERPROFILE of its own, or the user's). */
+export function inUserProfile(env: Record<string, string | undefined>, user: string = userProfileFolder()): boolean {
+  const key = Object.keys(env).find((k) => k.toUpperCase() === 'USERPROFILE')
+  const p = key ? env[key] : undefined
+  return !p || resolve(p).toLowerCase() === resolve(user).toLowerCase()
+}
 
 /** Where agy keeps an agent's conversations in its profile: brain\<conversation id>. */
 export const brainDir = (profile: string): string => join(profile, '.gemini', 'antigravity-cli', 'brain')

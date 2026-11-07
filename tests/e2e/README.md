@@ -388,6 +388,37 @@ suite or a source file; `tests/e2esuites.test.ts` checks every suite and source 
 tests use (`tests/*.test.ts` and their helpers in `tests/`, `vitest.config.ts`, CI's workflow: `UNIT_ONLY`) selects no
 suite, so an e2e suite or scenario must never load a `.ts` helper from `tests/` (the unit test fails if one does).
 
+**The picker's unit tests** (`node tests/e2e/affected.mjs --pick`, the merge queue's focused tests) are a changed test
+file, those `UNIT_SCANS` names for a change, and those Vitest relates by import (`vitest list --changed`) **narrowed by
+name** (HI-2677, `relatedTests.mjs`): a related test stays when a file it loads (by the import graph read there, with
+the setup files) names a changed part or what holds it: the table or const it is in, what in its file names it, and for
+a class's member its class and whatever names that (a factory, an instance). It leaves out a test only when none does,
+so a key built at run time can still reach the part only through something named. **Whatever it can't tell keeps every
+related test**, with a reason in the picker's output: a changed file that isn't code, is added, deleted or unparseable,
+has a changed line outside every function, method or entry (module code, an import that isn't type-only, a
+constructor) or in a class's field, or whose module code names a changed part; a test the graph doesn't connect to the
+change; one loading a file that uses the module whole, as the graph resolves its imports (`import * as` other than
+`mod.name`, `export *`, a `require` or `import()` not taken apart by name, `vi.importActual`, `vi.mock` from the
+original, a glob of it) or lists keys by reflection; and one loading an **unknown** file, whatever else reaches the
+change. What a file loads is an allowlist (literal static imports, `import()`, `require()`, a `createRequire` require,
+Vitest's mocks and `importActual`, `import.meta.glob`): those are taken and blanked with the comments, types and strings,
+and a gate reads what is left for any other way to load or run code (`LOADS_CODE`: `require`, `import(`, `import.meta`,
+a Vitest loader, the `module` module, `eval`, `vi` other than its calls that load nothing…), so any form not on the
+list makes its file unknown with no rule of its own. A worker or a node process is unknown outside `src/` (a test
+running or naming a script); in `src/` it runs one of the build's entries (`electron.vite.config.ts`'s main input), so
+it counts only when the change is in what an entry loads, or the entries can't be read; a `node -e` script is read as a
+file of its own. External programs (git, the CLIs) are the boundary, and so is a loader deliberately hidden (eval or
+`Function` reached through globals or built keys, a loader chosen through an environment variable): the gate covers
+the forms this repository's tests use or would plausibly write (Darren's review bar for HI-2677), still catching any
+`eval`, `Function` or `constructor` reference, and a guard can refuse hidden ones in tests if they ever appear. A changed `import type` counts for nothing. A
+`WorkspaceService` member keeps nearly every test of main, since nearly every one names `workspace`: narrowing those
+by which receivers can be one is HI-2678. Measured at 1.2.0's head (HI-2677, round 5): 370 files are unknown (six in
+`src/`: the queue's launcher and git host, whose `node -e` scripts are built from text, `cw-mcp.ts`, and three renderer
+files handing the global object on), so 187 of 704 test files can be left out at all, and a one-function change to
+`settingsTools.ts` still selects all 27 related. The worker entries' closure holds unknown files (`cw-mcp.ts`, the
+launcher), so every starter counts for now. When the e2e side is
+every suite the pick is still `{"every":true}`, unchanged.
+
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in
 `%LOCALAPPDATA%\combwork-test\progress-timings.json`). `npm test` does the same, a step per test file. It reports to the
@@ -568,6 +599,25 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   when `--affected` needs them. Run them when what they test can't be done with the fake Claude Code (below), and
   prefer the fake where it covers the case. Warn the user first if one could
   reach a sign-in screen; never send key presses to one.
+- **The CLI test homes start each run fresh** (HI-2606; `testHomes.mjs`, `testHomeManifest.mjs`, `testHomeLock.mjs`).
+  Before each suite that uses Claude Code's signed-in test home (`claudeHome: 'test'`) or Codex's (`needs: ['codex']`,
+  `codexHome: 'test'`), and before each real model trial, the runner takes the home's lease (one run at a time per
+  home, machine-wide; Claude Code's before Codex's, reused by what a holder starts, `CW_TEST_HOME_LEASES`) and resets it
+  to its sign-in: memory, transcripts, per-folder trust, MCP servers in `config.toml`, history, skill use, the CLIs' own
+  databases, caches and temp leftovers go; the sign-in (`.credentials.json`, `auth.json`), the PC's Codex sandbox
+  setup, Codex's downloaded packages, and `.claude.json`'s and `config.toml`'s account and onboarding fields stay (runs
+  start signed in and onboarded). The sign-in is never copied, written or put back: copies of a home would share a
+  rotating refresh token and sign each other out. A home that isn't signed in skips the suite for its environment; one
+  still in use is waited for, then refused, never ended: in use means what used it under the lease (the test copies of
+  Combwork a suite started there, noted in the lease's holder record, `holder.state`) or, after taking over from a run
+  that didn't let the home go, what that run left, and every CLI those started; a nested run reusing its parent's lease
+  never resets. One
+  whose status can't be read stops the suite. An entry `testHomeManifest.mjs` doesn't classify (a new CLI version's new
+  file) is kept, never deleted, and named in the suite's log (Darren, 7 Nov): classify it there. `--warm-homes` (e2e
+  and scenarios) skips the reset, keeping what earlier runs left, on purpose; a suite needing state from an earlier,
+  separate run says so with `home: 'warm'` in `suites.mjs` (none does today). Copilot has no long-lived test home: its
+  suites make theirs each run, and its sign-in is in Windows Credential Manager. A suite run on its own (`node
+  tests/e2e/<suite>.cjs`) takes no lease and resets nothing.
 - **`claudehome`** (#345) runs the real Claude Code in a home of its own (`claudeHome: 'own'` in `suites.mjs`), never
   the default one: a new folder each run with onboarding done and a made-up API key approved in its `.claude.json`, so
   Claude Code starts at its prompt with no sign-in, and is sent nothing (no tokens, nothing reaches Anthropic). It

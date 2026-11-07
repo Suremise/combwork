@@ -59,7 +59,8 @@ const check = (name, ok, extra = '') => {
     }
 
     // ---- Off: the user's status line shows, with the model from Claude Code's JSON; Combwork still reads the status.
-    await inv('advanced:set', SWITCH, false)
+    // Its connection's switch (HI-2670: each connection's, in its Launch Settings, no longer Settings → Advanced's).
+    await lib.setAgentLaunch(inv, proj, agent.id, { overrides: { [SWITCH.split('.').pop()]: false } })
     check('the real Claude Code is ready', await start(), JSON.stringify(await live().then((l) => l && { status: l.status })))
     const shown = await lib.until(async () => /MYLINE (?!\?)\S/.test(await screen()), HUNG_MS)
     check("off: the user's own status line shows, given Claude Code's JSON whole (its model's name)", !!shown, (await screen()).slice(-600))
@@ -68,7 +69,7 @@ const check = (name, ok, extra = '') => {
     await stop()
 
     // ---- On (the default): Combwork's alone, showing nothing.
-    await inv('advanced:set', SWITCH, true)
+    await lib.setAgentLaunch(inv, proj, agent.id, {})
     const mark = (await screen()).length
     check('on: the real Claude Code is ready', await start())
     check('…Combwork reads the status', !!(await lib.until(async () => !!(await live())?.modelName, HUNG_MS)))

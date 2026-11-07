@@ -291,10 +291,11 @@ function codexCommandLine(runId) {
       return out
     }
     record.titleOn = await titleRun(true)
-    const set = await inv('advanced:set', TITLE_ID, false)
+    // Its connection's switch (HI-2670: each connection's, in its Launch Settings, no longer Settings → Advanced's).
+    const set = await lib.setAgentLaunch(inv, proj, def.id, { overrides: { [TITLE_ID.split('.').pop()]: false } })
     check("Set Codex's terminal title: off", !!set)
     record.titleOff = await titleRun(false)
-    await inv('advanced:set', TITLE_ID, true)
+    await lib.setAgentLaunch(inv, proj, def.id, {})
     if (source) await inv('console:subscribe', [])
 
     // ---- 3. Claude Code's pane: the fake Claude Code, tracking no mouse (as Claude Code 2.1.305 at its prompt).
