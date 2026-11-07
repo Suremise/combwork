@@ -16,6 +16,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
 import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
 import { gitChangedLines, gitRevision, splitOf, unitSelection } from './affectedUnits.mjs'
+import { narrowRelatedInTree } from './relatedTests.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 
@@ -91,6 +92,7 @@ export const EVERYTHING = [
   'tests/e2e/suites.mjs',
   'tests/e2e/affected.mjs',
   'tests/e2e/affectedUnits.mjs',
+  'tests/e2e/relatedTests.mjs',
   'tests/e2e/record.mjs',
   'tests/e2e/runner.mjs',
   'tests/e2e/build.mjs',
@@ -761,7 +763,8 @@ export function changedFiles(base = 'main', cwd = process.cwd()) {
 // Combwork's merge queue calls the project's `focused.pick` command in a clean checkout of the revision, with the base
 // commit in CW_FOCUSED_BASE and the changed paths on stdin, and reads one JSON line per test (or {"every":true}).
 // The unit tests come from three places: a changed test file itself; Vitest's import graph (`vitest list --changed`,
-// which the CLI runs, so a change to code a test imports selects it); and UNIT_SCANS, for the tests that read the
+// which the CLI runs, so a change to code a test imports selects it), narrowed to the tests loading a file that names a
+// changed part (relatedTests.mjs, HI-2677: every related test where it can't tell); and UNIT_SCANS, for the tests that read the
 // repository by `git ls-files`, folder scans or file reads rather than imports, which the import graph can't see.
 // The e2e suites are affectedSuites' (above): a change it can't place means every test.
 
@@ -1020,7 +1023,10 @@ async function pickCli() {
   const added = paths.filter((p) => !atBase.has(p))
   const deleted = paths.filter((p) => atBase.has(p) && !existsSync(join(cwd, p)))
   const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
-  const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: listVitestRelated(cwd, base), units })
+  // Vitest's related tests, narrowed to those loading a file that names what changed (relatedTests.mjs, HI-2677).
+  const related = narrowRelatedInTree({ cwd, base, paths, related: listVitestRelated(cwd, base) })
+  const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: related.keep, units })
+  for (const w of related.why) console.error(w)
   for (const w of picked.why) console.error(w)
   for (const l of pickLines(picked)) console.log(l)
 }

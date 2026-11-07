@@ -388,6 +388,21 @@ suite or a source file; `tests/e2esuites.test.ts` checks every suite and source 
 tests use (`tests/*.test.ts` and their helpers in `tests/`, `vitest.config.ts`, CI's workflow: `UNIT_ONLY`) selects no
 suite, so an e2e suite or scenario must never load a `.ts` helper from `tests/` (the unit test fails if one does).
 
+**The picker's unit tests** (`node tests/e2e/affected.mjs --pick`, the merge queue's focused tests) are a changed test
+file, those `UNIT_SCANS` names for a change, and those Vitest relates by import (`vitest list --changed`) **narrowed by
+name** (HI-2677, `relatedTests.mjs`): a related test stays when a file it loads (by the import graph read there, with
+the setup files) names a changed part or what holds it: the table or const it is in, what in its file names it, and for
+a class's member its class and whatever names that (a factory, an instance). It leaves out a test only when none does,
+so a key built at run time can still reach the part only through something named. **Whatever it can't tell keeps every
+related test**, with a reason in the picker's output: a changed file that isn't code, is added, deleted or unparseable,
+has a changed line outside every function, method or entry (module code, an import that isn't type-only, a
+constructor) or in a class's field, or whose module code names a changed part; a test the graph doesn't connect to the
+change; one loading a file that uses the module whole (`import * as` other than `mod.name`, `export *`, a `require` or
+`import()` not taken apart by name, `vi.importActual`, `vi.mock` from the original) or lists keys by reflection. A
+changed `import type` counts for nothing. A `WorkspaceService` member keeps nearly every test of main, since nearly
+every one names `workspace`: narrowing those by which receivers can be one is HI-2678. When the e2e side is every
+suite the pick is still `{"every":true}`, unchanged.
+
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in
 `%LOCALAPPDATA%\combwork-test\progress-timings.json`). `npm test` does the same, a step per test file. It reports to the
