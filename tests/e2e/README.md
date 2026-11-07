@@ -450,7 +450,32 @@ the forms this repository's tests use or would plausibly write (Darren's review 
 class's (which nearly every test of main names), and a file outside the app where a `WorkspaceService` loses its type
 (50 test files today, mostly fakes cast through `unknown`) is pinned: every test loading it is kept for any member.
 Measured on this tree (HI-2678): a one-method change to `setAdvanced` keeps 143 of its 365 related tests (12 load a file
-naming it, 6 import `workspace.ts` whole, 43 load a pinned file, the rest are unknown by their own loaders), before 365. Measured at 1.2.0's head (HI-2677, round 5): 370 files are unknown (six in
+naming it, 6 import `workspace.ts` whole, 43 load a pinned file, the rest are unknown by their own loaders), before 365.
+**The tests kept for a loader** (HI-2715, 7 Nov: 80 of the 371 related to `workspace.ts`, after two fixed at their
+source, `flightRecorder`'s computed `import()` and `projectRename`'s `vi.spyOn(globalThis, …)`) are kept for good reason:
+- naming a script (`'src/a.ts'`, `'cw-mcp.js'`: mostly a fixture's data) while starting a process themselves (30:
+  agentMcp, agentText.laneStart, agentText.progress, agentTextApi, agentTextWorkflow, assistantMcp, cliOwnMode,
+  codexConnections, combworkMove, copilot, core, gitInit, i18n/content, liveInfoReads, mcpCatalog, mcpFromFile,
+  mcpProjects, noneCheckPoint, oldNames, progressReport, queueGitRoute, queueRunner, reviewCopies, shellCommand,
+  slotWriters, teamParked, workflow/focused, workflow/queueChecks, workflowOptionsForm, workspaceNotes);
+- naming a script while reaching only `src` starters: every one of them reaches the three that run a caller's script
+  (`logger.ts`'s `useLogWriter`, `closeCommand/runs.ts`, `workflow/queueJobs.ts`'s supervisor), through the hubs (30:
+  admission, attachments, cardAttachmentRead, cardIntents, cardWork, combworkMove10, dialects, filesIgnore, guidance,
+  i18n/main, i18n/providers, i18n/service, i18n/tasks, i18n/worktrees, loopWakes, observe, projectDeletedInPlace,
+  projectKeys, runChecks, runLink, slotCards, titleNudge, usageMoves, watch, workflow/queueAgents, workflow/queueCommits,
+  workflow/scenarios.git, workflow/scenarios.none, workflow/texts, worktreeChanges);
+- starting a worker or a process with a script they name or write (8: advanced, agentTextLanes, boardStore through
+  `mappedShm.ts`, lanes, nameUpgrade, quietCheck, repairSlots, unusedWorktrees);
+- `eval`, `Function` or `constructor` as content: prototype names under test, a Babel visitor named `Function`
+  (agentText, agentText.slots, agentTextBoth, metrics; agentText.prompt and agentText.settings reach
+  `scripts/agentTextBoth.mjs`'s);
+- a real dynamic load (actionHandlers imports a module it writes; gitRepo names `expect.any(Function)` beside its own
+  query import; copies and slots run `node -e "require('fs')…"`; queueGitHost runs the git host in a `vm` with a
+  require; workflow/queue's regex names `require(`).
+Tried and measured, not taken: reviewing the `src` starters to run only their own entries (P2) clears none, as all 30
+reach the three that run a caller's script; following a named script by its stem and reading every string holding
+loader syntax as script text (P3′) leaves 75 kept and adds 45 related tests through its edges, so it is net worse. The
+lever left is structural: the hubs (`logger.ts`, `git.ts`, `walCheckpoint.ts`…) out of every test's closure. Measured at 1.2.0's head (HI-2677, round 5): 370 files are unknown (six in
 `src/`: the queue's launcher and git host, whose `node -e` scripts are built from text, `cw-mcp.ts`, and three renderer
 files handing the global object on), so 187 of 704 test files can be left out at all, and a one-function change to
 `settingsTools.ts` still selects all 27 related. The worker entries' closure holds unknown files (`cw-mcp.ts`, the
