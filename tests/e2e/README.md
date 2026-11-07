@@ -375,10 +375,10 @@ unchanged; HI-2652's seam selects 2 suites, and HI-2653's New Project 28 from `a
 `WorkspaceService`'s members is HI-2678.
 **The escape hatch** errs towards more, each time with a reason in the selection's output: whatever it can't follow
 selects every suite (a line in no function or entry, such as an import or module code; a file it can't parse or read in
-either revision; a public part whose trail reaches nothing that runs it, a cycle of public parts included; a value a
-file took from the module, or a variable holding it, indexed with a computed key (`x[k]`), enumerated (`Object.keys`,
-`for…in`, a spread) or let out where the tracer doesn't follow (passed to a callee not from the module, stored,
-returned, exported); a value whose provenance isn't resolved within a few bindings, or only goes round a cycle; a module
+either revision; a public part whose trail reaches nothing that runs it, a cycle of public parts included; any use of
+an import of the module other than a short safe list: `mod.name`, the part called or read by name, a function handed
+off by its name, a type. Every reference to such an import is checked, so an alias, a computed key (`x[k]`),
+`Object.keys`, a spread, a destructuring, an argument, a template or a store is every suite, whatever its form; a module
 re-exported whole; a channel built at run time; a `WorkspaceService` member), the files still in `EVERYTHING` but not
 `SPLIT` select every suite as before (each with its reason there), and a change you know is cross-cutting though it touches only a few parts (a behaviour every handler
 relies on, a type's meaning) runs `--all`, said on the card. Add an area to `affected.mjs` when you add a

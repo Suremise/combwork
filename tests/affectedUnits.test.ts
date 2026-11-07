@@ -302,7 +302,7 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
 
   it('a namespace import indexed, or the module re-exported whole', () => {
     const indexed = { 'src/renderer/src/views/X.tsx': "import * as acts from '../actions'\nexport const go = (n: string) => (acts as Record<string, () => void>)[n]()\n" }
-    expect(allOf(ACTIONS, repo(indexed), repo({ ...indexed, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/indexes acts /)
+    expect(allOf(ACTIONS, repo(indexed), repo({ ...indexed, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/uses acts \(line 2\) as a computed key/)
     const all = { 'src/renderer/src/views/Y.ts': "export * from '../actions'\n" }
     expect(allOf(ACTIONS, repo(all), repo({ ...all, [ACTIONS]: actionsTs({ one: "'a:one' as const" }) }))).toMatch(/re-exports it all/)
   })
@@ -321,30 +321,49 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
     }
   })
 
-  it('a computed access, an enumeration or an escape of the module, or of a variable holding it, selects every suite (B, C2)', () => {
+  it('any use of the module outside the safe list selects every suite, whatever its form (round 3: safe by construction)', () => {
     const cases: [string, RegExp][] = [
-      ["import * as actions from '../actions'\nexport const go = (k: string) => (actions as Record<string, () => void>)[k]()\n", /indexes actions/],
-      ["import * as actions from '../actions'\nlet a: unknown = {}\na = actions\nexport const go = (k: string) => (a as Record<string, () => void>)[k]()\n", /indexes a /],
-      ["import * as actions from '../actions'\nexport const keys = () => Object.keys(actions)\n", /enumerates \(Object\.keys\) actions/],
-      ["import * as actions from '../actions'\nexport const all = () => ({ ...actions })\n", /lets out .* actions/],
-      ["import * as actions from '../actions'\nimport { foreignLookup } from './lookup'\nexport const go = (k: string) => foreignLookup(actions)[k]()\n", /passes on \(to foreignLookup\) actions/],
-      ["import * as actions from '../actions'\nexport const box = { actions }\n", /lets out .* actions/]
+      ["import * as actions from '../actions'\nexport const go = (k: string) => (actions as Record<string, () => void>)[k]()\n", /uses actions \(line 2\) as a computed key/],
+      ["import * as actions from '../actions'\nexport const keys = () => Object.keys(actions)\n", /uses actions \(line 2\) as an argument to Object\.keys/],
+      ["import * as actions from '../actions'\nexport const all = () => ({ ...actions })\n", /uses actions \(line 2\) as a SpreadElement/],
+      ["import * as actions from '../actions'\nimport { foreignLookup } from './lookup'\nexport const go = (k: string) => foreignLookup(actions)[k]()\n", /uses actions \(line 3\) as an argument to foreignLookup/],
+      ["import * as actions from '../actions'\nexport const box = { actions }\n", /uses actions \(line 2\) as a ObjectProperty/],
+      // An alias, however long its chain or wherever its assignments go round: not followed, so every suite.
+      ["import * as actions from '../actions'\nlet a: unknown = {}\na = actions\nexport const go = (k: string) => (a as Record<string, () => void>)[k]()\n", /uses actions \(line 3\) as a AssignmentExpression/],
+      [`import * as actions from '../actions'\n${['actions', ...Array.from({ length: 10 }, (_, i) => `a${i}`)].slice(1).map((n, i, all) => `const ${n} = ${i ? all[i - 1] : 'actions'}`).join('\n')}\nexport const go = (k: string) => (a9 as Record<string, () => void>)[k]()\n`, /uses actions \(line 2\) as a VariableDeclarator/],
+      ["import * as actions from '../actions'\nlet a: unknown = actions\nlet b: unknown = a\na = b\nb = a\nexport const go = (k: string) => (a as Record<string, () => void>)[k]()\n", /uses actions \(line 2\) as a VariableDeclarator/],
+      // HR3's round-3 probes: a computed destructuring of the namespace, and a tagged template handing it to a function.
+      ["import * as actions from '../actions'\nexport function run(key: string) {\n  const { [key]: f } = actions as Record<string, () => void>\n  return f()\n}\n", /uses actions \(line 3\) as a VariableDeclarator/],
+      ["import * as actions from '../actions'\nimport { forward } from './other'\nexport const go = (key: string) => forward`${actions}`[key]()\n", /uses actions \(line 3\) as a TemplateLiteral/]
     ]
-    for (const [text, why] of cases) {
-      const r = using(text)
-      expect(r.all, text).toMatch(why)
+    for (const [text, why] of cases) expect(using(text).all, text).toMatch(why)
+  })
+
+  it('the safe uses: another unit by name, the unit called or read by name, a function handed off by its name, a type', () => {
+    PLACES['src/renderer/src/views/X.tsx'] = { suites: ['x'] }
+    try {
+      for (const text of [
+        "import * as actions from '../actions'\nexport const a = () => actions.f1()\nexport const b = () => actions.f2()\n",
+        "import * as actions from '../actions'\nexport const cb = [actions.f2, actions.f1]\nexport type T = typeof actions\n",
+        "import { f2 } from '../actions'\nexport const later = () => setTimeout(f2)\n",
+        "import * as actions from '../actions'\nexport const n = () => actions['f1']()\n"
+      ]) expect(using(text).all, text).toBeNull()
+    } finally {
+      delete PLACES['src/renderer/src/views/X.tsx']
+    }
+    // A unit that isn't a function: called or read by name, safe; passed on, not.
+    const holder = (use: string): Files => ({ [ACTIONS]: actionsTs() + 'export const TABLE = { a: 1 }\n', 'src/renderer/src/views/X.tsx': `import * as actions from '../actions'\n${use}\n` })
+    const tableChange = (use: string): Selection => select(ACTIONS, repo(holder(use)), repo({ ...holder(use), [ACTIONS]: actionsTs() + 'export const TABLE = { a: 2 }\n' }))
+    PLACES['src/renderer/src/views/X.tsx'] = { suites: ['x'] }
+    try {
+      expect(tableChange('export const v = () => actions.TABLE.a').suites).toEqual(['x'])
+      expect(tableChange('export const v = () => JSON.stringify(actions.TABLE)').all).toMatch(/uses actions\.TABLE \(line 2\) as an argument to JSON\.stringify/)
+    } finally {
+      delete PLACES['src/renderer/src/views/X.tsx']
     }
   })
 
-  it('provenance followed further than its bound, or round a cycle with no other source, is unresolved: every suite (C1)', () => {
-    const chain = ['actions', ...Array.from({ length: 10 }, (_, i) => `a${i}`)]
-    const aliases = chain.slice(1).map((n, i) => `const ${n} = ${chain[i]}`).join('\n')
-    expect(using(`import * as actions from '../actions'\n${aliases}\nexport const go = (k: string) => (a9 as Record<string, () => void>)[k]()\n`).all).toMatch(/provenance isn't resolved/)
-    // a and b only take each other's values after their start: no source of their own but the module's.
-    expect(using("import * as actions from '../actions'\nlet a: unknown = actions\nlet b: unknown = a\na = b\nb = a\nexport const go = (k: string) => (a as Record<string, () => void>)[k]()\n").all).toMatch(/indexes a /)
-  })
-
-  it('a receiver proved foreign is no fallback: a literal, a cycle whose only source is a literal, a parameter where nothing lets the module out', () => {
+  it('a value not from the module is no fallback: a local record, a cycle of locals, a parameter, a counter', () => {
     for (const text of [
       "import * as actions from '../actions'\nexport const a = () => actions.f2()\nexport const b = (k: string) => {\n  const o: Record<string, number> = {}\n  return o[k]\n}\n",
       "import * as actions from '../actions'\nexport const a = () => actions.f2()\nexport const b = (k: string) => {\n  let x: Record<string, number> = {}\n  let y = x\n  x = y\n  return x[k]\n}\n",

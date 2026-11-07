@@ -9,10 +9,10 @@
 // can't read or parse in either revision, one added or deleted, a changed line outside any unit (imports, module
 // code), a public unit (public in either revision) whose trail reaches no file that runs it (it may be reached in a
 // way a name search can't see; a cycle of public units naming only each other too), a re-export of a SPLIT module, a
-// channel named only at run time, and what a file does with a value it took from one (moduleUse, by Babel's scope
-// bindings): index it with a computed key, enumerate it, or let it escape where the tracer doesn't follow. Provenance
-// is 'derived', 'foreign' (proved) or 'unresolved' (a capped or cyclic chain), and unresolved is never foreign. A name
-// spelled in a string (`x['setX']`) is a reference like the identifier. WorkspaceService's members and instance aren't
+// channel named only at run time, and any use of an import of one that isn't on moduleUse's short list of safe forms
+// (`mod.name`, the unit called or read by name, a function handed off by its name, a type): every reference to such
+// an import, by Babel's scope bindings, is checked, so an unlisted form is every suite by construction. A name spelled
+// in a string (`x['setX']`) is a reference like the identifier. WorkspaceService's members and instance aren't
 // narrowed at all: its instances flow where this can't follow (SPLIT's `conservative`). Lines whose text is all comment
 // count for nothing, unless a comment they're in covers code in one revision and not the other.
 // tests/affectedUnits.test.ts checks each rule, and the selections of HI-2652, HI-2653 and HI-2654.
@@ -268,13 +268,8 @@ function importsModule(text, file) {
   return new RegExp(`(from\\s*|import\\s*\\(\\s*|require\\s*\\(\\s*)['"][^'"]*/${esc(base)}(\\.[a-z]+)?['"]`).test(text)
 }
 /**
- * How a file uses a SPLIT module in ways a name search can't follow: its description (why every suite), or null.
- * `export * from` it; and, by Babel's scope bindings, what a value from it (an import binding of it, or a variable
- * that is one again) is used for: indexed by a computed key (`x[k]`, k not a literal: a literal key is a name, A),
- * enumerated (Object.keys/values/entries/assign/getOwnPropertyNames/fromEntries/getPrototypeOf, Reflect.*, for…in,
- * spread), or escaping where the tracer doesn't follow it (an argument to a callee not from the module, a property, an
- * element or a member it is stored in, a return, an export). A function the module exports, handed off by its name
- * (`items.map(f1)`, `onClick={actions.f1}`), is no escape: that name is a reference, and the file naming it is placed.
+ * Whether a file's uses of a SPLIT module, for one of its units, are all ones a name search follows (moduleUse): null,
+ * or why not (every suite). `export * from` it, and any use of an import of it outside a short list of safe forms.
  */
 export function untraceable(text, file, parsed, functions, unitName) {
   const base = esc(file.replace(/^.*\//, '').replace(/\.[^.]+$/, ''))
@@ -283,138 +278,74 @@ export function untraceable(text, file, parsed, functions, unitName) {
   return moduleUse(parsed, new RegExp(`/${base}(\\.[a-z]+)?$`), functions, unitName)
 }
 
-/** How far a value's provenance is followed back, binding to binding, before it is unresolved. */
-const PROVENANCE_STEPS = 8
-const REFLECTION = /^(Object\.(keys|values|entries|assign|getOwnPropertyNames|getOwnPropertyDescriptors|fromEntries|getPrototypeOf)|Reflect\.\w+)$/
+const TS_WRAPPERS = ['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression']
 
 /**
- * A value's provenance (C1 of HI-2659's design): 'derived' (from the module: an import binding of it, or a variable
- * whose initialiser or any later assignment is one), 'foreign' (proved not: a literal, a call's or `new`'s result, a
- * function or class, a parameter — a value of the module reaches one only by an argument escape, caught where it
- * happens — or a global, likewise only by a store), or 'unresolved' (a chain longer than PROVENANCE_STEPS, or a cycle
- * of bindings): never taken as foreign.
+ * Every reference to an import of the module that can hold the unit (the namespace, the default, the unit by its own
+ * name), each checked against the uses a name search follows (HI-2659's round-3 contract, safe by construction):
+ * - `mod.other` (by name, or a literal key) for another unit: a use of that one, not of this;
+ * - for a function the module exports: `mod.fn` or `fn` anywhere (a call, or a hand-off by name, which places the
+ *   file naming it);
+ * - for any other unit: called (`mod.u(…)`, `u(…)`), or read by name (`mod.u.x`, `u.x`);
+ * - in a type (`typeof mod`, `mod.T`).
+ * Any other use (a computed key, an alias, destructuring, an argument, a spread, a template, a property, a return, an
+ * export, an operator…) is one the tracer doesn't follow: its description, so every suite. Null when all are safe.
  */
-export function provenance(path, node, fromModule, functions, seen = new Set(), depth = 0) {
-  const outcome = provenanceOf(path, node, fromModule, functions, seen, depth)
-  // A chain that only comes back to a binding already on it has no source of its own: unresolved, not proved foreign.
-  return outcome === 'cycle' ? 'unresolved' : outcome
-}
-
-// provenance's steps, with 'cycle' for a way back to a binding already on the chain: it adds no value of its own, so
-// a binding whose every other source is foreign is proved foreign (its values can only come from those).
-function provenanceOf(path, node, fromModule, functions, seen, depth) {
-  const v = unwrap(node?.type === 'AwaitExpression' ? node.argument : node)
-  if (!v) return 'foreign'
-  const combine = (outs) => {
-    if (outs.includes('derived')) return 'derived'
-    if (outs.includes('unresolved')) return 'unresolved'
-    return outs.every((o) => o === 'cycle') ? 'cycle' : 'foreign'
-  }
-  // The same binding's expression (no step), and another binding's (a step: at most PROVENANCE_STEPS of them).
-  const next = (p, n) => provenanceOf(p, n, fromModule, functions, seen, depth)
-  const hop = (p, n, s) => provenanceOf(p, n, fromModule, functions, s, depth + 1)
-  switch (v.type) {
-    case 'Identifier': {
-      const b = path.scope.getBinding(v.name)
-      if (!b) return 'foreign'
-      if (fromModule(b)) return 'derived'
-      if (seen.has(b)) return 'cycle'
-      const d = b.path.node
-      if (d.type !== 'VariableDeclarator' || d.id.type !== 'Identifier') return 'foreign'
-      if (depth >= PROVENANCE_STEPS) return 'unresolved'
-      const on = new Set([...seen, b])
-      // Each later assignment: `=` (also into a pattern) passes its value on; `+=`, `++` and the like make a number or
-      // a string; a for…of or for…in variable takes what its loop goes through; anything else is unresolved.
-      const later = b.constantViolations.map((cv) => {
-        const c = cv.node
-        if (c.type === 'AssignmentExpression') return c.operator === '=' ? hop(cv, c.right, on) : 'foreign'
-        if (c.type === 'UpdateExpression') return 'foreign'
-        if (c.type === 'ForOfStatement' || c.type === 'ForInStatement') return hop(cv, c.right, on)
-        return 'unresolved'
-      })
-      return combine([hop(b.path, d.init, on), ...later])
-    }
-    case 'ConditionalExpression':
-      return combine([next(path, v.consequent), next(path, v.alternate)])
-    case 'LogicalExpression':
-      return combine([next(path, v.left), next(path, v.right)])
-    case 'SequenceExpression':
-      return next(path, v.expressions[v.expressions.length - 1])
-    case 'AssignmentExpression':
-      return next(path, v.right)
-    case 'MemberExpression':
-    case 'OptionalMemberExpression': {
-      const o = next(path, v.object)
-      // A namespace's function, by its name: a reference, found as one.
-      if (o === 'derived' && !v.computed && functions.has(keyName(v.property))) return 'foreign'
-      return o
-    }
-    default:
-      return 'foreign'
-  }
-}
-
 function moduleUse(parsed, source, functions, unitName) {
-  // An import's binding (a type-only import's kind is 'unknown' to Babel's scopes).
-  // An import of it that can hold the unit: the module's namespace or default, or the unit by its name. (Another named
-  // import holds another unit, whose own use is checked when that one changes.)
-  const fromModule = (b) => !!b && b.path.parentPath?.node?.type === 'ImportDeclaration' && source.test(b.path.parentPath.node.source?.value ?? '') && (b.path.node.type !== 'ImportSpecifier' || keyName(b.path.node.imported) === unitName)
-  // A function the module exports, imported by its name: handing it off is a reference.
-  const functionImport = (path, node) => {
-    const v = unwrap(node)
-    if (v?.type !== 'Identifier') return false
-    const b = path.scope.getBinding(v.name)
-    return fromModule(b) && b.path.node.type === 'ImportSpecifier' && functions.has(keyName(b.path.node.imported))
-  }
-  const of = (path, node) => provenance(path, node, fromModule, functions)
-  const say = (n) => parsed.text.slice(unwrap(n).start, unwrap(n).end).replace(/\s+/g, ' ').slice(0, 60)
-  const bad = (outcome) => outcome === 'derived' || outcome === 'unresolved'
-  const why = (outcome, what, n) => `${what} ${say(n)} (line ${n.loc.start.line})${outcome === 'unresolved' ? ", whose provenance isn't resolved" : ''}, which a name can't follow`
+  const unitIsFunction = functions.has(unitName)
   let hit = null
+  const unsafe = (p, name, what) => {
+    hit ??= `uses ${name} (line ${p.node.loc?.start.line ?? '?'}) as ${what}, which a name search doesn't follow`
+  }
+  // Up through casts and parentheses, which don't change the value.
+  const outer = (p) => {
+    let q = p
+    while (q.parentPath && TS_WRAPPERS.includes(q.parentPath.node.type)) q = q.parentPath
+    return q
+  }
+  const inType = (p) => !!p.findParent((a) => a.node.type.startsWith('TS') &&!TS_WRAPPERS.includes(a.node.type) && a.node.type !== 'TSExpressionWithTypeArguments')
+  const describe = (q) => {
+    const par = q.parentPath?.node
+    if (!par) return 'module code'
+    if ((par.type === 'CallExpression' || par.type === 'NewExpression' || par.type === 'OptionalCallExpression') && par.arguments.includes(q.node)) return `an argument to ${parsed.text.slice(par.callee.start, par.callee.end).slice(0, 40)}`
+    if ((par.type === 'MemberExpression' || par.type === 'OptionalMemberExpression') && par.computed && par.object === q.node) return 'a computed key'
+    return `a ${par.type}`
+  }
+  // A use of the unit's value itself (an import of it by name, or mod.unit): safe when called or read by name.
+  const unitValueUse = (p, name) => {
+    if (unitIsFunction) return
+    const q = outer(p)
+    const par = q.parentPath?.node
+    if ((par?.type === 'CallExpression' || par?.type === 'OptionalCallExpression' || par?.type === 'NewExpression') && par.callee === q.node) return
+    if ((par?.type === 'MemberExpression' || par?.type === 'OptionalMemberExpression') && par.object === q.node && !par.computed) return
+    unsafe(q, name, describe(q))
+  }
   traverse(parsed.ast, {
-    'MemberExpression|OptionalMemberExpression'(path) {
-      const n = path.node
-      if (hit || !n.computed || ['StringLiteral', 'NumericLiteral'].includes(unwrap(n.property)?.type)) return
-      const o = of(path, n.object)
-      if (bad(o)) hit = why(o, 'indexes', n.object)
-    },
-    'CallExpression|OptionalCallExpression|NewExpression'(path) {
-      if (hit) return
-      const n = path.node
-      const callee = parsed.text.slice(n.callee.start, n.callee.end)
-      const fromIt = n.callee.type === 'Identifier' && fromModule(path.scope.getBinding(n.callee.name))
-      for (const a of n.arguments) {
-        const arg = a.type === 'SpreadElement' ? a.argument : a
-        if (functionImport(path, arg)) continue
-        const o = of(path, arg)
-        if (!bad(o)) continue
-        if (REFLECTION.test(callee)) hit = why(o, `enumerates (${callee})`, arg)
-        else if (!fromIt) hit = why(o, `passes on (to ${callee.slice(0, 40)})`, arg)
-        if (hit) return
-      }
-    },
-    'ForInStatement|SpreadElement|ReturnStatement|ArrowFunctionExpression|ObjectProperty|ArrayExpression|AssignmentExpression|ExportNamedDeclaration|ExportDefaultDeclaration|JSXExpressionContainer'(path) {
-      if (hit) return
-      const n = path.node
-      const vals = {
-        ForInStatement: () => [n.right],
-        // A spread in a call's arguments is the call's (above).
-        SpreadElement: () => (path.parentPath.isCallExpression() || path.parentPath.isNewExpression() ? [] : [n.argument]),
-        ReturnStatement: () => [n.argument],
-        ArrowFunctionExpression: () => (n.body.type === 'BlockStatement' ? [] : [n.body]),
-        ObjectProperty: () => (path.parentPath.isObjectPattern() ? [] : [n.value]),
-        ArrayExpression: () => n.elements.filter((e) => e && e.type !== 'SpreadElement'),
-        AssignmentExpression: () => (n.left.type === 'Identifier' ? [] : [n.right]),
-        ExportNamedDeclaration: () => (n.source ? [] : (n.specifiers ?? []).map((s) => s.local)),
-        ExportDefaultDeclaration: () => [n.declaration],
-        JSXExpressionContainer: () => [n.expression]
-      }[n.type]()
-      for (const v of vals) {
-        if (!v || v.type === 'JSXEmptyExpression' || functionImport(path, v)) continue
-        const o = of(path, v)
-        if (bad(o)) {
-          hit = why(o, n.type === 'ForInStatement' ? 'enumerates (for…in)' : 'lets out (stored, returned or exported)', v)
-          return
+    Program(program) {
+      for (const b of Object.values(program.scope.getAllBindings())) {
+        const decl = b.path.parentPath?.node
+        if (decl?.type !== 'ImportDeclaration' || !source.test(decl.source?.value ?? '')) continue
+        const spec = b.path.node
+        const whole = spec.type === 'ImportNamespaceSpecifier' || spec.type === 'ImportDefaultSpecifier'
+        const own = spec.type === 'ImportSpecifier' && keyName(spec.imported) === unitName
+        if (!whole && !own) continue
+        for (const ref of b.referencePaths) {
+          if (hit) return
+          if (inType(ref)) continue
+          if (own) {
+            unitValueUse(ref, ref.node.name)
+            continue
+          }
+          // The namespace or default: only `mod.name` (or a literal key) is followed.
+          const q = outer(ref)
+          const par = q.parentPath?.node
+          const member = (par?.type === 'MemberExpression' || par?.type === 'OptionalMemberExpression') && par.object === q.node
+          const key = member ? (par.computed ? (unwrap(par.property)?.type === 'StringLiteral' ? unwrap(par.property).value : null) : keyName(par.property)) : null
+          if (key == null) {
+            unsafe(q, ref.node.name, describe(q))
+            continue
+          }
+          if (key === unitName) unitValueUse(q.parentPath, `${ref.node.name}.${key}`)
         }
       }
     }
