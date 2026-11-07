@@ -243,6 +243,6 @@ describe('the canary dialect over the tool replies (HI-2435)', () => {
     expect(R.noteWrittenText('notes/plan.md', 12345, false, 'abc')).toBe('Wrote notes/plan.md (12,345 characters, revision abc).')
     expect(R.undoText([{ change: 'a-1', what: 'title', undone: ['title'], skipped: [] }])).toBe('Undid 1 of 1 change in full.')
     expect(R.releasableText({ project: 'alpha', carried: [], held: [{ slot: 'slot-a', agent: 'Coder', run: 'r1', combwork: 'h1', processes: null }] })).toBe('slot-a: held by Coder\'s ended run r1, its Combwork h1 (kind writer, confirm {"slot":"slot-a","run":"r1"}). Combwork doesn\'t know which of its processes still run.')
-    expect(R.checksView(['typecheck'], 'HI-12', true)?.checksHint).toBe('before review: run one with cw-progress --check <name> --card "HI-12" (--isolated: in a check copy at the card\'s revision; work-on-card)')
+    expect(R.checksView(['typecheck'], 'HI-12', true)?.checksHint).toBe('before review: run one with cw-progress --check <name> --card "HI-12" (--isolated: in a check copy). Budget and other checks: project notes; work-on-card')
   })
 })

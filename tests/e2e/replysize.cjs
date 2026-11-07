@@ -299,7 +299,7 @@ const prose = (seed, n) => {
     try {
       const checked = JSON.parse(tool('cw_read_task', { number: todo[0] }).text)
       measure('cw_read_task (checks fields)', JSON.stringify({ checks: checked.checks, checksHint: checked.checksHint }), 200)
-      check('…and its checks where they name one: the names as data, a hint with <name>', JSON.stringify(checked.checks) === '["quick"]' && /^before review: run one with cw-progress --check <name> --card "[A-Z]+-\d+"/.test(checked.checksHint ?? ''), JSON.stringify([checked.checks, checked.checksHint]))
+      check('…and its checks where they name one: the names as data, a hint with <name>', JSON.stringify(checked.checks) === '["quick"]' && /^before review: run one with cw-progress --check <name> --card "[A-Z]+-\d+".*Budget and other checks: project notes; work-on-card$/.test(checked.checksHint ?? ''), JSON.stringify([checked.checks, checked.checksHint]))
     } finally {
       await inv('workflow:setOptions', alpha, { preset: rules.preset, options: rules.own })
     }

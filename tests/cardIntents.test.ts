@@ -435,7 +435,7 @@ describe('a card by intent (#1267)', () => {
     const wf = (await service.workflowFor(w, repo))!
     const card = await create(w)
     const key = wf.store.card(card).key
-    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: run one with cw-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision; work-on-card)` }
+    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: run one with cw-progress --check <name> --card "${key}" (--isolated: in a check copy). Budget and other checks: project notes; work-on-card` }
     expect(wf.checksOf(`#${card}`)).toEqual(line)
     await act(w, card, builder, { kind: 'start' })
     expect(wf.checksOf(`#${card}`)).toEqual(line)
@@ -958,7 +958,7 @@ describe("the intents' routes and tools (#1267)", () => {
   })
 
   it("a card's checks (HI-2276): the names as data, a fixed hint with <name>; never a command built from a name", () => {
-    const hint = (iso: boolean) => `before review: run one with cw-progress --check <name> --card "AL-1"${iso ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}`
+    const hint = (iso: boolean) => `before review: run one with cw-progress --check <name> --card "AL-1"${iso ? ' (--isolated: in a check copy)' : ''}. Budget and other checks: project notes; work-on-card`
     expect(checksView(['quick'], 'AL-1', true)).toEqual({ checks: ['quick'], checksHint: hint(true) })
     expect(checksView(['quick', 'tests'], 'AL-1', false)).toEqual({ checks: ['quick', 'tests'], checksHint: hint(false) })
     expect(checksView([], 'AL-1', true)).toBeNull()
