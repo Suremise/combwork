@@ -209,6 +209,8 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
   check('…and, once answered, the turn ends as one turn', await turnIs(latestTurn(first.conv)), JSON.stringify(await live(gem.id)))
   // Cancelled instead: agy sends no hook at all; its status line idle, the turn is interrupted after the grace.
+  // The answered turn's Stop is logged by the fake once Combwork has replied to it: counted from after it.
+  await until(async () => entries('hook').at(-1)?.event === 'Stop', HUNG_MS)
   const hooksBefore = entries('hook').length
   await inv('pty:write', lib.ptyKey(alpha, gem.id), 'this needs approval again')
   await inv('pty:write', lib.ptyKey(alpha, gem.id), '\r')
