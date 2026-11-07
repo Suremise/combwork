@@ -447,6 +447,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const keptSave = await openSave()
     const keptList = keptSave.locator('[data-kept-targets]')
     check("HI-2674: with the target changed, the save's warning names the running lane and Two, each merging into main still", !!(await waitHung(async () => { const x = await text(keptList); return /even if you tick/.test(x) && /Lane .*into main/.test(x) && /Two: into main/.test(x) })), await text(keptSave))
+    // HI-2680: its Retarget says what stays on main and why: Two already started, the running lane, the lane's lent slot;
+    // nothing can move, so no tick box.
+    const retargetList = keptSave.locator('[data-retarget]')
+    check("HI-2680: the save's Retarget lists what stays on main with why (Two started, the running lane, its lent slot), and offers nothing to move", !!(await waitHung(async () => { const x = await text(retargetList); return /These stay on main/.test(x) && /Two: already started/.test(x) && /a running lane keeps its branch until it ends/.test(x) && /: lent/.test(x) })) && (await retargetList.locator('[data-retarget-on]').count()) === 0, await text(retargetList))
+    await keptSave.screenshot({ path: path.join(fx.shots ?? lib.WORK, 'p6lane-retarget-preview.png') }).catch(() => undefined)
     await cancelSave(keptSave, 'en')
     await targetInput.fill(targetWas)
     await targetInput.press('Enter')
