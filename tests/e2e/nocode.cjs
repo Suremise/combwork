@@ -218,6 +218,13 @@ const check = (name, ok, extra = '') => {
 
     // --- HI-2556: the New Card dialog's Merges into (gamma lists 1.2.0): the card made on it, its tile says so; the next
     // New Card, and one cancelled and opened again, start on the project's own branch (HR2's round 1: no carry-over).
+    // Cancel: a project changed counts as an edit, so it asks to discard first.
+    const cancelCard = async () => {
+      await edit.getByRole('button', { name: 'Cancel' }).click()
+      const ask = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
+      if (await lib.until(async () => (await ask.count()) === 1 || (await edit.count()) === 0, HUNG_MS) && (await ask.count()) === 1) await ask.getByRole('button', { name: 'Discard', exact: true }).click()
+      await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
+    }
     const newCard = async () => {
       await page.locator('.board-toolbar button', { hasText: 'New Card' }).first().click()
       await edit.waitFor({ timeout: HUNG_MS })
@@ -238,13 +245,11 @@ const check = (name, ok, extra = '') => {
       check('…the next New Card starts on the project’s own branch', !!field && (await field.inputValue()) === '', field ? await field.inputValue() : 'no field')
       if (field) {
         await field.selectOption('1.2.0')
-        await edit.getByRole('button', { name: 'Cancel' }).click()
-        await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
+        await cancelCard()
       }
       field = await newCard()
       check('…and so does one opened after a cancelled pick', !!field && (await field.inputValue()) === '', field ? await field.inputValue() : 'no field')
-      await edit.getByRole('button', { name: 'Cancel' }).click()
-      await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
+      await cancelCard()
     }
 
     // --- A project agent only proposes it, with its reason: the user keeps the review in the dialog; agents never set it.
