@@ -419,7 +419,7 @@ const check = (name, ok, extra = '') => {
     await planItem.click()
     check('…and the Overview shows them, the premium requests as Not in your plan', !!(await lib.until(async () => (await page.getByText('Chat messages limit').count()) > 0 && (await page.getByText('Premium requests limit').count()) > 0 && (await page.getByText('Not in your plan').count()) > 0, 20000, 300)))
     // Its cards in view, with the status bar, in both themes (kept with --keep-files: HR1's round 1).
-    await page.getByText('Premium requests limit').first().scrollIntoViewIfNeeded()
+    await page.getByText('Premium requests limit').first().evaluate((el) => el.scrollIntoView({ block: 'center' }))
     for (const theme of ['dark', 'light']) {
       await inv('settings:update', { appearance: { theme } })
       await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 20000, 100)
