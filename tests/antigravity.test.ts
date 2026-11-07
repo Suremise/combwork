@@ -348,7 +348,7 @@ describe('launch settings and arguments (1.5.0)', () => {
     // No quote (agy escapes them for cmd, HI-2548): the token file's path is the launch's environment's, the & escaped.
     expect(s.statusLine.command).toContain('run=r1^&statusline')
     expect(s.statusLine.command).not.toContain('"')
-    expect(antigravity.buildCommand('agy.exe', { ...ctx, agentId: 'a1', workspacePath: 'C:\\ws', privateDir: 'C:\\p', env: {}, overrides: {}, extraArgs: [], resume: false } as never).env.CW_AGY_HOOK_AUTH).toBe('"@C:/Users/Jo Smith/launch/hook-auth.txt"')
+    expect(antigravity.buildCommand('agy.exe', { ...ctx, agentId: 'a1', workspacePath: 'C:\\ws', privateDir: 'C:\\p', env: {}, overrides: {}, extraArgs: [], resume: false } as never).env?.CW_AGY_HOOK_AUTH).toBe('"@C:/Users/Jo Smith/launch/hook-auth.txt"')
     expect(s.permissions?.allow).toEqual([`mcp(${TOOLS_SERVER}/*)`])
     expect((launchSettings(ctx, false) as { permissions?: unknown }).permissions).toBeUndefined()
     expect((launchSettings({ ...ctx, trustedCombworkTools: ['cw_inbox'] }, true) as { permissions: { allow: string[] } }).permissions.allow).toEqual([`mcp(${TOOLS_SERVER}/cw_inbox)`])
