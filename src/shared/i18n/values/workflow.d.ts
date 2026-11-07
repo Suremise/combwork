@@ -230,7 +230,7 @@ interface CombworkMessageValues {
   'workflow.refused.approval.given.next': undefined
   'workflow.refused.card.plainNumber.message': undefined
   'workflow.refused.card.plainNumber.next': { key: string | number }
-  'workflow.refused.check.revisionMismatch.message': { revision: string | number }
+  'workflow.refused.check.revisionMismatch.message': { why: string; revision: string | number; head: string | number }
   'workflow.refused.check.revisionMismatch.next': { revision: string | number }
   'workflow.refused.done.contained.change': undefined
   'workflow.refused.done.contained.message': { card: string | number; revision: string | number; target: string | number }

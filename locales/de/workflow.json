@@ -228,7 +228,7 @@
   "workflow.refused.approval.given.next": "Warte auf die Zustimmung – sie wird auf der Karte oder in „Für dich“ gegeben.",
   "workflow.refused.card.plainNumber.message": "Eine bloße Zahl ist kein Verweis auf eine Karte.",
   "workflow.refused.card.plainNumber.next": "Nenne die Karte bei ihrem Schlüssel: {key}.",
-  "workflow.refused.check.revisionMismatch.message": "{revision} ist hier nicht ausgecheckt.",
+  "workflow.refused.check.revisionMismatch.message": "{why, select, ambiguous {{revision} ist hier der Anfang mehrerer Commits: Gib mehr davon an. Ausgecheckt ist {head}.} other {{revision} ist hier nicht ausgecheckt: Ausgecheckt ist {head}.}}",
   "workflow.refused.check.revisionMismatch.next": "Führe den Check dort aus, wo {revision} ausgecheckt ist, oder ohne Revision.",
   "workflow.refused.done.contained.change": "Diese Regel wird hier festgelegt: Versionsverwaltung → Wer mergt.",
   "workflow.refused.done.contained.message": "{card} (Revision {revision}) ist nicht in {target} enthalten.",

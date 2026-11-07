@@ -228,7 +228,7 @@
   "workflow.refused.approval.given.next": "Aguarde a aprovação, dada no cartão ou em Para você.",
   "workflow.refused.card.plainNumber.message": "Um número sozinho não é uma referência de cartão.",
   "workflow.refused.card.plainNumber.next": "Indique o cartão pela chave: {key}.",
-  "workflow.refused.check.revisionMismatch.message": "A versão {revision} não é a que está em checkout aqui.",
+  "workflow.refused.check.revisionMismatch.message": "{why, select, ambiguous {{revision} é aqui o início de mais de um commit: informe mais caracteres. A versão em checkout é {head}.} other {A versão {revision} não é a que está em checkout aqui: está {head}.}}",
   "workflow.refused.check.revisionMismatch.next": "Execute a verificação onde a versão {revision} está em checkout, ou sem indicar uma versão.",
   "workflow.refused.done.contained.change": "Esta regra é definida em Controle de versão → Quem faz o merge.",
   "workflow.refused.done.contained.message": "O cartão {card} na versão {revision} não está no branch {target}.",

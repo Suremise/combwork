@@ -228,7 +228,7 @@
   "workflow.refused.approval.given.next": "Poczekaj na zgodę, udzieloną na karcie lub w sekcji Dla Ciebie.",
   "workflow.refused.card.plainNumber.message": "Sam numer nie jest odwołaniem do karty.",
   "workflow.refused.card.plainNumber.next": "Podaj kartę jej kluczem: {key}.",
-  "workflow.refused.check.revisionMismatch.message": "Rewizja {revision} nie jest tą, która jest tu wybrana.",
+  "workflow.refused.check.revisionMismatch.message": "{why, select, ambiguous {{revision} to tu początek więcej niż jednego commita: podaj więcej znaków. Wybrana jest rewizja {head}.} other {Rewizja {revision} nie jest tą, która jest tu wybrana: wybrana jest {head}.}}",
   "workflow.refused.check.revisionMismatch.next": "Uruchom sprawdzenie tam, gdzie wybrana jest rewizja {revision}, albo bez podawania rewizji.",
   "workflow.refused.done.contained.change": "Tę regułę ustawisz w Kontrola wersji → Kto scala.",
   "workflow.refused.done.contained.message": "Karty {card} w rewizji {revision} nie ma w gałęzi {target}.",

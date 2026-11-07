@@ -228,7 +228,7 @@
   "workflow.refused.approval.given.next": "承認を待ってください。承認はカードまたは「要対応」で行います。",
   "workflow.refused.card.plainNumber.message": "数字だけではカードを指定できません。",
   "workflow.refused.card.plainNumber.next": "カードはキーで指定してください：{key}。",
-  "workflow.refused.check.revisionMismatch.message": "{revision}は、ここでチェックアウトされているリビジョンではありません。",
+  "workflow.refused.check.revisionMismatch.message": "{why, select, ambiguous {{revision}は、ここでは複数のコミットの先頭に一致します。もっと長く指定してください。チェックアウトされているのは{head}です。} other {{revision}は、ここでチェックアウトされているリビジョンではありません。チェックアウトされているのは{head}です。}}",
   "workflow.refused.check.revisionMismatch.next": "{revision}がチェックアウトされている場所でチェックを実行するか、リビジョンを指定せずに実行してください。",
   "workflow.refused.done.contained.change": "このルールは「バージョン管理」→「マージする人」で設定します。",
   "workflow.refused.done.contained.message": "{card}のリビジョン{revision}は{target}に含まれていません。",

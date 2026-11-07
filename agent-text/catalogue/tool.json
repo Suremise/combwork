@@ -240,7 +240,7 @@
     "note": "#1531: read=true acks and reads in one call."
   },
   "tool.intent.arg.revision": {
-    "text": "Default: the card's current revision (its commit, or its files' hash)."
+    "text": "Default: the card's current revision (its commit, or its files' hash). A commit's short id (7+ characters) will do."
   },
   "tool.intent.arg.submission": {
     "text": "Default: the latest."
