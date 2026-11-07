@@ -100,8 +100,8 @@
     "note": "Where a card is now: its column's name and its place in it (an ordinal such as 51st, of how many)."
   },
   "reply.checks.hint": {
-    "text": "before review: run one with cw-progress --check <name> --card \"{card}\" {isolated, select, yes {(--isolated: in a check copy at the card's revision; work-on-card)} other {(work-on-card)}}",
-    "note": "A code card's checks before review (HI-2276): how to run one, with <name> left for the agent to fill (a configured name is never quoted into a command, HR1's rounds 1 and 2). {card} is the card's key; isolated: its platform can make a check copy."
+    "text": "before review: cw-progress --check <name> --card \"{card}\"{isolated, select, yes { (--isolated: in a check copy)} other {}}. Budget, other checks: project notes; work-on-card",
+    "note": "A code card's checks before review (HI-2276): how to run one, with <name> left for the agent to fill (a configured name is never quoted into a command, HR1's rounds 1 and 2), and where the rest of a round's tests and their time budget for its kind of change are, the project's notes (HI-2658: a pointer, never a budget of its own; replysize holds the checks fields to 200 bytes). {card} is the card's key; isolated: its platform can make a check copy."
   },
   "reply.connection.accountBare": {
     "text": "Account {name} (id {id}), {cli}: no connections{off, select, yes {, off here} other {}}",
