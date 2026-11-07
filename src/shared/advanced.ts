@@ -413,6 +413,12 @@ export const folderList = (text: string): string[] => text.split(';').map((s) =>
 export const foldersText = (folders: readonly string[]): string => folders.join(';')
 
 const FIX = 'tests/fixtures'
+// The plan's limits as CLIs record them (HI-2734): agy 1.5.0's status line with its quota, one of its quotas, and a Copilot
+// 1.0.93 quota snapshot (each a recorded object's fields).
+const AGY_QUOTA_LINE = ['agent_state', 'context_window', 'conversation_id', 'cwd', 'cycle_mode', 'email', 'exceeds_200k_tokens', 'model', 'plan_tier', 'product', 'quota', 'sandbox', 'session_id', 'terminal_width', 'transcript_path', 'vcs', 'version', 'workspace'] // i18n-ignore: a CLI's field names (#367)
+const AGY_QUOTA_BUCKET = ['remaining_fraction', 'reset_in_seconds', 'reset_time'] // i18n-ignore: a CLI's field names (#367)
+const COPILOT_QUOTA = ['entitlementRequests', 'isUnlimitedEntitlement', 'overage', 'overageAllowedWithExhaustedQuota', 'remainingPercentage', 'resetDate', 'usageAllowedWithExhaustedQuota', 'usedRequests'] // i18n-ignore: a CLI's field names (#367)
+const COPILOT_QUOTA_FROM = `${FIX}/copilot/quota-snapshots-1.0.93.jsonl`
 
 /** A CLI's value (not Combwork's own): it needs recorded samples, and an override records the CLI version it was made for. */
 export const cliFacing = (d: AdvancedDef): boolean => d.group !== 'cw'
@@ -2694,6 +2700,44 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/rate-limit-copilot-1.0.105.jsonl`, version: '1.0.105', text: 'rate_limit' } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
+  // Copilot's plan limits (HI-2734, providers/copilot/quota.ts): a model call's quota snapshots in its session file.
+  {
+    id: 'copilot.quota.event',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.quota.event.title', defaultMessage: 'Plan limits: event', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.copilot.quota.event.desc', defaultMessage: "The event, in Copilot's session file, of a model call that carries your plan's quotas. Wrong, Combwork shows no plan limits for Copilot.", description: 'What the advanced setting "Plan limits: event" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'model.model_call_success',
+    applies: 'now',
+    samples: [{ from: COPILOT_QUOTA_FROM, version: '1.0.93', text: 'model.model_call_success' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'copilot.quota.snapshotsField',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.quota.snapshotsField.title', defaultMessage: 'Plan limits: quotas field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.copilot.quota.snapshotsField.desc', defaultMessage: "That event's field with your plan's quotas, one per kind of request. Wrong, Combwork shows no plan limits for Copilot.", description: 'What the advanced setting "Plan limits: quotas field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'quotaSnapshots',
+    applies: 'now',
+    samples: [{ from: COPILOT_QUOTA_FROM, version: '1.0.93', fields: ['quotaSnapshots'] }]
+  },
+  {
+    id: 'copilot.quota.premiumKey',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.quota.premiumKey.title', defaultMessage: 'Plan limits: premium requests', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.copilot.quota.premiumKey.desc', defaultMessage: "The quota of premium requests among them. Wrong, that limit shows by Copilot's own name for it.", description: 'What the advanced setting "Plan limits: premium requests" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: 'premium_interactions',
+    applies: 'now',
+    samples: [{ from: COPILOT_QUOTA_FROM, version: '1.0.93', text: 'premium_interactions' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  ...([
+    ['entitlementField', 'entitlementRequests', msg({ id: 'settings.advanced.copilot.quota.entitlementField.title', defaultMessage: 'Plan limits: allowance field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }), msg({ id: 'settings.advanced.copilot.quota.entitlementField.desc', defaultMessage: "A quota's field with how much your plan allows (-1: unlimited). Wrong, Combwork shows no plan limits for Copilot.", description: 'What the advanced setting "Plan limits: allowance field" is for, and what goes wrong when it is wrong (Settings → Advanced).' })],
+    ['usedField', 'usedRequests', msg({ id: 'settings.advanced.copilot.quota.usedField.title', defaultMessage: 'Plan limits: used field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }), msg({ id: 'settings.advanced.copilot.quota.usedField.desc', defaultMessage: "A quota's field with how much of it is used. Wrong, Copilot's limits don't say how many were used.", description: 'What the advanced setting "Plan limits: used field" is for, and what goes wrong when it is wrong (Settings → Advanced).' })],
+    ['remainingPercentField', 'remainingPercentage', msg({ id: 'settings.advanced.copilot.quota.remainingPercentField.title', defaultMessage: 'Plan limits: percent left field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }), msg({ id: 'settings.advanced.copilot.quota.remainingPercentField.desc', defaultMessage: "A quota's field with the percent of it left. Wrong, Combwork shows no plan limits for Copilot.", description: 'What the advanced setting "Plan limits: percent left field" is for, and what goes wrong when it is wrong (Settings → Advanced).' })],
+    ['unlimitedField', 'isUnlimitedEntitlement', msg({ id: 'settings.advanced.copilot.quota.unlimitedField.title', defaultMessage: 'Plan limits: unlimited field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }), msg({ id: 'settings.advanced.copilot.quota.unlimitedField.desc', defaultMessage: "A quota's field that is true when your plan has no limit on it. Wrong, an unlimited quota isn't shown as unlimited.", description: 'What the advanced setting "Plan limits: unlimited field" is for, and what goes wrong when it is wrong (Settings → Advanced).' })],
+    ['resetField', 'resetDate', msg({ id: 'settings.advanced.copilot.quota.resetField.title', defaultMessage: 'Plan limits: reset date field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }), msg({ id: 'settings.advanced.copilot.quota.resetField.desc', defaultMessage: "A quota's field with when it resets. Wrong, Copilot's plan limits show no reset date.", description: 'What the advanced setting "Plan limits: reset date field" is for, and what goes wrong when it is wrong (Settings → Advanced).' })]
+  ] as const).map(([name, field, title, desc]): AdvancedSource => ({ id: `copilot.quota.${name}`, group: 'copilot', title, desc, kind: 'field', default: field, applies: 'now', samples: [{ from: COPILOT_QUOTA_FROM, version: '1.0.93', fields: [...COPILOT_QUOTA] }] })),
   // Copilot trying a failed model call again (HI-1973): an ErrorOccurred hook that says recoverable, for each try.
   {
     id: 'copilot.retry.context',
@@ -3438,6 +3482,66 @@ const SOURCES: readonly AdvancedSource[] = [
     default: 'tool_confirmation_pending',
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/statusline-run-antigravity-1.5.0.jsonl`, version: '1.5.0', fields: ['agent_state', 'context_window', 'conversation_id', 'cwd', 'cycle_mode', 'email', 'exceeds_200k_tokens', 'model', 'plan_tier', 'product', 'quota', 'sandbox', 'session_id', 'terminal_width', 'tool_confirmation_pending', 'transcript_path', 'vcs', 'version', 'workspace'] }]
+  },
+  {
+    id: 'antigravity.statusLine.quota',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.statusLine.quota.title', defaultMessage: 'Status line: plan limits field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.statusLine.quota.desc', defaultMessage: "The status line's field with your plan's quotas, one per group of models (HI-2734). Wrong, Combwork shows no plan limits for Antigravity.", description: 'What the advanced setting "Status line: plan limits field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'quota',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/statusline-run-antigravity-1.5.0.jsonl`, version: '1.5.0', fields: AGY_QUOTA_LINE }]
+  },
+  {
+    id: 'antigravity.statusLine.remainingFraction',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.statusLine.remainingFraction.title', defaultMessage: 'Status line: share left field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.statusLine.remainingFraction.desc', defaultMessage: "A quota's field with the share of it left, from 0 to 1. Wrong, Combwork shows no plan limits for Antigravity.", description: 'What the advanced setting "Status line: share left field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'remaining_fraction',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/statusline-run-antigravity-1.5.0.jsonl`, version: '1.5.0', fields: AGY_QUOTA_BUCKET }]
+  },
+  {
+    id: 'antigravity.statusLine.resetTime',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.statusLine.resetTime.title', defaultMessage: 'Status line: reset time field', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.statusLine.resetTime.desc', defaultMessage: "A quota's field with when it resets. Wrong, Antigravity's plan limits show no reset time.", description: 'What the advanced setting "Status line: reset time field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'reset_time',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/statusline-run-antigravity-1.5.0.jsonl`, version: '1.5.0', fields: AGY_QUOTA_BUCKET }]
+  },
+  {
+    id: 'antigravity.statusLine.planTier',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.statusLine.planTier.title', defaultMessage: "Status line: plan's name field", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.statusLine.planTier.desc', defaultMessage: "The status line's field with your plan's name. Wrong, Antigravity's plan limits show without it.", description: 'What the advanced setting "Status line: plan\'s name field" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'field',
+    default: 'plan_tier',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/statusline-run-antigravity-1.5.0.jsonl`, version: '1.5.0', fields: AGY_QUOTA_LINE }]
+  },
+  {
+    id: 'antigravity.statusLine.weeklySuffix',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.statusLine.weeklySuffix.title', defaultMessage: 'Status line: a weekly quota', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.statusLine.weeklySuffix.desc', defaultMessage: "How a weekly quota's name ends; what comes before it is the models it covers. Wrong, Antigravity's limits show by agy's own names, with no window.", description: 'What the advanced setting "Status line: a weekly quota" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: '-weekly',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/statusline-run-antigravity-1.5.0.jsonl`, version: '1.5.0', text: 'gemini-weekly' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.statusLine.otherModels',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.statusLine.otherModels.title', defaultMessage: "Status line: other providers' models", description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.antigravity.statusLine.otherModels.desc', defaultMessage: "The models part of the quota for other providers' models (not Gemini). Wrong, that limit shows by agy's own name for it.", description: 'What the advanced setting "Status line: other providers\' models" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'text',
+    default: '3p',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/statusline-run-antigravity-1.5.0.jsonl`, version: '1.5.0', text: '3p-weekly' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'antigravity.statusLine.idleGraceSeconds',

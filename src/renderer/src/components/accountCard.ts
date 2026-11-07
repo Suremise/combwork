@@ -1,4 +1,5 @@
 import type { Account, AppSettings, Connection, PlanLimit } from '../../../shared/types'
+import { hasShare, limitWindow } from '../../../shared/planLimits'
 import { permissionLabel, providerDescriptor } from '../../../shared/providers'
 import { effortName } from '../../../shared/models'
 import { modelLabel } from '../../../shared/defaults'
@@ -21,11 +22,13 @@ export const M = {
 
 /** An account's plan limits that haven't reset yet (an expired reading says nothing of now), in the order reported. */
 export function currentLimits(limits: readonly PlanLimit[] | undefined, now = Date.now()): PlanLimit[] {
-  return (limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now)
+  // An unlimited one (HI-2734) has no share to draw: accounts' bars and usage moves are of shares only.
+  return (limits ?? []).filter((l) => hasShare(l) && (!l.resetsAt || Date.parse(l.resetsAt) > now))
 }
 
 /** A limit's window for its label: the 5-hour or the weekly one, else the provider's own name for it. */
-export const windowOf = (l: Pick<PlanLimit, 'windowMinutes'>): 'fiveHour' | 'weekly' | 'other' => (l.windowMinutes === 300 ? 'fiveHour' : l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other')
+/** A limit's window as the usage messages select on (shared/planLimits.ts: a limit of part of a plan is named by limitName). */
+export const windowOf = (l: Pick<PlanLimit, 'windowMinutes' | 'models'>): 'fiveHour' | 'weekly' | 'other' => limitWindow(l)
 
 /**
  * When a limit resets, as plan-usage notices say it (main.plan.resetsAt/resetsOn): its time when that's today, its weekday

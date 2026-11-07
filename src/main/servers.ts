@@ -1320,7 +1320,7 @@ function accountUsageRows(ids: readonly string[]): AccountUsagePublic[] {
   for (const id of ids) {
     const a = accountById(id)
     if (!a) continue
-    const limits = (config.get().connectionPlanUsage?.[id]?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now).map((l) => ({ label: l.label, usedPercent: Math.round(l.usedPercent * 10) / 10, resetsAt: l.resetsAt }))
+    const limits = (config.get().connectionPlanUsage?.[id]?.limits ?? []).filter((l) => !l.unlimited && !l.notIncluded && (!l.resetsAt || Date.parse(l.resetsAt) > now)).map((l) => ({ label: l.label, usedPercent: Math.round(l.usedPercent * 10) / 10, resetsAt: l.resetsAt }))
     const m = a.usageMove
     const move = m ? { percent: m.percent, limit: m.limit, to: accountById(m.to)?.name ?? m.to } : undefined
     if (limits.length || move) rows.push({ account: a.name, limits, ...(move ? { move } : {}) })

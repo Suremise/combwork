@@ -705,6 +705,25 @@ export interface PlanLimit {
   /** When the reading kept was reported, and by which session's agent (#383: sessions relay readings of different ages). */
   reportedAt?: string
   reportedBy?: string
+  /**
+   * Which part of the plan it covers, where a provider has several limits of one window (HI-2734: agy's weekly quotas):
+   * `gemini`, `otherModels` (agy's third-party models), `premium` (Copilot's premium requests), else the provider's own word.
+   */
+  models?: string
+  /**
+   * An unlimited entitlement the provider reported (HI-2734: Copilot): shown as such, no meter, never warned of. Its
+   * usedPercent is 0, a placeholder, never a measured 0: every reader checks hasShare() (shared/planLimits.ts) first.
+   */
+  unlimited?: true
+  /** An allowance of 0 the provider reported (HI-2734: Copilot Free's premium requests): not in the plan, no meter, never warned of; usedPercent a placeholder as for unlimited. */
+  notIncluded?: true
+  /** When what the limit is (label, window, models) was taken from a report (HI-2734): a delayed report never rolls it back. */
+  describedAt?: string
+  /** When what the plan allows (entitlement, unlimited, not included) was last seen as it is (HI-2734): a delayed report of another allowance never replaces it. */
+  allowanceAt?: string
+  /** What was used of how much, in the provider's own units, where it says (Copilot's requests). */
+  used?: number
+  entitlement?: number
 }
 
 /** Subscription limits a provider reported (e.g. a rolling 5-hour window and a weekly limit). */

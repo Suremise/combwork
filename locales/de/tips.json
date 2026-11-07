@@ -386,6 +386,8 @@
   "tips.performance.title": "Was Combwork selbst kostet",
   "tips.permissionMode.text": "Klicke auf den Modus in der Fußzeile eines Agenten oder drück {key}, um zwischen erst fragen, Änderungen annehmen und planen zu wechseln.",
   "tips.permissionMode.title": "Berechtigungsmodus wechseln",
+  "tips.planLimitsProviders.text": "Die Statusleiste zeigt auch für Antigravity und Copilot, wie viel deines Plans genutzt ist: die Wochenkontingente von Antigravity für Gemini und für andere Modelle, die monatlichen Premium-Anfragen und Chats von Copilot. Fahre mit der Maus darüber, um zu sehen, wann jedes zurückgesetzt wird.",
+  "tips.planLimitsProviders.title": "Die Limits jedes Plans in der Statusleiste",
   "tips.progressCard.text": "Ein Lauf im Fortschrittspanel zeigt unter dem Agenten die Karte und die Revision, auf der er lief, etwa #1061 · a3f2c1d: Klicke auf die Karte, um sie zu öffnen, oder auf die Revision, um sie zu kopieren.",
   "tips.progressCard.title": "Für welche Karte war dieser Lauf?",
   "tips.progressCheck.text": "Ein Lauf für eine Karte wird als Check der Revision der Karte festgehalten. Seine Details im Fortschrittspanel sagen „Zählt als Check“ oder warum nicht: Er wurde nicht als dieser Check gestartet, der Ordner hatte nicht committete Änderungen, oder Dateien haben sich während des Laufs geändert.",

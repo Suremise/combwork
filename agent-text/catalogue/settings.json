@@ -174,6 +174,66 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
+  "settings.advanced.antigravity.statusLine.otherModels.desc": {
+    "text": "The models part of the quota for other providers' models (not Gemini). Wrong, that limit shows by agy's own name for it.",
+    "note": "What the advanced setting \"Status line: other providers' models\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.otherModels.title": {
+    "text": "Status line: other providers' models",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.planTier.desc": {
+    "text": "The status line's field with your plan's name. Wrong, Antigravity's plan limits show without it.",
+    "note": "What the advanced setting \"Status line: plan's name field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.planTier.title": {
+    "text": "Status line: plan's name field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.quota.desc": {
+    "text": "The status line's field with your plan's quotas, one per group of models (HI-2734). Wrong, Combwork shows no plan limits for Antigravity.",
+    "note": "What the advanced setting \"Status line: plan limits field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.quota.title": {
+    "text": "Status line: plan limits field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.remainingFraction.desc": {
+    "text": "A quota's field with the share of it left, from 0 to 1. Wrong, Combwork shows no plan limits for Antigravity.",
+    "note": "What the advanced setting \"Status line: share left field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.remainingFraction.title": {
+    "text": "Status line: share left field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.resetTime.desc": {
+    "text": "A quota's field with when it resets. Wrong, Antigravity's plan limits show no reset time.",
+    "note": "What the advanced setting \"Status line: reset time field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.resetTime.title": {
+    "text": "Status line: reset time field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.weeklySuffix.desc": {
+    "text": "How a weekly quota's name ends; what comes before it is the models it covers. Wrong, Antigravity's limits show by agy's own names, with no window.",
+    "note": "What the advanced setting \"Status line: a weekly quota\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.weeklySuffix.title": {
+    "text": "Status line: a weekly quota",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.antigravity.transcript.modelChange.desc": {
     "text": "What agy adds to a prompt when its model changes: the model's name is its first group. Wrong, an agent's usage names no model.",
     "note": "What the advanced setting \"Transcript: the model picked\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
@@ -1481,6 +1541,86 @@
   },
   "settings.advanced.copilot.question.tool.title": {
     "text": "Question: tool name",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.entitlementField.desc": {
+    "text": "A quota's field with how much your plan allows (-1: unlimited). Wrong, Combwork shows no plan limits for Copilot.",
+    "note": "What the advanced setting \"Plan limits: allowance field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.entitlementField.title": {
+    "text": "Plan limits: allowance field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.event.desc": {
+    "text": "The event, in Copilot's session file, of a model call that carries your plan's quotas. Wrong, Combwork shows no plan limits for Copilot.",
+    "note": "What the advanced setting \"Plan limits: event\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.event.title": {
+    "text": "Plan limits: event",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.premiumKey.desc": {
+    "text": "The quota of premium requests among them. Wrong, that limit shows by Copilot's own name for it.",
+    "note": "What the advanced setting \"Plan limits: premium requests\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.premiumKey.title": {
+    "text": "Plan limits: premium requests",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.remainingPercentField.desc": {
+    "text": "A quota's field with the percent of it left. Wrong, Combwork shows no plan limits for Copilot.",
+    "note": "What the advanced setting \"Plan limits: percent left field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.remainingPercentField.title": {
+    "text": "Plan limits: percent left field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.resetField.desc": {
+    "text": "A quota's field with when it resets. Wrong, Copilot's plan limits show no reset date.",
+    "note": "What the advanced setting \"Plan limits: reset date field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.resetField.title": {
+    "text": "Plan limits: reset date field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.snapshotsField.desc": {
+    "text": "That event's field with your plan's quotas, one per kind of request. Wrong, Combwork shows no plan limits for Copilot.",
+    "note": "What the advanced setting \"Plan limits: quotas field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.snapshotsField.title": {
+    "text": "Plan limits: quotas field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.unlimitedField.desc": {
+    "text": "A quota's field that is true when your plan has no limit on it. Wrong, an unlimited quota isn't shown as unlimited.",
+    "note": "What the advanced setting \"Plan limits: unlimited field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.unlimitedField.title": {
+    "text": "Plan limits: unlimited field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.usedField.desc": {
+    "text": "A quota's field with how much of it is used. Wrong, Copilot's limits don't say how many were used.",
+    "note": "What the advanced setting \"Plan limits: used field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.usedField.title": {
+    "text": "Plan limits: used field",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },

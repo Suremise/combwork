@@ -475,6 +475,7 @@ interface CombworkMessageValues {
   'workspace.statusBar.keepAwake': { working: number }
   'workspace.statusBar.limitLine': { window: string; label: string | number; used: number; hasReset: string; when: string | number }
   'workspace.statusBar.more': { count: string | number }
+  'workspace.statusBar.notIncludedLine': { label: string | number }
   'workspace.statusBar.notInstalled': undefined
   'workspace.statusBar.notInstalledTip': { provider: string | number }
   'workspace.statusBar.notInstalledUnused': { provider: string | number }
@@ -484,6 +485,9 @@ interface CombworkMessageValues {
   'workspace.statusBar.reportedBy': { agent: string | number; when: string | number }
   'workspace.statusBar.running': { count: number; working: string | number; background: number; waiting: string | number }
   'workspace.statusBar.shortLimit': { window: string; label: string | number }
+  'workspace.statusBar.shortModels': { models: string; window: string }
+  'workspace.statusBar.unlimitedLine': { label: string | number; hasReset: string; when: string | number }
+  'workspace.statusBar.unlimitedShort': undefined
   'workspace.statusBar.workspace': { path: string | number }
   'workspace.storage.archive': undefined
   'workspace.storage.assistant': undefined

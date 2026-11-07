@@ -104,6 +104,42 @@
   "settings.advanced.antigravity.statusLine.knownFields.title": {
     "placeholders": {}
   },
+  "settings.advanced.antigravity.statusLine.otherModels.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.otherModels.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.planTier.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.planTier.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.quota.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.quota.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.remainingFraction.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.remainingFraction.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.resetTime.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.resetTime.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.weeklySuffix.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.antigravity.statusLine.weeklySuffix.title": {
+    "placeholders": {}
+  },
   "settings.advanced.antigravity.transcript.modelChange.desc": {
     "placeholders": {}
   },
@@ -906,6 +942,54 @@
     "placeholders": {}
   },
   "settings.advanced.copilot.question.tool.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.entitlementField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.entitlementField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.event.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.event.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.premiumKey.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.premiumKey.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.remainingPercentField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.remainingPercentField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.resetField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.resetField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.snapshotsField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.snapshotsField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.unlimitedField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.unlimitedField.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.usedField.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.quota.usedField.title": {
     "placeholders": {}
   },
   "settings.advanced.copilot.ready.footer.desc": {
