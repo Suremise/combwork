@@ -868,6 +868,8 @@ export const UNIT_SCANS = [
   { test: 'tests/modeDescriptions.test.ts', paths: ['resources/modes/'] },
   { test: 'tests/skills.test.ts', paths: ['resources/skills/'] },
   { test: 'tests/retention.test.ts', paths: ['resources/skills/'] },
+  // Each side's skill files name only the tools offered to that side (HI-2664).
+  { test: 'tests/toolSides.test.ts', paths: ['resources/skills/'] },
   { test: 'tests/bundled.test.ts', paths: ['resources/', 'src/main/bundledHistory.json'] },
   { test: 'tests/bundledrace.test.ts', paths: ['resources/'] },
   // The shipped dialect files (HI-2442): each one's form, model and schema, and their sync into a workspace.
