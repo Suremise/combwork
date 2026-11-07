@@ -166,6 +166,13 @@ npm run scenarios -- --dialect "Opus 5.5 v2.json" --provider claude-code --model
 node tests/scenarios/measure.cjs              # what sessions are given about Combwork, measured from real launches
 ```
 
+**When a model trial runs** is AGENTS.md's rule (HI-2662, the user's decision, 7 Nov): a card that changes agent-facing
+text runs the scenarios that text affects on each model it reaches, before and after, on the same provider, model,
+effort and dialect, and names them on the card; a release gets 3 to 5 at random (RELEASING.md). A detector or a
+fixture's premise is fixed with a unit test of its actual failure (`tests/scenarioObserve.test.ts` and the like), never
+with a model run: HI-2560's alarms were mostly detector errors. Which fakes run which scenarios is `fakeScope.cjs`'s
+(below, HI-2663).
+
 **A dialect** (HI-2439; plans/2026-11-03-dialects-design.md, section 6): `--dialect <file>` puts a dialect file in the
 model slot of every agent of the provider's CLI, as a test copy in each scenario workspace's `.combwork/dialects/<CLI>/`.
 The file is checked against the schema first, as Combwork checks one (`src/main/dialects/format.ts`): one that isn't a
