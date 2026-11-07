@@ -4906,6 +4906,39 @@ repeating them (#533) [note §8].
   kept for their return); Add Agent and Agent Settings then offer only Independent, the other roles greyed out with "This
   connection launches without Combwork's tools". It can be chosen on any connection too. The Agent API and the
   Combwork tools' enum take it.
+- **Tools by side** [HI-2664, Darren's 7 Nov decisions (02:25 and 02:30, the card's): "Changing role should maybe require a
+  restart of the session to load different tools"] **Built**: a project agent's combwork server is told its side,
+  `CW_SIDE` in its env (`effective()`): `toolSideOf(role)`, its saved role's alone, builder, reviewer or `both` (either,
+  generalist, independent). Its lanes never change it (HR3's round 1), and an either-role agent keeps both sets on any
+  lane. A lane part is only for a role that does it, however the lane is started or joined (the Assistant's (A), 7 Nov:
+  the Agent API, cw_lane and the Assistant, as Start Lane… offers them): its builder `buildsWork`, its reviewer
+  `reviewsWork`, else `400` `lane.refused.wrongSide` ("X is a builder by its role, so it has no reviewer's tools…
+  Choose another, or change X's role first"); a guessed role (no role saved) counts as it reads. **A running lane**
+  (HR3's round 2): a role change that would leave its agent unable to do its part in one is refused before anything is
+  saved (`agentChangeCheck`'s `offSideCheck`, read as one snapshot and again under the lock; `main.connections.launch.offSide`:
+  end the lane, give it another agent, or choose a role that does it), its lanes and cards as they were. A lane already
+  so (from before roles counted, or a guessed role) pauses, `offSide` ("paused: X isn't a reviewer by its role…"),
+  its work in flight kept: its next card isn't started while its builder is off its side (`laneStarts`), and a
+  reviewer's handoff to an agent whose role doesn't review, or whose session hasn't loaded a reviewer's tools yet, is
+  made and kept queued, never dropped, but not given (the loop source's `holds`, HR3's round 2): given once, at the
+  next try after that's put right (a restart with its tools, a role that reviews). The metrics' launch side (`launchWorkflow`,
+  HI-2049) stays apart. `cw-mcp.ts` leaves out `hiddenForSide(side)`
+  (`shared/assistantTools.ts`): a builder `REVIEWER_ONLY_TOOLS` (cw_start_review, cw_verdict, cw_request_builder,
+  cw_focused_skip), a reviewer `BUILDER_ONLY_TOOLS` (cw_start_card, cw_submit, cw_put_back, cw_declare_paths,
+  cw_cannot_within_rules, cw_merge_slot, cw_report_merge, cw_reorder_tasks, cw_update_tasks). The Assistant is offered
+  none of `WORKER_ONLY_TOOLS` (the intent tools but cw_ask_user, and cw_focused_skip); it keeps cw_release_slot and its
+  Control-level tools. Measured on the bridge (replysize): both sides 38 tools, 24.7 KB; builder 34, 22.8 KB; reviewer 29,
+  19.7 KB; the Assistant 50, 37.9 KB (was 41.5). The side is in the launch signature, so a change shows "restart needed";
+  `sessions.restartForSide` restarts through `switchAtSafePoint` (same conversation), once however often asked: every role
+  change runs it (`projectAgents.updateAgent`: Agent Settings, the Agent API, the Assistant's cw_update_agent), `ifIdle`
+  restarting an idle agent at once and answering `busy` for a working one. The window then asks (Restart When Its Turn
+  Is Over → `atSafePoint`; Later: its old tools until it restarts); the Agent API's reply says which
+  (`api.done.updatedAgent`). **Until it has restarted** (Later, busy, a restart that failed) a running agent keeps the
+  tools it launched with and is given no work needing the new ones (`sessions.sideAllows`, from its launch's `CW_SIDE`):
+  the reviewer pool doesn't count it free (`idle`), a lane start or join naming it for that part is refused, `409`,
+  saying to restart it first (`lane.refused.oldTools`), and a lane waiting for a slot waits on (`startWaitingLane`).
+  No session-contract sentence. Hiding tools a project's workflow settings make
+  unusable, with live list updates, is HI-2694 (split off, Darren 7 Nov).
 - **Templates v2 and Combwork's own** [#1436] **Built [#1436]**: `TEMPLATE_VERSION` 2 (`shared/templates.ts`). Each agent
   `role: WorkflowRole` (none given: #1430's guess) and an optional `note` (the agent's free text); `worktree` is gone,
   with the plan's worktree types (`worktrees`, `oldWorktrees`, `mergedInto`, `setup`), the load's removal of old

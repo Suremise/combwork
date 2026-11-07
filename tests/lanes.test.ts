@@ -315,7 +315,7 @@ describe('the lanes service', () => {
   beforeAll(async () => {
     const p = join(wsPath, 'alpha')
     mkdirSync(join(p, '.combwork'), { recursive: true })
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2', workflowRole: 'either' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()
@@ -348,6 +348,27 @@ describe('the lanes service', () => {
     // The other roles as before: an either-role or guessed reviewer still reviews.
     expect((await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number, c2.number], by: 'B2 (alpha)' })).did).toBe('updated')
     await lanes.endLane(w, kept.lane.id, { abandoned: true })
+  })
+
+  // HI-2664 (HR3's round 1): an agent whose role changed while it ran keeps its old side's tools until it restarts.
+  it("an agent still on its old role's tools isn't given a lane part needing the new ones: refused, saying to restart it, nothing changed", async () => {
+    const [c1] = [await make('Old tools')]
+    const oldTools = /R1's role changed while it was running, and it still has its old role's tools: .*Restart it first/
+    lanes.setPartToolsCheck((_p, id, part) => !(id === 'r1' && part === 'reviewer'))
+    try {
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'the Assistant' })).rejects.toMatchObject({ status: 409, message: expect.stringMatching(oldTools) })
+      expect((await lanes.listLanes(w)).filter((l) => l.builder.id === 'b2' && l.state === 'active')).toEqual([])
+      const kept = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: null, pool: true, cards: [c1.number], by: 'the Assistant' })
+      await expect(lanes.joinLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'R1 (alpha)' })).rejects.toMatchObject({ status: 409, message: expect.stringMatching(oldTools) })
+      expect((await lanes.listLanes(w)).find((l) => l.id === kept.lane.id)?.reviewer ?? null).toBe(null)
+      await lanes.endLane(w, kept.lane.id, { abandoned: true })
+    } finally {
+      lanes.setPartToolsCheck(() => true)
+    }
+    // Restarted with its tools: the same start goes ahead.
+    const started = await lanes.startLane(w, { project: 'alpha', builder: 'b2', reviewer: 'r1', cards: [c1.number], by: 'the Assistant' })
+    expect(started.lane.reviewer?.id).toBe('r1')
+    await lanes.endLane(w, started.lane.id, { abandoned: true })
   })
 
   it('starts a lane, updates it when started again with a card in common, and starts anew with none', async () => {

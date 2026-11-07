@@ -75,8 +75,9 @@ const prose = (seed, n) => {
 
   // Agents: two in alpha (one running a few turns), one in beta.
   const alpha = path.join(ws, 'alpha')
-  const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })
-  await lib.addAgent(inv, alpha, { name: 'Tester' })
+  // Each builds and reviews the other's lanes (HI-2664: a lane part only for a role that does it).
+  const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either' })
+  await lib.addAgent(inv, alpha, { name: 'Tester', workflowRole: 'either' })
   await lib.addAgent(inv, path.join(ws, 'beta'), { name: 'Builder' })
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
   await inv('session:start', alpha, { agentId: coder.id })
@@ -127,9 +128,12 @@ const prose = (seed, n) => {
     const r = JSON.parse(out.split('\n')[0]).result
     return { text: r.content[0].text, isError: !!r.isError }
   }
-  /** The tools a role is offered, as the CLI lists them ('assistant+settings': with Change settings on, every one of its own). */
-  const toolList = (role = 'agent') => {
-    const extra = { CW_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
+  /**
+   * The tools a role is offered, as the CLI lists them ('assistant+settings': with Change settings on, every one of its own);
+   * `side`, a project agent's side of the workflow (HI-2664: CW_SIDE, builder, reviewer or both).
+   */
+  const toolList = (role = 'agent', side = undefined) => {
+    const extra = { CW_DEV_CONSOLE: '1', ...(side ? { CW_SIDE: side } : {}), ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, ...extra }),
@@ -180,6 +184,19 @@ const prose = (seed, n) => {
       check(`tool descriptions (${role}): ${total} characters in all, within ${limits.total[role]}`, total <= limits.total[role])
     }
   }
+  // HI-2664: a builder is offered no reviewer's moves and a reviewer no builder's, both sides everything; the Assistant none
+  // of a worker's (it keeps cw_ask_user, its own cw_release_slot, and moves a card with cw_update_task).
+  {
+    const names = (list) => list.map((t) => t.name)
+    const all = names(toolList('agent'))
+    const builder = names(toolList('agent', 'builder'))
+    const reviewer = names(toolList('agent', 'reviewer'))
+    check('tools by side: a builder is offered no reviewer moves, and keeps its own', !builder.some((n) => ['cw_start_review', 'cw_verdict', 'cw_request_builder', 'cw_focused_skip'].includes(n)) && builder.includes('cw_submit') && builder.includes('cw_loop_step'), builder.join(' '))
+    check('…a reviewer no builder moves, and keeps its own', !reviewer.some((n) => ['cw_start_card', 'cw_submit', 'cw_put_back', 'cw_merge_slot', 'cw_report_merge'].includes(n)) && reviewer.includes('cw_verdict') && reviewer.includes('cw_lane') && reviewer.includes('cw_loop_step'), reviewer.join(' '))
+    check('…both sides, and no side given, everything an agent has', names(toolList('agent', 'both')).length === all.length && all.includes('cw_verdict') && all.includes('cw_submit'))
+    const assistantNames = names(toolList('assistant+settings'))
+    check("the Assistant: none of a worker's tools; cw_ask_user, cw_release_slot and cw_update_task kept", !assistantNames.some((n) => ['cw_submit', 'cw_verdict', 'cw_start_review', 'cw_loop_step', 'cw_put_back', 'cw_request_builder', 'cw_declare_paths', 'cw_focused_skip', 'cw_report_merge', 'cw_cannot_within_rules'].includes(n)) && ['cw_ask_user', 'cw_release_slot', 'cw_update_task'].every((n) => assistantNames.includes(n)), assistantNames.join(' '))
+  }
   const sizes = {}
   const texts = {}
   // The checkout's path (in the fake CLI's path the settings list) counts as this token, so a reply measures the same
@@ -204,7 +221,7 @@ const prose = (seed, n) => {
 
   console.log('\n--- Combwork tools (as an agent)')
   const projects = measure('cw_list_projects', tool('cw_list_projects', {}), 1000)
-  check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, builder\] idle; Tester \[claude-code, builder\] stopped$/m.test(projects), projects)
+  check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, either\] idle; Tester \[claude-code, either\] stopped$/m.test(projects), projects)
   // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
   // Each agent row names its connection (HI-2108: every agent has one, its id and name).
   measure('cw_project_status', tool('cw_project_status', {}), 3300)
@@ -952,7 +969,8 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
       check('…and that lane ends', endLane(first), first)
       check('…the card started again, on a new lane', await startA())
       const second = laneOver()
-      const asBack = measure('cw_put_back (a lane\'s card, as Assistant)', tool('cw_put_back', { card: `#${a}`, why: 'The user wants B first.' }, 'assistant'), 600)
+      // The Assistant moves a card with cw_update_task (HI-2664: cw_put_back is a worker's, never offered to it).
+      const asBack = measure('cw_update_task to Todo (a lane\'s card, as Assistant)', tool('cw_update_task', { number: `#${a}`, column: 'todo', comment: 'The user wants B first.' }, 'assistant'), 600)
       check("…as the Assistant: the lane's line too", asBack.split('\n').some((l) => NOTE.test(l.replace(/^Warning: /, '')) && l.includes(second ?? '?')), asBack)
       const reorderedLane = measure("cw_reorder_tasks (a lane's cards)", tool('cw_reorder_tasks', { column: 'todo', cards: [b, a] }), 500)
       const reorderLines = reorderedLane.split('\n')

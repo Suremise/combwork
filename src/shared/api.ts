@@ -1166,6 +1166,8 @@ export interface CombworkRequests {
   'connections:switchAffected': () => { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]
   /** Switches one agent to the connection chosen for it now, at its next safe point (HI-1755). */
   'session:switchConnection': (projectPath: string, agentId: string) => 'queued' | 'waiting' | 'notRunning'
+  /** An agent whose role changed (HI-2664): restarted to load its side's tools; `ifIdle` says `busy` rather than wait. */
+  'session:restartForSide': (projectPath: string, agentId: string, when: 'ifIdle' | 'atSafePoint') => 'restarting' | 'busy' | 'same' | 'notRunning'
 
   'api:info': () => AgentApiInfo
   'api:regenerateToken': () => AgentApiInfo

@@ -23,6 +23,8 @@ import { scopeOfHost, withCardNames } from './projectKeys'
 import { queueReturnOf, resubmittedOf } from './queueReturn'
 import { projectPreferences } from './workflow/preferences'
 import { rulesEnforced } from './workflow/recorder'
+import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
+import { sessions } from './sessions'
 
 /**
  * Combwork's loop wakes (#405): a card loop's routine handoffs, delivered by Combwork whether or not the agent set a card watch.
@@ -397,6 +399,15 @@ let versions = 0
 const madeFrom = new Map<string, { seq: number; column: TaskCard['column']; key: string | null }>()
 
 /**
+ * Whether an agent can take a reviewer's handoff now (HI-2664): its role reviews (the workspace's projects as it holds
+ * them: nothing is read, as `holds` is pure) and its running session has a reviewer's tools (sessions.sideAllows).
+ */
+function reviewsNow(ws: WorkspaceService, host: string, agentId: string): boolean {
+  const a = ws.info()?.projects.find((x) => x.path.toLowerCase() === host.toLowerCase())?.config.agents?.find((x) => x.id === agentId)
+  return (!a || reviewsWork(agentWorkflowRole(a))) && sessions.sideAllows(host, agentId, 'reviewer')
+}
+
+/**
  * The loop wakes' part in their deliveries (#649): made again just before each offer (the line from the card as it is
  * now; dropped if no longer due, its watch tells it, or it is someone else's wake now, who gets it instead); offered only
  * while its card, lanes and project settings haven't changed (else made again at the next try) and its watch doesn't tell it;
@@ -448,6 +459,10 @@ registerSource('loop', {
     const m = madeFrom.get(madeKey(host, r.id, r.meta?.v))
     if (!p || !m || covered(host, r.agentId, { number: p.n, column: m.column } as TaskCard, p.kind)) return false
     const ws = workspaceFor(host)
+    // A reviewer's handoff to an agent that can't review yet (HI-2664, HR3's round 2): its role doesn't (its lane pauses,
+    // offSide), or its running session hasn't loaded a reviewer's tools (a role changed, not restarted since). Not given
+    // now, but kept: the delivery stays queued, made again and given at a later try, once its tools are there.
+    if ((p.kind === 'review' || toReviewer(p.kind)) && !(ws && reviewsNow(ws, host, r.agentId))) return false
     const unchanged = m.key !== null && !!ws && wakeKey(ws, host, p.n) === m.key
     return unchanged || (m.key === null && m.seq === rolesSeq)
   },

@@ -14,7 +14,7 @@ import { slotCopyOf } from '../shared/slotDefaults'
 import { toast } from './events'
 import { placeKey, samePlace } from './fsutil'
 import { withRepoLock } from './repoLock'
-import { createLogger } from './logger'
+import { createLogger, userText } from './logger'
 import { checkProject } from './branchWatch'
 import { noteManualChoice } from './agentChoice'
 import { sessions } from './sessions'
@@ -555,6 +555,10 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const live = sessions.liveFor(projectPath, agentId)
   if (live && patch.name) live.agentName = patch.name
   await workspaceOf(projectPath).refresh()
+  // A role change, however made (HI-2664, HR3's round 1: Agent Settings, the Agent API, the Assistant): an idle agent is
+  // restarted now to load its new side's tools; a busy one keeps its old tools, and no work needing the new ones, until
+  // it restarts (the window asks; restartForSide).
+  if ('workflowRole' in clean && !workspace.isAssistantHome(projectPath)) await sessions.restartForSide(projectPath, agentId, { when: 'ifIdle' }).catch((e) => log.warn(`${userText(def.name)}: not restarted for its new role`, e))
   return def
 }
 

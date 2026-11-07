@@ -1514,7 +1514,9 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     })
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
-    return { done: [API.done.updatedAgent, { agent: def.name, project: basename(p), live: live ? 'yes' : 'no' }], act: { agent: actAgent(def) }, result: def }
+    // A role change (HI-2664): updateAgent restarted it if idle; asked again, what became of it (one restart, never two).
+    const side = live && body?.workflowRole !== undefined ? await sessions.restartForSide(p, agentId, { when: 'ifIdle' }).catch(() => 'same' as const) : 'same'
+    return { done: [API.done.updatedAgent, { agent: def.name, project: basename(p), live: side === 'restarting' || side === 'busy' ? side : live ? 'yes' : 'no' }], act: { agent: actAgent(def) }, result: def }
   })
 })
 
@@ -3282,7 +3284,13 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     return c
   }
   const nudge = patch.title === undefined ? null : titleNudge(patch.title, actor, titleKeys())
-  const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(nudge ? { nudge } : {}) })
+  // A lane's card moved (HI-2664: the Assistant's move to Todo, now that cw_put_back is a worker's): its lane keeps its own
+  // order and takes it again in it, said as a put-back says it (HI-2267).
+  const reply = async (c: TaskCard) => {
+    const held = patch.column !== undefined ? await lanes.lanesHolding(requireWorkspace(), [c.number]).catch(() => []) : []
+    const notes = [nudge, ...held.map(laneOrderNote)].filter(Boolean).join('\n')
+    return { ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
+  }
   if (actor.kind !== 'assistant') {
     const c = await apply()
     const copy = await reviewCopyAfter(actor, c, { start: patch.review === 'start', verdict: patch.review === 'passed' || patch.review === 'failed' || patch.column === 'passed' })

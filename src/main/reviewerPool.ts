@@ -70,11 +70,14 @@ const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCas
  * Whether an agent is idle: not running, or running with no turn, nothing typed or queued, no run or background task (a
  * card watch counts as idle, HI-2333), and able to take the pool's line now (`readyFor`'s `idle`, the need its line is
  * typed with): so the pass never gives or tells what the delivery would refuse, which a pass at each status change
- * would then try again at once.
+ * would then try again at once. Never one whose running session lacks a reviewer's tools (sessions.sideAllows).
  */
 function idle(projectPath: string, agentId: string): boolean {
   const now = sessions.agentNow(projectPath, agentId)
   if (!now) return true
+  // Made a reviewer while running and not restarted since (HI-2664, HR3's round 1: Later, or a restart that failed): it
+  // has no reviewer's tools yet, so it waits, as a busy one does, until it has restarted with them.
+  if (!sessions.sideAllows(projectPath, agentId, 'reviewer')) return false
   if (BUSY.has(now.status) || agentBusy(projectPath, agentId) || now.backgroundTasks !== 0 || agentRunsGoing(projectPath, agentId).length !== 0) return false
   const st = sessions.liveFor(projectPath, agentId)
   return !st || readyFor(st, 'idle')

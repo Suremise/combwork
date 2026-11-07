@@ -248,6 +248,39 @@ describe("HR1 on s44: an agent made Independent is checked again under its proje
   })
 })
 
+// HI-2664 (HR3's round 2): an agent's tools follow its role, so a role that doesn't do its part in a running lane would
+// leave the lane unable to go on: refused, saying what to change first, its lanes and cards as they were.
+describe("a role that doesn't do the agent's part in a running lane", () => {
+  const hb1 = { id: 'b1', name: 'HB1', workflowRole: 'builder' as const, connection: 'c-1' }
+  const hr1 = { id: 'r1', name: 'HR1', workflowRole: 'reviewer' as const, connection: 'c-1' }
+  const ws = { path: 'C:/ws', info: () => ({ projects: [] }), projectConfigWrites: () => 0 } as never
+  const change = (a: typeof hb1 | typeof hr1, workflowRole: AgentDef['workflowRole']) => agentChangeCheck(ws, 'C:/ws/demo', 'demo', a as AgentDef, { workflowRole }, null)
+
+  it("is refused for a lane's builder made a reviewer or a generalist, and its reviewer made a builder, naming the lane", async () => {
+    await expect(change(hb1, 'reviewer')).rejects.toThrow(/HB1 is the builder of lane lane-1, which a reviewer isn't: end the lane or give it another builder first, or choose a role that does it/)
+    await expect(change(hb1, 'generalist')).rejects.toThrow(/which a generalist isn't/)
+    state.lanes = [{ id: 'lane-2', project: 'demo', state: 'active', builder: { id: 'b1', name: 'HB1' }, reviewer: { id: 'r1', name: 'HR1' }, cards: [7] }]
+    await expect(change(hr1, 'builder')).rejects.toThrow(/HR1 is the reviewer of lane lane-2, which a builder isn't: end the lane or give it another reviewer first/)
+  })
+
+  it('is let through for a role that still does it (Either does both), on another project or with the lane ended', async () => {
+    expect((await change(hb1, 'either'))(hb1)).toBeUndefined()
+    state.lanes = [{ id: 'lane-1', project: 'other', state: 'active', builder: { id: 'b1', name: 'HB1' }, reviewer: null, cards: [7] }]
+    expect((await change(hb1, 'reviewer'))(hb1)).toBeUndefined()
+    state.lanes = [{ id: 'lane-1', project: 'demo', state: 'ended', builder: { id: 'b1', name: 'HB1' }, reviewer: null, cards: [7] }]
+    expect((await change(hb1, 'reviewer'))(hb1)).toBeUndefined()
+  })
+
+  it('is read again at the write when the board moved since (a lane started or joined meanwhile)', async () => {
+    state.lanes = []
+    const check = await change(hb1, 'reviewer')
+    state.lanes = [{ id: 'lane-3', project: 'demo', state: 'active', builder: { id: 'b1', name: 'HB1' }, reviewer: null, cards: [7] }]
+    state.rev++
+    expect(() => check(hb1)).toThrow(/written to since it was read/)
+    await expect(change(hb1, 'reviewer')).rejects.toThrow(/builder of lane lane-3/)
+  })
+})
+
 describe('HR3 on s45: an affected set that can\'t be read never lets the change through', () => {
   for (const [what, fail] of [
     ['the cards', () => void (state.failCards = true)],

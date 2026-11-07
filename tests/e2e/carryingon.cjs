@@ -96,7 +96,7 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     }
 
     await page.getByText('alpha', { exact: true }).first().click()
-    const claude = { ...(await lib.addAgent(inv, alpha, { name: 'Claude' })), name: 'Claude', provider: 'claude-code' }
+    const claude = { ...(await lib.addAgent(inv, alpha, { name: 'Claude', workflowRole: 'reviewer' })), name: 'Claude', provider: 'claude-code' }
     const codex = { ...(await lib.addAgent(inv, alpha, { name: 'Codex', provider: 'codex', permissionMode: 'approve-for-me' })), name: 'Codex', provider: 'codex' }
     for (const a of [claude, codex]) await inv('session:start', alpha, { agentId: a.id })
     check('both agents start', !!(await until(async () => (await idle(claude.id)) && (await idle(codex.id)), HUNG_MS)))

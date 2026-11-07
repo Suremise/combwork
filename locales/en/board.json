@@ -2075,6 +2075,10 @@
     "defaultMessage": "No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.",
     "description": "The Progress panel's Lanes tab when there are no lanes. Glossary: lane."
   },
+  "board.lanes.offSide": {
+    "defaultMessage": "paused: {agent} isn’t a {part, select, builder {builder} other {reviewer}} by its role: give the lane another {part, select, builder {builder} other {reviewer}}, or change {agent}’s role",
+    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2664): its builder or reviewer {agent} (an agent's name) has a workflow role that doesn't do its part ({part}: builder or reviewer) in the lane, so it has none of that part's tools and Combwork gives it nothing new for the lane."
+  },
   "board.lanes.oldRules": {
     "defaultMessage": "old rules",
     "description": "A lane's mark in its header (Progress panel), lower case: the project's workflow options changed while the lane ran, and it keeps the ones it started with until it ends; its tooltip says so. Glossary: workflow options."

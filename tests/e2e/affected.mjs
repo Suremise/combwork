@@ -154,6 +154,7 @@ export const AREAS = [
   { paths: ['src/main/advanced.ts'], suites: ['replysize', 'assistantsettings'] },
   // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
+  { paths: ['tests/e2e/toolsides.cjs', 'src/shared/assistantTools.ts', 'src/main/mcp/cw-mcp.ts', 'src/main/sessions.ts', 'src/shared/workflow/roles.ts', 'src/main/launchSides.ts', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['toolsides', 'replysize'] },
   { paths: ['src/main/providers/antigravity/', 'src/shared/antigravity.ts', 'tests/e2e/fake-agy/'], suites: ['antigravity'] },
   { paths: ['src/main/assistantMemory.ts', 'src/shared/assistantMemory.ts', 'src/renderer/src/components/AssistantMemory.tsx', 'src/renderer/src/components/AssistantView.tsx'], suites: ['assistantmemory', 'assistantimages'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
@@ -940,6 +941,8 @@ export const UNIT_SCANS = [
   { test: 'tests/modeDescriptions.test.ts', paths: ['resources/modes/'] },
   { test: 'tests/skills.test.ts', paths: ['resources/skills/'] },
   { test: 'tests/retention.test.ts', paths: ['resources/skills/'] },
+  // Each side's skill files name only the tools offered to that side (HI-2664).
+  { test: 'tests/toolSides.test.ts', paths: ['resources/skills/'] },
   { test: 'tests/bundled.test.ts', paths: ['resources/', 'src/main/bundledHistory.json'] },
   { test: 'tests/bundledrace.test.ts', paths: ['resources/'] },
   // The shipped dialect files (HI-2442): each one's form, model and schema, and their sync into a workspace.

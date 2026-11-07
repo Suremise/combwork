@@ -317,6 +317,11 @@ function handMerged(c, n) {
   c.git('merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch)
   return { branch, base }
 }
+/** Implementer builds and Coder reviews (HI-2664: the harness saves Coder either and Implementer a reviewer). */
+async function swapRoles(c) {
+  await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
+  await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
+}
 /** Coder builds and Implementer reviews (their workflow roles), in a project whose work an agent reviews (#1527). */
 async function reviewedPair(c) {
   await pairInProject(c)
@@ -1732,6 +1737,9 @@ module.exports.SCENARIOS = [
   {
     id: 'review-passed',
     title: 'A review that passes: its verdict moves the card to Passed, not to Done (#170; #1536: a project where an agent reviews and merges come after, so a pass stops in Passed)',
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       // A reviewer agent, and merges reported by the builder, not checked: a pass waits in Passed for the merge.
@@ -2818,6 +2826,7 @@ module.exports.SCENARIOS = [
     id: 'card-loop-lane-join',
     title: "A card loop reviewer joins its builder's lane (#483) by the builder's name, then waits for the first card",
     async setup(c) {
+      await swapRoles(c)
       await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', column: 'doing', agent: 'implementer' })
       await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'implementer' })
     },
@@ -3221,6 +3230,9 @@ module.exports.SCENARIOS = [
   {
     id: 'intent-review-request',
     title: "A reviewer starts a review, asks the builder something and fails it (#1267): start review, request to builder and verdict",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -3421,6 +3433,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
+      await swapRoles(c)
       // Implementer starts the card, registers its lane (the subject, Coder, reviewing) and posts its design, with its own
       // token. The start comes before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing this start.
@@ -3491,10 +3504,14 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-follow-up-check',
     title: "A card loop reviewer told of a follow-up to check, on a card in Review (#1467): it answers with cw_loop_step naming it, not a verdict",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
+      await swapRoles(c)
       // Implementer's round 1 sent for review, then its lane (the subject, Coder, reviewing), then its follow-up, with its
       // own token. The moves come before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing the move to Doing.
@@ -3580,6 +3597,9 @@ module.exports.SCENARIOS = [
   {
     id: 'old-move-review',
     title: "A reviewer's review start and failed verdict are start review and a verdict for now (#1268): today's skills, the card back in Doing with its builder",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -5558,6 +5578,8 @@ module.exports.SCENARIOS.push({
   files: { 'README.md': '# alpha\n\nA project for the tool sweep.\n' },
   async setup(c) {
     await pairInProject(c)
+    // Both sides' tools (HI-2664: a builder isn't offered cw_request_builder, a reviewer not cw_put_back).
+    await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'either' })
     await c.card('s', { title: 'Sweep the tools', description: 'A card for each tool to name.' })
   },
   prompt: (c) => `Call each Combwork tool once on card #${c.cards.s}.`,

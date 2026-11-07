@@ -518,6 +518,7 @@
   "board.lanes.moveUp": "Move Up",
   "board.lanes.moved": "{lane} moved: {at} of {n, plural, one {# running lane} other {# running lanes}}",
   "board.lanes.none": "No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.",
+  "board.lanes.offSide": "paused: {agent} isn’t a {part, select, builder {builder} other {reviewer}} by its role: give the lane another {part, select, builder {builder} other {reviewer}}, or change {agent}’s role",
   "board.lanes.oldRules": "old rules",
   "board.lanes.oldRulesTip": "Old rules: this lane started under the workflow options from before they changed, and keeps them until it ends. New lanes and cards use the new options.{enforced, select, no { Workflow rules aren’t enforced now (Settings → Advanced).} other {}}",
   "board.lanes.poolLastVerdict": "Last verdict: {name}, {pass, select, yes {passed} other {failed}}",
