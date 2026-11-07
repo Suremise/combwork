@@ -95,7 +95,7 @@ export async function dropEmptyLines(projectPath: string, s: CardState, keep: re
   let at = ''
   for (const row of list.out.split(/\r?\n/)) {
     if (row.startsWith('worktree ')) at = row.slice('worktree '.length)
-    else if (row.startsWith('branch refs/heads/')) out.set(row.slice('branch refs/heads/'.length), at)
+    else if (row.startsWith('branch refs/heads/')) out.set(row.slice('branch refs/heads/'.length), at) // i18n-ignore: git's porcelain output, parsed
   }
   const heads: [string, string][] = []
   for (const line of own) {
