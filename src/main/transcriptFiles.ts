@@ -2,6 +2,7 @@ import { createReadStream, createWriteStream } from 'original-fs'
 import { open, rename, rm, stat } from 'original-fs/promises'
 import { pipeline } from 'stream/promises'
 import { createGunzip, createGzip, constants } from 'zlib'
+import { createHash } from 'crypto'
 
 /**
  * Combwork's transcript backups compressed (#1110): a session's backup (`.combwork/sessions` or `.combwork/archive`, `<id>.jsonl`)
@@ -117,6 +118,31 @@ export async function readBytes(path: string, from: number, to: number): Promise
     gunzip.destroy()
   }
   return Buffer.concat(parts)
+}
+
+/**
+ * A hash of a plain file's first `length` bytes, read a piece at a time (HI-2546: whether what a reader read of a
+ * transcript its CLI may write again in place is still there); null when the file is shorter or can't be read.
+ */
+export async function prefixHash(path: string, length: number, chunk = 4 * 1024 * 1024): Promise<string | null> {
+  try {
+    const fh = await open(path, 'r')
+    try {
+      const h = createHash('sha1')
+      const buf = Buffer.alloc(Math.min(chunk, Math.max(1, length)))
+      for (let at = 0; at < length; ) {
+        const { bytesRead } = await fh.read(buf, 0, Math.min(buf.length, length - at), at)
+        if (bytesRead === 0) return null
+        h.update(buf.subarray(0, bytesRead))
+        at += bytesRead
+      }
+      return h.digest('hex')
+    } finally {
+      await fh.close()
+    }
+  } catch {
+    return null
+  }
 }
 
 /** A transcript's first line, at most `max` bytes of it (a sub-session's check). */

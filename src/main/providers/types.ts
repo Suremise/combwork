@@ -399,6 +399,11 @@ export interface ConversationParserLike {
   /** Bytes consumed, always at a line boundary. */
   offset: number
   feed(buf: Buffer): number
+  /**
+   * Its CLI may write the transcript again in place, not only append (HI-2546: agy): the reader checks the bytes it read are
+   * unchanged whenever the file changes, and reads it again from the start when they aren't.
+   */
+  readonly rewritten?: boolean
 }
 
 /** The answer to a PreToolUse file-lock check, in the provider's hook reply format. */
@@ -715,7 +720,8 @@ export interface ProviderAdapter {
   usageTitle?(sessionId: string): string | null
   conversationParser(projectPath: string): ConversationParserLike
   /** An image's data URL from the transcript line holding it. */
-  imageData(line: Record<string, any>, loc: ImageLocation): string | null
+  /** `transcriptPath`: the transcript the line is from, for an image kept beside it (agy's media files, HI-2546). */
+  imageData(line: Record<string, any>, loc: ImageLocation, transcriptPath: string): string | null | Promise<string | null>
   /** Heading for a Markdown export. */
   exportSubtitle(sessionId: string, project: string): string
 

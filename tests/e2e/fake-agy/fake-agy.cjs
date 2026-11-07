@@ -11,7 +11,8 @@
 //   .agents\mcp_config.json (the cwd and each --add-dir), a server named in the profile replacing the project's of that
 //   name, and keeps them running (one that ends falls back to the project's, as the real CLI's does);
 // - each line typed is a turn: written to the transcript, answered "Done: <line>", the status line run again; a line
-//   "tool <text>" also calls an MCP tool (call_mcp_tool) whose result is <text>.
+//   "tool <text>" also calls an MCP tool (call_mcp_tool) whose result is <text>, and "image" reads an image (read_file, its
+//   result naming a copy in logs\media); a resume needs the conversation's store (conversations\<id>.db), as 1.5.0's does.
 // Every launch is logged to FAKE_AGY_LOG (a JSON line: its arguments, cwd, and the environment the adapter sets).
 const fs = require('fs')
 const path = require('path')
@@ -80,6 +81,8 @@ const keep = (rel, text) => {
   fs.writeFileSync(path.join(cli, rel), text)
 }
 keep(path.join('cache', 'last_conversations.json'), JSON.stringify({ [process.cwd()]: conv }))
+// The conversation's own store, which a resume reads (1.5.0: conversations\<id>.db; the fake's is empty).
+if (!fs.existsSync(path.join(cli, 'conversations', `${conv}.db`))) keep(path.join('conversations', `${conv}.db`), '')
 log({ kind: 'session', args: argv, cwd: process.cwd(), conversation: conv, resumed: !!resumed, env: pick() })
 
 // The status line, per --settings (never saved), through cmd /c as agy runs it.
@@ -145,6 +148,14 @@ const turn = (text) => {
   if (tool) {
     write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'call_mcp_tool', args: { Arguments: {}, ServerName: 'fake', ToolName: 'echo' } }] })
     write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\n${tool[1]}` })
+  }
+  if (text === 'image') {
+    // read_file of an image: its result names the copy agy keeps in logs\media (1.5.0's media entry).
+    write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), tool_calls: [{ name: 'read_file', args: { Path: path.join(process.cwd(), 'red.png') } }] })
+    const media = path.join(logs, 'media', `step_${step}_media_0.png`)
+    fs.mkdirSync(path.dirname(media), { recursive: true })
+    fs.copyFileSync(path.join(__dirname, '..', '..', 'fixtures', 'antigravity', 'image-1.5.0-media.png'), media)
+    write({ source: 'MODEL', type: 'GENERIC', status: 'DONE', content: `Created At: ${now()}\nCompleted At: ${now()}\nShowing binary file of type image/png`, media: [{ mime_type: 'image/png', uri: `file:///${media.replace(/\\/g, '/')}` }] })
   }
   write({ source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', ...tokens(), content: `Done: ${text}` })
   process.stdout.write(`Done: ${text}\n> `)

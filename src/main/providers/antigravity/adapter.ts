@@ -1,5 +1,5 @@
 import { createHash } from 'crypto'
-import { join, resolve } from 'path'
+import { dirname, join, resolve } from 'path'
 import { existsSync } from 'original-fs'
 import { cp, mkdir, stat } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PathDataCopy, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
@@ -21,7 +21,7 @@ import { antigravityInstallCommand, antigravityLoginCommand, antigravityReadines
 import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './projectConfig'
 import { agyStatusDetails } from './status'
 import { AntigravityConversationParser, AntigravityUsageParser, parseAgyTranscript } from './transcript'
-import { conversationTitle, isConversationId, listConversations, mediaData, profileOf, profileOfNow, profileTranscript, subOf, transcriptIn } from './conversations'
+import { isConversationId, knownTitle, learnTitle, listConversations, mediaData, profileOf, subOf, trustedTranscript } from './conversations'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
@@ -35,6 +35,7 @@ const NAME = ANTIGRAVITY_DESCRIPTOR.name
 
 const REFUSED = {
   unreadable: msg({ id: 'providers.antigravity.unreadableConfig', defaultMessage: "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.", description: "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words." }),
+  gone: msg({ id: 'providers.antigravity.conversationGone', defaultMessage: "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation's own store in the agent's profile is gone, though its transcript may be left. {provider} is the CLI's name, {conversation} the conversation's id." }),
   notOwn: msg({ id: 'providers.antigravity.notOwnConversation', defaultMessage: "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.", description: "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id." }),
   projectServers: msg({ id: 'providers.antigravity.projectServers', defaultMessage: "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.", description: "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork." })
 }
@@ -214,6 +215,8 @@ export class AntigravityAdapter implements ProviderAdapter {
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
     // A resume reopens only one of this agent's own conversations (in its profile), never another's or a missing one.
     if (ctx.resume && !(await this.ownsConversation(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.notOwn, { provider: NAME, conversation: ctx.sessionId })
+    // Its transcript alone (the brain folder) isn't the conversation: agy resumes from its store, conversations\<id>.db.
+    if (ctx.resume && !(await this.hasConversationStore(ctx.agentId, ctx.workspacePath, ctx.sessionId))) throw combworkError(REFUSED.gone, { provider: NAME, conversation: ctx.sessionId })
     const delivered = await syncAgentsSkills(ctx, NAME)
     let workspace: Map<string, WorkspaceServer[]>
     try {
@@ -283,9 +286,12 @@ export class AntigravityAdapter implements ProviderAdapter {
   async transcriptPath(_folder: string, sessionId: string, recorded?: string): Promise<string | null> {
     if (!isConversationId(sessionId)) return null
     const root = profilesRoot()
-    if (recorded && profileTranscript(recorded, root, sessionId) && existsSync(recorded)) return recorded
-    const profile = await profileOf(root, sessionId)
-    return profile ? transcriptIn(profile, sessionId) : null
+    const found = await profileOf(root, sessionId)
+    if (!found) return null
+    // Its title, for a usage asked for without waiting (usageTitle).
+    await learnTitle(root, found.profile, sessionId)
+    const reported = recorded ? await trustedTranscript(recorded, root, sessionId) : null
+    return reported ?? found.transcript
   }
 
   /**
@@ -319,11 +325,28 @@ export class AntigravityAdapter implements ProviderAdapter {
     }
   }
 
+  /** Whether agy's own store of the conversation (conversations\<id>.db in the agent's profile), which a resume reads, is there. */
+  async hasConversationStore(agentId: string, workspacePath: string, sessionId: string): Promise<boolean> {
+    if (!isConversationId(sessionId)) return false
+    try {
+      return (await stat(join(dirname(brainDir(profileFolder(agentId, workspacePath))), 'conversations', `${sessionId}.db`))).isFile()
+    } catch {
+      return false
+    }
+  }
+
   // ---- Usage (HI-2546): from the transcript (transcript.ts).
   /** The conversation's title agy made (its annotations), from the profile that has it. */
   usageTitle(sessionId: string): string | null {
-    const profile = profileOfNow(profilesRoot(), sessionId)
-    return profile ? conversationTitle(profile, sessionId) : null
+    const known = knownTitle(sessionId)
+    // Never read here, on the caller's thread: one not read yet is looked up meanwhile, for the next ask.
+    if (known === undefined && isConversationId(sessionId)) {
+      const root = profilesRoot()
+      void profileOf(root, sessionId)
+        .then((f) => (f ? learnTitle(root, f.profile, sessionId) : null))
+        .catch(() => null)
+    }
+    return known ?? null
   }
 
   parseUsage(text: string, sessionId: string): SessionUsage {
@@ -340,10 +363,10 @@ export class AntigravityAdapter implements ProviderAdapter {
   }
 
   /** An image a tool read (its result step's `media`, a file in the conversation's logs\media): mediaData. */
-  imageData(line: Record<string, any>, loc: ImageLocation): string | null {
+  imageData(line: Record<string, any>, loc: ImageLocation, transcriptPath: string): Promise<string | null> {
     let v: any = line
     for (const k of loc.path) v = v?.[k]
-    return mediaData(v, profilesRoot())
+    return mediaData(v, transcriptPath, profilesRoot())
   }
 
   exportSubtitle(sessionId: string, project: string): string {

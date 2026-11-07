@@ -22,12 +22,21 @@ export interface RawUsageParser {
   result(): SessionUsage
 }
 
-const PARSERS: Partial<Record<ProviderId, new (sessionId: string) => { feed(text: string): void; result(title?: string | null): SessionUsage }>> = {
+/** A parser's class: `rewritten`, its CLI may write a transcript again in place (not only append), so it is read whole again. */
+type ParserClass = (new (sessionId: string) => { feed(text: string): void; result(title?: string | null): SessionUsage }) & { readonly rewritten?: boolean }
+
+const PARSERS: Partial<Record<ProviderId, ParserClass>> = {
   [CLAUDE_CODE]: ClaudeUsageParser,
   [CODEX]: CodexUsageParser,
   [COPILOT]: CopilotUsageParser,
   [ANTIGRAVITY]: AntigravityUsageParser
 }
+
+/**
+ * Whether a provider's transcripts are read whole again whenever they change (HI-2546: agy may write its transcript again in
+ * place), never taken up from where a parser or a saved state left them: their earlier bytes can't be trusted unchanged.
+ */
+export const rereadsWhole = (provider: ProviderId): boolean => PARSERS[provider]?.rewritten === true
 
 /** A provider's parser for a session, or null for one this Combwork can't read. */
 export function newUsageParser(provider: ProviderId, sessionId: string): RawUsageParser | null {

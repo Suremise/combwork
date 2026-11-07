@@ -5,8 +5,9 @@
 // config can't be read, and the sentinel never starts (agy 1.5.0 can't be kept from starting it: HR1, fail closed); the
 // conversation's id comes from the status line; two new conversations one after the other, then each resumed by its id;
 // a conversation that isn't the agent's is never resumed. Its transcript (HI-2546): the conversation view (prompts without
-// what agy adds, replies, a tool call and its result), its usage (requests, the cache counted once, the model, agy's title)
-// and the status line's model and effort. The fake proves the adapter's side only (HI-2548 runs the real
+// what agy adds, replies, tool calls with their results and the image one read, light and dark), its usage (requests, the
+// cache counted once, the model, agy's title), the status line's model and effort, the Sessions tab, and a conversation
+// whose store agy no longer has, refused with why. The fake proves the adapter's side only (HI-2548 runs the real
 // CLI). Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -158,23 +159,39 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check('its turns are kept in its own conversation, in its profile', await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity'))
   // --- Its transcript (HI-2546): the conversation view, its usage and the status line's details.
   check('…and a turn with a tool call', await say(gem.id, e.USERPROFILE, first.conv, 'tool fake result'))
+  check('…and one reading an image', await say(gem.id, e.USERPROFILE, first.conv, 'image'))
   const shown = await until(async () => {
     const items = (await inv('transcript:read', alpha, first.conv).catch(() => null))?.items ?? []
-    return items.some((i) => i.kind === 'assistant' && i.text === 'Done: tool fake result') ? items : null
+    return items.some((i) => i.kind === 'assistant' && i.text === 'Done: image') ? items : null
   }, HUNG_MS)
-  const said = (shown ?? []).map((i) => (i.kind === 'tool' ? `tool ${i.tool.name}: ${i.tool.result}` : `${i.kind} ${i.text}`))
-  check("the conversation view shows the prompts without what agy adds, the replies and the tool call with its result", JSON.stringify(said) === JSON.stringify(['user hello antigravity', 'assistant Done: hello antigravity', 'user tool fake result', 'tool fake · echo: fake result', 'assistant Done: tool fake result']), JSON.stringify(said))
+  const said = (shown ?? []).map((i) => (i.kind === 'tool' ? `tool ${i.tool.name}: ${i.tool.result} (${i.tool.images.length} image)` : `${i.kind} ${i.text}`))
+  check("the conversation view shows the prompts without what agy adds, the replies and the tool calls with their results and image", JSON.stringify(said) === JSON.stringify(['user hello antigravity', 'assistant Done: hello antigravity', 'user tool fake result', 'tool fake · echo: fake result (0 image)', 'assistant Done: tool fake result', 'user image', 'tool read_file: Showing binary file of type image/png (1 image)', 'assistant Done: image']), JSON.stringify(said))
+  const picture = await inv('transcript:image', alpha, first.conv, 0).catch((err) => String(err?.message ?? err))
+  check("…the image from agy's own copy in the conversation's media folder", picture === `data:image/png;base64,${fs.readFileSync(path.join(__dirname, '..', 'fixtures', 'antigravity', 'image-1.5.0-media.png')).toString('base64')}`, String(picture).slice(0, 80))
   const used = await until(async () => {
     const u = await inv('session:usage', alpha, first.conv).catch(() => null)
-    return u?.requests === 3 ? u : null
+    return u?.requests === 5 && u.title ? u : null
   }, HUNG_MS)
   // The fake's requests: input 3000 + 100 × its step without the cache read (4000 from the second on), output 20.
-  check("its usage counts each request, the cache once, its prompts, model and agy's title", !!used && used.inputTokens === 3100 + 3300 + 3500 && used.cacheReadTokens === 8000 && used.contextTokens === 3500 + 4000 + 20 && used.outputTokens === 60 && used.userMessages === 2 && used.model === 'Gemini 3.8 Flash (Low)' && used.title === 'Fake: hello antigravity' && used.costUsd === null, JSON.stringify(used && { ...used, days: undefined, timeline: undefined }))
+  check("its usage counts each request, the cache once, its prompts, model and agy's title", !!used && used.inputTokens === 3100 + 3300 + 3500 + 3700 + 3900 && used.cacheReadTokens === 16000 && used.contextTokens === 3900 + 4000 + 20 && used.outputTokens === 100 && used.userMessages === 3 && used.model === 'Gemini 3.8 Flash (Low)' && used.title === 'Fake: hello antigravity' && used.costUsd === null, JSON.stringify(used && { ...used, days: undefined, timeline: undefined }))
   const details = await live(gem.id)
   check("the status line gives the model, its effort and the context window", details?.modelName === 'Gemini 3.8 Flash (Low)' && details?.effort === 'low', JSON.stringify({ modelName: details?.modelName, effort: details?.effort }))
   check('it stops', !!(await stop()))
   const listed = (await inv('session:list', alpha)).find((s) => s.id === first.conv)
   check("the Sessions list has it, with agy's title", listed?.title === 'Fake: hello antigravity', JSON.stringify(listed && { id: listed.id, title: listed.title }))
+  // What the user sees, light and dark (kept with --keep-files): the Sessions tab, its conversation, the image a tool read.
+  await page.locator('.tabs .tab', { hasText: 'Sessions' }).first().click()
+  const row = page.locator('.session-row', { hasText: 'Fake: hello antigravity' })
+  check('the Sessions tab lists it by its title', !!(await until(async () => (await row.count()) === 1, HUNG_MS)))
+  await row.click()
+  const reading = page.locator('.transcript .tx-tool', { hasText: 'read_file' }).first()
+  await reading.waitFor({ timeout: HUNG_MS })
+  await reading.locator('.tx-fold-head').click()
+  const thumb = reading.locator('.tx-images .thumb img')
+  check('…its conversation shows the tool call and the image it read', !!(await until(async () => ((await thumb.getAttribute('src').catch(() => null)) ?? '').startsWith('data:image/png'), HUNG_MS)))
+  await shots('sessions-transcript', page.locator('.transcript').first())
+  await shots('sessions-list', page.locator('.sessions-tree').first())
+  await page.getByText('alpha', { exact: true }).first().click()
 
   // --- A second new conversation, then each resumed by its own id.
   const second = await startNew()
@@ -191,6 +208,11 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
     check(`…and the session is that conversation`, (await until(async () => ((await live(gem.id))?.sessionId === c ? c : null), HUNG_MS)) === c)
     await stop()
   }
+  // --- A conversation whose store agy no longer has (its transcript kept): refused before agy starts, saying so.
+  fs.rmSync(path.join(e.USERPROFILE, '.gemini', 'antigravity-cli', 'conversations', `${second.conv}.db`))
+  const beforeGone = entries('session').length
+  const gone = await inv('session:start', alpha, { agentId: gem.id, resumeId: second.conv }).then(() => null, (err) => String(err?.message ?? err))
+  check("a conversation agy no longer has isn't resumed, and says why", entries('session').length === beforeGone && /no longer has that conversation/.test(gone ?? ''), gone ?? 'started')
   // --- Another agent's conversation (in its own profile): never resumed by this one, refused before agy starts.
   const other = await lib.addAgent(inv, alpha, { name: 'Ada', provider: 'antigravity' })
   const theirs = await startNew(other.id)

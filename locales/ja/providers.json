@@ -3,6 +3,7 @@
   "providers.action.signIn": "サインイン",
   "providers.action.update": "更新",
   "providers.antigravity.checkFailed": "{provider}のサインインを確認できませんでした：{text}。「再確認」を選んでください。まだサインインしていない場合は、ターミナルでagyを実行してください。",
+  "providers.antigravity.conversationGone": "{provider}は{conversation}を再開しませんでした。{provider}にはその会話がもうありません（トランスクリプトとは別にエージェントのプロファイルに保存され、それが削除されました）。代わりに新しいセッションを開始してください。",
   "providers.antigravity.projectServers": "{provider}は起動しませんでした：{count, plural, other {{files}}}に、このエージェントに渡されていないMCPサーバー（{servers}）が定義されており、{provider}はそれらをセッション内で起動してしまいます。Combworkはそれらを除外できないため、ここでは{provider}を起動しません。そのファイルから削除するか、CombworkのMCPサーバーでエージェントに渡してください。",
   "providers.antigravity.notOwnConversation": "{provider}は{conversation}を再開しませんでした：このエージェント自身の会話ではありません（削除されたか、別のエージェントの会話の可能性があります）。代わりに新しいセッションを開始してください。",
   "providers.antigravity.signIn.runs": "**サインイン**を押すと、ターミナルで`agy`を実行します。そこでサインインしてください。Combworkが代わりにサインインすることはありません。",

@@ -3,6 +3,7 @@
   "providers.action.signIn": "Zaloguj się",
   "providers.action.update": "Zaktualizuj",
   "providers.antigravity.checkFailed": "Nie udało się sprawdzić logowania {provider}: {text}. Wybierz Sprawdź ponownie; jeśli jeszcze się nie zalogowano, uruchom agy w terminalu.",
+  "providers.antigravity.conversationGone": "{provider} nie wznowił {conversation}: {provider} nie ma już tej rozmowy (przechowuje ją osobno od transkrypcji, w profilu agenta, i została usunięta). Zamiast tego rozpocznij nową sesję.",
   "providers.antigravity.projectServers": "{provider} nie uruchomił się: {count, plural, one {{files} definiuje} few {{files} definiują} many {{files} definiuje} other {{files} definiuje}} serwery MCP, których ten agent nie otrzymał ({servers}), a {provider} uruchomiłby je w swojej sesji. Combwork nie może ich wykluczyć, więc nie uruchamia tu {provider}. Usuń je z tego pliku albo przekaż je agentowi w serwerach MCP Combwork.",
   "providers.antigravity.notOwnConversation": "{provider} nie wznowił {conversation}: nie należy ona do rozmów tego agenta (mogła zostać usunięta albo należy do innego agenta). Zamiast tego rozpocznij nową sesję.",
   "providers.antigravity.signIn.runs": "**Zaloguj się** uruchamia `agy` w terminalu: zaloguj się tam. Combwork nigdy nie loguje się za Ciebie.",

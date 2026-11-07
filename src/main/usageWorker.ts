@@ -12,7 +12,7 @@ import { COARSE_STEP, coarsenTimeline } from '../shared/usageTimeline'
 import { USAGE_TIMELINE_DETAIL_DAYS } from '../shared/advanced'
 import { isGz, readTranscript } from './transcriptFiles'
 import { withoutCostReports } from '../shared/usageDays'
-import { newUsageParser, parserShape, restoreParser, saveParser, type RawUsageParser } from './usageParsers'
+import { newUsageParser, parserShape, rereadsWhole, restoreParser, saveParser, type RawUsageParser } from './usageParsers'
 
 /**
  * The usage worker (#1106): a thread of its own that keeps each workspace's usage history (usageDb.ts), so reading the
@@ -280,7 +280,7 @@ function keep(path: string, c: ReadEntry): void {
 /** The file's entry, when its parser can go on from where it stopped: the same session and provider, a file that only grew. */
 function goOn(path: string, session: string, provider: ProviderId, size: number, mtime: number): ReadEntry | null {
   const c = touch(path)
-  if (!c?.parser || c.session !== session || c.provider !== provider || isGz(path) || size < c.offset || (size === c.size && mtime !== c.mtime)) return null
+  if (!c?.parser || c.session !== session || c.provider !== provider || isGz(path) || rereadsWhole(provider) || size < c.offset || (size === c.size && mtime !== c.mtime)) return null
   return c
 }
 
@@ -303,7 +303,7 @@ function inTurn<T>(path: string, fn: () => Promise<T>): Promise<T> {
  * A compressed backup (#1110) is finished and read whole: no state for it.
  */
 async function takeUp(cur: ReturnType<typeof cursorOf>, path: string, size: number, provider: ProviderId, session: string): Promise<{ parser: RawUsageParser; from: number } | null> {
-  if (isGz(path) || !cur?.state || !cur.path || cur.path.toLowerCase() !== path.toLowerCase() || cur.stateOffset === null || cur.stateOffset > size || cur.stateVersion !== appVersion || !cur.stateShape) return null
+  if (isGz(path) || rereadsWhole(provider) || !cur?.state || !cur.path || cur.path.toLowerCase() !== path.toLowerCase() || cur.stateOffset === null || cur.stateOffset > size || cur.stateVersion !== appVersion || !cur.stateShape) return null
   if (cur.stateCheck !== (await bytesBefore(path, cur.stateOffset))) return null
   const parser = restoreParser(provider, session, cur.state, cur.stateShape)
   return parser ? { parser, from: cur.stateOffset } : null
