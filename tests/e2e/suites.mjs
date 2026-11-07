@@ -296,6 +296,7 @@ export const SUITES = [
   { name: 'restartresume' },
   { name: 'resume' },
   { name: 'resumeall' },
+  { name: 'retarget' },
   { name: 'review' },
   { name: 'reviewcopies' },
   { name: 'reviewcopiesreal', needs: ['claude', 'codex', 'copilot'], claudeHome: 'test' },

@@ -7,7 +7,7 @@ import { createRequire } from 'module'
 import { dirname, join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
-import { SPLIT, lineDiff, memoryRevision, unitSelection, unitsOf } from './e2e/affectedUnits.mjs'
+import { SPLIT, lineDiff, memoryRevision, typeOnlyChange, unitSelection, unitsOf } from './e2e/affectedUnits.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { EVERYTHING, REAL_TIER, affectedSuites, splitSelections, under } from './e2e/affected.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -395,7 +395,72 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
   })
 })
 
+describe('a change of types only selects nothing, proved node by node (HI-2690, D1)', () => {
+  const typeOnly = (file: string, base: string, head: string, more: Files = {}): string | null =>
+    typeOnlyChange({ file, base: memoryRevision({ ...more, [file]: base }, 'base'), head: memoryRevision({ ...more, [file]: head }, 'head'), lines: lineDiff(base, head) }) as string | null
+  const T = 'export interface A {\n  a: string\n}\nexport type B = number\nexport const c = 1\n'
+  it('an interface, a type alias, a type-only import or export, a declared value with none: no suite, saying why', () => {
+    expect(typeOnly('src/shared/x.ts', T, T.replace('a: string', 'a: number'))).toMatch(/types only/)
+    expect(typeOnly('src/shared/x.ts', T, T.replace('= number', '= string'))).toMatch(/types only/)
+    expect(typeOnly('src/shared/x.ts', `import type { Y } from './y'\n${T}`, `import type { Y, Z } from './y'\n${T}`)).toMatch(/types only/)
+    expect(typeOnly('src/shared/x.ts', `${T}export type { A as AA }\n`, `${T}export type { A as AA, B as BB }\n`)).toMatch(/types only/)
+    expect(typeOnly('src/main/raw.d.ts', 'declare const x: number\n', 'declare const x: string\n')).toMatch(/types only/)
+    expect(typeOnly('src/shared/x.ts', T, T.replace('export interface A', '/** A thing. */\nexport interface A'))).toMatch(/comments only/)
+  })
+  it("an overload's signature is erased, its implementation isn't", () => {
+    const f = 'export function f(a: string): void\nexport function f(a: number): void\nexport function f(a: unknown): void {\n  void a\n}\n'
+    expect(typeOnly('src/shared/x.ts', f, f.replace('f(a: string): void', 'f(a: boolean): void'))).toMatch(/types only/)
+    expect(typeOnly('src/shared/x.ts', f, f.replace('void a', 'void [a]'))).toBeNull()
+  })
+  it('an enum of any kind is not: a const enum in a .d.ts, an ambient one, one in a declare block', () => {
+    expect(typeOnly('src/shared/e.d.ts', 'export declare const enum E {\n  A = 1\n}\n', 'export declare const enum E {\n  A = 2\n}\n')).toBeNull()
+    expect(typeOnly('src/shared/x.ts', 'export enum E {\n  A = 1\n}\n', 'export enum E {\n  A = 2\n}\n')).toBeNull()
+    const g = (body: string) => `export {}\ndeclare global {\n${body}\n}\n`
+    expect(typeOnly('src/shared/x.ts', g('  interface W {\n    a: string\n  }'), g('  interface W {\n    a: number\n  }'))).toMatch(/types only/)
+    expect(typeOnly('src/shared/x.ts', g('  const enum K {\n    A = 1\n  }'), g('  const enum K {\n    A = 2\n  }'))).toBeNull()
+    const ns = (v: string) => `declare namespace N {\n  namespace M {\n    interface I {\n      a: ${v}\n    }\n  }\n}\n`
+    expect(typeOnly('src/shared/x.ts', ns('string'), ns('number'))).toMatch(/types only/)
+    expect(typeOnly('src/shared/x.ts', 'namespace N {\n  export const a = 1\n}\n', 'namespace N {\n  export const a = 2\n}\n')).toBeNull()
+  })
+  it('a value, a mixed line, a class field, a parse error, an added file: as usual', () => {
+    expect(typeOnly('src/shared/x.ts', T, T.replace('c = 1', 'c = 2'))).toBeNull()
+    expect(typeOnly('src/shared/x.ts', 'export type T = number; export const v = 1\n', 'export type T = string; export const v = 1\n')).toBeNull()
+    expect(typeOnly('src/shared/x.ts', 'export class C {\n  a: string = ""\n}\n', 'export class C {\n  a: number | string = ""\n}\n')).toBeNull()
+    expect(typeOnly('src/shared/x.ts', T, `${T}export interface (\n`)).toBeNull()
+    expect(typeOnlyChange({ file: 'src/shared/x.ts', base: memoryRevision({}, 'base'), head: memoryRevision({ 'src/shared/x.ts': T }, 'head'), lines: lineDiff('', T) })).toBeNull()
+  })
+  it('a file read as source data keeps its selection: named in a suite, a scenario or a script', () => {
+    const reader = { 'tests/e2e/tipwindows.cjs': "const src = fs.readFileSync(path.join(lib.ROOT, 'src', 'shared', 'tips.ts'), 'utf8')\n" }
+    expect(typeOnly('src/shared/tips.ts', T, T.replace('a: string', 'a: number'), reader)).toBeNull()
+    // Selection's own tooling names files only to select them.
+    expect(typeOnly('src/shared/tips.ts', T, T.replace('a: string', 'a: number'), { 'tests/e2e/affected.mjs': "'src/shared/tips.ts'\n" })).toMatch(/types only/)
+  })
+})
+
 describe('real changes: before every suite, now the suites their parts need (git history)', () => {
+  // HI-2690 (the RC4 rounds, HI-2661's table): the suite counts stay (each still has a shared file's every-suite
+  // reason), but the reasons D1 and D3 cleared are gone: RC4 3's types.ts, values/*.d.ts and tests/sandbox files.
+  it('RC4 and HI-2654: every suite still, by the reasons left (App.tsx, servers.ts, workspace.ts members)', () => {
+    const names = SUITES.map((s: { name: string }) => s.name)
+    const real = SUITES.filter(isRealCli).map((s: { name: string }) => s.name)
+    const ranges: [string, string, string, string[]][] = [
+      ['RC4 1', 'dc539d923', '893a666a5', ['src/renderer/src/App.tsx']],
+      ['RC4 2', '893a666a5', 'ee2d45a66', ['src/main/servers.ts']],
+      ['RC4 3', 'ee2d45a66', 'a7a7816df', ['src/main/workspace.ts']],
+      ['RC4 4', 'a7a7816df', 'ac8e5773a', ['src/main/workspace.ts']]
+    ]
+    for (const [label, base, head, left] of ranges) {
+      const files = execFileSync('git', ['diff', '--name-only', '--no-renames', base, head], { cwd: root, encoding: 'utf8', env: runContext.baseEnv() }).split(/\r?\n/).filter(Boolean)
+      const units = splitSelections(files, { cwd: root, base, head, suiteNames: names })
+      expect(affectedSuites(files, names, real, units).all, label).toBe(true)
+      expect(files.filter((f: string) => affectedSuites([f], names, real, units).all), label).toEqual(left)
+      if (label === 'RC4 3') {
+        for (const f of ['src/shared/types.ts', 'src/shared/i18n/values/main.d.ts']) expect(units[f]?.typeOnly, f).toBeTruthy()
+        expect(affectedSuites(files.filter((f: string) => f.startsWith('tests/sandbox/')), names, real, units).suites).toEqual([])
+      }
+    }
+  }, 120_000)
+
   const names = (SUITES as { name: string }[]).map((s) => s.name)
   const realNames = (SUITES as { name: string; needs?: string[] }[]).filter(isRealCli).map((s) => s.name)
   // Each card's merge into its branch: its changes are the merge's against its first parent.

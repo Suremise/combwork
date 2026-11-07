@@ -215,6 +215,8 @@ export function fileLoads(text, file, known) {
   let computedGlobal = null
   // Node's script-from-text flags met (ArrayExpression): unknown only in a file that starts node.
   const flags = []
+  // A starter in an inline node script it accepted (ArrayExpression): the file's, once the script's text is blanked.
+  let scriptStarts = null
   // Outside src, a string naming a script (`worker.cjs`, `x.mjs`) may be handed to a worker or a process anywhere (a
   // src starter's test override): the file is unknown.
   let named = null
@@ -316,7 +318,9 @@ export function fileLoads(text, file, known) {
     },
     // A node flag running a script from text (`-e`, `--eval`, `-p`, `--print`), in a file that starts node (STARTS): the
     // script must be the next element, a constant literal of the file, read as a file of its own, loading no repository
-    // file and leaving no gate token; else the file is unknown. (Outside such a file, `-p` is git's or a CLI's flag.)
+    // file and leaving no gate token; else the file is unknown. (Outside such a file, `-p` is git's or a CLI's flag.) A
+    // script that itself starts a process (the queue's launcher runs the command it's handed) is its src file's starter,
+    // under the build entries' rule as the file's own is (HI-2697); outside src, a starter is unknown anyway.
     ArrayExpression(p) {
       const els = p.node.elements
       for (let i = 0; i < els.length; i++) {
@@ -326,7 +330,11 @@ export function fileLoads(text, file, known) {
         const init = b?.constant && b.path.isVariableDeclarator() ? b.path.node.init : next
         const script = literal(init)
         const sub = script == null ? null : fileLoads(script, file.replace(/[^/]*$/, 'inline-script.js'), known)
-        if (sub && !sub.unknown && !sub.starts && !sub.edges.size) blank.push([init.start, init.end])
+        if (sub && !sub.unknown && !sub.edges.size && (!sub.starts || file.startsWith('src/'))) {
+          blank.push([init.start, init.end])
+          // Its starter is the file's, whether or not the file has a starter token of its own (HR1, HI-2697 round 1).
+          if (sub.starts) scriptStarts ??= `${sub.starts} (its node script, line ${line(els[i])})`
+        }
         else flags.push(`may run a script made from text it can't read (${els[i].value}, line ${line(els[i])})`)
       }
     },
@@ -429,7 +437,7 @@ export function fileLoads(text, file, known) {
     const t = resolveSpecifier(file, m[2], known)
     wholly(t, `re-exports all of ${t}`)
   }
-  const starts = STARTS.test(code) ? `starts a worker or a process running JavaScript` : null
+  const starts = STARTS.test(code) ? `starts a worker or a process running JavaScript` : scriptStarts
   const unknown = loadsCode(code) ?? computedGlobal ?? missing ?? named ?? (starts && flags.length ? flags[0] : null) ?? (starts && !file.startsWith('src/') ? `${starts}: a script it names` : null)
   return { edges, unknown, whole, starts }
 }

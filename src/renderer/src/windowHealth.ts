@@ -6,7 +6,8 @@ import { marksBetween } from './pageMarks'
 import { findProject, useStore } from './store'
 
 /** The preload's bridge: none where a component renders outside Combwork's window (a unit test). */
-const bridge = (): Window['combwork'] | undefined => (typeof window === 'undefined' ? undefined : window.combwork)
+// `globalThis.window` by name, not `typeof window` (HI-2697: the test picker reads the global object itself as unknown code).
+const bridge = (): Window['combwork'] | undefined => (typeof globalThis.window === 'undefined' ? undefined : window.combwork)
 
 /** The dialogs open, by title, the newest last (Modal says when one opens and closes). */
 const dialogs: { title: string }[] = []

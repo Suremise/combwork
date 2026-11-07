@@ -77,6 +77,7 @@
   "tasks.error.reviewTaken": "{agent}がすでに{card}をレビューしています（{since} UTCから）。",
   "tasks.error.setAsideGone": "その退避されたカードはなくなったか、カードではありません。破棄することしかできません。",
   "tasks.error.staysInProject": "カードは自分のプロジェクト（{project}）から移動できません。",
+  "tasks.error.targetChanged": "{card}の「マージ先」が一覧の表示後に変更されたため、そのままにします。",
   "tasks.error.targetCheckedOut": "{unknown, select, yes {{card} の古いブランチが使用中か Combwork で確認できないため、「マージ先」はそのままです。} other {{card} の古いブランチがまだ {folder} でチェックアウトされているため、「マージ先」はそのままです。そのフォルダーが別の作業に移ってから、もう一度お試しください。}}",
   "tasks.error.targetHasWork": "{unknown, select, yes {Combworkは{card}のブランチに作業があるかどうかを判断できないため、「マージ先」はそのままです。} other {{card}には{target}から作成したブランチに作業があるため、引き続きそこにマージされます。移すには、もう一方のブランチで新しいカードを作成し、変更をコピーしてください。}}",
   "tasks.error.targetLane": "{card}は{builder}のレーンにあり、そのレーンは{target}にマージされます。レーンのカードはレーンと同じブランチにマージされます。先にレーンから外してください。",
@@ -194,5 +195,6 @@
   "tasks.error.waitingNotYours": "{card} を待機中にしたり解除したりできるのは、そのカード自身のエージェント、ユーザー、アシスタントだけです。",
   "tasks.error.waitingTooLong": "待機の理由が長すぎます（最大 {max, number} 文字）。",
   "tasks.history.notWaiting": "待機を解除",
-  "tasks.history.waiting": "待機中：{reason}"
+  "tasks.history.waiting": "待機中：{reason}",
+  "tasks.error.targetDefaultMoved": "{card}を移している間に「マージ先」が再び変更されたため、そのままにします。"
 }

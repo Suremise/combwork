@@ -77,6 +77,7 @@
   "tasks.error.reviewTaken": "{agent} 已在评审 {card}（自 {since} UTC 起）。",
   "tasks.error.setAsideGone": "该暂存卡片已不存在，或不是卡片：只能丢弃。",
   "tasks.error.staysInProject": "卡片只能留在你的项目（{project}）中。",
+  "tasks.error.targetChanged": "{card} 的“合并到”在列出后已更改，因此保持不变。",
   "tasks.error.targetCheckedOut": "{unknown, select, yes {Combwork 无法确定 {card} 的旧分支是否仍在使用，因此其“合并到”保持不变。} other {{card} 的旧分支仍在 {folder} 中检出，因此其“合并到”保持不变。请在该文件夹转到其他工作后再试。}}",
   "tasks.error.targetHasWork": "{unknown, select, yes {Combwork 无法判断 {card} 的分支上是否已有工作，因此它的“合并到”保持不变。} other {{card} 在从 {target} 创建的分支上已有工作，因此会继续合并到那里。要移动它，请在另一个分支上为它新建卡片并复制该变更。}}",
   "tasks.error.targetLane": "{card} 在 {builder} 的通道中，该通道合并到 {target}：通道中的卡片与通道合并到同一分支。请先把它移出通道。",
@@ -194,5 +195,6 @@
   "tasks.error.waitingNotYours": "只有 {card} 自己的代理、用户或助手才能将其标记为等待中或取消标记。",
   "tasks.error.waitingTooLong": "等待原因太长（最多 {max, number} 个字符）。",
   "tasks.history.notWaiting": "不再等待",
-  "tasks.history.waiting": "等待中：{reason}"
+  "tasks.history.waiting": "等待中：{reason}",
+  "tasks.error.targetDefaultMoved": "移动 {card} 时“工作合并到”再次更改，因此保持不变。"
 }

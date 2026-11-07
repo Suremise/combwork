@@ -10,7 +10,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, UNIT_ONLY, affectedSuites, under, unitTest } from './e2e/affected.mjs'
+import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, REASONS_PER_SUITE, UNIT_ONLY, UNIT_SCANS, affectedSuites, becauseLines, scanSelects, under, unitTest } from './e2e/affected.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -192,7 +192,7 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(affectedSuites(['tests/e2e/carddialog.cjs', 'docs/SPEC.md', 'CHANGELOG.md'], names).suites).toEqual(['about', 'carddialog'])
     expect(affectedSuites(['docs/USER_GUIDE.md'], names).suites).toEqual(['about', 'tipcorner', 'tips'])
     expect(affectedSuites(['README.md'], names).suites).toEqual([])
-    expect(affectedSuites(['CONTRIBUTING.md'], names)).toEqual({ suites: [], why: [] })
+    expect(affectedSuites(['CONTRIBUTING.md'], names)).toMatchObject({ suites: [], why: [] })
   })
 
   it('maps runtime resources and every user of a shared test helper (review round 1)', () => {
@@ -207,9 +207,9 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(affectedSuites(['scripts/release.mjs'], names).suites).toEqual(['testedclis'])
     expect(affectedSuites(['docs/SPEC.md'], names).suites).toEqual(['about'])
     expect(affectedSuites(['tests/progress.test.ts', 'AGENTS.md'], names).suites).toEqual([])
-    expect(affectedSuites(['scripts/notices/winshell.txt'], names, realNames)).toEqual({ suites: ['about'], why: ['scripts/notices/winshell.txt: about'] })
+    expect(affectedSuites(['scripts/notices/winshell.txt'], names, realNames)).toMatchObject({ suites: ['about'], why: ['scripts/notices/winshell.txt: about'] })
     // The skills for developing Combwork are notes for agents, neither shipped nor read by the app (#197).
-    expect(affectedSuites(['.claude/skills/verify-combwork-ui/SKILL.md', '.agents/skills/verify-combwork-ui/SKILL.md'], names, realNames)).toEqual({ suites: [], why: [] })
+    expect(affectedSuites(['.claude/skills/verify-combwork-ui/SKILL.md', '.agents/skills/verify-combwork-ui/SKILL.md'], names, realNames)).toMatchObject({ suites: [], why: [] })
     // Every suite file that uses the fake Codex is selected by it.
     const users = names.filter((n) => readFileSync(join(dir, `${n}.cjs`), 'utf8').includes('fake-codex'))
     expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(expect.arrayContaining(users))
@@ -221,9 +221,9 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(helpers).toEqual(expect.arrayContaining(['tests/electron-stub.ts', 'tests/tempDir.ts', 'tests/noGlobalGit.ts', 'tests/pathAliases.ts', 'tests/watchRealPaths.ts']))
     for (const f of [...helpers, ...(UNIT_ONLY as string[])]) {
       expect(unitTest(f), f).toBe(true)
-      expect(affectedSuites([f], names, realNames), f).toEqual({ suites: [], why: [] })
+      expect(affectedSuites([f], names, realNames), f).toMatchObject({ suites: [], why: [] })
     }
-    expect(affectedSuites(['vitest.config.ts', 'tests/tempDir.ts', 'tests/licenses.test.ts'], names, realNames)).toEqual({ suites: [], why: [] })
+    expect(affectedSuites(['vitest.config.ts', 'tests/tempDir.ts', 'tests/licenses.test.ts'], names, realNames)).toMatchObject({ suites: [], why: [] })
     // The runners' progress reporter isn't the unit tests' alone.
     expect(unitTest('tests/progressReport.mts')).toBe(false)
     expect(affectedSuites(['tests/progressReport.mts'], names).all).toBe(true)
@@ -240,6 +240,46 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(affectedSuites(['tests/e2e/lib.cjs'], names).all).toBe(true)
     expect(affectedSuites(['src/main/brandNewThing.ts'], names).all).toBe(true)
     expect(affectedSuites(['SRC\\Renderer\\src\\components\\Progress.tsx'], names).suites).toContain('progress')
+  })
+
+  it('the cross-cutting boundaries still mean every suite, each saying why (HI-2690)', () => {
+    for (const f of ['src/main/servers.ts', 'src/renderer/src/App.tsx', 'src/renderer/src/main.tsx', 'src/preload/index.ts', 'src/main/sessions.ts']) {
+      const r = affectedSuites([f], names)
+      expect(r.all, f).toBe(true)
+      expect(r.why[0], f).toMatch(/shared by every part of Combwork/)
+    }
+  })
+
+  it('a change of types only selects nothing, the real tier included; the Sandbox checks’ own files no e2e suite (HI-2690)', () => {
+    // splitSelections marks a types-only change (affectedUnits.mjs's typeOnlyChange, tests/affectedUnits.test.ts).
+    const why = 'src/main/providers/codex/adapter.ts: types only (erased before anything runs; typecheck checks them), so no suite'
+    const typed = affectedSuites(['src/main/providers/codex/adapter.ts'], names, realNames, { 'src/main/providers/codex/adapter.ts': { typeOnly: why, all: null, suites: [], why: [] } })
+    expect(typed).toMatchObject({ suites: [] })
+    expect(typed.why).toEqual([why])
+    const sandbox = affectedSuites(['tests/sandbox/checks.cjs', 'tests/sandbox/inside/drive.cjs', 'tests/sandbox/inside/install.ps1'], names, realNames)
+    expect(sandbox).toMatchObject({ suites: [] })
+  })
+
+  it('no e2e suite or scenario loads or reads the Sandbox checks’ files, and their unit tests stay selected (HI-2690)', () => {
+    const tracked = (...paths: string[]) => execFileSync('git', ['ls-files', ...paths], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean)
+    for (const f of tracked('tests/e2e', 'tests/scenarios').filter((p) => /\.(c|m)?js$/.test(p) && !/^tests\/e2e\/(affected|affectedUnits|relatedTests|typeProvenance)\.mjs$/.test(p))) {
+      const text = readFileSync(join(root, f), 'utf8')
+      expect(/tests[/\\]sandbox|['"`]\.\.[/\\]sandbox[/\\'"`]|join\([^)]*['"]sandbox['"]\s*,\s*['"](checks|clean|report|inside|wsb|client)/.test(text), f).toBe(false)
+    }
+    for (const t of ['tests/sandboxChecks.test.ts', 'tests/sandboxClean.test.ts', 'tests/sandboxCompare.test.ts', 'tests/sandboxReport.test.ts']) {
+      expect(UNIT_SCANS.some((e: { test: string }) => e.test === t && scanSelects(e, 'tests/sandbox/inside/drive.cjs')), t).toBe(true)
+    }
+  })
+
+  it('says why it picked each suite, at most a few reasons each, deduplicated (HI-2690)', () => {
+    const r = affectedSuites(['tests/e2e/progress.cjs', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/Progress.tsx'], names)
+    expect(r.because.progress[0]).toBe('tests/e2e/progress.cjs: its own suite')
+    expect(r.because.progress).toContain('src/renderer/src/components/Progress.tsx (its area)')
+    expect(new Set(r.because.progress).size).toBe(r.because.progress.length)
+    for (const s of r.suites) expect(r.because[s].length, s).toBeGreaterThan(0)
+    for (const s of r.suites) expect(r.because[s].length, s).toBeLessThanOrEqual(REASONS_PER_SUITE)
+    expect(becauseLines(r)[0]).toMatch(/^\S+: /)
+    expect(becauseLines(affectedSuites(['src/main/servers.ts'], names))).toEqual([])
   })
 
   it('a file no area names falls back to the full set, real tier too, wherever it is (#628)', () => {
@@ -267,7 +307,7 @@ describe('the suites a change needs (affected.mjs)', () => {
       expect(r.why[0], f).toMatch(/shared by every part of Combwork/)
     }
     // The scenarios themselves, and the notes on testing, are checked by npm run scenarios and need no suite.
-    for (const f of ['tests/scenarios/scenarios.cjs', 'tests/scenarios/README.md', 'tests/README.md', 'scripts/testWaits.mjs']) expect(affectedSuites([f], names, realNames), f).toEqual({ suites: [], why: [] })
+    for (const f of ['tests/scenarios/scenarios.cjs', 'tests/scenarios/README.md', 'tests/README.md', 'scripts/testWaits.mjs']) expect(affectedSuites([f], names, realNames), f).toMatchObject({ suites: [], why: [] })
   })
 
   it('picks real-CLI suites only for changes to what they cover (card #191)', () => {

@@ -77,6 +77,7 @@
   "tasks.error.reviewTaken": "Agent {agent} reviewt {card} bereits (seit {since} UTC).",
   "tasks.error.setAsideGone": "Diese zurückgestellte Karte ist weg oder keine Karte: Sie kann nur verworfen werden.",
   "tasks.error.staysInProject": "Karten bleiben in deinem Projekt ({project}).",
+  "tasks.error.targetChanged": "„Wird gemergt in“ von {card} hat sich seit der Auflistung geändert, daher bleibt die Karte, wie sie ist.",
   "tasks.error.targetCheckedOut": "{unknown, select, yes {Combwork kann nicht feststellen, ob der alte Branch von {card} noch verwendet wird, daher bleibt sein „Wird gemergt in“ unverändert.} other {Der alte Branch von {card} ist noch in {folder} ausgecheckt, daher bleibt sein „Wird gemergt in“ unverändert. Versuch es erneut, sobald dieser Ordner weitergegangen ist.}}",
   "tasks.error.targetHasWork": "{unknown, select, yes {Combwork kann nicht feststellen, ob die Karte {card} schon Arbeit auf ihrem Branch hat, daher bleibt ihr „Wird gemergt in“ unverändert.} other {Karte {card} hat schon Arbeit auf ihrem Branch, der aus {target} erstellt wurde, und wird deshalb weiter dorthin gemergt. Um sie zu verschieben, erstelle für sie eine neue Karte auf dem anderen Branch und übernimm die Änderung.}}",
   "tasks.error.targetLane": "Karte {card} ist in der Lane von {builder}, die in {target} gemergt wird: Die Karten einer Lane werden dorthin gemergt, wohin die Lane gemergt wird. Nimm sie zuerst aus der Lane.",
@@ -194,5 +195,6 @@
   "tasks.error.waitingNotYours": "Nur der eigene Agent von {card}, der Benutzer oder der Assistent kann sie als wartend markieren oder das aufheben.",
   "tasks.error.waitingTooLong": "Der Grund für das Warten ist zu lang (höchstens {max, number} Zeichen).",
   "tasks.history.notWaiting": "Wartet nicht mehr",
-  "tasks.history.waiting": "Wartet: {reason}"
+  "tasks.history.waiting": "Wartet: {reason}",
+  "tasks.error.targetDefaultMoved": "„Arbeit wird gemergt in“ hat sich erneut geändert, während {card} umgestellt wurde, daher bleibt die Karte, wie sie ist."
 }

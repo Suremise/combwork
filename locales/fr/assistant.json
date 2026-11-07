@@ -741,6 +741,7 @@
   "assistant.undo.why.removedFromQueue": "Le retrait de la file de fusion reste dans le travail de la carte : elle n’y revient que par « Réessayer la fusion » ou une nouvelle validation.",
   "assistant.undo.why.reportMerge": "La fusion qu’il a signalée reste dans le travail de la carte.",
   "assistant.undo.why.request": "Sa demande à l’auteur reste en commentaire.",
+  "assistant.undo.why.retargeted": "Les cartes et les emplacements qu’il a déplacés vers la nouvelle cible d’un projet ne sont pas remis en place : redéfinis Fusion dans d’une carte si elle doit revenir.",
   "assistant.undo.why.retriedMerge": "Son « Réessayer la fusion » reste dans le travail de la carte.",
   "assistant.undo.why.slotReleased": "Un emplacement libéré n’est ni réservé ni occupé à nouveau : le prochain travail qui a besoin d’un emplacement peut le prendre.",
   "assistant.undo.why.start": "Son démarrage reste dans le travail de la carte : l’annulation remet la carte en place, sans annuler le démarrage.",

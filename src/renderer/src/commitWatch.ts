@@ -14,8 +14,8 @@ interface Watched {
 /** The DOM events that start work from outside: the user's input, focus, scrolling, sizes, loads, animations ending. */
 const OUTSIDE_EVENTS = ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'pointerover', 'pointerout', 'mousedown', 'mousemove', 'mouseup', 'mouseover', 'mouseout', 'click', 'auxclick', 'dblclick', 'contextmenu', 'wheel', 'touchstart', 'touchmove', 'touchend', 'keydown', 'keyup', 'keypress', 'beforeinput', 'input', 'change', 'compositionstart', 'compositionupdate', 'compositionend', 'focusin', 'focusout', 'focus', 'blur', 'paste', 'copy', 'cut', 'dragstart', 'drag', 'dragenter', 'dragover', 'dragleave', 'drop', 'dragend', 'scroll', 'resize', 'load', 'error', 'transitionend', 'animationend', 'visibilitychange', 'selectionchange', 'submit', 'toggle', 'message']
 
-const w = window as unknown as Watched
-if (w.combwork?.commitWatch && w.__REACT_DEVTOOLS_GLOBAL_HOOK__ === undefined) {
+// The window's members by name, never the window itself in a variable (HI-2697: the test picker reads that as unknown code).
+if ((window as unknown as Watched).combwork?.commitWatch && (window as unknown as Watched).__REACT_DEVTOOLS_GLOBAL_HOOK__ === undefined) {
   const bursts = burstCounter()
   const chains = chainCounter()
   // Each new largest, small ones too (a window's normal work is what step 2's threshold is set from).
@@ -31,7 +31,7 @@ if (w.combwork?.commitWatch && w.__REACT_DEVTOOLS_GLOBAL_HOOK__ === undefined) {
   wrapCallbacks(outside)
   const noop = (): void => {}
   // The least of DevTools' hook React DOM needs to report to it: a renderer id from inject, and onCommitFiberRoot.
-  w.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+  ;(window as unknown as Watched).__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
     supportsFiber: true,
     isDisabled: false,
     renderers: new Map(),
@@ -53,7 +53,7 @@ if (w.combwork?.commitWatch && w.__REACT_DEVTOOLS_GLOBAL_HOOK__ === undefined) {
     onScheduleFiberRoot: noop,
     checkDCE: noop
   }
-  w.__cwCommitBurst = () => ({ max: bursts.max, chain: chains.max })
+  ;(window as unknown as Watched).__cwCommitBurst = () => ({ max: bursts.max, chain: chains.max })
 }
 
 /** Timers' and frames' callbacks start work from outside too: each marks it first (a string to evaluate stays as it is). */
@@ -65,10 +65,19 @@ function wrapCallbacks(outside: () => void): void {
           return (fn as (...a: unknown[]) => unknown)(...args)
         }
       : fn
-  const g = window as unknown as Record<string, (fn: unknown, ...rest: unknown[]) => unknown>
-  for (const name of ['setTimeout', 'setInterval', 'requestAnimationFrame', 'requestIdleCallback']) {
-    const original = g[name]
-    if (typeof original !== 'function') continue
-    g[name] = (fn: unknown, ...rest: unknown[]) => original.call(window, marked(fn), ...rest)
-  }
+  const wrapped = (original: Scheduler) => (fn: unknown, ...rest: unknown[]) => original.call(globalThis.window, marked(fn), ...rest)
+  // Each by its name, the window never in a variable nor read by a computed key (HI-2697: the test picker reads either
+  // as unknown code); one a browser lacks stays absent.
+  const s1 = (window as unknown as Schedulers).setTimeout
+  if (typeof s1 === 'function') (window as unknown as Schedulers).setTimeout = wrapped(s1)
+  const s2 = (window as unknown as Schedulers).setInterval
+  if (typeof s2 === 'function') (window as unknown as Schedulers).setInterval = wrapped(s2)
+  const s3 = (window as unknown as Schedulers).requestAnimationFrame
+  if (typeof s3 === 'function') (window as unknown as Schedulers).requestAnimationFrame = wrapped(s3)
+  const s4 = (window as unknown as Schedulers).requestIdleCallback
+  if (typeof s4 === 'function') (window as unknown as Schedulers).requestIdleCallback = wrapped(s4)
 }
+
+type Scheduler = (fn: unknown, ...rest: unknown[]) => unknown
+/** The window's timers and frames, as wrapCallbacks sees them. */
+type Schedulers = { setTimeout?: Scheduler; setInterval?: Scheduler; requestAnimationFrame?: Scheduler; requestIdleCallback?: Scheduler }

@@ -245,6 +245,7 @@
   "service.workflow.changedMeanwhile": "Opcje przepływu pracy zmieniły się w międzyczasie (w innym oknie albo przez Asystenta), więc nic nie zapisano. Sekcja pokazuje je w obecnym stanie.",
   "service.workflow.closed": "Obszar roboczy tej karty został zamknięty",
   "service.workflow.inheritor": "Projekt {project} dziedziczy te opcje, a zmiana sprawiłaby, że jego opcje byłyby ze sobą sprzeczne:",
+  "service.workflow.targetInUse": "Nie można usunąć {branch} z „Inne gałęzie, do których można scalać pracę”, dopóki używają jej: {uses}. Najpierw przestaw je na nowy cel albo je zakończ.",
   "service.workflowNotice.blocked": "Karta {card} jest zablokowana: {reason}",
   "service.workflowNotice.blockedNoReason": "Karta {card} jest zablokowana",
   "service.workflowNotice.failed": "{card}: recenzja niezaliczona",
