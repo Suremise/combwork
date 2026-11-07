@@ -19,9 +19,10 @@
 import { parse } from '@babel/parser'
 import traverseModule from '@babel/traverse'
 import { execFileSync } from 'child_process'
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
+import { ruleOn } from './workspaceRule.mjs'
 
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 const traverse = traverseModule.default ?? traverseModule
@@ -70,10 +71,11 @@ export const SPLIT = [
   { file: 'src/shared/api.ts', scope: ['src/'], keyed: { CombworkRequests: 'channel' } },
   { file: 'src/renderer/src/actions.ts', scope: ['src/renderer/'] },
   { file: 'src/renderer/src/commands.ts', scope: ['src/renderer/'], keyed: { COMMAND_DEFS: 'command' } },
-  // WorkspaceService's members and its instance stay every suite (HI-2659's design, C3): its instances flow where the
-  // tracer can't follow (2,150 arguments in src/main, 234 to callees it can't resolve, beside 859 unknown or any slots
-  // and 200 casts that erase a type), so a name search can't show all their callers. Its top-level functions are traced.
-  { file: 'src/main/workspace.ts', scope: ['src/main/'], conservative: { test: (u) => u.member || u.id === 'workspace', why: "WorkspaceService's instances flow where the tracer can't follow them (HI-2659's design, C3: its members and the workspace instance are never narrowed)" } },
+  // WorkspaceService's members are followed by name, like any class's, because the WorkspaceService rule holds
+  // (workspaceRule.mjs, HI-2678): no value holding one goes where its type is lost or is read by a key the code doesn't
+  // spell, so every use of a member spells its name in the program. `rule`: the rule is checked on both revisions
+  // before a member is followed, and where it doesn't hold, every suite. The `workspace` Proxy const stays every suite.
+  { file: 'src/main/workspace.ts', scope: ['src/main/', 'src/preload/', 'src/shared/'], rule: true, conservative: { test: (u) => u.id === 'workspace', why: "the workspace instance is a Proxy every window's calls go through (HI-2659's design, C3)" } },
   { file: 'tests/e2e/runner.mjs', scope: ['tests/e2e/', 'scripts/'], seamTables: ['DEV_SEAMS', 'PACKAGED_SEAMS'] }
 ]
 
@@ -398,8 +400,22 @@ export function gitRevision(cwd, rev) {
       at = nl + 1 + Number(size[1]) + 1
     }
   }
+  let listed = null
   return {
     name: rev ?? 'the working tree',
+    /** The checkout it's read in (the census resolves node_modules there). */
+    root: cwd,
+    /** The commit (null: the working tree). */
+    commit: rev,
+    /** Its files: a commit's, or the working tree's (tracked and untracked, not ignored). */
+    list() {
+      // The working tree's: a tracked file deleted but not yet staged isn't there.
+      listed ??= rev ? git(['ls-tree', '-r', '-z', '--name-only', rev]).split('\0').filter(Boolean) : [...new Set(git(['ls-files', '-z', '--cached', '--others', '--exclude-standard']).split('\0').filter(Boolean))].filter((p) => existsSync(join(cwd, p)))
+      if (rev) prefetch(listed.filter((p) => /\.(ts|tsx|mts|cts|json)$/i.test(p)))
+      return listed
+    },
+    /** Its whole tree's id, which fixes every file (null: the working tree, which no id fixes). */
+    tree: () => (rev ? git(['rev-parse', `${rev}^{tree}`]).trim() : null),
     /** Reads these files of a commit in one git process, ahead of read() (the working tree: nothing to do). */
     prefetch,
     read(path) {
@@ -434,6 +450,7 @@ export function gitRevision(cwd, rev) {
 export function memoryRevision(files, name = 'memory') {
   return {
     name,
+    list: () => Object.keys(files),
     read: (path) => files[path] ?? null,
     grep(needle, scopes, word) {
       const re = word ? new RegExp(`(^|[^\\w$])${esc(needle)}($|[^\\w$])`) : null
@@ -780,6 +797,10 @@ export function unitSelection({ file, base, head, lines, place, areaSuites }) {
     if (unit.alias) return stop(`${uf} exports ${unit.name} as ${unit.alias}`), edges
     const conservative = splitOf(uf).conservative
     if (conservative?.test(unit)) return stop(`${uf}'s ${unit.id}: ${conservative.why}`), edges
+    if (splitOf(uf).rule && unit.member) {
+      const r = ruleOn(revs, revs[0].root ?? process.cwd(), { scope: 'src' })
+      if (r.all) return stop(`${uf}'s ${unit.id} can't be followed by name: ${r.all}`), edges
+    }
     if (unit.kind === 'named' && !unit.local) for (const rev of revs) stop(untracedIn(rev, uf, unit.name) ?? undefined)
     // A command is also reached through the list holding it, by its generic dispatch (the palette, the menus, the
     // shortcuts, App.tsx's keys): a boundary mapped to commands.ts's own areas' suites (keys, i18nlive…), which drive

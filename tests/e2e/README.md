@@ -360,7 +360,7 @@ real suites.
 
 A few of those shared files are selected by **the parts of them a change touches** instead (HI-2659, `SPLIT` in
 `affectedUnits.mjs`): `ipc.ts` and `shared/api.ts` by IPC channel, `actions.ts` by action, `commands.ts` by command,
-`workspace.ts` by its top-level functions, and `runner.mjs`'s seam tables by the seam names added or removed. Each
+`workspace.ts` by its top-level functions and `WorkspaceService`'s members, and `runner.mjs`'s seam tables by the seam names added or removed. Each
 changed part is followed to what names it (a channel's callers, an action's, a function's, and theirs while they are in
 those files too; its name spelled in a string, `x['f']`, counts too), and a file that names it counts as it would
 changed: its own suite, its area's suites, or every suite when it is itself shared by everything (`store.ts`,
@@ -369,19 +369,38 @@ changed: its own suite, its area's suites, or every suite when it is itself shar
 reach a file that runs it. Lines that are only comments select nothing, unless a comment they're in now covers code, or
 no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines map only for its test seams' branches
 (`CW_TEST_SLOW_IPC`, `FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access
-check, the error path) is every suite. **Workspace settings and the rest of `WorkspaceService` stay every suite**: its
-members and the `workspace` instance are never narrowed, since its instances flow where the tracer can't follow (passed
-on 2,150 times in `src/main`, 234 of them to callees it can't resolve). So HI-2654's `setAdvanced` is still every suite,
-unchanged; HI-2652's seam selects 2 suites, and HI-2653's New Project 28 from `actions.ts` (37 with its `Overlays.tsx`)
-(`tests/affectedUnits.test.ts` checks all three, and the suites the two narrowed ones need). Narrowing
-`WorkspaceService`'s members is HI-2678.
+check, the error path) is every suite. **`WorkspaceService`'s members are followed by name because of a rule**
+(HI-2678, Darren's R2; `workspaceRule.mjs`): no value holding a `WorkspaceService` (a view of one, a container, a
+callback returning one; one by an intersection, a subclass or sub-interface, a type parameter constrained to it, or a
+generic's own type parameter it went into) goes where its type is lost (`any`, `unknown`, `object`, an index signature, a cast, a slot whose
+type drops it) or is read by a key the code doesn't spell (a computed key, a destructuring by one or into a rest, a
+spread, `for-in`), and no code outside the program (a script, a suite, a `.mjs` helper) may load `workspace.ts`: by an
+import, or by a loader the import graph can't read beside a path to it (selection's own tooling, which reads it as text,
+aside). The reviewed
+`workspace` Proxy aside (its handlers forward by the name the caller spelled; bound to its tokens, `PROXY_HASH`). With the
+rule holding, every use of a member spells its name, so a name search can only over-select. It is a census of the whole
+`tsconfig.node.json` program with TypeScript 5.9's in-process checker (`typescript-classic`; TypeScript 7's API runs out
+of process and its types weren't reliable for this), about a minute, each revision in a process of its own (the whole
+program's types take about 4 GB: an 8 GB heap) and a picker's two at once; anything it can't prove fails closed (any program
+error, a file of `src/main`, `preload` or `shared` outside the program, a type walk past its budget, a compiler that
+throws). The picker checks it on **both** revisions before following a member (the rule's scope alone, about 30 s each),
+and where it doesn't hold, every suite, naming the escape; check:repo runs it on the merged tree whenever the change
+touches one of its inputs (code, a tsconfig, `package.json` or the lock, its own files: `workspaceRuleCheck.mjs`). A tree
+from before the rule holds only when audited by hand (`workspaceRule.audited.json`: its exact git tree, the rule's and
+the compiler's identity, each escape's proof along its whole flow; `--reaudit <commit>` carries a record to a new rule
+only when the census still finds exactly what was audited, and never covers code outside the program, a member
+reached without its name or an edited Proxy). The `workspace` instance itself stays every suite. So
+HI-2654's `setAdvanced` selects 50 of 387 suites (`advanced`, `assistantsettings`, `consoletext`, `p7settings` among them;
+its two trees are audited), HI-2652's seam 2 suites, and HI-2653's New Project 28 from `actions.ts` (37 with its
+`Overlays.tsx`) (`tests/affectedUnits.test.ts` checks all three, and the suites they need; `tests/workspaceRule.test.ts`
+each of the rule's cases).
 **The escape hatch** errs towards more, each time with a reason in the selection's output: whatever it can't follow
 selects every suite (a line in no function or entry, such as an import or module code; a file it can't parse or read in
 either revision; a public part whose trail reaches nothing that runs it, a cycle of public parts included; any use of
 an import of the module other than a short safe list: `mod.name`, the part called or read by name, a function handed
 off by its name, a type. Every reference to such an import is checked, so an alias, a computed key (`x[k]`),
 `Object.keys`, a spread, a destructuring, an argument, a template or a store is every suite, whatever its form; a module
-re-exported whole; a channel built at run time; a `WorkspaceService` member), the files still in `EVERYTHING` but not
+re-exported whole; a channel built at run time; a `WorkspaceService` member where its rule doesn't hold), the files still in `EVERYTHING` but not
 `SPLIT` select every suite as before (each with its reason there), and a change you know is cross-cutting though it touches only a few parts (a behaviour every handler
 relies on, a type's meaning) runs `--all`, said on the card. Add an area to `affected.mjs` when you add a
 suite or a source file; `tests/e2esuites.test.ts` checks every suite and source file is covered. What only the unit
@@ -427,8 +446,11 @@ file of its own. External programs (git, the CLIs) are the boundary, and so is a
 `Function` reached through globals or built keys, a loader chosen through an environment variable): the gate covers
 the forms this repository's tests use or would plausibly write (Darren's review bar for HI-2677), still catching any
 `eval`, `Function` or `constructor` reference, and a guard can refuse hidden ones in tests if they ever appear. A changed `import type` counts for nothing. A
-`WorkspaceService` member keeps nearly every test of main, since nearly every one names `workspace`: narrowing those
-by which receivers can be one is HI-2678. Measured at 1.2.0's head (HI-2677, round 5): 370 files are unknown (six in
+`WorkspaceService` member, while its rule holds in both revisions (above), is searched by its own name rather than its
+class's (which nearly every test of main names), and a file outside the app where a `WorkspaceService` loses its type
+(50 test files today, mostly fakes cast through `unknown`) is pinned: every test loading it is kept for any member.
+Measured on this tree (HI-2678): a one-method change to `setAdvanced` keeps 143 of its 365 related tests (12 load a file
+naming it, 6 import `workspace.ts` whole, 43 load a pinned file, the rest are unknown by their own loaders), before 365. Measured at 1.2.0's head (HI-2677, round 5): 370 files are unknown (six in
 `src/`: the queue's launcher and git host, whose `node -e` scripts are built from text, `cw-mcp.ts`, and three renderer
 files handing the global object on), so 187 of 704 test files can be left out at all, and a one-function change to
 `settingsTools.ts` still selects all 27 related. The worker entries' closure holds unknown files (`cw-mcp.ts`, the

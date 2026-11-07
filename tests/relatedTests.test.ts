@@ -494,7 +494,48 @@ describe("the picker's entry: the working tree against a commit", () => {
   })
 })
 
-describe('HI-2654 (git history): a WorkspaceService member, so every related test until HI-2678', () => {
+// WorkspaceService's members (HI-2678): while its rule holds in both revisions, a member's own name is the needle (not
+// its class's), and the files the rule pins keep every test reaching them.
+describe("WorkspaceService's members, by the WorkspaceService rule", () => {
+  const TSCONFIG = JSON.stringify({ compilerOptions: { target: 'ES2023', lib: ['ES2023'], module: 'ESNext', moduleResolution: 'bundler', strict: true, noEmit: true, types: [] }, include: ['src/**/*', 'tests/**/*'] })
+  const ws = (body = 'void value'): string => `export class WorkspaceService {\n  setAdvanced(value: string): void {\n    ${body}\n  }\n  other(): number {\n    return 1\n  }\n}\nexport const workspaceOf = (): WorkspaceService => new WorkspaceService()\n`
+  const fixture = (over: Files = {}): Files => ({
+    'tsconfig.node.json': TSCONFIG,
+    'src/main/workspace.ts': ws(),
+    'src/main/settingsTools.ts': "import { workspaceOf } from './workspace'\nexport const apply = (v: string): void => workspaceOf().setAdvanced(v)\n",
+    'src/main/unrelated.ts': "import { workspaceOf } from './workspace'\nexport const n = (): number => workspaceOf().other()\n",
+    // Reaches the member through a module naming it, without spelling it itself.
+    'tests/settings.test.ts': "import { apply } from '../src/main/settingsTools'\napply('x')\n",
+    // Reaches the class, names neither the member nor a file naming it.
+    'tests/unrelated.test.ts': "import { n } from '../src/main/unrelated'\nn()\n",
+    // An ordinary import of a helper erasing one, and a key the test builds: the member's name nowhere in it.
+    'tests/helper.ts': "import { WorkspaceService } from '../src/main/workspace'\nexport const erased = (): any => new WorkspaceService() as any\n",
+    'tests/computed.test.ts': "import { erased } from './helper'\nconst suffix = 'Advanced'\nerased()['set' + suffix]('x')\n",
+    ...over
+  })
+  const edit = { 'src/main/workspace.ts': ws('void value.length') }
+  it("selects the tests reaching a file naming the member, and those reaching a pinned helper, not the class's every test", () => {
+    const base = fixture()
+    const r = narrow(base, { ...base, ...edit })
+    expect(r.keep).toEqual(['tests/computed.test.ts', 'tests/settings.test.ts'])
+    expect(r.dropped).toEqual(['tests/unrelated.test.ts'])
+    expect(r.why.join('\n')).toMatch(/WorkspaceService's members by their names \(its rule holds; 1 files pinned\) \(searched: setAdvanced\)/)
+    expect(r.why.join('\n')).toMatch(/1 related test files kept: a file it loads loses a WorkspaceService's type/)
+  })
+  it('a helper erasing one only in base still pins its tests', () => {
+    const clean = "import { WorkspaceService } from '../src/main/workspace'\nexport const erased = (): WorkspaceService => new WorkspaceService()\n"
+    const base = fixture()
+    expect(narrow(base, { ...base, ...edit, 'tests/helper.ts': clean, 'tests/computed.test.ts': "import { erased } from './helper'\nerased().other()\n" }).keep).toContain('tests/computed.test.ts')
+  })
+  it("where the rule doesn't hold (an escape in the app), the member is searched by its class, as before", () => {
+    const base = fixture({ 'src/main/unrelated.ts': "import { workspaceOf } from './workspace'\nexport const lost: unknown = workspaceOf()\nexport const n = (): number => 1\n" })
+    const r = narrow(base, { ...base, ...edit })
+    expect(r.keep).toContain('tests/unrelated.test.ts')
+    expect(r.why.join('\n')).toMatch(/members by its class: the WorkspaceService rule doesn't hold: src\/main\/unrelated\.ts:2/)
+  })
+})
+
+describe('HI-2654 (git history): a WorkspaceService member, searched by its name (HI-2678)', () => {
   it('keeps every test its change relates, the two that must run among them, saying why', () => {
     const commit = '22fd88db7a58f978d7059d3f21298d89a6fc2667'
     const out = (...a: string[]): string[] => execFileSync('git', a, { cwd: root, encoding: 'utf8', env: runContext.baseEnv(), maxBuffer: 64 * 1024 * 1024 }).split(/\r?\n/).filter(Boolean)
@@ -510,10 +551,14 @@ describe('HI-2654 (git history): a WorkspaceService member, so every related tes
     expect(r.dropped).toEqual([])
     for (const f of ['tests/settingsWorkspace.test.ts', 'tests/settingsReadFirst.test.ts']) expect(r.keep).toContain(f)
     expect(changes['src/main/settingsTools.ts'].needles.map((n: { name: string }) => n.name)).toEqual(['applySetting'])
-    // Its class, and from it what in workspace.ts names that (the factories, the `workspace` instance), named by nearly
-    // every test of main: HI-2678 narrows them by which receivers can be a WorkspaceService.
-    expect(r.why.join('\n')).toMatch(/src\/main\/workspace\.ts: WorkspaceService\.setAdvanced, class WorkspaceService, .* and \d+ more/)
+    // The WorkspaceService rule holds in both its (audited) trees, so the member's own name is searched, not its class.
+    // Nothing is left out at this commit all the same: its tests were all kept by launcher.ts's generated scripts
+    // (`may load code by require`), which HI-2697 made readable later.
+    expect(changes['src/main/workspace.ts'].needles.map((n: { name: string }) => n.name)).toEqual(['setAdvanced'])
+    expect(r.why.join('\n')).toMatch(/src\/main\/workspace\.ts: WorkspaceService\.setAdvanced, WorkspaceService's members by their names \(its rule holds; \d+ files pinned\)/)
+    expect(r.why.join('\n')).toMatch(/related test files kept: src\/main\/workflow\/launcher\.ts may load code by require/)
     expect(r.why.join('\n').length).toBeLessThan(3000)
-    // It parses every code file the repository's tests reach (about 2,000: 17 s alone, more under a full run's load).
-  }, 120_000)
+    // It parses every code file the repository's tests reach (about 2,000: 17 s alone, more under a full run's load),
+    // and censuses both trees' whole programs (about 45 s each).
+  }, 300_000)
 })
