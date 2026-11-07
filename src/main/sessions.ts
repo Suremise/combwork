@@ -5945,7 +5945,7 @@ class SessionManager {
         if (this.live.get(id) !== l || !turn || !session || l.state.sessionId !== session || (conv && conv !== session) || now?.id !== turn || now.state !== 'running') return
         const scope = { turn, session }
         const grace = l.idleGrace
-        const { next, actions } = applyStatus(l.statusState ?? NO_STATUS, { ask: !!ask, idle, scope }, !!grace && grace.turn === turn && grace.sessionId === session)
+        const { next, actions } = applyStatus(l.statusState ?? NO_STATUS, { ask: !!ask, idle, scope }, !!grace && grace.turn === turn && grace.sessionId === session, l.state.status === 'waiting')
         l.statusState = next
         for (const a of actions) {
           if (a === 'ask' && ask) this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })

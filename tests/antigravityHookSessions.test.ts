@@ -234,7 +234,9 @@ describe("agy's hooks through sessions (s56)", () => {
     const IDLE = { agent_state: 'idle' }
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
     // [the reports, the status they end in, whether a grace stands then]
-    const cases: [Record<string, unknown>[], string, boolean][] = [
+    // A tool's start and end hooks (agy's recorded read_file), between reports: its end answers a wait.
+    const TOOL = 'TOOL' as const
+    const cases: [(Record<string, unknown> | typeof TOOL)[], string, boolean][] = [
       [[PENDING, WORKING], 'working', false],
       [[WORKING, PENDING], 'waiting', false],
       [[PENDING, PENDING], 'waiting', false],
@@ -245,8 +247,17 @@ describe("agy's hooks through sessions (s56)", () => {
       [[IDLE, PENDING], 'waiting', false],
       [[IDLE, OTHER], 'working', true],
       [[IDLE, WORKING, IDLE], 'working', true],
-      [[IDLE, IDLE, WORKING], 'working', false]
+      [[IDLE, IDLE, WORKING], 'working', false],
+      [[PENDING, TOOL, PENDING], 'waiting', false],
+      [[PENDING, TOOL, WORKING], 'working', false],
+      [[PENDING, PENDING, TOOL, PENDING, PENDING], 'waiting', false],
+      [[PENDING, TOOL, IDLE], 'working', true]
     ]
+    const read = recorded('PreToolUse', (q) => q.toolCall.name === 'read_file')
+    const readEnd = { ...recorded('PostToolUse'), stepIdx: read.stepIdx, toolCall: read.toolCall }
+    /** One input: a report, or a tool's start and end (not awaited while the queue is held). */
+    const send = (st: State, r: Record<string, unknown> | typeof TOOL): Promise<unknown> =>
+      r === TOOL ? Promise.all([hook(st, 'PreToolUse', read), hook(st, 'PostToolUse', readEnd)]) : run(() => sessions.handleStatusLine(st.runId, { conversation_id: MAIN, session_id: MAIN, model: null, ...r }))
     try {
     for (const [reports, want, graced] of cases) {
       const { st } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
@@ -255,9 +266,15 @@ describe("agy's hooks through sessions (s56)", () => {
       let release!: () => void
       const gate = new Promise<void>((r) => (release = r))
       const held = run(() => ordered.inHookOrder(st.runId, () => gate))
-      for (const r of reports) await run(() => sessions.handleStatusLine(st.runId, { conversation_id: MAIN, session_id: MAIN, model: null, ...r }))
+      const pending: Promise<unknown>[] = []
+      for (const r of reports) {
+        const sent = send(st, r)
+        if (r === TOOL) pending.push(sent)
+        else await sent
+      }
       release()
       await held
+      await Promise.all(pending)
       await run(() => ordered.inHookOrder(st.runId, () => undefined))
       expect(st.status, JSON.stringify(reports)).toBe(want)
       expect(!!(s.live.get(`${p.toLowerCase()}#${st.agentId}`) as Live).idleGrace, JSON.stringify(reports)).toBe(graced)
@@ -265,7 +282,7 @@ describe("agy's hooks through sessions (s56)", () => {
       const { st: one } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
       await hook(one, 'PreInvocation', zero(MAIN, 1))
       for (const r of reports) {
-        await run(() => sessions.handleStatusLine(one.runId, { conversation_id: MAIN, session_id: MAIN, model: null, ...r }))
+        await send(one, r)
         await run(() => ordered.inHookOrder(one.runId, () => undefined))
       }
       expect(one.status, JSON.stringify(reports)).toBe(want)
