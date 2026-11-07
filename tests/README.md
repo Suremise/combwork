@@ -123,7 +123,10 @@ own, or one under 5 s with no comment, and sleeps that a check follows within th
 above saying why. A change anywhere in a multiline wait counts, including removing its timeout. Existing findings
 are left to the full audit (HI-2491), so unrelated cards can run this lean builder check. It exits 1 when there is a
 new or changed finding, and 2 when it can't compare (no `main`, a bad `--base`, git failing): nothing was
-checked, so that isn't a pass. Only the first check after a sleep counts, and the sleep is let through only when that
+checked, so that isn't a pass. Its last step (`scripts/readyWaits.mjs`, HI-2688) finds an e2e suite's new or changed
+wait for an agent's `status === 'ready'` with no comment: after a turn a fake is `finished`, so that wait runs out at its
+bound, unchecked; use `lib.agentIdle(inv, agentId, ms)`, and say in a comment why `ready` is right where it is (before
+any turn). Only the first check after a sleep counts, and the sleep is let through only when that
 check itself waits (`until`, `waitFor`, `poll`): a wait in a later check doesn't cover an earlier one. A short sleep
 needs its comment like a long one. A pause inside a loop that polls state is the loop's way of
 waiting for its condition, so it isn't counted: one whose `while` (or `do…while`) condition reads state, or whose body

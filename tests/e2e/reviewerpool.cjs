@@ -132,7 +132,9 @@ const commitIn = (dir, files, message, trailer) => {
     const lane = async (id) => (await inv('lanes:list', { all: true })).find((l) => l.id === id)
     const slotOf = async (laneId) => (await inv('slots:list', alpha)).find((s) => s.lease?.lane === laneId)
     const create = async (p, title) => (await inv('tasks:create', { title, project: path.basename(p) })).number
-    const idle = (p, id) => until(async () => ['ready', 'finished'].includes((await live(p, id))?.status), HUNG_MS)
+    // Idle in any of the fake's idle states (lib.agentIdle), `watching` among them: a reviewer watching its card is idle,
+    // and a wait for ready or finished alone ran out there each time (HI-2688). Agent ids are unique, so p isn't needed.
+    const idle = (_p, id) => lib.agentIdle(inv, id, HUNG_MS)
     const shoot = async (name, target) => {
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })

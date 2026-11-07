@@ -14,6 +14,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { reportReadyWaits } from './readyWaits.mjs'
 
 const ROOT = join(import.meta.dirname, '..')
 /** A fake's sleep is a slow CLI, and fixtures aren't tests. */
@@ -338,5 +339,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   console.log(found ? `\n${found} new or changed sleep(s) followed by a check: wait for the condition instead, or say in a comment why the sleep is meant (tests/README.md).` : `No new sleep followed by a check since ${base}.`)
   reportUnbounded()
   if (!unbounded) console.log(`Every new or changed wait states its bound since ${base}.`)
-  process.exit(found || unbounded ? 1 : 0)
+  // And its e2e waits for an agent's `ready` (HI-2688, readyWaits.mjs): after a turn a fake is `finished`.
+  process.exit([found, unbounded, reportReadyWaits(base)].some(Boolean) ? 1 : 0)
 }

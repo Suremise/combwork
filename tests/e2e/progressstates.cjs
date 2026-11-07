@@ -61,7 +61,8 @@ const until = (fn, ms = 30000) => lib.until(fn, ms, 150)
   /** Has the agent start a command (as its shell would); resolves to a wait for what it recorded. */
   const startShell = async (id, cmd, ms = 60000) => {
     const before = shells().length
-    await until(async () => (await live(id))?.status === 'ready', 30000)
+    // Idle, as the agent is after a command before (`finished`, not `ready`: that wait ran out, HI-2688).
+    await lib.agentIdle(inv, id, 30000)
     const key = lib.ptyKey(alpha, id)
     // Taken once it works, or (a quick command) has already recorded it.
     await lib.sendPrompt(inv, key, `shell: ${cmd}`, { submitted: async () => shells().length > before || (await live(id))?.status === 'working' })

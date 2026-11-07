@@ -182,8 +182,11 @@ const check = (name, ok, extra = '') => {
     const finishUnseen = async () => {
       await row('beta').locator('.assistant-project-name').click()
       await lib.until(async () => (await page.locator('.pane-header-bar .agent-name', { hasText: 'Resting' }).count()) === 1, HUNG_MS)
-      await lib.until(async () => (await live(a.Coder.id))?.status === 'ready', HUNG_MS)
-      await lib.sendPrompt(inv, lib.ptyKey(alpha, a.Coder.id), 'hello', { submitted: async () => (await live(a.Coder.id))?.status !== 'ready' })
+      // Idle: after its first finish Coder is `finished`, not `ready` (that wait ran out, HI-2688); so the prompt counts
+      // as taken once a new turn shows, not once its status isn't `ready`.
+      await lib.agentIdle(inv, a.Coder.id, HUNG_MS)
+      const turnBefore = (await live(a.Coder.id))?.turn?.id
+      await lib.sendPrompt(inv, lib.ptyKey(alpha, a.Coder.id), 'hello', { submitted: async () => { const s = await live(a.Coder.id); return s?.turn?.state === 'running' || s?.turn?.id !== turnBefore } })
       return !!(await lib.until(async () => (await openRow.count()) === 1 && (await live(a.Coder.id))?.unseen === true, HUNG_MS))
     }
     check('Coder finishes while beta is shown: “alpha · Coder has finished”', (await finishUnseen()) && (await openRow.innerText()).trim() === 'alpha · Coder has finished', await openRow.innerText().catch(() => 'no row'))
