@@ -661,7 +661,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
         defaultMessage: 'Combwork\'s starting prices are the published ones, checked {checked}: edit any that are out of date, add models and remove them. The table lists the models {provider} has, so a new one shows with "No price" until you enter one. Combwork never fetches prices. On a subscription you are not charged these — they show how heavy the work was.',
         description: 'The info tip of the setting "API prices" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {checked} is a date; {provider} is its name; "No price" is a badge in the table.'
       }),
-      { checked: PRICES_CHECKED, provider: p.name }
+      { checked: PRICES_CHECKED[p.id], provider: p.name }
     ),
     type: 'custom',
     wide: true

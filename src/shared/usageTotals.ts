@@ -58,7 +58,7 @@ export interface Totals {
   estimated: boolean
   /** Sessions with a cost (reported or estimated). */
   priced: number
-  /** Sessions with no cost at all (no price known for their model). */
+  /** Sessions with no cost at all (no price known for their model), or with some of it unknown (HI-2675: also in `priced`). */
   unpriced: number
   /** Sessions run only on servers on this PC (HI-1772): free, neither priced nor unpriced. */
   free?: number
@@ -133,6 +133,8 @@ export function sumUsage(list: SessionListItem[], fromDay: string | null = null)
       t.priced++
       t.cost += u.costUsd
       if (u.costEstimated) t.estimated = true
+      // Priced only in part (HI-2675): its known cost counted, and unpriced too, so the total says "+ ?".
+      if (u.costUnpriced) t.unpriced++
     }
   }
   return t
@@ -177,6 +179,7 @@ export function dailyTotals(list: SessionListItem[], fromDay: string, now: numbe
       else if (d.costUsd !== null) {
         o.cost += d.costUsd
         o.priced++
+        if (d.costUnpriced) o.unpriced++
       } else o.unpriced++
       if (d.costEstimated) o.estimated = true
     }

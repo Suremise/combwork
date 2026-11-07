@@ -627,6 +627,8 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
   const pct = contextPercent(ctx, window)
   const cost = live.costUsd ?? usage?.costUsd ?? null
   const estimated = live.costUsd !== undefined ? !!live.costEstimated : !!usage?.costEstimated
+  // Some of its tokens without a price (HI-2675): " + ?", as a total says it.
+  const partUnpriced = live.costUsd === undefined && !!usage?.costUnpriced
   const status = statusText(live)
   // Waiting on cards (HI-1679): their chips, as a working agent's card, and the status says what for; its hover the whole.
   const wait = cardsWait(live, status)
@@ -670,7 +672,7 @@ export function RunningAgent({ project, a, label, onOpen, assistant }: { project
           <span className="running-cost small faint">{tr(M.unknownCost)}</span>
         </Tooltip>
       ) : (
-        <span className="running-cost small">{cost !== null ? `${estimated ? '≈ ' : ''}${moneyLabel(cost)}` : ''}</span>
+        <span className="running-cost small">{cost !== null ? `${estimated ? '≈ ' : ''}${moneyLabel(cost)}${partUnpriced ? ' + ?' : ''}` : ''}</span>
       )}
     </div>
   )
@@ -767,6 +769,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
   const liveCost = liveState && liveState.sessionId === current?.id ? liveState.costUsd : undefined
   const cost = liveCost ?? u?.costUsd ?? null
   const costEstimated = liveCost !== undefined ? !!liveState?.costEstimated : !!u?.costEstimated
+  const costPartUnpriced = liveCost === undefined && !!u?.costUnpriced
 
   return (
     <>
@@ -835,7 +838,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
               {cost !== null && (
                 <Card
                   title={tr(M.cost)}
-                  value={`${costEstimated ? '≈ ' : ''}${moneyLabel(cost)}`}
+                  value={`${costEstimated ? '≈ ' : ''}${moneyLabel(cost)}${costPartUnpriced ? ' + ?' : ''}`}
                   sub={tr(costEstimated ? M.sessionEstimated : M.sessionAtPrices)}
                   tip={tr(M.sessionCostTip, { estimated: costEstimated ? 'yes' : 'no', company: provider.company, provider: provider.name })}
                 />

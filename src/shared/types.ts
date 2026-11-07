@@ -3120,6 +3120,11 @@ export interface SessionUsage {
   costUsd: number | null
   costEstimated: boolean
   /**
+   * Some of its tokens have no known price (HI-2675: a model with none beside priced ones, or a day without a price):
+   * costUsd is only the priced part, shown "+ ?" and counted as unpriced too, never as their $0.
+   */
+  costUnpriced?: true
+  /**
    * Tokens used after the provider last reported the cost (Claude Code writes it only at some turns' ends):
    * Combwork adds its estimate for them to the reported cost.
    */
@@ -3175,6 +3180,8 @@ export interface DayUsage extends UsageTokens {
   /** The day's API-equivalent cost: its share of the reported cost, else Combwork's estimate; null when no price is known. */
   costUsd: number | null
   costEstimated: boolean
+  /** Some of the day's tokens have no known price (HI-2675): costUsd is only the priced part, shown "+ ?", never as their $0. */
+  costUnpriced?: true
 }
 
 export interface RecacheEstimate {

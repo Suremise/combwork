@@ -512,11 +512,11 @@ export function rowCost(r: LedgerRow, provider: ProviderId, settings?: Pick<AppS
 }
 
 /** The fields of a session's usage that aren't sums of its rows: what the history keeps beside them. */
-export type UsageSummary = Omit<SessionUsage, 'inputTokens' | 'outputTokens' | 'cacheWriteTokens' | 'cacheReadTokens' | 'requests' | 'costUsd' | 'costEstimated' | 'costUnreported' | 'days' | 'costReports' | 'timeline'>
+export type UsageSummary = Omit<SessionUsage, 'inputTokens' | 'outputTokens' | 'cacheWriteTokens' | 'cacheReadTokens' | 'requests' | 'costUsd' | 'costEstimated' | 'costUnpriced' | 'costUnreported' | 'days' | 'costReports' | 'timeline'>
 
 /** What the history keeps of a parser's result beside its rows. */
 export function summaryOf(u: SessionUsage): UsageSummary {
-  const { inputTokens: _i, outputTokens: _o, cacheWriteTokens: _w, cacheReadTokens: _r, requests: _q, costUsd: _c, costEstimated: _e, costUnreported: _u, days: _d, costReports: _cr, timeline: _t, ...summary } = u
+  const { inputTokens: _i, outputTokens: _o, cacheWriteTokens: _w, cacheReadTokens: _r, requests: _q, costUsd: _c, costEstimated: _e, costUnpriced: _p, costUnreported: _u, days: _d, costReports: _cr, timeline: _t, ...summary } = u
   return summary
 }
 
@@ -541,13 +541,20 @@ export function usageFromRows(summary: UsageSummary, rows: LedgerRow[], settings
     if (c.usd !== null) {
       d.costUsd = (d.costUsd ?? 0) + c.usd
       if (c.estimated) d.costEstimated = true
-    }
+    } else if (tokenSum(r) > 0) d.costUnpriced = true
   }
   for (const d of Object.values(days)) {
-    if (d.costUsd === null) continue
+    // A day's tokens with no price beside priced ones (HI-2675): its cost is only part, never their $0.
+    if (d.costUsd === null) {
+      if (d.costUnpriced) delete d.costUnpriced
+      if (tokenSum(d) > 0) usage.costUnpriced = true
+      continue
+    }
     usage.costUsd = (usage.costUsd ?? 0) + d.costUsd
     if (d.costEstimated) usage.costEstimated = true
+    if (d.costUnpriced) usage.costUnpriced = true
   }
+  if (usage.costUsd === null) delete usage.costUnpriced
   return usage
 }
 

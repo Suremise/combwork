@@ -1,5 +1,10 @@
 # Release Notes
 
+## Unreleased
+
+- **Codex prices checked again** (7 Nov 2026) against OpenAI's published API prices: unchanged, with GPT-6.1 Terra added. Settings → Codex → API prices says when Codex's were checked, apart from the other providers'.
+- **A session priced only in part shows as such.** When a session used a model Combwork has no price for beside models it has, its cost and the totals that include it show the known part with **+ ?**, rather than counting the rest as $0.
+
 ## 1.1.0 — 2026-11-06
 
 <!-- old-name: begin changelog-upgrade -->
