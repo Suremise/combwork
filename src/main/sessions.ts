@@ -91,6 +91,7 @@ import { createLogger, hookJournal, userText } from './logger'
 import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
+import { applyStatus, idleNow, NO_STATUS, type StatusState } from './statusLineState'
 import { acceptTurn, admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
 import { lastTitle } from './terminalTitle'
@@ -411,12 +412,8 @@ interface LiveSession {
    * the transcript is dropped if one came after the read began, as that hook says something newer (#475).
    */
   hooksSeen?: number
-  /**
-   * The turn and session whose permission prompt the status line says is showing, as last applied (statusLineAsk, HI-2545):
-   * an ask applies once per prompt. Only a report accepted in hook order for its own turn sets or clears it, so a report
-   * about an earlier turn never stands for (or hides) the running one's prompt.
-   */
-  statusAsk?: { turn: string; session: string }
+  /** What its status line says that no hook tells (statusLineState.ts, HI-2545): derived in hook order from its valid reports. */
+  statusState?: StatusState
   /** What its CLI's adapter keeps for this launch while preparing its hooks (prepareHook's memo, HI-2545): dropped with it. */
   hookMemo?: Record<string, unknown>
   /**
@@ -425,8 +422,6 @@ interface LiveSession {
    * turn as it began; anything heard of the launch meanwhile cancels it.
    */
   idleGrace?: { timer: ReturnType<typeof setTimeout>; runId: string; sessionId: string; turn: string }
-  /** Whether the latest status line said idle with no prompt pending (statusLineIdle), for the grace's last look. */
-  statusIdle?: boolean
   /** Whether its hooks are reaching Combwork (#1336, hooksHealth.ts): what the check reads of the launch. */
   hooksWatch?: HooksWatch
   /**
@@ -5937,28 +5932,27 @@ class SessionManager {
       const id = liveId(l.state.projectPath, l.state.agentId)
       const ask = l.adapter.statusLineAsk?.(body) ?? null
       const idle = !!l.adapter.statusLineIdle?.(body)
-      // Anything but idle is news of the turn going on: no silent end stands.
-      if (!idle) this.cancelIdleGrace(l)
-      // Derived, never tracked at the door (the Assistant's note on HI-2545, after HR1's and HR2's rounds): every report
-      // is queued in hook order as it comes, unfiltered, and only there validated: still this launch, about the
-      // conversation it runs, and the turn running as the report arrived still the running one. The prompt showing is
-      // then the latest valid report's alone, compared with what the one before said: false to true asks once, true to
-      // false answers it. So reports applied in any arrival order end as the last valid one says.
+      // Derived in one place, never tracked at the door (the Assistant's note on HI-2545, after HR1's and HR2's rounds):
+      // every report is queued in hook order as it comes, unfiltered, and only there validated: still this launch, about
+      // the conversation it runs, and the turn running as it arrived still the running one. applyStatus then owns all
+      // that the status line says: the prompt showing, the idle period and its grace. So reports applied in any arrival
+      // order end as the last valid one says. Nothing is done as a report arrives: a grace's end is queued in the same order,
+      // so a report that came before it is applied first.
       const turn = l.ledger?.active?.state === 'running' ? l.ledger.active.id : null
       const session = l.state.sessionId
       void this.inHookOrder(l.state.runId, () => {
         const now = l.ledger?.active
         if (this.live.get(id) !== l || !turn || !session || l.state.sessionId !== session || (conv && conv !== session) || now?.id !== turn || now.state !== 'running') return
-        l.statusIdle = idle
-        const was = l.statusAsk?.turn === turn && l.statusAsk.session === session
-        if (ask && !was) {
-          l.statusAsk = { turn, session }
-          this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
-        } else if (!ask && was) {
-          l.statusAsk = undefined
-          this.carryOut(id, l, hookStep({ kind: 'toolEnd' }, this.statusInput(l)), 'statusline', { kind: 'toolEnd' })
-        } else if (!ask) l.statusAsk = undefined
-        if (idle && !l.idleGrace) this.startIdleGrace(id, l, turn)
+        const scope = { turn, session }
+        const grace = l.idleGrace
+        const { next, actions } = applyStatus(l.statusState ?? NO_STATUS, { ask: !!ask, idle, scope }, !!grace && grace.turn === turn && grace.sessionId === session)
+        l.statusState = next
+        for (const a of actions) {
+          if (a === 'ask' && ask) this.carryOut(id, l, hookStep({ kind: 'ask', ask }, this.statusInput(l)), 'statusline', { kind: 'ask', ask })
+          else if (a === 'answer') this.carryOut(id, l, hookStep({ kind: 'toolEnd' }, this.statusInput(l)), 'statusline', { kind: 'toolEnd' })
+          else if (a === 'startGrace') this.startIdleGrace(id, l, turn)
+          else if (a === 'cancelGrace') this.cancelIdleGrace(l)
+        }
       })
     }
   }
@@ -5973,13 +5967,15 @@ class SessionManager {
   private startIdleGrace(id: string, l: LiveSession, turnId: string): void {
     const turn = l.ledger?.active
     if (!turn || turn.id !== turnId || turn.state !== 'running' || !l.state.sessionId) return
+    // One grace at a time: a new idle period's replaces any other.
+    this.cancelIdleGrace(l)
     const grace = { runId: l.state.runId, sessionId: l.state.sessionId, turn: turn.id } as Omit<NonNullable<LiveSession['idleGrace']>, 'timer'>
     const timer = setTimeout(() => {
       void this.inHookOrder(grace.runId, () => {
         if (l.idleGrace?.timer !== timer) return
         l.idleGrace = undefined
         const now = l.ledger?.active
-        if (this.live.get(id) !== l || l.state.runId !== grace.runId || l.state.sessionId !== grace.sessionId || !l.statusIdle || now?.id !== grace.turn || now.state !== 'running') return
+        if (this.live.get(id) !== l || l.state.runId !== grace.runId || l.state.sessionId !== grace.sessionId || !idleNow(l.statusState ?? NO_STATUS, { turn: grace.turn, session: grace.sessionId }) || now?.id !== grace.turn || now.state !== 'running') return
         endRunning(l.ledger!, 'interrupt')
         this.carryOut(id, l, hookStep({ kind: 'interrupt' }, this.statusInput(l)), 'statusline', { kind: 'interrupt' })
         this.noteTurn(l)

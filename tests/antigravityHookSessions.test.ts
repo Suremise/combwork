@@ -225,21 +225,30 @@ describe("agy's hooks through sessions (s56)", () => {
     }
   })
 
-  it("status reports, however they queue, end as the last valid one says: the prompt showing is derived from it (HR2's round 3, the Assistant's note)", async () => {
+  it("status reports, however they queue, end as the last valid one says: the prompt showing and the idle grace are derived from it (HR2's round 3, the Assistant's note)", async () => {
     const ordered = sessions as unknown as { inHookOrder: (key: string, fn: () => Promise<void> | void) => Promise<void> }
     const PENDING = { agent_state: 'tool_use', tool_confirmation_pending: true }
     const WORKING = { agent_state: 'working', tool_confirmation_pending: false }
     // Another conversation's report (not the one the launch runs): stale, dropped in order.
     const OTHER = { agent_state: 'working', conversation_id: NEW, session_id: NEW }
-    const cases: [Record<string, unknown>[], string][] = [
-      [[PENDING, WORKING], 'working'],
-      [[WORKING, PENDING], 'waiting'],
-      [[PENDING, PENDING], 'waiting'],
-      [[PENDING, OTHER], 'waiting'],
-      [[PENDING, OTHER, WORKING], 'working'],
-      [[WORKING, OTHER, PENDING, WORKING, PENDING], 'waiting']
+    const IDLE = { agent_state: 'idle' }
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    // [the reports, the status they end in, whether a grace stands then]
+    const cases: [Record<string, unknown>[], string, boolean][] = [
+      [[PENDING, WORKING], 'working', false],
+      [[WORKING, PENDING], 'waiting', false],
+      [[PENDING, PENDING], 'waiting', false],
+      [[PENDING, OTHER], 'waiting', false],
+      [[PENDING, OTHER, WORKING], 'working', false],
+      [[WORKING, OTHER, PENDING, WORKING, PENDING], 'waiting', false],
+      [[PENDING, IDLE], 'working', true],
+      [[IDLE, PENDING], 'waiting', false],
+      [[IDLE, OTHER], 'working', true],
+      [[IDLE, WORKING, IDLE], 'working', true],
+      [[IDLE, IDLE, WORKING], 'working', false]
     ]
-    for (const [reports, want] of cases) {
+    try {
+    for (const [reports, want, graced] of cases) {
       const { st } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
       await hook(st, 'PreInvocation', zero(MAIN, 1))
       // Held: every report arrives before any is applied.
@@ -251,6 +260,7 @@ describe("agy's hooks through sessions (s56)", () => {
       await held
       await run(() => ordered.inHookOrder(st.runId, () => undefined))
       expect(st.status, JSON.stringify(reports)).toBe(want)
+      expect(!!(s.live.get(`${p.toLowerCase()}#${st.agentId}`) as Live).idleGrace, JSON.stringify(reports)).toBe(graced)
       // The same, applied one at a time as they come: the same end.
       const { st: one } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
       await hook(one, 'PreInvocation', zero(MAIN, 1))
@@ -259,6 +269,54 @@ describe("agy's hooks through sessions (s56)", () => {
         await run(() => ordered.inHookOrder(one.runId, () => undefined))
       }
       expect(one.status, JSON.stringify(reports)).toBe(want)
+      expect(!!(s.live.get(`${p.toLowerCase()}#${one.agentId}`) as Live).idleGrace, JSON.stringify(reports)).toBe(graced)
+    }
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("idle and working reports, however they queue, leave only the latest idle period's grace: a fresh one gets its full time, the turn and its locks stay (HR2's round 4)", async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const ordered = sessions as unknown as { inHookOrder: (key: string, fn: () => Promise<void> | void) => Promise<void> }
+      const drain = (st: State) => run(() => ordered.inHookOrder(st.runId, () => undefined))
+      const report = (st: State, o: Record<string, unknown>) => run(() => sessions.handleStatusLine(st.runId, { conversation_id: MAIN, session_id: MAIN, model: null, ...o }))
+      const IDLE = { agent_state: 'idle' }
+      const WORKING = { agent_state: 'working' }
+      for (const reports of [[IDLE, WORKING], [IDLE, WORKING, IDLE, WORKING], [WORKING, IDLE, WORKING]]) {
+        const { st, l } = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
+        await hook(st, 'PreInvocation', zero(MAIN, 1))
+        const edit = recorded('PreToolUse', (q) => q.toolCall.name === 'edit_file')
+        edit.toolCall.args.Path = join(p, `grace-${l.state.agentId}.txt`)
+        expect(await hook(st, 'PreToolUse', { ...edit, stepIdx: 2 })).toEqual({ decision: 'allow' })
+        // Held: all of them arrive before any is applied; the last says working, so no grace stands.
+        let release!: () => void
+        const gate = new Promise<void>((r) => (release = r))
+        const held = run(() => ordered.inHookOrder(st.runId, () => gate))
+        for (const r of reports) await report(st, r)
+        release()
+        await held
+        await drain(st)
+        expect(l.idleGrace, JSON.stringify(reports)).toBeUndefined()
+        // A fresh idle period just before the old one would have ended: it gets its full grace.
+        await vi.advanceTimersByTimeAsync(2900)
+        await report(st, IDLE)
+        await drain(st)
+        await vi.advanceTimersByTimeAsync(101)
+        await drain(st)
+        expect([l.ledger.active?.state, st.status], JSON.stringify(reports)).toEqual(['running', 'working'])
+        // Its lock still stands: another agent's edit of the file is refused.
+        const other = agent(MAIN, { [MAIN]: fixture('run-tools-continue-1.5.0.jsonl') })
+        await hook(other.st, 'PreInvocation', zero(MAIN, 1))
+        expect(((await hook(other.st, 'PreToolUse', edit)) as Record<string, unknown> | null)?.decision).toBe('deny')
+        // Its own grace, once it has run its full time: interrupted.
+        await vi.advanceTimersByTimeAsync(3000)
+        await drain(st)
+        expect(st.status, JSON.stringify(reports)).toBe('ready')
+      }
+    } finally {
+      vi.useRealTimers()
     }
   })
 
