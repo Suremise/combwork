@@ -216,6 +216,8 @@ const projectFileConfig = (raw: Record<string, unknown>): { cfg: ProjectConfig; 
 
 export class WorkspaceService {
   path: string | null = null
+  /** Who holds workspace.json's settings to save them whole (fsutil's KeptReadOptions.holder): this workspace, by identity. */
+  private readonly keptHolder = {}
   /**
    * Its folder's real location as the window opened it (`placeKey`): what the close fences and lets go (#1402), so a
    * junction or short name it was opened by, removed or pointed elsewhere since, can't send the close to another folder.
@@ -527,7 +529,7 @@ export class WorkspaceService {
     const fresh = !existsSync(join(abs, CW_DIR))
     await this.ensureWorkspaceStructure()
     await configTestHooks.beforeSettingsRead?.(abs)
-    this.wsConfig = loadedConfig(await readKeptJson(join(this.combworkDir, 'workspace.json'), {}, { holder: this }))
+    this.wsConfig = loadedConfig(await readKeptJson(join(this.combworkDir, 'workspace.json'), {}, { holder: this.keptHolder }))
     this.settingsReadNow()
     // Its open point's commands hold its agents back until they are done (HI-1954): reserved here, before anything hears
     // of the open (the recent list, workspace-changed, onOpened), so no start slips in ahead of them.
@@ -775,7 +777,7 @@ export class WorkspaceService {
     const file = join(this.combworkDir, 'workspace.json')
     const data = this.wsConfig
     this.configSaves++
-    const run = this.savingConfig.then(() => writeKeptJson(file, data, { holder: this })).finally(() => {
+    const run = this.savingConfig.then(() => writeKeptJson(file, data, { holder: this.keptHolder })).finally(() => {
       this.configSaves--
       this.configWritten = JSON.stringify(data, null, 2) + '\n'
     })
@@ -800,7 +802,7 @@ export class WorkspaceService {
         if (!data) return
         const next = { ...data, ...change(data) }
         text = JSON.stringify(next, null, 2) + '\n'
-        await writeKeptJson(file, next, { holder: this })
+        await writeKeptJson(file, next, { holder: this.keptHolder })
         // Worked out again: the settings may have changed in memory while it was written (their own save is after this one).
         Object.assign(data, change(data))
       })
@@ -1050,7 +1052,7 @@ export class WorkspaceService {
     const text = await readFile(file, 'utf8').catch(() => '')
     // Combwork's own save, or a save started meanwhile (its settings are newer), or another workspace opened since.
     if (text === this.configWritten || this.configSaves || generation !== this.generation) return
-    this.wsConfig = loadedConfig(await readKeptJson(file, {}, { holder: this }))
+    this.wsConfig = loadedConfig(await readKeptJson(file, {}, { holder: this.keptHolder }))
     this.emit({ type: 'skills-changed' })
     this.scheduleRefresh()
   }

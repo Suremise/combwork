@@ -159,16 +159,18 @@ export function keptRuns(saved: unknown, workspacePath: string): ProgressRun[] {
     // A copy's warming run credited to its lease's agent (HI-1710): kept with that agent's id and name.
     const keptHolder = source === 'combwork' && copy && !slot ? keptText(r.agentId, 200) : null
     const holder = keptHolder && named && r.defaultName !== 'copy' && named !== COPIES_RUNS && !named.startsWith('Combwork (') ? { agentId: keptHolder, agentName: named } : null
+    // Combwork's own run: its name, and the rest of what it is (spread below without the name, which comes first).
+    const { agentName: cwName, ...cwRest } = source === 'combwork' ? combworkName(slot, copy, holder) : { agentName: null }
     out.push({
       id,
       workspacePath,
       projectPath: source === 'agent' || source === 'combwork' ? keptText(r.projectPath, 1000) : null,
       agentId: source === 'agent' ? keptText(r.agentId, 200) : (holder?.agentId ?? null),
-      agentName: source === 'combwork' ? combworkName(slot, copy, holder).agentName : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
+      agentName: source === 'combwork' ? (cwName as string) : (named ?? (source === 'api' ? 'Script' : 'Agent')), // i18n-ignore: a run's stored name for a script, which agents read too
       // A script's name is always Combwork's (scripts don't name themselves, start()), as is the merge queue's; an agent's
       // only when it has none, or when Combwork's "Agent" was saved with its mark (a nameless run kept before: this file is
       // read again after a save).
-      ...(source === 'combwork' ? combworkName(slot, copy, holder) : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
+      ...(source === 'combwork' ? cwRest : source === 'api' ? (named === null || named === 'Script' ? { defaultName: 'script' as const } : {}) : named === null || (named === 'Agent' && r.defaultName === 'agent') ? { defaultName: 'agent' as const } : {}),
       provider: source !== 'combwork' && PROVIDERS.some((p) => p.id === r.provider) ? (r.provider as ProviderId) : null,
       source,
       title,
@@ -389,13 +391,14 @@ export class ProgressStore {
     // The workspace's bound holds whoever reports. Ended runs don't count: Recent keeps the newest RECENT_KEPT.
     if (list.filter((r) => r.finishedAt === null).length >= MAX_OPEN_PER_WORKSPACE) throw new ProgressError(429, `This workspace already has ${MAX_OPEN_PER_WORKSPACE} open runs: finish some first`) // i18n-ignore: the Agent API's progress replies, which agents and cw-progress read
     const now = this.deps.now()
+    const { agentName: cwName, ...cwRest } = caller.source === 'combwork' ? combworkName(caller.slot, caller.copy, caller.reviewer) : { agentName: null }
     const run: ProgressRun = {
       id: randomUUID(),
       workspacePath: caller.workspacePath,
       projectPath: caller.source === 'agent' || caller.source === 'combwork' ? caller.projectPath : null,
       agentId: caller.source === 'agent' ? caller.agentId : caller.source === 'combwork' && caller.copy && !caller.slot && caller.reviewer ? caller.reviewer.agentId : null,
-      agentName: caller.source === 'api' ? 'Script' : caller.source === 'combwork' ? combworkName(caller.slot, caller.copy, caller.reviewer).agentName : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
-      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'combwork' ? combworkName(caller.slot, caller.copy, caller.reviewer) : {}),
+      agentName: caller.source === 'api' ? 'Script' : caller.source === 'combwork' ? (cwName as string) : caller.agentName, // i18n-ignore: a run's stored name for a script, which agents read too
+      ...(caller.source === 'api' ? { defaultName: 'script' as const } : caller.source === 'combwork' ? cwRest : {}),
       provider: caller.source === 'api' || caller.source === 'combwork' ? null : caller.provider,
       source: caller.source as ProgressSource,
       title,

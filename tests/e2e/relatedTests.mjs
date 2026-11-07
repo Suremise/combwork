@@ -57,6 +57,7 @@ import traverseModule from '@babel/traverse'
 import { execFileSync } from 'child_process'
 import { createRequire } from 'module'
 import { codeLines, gitChangedLines, gitRevision, unitsOf } from './affectedUnits.mjs'
+import { CLASS_FILE, CLASS_NAME, ruleOn } from './workspaceRule.mjs'
 
 const traverse = traverseModule.default ?? traverseModule
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
@@ -529,9 +530,17 @@ export function narrowChange({ file, base, head, lines }) {
   }
   if (!ids.size) return { needles: [], why: `${file}: only comments or type-only imports changed` }
   // A class's member is reached through an instance, by a key a name search may not see: its class, and whatever in
-  // the file names that (a factory, an instance), are what a test must name to have one.
+  // the file names that (a factory, an instance), are what a test must name to have one. But for WorkspaceService's,
+  // while its rule holds in both revisions (workspaceRule.mjs, HI-2678): every use of one spells its name, so the
+  // member's own name is the needle, and the files the rule pins (an escape outside the app) keep the tests reaching them.
+  let rule = null
+  const ruled = (unit) => {
+    if (!unit.member || slashes(file) !== CLASS_FILE || !unit.id.startsWith(`${CLASS_NAME}.`)) return false
+    rule ??= ruleOn([base, head], base.root ?? head.root ?? process.cwd(), { scope: 'all' })
+    return !rule.all
+  }
   const classOf = (unit) => {
-    if (!unit.member) return
+    if (!unit.member || ruled(unit)) return
     const cls = unit.id.slice(0, unit.id.lastIndexOf('.'))
     for (const side of sides) if (!side.units.some((u) => u.id === `class ${cls}`)) side.units.push({ id: `class ${cls}`, name: cls, kind: 'named', needle: cls, startLine: -1, endLine: -1 })
     return `class ${cls}`
@@ -580,7 +589,8 @@ export function narrowChange({ file, base, head, lines }) {
       if (u.alias) needles.set(`named\0${u.alias}`, { name: u.alias, key: false })
     }
   }
-  return { needles: [...needles.values()], why: `${file}: ${few([...ids])}` }
+  const byRule = rule ? (rule.all ? ` (${CLASS_NAME}'s members by its class: ${rule.all})` : `, ${CLASS_NAME}'s members by their names (its rule holds; ${rule.pinned.length} files pinned)`) : ''
+  return { needles: [...needles.values()], why: `${file}: ${few([...ids])}${byRule}`, ...(rule && !rule.all ? { pins: rule.pinned } : {}) }
 }
 
 /** Where a file names a unit, by offset (affectedUnits.mjs's occurrences): identifier tokens and strings of its name, or a key's strings. */
@@ -626,7 +636,7 @@ export function narrowRelated({ related, changes, graph, read, setupFiles = [], 
     return regexes.get(k)
   }
   const setup = setupFiles.flatMap((s) => [...graph.closure(s)])
-  const reasons = { all: new Map(), graph: 0, unknown: new Map(), whole: new Map(), reflection: new Map(), named: 0 }
+  const reasons = { all: new Map(), graph: 0, unknown: new Map(), whole: new Map(), reflection: new Map(), pinned: new Map(), named: 0 }
   for (const test of [...new Set(related.map(slashes))]) {
     const files = new Set([...graph.closure(graph.known.get(lower(test)) ?? test), ...setup])
     // A file it loads whose own imports aren't all known may load the change: its closure isn't the whole of it.
@@ -647,6 +657,12 @@ export function narrowRelated({ related, changes, graph, read, setupFiles = [], 
     for (const c of reached) {
       if (c.all) {
         reason = ['all', c.all]
+        break
+      }
+      // A file the WorkspaceService rule pins (an escape outside the app, HI-2678) that it loads: kept for any member.
+      const pin = c.pins?.find((p) => files.has(p) || [...files].some((f) => lower(f) === lower(p)))
+      if (pin) {
+        reason = ['pinned', "a file it loads loses a WorkspaceService's type, so the WorkspaceService rule pins it"]
         break
       }
       for (const f of files) {
@@ -680,7 +696,7 @@ export function narrowRelated({ related, changes, graph, read, setupFiles = [], 
   if (reasons.named) why.push(`${reasons.named} related test files load a file naming what changed`)
   if (reasons.graph) why.push(`${reasons.graph} related test files kept: the imports read here don't reach a changed file from them`)
   // Bounded: a reason a line, at most a few of each kind (the picker's diagnostics are kept to a few KB).
-  for (const kind of ['all', 'unknown', 'whole', 'reflection']) {
+  for (const kind of ['all', 'unknown', 'whole', 'reflection', 'pinned']) {
     const rows = [...reasons[kind]]
     for (const [r, n] of rows.slice(0, 8)) why.push(`${n} related test files kept: ${r}`)
     if (rows.length > 8) why.push(`${rows.slice(8).reduce((a, [, n]) => a + n, 0)} more related test files kept for ${rows.length - 8} more such reasons`)

@@ -17,8 +17,9 @@ const root = join(__dirname, '..')
 const script: string = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).scripts['check:repo']
 const FILES = '((?:tests\\/[\\w/]+\\.test\\.ts ?)+)'
 // The agent-text guard and its catalogue's freshness (HI-2065) beside the i18n guard's, then the names check of the
-// change (HI-2617: the lines it adds since the merge queue's target, CW_CHECK_BASE).
-const SHAPE = new RegExp(`^node scripts\\/i18nGuard\\.mjs && node scripts\\/agentTextGuard\\.mjs && node scripts\\/agentTextExtract\\.mjs --check && node tests\\/oldNames\\.mjs --diff && vitest run ${FILES} && vitest run ${FILES} -t "([^"]+)"$`)
+// change (HI-2617: the lines it adds since the merge queue's target, CW_CHECK_BASE), and the WorkspaceService rule when the
+// change touches one of its inputs (HI-2678, tests/e2e/workspaceRuleCheck.mjs).
+const SHAPE = new RegExp(`^node scripts\\/i18nGuard\\.mjs && node scripts\\/agentTextGuard\\.mjs && node scripts\\/agentTextExtract\\.mjs --check && node tests\\/oldNames\\.mjs --diff && node tests\\/e2e\\/workspaceRuleCheck\\.mjs --diff && vitest run ${FILES} && vitest run ${FILES} -t "([^"]+)"$`)
 const shape = SHAPE.exec(script)
 const list = (s: string | undefined): string[] => s?.trim().split(' ') ?? []
 const whole = list(shape?.[1])

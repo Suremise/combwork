@@ -1,0 +1,108 @@
+[
+  {
+    "commit": "22fd88db7^1 (HI-2654's base)",
+    "tree": "f2224f3f5310e5b9a3b4de67c275409937e45985",
+    "rule": "98558f86705fec657105fe22a112fd698e61a864",
+    "compiler": "5.9.3 5ec92e32c898625aaecbf9fe71a0d5bdc5f6e63f",
+    "types": "26.6.3",
+    "escapes": [
+      {
+        "file": "src/main/watches.ts",
+        "text": "load(ws)",
+        "why": "Promise<Store> goes into a Promise<unknown> slot, which drops it",
+        "safe": "inBackground(what, work: Promise<unknown>) only hands it to counted(), which chains .then(() => undefined, () => undefined), adds that new promise to the inFlight Set and deletes it when it settles; settled() awaits Promise.allSettled([...inFlight]) and reads no result. The Store and its workspace are never read from it."
+      },
+      {
+        "file": "src/main/workspace.ts",
+        "text": "{ holder: this }",
+        "why": "{ holder: this; } goes into a KeptReadOptions | undefined slot, which drops it",
+        "safe": "The options object goes to readKeptJson/writeKeptJson (fsutil.ts), which read opts.holder only to pass it to heldBy, unreadableValue and saveKept."
+      },
+      {
+        "file": "src/main/workspace.ts",
+        "text": "this",
+        "why": "this goes into a object slot",
+        "safe": "fsutil.ts uses a holder only by identity: a truthiness test, and staleHolders' Set<object> add, delete and has; nothing reads a member of it."
+      },
+      {
+        "file": "src/main/workspace.ts",
+        "text": "{ holder: this }",
+        "why": "{ holder: this; } goes into a { compact?: boolean | undefined; bakOncePerRun?: boolean | u slot, which drops it",
+        "safe": "The options object goes to readKeptJson/writeKeptJson (fsutil.ts), which read opts.holder only to pass it to heldBy, unreadableValue and saveKept."
+      },
+      {
+        "file": "src/main/workflow/levels.ts",
+        "text": "{ w, path: p.path, name: p.name, changed, problems: after.problems }",
+        "why": "{ w: WorkspaceService; path: string; name: string; changed:  goes into a any slot",
+        "safe": "`out` (an inferred any[]) is only pushed to and returned from inheritors(), whose declared return type is Promise<{ w: WorkspaceService; path; name; changed; problems }[]>: its callers see the type kept, and nothing between reads it."
+      },
+      {
+        "file": "src/main/workflow/levels.ts",
+        "text": "h",
+        "why": "{ w: WorkspaceService; path: string; name: string; changed:  goes into a { path: string; name: string; } slot, which drops it",
+        "safe": "cardsInFlight(ws, project: { path; name }) (optionsForm.ts) reads only project.path and project.name, by name; the holder's w isn't reached through it."
+      }
+    ],
+    "errors": [
+      {
+        "file": "src/main/progress.ts",
+        "code": 2783,
+        "text": "'agentName' is specified more than once, so this usage will be overwritten.",
+        "safe": "TS 5.9's TS2783 on an object literal whose `agentName` is written again by a spread after it (TS 7 doesn't report it): the literal's type is still the declared ProgressRun, and progress.ts declares, imports or names no WorkspaceService, so the duplicate can't hide one."
+      }
+    ]
+  },
+  {
+    "commit": "22fd88db7 (HI-2654)",
+    "tree": "811360867eb37faf13ce80416aa8c1f4996a041a",
+    "rule": "98558f86705fec657105fe22a112fd698e61a864",
+    "compiler": "5.9.3 5ec92e32c898625aaecbf9fe71a0d5bdc5f6e63f",
+    "types": "26.6.3",
+    "escapes": [
+      {
+        "file": "src/main/watches.ts",
+        "text": "load(ws)",
+        "why": "Promise<Store> goes into a Promise<unknown> slot, which drops it",
+        "safe": "inBackground(what, work: Promise<unknown>) only hands it to counted(), which chains .then(() => undefined, () => undefined), adds that new promise to the inFlight Set and deletes it when it settles; settled() awaits Promise.allSettled([...inFlight]) and reads no result. The Store and its workspace are never read from it."
+      },
+      {
+        "file": "src/main/workspace.ts",
+        "text": "{ holder: this }",
+        "why": "{ holder: this; } goes into a KeptReadOptions | undefined slot, which drops it",
+        "safe": "The options object goes to readKeptJson/writeKeptJson (fsutil.ts), which read opts.holder only to pass it to heldBy, unreadableValue and saveKept."
+      },
+      {
+        "file": "src/main/workspace.ts",
+        "text": "this",
+        "why": "this goes into a object slot",
+        "safe": "fsutil.ts uses a holder only by identity: a truthiness test, and staleHolders' Set<object> add, delete and has; nothing reads a member of it."
+      },
+      {
+        "file": "src/main/workspace.ts",
+        "text": "{ holder: this }",
+        "why": "{ holder: this; } goes into a { compact?: boolean | undefined; bakOncePerRun?: boolean | u slot, which drops it",
+        "safe": "The options object goes to readKeptJson/writeKeptJson (fsutil.ts), which read opts.holder only to pass it to heldBy, unreadableValue and saveKept."
+      },
+      {
+        "file": "src/main/workflow/levels.ts",
+        "text": "{ w, path: p.path, name: p.name, changed, problems: after.problems }",
+        "why": "{ w: WorkspaceService; path: string; name: string; changed:  goes into a any slot",
+        "safe": "`out` (an inferred any[]) is only pushed to and returned from inheritors(), whose declared return type is Promise<{ w: WorkspaceService; path; name; changed; problems }[]>: its callers see the type kept, and nothing between reads it."
+      },
+      {
+        "file": "src/main/workflow/levels.ts",
+        "text": "h",
+        "why": "{ w: WorkspaceService; path: string; name: string; changed:  goes into a { path: string; name: string; } slot, which drops it",
+        "safe": "cardsInFlight(ws, project: { path; name }) (optionsForm.ts) reads only project.path and project.name, by name; the holder's w isn't reached through it."
+      }
+    ],
+    "errors": [
+      {
+        "file": "src/main/progress.ts",
+        "code": 2783,
+        "text": "'agentName' is specified more than once, so this usage will be overwritten.",
+        "safe": "TS 5.9's TS2783 on an object literal whose `agentName` is written again by a spread after it (TS 7 doesn't report it): the literal's type is still the declared ProgressRun, and progress.ts declares, imports or names no WorkspaceService, so the duplicate can't hide one."
+      }
+    ]
+  }
+]
