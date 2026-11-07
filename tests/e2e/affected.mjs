@@ -420,7 +420,7 @@ export const AREAS = [
   { paths: ['src/main/titleNudge.ts'], suites: ['replysize'] },
   // An agent's request for the Assistant on a card, cw_ask_assistant (HI-1866).
   { paths: ['src/main/assistantAsk.ts'], suites: ['intents', 'replysize'] },
-  { paths: ['src/renderer/src/components/CardKind.tsx', 'src/renderer/src/components/CardReviewSkip.tsx', 'src/renderer/src/components/reviewSkipTip.ts', 'tests/e2e/nocode.cjs'], suites: ['nocode'] },
+  { paths: ['src/renderer/src/components/CardKind.tsx', 'src/renderer/src/components/CardReviewSkip.tsx', 'src/renderer/src/components/CardTarget.tsx', 'src/renderer/src/components/reviewSkipTip.ts', 'tests/e2e/nocode.cjs'], suites: ['nocode'] },
   { paths: ['src/renderer/src/components/ForYou.tsx', 'src/renderer/src/forYou.ts', 'src/renderer/src/sharedRead.ts', 'src/renderer/src/components/Shell.tsx', 'src/main/answerRelay.ts'], suites: ['foryou'] },
   // A request's or a decision's short plain form (#1635): For you's chip, the inbox's rows, a card's decision count.
   { paths: ['src/shared/gist.ts'], suites: ['foryou', 'inbox', 'decisions'] },
