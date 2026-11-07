@@ -55,7 +55,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await page.getByText('alpha', { exact: true }).first().click()
 
   // --- Its PC-wide account, its own (never Copilot's).
-  const accounts = (await inv('connections:list')).accounts ?? (await inv('connections:list')).connections ?? []
+  const accounts = (await inv('connections:list')).homes ?? []
   const own = accounts.find((a) => a.id === 'antigravity')
   check("Antigravity's PC-wide account is its own", !!own && own.provider === 'antigravity' && own.home === 'cli', JSON.stringify(accounts.map((a) => [a.id, a.provider, a.home])))
 

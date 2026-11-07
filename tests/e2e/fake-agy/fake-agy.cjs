@@ -78,7 +78,8 @@ function statusLine(state) {
   const cmd = settings.statusLine?.command
   if (!cmd) return
   const input = JSON.stringify({ conversation_id: conv, session_id: conv, transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: { id: flag('--model') || null }, product: 'antigravity' })
-  spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', cmd], { input, timeout: 5000, windowsHide: true })
+  // Through cmd, the command line as given (Node quotes it for cmd's /s /c, so its own quotes reach it unchanged).
+  spawnSync(cmd, [], { shell: true, input, timeout: 5000, windowsHide: true })
 }
 
 // MCP servers: the profile's, then each workspace folder's .agents (a name in the profile wins).
