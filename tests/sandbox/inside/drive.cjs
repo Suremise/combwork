@@ -325,7 +325,7 @@ async function markCombwork() {
   if (signedIn) {
     const f = path.join(home, '.claude.json')
     const j = readJson(f) ?? {}
-    fs.writeFileSync(f, JSON.stringify({ ...j, projects: { ...(j.projects ?? {}), ...TRUST_JSON.projects } }))
+    fs.writeFileSync(f, JSON.stringify({ ...j, projects: { ...j.projects, ...TRUST_JSON.projects } }))
   }
   const seededNow = home ? connectionSnapshot({ connections: [{ id: account.id, provider: 'claude-code', name: SEED.connection }] }, account.id, connectionFiles(home), TRUST_FOLDERS) : null
   const connection = { id: account?.id ?? null, name: SEED.connection, home, error: account?.error }
