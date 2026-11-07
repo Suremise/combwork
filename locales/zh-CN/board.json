@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "合并队列 · {target}",
   "board.queue.transient": "{why}（临时）",
+  "board.queue.waitingOn": "等待 {cards}",
   "board.readOnly.newer": "此看板由更新版本的 Combwork 保存：它在这里是只读的。",
   "board.restore09.done": "0.9 看板已恢复",
   "board.restore09.doneDetail": "1.0 看板已保留为 {file}。",
@@ -968,6 +969,7 @@
   "board.work.filesNotRead": "{note, select, beforeChange {未读取文件} noBaseOrHead {未读取文件：没有可比较的基准或修订版本} other {未读取文件：Combwork 无法读取{why}}}",
   "board.work.folder": "文件夹",
   "board.work.folderGone": "其文件夹 {folder} 已不再是任何智能体的工作树：无法在此打开其文件。",
+  "board.work.inTarget": "其代码已在 {target} 中：它仍留在评审中，评审通过后即作为已合并关闭。",
   "board.work.integrated": "{method, select, merge {已合并到 {target}（{result}）} squash {已压缩合并到 {target}（{result}）} fastForward {{target} 已快进到 {result}} sameTree {已在 {target} 中（{result}）} other {已提交到 {target}（{result}）}}",
   "board.work.leftTarget": "已不在 {target} 中：其修订版本 {revision} 已被移除。",
   "board.work.mergedInPart": "部分合并：其部分工作已在 {target} 中。",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} 位于",
   "board.workQueue.testing": "正在测试：{step}",
   "board.workQueue.unreadRef": "未读取",
+  "board.workQueue.waiting": "在 {target} 的队列中，等待 {cards} 进入已完成",
   "board.workflows": "工作流程"
 }

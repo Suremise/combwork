@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "决定为空：请改为删除它。",
   "tasks.error.decisionGone": "该决定已不在 {card} 上。",
   "tasks.error.decisionsUsers": "只有用户能更改或删除卡片的决定。",
+  "tasks.error.dependencyTooLate": "{card} 正在合并到 {target}，因此不能再等待 {cards}。其依赖关系未变。",
   "tasks.error.doingNobodyNew": "在“进行中”创建的卡片需要有智能体负责（agent）。请询问用户想要哪种：交给一个智能体、启动一个智能体处理它（先在“待办”中创建，再用 cw_start_task），或无人负责（先在“待办”中创建，再带上 override 和用户的理由移动它）。",
   "tasks.error.emptyComment": "评论为空。",
   "tasks.error.emptyDecision": "决定为空。",

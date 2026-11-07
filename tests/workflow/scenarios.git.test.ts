@@ -668,7 +668,7 @@ describe('workflow scenarios, Git', () => {
 
   // GIT_HEAVY_MS (HI-2453's decision, HI-2025's rule): three cards started in folders of their own, two merged by hand and
   // each reconciled, 52 git processes, 7.9 s alone with no wait between them; past 20 s in HI-2499's run of 353 files.
-  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', { timeout: GIT_HEAVY_MS }, async () => {
+  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand is marked and stays in Review (HI-2709)', { timeout: GIT_HEAVY_MS }, async () => {
     const e = pair()
     const fresh = e.wf.createCard({ title: 'Just started' })
     moved(await e.wf.start(fresh.key, B1))
@@ -688,10 +688,11 @@ describe('workflow scenarios, Git', () => {
     moved(await e.wf.submit(reviewed.key, B2, { summary: 'x' }))
     sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', sh(f2, 'rev-parse', 'HEAD'))
     await reconcile(e.wf, reviewed)
+    // HI-2709: marked, and still in Review: its review decides (the queue closes it as merged once that passes).
     const r = e.wf.state(reviewed)
-    expect(r.stage).toBe('done')
-    expect(r.integrated).toMatchObject({ by: 'outside' })
-    expect(r.marks.outsideRules).toEqual(['review'])
+    expect(r.stage).toBe('review')
+    expect(r.integrated).toBeNull()
+    expect(r.marks.inTarget).toMatchObject({ target: 'main', submission: r.latest!.id })
   })
 
   it('S44: Solo, one agent in the project folder, no trailers: start, commit, submit → Done; the change is base..HEAD', async () => {

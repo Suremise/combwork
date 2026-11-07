@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "Die Entscheidung ist leer: Entferne sie stattdessen.",
   "tasks.error.decisionGone": "Diese Entscheidung steht nicht mehr auf {card}.",
   "tasks.error.decisionsUsers": "Nur der Benutzer ändert oder entfernt die Entscheidungen einer Karte.",
+  "tasks.error.dependencyTooLate": "{card} wird gerade in {target} gemergt und kann daher nicht mehr auf {cards} warten. Ihre Abhängigkeiten bleiben unverändert.",
   "tasks.error.doingNobodyNew": "Eine Karte, die in „In Arbeit“ angelegt wird, braucht einen Agenten (agent). Frag den Benutzer, was er möchte: einen Agenten daran, einen damit gestarteten Agenten (lege sie in „Offen“ an, dann cw_start_task) oder niemanden daran (lege sie in „Offen“ an und verschiebe sie dann mit override und seinem Grund).",
   "tasks.error.emptyComment": "Der Kommentar ist leer.",
   "tasks.error.emptyDecision": "Die Entscheidung ist leer.",

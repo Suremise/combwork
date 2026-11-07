@@ -297,6 +297,8 @@ interface CombworkMessageValues {
   'workflow.refused.merge.combworkMerges.nextReturned': undefined
   'workflow.refused.merge.combworkMerges.nextStale': { current: string | number }
   'workflow.refused.merge.combworkMerges.nextTesting': { target: string | number }
+  'workflow.refused.merge.waitsForBlockers.message': { card: string | number; waitsFor: string | number }
+  'workflow.refused.merge.waitsForBlockers.next': { waitsFor: string | number }
   'workflow.refused.move.doingNobody.message': { card: string | number; stage: string | number; also: string; rules: string | number }
   'workflow.refused.move.doingNobody.next': { reader: string }
   'workflow.refused.move.needsOverride.change': { reader: string }

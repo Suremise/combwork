@@ -295,6 +295,8 @@
   "workflow.refused.merge.combworkMerges.nextReturned": "It came back from the merge queue: fix it in your worktree, commit and submit again.",
   "workflow.refused.merge.combworkMerges.nextStale": "Its pass is stale: its line changed since it passed review (it is at {current}). Submit it again for review; it is queued once it passes again.",
   "workflow.refused.merge.combworkMerges.nextTesting": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
+  "workflow.refused.merge.waitsForBlockers.message": "{card} depends on {waitsFor}, which isn't Done: it isn't closed as merged before then.",
+  "workflow.refused.merge.waitsForBlockers.next": "Wait for {waitsFor} to be Done, then report the merge again.",
   "workflow.refused.move.doingNobody.message": "{card} would be in {stage} with nobody on it{also, select, yes {, and the move skips: {rules}} other {}}.",
   "workflow.refused.move.doingNobody.next": "{reader, select, you {Choose nobody on it, an agent on it, or an agent started on it.} other {Ask the user which they want: nobody on it (move it again with override and their reason), an agent on it (agent), or an agent started on it (cw_start_task).}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {These rules are set in Version Control, where you can change them.} other {These rules are set in Version Control, where the user can change them.}}",

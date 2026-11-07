@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "The decision is empty: remove it instead.",
   "tasks.error.decisionGone": "That decision is no longer on {card}.",
   "tasks.error.decisionsUsers": "Only the user changes or removes a card's decisions.",
+  "tasks.error.dependencyTooLate": "{card} is being merged into {target} now, so it can't wait for {cards} any more. Its dependencies are unchanged.",
   "tasks.error.doingNobodyNew": "A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).",
   "tasks.error.emptyComment": "The comment is empty.",
   "tasks.error.emptyDecision": "The decision is empty.",

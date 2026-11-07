@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "Fila de merge · {target}",
   "board.queue.transient": "{why} (temporário)",
+  "board.queue.waitingOn": "Aguardando {cards}",
   "board.readOnly.newer": "Este quadro foi salvo por uma versão mais nova do Combwork: aqui ele fica só para leitura.",
   "board.restore09.done": "O quadro 0.9 está de volta",
   "board.restore09.doneDetail": "O quadro 1.0 está guardado como {file}.",
@@ -968,6 +969,7 @@
   "board.work.filesNotRead": "{note, select, beforeChange {Arquivos não lidos} noBaseOrHead {Arquivos não lidos: não havia base nem versão para comparar} other {Arquivos não lidos: o Combwork não conseguiu ler {why}}}",
   "board.work.folder": "Pasta",
   "board.work.folderGone": "A pasta, {folder}, não é mais o worktree de um agente: os arquivos não podem ser abertos aqui.",
+  "board.work.inTarget": "O código já está em {target}: o cartão continua em Revisão e é fechado como mesclado quando a revisão for aprovada.",
   "board.work.integrated": "{method, select, merge {Mesclado em {target} como {result}} squash {Mesclado (squash) em {target} como {result}} fastForward {{target} avançou para {result}} sameTree {Já estava em {target}, em {result}} other {Commitado em {target} como {result}}}",
   "board.work.leftTarget": "Não está mais em {target}: a versão {revision} foi retirada.",
   "board.work.mergedInPart": "Mesclado em parte: parte do trabalho já está em {target}.",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} está em",
   "board.workQueue.testing": "Testando agora: {step}",
   "board.workQueue.unreadRef": "não lido",
+  "board.workQueue.waiting": "Na fila de {target}, aguardando {cards} ficar Concluído",
   "board.workflows": "Fluxos de trabalho"
 }

@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "Merge queue · {target}",
   "board.queue.transient": "{why} (temporary)",
+  "board.queue.waitingOn": "Waiting for {cards}",
   "board.readOnly.newer": "This board was saved by a newer version of Combwork: it is read-only here.",
   "board.restore09.done": "The 0.9 board is back",
   "board.restore09.doneDetail": "The 1.0 board is kept as {file}.",
@@ -968,6 +969,7 @@
   "board.work.filesNotRead": "{note, select, beforeChange {Files not read} noBaseOrHead {Files not read: there was no base or revision to compare} other {Files not read: Combwork couldn't read {why}}}",
   "board.work.folder": "Folder",
   "board.work.folderGone": "Its folder, {folder}, is no longer an agent’s worktree: its files can’t be opened here.",
+  "board.work.inTarget": "Its code is already in {target}: it stays in Review, and is closed as merged once its review passes.",
   "board.work.integrated": "{method, select, merge {Merged into {target} as {result}} squash {Squashed into {target} as {result}} fastForward {{target} moved forward to {result}} sameTree {Already in {target} at {result}} other {Committed in {target} as {result}}}",
   "board.work.leftTarget": "No longer in {target}: its revision {revision} was taken out.",
   "board.work.mergedInPart": "Merged in part: some of its work is already in {target}.",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} is at",
   "board.workQueue.testing": "Testing now: {step}",
   "board.workQueue.unreadRef": "not read",
+  "board.workQueue.waiting": "Queued for {target}, waiting for {cards} to be Done",
   "board.workflows": "Workflows"
 }

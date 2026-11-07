@@ -1359,7 +1359,7 @@ export async function branchUpdatePlan(projectPath: string, branch: string): Pro
   let blocked: Text | null = null
   const busy = agents.find((a) => a.status && FOLDER_BUSY.has(a.status))
   if (busy) blocked = withValues(UPDATE.agentBusy, { agent: busy.name, status: busy.status!, folder: where, branch })
-  else if (line && q && (q.state === 'queued' || q.state === 'testing' || q.state === 'paused')) blocked = withValues(UPDATE.queued, { card: line.key, branch })
+  else if (line && q && (q.state === 'queued' || q.state === 'waiting' || q.state === 'testing' || q.state === 'paused')) blocked = withValues(UPDATE.queued, { card: line.key, branch })
   else if (place.folder) {
     const state = (await repoSummary(place.folder)).state
     if (state) blocked = withValues(UPDATE.midOperation, { state, folder: where })

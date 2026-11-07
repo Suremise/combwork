@@ -749,6 +749,7 @@
   "board.queue.testingNoHead": "{card} + {target} → {step}",
   "board.queue.title": "File de fusion · {target}",
   "board.queue.transient": "{why} (temporaire)",
+  "board.queue.waitingOn": "Attend {cards}",
   "board.readOnly.newer": "Ce tableau a été enregistré par une version plus récente de Combwork : il est en lecture seule ici.",
   "board.restore09.done": "Le tableau 0.9 est de retour",
   "board.restore09.doneDetail": "Le tableau 1.0 est conservé sous {file}.",
@@ -968,6 +969,7 @@
   "board.work.filesNotRead": "{note, select, beforeChange {Fichiers non lus} noBaseOrHead {Fichiers non lus : il n’y avait ni base ni révision à comparer} other {Fichiers non lus : Combwork n’a pas pu lire {why}}}",
   "board.work.folder": "Dossier",
   "board.work.folderGone": "Son dossier, {folder}, n’est plus le worktree d’un agent : ses fichiers ne peuvent pas être ouverts ici.",
+  "board.work.inTarget": "Son code est déjà dans {target} : elle reste en Relecture, et sera close comme fusionnée une fois sa relecture réussie.",
   "board.work.integrated": "{method, select, merge {Fusionnée dans {target} en {result}} squash {Fusionnée (squash) dans {target} en {result}} fastForward {{target} avancée jusqu’à {result}} sameTree {Déjà dans {target}, en {result}} other {Commitée dans {target} en {result}}}",
   "board.work.leftTarget": "N’est plus dans {target} : sa révision {revision} en a été retirée.",
   "board.work.mergedInPart": "Fusionnée en partie : une partie de son travail est déjà dans {target}.",
@@ -1039,5 +1041,6 @@
   "board.workQueue.stuckRef": "{target} est à",
   "board.workQueue.testing": "En test : {step}",
   "board.workQueue.unreadRef": "non lu",
+  "board.workQueue.waiting": "En file pour {target}, en attente que {cards} soit dans Terminé",
   "board.workflows": "Flux de travail"
 }

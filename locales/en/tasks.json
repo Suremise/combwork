@@ -119,6 +119,10 @@
     "defaultMessage": "Only the user changes or removes a card's decisions.",
     "description": "An error: an agent or the Assistant tried to change or remove a decision on a card; only the user does that (they only record them)."
   },
+  "tasks.error.dependencyTooLate": {
+    "defaultMessage": "{card} is being merged into {target} now, so it can't wait for {cards} any more. Its dependencies are unchanged.",
+    "description": "An error (HI-2709): a dependency was added to card {card} (its key, such as HI-12) while the merge queue was already moving branch {target} to its merge, too late to hold it; {cards} are the cards added (keys, joined with commas). Nothing was changed."
+  },
   "tasks.error.doingNobodyNew": {
     "defaultMessage": "A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).",
     "description": "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names."

@@ -31,7 +31,7 @@ import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCar
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
 import { hasStage, skipReviewOf, targetOfRulesetId } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
@@ -72,6 +72,7 @@ const ERR = {
   archived: msg({ id: 'tasks.error.archived', defaultMessage: '{card} is archived. Only the user can bring it back.', description: 'An error: card {card} (its key, such as HI-12) is archived, so an agent or the Assistant cannot change it; only the user can bring it back from the archive.' }),
   waitingNotYours: msg({ id: 'tasks.error.waitingNotYours', defaultMessage: "Only {card}'s own agent, the user or the Assistant can mark it waiting or clear that.", description: "An error, read by agents (HI-2618): an agent tried to mark card {card} (its key, such as HI-12) as waiting on purpose, or clear that mark, but the card isn't its own. A waiting card isn't reported as stalled." }),
   waitingNotActive: msg({ id: 'tasks.error.waitingNotActive', defaultMessage: "{card} isn't in {active}: only a card in {active} can be marked waiting.", description: "An error (HI-2618): only a card in the stage {active} (the board's name for it, such as Active) can be marked as waiting on purpose; card {card} (its key, such as HI-12) is elsewhere." }),
+  dependencyTooLate: msg({ id: 'tasks.error.dependencyTooLate', defaultMessage: "{card} is being merged into {target} now, so it can't wait for {cards} any more. Its dependencies are unchanged.", description: "An error (HI-2709): a dependency was added to card {card} (its key, such as HI-12) while the merge queue was already moving branch {target} to its merge, too late to hold it; {cards} are the cards added (keys, joined with commas). Nothing was changed." }),
   waitingTooLong: msg({ id: 'tasks.error.waitingTooLong', defaultMessage: 'The waiting reason is too long (at most {max, number} characters).', description: "An error (HI-2618): the reason a card waits on purpose is longer than it may be; {max} is the most characters it takes." }),
   noCard: msg({ id: 'tasks.error.noCard', defaultMessage: 'There is no card {card}.', description: 'An error: there is no card {card} (its key, such as HI-12) that the caller may see.' }),
   cardsTooMany: msg({ id: 'tasks.error.cardsTooMany', defaultMessage: 'cards: at most {max, number} cards at once.', description: 'An error: a call listed more than {max} cards. "cards:" is the name of the call\'s field: keep it as it is.' }),
@@ -1011,6 +1012,33 @@ export function labelChange(labels: readonly string[], add: unknown, remove: unk
       ? storedText(HISTORY.labelsTakenOff, { labels: removed.join(', ') })
       : storedText(HISTORY.labelsAddedTakenOff, { added: added.join(', '), removed: removed.join(', ') })
   return { labels: next, said }
+}
+
+/**
+ * HI-2709: a card's dependencies changed, in the change's transaction (the board's lock, as the merge queue's writes).
+ * Its queue entry's advance already begun (`IntegrationStarted`, no outcome yet: the advance's authority, SPEC §16.9.1):
+ * a blocker added that isn't Done is refused, since nothing can hold that merge now, rather than saved as a hold the
+ * queue then passes. Waiting in its queue with a blocker taken away: its queue runs again (`enqueue`), with no new approval.
+ */
+function queueDependencyEdit(ws: WorkspaceService, card: TaskCard, had: number[]): void {
+  const store = FactStore.forBoard(ws, { project: card.project, key: '' })
+  const stage = (n: number): StageId | null => {
+    try {
+      return store.card(n).stage
+    } catch {
+      return null
+    }
+  }
+  const own = stage(card.number)
+  if (!own) return
+  const e = openEntry(foldCard(store.facts(card.number), own))
+  if (!e) return
+  if (e.state === 'started') {
+    const late = card.blockedBy.filter((b) => !had.includes(b) && stage(b) !== 'done')
+    if (late.length) throw combworkError(ERR.dependencyTooLate, { card: cardRef(card.number), cards: late.map(cardRef).join(', '), target: e.target }, { kind: 'conflict' })
+    return
+  }
+  if (had.some((b) => !card.blockedBy.includes(b))) store.tx((tx) => tx.action(card.number, 'enqueue', { target: e.target }, null))
 }
 
 /**
@@ -2552,7 +2580,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       said.push(storedText(HISTORY.notWaiting))
     }
     if (patch.blockedBy !== undefined) {
+      const had = card.blockedBy
       card.blockedBy = await cardRefs(patch.blockedBy, n, 'blockedBy', scope, card.blockedBy)
+      queueDependencyEdit(ws, card, had)
       said.push(card.blockedBy.length ? storedText(HISTORY.dependsOn, { cards: card.blockedBy.map(cardRef).join(', ') }) : storedText(HISTORY.noDependencies))
     }
     if (patch.links !== undefined) {

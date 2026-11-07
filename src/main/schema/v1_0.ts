@@ -1102,6 +1102,8 @@ export const QUERIES: Record<string, SchemaQuery> = {
   'facts.nextSeq': { sql: 'SELECT max(seq) FROM card_facts WHERE card = ?', args: [1], index: 'sqlite_autoindex_card_facts_1' },
   'facts.dedupe': { sql: 'SELECT 1 FROM card_facts WHERE card = ? AND kind = ? AND dedupe = ?', args: [1, 'HeadMoved', 'prev:1'], index: 'card_facts_dedupe' },
   'facts.ofKind': { sql: 'SELECT card, seq FROM card_facts WHERE kind = ? ORDER BY rowid', args: ['IntegrationRequested'], index: 'card_facts_kind' },
+  // HI-2709: the cards blocked by a card (factStore.dependents: a card into Done runs their queues again).
+  'links.dependents': { sql: "SELECT card FROM card_links WHERE target = ? AND kind = 'blockedBy' ORDER BY card", args: [1], index: 'card_links_target' },
   // cardWork.ts: the live cards' facts for the board's badges (#1223), an archived card's never read.
   'facts.live': { sql: 'SELECT f.* FROM cards c JOIN card_facts f ON f.card = c.number WHERE c.archived = 0 ORDER BY f.card, f.seq', args: [], index: 'sqlite_autoindex_card_facts_1' },
   'actions.pending': { sql: "SELECT * FROM card_actions WHERE state = 'pending' ORDER BY id", args: [], index: 'card_actions_pending' },

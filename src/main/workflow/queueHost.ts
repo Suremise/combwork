@@ -246,7 +246,8 @@ async function runHost(h: Host): Promise<void> {
           return
         }
         const outcomes = await withGitRoute(route, () => q.drain(h.target))
-        for (const o of outcomes) if (o.outcome !== 'paused') await dropQueuePin(h.projectPath, o.card)
+        // A waiting entry (HI-2709) stays open, its pin kept for its test once unblocked.
+        for (const o of outcomes) if (o.outcome !== 'paused' && o.outcome !== 'waiting') await dropQueuePin(h.projectPath, o.card)
       } catch (e) {
         // Its git host failed it part way: what it was doing is uncertain, never a card's outcome (its writes refused).
         if (!r.failed) throw e

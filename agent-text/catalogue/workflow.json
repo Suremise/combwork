@@ -787,6 +787,16 @@
     "note": "The next step after a refused merge of a card Combwork merges, when it isn't in the merge queue yet.",
     "audience": "both"
   },
+  "workflow.refused.merge.waitsForBlockers.message": {
+    "text": "{card} depends on {waitsFor}, which isn't Done: it isn't closed as merged before then.",
+    "note": "HI-2709: a refused report of a merge: the card depends on {waitsFor} (card keys, comma-joined), which aren't Done yet. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.merge.waitsForBlockers.next": {
+    "text": "Wait for {waitsFor} to be Done, then report the merge again.",
+    "note": "HI-2709: the next step after a merge report refused for an unfinished dependency: {waitsFor} are card keys.",
+    "audience": "both"
+  },
   "workflow.refused.move.doingNobody.message": {
     "text": "{card} would be in {stage} with nobody on it{also, select, yes {, and the move skips: {rules}} other {}}.",
     "note": "A refused move into the Active stage by the Combwork Assistant (HI-2062): the card {card} (its key, like AM-12) would have no agent on it. {stage} is the stage's name. {also} (select): yes when the move also skips other rules, listed in {rules}; translate both branches.",

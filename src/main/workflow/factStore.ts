@@ -403,6 +403,11 @@ export class FactStore {
     return ofThis(Number(m[2]))
   }
 
+  /** HI-2709: the cards blocked by a card (their `blockedBy` names it), by number, any project's: the links' own index. */
+  dependents(id: number): number[] {
+    return this.conn.read((db) => (db.prepare("SELECT card FROM card_links WHERE target = ? AND kind = 'blockedBy' ORDER BY card").all(id) as { card: number }[]).map((r) => r.card))
+  }
+
   /** Whether a card is archived (a gone card counts as archived: its pins may go). */
   isArchived(id: number): boolean {
     return this.conn.read((db) => ((db.prepare('SELECT archived FROM cards WHERE number = ?').get(id) as { archived: number } | undefined)?.archived ?? 1) === 1)
