@@ -1203,6 +1203,18 @@ export class Workflow {
   }
 
   /**
+   * HI-2709: the one rule every route that closes a card as merged keeps, in its own write (`w.tx`, so a dependency added
+   * while its reads ran counts): not while a card it depends on isn't Done. An agent's merge report is refused so;
+   * reconciliation writes nothing (reconcile.ts integratedOutside); the queue's advance decided it in IntegrationStarted's
+   * write. With the rules not enforced, nothing is refused.
+   */
+  blockersNotDone(w: Write): GuardRefusal | null {
+    if (!this.enforced()) return null
+    const waits = this.queueWaitingOn(w.card.id, w.tx)
+    return waits.length ? ({ rule: 'merge.waitsForBlockers', values: { card: w.card.key, waitsFor: waits.join(', ') } } as GuardRefusal) : null
+  }
+
+  /**
    * HI-2709: a card into Done, in its write: each card it blocks that waits in a merge queue gets that queue run again
    * (`enqueue`, its entry's target), so a queue that went idle with only waiting entries takes it, with no new approval.
    */
@@ -2072,7 +2084,7 @@ export class Workflow {
     }
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) ?? this.blockersNotDone(w) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
       const open = combwork ? openEntry(w.state()) : undefined

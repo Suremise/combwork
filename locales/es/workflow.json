@@ -295,6 +295,8 @@
   "workflow.refused.merge.combworkMerges.nextReturned": "Volvió de la cola de fusión: corrígelo en tu worktree, haz commit y vuelve a enviarla.",
   "workflow.refused.merge.combworkMerges.nextStale": "Su revisión superada está caducada: la rama cambió desde que superó la revisión (ahora está en {current}). Vuelve a enviarla a revisión; entra en la cola en cuanto la supere.",
   "workflow.refused.merge.combworkMerges.nextTesting": "La cola de fusión la está fusionando en {target} ahora y la mueve a Hecho al terminar: espera a eso o a que vuelva.",
+  "workflow.refused.merge.waitsForBlockers.message": "{card} depende de {waitsFor}, que aún no está en Hecho: no se cierra como fusionada hasta entonces.",
+  "workflow.refused.merge.waitsForBlockers.next": "Espera a que {waitsFor} esté en Hecho y vuelve a notificar la fusión.",
   "workflow.refused.move.doingNobody.message": "{card} quedaría en {stage} sin nadie en ella{also, select, yes {, y el movimiento se salta estas reglas: {rules}} other {}}.",
   "workflow.refused.move.doingNobody.next": "{reader, select, you {Elige: nadie en ella, un agente en ella o un agente que la empiece.} other {Pregunta al usuario qué quiere: nadie en ella (muévela de nuevo con override y su motivo), un agente en ella (agent) o un agente que la empiece (cw_start_task).}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {Estas reglas se configuran en Control de versiones, donde puedes cambiarlas.} other {Estas reglas se configuran en Control de versiones, donde el usuario puede cambiarlas.}}",

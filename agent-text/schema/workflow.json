@@ -615,6 +615,17 @@
   "workflow.refused.merge.combworkMerges.next": {
     "placeholders": {}
   },
+  "workflow.refused.merge.waitsForBlockers.message": {
+    "placeholders": {
+      "card": "plain",
+      "waitsFor": "plain"
+    }
+  },
+  "workflow.refused.merge.waitsForBlockers.next": {
+    "placeholders": {
+      "waitsFor": "plain"
+    }
+  },
   "workflow.refused.move.doingNobody.message": {
     "placeholders": {
       "card": "plain",

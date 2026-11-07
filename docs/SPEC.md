@@ -3344,6 +3344,10 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    begun, no outcome yet) is **refused** ("being merged into main now"), since nothing can hold that merge any more; a
    blocker reopened from Done after that point doesn't stop it either. A blocker moving into Done, or a dependency
    taken away, runs its queue again (`enqueue`): the entry is still the approved one, so there's no new approval.
+   **Every route that closes a card as merged** keeps the same rule, read in its own write: reconciliation's close of a
+   passed card whose change is in the target writes nothing while a blocker isn't Done (the card waits, Merging), the
+   queue's already-in-the-target step says `waiting`, and an agent's merge report is refused (`merge.waitsForBlockers`,
+   two messages in 7 locales). The queue's own `Integrated` follows its advance, decided in `IntegrationStarted`'s write.
 2. Check `integrate.approved` (quorum, approvals, not stale), and **check containment first**: if the change is
    already in the target (merged by hand meanwhile), record `Integrated` (observed) instead of making an empty merge
    [HB3's round 1 finding 19]. An entry that isn't approved any more gets an outcome, never a skip that leaves it

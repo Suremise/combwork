@@ -1047,6 +1047,9 @@ export class MergeQueue {
           // now, is what is recorded (never a newer source head's).
           if (s.forward) await this.integrated(card, entry, revision, target, head, 'merge', 'outside')
           else await reconcile(this.wf, card)
+          // HI-2709: not closed while a dependency added meanwhile isn't Done (reconcile writes nothing then): it waits.
+          const held = this.wf.state(card).stage !== 'done' ? this.wf.queueWaitingOn(card.id) : []
+          if (held.length) return this.waiting(card, entry, held)
           return { card: card.key, entry: entry.id, outcome: 'integratedOutside' }
         }
         expected = head

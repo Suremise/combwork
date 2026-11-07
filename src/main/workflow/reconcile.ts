@@ -324,7 +324,10 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // Found in the target, not by Combwork → Done (outside); the queue drops the entry; the lane counts it.
     if (approved.revision !== base) {
       const c = await G.contains(project, target, approved)
-      if (!isUnknown(c) && c) return integratedOutside(wf, card, s, approved.revision, c.method, [])
+      if (!isUnknown(c) && c) {
+        await hooks.afterRead?.()
+        return integratedOutside(wf, card, s, approved.revision, c.method, [])
+      }
     }
     // The pass follows the newest observed head (#1623, the Assistant's call after HR2's round 2): at exactly the approved
     // revision it holds; elsewhere it is the same change (carried over) or stale. Facts record each transition, as
@@ -453,6 +456,9 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
   const th = await G.lineHead(wf.cfg.project, target)
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
     if (!sameCycle(w, s)) return
+    // HI-2709: never while a card it depends on isn't Done, read in this write (a dependency added while containment was
+    // read counts): nothing written; it waits, as the queue does, and is looked at again once they are Done.
+    if (wf.queueWaitingOn(w.card.id, w.tx).length) return
     // Unique per cycle: two Combworks observing the same merge write one `Integrated` (§16.17).
     const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } }) // i18n-ignore: a fact's kind and codes, not text
     if (f) w.written.push(f as Fact)

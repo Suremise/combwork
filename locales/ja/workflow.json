@@ -295,6 +295,8 @@
   "workflow.refused.merge.combworkMerges.nextReturned": "マージキューから差し戻されました。ワークツリーで修正してコミットし、もう一度提出してください。",
   "workflow.refused.merge.combworkMerges.nextStale": "合格が失効しています。合格後にブランチが変わりました（現在は{current}）。もう一度レビューに提出してください。合格するとキューに入ります。",
   "workflow.refused.merge.combworkMerges.nextTesting": "マージキューが今{target}にマージしています。終わると「完了」に移ります。それを待つか、差し戻されるのを待ってください。",
+  "workflow.refused.merge.waitsForBlockers.message": "{card}は未完了の{waitsFor}に依存しています。それまではマージ済みとして完了しません。",
+  "workflow.refused.merge.waitsForBlockers.next": "{waitsFor}が完了するのを待ってから、もう一度マージを報告してください。",
   "workflow.refused.move.doingNobody.message": "{card}は担当者なしで「{stage}」に入ります{also, select, yes {。さらに、この移動は次のルールをスキップします：{rules}} other {}}。",
   "workflow.refused.move.doingNobody.next": "{reader, select, you {担当者なし、エージェントを割り当てる、エージェントを開始する、のいずれかを選んでください。} other {ユーザーにどれを望むか確認してください：担当者なし（overrideとユーザーの理由を付けて、もう一度移動）、エージェントを割り当てる（agent）、エージェントを開始する（cw_start_task）。}}",
   "workflow.refused.move.needsOverride.change": "{reader, select, you {これらのルールは「バージョン管理」で設定され、そこで変更できます。} other {これらのルールは「バージョン管理」で設定され、ユーザーが変更できます。}}",
