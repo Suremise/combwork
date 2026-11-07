@@ -316,7 +316,9 @@ export function fileLoads(text, file, known) {
     },
     // A node flag running a script from text (`-e`, `--eval`, `-p`, `--print`), in a file that starts node (STARTS): the
     // script must be the next element, a constant literal of the file, read as a file of its own, loading no repository
-    // file and leaving no gate token; else the file is unknown. (Outside such a file, `-p` is git's or a CLI's flag.)
+    // file and leaving no gate token; else the file is unknown. (Outside such a file, `-p` is git's or a CLI's flag.) A
+    // script that itself starts a process (the queue's launcher runs the command it's handed) is its src file's starter,
+    // under the build entries' rule as the file's own is (HI-2697); outside src, a starter is unknown anyway.
     ArrayExpression(p) {
       const els = p.node.elements
       for (let i = 0; i < els.length; i++) {
@@ -326,7 +328,7 @@ export function fileLoads(text, file, known) {
         const init = b?.constant && b.path.isVariableDeclarator() ? b.path.node.init : next
         const script = literal(init)
         const sub = script == null ? null : fileLoads(script, file.replace(/[^/]*$/, 'inline-script.js'), known)
-        if (sub && !sub.unknown && !sub.starts && !sub.edges.size) blank.push([init.start, init.end])
+        if (sub && !sub.unknown && !sub.edges.size && (!sub.starts || file.startsWith('src/'))) blank.push([init.start, init.end])
         else flags.push(`may run a script made from text it can't read (${els[i].value}, line ${line(els[i])})`)
       }
     },
