@@ -19,7 +19,7 @@ import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
 import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
-import { pickTarget, projectTargets, type ProjectTargets } from './workflow/targets'
+import { branchExists, pickTarget, projectTargets, type ProjectTargets } from './workflow/targets'
 import { targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
@@ -79,6 +79,7 @@ const M = {
   noWorkspace: msg({ id: 'service.lanes.noWorkspace', defaultMessage: 'No workspace is open', description: "An error changing a workspace's lanes (card loops) while no workspace is open in the window." }),
   unknown: msg({ id: 'service.lanes.unknown', defaultMessage: 'Unknown lane {id}', description: 'An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile.' }),
   targetNotListed: msg({ id: 'service.lanes.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a lane’s Merges into is for Git projects.}}', description: 'HI-2556: an error starting a lane (a card loop) whose Merges into is a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
+  targetMissing: msg({ id: 'service.lanes.targetMissing', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so the lane wasn’t started.} other {There is no branch {target} in this repository: make it first, then start the lane on it.}}', description: 'HI-2556: an error starting a lane (a card loop) on a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.' }),
   targetFixed: msg({ id: 'service.lanes.targetFixed', defaultMessage: '{builder}’s lane merges into {target} until it ends: start a new lane for another branch.', description: 'HI-2556: an error changing a running lane’s Merges into (fixed for its life). {builder} is the lane’s builder agent, {target} its branch.' }),
   targetCard: msg({ id: 'service.lanes.targetCard', defaultMessage: '{card} merges into {cardTarget}, and this lane into {target}: a lane’s cards merge where it does. Leave it out, or start it in a lane of its own.', description: 'HI-2556: an error putting a card whose own Merges into is another branch than the lane’s into that lane. {card} is the card’s key (HI-12); {cardTarget} and {target} are branch names.' }),
   targetBuilder: msg({ id: 'service.lanes.targetBuilder', defaultMessage: 'A lane’s Merges into is set by the user or the Assistant, not its builder.', description: 'HI-2556: an error, a lane’s own builder agent named the branch its lane merges into; only the user or the Combwork Assistant (or a script) sets it.' }),
@@ -1129,7 +1130,12 @@ async function projectTargetsOf(ws: WorkspaceService, project: string): Promise<
 async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Promise<string | null> {
   const t = await projectTargetsOf(ws, project)
   const p = pickTarget(t, raw)
-  if ('target' in p) return p.target
+  if ('target' in p) {
+    // A listed branch work can start from now (HR2's round 1: listed is not made).
+    const there = p.target && ws.path ? await branchExists(join(ws.path, project), p.target) : true
+    if (there !== true) throw new LaneError(409, withValues(M.targetMissing, { target: p.target ?? '', unknown: there === 'unknown' ? 'yes' : 'no' })) // i18n-ignore: select keys
+    return p.target
+  }
   throw new LaneError(400, withValues(M.targetNotListed, { hasTargets: t ? 'yes' : 'no', target: typeof raw === 'string' ? raw.trim() : '', default: t?.default ?? '', hasOthers: t?.others.length ? 'yes' : 'no', others: fmt.list(t?.others ?? []) })) // i18n-ignore: select keys
 }
 
@@ -1186,14 +1192,22 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // once (between cards), bound to that lane.
   // HI-2273: never with a reviewer that is no agent: a running lane's start is then refused (under the lock below), and a
   // new lane has nothing to put back, so whatever lane a start meanwhile makes, nothing is put back before the refusal.
-  const put = s.applyNow && on && s.unknownReviewer === undefined ? await putBackForReorder(ws, s, builder) : null
   // Its Merges into (HI-2556), checked as the start is asked: one of the project's targets, set by the user, the
   // Assistant or a script, never the lane's own builder; recorded in the lane's ruleset, so only with the rules on.
+  // Checked before anything changes (HR2's round 1: a refused target never leaves a card put back), and again under the
+  // lanes' lock below, as the list is saved.
   const pick = s.target === undefined ? undefined : await lanePick(ws, s.project, s.target)
   if (pick && s.ownBuilder) throw new LaneError(403, M.targetBuilder)
   if (pick && !on) throw new LaneError(409, M.targetRulesOff)
-  const ruleset = await rulesetNow(ws, s.project, pick)
   const defaultTarget = ws.path ? ((await projectTargetsOf(ws, s.project))?.default ?? null) : null
+  if (ws.path) {
+    const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
+    const target0 = running0?.ruleset ? targetOfRulesetId(running0.ruleset) : null
+    if (running0 && on && pick !== undefined && (pick ?? null) !== target0) throw new LaneError(409, withValues(M.targetFixed, { builder: running0.builder.name, target: target0 ?? defaultTarget ?? '' }))
+    refuseOtherTargets(ws, s.project, s.cards, running0 && on ? target0 : (pick ?? null), defaultTarget, s.ownBuilder ? s.project : null)
+  }
+  const put = s.applyNow && on && s.unknownReviewer === undefined ? await putBackForReorder(ws, s, builder) : null
+  const ruleset = await rulesetNow(ws, s.project, pick)
   const ended: EndedLane[] = []
   let queuedAfter: number | null = null
   let shared: string | null = null

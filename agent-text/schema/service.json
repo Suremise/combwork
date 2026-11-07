@@ -666,6 +666,12 @@
       "target": "plain"
     }
   },
+  "service.lanes.targetMissing": {
+    "placeholders": {
+      "unknown": "select",
+      "target": "plain"
+    }
+  },
   "service.lanes.targetNotListed": {
     "placeholders": {
       "hasTargets": "select",

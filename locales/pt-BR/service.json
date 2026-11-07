@@ -185,6 +185,7 @@
   "service.lanes.targetBuilder": "O “Mescla em” de uma raia é definido por você ou pelo Assistente, não pelo executor dela.",
   "service.lanes.targetCard": "O cartão {card} é mesclado em {cardTarget}, e esta raia em {target}: os cartões de uma raia são mesclados onde ela é. Deixe-o de fora ou inicie-o em uma raia própria.",
   "service.lanes.targetFixed": "A raia de {builder} é mesclada em {target} até terminar: inicie uma nova raia para outro branch.",
+  "service.lanes.targetMissing": "{unknown, select, yes {O Combwork não consegue saber se o branch {target} existe, então a raia não foi iniciada.} other {Não há nenhum branch {target} neste repositório: crie-o primeiro e depois inicie a raia nele.}}",
   "service.lanes.targetNotListed": "{hasTargets, select, yes {{target} não é um branch em que o trabalho possa ser mesclado aqui: indique {default}{hasOthers, select, yes { ou um de {others}} other {}}, ou adicione-o em “Outros branches em que o trabalho pode ser mesclado” (Controle de versão → Fluxo de trabalho).} other {Este projeto não mescla o trabalho em nenhum branch que o Combwork possa escolher: o “Mescla em” de uma raia é para projetos Git.}}",
   "service.lanes.targetRulesOff": "Uma raia só é mesclada em outro branch enquanto “As regras do fluxo de trabalho são aplicadas” estiver ativado (Configurações → Avançado).",
   "service.lanes.teamPaused": "A equipe está pausada (antes de uma atualização): retome a equipe primeiro e depois inicie a raia.",

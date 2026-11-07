@@ -187,6 +187,7 @@ interface CombworkMessageValues {
   'service.lanes.targetBuilder': undefined
   'service.lanes.targetCard': { card: string | number; cardTarget: string | number; target: string | number }
   'service.lanes.targetFixed': { builder: string | number; target: string | number }
+  'service.lanes.targetMissing': { unknown: string; target: string | number }
   'service.lanes.targetNotListed': { hasTargets: string; target: string | number; default: string | number; hasOthers: string; others: string | number }
   'service.lanes.targetRulesOff': undefined
   'service.lanes.teamPaused': undefined

@@ -1932,6 +1932,8 @@ export function TaskDialog() {
     setNoCode(false)
     setSkipReview(false)
     setSkipNote('')
+    // A new card starts on its project's own branch (HI-2556, HR2's round 1): a pick never carries over to the next card.
+    setNewTarget('')
     const c = typeof open === 'number' ? get().tasks.find((x) => x.number === open) : null
     setTitle(c?.title ?? '')
     setDescription(c?.description ?? '')
@@ -1975,6 +1977,8 @@ export function TaskDialog() {
   // Whether the chosen project's rules review (#1625): Skip review is offered, and sent, only where they do.
   const projectReviews = useProjectReviews(projects.find((p) => p.name === project)?.path ?? null)
   const projectTargets = useProjectTargets(projects.find((p) => p.name === project)?.path ?? null)
+  // Another project chosen: its own branch, whatever the last one's pick (even a branch both list).
+  useEffect(() => setNewTarget(''), [project])
   if (open === null || (!isNew && (!card || !ready))) return null
   const close = (): void => set({ taskOpen: null })
   const proj = projects.find((p) => p.name === project) ?? null

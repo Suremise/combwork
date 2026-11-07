@@ -185,6 +185,7 @@
   "service.lanes.targetBuilder": "レーンの「マージ先」を設定できるのは、あなたかアシスタントだけです。レーンのビルダーは設定できません。",
   "service.lanes.targetCard": "{card}のマージ先は{cardTarget}、このレーンのマージ先は{target}です。レーンのカードはレーンと同じブランチにマージされます。このカードを外すか、専用のレーンで開始してください。",
   "service.lanes.targetFixed": "{builder}のレーンは終了するまで{target}にマージされます。別のブランチには新しいレーンを開始してください。",
+  "service.lanes.targetMissing": "{unknown, select, yes {ブランチ {target} が存在するか Combwork で確認できないため、レーンは開始されませんでした。} other {このリポジトリにはブランチ {target} がありません。先に作成してから、そのブランチでレーンを開始してください。}}",
   "service.lanes.targetNotListed": "{hasTargets, select, yes {{target}は、ここで作業をマージできるブランチではありません。{default}{hasOthers, select, yes {または{others}のいずれか} other {}}を指定するか、「バージョン管理」→「ワークフロー」の「その他のマージ先ブランチ」に追加してください。} other {このプロジェクトには、Combworkが選べるマージ先ブランチがありません。レーンの「マージ先」はGitプロジェクト用です。}}",
   "service.lanes.targetRulesOff": "レーンを別のブランチにマージできるのは、「ワークフローのルールを適用する」がオンのときだけです（「設定」→「詳細」）。",
   "service.lanes.teamPaused": "チームは（アップデート前に）一時停止中です。先にチームを再開してから、レーンを開始してください。",

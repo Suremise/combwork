@@ -2282,8 +2282,12 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   with the rules enforced. **A lane is one target**: a card whose own target isn't its lane's is refused into it (on a
   start, an edit or a placement), and a lane's card can't be set to another. A **card's** own target is the user's or the
   Assistant's (`tasks.setTarget`, the card dialog, `cw_create_task`/`cw_update_task`, the Agent API's `target`), only
-  while its branch has no work (never started, or each line it had is gone or already in its target: `hasOwnWork`):
-  no rebase of started work. Both name only the default (stored as none) or a branch G7b lists (`pickTarget`).
+  while its branch has no work (never started, or each line it had is gone or already in its target, and its slot,
+  still on its line, holds nothing uncommitted, tracked or not: `hasOwnWork`): no rebase of started work. Its old lines,
+  empty, are deleted with the change (`dropEmptyLines`, compare and swap; refused while a folder has one checked out;
+  only its own slot lines, never a target), so its next start makes a fresh line from the new target. Both name only
+  the default (stored as none) or a branch G7b lists that exists now (`pickTarget`, `branchExists`). A lane start's
+  target is checked before anything changes (an `applyNow` put back included), and again under the lanes' lock.
 - A ruleset can't run arbitrary code: pieces are looked up by id, and an unknown id or parameter refuses to compile
   (a ruleset from a newer Combwork opens read-only, like `combwork.db`, §4) [#1112 D].
 

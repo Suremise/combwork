@@ -311,6 +311,10 @@
     "defaultMessage": "Cards stay in your project ({project}).",
     "description": "An error: an agent tried to move a card to another project, or to the whole workspace; its cards stay in its own project ({project}, its folder name)."
   },
+  "tasks.error.targetCheckedOut": {
+    "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}",
+    "description": "HI-2556: an error changing a card’s Merges into: its old branch (which has no work of its own and would be removed so its next start begins fresh) is still checked out in a folder. {card} is the card’s key (HI-12), {folder} a folder’s path. unknown yes: git couldn’t say. Keep the select keys."
+  },
   "tasks.error.targetHasWork": {
     "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}",
     "description": "HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys."
@@ -318,6 +322,10 @@
   "tasks.error.targetLane": {
     "defaultMessage": "{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.",
     "description": "HI-2556: an error setting a card’s Merges into to another branch than its lane’s. {card} is the card’s key (HI-12), {builder} the lane’s builder agent, {target} the lane’s branch."
+  },
+  "tasks.error.targetMissing": {
+    "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}",
+    "description": "HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys."
   },
   "tasks.error.targetNotAgents": {
     "defaultMessage": "Only the user or the Assistant sets which branch a card merges into.",

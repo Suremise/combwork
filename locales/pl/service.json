@@ -185,6 +185,7 @@
   "service.lanes.targetBuilder": "„Scalanie do” toru ustawiasz Ty lub Asystent, a nie jego wykonawca.",
   "service.lanes.targetCard": "Karta {card} jest scalana do {cardTarget}, a ten tor do {target}: karty toru są scalane tam, gdzie tor. Pomiń ją albo uruchom ją we własnym torze.",
   "service.lanes.targetFixed": "Tor agenta {builder} jest scalany do {target} aż do swojego końca: dla innej gałęzi uruchom nowy tor.",
+  "service.lanes.targetMissing": "{unknown, select, yes {Combwork nie może ustalić, czy gałąź {target} istnieje, więc tor nie został uruchomiony.} other {W tym repozytorium nie ma gałęzi {target}: najpierw ją utwórz, a potem uruchom na niej tor.}}",
   "service.lanes.targetNotListed": "{hasTargets, select, yes {{target} nie jest tu gałęzią, do której można scalać pracę: podaj {default}{hasOthers, select, yes { lub jedną z {others}} other {}} albo dodaj ją w „Inne gałęzie, do których można scalać pracę” (Kontrola wersji → Przepływ pracy).} other {Ten projekt nie scala pracy do żadnej gałęzi, którą Combwork może wybrać: „Scalanie do” toru jest dla projektów Git.}}",
   "service.lanes.targetRulesOff": "Tor jest scalany do innej gałęzi tylko wtedy, gdy włączone jest „Reguły przepływu pracy są egzekwowane” (Ustawienia → Zaawansowane).",
   "service.lanes.teamPaused": "Zespół jest wstrzymany (przed aktualizacją): najpierw wznów zespół, a potem uruchom tor.",

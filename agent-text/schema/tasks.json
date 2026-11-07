@@ -319,6 +319,13 @@
       "project": "plain"
     }
   },
+  "tasks.error.targetCheckedOut": {
+    "placeholders": {
+      "unknown": "select",
+      "card": "plain",
+      "folder": "plain"
+    }
+  },
   "tasks.error.targetHasWork": {
     "placeholders": {
       "unknown": "select",
@@ -330,6 +337,12 @@
     "placeholders": {
       "card": "plain",
       "builder": "plain",
+      "target": "plain"
+    }
+  },
+  "tasks.error.targetMissing": {
+    "placeholders": {
+      "unknown": "select",
       "target": "plain"
     }
   },

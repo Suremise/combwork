@@ -133,6 +133,33 @@ describe("a lane's Merges into", () => {
   })
 })
 
+describe("refused before anything changes (HR2's round 1)", () => {
+  it('a listed branch that doesn’t exist yet, for a card and a lane', async () => {
+    const { w } = await project(['1.2.0', 'ghost'])
+    await expect(card(w, 'On a ghost', { target: 'ghost' })).rejects.toThrow(/There is no branch ghost in this repository/)
+    const c = await card(w, 'Later on a ghost')
+    await expect(inWorkspace(w, () => tasks.setTarget(c.number, 'ghost', user))).rejects.toThrow(/There is no branch ghost/)
+    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [c.number], by: 'You', target: 'ghost' })).rejects.toThrow(/There is no branch ghost in this repository: make it first/)
+    expect(cardTarget(w, c.number)).toBeNull()
+  })
+
+  it('a running lane’s other target or its own builder’s, with applyNow: its card in flight stays, its list too', async () => {
+    const { w, repo } = await project()
+    const [a, b] = [await card(w, 'A'), await card(w, 'B')]
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [a.number, b.number], by: 'You', target: '1.2.0' })
+    const wf = (await workflowFor(w, repo))!
+    const builder = { kind: 'agent', name: 'B1 (p)', self: { project: 'p', agentId: 'b1' }, scope: 'p' } as const
+    const started = await inWorkspace(w, () => tasks.runIntent(wf, a.number, builder, (x) => x.start(`#${a.number}`, agentActor('b1'))))
+    expect(started.reply).toMatchObject({ ok: true })
+    const column = async (number: number) => (await inWorkspace(w, () => tasks.readTask(number, user))).column
+    expect(await column(a.number)).toBe('doing')
+    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [b.number, a.number], by: 'You', applyNow: true, target: 'main' })).rejects.toThrow(/B1’s lane merges into 1\.2\.0 until it ends/)
+    await expect(lanes.startLane(w, { project: 'p', builder: 'b1', cards: [b.number, a.number], by: 'B1 (p)', applyNow: true, ownBuilder: true, target: '1.2.0' })).rejects.toThrow(/not its builder/)
+    expect(await column(a.number)).toBe('doing')
+    expect((await lanes.laneOf(w, 'p', 'b1'))!.cards.map((c) => c.number)).toEqual([a.number, b.number])
+  })
+})
+
 describe("a card's Merges into", () => {
   it("is the user's or the Assistant's, one of the project's branches; shown on its tile and to agents", async () => {
     const { w } = await project()

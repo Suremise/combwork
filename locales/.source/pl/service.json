@@ -185,6 +185,7 @@
   "service.lanes.targetBuilder": "A lane’s Merges into is set by the user or the Assistant, not its builder.",
   "service.lanes.targetCard": "{card} merges into {cardTarget}, and this lane into {target}: a lane’s cards merge where it does. Leave it out, or start it in a lane of its own.",
   "service.lanes.targetFixed": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch.",
+  "service.lanes.targetMissing": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so the lane wasn’t started.} other {There is no branch {target} in this repository: make it first, then start the lane on it.}}",
   "service.lanes.targetNotListed": "{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a lane’s Merges into is for Git projects.}}",
   "service.lanes.targetRulesOff": "A lane merges into another branch only while workflow rules are enforced (Settings → Advanced).",
   "service.lanes.teamPaused": "The team is paused (before an update): resume the team first, then start the lane.",

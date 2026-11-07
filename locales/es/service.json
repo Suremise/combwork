@@ -185,6 +185,7 @@
   "service.lanes.targetBuilder": "El “Se fusiona en” de un carril lo fijas tú o el Asistente, no su autor.",
   "service.lanes.targetCard": "{card} se fusiona en {cardTarget} y este carril en {target}: las tarjetas de un carril se fusionan donde se fusiona el carril. Déjala fuera o iníciala en un carril propio.",
   "service.lanes.targetFixed": "El carril de {builder} se fusiona en {target} hasta que termine: inicia un carril nuevo para otra rama.",
+  "service.lanes.targetMissing": "{unknown, select, yes {Combwork no puede saber si existe la rama {target}, así que el carril no se ha iniciado.} other {No hay ninguna rama {target} en este repositorio: créala primero y luego inicia el carril en ella.}}",
   "service.lanes.targetNotListed": "{hasTargets, select, yes {{target} no es una rama en la que se pueda fusionar trabajo aquí: indica {default}{hasOthers, select, yes { o una de {others}} other {}}, o agrégala en “Otras ramas en las que se puede fusionar el trabajo” (Control de versiones → Flujo de trabajo).} other {Este proyecto no fusiona el trabajo en ninguna rama que Combwork pueda elegir: el “Se fusiona en” de un carril es para proyectos Git.}}",
   "service.lanes.targetRulesOff": "Un carril se fusiona en otra rama solo mientras “Se aplican las reglas del flujo de trabajo” esté activado (Configuración → Avanzado).",
   "service.lanes.teamPaused": "El equipo está en pausa (antes de una actualización): reanuda primero el equipo y luego inicia el carril.",
