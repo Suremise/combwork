@@ -925,6 +925,20 @@ describe("the repository's AGENTS.md", () => {
 describe('RELEASING.md on the 1.0 path', () => {
   const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
   const section = (heading: string): string => releasing.split(/^## /m).find((s) => s.startsWith(heading)) ?? ''
+  it("Step 4's real-tier command selects every suite of a real CLI, Copilot's too, and none of the rest (HI-2658)", async () => {
+    // The manifest needs each CLI's every real suite in one record (scripts/testedClis.mjs): run the command through the
+    // runner's own parsing and selection, so a Copilot suite added to suites.mjs, or a dropped --all, fails here.
+    const { parseArgs, selectSuites } = await import('./e2e/runner.mjs')
+    const { SUITES } = await import('./e2e/suites.mjs')
+    const command = /`npm run e2e -- (--all --only-real [^`]+)`/.exec(section('Steps'))?.[1]
+    expect(command, 'Step 4 names its real-tier command').toBeTruthy()
+    const o = parseArgs(command!.split(' '), SUITES.map((s: { name: string }) => s.name))
+    expect(o.error).toBeUndefined()
+    const chosen = selectSuites(SUITES, o).map((s: { name: string }) => s.name).sort()
+    const needsCli = (s: { needs?: string[] }): boolean => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex' || n === 'copilot')
+    const wanted = SUITES.filter((s: { needs?: string[] }) => needsCli(s) && !(s.needs ?? []).includes('packaged')).map((s: { name: string }) => s.name).sort()
+    expect(chosen).toEqual(wanted)
+  })
   it('goes from phases on the integration branch to a baseline install, then an RC and the release', () => {
     const path = section('The 1.0 path')
     expect(path).toMatch(/\*\*integration branch\*\* \(`1\.0\.0`\)/)
