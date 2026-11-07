@@ -392,5 +392,9 @@
   "agents.workflowRole.label": "Role in the workflow",
   "agents.workflowRole.needsTools": "This connection launches without Combwork's tools.",
   "agents.workflowRole.reviewer": "Reviewer",
-  "agents.workflowRole.reviewerText": "Reviews the builders’ cards and passes or fails them."
+  "agents.workflowRole.reviewerText": "Reviews the builders’ cards and passes or fails them.",
+  "agents.workflowTools.later": "Later",
+  "agents.workflowTools.restartMessage": "{count, plural, one {{agents} is working. The tools its project’s workflow now allows load when it restarts; it carries on in the same conversation.} other {{agents} are working. The tools their project’s workflow now allows load when they restart; each carries on in the same conversation.}}",
+  "agents.workflowTools.restartTitle": "Restart {agents} for the new workflow?",
+  "agents.workflowTools.restartWhenDone": "{count, plural, one {Restart When Its Turn Is Over} other {Restart When Their Turns Are Over}}"
 }

@@ -4973,7 +4973,38 @@ repeating them (#533) [note §8].
   the reviewer pool doesn't count it free (`idle`), a lane start or join naming it for that part is refused, `409`,
   saying to restart it first (`lane.refused.oldTools`), and a lane waiting for a slot waits on (`startWaitingLane`).
   No session-contract sentence. Hiding tools a project's workflow settings make
-  unusable, with live list updates, is HI-2694 (split off, Darren 7 Nov).
+  unusable is HI-2694 (below).
+- **Tools by workflow** [HI-2694, Darren's 7 Nov decision (~14:55, the card's): launch-only, "in solo or review-off projects
+  agents shouldn't see tools they can never use"; design HI-2694/s15, HR1's OK] **Built**: a project agent's combwork
+  server is also told the tools its project's workflow makes unusable, `CW_WORKFLOW_HIDDEN` in its env (`effective()`,
+  those its side doesn't already leave out), and `cw-mcp.ts` leaves them out beside `hiddenForSide`. A tool is hidden only
+  where its handler refuses every operation (`WORKFLOW_TOOLS`, `shared/assistantTools.ts`): cw_start_review and cw_verdict
+  without review (`review` none: both refuse outside Review); cw_focused_skip unless each card's focused tests are on and
+  Combwork merges (its request is only the queue's); cw_report_merge unless Combwork merges, the agent merges, or not checked
+  with a review or your OK before merging (its only stages). Never hidden, one of their operations working under any options:
+  cw_queue (its list), cw_loop_step (a lane's reviewer takes a design), cw_request_builder, cw_declare_paths, cw_merge_slot
+  (any merge into a branch), cw_lane and the builder's moves. **Usable if any set of rules still in force allows it**
+  (`hiddenForWorkflow`): the project's options now, each distinct ruleset recorded on the facts of its cards out of Hold,
+  Todo and Done (not archived), and its running lanes' (`cardWork.workRetained`, one snapshot), and kept by a card's stage
+  (Review keeps the review tools, Approved and Merging the merge report) whatever its rules say. Nothing hidden when the
+  rules aren't enforced, under All off or while work under it is in flight (§16.6.4: its cards move freely, Review
+  included, so every tool can be used; HI-2694's loopwakes run), the platform isn't recorded, the options don't resolve, the board has no facts or a ruleset can't
+  be read. Kept per project (`workflowTools.ts`) by the board's read token (any commit, another process's, a database
+  reopened or replaced; never kept inside a write or a snapshot), the three option levels and the platform. **A settings
+  change** (`workflow-changed`, at every level and from every writer, and the *Workflow rules are enforced* switch) runs
+  `sessions.restartForTools` (HI-2664's, generalised: side and workflow list compared) for each running agent of the
+  project, either way: idle at once, same conversation; busy ones are asked once in the window (`tools-restart-asked`:
+  Restart When Its Turn Is Over / Later; not asked again while the list it would get is the same). **A board change** that
+  makes a tool usable again with no settings change (a card moved into Review by hand on a project without review: its
+  stage keeps the review tools) restarts the running agents launched without it the same way (`gainsOfBoard`, after
+  `tasks-changed` settles, only projects with an agent running without some tool); one that only makes tools unusable (a
+  card finished) shows "restart needed" and restarts nobody. **Until it has relaunched** a session is
+  given no work needing a tool its launch lacked and its project now allows (`sessions.sideAllows` with
+  `workflowAllows`, from its launch's own list, so Later, a pending and a failed restart all hold; unreadable: held), through
+  HI-2664's checks (reviewer pool, lane start and join, waiting lanes, loop handoffs). A ruleset joins the union only as
+  the options in force (a card's start, a lane's start, an override applying options), so besides a settings change only
+  a card's stage adds a tool (above). No live tool-list update, MCP notice or provider probe. Measured on the bridge (replysize), Solo against Pair:
+  both sides 34 tools, 22.6 KB (38, 24.6 KB); builder 33, 22.3 KB (34, 22.7); reviewer 26, 18.1 KB (29, 19.7).
 - **Templates v2 and Combwork's own** [#1436] **Built [#1436]**: `TEMPLATE_VERSION` 2 (`shared/templates.ts`). Each agent
   `role: WorkflowRole` (none given: #1430's guess) and an optional `note` (the agent's free text); `worktree` is gone,
   with the plan's worktree types (`worktrees`, `oldWorktrees`, `mergedInto`, `setup`), the load's removal of old

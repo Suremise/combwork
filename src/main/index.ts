@@ -127,6 +127,7 @@ import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
 import { startLaunchSides } from './launchSides'
+import { startWorkflowTools } from './workflowTools'
 import { checkInstallDir, setLanguageBeforeReady } from './installDir'
 import { exitBeforeProfile, exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, lastUnexpectedClose, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
@@ -1252,6 +1253,8 @@ app.whenReady().then(async () => {
   await clearHookAuth()
   // A launch's side of the workflow for its metrics (HI-2049): before the Agent API or a window can start an agent.
   startLaunchSides()
+  // The tools a project's workflow leaves out of its agents' launches, and the restarts when it changes (HI-2694).
+  startWorkflowTools()
   await startHookServer()
   // After an unexpected close, its port is tried again for a few seconds (HI-2196): the copy just ended may still hold
   // it. Awaited, so the agents resumed after it launch with the API's address.

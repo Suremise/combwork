@@ -557,8 +557,8 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   await workspaceOf(projectPath).refresh()
   // A role change, however made (HI-2664, HR3's round 1: Agent Settings, the Agent API, the Assistant): an idle agent is
   // restarted now to load its new side's tools; a busy one keeps its old tools, and no work needing the new ones, until
-  // it restarts (the window asks; restartForSide).
-  if ('workflowRole' in clean && !workspace.isAssistantHome(projectPath)) await sessions.restartForSide(projectPath, agentId, { when: 'ifIdle' }).catch((e) => log.warn(`${userText(def.name)}: not restarted for its new role`, e))
+  // it restarts (the window asks; restartForTools).
+  if ('workflowRole' in clean && !workspace.isAssistantHome(projectPath)) await sessions.restartForTools(projectPath, agentId, { when: 'ifIdle' }).catch((e) => log.warn(`${userText(def.name)}: not restarted for its new role`, e))
   return def
 }
 

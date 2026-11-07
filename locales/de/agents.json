@@ -392,5 +392,9 @@
   "agents.workflowRole.label": "Rolle im Workflow",
   "agents.workflowRole.needsTools": "Diese Verbindung startet ohne die Combwork-Tools.",
   "agents.workflowRole.reviewer": "Reviewer",
-  "agents.workflowRole.reviewerText": "Reviewt die Karten der Bearbeiter: bestanden oder nicht bestanden."
+  "agents.workflowRole.reviewerText": "Reviewt die Karten der Bearbeiter: bestanden oder nicht bestanden.",
+  "agents.workflowTools.restartTitle": "{agents} für den neuen Workflow neu starten?",
+  "agents.workflowTools.restartMessage": "{count, plural, one {{agents} arbeitet gerade. Die Tools, die der Workflow des Projekts jetzt erlaubt, werden beim Neustart geladen; er macht im selben Gespräch weiter.} other {{agents} arbeiten gerade. Die Tools, die der Workflow ihres Projekts jetzt erlaubt, werden beim Neustart geladen; jeder macht im selben Gespräch weiter.}}",
+  "agents.workflowTools.restartWhenDone": "{count, plural, one {Neu starten, wenn sein Durchgang vorbei ist} other {Neu starten, wenn ihre Durchgänge vorbei sind}}",
+  "agents.workflowTools.later": "Später"
 }

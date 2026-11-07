@@ -392,5 +392,9 @@
   "agents.workflowRole.label": "Rola w przepływie pracy",
   "agents.workflowRole.needsTools": "To połączenie uruchamia się bez narzędzi Combwork.",
   "agents.workflowRole.reviewer": "Recenzent",
-  "agents.workflowRole.reviewerText": "Recenzuje karty wykonawców i ocenia je jako zaliczone lub niezaliczone."
+  "agents.workflowRole.reviewerText": "Recenzuje karty wykonawców i ocenia je jako zaliczone lub niezaliczone.",
+  "agents.workflowTools.restartTitle": "Uruchomić ponownie {agents} dla nowego przepływu pracy?",
+  "agents.workflowTools.restartMessage": "{count, plural, one {{agents} pracuje. Narzędzia, na które pozwala teraz przepływ pracy projektu, wczytają się po ponownym uruchomieniu; agent kontynuuje tę samą rozmowę.} few {{agents} pracują. Narzędzia, na które pozwala teraz przepływ pracy ich projektu, wczytają się po ponownym uruchomieniu; każdy kontynuuje tę samą rozmowę.} many {{agents} pracują. Narzędzia, na które pozwala teraz przepływ pracy ich projektu, wczytają się po ponownym uruchomieniu; każdy kontynuuje tę samą rozmowę.} other {{agents} pracują. Narzędzia, na które pozwala teraz przepływ pracy ich projektu, wczytają się po ponownym uruchomieniu; każdy kontynuuje tę samą rozmowę.}}",
+  "agents.workflowTools.restartWhenDone": "{count, plural, one {Uruchom ponownie po zakończeniu tury} few {Uruchom ponownie po zakończeniu ich tur} many {Uruchom ponownie po zakończeniu ich tur} other {Uruchom ponownie po zakończeniu ich tur}}",
+  "agents.workflowTools.later": "Później"
 }

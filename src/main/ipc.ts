@@ -1862,7 +1862,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:dismissIntro': () => dismissConnectionsIntro(),
     'session:switchConnection': (p, agentId) => sessions.switchAtSafePoint(p, agentId),
     // An agent's role changed (HI-2664): restarted to load its side's tools, at once if idle, else when the user says.
-    'session:restartForSide': (p, agentId, when) => sessions.restartForSide(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
+    'session:restartForTools': (p, agentId, when) => sessions.restartForTools(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
 
     'api:info': () => apiInfo(),
     'api:regenerateToken': async () => {

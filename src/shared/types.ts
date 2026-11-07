@@ -4027,6 +4027,8 @@ export type CombworkEvent =
   | { type: 'queue-changed'; workspacePath: string; projectPath: string; target: string }
   /** A project's workflow (project.json's `workflow`: its options, preset, stage names) was written (#1417): views read its stages again. */
   | { type: 'workflow-changed'; workspacePath: string; projectPath: string }
+  /** Busy agents whose tools a workflow change changes (HI-2694): the window asks whether to restart them when their turn is over. */
+  | { type: 'tools-restart-asked'; workspacePath: string; projectPath: string; agents: { id: string; name: string }[] }
   /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
   | { type: 'lane-ended'; workspacePath: string; lane: string; project: string; results: { card: number; revision: string | null }[] }
   /** The developer console's new events for the sources this window watches (#636): sent to that window only. */
