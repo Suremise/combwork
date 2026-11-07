@@ -304,7 +304,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     // Settings' own Modified only, at the top, filters the list too.
     await page.locator('.settings-top').getByLabel('Modified only').check()
     check("Settings' Modified only lists only the changed advanced values", !!(await lib.until(async () => (await ids()) === changedIds, HUNG_MS)), await ids())
-    check('…each tab counting its changed ones (Combwork 2, Claude Code 1, Codex 2, GitHub Copilot 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0]', HUNG_MS)), JSON.stringify(await tabs()))
+    check('…each tab counting its changed ones (Combwork 2, Claude Code 1, Codex 2, GitHub Copilot 0, Antigravity 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0,0]', HUNG_MS)), JSON.stringify(await tabs()))
     await page.locator('.settings-top').getByLabel('Modified only').uncheck()
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await list.getByLabel('Modified only').check()
