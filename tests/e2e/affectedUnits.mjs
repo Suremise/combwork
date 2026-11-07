@@ -303,7 +303,10 @@ function moduleUse(parsed, source, functions, unitName) {
     while (q.parentPath && TS_WRAPPERS.includes(q.parentPath.node.type)) q = q.parentPath
     return q
   }
-  const inType = (p) => !!p.findParent((a) => a.node.type.startsWith('TS') &&!TS_WRAPPERS.includes(a.node.type) && a.node.type !== 'TSExpressionWithTypeArguments')
+  // Type-only, by a positive list: inside a type query (`typeof mod`) or a type reference (`mod.T`, `Foo<typeof mod>`).
+  // Any other TypeScript node (a parameter property's initializer, a decorator, a cast, an interface's heritage…) is a
+  // value use, checked like any other.
+  const inType = (p) => !!p.findParent((a) => a.isTSTypeQuery() || a.isTSTypeReference())
   const describe = (q) => {
     const par = q.parentPath?.node
     if (!par) return 'module code'

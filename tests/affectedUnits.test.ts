@@ -334,7 +334,9 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
       ["import * as actions from '../actions'\nlet a: unknown = actions\nlet b: unknown = a\na = b\nb = a\nexport const go = (k: string) => (a as Record<string, () => void>)[k]()\n", /uses actions \(line 2\) as a VariableDeclarator/],
       // HR3's round-3 probes: a computed destructuring of the namespace, and a tagged template handing it to a function.
       ["import * as actions from '../actions'\nexport function run(key: string) {\n  const { [key]: f } = actions as Record<string, () => void>\n  return f()\n}\n", /uses actions \(line 3\) as a VariableDeclarator/],
-      ["import * as actions from '../actions'\nimport { forward } from './other'\nexport const go = (key: string) => forward`${actions}`[key]()\n", /uses actions \(line 3\) as a TemplateLiteral/]
+      ["import * as actions from '../actions'\nimport { forward } from './other'\nexport const go = (key: string) => forward`${actions}`[key]()\n", /uses actions \(line 3\) as a TemplateLiteral/],
+      // HR3's round-4 probe: a parameter property's initializer is a value, though a TypeScript node holds it.
+      ["import * as actions from '../actions'\nexport class Runner {\n  constructor(private api = actions) {}\n  run(key: keyof typeof actions) {\n    return this.api[key]()\n  }\n}\n", /uses actions \(line 3\) as a AssignmentPattern/]
     ]
     for (const [text, why] of cases) expect(using(text).all, text).toMatch(why)
   })
@@ -344,7 +346,7 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
     try {
       for (const text of [
         "import * as actions from '../actions'\nexport const a = () => actions.f1()\nexport const b = () => actions.f2()\n",
-        "import * as actions from '../actions'\nexport const cb = [actions.f2, actions.f1]\nexport type T = typeof actions\n",
+        "import * as actions from '../actions'\nexport const cb = [actions.f2, actions.f1]\nexport type T = typeof actions\nexport const k = (key: keyof typeof actions, t: actions.Thing) => [key, t]\n",
         "import { f2 } from '../actions'\nexport const later = () => setTimeout(f2)\n",
         "import * as actions from '../actions'\nexport const n = () => actions['f1']()\n"
       ]) expect(using(text).all, text).toBeNull()
