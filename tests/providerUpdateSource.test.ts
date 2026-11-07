@@ -12,6 +12,15 @@ import { tempDir } from './tempDir'
 const LINKS = 'C:\\Users\\me\\AppData\\Local\\Microsoft\\WinGet\\Links'
 const WINGET_EXE = `${LINKS}\\copilot.exe`
 const NPM_CMD = 'C:\\Users\\me\\AppData\\Roaming\\npm\\copilot.cmd'
+/** WinGet's machine-scoped portable roots (%PROGRAMFILES%\WinGet\Packages) and Links, for each CLI. */
+const MACHINE = [
+  'C:\\Program Files\\WinGet\\Links\\copilot.exe',
+  'C:\\Program Files\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe',
+  'C:/Program Files/WinGet/Packages/Anthropic.ClaudeCode_Microsoft.Winget.Source_8wekyb3d8bbwe/claude.exe',
+  'C:\\Program Files\\WinGet\\Links\\claude.exe',
+  'C:\\Program Files\\WinGet\\Packages\\OpenAI.Codex_Microsoft.Winget.Source_8wekyb3d8bbwe\\codex.exe',
+  'C:\\Program Files (x86)\\WinGet\\Links\\codex.exe'
+]
 const SHOW = readFileSync(join(__dirname, 'fixtures', 'advanced', 'winget-show-copilot-1.29.380.txt'), 'utf8')
 
 type RunReply = { stdout: string; stderr: string; code: number; ended?: true }
@@ -66,12 +75,23 @@ describe('WinGet’s version of a package', () => {
     expect(wingetUpToDate(1)).toBe(false)
   })
 
-  it('knows a copy WinGet installed by its folder', () => {
-    expect(isWingetPath(WINGET_EXE)).toBe(true)
-    expect(isWingetPath('C:/Users/me/AppData/Local/Microsoft/WinGet/Packages/Anthropic.ClaudeCode_Microsoft.Winget.Source_8wekyb3d8bbwe/claude.exe')).toBe(true)
-    expect(isWingetPath(NPM_CMD)).toBe(false)
-    expect(isWingetPath('C:\\Users\\me\\.local\\bin\\claude.exe')).toBe(false)
-    expect(isWingetPath('C:\\Users\\me\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe')).toBe(false)
+  it('knows a copy WinGet installed by its default roots, per user and per machine, and their Links folders', () => {
+    const none = {}
+    expect(isWingetPath(WINGET_EXE, none)).toBe(true)
+    expect(isWingetPath('C:/Users/me/AppData/Local/Microsoft/WinGet/Packages/Anthropic.ClaudeCode_Microsoft.Winget.Source_8wekyb3d8bbwe/claude.exe', none)).toBe(true)
+    for (const exe of MACHINE) expect(isWingetPath(exe, none), exe).toBe(true)
+    // By this process's variables, on another drive or profile folder.
+    const env = { LOCALAPPDATA: 'E:\\Profiles\\me\\Local', ProgramFiles: 'D:\\Apps', 'ProgramFiles(x86)': 'D:\\Apps (x86)' }
+    expect(isWingetPath('E:\\Profiles\\me\\Local\\Microsoft\\WinGet\\Links\\copilot.exe', env)).toBe(true)
+    expect(isWingetPath('D:/Apps/WinGet/Packages/OpenAI.Codex_Microsoft.Winget.Source_8wekyb3d8bbwe/codex.exe', env)).toBe(true)
+    expect(isWingetPath('D:\\Apps (x86)\\WinGet\\Links\\codex.exe', env)).toBe(true)
+    // Not WinGet's: another install, or a folder that's only named WinGet.
+    expect(isWingetPath(NPM_CMD, none)).toBe(false)
+    expect(isWingetPath('C:\\Users\\me\\.local\\bin\\claude.exe', none)).toBe(false)
+    expect(isWingetPath('C:\\Users\\me\\AppData\\Local\\Programs\\OpenAI\\Codex\\bin\\codex.exe', none)).toBe(false)
+    expect(isWingetPath('D:\\tools\\WinGet\\Packages\\claude.exe', none)).toBe(false)
+    expect(isWingetPath('C:\\Program Files\\WinGet\\claude.exe', none)).toBe(false)
+    expect(isWingetPath('C:\\Program Files\\WinGetTools\\Links\\claude.exe', none)).toBe(false)
   })
 })
 
@@ -165,6 +185,38 @@ describe('Claude Code’s and Codex’s latest version and update, by install ki
     expect(claudeCode.updateCommand(CLAUDE_WINGET)).toEqual({ file: 'winget.exe', args: ['upgrade', '--id', 'Anthropic.ClaudeCode', '--exact', '--source', 'winget'] })
     expect(claudeCode.updateUpToDate(CLAUDE_WINGET, -1978335189)).toBe(true)
     expect(claudeCode.updateUpToDate(CLAUDE_WINGET, 1)).toBe(false)
+  })
+
+  it('treats each CLI in WinGet’s machine-wide folders as a WinGet install: WinGet’s version, WinGet’s update', async () => {
+    const urls = await withRegistry({ version: '1.0.107', stable: '2.1.311', latest: '2.1.319', tag_name: 'rust-v0.167.0' })
+    const install = await import('../src/main/providers/copilot/install')
+    const { claudeCode, claudeLatestVersion } = await import('../src/main/providers/claude/adapter')
+    const { codex } = await import('../src/main/providers/codex/adapter')
+    const asked: string[] = []
+    const winget = async (id: string): Promise<string | null> => {
+      asked.push(id)
+      return '9.9.9'
+    }
+    const upgrade = (id: string): { file: string; args: string[] } => ({ file: 'winget.exe', args: ['upgrade', '--id', id, '--exact', '--source', 'winget'] })
+    for (const exe of MACHINE) {
+      const cli = exe.endsWith('copilot.exe') ? 'copilot' : exe.endsWith('claude.exe') ? 'claude' : 'codex'
+      if (cli === 'copilot') {
+        expect(install.installKind(exe), exe).toBe('winget')
+        expect(await install.copilotLatestVersion(exe, winget)).toBe('9.9.9')
+        expect(install.copilotUpdateCommand(exe)).toEqual(upgrade('GitHub.Copilot'))
+        expect(install.copilotUpdateUpToDate(exe, -1978335189)).toBe(true)
+      } else if (cli === 'claude') {
+        expect(await claudeLatestVersion(exe, { winget, channel: async () => 'latest' })).toBe('9.9.9')
+        expect(claudeCode.updateCommand(exe)).toEqual(upgrade('Anthropic.ClaudeCode'))
+        expect(claudeCode.updateUpToDate(exe, -1978335189)).toBe(true)
+      } else {
+        expect(await codex.latestVersion(exe, winget)).toBe('9.9.9')
+        expect(codex.updateCommand(exe)).toEqual(upgrade('OpenAI.Codex'))
+        expect(codex.updateUpToDate(exe, -1978335189)).toBe(true)
+      }
+    }
+    expect(asked).toEqual(['GitHub.Copilot', 'GitHub.Copilot', 'Anthropic.ClaudeCode', 'Anthropic.ClaudeCode', 'OpenAI.Codex', 'OpenAI.Codex'])
+    expect(urls).toEqual([])
   })
 
   it('compares a native or npm Claude Code with npm’s tag of its channel, and updates it with `claude update`', async () => {
@@ -291,15 +343,28 @@ describe('the channel `claude update` follows', () => {
     expect(parseRegSettings(reg('REG_EXPAND_SZ', '{"autoUpdatesChannel": "latest", "model": "a b"}'))).toEqual(read({ autoUpdatesChannel: 'latest', model: 'a b' }))
     expect(parseRegSettings(reg('REG_SZ', 'not json'))).toEqual(UNREADABLE)
     expect(parseRegSettings(reg('REG_SZ', '"stable"'))).toEqual(UNREADABLE)
+    // Another type, or an empty value: Claude Code refuses those too.
+    expect(parseRegSettings('    Settings    REG_DWORD    0x1\r\n')).toEqual(UNREADABLE)
+    expect(parseRegSettings('    Settings    REG_SZ    \r\n')).toEqual(UNREADABLE)
+    // A key listed with other values, and its subkeys, but no Settings.
+    expect(parseRegSettings('\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\ClaudeCode\r\n    Other    REG_SZ    x\r\n\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\ClaudeCode\\Settings\r\n')).toEqual(ABSENT)
     expect(parseRegSettings('')).toEqual(ABSENT)
   })
 
+  /** reg.exe's replies, as recorded on Windows 11 (7 Nov): a key's listing names its subkeys by full path; a key that isn't there exits 1. */
+  const POLICIES = (root: string, subkeys: string[]): RunReply => ({ stdout: `\r\n${subkeys.map((k) => `${root}\\SOFTWARE\\Policies\\${k}`).join('\r\n')}\r\n`, stderr: '', code: 0 })
+  const MISSING: RunReply = { stdout: '', stderr: 'ERROR: The system was unable to find the specified registry key or value.\r\n', code: 1 }
+  const policyRun = (replies: Record<string, RunReply>, calls: string[][] = []) => async (file: string, args: string[]): Promise<RunReply> => {
+    calls.push([file, ...args])
+    return replies[args[1]] ?? MISSING
+  }
+
   it('asks Windows’ own places, read only: the two registry policies, Program Files’ files and the user’s settings.json', async () => {
     const calls: string[][] = []
-    const run = async (file: string, args: string[]): Promise<RunReply> => {
-      calls.push([file, ...args])
-      return args[1].startsWith('HKLM') ? { stdout: '    Settings    REG_SZ    {"autoUpdatesChannel":"stable"}', stderr: '', code: 0 } : { stdout: '', stderr: 'ERROR: not found', code: 1 }
-    }
+    const run = policyRun({
+      'HKLM\\SOFTWARE\\Policies\\ClaudeCode': { stdout: '\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\ClaudeCode\r\n    Settings    REG_SZ    {"autoUpdatesChannel":"stable"}\r\n', stderr: '', code: 0 },
+      'HKCU\\SOFTWARE\\Policies': POLICIES('HKEY_CURRENT_USER', ['Microsoft', 'Power'])
+    }, calls)
     const home = tempDir('claude-home-')
     writeFileSync(join(home, 'settings.json'), JSON.stringify(LATEST))
     const programFiles = tempDir('program-files-')
@@ -309,8 +374,9 @@ describe('the channel `claude update` follows', () => {
     expect(await s.files()).toEqual(ABSENT)
     expect(await s.user()).toEqual(read(LATEST))
     expect(calls).toEqual([
-      ['reg.exe', 'query', 'HKLM\\SOFTWARE\\Policies\\ClaudeCode', '/v', 'Settings'],
-      ['reg.exe', 'query', 'HKCU\\SOFTWARE\\Policies\\ClaudeCode', '/v', 'Settings']
+      ['reg.exe', 'query', 'HKLM\\SOFTWARE\\Policies\\ClaudeCode'],
+      ['reg.exe', 'query', 'HKCU\\SOFTWARE\\Policies\\ClaudeCode'],
+      ['reg.exe', 'query', 'HKCU\\SOFTWARE\\Policies']
     ])
     expect(await resolveUpdateChannel(s, 'autoUpdatesChannel')).toBe('stable')
     mkdirSync(join(programFiles, 'ClaudeCode'))
@@ -321,5 +387,33 @@ describe('the channel `claude update` follows', () => {
     calls.length = 0
     expect(await resolveUpdateChannel(other, 'autoUpdatesChannel')).toBe('latest')
     expect(calls).toEqual([])
+  })
+
+  it('takes a policy as absent only when its parent key lists none; a lookup that failed or ended is unreadable, so the channel can’t be told', async () => {
+    const home = tempDir('claude-home-')
+    writeFileSync(join(home, 'settings.json'), JSON.stringify(LATEST))
+    const programFiles = tempDir('program-files-')
+    const key = 'HKLM\\SOFTWARE\\Policies\\ClaudeCode'
+    const hklm = async (replies: Record<string, RunReply>): Promise<ManagedDoc> => windowsChannelSources(home, policyRun(replies), programFiles, 'win32').hklm()
+    const onPc = async (replies: Record<string, RunReply>): Promise<string | null> => resolveUpdateChannel(windowsChannelSources(home, policyRun(replies), programFiles, 'win32'), 'autoUpdatesChannel')
+    const parentWithout = { 'HKLM\\SOFTWARE\\Policies': POLICIES('HKEY_LOCAL_MACHINE', ['Microsoft']), 'HKCU\\SOFTWARE\\Policies': POLICIES('HKEY_CURRENT_USER', ['Microsoft']) }
+    // Confirmed missing: the parent lists no ClaudeCode. The user's latest decides.
+    expect(await hklm(parentWithout)).toEqual(ABSENT)
+    expect(await onPc(parentWithout)).toBe('latest')
+    // Timed out or not started (ended): unreadable, and with nothing else to go on, no channel.
+    const ended: RunReply = { stdout: '', stderr: '', code: 1, ended: true }
+    expect(await hklm({ ...parentWithout, [key]: ended })).toEqual(UNREADABLE)
+    expect(await onPc({ ...parentWithout, [key]: ended })).toBeNull()
+    // Refused: the key isn't listable, yet its parent names it.
+    const refused = { ...parentWithout, 'HKLM\\SOFTWARE\\Policies': POLICIES('HKEY_LOCAL_MACHINE', ['Microsoft', 'ClaudeCode']), [key]: { stdout: '', stderr: 'ERROR: Access is denied.', code: 1 } }
+    expect(await hklm(refused)).toEqual(UNREADABLE)
+    expect(await onPc(refused)).toBeNull()
+    // The parent can't be listed, or its listing ended: not known to be missing.
+    expect(await hklm({ ...parentWithout, 'HKLM\\SOFTWARE\\Policies': MISSING })).toEqual(UNREADABLE)
+    expect(await hklm({ ...parentWithout, 'HKLM\\SOFTWARE\\Policies': { ...POLICIES('HKEY_LOCAL_MACHINE', ['Microsoft']), ended: true } })).toEqual(UNREADABLE)
+    // A Settings value of another type.
+    expect(await hklm({ ...parentWithout, [key]: { stdout: `\r\nHKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\ClaudeCode\r\n    Settings    REG_DWORD    0x1\r\n`, stderr: '', code: 0 } })).toEqual(UNREADABLE)
+    // An HKCU lookup that failed never blocks: Claude Code only notes a bad HKCU value.
+    expect(await onPc({ 'HKLM\\SOFTWARE\\Policies': POLICIES('HKEY_LOCAL_MACHINE', ['Microsoft']), 'HKCU\\SOFTWARE\\Policies\\ClaudeCode': ended })).toBe('latest')
   })
 })

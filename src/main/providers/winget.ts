@@ -6,9 +6,24 @@ import type { CommandSpec } from './types'
 // GitHub, which WinGet follows days later, nor through the CLI's own updater (Claude Code's `claude update` answers
 // "Claude is up to date!" for a WinGet install). So an update is offered only once WinGet has it, and made by WinGet.
 
-/** A copy WinGet installed: its Links folder's, or one in its Packages folder. */
-export function isWingetPath(path: string): boolean {
-  return /[\\/]Microsoft[\\/]WinGet[\\/](Links|Packages)[\\/]/i.test(path)
+/**
+ * A copy WinGet installed, in its default portable roots (WinGet's Settings.md) or their Links folders: per user,
+ * %LOCALAPPDATA%\Microsoft\WinGet\{Packages,Links}; per machine, %PROGRAMFILES%\WinGet\{Packages,Links} (and Program Files
+ * (x86)'s for x86 packages). Only those: a folder merely named WinGet elsewhere isn't one. A custom root set in WinGet's
+ * own settings isn't known.
+ */
+export function isWingetPath(path: string, env: Record<string, string | undefined> = process.env): boolean {
+  const norm = (p: string): string => p.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase()
+  const file = norm(path)
+  const roots = [
+    env.LOCALAPPDATA && `${norm(env.LOCALAPPDATA)}\\microsoft\\winget`,
+    env.ProgramFiles && `${norm(env.ProgramFiles)}\\winget`,
+    env['ProgramFiles(x86)'] && `${norm(env['ProgramFiles(x86)'])}\\winget`,
+    env.ProgramW6432 && `${norm(env.ProgramW6432)}\\winget`
+  ].filter((r): r is string => !!r)
+  if (roots.some((r) => file.startsWith(`${r}\\links\\`) || file.startsWith(`${r}\\packages\\`))) return true
+  // The same layouts under another profile or drive than this process's variables name.
+  return /^[a-z]:\\users\\[^\\]+\\appdata\\local\\microsoft\\winget\\(links|packages)\\/.test(file) || /^[a-z]:\\program files( \(x86\))?\\winget\\(links|packages)\\/.test(file)
 }
 
 /** The command that asks the WinGet source for a package's newest version (it reads, never installs). */

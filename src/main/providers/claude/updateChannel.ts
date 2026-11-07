@@ -105,22 +105,42 @@ export async function managedFiles(dir: string): Promise<ManagedDoc> {
   return read.length ? { state: 'read', settings: Object.assign({}, ...read.map((d) => d.settings)) } : { state: 'absent' }
 }
 
-/** `reg query <key> /v Settings`'s value, as a policy document (REG_SZ or REG_EXPAND_SZ holding a JSON object). */
+/**
+ * The Settings value in `reg query <key>`'s listing, as a policy document: absent when the key has none; a JSON object
+ * in a REG_SZ or REG_EXPAND_SZ when read; unreadable otherwise (another type, empty, or not a JSON object, which Claude
+ * Code refuses too). reg.exe's names and types aren't translated.
+ */
 export function parseRegSettings(stdout: string): ManagedDoc {
-  const m = /^\s*Settings\s+REG_(?:EXPAND_)?SZ\s+(.*?)\s*$/im.exec(stdout) // i18n-ignore: reg.exe's own output, not translated
+  const m = /^\s*Settings\s+(REG_\w+)(?:[ \t]+(.*?))?\s*$/im.exec(stdout) // i18n-ignore: reg.exe's own output, not translated
   if (!m) return { state: 'absent' }
+  if (m[1] !== 'REG_SZ' && m[1] !== 'REG_EXPAND_SZ') return { state: 'unreadable' }
   try {
-    const settings = asObject(JSON.parse(m[1]))
+    const settings = asObject(JSON.parse(m[2] ?? ''))
     return settings ? { state: 'read', settings } : { state: 'unreadable' }
   } catch {
     return { state: 'unreadable' }
   }
 }
 
+/** Whether `reg query <parent>`'s listing names the subkey `name` (reg prints each subkey's full path, one a line). */
+export function listsSubkey(stdout: string, name: string): boolean {
+  const want = `\\${name.toLowerCase()}`
+  return stdout.split(/\r?\n/).some((l) => l.trim().toLowerCase().endsWith(want))
+}
+
+/**
+ * A registry policy, as far as it can be told. Its key listed: its Settings value (absent when it has none). Not listed
+ * (reg.exe exits 1 whether the key is missing or refused, saying which in Windows' language): absent only when its
+ * parent key lists no such subkey; anything else (refused, timed out, reg.exe not started) is unreadable, which Claude
+ * Code counts as a present admin source, so the channel can't be told (HI-2729).
+ */
 async function registryDoc(key: string, runFn: typeof run): Promise<ManagedDoc> {
-  // Exit 1 when the key or value isn't there (its message is in Windows' language): read as absent.
-  const r = await runFn('reg.exe', ['query', key, '/v', 'Settings'], 5000) // i18n-ignore: a registry value's name, as Claude Code's docs give it
-  return r.code === 0 ? parseRegSettings(r.stdout) : { state: 'absent' }
+  const r = await runFn('reg.exe', ['query', key], 5000)
+  if (r.ended) return { state: 'unreadable' }
+  if (r.code === 0) return parseRegSettings(r.stdout)
+  const at = key.lastIndexOf('\\')
+  const parent = await runFn('reg.exe', ['query', key.slice(0, at)], 5000)
+  return parent.code === 0 && !parent.ended && !listsSubkey(parent.stdout, key.slice(at + 1)) ? { state: 'absent' } : { state: 'unreadable' }
 }
 
 /** The sources on this PC: Windows' managed locations, and the user's settings in `home`. */
