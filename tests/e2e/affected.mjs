@@ -219,6 +219,8 @@ export const AREAS = [
   { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'src/renderer/src/components/accountCard.ts', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server', 'usagemove'] },
   // Server connections (HI-1772): the key store and its masking, the server's form, models and launch variables.
   { paths: ['src/main/serverConnections.ts', 'src/main/serverMarks.ts', 'src/main/keyStore.ts', 'src/main/keyMatcher.ts', 'src/main/keyCoverage.ts', 'src/shared/serverConnection.ts', 'src/renderer/src/components/ServerConnections.tsx', 'tests/e2e/connections-server.cjs'], suites: ['connections-server'] },
+  // Server diagnostics (HI-2683): its service, judgements, dialog and the plain request it sends.
+  { paths: ['src/main/serverDiagnostics.ts', 'src/shared/serverDiagnostics.ts', 'src/renderer/src/components/ServerDiagnostics.tsx', 'tests/e2e/serverdiag.cjs'], suites: ['serverdiag'] },
   // Launching on a connection (HI-1755): the launch step, the switch at a safe point, the seam, the Connection choice.
   { paths: ['src/main/connectionSeam.ts', 'src/main/connectionSwitch.ts', 'src/renderer/src/components/ConnectionChoice.tsx', 'tests/e2e/connections.cjs'], suites: ['connections', 'connectionrows', 'connections-codex'] },
   { paths: ['tests/e2e/connections-codex.cjs', 'tests/e2e/fake-codex/', 'src/main/providers/codex/', 'src/shared/codex.ts'], suites: ['connections-codex'] },

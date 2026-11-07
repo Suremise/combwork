@@ -1367,6 +1367,14 @@
     "defaultMessage": "it was stopped while it started",
     "description": "Why an agent was not resumed after Combwork restarted: its launch ended (the user stopped it, or its CLI exited) before it was ready."
   },
+  "main.server.context.invalid": {
+    "defaultMessage": "A context size is a whole number of tokens, from 1 to {max, number}.",
+    "description": "An error saving the context size a user typed for a server connection's model (its Server diagnostics): not a whole number in range. {max} is a number."
+  },
+  "main.server.context.noModel": {
+    "defaultMessage": "The connection has no model {model} now.",
+    "description": "An error saving a server connection's model context: the model was removed from the connection meanwhile. {model} is a model's id."
+  },
   "main.server.key.chars": {
     "defaultMessage": "A key has no spaces or special characters outside plain ASCII. Check what was pasted.",
     "description": "An error saving a server connection's API key (Settings → Accounts & Connections): it has spaces, line breaks or non-ASCII characters. The key itself is never shown."

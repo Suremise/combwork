@@ -550,5 +550,7 @@
   "tips.waitingOnPurpose.title": "Una tarjeta que espera a propósito",
   "tips.waitingOnPurpose.text": "¿Una tarjeta En curso espera un momento tranquilo o una respuesta? Haz clic derecho en ella, Marcar como en espera…, y di por qué: Combwork deja de marcarla como estancada hasta que lo quites o salga de En curso. Su agente sigue funcionando.",
   "tips.perfFailures.title": "Rechazado no es roto",
-  "tips.perfFailures.text": "Rendimiento → Fallos clasifica lo que no tuvo éxito: los errores reales en rojo, aparte de las llamadas que rechazó una regla del flujo de trabajo y de las llamadas incorrectas. Rechazos y llamadas incorrectas por motivo muestra qué regla o mensaje salió más: una descripción de herramienta que conviene aclarar."
+  "tips.perfFailures.text": "Rendimiento → Fallos clasifica lo que no tuvo éxito: los errores reales en rojo, aparte de las llamadas que rechazó una regla del flujo de trabajo y de las llamadas incorrectas. Rechazos y llamadas incorrectas por motivo muestra qué regla o mensaje salió más: una descripción de herramienta que conviene aclarar.",
+  "tips.serverDiagnostics.title": "¿Un agente en Ollama solo escribe texto?",
+  "tips.serverDiagnostics.text": "Comprobar servidor… en una cuenta de servidor, en Configuración → Cuentas y conexiones, muestra el contexto real de su modelo y prueba una llamada a herramienta. Un contexto más pequeño que el prompt de Claude Code es la razón habitual por la que un modelo local escribe una llamada a herramienta en vez de hacerla."
 }

@@ -1,3 +1,4 @@
+import { tokensOf } from './serverDiagnostics'
 import type { ServerListing } from './providers'
 import type { ModelAlias, ServerModel } from './types'
 
@@ -93,7 +94,9 @@ export function cleanModels(models: readonly ServerModel[]): ServerModel[] {
     seen.add(id)
     const as = MODEL_ALIASES.filter((a) => Array.isArray(m.as) && m.as.includes(a) && !taken.has(a))
     for (const a of as) taken.add(a)
-    out.push({ id, ...(as.length ? { as } : {}), ...(m.remote === true ? { remote: true as const } : {}) })
+    // The user's context for it (HI-2683), a positive whole number of tokens within CONTEXT_MAX, else none.
+    const context = tokensOf(m.context)
+    out.push({ id, ...(as.length ? { as } : {}), ...(m.remote === true ? { remote: true as const } : {}), ...(context ? { context } : {}) })
   }
   return out
 }
@@ -189,7 +192,9 @@ export function mergeListed(before: readonly ServerModel[], ids: readonly string
   const was = new Map(before.map((m) => [m.id, m]))
   const models = ids.map((id) => {
     const as = was.get(id)?.as
-    return { id, ...(as ? { as } : {}), ...(isRemote(id) ? { remote: true as const } : {}) }
+    // The user's context for a model still listed is theirs, kept (HI-2683): a listing never sets it.
+    const context = was.get(id)?.context
+    return { id, ...(as ? { as } : {}), ...(isRemote(id) ? { remote: true as const } : {}), ...(context ? { context } : {}) }
   })
   return { models: cleanModels(models), dropped: before.map((m) => m.id).filter((id) => !ids.includes(id)) }
 }

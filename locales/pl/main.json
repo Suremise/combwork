@@ -500,5 +500,7 @@
   "main.window.stopped": "Okno Combwork przestało działać.",
   "main.window.unresponsive": "Okno Combwork nie odpowiada.",
   "main.window.unresponsiveDetail": "{stillRunning} Zaczekaj albo wczytaj je ponownie.",
-  "main.window.wait": "Zaczekaj"
+  "main.window.wait": "Zaczekaj",
+  "main.server.context.invalid": "Rozmiar kontekstu to liczba całkowita tokenów, od 1 do {max, number}.",
+  "main.server.context.noModel": "Połączenie nie ma już modelu {model}."
 }

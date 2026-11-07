@@ -302,6 +302,7 @@ export const SUITES = [
   { name: 'safeguards' },
   { name: 'scenarioteardown' },
   { name: 'searchclear' },
+  { name: 'serverdiag' },
   { name: 'sessioncleanup' },
   { name: 'sessionname' },
   { name: 'sessionorigin' },

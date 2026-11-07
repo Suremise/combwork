@@ -8,6 +8,7 @@ import { call, errorMessage } from '../api'
 import { confirm, notify } from '../store'
 import { Icon, Modal } from './ui'
 import { ProviderIcon } from './ProviderIcon'
+import { CHECK_SERVER, ServerDiagnosticsDialog } from './ServerDiagnostics'
 
 /**
  * Server connections in Settings → Accounts & Connections (HI-1772): Add Connection's choice of where a connection gets its model
@@ -379,7 +380,7 @@ function EditServerDialog({ c, onClose }: { c: Account; onClose: () => void }) {
 
 /** A server connection's part of its row: its server and key, and what can be done with them. */
 export function ServerConnectionDetail({ c, keyLast4, needsSetUp, onSetUp }: { c: Account; keyLast4?: string; needsSetUp?: boolean; onSetUp: (id: string) => void }) {
-  const [dialog, setDialog] = useState<'key' | 'edit' | null>(null)
+  const [dialog, setDialog] = useState<'key' | 'edit' | 'check' | null>(null)
   const [reading, setReading] = useState(false)
   const url = parseBaseUrl(c.server?.baseUrl ?? '')
   const host = hostOf(c.server?.baseUrl ?? '')
@@ -413,10 +414,13 @@ export function ServerConnectionDetail({ c, keyLast4, needsSetUp, onSetUp }: { c
             {tr(reading ? M.reading : M.read)}
           </button>
         )}
+        {/* Its model's context and a tool-call test (HI-2683): read-only. */}
+        {models.length > 0 && <button className="btn subtle small" data-check-server onClick={() => setDialog('check')}>{tr(CHECK_SERVER)}</button>}
         <button className={needsSetUp ? 'btn primary small' : 'btn subtle small'} data-set-up onClick={() => onSetUp(c.id)}>{tr(M.setUp)}</button>
       </div>
       {dialog === 'key' && <KeyDialog c={c} onClose={() => setDialog(null)} />}
       {dialog === 'edit' && <EditServerDialog c={c} onClose={() => setDialog(null)} />}
+      {dialog === 'check' && <ServerDiagnosticsDialog c={c} onClose={() => setDialog(null)} />}
     </div>
   )
 }

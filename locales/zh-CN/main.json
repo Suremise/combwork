@@ -500,5 +500,7 @@
   "main.window.stopped": "Combwork 的窗口已停止工作。",
   "main.window.unresponsive": "Combwork 的窗口没有响应。",
   "main.window.unresponsiveDetail": "{stillRunning}可以等待，或重新加载窗口。",
-  "main.window.wait": "等待"
+  "main.window.wait": "等待",
+  "main.server.context.invalid": "上下文大小是 Token 数的整数，范围为 1 到 {max, number}。",
+  "main.server.context.noModel": "该连接现在已没有模型 {model}。"
 }

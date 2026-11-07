@@ -810,6 +810,16 @@ export function renameAccount(id: string, name: string): void {
 const TERMINAL_GONE_MS = 15_000
 
 /**
+ * What else follows an account (HI-2683: a server connection's diagnostics, which register here rather than this module
+ * importing them): told once an account being removed has lost its key, so what was asked for it stops at once and what
+ * was read of it is dropped, never left running to its deadline.
+ */
+const removedHooks: ((id: string) => void)[] = []
+export function onAccountRemoved(fn: (id: string) => void): void {
+  removedHooks.push(fn)
+}
+
+/**
  * Removes an account: refused while anything runs on it (its agents, a launch, its sign-in). With `closeTerminal`
  * (HI-1870: the user said yes to closing it), its sign-in or Set Up terminal is ended first rather than refused; agents
  * on it still refuse. Its folder goes for good (removeFolder); the account stays listed, saying what's left, until that
@@ -846,6 +856,14 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
       } catch (e) {
         log.warn(`connection ${id}'s key couldn't be removed: ${userText(String((e as Error).message ?? e))}`)
         throw combworkError(msg({ id: 'main.accounts.keyRemoveFailed', defaultMessage: "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.", description: "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was." }), { name: a.name }, { kind: 'conflict' })
+      }
+    }
+    // Its key is gone: what was asked for it stops now (HI-2683, HR3 round 1), whatever comes of the rest.
+    for (const fn of removedHooks) {
+      try {
+        fn(id)
+      } catch (e) {
+        log.warn('an account removal hook failed', e)
       }
     }
     // Checks started before are dropped from here (their result would bring it back).

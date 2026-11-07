@@ -500,5 +500,7 @@
   "main.window.stopped": "A janela do Combwork parou de funcionar.",
   "main.window.unresponsive": "A janela do Combwork não está respondendo.",
   "main.window.unresponsiveDetail": "{stillRunning} Aguarde ou recarregue a janela.",
-  "main.window.wait": "Aguardar"
+  "main.window.wait": "Aguardar",
+  "main.server.context.invalid": "Um tamanho de contexto é um número inteiro de tokens, de 1 a {max, number}.",
+  "main.server.context.noModel": "A conexão não tem mais o modelo {model}."
 }

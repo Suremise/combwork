@@ -3307,6 +3307,226 @@
     "defaultMessage": "Cancel",
     "description": "A dialog's button in Settings → Accounts & Connections that closes it without changing anything."
   },
+  "settings.connections.diag.advice": {
+    "defaultMessage": "{name} recommends {size, number} tokens or more for {cli}.",
+    "description": "Server diagnostics: the service's advice ({name}: \"Ollama\", {cli}: \"Claude Code\", {size}: 64,000)."
+  },
+  "settings.connections.diag.allocated": {
+    "defaultMessage": "Allocated now",
+    "description": "A row of Server diagnostics: the context the server has allocated for the loaded model now."
+  },
+  "settings.connections.diag.below": {
+    "defaultMessage": "This model has {tokens, number}: below it. A prompt longer than the context can lose its start, tools included.",
+    "description": "Server diagnostics: the model's context ({tokens}) is below the advice."
+  },
+  "settings.connections.diag.clear": {
+    "defaultMessage": "Clear",
+    "description": "Button in Server diagnostics: clears the context the user typed."
+  },
+  "settings.connections.diag.close": {
+    "defaultMessage": "Close",
+    "description": "Button closing Server diagnostics."
+  },
+  "settings.connections.diag.configured": {
+    "defaultMessage": "Configured",
+    "description": "A row of Server diagnostics: the context set for the model in the server's settings (Ollama's Modelfile num_ctx)."
+  },
+  "settings.connections.diag.context": {
+    "defaultMessage": "Context",
+    "description": "Heading in Server diagnostics: the model's context window, in tokens."
+  },
+  "settings.connections.diag.failed": {
+    "defaultMessage": "Couldn't check the server",
+    "description": "An error's title in Server diagnostics."
+  },
+  "settings.connections.diag.failedStep": {
+    "defaultMessage": "{step, select, 2 {Failed at its result:} other {Failed at the call:}} {why}",
+    "description": "Server diagnostics: the tool-call test failed at its first request (the call) or second (the tool's result). {why} is why, a sentence."
+  },
+  "settings.connections.diag.kind": {
+    "defaultMessage": "{kind, select, llamacpp {llama.cpp server} ollama {Ollama} other {A compatible server: its context isn't readable}}",
+    "description": "Server diagnostics: what the server is, by how it answered. {kind} is a key: don't translate the keys. llama.cpp and Ollama are product names."
+  },
+  "settings.connections.diag.line": {
+    "defaultMessage": "Server context {tokens, number} (read {ago})",
+    "description": "A line in the connection editor and Provider Setup for a server connection: its model's context as last read in Server diagnostics. {ago}: when."
+  },
+  "settings.connections.diag.lineBelow": {
+    "defaultMessage": "Server context {tokens, number} (read {ago}): below {name}'s advice of {size, number}",
+    "description": "The same line when the context is below the service's advice ({name}: \"Ollama\", {size}: 64,000)."
+  },
+  "settings.connections.diag.measured": {
+    "defaultMessage": "Measured on a test server: Claude Code's first request, with Combwork's tools, was about 14,000 to 28,000 tokens. Other models count differently.",
+    "description": "A note in Server diagnostics: a measurement from a test server, a guide, not a rule."
+  },
+  "settings.connections.diag.meets": {
+    "defaultMessage": "This model has {tokens, number}: enough by that advice.",
+    "description": "Server diagnostics: the model's context ({tokens}) meets the advice."
+  },
+  "settings.connections.diag.mine": {
+    "defaultMessage": "Context (if the server doesn't say)",
+    "description": "Label of the box in Server diagnostics where the user types the context their model has on this server, in tokens. Combwork keeps it as theirs."
+  },
+  "settings.connections.diag.mineHint": {
+    "defaultMessage": "Yours, in tokens: compared with the advice here. A server's own figures never replace it.",
+    "description": "Under the context box in Server diagnostics."
+  },
+  "settings.connections.diag.model": {
+    "defaultMessage": "Model",
+    "description": "Label of the model chosen in Server diagnostics."
+  },
+  "settings.connections.diag.notLoaded": {
+    "defaultMessage": "not loaded: Ollama allocates it when the model is first used",
+    "description": "Server diagnostics' Allocated now for an Ollama model that isn't loaded now."
+  },
+  "settings.connections.diag.notReported": {
+    "defaultMessage": "not reported",
+    "description": "A context value in Server diagnostics the server didn't report (never shown as 0)."
+  },
+  "settings.connections.diag.ollamaDefault": {
+    "defaultMessage": "Ollama's own default (OLLAMA_CONTEXT_LENGTH) can't be read over its API: where no Modelfile sets num_ctx, it decides the context.",
+    "description": "A note in Server diagnostics for an Ollama server. OLLAMA_CONTEXT_LENGTH and num_ctx are Ollama's setting names: keep them."
+  },
+  "settings.connections.diag.open": {
+    "defaultMessage": "Check Server…",
+    "description": "Button on a server connection (Settings → Accounts & Connections, the connection editor, Provider Setup): opens its Server diagnostics (its model's context, a tool-call test)."
+  },
+  "settings.connections.diag.passed": {
+    "defaultMessage": "Passed: the model called the tool as asked and answered with its result ({ago}).",
+    "description": "Server diagnostics: the tool-call test passed. {ago} is when (\"just now\")."
+  },
+  "settings.connections.diag.prefixed": {
+    "defaultMessage": "Its base URL has a path (a gateway), so Combwork doesn't ask the server's own paths for its context: not reported.",
+    "description": "Server diagnostics, when the base URL has a path such as /anthropic after the host: the context fields are not asked for."
+  },
+  "settings.connections.diag.readAgain": {
+    "defaultMessage": "Read Again",
+    "description": "Button in Server diagnostics: reads the context from the server again."
+  },
+  "settings.connections.diag.reading": {
+    "defaultMessage": "Reading…",
+    "description": "Server diagnostics while it reads the context from the server."
+  },
+  "settings.connections.diag.save": {
+    "defaultMessage": "Save",
+    "description": "Button in Server diagnostics: saves the context the user typed."
+  },
+  "settings.connections.diag.seen": {
+    "defaultMessage": "Seen: HTTP {status}{stop, select, none {} other {, stop reason {stop}}}{blocks, select, none {} other {, blocks {blocks}}}",
+    "description": "Under a failed tool-call test in Server diagnostics: what the server's reply was, as data. {status}, {stop} and {blocks} are values from the reply (none: not there)."
+  },
+  "settings.connections.diag.templateTools": {
+    "defaultMessage": "{state, select, supported {Its chat template supports tool calls.} unsupported {Its chat template doesn't support tool calls. llama-server needs --jinja for tools: if it was started without it, add it.} inconsistent {Its chat template's tool flags disagree. llama-server needs --jinja for tools: if it was started without it, add it.} other {Its chat template doesn't say whether it supports tools. llama-server needs --jinja for tools: if it was started without it, add it.}}",
+    "description": "Server diagnostics for a llama.cpp server: what its chat template says of tools. {state} is a key: translate the texts only. llama-server and --jinja are a program and its option: keep them."
+  },
+  "settings.connections.diag.test": {
+    "defaultMessage": "Test Tool Calls",
+    "description": "Button in Server diagnostics: runs the tool-call test (two requests to the model)."
+  },
+  "settings.connections.diag.testing": {
+    "defaultMessage": "Testing…",
+    "description": "Server diagnostics while the tool-call test runs (a model may take a while to load)."
+  },
+  "settings.connections.diag.title": {
+    "defaultMessage": "Server diagnostics: {name}",
+    "description": "Title of the Server diagnostics dialog (Settings → Accounts & Connections → a server connection's Check Server…, HI-2683). {name} is the connection's name."
+  },
+  "settings.connections.diag.tools": {
+    "defaultMessage": "Tool calls",
+    "description": "Heading in Server diagnostics: the tool-call test."
+  },
+  "settings.connections.diag.toolsWhat": {
+    "defaultMessage": "Asks the model to call one tool, then gives it the tool's result and checks its answer used it, through the API Claude Code uses. A small structured tool-call check: it doesn't show that every Claude Code tool or a long conversation will work.",
+    "description": "Under the Tool calls heading in Server diagnostics: what the test does and what it proves."
+  },
+  "settings.connections.diag.trained": {
+    "defaultMessage": "Trained maximum",
+    "description": "A row of Server diagnostics: the most context the model was trained for, as the server reports it."
+  },
+  "settings.connections.diag.value": {
+    "defaultMessage": "{tokens, number} tokens · read {ago}",
+    "description": "A context value in Server diagnostics: {tokens} is a number, {ago} when it was read (\"2 min ago\")."
+  },
+  "settings.connections.diag.why.busy": {
+    "defaultMessage": "Other checks are running. Try again in a moment.",
+    "description": "Why a Server diagnostics check was refused: too many at once."
+  },
+  "settings.connections.diag.why.endpoint": {
+    "defaultMessage": "The server has no Messages API at this base URL (Claude Code calls the base URL followed by /v1/messages). Check the base URL.",
+    "description": "Why the tool-call test failed: 404 or 405 from the messages URL. Keep /v1/messages as it is."
+  },
+  "settings.connections.diag.why.extraCalls": {
+    "defaultMessage": "The model made more than the one call asked for.",
+    "description": "Why the tool-call test failed: several tool calls."
+  },
+  "settings.connections.diag.why.forbidden": {
+    "defaultMessage": "The server refused access (403).",
+    "description": "Why the tool-call test failed: 403."
+  },
+  "settings.connections.diag.why.incomplete": {
+    "defaultMessage": "The answer stopped before its end (the output limit).",
+    "description": "Why the tool-call test failed at its second step: cut at the output limit."
+  },
+  "settings.connections.diag.why.invalidArguments": {
+    "defaultMessage": "The model's call had arguments the tool doesn't take.",
+    "description": "Why the tool-call test failed: the call's arguments don't fit the tool's schema."
+  },
+  "settings.connections.diag.why.modelRejected": {
+    "defaultMessage": "The server says it doesn't have this model. Check its id, or load or pull it on the server.",
+    "description": "Why the tool-call test failed: the server said the model is missing."
+  },
+  "settings.connections.diag.why.noToolCall": {
+    "defaultMessage": "The model answered without calling the tool it was asked to use.",
+    "description": "Why the tool-call test failed: an answer with no tool call."
+  },
+  "settings.connections.diag.why.promptTooLarge": {
+    "defaultMessage": "The server says the prompt is larger than the model's context. Give the model a larger context in the server's settings.",
+    "description": "Why the tool-call test failed: the server said the prompt exceeds the context."
+  },
+  "settings.connections.diag.why.protocol": {
+    "defaultMessage": "The server's answer isn't the Messages API's (as Claude Code expects it).",
+    "description": "Why the tool-call test failed: the reply wasn't the Anthropic Messages API's shape."
+  },
+  "settings.connections.diag.why.refused": {
+    "defaultMessage": "The server refused the key (401). Replace the key, then test again.",
+    "description": "Why the tool-call test failed: 401."
+  },
+  "settings.connections.diag.why.resultIgnored": {
+    "defaultMessage": "The model's answer didn't use the tool's result.",
+    "description": "Why the tool-call test failed at its second step: the answer doesn't contain the result, or calls the tool again."
+  },
+  "settings.connections.diag.why.stale": {
+    "defaultMessage": "The connection changed while it was checked. Check again.",
+    "description": "Why a Server diagnostics check was dropped: its server, key or model changed meanwhile, or a newer check started."
+  },
+  "settings.connections.diag.why.thinkingBudget": {
+    "defaultMessage": "The model spent its whole output budget thinking, and wrote no answer.",
+    "description": "Why the tool-call test failed: only thinking, cut at the output limit."
+  },
+  "settings.connections.diag.why.toolText": {
+    "defaultMessage": "The model returned tool-shaped text rather than a tool call: check the loaded context and the server's tool parser.",
+    "description": "Why the tool-call test failed: the model wrote out a tool call as text instead of making one."
+  },
+  "settings.connections.diag.why.toolsUnsupported": {
+    "defaultMessage": "The server says it doesn't support tools for this model (for llama.cpp, --jinja may be missing).",
+    "description": "Why the tool-call test failed: the server said tools are unsupported. --jinja is a llama-server option: keep it."
+  },
+  "settings.connections.diag.why.unexpected": {
+    "defaultMessage": "An unexpected reply.",
+    "description": "Why the tool-call test failed: none of the named reasons; what was seen is shown under it."
+  },
+  "settings.connections.diag.why.unreachable": {
+    "defaultMessage": "Couldn't reach the server: check its base URL and that it is running.",
+    "description": "Why a Server diagnostics check failed: no answer."
+  },
+  "settings.connections.diag.why.wrongArgument": {
+    "defaultMessage": "The model's call was valid but not for what was asked (another city).",
+    "description": "Why the tool-call test failed: a valid call with the wrong argument."
+  },
+  "settings.connections.diag.why.wrongTool": {
+    "defaultMessage": "The model called a tool it wasn't offered.",
+    "description": "Why the tool-call test failed: a call to another tool."
+  },
   "settings.connections.launch.assistant": {
     "defaultMessage": "The Assistant uses this connection: it always launches with Combwork's guidance, tools and typing, whatever these say. They apply to the connection's other agents.",
     "description": "A note in a connection's Launch Settings (HI-2670) when the Combwork Assistant uses it: its role needs them."

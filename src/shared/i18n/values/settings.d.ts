@@ -828,6 +828,61 @@ interface CombworkMessageValues {
   'settings.connections.add.title': { cli: string | number }
   'settings.connections.add.titleAny': undefined
   'settings.connections.cancel': undefined
+  'settings.connections.diag.advice': { name: string | number; size: number; cli: string | number }
+  'settings.connections.diag.allocated': undefined
+  'settings.connections.diag.below': { tokens: number }
+  'settings.connections.diag.clear': undefined
+  'settings.connections.diag.close': undefined
+  'settings.connections.diag.configured': undefined
+  'settings.connections.diag.context': undefined
+  'settings.connections.diag.failed': undefined
+  'settings.connections.diag.failedStep': { step: string; why: string | number }
+  'settings.connections.diag.kind': { kind: string }
+  'settings.connections.diag.line': { tokens: number; ago: string | number }
+  'settings.connections.diag.lineBelow': { tokens: number; ago: string | number; name: string | number; size: number }
+  'settings.connections.diag.measured': undefined
+  'settings.connections.diag.meets': { tokens: number }
+  'settings.connections.diag.mine': undefined
+  'settings.connections.diag.mineHint': undefined
+  'settings.connections.diag.model': undefined
+  'settings.connections.diag.notLoaded': undefined
+  'settings.connections.diag.notReported': undefined
+  'settings.connections.diag.ollamaDefault': undefined
+  'settings.connections.diag.open': undefined
+  'settings.connections.diag.passed': { ago: string | number }
+  'settings.connections.diag.prefixed': undefined
+  'settings.connections.diag.readAgain': undefined
+  'settings.connections.diag.reading': undefined
+  'settings.connections.diag.save': undefined
+  'settings.connections.diag.seen': { status: string | number; stop: string; blocks: string }
+  'settings.connections.diag.templateTools': { state: string }
+  'settings.connections.diag.test': undefined
+  'settings.connections.diag.testing': undefined
+  'settings.connections.diag.title': { name: string | number }
+  'settings.connections.diag.tools': undefined
+  'settings.connections.diag.toolsWhat': undefined
+  'settings.connections.diag.trained': undefined
+  'settings.connections.diag.value': { tokens: number; ago: string | number }
+  'settings.connections.diag.why.busy': undefined
+  'settings.connections.diag.why.endpoint': undefined
+  'settings.connections.diag.why.extraCalls': undefined
+  'settings.connections.diag.why.forbidden': undefined
+  'settings.connections.diag.why.incomplete': undefined
+  'settings.connections.diag.why.invalidArguments': undefined
+  'settings.connections.diag.why.modelRejected': undefined
+  'settings.connections.diag.why.noToolCall': undefined
+  'settings.connections.diag.why.promptTooLarge': undefined
+  'settings.connections.diag.why.protocol': undefined
+  'settings.connections.diag.why.refused': undefined
+  'settings.connections.diag.why.resultIgnored': undefined
+  'settings.connections.diag.why.stale': undefined
+  'settings.connections.diag.why.thinkingBudget': undefined
+  'settings.connections.diag.why.toolText': undefined
+  'settings.connections.diag.why.toolsUnsupported': undefined
+  'settings.connections.diag.why.unexpected': undefined
+  'settings.connections.diag.why.unreachable': undefined
+  'settings.connections.diag.why.wrongArgument': undefined
+  'settings.connections.diag.why.wrongTool': undefined
   'settings.connections.launch.assistant': undefined
   'settings.connections.launch.cancel': undefined
   'settings.connections.launch.guidanceText': undefined

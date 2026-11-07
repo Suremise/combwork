@@ -897,6 +897,12 @@ export interface ServerModel {
    * sends a window or a launch also has its preset's pattern applied, as set now (withRemote).
    */
   remote?: true
+  /**
+   * The context the user says this model has on this server, in tokens (HI-2683, shared with HI-2682): set only by the
+   * user, never by what a server reports (that stays in its diagnostics, with its source and time, beside this one).
+   * HI-2683 compares it with the advice; HI-2682 launches with it.
+   */
+  context?: number
 }
 
 /**
