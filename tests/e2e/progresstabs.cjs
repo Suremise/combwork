@@ -529,23 +529,36 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check('…the retries a warning (failed, then passed), the failed run a failure', (await group(a.number).locator('.progress-run-group').filter({ hasText: 'unit: 6 files' }).locator('.progress-group-head .codicon-warning').count()) === 1 && (await group(a.number).locator('.progress-recent-item[data-run="a-cardloop"] .progress-recent .codicon-error').count()) === 1)
     const reviewRow = group(a.number).locator('.progress-recent-item[data-run="a-review"] .progress-recent > .tip-wrap').first()
     const tipText = async () => (await page.locator('body > .tip').allTextContents().catch(() => [])).join(' | ')
-    // Whether the pointer is on the row, and whether something else (a notice) is over its middle.
-    const rowState = () => reviewRow.evaluate((el) => {
+    // HI-2703: the tip shows 350 ms after the pointer ENTERS the row (React's mouseenter), and leaving cancels it. A notice
+    // passing over the row, or the row reached while covered, leaves the pointer on it (:hover) with no entry the tip saw,
+    // and hovering the same point again moves nothing: no entry comes. So each try is an entry of its own (the pointer off
+    // the row, then onto it), marked on the row with the leaves after it; while that entry stands (still on the row,
+    // nothing over it, no leave since), the pointer stays put for the tip's delay.
+    let entry = 0
+    const rowState = () => reviewRow.evaluate((el, e) => {
       const r = el.getBoundingClientRect()
       const at = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
-      return { hovered: el.matches(':hover'), covered: !at || !el.contains(at) }
-    }).catch(() => ({ hovered: false, covered: true }))
+      return { hovered: el.matches(':hover'), covered: !at || !el.contains(at), ours: el.dataset.cwEntry === String(e), left: el.dataset.cwLeft === '1' }
+    }, entry).catch(() => ({ hovered: false, covered: true, ours: false, left: false }))
     check('…its card, revision and copy in the hover', !!(await until(async () => {
       if ((await tipText()).includes(`${a.key} · e2d018f · in copy-5`)) return true
-      // HI-2703: the tip shows 350 ms after the pointer enters, and leaving cancels it. While the pointer is on the row
-      // and nothing covers it, it stays there: a dismissal's click or another hover would move it away and start again.
       const s = await rowState()
-      if (s.hovered && !s.covered) return false
+      if (s.hovered && !s.covered && s.ours && !s.left) return false
       // The runs are docked at the bottom (HI-1925), where the window's notices show: those over the row go first.
       if (s.covered) for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click().catch(() => undefined)
+      await page.mouse.move(5, 5)
+      entry++
+      await reviewRow.evaluate((el, e) => {
+        el.dataset.cwEntry = String(e)
+        delete el.dataset.cwLeft
+        if (!el.dataset.cwWatched) {
+          el.dataset.cwWatched = '1'
+          el.addEventListener('mouseleave', () => (el.dataset.cwLeft = '1'))
+        }
+      }, entry).catch(() => undefined)
       await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)
       return false
-    }, HUNG_MS)), `${await tipText()} (row ${JSON.stringify(await rowState())}, notices ${await page.locator('.toasts .toast').count()})`)
+    }, HUNG_MS)), `${await tipText()} (row ${JSON.stringify(await rowState())}, entries ${entry}, notices ${await page.locator('.toasts .toast').count()})`)
     await page.mouse.move(5, 5)
     await shoot('runs-by-card')
     // A card whose runs all passed shows its run too (HI-1925: nothing folded but details); a click on a heading folds nothing.
