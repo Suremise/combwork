@@ -15336,5 +15336,6 @@ button.progress-lane-retry {
 .server-model-limits { flex-basis: 100%; padding: 2px 0 6px 0; }
 .server-model-limits > .flex { gap: 16px; flex-wrap: wrap; }
 .server-model-limit { gap: 6px; align-items: center; }
-.server-model-limit .input { width: 13em; }
+/* As wide as its placeholder (HI-2708: "Not set: 200,000 assumed" is longer in German and Polish), 13em at least. */
+.server-model-limit .input { field-sizing: content; min-width: 13em; max-width: 100%; }
 .server-model-limits .hint.warn { color: var(--warning); }
