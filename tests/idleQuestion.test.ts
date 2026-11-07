@@ -83,6 +83,23 @@ describe("Claude Code's question by itself and its input box, on its screen (2.1
       screen.dispose()
     })
   })
+
+  it("leaves out the hint's first letter under Claude Code's cursor too (inverse, then the dim rest), and keeps a draft's (HI-2692)", () => {
+    const screen = new TerminalScreen(80, 10)
+    // As Claude Code draws it while its terminal reports the focus: `m(t[0]) + dim(t.slice(1))`.
+    const drawn = new Promise<void>((r) => screen.write(`${RULE}\r\n❯ \x1b[7mT\x1b[27m\x1b[2mry "how does <filepath> work?"\x1b[22m\r\n${RULE}\r\n`, r))
+    return drawn.then(async () => {
+      expect(screen.text()).toContain('Try "how does')
+      expect(screen.textWithoutDim()).not.toMatch(/T/)
+      expect(claudeCode.promptText(screen.textWithoutDim())).toBe('')
+      // A draft with the cursor on one of its letters, or after it: all of it kept.
+      await new Promise<void>((r) => screen.write(`\x1b[2J\x1b[H${RULE}\r\n❯ ab\x1b[7mc\x1b[27md\r\n${RULE}\r\n`, r))
+      expect(claudeCode.promptText(screen.textWithoutDim())).toBe('abcd')
+      await new Promise<void>((r) => screen.write(`\x1b[2J\x1b[H${RULE}\r\n❯ abcd\x1b[7m \x1b[27m\r\n${RULE}\r\n`, r))
+      expect(claudeCode.promptText(screen.textWithoutDim())).toBe('abcd')
+      screen.dispose()
+    })
+  })
 })
 
 describe('a held line gone from the input (heldLineLost)', () => {
