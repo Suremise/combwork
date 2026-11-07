@@ -32,6 +32,10 @@
 // is read as a file of its own, and is unknown unless fixed text loading nothing of the repository. External programs
 // (git, the CLIs) are the boundary: what they run isn't JavaScript a change here is in.
 //
+// The invariant: anything not proved known propagates as unknown. A file is known only when every way it can load or
+// run code is on the allowlist; a test's closure only when every file in it is known; a worker entry's closure, the
+// same (else every starter counts); the global object only as `G.name`.
+//
 // Whatever it can't tell keeps every related test, with a reason. For a changed file (narrowChange's `all`): not code,
 // added or deleted, unparseable in either revision, a changed line outside every unit (module code, an import that
 // isn't type-only, a constructor) or in a class's field (set as an instance is made), its own module code naming a
@@ -313,10 +317,19 @@ export function fileLoads(text, file, known) {
         else flags.push(`may run a script made from text it can't read (${els[i].value}, line ${line(els[i])})`)
       }
     },
-    // The global object read by a key worked out at run time (`globalThis[k]`): it may be any global, a loader too.
-    MemberExpression(p) {
-      const o = p.node.object
-      if (p.node.computed && literal(p.node.property) == null && o.type === 'Identifier' && ['globalThis', 'global', 'window', 'self'].includes(o.name) && !p.scope.getBinding(o.name)) computedGlobal ??= `reads the global object by a computed key (line ${line(p.node)})`
+    // The global object (unbound globalThis, global, window, self) only as `G.name`, so a loader taken from it is a
+    // token the gate reads (`globalThis.eval`); used any other way (a key, even a literal one, whose string is blanked;
+    // handed on, destructured) it may give any global, a loader too: the file is unknown.
+    Identifier(p) {
+      if (!['globalThis', 'global', 'window', 'self'].includes(p.node.name) || !p.isReferencedIdentifier() || p.scope.getBinding(p.node.name)) return
+      if (p.parentPath.isTSModuleDeclaration()) return
+      // Through casts and parentheses (`(globalThis as T).x`), which don't change the value.
+      let q = p
+      while (q.parentPath && ['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'ParenthesizedExpression'].includes(q.parentPath.node.type)) q = q.parentPath
+      const par = q.parentPath.node
+      if ((par.type === 'MemberExpression' || par.type === 'OptionalMemberExpression') && par.object === q.node && !par.computed) return
+      if (p.findParent((a) => a.isTSTypeQuery() || a.isTSTypeReference())) return
+      computedGlobal ??= `uses the global object other than by a member's name (line ${line(p.node)})`
     },
     // Types are erased before a test runs; a string is code only through a sink the gate reads (eval, Function, a
     // worker, a process: identifiers, or a string naming node to run, which stays).
@@ -570,9 +583,12 @@ function namesOf(parsed, unit) {
  */
 export function narrowRelated({ related, changes, graph, read, setupFiles = [], workers = null }) {
   // Whether a change reaches what a src worker or process may run: then, and when that can't be read, a starter counts.
-  const entryFiles = workers ? new Set(workers.flatMap((w) => [...graph.closure(w)].map(lower))) : null
+  // The entries' closure is what they may run only when it is all known: an unknown file in it may run anything, a change too.
+  const entryClosure = workers ? workers.flatMap((w) => [...graph.closure(w)]) : null
+  const entryUnknown = entryClosure ? entryClosure.map((f) => graph.unknownOf(f)).find(Boolean) : null
+  const entryFiles = entryClosure && !entryUnknown ? new Set(entryClosure.map(lower)) : null
   const changeRuns = !entryFiles || Object.keys(changes).some((f) => entryFiles.has(lower(f)))
-  const runsWhy = !entryFiles ? "the build's worker entries couldn't be read" : 'a change is in what one of the build’s workers or scripts loads'
+  const runsWhy = !workers ? "the build's worker entries couldn't be read" : entryUnknown ? `what the build's workers and scripts load isn't all known (${entryUnknown})` : 'a change is in what one of the build’s workers or scripts loads'
   const keep = []
   const dropped = []
   const why = []

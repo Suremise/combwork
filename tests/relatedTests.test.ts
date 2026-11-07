@@ -307,15 +307,19 @@ describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2
     ...t('mockComputed', `import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\n${computed}\nvi.mock(p)\nit('v', () => fb())\n`),
     ...t('doMockComputed', `import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\n${computed}\nit('v', () => { vi.doMock(p); fb() })\n`),
     ...t('viHanded', "import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\nconst v = vi\nit('v', () => { void v; fb() })\n"),
+    // HR2's round-4 probes: the global object handed on, and a loader taken from it by a literal key.
+    ...t('globalHanded', "import { fb } from '../src/main/lib'\nit('g', () => { const g = globalThis; const k = process.env.LOADER!; const f = (g as unknown as Record<string, (s: string) => void>)[k]; f(process.env.SCRIPT!); fb() })\n"),
+    ...t('globalLiteralKey', "import { fb } from '../src/main/lib'\nit('g', () => { const e = globalThis['eval']; e(process.env.SCRIPT!); fb() })\n"),
+    // Safe: a named member of the global object, through a cast too.
+    ...t('globalByName', "import { fb } from '../src/main/lib'\nit('g', () => { globalThis.crypto.getRandomValues(new Uint8Array(1)); void (globalThis as { x?: number }).x; fb() })\n"),
     // Allowed: each a literal form, so they narrow.
     ...t('literalForms', "import { vi } from 'vitest'\nimport { createRequire } from 'module'\nimport { fb } from '../src/main/lib'\nconst require = createRequire(import.meta.url)\nvi.mock('../src/main/useB', () => ({ useB: () => 0 }))\nit('v', async () => { const { useB } = await import('../src/main/useB'); require('../src/main/useB').useB(); createRequire(import.meta.url)('../src/main/useB').useB(); vi.fn(); vi.spyOn(console, 'log'); useB(); fb() })\n")
   }
   const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
   it("keeps each of HR2's probes: a createRequire require named require, vi['importActual'], vitest's own export, and the other Vitest loaders computed", () => {
-    for (const k of ['localRequire', 'viComputedKey', 'vitestExport', 'importMock', 'mockComputed', 'doMockComputed', 'viHanded']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)
-  })
+    for (const k of ['localRequire', 'viComputedKey', 'vitestExport', 'importMock', 'mockComputed', 'doMockComputed', 'viHanded', 'globalHanded', 'globalLiteralKey']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)  })
   it('leaves out a file whose loads are all literal allowed forms, naming nothing changed', () => {
-    expect(lib.dropped).toEqual(['tests/literalForms.test.ts'])
+    expect(lib.dropped).toEqual(['tests/globalByName.test.ts', 'tests/literalForms.test.ts'])
   })
   it('a worker or a process running JavaScript (the Assistant\'s option 4): in src, it counts only when the change is in what a build entry loads', () => {
     const w: Files = {
@@ -348,6 +352,20 @@ describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2
     expect(libChange(['src/main/logWriter.ts'])).toMatch(/src\/main\/logger\.ts starts a worker or a process running JavaScript, and a change is in what one of the build’s workers or scripts loads/)
     expect(libChange(null)).toMatch(/the build's worker entries couldn't be read/)
   })
+  it("an unknown file in a worker entry's closure makes what the entries may run unknown: the starter counts (HR2, round 4)", () => {
+    const w: Files = {
+      'src/main/types.ts': FILES['src/main/types.ts'],
+      'src/main/lib.ts': LIB,
+      'src/main/starter.ts': "import { Worker } from 'worker_threads'\nimport { fb } from './lib'\nexport function start(p: string): number {\n  void new Worker(p)\n  return fb()\n}\n",
+      'src/main/worker.ts': 'void import(process.env.TARGET!).then((m) => m[process.env.KEY!]())\n',
+      ...t('worker', "import { start } from '../src/main/starter'\nit('w', () => start('worker'))\n")
+    }
+    const head: Files = { ...w, 'src/main/lib.ts': LIB_FA }
+    const graph = importGraph(Object.keys(head), (f: string) => head[f] ?? null)
+    const r = narrowRelated({ related: ['tests/worker.test.ts'], changes: { 'src/main/lib.ts': change('src/main/lib.ts', w, head) }, graph, read: (f: string) => head[f] ?? null, workers: ['src/main/worker.ts'] }) as Narrowed
+    expect(r.keep).toEqual(['tests/worker.test.ts'])
+    expect(r.why.join('\n')).toMatch(/starter\.ts starts a worker .* what the build's workers and scripts load isn't all known \(src\/main\/worker\.ts may load code by import\(\)\)/)
+  })
   it("electron.vite.config.ts's worker and script entries, the app's own index aside; null when an entry isn't in the known form", () => {
     expect(workerEntriesOf("input: {\n  index: resolve(__dirname, 'src/main/index.ts'),\n  // a worker\n  'git-worker': resolve(__dirname, 'src/main/gitWorker.ts'),\n}")).toEqual(['src/main/gitWorker.ts'])
     expect(workerEntriesOf("input: {\n  w: resolve(__dirname, WORKER),\n}")).toBeNull()
@@ -373,7 +391,9 @@ describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2
       ['new Function(s)', 'eval'],
       ['vi.unmock(p)', 'uses vi other than'],
       ['x.importActual(p)', 'Vitest module loader'],
-      ['globalThis[k]()', 'global object by a computed key']
+      ['globalThis[k]()', 'global object other than by a member'],
+      ["globalThis['eval'](s)", 'global object other than by a member'],
+      ['const g = globalThis', 'global object other than by a member']
     ] as const) expect(unknown(text), text).toMatch(new RegExp(what))
     for (const text of ["// require(x), import(p), eval\nexport const a = 1\n", "const s = 'require(x) eval(y) import(z)'\n", "type T = typeof import('./y')\nconst u: import('./y').U = 1\n", 'const k = import.meta.url\n', "import { syncBuiltinESMExports } from 'module'\nsyncBuiltinESMExports()\n", "const global = { a: 1 }\nvoid global[k]\n"]) expect(unknown(text), text).toBeNull()
   })
