@@ -1,6 +1,6 @@
 // The Assistant's own memory (HI-2666): Memory in the Assistant view lists what its coding agent saved for the workspace's
 // folder, from a fake memory folder in the suite's own Claude Code home (never the user's): MEMORY.md first, its folder's
-// path with Copy Path, a file opened in the project Memory tab's editor and saved through the same guarded file:read and
+// path with Copy Path and Open Folder (HI-2736: main opens that folder, Explorer stubbed), a file opened in the project Memory tab's editor and saved through the same guarded file:read and
 // file:write. With its files gone, it says there is no memory yet; with the Assistant set to a coding agent whose memory
 // Combwork doesn't show (Codex), it says so, and nothing of the old list stays. Screenshots in both themes. Nothing runs.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR, quiet.
@@ -59,6 +59,24 @@ const check = (name, ok, extra = '') => {
     return t && t.toLowerCase() === memDir.toLowerCase() ? t : null
   }, HUNG_MS)
   check('Copy Path copies it', !!clip)
+  // Open Folder (HI-2736): main opens the folder it names itself; Explorer stubbed, so no window opens.
+  await app.evaluate(({ shell }) => {
+    globalThis.__opened = []
+    shell.openPath = async (p) => (globalThis.__opened.push(p), '')
+  })
+  await view.getByRole('button', { name: 'Open Folder' }).click()
+  const opened = await until(async () => {
+    const o = await app.evaluate(() => globalThis.__opened)
+    return o.length ? o : null
+  }, HUNG_MS)
+  check('Open Folder opens that folder, and only it', !!opened && opened.length === 1 && opened[0].toLowerCase() === memDir.toLowerCase(), JSON.stringify(opened))
+  check('…with no error shown', (await page.locator('.toast.error').count()) === 0)
+  // Explorer failing: its error is shown, not dropped.
+  await app.evaluate(({ shell }) => {
+    shell.openPath = async () => 'Failed to open path'
+  })
+  await view.getByRole('button', { name: 'Open Folder' }).click()
+  check('a failed open shows its error', !!(await until(async () => (await page.locator('.toast.error', { hasText: 'Failed to open path' }).count()) > 0, HUNG_MS)))
 
   // --- MEMORY.md, opened first, in the Memory tab's editor (read through the guarded file:read).
   const editor = view.locator('.split-main')

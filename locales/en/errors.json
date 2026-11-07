@@ -1,4 +1,8 @@
 {
+  "errors.assistantMemory.noFolder": {
+    "defaultMessage": "There's no memory folder to open yet.",
+    "description": "Refusal of Open Folder beside the Assistant's memory (HI-2736): its coding agent hasn't made the folder yet, or keeps no memory Combwork shows."
+  },
   "errors.assistantUndo.gone": {
     "defaultMessage": "That change of the Assistant's is no longer kept: changes are kept for 7 days.",
     "description": "An error: the user asked to undo a change the Combwork Assistant made, but it is older than 7 days (or was never kept), so it can't be undone any more."

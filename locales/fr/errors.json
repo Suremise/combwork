@@ -1,4 +1,5 @@
 {
+  "errors.assistantMemory.noFolder": "Il n’y a pas encore de dossier de mémoire à ouvrir.",
   "errors.assistantUndo.gone": "Cette modification de l’Assistant n’est plus conservée : les modifications sont conservées 7 jours.",
   "errors.assistantUndo.which": "Choisis une modification de l’Assistant à annuler, ou les modifications d’un message.",
   "errors.changes.notFile": "{file} n’est pas un fichier du dossier {folder}.",

@@ -71,7 +71,7 @@ import * as tasks from './tasks'
 import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
-import { assistantMemoryFor } from './assistantMemory'
+import { assistantMemoryFolder, assistantMemoryFor } from './assistantMemory'
 import { finalWhys } from '../shared/assistantActivity'
 import { changeGroups } from './assistantChanges'
 import { UndoNotFound, userUndo } from './assistantUndo'
@@ -163,6 +163,7 @@ const M = {
   unknownProvider: msg({ id: 'errors.provider.unknown', defaultMessage: 'Unknown provider "{provider}".', description: "A call named a coding-agent CLI this version of Combwork doesn't know. {provider} is the id it gave." }),
   insideArchive: msg({ id: 'errors.file.insideArchive', defaultMessage: 'Combwork opens no files inside .asar archives.', description: 'Refusal to open a file inside an Electron .asar archive. Keep ".asar" as it is.' }),
   outsideWorkspace: msg({ id: 'errors.file.outsideWorkspace', defaultMessage: "Combwork can only read and write files inside the workspace, and the agents' instruction, memory and skill files.", description: 'Refusal to open or save a file outside what Combwork may touch.' }),
+  noMemoryFolder: msg({ id: 'errors.assistantMemory.noFolder', defaultMessage: "There's no memory folder to open yet.", description: "Refusal of Open Folder beside the Assistant's memory (HI-2736): its coding agent hasn't made the folder yet, or keeps no memory Combwork shows." }),
   noLog: msg({ id: 'errors.log.none', defaultMessage: 'That run reported no log.', description: "Progress panel: a run's log can't be opened because the run never said where it was." }),
   logNotFull: msg({ id: 'errors.log.notFullPath', defaultMessage: 'The run reported its log without a full path: {path}', description: "Progress panel: a run gave its log as a relative path, which Combwork won't open. {path} is that path." }),
   logGone: msg({ id: 'errors.log.gone', defaultMessage: "The log isn't there any more: {path}", description: "Progress panel: a run's log file was deleted or moved. {path} is where it was." }),
@@ -1714,6 +1715,14 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'file:write': (p, content, expected) => writeTextUnlessChanged(guardFile(p, true), content, expected),
 
     'assistant:memory': (id) => (workspace.path ? assistantMemoryFor(workspace.path, knownProvider(id)) : { provider: knownProvider(id), folder: null, files: [] }),
+    // Its folder, as assistant:memory names it, never a path the window passes (HI-2736).
+    'assistant:openMemoryFolder': async (id) => {
+      const provider = knownProvider(id)
+      const folder = workspace.path ? await assistantMemoryFolder(workspace.path, provider) : null
+      if (!folder) throw combworkError(M.noMemoryFolder, undefined, { kind: 'notFound' })
+      const failed = await shell.openPath(folder)
+      if (failed) throw new Error(failed)
+    },
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
       return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()

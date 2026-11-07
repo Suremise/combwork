@@ -997,6 +997,8 @@ export interface CombworkRequests {
   'memory:list': (projectPath: string) => MemorySource[]
   /** The Assistant's own memory (HI-2666): what `provider` (the one it runs on) saved for the window's workspace's folder. */
   'assistant:memory': (provider: ProviderId) => AssistantMemory
+  /** Opens that memory's folder in File Explorer (HI-2736): the one assistant:memory names, found again in main. */
+  'assistant:openMemoryFolder': (provider: ProviderId) => void
   /** Whether the given providers all read the project's AGENTS.md (directly or through an import). */
   'memory:instructionsShared': (projectPath: string, providers: ProviderId[]) => boolean
   /** Makes the given providers share AGENTS.md; returns the files written. */

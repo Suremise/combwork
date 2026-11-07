@@ -1,4 +1,5 @@
 {
+  "errors.assistantMemory.noFolder": "There's no memory folder to open yet.",
   "errors.assistantUndo.gone": "That change of the Assistant's is no longer kept: changes are kept for 7 days.",
   "errors.assistantUndo.which": "Choose one change of the Assistant's to undo, or one message's changes.",
   "errors.changes.notFile": "{file} isn't a file of {folder}.",

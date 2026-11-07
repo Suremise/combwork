@@ -1,6 +1,7 @@
 // Generated from locales/en/errors.json: do not edit. Each message's placeholders and their types, for tr(): a
 // global script, so its interface merges with every other area's (shared/i18n/msg.ts).
 interface CombworkMessageValues {
+  'errors.assistantMemory.noFolder': undefined
   'errors.assistantUndo.gone': undefined
   'errors.assistantUndo.which': undefined
   'errors.changes.notFile': { file: string | number; folder: string | number }
