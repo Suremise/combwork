@@ -4895,7 +4895,8 @@ repeating them (#533) [note §8].
   so (from before roles counted, or a guessed role) pauses, `offSide` ("paused: X isn't a reviewer by its role…"),
   its work in flight kept: its next card isn't started while its builder is off its side (`laneStarts`), and a
   reviewer's handoff to an agent whose role doesn't review, or whose session hasn't loaded a reviewer's tools yet, is
-  held, not made (`loopWakes` `targetOf`), until that's put right. The metrics' launch side (`launchWorkflow`,
+  made and kept queued, never dropped, but not given (the loop source's `holds`, HR3's round 2): given once, at the
+  next try after that's put right (a restart with its tools, a role that reviews). The metrics' launch side (`launchWorkflow`,
   HI-2049) stays apart. `cw-mcp.ts` leaves out `hiddenForSide(side)`
   (`shared/assistantTools.ts`): a builder `REVIEWER_ONLY_TOOLS` (cw_start_review, cw_verdict, cw_request_builder,
   cw_focused_skip), a reviewer `BUILDER_ONLY_TOOLS` (cw_start_card, cw_submit, cw_put_back, cw_declare_paths,

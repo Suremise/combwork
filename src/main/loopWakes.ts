@@ -121,8 +121,7 @@ export async function cardReviewer(ws: WorkspaceService, _projectPath: string, c
  * action named one: the runtime's builder); an agent of the project. Null: no one's.
  */
 async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string): Promise<{ id: string; name: string } | null> {
-  const all = projectAgents(await ws.projectConfig(projectPath))
-  const agents = all.map((a) => ({ id: a.id, name: a.name }))
+  const agents = projectAgents(await ws.projectConfig(projectPath)).map((a) => ({ id: a.id, name: a.name }))
   // The user's answer reaches the agent waiting on it in or out of a loop (#1269); a loop's handoffs need a reviewer.
   // A pool lane's design closed by its answer or its builder going ahead (HI-2325) leaves the card with no reviewer
   // until the pool gives out its next submission, but the handoff is still the loop's: the answer to its builder, the
@@ -132,10 +131,6 @@ async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCar
   if (!reviewer && kind !== 'answer' && !poolStep) return null
   const target = kind === 'review' || toReviewer(kind) ? (agent ?? reviewer) : (agent ?? card.agent)
   if (!target || ((kind === 'review' || toReviewer(kind)) && target === card.agent)) return null
-  // A reviewer's handoff to an agent whose role doesn't review (HI-2664: its tools follow its role; its lane pauses,
-  // offSide), or whose running session hasn't loaded a reviewer's tools yet: held, not made, until that's put right.
-  const def = all.find((a) => a.id === target)
-  if ((kind === 'review' || toReviewer(kind)) && def && (!reviewsWork(agentWorkflowRole(def)) || !sessions.sideAllows(projectPath, def.id, 'reviewer'))) return null
   const found = agents.find((a) => a.id === target)
   return found ? { id: found.id, name: `${found.name} (${card.project})` } : null
 }
@@ -404,6 +399,15 @@ let versions = 0
 const madeFrom = new Map<string, { seq: number; column: TaskCard['column']; key: string | null }>()
 
 /**
+ * Whether an agent can take a reviewer's handoff now (HI-2664): its role reviews (the workspace's projects as it holds
+ * them: nothing is read, as `holds` is pure) and its running session has a reviewer's tools (sessions.sideAllows).
+ */
+function reviewsNow(ws: WorkspaceService, host: string, agentId: string): boolean {
+  const a = ws.info()?.projects.find((x) => x.path.toLowerCase() === host.toLowerCase())?.config.agents?.find((x) => x.id === agentId)
+  return (!a || reviewsWork(agentWorkflowRole(a))) && sessions.sideAllows(host, agentId, 'reviewer')
+}
+
+/**
  * The loop wakes' part in their deliveries (#649): made again just before each offer (the line from the card as it is
  * now; dropped if no longer due, its watch tells it, or it is someone else's wake now, who gets it instead); offered only
  * while its card, lanes and project settings haven't changed (else made again at the next try) and its watch doesn't tell it;
@@ -455,6 +459,10 @@ registerSource('loop', {
     const m = madeFrom.get(madeKey(host, r.id, r.meta?.v))
     if (!p || !m || covered(host, r.agentId, { number: p.n, column: m.column } as TaskCard, p.kind)) return false
     const ws = workspaceFor(host)
+    // A reviewer's handoff to an agent that can't review yet (HI-2664, HR3's round 2): its role doesn't (its lane pauses,
+    // offSide), or its running session hasn't loaded a reviewer's tools (a role changed, not restarted since). Not given
+    // now, but kept: the delivery stays queued, made again and given at a later try, once its tools are there.
+    if ((p.kind === 'review' || toReviewer(p.kind)) && !(ws && reviewsNow(ws, host, r.agentId))) return false
     const unchanged = m.key !== null && !!ws && wakeKey(ws, host, p.n) === m.key
     return unchanged || (m.key === null && m.seq === rolesSeq)
   },
