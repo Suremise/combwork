@@ -402,7 +402,7 @@ test("the driver's provider ids are the descriptors' (2.api-providers checks by 
 test('what the 1.1+ seeding calls is in 1.1.0 (its IPC channels and routes), and what after-upgrade reads is here', () => {
   const root = path.resolve(__dirname, '..')
   const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
-  const seeding = ['settings:update', 'provider:info', 'connections:add', 'connections:signIn', 'connections:setOn', 'workspace:open', 'workflow:setPlatform', 'workflow:setOptions', 'tasks:create', 'tasks:setKind', 'tasks:update', 'tasks:comment', 'advanced:set', 'agents:add']
+  const seeding = ['settings:update', 'provider:info', 'connections:add', 'connections:signIn', 'connections:setOn', 'workspace:open', 'workflow:setPlatform', 'workflow:form', 'workflow:setOptions', 'tasks:create', 'tasks:setKind', 'tasks:update', 'tasks:comment', 'advanced:set', 'agents:add']
   const reading = ['connections:list', 'advanced:state', 'tasks:facts', 'workspace:open']
   for (const c of [...seeding, ...reading]) assert.ok(drive.includes(`'${c}'`), c)
   for (const r of ["'/v1/lanes'", '/v1/lanes?project=demo', '/v1/tasks/']) assert.ok(drive.includes(r), r)

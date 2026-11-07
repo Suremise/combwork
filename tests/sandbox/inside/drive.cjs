@@ -323,12 +323,14 @@ async function markCombwork() {
   await inv('workspace:open', KEPT_WS)
   const made = await until(async () => fs.existsSync(path.join(KEPT_WS, TREE_BEFORE, DB_BEFORE)) && fs.existsSync(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json')), 30_000)
   if (account?.id) res.facts.connectionOn = await inv('connections:setOn', account.id, true).then(() => true, (e) => String(e))
-  // Git, on the Pair (agent merges) preset: each card in a slot.
-  res.facts.workflowSet = {
-    platform: await inv('workflow:setPlatform', KEPT_PROJECT, 'git').catch((e) => ({ error: String(e) })),
-    preset: await inv('workflow:setOptions', KEPT_PROJECT, { preset: SEED.preset, options: {} }).then((f) => f?.preset ?? 'saved', (e) => ({ error: String(e) }))
-  }
-  const workflow = await until(async () => { const w = readJson(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json'))?.workflow; return w?.preset === SEED.preset && w }, 15_000)
+  // Git, on the Pair (agent merges) preset, as the window's Version Control tab saves it: the preset named and its
+  // options (as the form offers them for this project) the project's own. Only the name, the options stay inherited (no slots).
+  const platform = await inv('workflow:setPlatform', KEPT_PROJECT, 'git').catch((e) => ({ error: String(e) }))
+  const form = await inv('workflow:form', KEPT_PROJECT).catch((e) => ({ error: String(e) }))
+  const offered = form?.presets?.find?.((x) => x.id === SEED.preset)?.options ?? null
+  const savedForm = offered ? await inv('workflow:setOptions', KEPT_PROJECT, { preset: SEED.preset, options: offered }).catch((e) => ({ error: String(e) })) : { error: `no ${SEED.preset} preset offered: ${JSON.stringify(form?.presets?.map?.((x) => x.id) ?? form).slice(0, 300)}` }
+  res.facts.workflowSet = { platform, preset: savedForm?.preset ?? savedForm, folder: savedForm?.options?.folder ?? null, invalid: savedForm?.invalid ?? null, enforced: savedForm?.enforced ?? null }
+  const workflow = await until(async () => { const w = readJson(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json'))?.workflow; return w?.preset === SEED.preset && w?.options?.folder === 'slots' && w }, 15_000)
   // Two cards, the first labelled, linked to the second and commented on; both code cards (the lane's needs a slot).
   const create = (title, description) => inv('tasks:create', { title, project: 'demo', description }).catch((e) => ({ error: String(e) }))
   const card = made ? await create(KEPT_CARD, `The plan: ${path.join(KEPT_WS, '.combwork', 'shared', 'plan.md')}`) : null
@@ -361,6 +363,8 @@ async function markCombwork() {
   const slotDir = lane?.slot ? path.join(`${KEPT_WS}.worktrees`, 'demo', lane.slot) : null
   const listed = slotDir && worktreesOf(KEPT_PROJECT).includes(path.resolve(slotDir).toLowerCase())
   res.facts.lane = { agent: agent?.id ?? agent, started: started && { did: started.did, note: started.note, error: started.error }, lane: lane || (laneId ? await laneView(laneId) : null), slotDir, listed }
+  // Without a slot, what decided it: the log's lane and slot lines.
+  if (!listed) { try { res.facts.laneLog = fs.readFileSync(path.join(PROFILE, 'logs', LOG_BEFORE), 'utf8').split(/\r?\n/).filter((x) => /lane|slot|lease/i.test(x)).slice(-25) } catch (e) { res.facts.laneLog = String(e) } }
   check('4.lane-made', 'Before the upgrade: a lane over an agent, lent a slot (a worktree git lists)', !!lane && !!listed, JSON.stringify(res.facts.lane))
 
   const cards = {}
