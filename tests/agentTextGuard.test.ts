@@ -9,7 +9,7 @@ import { tempDir } from './tempDir'
 // @ts-expect-error: a plain .mjs module without types
 import { ALLOW_DIR, runAgentGuard } from '../scripts/agentTextGuard.mjs'
 // @ts-expect-error: a plain .mjs module without types
-import { allowName, baseLists, defaultBaseRef, readLists, runGuard } from '../scripts/i18nGuard.mjs'
+import { allowName, readLists, runGuard } from '../scripts/i18nGuard.mjs'
 // @ts-expect-error: a plain .mjs module without types
 import { agentReason, isAgentFile } from '../scripts/agentTextFiles.mjs'
 
@@ -103,12 +103,8 @@ describe('the agent-text guard', () => {
 })
 
 describe("Combwork's own source", () => {
-  it('has no new hard-coded agent text, and its lists are no bigger than at the merge base', () => {
-    const ref = defaultBaseRef(ROOT)
-    const base = baseLists(ROOT, ref, ALLOW_DIR) as { base: string; lists: Lists | null } | null
-    const r = runAgentGuard({ root: ROOT, against: base?.lists ?? undefined }) as Result
-    expect(r.exit, r.lines.join('\n')).toBe(0)
-  }, 120_000)
+  // The whole source against its merge base is `node scripts/agentTextGuard.mjs` (check:repo, CI's `npm run
+  // agent-text:guard`): it was also run here until HI-2689, the same scan twice (as i18nGuard.test.ts's, HI-2663).
 
   it('fails a new hard-coded string in the session contract, which has no list (group 1 is extracted)', () => {
     const rel = 'src/shared/combworkGuidance.ts'
