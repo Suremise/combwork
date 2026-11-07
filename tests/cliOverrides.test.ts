@@ -54,6 +54,7 @@ describe('the override switches', () => {
   it('are booleans, on by default (what Combwork does today), named <provider>.override.<what>, taken by sessions started afterwards', () => {
     const switches = ADVANCED_DEFS.filter((d) => d.override)
     expect(switches.map((d) => d.id).sort()).toEqual([
+      'antigravity.override.noAutoUpdate', 'antigravity.override.preApproveCombworkTools', 'antigravity.override.stripAccountVars',
       'claude-code.override.mcpIsolation', 'claude-code.override.preApproveCombworkTools', 'claude-code.override.promptSnapshotOff', 'claude-code.override.statusLine',
       'codex.override.mcpIsolation', 'codex.override.preApproveCombworkTools', 'codex.override.terminalTitle',
       'copilot.override.allMcpInstructions', 'copilot.override.mcpIsolation', 'copilot.override.noAutoUpdate', 'copilot.override.preApproveCombworkTools', 'copilot.override.stripGitHubTokens'

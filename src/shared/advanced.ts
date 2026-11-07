@@ -2893,6 +2893,82 @@ const SOURCES: readonly AdvancedSource[] = [
     ]
   },
   {
+    id: overrideId('antigravity', 'noAutoUpdate'),
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.override.noAutoUpdate.title', defaultMessage: "Don't let Antigravity update itself", description: "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.antigravity.override.noAutoUpdate.desc',
+      defaultMessage: "Combwork starts agy with AGY_CLI_DISABLE_AUTO_UPDATE=true (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Provider Setup updates it when you choose. Turned off, Combwork doesn't set it and agy updates itself as it would outside Combwork (your own AGY_CLI_DISABLE_AUTO_UPDATE still applies).",
+      description: 'What the advanced setting "Don\'t let Antigravity update itself" does (Settings → Advanced, under Antigravity CLI). agy is a command and AGY_CLI_DISABLE_AUTO_UPDATE=true an environment variable: keep them. Update is a button\'s name and Provider Setup a dialog\'s.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/env-antigravity-1.5.0.txt`, version: '1.5.0', text: 'Auto-update disabled via environment variable AGY_CLI_DISABLE_AUTO_UPDATE', shows: "agy's log line for the variable Combwork sets" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'antigravity.models.line',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.models.line.title', defaultMessage: 'A model in agy models', description: "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of one line of the CLI's model list. agy models is a command: keep it." }),
+    desc: msg({ id: 'settings.advanced.antigravity.models.line.desc', defaultMessage: "One line of agy models' list: the model's id (its first group), then its display name (its second). Combwork passes the id and shows the name.", description: 'What the advanced setting "A model in agy models" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`^\s*([A-Za-z0-9][A-Za-z0-9._:/-]*)\t+(.+?)\s*$`,
+    flags: '',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/models-antigravity-1.5.0.txt`, version: '1.5.0', text: 'gemini-3.8-flash-low\tGemini 3.8 Flash (Low)', shows: 'A model of the account, its id and display name' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/models-antigravity-1.5.0.txt`, version: '1.5.0', text: 'claude-opus-4-6-thinking\tClaude Opus 4.6 (Thinking)', shows: 'Another company’s model, as agy lists it' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: 'antigravity.signIn.needed',
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.signIn.needed.title', defaultMessage: 'Not signed in (agy models)', description: "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of the CLI's message when it isn't signed in. agy models is a command: keep it." }),
+    desc: msg({ id: 'settings.advanced.antigravity.signIn.needed.desc', defaultMessage: "What agy models prints when the PC isn't signed in to Antigravity. Only this says signed out: any other failure (the network, the service, a timeout) is shown as it is, never as a sign-in to do.", description: 'What the advanced setting "Not signed in (agy models)" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`Please sign in to view available models`,
+    flags: 'i',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/models-signedout-antigravity-1.5.0.txt`, version: '1.5.0', text: 'Error: Please sign in to view available models. Launch the CLI without arguments to sign in.', shows: 'agy models with nobody signed in (a Windows Sandbox, HI-2544)' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('antigravity', 'preApproveCombworkTools'),
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.override.preApproveCombworkTools.title', defaultMessage: "Pre-approve Combwork's tools", description: "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.antigravity.override.preApproveCombworkTools.desc',
+      defaultMessage: "Combwork starts agy with an allow rule for Combwork's tools in its settings for that session (for the Assistant, only those its Control settings let it use without asking), so agy doesn't ask before them. Turned off, agy asks before them as its own permission mode says. What an agent or the Assistant may do with them is still decided by Combwork.",
+      description: 'What the advanced setting "Pre-approve Combwork\'s tools" does (Settings → Advanced, under Antigravity CLI). agy is a command: keep it. Control is the name of the Assistant\'s settings page.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [
+      { from: `${FIX}/advanced/headless-denied-antigravity-1.5.0.txt`, version: '1.5.0', text: 'Add an allow-rule under permissions.allow in settings.json (e.g. mcp(<target>))', shows: "agy's own words on allowing an MCP tool, which Combwork does for its own" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-antigravity-1.5.0.txt`, version: '1.5.0', text: 'Settings for this session only, never saved', shows: "agy's help for the flag Combwork passes them with" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: overrideId('antigravity', 'stripAccountVars'),
+    group: 'antigravity',
+    title: msg({ id: 'settings.advanced.antigravity.override.stripAccountVars.title', defaultMessage: "Keep other accounts' variables from Antigravity", description: "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.antigravity.override.stripAccountVars.desc',
+      defaultMessage: "Combwork leaves GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT out of agy's environment (its sessions, and checking its sign-in and models), so a key or account another tool set never switches Antigravity agents away from this PC's sign-in. Turned off, agy gets them from Combwork's environment as it would outside Combwork.",
+      description: 'What the advanced setting "Keep other accounts\' variables from Antigravity" does (Settings → Advanced, under Antigravity CLI). GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT are environment variables and agy a command: keep them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [
+      { from: `${FIX}/advanced/env-antigravity-1.5.0.txt`, version: '1.5.0', text: 'GEMINI_API_KEY', shows: 'A variable named in the agy 1.5.0 binary that Combwork leaves out' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/env-antigravity-1.5.0.txt`, version: '1.5.0', text: 'AGY_ADC_AUTH', shows: 'A variable named in the agy 1.5.0 binary that Combwork leaves out' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
     id: overrideId('copilot', 'allMcpInstructions'),
     group: 'copilot',
     title: msg({ id: 'settings.advanced.copilot.override.allMcpInstructions.title', defaultMessage: "Include every MCP server's instructions", description: "An advanced setting's title (Settings → Advanced, under GitHub Copilot): one of Combwork's overrides of the CLI, on by default. MCP is a protocol's name." }),
@@ -3262,7 +3338,7 @@ export function sampleMissText(def: AdvancedDef, value: unknown): Text | null {
   )
 }
 
-const GROUP_NAMES: Record<string, string> = { cw: APP_NAME, 'claude-code': 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot' } // i18n-ignore: product names
+const GROUP_NAMES: Record<string, string> = { cw: APP_NAME, 'claude-code': 'Claude Code', codex: 'Codex', copilot: 'GitHub Copilot', antigravity: 'Antigravity CLI' } // i18n-ignore: product names
 export const groupName = (g: AdvancedGroup): string => GROUP_NAMES[g] ?? g
 
 /** The CLI version an override was made for: the installed one when it was set, and the value it was set to. */
