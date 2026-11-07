@@ -12,7 +12,7 @@ import type { ConversationParserLike } from './providers/types'
 import { sessions } from './sessions'
 import { setViewing, whileReading } from './transcriptReads'
 import { workspace } from './workspace'
-import { isGz, prefixHash, readBytes, readTranscript } from './transcriptFiles'
+import { fileIdentity, isGz, prefixHash, readBytes, readTranscript } from './transcriptFiles'
 import { createHash, type Hash } from 'crypto'
 import { toolForDisplay } from './transcriptDisplay'
 
@@ -41,10 +41,12 @@ interface Entry {
    */
   read?: Hash
   mtime?: number
+  /** The file's identity when read (fileIdentity), for the same: another file in its place is read from the start. */
+  ident?: string
 }
 
 /** What the viewer passes back to learn nothing changed: a plain file's size read, a compressed one's identity. */
-const versionOf = (e: Entry): string => (isGz(e.path) ? `gz:${e.stamp}` : e.parser.rewritten ? `${e.size}:${e.mtime ?? 0}` : String(e.size))
+const versionOf = (e: Entry): string => (isGz(e.path) ? `gz:${e.stamp}` : e.parser.rewritten ? `${e.size}:${e.mtime ?? 0}:${e.ident ?? ''}` : String(e.size))
 
 const MAX_CACHED = 6
 /** How much of a transcript is read at a time. */
@@ -101,7 +103,10 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
   // start again.
   // One its CLI may write again in place (HI-2546): a change of size or time whose bytes read before aren't the same any
   // more (an equal-length rewrite, a rewritten start that grew) is read again from the start too.
-  const rewritten = !!e && !isGz(path) && e.path === path && !!e.parser.rewritten && (size !== e.size || st.mtimeMs !== e.mtime) && e.parser.offset > 0 && size >= e.parser.offset && (await prefixHash(path, e.parser.offset)) !== e.read?.copy().digest('hex')
+  // Another file put in its place (its identity differs), even of the same size and time, is read from the start too.
+  const ident = fileIdentity(st)
+  const replaced = !!e && !isGz(path) && e.path === path && !!e.parser.rewritten && e.ident !== undefined && e.ident !== ident
+  const rewritten = replaced || (!!e && !isGz(path) && e.path === path && !!e.parser.rewritten && (size !== e.size || st.mtimeMs !== e.mtime) && e.parser.offset > 0 && size >= e.parser.offset && (await prefixHash(path, e.parser.offset)) !== e.read?.copy().digest('hex'))
   if (!e || rewritten || e.path !== path || (isGz(path) ? stamp !== e.stamp : size < e.parser.offset)) {
     const id = await sessions.sessionProvider(projectPath, sessionId)
     e = { path, provider: id, parser: provider(id).conversationParser(projectPath), size: 0, stamp: '', used: 0 }
@@ -116,7 +121,7 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
       e.size = size
       e.stamp = stamp
     }
-  } else if (size !== e.size || (e.parser.rewritten && st.mtimeMs !== e.mtime)) {
+  } else if (size !== e.size || (e.parser.rewritten && (st.mtimeMs !== e.mtime || e.ident !== ident))) {
     // In pieces, so a long transcript opened for the first time doesn't take its whole size in memory at once.
     let chunk = READ_CHUNK
     if (e.parser.rewritten) e.read ??= createHash('sha1')
@@ -133,6 +138,7 @@ async function parseNow(projectPath: string, sessionId: string, key: string): Pr
     }
     e.size = size
     e.mtime = st.mtimeMs
+    e.ident = ident
   }
   if (cache.size > MAX_CACHED) {
     const oldest = [...cache.entries()].sort((a, b) => a[1].used - b[1].used)[0]

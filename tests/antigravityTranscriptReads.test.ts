@@ -3,7 +3,7 @@
 // start that then grew) is read again from the start, with no item, image offset or token counted twice; appending stays
 // incremental; the image a tool read comes from that conversation's own media file only. Append-only providers are left
 // as they were (rereadsWhole is agy's alone).
-import { mkdirSync, readFileSync, utimesSync, writeFileSync } from 'fs'
+import { mkdirSync, readFileSync, renameSync, statSync, utimesSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
@@ -95,5 +95,27 @@ describe("agy's transcript, written again in place", () => {
     // Grown after a rewrite of its start: counted from the start again, not added.
     put(same.replace('"input_tokens":7088', '"input_tokens":70880') + JSON.stringify({ step_index: 4, source: 'MODEL', type: 'PLANNER_RESPONSE', status: 'DONE', created_at: '2026-11-07T11:46:33Z', input_tokens: 10, cache_read_tokens: 0, output_tokens: 1 }) + '\n')
     expect(await read()).toMatchObject({ requests: 3, inputTokens: 70880 + 8353 + 10, outputTokens: 103 + 1 + 1 })
+  })
+
+  it("another file put in its place, keeping its size and time (a rename over it), is read from the start by both readers (HR2's round 2)", async () => {
+    let id = 100
+    const usage = async () => ((await handleRequest({ id: ++id, type: 'read', path: file, session: CONV, provider: 'antigravity', seed: null } as never)) as { usage: { inputTokens: number } }).usage
+    const text = imageText()
+    const other = text.replace('in this folder and reply', 'in this folder and REPLY').replace('"input_tokens":8352', '"input_tokens":8353')
+    expect(other.length).toBe(text.length)
+    const at = 1_900_000_000
+    writeFileSync(file, text)
+    utimesSync(file, at, at)
+    expect((await shown())[0]).toMatch(/and reply/)
+    expect((await usage()).inputTokens).toBe(7088 + 8352)
+    const next = join(logs, 'replacement.jsonl')
+    writeFileSync(next, other)
+    utimesSync(next, at, at)
+    const before = statSync(file)
+    renameSync(next, file)
+    const after = statSync(file)
+    expect([after.size === before.size, after.mtimeMs === before.mtimeMs, after.ino !== before.ino]).toEqual([true, true, true])
+    expect((await shown())[0]).toMatch(/and REPLY/)
+    expect((await usage()).inputTokens).toBe(7088 + 8353)
   })
 })

@@ -78,6 +78,10 @@ describe("agy's transcript as a conversation", () => {
     const text = [
       step({ step_index: 1, type: 'PLANNER_RESPONSE', tool_calls: [{ name: 'read_file', args: { Path: 'a' } }, { name: 'read_file', args: { Path: 'b' } }] }),
       step({ step_index: 2, source: 'SYSTEM', type: 'FUTURE_METADATA', content: 'not a tool result' }),
+      // A known type in another shape (HR2's round 2): no status, its content an object, at the index a valid result has later.
+      JSON.stringify({ step_index: 3, type: 'GENERIC', content: { future_metadata: true } }),
+      step({ step_index: 3, type: 'GENERIC', status: 'PENDING', content: 'an unknown status' }),
+      step({ step_index: 3, type: 'GENERIC', content: 'no output', media: 'not a list' }),
       'not json',
       step({ step_index: 1e300, type: 'GENERIC', content: 'a huge index' }),
       step({ step_index: -1, type: 'GENERIC', content: 'a negative index' }),

@@ -114,8 +114,33 @@ export const isCompaction = (s: AgyStep): boolean => s.type === 'CHECKPOINT'
 /** A step's index: a whole number from 0, else null (the line isn't read). */
 export const stepIndex = (s: AgyStep): number | null => (Number.isSafeInteger(s.step_index) && (s.step_index as number) >= 0 ? (s.step_index as number) : null)
 
-/** A tool call's result: GENERIC, the only result step agy 1.5.0 wrote (an unknown type never takes a waiting call). */
-export const isToolResult = (s: AgyStep): boolean => s.type === 'GENERIC'
+const optString = (v: unknown): boolean => v === undefined || typeof v === 'string'
+const tokensOk = (s: AgyStep): boolean => [s.input_tokens, s.cache_read_tokens, s.output_tokens].every((v) => v === undefined || (typeof v === 'number' && Number.isFinite(v)))
+
+/**
+ * Whether a step is one this parser reads, in the shape agy 1.5.0 wrote it (HI-2546's fixtures): an unknown type, or a
+ * known one in another shape, is left out whole: it takes no call's result and leaves its index unread, so a valid step
+ * there later is still read.
+ */
+export function knownStep(s: AgyStep): boolean {
+  switch (s.type) {
+    case 'USER_INPUT':
+    case 'SYSTEM_MESSAGE':
+      return typeof s.content === 'string'
+    case 'PLANNER_RESPONSE':
+      return optString(s.content) && optString(s.thinking) && (s.tool_calls === undefined || Array.isArray(s.tool_calls)) && tokensOk(s)
+    case 'CHECKPOINT':
+      return optString(s.content) && tokensOk(s)
+    case 'GENERIC':
+      // A tool's result: done or failed, with its output, its error or its images.
+      return (s.status === 'DONE' || s.status === 'ERROR') && optString(s.content) && optString(s.error) && (s.media === undefined || Array.isArray(s.media)) && (typeof s.content === 'string' || typeof s.error === 'string' || Array.isArray(s.media))
+    default:
+      return false
+  }
+}
+
+/** A tool call's result: GENERIC in its shape (knownStep), the only result step agy 1.5.0 wrote. */
+export const isToolResult = (s: AgyStep): boolean => s.type === 'GENERIC' && knownStep(s)
 
 /** A call's arguments as transcript_full.jsonl has them (an object), else none. */
 const argsOf = (args: unknown): Record<string, unknown> => (args && typeof args === 'object' && !Array.isArray(args) ? (args as Record<string, unknown>) : {})
@@ -190,7 +215,7 @@ export class AntigravityConversationParser implements ConversationParserLike {
   private line(text: string, offset: number, length: number): void {
     const s = parseStep(text)
     const index = s ? stepIndex(s) : null
-    if (!s || index === null || this.seen.has(index)) return
+    if (!s || index === null || !knownStep(s) || this.seen.has(index)) return
     this.seen.add(index)
     const ts = typeof s.created_at === 'string' ? s.created_at : null
     if (s.type === 'USER_INPUT') {
@@ -329,7 +354,7 @@ export class AntigravityUsageParser {
     for (const line of text.split('\n')) {
       const s = parseStep(line)
       const index = s ? stepIndex(s) : null
-      if (!s || index === null || this.seen.has(index)) continue
+      if (!s || index === null || !knownStep(s) || this.seen.has(index)) continue
       this.seen.add(index)
       const ts = typeof s.created_at === 'string' ? s.created_at : undefined
       if (ts) {

@@ -120,6 +120,9 @@ export async function readBytes(path: string, from: number, to: number): Promise
   return Buffer.concat(parts)
 }
 
+/** A file's identity from its stat (its volume and file id): a file put in another's place keeping its size and time differs. */
+export const fileIdentity = (st: { dev: number | bigint; ino: number | bigint }): string => `${st.dev}:${st.ino}`
+
 /**
  * A hash of a plain file's first `length` bytes, read a piece at a time (HI-2546: whether what a reader read of a
  * transcript its CLI may write again in place is still there); null when the file is shorter or can't be read.
