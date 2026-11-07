@@ -384,6 +384,25 @@ describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2
     expect(unknown("import { spawn } from 'child_process'\nconst S = `require(${JSON.stringify(p)})`\nspawn(process.execPath, ['-e', S])\n")).toMatch(/script made from text/)
     // `-p` is git's patch flag where nothing starts node.
     expect(unknown("export const args = ['log', '-p', '-U0']\n")).toBeNull()
+    // HI-2697: a fixed script that itself starts a process (the queue's launcher) is its src file's starter, under the
+    // build entries' rule; outside src a starter is unknown whatever its script.
+    const starting = "import { spawn } from 'child_process'\nconst S = `process.env.ELECTRON_RUN_AS_NODE = '1'; require('child_process').spawn(process.env.CMD)`\nspawn(process.execPath, ['-e', S, '129'])\n"
+    const graph = (f: string) => importGraph([f], () => starting)
+    expect(graph('src/main/x.ts').unknownOf('src/main/x.ts')).toBeNull()
+    expect(graph('src/main/x.ts').startsOf('src/main/x.ts')).toMatch(/starts a worker/)
+    expect(graph('tests/x.ts').unknownOf('tests/x.ts')).toBeTruthy()
+  })
+  it("the merge queue's node scripts, cw-mcp and the renderer's window uses stay known (HI-2697)", () => {
+    const hubs = ['src/main/workflow/launcher.ts', 'src/main/workflow/gitHost.ts', 'src/main/mcp/cw-mcp.ts', 'src/renderer/src/commitLoop.tsx', 'src/renderer/src/commitWatch.ts', 'src/renderer/src/windowHealth.ts']
+    const files = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf8', env: runContext.baseEnv() }).split(/\r?\n/).filter(Boolean)
+    const g = importGraph(files, (f: string) => {
+      try {
+        return readFileSync(join(root, f), 'utf8')
+      } catch {
+        return null
+      }
+    })
+    for (const f of hubs) expect(g.unknownOf(f), f).toBeNull()
   })
   it("the gate's tokens, each on what an allowed form leaves behind; comments, strings and types are nothing", () => {
     const unknown = (text: string): string | null => importGraph(['src/x.ts'], () => text).unknownOf('src/x.ts')
