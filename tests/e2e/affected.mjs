@@ -99,6 +99,9 @@ export const EVERYTHING = [
   'tests/e2e/runContext.cjs',
   'tests/e2e/slots.mjs',
   'tests/e2e/codexHomeLock.mjs',
+  'tests/e2e/testHomeLock.mjs',
+  'tests/e2e/testHomes.mjs',
+  'tests/e2e/testHomeManifest.mjs',
   'tests/e2e/clean.mjs',
   'tests/e2e/evidence.cjs',
   'tests/e2e/boardRows.cjs',
@@ -658,7 +661,11 @@ export const REAL_TIER = [
   'tests/e2e/lib.cjs',
   // The environment the real CLIs are started in.
   'tests/e2e/runContext.cjs',
-  'tests/e2e/codexHomeLock.mjs'
+  'tests/e2e/codexHomeLock.mjs',
+  // Each real CLI's test home, reset before its run (HI-2606).
+  'tests/e2e/testHomeLock.mjs',
+  'tests/e2e/testHomes.mjs',
+  'tests/e2e/testHomeManifest.mjs'
 ]
 const PROVIDER_OWN = ['src/main/providers/claude/', 'src/main/providers/codex/', 'src/main/providers/copilot/']
 
