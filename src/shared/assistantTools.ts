@@ -116,15 +116,25 @@ export const WORKER_ONLY_TOOLS: readonly string[] = [...INTENT_TOOLS.filter((t) 
  * never narrows an either-role agent, nor gives a role the other side's tools; a lane's builder builds and its reviewer
  * reviews, as lanes.ts checks), fixed for the session: a role change restarts it (sessions.ts).
  */
-export type ToolSide = 'builder' | 'reviewer' | 'both'
+export type ToolSide = 'builder' | 'reviewer' | 'both' | 'independent'
 /** A reviewer's moves: a builder is never offered them. */
 export const REVIEWER_ONLY_TOOLS: readonly string[] = ['cw_start_review', 'cw_verdict', 'cw_request_builder', 'cw_focused_skip']
 /** A builder's moves: a reviewer is never offered them. */
 export const BUILDER_ONLY_TOOLS: readonly string[] = ['cw_start_card', 'cw_submit', 'cw_put_back', 'cw_declare_paths', 'cw_cannot_within_rules', 'cw_merge_slot', 'cw_report_merge', 'cw_reorder_tasks', 'cw_update_tasks']
-/** An agent's side as its tools follow it, from its workflow role: builder, reviewer, else both. */
-export const toolSideOf = (role: string | null | undefined): ToolSide => (role === 'builder' || role === 'reviewer' ? role : 'both')
-/** The tools a side isn't offered (nothing for both, or a side not known). */
+/**
+ * An Independent agent's tools (HI-2731, Darren's 7 Nov decisions: "Agent level is whatever is required for that role…
+ * If the role doesn't require them to use the task board then it's pointless telling them about the tools"): it works
+ * only with the user in its pane, so none of the board's, cards', lanes', the inbox's or the queue's, only the
+ * workspace's shared notes and handovers, reading long documents, the skills list, the projects, a notification and
+ * its own usage.
+ */
+export const INDEPENDENT_TOOLS: readonly string[] = ['cw_list_shared_notes', 'cw_read_shared_note', 'cw_write_shared_note', 'cw_create_handover', 'cw_read_latest_handover', 'cw_doc_outline', 'cw_read_section', 'cw_list_skills', 'cw_list_projects', 'cw_notify', 'cw_session_usage']
+/** An agent's side as its tools follow it, from its workflow role: builder, reviewer, independent, else both. */
+export const toolSideOf = (role: string | null | undefined): ToolSide => (role === 'builder' || role === 'reviewer' || role === 'independent' ? role : 'both')
+/** The tools a side isn't offered among the workflow's own (nothing for both, or a side not known); Independent's: sideOffers. */
 export const hiddenForSide = (side: string | null | undefined): readonly string[] => (side === 'builder' ? REVIEWER_ONLY_TOOLS : side === 'reviewer' ? BUILDER_ONLY_TOOLS : [])
+/** Whether a project agent on `side` is offered `tool`: an Independent one only its own few, any other all but its hidden. */
+export const sideOffers = (side: string | null | undefined, tool: string): boolean => (side === 'independent' ? INDEPENDENT_TOOLS.includes(tool) : !hiddenForSide(side).includes(tool))
 /**
  * Whether a session launched with `side`'s tools can do a part's work (HI-2664, HR3's round 1): a running agent whose role
  * changed keeps the tools it launched with until it restarts, and is given no work needing the new ones meanwhile. No side

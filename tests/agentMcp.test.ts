@@ -140,6 +140,45 @@ describe('a launch', () => {
       await disposeWorkspaceService(w)
     }
   })
+
+  it('tells the combwork server each role’s side, Independent its own; the workspace’s servers and skills stay as for any role (HI-2731)', async () => {
+    // A workspace of its own: two servers on, a skill of its own, one agent per role.
+    const home = join(base, 'ws-roles')
+    const project = join(home, 'proj')
+    mkdirSync(join(project, '.combwork'), { recursive: true })
+    mkdirSync(join(home, '.combwork', 'mcp'), { recursive: true })
+    for (const n of ['notes', 'sandbox']) writeFileSync(join(home, '.combwork', 'mcp', `${n}.json`), JSON.stringify(server(n)))
+    writeFileSync(join(home, '.combwork', 'workspace.json'), JSON.stringify({ version: 1, mcp: { enabled: ['notes', 'sandbox'] } }))
+    const roles = ['builder', 'reviewer', 'either', 'generalist', 'independent'] as const
+    const agents = roles.map((r) => ({ id: `a-${r}`, name: r, provider: 'claude-code', workflowRole: r }))
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents }))
+    mkdirSync(join(home, '.combwork', 'skills', 'house-style'), { recursive: true })
+    writeFileSync(join(home, '.combwork', 'skills', 'house-style', 'SKILL.md'), '---\nname: house-style\ndescription: How we write.\n---\n\nWrite plainly.\n')
+    const { createWorkspaceService, disposeWorkspaceService } = await import('../src/main/workspace')
+    const { sessions } = await import('../src/main/sessions')
+    const w = createWorkspaceService()
+    await w.open(home)
+    // Combwork's own server, as the Agent API gives it when it runs.
+    const was = sessions.combworkMcp
+    sessions.combworkMcp = () => ({ command: 'node', args: ['cw-mcp.js'], env: {} })
+    try {
+      const eff = async (r: (typeof roles)[number]) => sessions.effective(project, agents.find((a) => a.workflowRole === r) as never)
+      const sides: Record<string, unknown> = {}
+      for (const r of roles) {
+        const e = await eff(r)
+        sides[r] = e.mcpServers.combwork?.env?.CW_SIDE
+        expect(e.launch.tools && e.launch.guidance, r).toBe(true)
+        expect(e.skills.map((s) => s.name), r).toContain('house-style')
+        expect(Object.keys(e.mcpServers).sort(), r).toEqual(['combwork', 'notes', 'sandbox'])
+      }
+      expect(sides).toEqual({ builder: 'builder', reviewer: 'reviewer', either: 'both', generalist: 'both', independent: 'independent' })
+      // A role change to or from Independent changes the signature, so a running agent restarts for it.
+      expect(sessions.signature(await eff('independent'))).not.toBe(sessions.signature(await eff('either')))
+    } finally {
+      sessions.combworkMcp = was
+      await disposeWorkspaceService(w)
+    }
+  })
 })
 
 describe('saving it', () => {

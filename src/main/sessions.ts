@@ -21,7 +21,7 @@ import { ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { formatDateTime } from '../shared/dates'
 import { formatSize } from '../shared/units'
 import { backgroundTaskMinutes } from '../shared/tasks'
-import { assistantTools, hiddenForSide, isReservedServerName, sideAllows, toolSideOf, TOOLS_SERVER, workflowAllows, workflowHiddenOf } from '../shared/assistantTools'
+import { assistantTools, isReservedServerName, sideAllows, sideOffers, toolSideOf, TOOLS_SERVER, workflowAllows, workflowHiddenOf } from '../shared/assistantTools'
 import { CW_DIR, isCompacting, agentPtyKey, assertSessionId, cliRename, isSessionId, launchedWithOf, projectAgents, resumeRecord, transcriptWarnLimit } from '../shared/defaults'
 import { defaultPurpose, legacySetupPending, legacyWorktree, namedFolders, type StoredAgent, resumeHold, resumeHome, shownPlace, slotAt, type FolderFacts, type FolderPurpose, type NamedFolder, type FolderSlot, type ResumeHold } from '../shared/agentFolders'
 import { holdText } from '../shared/sessionResume'
@@ -2585,9 +2585,8 @@ class SessionManager {
    * doesn't already leave out, sorted. Read through workflowHiddenOf (workflowTools.ts sets it at startup); unreadable, none.
    */
   private workflowToolsHidden(projectPath: string, side: string, pc: ProjectConfig): string[] {
-    const bySide = hiddenForSide(side)
     try {
-      return this.workflowHiddenOf(projectPath, pc).filter((t) => !bySide.includes(t))
+      return this.workflowHiddenOf(projectPath, pc).filter((t) => sideOffers(side, t))
     } catch (e) {
       log.warn('the tools a project\'s workflow hides, not read: none are', e)
       return []

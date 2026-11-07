@@ -31,6 +31,7 @@ import { listOf, shownText, withValues, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { capturedText, CombworkError, combworkError, shownError } from './combworkError'
 import { providerService } from './providerService'
+import { allProviders } from './providers'
 import { accountById, allConnections, firstUsableAccount, assertConnectionHere, connectionProblem, firstAccountHere, getConnection } from './accounts'
 import { ensureMigrated, saveConnections } from './connectionMoves'
 import { baseConnection } from '../shared/accounts'
@@ -595,6 +596,12 @@ export async function removeAgent(projectPath: string, agentId: string, opts: { 
     return { agents: left, ...pendingSetupPatch(now, { add: pending, drop: gone }) }
   })
   await agentsGone(projectPath, [agentId], { releaseCards: !!opts.releaseCards })
+  // What a CLI keeps for this agent alone (Antigravity's profile, HI-2731) goes too: only here, since Remove Agent can't
+  // be undone, while a template load's can (its agents come back with their ids and conversations).
+  const home = workspaceOf(projectPath).path
+  if (home) {
+    for (const p of allProviders()) await p.agentRemoved?.(agentId, home).catch((e) => log.warn(`Could not send ${userText(def.name)}'s ${p.descriptor.name} profile to the Recycle Bin`, e))
+  }
   return result
 }
 

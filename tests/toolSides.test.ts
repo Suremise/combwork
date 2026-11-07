@@ -5,7 +5,7 @@
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { ASSISTANT_ONLY_TOOLS, BUILDER_ONLY_TOOLS, CW_TOOLS, REVIEWER_ONLY_TOOLS, WORKER_ONLY_TOOLS, hiddenForSide, sideAllows, toolSideOf } from '../src/shared/assistantTools'
+import { ASSISTANT_ONLY_TOOLS, BUILDER_ONLY_TOOLS, CW_TOOLS, INDEPENDENT_TOOLS, REVIEWER_ONLY_TOOLS, WORKER_ONLY_TOOLS, hiddenForSide, sideAllows, sideOffers, toolSideOf } from '../src/shared/assistantTools'
 
 const SKILLS = join(__dirname, '..', 'resources', 'skills')
 const read = (...p: string[]): string => readFileSync(join(SKILLS, ...p), 'utf8')
@@ -27,11 +27,32 @@ describe('tools by side (HI-2664)', () => {
     expect(BUILDER_ONLY_TOOLS.filter((t) => REVIEWER_ONLY_TOOLS.includes(t))).toEqual([])
   })
 
-  it("an agent's side is its role's: builder, reviewer, else both (either, generalist, independent, unknown)", () => {
-    expect(['builder', 'reviewer', 'either', 'generalist', 'independent', 'unknown', undefined].map(toolSideOf)).toEqual(['builder', 'reviewer', 'both', 'both', 'both', 'both', 'both'])
+  it("an agent's side is its role's: builder, reviewer, independent, else both (either, generalist, unknown)", () => {
+    expect(['builder', 'reviewer', 'either', 'generalist', 'independent', 'unknown', undefined].map(toolSideOf)).toEqual(['builder', 'reviewer', 'both', 'both', 'independent', 'both', 'both'])
     expect(hiddenForSide('builder')).toEqual(REVIEWER_ONLY_TOOLS)
     expect(hiddenForSide('reviewer')).toEqual(BUILDER_ONLY_TOOLS)
     expect([hiddenForSide('both'), hiddenForSide(undefined), hiddenForSide('nonsense')]).toEqual([[], [], []])
+  })
+
+  // HI-2731, Darren's 7 Nov decisions: an Independent agent works only with the user, so none of the board's tools.
+  it('an Independent agent is offered only its own few, none of the board’s, cards’, lanes’ or inbox’s', () => {
+    for (const t of INDEPENDENT_TOOLS) {
+      expect(CW_TOOLS, t).toContain(t)
+      expect(ASSISTANT_ONLY_TOOLS, t).not.toContain(t)
+    }
+    const offered = CW_TOOLS.filter((t) => !ASSISTANT_ONLY_TOOLS.includes(t) && sideOffers('independent', t))
+    expect(offered.sort()).toEqual([...INDEPENDENT_TOOLS].sort())
+    expect(offered.filter((t) => /task|card|lane|inbox|queue|merge|review|verdict|submit|loop|put_back|wait_for|ask_|declare|report|cannot|request|focused|attachment|project_status/.test(t))).toEqual([])
+    // Every other side keeps what HI-2664 gave it.
+    for (const side of ['builder', 'reviewer', 'both', undefined]) for (const t of CW_TOOLS) expect(sideOffers(side, t), `${side} ${t}`).toBe(!hiddenForSide(side).includes(t))
+    // And it does no lane part, whatever it is asked.
+    expect([sideAllows('independent', 'builder'), sideAllows('independent', 'reviewer')]).toEqual([false, false])
+  })
+
+  it('every tool the skills for its own work name (handover, workspace notes) is offered to an Independent agent', () => {
+    const own = named([dir('handover'), dir('workspace-note')].join('\n'))
+    expect(own.length).toBeGreaterThan(2)
+    expect(own.filter((t) => !sideOffers('independent', t))).toEqual([])
   })
 
   // HR3's round 1: lanes never narrow an either-role agent's tools, nor give a role the other side's.

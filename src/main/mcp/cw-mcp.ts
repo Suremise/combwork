@@ -14,7 +14,7 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { appendFileSync, readFileSync } from 'fs'
 import { createInterface } from 'readline'
 import { combworkInstructions, withLatestHandover } from '../../shared/combworkGuidance'
-import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, assistantTools, controlAllows, hiddenForSide, TOOLS_SERVER, WORKER_ONLY_TOOLS, workflowHiddenOf } from '../../shared/assistantTools'
+import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, assistantTools, controlAllows, sideOffers, TOOLS_SERVER, WORKER_ONLY_TOOLS, workflowHiddenOf } from '../../shared/assistantTools'
 import { COLUMN_IDS } from '../../shared/tasks'
 import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
@@ -1420,11 +1420,12 @@ const tools: Tool[] = [
 /** Agents get Combwork's common tools; the Assistant also those its control level allows. */
 const allowed = new Set(assistantTools(CONTROL, CHANGE_SETTINGS, JOURNAL))
 // The Assistant never gets a worker's tools (HI-2664: it coordinates cards, never builds or reviews them); a project agent
-// not its other side's (CW_SIDE, its launch's: a builder no reviewer's moves, a reviewer no builder's).
-const SIDE_HIDDEN = hiddenForSide(process.env.CW_SIDE)
+// not its other side's (CW_SIDE, its launch's: a builder no reviewer's moves, a reviewer no builder's, an Independent
+// agent only its own few, HI-2731).
+const SIDE = process.env.CW_SIDE
 // Nor the tools its project's workflow made unusable when it launched (HI-2694: CW_WORKFLOW_HIDDEN, launch-only).
 const WORKFLOW_HIDDEN = workflowHiddenOf(process.env.CW_WORKFLOW_HIDDEN)
-const offered = tools.filter((t) => (t.name !== 'cw_console' || DEV_CONSOLE) && (ASSISTANT ? (!ASSISTANT_ONLY_TOOLS.includes(t.name) || allowed.has(t.name)) && !AGENT_ONLY_TOOLS.includes(t.name) && !WORKER_ONLY_TOOLS.includes(t.name) : !ASSISTANT_ONLY_TOOLS.includes(t.name) && !SIDE_HIDDEN.includes(t.name) && !WORKFLOW_HIDDEN.includes(t.name)))
+const offered = tools.filter((t) => (t.name !== 'cw_console' || DEV_CONSOLE) && (ASSISTANT ? (!ASSISTANT_ONLY_TOOLS.includes(t.name) || allowed.has(t.name)) && !AGENT_ONLY_TOOLS.includes(t.name) && !WORKER_ONLY_TOOLS.includes(t.name) : !ASSISTANT_ONLY_TOOLS.includes(t.name) && sideOffers(SIDE, t.name) && !WORKFLOW_HIDDEN.includes(t.name)))
 /** The offered tools a CLI that defers tools gets in full (HI-2229). */
 const FULL = new Set(alwaysLoaded(ASSISTANT))
 

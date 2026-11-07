@@ -7,8 +7,11 @@
 // a conversation that isn't the agent's is never resumed. Its transcript (HI-2546): the conversation view (prompts without
 // what agy adds, replies, tool calls with their results and the image one read, light and dark), its usage (requests, the
 // cache counted once, the model, agy's title), the status line's model and effort, the Sessions tab, and a conversation
-// whose store agy no longer has, refused with why. The fake proves the adapter's side only (HI-2548 runs the real
-// CLI). Dev build, throwaway profile and workspace.
+// whose store agy no longer has, refused with why. Roles (HI-2731): one agent Either → Independent → Either, a new session
+// each time, and a fresh one only ever Independent: the combwork server's side in its profile's mcp_config.json (both,
+// then Independent's own few tools) and its GEMINI.md; on a connection without Combwork's tools, no server, no guidance
+// and agy's cache of the server gone; removed, its profile to the Recycle Bin. The fake proves the adapter's side only
+// (HI-2548 runs the real CLI). Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -336,6 +339,49 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await stop()
   void ada
   check('the sentinel was never started, all along', !fs.existsSync(marker))
+
+  // --- Roles (HI-2731, Darren's 7 Nov decisions): what each launch gives agy for the agent's role, one agent Either →
+  // Independent → Either (a new session each time), beside a fresh agent only ever Independent; then removed, its profile
+  // to the Recycle Bin (the suite's trash folder).
+  const profileOf = (id) => path.join(userData, 'antigravity', 'profiles', id)
+  const given = (id) => {
+    const p = profileOf(id)
+    const mcp = JSON.parse(fs.readFileSync(path.join(p, '.gemini', 'config', 'mcp_config.json'), 'utf8')).mcpServers
+    return { side: mcp.combwork?.env?.CW_SIDE ?? null, rules: fs.readFileSync(path.join(p, '.gemini', 'GEMINI.md'), 'utf8') }
+  }
+  const launchAs = async (id, role) => {
+    await inv('agents:update', alpha, id, { workflowRole: role })
+    const launched = entries('session').length
+    await inv('session:start', alpha, { agentId: id })
+    // Before any turn (a new session, no prompt): ready is its first status line's idle.
+    await until(async () => entries('session').length > launched && (await live(id))?.status === 'ready', HUNG_MS)
+    const got = given(id)
+    await stop(id)
+    return got
+  }
+  const rolf = await lib.addAgent(inv, alpha, { name: 'Rolf', provider: 'antigravity' })
+  const asEither = await launchAs(rolf.id, 'either')
+  check('an Either agent gets the combwork server with both sides’ tools, and Combwork’s guidance in its GEMINI.md', asEither.side === 'both' && /cw_inbox/.test(asEither.rules), JSON.stringify({ side: asEither.side, rules: asEither.rules.slice(0, 120) }))
+  // agy's own cache of the server, as an earlier launch leaves it (agy writes it as it loads the tools).
+  const cache = path.join(profileOf(rolf.id), '.gemini', 'antigravity-cli', 'mcp', 'combwork')
+  fs.mkdirSync(cache, { recursive: true })
+  fs.writeFileSync(path.join(cache, 'instructions.md'), 'cw_inbox')
+  const asIndependent = await launchAs(rolf.id, 'independent')
+  check('…made Independent, its next launch gets its own side only (no board, card, lane or inbox tools)', asIndependent.side === 'independent', JSON.stringify(asIndependent.side))
+  const asEitherAgain = await launchAs(rolf.id, 'either')
+  check('…and made Either again, both sides again', asEitherAgain.side === 'both' && /cw_inbox/.test(asEitherAgain.rules), JSON.stringify(asEitherAgain.side))
+  const indy = await lib.addAgent(inv, alpha, { name: 'Indy', provider: 'antigravity' })
+  const fresh = await launchAs(indy.id, 'independent')
+  check('a fresh agent only ever Independent gets the same as the one made Independent', fresh.side === asIndependent.side && fresh.rules === asIndependent.rules, JSON.stringify({ fresh: fresh.side, changed: asIndependent.side }))
+  // A connection launching as from a terminal: no combwork server, and agy's cache of it gone from the profile.
+  fs.mkdirSync(cache, { recursive: true })
+  fs.writeFileSync(path.join(cache, 'instructions.md'), 'cw_inbox')
+  await lib.setAgentLaunch(inv, alpha, rolf.id, { tools: false, guidance: false })
+  const plain = await launchAs(rolf.id, 'either')
+  check('on a connection without Combwork’s tools: no combwork server, no guidance, and agy’s cache of the server gone', plain.side === null && !/cw_inbox/.test(plain.rules) && !fs.existsSync(cache), JSON.stringify({ side: plain.side, cache: fs.existsSync(cache) }))
+  // Removed: its profile goes to the Recycle Bin, whole; the other agent's stays.
+  await inv('agents:remove', alpha, rolf.id, { deleteWorktree: false })
+  check("a removed agent's profile goes to the Recycle Bin", !fs.existsSync(profileOf(rolf.id)) && lib.trashed(rolf.id).length === 1 && fs.existsSync(profileOf(indy.id)), JSON.stringify(lib.trashed(rolf.id)))
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')
