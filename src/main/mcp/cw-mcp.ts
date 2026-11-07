@@ -98,6 +98,7 @@ const T = {
   'connection.arg.model': agentMsg({ id: 'tool.connection.arg.model', text: 'Empty: the CLI decides (each value below too).' }),
   'connection.arg.mode': agentMsg({ id: 'tool.connection.arg.mode', text: 'Permission mode.' }),
   'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: what of Combwork its sessions get. guidance, tools, typing (false: off; tools off makes its agents Independent), overrides by key; preset "terminal": all off; an empty object: all on.' }),
+  'updateAgent.arg.confirm': agentMsg({ id: 'tool.updateAgent.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make this agent Independent (its role, or a connection without Combwork tools) while it is on a lane or holds a card.' }),
   'connection.arg.confirm': agentMsg({ id: 'tool.connection.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make those agents Independent.' }),
   'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
   'promptAgent.description': agentMsg({ id: 'tool.promptAgent.description', text: 'Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use cw_start_task.' }),
@@ -747,8 +748,8 @@ const tools: Tool[] = [
   {
     name: 'cw_update_agent',
     description: say(T['updateAgent.description']),
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs }, required: ['project', 'agent'] },
-    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, ...legacyAgentArgs(a) })
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs, confirm: { type: 'string', description: say(T['updateAgent.arg.confirm']) } }, required: ['project', 'agent'] },
+    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, confirm: a.confirm, ...legacyAgentArgs(a) })
   },
   {
     name: 'cw_connection',

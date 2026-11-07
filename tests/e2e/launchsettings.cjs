@@ -169,6 +169,26 @@ const lines = (f) => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').trim().split
     check('…turning its tools off again is refused without confirm, naming HB1 and a fingerprint', refused.isError && /HB1 \(/.test(refused.text) && !!fingerprint, JSON.stringify(refused))
     const confirmed = tool('cw_connection', { action: 'update', connection: conn.id, launch: { tools: false }, confirm: fingerprint })
     check('…and done with it', !confirmed.isError && (await inv('connections:list')).connectionRows.find((c) => c.id === conn.id)?.launch?.tools === false, JSON.stringify(confirmed))
+
+    // --- cw_update_agent (HR1 on s44): refused, then done with the user's confirmation, for Independent chosen and for a
+    // connection without Combwork's tools. Max 1's tools on again first; HB1 holds its card, HR1 is given one.
+    tool('cw_connection', { action: 'update', connection: conn.id, launch: {} })
+    await lib.until(async () => ((await agents()).HB1.role === 'builder' ? true : null), HUNG_MS)
+    const asIndependent = { project: 'alpha', agent: 'HB1', workflowRole: 'independent' }
+    const noRole = tool('cw_update_agent', asIndependent)
+    const roleFp = /confirm: ([0-9a-f]+)/.exec(noRole.text)?.[1]
+    check('cw_update_agent making HB1 Independent is refused without confirm, naming its card and a fingerprint', noRole.isError && /HB1 \(/.test(noRole.text) && !!roleFp && saved().find((a) => a.id === 'a-hb1')?.workflowRole === 'builder', JSON.stringify(noRole))
+    const role = tool('cw_update_agent', { ...asIndependent, confirm: roleFp })
+    check('…and done with the confirmation: HB1 is Independent', !role.isError && saved().find((a) => a.id === 'a-hb1')?.workflowRole === 'independent', JSON.stringify(role))
+    const plainConn = await inv('connection:add', max1.id, { name: 'Plain' })
+    await inv('connection:setLaunch', plainConn.id, { tools: false })
+    await inv('tasks:create', { title: 'Reviewer card', project: 'alpha', agent: 'a-hr1', column: 'doing' })
+    const toPlain = { project: 'alpha', agent: 'HR1', connection: plainConn.id }
+    const noConn = tool('cw_update_agent', toPlain)
+    const connFp = /confirm: ([0-9a-f]+)/.exec(noConn.text)?.[1]
+    check("cw_update_agent moving HR1 onto a connection without Combwork's tools is refused without confirm", noConn.isError && /HR1 \(/.test(noConn.text) && !!connFp && saved().find((a) => a.id === 'a-hr1')?.connection === conn.id, JSON.stringify(noConn))
+    const moved = tool('cw_update_agent', { ...toPlain, confirm: connFp })
+    check('…and done with the confirmation: HR1 is on it, and Independent', !moved.isError && saved().find((a) => a.id === 'a-hr1')?.connection === plainConn.id && !!(await lib.until(async () => ((await agents()).HR1.role === 'independent' ? true : null), HUNG_MS)), JSON.stringify(moved))
   } finally {
     await app.close().catch(() => undefined)
   }

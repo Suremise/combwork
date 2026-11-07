@@ -11,8 +11,17 @@ const state = vi.hoisted(() => ({
   agents: [] as Partial<AgentDef>[],
   lanes: [] as Partial<LaneRecord>[],
   cards: [] as Partial<TaskCard>[],
-  emitted: 0
+  emitted: 0,
+  // The board's revision (boardRevision), moved by every write a test makes, and what a card read does meanwhile.
+  rev: 0,
+  duringCardRead: null as null | ((agent: string) => void),
+  valuesSaved: [] as unknown[]
 }))
+/** A card given to an agent, as a board write: its revision moves. */
+const give = (card: Partial<TaskCard>): void => {
+  state.cards.push(card)
+  state.rev++
+}
 
 vi.mock('../src/main/config', () => ({
   config: {
@@ -29,14 +38,27 @@ vi.mock('../src/main/accounts', () => ({
   getConnection: (id: string | undefined) => state.connections.find((c) => c.id === id),
   accountById: (id: string | undefined) => (id === 'acc' ? { id: 'acc', provider: 'claude-code' } : undefined),
   allAccounts: () => [{ id: 'acc', provider: 'claude-code' }],
-  allConnections: () => state.connections
+  allConnections: () => state.connections,
+  updateConnection: (id: string, v: Record<string, unknown>) => {
+    if (v.model === 'bad') throw new Error('no such model')
+    state.valuesSaved.push(v)
+    state.connections = state.connections.map((c) => (c.id === id ? { ...c, ...v } : c))
+    return state.connections.find((c) => c.id === id)
+  }
 }))
+vi.mock('../src/main/boardStore', () => ({ boardRevision: () => String(state.rev) }))
 vi.mock('../src/main/advanced', () => ({ advanced: { overrides: () => ({}), state: () => ({ fileError: null }) } }))
 vi.mock('../src/main/events', () => ({ emit: () => void state.emitted++ }))
 vi.mock('../src/main/lanes', () => ({ rawLanes: async () => state.lanes }))
-vi.mock('../src/main/tasks', () => ({ agentCards: async (_p: string, id: string) => state.cards.filter((c) => c.agent === id) }))
+vi.mock('../src/main/tasks', () => ({
+  agentCards: async (_p: string, id: string) => {
+    const now = state.cards.filter((c) => c.agent === id)
+    state.duringCardRead?.(id)
+    return now
+  }
+}))
 vi.mock('../src/main/workspace', () => ({
-  openWorkspaces: () => [{ path: 'C:/ws', info: () => ({ projects: [{ name: 'demo', path: 'C:/ws/demo' }] }), refresh: async () => undefined }]
+  openWorkspaces: () => [{ path: 'C:/ws', info: () => ({ projects: [{ name: 'demo', path: 'C:/ws/demo' }] }), projectConfigWrites: () => 0, refresh: async () => undefined }]
 }))
 vi.mock('../src/main/fsutil', async (orig) => ({
   ...(await orig<typeof import('../src/main/fsutil')>()),
@@ -44,7 +66,7 @@ vi.mock('../src/main/fsutil', async (orig) => ({
   readKeptJson: async () => ({ agents: state.agents })
 }))
 
-const { launchImpact, setConnectionLaunch, ownRunOverride } = await import('../src/main/connectionLaunch')
+const { agentChangeCheck, changeConnection, launchImpact, setConnectionLaunch, ownRunOverride } = await import('../src/main/connectionLaunch')
 
 beforeEach(() => {
   state.connections = [{ id: 'c-1', account: 'acc', name: 'Claude' }]
@@ -56,6 +78,9 @@ beforeEach(() => {
   ]
   state.lanes = [{ id: 'lane-1', project: 'demo', state: 'active', builder: { id: 'b1', name: 'HB1' }, reviewer: null, cards: [7] }]
   state.cards = [{ number: 7, key: 'DE-7', agent: 'b1', column: 'doing' }]
+  state.rev = 0
+  state.duringCardRead = null
+  state.valuesSaved = []
 })
 
 describe('turning a connection\'s tools off', () => {
@@ -108,5 +133,85 @@ describe("Combwork's own runs of a CLI", () => {
     expect(ownRunOverride('claude-code', 'statusLine')).toBe(false)
     // With no connection of its CLI: its default.
     expect(ownRunOverride('copilot', 'noAutoUpdate')).toBe(true)
+  })
+})
+
+describe('HR1 on s44: what a change affects is one snapshot, checked at the write', () => {
+  it('reads it again when a card is given meanwhile, so a confirmation of the set before never approves the card given during the save', async () => {
+    const before = (await launchImpact('c-1', { tools: false }))!
+    // While the save reads HR1's cards (after HB1's), HB1 is given DE-8.
+    let once = true
+    state.duringCardRead = (agent) => {
+      if (agent === 'r1' && once) {
+        once = false
+        give({ number: 8, key: 'DE-8', agent: 'b1', column: 'doing' })
+      }
+    }
+    await expect(setConnectionLaunch('c-1', { tools: false }, before.fingerprint)).rejects.toThrow(/changed since you were asked.*HB1 \(lane-1, DE-7 doing, DE-8 doing\)/)
+    expect(state.connections[0].launch).toBeUndefined()
+  })
+
+  it("asks the caller's checks at the write itself, after the read: one that no longer holds then changes nothing", async () => {
+    state.lanes = []
+    state.cards = []
+    let allowed = true
+    // Change settings turned off, or the Assistant's session ended, while the save reads the board.
+    state.duringCardRead = () => void (allowed = false)
+    const atWrite = (): void => {
+      if (!allowed) throw new Error('Change settings is off')
+    }
+    await expect(changeConnection('c-1', { launch: { tools: false }, atWrite })).rejects.toThrow(/Change settings is off/)
+    expect(state.connections[0].launch).toBeUndefined()
+  })
+
+  it('refuses a change of values and launch settings whole: a missing confirmation leaves the model as it was; confirmed, both are saved', async () => {
+    await expect(changeConnection('c-1', { values: { model: 'opus' }, launch: { tools: false } })).rejects.toThrow(/confirm/)
+    expect(state.valuesSaved).toEqual([])
+    expect(state.connections[0]).toEqual({ id: 'c-1', account: 'acc', name: 'Claude' })
+    // Values that don't check out: neither part saved.
+    const fp = (await launchImpact('c-1', { tools: false }))!.fingerprint
+    await expect(changeConnection('c-1', { values: { model: 'bad' }, launch: { tools: false }, confirmed: fp })).rejects.toThrow(/no such model/)
+    expect(state.connections[0].launch).toBeUndefined()
+    const saved = await changeConnection('c-1', { values: { model: 'opus' }, launch: { tools: false }, confirmed: fp })
+    expect(saved).toMatchObject({ model: 'opus', launch: { tools: false } })
+  })
+
+  it('refuses when its launch settings were changed meanwhile', async () => {
+    state.lanes = []
+    state.cards = []
+    state.duringCardRead = () => {
+      state.connections = [{ ...state.connections[0], launch: { guidance: false } }]
+    }
+    await expect(changeConnection('c-1', { launch: { tools: false } })).rejects.toThrow(/changed meanwhile/)
+    expect(state.connections[0].launch).toEqual({ guidance: false })
+  })
+})
+
+describe("HR1 on s44: an agent made Independent is checked again under its project's lock", () => {
+  const hb1 = { id: 'b1', name: 'HB1', workflowRole: 'builder' as const, connection: 'c-1' }
+  const ws = { path: 'C:/ws', info: () => ({ projects: [] }), projectConfigWrites: () => 0 } as never
+  const fingerprint = async (): Promise<string> => /confirm: ([0-9a-f]+)/.exec(String(await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, null).catch((e: Error) => e.message)))![1]
+
+  it('needs the fingerprint of its lanes and cards, at once and again at the write', async () => {
+    await expect(agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, null)).rejects.toThrow(/HB1 \(lane-1, DE-7 doing\).*confirm: [0-9a-f]+/)
+    const check = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, await fingerprint()))!
+    expect(() => check(hb1)).not.toThrow()
+  })
+
+  it('refuses at the write when a card was given to it after the read, or its role or connection changed meanwhile', async () => {
+    const check = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, await fingerprint()))!
+    give({ number: 9, key: 'DE-9', agent: 'b1', column: 'review' })
+    expect(() => check(hb1)).toThrow(/changed since you were asked/)
+    state.rev = 0
+    expect(() => check({ ...hb1, connection: 'c-2' })).toThrow(/changed meanwhile/)
+    // An agent holding nothing: no confirmation, and still refused when the board moved before the write.
+    state.lanes = []
+    state.cards = []
+    const free = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, null))!
+    expect(() => free(hb1)).not.toThrow()
+    give({ number: 10, key: 'DE-10', agent: 'b1', column: 'doing' })
+    expect(() => free(hb1)).toThrow(/kept changing/)
+    // A change that makes nobody Independent needs no check.
+    expect(await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'reviewer' }, null)).toBeNull()
   })
 })

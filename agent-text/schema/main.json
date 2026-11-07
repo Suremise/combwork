@@ -142,9 +142,22 @@
       "users": "plain"
     }
   },
+  "main.connections.launch.agentChanged": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "main.connections.launch.busy": {
+    "placeholders": {}
+  },
   "main.connections.launch.changedAgain": {
     "placeholders": {
       "agent": "plain"
+    }
+  },
+  "main.connections.launch.changedMeanwhile": {
+    "placeholders": {
+      "name": "plain"
     }
   },
   "main.connections.launch.changing": {

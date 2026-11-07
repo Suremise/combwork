@@ -21,7 +21,7 @@ import { sessions } from './sessions'
 import { endReviews, releaseAgentCards } from './tasks'
 import { laneAgentRemoved } from './lanes'
 import { workspace, workspaceOf } from './workspace'
-import { agentImpact, assertAgentChangeConfirmed } from './connectionLaunch'
+import { agentChangeCheck, agentImpact } from './connectionLaunch'
 import type { LaunchImpact } from '../shared/launchPolicy'
 import * as wt from './worktrees'
 import { gitProblem, gitTool } from './gitTool'
@@ -494,8 +494,9 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // still has that name. The Assistant's agent is never renamed.
   const name = patch.name
   // Made Independent (HI-2670: Independent chosen, or a connection without Combwork's tools) while on a lane or holding
-  // a card: only with `confirmed` naming that exact set (agentImpact), worked out again here, just before the write.
-  if (before && !workspace.isAssistantHome(projectPath)) await assertAgentChangeConfirmed(workspaceOf(projectPath), projectPath, basename(projectPath), before, { ...before, ...clean }, opts.confirmed)
+  // a card: only with `confirmed` naming that exact set, read as one snapshot and checked again under the lock with the
+  // write (agentChangeCheck, HR1 on s44): the agent as saved still as read, and nothing it reads written since.
+  const independentCheck = before && !workspace.isAssistantHome(projectPath) ? await agentChangeCheck(workspaceOf(projectPath), projectPath, basename(projectPath), before, { ...before, ...clean }, opts.confirmed) : null
   // Its connection (HI-1769), checked under the lock with the write: one that exists, is the CLI's it will run and is on
   // here. Only the one already saved, for the same CLI, may stay while it is off here (the default runs it meanwhile).
   // Whether the patch changes its CLI was decided from the agent as read before the write (resetting what belongs to the
@@ -503,6 +504,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const beforeCli = before ? agentProvider(before, config.settings) : null
   const check = (current: AgentDef): void => {
     opts.check?.(current)
+    independentCheck?.(current)
     const was = agentProvider(current, config.settings)
     // A change of CLI only while it is stopped, as it is now: one started while this write waited keeps everything.
     if (patch.provider !== undefined && patch.provider !== was && sessions.liveFor(projectPath, agentId)) throw combworkError(M.stopForProvider, undefined, { kind: 'conflict' })

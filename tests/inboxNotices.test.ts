@@ -155,6 +155,34 @@ describe('notices in the hook replies (#650)', () => {
     }
   })
 
+  it('HI-2670 (HR1 on s44): made Independent while its notice is being worked out, it gets none of it', async () => {
+    const st = agent()
+    const real = sessions.inboxNotice!
+    const out = { why: null as 'independent' | 'plain' | null }
+    const keepsOut = vi.spyOn(sessions, 'keepsOut').mockImplementation(() => out.why)
+    let release!: () => void
+    const made = new Promise<void>((r) => (release = r))
+    let asked!: () => void
+    const askedP = new Promise<void>((r) => (asked = r))
+    try {
+      await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+      await leave(st)
+      sessions.inboxNotice = async (state, at) => {
+        asked()
+        await made
+        return real(state, at)
+      }
+      const reply = hook(st, tool('p1', 'c1'))
+      await askedP
+      out.why = 'independent'
+      release()
+      expect(await reply).toBeNull()
+    } finally {
+      sessions.inboxNotice = real
+      keepsOut.mockRestore()
+    }
+  })
+
   it("HI-2670: a launch without Combwork's typing (its connection's switch as it launched) gets no notice, whatever its role, until it restarts", async () => {
     const st = agent()
     const l = s.live.get(`${p.toLowerCase()}#${st.agentId}`) as unknown as { policy?: { guidance: boolean; tools: boolean; typing: boolean; overrides: Record<string, boolean> } }

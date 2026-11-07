@@ -59,7 +59,10 @@ interface CombworkMessageValues {
   'main.connections.choice.off': { name: string | number; agent: string | number }
   'main.connections.choice.otherCli': { name: string | number; agent: string | number }
   'main.connections.inUse': { name: string | number; users: string | number }
+  'main.connections.launch.agentChanged': { agent: string | number }
+  'main.connections.launch.busy': undefined
   'main.connections.launch.changedAgain': { agent: string | number }
+  'main.connections.launch.changedMeanwhile': { name: string | number }
   'main.connections.launch.changing': { name: string | number; agent: string | number }
   'main.connections.launch.confirm': { agents: string | number; fingerprint: string | number }
   'main.connections.launch.deleted': { agent: string | number }

@@ -614,6 +614,9 @@
   "tool.undo.description": {
     "text": "Undo changes of your own (kept 7 days, grouped by the user's message): list, then change or group (\"latest\": your newest). What someone changed since stays. Only your own: never the user's or agents'. (detail: use-cw-api, tools.md)"
   },
+  "tool.updateAgent.arg.confirm": {
+    "text": "The fingerprint a refusal named, once the user agreed to make this agent Independent (its role, or a connection without Combwork tools) while it is on a lane or holds a card."
+  },
   "tool.updateAgent.description": {
     "text": "Change an agent's name, role, MCP servers or connection. A running agent takes them when restarted; another CLI's connection only while it is stopped."
   },

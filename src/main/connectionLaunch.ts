@@ -16,7 +16,9 @@ import { msg } from '../shared/i18n'
 import { agentWorkflowRole, inWorkflow, readToolsOffWith } from '../shared/workflow/roles'
 import type { AgentDef, Connection, ConnectionLaunch, ProjectConfig, ProviderId } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
-import { accountById, allAccounts, allConnections, getConnection, NO_CONNECTION } from './accounts'
+import { accountById, allAccounts, allConnections, getConnection, NO_CONNECTION, updateConnection } from './accounts'
+import { boardRevision } from './boardStore'
+import type { ConnectionPatch } from '../shared/accounts'
 import { readOwnRunOverridesWith } from './advancedValues'
 import { advanced } from './advanced'
 import { config } from './config'
@@ -133,34 +135,102 @@ function assertConfirmed(impact: LaunchImpact, confirmed: string | null | undefi
   if (confirmed !== impact.fingerprint) throw combworkError(CHANGED, values, { kind: 'conflict' })
 }
 
+/**
+ * A token for everything an impact is read from (HI-2670, HR1 on s44): each open workspace's board (cards and lanes, its
+ * revision moving as a write commits) and each project's project.json (Combwork's write stamp). The same token twice:
+ * nothing an impact reads was written between.
+ */
+export function impactToken(): string {
+  return JSON.stringify(
+    openWorkspaces()
+      .filter((ws) => !!ws.path)
+      .map((ws) => [ws.path, safeRevision(ws), ...(ws.info()?.projects ?? []).map((p) => ws.projectConfigWrites(p.path))])
+  )
+}
+function safeRevision(ws: WorkspaceService): string {
+  try {
+    return boardRevision(ws)
+  } catch {
+    return ''
+  }
+}
+
+/** How many times an impact is read again when what it reads changed while it was read. */
+const STABLE_TRIES = 5
+const BUSY = msg({ id: 'main.connections.launch.busy', defaultMessage: 'The board kept changing while Combwork worked out what this change affects. Try again.', description: "An error saving a connection's launch settings or an agent's role or connection (HI-2670): cards, lanes or agents changed every time Combwork read which of them the change would take out of the workflow, so nothing was saved." })
+
+/**
+ * An impact read as one consistent snapshot (HR1 on s44): read again while anything it reads was written during the
+ * read, so the set returned, with its token, is what all of it was at one moment.
+ */
+async function stableImpact(read: () => Promise<LaunchImpact>): Promise<{ impact: LaunchImpact; token: string }> {
+  for (let i = 0; i < STABLE_TRIES; i++) {
+    const token = impactToken()
+    const impact = await read()
+    if (impactToken() === token) return { impact, token }
+  }
+  throw combworkError(BUSY, undefined, { kind: 'conflict' })
+}
+
 /** What saving these launch settings on a connection would take out of the workflow (null: nothing to confirm). */
 export async function launchImpact(id: string, raw: unknown): Promise<LaunchImpact | null> {
   const c = getConnection(id)
   const cli = accountById(c?.account)?.provider
   if (!c || !cli) return null
   if (!turnsToolsOff(c.launch, cleanLaunch(raw, cli))) return null
-  const impact = await connectionImpact(id)
+  const { impact } = await stableImpact(() => connectionImpact(id))
   return impact.agents.length ? impact : null
 }
 
+const CHANGED_MEANWHILE = msg({ id: 'main.connections.launch.changedMeanwhile', defaultMessage: "{name}'s launch settings were changed meanwhile: nothing was saved. Look at them again.", description: "An error saving a connection's launch settings (HI-2670): something else changed them while this change was being checked, so nothing was saved. {name} is the connection's name." })
+
+/** A connection change (HI-2670): its values (ConnectionPatch, as updateConnection takes them) and its launch settings. */
+export interface ConnectionChange {
+  values?: ConnectionPatch
+  /** Its launch settings as given (cleanLaunch); undefined: unchanged. */
+  launch?: unknown
+  /** launchImpact's fingerprint, when the change makes agents Independent. */
+  confirmed?: string | null
+  /**
+   * Asked at the write itself, after every await (HR1 on s44): the caller's checks that must still hold then (the
+   * Assistant's Control and session: servers.ts's atTheChange). Throws to refuse.
+   */
+  atWrite?: () => void
+}
+
 /**
- * Saves a connection's launch settings (HI-2670: Settings, the Agent API and the Assistant's changes). Turning its tools
- * off where that takes agents out of lanes or cards needs `confirmed` (launchImpact's fingerprint), checked against the
- * set as it is when saved. Running sessions keep what they launched with until they restart (offered, as for any change
- * of a connection); their role and deliveries change at once.
+ * Changes a connection's values and launch settings together (HI-2670: Settings, the Agent API and the Assistant's
+ * changes). Turning its tools off where that takes agents out of lanes or cards needs `confirmed`, launchImpact's
+ * fingerprint. What it affects is read as one snapshot (stableImpact); then, with nothing awaited from there to the
+ * write, the caller's checks (`atWrite`), the snapshot still current, the launch settings not changed meanwhile and the
+ * fingerprint are checked and both parts saved, or nothing is: a refusal leaves every field as it was. Running sessions
+ * keep what they launched with until they restart (offered, as for any change of a connection); their role and
+ * deliveries change at once.
  */
-export async function setConnectionLaunch(id: string, raw: unknown, confirmed?: string | null): Promise<Connection> {
+export async function changeConnection(id: string, ch: ConnectionChange): Promise<Connection> {
   const c = getConnection(id)
   const cli: ProviderId | undefined = accountById(c?.account)?.provider
   if (!c || !cli) throw combworkError(NO_CONNECTION, undefined, { kind: 'notFound' })
-  const next = cleanLaunch(raw, cli)
-  // Worked out as it is saved: from here to the write nothing awaits.
-  if (turnsToolsOff(c.launch, next)) assertConfirmed(await connectionImpact(id), confirmed)
+  const was = JSON.stringify(c.launch ?? null)
+  const next = ch.launch === undefined ? c.launch : cleanLaunch(ch.launch, cli)
+  const read = ch.launch !== undefined && turnsToolsOff(c.launch, next) ? await stableImpact(() => connectionImpact(id)) : null
+  // From here to the write nothing awaits.
+  ch.atWrite?.()
+  const now = getConnection(id)
+  if (!now) throw combworkError(NO_CONNECTION, undefined, { kind: 'notFound' })
+  if (JSON.stringify(now.launch ?? null) !== was) throw combworkError(CHANGED_MEANWHILE, { name: now.name }, { kind: 'conflict' })
+  if (read) {
+    if (impactToken() !== read.token) throw combworkError(BUSY, undefined, { kind: 'conflict' })
+    assertConfirmed(read.impact, ch.confirmed)
+  }
+  // Its values first (updateConnection checks them, and refuses before writing anything), then its launch settings.
+  if (ch.values && Object.keys(ch.values).length) updateConnection(id, ch.values)
+  if (ch.launch === undefined) return getConnection(id)!
   let saved: Connection | undefined
   config.update((cfg) => {
     cfg.connections = (cfg.connections ?? []).map((x) => {
       if (x.id !== id) return x
-      const { launch: _was, ...rest } = x
+      const { launch: _old, ...rest } = x
       saved = next ? { ...rest, launch: next } : rest
       return saved
     })
@@ -172,18 +242,43 @@ export async function setConnectionLaunch(id: string, raw: unknown, confirmed?: 
   return saved
 }
 
+/** Saves a connection's launch settings alone (Settings' Launch Settings dialog): changeConnection. */
+export function setConnectionLaunch(id: string, raw: unknown, confirmed?: string | null): Promise<Connection> {
+  return changeConnection(id, { launch: raw ?? {}, confirmed })
+}
+
 /**
  * What a change of one agent would take out of the workflow (HI-2670): moving it onto a connection without Combwork's
  * tools, or choosing Independent for it, while it is on a running lane or holds a card in Doing or Review. Null: nothing.
  */
 export async function agentImpact(ws: WorkspaceService, projectPath: string, project: string, before: AgentDef | undefined, after: Pick<AgentDef, 'name' | 'role' | 'workflowRole' | 'connection'>): Promise<LaunchImpact | null> {
   if (!before || !inWorkflow(agentWorkflowRole(before)) || inWorkflow(agentWorkflowRole(after))) return null
-  const parts = await partsOf(ws, project, projectPath, before)
-  return parts ? impactOf([parts]) : null
+  const { impact } = await stableImpact(async () => {
+    const parts = await partsOf(ws, project, projectPath, before)
+    return impactOf(parts ? [parts] : [])
+  })
+  return impact.agents.length ? impact : null
 }
 
-/** Refused unless `confirmed` names exactly what this agent's change takes out of the workflow now (agentImpact). */
-export async function assertAgentChangeConfirmed(ws: WorkspaceService, projectPath: string, project: string, before: AgentDef | undefined, after: Pick<AgentDef, 'name' | 'role' | 'workflowRole' | 'connection'>, confirmed: string | null | undefined): Promise<void> {
-  const impact = await agentImpact(ws, projectPath, project, before, after)
-  if (impact) assertConfirmed(impact, confirmed)
+/**
+ * What a change of one agent takes out of the workflow, read as one snapshot (HR1 on s44), and the check its write makes
+ * under the project's lock, with nothing awaited before it: the snapshot still current, the agent as saved still as it was
+ * read (its role and connection), and `confirmed` naming exactly that set. Null: the change makes nobody Independent.
+ */
+export async function agentChangeCheck(ws: WorkspaceService, projectPath: string, project: string, before: AgentDef | undefined, after: Pick<AgentDef, 'name' | 'role' | 'workflowRole' | 'connection'>, confirmed: string | null | undefined): Promise<((current: AgentDef) => void) | null> {
+  if (!before || !inWorkflow(agentWorkflowRole(before)) || inWorkflow(agentWorkflowRole(after))) return null
+  const read = await stableImpact(async () => {
+    const parts = await partsOf(ws, project, projectPath, before)
+    return impactOf(parts ? [parts] : [])
+  })
+  // Checked now too, so a caller that didn't confirm is told at once, with the set and its fingerprint.
+  assertConfirmed(read.impact, confirmed)
+  return (current) => {
+    if (current.workflowRole !== before.workflowRole || current.connection !== before.connection) throw combworkError(AGENT_CHANGED, { agent: current.name }, { kind: 'conflict' })
+    // Anything it reads written since (a card given to it meanwhile, too): refused, to be worked out again.
+    if (impactToken() !== read.token) throw read.impact.agents.length ? combworkError(CHANGED, { agents: impactText(read.impact), fingerprint: read.impact.fingerprint }, { kind: 'conflict' }) : combworkError(BUSY, undefined, { kind: 'conflict' })
+    assertConfirmed(read.impact, confirmed)
+  }
 }
+const AGENT_CHANGED = msg({ id: 'main.connections.launch.agentChanged', defaultMessage: "{agent}'s role or connection was changed meanwhile: nothing was saved. Try again.", description: "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change, which would make it Independent, was being checked, so nothing was saved. {agent} is its name." })
+

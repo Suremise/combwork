@@ -695,6 +695,9 @@
   "tool.undo.description": {
     "placeholders": {}
   },
+  "tool.updateAgent.arg.confirm": {
+    "placeholders": {}
+  },
   "tool.updateAgent.description": {
     "placeholders": {}
   },

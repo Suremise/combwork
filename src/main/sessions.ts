@@ -6369,10 +6369,12 @@ class SessionManager {
   private async startContextFor(l: LiveSession, source: string | null): Promise<Record<string, unknown> | null> {
     if (!this.startContext || !l.adapter.startContextReply) return null
     // Context of Combwork's (HI-2670): never without its guidance, nor into an agent Combwork keeps out of.
-    if (l.policy?.guidance === false || this.keepsOut(l.state.projectPath, l.state.agentId)) return null
+    const barred = (): boolean => l.policy?.guidance === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
+    if (barred()) return null
     try {
       const text = await this.startContext(l.state, source)
-      return text ? l.adapter.startContextReply(text) : null
+      // Asked again once it is made (HR1 on s44): made Independent meanwhile, it gets none.
+      return text && !barred() ? l.adapter.startContextReply(text) : null
     } catch (e) {
       log.warn('start context', e)
       return null
@@ -6446,6 +6448,14 @@ class SessionManager {
   private noticeReplies = new WeakMap<object, (reply: Record<string, unknown> | null) => void>()
 
   /**
+   * Whether no notice of Combwork's may go into a launch's context now (HI-2670): launched without Combwork's typing or
+   * tools, or its agent Independent now. Asked before a notice is worked out and again once it is, before it is given.
+   */
+  private noticeBarred(l: LiveSession): boolean {
+    return l.policy?.typing === false || l.policy?.tools === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
+  }
+
+  /**
    * The notice for a hook in the launch's order (#650), with the turn ledger as it is just before it (nothing else of the
    * launch is handled while this is worked out): none for a hook the ledger finds stale; a checkpoint after the agent's
    * own tool call; the drain at a Stop of the running turn that Combwork hasn't carried on yet (the ledger's own count, so at
@@ -6455,7 +6465,7 @@ class SessionManager {
     if (!this.inboxNotice) return null
     // Never into a launch without Combwork's typing or tools, nor an agent Independent now (HI-2670): its hooks still
     // report its status, and add nothing to its context.
-    if (l.policy?.typing === false || l.policy?.tools === false || this.keepsOut(l.state.projectPath, l.state.agentId)) return null
+    if (this.noticeBarred(l)) return null
     const hook = l.adapter.normalizeHook(body)
     const ev = hook.event
     // What the ledger would make of it (a copy: it is admitted below, with what it was told).
@@ -6464,8 +6474,9 @@ class SessionManager {
     if (drain && !(ledger.active && ledger.active.state === 'running' && ledger.active.continued === 0)) return null
     const turn = ledger.active
     const text = await this.inboxNotice(l.state, drain ? 'drain' : 'checkpoint')
-    // Still that launch and that turn (the queue holds the rest of the launch's hooks, so only its end can change them).
-    if (!text || this.findLaunch(runId, body.session_id)?.[1] !== l || ledger.active !== turn) return null
+    // Still that launch and that turn (the queue holds the rest of the launch's hooks, so only its end can change them),
+    // and still one Combwork may add to (HR1 on s44: made Independent while the notice was worked out, it gets none).
+    if (!text || this.findLaunch(runId, body.session_id)?.[1] !== l || ledger.active !== turn || this.noticeBarred(l)) return null
     const reply = l.adapter.noticeReply(String(body.hook_event_name ?? ''), text)
     // A CLI that takes the drain as a new prompt: that prompt is Combwork's own, in the turn it carries on.
     if (reply && drain && l.adapter.drainIsPrompt) expectInjected(ledger, text)

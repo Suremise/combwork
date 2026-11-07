@@ -102,7 +102,7 @@ import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { accountOnIn, connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
 import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, combworkAccounts, updateConnection } from './accounts'
-import { setConnectionLaunch } from './connectionLaunch'
+import { changeConnection } from './connectionLaunch'
 import { cleanLaunch, policySummary, terminalPreset } from '../shared/launchPolicy'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
@@ -1404,8 +1404,9 @@ route('PATCH', '/v1/connections/:ref', async ({ params, body }) =>
     // Its launch settings (HI-2670): `launch`, and `confirm` naming what it takes out of the workflow, when it does.
     const launch = body?.launch === undefined ? undefined : launchArg(body.launch, r.id)
     if (!Object.keys(v).length && launch === undefined) throw new HttpError(400, say(API.connection.nothingToChange))
-    let c = Object.keys(v).length ? await checked(() => connectionsCall(() => updateConnection(r.id, v))) : getConnection(r.id)!
-    if (launch !== undefined) c = await checked(() => connectionsCall(() => setConnectionLaunch(r.id, launch, typeof body?.confirm === 'string' ? body.confirm : null)))
+    // Values and launch settings together (HR1 on s44): what it affects read first, then, after every await, Change
+    // settings and the Assistant's session checked at the write (atWrite), and both saved or neither.
+    const c = Object.keys(v).length && launch === undefined ? await checked(() => connectionsCall(() => updateConnection(r.id, v))) : await connectionsCall(() => changeConnection(r.id, { values: v, launch, confirmed: typeof body?.confirm === 'string' ? body.confirm : null, atWrite: () => checked(() => undefined) }))
     const cli = accountById(c.account)?.provider
     const done: [AgentMsg, Record<string, string>] = launch !== undefined && !Object.keys(v).length ? [API.done.launchedConnection, { connection: c.name, how: (cli && policySummary(c, cli, true)) || '' }] : [API.done.updatedConnection, { connection: c.name }]
     return { done, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
