@@ -4,7 +4,7 @@ import { join } from 'path'
 import { copyFileSync, existsSync, readFileSync } from 'original-fs'
 import { DEFAULT_APP_CONFIG, mergeDefaults, migrateConfig, withLegacySettings } from '../shared/defaults'
 import { extraArgsProblem } from '../shared/providers'
-import { migrateAccounts } from '../shared/connectionDefaults'
+import { ensurePcAccounts, migrateAccounts } from '../shared/connectionDefaults'
 import type { AppConfig, AppSettings, EffortOption, FallbackModel, LegacyConnection, ModelPrice, ProviderSettings, SlotDefaults } from '../shared/types'
 import type { SettingsPatch } from '../shared/api'
 import type { PlatformId } from '../shared/platform/descriptors'
@@ -89,6 +89,8 @@ class ConfigStore {
     // Accounts and connections (HI-2106), once, before anything reads them: the connections become accounts, each with
     // its base connection; the old ones stay in the record, for the workspaces still to migrate from them.
     if (!this.data.migrations?.accounts1) this.migrateAccounts()
+    // A PC-wide sign-in's account for a CLI added since (HI-2544: the Antigravity CLI), made once.
+    else this.ensurePcAccounts()
     // Kept beside it since #1111; a config.json from before still has them, and its first save moves them.
     let text: string | null = null
     try {
@@ -103,6 +105,16 @@ class ConfigStore {
     if (state.boardFold || state.projectViews || state.modelCatalogs) this.stateWritten = text
     // Tests: no tip card over what a suite clicks, unless its profile turns tips on.
     if (testTipsOff() && raw?.settings?.general?.showTips === undefined) this.data.settings.general.showTips = false
+  }
+
+  /** Each PC-wide sign-in's account and base connection where missing (ensurePcAccounts), saved when it made any. */
+  private ensurePcAccounts(): void {
+    const store = { accounts: [...(this.data.accounts ?? [])], connections: [...(this.data.connections ?? [])], newId: () => `c-${randomBytes(4).toString('hex')}` }
+    if (!ensurePcAccounts(store, new Date().toISOString())) return
+    this.data.accounts = store.accounts
+    this.data.connections = store.connections
+    log.info('accounts: made the PC-wide sign-in account of a CLI added since (HI-2544)')
+    this.scheduleSave()
   }
 
   /** config.json's accounts migration (HI-2106: migrateAccounts), saved at once: workspaces' migrations point at what it made. */

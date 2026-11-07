@@ -735,6 +735,7 @@
   "assistant.undo.why.projectOpened": "A project it opened stays open: close it if it isn't wanted.",
   "assistant.undo.why.prompt": "A prompt that was sent can't be taken back.",
   "assistant.undo.why.putBack": "Its reason stays as a comment.",
+  "assistant.undo.why.queueForwarded": "A forward merge it asked for isn't taken back: remove it from the merge queue if it shouldn't merge.",
   "assistant.undo.why.queuePaused": "A merge queue it paused stays paused: resume it if it should run.",
   "assistant.undo.why.queueResumed": "A merge queue it resumed isn't paused again: pause it if it shouldn't run.",
   "assistant.undo.why.removedFromQueue": "Taking it out of the merge queue stays in the card's work: it is queued again only by Retry merge or a new approval.",

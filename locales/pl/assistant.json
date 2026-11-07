@@ -735,6 +735,7 @@
   "assistant.undo.why.projectOpened": "Otwarty projekt pozostaje otwarty: zamknij go, jeśli nie jest potrzebny.",
   "assistant.undo.why.prompt": "Wysłanego promptu nie da się odwołać.",
   "assistant.undo.why.putBack": "Jego powód zostaje jako komentarz.",
+  "assistant.undo.why.queueForwarded": "Zlecone przez niego scalenie aktualizujące nie jest cofane: usuń je z kolejki scalania, jeśli nie powinno zostać scalone.",
   "assistant.undo.why.queuePaused": "Wstrzymana kolejka scalania pozostaje wstrzymana: wznów ją, jeśli ma działać.",
   "assistant.undo.why.queueResumed": "Wznowiona kolejka scalania nie zostaje ponownie wstrzymana: wstrzymaj ją, jeśli nie ma działać.",
   "assistant.undo.why.removedFromQueue": "Usunięcie z kolejki scalania zostaje w pracy karty: wraca do kolejki tylko przez „Ponów scalanie” albo nowe zatwierdzenie.",

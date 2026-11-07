@@ -554,6 +554,11 @@ export interface ProviderAdapter {
   /** Claude Code's status-line JSON. */
   statusLine?(body: Record<string, any>): LiveDetails
   /**
+   * The conversation a status line names, for a CLI that can't be given one up front (HI-2544: the Antigravity CLI):
+   * a valid id, or null. Combwork takes it for the launch while it has none, and never in place of a known one.
+   */
+  statusLineSession?(body: Record<string, any>): string | null
+  /**
    * How a launch's CLI will compact by itself, read from its command, environment and the CLI's settings files (never
    * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Combwork doesn't know.
    */

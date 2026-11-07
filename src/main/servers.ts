@@ -93,7 +93,7 @@ import type { DeliverySender, InboxItem } from '../shared/deliveries'
 import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import { armIntentWatch } from './intentWatch'
-import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
@@ -714,6 +714,7 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'lane-fresh-start': UNDO_FINAL.freshRetried,
   'queue-pause': UNDO_FINAL.queuePaused,
   'queue-resume': UNDO_FINAL.queueResumed,
+  'queue-forward': UNDO_FINAL.queueForwarded,
   'team-pause': UNDO_FINAL.teamPaused,
   'team-resume': UNDO_FINAL.teamResumed,
   'release-slot': UNDO_FINAL.slotReleased,
@@ -2536,6 +2537,24 @@ async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Pro
 }
 
 route('POST', '/v1/queue/remove', async ({ body }) => queueCard(body, 'removeFromQueue'))
+// HI-2679: bring one of a project's targets up to date with another (a forward merge), the Assistant's (within Control
+// agents) and the user's: never a project agent's or a script's.
+route('POST', '/v1/queue/forward', async ({ body }) => {
+  notAgents([API.change.forwardAny])
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
+  const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
+  if (!from || !to) throw new HttpError(400, say(API.queue.forwardArgs))
+  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
+    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard).catch((e: unknown) => {
+      throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
+    })
+    const made = 'upToDate' in r ? null : r
+    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
+    return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
+  })
+})
 route('POST', '/v1/queue/retry', async ({ body }) => queueCard(body, 'retryMerge'))
 
 route('GET', '/v1/shared', async () => inWorkspace(requireWorkspace(), () => notesTree()))

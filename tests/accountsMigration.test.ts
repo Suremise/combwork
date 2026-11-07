@@ -119,9 +119,11 @@ describe('the accounts migration: each row (HI-2105 s11, s13)', () => {
   it('config.json: each connection becomes the account with its id, its defaults its base connection; Copilot becomes an account', () => {
     const old = [account('a-1', 'claude-code', { name: 'Personal', defaults: { model: 'opus' }, accepted: { email: 'd@x', orgId: 'o' } }), account('a-2', 'claude-code', { name: 'Work', defaults: {} }), account('a-3', 'codex', { name: 'Codex' })]
     const r = migrateAccounts(old, settings, AT, newId)
-    expect(r.accounts.map((a) => a.id)).toEqual(['a-1', 'a-2', 'a-3', COPILOT_ACCOUNT])
+    // Each PC-wide sign-in becomes its own account: Copilot's, and the Antigravity CLI's (HI-2544).
+    expect(r.accounts.map((a) => a.id)).toEqual(['a-1', 'a-2', 'a-3', COPILOT_ACCOUNT, 'antigravity'])
     expect(r.accounts[0]).toEqual({ id: 'a-1', provider: 'claude-code', name: 'Personal', createdAt: AT, kind: 'signIn', accepted: { email: 'd@x', orgId: 'o' } })
     expect(r.accounts[3]).toMatchObject({ provider: 'copilot', home: 'cli' })
+    expect(r.accounts[4]).toMatchObject({ provider: 'antigravity', home: 'cli' })
     const base = (id: string): Connection => r.connections.find((c) => c.account === id)!
     // Its defaults, the CLI's mode and arguments; never the global 200K context (the connection layer ignored it).
     expect(base('a-1')).toMatchObject({ name: 'Personal', model: 'opus', permissionMode: 'acceptEdits', extraArgs: '--verbose' })

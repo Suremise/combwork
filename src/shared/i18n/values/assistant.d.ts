@@ -737,6 +737,7 @@ interface CombworkMessageValues {
   'assistant.undo.why.projectOpened': undefined
   'assistant.undo.why.prompt': undefined
   'assistant.undo.why.putBack': undefined
+  'assistant.undo.why.queueForwarded': undefined
   'assistant.undo.why.queuePaused': undefined
   'assistant.undo.why.queueResumed': undefined
   'assistant.undo.why.removedFromQueue': undefined

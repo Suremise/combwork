@@ -111,6 +111,14 @@
     "defaultMessage": "Keep a Combwork window on top",
     "description": "A tip's title."
   },
+  "tips.antigravity.text": {
+    "defaultMessage": "Agents can use Google’s Antigravity CLI. Provider Setup installs it; sign in once in a terminal and every workspace on this PC shares the sign-in. Each agent runs in a private profile of its own.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.antigravity.title": {
+    "defaultMessage": "Run agents on the Antigravity CLI",
+    "description": "A tip's title. Antigravity CLI is a product name."
+  },
   "tips.antivirus.text": {
     "defaultMessage": "On Windows, Microsoft Defender scans every file builds, tests and git touch. Settings → Workspace → Antivirus scanning shows whether it scans your workspace and can exclude its folders, with your consent.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -478,6 +486,14 @@
   "tips.branchCleanup.title": {
     "defaultMessage": "Clean up merged branches",
     "description": "A tip's title."
+  },
+  "tips.bringUpToDate.text": {
+    "defaultMessage": "A branch’s merge queue card says when it is behind another of the project’s branches. Bring Up to Date… merges that branch into it through its queue, with its merge checks; the other branch doesn’t change.",
+    "description": "A tip (HI-2679). Bring Up to Date… is a button on a merge queue's card: keep it as Combwork shows it."
+  },
+  "tips.bringUpToDate.title": {
+    "defaultMessage": "Bring the next release up to date",
+    "description": "A tip's title (HI-2679): merging one of a project's branches into another through the merge queue."
   },
   "tips.cardAttachments.text": {
     "defaultMessage": "Paste or drop files into a card's description or comment: they are kept with the card when you save or post, shown in it, and listed for the agent that starts it. The pin on a pane's attachment chip copies a file to the agent's card.",

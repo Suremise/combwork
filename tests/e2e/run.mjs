@@ -28,6 +28,9 @@
 //   --no-wait       a heavy run (more than 5 suites, or --repeat) fails at once when every test slot on this machine is
 //                   taken, instead of waiting for one (slots.mjs; heavySlots and sideSlots in combwork-test\config.json); and
 //                   any run fails at once when every test lane (10) is taken, instead of waiting for one (lanes.mjs, #707).
+//   --warm-homes    the real suites run in the CLI test homes as earlier runs left them (HI-2606): no reset first.
+//                   Without it, each real suite's test homes (Claude Code's signed-in one, Codex's) are reset under their
+//                   lease to their sign-in and kept files (testHomes.mjs), and a suite marked `home: 'warm'` keeps them.
 //   --pre-merge     a heavy run checking a merge goes first in the queue for a test slot (#558). Not needed in the
 //                   session of an agent holding the merge slot: such a run goes first anyway (slots.mjs holdsMergeSlot).
 // Needs a dev build. A suite fails when it exits non-zero or prints a line starting with FAIL. Each suite gets its own
@@ -51,7 +54,8 @@ import { FAILED_KEEP_MS, finishRunDirs, keepSuiteFiles, logRetention, logsRootFo
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from './lanes.mjs'
 import { endLeftCopies } from './leftCopies.mjs'
 import { SIDE_E2E_JOBS, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from './slots.mjs'
-import { usesCodexHome, waitForCodexHome } from './codexHomeLock.mjs'
+import { consumerHooks, homesOf, leasesEnv, noteConsumers, waitForTestHome } from './testHomeLock.mjs'
+import { freshenHome, freshenedLine, HomeNotReady } from './testHomes.mjs'
 import { autoClean, holdLane } from './clean.mjs'
 import { recycleBinCount, recycleBinLine } from './recycleBin.mjs'
 import { readUnpackedInfo } from '../../scripts/distCopy.mjs'
@@ -62,7 +66,7 @@ const root = join(here, '..', '..')
 const lib = createRequire(import.meta.url)('./lib.cjs')
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 const { claimedByRuns, clearDir, evidenceFor, findBoard, finishSuiteDir, freshFolder, recordKept, releaseKept } = createRequire(import.meta.url)('./evidence.cjs')
-const { stopProcessesIn, endChildTree, endCopies, processes } = createRequire(import.meta.url)('./folderProcesses.cjs')
+const { stopProcessesIn, endChildTree, endCopies, processes, recordedCopies } = createRequire(import.meta.url)('./folderProcesses.cjs')
 /** The machine's processes now, or null (off Windows, or the listing failed): each user of it lists again when null. */
 const listOnce = () => {
   if (process.platform !== 'win32') return null
@@ -75,6 +79,8 @@ const listOnce = () => {
 const { describeExit, windowsCodesIn } = createRequire(import.meta.url)('./windowsExits.cjs')
 
 const args = process.argv.slice(2)
+/** --warm-homes (HI-2606): the CLI test homes as earlier runs left them, not reset first. */
+const warmHomes = args.includes('--warm-homes')
 const opts = parseArgs(args, SUITES.map((s) => s.name))
 if (opts.error) {
   console.error(opts.error.startsWith('Unknown suite') ? `${opts.error}. Suites: ${SUITES.map((s) => s.name).join(', ')}` : opts.error)
@@ -287,11 +293,12 @@ if (lane) console.log(`Lane ${lane.lane}: ports ${lane.first}–${lane.last}\n  
  * same said without the CW_ prefix (E2E_RUN_*), which Combwork keeps in its sessions: a runner started in an agent's
  * shell inside the suite's Combwork (progressreport does) knows it is inside a suite, and which port to keep clear of.
  */
-const suiteEnv = (name, port, dir) => {
+const suiteEnv = (name, port, dir, extra = {}) => {
   const env = runContext.suiteEnv({ name, port, work: dir, runDir: dir ?? lib.WORK, cliLog: dir ? join(dir, CLI_LOG) : null, slots: creditFor(pool) })
   // --lang: the languages the i18n screenshot route photographs (it reads E2E_I18N_LANGS; the others are pinned to English).
   if (name === LANG_SUITE && opts.lang.length) env.E2E_I18N_LANGS = opts.lang.join(',')
-  return env
+  // The CLI test homes' leases its runner holds for it (HI-2606, testHomeLock.mjs leasesEnv): reused, not waited for.
+  return Object.assign(env, extra)
 }
 /** The CLIs the suite's test copies of Combwork selected (record.mjs readCliLog), read before its folder goes. */
 const suiteClis = (dir) => {
@@ -309,7 +316,7 @@ const suiteClis = (dir) => {
  * runs up to a size, and a failed run a day: logs.mjs), so copies never pile up.
  */
 
-const run = (name, port) =>
+const run = (name, port, extraEnv = {}, uses = null) =>
   new Promise((resolve) => {
     const started = Date.now()
     let dir = null
@@ -322,8 +329,11 @@ const run = (name, port) =>
       resolve({ name, ok: false, failed: [`FAIL ${e.message}`], code: 2, out: `FAIL ${e.message}\n`, seconds: 0, dir: null, kept: null })
       return
     }
+    // What it uses a CLI test home with, noted before it can (HI-2606, HR1 on s29): its folder now, its process once spawned.
+    uses?.folder(dir)
     // No tip card over what a suite clicks, unless its profile turns tips on (tips does).
-    const child = spawn(process.execPath, [join(here, `${name}.cjs`)], { cwd: root, env: suiteEnv(name, port, dir) })
+    const child = spawn(process.execPath, [join(here, `${name}.cjs`)], { cwd: root, env: suiteEnv(name, port, dir, extraEnv) })
+    uses?.spawned(child)
     let out = ''
     const add = (d) => (out += d)
     child.stdout.on('data', add)
@@ -477,14 +487,40 @@ async function runOnce(k) {
   }
 
   async function runSuite(s, port) {
-    const lease = usesCodexHome(s) ? await waitForCodexHome(lib.CODEX_HOME, { kind: 'e2e', root, what: `e2e: ${s.name}`, argv: args }) : null
+    // Its CLI test homes' leases (HI-2606: Claude Code's before Codex's), each reset to its sign-in under it unless this
+    // run or the suite keeps them warm. A home that can't be reset skips the suite (signed out: its environment) or
+    // fails it, saying why; what a reset kept unclassified is named in its log.
+    const leases = []
+    const said = []
     try {
+      for (const cli of homesOf(s)) {
+        const home = cli === 'claude' ? lib.CLAUDE_TEST_HOME : lib.CODEX_HOME
+        const lease = await waitForTestHome(cli, home, { kind: 'e2e', root, what: `e2e: ${s.name}`, argv: args })
+        leases.push(lease)
+        if (warmHomes || s.home === 'warm') continue
+        try {
+          said.push(freshenedLine(cli, await freshenHome(cli, home, { lease })))
+        } catch (e) {
+          if (!(e instanceof HomeNotReady)) throw e
+          // Shaped as a suite's own result (runner.mjs): a skip for its environment, else a failure, before it started.
+          return e.kind === 'signedOut'
+            ? { name: s.name, skipped: `environment: ${e.message}`, environment: true, failed: [], out: `SKIPPED environment: ${e.message}\n`, seconds: 0 }
+            : { name: s.name, ok: false, failed: [`FAIL ${e.message}`], out: `FAIL ${e.message}\n`, seconds: 0 }
+        }
+      }
       // Only suites actually starting count as running in peer diagnostics; a queued Codex suite cannot collide.
       running.add(s.name)
       report()
-      return await run(s.name, port)
+      // What uses the homes, noted before it does (HR1 on s29): the suite's folder (its test copies of Combwork record
+      // themselves there, and their CLIs name it), its process, and after it its recorded copies. A reset waits for each
+      // until it proves them gone, after this lease and a crash alike. Its process's start: spawn has just returned, within
+      // the 2 s a consumer's start is matched by (testHomes.mjs homeUsers).
+      const uses = consumerHooks(leases)
+      const r = await run(s.name, port, leasesEnv(leases), uses)
+      if (leases.length && r.dir) for (const l of leases) noteConsumers(l, recordedCopies(r.dir))
+      return said.length ? { ...r, out: `${said.join('\n')}\n${r.out}` } : r
     } finally {
-      lease?.release()
+      for (const l of leases.reverse()) l.release()
     }
   }
 

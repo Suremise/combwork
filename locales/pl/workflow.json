@@ -239,6 +239,8 @@
   "workflow.refused.done.contained.next": "Scal rewizję {revision} do gałęzi {target}, a potem ponownie zgłoś scalenie.",
   "workflow.refused.evidence.changed.message": "To, co Combwork odczytał dla karty {card}, zmieniło się, zanim podjął decyzję.",
   "workflow.refused.evidence.changed.next": "Spróbuj ponownie: Combwork odczyta to od nowa.",
+  "workflow.refused.forward.notAgents.message": "{card} aktualizuje jedną gałąź względem drugiej: działać na niej może tylko użytkownik lub Asystent.",
+  "workflow.refused.forward.notAgents.next": "Zostaw to użytkownikowi lub Asystentowi.",
   "workflow.refused.integrate.approved.message": "Karta {card} w rewizji {revision} nie jest zatwierdzona: {why}",
   "workflow.refused.integrate.approved.next": "Przekaż ją do recenzji.",
   "workflow.refused.integrate.checksPassed.change": "Tę regułę ustawisz w Kontrola wersji → Sprawdzenia przechodzą na scalonym wyniku.",
