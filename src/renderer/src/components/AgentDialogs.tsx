@@ -18,7 +18,7 @@ import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace
 import { call, errorMessage } from '../api'
 import { projectMergeChoice } from '../mergeChoice'
 import { agentProviderOf, bumpUnused, choose as askChoice, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
-import { msg, tr, tRich } from '@shared/i18n'
+import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { ProviderIcon } from './ProviderIcon'
 import { cliReadyOf, ConnectionChoice, connectionCli, firstReadyConnection, noAccountHere, noAccountText, offeredConnections, useConnections } from './ConnectionChoice'
 import { ConnectionDialog } from './ConnectionDefaults'
@@ -664,7 +664,7 @@ export function AgentSettingsDialog() {
         // A new role gives it another side's tools (HI-2664, Darren's decision): restarted to load them, at once if it is
         // idle; busy, asked first (restart when its turn is over, or later: it keeps its old tools until it restarts).
         if (f.workflowRole !== initial.workflowRole) {
-          const r = await call('session:restartForSide', project.path, agent.id, 'ifIdle').catch(() => 'same' as const)
+          const r = await call('session:restartForTools', project.path, agent.id, 'ifIdle').catch(() => 'same' as const)
           if (r === 'busy') {
             const choice = await askChoice({
               title: tr(msg({ id: 'agents.side.restartTitle', defaultMessage: 'Restart {agent} for its new role?', description: "Title of the question after an agent's workflow role was changed while it is working (HI-2664): it needs a restart to get its new role's tools. {agent} is its name." }), { agent: agent.name }),
@@ -674,7 +674,7 @@ export function AgentSettingsDialog() {
                 { label: tr(msg({ id: 'agents.side.later', defaultMessage: 'Later', description: 'Button (HI-2664): the agent keeps its old tools until it restarts.' })), value: 'later' }
               ]
             })
-            if (choice === 'restart') await call('session:restartForSide', project.path, agent.id, 'atSafePoint').catch(() => undefined)
+            if (choice === 'restart') await call('session:restartForTools', project.path, agent.id, 'atSafePoint').catch(() => undefined)
           }
         }
       }}
@@ -688,6 +688,25 @@ export function AgentSettingsDialog() {
  * saves the template with it, #510). Its role in the workflow and note (#1436), never where it works: that is the card's
  * or lane's. No connection (HI-2109: the user picks connections when loading it), but the CLI it suggests.
  */
+/**
+ * Busy agents whose tools a workflow change changes (HI-2694, Darren's decision: as a role change, HI-2664): asked once
+ * whether to restart them when their turn is over, in the same conversation, or later (they keep their old tools until
+ * they restart, and are given no work that needs the new ones meanwhile). Idle ones were restarted already.
+ */
+export async function askWorkflowToolsRestart(projectPath: string, agents: readonly { id: string; name: string }[]): Promise<void> {
+  if (!agents.length) return
+  const names = fmt.list(agents.map((a) => a.name))
+  const choice = await askChoice({
+    title: tr(msg({ id: 'agents.workflowTools.restartTitle', defaultMessage: 'Restart {agents} for the new workflow?', description: "Title of the question after a project's workflow settings changed the Combwork tools of agents that are working (HI-2694): they need a restart to get them. {agents} is their names as a list." }), { agents: names }),
+    message: tr(msg({ id: 'agents.workflowTools.restartMessage', defaultMessage: '{count, plural, one {{agents} is working. The tools its project’s workflow now allows load when it restarts; it carries on in the same conversation.} other {{agents} are working. The tools their project’s workflow now allows load when they restart; each carries on in the same conversation.}}', description: "The question after a project's workflow settings changed the Combwork tools of agents that are working (HI-2694). {agents} is their names as a list; {count} how many." }), { agents: names, count: agents.length }),
+    choices: [
+      { label: tr(msg({ id: 'agents.workflowTools.restartWhenDone', defaultMessage: '{count, plural, one {Restart When Its Turn Is Over} other {Restart When Their Turns Are Over}}', description: 'Button (HI-2694): each agent restarts once its turn is over, in the same conversation, with the tools its new workflow allows.' }), { count: agents.length }), value: 'restart' },
+      { label: tr(msg({ id: 'agents.workflowTools.later', defaultMessage: 'Later', description: 'Button (HI-2694): the agents keep their old tools until they restart.' })), value: 'later' }
+    ]
+  })
+  if (choice === 'restart') for (const a of agents) await call('session:restartForTools', projectPath, a.id, 'atSafePoint').catch(() => undefined)
+}
+
 export function TemplateAgentDialog() {
   useLanguage()
   const req = useStore((s) => s.templateAgentFor)

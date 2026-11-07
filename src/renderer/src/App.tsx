@@ -10,7 +10,7 @@ import { matchKeybinding, runCommand, runCommandAsync } from './commands'
 import { HooksDialog } from './components/HooksDialog'
 import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog } from './components/Overlays'
 import { ConnectionsIntroBanner, useProviderWarnings } from './components/ConnectionChoice'
-import { AddAgentDialog, AgentSettingsDialog, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
+import { AddAgentDialog, AgentSettingsDialog, askWorkflowToolsRestart, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
 import { BranchMergeDialog } from './components/BranchMerge'
 import { BoardUpgradeAsk, BoardUpgradeBanner } from './components/BoardUpgrade'
 import { WorkspaceOpening } from './components/WorkspaceOpening'
@@ -322,6 +322,10 @@ function handleEvent(e: CombworkEvent): void {
       break
     case 'queue-changed':
       if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) queueChangedEvent(e.projectPath)
+      break
+    case 'tools-restart-asked':
+      // Busy agents whose tools a workflow change changed (HI-2694): asked whether to restart them.
+      if (e.workspacePath.toLowerCase() === get().workspace?.path.toLowerCase()) void askWorkflowToolsRestart(e.projectPath, e.agents)
       break
     case 'workflow-changed':
       if (e.workspacePath.toLowerCase() !== get().workspace?.path.toLowerCase()) break

@@ -67,7 +67,8 @@
       "6c2838fb53f21025",
       "b706867be0d1e21f",
       "07563718ad7aa495",
-      "9699fd9cb16fb4cf"
+      "9699fd9cb16fb4cf",
+      "7d4ed2343a8fb81a"
     ],
     "coordinate-agents": [
       "148fcb5639058ac2",
@@ -328,7 +329,8 @@
       "375851b1e9796c8e",
       "c44e97bb6650c59c",
       "e4e3c955560eb4b5",
-      "7777f637f09d3a31"
+      "7777f637f09d3a31",
+      "353a6cfb4491802f"
     ],
     "workspace-note": [
       "5ecc6339b89ba668",
@@ -383,6 +385,9 @@
     ]
   },
   "dialects": {
+    "antigravity/cli": [
+      "8c2a6de9c73e6754"
+    ],
     "api/cli": [
       "c91cf96256abb477"
     ],

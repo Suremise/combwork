@@ -23,9 +23,9 @@ Combwork keeps the loop as a **lane**, shown to the user. Register it as you sta
 
 Wait with `cw_wait_for_tasks`, `wake: true`, `limitMinutes` the lane's wait. **After a submission or a failed verdict in your lane, Combwork watches the card for you**: the reply says so; end your turn. Where it says your own watch stays, or nothing of a watch, or you are woken with nothing to do yet, start it yourself, as your role's file says.
 
-**A change asked of your card in Review**: `cw_submit` with `followUp: true` before you wait: until then nothing is handed over. **Start the watch before the other steps that let the other side act** (a request, a design, a follow-up step, a reply), so a quick answer isn't missed; your own step doesn't wake you. Then check the watch's reply: "Waiting for…" is live, so finish that step and **end your turn**, saying what you wait for; "Already: …" has happened, so carry on now. Anything else: start it again once, and if it still says neither, `cw_notify` the user. **Never end a turn in a loop without a watch or a loop wake to come** ([waiting.md](waiting.md)), unless the loop is over or you're asking the user, and never poll or sleep instead. Combwork also wakes a loop's agents (a card arriving in Review, a verdict, a request, a design); act on that as on your own watch's wake.
+**End your turn only when your next step waits on someone else** (a verdict, an answer, the user, a card you need, the rest done), on a watch or loop wake ([waiting.md](waiting.md)), never polling: a comment or reply hands nothing over. A change asked in Review: `cw_submit` with `followUp: true` before you wait. **Start the watch before the step that lets the other side act** (a request, a design, a follow-up step, a reply asked for), so a quick answer isn't missed; your own step doesn't wake you. Then its reply: "Waiting for…" is live, so finish that step and **end your turn**, saying what you wait for; "Already: …" has happened, so carry on now. Combwork also wakes a loop's agents (a submission, a verdict, a request, a design): act on it as on your watch's wake.
 
-**When woken**, `cw_inbox` first: it says what changed and what else came, each with its sender (work-on-card, Your inbox: act, then ack). Read only what you need: `cw_read_task` with `latestComment: true` (`summary: true` for first lines; in full to act on findings). Woken by several watched cards: check each one's column and verdict, and watch them all again in one watch. If a wake isn't possible (the tool says so), wait in the call instead (`timeoutSeconds` up to 840, passing the reply's `since` on).
+**When woken**, `cw_inbox` first: it says what changed and what else came, each with its sender (work-on-card, Your inbox: act, then ack). Read only what you need: `cw_read_task` with `latestComment: true` (`summary: true` for first lines; in full to act on findings). Woken by several watched cards: check each one's column and verdict, and watch them all again in one watch.
 
 ## At the end
 
@@ -35,5 +35,5 @@ Report each card: its rounds, how it ended (Passed, Done once merged, waiting fo
 
 Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
-- [waiting.md](waiting.md): ending a turn with no watch (a loop wake), another card, one that left your watch, a blocked one.
+- [waiting.md](waiting.md): ending a turn with no watch (a loop wake), odd watch replies, no wake, another card, one that left your watch, a blocked one.
 - [rounds.md](rounds.md): a card failing again, a finding back or disputed, the round limit, stopping to ask the user.

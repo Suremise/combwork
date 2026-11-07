@@ -1522,7 +1522,7 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
     // A role change (HI-2664): updateAgent restarted it if idle; asked again, what became of it (one restart, never two).
-    const side = live && body?.workflowRole !== undefined ? await sessions.restartForSide(p, agentId, { when: 'ifIdle' }).catch(() => 'same' as const) : 'same'
+    const side = live && body?.workflowRole !== undefined ? await sessions.restartForTools(p, agentId, { when: 'ifIdle' }).catch(() => 'same' as const) : 'same'
     return { done: [API.done.updatedAgent, { agent: def.name, project: basename(p), live: side === 'restarting' || side === 'busy' ? side : live ? 'yes' : 'no' }], act: { agent: actAgent(def) }, result: def }
   })
 })

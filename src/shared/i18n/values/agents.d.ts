@@ -395,4 +395,8 @@ interface CombworkMessageValues {
   'agents.workflowRole.needsTools': undefined
   'agents.workflowRole.reviewer': undefined
   'agents.workflowRole.reviewerText': undefined
+  'agents.workflowTools.later': undefined
+  'agents.workflowTools.restartMessage': { count: number; agents: string | number }
+  'agents.workflowTools.restartTitle': { agents: string | number }
+  'agents.workflowTools.restartWhenDone': { count: number }
 }

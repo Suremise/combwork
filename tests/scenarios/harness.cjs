@@ -753,6 +753,9 @@ async function runScenario(sc, providerKey, opts = {}) {
     // for the session under test (the Assistant's by its name, #402).
     const wakesOf = sc.role === 'assistant' ? 'Assistant' : coder.name
     if (providerKey === 'fake' && sc.fakeWakes) fs.writeFileSync(path.join(fakeHome, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
+    // The fake Codex answers a wake it read from the same file in its home (fake-codex.cjs, nextScripted): only where a
+    // scenario asks (codexWakes, HI-2716), since the others' fakeSkips take a fake Codex that doesn't act on its wakes.
+    if (providerKey === 'fake-codex' && sc.fakeWakes && sc.codexWakes) fs.writeFileSync(path.join(fakeCodexHome, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
     const skillNames = fs.existsSync(ctx.skillsDir) ? fs.readdirSync(ctx.skillsDir).filter((d) => !d.startsWith('.')) : []
 
     // Start the session under test, answer a trust question, wait until it's ready, and send the prompt.

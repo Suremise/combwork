@@ -132,6 +132,74 @@ export const hiddenForSide = (side: string | null | undefined): readonly string[
  */
 export const sideAllows = (side: string | null | undefined, part: 'builder' | 'reviewer'): boolean => !side || side === 'both' || side === part
 
+/**
+ * The workflow options a tool's use depends on (HI-2694): a structural slice of WorkflowOptions, as this file imports
+ * nothing (cw-mcp.js runs outside the app bundle).
+ */
+export interface WorkflowToolOptions {
+  review: string
+  finish: string
+  focusedTests: boolean
+  okBefore: { mode: string }
+}
+
+/**
+ * A project agent's tools its project's workflow makes unusable (HI-2694, Darren 7 Nov: launch-only, "agents shouldn't see
+ * tools they can never use"): each with when it can be used, read off its handler's own refusals (runtime.ts), so a tool
+ * is hidden only where every operation of it is refused. A tool not listed is never hidden for the workflow: one of its
+ * operations works under any options (cw_queue's list, cw_loop_step with a lane's reviewer, cw_request_builder,
+ * cw_declare_paths, cw_merge_slot, cw_lane, the builder's moves).
+ * - cw_start_review, cw_verdict: only in Review (`notFrom` first thing), a stage only some review gives.
+ * - cw_focused_skip: only on the merge queue's skipped focused tests, raised only with each card's focused tests and
+ *   Combwork merging.
+ * - cw_report_merge: only from Approved, Merging, or the agent's merge in Doing; refused for every finish but Combwork
+ *   merges, the agent merges and not checked (Committed is done, None's accept), and under not checked only from Approved,
+ *   which only a review or your OK before merging gives.
+ */
+export const WORKFLOW_TOOLS: Readonly<Record<string, (o: WorkflowToolOptions) => boolean>> = {
+  cw_start_review: (o) => o.review !== 'none',
+  cw_verdict: (o) => o.review !== 'none',
+  cw_focused_skip: (o) => o.focusedTests && o.finish === 'combworkMerges',
+  cw_report_merge: (o) => o.finish === 'combworkMerges' || o.finish === 'agentMerges' || (o.finish === 'notChecked' && (o.review !== 'none' || o.okBefore.mode !== 'never'))
+}
+
+/**
+ * The stages a card can be in that keep a tool usable whatever its rules say (HI-2694, HR1's s15 check): a card left in
+ * Review or Approved while the rules were off, or moved there past them, still takes these.
+ */
+export const WORKFLOW_TOOL_STAGES: Readonly<Record<string, readonly string[]>> = {
+  cw_start_review: ['review'],
+  cw_verdict: ['review'],
+  cw_report_merge: ['approved', 'merging']
+}
+
+/**
+ * The tools hidden for a project's workflow (HI-2694): those no option set allows and no card's stage keeps, sorted. `sets`:
+ * the project's options now and every ruleset its cards in flight and running lanes still work under; `stages`: the
+ * stages its cards in flight are in. No set (nothing known): nothing hidden.
+ */
+export function hiddenForWorkflow(sets: readonly WorkflowToolOptions[], stages: Iterable<string> = []): string[] {
+  if (!sets.length) return []
+  const at = new Set(stages)
+  return Object.entries(WORKFLOW_TOOLS)
+    .filter(([name, usable]) => !sets.some(usable) && !(WORKFLOW_TOOL_STAGES[name] ?? []).some((s) => at.has(s)))
+    .map(([name]) => name)
+    .sort()
+}
+
+/** A launch's CW_WORKFLOW_HIDDEN read back (HI-2694): the tools it was not offered. */
+export const workflowHiddenOf = (env: string | null | undefined): string[] => (env ? env.split(',').filter(Boolean) : [])
+
+/**
+ * Whether a session launched without `launchedHidden` (its CW_WORKFLOW_HIDDEN) has every tool of a part that its project
+ * makes usable now (`hiddenNow`: null when that can't be read, taken as every tool usable). A part's tools are its side's
+ * (REVIEWER_ONLY_TOOLS, BUILDER_ONLY_TOOLS). False holds work back until it has relaunched with them (HR1's s11 point 2).
+ */
+export function workflowAllows(launchedHidden: readonly string[], hiddenNow: readonly string[] | null, part: 'builder' | 'reviewer'): boolean {
+  const own = part === 'reviewer' ? REVIEWER_ONLY_TOOLS : BUILDER_ONLY_TOOLS
+  return !launchedHidden.some((t) => own.includes(t) && !(hiddenNow ?? []).includes(t))
+}
+
 /** Tools only the Assistant has (project agents don't get them). cw_wait_for_agents isn't one: an agent waits on its project's agents too (#416). */
 export const ASSISTANT_ONLY_TOOLS = ['cw_agent_activity', 'cw_list_providers', 'cw_list_settings', 'cw_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]
 

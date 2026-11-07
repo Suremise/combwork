@@ -41,6 +41,31 @@ Codex run.
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
 <!-- old-name: begin baseline-run-records -->
+## Builders carry on after answering a message (HI-2716): fakes, Codex (GPT-6.1 Sol, GPT-6 Astra), Claude Code, fixtures v127, 7 November 2026
+
+On 7 Nov in the cli project, CB1 and CB2 (Codex, GPT-6 Astra) parked five times on a watch of their own card in Doing
+after answering the Assistant with a comment. card-loop's Waiting said to start the watch before "a reply" and never to
+end a turn without one. Now one rule for every CLI: end the turn only when the next step waits on someone else; a
+comment or reply hands nothing over (card-loop SKILL.md; work-on-card while-working.md, inbox.md step 4). No dialect
+override.
+
+New **card-loop-progress-comment**: a lane builder idle mid-card (part 1 committed) is told by the Assistant the user's
+pick it waited for, and asked for a line on the card. The fake Codex acts out its wake too (`codexWakes`).
+
+Runs, the same ids before (the old skills, with this card's scenarios) and after (7ca373a22): card-loop-progress-comment,
+card-loop-submit-watch, inbox-rebrief, card-loop-design-first, card-loop-ask-assistant.
+- **Fakes** (each where fakeScope runs it): all pass before and after (`baselines/hi2716-before-<fake>`, `hi2716-final-<fake>`).
+- **Codex GPT-6.1 Sol** (default), **GPT-6 Astra**, CLI 0.166.0: all pass before and after, card-loop-progress-comment
+  `--repeat 2` each time (`hi2716-before-codex-progress`, `hi2716-before-astra-progress`, `hi2716-final-codex-progress`,
+  `hi2716-final-astra-progress`; the other four `hi2716-before-codex`, `hi2716-before-astra`, `hi2716-final-codex`,
+  `hi2716-final-astra`, `hi2716-final-astra-ask`).
+- **Claude Code** (default): all pass before and after (`hi2716-before-claude-code`, `hi2716-before-claude-code-progress`,
+  `hi2716-final-claude-code`).
+
+The scenario didn't reproduce the cli project's parking before the change (0 of 4 Codex samples): it guards the rule,
+and isn't evidence the change fixed it. What the cli builders had and the fixture lacks: long cards, several messages
+over an hour, and turns Codex ended on its own after a step.
+
 ## A known Codex habit (accepted for 1.0.0): Codex, fixtures v119–v120, 1 November 2026
 
 **assistant-card-question**, Codex 0 of 2 before and after HI-2265's fixes (and 0 of 3 on df1676127, HI-2190); Haiku

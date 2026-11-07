@@ -392,5 +392,9 @@
   "agents.workflowRole.label": "ワークフローでの役割",
   "agents.workflowRole.needsTools": "この接続はCombworkのツールなしで起動します。",
   "agents.workflowRole.reviewer": "レビュアー",
-  "agents.workflowRole.reviewerText": "ビルダーのカードをレビューし、合格か不合格かを判定します。"
+  "agents.workflowRole.reviewerText": "ビルダーのカードをレビューし、合格か不合格かを判定します。",
+  "agents.workflowTools.restartTitle": "新しいワークフローのために{agents}を再起動しますか？",
+  "agents.workflowTools.restartMessage": "{count, plural, other {{agents}は作業中です。プロジェクトのワークフローで使えるようになったツールは再起動時に読み込まれ、同じ会話のまま続けます。}}",
+  "agents.workflowTools.restartWhenDone": "{count, plural, other {ターンが終わったら再起動}}",
+  "agents.workflowTools.later": "後で"
 }

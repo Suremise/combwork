@@ -93,7 +93,7 @@ The checks are positive and negative:
   reviews it when Combwork wakes it once the card is unblocked and back in Review (#481).
   A reviewer woken by Combwork's own loop wake, with no watch of its own, reviews the card and waits for the next (#405).
   A builder told no rounds or wait gets the workspace's Card loop settings for its lane and its wait; one told its own keeps them (#412).
-  The Assistant at Look and advise lists the running lanes when asked, and changes none (#500). A builder whose card's decision needs what only the Assistant may do (park another card, move its own to Done) asks it with `cw_ask_assistant`, not in a comment, and doesn't ask the user again (HI-1866).
+  The Assistant at Look and advise lists the running lanes when asked, and changes none (#500). A builder whose card's decision needs what only the Assistant may do (park another card, move its own to Done) asks it with `cw_ask_assistant`, not in a comment, and doesn't ask the user again (HI-1866). A builder the Assistant asks mid-card where its card stands answers on the card, then carries on and submits it, rather than ending its turn on a watch of its own card in Doing (HI-2716).
 - **The intents and their gates** (1.0): an agent starts, puts back, submits, reviews and gives verdicts with the intent
   tools (`cw_start_card`, `cw_submit`, `cw_start_review`, `cw_verdict`…). **work-on-card** runs in a project
   whose work an agent reviews and requires them: started, committed, submitted, stopping in Review. Most other

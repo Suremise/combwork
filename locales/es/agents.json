@@ -392,5 +392,9 @@
   "agents.workflowRole.label": "Rol en el flujo de trabajo",
   "agents.workflowRole.needsTools": "Esta conexión se inicia sin las herramientas de Combwork.",
   "agents.workflowRole.reviewer": "Revisor",
-  "agents.workflowRole.reviewerText": "Revisa las tarjetas de los autores y las da por superadas o no superadas."
+  "agents.workflowRole.reviewerText": "Revisa las tarjetas de los autores y las da por superadas o no superadas.",
+  "agents.workflowTools.restartTitle": "¿Reiniciar {agents} para el nuevo flujo de trabajo?",
+  "agents.workflowTools.restartMessage": "{count, plural, one {{agents} está trabajando. Las herramientas que ahora permite el flujo de trabajo de su proyecto se cargan al reiniciarse; sigue en la misma conversación.} many {{agents} están trabajando. Las herramientas que ahora permite el flujo de trabajo de su proyecto se cargan al reiniciarse; cada uno sigue en la misma conversación.} other {{agents} están trabajando. Las herramientas que ahora permite el flujo de trabajo de su proyecto se cargan al reiniciarse; cada uno sigue en la misma conversación.}}",
+  "agents.workflowTools.restartWhenDone": "{count, plural, one {Reiniciar cuando termine su turno} many {Reiniciar cuando terminen sus turnos} other {Reiniciar cuando terminen sus turnos}}",
+  "agents.workflowTools.later": "Más tarde"
 }

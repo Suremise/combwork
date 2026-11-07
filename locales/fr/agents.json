@@ -392,5 +392,9 @@
   "agents.workflowRole.label": "Rôle dans le flux de travail",
   "agents.workflowRole.needsTools": "Cette connexion se lance sans les outils de Combwork.",
   "agents.workflowRole.reviewer": "Relecteur",
-  "agents.workflowRole.reviewerText": "Relit les cartes des auteurs et les déclare validées ou refusées."
+  "agents.workflowRole.reviewerText": "Relit les cartes des auteurs et les déclare validées ou refusées.",
+  "agents.workflowTools.restartTitle": "Redémarrer {agents} pour le nouveau flux de travail ?",
+  "agents.workflowTools.restartMessage": "{count, plural, one {{agents} est en train de travailler. Les outils que le flux de travail de son projet permet désormais se chargent à son redémarrage ; il continue dans la même conversation.} many {{agents} sont en train de travailler. Les outils que le flux de travail de leur projet permet désormais se chargent à leur redémarrage ; chacun continue dans la même conversation.} other {{agents} sont en train de travailler. Les outils que le flux de travail de leur projet permet désormais se chargent à leur redémarrage ; chacun continue dans la même conversation.}}",
+  "agents.workflowTools.restartWhenDone": "{count, plural, one {Redémarrer une fois son tour terminé} many {Redémarrer une fois leurs tours terminés} other {Redémarrer une fois leurs tours terminés}}",
+  "agents.workflowTools.later": "Plus tard"
 }
