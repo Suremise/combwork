@@ -2839,6 +2839,10 @@
     "text": "to sessions started afterwards (running agents show Restart session)",
     "note": "When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it."
   },
+  "settings.agent.tool.retarget": {
+    "text": "These still on {from} can follow {to} (Todo cards with no work, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with from, target and items; {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.",
+    "note": "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names."
+  },
   "settings.agent.tool.switchRefused": {
     "text": "{error} Tell the user, or leave it as it is.",
     "note": "Switching a project's version control refused (#1419). {error} is why, a sentence."

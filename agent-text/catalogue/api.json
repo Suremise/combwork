@@ -436,6 +436,12 @@
   "api.change.resumeTeam": {
     "text": "resume the team"
   },
+  "api.change.retarget": {
+    "text": "move cards and slots from {from} to {to} in {project}"
+  },
+  "api.change.retargetAny": {
+    "text": "move cards and slots to a project's new target"
+  },
   "api.change.retryFresh": {
     "text": "retry lane {lane}'s new conversations"
   },
@@ -698,6 +704,9 @@
   },
   "api.done.reordered": {
     "text": "Put {cards} at the top of {column}"
+  },
+  "api.done.retargeted": {
+    "text": "Moved {cards} cards and {slots} slots from {from} to {to}; {skipped} left where they were, each with why"
   },
   "api.done.slotReleased": {
     "text": "Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}"
@@ -1045,6 +1054,9 @@
   },
   "api.queue.projectRequired": {
     "text": "project is required"
+  },
+  "api.queue.retargetArgs": {
+    "text": "from, to and items are required: the finished target, the new one, and the cards and slots to move (keys and names, as the target change listed them)"
   },
   "api.queue.targetArg": {
     "text": "target is a branch name"

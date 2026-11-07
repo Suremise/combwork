@@ -121,6 +121,14 @@ interface CombworkMessageValues {
   'workflow.form.previewNow': { value: string | number }
   'workflow.form.readOnly': { agents: string | number }
   'workflow.form.removeCheck': undefined
+  'workflow.form.retargetCard': { card: string | number; title: string | number }
+  'workflow.form.retargetChoice': { from: string | number; to: string | number; cards: number; slots: number }
+  'workflow.form.retargetDone': { skipped: number; to: string | number; cards: number; slots: number }
+  'workflow.form.retargetFailed': undefined
+  'workflow.form.retargetKeep': { what: string | number; why: string; from: string | number }
+  'workflow.form.retargetSkipped': { what: string | number; why: string }
+  'workflow.form.retargetSlot': { slot: string | number }
+  'workflow.form.retargetStays': { from: string | number }
   'workflow.form.save': undefined
   'workflow.form.saveBlocked': undefined
   'workflow.form.saved': undefined

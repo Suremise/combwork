@@ -145,6 +145,7 @@ import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { copyViews, stopIsolated } from './copiesApp'
+import { retargetApply, retargetArg } from './workflow/retarget'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
@@ -1021,6 +1022,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
+    'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
     'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),

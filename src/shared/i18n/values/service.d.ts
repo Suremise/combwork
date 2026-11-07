@@ -247,6 +247,7 @@ interface CombworkMessageValues {
   'service.workflow.changedMeanwhile': undefined
   'service.workflow.closed': undefined
   'service.workflow.inheritor': { project: string | number }
+  'service.workflow.targetInUse': { branch: string | number; uses: string | number }
   'service.workflowNotice.blocked': { card: string | number; reason: string | number }
   'service.workflowNotice.blockedNoReason': { card: string | number }
   'service.workflowNotice.failed': { card: string | number }

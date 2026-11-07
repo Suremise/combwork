@@ -93,6 +93,7 @@ import type { DeliverySender, InboxItem } from '../shared/deliveries'
 import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import { armIntentWatch } from './intentWatch'
+import { retargetApply, retargetPreview } from './workflow/retarget'
 import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
@@ -715,6 +716,7 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'queue-pause': UNDO_FINAL.queuePaused,
   'queue-resume': UNDO_FINAL.queueResumed,
   'queue-forward': UNDO_FINAL.queueForwarded,
+  retarget: UNDO_FINAL.retargeted,
   'team-pause': UNDO_FINAL.teamPaused,
   'team-resume': UNDO_FINAL.teamResumed,
   'release-slot': UNDO_FINAL.slotReleased,
@@ -2537,6 +2539,27 @@ async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Pro
 }
 
 route('POST', '/v1/queue/remove', async ({ body }) => queueCard(body, 'removeFromQueue'))
+// HI-2680: after a project's target moved on, what can follow the new one: the Assistant's (within Control agents) and
+// the user's, never a project agent's or a script's; only the items named (as the reply to the target change listed
+// them), each as it is now and only while still movable (a fresh preview's), rechecked as it moves.
+route('POST', '/v1/workflow/retarget', async ({ body }) => {
+  notAgents([API.change.retargetAny])
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
+  const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
+  const items = Array.isArray(body?.items) ? (body.items as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 500) : []
+  if (!from || !to || !items.length) throw new HttpError(400, say(API.queue.retargetArgs))
+  return assistantChange('agents', [API.change.retarget, { project: basename(p), from, to }], { kind: 'retarget', project: basename(p) }, async (guard) => {
+    const now = await retargetPreview(ws, p, from, to)
+    const named = new Set(items.map((x) => x.toLowerCase()))
+    const confirmed = { ...now, cards: { move: now.cards.move.filter((c) => named.has(c.key.toLowerCase())), keep: [] }, slots: { move: now.slots.move.filter((s) => named.has(s.name.toLowerCase())), keep: [] } }
+    const r = await retargetApply(ws, p, confirmed, await taskActor(), guard)
+    const left = items.filter((x) => !confirmed.cards.move.some((c) => c.key.toLowerCase() === x.toLowerCase()) && !confirmed.slots.move.some((s) => s.name.toLowerCase() === x.toLowerCase()))
+    const result = { ...r, skipped: [...r.skipped, ...left.map((x) => ({ key: x, why: 'changed' as const }))] }
+    return { done: [API.done.retargeted, { from, to, cards: String(r.moved.cards.length), slots: String(r.moved.slots.length), skipped: String(result.skipped.length) }], result }
+  })
+})
 // HI-2679: bring one of a project's targets up to date with another (a forward merge), the Assistant's (within Control
 // agents) and the user's: never a project agent's or a script's.
 route('POST', '/v1/queue/forward', async ({ body }) => {

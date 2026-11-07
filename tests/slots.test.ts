@@ -1521,4 +1521,103 @@ describe('preparing a lent slot for its card (#1438)', { timeout: 90_000 }, () =
   })
 })
 
+describe('moving a free slot onto another target (HI-2680)', { timeout: 90_000 }, () => {
+  /** A slot lent, released and settled: free, ready, its recorded target and head as the preview would read them. */
+  async function free(w: World) {
+    const r = await lent(w, { agent: 'a1', card: 1 })
+    await w.pool.release(r.lease.id, 'done')
+    await w.pool.refresh()
+    const s = w.store.slot(r.slot.name)!
+    expect(s.state).toBe('ready')
+    return { name: s.name, expect: { folder: s.folder, target: s.target, head: sh(s.folder, 'rev-parse', 'HEAD') } }
+  }
+  /** 1.2.0 made from main, then (`ahead`) a commit of its own. */
+  const release = (w: World, ahead: boolean): string => {
+    sh(w.project, 'branch', '1.2.0', 'main')
+    if (ahead) {
+      sh(w.project, 'checkout', '-q', '1.2.0')
+      commit(w.project, { 'release.txt': '1.2.0\n' }, '1.2.0 only')
+      sh(w.project, 'checkout', '-q', 'main')
+    }
+    return sh(w.project, 'rev-parse', '1.2.0')
+  }
+  const ok = () => true
+
+  it("records the new target though it names the same commit (a release cut just now): the folder untouched", async () => {
+    const w = world({ builders: 1 })
+    const { name, expect: was } = await free(w)
+    release(w, false)
+    expect(await w.pool.retarget(name, was, 'main', '1.2.0', ok)).toEqual({ kind: 'moved' })
+    expect(w.store.slot(name)).toMatchObject({ state: 'ready', target: '1.2.0', op: null })
+    expect(sh(was.folder, 'rev-parse', 'HEAD')).toBe(was.head)
+    expect(w.store.retargetOf(name)).toBeNull()
+  })
+
+  it("moves its folder to the new target's head, clean, and records it", async () => {
+    const w = world({ builders: 1 })
+    const { name, expect: was } = await free(w)
+    const head = release(w, true)
+    expect(await w.pool.retarget(name, was, 'main', '1.2.0', ok)).toEqual({ kind: 'moved' })
+    expect(w.store.slot(name)).toMatchObject({ state: 'ready', target: '1.2.0' })
+    expect(sh(was.folder, 'rev-parse', 'HEAD')).toBe(head)
+    expect(sh(was.folder, 'status', '--porcelain')).toBe('')
+  })
+
+  it("a recheck that fails (authority, the project's target) leaves it on its own target, even when the heads match", async () => {
+    const w = world({ builders: 1 })
+    const { name, expect: was } = await free(w)
+    release(w, false)
+    expect(await w.pool.retarget(name, was, 'main', '1.2.0', () => false)).toEqual({ kind: 'kept', why: 'refused' })
+    expect(w.store.slot(name)).toMatchObject({ state: 'ready', target: was.target, op: null })
+  })
+
+  it('a folder with changes, or moved off the head seen, is set aside (dirty), never ready on its old target', async () => {
+    const w = world({ builders: 2 })
+    const a = await free(w)
+    release(w, true)
+    writeFileSync(join(a.expect.folder, 'wip.txt'), 'not committed\n')
+    expect(await w.pool.retarget(a.name, a.expect, 'main', '1.2.0', ok)).toMatchObject({ kind: 'setAside', state: 'dirty' })
+    expect(w.store.slot(a.name)).toMatchObject({ state: 'dirty', target: a.expect.target, op: null })
+    const b = await free(w)
+    commit(b.expect.folder, { 'stray.txt': 'stray\n' }, 'a stray commit')
+    expect(await w.pool.retarget(b.name, b.expect, 'main', '1.2.0', ok)).toMatchObject({ kind: 'setAside', state: 'dirty' })
+    expect(w.store.slot(b.name)?.state).toBe('dirty')
+  })
+
+  it('one that changed since the preview (its recorded target, or lent meanwhile) is left exactly as it is', async () => {
+    const w = world({ builders: 1 })
+    const { name, expect: was } = await free(w)
+    release(w, true)
+    expect(await w.pool.retarget(name, { ...was, target: 'elsewhere' }, 'main', '1.2.0', ok)).toEqual({ kind: 'kept', why: 'changed' })
+    const r = await lent(w, { agent: 'a2', card: 2 })
+    expect(r.slot.name).toBe(name)
+    expect(await w.pool.retarget(name, was, 'main', '1.2.0', ok)).toEqual({ kind: 'kept', why: 'changed' })
+    expect(w.store.slot(name)).toMatchObject({ state: 'lent', target: was.target })
+  })
+
+  it("a retarget whose Combwork has gone is settled from its folder: switched → the new target; not yet → as it was; changes → dirty", async () => {
+    for (const how of ['switched', 'reserved', 'dirty'] as const) {
+      const w = world({ builders: 1 })
+      const { name, expect: was } = await free(w)
+      const head = release(w, true)
+      const gone = w.another(5)
+      expect(await gone.store.startRetarget(name, { folder: was.folder, target: was.target }, 'o-gone', { pid: 5, started: 1005 }, { oldHead: was.head, from: was.target, baseline: 'main', to: '1.2.0', toHead: head })).toBe(true)
+      // While it holds the slot, nothing else lends it.
+      expect((await w.pool.lend({ agent: 'a2', card: 2 })).ok).toBe(false)
+      if (how === 'switched') {
+        sh(was.folder, 'switch', '-q', '--detach', head)
+        await gone.store.retargetSwitched(name, 'o-gone')
+      }
+      if (how === 'dirty') writeFileSync(join(was.folder, 'wip.txt'), 'not committed\n')
+      w.dead.add(5)
+      await w.pool.refresh()
+      const now = w.store.slot(name)
+      if (how === 'switched') expect(now).toMatchObject({ state: 'ready', target: '1.2.0', op: null })
+      if (how === 'reserved') expect(now).toMatchObject({ state: 'ready', target: was.target, op: null })
+      if (how === 'dirty') expect(now).toMatchObject({ state: 'dirty', op: null })
+      expect(w.store.retargetOf(name)).toBeNull()
+    }
+  })
+})
+
 afterAll(() => setBuilderCount(null))

@@ -743,6 +743,7 @@ interface CombworkMessageValues {
   'assistant.undo.why.removedFromQueue': undefined
   'assistant.undo.why.reportMerge': undefined
   'assistant.undo.why.request': undefined
+  'assistant.undo.why.retargeted': undefined
   'assistant.undo.why.retriedMerge': undefined
   'assistant.undo.why.slotReleased': undefined
   'assistant.undo.why.start': undefined

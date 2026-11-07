@@ -47,6 +47,7 @@ import { BOARD_MIGRATIONS } from './boardStore'
 import { openDb } from './db'
 import { samePlace } from './fsutil'
 import { git, gitErrorLine } from './git'
+import { withRepoLocks } from './repoLock'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
@@ -968,6 +969,50 @@ export class SlotStore {
     })
   }
 
+  /**
+   * HI-2680: a free slot reserved for its move onto another target, in one write, only as the preview saw it: ready, free
+   * (no operation, job, writer or lease), at the same folder, with the same recorded target; its intent recorded with it.
+   */
+  async startRetarget(name: string, expect: { folder: string; target: string | null }, token: string, holder: Holder, intent: Omit<RetargetIntent, 'stage'>): Promise<boolean> {
+    return this.conn.write((db) => {
+      const s = this.slotIn(db, name)
+      if (!s || s.state !== 'ready' || s.op || s.job || s.writer || !samePlace(s.folder, expect.folder) || (s.target ?? null) !== expect.target) return false
+      if (openLeaseIn(db, this.project, name)) return false
+      if (Number(db.prepare(`UPDATE slots SET op = ?, op_kind = 'warm', op_lease = NULL, op_pid = ?, op_started = ? WHERE project = ? AND name = ? AND state = 'ready' AND ${FREE}`).run(token, holder.pid, holder.started, this.project, name).changes) !== 1) return false
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(retargetKey(this.project, name), JSON.stringify({ ...intent, stage: 'reserved' } satisfies RetargetIntent))
+      return true
+    })
+  }
+
+  /** A slot's retarget intent, if one is recorded (HI-2680). */
+  retargetOf(name: string): RetargetIntent | null {
+    return this.conn.read((db) => {
+      const v = (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(retargetKey(this.project, name)) as { value: string } | undefined)?.value
+      return v ? retargetIntentOf(v) : null
+    })
+  }
+
+  /** HI-2680: its folder moved and checked: recorded before the slot is, by its operation (`token`). */
+  async retargetSwitched(name: string, token: string): Promise<void> {
+    await this.fenced(name, token, (db) => {
+      const v = (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(retargetKey(this.project, name)) as { value: string } | undefined)?.value
+      const i = v ? retargetIntentOf(v) : null
+      if (i) db.prepare('UPDATE board_meta SET value = ? WHERE key = ?').run(JSON.stringify({ ...i, stage: 'switched' } satisfies RetargetIntent), retargetKey(this.project, name))
+    })
+  }
+
+  /**
+   * HI-2680: a retarget ended by its operation, in one fenced write: `ready` on `target` (the new one, or back on the
+   * recorded one), or set aside (`dirty`: never lent; `gone`); the operation and the intent cleared.
+   */
+  async endRetarget(name: string, token: string, end: { state: 'ready'; target: string | null } | { state: 'dirty' | 'gone' }): Promise<void> {
+    await this.fenced(name, token, (db) => {
+      if (end.state === 'ready') db.prepare('UPDATE slots SET target = ? WHERE project = ? AND name = ?').run(end.target, this.project, name)
+      this.setIn(db, name, end.state, {}, { op: null })
+      db.prepare('DELETE FROM board_meta WHERE key = ?').run(retargetKey(this.project, name))
+    })
+  }
+
   /** A leased slot's folder is gone: marked so (its holder's sessions are refused, #1434). */
   async markGone(name: string): Promise<void> {
     await this.conn.write((db) => db.prepare("UPDATE slots SET state = 'gone' WHERE project = ? AND name = ? AND state = 'lent' AND op IS NULL").run(this.project, name))
@@ -1132,6 +1177,33 @@ export interface RecreateIntent {
 }
 /** board_meta: a slot's recreate intent. */
 export const recreateKey = (project: string, slot: string): string => `slot_recreate:${project}:${slot}`
+
+/**
+ * A free slot's move onto another target (HI-2680: Work merges into moved on), recorded with its operation so a crash
+ * part way is settled from the folder: its head and recorded target as the preview saw them (`from`: null for none), the
+ * finished branch they were checked against (`baseline`), the new target and its head then, and how far it got
+ * (`switched`: its folder was moved to `toHead` and checked, even when that was already its head).
+ */
+export interface RetargetIntent {
+  oldHead: string
+  from: string | null
+  baseline: string
+  to: string
+  toHead: string
+  stage: 'reserved' | 'switched'
+}
+export const retargetKey = (project: string, slot: string): string => `slot_retarget:${project}:${slot}`
+function retargetIntentOf(v: string): RetargetIntent | null {
+  try {
+    const i = JSON.parse(v) as Partial<RetargetIntent>
+    return typeof i.oldHead === 'string' && (i.from === null || typeof i.from === 'string') && typeof i.baseline === 'string' && typeof i.to === 'string' && typeof i.toHead === 'string' && (i.stage === 'reserved' || i.stage === 'switched') ? (i as RetargetIntent) : null
+  } catch {
+    return null
+  }
+}
+
+/** What a slot's retarget ended as (HI-2680): moved to its new target, back as it was, or set aside (dirty or gone). */
+export type RetargetEnd = { kind: 'moved' } | { kind: 'kept'; why: 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'refused' | 'cantCheck'; detail?: string } | { kind: 'setAside'; state: 'dirty' | 'gone'; detail?: string }
 function recreateIntentOf(v: string): RecreateIntent | null {
   try {
     const i = JSON.parse(v) as Partial<RecreateIntent>
@@ -1615,6 +1687,91 @@ export class SlotPool {
   }
 
   /**
+   * HI-2680: moves a free slot onto another target, as the confirmed preview saw it (`expect`: its folder, its recorded
+   * target, its head; `baseline`: the finished branch it was checked against). Reserved in the pool's write; under the
+   * repository's lock, outside any database write, the folder checked (there, clean, at the head seen, in the baseline),
+   * `still()` asked (the caller's authority, the project's target still `to`), then detached at `to`'s head and checked;
+   * then classified from the folder against its intent and finished by its operation. Every exit is classified the same way.
+   */
+  async retarget(name: string, expect: { folder: string; target: string | null; head: string }, baseline: string, to: string, still: () => boolean | Promise<boolean>): Promise<RetargetEnd> {
+    const toHead = await G.lineHead(this.deps.project, to)
+    if (isUnknown(toHead) || !toHead) return { kind: 'kept', why: 'cantCheck', detail: `can't read ${to}` } // agent-protocol: a reason's detail for the log and the result, as git's are (English)
+    const token = newToken()
+    return this.op(token, async (): Promise<RetargetEnd> => {
+      const intent = { oldHead: expect.head, from: expect.target, baseline, to, toHead }
+      if (!(await this.store.startRetarget(name, { folder: expect.folder, target: expect.target }, token, await this.deps.holder.self(), intent))) return { kind: 'kept', why: 'changed' }
+      let why: Extract<RetargetEnd, { kind: 'kept' }>['why'] | null = null
+      let detail: string | undefined
+      await withRepoLocks([this.deps.project], async () => {
+        const pre = await this.retargetable(expect.folder, expect.head, baseline)
+        if (pre) return void ((why = pre.why), (detail = pre.detail))
+        if (!(await still())) return void (why = 'refused')
+        if (expect.head !== toHead) {
+          const sw = await git(expect.folder, ['switch', '-q', '--detach', toHead])
+          if (!sw.ok) return void ((why = 'cantCheck'), (detail = gitErrorLine(sw.err)))
+        }
+        const head = await G.head(expect.folder)
+        const d = await G.dirty(expect.folder)
+        if (isUnknown(head) || head !== toHead || isUnknown(d) || d.length) return
+        await this.store.retargetSwitched(name, token)
+      }, { quiet: true, project: this.deps.project })
+      const end = await this.settleRetarget(name, token)
+      if (end.kind === 'moved' || end.kind === 'setAside') return end
+      return why ? { kind: 'kept', why, ...(detail ? { detail } : {}) } : end
+    })
+  }
+
+  /** Whether a free slot's folder can move (HI-2680): there, clean (tracked and untracked), at `head`, and in `baseline`. */
+  private async retargetable(folder: string, head: string, baseline: string): Promise<{ why: 'dirty' | 'moved' | 'unmerged' | 'cantCheck'; detail?: string } | null> {
+    if (!(await folderThere(folder))) return { why: 'cantCheck', detail: 'its folder is gone' } // agent-protocol: a reason's detail for the log and the result, as git's are (English)
+    const d = await G.dirty(folder)
+    if (isUnknown(d)) return { why: 'cantCheck', detail: d.what }
+    if (d.length) return { why: 'dirty' }
+    const h = await G.head(folder)
+    if (isUnknown(h)) return { why: 'cantCheck', detail: h.what }
+    if (h !== head) return { why: 'moved' }
+    const b = await G.lineHead(this.deps.project, baseline)
+    if (isUnknown(b) || !b) return { why: 'cantCheck', detail: `can't read ${baseline}` } // agent-protocol: a reason's detail for the log and the result, as git's are (English)
+    const inIt = h === b || (await G.isAncestor(this.deps.project, h, b))
+    if (isUnknown(inIt)) return { why: 'cantCheck', detail: inIt.what }
+    return inIt ? null : { why: 'unmerged' }
+  }
+
+  /**
+   * HI-2680: a retarget settled from its folder against its intent, by its operation (`token`), under the repository's
+   * lock: clean at the new head once switched (or there and never at the old one) → `ready` on the new target; clean at
+   * its old head, not switched → back on its recorded target (none stays none); the folder gone → `gone`; anything else
+   * (changes, another head, unreadable) → `dirty`, never lent. A switch already made is never undone.
+   */
+  private async settleRetarget(name: string, token: string): Promise<RetargetEnd> {
+    const i = this.store.retargetOf(name)
+    const s = this.store.slot(name)
+    if (!i || !s) return { kind: 'kept', why: 'changed' }
+    const seen = await withRepoLocks([this.deps.project], async () => {
+      if (!(await folderThere(s.folder))) return 'gone' as const
+      const d = await G.dirty(s.folder)
+      const h = await G.head(s.folder)
+      if (isUnknown(d) || isUnknown(h)) return 'unreadable' as const
+      if (d.length) return 'dirty' as const
+      if (h === i.toHead && (i.stage === 'switched' || h !== i.oldHead)) return 'to' as const
+      if (h === i.oldHead) return 'from' as const
+      return 'other' as const
+    }, { quiet: true, project: this.deps.project })
+    if (seen === 'to') {
+      await this.store.endRetarget(name, token, { state: 'ready', target: i.to })
+      return { kind: 'moved' }
+    }
+    if (seen === 'from') {
+      await this.store.endRetarget(name, token, { state: 'ready', target: i.from })
+      return { kind: 'kept', why: 'changed' }
+    }
+    const state = seen === 'gone' ? 'gone' : 'dirty'
+    log.warn(`Slot ${userText(name)}'s retarget to ${userText(i.to)} ended ${seen}: set aside (${state})`)
+    await this.store.endRetarget(name, token, { state })
+    return { kind: 'setAside', state, detail: seen }
+  }
+
+  /**
    * Takes over an operation whose holder is gone: its job settled first (refused, and left to the next refresh, while
    * that fails); a warming is failed (its lease ended `interrupted`, the slot not ready), a removal is looked at again.
    */
@@ -1634,6 +1791,11 @@ export class SlotPool {
         const settled = !s.job || (await this.deps.settle(s.job))
         if (!settled) log.warn(`Slot ${userText(s.name)}'s job ${s.job} couldn't be emptied: it stays out of the pool`)
         const job = settled ? { job: null } : {}
+        // A move onto another target (HI-2680, its intent recorded with it): settled from its folder, as it ends: before a settle cut short, which is a warm with no lease too.
+        if (was.kind === 'warm' && this.store.retargetOf(s.name)) {
+          await this.settleRetarget(s.name, token)
+          return
+        }
         // A settle cut short (HI-2170, a warm with no lease): the slot as it was, looked at again by the next refresh.
         if (was.kind === 'warm' && was.lease === null) {
           await this.store.fenced(s.name, token, (db) => this.store.setIn(db, s.name, s.state, {}, { op: null, ...job }))

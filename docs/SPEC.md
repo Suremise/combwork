@@ -2330,6 +2330,24 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
   new target. Both name only
+- **Retargeting when Work merges into moves on (HI-2680, design s14 after s8/s11).** A change of G7 from `A` (a release
+  shipped) to `B` previews what still points at `A` (`retargetPreview`, read-only): Todo cards whose own target is `A`
+  with no own work move; free slots recording `A` (or none, `A` being the target they fell back to) that are clean with
+  nothing `A` lacks move; cards with work, cards started on `A`, running lanes on `A` and slots lent, busy, dirty or
+  holding unmerged commits stay, each with why. The apply (`retargetApply`) is bound to that preview: each card only
+  from `A` (`tasks.setTarget`'s `expect`, under the board's lock), each slot only as seen (its folder, recorded target and
+  head: the pool's `retarget`), and before each the project's target still `B` and the caller still allowed; each item
+  says moved or why not, never all or nothing. A slot's move is its pool's operation (`op_kind` warm, its intent in
+  `board_meta` `slot_retarget:`): reserved by compare and swap, then under the repository's lock and outside any
+  database write the folder checked (clean, at its head, in `A`), the caller rechecked, detached at `B`'s head and
+  checked, the intent marked `switched`; every exit, a crash's recovery too, settles it from the folder against the
+  intent: clean at `B`'s head once switched → `B`; clean at its old head, not switched → its recorded target (none stays
+  none); gone → `gone`; anything else → `dirty`, never lent. A branch taken out of G7b is refused while anything records
+  it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, slots),
+  checked under the lanes' lock and in the board's write, so a lane start on it (which picks again under the lanes'
+  lock) and the removal are serial; it is never taken out by itself. The window: Save…'s preview with **Also retarget
+  what can move**, applied after the save; the Assistant: the setting's reply lists what can move, applied with
+  `cw_queue` `retarget` (`POST /v1/workflow/retarget`, the items named; a fresh preview's, intersected).
   the default (stored as none) or a branch G7b lists that exists now (`pickTarget`, `branchExists`). A lane start's
   target is checked before anything changes (an `applyNow` put back included), and again under the lanes' lock.
 - A ruleset can't run arbitrary code: pieces are looked up by id, and an unknown id or parameter refuses to compile

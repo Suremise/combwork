@@ -826,6 +826,12 @@
       "project": "plain"
     }
   },
+  "service.workflow.targetInUse": {
+    "placeholders": {
+      "branch": "plain",
+      "uses": "plain"
+    }
+  },
   "service.workspace.advancedNotHere": {
     "placeholders": {
       "setting": "plain"

@@ -319,6 +319,11 @@
       "project": "plain"
     }
   },
+  "tasks.error.targetChanged": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "tasks.error.targetCheckedOut": {
     "placeholders": {
       "unknown": "select",

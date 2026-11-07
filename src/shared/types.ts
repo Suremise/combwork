@@ -1611,6 +1611,8 @@ export interface WorkflowCheck {
   inFlight: { number: number; key: string; title: string }[]
   /** A change of the target (G7, HI-2674): the cards and lanes that keep merging into another one (absent: no target change). */
   targets?: KeptTargets
+  /** A change of the target (HI-2680): what can follow the new one from the old (Retarget), and what stays. */
+  retarget?: RetargetPreview
 }
 
 /**
@@ -1618,6 +1620,29 @@ export interface WorkflowCheck {
  * (§16.5.4), so a change of the project's target moves neither. `to`: the target now (the default branch for none);
  * `cards` and `lanes`: only those whose own target is another branch, each with it.
  */
+/**
+ * HI-2680: what a change of Work merges into from `from` to `to` would move (Todo cards whose own target is `from` with no
+ * work of their own; free slots recording it, clean, with nothing `from` lacks), and what stays, with why; running lanes
+ * on `from` are never rewritten. A slot is listed as it was seen (its folder, recorded target, head): the apply moves it
+ * only so.
+ */
+export interface RetargetPreview {
+  from: string
+  to: string
+  cards: { move: { number: number; key: string; title: string }[]; keep: { number: number; key: string; title: string; why: 'work' | 'started' | 'cantCheck' }[] }
+  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' }[] }
+  lanes: { id: string; name: string | null; builder: string }[]
+}
+
+/** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
+export interface RetargetResult {
+  from: string
+  to: string
+  moved: { cards: { number: number; key: string }[]; slots: string[] }
+  /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
+  skipped: { card?: number; key?: string; slot?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside'; detail?: string }[]
+}
+
 export interface KeptTargets {
   to: string
   cards: { number: number; key: string; title: string; target: string }[]

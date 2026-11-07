@@ -79,6 +79,7 @@ interface CombworkMessageValues {
   'tasks.error.reviewTaken': { agent: string | number; card: string | number; since: string | number }
   'tasks.error.setAsideGone': undefined
   'tasks.error.staysInProject': { project: string | number }
+  'tasks.error.targetChanged': { card: string | number }
   'tasks.error.targetCheckedOut': { unknown: string; card: string | number; folder: string | number }
   'tasks.error.targetHasWork': { unknown: string; card: string | number; target: string | number }
   'tasks.error.targetLane': { card: string | number; builder: string | number; target: string | number }

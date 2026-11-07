@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { OwnWorkflowProblem, ProjectInfo, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
+import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
 import type { PlatformId } from '@shared/platform/descriptors'
 import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
@@ -73,6 +73,14 @@ const T = {
   identityValue: msg({ id: 'workflow.form.identityValue', defaultMessage: 'On, as {name} <{email}>', description: 'A value of “Commits use the project’s identity” in the list of what changes before saving workflow options: on, with the name and email commits use.' }),
   noneValue: msg({ id: 'workflow.form.noneValue', defaultMessage: 'None', description: 'An empty value in the list of what changes before saving workflow options: no checks, no commands, no folders.' }),
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
+  retargetChoice: msg({ id: 'workflow.form.retargetChoice', defaultMessage: 'Also retarget what can move from {from} to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# free slot} other {# free slots}}', description: 'HI-2680: a tick box in the dialog before saving workflow options that change Work merges into: after saving, move the Todo cards with no work of their own and the free slots still on the old branch {from} to the new one {to}. Card and slot counts.' }),
+  retargetCard: msg({ id: 'workflow.form.retargetCard', defaultMessage: '{card} {title}: to the new branch', description: 'HI-2680: a card the retarget moves to the new Work merges into, in the dialog before saving. {card} is its key (HI-12).' }),
+  retargetSlot: msg({ id: 'workflow.form.retargetSlot', defaultMessage: '{slot}: free, to the new branch', description: 'HI-2680: a free slot the retarget moves to the new Work merges into (its folder detached at the new branch), in the dialog before saving. {slot} is its name (slot-a).' }),
+  retargetStays: msg({ id: 'workflow.form.retargetStays', defaultMessage: 'These stay on {from}:', description: 'HI-2680: in the dialog before saving workflow options, above what the retarget leaves on the old branch {from}, each with why.' }),
+  retargetKeep: msg({ id: 'workflow.form.retargetKeep', defaultMessage: '{what}: {why, select, work {it has work on its branch} started {already started} lane {a running lane keeps its branch until it ends} lent {lent} dirty {it has changes not committed} busy {in use} unmerged {it holds commits {from} lacks} targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} moved {it moved meanwhile} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}', description: 'HI-2680: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name.' }),
+  retargetDone: msg({ id: 'workflow.form.retargetDone', defaultMessage: '{skipped, plural, =0 {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}} other {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}; # left where they were}}', description: 'HI-2680: a notification after the retarget: how many cards and slots moved to the new branch {to}, and how many were left (each listed with why in its text).' }),
+  retargetSkipped: msg({ id: 'workflow.form.retargetSkipped', defaultMessage: '{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}', description: 'HI-2680: a line of the notification after the retarget: a card or slot left where it was ({what}: its key or name), and why (a select: keep the keys).' }),
+  retargetFailed: msg({ id: 'workflow.form.retargetFailed', defaultMessage: 'The options were saved, but nothing was retargeted', description: 'HI-2680: an error’s title: the workflow options were saved, but the retarget that should follow failed. Its text says why.' }),
   otherTargets: msg({ id: 'workflow.form.otherTargets', defaultMessage: 'Branches, separated by commas (such as 1.2.0)', description: 'HI-2556: the placeholder of the field “Other branches work can merge into” (branch names besides Work merges into). Keep 1.2.0 as it is.' }),
   appliesNowBranches: msg({ id: 'workflow.form.appliesNowBranches', defaultMessage: 'Only the other branches work can merge into change: they aren’t rules, so they apply now. A lane or card already merging into one keeps it.', description: 'HI-2556: the message of the dialog before saving workflow options when only “Other branches work can merge into” changes (or that and stage names).' }),
   folders: msg({ id: 'workflow.form.folders', defaultMessage: 'Folders and files, separated by commas', description: 'The placeholder of the field “What the work is” (folders and files left out).' }),
@@ -384,17 +392,28 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       return title && k !== 'platform' ? [tr(T.changeLine, { option: tr(title), from: valueText(k, form.options[k]), to: valueText(k, effective[k]) })] : []
     })
     const picked = new Set<number>()
+    // HI-2680: Also retarget what can move, ticked when anything can.
+    const retargets = 'retarget' in check ? check.retarget : undefined
+    const retarget = new Set<'on'>(retargets && retargets.cards.move.length + retargets.slots.move.length > 0 ? ['on'] : [])
     let stale = false
     const ok = await confirm({
       title: tr(T.confirmTitle),
       message: tr(source.level ? T.levelConfirm : check.appliesNow ? (check.changed.includes('otherTargets') ? T.appliesNowBranches : T.appliesNow) : T.confirmMessage),
       wide: true,
-      content: <SaveDetails changes={changes} check={check} picked={picked} title={(k) => tr(optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]!.title)} />,
+      content: <SaveDetails changes={changes} check={check} picked={picked} retarget={retarget} title={(k) => tr(optionTitle(k, platform, effective.folder) ?? OPTION_TEXT[k]!.title)} />,
       confirmLabel: tr(T.save).replace(/…$/, ''),
       run: async () => {
         const path = source.key
         try {
           show(path, await source.save(change, [...picked]))
+          // Saved: then what follows the new target, as previewed, each item rechecked; said whatever came of it.
+          if (retargets && retarget.has('on')) {
+            const r = await call('workflow:retarget', path, retargets).catch((e: unknown) => {
+              notify('error', tr(T.retargetFailed), errorMessage(e))
+              return null
+            })
+            if (r) notify(r.skipped.length ? 'warning' : 'success', tr(T.retargetDone, { cards: r.moved.cards.length, slots: r.moved.slots.length, skipped: r.skipped.length, to: r.to }), retargetSkippedText(r))
+          }
         } catch (e) {
           // Changed meanwhile (the Assistant's tool, another window): never written over; shown as it is now.
           const now = await source.read().catch(() => null)
@@ -886,7 +905,12 @@ function ChecksEditor({ names, commands, onChange }: { names: string[]; commands
  * level (#1422), each project inheriting the change, what changes for it, and its running lanes and cards in flight,
  * which keep their rules until their next card.
  */
-function SaveDetails({ changes, check, picked, title }: { changes: string[]; check: WorkflowCheck | WorkflowLevelCheck; picked: Set<number>; title: (k: OptionKey) => string }) {
+/** HI-2680: what a retarget left where it was, a line each (the toast's text). */
+function retargetSkippedText(r: RetargetResult): string {
+  return r.skipped.map((s) => tr(T.retargetSkipped, { what: s.key ?? s.slot ?? '', why: s.why })).join('\n')
+}
+
+function SaveDetails({ changes, check, picked, retarget, title }: { changes: string[]; check: WorkflowCheck | WorkflowLevelCheck; picked: Set<number>; retarget?: Set<'on'>; title: (k: OptionKey) => string }) {
   const [, redraw] = useState(0)
   const tasks = useStore((s) => s.tasks)
   const workspacePath = useStore((s) => s.workspace?.path ?? '')
@@ -946,6 +970,7 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
           </ul>
         </div>
       )}
+      {'retarget' in check && check.retarget && retarget && <RetargetDetails preview={check.retarget} choice={retarget} onChange={() => redraw((n) => n + 1)} />}
       {'projects' in check && (
         <div className="workflow-heirs" data-heirs="">
           <p>{check.projects.length ? tr(T.heirs, { n: check.projects.length }) : tr(T.noHeirs)}</p>
@@ -982,6 +1007,67 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
             ))}
           </ul>
         </div>
+      )}
+    </div>
+  )
+}
+
+/** HI-2680: a running lane's why in the Retarget's list (the select key of workflow.form.retargetKeep). */
+const LANE_KEEPS = 'lane' // i18n-ignore: a select key
+
+/** HI-2680: the Save… dialog's Retarget: what can follow the new target, what stays and why, and its tick box. */
+function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPreview; choice: Set<'on'>; onChange: () => void }) {
+  const movable = p.cards.move.length + p.slots.move.length
+  return (
+    <div className="workflow-retarget" data-retarget="">
+      {movable > 0 && (
+        <label className="flex dialog-check">
+          <input
+            type="checkbox"
+            checked={choice.has('on')}
+            data-retarget-on=""
+            onChange={(e) => {
+              if (e.target.checked) choice.add('on')
+              else choice.delete('on')
+              onChange()
+            }}
+          />{' '}
+          {tr(T.retargetChoice, { cards: p.cards.move.length, slots: p.slots.move.length, from: p.from, to: p.to })}
+        </label>
+      )}
+      <ul>
+        {p.cards.move.map((c) => (
+          <li key={`c${c.number}`} data-retarget-move={c.key}>
+            {tr(T.retargetCard, { card: c.key, title: c.title })}
+          </li>
+        ))}
+        {p.slots.move.map((s) => (
+          <li key={`s${s.name}`} data-retarget-move={s.name}>
+            {tr(T.retargetSlot, { slot: s.name })}
+          </li>
+        ))}
+      </ul>
+      {p.cards.keep.length + p.slots.keep.length + p.lanes.length > 0 && (
+        <>
+          <p>{tr(T.retargetStays, { from: p.from })}</p>
+          <ul>
+            {p.cards.keep.map((c) => (
+              <li key={`ck${c.number}`} data-retarget-keep={c.key}>
+                {tr(T.retargetKeep, { what: `${c.key} ${c.title}`, why: c.why, from: p.from })}
+              </li>
+            ))}
+            {p.slots.keep.map((s) => (
+              <li key={`sk${s.name}`} data-retarget-keep={s.name}>
+                {tr(T.retargetKeep, { what: s.name, why: s.why, from: p.from })}
+              </li>
+            ))}
+            {p.lanes.map((l) => (
+              <li key={`l${l.id}`} data-retarget-keep={l.id}>
+                {tr(T.retargetKeep, { what: l.name ? tr(T.lane, { builder: l.builder, name: l.name }) : tr(T.laneUnnamed, { builder: l.builder }), why: LANE_KEEPS, from: p.from })}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
     </div>
   )
