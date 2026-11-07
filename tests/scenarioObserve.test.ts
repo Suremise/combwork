@@ -1745,17 +1745,20 @@ describe('the fixtures fail when nothing was done', () => {
     expect(run([{ tool: 'cw_start_task', ok: true }, { tool: 'cw_wait_for_tasks', ok: true, args: '{"cards":[8],"wake":true}' }])).toContain(waited)
   })
 
-  it('review-record-trusted (#533): the commands that ran are what count, in every form a tool call has; a review that runs no test fails', () => {
+  it('review-record-trusted (#533, HI-2660): the commands that ran are what count, in every form a tool call has; a test run again needs a named doubt', () => {
     const sc = scenario('review-record-trusted')
     const whole = "didn't run the whole suite again"
-    const affected = 'ran the test the change affects (greet.test.js)'
-    const run = (...calls: [string, string][]) => {
-      const checks = sc.expect({ ...base, skillsRead: ['review-agent-work'], tools: calls.map(([name, input]) => ({ name, input, result: '', isError: false })) }, {})
-      return checks.filter(([n]) => n === whole || n === affected).filter(([, ok]) => !ok).map(([n]) => n)
+    const reuse = 'ran no recorded test again, or the verdict names its doubt (reran … because …)'
+    const DOUBT = { by: 'Coder (alpha)', text: 'Round 1: PASSED. Reran greet.test.js because the record predates the test it adds.' }
+    const check = (comments: { by: string; text: string }[], calls: [string, string][]) => {
+      const checks = sc.expect({ ...base, skillsRead: ['review-agent-work'], cards: { b: { comments } }, tools: calls.map(([name, input]) => ({ name, input, result: '', isError: false })) }, {})
+      return checks.filter(([n]) => n === whole || n === reuse).filter(([, ok]) => !ok).map(([n]) => n)
     }
+    // With a doubt the verdict names: only the whole suite fails.
+    const run = (...calls: [string, string][]) => check([DOUBT], calls)
     // As Combwork's transcripts give them: Claude Code's Bash and Codex's shell as the command itself; a Codex script's cmd.
     expect(run(['Bash', 'node --test "greet.test.js"'])).toEqual([])
-    expect(run(['Shell', 'node --test .\\greet.test.js'])).toEqual([])
+    expect(run(['Shell', 'node --test .\greet.test.js'])).toEqual([])
     expect(run(['Script', 'text(await tools.exec_command({cmd:"git rev-parse --short HEAD; node --test greet.test.js"}))'])).toEqual([])
     expect(run(['Script', 'text(await tools.exec_command({"cmd":"node --test \\"greet.test.js\\""}))'])).toEqual([])
     // And as JSON, should a tool's input come that way: its command only, never its description.
@@ -1766,9 +1769,12 @@ describe('the fixtures fail when nothing was done', () => {
     expect(run(['PowerShell', 'node --test'], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
     expect(run(['Script', 'text(await tools.exec_command({cmd:"npm run test"}))'], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
     expect(run(['Script', 'text(await tools.mcp__combwork__cw_update_task({number:1,review:"passed",comment:"Trusted the npm test record"}))'], ['Bash', 'node --test greet.test.js'])).toEqual([])
-    // No test run at all: the affected test wasn't run.
-    expect(run(['Bash', 'git status --short'])).toEqual([affected])
-    expect(run()).toEqual([affected])
+    // HI-2660: no test run at all reuses the record; a test run again with no doubt named is duplication.
+    expect(check([], [['Bash', 'git status --short']])).toEqual([])
+    expect(check([], [])).toEqual([])
+    expect(check([{ by: 'Coder (alpha)', text: 'Round 1: PASSED.' }], [['Bash', 'node --test greet.test.js']])).toEqual([reuse])
+    // The builder's comment never names the reviewer's doubt.
+    expect(check([{ by: 'Agent API', text: 'Reran greet.test.js because I could.' }], [['Bash', 'node --test greet.test.js']])).toEqual([reuse])
   })
 
   it("review-record-stale (#533): only the reviewer's own verdict counts, and it must say the record is for other code", () => {
