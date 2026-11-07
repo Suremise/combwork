@@ -2550,6 +2550,8 @@ route('POST', '/v1/workflow/retarget', async ({ body }) => {
   const id = typeof body?.preview === 'string' ? body.preview.trim().slice(0, 40) : ''
   const items = Array.isArray(body?.items) ? (body.items as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 500) : []
   if (!id) {
+    // A preview is the Assistant's too (the user's is the window's): never a script's.
+    if (!assistantCaller()) throw new HttpError(403, apiSaid(API.change.onlyAssistant, { what: sayNow([API.change.retargetAny]) }))
     const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
     const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
     if (!from || !to) throw new HttpError(400, say(API.queue.retargetArgs))

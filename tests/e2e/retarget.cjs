@@ -40,6 +40,8 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
     const card = async (n) => (await inv('tasks:list')).find((c) => c.number === n)
     const slots = () => inv('slots:list', fx.alpha)
+    /** A card's own Merges into, as its badge has it (none: the project's). */
+    const ownTarget = async (n) => (await inv('tasks:workBadges')).find((b) => b.card === n)?.target ?? null
     const api = async (token, method, p, body) => {
       const res = await fetch(`http://127.0.0.1:${h.port}${p}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) })
       return { status: res.status, body: await res.json().catch(() => null) }
@@ -96,15 +98,15 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await save.screenshot({ path: path.join(fx.shots, 'retarget-save-preview.png') }).catch(() => undefined)
     // One card changed between the preview and the save: never overwritten.
     await inv('tasks:setTarget', stays, '1.2.0')
-    const changedOwn = (await card(stays)).target ?? null
+    check('…the changed card merges into 1.2.0 of its own, the other into integration still', (await ownTarget(stays)) === '1.2.0' && (await ownTarget(moves)) === 'integration', JSON.stringify(await inv('tasks:workBadges')))
     await save.getByRole('button', { name: 'Save', exact: true }).click()
     await save.waitFor({ state: 'detached', timeout: HUNG_MS })
     const toast = page.locator('.toast', { hasText: 'Moved to 1.2.0' })
     const said = await waitHung(async () => ((await toast.count()) ? text(toast.first()) : null))
     check('the notification says what moved (1 card, 1 slot) and what stayed, with why', !!said && /1 card and 1 slot/.test(said) && /1 left where they were/.test(said) && said.includes(`${stayKey}: it changed meanwhile`), said ?? '')
     await page.screenshot({ path: path.join(fx.shots, 'retarget-done-toast.png') }).catch(() => undefined)
-    check('…the card that could move now follows 1.2.0 (no target of its own)', ((await card(moves)).target ?? null) === null, JSON.stringify(await card(moves)))
-    check('…the changed one is as it was changed', ((await card(stays)).target ?? null) === changedOwn, JSON.stringify(await card(stays)))
+    check('…the card that could move now follows 1.2.0 (no target of its own)', (await ownTarget(moves)) === null, JSON.stringify(await card(moves)))
+    check('…the changed one is as it was changed', (await ownTarget(stays)) === '1.2.0', JSON.stringify(await inv('tasks:workBadges')))
     const head12 = git(fx.alpha, 'rev-parse', '1.2.0')
     check("…the slot's folder is at 1.2.0's head, clean, and ready", git(slot.folder, 'rev-parse', 'HEAD') === head12 && git(slot.folder, 'status', '--porcelain') === '' && (await slots()).find((s) => s.name === slot.name)?.state === 'ready', JSON.stringify(await slots()))
 
@@ -130,10 +132,10 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     check('the Assistant has its token', !!assistant)
     const [k3, k4] = [await keyOf(c3), await keyOf(c4)]
     const preview = await api(assistant, 'POST', '/v1/workflow/retarget', { project: 'alpha', from: '1.2.0', to: 'integration' })
-    check("the Assistant's preview: an id, both cards and the slot able to move, nothing moved", preview.status === 200 && (preview.body?.preview ?? '').startsWith('rt-') && [k3, k4, slot.name].every((x) => preview.body.move.includes(x)) && ((await card(c3)).target ?? null) === '1.2.0', JSON.stringify(preview.body))
+    check("the Assistant's preview: an id, both cards and the slot able to move, nothing moved", preview.status === 200 && (preview.body?.preview ?? '').startsWith('rt-') && [k3, k4, slot.name].every((x) => preview.body.move.includes(x)) && (await ownTarget(c3)) === '1.2.0', JSON.stringify(preview.body))
     await inv('settings:update', { assistant: { control: 'look' } })
     const looked = await api(assistant, 'POST', '/v1/workflow/retarget', { project: 'alpha', preview: preview.body?.preview, items: [k4] })
-    check('at Look and advise its apply is refused (403), nothing moved', looked.status === 403 && ((await card(c4)).target ?? null) === '1.2.0', JSON.stringify(looked.body))
+    check('at Look and advise its apply is refused (403), nothing moved', looked.status === 403 && (await ownTarget(c4)) === '1.2.0', JSON.stringify(looked.body))
     await inv('settings:update', { assistant: { control: 'agents' } })
     // Since the preview: c3 moved by hand, and the slot's folder moved to another commit (clean, one 1.2.0 has: a fresh
     // preview would list it again, at its new head).
@@ -143,7 +145,7 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     check('an unknown preview is refused (409), saying to ask for a new one', gone.status === 409 && /new one/.test(gone.body?.error ?? ''), JSON.stringify(gone.body))
     const applied = await api(assistant, 'POST', '/v1/workflow/retarget', { project: 'alpha', preview: preview.body?.preview, items: [k3, k4, slot.name, 'AL-999'] })
     const skip = (x) => applied.body?.skipped?.find((s) => s.key === x || s.slot === x)?.why
-    check('its apply moves only what is as offered: the other card', applied.status === 200 && applied.body?.moved?.cards?.map((c) => c.key).join() === k4 && ((await card(c4)).target ?? null) === null, JSON.stringify(applied.body))
+    check('its apply moves only what is as offered: the other card', applied.status === 200 && applied.body?.moved?.cards?.map((c) => c.key).join() === k4 && (await ownTarget(c4)) === null, JSON.stringify(applied.body))
     check('…the changed card stays (changed), the moved slot is set aside, the unlisted item is said so', skip(k3) === 'changed' && skip(slot.name) === 'setAside' && skip('AL-999') === 'notOffered', JSON.stringify(applied.body?.skipped))
     check('…the slot is out of the pool (dirty), its folder untouched', (await slots()).find((s) => s.name === slot.name)?.state === 'dirty' && git(slot.folder, 'rev-parse', 'HEAD') === git(fx.alpha, 'rev-parse', 'main'), JSON.stringify(await slots()))
     const actions = await inv('assistant:actions')
