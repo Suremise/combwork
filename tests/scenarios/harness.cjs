@@ -570,7 +570,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
       ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {}),
       // The fake agy follows Combwork's notices as a model does (#650), and logs what it did.
-      ...(p.provider === 'antigravity' ? { FAKE_AGY_LOG: agyLog, FAKE_AGY_FOLLOW_NOTICES: '1' } : {})
+      ...(p.provider === 'antigravity' ? { FAKE_AGY_LOG: agyLog, FAKE_AGY_FOLLOW_NOTICES: '1', FAKE_AGY_MODEL_MS: '700' } : {})
     }
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')

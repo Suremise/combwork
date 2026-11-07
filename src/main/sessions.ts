@@ -6548,6 +6548,9 @@ class SessionManager {
   private async startReply(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
     const l = this.findLaunch(runId, body.session_id)?.[1]
     if (!l || !this.startContext || !l.adapter.startContextReply) return null
+    // A CLI whose hooks say what they are only once prepared (HI-2545: agy's SessionStart, unprepared, is nothing): its
+    // reply is decided in the launch's order, after prepareHook (handleHookIn), and always settled there (HI-2548).
+    if (l.adapter.prepareHook) return new Promise((settle) => this.noticeReplies.set(body, settle))
     const hook = l.adapter.normalizeHook(body)
     if (hook.ids.sub || hook.event.kind !== 'start') return null
     return this.startContextFor(l, hook.event.source)
@@ -6818,8 +6821,11 @@ class SessionManager {
     const typed = l.adapter.descriptor.capabilities.typedTurnsWithoutPrompt && typedPending(l.hooksWatch)
     // Its notice (#650), from the ledger as it is now, before it is admitted with what it was told.
     if (decide) {
-      reply = await this.noticeIn(runId, l, ledger, body, woke, typed, at).catch((e) => {
-        log.warn(`${userText(label)}: no inbox notice`, e)
+      // A SessionStart whose CLI says what it is only once prepared (HI-2548: agy's, startReply): its start context, the
+      // launch's own start only, never a sub-agent's.
+      const starting = body.hook_event_name === 'SessionStart'
+      reply = await (starting ? (hook.ids.sub || hook.event.kind !== 'start' ? Promise.resolve(null) : this.startContextFor(l, hook.event.source)) : this.noticeIn(runId, l, ledger, body, woke, typed, at)).catch((e) => {
+        log.warn(`${userText(label)}: ${starting ? 'no start context' : 'no inbox notice'}`, e)
         return null
       })
       if (!current()) return

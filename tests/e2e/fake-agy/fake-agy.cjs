@@ -146,6 +146,9 @@ function handlers(event) {
   return out
 }
 let lastUserInput = ''
+// A model call's time (FAKE_AGY_MODEL_MS; the scenarios' 700 ms, so a turn is seen under way as a real one is; else none).
+const MODEL_MS = Number(process.env.FAKE_AGY_MODEL_MS ?? 0)
+const thinking = () => MODEL_MS > 0 && Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, MODEL_MS)
 function fire(event, extra = {}) {
   const payload = { conversationId: conv, workspacePaths: [process.cwd().replace(/\\/g, '/')], transcriptPath: full.replace(/\\/g, '/'), artifactDirectoryPath: brain.replace(/\\/g, '/'), modelName: flag('--model') || 'auto', lastUserInput, ...extra }
   const reply = {}
@@ -337,6 +340,7 @@ async function turn(text) {
   const call = (body) => {
     const at = step
     fire('PreInvocation', { invocationNum: invocation, initialNumSteps: at })
+    thinking()
     body()
     fire('PostInvocation', { invocationNum: invocation, initialNumSteps: at })
     invocation++
@@ -345,6 +349,7 @@ async function turn(text) {
   const invoked = async (body) => {
     const at = step
     fire('PreInvocation', { invocationNum: invocation, initialNumSteps: at })
+    thinking()
     await body()
     fire('PostInvocation', { invocationNum: invocation, initialNumSteps: at })
     invocation++
