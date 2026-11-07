@@ -102,5 +102,16 @@
   "providers.transcript.interrupted": "Von dir unterbrochen",
   "providers.transcript.resumed": "Sitzung fortgesetzt",
   "providers.transcript.turnEnded": "Durchgang beendet: {reason}",
-  "providers.unknown": "Unbekannter Anbieter „{provider}“. Dafür ist eventuell eine neuere Version von Combwork nötig."
+  "providers.unknown": "Unbekannter Anbieter „{provider}“. Dafür ist eventuell eine neuere Version von Combwork nötig.",
+  "providers.claude.localLimits.inFile": "env in {file}",
+  "providers.claude.localLimits.oursContext": "Kontextgröße bei {connection}",
+  "providers.claude.localLimits.oursOutput": "Ausgabebudget bei {connection}",
+  "providers.claude.localLimits.outputNotBelow": "{agent} wurde nicht gestartet: Sein Ausgabebudget ({output, number} Tokens, {outputFrom}) ist nicht kleiner als seine Kontextgröße ({context, number} Tokens, {contextFrom}). Ändere einen der Werte und starte ihn dann erneut.",
+  "providers.claude.localLimits.tooSmall": "{agent} wurde nicht gestartet: Seine Kontextgröße ({context, number} Tokens, {contextFrom}) ist für jedes Ausgabebudget zu klein. Stelle eine größere Kontextgröße ein.",
+  "providers.localLimits.context": "Kontextgröße {value, number} Tokens ({from}){estimate, select, yes {: eine Schätzung, bis Claude Code sein Fenster meldet} other {}}",
+  "providers.localLimits.inFile": "env in {file}",
+  "providers.localLimits.notUsed": "{why, select, alias {Kontextgröße nicht verwendet: Claude Code liest {model} als einen seiner Aliasse} spelling {Kontextgröße nicht verwendet: IDs mit claude, [1m] oder einem Datumssuffix werden dafür nicht unterstützt} mapped {Kontextgröße nicht verwendet: {file} ordnet {model} einem Claude-Modell zu} unreadable {Kontextgröße nicht verwendet: {file} konnte nicht gelesen werden, daher kann Combwork nicht sagen, ob es {model} zuordnet} other {Kontextgröße nicht verwendet: {model} ist keines der Modelle von {connection}}}",
+  "providers.localLimits.ours": "festgelegt bei {connection}",
+  "providers.localLimits.output": "Ausgabebudget {value, number} Tokens ({from}){fallback, select, none {} other {: {fallback} war nicht kleiner als der Kontext, daher wurde der Standard verwendet}}",
+  "providers.localLimits.switched": "Mit diesen Werten auf {model} gestartet: Sie bleiben für die Sitzung, und Claude Code meldet das Fenster des Modells, das jetzt läuft."
 }

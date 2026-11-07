@@ -30,6 +30,8 @@ import { claudeTranscriptTurns } from './turns'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
+import { lastModelArg, localLimitsFor } from './localLimits'
+import { localLimitsTest } from '../../localLimitsTest'
 import { ClaudeUsageParser, encodeProjectPath, parseTranscript, transcriptSubSession } from './usage'
 import { atMost } from '../../../shared/atMost'
 import { joined } from '../../../shared/coalesce'
@@ -211,6 +213,17 @@ export function toIso(v: unknown): string | null {
 /** What a launch appends to Claude Code's system prompt: the Assistant's role and mode, then the Workspace notes note (#1433). */
 export function appendedInstructions(ctx: LaunchContext): string {
   return [ctx.instructions ?? '', ctx.notes ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
+}
+
+/** Combwork's own --model for a launch (its model, without a 1M suffix where 200K is asked for), or null. */
+const modelArg = (ctx: Pick<LaunchContext, 'model' | 'use200kContext'>): string | null => (ctx.model ? (ctx.use200kContext ? baseModel(ctx.model) : ctx.model) : null)
+
+/**
+ * The model a launch runs as on its command line (HI-2682, HR1's round 1): its arguments' last --model, as buildCommand
+ * puts them (Combwork's own, then the user's extra arguments, which win), or null when none names one.
+ */
+export function launchModel(ctx: Pick<LaunchContext, 'model' | 'use200kContext' | 'extraArgs'>): string | null {
+  return lastModelArg(withoutSettingsArgs(ctx.extraArgs)) ?? modelArg(ctx)
 }
 
 export class ClaudeCodeAdapter implements ProviderAdapter {
@@ -449,6 +462,17 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const started = performance.now()
     // A --settings of the user's is read first: one Combwork can't read stops the launch before anything changes (#330).
     const theirs = await userSettings(ctx.extraArgs, ctx.cwd)
+    // A local model's limits on a server connection (HI-2682), resolved in this launch's own settings scopes: added to its
+    // environment (never the user's config) and recorded as applied. A conflict a settings file causes refuses the launch.
+    const serverCaps = this.descriptor.capabilities.connections?.server
+    const test = ctx.server && serverCaps ? localLimitsTest(serverCaps) : null
+    if (ctx.server && serverCaps && test) {
+      const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+      // The model it runs as, from its final arguments as buildCommand puts them (HR1's round 1): the user's own --model wins.
+      const got = localLimitsFor({ caps: serverCaps, models: ctx.server.models, connection: ctx.server.connection, agent: ctx.name, model: launchModel(ctx), env: ctx.env, scopes, test })
+      Object.assign(ctx.env, got.env)
+      ctx.localLimits = got.record
+    }
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
     const pluginDir = join(dir, 'plugin')
     const skillsDir = join(pluginDir, 'skills')
@@ -612,7 +636,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (refresh && ctx.resume && launchOverrides(ctx.overrides, CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
     if (ctx.trustedCombworkTools?.length && ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveCombworkTools')) args.push('--allowedTools', ctx.trustedCombworkTools.map((t) => `mcp__${TOOLS_SERVER}__${t}`).join(','))
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
-    if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)
+    const model = modelArg(ctx)
+    if (model) args.push('--model', model)
     if (ctx.effort) args.push('--effort', ctx.effort)
     // The CLI's own setting (#1284): no flag, so Claude Code's own settings (defaultMode) decide.
     if (ctx.permissionMode && !isCliOwnMode(ctx.permissionMode)) args.push('--permission-mode', ctx.permissionMode)

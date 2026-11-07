@@ -102,5 +102,16 @@
   "providers.transcript.interrupted": "ユーザーが中断しました",
   "providers.transcript.resumed": "セッションを再開しました",
   "providers.transcript.turnEnded": "ターン終了：{reason}",
-  "providers.unknown": "不明なプロバイダー「{provider}」です。新しいバージョンのCombworkが必要かもしれません。"
+  "providers.unknown": "不明なプロバイダー「{provider}」です。新しいバージョンのCombworkが必要かもしれません。",
+  "providers.claude.localLimits.inFile": "{file}のenv",
+  "providers.claude.localLimits.oursContext": "{connection}のコンテキストサイズ",
+  "providers.claude.localLimits.oursOutput": "{connection}の出力上限",
+  "providers.claude.localLimits.outputNotBelow": "{agent}は開始されませんでした：出力上限（{output, number}トークン、{outputFrom}）がコンテキストサイズ（{context, number}トークン、{contextFrom}）より小さくありません。どちらかを変更してから、もう一度開始してください。",
+  "providers.claude.localLimits.tooSmall": "{agent}は開始されませんでした：コンテキストサイズ（{context, number}トークン、{contextFrom}）が小さすぎて、どの出力上限も収まりません。より大きいコンテキストサイズを設定してください。",
+  "providers.localLimits.context": "コンテキストサイズ {value, number}トークン（{from}）{estimate, select, yes {：Claude Codeがウィンドウを報告するまでの推定} other {}}",
+  "providers.localLimits.inFile": "{file}のenv",
+  "providers.localLimits.notUsed": "{why, select, alias {コンテキストサイズは未使用：Claude Codeは{model}を自身のエイリアスとして読みます} spelling {コンテキストサイズは未使用：claude、[1m]、日付の接尾辞を含むIDはサポートされていません} mapped {コンテキストサイズは未使用：{file}が{model}をClaudeのモデルに対応付けています} unreadable {コンテキストサイズは未使用：{file}を読めなかったため、{model}を対応付けているかCombworkには判断できません} other {コンテキストサイズは未使用：{model}は{connection}のモデルではありません}}",
+  "providers.localLimits.ours": "{connection}で設定",
+  "providers.localLimits.output": "出力上限 {value, number}トークン（{from}）{fallback, select, none {} other {：{fallback}がコンテキストより小さくなかったため、既定値を使いました}}",
+  "providers.localLimits.switched": "この値で{model}として開始：値はセッション中ずっと有効で、Claude Codeは現在動いているモデルのウィンドウを報告します。"
 }

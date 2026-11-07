@@ -1287,6 +1287,14 @@
     "defaultMessage": "{is, select, slot {Works in {name}: {path}} carried {Works in {name}, the slot kept for it: {path}} home {Works in its retired home {name}: {path}} other {Works in its 0.9 worktree {name}: {path}}}",
     "description": "A line of an agent's hover: where it works and that folder's path ({path}): a slot it builds in ({name}: the slot's name, such as slot-b), its carried slot (its own worktree from before 1.0, kept for it as a slot), a reviewer's retired home, or its worktree from before 1.0 (version 0.9) not moved to a slot yet. Glossary: slot."
   },
+  "agents.provider.compactDeclared": {
+    "defaultMessage": "{provider} compacts by itself at about {at, number}, the local model’s declared context{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}",
+    "description": "A context tooltip (HI-2682): where the CLI ({provider}) compacts the conversation of a local model whose context Combwork declared, in tokens ({at}). {why}: what brings it earlier (a settings file, a percentage), none: leave it empty; {estimate}: why it is an estimate, none: leave it empty."
+  },
+  "agents.provider.compactDeclaredCap": {
+    "defaultMessage": "an estimate: an auto-compact window set too is taken as capped by the declared context",
+    "description": "Part of a context tooltip (HI-2682), in brackets: why where a local model compacts is an estimate: an auto-compact window is set as well, and Combwork assumes the CLI caps it at the declared context."
+  },
   "agents.provider.compactDefault": {
     "defaultMessage": "{provider} compacts by itself at about {at, number} by default (its settings can change this)",
     "description": "A context tooltip for a session that isn't running: where the CLI ({provider}) compacts its conversation by itself by default, in tokens ({at})."

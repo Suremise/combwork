@@ -558,5 +558,7 @@
   "tips.workspaceNotes.text": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
   "tips.workspaceNotes.title": "Notes about this machine for every agent",
   "tips.retargetRelease.title": "When a release ships, move what’s left onto the next",
-  "tips.retargetRelease.text": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them."
+  "tips.retargetRelease.text": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them.",
+  "tips.localModelLimits.text": "On a server account’s models (Settings → Accounts & Connections, Edit Server…), set Context size and Output budget: agents started on that model then compact at its real context rather than an assumed 200,000.",
+  "tips.localModelLimits.title": "Tell Claude Code your local model’s real context"
 }

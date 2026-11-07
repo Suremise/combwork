@@ -321,6 +321,8 @@
   "agents.picker.showOlder": "旧バージョンを表示",
   "agents.place.short": "{is, select, slot {{name}で作業中} carried {引き継ぎ：{name}} home {ホーム：{name}} other {0.9のワークツリー：{name}}}",
   "agents.place.tip": "{is, select, slot {{name}で作業中：{path}} carried {引き継いだスロット{name}で作業中：{path}} home {引退したホーム{name}で作業中：{path}} other {0.9のワークツリー{name}で作業中：{path}}}",
+  "agents.provider.compactDeclared": "{provider}は約{at, number}トークン（ローカルモデルに宣言したコンテキスト）になると自動でコンパクト化します{why, select, none {} other {（{why}）}}{estimate, select, none {} other {（{estimate}）}}",
+  "agents.provider.compactDeclaredCap": "推定：あわせて設定された自動コンパクト化ウィンドウは、宣言したコンテキストで上限が決まるものとみなしています",
   "agents.provider.compactDefault": "{provider}は既定で約{at, number}トークンになると自動でコンパクト化します（設定で変更できます）",
   "agents.provider.compactDefaultFor": "{provider}は約{at, number}トークンになると自動でコンパクト化します。このウィンドウでの既定値です{why, select, none {} other {（{why}）}}{estimate, select, none {} other {（{estimate}）}}",
   "agents.provider.compactOff": "{provider}は自動でコンパクト化しません：自動コンパクト化がオフです（{source}）{estimate, select, none {} other {（{estimate}）}}",

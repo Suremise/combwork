@@ -35,6 +35,11 @@ interface CombworkMessageValues {
   'providers.claude.hint.broken': undefined
   'providers.claude.hint.model': undefined
   'providers.claude.hint.signIn': undefined
+  'providers.claude.localLimits.inFile': { file: string | number }
+  'providers.claude.localLimits.oursContext': { connection: string | number }
+  'providers.claude.localLimits.oursOutput': { connection: string | number }
+  'providers.claude.localLimits.outputNotBelow': { agent: string | number; output: number; outputFrom: string | number; context: number; contextFrom: string | number }
+  'providers.claude.localLimits.tooSmall': { agent: string | number; context: number; contextFrom: string | number }
   'providers.cmdTooLong': { file: string | number; max: number; length: number }
   'providers.codex.connections.setUp': undefined
   'providers.codex.developerUnread.agentMessage': undefined
@@ -85,6 +90,12 @@ interface CombworkMessageValues {
   'providers.export.summary': undefined
   'providers.export.thinking': undefined
   'providers.export.you': undefined
+  'providers.localLimits.context': { value: number; from: string | number; estimate: string }
+  'providers.localLimits.inFile': { file: string | number }
+  'providers.localLimits.notUsed': { why: string; model: string | number; file: string | number; connection: string | number }
+  'providers.localLimits.ours': { connection: string | number }
+  'providers.localLimits.output': { value: number; from: string | number; fallback: string }
+  'providers.localLimits.switched': { model: string | number }
   'providers.memory.connection': { file: string | number; name: string | number }
   'providers.memory.user': { file: string | number }
   'providers.readiness.notInstalled': { provider: string | number }

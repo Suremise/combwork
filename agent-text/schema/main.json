@@ -487,6 +487,18 @@
   "main.server.notServer": {
     "placeholders": {}
   },
+  "main.server.output.invalid": {
+    "placeholders": {
+      "max": "number"
+    }
+  },
+  "main.server.output.notBelow": {
+    "placeholders": {
+      "model": "plain",
+      "output": "number",
+      "context": "number"
+    }
+  },
   "main.server.setUp.noKey": {
     "placeholders": {
       "name": "plain"

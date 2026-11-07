@@ -903,6 +903,18 @@ export interface ServerModel {
    * HI-2683 compares it with the advice; HI-2682 launches with it.
    */
   context?: number
+  /**
+   * The output budget the user sets for this model, in tokens (HI-2682): Claude Code's CLAUDE_CODE_MAX_OUTPUT_TOKENS for a
+   * session started on it, where the ID is one Combwork passes local-model limits for. Kept smaller than `context` (both
+   * set); none: the default (localModelLimits.defaultOutput).
+   */
+  output?: number
+  /**
+   * Why Combwork never passes this model's context and output (HI-2682), judged from its ID alone, in what main sends a
+   * window (never saved): Claude Code reads it as one of its aliases, or it is a spelling (claude, [1m], a date) the
+   * control doesn't support.
+   */
+  unsupported?: 'alias' | 'spelling'
 }
 
 /**
@@ -2576,6 +2588,8 @@ export interface LiveSessionState {
    * login and usage); `connection`, the named connection on it whose values it launched with (HI-2397), is what the
    * window names. `note`: why it isn't the one chosen (its choice was off).
    */
+  /** A local model's limits as this launch applied them (HI-2682), on a server connection: launch-global. */
+  localLimits?: LaunchedLimits
   launchedConnection?: {
     id: string
     name: string
@@ -3144,6 +3158,28 @@ export interface CompactionEvent {
 }
 
 /** How a session's CLI was set to compact by itself (#242), as far as Combwork could read at launch. */
+/**
+ * A local model's limits as one launch applied them (HI-2682), after every settings scope's `env` (Claude Code's own
+ * order): launch-global, never read again from the connection. `from` is a settings file's label when one set it, else
+ * null (Combwork's, from the connection's model). Not applied: why, and the file where that is a file's.
+ */
+export interface LaunchedLimits {
+  /** The model the session started on, and its connection's name. */
+  model: string
+  connection: string
+  applied: boolean
+  why?: 'notListed' | 'alias' | 'spelling' | 'mapped' | 'unreadable'
+  whyFile?: string
+  context?: { value: number; from: string | null }
+  /** `fallback`: Combwork's own output that wasn't below the effective context, replaced by the default for it. */
+  output?: { value: number; from: string | null; fallback?: number }
+  /**
+   * The connection's models the launch-wide context also sizes (none mapped in this session's settings, none Claude Code
+   * reads as its own): a switch to one keeps the declared context, an estimate until Claude Code reports (HR1, round 1).
+   */
+  eligible?: string[]
+}
+
 export interface AutoCompactSetting {
   /** 'off': auto-compaction is turned off; a number: the auto-compact window it was set to (tokens); null: the CLI's own default. */
   window: number | 'off' | null

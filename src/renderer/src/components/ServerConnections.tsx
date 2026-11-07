@@ -4,6 +4,8 @@ import { providerDescriptor, type ServerPreset } from '@shared/providers'
 import { MODEL_ALIASES, parseBaseUrl, type ServerModelsRead } from '@shared/serverConnection'
 import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { serverModelLabel } from '@shared/models'
+import { defaultOutput, outputFits, tightFit } from '@shared/localModelLimits'
+import { CONTEXT_MAX } from '@shared/serverDiagnostics'
 import { call, errorMessage } from '../api'
 import { confirm, notify } from '../store'
 import { Icon, Modal } from './ui'
@@ -38,6 +40,16 @@ const M = {
   keyHint: msg({ id: 'settings.connections.server.keyHint', defaultMessage: "Stored encrypted for your Windows account, never shown again. The agent's commands can read it from their environment.", description: "Under a server connection's API key box: how Combwork keeps the key, and that an agent running on it can read it (it is in the agent's environment)." }),
   keyLocal: msg({ id: 'settings.connections.server.keyLocal', defaultMessage: 'Not needed for a server on this PC.', description: "Under a server connection's API key box when its base URL is this computer (localhost): the key may be left empty." }),
   models: msg({ id: 'settings.connections.server.models', defaultMessage: 'Models', description: "Label of a server connection's model list (Settings → Accounts & Connections)." }),
+  // HI-2682: a local model's limits, on its row.
+  context: msg({ id: 'settings.connections.server.context', defaultMessage: 'Context size', description: "A field on a server connection's model (HI-2682): the context the model has on this server, in tokens. The same value as Server diagnostics' context size." }),
+  output: msg({ id: 'settings.connections.server.output', defaultMessage: 'Output budget', description: "A field on a server connection's model (HI-2682): the most tokens the model may write in one reply." }),
+  tokens: msg({ id: 'settings.connections.server.tokens', defaultMessage: 'tokens', description: "Beside a server connection's model's Context size and Output budget fields (HI-2682): the unit." }),
+  contextNone: msg({ id: 'settings.connections.server.contextNone', defaultMessage: 'Not set: 200,000 assumed', description: "The placeholder of a server connection's model's empty Context size field (HI-2682): with none set, Claude Code assumes a 200K context." }),
+  outputDefault: msg({ id: 'settings.connections.server.outputDefault', defaultMessage: 'Default: {n, number}', description: "The placeholder of a server connection's model's empty Output budget field (HI-2682): the budget used when none is set. {n} is a number of tokens." }),
+  notBelow: msg({ id: 'settings.connections.server.notBelow', defaultMessage: 'The output budget must be smaller than the context size.', description: "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved." }),
+  tight: msg({ id: 'settings.connections.server.tight', defaultMessage: 'Little room: Claude Code’s first request with Combwork’s tools can be 14,000–28,000 tokens, so a session may not start, or may compact at once.', description: "A warning under a server connection's model's fields (HI-2682): its context minus its output budget is small. Advice: saving is allowed." }),
+  unsupported: msg({ id: 'settings.connections.server.unsupported', defaultMessage: '{why, select, alias {Not supported for this model: Claude Code reads this ID as one of its aliases.} other {Not supported for this model: IDs with claude, [1m] or a date suffix aren’t supported here.}}', description: "Under a server connection's model whose Context size and Output budget fields are off (HI-2682), why. Keep [1m] and the select keys." }),
+  limitsHint: msg({ id: 'settings.connections.server.limitsHint', defaultMessage: 'Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.', description: "Under a server connection's model list (HI-2682): when the models' Context size and Output budget fields are used. Context size and Output budget are the fields' names." }),
   modelsHint: msg({ id: 'settings.connections.server.modelsHint', defaultMessage: "Each Claude name (Opus, Sonnet, Haiku) runs the model ticked for it. A model can stand in for several.", description: "Under a server connection's model list: the CLI asks for Claude models by name, and each name runs the server model ticked for it." }),
   modelId: msg({ id: 'settings.connections.server.modelId', defaultMessage: 'Model id', description: "Placeholder of a model's id box in a server connection's model list (\"deepseek-flash\")." }),
   addModel: msg({ id: 'settings.connections.server.addModel', defaultMessage: 'Add Model', description: "Button under a server connection's model list: adds a row." }),
@@ -131,7 +143,7 @@ export function ServerModelsEditor({ models, onChange, disabled }: { models: Ser
     <div className="server-models" data-server-models>
       {models.map((m, i) => (
         <div key={i} className="server-model-row flex" data-model={m.id}>
-          <input className="input" value={m.id} disabled={disabled} placeholder={tr(M.modelId)} aria-label={tr(M.modelId)} spellCheck={false} onChange={(e) => set(i, { ...m, id: e.target.value })} />
+          <input className="input" value={m.id} disabled={disabled} placeholder={tr(M.modelId)} aria-label={tr(M.modelId)} spellCheck={false} onChange={(e) => set(i, { ...m, id: e.target.value, unsupported: undefined })} />
           {m.remote && <span className="muted" data-cloud title={tr(M.cloudTip)}>{tr(M.cloud)}</span>}
           {MODEL_ALIASES.map((a) => (
             <label key={a} className="flex server-model-alias">
@@ -141,12 +153,60 @@ export function ServerModelsEditor({ models, onChange, disabled }: { models: Ser
           <button className="btn subtle small" disabled={disabled} title={tr(M.removeModel, { model: m.id })} aria-label={tr(M.removeModel, { model: m.id })} onClick={() => onChange(models.filter((_, j) => j !== i))}>
             <Icon name="close" />
           </button>
+          <ModelLimits m={m} disabled={disabled} onChange={(n) => set(i, n)} />
         </div>
       ))}
       <button className="btn subtle small" disabled={disabled} onClick={() => onChange([...models, { id: '' }])}>
         <Icon name="add" /> {tr(M.addModel)}
       </button>
       <div className="hint">{tr(M.modelsHint)}</div>
+      <div className="hint">{tr(M.limitsHint)}</div>
+    </div>
+  )
+}
+
+/** Digits typed into a limit's field (HI-2682): its number of tokens, or none for an empty field. */
+const tokensTyped = (v: string): number | undefined => {
+  const d = v.replace(/[^0-9]/g, '')
+  return d ? Math.min(Number(d), CONTEXT_MAX) : undefined
+}
+
+/**
+ * A model's Context size and Output budget (HI-2682), on its row: off, saying why, for an ID its connection judged
+ * unsupported (a value kept from before stays kept); the output's default as its placeholder; an output not below the
+ * context said at once (the save refuses it too), and little room left for Claude Code's first request warned of.
+ */
+function ModelLimits({ m, disabled, onChange }: { m: ServerModel; disabled?: boolean; onChange: (m: ServerModel) => void }) {
+  const off = disabled || !!m.unsupported
+  const out = defaultOutput(m.context)
+  const field = (key: 'context' | 'output', label: Msg, placeholder: string) => (
+    <label className="flex server-model-limit" data-limit={key}>
+      {tr(label)}
+      <input
+        className="input"
+        inputMode="numeric"
+        disabled={off}
+        value={m[key] !== undefined ? String(m[key]) : ''}
+        placeholder={placeholder}
+        aria-label={`${tr(label)} (${m.id})`}
+        onChange={(e) => {
+          const v = tokensTyped(e.target.value)
+          const { [key]: _drop, ...rest } = m
+          onChange(v ? { ...rest, [key]: v } : rest)
+        }}
+      />
+      <span className="muted">{tr(M.tokens)}</span>
+    </label>
+  )
+  return (
+    <div className="server-model-limits" data-model-limits={m.id}>
+      <div className="flex">
+        {field('context', M.context, tr(M.contextNone))}
+        {field('output', M.output, out ? tr(M.outputDefault, { n: out }) : '')}
+      </div>
+      {m.unsupported && <div className="hint" data-limits-unsupported={m.unsupported}>{tr(M.unsupported, { why: m.unsupported })}</div>}
+      {!m.unsupported && !outputFits(m) && <div className="error" data-limits-error>{tr(M.notBelow)}</div>}
+      {!m.unsupported && outputFits(m) && tightFit(m) && <div className="hint warn" data-limits-tight>{tr(M.tight)}</div>}
     </div>
   )
 }
@@ -372,7 +432,15 @@ function EditServerDialog({ c, onClose }: { c: Account; onClose: () => void }) {
         <input id="edit-url" className="input" value={baseUrl} disabled={busy} spellCheck={false} onChange={(e) => setBaseUrl(e.target.value)} />
         {moves && <div className="account-warning span2"><Icon name="warning" /> {tr(M.moveWarn)}</div>}
         <label>{tr(M.models)}</label>
-        <ServerModelsEditor models={models} onChange={setModels} disabled={busy} />
+        <ServerModelsEditor
+          models={models}
+          onChange={(m) => {
+            setModels(m)
+            // A refusal was for the models as they were.
+            setError(null)
+          }}
+          disabled={busy}
+        />
       </div>
     </Modal>
   )

@@ -22,7 +22,7 @@ import { providerService } from './providerService'
 import { connectionInput, type ConnectionPatch } from '../shared/accounts'
 import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, setUsageMove, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
 import { launchImpact, setConnectionLaunch } from './connectionLaunch'
-import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setServerModelContext, setUpServerConnection } from './serverConnections'
+import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setServerModelContext, setServerModelOutput, setUpServerConnection } from './serverConnections'
 import { cancelServerChecks, lastServerCheck, readServerContext, testServerTools } from './serverDiagnostics'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
@@ -1831,6 +1831,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:cancelCheck': (id, model, request) => cancelServerChecks(id, String(model), String(request)),
     'connections:lastCheck': (id, model) => lastServerCheck(id, String(model)),
     'connections:setModelContext': (id, model, tokens) => setServerModelContext(id, String(model), typeof tokens === 'number' ? tokens : null),
+    'connections:setModelOutput': (id, model, tokens) => setServerModelOutput(id, String(model), typeof tokens === 'number' ? tokens : null),
     'connections:setUp': async (id) => {
       await refreshPathBeforeStart()
       // A sign-in connection's Set Up (HI-1826): the CLI on its folder, for the first-run screens its sign-in leaves.

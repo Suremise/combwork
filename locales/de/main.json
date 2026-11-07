@@ -348,6 +348,8 @@
   "main.server.key.inField": "Der Schlüssel steht {field, select, name {im Namen} url {in der Basis-URL} other {in der Modellliste}}: Entferne ihn zuerst dort. Es wurde nichts gespeichert.",
   "main.server.key.length": "Ein Schlüssel ist zwischen {min, number} und {max, number} Zeichen lang. Prüfe, was eingefügt wurde.",
   "main.server.notServer": "Diese Verbindung bezieht ihr Modell nicht von einem Server.",
+  "main.server.output.invalid": "Ein Ausgabebudget ist eine ganze Zahl von Tokens, von 1 bis {max, number}.",
+  "main.server.output.notBelow": "Das Ausgabebudget von {model} ({output, number} Tokens) muss kleiner sein als seine Kontextgröße ({context, number} Tokens). Senke zuerst das Ausgabebudget oder leere es, um den Standard zu nutzen.",
   "main.server.setUp.noKey": "{name} hat noch keinen Schlüssel. Füge zuerst den Schlüssel hinzu und richte die Verbindung dann ein.",
   "main.server.unsupported": "{cli} kann sein Modell in Combwork nicht von einem Server beziehen.",
   "main.server.url.extra": "Die URL darf keine Abfrage (?…) und kein Fragment (#…) enthalten: Gib den Schlüssel in seinem eigenen Feld an.",

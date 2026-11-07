@@ -4,6 +4,7 @@ import { providerDescriptor } from '../shared/providers'
 import { msg, type Msg } from '../shared/i18n'
 import { cleanModels, keepListedRemote, keyProblem, listedIds, listedRemote, listingUrl, mergeListed, parseBaseUrl, type BaseUrlProblem, type ServerModelsRead } from '../shared/serverConnection'
 import { CONTEXT_MAX, tokensOf } from '../shared/serverDiagnostics'
+import { outputFits } from '../shared/localModelLimits'
 import { accountFolder, addAccount, connectionInternals, connectionReadyAgain, effectiveModels, getAccount, isServer, loginKey, readSetUp, rereadTrust, serverEnv } from './accounts'
 import { hasPty } from './ptyHost'
 import { emit } from './events'
@@ -145,6 +146,10 @@ export async function editServerConnection(id: string, patch: { baseUrl?: string
   return locked(id, async () => {
     const { server, caps } = serverOf(id)
     const b = patch.baseUrl !== undefined ? checkedUrl(patch.baseUrl) : null
+    // Each model's output below its context (HI-2682): refused whole before anything changes, naming the first that isn't.
+    const models = patch.models ? keepListedRemote(patch.models, server.models) : null
+    const bad = models ? limitsProblem(models) : null
+    if (bad) throw combworkError(NOT_BELOW, bad, { kind: 'invalid' })
     // A reading of its models under way was for the server as it was: ended (and its reply stale anyway).
     if (b || patch.preset !== undefined) cancelServerModels(id)
     // Its diagnostics were for the server and models as they were (HI-2683).
@@ -163,7 +168,7 @@ export async function editServerConnection(id: string, patch: { baseUrl?: string
       }
       // A model its server's listing marked remote stays so through an edit of its names (HI-1773); the window can't
       // mark or unmark one.
-      if (patch.models) s.models = keepListedRemote(patch.models, s.models)
+      if (models) s.models = models
       if (patch.modelsFrom) s.modelsFrom = patch.modelsFrom === 'listed' ? 'listed' : 'typed'
       a.server = s
     })
@@ -203,13 +208,42 @@ export async function setServerModelContext(id: string, model: string, tokens: n
   if (tokens !== null && !value) throw combworkError(CONTEXT_PROBLEM, { max: CONTEXT_MAX }, { kind: 'invalid' })
   await locked(id, async () => {
     const { server } = serverOf(id)
-    if (!server.models.some((m) => m.id === model)) throw combworkError(NO_MODEL, { model }, { kind: 'notFound' })
+    const was = server.models.find((m) => m.id === model)
+    if (!was) throw combworkError(NO_MODEL, { model }, { kind: 'notFound' })
+    // Never at or under its output budget (HI-2682): refused, naming both, the output never changed for it.
+    if (value && was.output && was.output >= value) throw combworkError(NOT_BELOW, { model, output: was.output, context: value }, { kind: 'invalid' })
     change(id, (a) => (a.server = { ...a.server!, models: cleanModels(a.server!.models.map(({ context: _c, ...m }) => (m.id === model && value ? { ...m, context: value } : m.id === model ? m : { ...m, ...(_c ? { context: _c } : {}) }))) }))
   })
   emit({ type: 'connections-changed' })
 }
 
+/**
+ * Sets the output budget the user gives one of its models (HI-2682, `ServerModel.output`), or clears it (null: the
+ * default): a whole number of tokens, below its context when that is set (refused otherwise, nothing changed).
+ */
+export async function setServerModelOutput(id: string, model: string, tokens: number | null): Promise<void> {
+  serverOf(id)
+  const value = tokens === null ? null : tokensOf(tokens)
+  if (tokens !== null && !value) throw combworkError(OUTPUT_PROBLEM, { max: CONTEXT_MAX }, { kind: 'invalid' })
+  await locked(id, async () => {
+    const { server } = serverOf(id)
+    const was = server.models.find((m) => m.id === model)
+    if (!was) throw combworkError(NO_MODEL, { model }, { kind: 'notFound' })
+    if (value && was.context && value >= was.context) throw combworkError(NOT_BELOW, { model, output: value, context: was.context }, { kind: 'invalid' })
+    change(id, (a) => (a.server = { ...a.server!, models: cleanModels(a.server!.models.map(({ output: _o, ...m }) => (m.id === model ? { ...m, ...(value ? { output: value } : {}) } : { ...m, ...(_o ? { output: _o } : {}) }))) }))
+  })
+  emit({ type: 'connections-changed' })
+}
+
+/** A model's saved limits that don't fit each other (HI-2682): the first whose output isn't below its context, or null. */
+export function limitsProblem(models: readonly ServerModel[]): { model: string; output: number; context: number } | null {
+  const m = models.find((x) => !outputFits(x))
+  return m ? { model: m.id, output: m.output!, context: m.context! } : null
+}
+
 const CONTEXT_PROBLEM = msg({ id: 'main.server.context.invalid', defaultMessage: 'A context size is a whole number of tokens, from 1 to {max, number}.', description: "An error saving the context size a user typed for a server connection's model (its Server diagnostics): not a whole number in range. {max} is a number." })
+const OUTPUT_PROBLEM = msg({ id: 'main.server.output.invalid', defaultMessage: 'An output budget is a whole number of tokens, from 1 to {max, number}.', description: "An error saving the output budget a user typed for a server connection's model (HI-2682): not a whole number in range. {max} is a number." })
+const NOT_BELOW = msg({ id: 'main.server.output.notBelow', defaultMessage: 'The output budget of {model} ({output, number} tokens) must be smaller than its context size ({context, number} tokens). Lower the output budget first, or clear it to use the default.', description: "An error saving a server connection's model limits (HI-2682): its output budget isn't below its context size, so nothing was saved. {model} is a model's id; {output} and {context} are numbers of tokens. Output budget and context size are fields of the connection's models: as translated there." })
 const NO_MODEL = msg({ id: 'main.server.context.noModel', defaultMessage: 'The connection has no model {model} now.', description: "An error saving a server connection's model context: the model was removed from the connection meanwhile. {model} is a model's id." })
 
 /** Removes a server connection's key (Remove Key): it then has none, and a launch needing one is refused. */

@@ -348,6 +348,8 @@
   "main.server.key.inField": "密钥出现在{field, select, name {名称} url {基础 URL} other {模型列表}}中：请先从那里删除。未保存任何内容。",
   "main.server.key.length": "密钥长度为 {min, number} 到 {max, number} 个字符。请检查粘贴的内容。",
   "main.server.notServer": "该连接不从服务器获取模型。",
+  "main.server.output.invalid": "输出预算是 1 到 {max, number} 之间的整数 Token 数。",
+  "main.server.output.notBelow": "{model} 的输出预算（{output, number} 个 Token）必须小于其上下文大小（{context, number} 个 Token）。请先降低输出预算，或清空它以使用默认值。",
   "main.server.setUp.noKey": "{name} 还没有密钥。请先添加它的密钥，再进行设置。",
   "main.server.unsupported": "在 Combwork 中，{cli} 无法从服务器获取模型。",
   "main.server.url.extra": "URL 不能包含查询（?…）或片段（#…）：请在单独的字段中填写密钥。",

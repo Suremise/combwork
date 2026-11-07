@@ -1126,6 +1126,8 @@ export interface CombworkRequests {
   'connections:lastCheck': (id: string, model: string) => LastCheck
   /** The context the user says a model has (null: clears it). */
   'connections:setModelContext': (id: string, model: string, tokens: number | null) => void
+  /** HI-2682: a server connection's model's output budget (null: the default). */
+  'connections:setModelOutput': (id: string, model: string, tokens: number | null) => void
   /** Opens the CLI on a connection (a server one, or a sign-in one: HI-1826), for its first-run screens; returns the terminal's key. */
   /** Its terminal's key, and where it opened (HI-1871: a workspace folder or a project's; absent, its own folder). */
   'connections:setUp': (id: string) => { key: string; in?: { folder: string; project?: string; workspace?: true } }
