@@ -305,7 +305,7 @@ describe('a card read narrowed to its newest comments', () => {
     expect(commentsParam(null)).toBeNull()
     expect(commentsParam('0')).toBe(0)
     expect(commentsParam('2')).toBe(2)
-    for (const bad of ['-1', '1.5', '', 'none']) expect(commentsParam(bad)).toEqual({ error: `comments must be a whole number from 0: "${bad}"` })
+    for (const bad of ['-1', '1.5', '', 'none']) expect(commentsParam(bad)).toEqual({ error: { said: `comments must be a whole number from 0: "${bad}"`, id: 'reply.read.commentsInvalid' } })
   })
 
   it('0 keeps none and counts them all; a positive n keeps the newest n', () => {

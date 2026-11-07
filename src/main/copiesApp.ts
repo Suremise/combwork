@@ -17,7 +17,7 @@ import { inAgentLaunch, processSupervisor } from './agentProcesses'
 import { boardRead } from './boardStore'
 import { config } from './config'
 import { containsPlace } from './fsutil'
-import { agentMsg, say } from '../shared/agentText'
+import { agentMsg, say, sayWithId, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
 import { progress } from './progressService'
 import { sessions } from './sessions'
@@ -140,14 +140,14 @@ const T = {
  * Leases a check copy for an isolated run (the Agent API's resolve) and opens its job: the lease and the copy's folder,
  * or why not (`wait`: none free yet; `refused`: its setup failed).
  */
-export async function isolatedLease(ws: WorkspaceService, projectPath: string, req: { card: number; revision: string; agent: string | null }): Promise<{ lease: CopyLease; folder: string; copy: string } | { wait: string } | { refused: string }> {
+export async function isolatedLease(ws: WorkspaceService, projectPath: string, req: { card: number; revision: string; agent: string | null }): Promise<{ lease: CopyLease; folder: string; copy: string } | { wait: string } | { refused: Said }> {
   const pool = await copiesFor(ws, projectPath)
   const r = await pool.leaseCopy({ kind: 'check', card: req.card, revision: req.revision, agent: req.agent })
   if (!r.ok) {
     if (r.refusal.why === 'noCopy') return { wait: say(COPY_TEXT.waitCopy) }
     if (r.refusal.why === 'stillInUse') return { wait: say(T.stillInUse, { copy: r.refusal.copy, by: r.refusal.by }) }
     if (r.refusal.why === 'returned') return { wait: say(COPY_TEXT.waitCopy) }
-    return { refused: r.refusal.why === 'setupFailed' ? say(T.setupFailed, { copy: r.refusal.copy, error: r.refusal.error }) : say(T.noLease) }
+    return { refused: r.refusal.why === 'setupFailed' ? sayWithId(T.setupFailed, { copy: r.refusal.copy, error: r.refusal.error }) : sayWithId(T.noLease) }
   }
   // The job its run's processes go in: recorded on the lease before it exists, then made (kill on close, journaled).
   const job = await pool.setLeaseJob(r.lease.id)
@@ -156,7 +156,7 @@ export async function isolatedLease(ws: WorkspaceService, projectPath: string, r
   const opened = job && host.usable && (await host.ensure()) ? await LeaseJob.open(host, job, await journalPath(root, job, journalsOf(root))) : null
   if (!opened || 'problem' in opened) {
     await pool.returnCopy(r.lease.id, 'noJob')
-    return { refused: say(T.noSupervisor) }
+    return { refused: sayWithId(T.noSupervisor) }
   }
   jobs.set(r.lease.id, opened)
   return { lease: r.lease, folder: r.copy.folder, copy: r.copy.name }
@@ -171,7 +171,7 @@ const requests = new IsolatedRequests<{ lease: CopyLease; folder: string; copy: 
  * An isolated run's copy, asked for and set up without holding the Agent API's request (HR1's #1435 round 1: a first
  * setup outlasts any request's time limit): `wait` with a ticket to ask again with, until the copy is ready.
  */
-export function isolatedRequest(ws: WorkspaceService, projectPath: string, owner: string, req: { card: number; revision: string; agent: string | null }, ticket?: string): Promise<{ lease: CopyLease; folder: string; copy: string } | { wait: string; ticket: string } | { refused: string }> {
+export function isolatedRequest(ws: WorkspaceService, projectPath: string, owner: string, req: { card: number; revision: string; agent: string | null }, ticket?: string): Promise<{ lease: CopyLease; folder: string; copy: string } | { wait: string; ticket: string } | { refused: Said }> {
   return requests.ask(owner, projectPath, `${req.card}|${req.revision}`, () => isolatedLease(ws, projectPath, req), ticket, ws.lifetime)
 }
 
@@ -189,17 +189,17 @@ const assigned = new Set<string>()
  * in that window: never another's, HR1's #1435 round 1). A lease returned meanwhile gets nothing new in its job; one
  * returned after it is in has the job ended by the barrier. Why not, or null once it is.
  */
-export async function assignIsolated(ws: WorkspaceService, projectPath: string, agent: string, a: { lease: string; pid: number; after: number; before: number }): Promise<string | null> {
+export async function assignIsolated(ws: WorkspaceService, projectPath: string, agent: string, a: { lease: string; pid: number; after: number; before: number }): Promise<Said | null> {
   const pool = await copiesFor(ws, projectPath)
   const l = pool.lease(a.lease)
-  if (!l || l.agent !== agent) return say(T.noLease2)
-  if (!(await inAgentLaunch(projectPath, agent, a.pid, a.after, a.before))) return say(T.notOwn)
+  if (!l || l.agent !== agent) return sayWithId(T.noLease2)
+  if (!(await inAgentLaunch(projectPath, agent, a.pid, a.after, a.before))) return sayWithId(T.notOwn)
   const job = jobs.get(a.lease)
-  if (!job || assigned.has(a.lease)) return say(T.noLauncher)
+  if (!job || assigned.has(a.lease)) return sayWithId(T.noLauncher)
   // Taken before the await that assigns: a second call for the lease is refused, never two launchers in it.
   assigned.add(a.lease)
-  if (pool.lease(a.lease)?.returned) return say(T.returned)
-  return (await job.assign(a.pid, a.after, a.before)) ? null : say(T.notPut)
+  if (pool.lease(a.lease)?.returned) return sayWithId(T.returned)
+  return (await job.assign(a.pid, a.after, a.before)) ? null : sayWithId(T.notPut)
 }
 
 /** The lease a run holds (its isolated check), in any open pool of the workspace. */

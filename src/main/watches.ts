@@ -342,7 +342,7 @@ const loading = new Map<string, Promise<Store>>()
  */
 const fileOf = (path: string): string => join(path, CW_DIR, 'watches.json')
 const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase()
-// Its status as servers.ts statusFor() gave it by its words (/workspace was closed/), now its own (HI-2691).
+// Its status is its kind (HI-2691; servers.ts no longer reads its words, HI-2704).
 const closedError = (): Error => saidError(API.workspace.closed, undefined, { kind: 'conflict' })
 
 /** What an agent may see of the board: its own project's cards, or every card for the Assistant. */
@@ -464,7 +464,7 @@ function load(ws: WorkspaceService): Promise<Store> {
           over.unshift(list.pop()!)
           sum -= sizes.pop()!
         }
-        // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
+        // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
         if (over.length && !(await setAside(store, over))) throw saidError(T.cardsTooBig, undefined, { kind: 'conflict' })
       }
       store.dirty = true
@@ -534,8 +534,8 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
     got = await readCapped(file, MAX_FILE_BYTES)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-    throw saidError(T.cardsReadFailed, { error: (e as Error).message }, { cause: e })
+    // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+    throw saidError(T.cardsReadFailed, { error: (e as Error).message }, { kind: 'conflict', cause: e })
   }
   const aside = async (why: string): Promise<Saved> => {
     const to = `${file}.${why}-${Date.now()}`
@@ -544,8 +544,8 @@ async function readFileOf(path: string, open: () => boolean): Promise<Saved | nu
         if (!open()) throw closedError()
       }, renameOnce)
     } catch (e) {
-      // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
-      throw saidError(T.cardsDamaged, { why, error: (e as Error).message }, { cause: e })
+      // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+      throw saidError(T.cardsDamaged, { why, error: (e as Error).message }, { kind: 'conflict', cause: e })
     }
     log.warn(`The watches file was ${why}: set aside as ${userText(to)}`)
     return { watches: [], invalid: [] }
@@ -771,7 +771,7 @@ async function setAside(store: Store, watches: WatchRecord[] = []): Promise<bool
 async function save(store: Store): Promise<void> {
   checkAlive(store)
   const text = fileText(store, store.list)
-  // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
+  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
   if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw saidError(T.cardsFull, undefined, { kind: 'conflict' })
   await saveTable(store.path, 'watches', store.list.map(entryOf), { invalid: store.invalid.length ? JSON.stringify(store.invalid) : null }, () => checkAlive(store))
   store.dirty = false
@@ -947,8 +947,8 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
   const store = await load(ws)
   // A wake whose line its CLI has taken is received first, so this watch starts from what it told (#649).
   await followAgent(projectPath, agentId)
-  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath })
+  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'notFound' })
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
   const result = await locked(store, async (): Promise<WatchResult> => {
@@ -1000,7 +1000,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     const old = recordOf(store, projectPath, agentId)
     const before = store.list
     // The limit holds for what Combwork writes as for what it reads: replacing an agent's watch is always allowed.
-    // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
+    // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
     if (!already && !old && store.list.length >= MAX_WATCHES) throw saidError(T.cardsTooMany, { max: String(MAX_WATCHES) }, { kind: 'conflict' })
     const minutes = Math.min(WATCH_MAX_LIMIT_MINUTES, Math.max(1, Math.round(limitMinutes)))
     // The Assistant's: the user's replies to its cards' agents from what its last wake told (#418).
@@ -1009,7 +1009,7 @@ export async function registerWatch(ws: WorkspaceService, projectPath: string, a
     const next = [...store.list.filter((x) => x !== old), ...(rec ? [rec] : [])]
     // Every watch must be able to fire, be typed and end within the file's limit: make room, else refuse.
     if (rec && budget(store, next) > MAX_FILE_BYTES && !((await setAside(store)) && budget(store, next) <= MAX_FILE_BYTES))
-      // agent-protocol: servers.ts gives this reply its status by its words (/card watches/)
+      // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
       throw saidError(T.cardsFullWait, undefined, { kind: 'conflict' })
     store.list = next
     if (old || rec) {
@@ -1452,12 +1452,12 @@ export async function registerAgentWatch(ws: WorkspaceService, projectPath: stri
   // A wake whose line its CLI has taken is received first, so this watch starts from what it told (#649).
   await followAgent(projectPath, agentId)
   const store = await load(ws)
-  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath })
+  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'notFound' })
   for (const a of cond.agents) {
-    // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project })
-    // agent-protocol: servers.ts gives this reply its status by its opening (/^You can't watch yourself/)
+    // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project }, { kind: 'notFound' })
+    // agent-protocol: an English refusal with no kind (servers.ts has no pattern for it)
     if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
   }
   const result = await locked(store, async (): Promise<AgentWatchResult> => {
@@ -1569,8 +1569,8 @@ export type UsageWatchResult = ({ watching: TaskWatchInfo } | { already: string[
 export async function registerUsageWatch(ws: WorkspaceService, projectPath: string, agentId: string, usage: UsageWatch[], limitMinutes = WATCH_DEFAULT_LIMIT_MINUTES): Promise<UsageWatchResult> {
   await followAgent(projectPath, agentId)
   const store = await load(ws)
-  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath })
+  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'notFound' })
   const result = await locked(store, async (): Promise<UsageWatchResult> => {
     await assertNotPlacing(ws, projectPath, agentId, scopeFor(ws, projectPath))
     const already = usageHits(usage, (a) => config.get().connectionPlanUsage?.[a]?.limits, Date.now())
@@ -1950,20 +1950,20 @@ export async function registerLaneWatch(ws: WorkspaceService, projectPath: strin
   const waitsFrom = latestWaitSeq()
   await followAgent(projectPath, agentId)
   const store = await load(ws)
-  // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath })
+  // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+  if (!hostedIn(ws, store.path, projectPath)) throw saidError(T.notAProject, { project: projectPath }, { kind: 'notFound' })
   const scope = scopeFor(ws, projectPath)
   const self = await boardName(ws, projectPath, agentId)
   for (const a of extra.agents?.agents ?? []) {
-    // agent-protocol: servers.ts gives this reply its status by its opening (/Not a project/)
-    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project })
-    // agent-protocol: servers.ts gives this reply its status by its opening (/^You can't watch yourself/)
+    // agent-protocol: its status is its kind (HI-2704: servers.ts no longer reads its words)
+    if (!mayWatch(ws, store.path, projectPath, a.projectPath)) throw saidError(T.notAProject, { project: a.project }, { kind: 'notFound' })
+    // agent-protocol: an English refusal with no kind (servers.ts has no pattern for it)
     if (same(a.projectPath, projectPath) && a.agentId === agentId) throw new Error("You can't watch yourself: nothing would wake you")
   }
   if (cond.ids !== 'all') {
     const known = (await listLanes(ws, { all: true })).filter((l) => scope === null || same(l.project, scope))
     const unknown = cond.ids.filter((id) => !known.some((l) => l.id === id))
-    // servers.ts gives this reply its status by its opening (/^No such lane/).
+    // An English refusal with no kind (servers.ts has no pattern for it).
     if (unknown.length) throw saidError(T.noSuchLane, { count: unknown.length, lanes: unknown.join(', ') })
   }
   const result = await locked(store, async (): Promise<LaneWatchResult> => {

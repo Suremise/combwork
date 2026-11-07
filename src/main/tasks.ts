@@ -60,8 +60,8 @@ const BOARD_AGENT = {
 
 /**
  * The board's refusals (#846, E10b of #677) are CombworkErrors: the window reads them in its language, agents (the Agent API,
- * the cw_ tools) in English, exactly as before. A refusal's `kind` is set where it is the status its English always
- * gave (servers.ts `statusFor`); without one, the English still gives it. A column (`{column}`) is its key, and each
+ * the cw_ tools) in English, exactly as before. A refusal's `kind` is its Agent API status (HI-2704: whatever its
+ * values; one with none answers 500). A column (`{column}`) is its key, and each
  * message chooses its words.
  */
 const ERR = {
@@ -3222,7 +3222,7 @@ async function unarchiveBatchLocked(id: string, actor: TaskActor): Promise<Unarc
   const result = await (async (): Promise<UnarchiveResult> => {
     const batches = await readBatches(ws)
     const batch = batches.find((b) => b.id === id)
-    if (!batch) throw combworkError(msg({ id: 'tasks.error.batchGone', defaultMessage: 'That batch is no longer kept: unarchive its cards from Archived.', description: "An error: the Archive All batch to bring back is no longer kept (Combwork keeps the latest 50); its cards can still be brought back one by one from the board's Archived list." }))
+    if (!batch) throw combworkError(msg({ id: 'tasks.error.batchGone', defaultMessage: 'That batch is no longer kept: unarchive its cards from Archived.', description: "An error: the Archive All batch to bring back is no longer kept (Combwork keeps the latest 50); its cards can still be brought back one by one from the board's Archived list." }), undefined, { kind: 'conflict' })
     const failed = new Set<number>()
     // The batch's own list, read card by card: one that can't be read now still belongs to it.
     const back: TaskCard[] = []

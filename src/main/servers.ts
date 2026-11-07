@@ -33,7 +33,7 @@ import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalle
 import type { HandoverAuthor } from '../shared/combworkGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
-import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { isSaid, say, sayWithId, type AgentMsg, type AgentValues, type Said as SaidText } from '../shared/agentText'
 import { API } from './apiText'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
@@ -133,6 +133,7 @@ import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
 import { agentError, CombworkError, SaidError, shownError } from './combworkError'
+import { KindedError } from '../shared/kindedError'
 import { agentField, agentText, type TextPart } from '../shared/advanced'
 import { storedForAgents } from '../shared/taskHistory'
 import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
@@ -168,11 +169,8 @@ function readBody(req: IncomingMessage, onChunk?: (bytes: number) => void): Prom
 }
 
 /** An agent message said for an error reply, with its id kept beside the text (HI-2681): what Performance records as its reason. */
-interface ApiSaid {
-  said: string
-  id: string
-}
-const apiSaid = (m: AgentMsg, values?: AgentValues): ApiSaid => ({ said: say(m, values), id: m.id })
+type ApiSaid = SaidText
+const apiSaid = (m: AgentMsg, values?: AgentValues): ApiSaid => sayWithId(m, values)
 
 class HttpError extends Error {
   /** The agent message it says, by id (HI-2681, metrics.ts reasonOf): never its text. */
@@ -2107,13 +2105,13 @@ function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?:
   const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string; target?: string | null } = {}
   if (body?.cards !== undefined) {
     const c = laneCards(cardRefsIn(body.cards))
-    if (typeof c === 'string') throw new HttpError(400, c)
+    if (isSaid(c)) throw new HttpError(400, c)
     out.cards = c
   }
   for (const k of ['rounds', 'waitMinutes'] as const) {
     if (body?.[k] === undefined) continue
     const v = laneNumber(body[k], k, 0)
-    if (typeof v === 'string') throw new HttpError(400, v)
+    if (isSaid(v)) throw new HttpError(400, v)
     out[k] = v
   }
   if (body?.name !== undefined) out.name = laneName(body.name)
@@ -2673,11 +2671,11 @@ async function docOf(query: URLSearchParams): Promise<{ ref: string; text: strin
   const r = await readDoc(root, rel)
   if (r.ok) return { ref: path, text: r.text }
   const why = {
-    outside: say(API.doc.outside, { path, where: path.startsWith(SHARED_PREFIX) ? 'shared' : 'project' }),
-    hidden: say(API.doc.hidden, { path }),
-    notMarkdown: say(API.doc.notMarkdown, { path }),
-    notFound: say(API.doc.notFound, { path }),
-    tooBig: say(API.doc.tooBig, { path, megabytes: String(Math.round(DOC_MAX / 1048576)) })
+    outside: apiSaid(API.doc.outside, { path, where: path.startsWith(SHARED_PREFIX) ? 'shared' : 'project' }),
+    hidden: apiSaid(API.doc.hidden, { path }),
+    notMarkdown: apiSaid(API.doc.notMarkdown, { path }),
+    notFound: apiSaid(API.doc.notFound, { path }),
+    tooBig: apiSaid(API.doc.tooBig, { path, megabytes: String(Math.round(DOC_MAX / 1048576)) })
   }[r.code]
   throw new HttpError(r.code === 'notFound' ? 404 : 400, why)
 }
@@ -3582,9 +3580,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   if (body?.lanes !== undefined) {
     if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, apiSaid(API.watch.lanesAlone))
     const lc = readLaneCondition(body)
-    if (typeof lc === 'string') throw new HttpError(400, lc)
+    if (isSaid(lc)) throw new HttpError(400, lc)
     const extra = readLaneCards(body)
-    if (typeof extra === 'string') throw new HttpError(400, extra)
+    if (isSaid(extra)) throw new HttpError(400, extra)
     if (body.wake !== true || !who) throw new HttpError(400, apiSaid(API.watch.laneWakes))
     // Agents beside the lanes (HI-1987): each { project, agent }; left out, the last lane watch's are kept, [] drops them.
     let laneAgents: WatchedAgent[] | undefined
@@ -3617,7 +3615,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   }
   if (body?.agents !== undefined) throw new HttpError(400, apiSaid(API.watch.agentsWithLanes))
   const cond = readCondition(body ?? {})
-  if (typeof cond === 'string') throw new HttpError(400, cond)
+  if (isSaid(cond)) throw new HttpError(400, cond)
   // Each card must be one the caller may see (a project agent: its project's; others are unknown to it), and stays so:
   // the caller's scope goes with the wait, and every later read is checked against it.
   const actor = await taskActor()
@@ -4789,37 +4787,25 @@ const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409
 
 /**
  * The status the Agent API answers an error with. The session and workspace services don't know about HTTP: a
- * CombworkError's kind says it, else its English message does (statusFor).
+ * Combwork error's kind says it (CombworkError, SaidError, KindedError), given where it is thrown from its message
+ * alone, never from a name or a quoted value in it (HI-2704). Errors that aren't Combwork's own go by statusFor().
  */
 function errorStatus(e: unknown): number {
-  if ((e instanceof CombworkError || e instanceof SaidError) && e.kind) return KIND_STATUS[e.kind]
+  if ((e instanceof CombworkError || e instanceof SaidError || e instanceof KindedError) && e.kind) return KIND_STATUS[e.kind]
   return e instanceof HttpError ? e.status : e instanceof tasks.TaskPermissionError ? 403 : e instanceof tasks.TaskConflictError ? 409 : statusFor(e as Error)
 }
 
 /**
- * The status of an error with no kind of its own, by its English words: a fallback, its patterns tried in order, so a
- * name or a quoted cause in a message can change which one wins.
- *
- * Why each pattern stays (HI-2691's audit, source by source): every one but those named below still has producers thrown
- * with no kind (window messages through `combworkError()` in tasks.ts, sessions, workspace, worktrees and the like;
- * agent messages through `saidError()` whose values are names, keys, reasons or errors, which could change today's
- * status if typed). They go once each of their producers reachable from the Agent API has a kind.
- * - `Invalid session id`: shared/defaults.ts's plain Error, a programming error. `URI malformed`: decodeURIComponent's
- *   own error on a bad path.
- * - `card watches`, `Not a project`, `No workspace`, `workspace was closed`: some of their producers are typed now
- *   (watches.ts's file-full and limit errors, closedError, notes.ts, teamPause.ts); the rest are not: watches.ts's read
- *   and damaged-file errors (their cause quoted), a project's path or name quoted, tasks.ts's and lanes' noWorkspace,
- *   metricsUsage's closed read.
- * - `A failed review leaves` was removed: its message became tasks.error.failedToDoing ("A failed review sends…",
- *   HI-1946), thrown with its kind.
+ * The status of an error that isn't Combwork's own, by its words; anything else with no kind answers 500. Combwork's
+ * own errors give theirs as a kind where they are thrown (HI-2704: the English patterns this held for them are gone, so
+ * a name such as "busy" in a message no longer changes its status).
+ * - `URI malformed`: decodeURIComponent's error, for a request path that doesn't decode (400).
+ * - `EBUSY`: Node's, for a file another program holds open (409, as before HI-2704).
  */
 function statusFor(e: Error): number {
   const m = String(e?.message ?? '')
-  if (/Invalid session id|URI malformed|Unknown provider|Project names cannot|pinned to worktrees/i.test(m)) return 400
-  if (/already running|already open|already being opened|is starting|Stop it first|Stop the|archived|No session is running|ran in .* Resume it|is required to run|is turned off|no agents yet|No workspace|busy|no handover|changed while the cards|workspace was closed|card watches|not a conversation/i.test(m)) return 409
-  if (/several agents: choose/i.test(m)) return 400
-  if (/Not a project|Unknown (project|agent|task)|no longer exists/i.test(m)) return 404
-  if (/is archived|is done\.|has no project|needs a title|is too long|Unknown column|labels must|up to \d+ labels|^(blockedBy|links):|Choose a project|comment is empty|Unknown position|before or position|can't go before|, not in (On Hold|Todo|Doing|Review|Passed|Done)|There is no card #|^cards:|other project first/i.test(m)) return 400
+  if (/URI malformed/.test(m)) return 400
+  if (/^EBUSY\b/.test(m)) return 409
   return 500
 }
 

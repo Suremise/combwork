@@ -63,9 +63,9 @@ describe("an agent's plain number in a watch (HI-2197)", () => {
     // A number that is one alpha card's while another alpha card has the key <its key>-<that number>.
     const [, number] = pCards().find(([, n]) => made.has(`${A}-${n}`) && made.get(`${A}-${n}`) !== n)!
     const why = await run(() => clashingNumber(w, [number], agent))
-    expect(why).toBe(`${number} is ${keyOf(number)}'s number (#${number}), not ${A}-${number}, which is another card. Name cards by key: "${A}-${number}" or "${keyOf(number)}".`)
+    expect(why?.said).toBe(`${number} is ${keyOf(number)}'s number (#${number}), not ${A}-${number}, which is another card. Name cards by key: "${A}-${number}" or "${keyOf(number)}".`)
     // As a string of digits too.
-    expect(await run(() => clashingNumber(w, [String(number)], agent))).toBe(why)
+    expect(await run(() => clashingNumber(w, [String(number)], agent))).toEqual(why)
   })
 
   it('a number no key of its project reads as, #N, a key and a script (no agent) go on as before', async () => {

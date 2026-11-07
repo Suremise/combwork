@@ -12,6 +12,7 @@ import type { Tr } from './tasks'
 import { samePath } from './movePaths'
 import { legacyWorktree } from './agentFolders'
 import { migrateGlobalFileLocks, migrateProjectPreferences } from './workflow/preferences'
+import { KindedError } from './kindedError'
 
 export const CW_DIR = '.combwork'
 
@@ -20,7 +21,7 @@ export const isSessionId = (id: unknown): id is string => typeof id === 'string'
 
 /** Throws unless id is a valid session id (see isSessionId). Session ids end up in file names. */
 export function assertSessionId(id: unknown): string {
-  if (!isSessionId(id)) throw new Error('Invalid session id') // i18n-ignore: a programming error's message (E10 formats errors)
+  if (!isSessionId(id)) throw new KindedError('Invalid session id', 'invalid') // i18n-ignore: a programming error's message (E10 formats errors)
   return id
 }
 export const DEFAULT_API_PORT = 47821

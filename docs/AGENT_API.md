@@ -78,6 +78,13 @@ Errors return a non-2xx status and `{ "error": "message" }`. The message is in E
 | 500 | Unexpected error; details are in Combwork's log. A refusal by a rule or limit is never a 500 (HI-1952): one is a fault to report |
 | 413 | Body larger than 2 MB, or a skill file larger than 512 KB |
 
+An error's status is decided where Combwork makes it, from the error alone (HI-2704): a name, key, reason or quoted error in its text never changes it, nor does a dialect's wording. Before 1.2.0 an error without a status of its own got one from its English words, so a few statuses change in 1.2.0. If a script relied on the old ones:
+
+- A project, agent or card named with such a word (`busy-work`, `archived-ideas`) no longer turns its "not found" into a 409: it answers **404**, as the same error does for any other name.
+- `{provider} is required to resume this conversation` (the provider isn't installed) answers **409**, as `… is required to run …` already did; it was 500.
+- An error that quotes another error (a template that couldn't be applied, `Nothing was changed: …`; a watch file Combwork couldn't save) answers its own status, whatever the quoted text says. One with none of its own is a **500**, as when it quotes anything else.
+- An internal error whose words read like a refusal (`… command line is too long`) answers **500**, not 400.
+
 ---
 
 ## Several windows

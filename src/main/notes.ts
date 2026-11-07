@@ -316,7 +316,7 @@ export async function createHandover(project: string, title: string, content: st
   // All in the workspace it began in (a window switched meanwhile writes nothing into the next one).
   const ws = currentWorkspace()
   const at = workspaceAt(ws)
-  // The Agent API's handover (agents read English): its status was statusFor()'s by its words (/No workspace/), now its own (HI-2691).
+  // The Agent API's handover (agents read English): its status is its kind (HI-2691).
   if (!at) throw saidError(API.workspace.noneOpen, undefined, { kind: 'conflict' })
   const dir = join(at.shared, 'handovers')
   await mkdir(dir, { recursive: true })

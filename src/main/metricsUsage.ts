@@ -7,6 +7,7 @@ import { sessions } from './sessions'
 import { inWorkspace, type WorkspaceService } from './workspace'
 import { englishText, type Text } from '../shared/advanced'
 import { msg } from '../shared/i18n'
+import { KindedError } from '../shared/kindedError'
 
 /** Why a report has no provider usage: the window's text; the Agent API's report and its export get the English (#1104). */
 const NOTE = {
@@ -37,7 +38,7 @@ export async function providerUsage(w: WorkspaceService, f: UsageFilter, from: n
   // rather than mixing two workspaces' sessions.
   const lifetime = w.lifetime
   const still = (): void => {
-    if (lifetime.aborted) throw new Error('The workspace was closed while its metrics were read') // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
+    if (lifetime.aborted) throw new KindedError('The workspace was closed while its metrics were read', 'conflict') // i18n-ignore: the Agent API's metrics report and its export, in English (mixed audience: the Performance view gets messages with E10a's pattern)
   }
   return inWorkspace(w, async () => {
     const all = await w.listProjectPaths()

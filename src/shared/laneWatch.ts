@@ -4,7 +4,7 @@ import { laneStatusText } from './lanes'
 import { columnLabel } from './tasks'
 import { brief, cardPart, historyBlocked, historyVerdict, WAKE_MAX_BYTES, WATCH_CHANGES, WATCH_MAX_CARDS, type CardChange, type WatchChange } from './watch'
 import { cardRef } from './projectKeys'
-import { agentMsg, say } from './agentText'
+import { agentMsg, isSaid, say, sayWithId, type Said } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
 // Types only: agentWatch loads the translations, which cw-mcp (toolReplies imports this) never does.
 import type { AgentEvent, WatchedAgent } from './agentWatch'
@@ -432,32 +432,32 @@ export interface LaneWatchAgents {
  * The cards beside a lane watch's lanes (#726) from untrusted arguments (`cards`, `changes`), or what is wrong. `cards`
  * left out keeps the last lane watch's, [] drops them; `changes` left out keeps theirs (else LANE_CARD_CHANGES).
  */
-export function readLaneCards(args: { cards?: unknown; changes?: unknown }): { cards?: number[]; changes?: WatchChange[] } | string {
+export function readLaneCards(args: { cards?: unknown; changes?: unknown }): { cards?: number[]; changes?: WatchChange[] } | Said {
   const out: { cards?: number[]; changes?: WatchChange[] } = {}
   if (args.cards !== undefined) {
     const raw = args.cards
-    if (!Array.isArray(raw) || raw.some((n) => !Number.isInteger(n) || (n as number) <= 0) || new Set(raw).size !== raw.length) return say(T.badCards)
-    if (raw.length > WATCH_MAX_CARDS) return say(T.tooManyCards, { max: String(WATCH_MAX_CARDS) })
+    if (!Array.isArray(raw) || raw.some((n) => !Number.isInteger(n) || (n as number) <= 0) || new Set(raw).size !== raw.length) return sayWithId(T.badCards)
+    if (raw.length > WATCH_MAX_CARDS) return sayWithId(T.tooManyCards, { max: String(WATCH_MAX_CARDS) })
     out.cards = raw as number[]
   }
   if (args.changes !== undefined) {
     const c = args.changes
-    if (!Array.isArray(c) || !c.length || c.some((x) => !WATCH_CHANGES.includes(x as WatchChange))) return say(T.badChanges, { changes: WATCH_CHANGES.join(', ') })
+    if (!Array.isArray(c) || !c.length || c.some((x) => !WATCH_CHANGES.includes(x as WatchChange))) return sayWithId(T.badChanges, { changes: WATCH_CHANGES.join(', ') })
     out.changes = [...new Set(c as WatchChange[])]
   }
   return out
 }
 
 /** A lane watch's condition from untrusted arguments (`lanes`, `events`), or what is wrong. */
-export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): LaneWatchCondition | string {
+export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): LaneWatchCondition | Said {
   const l = args.lanes
   let ids: string[] | 'all'
   if (l === 'all' || (Array.isArray(l) && l.length === 1 && l[0] === 'all')) ids = 'all'
   else if (Array.isArray(l) && l.length && l.length <= LANE_WATCH_MAX && l.every((x) => typeof x === 'string' && /^[\w-]{1,64}$/.test(x)) && new Set(l).size === l.length) ids = l as string[]
-  else return say(T.badLanes, { max: String(LANE_WATCH_MAX) })
+  else return sayWithId(T.badLanes, { max: String(LANE_WATCH_MAX) })
   const e = Array.isArray(args.events) ? args.events.map((x) => (typeof x === 'string' && Object.hasOwn(LANE_EVENT_ALIASES, x) ? LANE_EVENT_ALIASES[x] : x)) : args.events
   if (e === undefined) return { ids, events: withAlwaysEvents(ids, LANE_DEFAULT_EVENTS) }
-  if (!Array.isArray(e) || !e.length || e.some((x) => !LANE_EVENTS.includes(x as LaneEvent))) return say(T.badEvents, { events: LANE_EVENTS.join(', ') })
+  if (!Array.isArray(e) || !e.length || e.some((x) => !LANE_EVENTS.includes(x as LaneEvent))) return sayWithId(T.badEvents, { events: LANE_EVENTS.join(', ') })
   // A question for the user always counts (HI-1991), whatever was asked for; so does named lanes' end (HI-2521), in a
   // watch read back from before too.
   return { ids, events: withAlwaysEvents(ids, e as LaneEvent[]) }
@@ -467,7 +467,7 @@ export function readLaneCondition(args: { lanes?: unknown; events?: unknown }): 
 export function readSavedLaneCondition(v: unknown): LaneWatchCondition | null {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return null
   const r = readLaneCondition({ lanes: (v as { ids?: unknown }).ids === 'all' ? 'all' : (v as { ids?: unknown }).ids, events: (v as { events?: unknown }).events })
-  return typeof r === 'string' || !Array.isArray((v as { events?: unknown }).events) ? null : r
+  return isSaid(r) || !Array.isArray((v as { events?: unknown }).events) ? null : r
 }
 
 const STATES = ['active', 'paused', 'ended', 'abandoned', 'gone']
