@@ -452,6 +452,7 @@ const FORWARD_TEXT = {
   byAssistant: msg({ id: 'service.forward.byAssistant', defaultMessage: 'the Assistant', description: 'HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant.' }),
   notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} and {to} must be two different branches this project merges work into: {targets}.', description: 'HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them.' }),
   missing: msg({ id: 'service.forward.missing', defaultMessage: '{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}', description: 'HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.' }),
+  raced: msg({ id: 'service.forward.raced', defaultMessage: 'The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.', description: 'HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.' }),
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
 }
 
@@ -491,7 +492,8 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
     // Stored by the start's own write, which records it.
     const ruleset = forwardOf(wf.currentRuleset(false), to)
     const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string) }, by, ruleset, guard), undefined, guard)
-    if (isRefusal(r.reply)) throw new ForwardRefused({ lines: [r.reply.message] }, { kind: 'conflict' })
+    // Its card started meanwhile (by nobody but this request: refused only in a race): said so, nothing queued twice.
+    if (isRefusal(r.reply)) throw new ForwardRefused(FORWARD_TEXT.raced, { kind: 'conflict' })
     queueChanged(ws, projectPath, to)
     return { card: r.saved ?? made, queued: true, from, to }
   })

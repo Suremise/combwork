@@ -3528,6 +3528,30 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
    64 KB; the limit is a match and what decides it within 256 characters (a code). **Pauses are not failures:** a busy or dirty target folder, a missing
    identity or a signing wait pauses the entry with its reason and never returns the card [HB3's round 1 finding 3].
 
+**Forward merges (HI-2679, design s10; Darren's decisions of 7 Nov on HI-2556's s14).** Bringing one of a project's
+targets up to date with another (Bring Up to Date… on the destination's queue card; `cw_queue` `forward`;
+`POST /v1/queue/forward`), the user's or the Assistant's alone, is an entry of the destination's queue on a card Combwork
+makes for it (`forwardMerge`, queueControls.ts; one per pair while open, requests taken in turn per project):
+- its authority is its `ForwardRequested` {from, to, source, by}, written only by that request, right after its
+  `Started` {folder project, line **null**, target = to, builder combwork}: with no line, nothing that updates, attributes
+  or cleans up a card's line can touch the source;
+- it runs under its own rules (`forwardOf`, its id the base's targeted one marked `~forward`, old rules comparing the
+  base): no review (its fact is its approval), a merge commit always (G6), G8 off (the source never brought up to date
+  with the destination), no focused tests (G20); every other gate stays (rules off, pauses, Ask each time on a
+  checked-out target, the lease, the compare and swap);
+- each attempt's source is its entry's frozen `revision`: a source that moves while it waits changes nothing; found in
+  the destination already, that very commit is recorded `Integrated` (by outside);
+- a conflict or a red check returns the card to Active (no builder is woken: it says so on itself), both branches as
+  they were; **Retry merge** freezes the source again at its head then (a new entry, its own checks); **Remove from
+  queue** ends it in Done with `IntegrationCancelled`, never an `Integrated` (refused while it advances);
+- a project agent's every intent on it is refused (`forward.notAgents`).
+
+Each target's queue card lists how far it is behind each other target of the project (`QueueView.forward`): the commits
+along the other's first-parent history it lacks (`git rev-list --count --first-parent to..from`: a card merged with a
+merge commit or squashed counts once, a rebased one per commit), kept by both heads (at most 64 pairs), null when a head
+can't be read; the window's listing includes every existing target, so a destination with nothing queued shows while it
+is behind. Automatic forward merges are later (they would refuse cycles).
+
 #### 16.9.2 Advancing the target
 
 [P1, answering HR2's round 1 finding 9 and round 2 finding 4] The advance moves the target from the expected

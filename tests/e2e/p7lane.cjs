@@ -473,6 +473,23 @@ function helpers(h) {
     check("S42: the moved main was tested again: both merge checks passed on the candidate with the user's commit, the one merged", retestedIn(queueChecks), JSON.stringify({ result: i1?.data?.result, userCommit, checks: queueChecks.map((f) => [f.data.name, f.data.result, f.data.tested]) }))
     // The same test given this run's facts with the moved candidate's checks left out (a merge with no retest): it fails.
     check('…and that test fails for a merge onto the moved main with no check of it', !retestedIn(queueChecks.filter((f) => !isIn(alpha, userCommit, f.data.tested))))
+    // --- HI-2679: 1.2.0, with nothing queued, is behind main now: its queue card says so, shown in the Merges tab; Bring Up
+    // to Date… merges main, as it is, into it through its own queue, a merge commit, main unchanged.
+    q.steer(fx, 'pass')
+    await x.showTab('merges')
+    const fwdQueue = x.panel.locator('.progress-queue-card[data-queue="alpha#1.2.0"]')
+    const mainNow = git(alpha, 'rev-parse', 'main')
+    check("HI-2679: 1.2.0's queue card shows with nothing queued, saying it is behind main", !!(await until(async () => (await fwdQueue.locator('[data-behind="main"]').count()) === 1, HUNG_MS)), await x.text(x.panel))
+    await x.shoot('forward-behind', fwdQueue)
+    await fwdQueue.locator('[data-action="forward"]').click()
+    const fwdAsk = page.locator('.dialog', { hasText: 'Bring 1.2.0 up to date with main?' })
+    await fwdAsk.waitFor({ timeout: HUNG_MS })
+    await fwdAsk.getByRole('button', { name: 'Queue It' }).click()
+    const fwd = await until(async () => (await inv('tasks:list')).find((c) => c.title === 'Bring 1.2.0 up to date with main' && c.column === 'done'), HUNG_MS)
+    const fi = fwd ? await x.fact(fwd.number, 'Integrated') : null
+    check('…merged into 1.2.0 through its queue: main in it, a merge commit; main unchanged', !!fi && fi.data.target === '1.2.0' && fi.data.revision === mainNow && isIn(alpha, mainNow, '1.2.0') && git(alpha, 'rev-parse', 'main') === mainNow && git(alpha, 'rev-list', '--parents', '-n', '1', '1.2.0').split(' ').length === 3, JSON.stringify(fi?.data))
+    check('…and its queue card no longer says it is behind', !!(await until(async () => (await fwdQueue.locator('[data-behind="main"]').count()) === 0, HUNG_MS)))
+
     // The next card in the same slot, from the new main.
     const s2 = await startIn(b1, a2, slotA)
     check('S43: the next card starts once the first is Done, in the same slot, from the main that has it', s2.ok && isIn(slotA.folder, rev1, 'HEAD'), s2.why)

@@ -241,6 +241,8 @@ interface CombworkMessageValues {
   'workflow.refused.done.contained.next': { revision: string | number; target: string | number }
   'workflow.refused.evidence.changed.message': { card: string | number }
   'workflow.refused.evidence.changed.next': undefined
+  'workflow.refused.forward.notAgents.message': { card: string | number }
+  'workflow.refused.forward.notAgents.next': undefined
   'workflow.refused.integrate.approved.message': { card: string | number; revision: string | number; why: string | number }
   'workflow.refused.integrate.approved.next': undefined
   'workflow.refused.integrate.checksPassed.change': undefined
