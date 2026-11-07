@@ -233,7 +233,7 @@
   },
   "main.connections.launch.agentChanged": {
     "defaultMessage": "{agent}'s role or connection was changed meanwhile: nothing was saved. Try again.",
-    "description": "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change, which would make it Independent, was being checked, so nothing was saved. {agent} is its name."
+    "description": "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change of its role or connection was being checked, so nothing was saved. {agent} is its name."
   },
   "main.connections.launch.busy": {
     "defaultMessage": "The board kept changing while Combwork worked out what this change affects. Try again.",
@@ -283,9 +283,17 @@
     "defaultMessage": "The connection chosen for {agent} is for another CLI. Pick a {cli} connection in its Agent Settings.",
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\")."
   },
+  "main.connections.launch.projectsUnread": {
+    "defaultMessage": "the projects of {workspace} aren't read yet",
+    "description": "Why Combwork couldn't read what a change of a connection's launch settings affects (HI-2670), put into a longer error in place of {error}: an open workspace's projects ({workspace}: its folder) haven't been read yet. Lower case, no full stop."
+  },
   "main.connections.launch.signedOut": {
     "defaultMessage": "{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.",
     "description": "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in."
+  },
+  "main.connections.launch.unreadable": {
+    "defaultMessage": "Combwork couldn't read which agents, lanes and cards this change affects ({error}), so nothing was saved. Try again.",
+    "description": "An error saving a connection's launch settings or an agent's role or connection (HI-2670): reading the board, the lanes or a project's agents failed, so Combwork can't tell whether the change takes agents out of the workflow, and saves nothing. {error} is why, as the system said it."
   },
   "main.connections.moveFailed": {
     "defaultMessage": "Combwork couldn't move {project}'s model settings to its agents",

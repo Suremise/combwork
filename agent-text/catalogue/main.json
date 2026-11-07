@@ -151,7 +151,7 @@
   },
   "main.connections.launch.agentChanged": {
     "text": "{agent}'s role or connection was changed meanwhile: nothing was saved. Try again.",
-    "note": "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change, which would make it Independent, was being checked, so nothing was saved. {agent} is its name.",
+    "note": "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change of its role or connection was being checked, so nothing was saved. {agent} is its name.",
     "audience": "both"
   },
   "main.connections.launch.busy": {
@@ -214,9 +214,19 @@
     "note": "Starting an agent ({agent}) is refused: the connection chosen for it belongs to another coding agent CLI. {cli} is the agent's CLI (\"Claude Code\").",
     "audience": "both"
   },
+  "main.connections.launch.projectsUnread": {
+    "text": "the projects of {workspace} aren't read yet",
+    "note": "Why Combwork couldn't read what a change of a connection's launch settings affects (HI-2670), put into a longer error in place of {error}: an open workspace's projects ({workspace}: its folder) haven't been read yet. Lower case, no full stop.",
+    "audience": "both"
+  },
   "main.connections.launch.signedOut": {
     "text": "{name} is signed out. Sign it in again in Settings → Accounts & Connections, then start {agent}.",
     "note": "Starting an agent ({agent}) is refused: its account ({name}) isn't signed in.",
+    "audience": "both"
+  },
+  "main.connections.launch.unreadable": {
+    "text": "Combwork couldn't read which agents, lanes and cards this change affects ({error}), so nothing was saved. Try again.",
+    "note": "An error saving a connection's launch settings or an agent's role or connection (HI-2670): reading the board, the lanes or a project's agents failed, so Combwork can't tell whether the change takes agents out of the workflow, and saves nothing. {error} is why, as the system said it.",
     "audience": "both"
   },
   "main.connections.nameTaken": {

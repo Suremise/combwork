@@ -10,6 +10,8 @@
 // change of connection (kept, cleared, a change of CLI resetting what was the old one's, decided again under the lock).
 // In this file's temp folders
 // only: the CLI is never run (its status is faked) and nothing signs in.
+import { writesAt } from '../src/main/dbWrites'
+import { AsyncResource } from 'async_hooks'
 import { lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -1519,4 +1521,60 @@ afterAll(async () => {
   accounts.stopAccountWatches()
   advanced.stop()
   await disposeWorkspaceService(w)
+})
+
+describe("HI-2670 (HR3 on s45): an agent's change to Independent is checked at its file's save, under the board's lock", () => {
+  // Another caller's board write: run in the test's own context, never inside the change's own write (whose board lock
+  // a write there would join, as a change made inside another is part of it).
+  const outside = AsyncResource.bind(<T>(fn: () => T): T => fn())
+  it('a change that looked like none is refused when the agent was made a builder meanwhile (and given a card)', async () => {
+    const p = join(wsPath, 'api1')
+    await here(() => w.updateAgent(p, 'k', { workflowRole: 'independent' }))
+    const actualUpdate = w.updateAgent.bind(w)
+    const tasks = await import('../src/main/tasks')
+    let carding: Promise<unknown> | null = null
+    const spy = vi.spyOn(w, 'updateAgent').mockImplementationOnce(async (host, id, patch, check) => {
+      // Another save makes it a builder, and a card is given to it, while this change waits for its project's lock.
+      await actualUpdate(host, id, { workflowRole: 'builder' })
+      carding = outside(() => here(() => tasks.createTask({ title: 'Given meanwhile', project: 'api1', agent: 'k', column: 'doing' }, { kind: 'user' })))
+      return actualUpdate(host, id, patch, check)
+    })
+    try {
+      await expect(here(() => updateAgent(p, 'k', { workflowRole: 'independent' }))).rejects.toThrow(/changed meanwhile/)
+      expect((await w.projectConfig(p)).agents?.find((x) => x.id === 'k')?.workflowRole).toBe('builder')
+    } finally {
+      spy.mockRestore()
+      await carding
+    }
+  })
+
+  it('no card is given to it while its file is saved: the board waits for the save', async () => {
+    const p = join(wsPath, 'alpha')
+    await here(() => w.updateAgent(p, 'a-one', { workflowRole: 'builder' }))
+    const tasks = await import('../src/main/tasks')
+    let carding: Promise<unknown> | null = null
+    // The role saved in project.json when the card was given: Independent only if the board waited for the save.
+    let roleWhenGiven: unknown = null
+    configTestHooks.beforeConfigWrite = async (written) => {
+      if (written !== p || carding) return
+      const state = { given: false }
+      carding = outside(() => here(() => tasks.createTask({ title: 'Given during the save', project: 'alpha', agent: 'a-one', column: 'doing' }, { kind: 'user' }))).then(() => {
+        state.given = true
+        roleWhenGiven = (JSON.parse(readFileSync(join(p, '.combwork', 'project.json'), 'utf8')) as { agents: { id: string; workflowRole?: string }[] }).agents.find((x) => x.id === 'a-one')?.workflowRole
+      })
+      // The save goes on once the card is given, or once its write waits for the board's lock (counted with this
+      // change's own): HR3's probe, which gave it during the save, without waiting on a lock the save holds.
+      const until = Date.now() + HUNG_MS
+      while (!state.given && writesAt(wsPath) < 2 && Date.now() < until) await new Promise((r) => setImmediate(r))
+    }
+    try {
+      await here(() => updateAgent(p, 'a-one', { workflowRole: 'independent' }))
+      await carding
+      // Given once the save was in place, never while it was being made with nothing to confirm.
+      expect(roleWhenGiven).toBe('independent')
+    } finally {
+      configTestHooks.beforeConfigWrite = undefined
+      await here(() => w.updateAgent(p, 'a-one', { workflowRole: 'builder' }))
+    }
+  })
 })

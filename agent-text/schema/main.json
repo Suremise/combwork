@@ -216,10 +216,20 @@
       "cli": "plain"
     }
   },
+  "main.connections.launch.projectsUnread": {
+    "placeholders": {
+      "workspace": "plain"
+    }
+  },
   "main.connections.launch.signedOut": {
     "placeholders": {
       "name": "plain",
       "agent": "plain"
+    }
+  },
+  "main.connections.launch.unreadable": {
+    "placeholders": {
+      "error": "plain"
     }
   },
   "main.connections.nameTaken": {

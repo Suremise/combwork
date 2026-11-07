@@ -84,8 +84,8 @@ export function migrateLaunchPolicy(): void {
 
 /** The lanes and held cards of one agent of an open workspace. */
 async function partsOf(ws: WorkspaceService, project: string, projectPath: string, a: Pick<AgentDef, 'id' | 'name'>): Promise<AffectedAgent | null> {
-  const lanes = (await rawLanes(ws).catch(() => [])).filter((l) => running(l) && l.project.toLowerCase() === project.toLowerCase() && (l.builder.id === a.id || l.reviewer?.id === a.id)).map((l) => l.id)
-  const cards = (await agentCards(project, a.id, ws).catch(() => [])).filter((c) => c.column === 'doing' || c.column === 'review').map((c) => ({ number: c.number, ...(c.key ? { key: c.key } : {}), column: c.column }))
+  const lanes = (await rawLanes(ws)).filter((l) => running(l) && l.project.toLowerCase() === project.toLowerCase() && (l.builder.id === a.id || l.reviewer?.id === a.id)).map((l) => l.id)
+  const cards = (await agentCards(project, a.id, ws)).filter((c) => c.column === 'doing' || c.column === 'review').map((c) => ({ number: c.number, ...(c.key ? { key: c.key } : {}), column: c.column }))
   if (!lanes.length && !cards.length) return null
   return { workspace: ws.path ?? '', project, projectPath, agentId: a.id, agent: a.name, lanes: lanes.sort(), cards: cards.sort((x, y) => x.number - y.number) }
 }
@@ -104,9 +104,12 @@ async function connectionImpact(id: string): Promise<LaunchImpact> {
   const out: AffectedAgent[] = []
   for (const ws of openWorkspaces()) {
     if (!ws.path) continue
-    for (const p of ws.info()?.projects ?? []) {
+    const info = ws.info()
+    // Its projects not known (still opening): nothing can be said to be unaffected.
+    if (!info) throw combworkError(PROJECTS_UNREAD, { workspace: ws.path })
+    for (const p of info.projects) {
       const file = join(p.path, CW_DIR, 'project.json')
-      const cfg = await withFileLock(file, () => readKeptJson<Partial<ProjectConfig>>(file, {})).catch(() => ({}) as Partial<ProjectConfig>)
+      const cfg = await withFileLock(file, () => readKeptJson<Partial<ProjectConfig>>(file, {}))
       for (const a of cfg.agents ?? []) {
         // Already out of the workflow by its own role: the change takes nothing from it.
         if (a.connection !== id || (a.workflowRole === 'independent')) continue
@@ -117,6 +120,8 @@ async function connectionImpact(id: string): Promise<LaunchImpact> {
   }
   return impactOf(out)
 }
+
+const PROJECTS_UNREAD = msg({ id: 'main.connections.launch.projectsUnread', defaultMessage: "the projects of {workspace} aren't read yet", description: "Why Combwork couldn't read what a change of a connection's launch settings affects (HI-2670), put into a longer error in place of {error}: an open workspace's projects ({workspace}: its folder) haven't been read yet. Lower case, no full stop." })
 
 /** Whether a launch change turns a connection's Combwork tools off. */
 const turnsToolsOff = (was: ConnectionLaunch | undefined, next: ConnectionLaunch | undefined): boolean => was?.tools !== false && next?.tools === false
@@ -144,15 +149,8 @@ export function impactToken(): string {
   return JSON.stringify(
     openWorkspaces()
       .filter((ws) => !!ws.path)
-      .map((ws) => [ws.path, safeRevision(ws), ...(ws.info()?.projects ?? []).map((p) => ws.projectConfigWrites(p.path))])
+      .map((ws) => [ws.path, boardRevision(ws), ...(ws.info()?.projects ?? []).map((p) => ws.projectConfigWrites(p.path))])
   )
-}
-function safeRevision(ws: WorkspaceService): string {
-  try {
-    return boardRevision(ws)
-  } catch {
-    return ''
-  }
 }
 
 /** How many times an impact is read again when what it reads changed while it was read. */
@@ -164,13 +162,20 @@ const BUSY = msg({ id: 'main.connections.launch.busy', defaultMessage: 'The boar
  * read, so the set returned, with its token, is what all of it was at one moment.
  */
 async function stableImpact(read: () => Promise<LaunchImpact>): Promise<{ impact: LaunchImpact; token: string }> {
-  for (let i = 0; i < STABLE_TRIES; i++) {
-    const token = impactToken()
-    const impact = await read()
-    if (impactToken() === token) return { impact, token }
+  // Anything that can't be read (a card, a lane, a project's file, the board's revision) refuses the change (HR3 on
+  // s45): only a read that worked may say nobody is affected.
+  try {
+    for (let i = 0; i < STABLE_TRIES; i++) {
+      const token = impactToken()
+      const impact = await read()
+      if (impactToken() === token) return { impact, token }
+    }
+  } catch (e) {
+    throw combworkError(UNREADABLE, { error: e instanceof Error ? e.message : String(e) }, { kind: 'conflict' })
   }
   throw combworkError(BUSY, undefined, { kind: 'conflict' })
 }
+const UNREADABLE = msg({ id: 'main.connections.launch.unreadable', defaultMessage: "Combwork couldn't read which agents, lanes and cards this change affects ({error}), so nothing was saved. Try again.", description: "An error saving a connection's launch settings or an agent's role or connection (HI-2670): reading the board, the lanes or a project's agents failed, so Combwork can't tell whether the change takes agents out of the workflow, and saves nothing. {error} is why, as the system said it." })
 
 /** What saving these launch settings on a connection would take out of the workflow (null: nothing to confirm). */
 export async function launchImpact(id: string, raw: unknown): Promise<LaunchImpact | null> {
@@ -261,24 +266,46 @@ export async function agentImpact(ws: WorkspaceService, projectPath: string, pro
 }
 
 /**
- * What a change of one agent takes out of the workflow, read as one snapshot (HR1 on s44), and the check its write makes
- * under the project's lock, with nothing awaited before it: the snapshot still current, the agent as saved still as it was
- * read (its role and connection), and `confirmed` naming exactly that set. Null: the change makes nobody Independent.
+ * The check an agent's change of role or connection makes under its project's lock, with nothing awaited before it (HR1
+ * on s44, HR3 on s45), read first as one snapshot: the agent as saved still as it was read (its role and connection), so
+ * whether the change makes it Independent is still what was worked out (an agent made a builder meanwhile is refused,
+ * however the change looked when asked); where it does, `confirmed` naming exactly what that takes out of the workflow,
+ * and nothing it reads written since. The caller holds the board's lock from the read through its file's save
+ * (projectAgents.ts), so no card or lane is given to it between.
  */
-export async function agentChangeCheck(ws: WorkspaceService, projectPath: string, project: string, before: AgentDef | undefined, after: Pick<AgentDef, 'name' | 'role' | 'workflowRole' | 'connection'>, confirmed: string | null | undefined): Promise<((current: AgentDef) => void) | null> {
-  if (!before || !inWorkflow(agentWorkflowRole(before)) || inWorkflow(agentWorkflowRole(after))) return null
-  const read = await stableImpact(async () => {
-    const parts = await partsOf(ws, project, projectPath, before)
-    return impactOf(parts ? [parts] : [])
-  })
+export async function agentChangeCheck(ws: WorkspaceService, projectPath: string, project: string, before: AgentDef, change: Partial<Pick<AgentDef, 'workflowRole' | 'connection'>>, confirmed: string | null | undefined): Promise<(current: AgentDef) => void> {
+  const becomes = (a: AgentDef): boolean => inWorkflow(agentWorkflowRole(a)) && !inWorkflow(agentWorkflowRole({ ...a, ...change }))
+  const transition = becomes(before)
+  const read = transition
+    ? await stableImpact(async () => {
+        const parts = await partsOf(ws, project, projectPath, before)
+        return impactOf(parts ? [parts] : [])
+      })
+    : null
   // Checked now too, so a caller that didn't confirm is told at once, with the set and its fingerprint.
-  assertConfirmed(read.impact, confirmed)
+  if (read) assertConfirmed(read.impact, confirmed)
   return (current) => {
-    if (current.workflowRole !== before.workflowRole || current.connection !== before.connection) throw combworkError(AGENT_CHANGED, { agent: current.name }, { kind: 'conflict' })
-    // Anything it reads written since (a card given to it meanwhile, too): refused, to be worked out again.
-    if (impactToken() !== read.token) throw read.impact.agents.length ? combworkError(CHANGED, { agents: impactText(read.impact), fingerprint: read.impact.fingerprint }, { kind: 'conflict' }) : combworkError(BUSY, undefined, { kind: 'conflict' })
+    // Its role or connection changed meanwhile, or its connection's tools since (what the change makes of it now isn't
+    // what was worked out): refused, to be asked again.
+    if (current.workflowRole !== before.workflowRole || current.connection !== before.connection || becomes(current) !== transition) throw combworkError(AGENT_CHANGED, { agent: current.name }, { kind: 'conflict' })
+    if (!read) return
+    // Anything it reads written since (a card given to it meanwhile, too): worked out again by the caller (ImpactMoved).
+    if (impactToken() !== read.token) throw new ImpactMoved()
     assertConfirmed(read.impact, confirmed)
   }
 }
-const AGENT_CHANGED = msg({ id: 'main.connections.launch.agentChanged', defaultMessage: "{agent}'s role or connection was changed meanwhile: nothing was saved. Try again.", description: "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change, which would make it Independent, was being checked, so nothing was saved. {agent} is its name." })
+
+/**
+ * Thrown by agentChangeCheck's check when the board or a project changed between the read and the write: the caller reads
+ * it again and tries once more (a few times), and a fingerprint confirmed before still holds only if the set is the same.
+ */
+export class ImpactMoved extends Error {
+  constructor() {
+    super('what the change affects was written to since it was read') // i18n-ignore: internal, caught and retried (never shown)
+  }
+}
+
+/** Refused after the tries: the board kept changing between reading what a change affects and saving it. */
+export const impactBusy = (): Error => combworkError(BUSY, undefined, { kind: 'conflict' })
+const AGENT_CHANGED = msg({ id: 'main.connections.launch.agentChanged', defaultMessage: "{agent}'s role or connection was changed meanwhile: nothing was saved. Try again.", description: "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change of its role or connection was being checked, so nothing was saved. {agent} is its name." })
 

@@ -10,6 +10,11 @@ const state = vi.hoisted(() => ({
   connections: [] as Connection[],
   agents: [] as Partial<AgentDef>[],
   lanes: [] as Partial<LaneRecord>[],
+  // A read that fails (HR3 on s45): the board's cards, its lanes, or one project's file.
+  failCards: false,
+  failLanes: false,
+  failProject: '' as string,
+  projects: [{ name: 'demo', path: 'C:/ws/demo' }] as { name: string; path: string }[],
   cards: [] as Partial<TaskCard>[],
   emitted: 0,
   // The board's revision (boardRevision), moved by every write a test makes, and what a card read does meanwhile.
@@ -49,21 +54,30 @@ vi.mock('../src/main/accounts', () => ({
 vi.mock('../src/main/boardStore', () => ({ boardRevision: () => String(state.rev) }))
 vi.mock('../src/main/advanced', () => ({ advanced: { overrides: () => ({}), state: () => ({ fileError: null }) } }))
 vi.mock('../src/main/events', () => ({ emit: () => void state.emitted++ }))
-vi.mock('../src/main/lanes', () => ({ rawLanes: async () => state.lanes }))
+vi.mock('../src/main/lanes', () => ({
+  rawLanes: async () => {
+    if (state.failLanes) throw new Error('lanes read unavailable')
+    return state.lanes
+  }
+}))
 vi.mock('../src/main/tasks', () => ({
   agentCards: async (_p: string, id: string) => {
+    if (state.failCards) throw new Error('board read unavailable')
     const now = state.cards.filter((c) => c.agent === id)
     state.duringCardRead?.(id)
     return now
   }
 }))
 vi.mock('../src/main/workspace', () => ({
-  openWorkspaces: () => [{ path: 'C:/ws', info: () => ({ projects: [{ name: 'demo', path: 'C:/ws/demo' }] }), projectConfigWrites: () => 0, refresh: async () => undefined }]
+  openWorkspaces: () => [{ path: 'C:/ws', info: () => ({ projects: state.projects }), projectConfigWrites: () => 0, refresh: async () => undefined }]
 }))
 vi.mock('../src/main/fsutil', async (orig) => ({
   ...(await orig<typeof import('../src/main/fsutil')>()),
   withFileLock: async (_f: string, fn: () => unknown) => fn(),
-  readKeptJson: async () => ({ agents: state.agents })
+  readKeptJson: async (file: string) => {
+    if (state.failProject && file.includes(state.failProject)) throw new Error('project.json unreadable')
+    return { agents: file.includes('demo') ? state.agents : [] }
+  }
 }))
 
 const { agentChangeCheck, changeConnection, launchImpact, setConnectionLaunch, ownRunOverride } = await import('../src/main/connectionLaunch')
@@ -81,6 +95,10 @@ beforeEach(() => {
   state.rev = 0
   state.duringCardRead = null
   state.valuesSaved = []
+  state.failCards = false
+  state.failLanes = false
+  state.failProject = ''
+  state.projects = [{ name: 'demo', path: 'C:/ws/demo' }]
 })
 
 describe('turning a connection\'s tools off', () => {
@@ -190,28 +208,56 @@ describe('HR1 on s44: what a change affects is one snapshot, checked at the writ
 describe("HR1 on s44: an agent made Independent is checked again under its project's lock", () => {
   const hb1 = { id: 'b1', name: 'HB1', workflowRole: 'builder' as const, connection: 'c-1' }
   const ws = { path: 'C:/ws', info: () => ({ projects: [] }), projectConfigWrites: () => 0 } as never
-  const fingerprint = async (): Promise<string> => /confirm: ([0-9a-f]+)/.exec(String(await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, null).catch((e: Error) => e.message)))![1]
+  const fingerprint = async (): Promise<string> => /confirm: ([0-9a-f]+)/.exec(String(await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { workflowRole: 'independent' }, null).catch((e: Error) => e.message)))![1]
 
   it('needs the fingerprint of its lanes and cards, at once and again at the write', async () => {
-    await expect(agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, null)).rejects.toThrow(/HB1 \(lane-1, DE-7 doing\).*confirm: [0-9a-f]+/)
-    const check = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, await fingerprint()))!
+    await expect(agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { workflowRole: 'independent' }, null)).rejects.toThrow(/HB1 \(lane-1, DE-7 doing\).*confirm: [0-9a-f]+/)
+    const check = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { workflowRole: 'independent' }, await fingerprint()))!
     expect(() => check(hb1)).not.toThrow()
   })
 
   it('refuses at the write when a card was given to it after the read, or its role or connection changed meanwhile', async () => {
-    const check = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, await fingerprint()))!
+    const check = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { workflowRole: 'independent' }, await fingerprint()))!
     give({ number: 9, key: 'DE-9', agent: 'b1', column: 'review' })
-    expect(() => check(hb1)).toThrow(/changed since you were asked/)
+    // Read again by its caller (updateAgent tries a few times): never saved on the old read.
+    expect(() => check(hb1)).toThrow(/written to since it was read/)
     state.rev = 0
     expect(() => check({ ...hb1, connection: 'c-2' })).toThrow(/changed meanwhile/)
     // An agent holding nothing: no confirmation, and still refused when the board moved before the write.
     state.lanes = []
     state.cards = []
-    const free = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'independent' }, null))!
+    const free = (await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { workflowRole: 'independent' }, null))!
     expect(() => free(hb1)).not.toThrow()
     give({ number: 10, key: 'DE-10', agent: 'b1', column: 'doing' })
-    expect(() => free(hb1)).toThrow(/kept changing/)
-    // A change that makes nobody Independent needs no check.
-    expect(await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { ...hb1, workflowRole: 'reviewer' }, null)).toBeNull()
+    expect(() => free(hb1)).toThrow(/written to since it was read/)
+    // A change that makes nobody Independent needs no confirmation, but is still checked against the agent as saved.
+    const plain = await agentChangeCheck(ws, 'C:/ws/demo', 'demo', hb1, { workflowRole: 'reviewer' }, null)
+    expect(() => plain(hb1)).not.toThrow()
+    expect(() => plain({ ...hb1, workflowRole: 'either' })).toThrow(/changed meanwhile/)
+  })
+})
+
+describe('HR3 on s45: an affected set that can\'t be read never lets the change through', () => {
+  for (const [what, fail] of [
+    ['the cards', () => void (state.failCards = true)],
+    ['the lanes', () => void (state.failLanes = true)],
+    ["one of two projects' files", () => {
+      state.projects = [{ name: 'demo', path: 'C:/ws/demo' }, { name: 'other', path: 'C:/ws/other' }]
+      state.failProject = 'other'
+    }]
+  ] as const) {
+    it(`refuses turning tools off when ${what} can't be read, changing nothing`, async () => {
+      fail()
+      await expect(launchImpact('c-1', { tools: false })).rejects.toThrow(/couldn't read which agents, lanes and cards/)
+      await expect(changeConnection('c-1', { values: { model: 'opus' }, launch: { tools: false } })).rejects.toThrow(/couldn't read which agents, lanes and cards/)
+      expect(state.connections[0]).toEqual({ id: 'c-1', account: 'acc', name: 'Claude' })
+      expect(state.valuesSaved).toEqual([])
+    })
+  }
+
+  it("refuses an agent's change to Independent when its cards can't be read", async () => {
+    state.failCards = true
+    const hb1 = { id: 'b1', name: 'HB1', workflowRole: 'builder' as const, connection: 'c-1' }
+    await expect(agentChangeCheck({ path: 'C:/ws', info: () => ({ projects: [] }), projectConfigWrites: () => 0 } as never, 'C:/ws/demo', 'demo', hb1, { workflowRole: 'independent' }, null)).rejects.toThrow(/couldn't read/)
   })
 })
