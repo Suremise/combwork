@@ -22,9 +22,12 @@
 // Whatever it can't tell keeps every related test, with a reason. For a changed file (narrowChange's `all`): not code,
 // added or deleted, unparseable in either revision, a changed line outside every unit (module code, an import that
 // isn't type-only, a constructor) or in a class's field (set as an instance is made), its own module code naming a
-// changed unit (run as it loads), or a unit with no name. For a test: the import graph read here reaching no changed
-// file from it (Vitest followed a way this doesn't), or a file it loads listing keys by reflection
-// (Object.getOwnPropertyNames, Reflect.ownKeys, Object.getOwnPropertyDescriptors: a method by no name). A changed
+// changed unit (run as it loads), or a unit with no name. For a test: a file it loads whose own imports can't all be
+// known (importGraph's unknownOf: a path worked out at run time, one not in the repository, a file unreadable or
+// unparseable), whatever else of it reaches the change; the import graph read here reaching no changed file from it
+// (Vitest followed a way this doesn't); or a file it loads listing keys by reflection (Object.getOwnPropertyNames,
+// Reflect.ownKeys, Object.getOwnPropertyDescriptors: a method by no name). Whether a file uses the changed module whole
+// is by the graph's resolution of its specifiers (a directory's index, `.js` for `.ts`), not by a file name. A changed
 // `import type` counts for nothing: it is erased before a test runs, and typecheck checks it. Changed test files and
 // UNIT_SCANS' picks are affected.mjs's, whatever this leaves out. tests/relatedTests.test.ts checks each rule.
 import { parse } from '@babel/parser'
@@ -36,9 +39,8 @@ import { codeLines, gitChangedLines, gitRevision, unitsOf } from './affectedUnit
 const traverse = traverseModule.default ?? traverseModule
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 
-/** The files a code file can import (resolve's targets): a module, JSON, or a worker. */
+/** The files whose imports are read: code. Any file can be imported (JSON, a stylesheet, `?raw` text). */
 const CODE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/i
-const IMPORTABLE = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|json)$/i
 const EXTENSIONS = ['', '.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs', '.json', '/index.ts', '/index.tsx', '/index.js', '/index.mjs']
 /**
  * vitest.config.ts's aliases: a bare specifier to a repo path, or null (a package). Electron's stub imports none of
@@ -88,21 +90,138 @@ export function resolveSpecifier(from, spec, known) {
   return null
 }
 
+/** A path a specifier may name in the repository: relative, or by an alias (a package's isn't). */
+const repoPath = (s) => s.startsWith('.') || Object.keys(ALIASES).some((a) => s === a || s.startsWith(`${a}/`))
+/** Text that may load a module by a path the text search can't read: parsed to tell (a comment or a string is nothing). */
+const MAYBE_COMPUTED = /\b(?:import|require)\s*\(\s*[^\s'"]|import\.meta\.glob|createRequire/
+
+/** A glob of import.meta.glob, from a file, as a RegExp over repo paths (lower case); a negated one is none. */
+function globRegex(from, glob) {
+  if (glob.startsWith('!')) return null
+  const dir = slashes(from).replace(/\/?[^/]*$/, '')
+  const parts = dir ? dir.split('/') : []
+  for (const seg of glob.split('/')) {
+    if (seg === '.' || seg === '') continue
+    if (seg === '..') parts.pop()
+    else parts.push(seg)
+  }
+  let re = ''
+  const g = lower(parts.join('/'))
+  for (let i = 0; i < g.length; i++) {
+    const c = g[i]
+    if (c === '*' && g[i + 1] === '*') {
+      re += '.*'
+      i++
+    } else if (c === '*') re += '[^/]*'
+    else if (c === '?') re += '[^/]'
+    else if (c === '{') re += '('
+    else if (c === '}') re += ')'
+    else if (c === ',') re += '|'
+    else re += esc(c)
+  }
+  return new RegExp(`^${re}$`)
+}
+
 /**
- * The import graph of a revision's code files: { known, closure(file) }. files: the repo's paths (only those IMPORTABLE
- * count); read(file): its text or null; prefetch(files): reads them ahead (gitRevision's), optional. closure(f): f and
- * every file its imports reach. Imports are found by text (comments too: an edge too many only keeps a test).
+ * The modules a file loads that its text alone doesn't show, by parsing it: { edges, unknown } (unknown: why the file's
+ * imports can't all be known: a path worked out at run time, one not in the repository, a glob that isn't a literal,
+ * or the file not parsing). import.meta.glob's literal globs are edges to the files they match (a negated one is
+ * ignored: more edges, never fewer).
+ */
+function parsedPaths(text, file, known) {
+  const edges = new Set()
+  let unknown = null
+  const unsure = (why) => {
+    unknown ??= why
+  }
+  let ast
+  try {
+    ast = parse(text, { sourceType: 'unambiguous', plugins: [...(/\.(ts|tsx|mts|cts)$/i.test(file) ? [['typescript', { dts: /\.d\.ts$/i.test(file) }]] : []), ...(/\.(tsx|jsx|js|mjs|cjs)$/i.test(file) ? ['jsx'] : [])], errorRecovery: false, allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true })
+  } catch (e) {
+    return { edges, unknown: `doesn't parse (${e.message}), so what it loads isn't known` }
+  }
+  const literal = (n) => (n?.type === 'StringLiteral' ? n.value : n?.type === 'TemplateLiteral' && !n.expressions.length ? n.quasis[0].value.cooked : null)
+  const to = (spec, node) => {
+    const t = resolveSpecifier(file, spec, known)
+    if (t) edges.add(t)
+    else if (repoPath(spec)) unsure(`loads ${spec} (line ${node.loc?.start.line ?? '?'}), which isn't in the repository`)
+  }
+  const load = (arg, node) => {
+    const spec = literal(arg)
+    if (spec == null) unsure(`loads a module by a path worked out at run time (line ${node.loc?.start.line ?? '?'})`)
+    else to(spec, node)
+  }
+  const requires = new Set(['require'])
+  const isCreateRequire = (n) => n?.type === 'CallExpression' && n.callee?.type === 'Identifier' && n.callee.name === 'createRequire'
+  traverse(ast, {
+    VariableDeclarator(p) {
+      if (p.node.id.type === 'Identifier' && isCreateRequire(p.node.init)) requires.add(p.node.id.name)
+    }
+  })
+  traverse(ast, {
+    'ImportDeclaration|ExportAllDeclaration|ExportNamedDeclaration'(p) {
+      if (p.node.source) to(p.node.source.value, p.node)
+    },
+    ImportExpression(p) {
+      load(p.node.source, p.node)
+    },
+    CallExpression(p) {
+      const n = p.node
+      const c = n.callee
+      const vi = c.type === 'MemberExpression' && c.object?.type === 'Identifier' && c.object.name === 'vi' && !c.computed && ['mock', 'doMock', 'importActual', 'importMock'].includes(c.property.name)
+      const glob = c.type === 'MemberExpression' && !c.computed && c.property.name === 'glob' && c.object?.type === 'MetaProperty'
+      if (c.type === 'Import' || (c.type === 'Identifier' && requires.has(c.name)) || isCreateRequire(c) || vi) load(n.arguments[0], n)
+      else if (glob) {
+        const arg = n.arguments[0]
+        const globs = arg?.type === 'ArrayExpression' ? arg.elements.map(literal) : [literal(arg)]
+        if (globs.some((g) => g == null)) unsure(`globs modules by a pattern worked out at run time (line ${n.loc?.start.line ?? '?'})`)
+        else {
+          for (const g of globs) {
+            const re = globRegex(file, g)
+            if (re) for (const [k, f] of known) if (re.test(k)) edges.add(f)
+          }
+        }
+      }
+    }
+  })
+  return { edges, unknown }
+}
+
+/**
+ * The import graph of a revision's files: { known, closure(file), edgesOf(file), unknownOf(file) }. files: the repo's
+ * paths; read(file): its text or null; prefetch(files): reads them ahead (gitRevision's), optional. closure(f): f and
+ * every file its imports reach. Imports are found by text (comments too: an edge too many only keeps a test), and by
+ * parsing a file whose text may load modules otherwise (a computed import() or require(), createRequire,
+ * import.meta.glob) or names a path the text search can't resolve. unknownOf(f): why f's imports can't all be known (a
+ * path worked out at run time, one not in the repository, its text unreadable or unparseable), or null.
  */
 export function importGraph(files, read, prefetch) {
-  const known = new Map(files.map(slashes).filter((f) => IMPORTABLE.test(f)).map((f) => [lower(f), f]))
+  const known = new Map(files.map(slashes).map((f) => [lower(f), f]))
   prefetch?.([...known.values()].filter((f) => CODE.test(f)))
-  const imports = new Map()
-  const edges = (f) => {
-    if (!imports.has(f)) {
-      const text = CODE.test(f) ? read(f) ?? '' : ''
-      imports.set(f, new Set(specifiersOf(text).map((s) => resolveSpecifier(f, s, known)).filter(Boolean)))
+  const info = new Map()
+  const infoOf = (f) => {
+    if (info.has(f)) return info.get(f)
+    const r = { edges: new Set(), unknown: null }
+    info.set(f, r)
+    if (!CODE.test(f)) return r
+    const text = read(f)
+    if (text == null) {
+      r.unknown = `${f} couldn't be read, so what it loads isn't known`
+      return r
     }
-    return imports.get(f)
+    const specs = specifiersOf(text)
+    let unresolved = false
+    for (const s of specs) {
+      const t = resolveSpecifier(f, s, known)
+      if (t) r.edges.add(t)
+      else if (repoPath(s)) unresolved = true
+    }
+    if (unresolved || MAYBE_COMPUTED.test(text)) {
+      const p = parsedPaths(text, f, known)
+      for (const e of p.edges) r.edges.add(e)
+      if (p.unknown) r.unknown = `${f} ${p.unknown}`
+    }
+    return r
   }
   const closures = new Map()
   const closure = (start) => {
@@ -110,7 +229,7 @@ export function importGraph(files, read, prefetch) {
     const seen = new Set([start])
     const queue = [start]
     while (queue.length) {
-      for (const g of edges(queue.shift())) {
+      for (const g of infoOf(queue.shift()).edges) {
         if (seen.has(g)) continue
         seen.add(g)
         queue.push(g)
@@ -119,7 +238,7 @@ export function importGraph(files, read, prefetch) {
     closures.set(start, seen)
     return seen
   }
-  return { known, closure }
+  return { known, closure, edgesOf: (f) => infoOf(f).edges, unknownOf: (f) => infoOf(f).unknown }
 }
 
 /** Whether a file's text names a word: an identifier's boundaries, so `setAdvanced` isn't found in `setAdvancedAll`. */
@@ -232,15 +351,14 @@ function namesOf(parsed, unit) {
 }
 
 /**
- * How a file loads a module (repo path) in a way a name search can't follow: why, or null. `export *` of it; an
- * `import * as` or default import of it used other than as `mod.name` (or a literal key) or in a type; `require` or
- * `import()` of it not taken apart at once (`const { a } = …`, `(…).a`).
+ * How a file loads a module in a way a name search can't follow: why, or null. module: its repo path, for the reasons;
+ * isModule(spec): whether a specifier in the file is that module, as the import graph resolves it (`../src/service` for
+ * src/service/index.ts, `./x.js` for x.ts). `export *` of it; an `import * as` or default import of it used other than as
+ * `mod.name` (or a literal key) or in a type; `require` or `import()` of it not taken apart at once (`const { a } = …`,
+ * `(…).a`); vi.importActual or vi.importMock of it; vi.mock of it from its original.
  */
-export function wholeUse(text, file, module) {
-  const stem = esc(module.replace(/^.*\//, '').replace(/\.[^.]+$/, ''))
-  const src = new RegExp(`(^|/)${stem}(\\.[a-z]+)?$`, 'i')
-  const named = new RegExp(`['"\`][^'"\`\\n]*/${stem}(\\.[a-z]+)?['"\`]`, 'i')
-  if (!named.test(text)) return null
+export function wholeUse(text, file, module, isModule) {
+  const src = { test: (spec) => typeof spec === 'string' && isModule(spec) }
   let ast
   try {
     ast = parse(text, { sourceType: 'unambiguous', plugins: [...(/\.(ts|tsx|mts|cts)$/i.test(file) ? [['typescript', { dts: /\.d\.ts$/i.test(file) }]] : []), ...(/\.(tsx|jsx|js|mjs|cjs)$/i.test(file) ? ['jsx'] : [])], errorRecovery: false, allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true })
@@ -321,13 +439,21 @@ export function narrowRelated({ related, changes, graph, read, setupFiles = [] }
   const whole = new Map()
   const wholeOf = (f, module) => {
     const k = `${f}\0${module}`
-    if (!whole.has(k)) whole.set(k, CODE.test(f) ? wholeUse(textOf(f), f, module) : null)
+    // Only a file importing it directly can use it whole (a barrel re-exporting it whole is one, and checked as such).
+    if (!whole.has(k)) whole.set(k, CODE.test(f) && graph.edgesOf(f).has(module) ? wholeUse(textOf(f), f, module, (spec) => resolveSpecifier(f, spec, graph.known) === module) : null)
     return whole.get(k)
   }
   const setup = setupFiles.flatMap((s) => [...graph.closure(s)])
-  const reasons = { all: new Map(), graph: 0, whole: new Map(), reflection: new Map(), named: 0 }
+  const reasons = { all: new Map(), graph: 0, unknown: new Map(), whole: new Map(), reflection: new Map(), named: 0 }
   for (const test of [...new Set(related.map(slashes))]) {
     const files = new Set([...graph.closure(graph.known.get(lower(test)) ?? test), ...setup])
+    // A file it loads whose own imports aren't all known may load the change: its closure isn't the whole of it.
+    const unsure = [...files].map((f) => graph.unknownOf(f)).find(Boolean)
+    if (unsure) {
+      keep.push(test)
+      reasons.unknown.set(unsure, (reasons.unknown.get(unsure) ?? 0) + 1)
+      continue
+    }
     const reached = [...files].map((f) => changed.get(lower(f))).filter(Boolean)
     if (!reached.length) {
       keep.push(test)
@@ -370,7 +496,12 @@ export function narrowRelated({ related, changes, graph, read, setupFiles = [] }
   for (const c of changed.values()) why.push(c.all ?? `${c.why}${c.needles.length ? ` (searched: ${few(c.needles.map((n) => n.name))})` : ''}`)
   if (reasons.named) why.push(`${reasons.named} related test files load a file naming what changed`)
   if (reasons.graph) why.push(`${reasons.graph} related test files kept: the imports read here don't reach a changed file from them`)
-  for (const kind of ['all', 'whole', 'reflection']) for (const [r, n] of reasons[kind]) why.push(`${n} related test files kept: ${r}`)
+  // Bounded: a reason a line, at most a few of each kind (the picker's diagnostics are kept to a few KB).
+  for (const kind of ['all', 'unknown', 'whole', 'reflection']) {
+    const rows = [...reasons[kind]]
+    for (const [r, n] of rows.slice(0, 8)) why.push(`${n} related test files kept: ${r}`)
+    if (rows.length > 8) why.push(`${rows.slice(8).reduce((a, [, n]) => a + n, 0)} more related test files kept for ${rows.length - 8} more such reasons`)
+  }
   if (dropped.length) why.push(`${dropped.length} related test files left out: nothing they load names what changed`)
   return { keep: keep.sort(), dropped: dropped.sort(), why }
 }

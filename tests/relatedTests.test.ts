@@ -201,8 +201,69 @@ describe('the related tests a change keeps', () => {
   })
 })
 
+describe('a module the graph resolves, or loads it cannot know (HR3, round 1)', () => {
+  const SERVICE = 'export function fa(): number {\n  return 1\n}\nexport function fb(): number {\n  return 2\n}\n'
+  const base: Files = {
+    'src/service/index.ts': SERVICE,
+    'src/main/types.ts': FILES['src/main/types.ts'],
+    'src/main/lib.ts': LIB,
+    'src/main/useB.ts': FILES['src/main/useB.ts'],
+    'src/main/data/a.json': '{}',
+    ...t('svcDir', "import * as svc from '../src/service'\nit('s', () => (svc as unknown as Record<string, () => number>)[process.env.KEY!]())\n"),
+    ...t('svcDirByName', "import * as svc from '../src/service'\nit('s', () => svc.fb())\n"),
+    ...t('libJs', "import * as lib from '../src/main/lib.js'\nit('l', () => (lib as unknown as Record<string, () => number>)[process.env.KEY!]())\n"),
+    ...t('otherComputed', "import * as u from '../src/main/useB'\nit('o', () => (u as unknown as Record<string, () => number>)[process.env.KEY!]())\n"),
+    ...t('mixed', "import { fb } from '../src/main/lib'\nit('m', async () => { const p = '../src/main/' + 'lib'; const ns = await import(p); ns[process.env.KEY!](); fb() })\n"),
+    ...t('literalLookup', "import { fb } from '../src/main/lib'\nit('m', async () => { const { fb: b } = await import('../src/main/lib'); const t: Record<string, number> = {}; void t[`x:${b()}`]; fb() })\n"),
+    ...t('missing', "import { fb } from '../src/main/lib'\nimport { gone } from '../src/main/gone'\nit('m', () => fb() + gone())\n"),
+    ...t('created', "import { createRequire } from 'module'\nconst req = createRequire(import.meta.url)\nit('c', () => req('../src/main/lib').fb())\n"),
+    ...t('createdComputed', "import { createRequire } from 'module'\nimport { fb } from '../src/main/lib'\nconst req = createRequire(import.meta.url)\nit('c', () => req(process.env.P!) && fb())\n"),
+    ...t('globbed', "import { fb } from '../src/main/lib'\nconst DATA = import.meta.glob('../src/main/data/*.json', { eager: true })\nit('g', () => fb() + Object.keys(DATA).length)\n"),
+    ...t('globComputed', "import { fb } from '../src/main/lib'\nconst DATA = import.meta.glob(process.env.G!)\nit('g', () => fb() + Object.keys(DATA).length)\n")
+  }
+  it('a directory or .js import of the changed module, used whole, keeps the test; by name, or another module whole, leaves it out', () => {
+    const svc = narrow(base, { ...base, 'src/service/index.ts': SERVICE.replace('return 1', 'return 10') })
+    expect(svc.keep).toEqual(['tests/svcDir.test.ts'])
+    expect(svc.dropped).toEqual(['tests/svcDirByName.test.ts'])
+    expect(svc.why.join('\n')).toMatch(/tests\/svcDir\.test\.ts uses src\/service\/index\.ts whole as svc/)
+    const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
+    expect(lib.keep).toContain('tests/libJs.test.ts')
+    expect(lib.dropped).toContain('tests/otherComputed.test.ts')
+  })
+  it('a module loaded by a path worked out at run time, or not in the repository, keeps the test, though another import reaches the change', () => {
+    const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
+    for (const k of ['mixed', 'missing', 'createdComputed', 'globComputed']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)
+    const why = lib.why.join('\n')
+    expect(why).toMatch(/tests\/mixed\.test\.ts loads a module by a path worked out at run time \(line 2\)/)
+    expect(why).toMatch(/tests\/missing\.test\.ts loads \.\.\/src\/main\/gone \(line 2\), which isn't in the repository/)
+    expect(why).toMatch(/globs modules by a pattern worked out at run time/)
+    // A literal import() taken apart by name, and an unrelated built-key lookup, leave it out.
+    expect(lib.dropped).toContain('tests/literalLookup.test.ts')
+  })
+  it("createRequire's and import.meta.glob's literal paths are edges", () => {
+    const g = importGraph(Object.keys(base), (f: string) => base[f])
+    expect([...g.closure('tests/created.test.ts')]).toContain('src/main/lib.ts')
+    expect([...g.closure('tests/globbed.test.ts')]).toContain('src/main/data/a.json')
+    expect(g.unknownOf('tests/created.test.ts')).toBeNull()
+    expect(g.unknownOf('tests/globbed.test.ts')).toBeNull()
+    // So a change to the data a glob loads reaches the test (and, not code, keeps it), whatever else it imports.
+    expect(narrow(base, { ...base, 'src/main/data/a.json': '{"a":1}' }).keep).toContain('tests/globbed.test.ts')
+  })
+  it("a file it loads that can't be read keeps the test", () => {
+    const head = { ...base, 'src/main/lib.ts': LIB_FA }
+    const graph = importGraph([...Object.keys(head), 'src/main/useB.ts'], (f: string) => (f === 'src/main/useB.ts' ? null : head[f] ?? null))
+    expect(graph.unknownOf('src/main/useB.ts')).toMatch(/couldn't be read/)
+    const r = narrowRelated({ related: ['tests/otherComputed.test.ts'], changes: { 'src/main/lib.ts': change('src/main/lib.ts', base, head) }, graph, read: (f: string) => head[f] ?? null }) as Narrowed
+    expect(r.keep).toEqual(['tests/otherComputed.test.ts'])
+  })
+  it('a comment or a string that only looks like a computed import is nothing', () => {
+    const files: Files = { 'src/a.ts': "// import (#1106): a note\nconst s = 'require(x)'\nexport const a = 1\n" }
+    expect(importGraph(Object.keys(files), (f: string) => files[f]).unknownOf('src/a.ts')).toBeNull()
+  })
+})
+
 describe('using a module whole', () => {
-  const use = (text: string): string | null => wholeUse(text, 'tests/x.test.ts', 'src/main/lib.ts')
+  const use = (text: string): string | null => wholeUse(text, 'tests/x.test.ts', 'src/main/lib.ts', (spec: string) => spec === '../src/main/lib')
   it('safe: by name, in types, taken apart at once, or not this module', () => {
     expect(use("import * as lib from '../src/main/lib'\nlib.fa(); lib['fb']()\ntype L = typeof lib\n")).toBeNull()
     expect(use("const { fa } = await import('../src/main/lib')\nconst b = (await import('../src/main/lib')).fb\nconst { fb } = require('../src/main/lib')\n")).toBeNull()

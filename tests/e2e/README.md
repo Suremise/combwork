@@ -397,8 +397,11 @@ so a key built at run time can still reach the part only through something named
 related test**, with a reason in the picker's output: a changed file that isn't code, is added, deleted or unparseable,
 has a changed line outside every function, method or entry (module code, an import that isn't type-only, a
 constructor) or in a class's field, or whose module code names a changed part; a test the graph doesn't connect to the
-change; one loading a file that uses the module whole (`import * as` other than `mod.name`, `export *`, a `require` or
-`import()` not taken apart by name, `vi.importActual`, `vi.mock` from the original) or lists keys by reflection. A
+change; one loading a file whose imports can't all be known (a path worked out at run time, one not in the repository,
+a file it can't read or parse), whatever else reaches the change; one loading a file that uses the module whole, as the
+graph resolves its imports (`import * as` other than `mod.name`, `export *`, a `require` or `import()` not taken apart
+by name, `vi.importActual`, `vi.mock` from the original) or lists keys by reflection. `import.meta.glob`'s and
+`createRequire`'s literal paths are edges like any import. A
 changed `import type` counts for nothing. A `WorkspaceService` member keeps nearly every test of main, since nearly
 every one names `workspace`: narrowing those by which receivers can be one is HI-2678. When the e2e side is every
 suite the pick is still `{"every":true}`, unchanged.
