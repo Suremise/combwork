@@ -5,6 +5,9 @@
 // tests/e2e/README.md). Suites that start a real CLI (the real tier) are picked only when a change touches what they
 // cover (an area naming them, or REAL_TIER), which is when a merge also needs the real tier. tests/e2esuites.test.ts
 // checks that every suite is in an area, every source file is covered, and what no area names falls back to every suite.
+// Some EVERYTHING files are selected by the parts of them a change touches instead (HI-2659): SPLIT in affectedUnits.mjs,
+// whose selection --affected and the picker work out from the diff (splitSelections) and pass to affectedSuites as
+// `units`; without it, or when it can't follow a change (affectedUnits.mjs says when), they select every suite.
 //
 // `node tests/e2e/affected.mjs --pick` is this repository's focused-test picker (HI-1367, the merge queue's "each
 // card's focused tests"): see pickTests and UNIT_SCANS below. Imported (run.mjs, the unit tests), it does nothing.
@@ -12,12 +15,18 @@ import { execFileSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
 import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
+import { gitChangedLines, gitRevision, splitOf, unitSelection } from './affectedUnits.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
 
 const runContext = createRequire(import.meta.url)('./runContext.cjs')
 
-/** Changes to these touch everything (the IPC contract, types, the store, the shell, the test harness): every suite. */
+/**
+ * Changes to these touch everything (the IPC contract, types, the store, the shell, the test harness): every suite. The
+ * SPLIT ones (affectedUnits.mjs: ipc.ts, shared/api.ts, actions.ts, commands.ts, workspace.ts, runner.mjs) only when
+ * their changed parts can't be followed. A file leaves this list for SPLIT, a card at a time, once its parts have callers
+ * a name search can find.
+ */
 export const EVERYTHING = [
   'src/main/index.ts',
   'src/main/ipc.ts',
@@ -81,6 +90,7 @@ export const EVERYTHING = [
   'tests/e2e/fake-bridge.cjs',
   'tests/e2e/suites.mjs',
   'tests/e2e/affected.mjs',
+  'tests/e2e/affectedUnits.mjs',
   'tests/e2e/record.mjs',
   'tests/e2e/runner.mjs',
   'tests/e2e/build.mjs',
@@ -658,7 +668,7 @@ const PROVIDER_OWN = ['src/main/providers/claude/', 'src/main/providers/codex/',
  * { suites, why } (why: a line per reason). A real-CLI suite is needed when an area names it, its own file changed, or
  * a file in REAL_TIER (or one no area names) changed. Only DOCS_ONLY files and unit tests select nothing.
  */
-export function affectedSuites(files, suiteNames, realNames = []) {
+export function affectedSuites(files, suiteNames, realNames = [], units = {}) {
   const picked = new Set()
   const why = []
   let all = null
@@ -673,9 +683,17 @@ export function affectedSuites(files, suiteNames, realNames = []) {
     }
     if (under(file, REAL_TIER) && !under(file, PROVIDER_OWN)) allReal ??= `${file}: every real-CLI suite`
     const areas = AREAS.filter((a) => under(file, a.paths))
-    for (const a of areas) for (const s of a.suites) picked.add(s)
+    // A SPLIT file (affectedUnits.mjs), by the units its change touches, when the caller worked them out (its areas'
+    // suites are in that, when its change needs them).
+    const u = units[file]
+    if (!u || u.all) for (const a of areas) for (const s of a.suites) picked.add(s)
     if (under(file, EVERYTHING)) {
-      all ??= `${file}: shared by every part of Combwork`
+      if (u && !u.all) {
+        for (const s of u.suites) picked.add(s)
+        why.push(`${file}: by its changed parts: ${u.suites.length ? [...new Set(u.suites)].join(', ') : 'no suite'}`, ...u.why.map((w) => `  ${w}`))
+        continue
+      }
+      all ??= u?.all ?? `${file}: shared by every part of Combwork`
       continue
     }
     if (areas.length) {
@@ -690,6 +708,42 @@ export function affectedSuites(files, suiteNames, realNames = []) {
   const real = realNames.filter((n) => allReal || picked.has(n))
   if (all) return { all: true, why: [all, ...(allReal ? [allReal] : [])], real }
   return { suites: suiteNames.filter((n) => picked.has(n) || (allReal && realNames.includes(n))), why: [...why, ...(allReal ? [allReal] : [])] }
+}
+
+/**
+ * How a file that names a changed unit of a SPLIT file counts (affectedUnits.mjs): as it would changed itself, without
+ * the real tier: { suites, why } (its own suite, its areas'), { all: why } (shared by everything, or in no area), or
+ * null (docs and unit tests: no suite).
+ */
+export function placeReference(file, suiteNames) {
+  const f = file.replace(/\\/g, '/')
+  const own = /^tests\/e2e\/([^/]+)\.cjs$/i.exec(f)
+  if (own && suiteNames.includes(own[1])) return { suites: [own[1]] }
+  if (under(f, EVERYTHING)) return { all: 'shared by every part of Combwork' }
+  const suites = [...new Set(AREAS.filter((a) => under(f, a.paths)).flatMap((a) => a.suites))]
+  if (suites.length) return { suites }
+  if (under(f, DOCS_ONLY) || unitTest(f)) return null
+  return { all: 'which no area names' }
+}
+
+/**
+ * The unit selections (affectedUnits.mjs) of the SPLIT files among files, changed from base (a commit) to head (a
+ * commit, or null: the working tree, as --affected and the picker see it): { file: unitSelection's result }, for
+ * affectedSuites' units. Errors don't escape: a file it can't work out selects every suite, saying why.
+ */
+export function splitSelections(files, { cwd = process.cwd(), base, head = null, suiteNames }) {
+  const out = {}
+  const split = [...new Set(files.map((f) => f.replace(/\\/g, '/')))].filter((f) => splitOf(f))
+  if (!split.length) return out
+  const revs = { base: gitRevision(cwd, base), head: gitRevision(cwd, head) }
+  for (const file of split) {
+    try {
+      out[file] = unitSelection({ file, ...revs, lines: gitChangedLines(cwd, base, head, file), place: (f) => placeReference(f, suiteNames), areaSuites: (f) => [...new Set(AREAS.filter((a) => under(f, a.paths)).flatMap((a) => a.suites))] })
+    } catch (e) {
+      out[file] = { all: `${file}: its changed parts couldn't be worked out (${e.message}), so every suite`, suites: [], why: [] }
+    }
+  }
+  return out
 }
 
 const gitLines = (cwd, ...a) => execFileSync('git', a, { cwd, encoding: 'utf8', env: runContext.baseEnv() }).split(/\r?\n/).filter(Boolean)
@@ -856,9 +910,9 @@ export const isUnitTestFile = (f) => /^tests\/(?:[^/]+\/)*[^/]+\.test\.ts$/.test
  * (realNames: the real tier's, packagedNames: the installer's); vitestRelated: the unit test files Vitest's import
  * graph relates to the change. Unit tests first (sorted), then suites (in suites' order).
  */
-export function pickTests({ paths, added = [], deleted = [], diffLines = {}, suites, realNames = [], packagedNames = [], vitestRelated = [] }) {
+export function pickTests({ paths, added = [], deleted = [], diffLines = {}, suites, realNames = [], packagedNames = [], vitestRelated = [], units = {} }) {
   const files = [...new Set(paths.map(slashes).filter(Boolean))]
-  const affected = affectedSuites(files, suites, realNames)
+  const affected = affectedSuites(files, suites, realNames, units)
   if (affected.all) return { every: true, why: affected.why }
   const unit = unitPicks({ paths: files, added, deleted, diffLines, vitestRelated })
   const tests = [
@@ -952,9 +1006,11 @@ async function pickCli() {
   const suites = SUITES.map((s) => s.name)
   const realNames = SUITES.filter(isRealCli).map((s) => s.name)
   const packagedNames = SUITES.filter((s) => (s.needs ?? []).includes('packaged')).map((s) => s.name)
+  // The SPLIT files by their changed parts (the checkout is the revision: its working tree against the base).
+  const units = splitSelections(paths, { cwd, base, head: null, suiteNames: suites })
   // Every suite: no need to look further.
-  if (affectedSuites(paths, suites, realNames).all) {
-    const picked = pickTests({ paths, suites, realNames, packagedNames })
+  if (affectedSuites(paths, suites, realNames, units).all) {
+    const picked = pickTests({ paths, suites, realNames, packagedNames, units })
     for (const w of picked.why) console.error(w)
     for (const l of pickLines(picked)) console.log(l)
     return
@@ -963,7 +1019,7 @@ async function pickCli() {
   const added = paths.filter((p) => !atBase.has(p))
   const deleted = paths.filter((p) => atBase.has(p) && !existsSync(join(cwd, p)))
   const diffLines = paths.some(needsLines) ? diffLinesOf(git(cwd, ['diff', '--no-ext-diff', '--no-color', '--no-renames', '-U0', base, '--'])) : {}
-  const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: listVitestRelated(cwd, base) })
+  const picked = pickTests({ paths, added, deleted, diffLines, suites, realNames, packagedNames, vitestRelated: listVitestRelated(cwd, base), units })
   for (const w of picked.why) console.error(w)
   for (const l of pickLines(picked)) console.log(l)
 }

@@ -354,7 +354,25 @@ only the unit tests use select nothing, and `tests/e2esuites.test.ts` checks tha
 suite. Real suites come in when an area names them, or when the change is to Combwork's side of every CLI (`REAL_TIER` in
 `affected.mjs`: `sessions.ts`, the providers, `providerService`, the terminal host, hook status, transcripts,
 `lib.cjs`) or to code no area names; a provider's own adapter (`src/main/providers/claude/`, `codex/`) picks only its
-real suites. Add an area to `affected.mjs` when you add a
+real suites.
+
+A few of those shared files are selected by **the parts of them a change touches** instead (HI-2659, `SPLIT` in
+`affectedUnits.mjs`): `ipc.ts` and `shared/api.ts` by IPC channel, `actions.ts` by action, `commands.ts` by command,
+`workspace.ts` by `WorkspaceService` method or function, and `runner.mjs`'s seam tables by the seam names added or
+removed. Each changed part is followed to what names it (a channel's callers, an action's, a method's, and theirs while
+they are in those files too), and a file that names it counts as it would changed: its own suite, its area's suites, or
+every suite when it is itself shared by everything (`store.ts`, `sessions.ts`…) or in no area. Lines that are only
+comments select nothing. The IPC dispatch's own lines map only for its test seams' branches (`CW_TEST_SLOW_IPC`,
+`FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access check, the error path) is
+every suite. So a one-file fix to one of them selects the suites that reach what it changed: HI-2652's seam, 2 suites;
+HI-2653's New Project, 28 from `actions.ts` (37 with its `Overlays.tsx`); HI-2654's `setAdvanced`, about 50, through
+`advanced:set`, which many suites call (`tests/affectedUnits.test.ts` checks these three keep the suites they need).
+**The escape hatch** errs towards more, each time with a reason in the selection's output: whatever it can't follow
+selects every suite (a line in no function or entry, such as an import or module code; a file it can't parse or read in
+either revision; a public part nothing names; a module imported as a namespace and indexed, or re-exported whole; a
+channel built at run time), the files still in `EVERYTHING` but not `SPLIT` select every suite as before (each with its
+reason there), and a change you know is cross-cutting though it touches only a few parts (a behaviour every handler
+relies on, a type's meaning) runs `--all`, said on the card. Add an area to `affected.mjs` when you add a
 suite or a source file; `tests/e2esuites.test.ts` checks every suite and source file is covered. What only the unit
 tests use (`tests/*.test.ts` and their helpers in `tests/`, `vitest.config.ts`, CI's workflow: `UNIT_ONLY`) selects no
 suite, so an e2e suite or scenario must never load a `.ts` helper from `tests/` (the unit test fails if one does).
