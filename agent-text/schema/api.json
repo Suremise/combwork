@@ -502,6 +502,16 @@
       "lane": "plain"
     }
   },
+  "api.change.forward": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.forwardAny": {
+    "placeholders": {}
+  },
   "api.change.handOver": {
     "placeholders": {
       "from": "plain",
@@ -929,6 +939,20 @@
   "api.done.createdProject": {
     "placeholders": {
       "name": "plain"
+    }
+  },
+  "api.done.forwardQueued": {
+    "placeholders": {
+      "queued": "select",
+      "card": "plain",
+      "to": "plain",
+      "from": "plain"
+    }
+  },
+  "api.done.forwardUpToDate": {
+    "placeholders": {
+      "to": "plain",
+      "from": "plain"
     }
   },
   "api.done.freshRetried": {
@@ -1469,6 +1493,9 @@
     }
   },
   "api.provider.notInstalled": {
+    "placeholders": {}
+  },
+  "api.queue.forwardArgs": {
     "placeholders": {}
   },
   "api.queue.notAgents": {

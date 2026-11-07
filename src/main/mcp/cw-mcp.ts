@@ -130,7 +130,7 @@ const T = {
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
   'queue.arg.target': agentMsg({ id: 'tool.queue.arg.target', text: 'The target branch.' }),
   'queue.arg.from': agentMsg({ id: 'tool.queue.arg.from', text: 'forward: the branch to bring in; target is the one brought up to date. Both the project\'s targets.' }),
-  'queue.reply.forward': agentMsg({ id: 'tool.queue.reply.forward', text: "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}", note: 'HI-2679: cw_queue forward\'s reply.' }),
+  'queue.reply.forward': agentMsg({ id: 'tool.queue.reply.forward', text: "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}}", note: 'HI-2679: cw_queue forward\'s reply.' }),
   'queue.arg.reason': agentMsg({ id: 'tool.queue.arg.reason', text: "remove, retry: the user's reason, recorded with the override." }),
   'releaseSlot.arg.slot': agentMsg({ id: 'tool.releaseSlot.arg.slot', text: 'release: the slot, by name (slot-b, hb2).' }),
   'releaseSlot.arg.kind': agentMsg({ id: 'tool.releaseSlot.arg.kind', text: 'release: which, when the slot is both.' }),

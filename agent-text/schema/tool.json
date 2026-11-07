@@ -477,6 +477,9 @@
   "tool.putBack.description": {
     "placeholders": {}
   },
+  "tool.queue.arg.from": {
+    "placeholders": {}
+  },
   "tool.queue.arg.reason": {
     "placeholders": {}
   },
@@ -496,6 +499,15 @@
   },
   "tool.queue.error.action.assistant": {
     "placeholders": {}
+  },
+  "tool.queue.reply.forward": {
+    "placeholders": {
+      "upToDate": "select",
+      "to": "plain",
+      "from": "plain",
+      "queued": "select",
+      "card": "plain"
+    }
   },
   "tool.readAttachment.arg.name": {
     "placeholders": {}

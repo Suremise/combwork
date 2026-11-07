@@ -441,6 +441,14 @@
   "workflow.refused.evidence.changed.next": {
     "placeholders": {}
   },
+  "workflow.refused.forward.notAgents.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.forward.notAgents.next": {
+    "placeholders": {}
+  },
   "workflow.refused.integrate.approved.message": {
     "placeholders": {
       "card": "plain",
