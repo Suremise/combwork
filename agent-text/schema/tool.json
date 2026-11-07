@@ -131,7 +131,13 @@
   "tool.connection.arg.account": {
     "placeholders": {}
   },
+  "tool.connection.arg.confirm": {
+    "placeholders": {}
+  },
   "tool.connection.arg.connection": {
+    "placeholders": {}
+  },
+  "tool.connection.arg.launch": {
     "placeholders": {}
   },
   "tool.connection.arg.mode": {

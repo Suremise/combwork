@@ -284,6 +284,8 @@
   "tips.lanesLegend.title": "O que as cores de uma raia significam",
   "tips.language.text": "O Combwork segue o idioma de exibição do Windows quando o tem. Configurações → Geral → Idioma escolhe outro; os idiomas traduzidos por IA são marcados, e melhorias são bem-vindas. Com os agentes, o Combwork continua falando em inglês.",
   "tips.language.title": "O Combwork no seu idioma",
+  "tips.launchSettings.text": "O menu ⋯ de uma conexão → Configurações de inicialização… → Iniciar como em um terminal inicia os agentes dela sem nada das orientações, ferramentas ou digitação do Combwork, como se você mesmo tivesse aberto a CLI nessa pasta. Eles são independentes: na equipe, mas fora do fluxo de trabalho.",
+  "tips.launchSettings.title": "Um agente como em um terminal",
   "tips.leftRunning.text": "Um processo iniciado pelo comando de um agente que continua em execução depois que o shell dele terminou aparece na Atividade como Deixado em execução, com o tempo de CPU e Encerrar. Passados dez minutos, uma notificação avisa uma vez, e o agente também é avisado.",
   "tips.leftRunning.title": "Veja o que um comando deixou em execução",
   "tips.leftoverBranches.text": "Controle de versão → Alterações lista os branches que sobraram: o de um cartão substituído ou arquivado, o de um agente de antes dos slots. Compare um primeiro com seu branch de destino e depois use Excluir…; um com commits próprios lista esses commits antes de sair.",

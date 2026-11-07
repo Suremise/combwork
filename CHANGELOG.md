@@ -1,5 +1,16 @@
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- **Launch an agent as if from a terminal** (HI-2670). A connection's **⋯ → Launch Settings…** say what of Combwork's the sessions it launches get: **Combwork's guidance**, **Combwork's tools**, **Combwork types into the agent**, **Only the workspace's MCP servers**, and each of Combwork's changes to the CLI. **Launch as from a terminal** turns them all off, so an agent on that connection starts with the same context as `claude`, `codex` or `copilot` opened in a terminal in its folder, while Combwork still shows its pane, status, transcript, sessions and usage. A connection with some turned off is **Partly plain**. The Assistant always keeps its guidance, tools and typing. The Agent API and the Assistant's `cw_connection` take `launch`.
+- **The Independent role** (HI-2670): an agent in the project's team that takes no part in the workflow. No lane, reviewer pool, merge queue or card start picks it, and Combwork never wakes it, delivers to it or types into it; you work with it in its pane. It's the only role offered on a connection without Combwork's tools. Making agents Independent while they're on a lane or hold a card asks first: their lanes pause and their cards stay for you to give to someone else.
+
+### Changed
+
+- **Combwork's guidance and its changes to the CLIs are each connection's** (HI-2670), in its Launch Settings, no longer in Settings → Advanced. The first time this version starts, any you had turned off is turned off on every connection of its CLI, so nothing changes.
+
 ## 1.1.0 — 2026-11-06
 
 <!-- old-name: begin changelog-upgrade -->

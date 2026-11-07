@@ -248,6 +248,11 @@
       "agent": "plain"
     }
   },
+  "lane.refused.independent": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
   "lane.refused.joinNoLane": {
     "placeholders": {
       "builder": "plain"
@@ -439,6 +444,11 @@
     }
   },
   "lane.status.hooks": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
+  "lane.status.independent": {
     "placeholders": {
       "agent": "plain"
     }

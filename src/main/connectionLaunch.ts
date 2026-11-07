@@ -9,14 +9,15 @@
  * themselves (their `independent` status), here and in a workspace opened later; the cards stay for the user.
  */
 import { join } from 'path'
-import { CW_GUIDANCE, overrideId } from '../shared/advanced'
-import { cleanLaunch, launchesWithoutTools, overrideKeys, type AffectedAgent, type LaunchImpact } from '../shared/launchPolicy'
+import { overrideId } from '../shared/advanced'
+import { cleanLaunch, copyAppSwitches, launchesWithoutTools, launchPolicy, type AffectedAgent, type LaunchImpact } from '../shared/launchPolicy'
 import { running } from '../shared/lanes'
 import { msg } from '../shared/i18n'
 import { agentWorkflowRole, inWorkflow, readToolsOffWith } from '../shared/workflow/roles'
 import type { AgentDef, Connection, ConnectionLaunch, ProjectConfig, ProviderId } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
-import { accountById, getConnection, NO_CONNECTION } from './accounts'
+import { accountById, allAccounts, allConnections, getConnection, NO_CONNECTION } from './accounts'
+import { readOwnRunOverridesWith } from './advancedValues'
 import { advanced } from './advanced'
 import { config } from './config'
 import { combworkError } from './combworkError'
@@ -38,6 +39,18 @@ export function readRolesFromConnections(): void {
     const x = a as { toolsOff?: boolean; connection?: string }
     return x.toolsOff === true || launchesWithoutTools(getConnection(x.connection))
   })
+  readOwnRunOverridesWith(ownRunOverride)
+}
+
+/**
+ * An override as Combwork's own runs of a CLI read it (HI-2670: Copilot's sign-in check and model catalogue, which are no
+ * session's): on unless every connection of that CLI has it off; its default with none. Just after the one-time copy,
+ * what the app-wide switch said.
+ */
+export function ownRunOverride(cli: ProviderId, what: string): boolean {
+  const accounts = new Map(allAccounts().map((a) => [a.id, a.provider]))
+  const on = allConnections().filter((c) => accounts.get(c.account) === cli).map((c) => launchPolicy(c, cli).overrides[overrideId(cli, what)])
+  return on.length ? on.some((v) => v !== false) : launchPolicy(null, cli).overrides[overrideId(cli, what)] !== false
 }
 
 /**
@@ -52,33 +65,17 @@ export function migrateLaunchPolicy(): void {
     return
   }
   const values = advanced.overrides()
-  const copied = new Set<string>()
+  let copied: string[] = []
   config.update((c) => {
     if (c.migrations?.launch1) return
-    const accounts = c.accounts ?? []
-    c.connections = (c.connections ?? []).map((conn) => {
-      const cli = accounts.find((a) => a.id === conn.account)?.provider
-      if (!cli) return conn
-      const raw: Record<string, unknown> = { ...conn.launch, overrides: { ...conn.launch?.overrides } }
-      if (values[CW_GUIDANCE] === false) {
-        raw.guidance = false
-        copied.add(CW_GUIDANCE)
-      }
-      for (const k of overrideKeys(cli)) {
-        const v = values[overrideId(cli, k)]
-        if (typeof v === 'boolean') {
-          ;(raw.overrides as Record<string, boolean>)[k] = v
-          copied.add(overrideId(cli, k))
-        }
-      }
-      const launch = cleanLaunch(raw, cli)
-      const { launch: _was, ...rest } = conn
-      return launch ? { ...rest, launch } : rest
-    })
-    c.migrations = { ...c.migrations, launch1: { at: new Date().toISOString(), copied: [...copied].sort() } }
+    const accounts = new Map((c.accounts ?? []).map((a) => [a.id, a.provider]))
+    const r = copyAppSwitches(c.connections ?? [], (id) => accounts.get(id), values)
+    c.connections = r.connections
+    copied = r.copied
+    c.migrations = { ...c.migrations, launch1: { at: new Date().toISOString(), copied } }
   })
-  if (copied.size) {
-    log.info(`launch settings: ${copied.size} app-wide switches copied onto the connections (HI-2670)`) // i18n-ignore: for the log
+  if (copied.length) {
+    log.info(`launch settings: ${copied.length} app-wide switches copied onto the connections (HI-2670)`) // i18n-ignore: for the log
     emit({ type: 'connections-changed' })
   }
 }
@@ -122,14 +119,18 @@ async function connectionImpact(id: string): Promise<LaunchImpact> {
 /** Whether a launch change turns a connection's Combwork tools off. */
 const turnsToolsOff = (was: ConnectionLaunch | undefined, next: ConnectionLaunch | undefined): boolean => was?.tools !== false && next?.tools === false
 
-const CHANGED = msg({ id: 'main.connections.launch.impactChanged', defaultMessage: 'What this change takes out of the workflow has changed since you were asked. Look at it again.', description: "An error saving a connection's launch settings or an agent's connection (HI-2670): the agents, lanes or cards it would take out of the workflow changed after the user confirmed, so nothing was saved and the user is asked again." })
-const CONFIRM = msg({ id: 'main.connections.launch.confirm', defaultMessage: 'This takes agents off their lanes and cards: confirm it first.', description: "An error saving a connection's launch settings or an agent's connection (HI-2670), from a caller that didn't confirm: it would make agents on lanes or holding cards Independent." })
+const CHANGED = msg({ id: 'main.connections.launch.impactChanged', defaultMessage: 'What this change takes out of the workflow has changed since you were asked: {agents}. Look at it again (confirm: {fingerprint}).', description: "An error saving a connection's launch settings or an agent's connection (HI-2670): the agents, lanes or cards it would take out of the workflow ({agents}: each agent with its lanes and cards) changed after the user confirmed, so nothing was saved. {fingerprint} is a code a script sends back to confirm: keep it and the word confirm." })
+const CONFIRM = msg({ id: 'main.connections.launch.confirm', defaultMessage: 'This makes agents Independent while they are on lanes or hold cards: {agents}. Their lanes pause and their cards stay. Confirm it first (confirm: {fingerprint}).', description: "An error saving a connection's launch settings or an agent's connection (HI-2670), from a caller that didn't confirm (the Agent API, the Assistant): it would make agents on lanes or holding cards Independent. {agents}: each agent with its lanes and cards; {fingerprint} is a code to send back as confirm: keep it and the word confirm." })
+
+/** The agents a change takes out of the workflow, each with its lanes and cards, for a refusal. */
+const impactText = (impact: LaunchImpact): string => impact.agents.map((a) => `${a.agent} (${[...a.lanes, ...a.cards.map((c) => `${c.key ?? c.number} ${c.column}`)].join(', ')})`).join('; ')
 
 /** Refused unless `confirmed` names exactly what the change takes out of the workflow now. */
 function assertConfirmed(impact: LaunchImpact, confirmed: string | null | undefined): void {
   if (!impact.agents.length) return
-  if (!confirmed) throw combworkError(CONFIRM, undefined, { kind: 'conflict' })
-  if (confirmed !== impact.fingerprint) throw combworkError(CHANGED, undefined, { kind: 'conflict' })
+  const values = { agents: impactText(impact), fingerprint: impact.fingerprint }
+  if (!confirmed) throw combworkError(CONFIRM, values, { kind: 'conflict' })
+  if (confirmed !== impact.fingerprint) throw combworkError(CHANGED, values, { kind: 'conflict' })
 }
 
 /** What saving these launch settings on a connection would take out of the workflow (null: nothing to confirm). */

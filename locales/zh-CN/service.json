@@ -7,6 +7,7 @@
   "service.advanced.notJson": "advanced.json 不是有效的 JSON：{error}。",
   "service.advanced.notObject": "advanced.json 应包含一个对象：{example}。",
   "service.advanced.notValues": "advanced.json 中的“values”应为“设置 → 值”形式的对象。",
+  "service.advanced.onConnection": "“{id}”现在在每个连接上设置：“设置”→“账号与连接”，连接的 ⋯ 菜单，“启动设置”。",
   "service.advanced.unknown": "没有名为“{id}”的高级设置。",
   "service.answerRelay.title": "{card}：没有其他人收到你的回答",
   "service.assistantAsk.title": "{card}：助手没有收到智能体的请求",

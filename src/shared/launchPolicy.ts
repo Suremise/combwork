@@ -14,7 +14,8 @@
  *
  * Pure data and helpers: no Node, no React.
  */
-import { ADVANCED_DEFS, overrideId } from './advanced'
+import { ADVANCED_DEFS, CW_GUIDANCE, overrideId } from './advanced'
+import { agentMsg, say } from './agentText'
 import type { Connection, ConnectionLaunch, ProviderId } from './types'
 
 /** The switches a connection has besides its CLI's overrides. */
@@ -95,17 +96,24 @@ export function cleanLaunch(raw: unknown, cli: ProviderId): ConnectionLaunch | u
   return Object.keys(out).length ? out : undefined
 }
 
+/** The words of a policy in short (agent-facing: the Agent API and project status). */
+const S = {
+  plain: agentMsg({ id: 'launch.summary.plain', text: 'plain: launched as from a terminal', note: "An agent's or connection's launch settings in short (HI-2670), in project status and the Agent API: none of Combwork's additions." }),
+  partly: agentMsg({ id: 'launch.summary.partly', text: 'partly plain: {off} off', note: "An agent's or connection's launch settings in short (HI-2670): {off} lists what is turned off (guidance, tools, typing, an override's key)." }),
+  all: agentMsg({ id: 'launch.summary.all', text: 'everything on', note: "A connection's launch settings in short (HI-2670), when nothing is turned off." })
+}
+
 /**
- * A connection's policy in short, for the Agent API and project status (English, agent-facing): "plain", "partly plain:
- * guidance off, typing off, statusLine off", or null when it launches with everything.
+ * A connection's policy in short, for the Agent API and project status (English, agent-facing): "plain: …", "partly
+ * plain: guidance, typing, statusLine off", or null when it launches with everything (`all`: "everything on" instead).
  */
-export function policySummary(conn: Pick<Connection, 'launch'> | null | undefined, cli: ProviderId): string | null {
+export function policySummary(conn: Pick<Connection, 'launch'> | null | undefined, cli: ProviderId, all = false): string | null {
   const how = plainness(conn, cli)
-  if (!how) return null
-  if (how === 'full') return 'plain'
+  if (!how) return all ? say(S.all) : null
+  if (how === 'full') return say(S.plain)
   const p = launchPolicy(conn, cli)
   const off = [...LAUNCH_SWITCHES.filter((s) => !p[s]), ...overrideKeys(cli).filter((k) => !p.overrides[overrideId(cli, k)])]
-  return `partly plain: ${off.map((s) => `${s} off`).join(', ')}`
+  return say(S.partly, { off: off.join(', ') })
 }
 
 /** One agent a change would take out of the workflow (HI-2670), with what it is part of now. */
@@ -125,4 +133,32 @@ export interface AffectedAgent {
 export interface LaunchImpact {
   agents: AffectedAgent[]
   fingerprint: string
+}
+
+/**
+ * The one-time copy (HI-2670): each app-wide switch that was set in advanced.json (`values`: Combwork's guidance off, a
+ * CLI's override either way) onto every connection of its CLI (guidance onto all), each value kept as it was, so a mix
+ * of them survives. What it copied, by advanced id.
+ */
+export function copyAppSwitches(connections: readonly Connection[], cliOf: (accountId: string) => ProviderId | undefined, values: Readonly<Record<string, unknown>>): { connections: Connection[]; copied: string[] } {
+  const copied = new Set<string>()
+  const out = connections.map((conn) => {
+    const cli = cliOf(conn.account)
+    if (!cli) return conn
+    const raw: Record<string, unknown> = { ...conn.launch, overrides: { ...conn.launch?.overrides } }
+    if (values[CW_GUIDANCE] === false) {
+      raw.guidance = false
+      copied.add(CW_GUIDANCE)
+    }
+    for (const k of overrideKeys(cli)) {
+      const v = values[overrideId(cli, k)]
+      if (typeof v !== 'boolean') continue
+      ;(raw.overrides as Record<string, boolean>)[k] = v
+      copied.add(overrideId(cli, k))
+    }
+    const launch = cleanLaunch(raw, cli)
+    const { launch: _was, ...rest } = conn
+    return launch ? { ...rest, launch } : rest
+  })
+  return { connections: out, copied: [...copied].sort() }
 }

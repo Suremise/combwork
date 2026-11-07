@@ -284,6 +284,8 @@
   "tips.lanesLegend.title": "What a lane’s colours mean",
   "tips.language.text": "Combwork follows Windows' display language when it has it. Settings → General → Language picks another; languages translated by AI are marked, and improvements are welcome. Agents are still spoken to in English.",
   "tips.language.title": "Combwork in your language",
+  "tips.launchSettings.text": "A connection's ⋯ → Launch Settings… → Launch as from a terminal starts its agents with none of Combwork's guidance, tools or typing, as if you had opened the CLI in that folder yourself. They are Independent: in the team, but out of the workflow.",
+  "tips.launchSettings.title": "An agent as if from a terminal",
   "tips.leftRunning.text": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
   "tips.leftRunning.title": "Spot what a command left running",
   "tips.leftoverBranches.text": "Version Control → Changes lists leftover branches: a superseded or archived card’s, an agent’s from before slots. Compare one with your target first, then Delete… it; one with commits of its own lists them before it goes.",
@@ -527,6 +529,8 @@
   "tips.versionControlTab.title": "One tab for version control and workflow",
   "tips.viewerTokens.text": "An app that shows what your agents are doing, such as Apiary, needs only a viewer token: Settings → Agent API → Viewer tokens makes one that can read everything and change nothing, and revokes it again.",
   "tips.viewerTokens.title": "Let another app watch Combwork",
+  "tips.waitingOnPurpose.text": "A card in Active held for a quiet window, or waiting for an answer? Right-click it, Mark as Waiting…, and say why: Combwork stops reporting it as stalled until you clear it or it leaves Active. Its agent keeps running.",
+  "tips.waitingOnPurpose.title": "A card that waits on purpose",
   "tips.workflowDefaults.text": "Settings → Version Control sets the options every project starts from: Combwork defaults, for every workspace, and the open workspace’s over them. A project’s own options still win, and saving lists the projects that inherit the change.",
   "tips.workflowDefaults.title": "Set a workflow once for every project",
   "tips.workflowOptions.text": "Version Control → Workflow sets who reviews a card’s work, which checks pass first and who merges it. Pick a preset, or set each option: a change applies from the next card that starts.",
@@ -538,7 +542,5 @@
   "tips.workspaceMovedDefender.text": "If Combwork had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
   "tips.workspaceMovedDefender.title": "Defender exclusions follow a moved workspace",
   "tips.workspaceNotes.text": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
-  "tips.workspaceNotes.title": "Notes about this machine for every agent",
-  "tips.waitingOnPurpose.title": "A card that waits on purpose",
-  "tips.waitingOnPurpose.text": "A card in Active held for a quiet window, or waiting for an answer? Right-click it, Mark as Waiting…, and say why: Combwork stops reporting it as stalled until you clear it or it leaves Active. Its agent keeps running."
+  "tips.workspaceNotes.title": "Notes about this machine for every agent"
 }

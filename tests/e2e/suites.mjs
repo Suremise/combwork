@@ -191,6 +191,7 @@ export const SUITES = [
   { name: 'lanestart' },
   { name: 'lanewatch' },
   { name: 'launchrace' },
+  { name: 'launchsettings' },
   { name: 'leftovers' },
   { name: 'leftovers-claude', needs: ['claude'], claudeHome: 'test' },
   { name: 'leftovers-codex', needs: ['codex'] },

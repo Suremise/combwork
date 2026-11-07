@@ -153,9 +153,21 @@
       "agent": "plain"
     }
   },
+  "main.connections.launch.confirm": {
+    "placeholders": {
+      "agents": "plain",
+      "fingerprint": "plain"
+    }
+  },
   "main.connections.launch.deleted": {
     "placeholders": {
       "agent": "plain"
+    }
+  },
+  "main.connections.launch.impactChanged": {
+    "placeholders": {
+      "agents": "plain",
+      "fingerprint": "plain"
     }
   },
   "main.connections.launch.noKey": {

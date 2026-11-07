@@ -39,6 +39,11 @@
     "note": "Above Settings → Advanced's list: the \"values\" field of advanced.json (keep both as they are) isn't a set of settings and their values.",
     "audience": "both"
   },
+  "service.advanced.onConnection": {
+    "text": "\"{id}\" is set on each connection now: Settings → Accounts & Connections, a connection's ⋯ menu, Launch Settings.",
+    "note": "An error changing an advanced setting (HI-2670): this one moved to each connection's launch settings. {id} is the setting's id; Settings → Accounts & Connections and Launch Settings are where it is now: use their translated names.",
+    "audience": "both"
+  },
   "service.advanced.unknown": {
     "text": "No advanced setting \"{id}\".",
     "note": "An error changing an advanced setting: Combwork has none with the id {id}.",

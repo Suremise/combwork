@@ -286,6 +286,8 @@ interface CombworkMessageValues {
   'tips.lanesLegend.title': undefined
   'tips.language.text': undefined
   'tips.language.title': undefined
+  'tips.launchSettings.text': undefined
+  'tips.launchSettings.title': undefined
   'tips.leftRunning.text': undefined
   'tips.leftRunning.title': undefined
   'tips.leftoverBranches.text': undefined

@@ -284,6 +284,8 @@
   "tips.lanesLegend.title": "Co oznaczają kolory toru",
   "tips.language.text": "Combwork używa języka wyświetlania Windows, jeśli go obsługuje. Ustawienia → Ogólne → Język pozwala wybrać inny; języki przetłumaczone przez AI są oznaczone, a poprawki mile widziane. Z agentami Combwork nadal rozmawia po angielsku.",
   "tips.language.title": "Combwork w Twoim języku",
+  "tips.launchSettings.text": "Menu ⋯ połączenia → Ustawienia uruchamiania… → Uruchamiaj jak z terminala uruchamia jego agentów bez wskazówek, narzędzi i wpisywania Combwork, tak jakbyś sam otworzył CLI w tym folderze. Są niezależni: w zespole, ale poza przepływem pracy.",
+  "tips.launchSettings.title": "Agent jak z terminala",
   "tips.leftRunning.text": "Proces uruchomiony przez polecenie agenta, który działa dalej po zakończeniu powłoki, widać w Aktywności jako Pozostawiony, z czasem CPU i przyciskiem Zakończ. Po dziesięciu minutach powiadomienie mówi o tym raz, a agent też dostaje informację.",
   "tips.leftRunning.title": "Zobacz, co polecenie zostawiło działające",
   "tips.leftoverBranches.text": "Kontrola wersji → Zmiany wyświetla pozostałe gałęzie: gałąź zastąpionej lub zarchiwizowanej karty, gałąź agenta sprzed slotów. Najpierw porównaj ją z gałęzią docelową, potem użyj Usuń…; gałąź z własnymi commitami wyświetla je przed usunięciem.",

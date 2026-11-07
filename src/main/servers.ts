@@ -8,7 +8,7 @@ import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachme
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
-import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, CombworkEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, Connection, ConnectionLaunch, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, CombworkEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { callsMade } from '../shared/activity'
 import { DEFAULT_API_PORT, CW_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
@@ -102,6 +102,8 @@ import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { accountOnIn, connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
 import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, combworkAccounts, updateConnection } from './accounts'
+import { setConnectionLaunch } from './connectionLaunch'
+import { cleanLaunch, policySummary, terminalPreset } from '../shared/launchPolicy'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
@@ -507,6 +509,13 @@ function progressOf(projectPath: string, agentId: string) {
   return { title: r.title, ...(r.total !== null ? { step: r.step ?? 0, total: r.total } : {}), ...(r.stepName ? { stepName: r.stepName } : {}), ...(r.waiting ? { waiting: r.waiting } : {}), ...(etaMs !== null ? { etaMs } : {}), ...(r.state === 'stale' ? { stale: true } : {}) }
 }
 
+/** What of Combwork's an agent's connection launches it with (HI-2670), in short; null: everything. */
+const launchSummaryOf = (a: AgentInfo): string | null => {
+  const c = getConnection(a.connection)
+  const cli = accountById(c?.account)?.provider
+  return c && cli ? policySummary(c, cli) : null
+}
+
 /**
  * An agent's status message: a watching agent's is what it waits for; one whose state is unknown says so (#648), as
  * does one whose hooks aren't reaching Combwork (#1336) and one whose CLI waits to retry its model request (HI-1972).
@@ -550,6 +559,8 @@ async function projectSummary(p: string) {
       provider: a.live?.provider ?? agentProvider(a, config.settings),
       // Its role in the workflow (#1430): its own, else the guess from its note or name.
       workflowRole: agentWorkflowRole(a),
+      // What of Combwork's its connection launches it with (HI-2670), when not everything: "plain" or "partly plain: …".
+      ...(launchSummaryOf(a) ? { launch: launchSummaryOf(a) } : {}),
       // Where it works now (#1451): its running session's folder, else where a new conversation would start, short (a
       // slot's name, project, or home: <name>); its slot, and that slot's line.
       folder: places.get(a.id)!.now.at,
@@ -747,7 +758,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 14
+export const API_VERSION = 15
 
 /** Who Combwork takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -806,7 +817,7 @@ route('GET', '/v1/workspaces', async () => openWorkspaces().map((w) => ({ name: 
 /** A project in a short listing (?view=short): its state and agents, without ids, paths or settings. */
 async function projectRow(p: string): Promise<ProjectRow> {
   const s = await projectSummary(p)
-  return { name: s.name, workspace: s.workspace, active: s.active, branch: s.branch, agents: s.agents.map((a) => ({ name: a.name, provider: a.provider, workflowRole: a.workflowRole, status: a.status, branch: a.branch, backgroundTasks: a.backgroundTasks, ...(a.watching ? { watching: a.watching.label } : {}), ...(a.progress ? { progress: progressLabel(a.progress) } : {}) })) }
+  return { name: s.name, workspace: s.workspace, active: s.active, branch: s.branch, agents: s.agents.map((a) => ({ name: a.name, provider: a.provider, workflowRole: a.workflowRole, ...(a.launch ? { launch: a.launch } : {}), status: a.status, branch: a.branch, backgroundTasks: a.backgroundTasks, ...(a.watching ? { watching: a.watching.label } : {}), ...(a.progress ? { progress: progressLabel(a.progress) } : {}) })) }
 }
 
 route('GET', '/v1/projects', async ({ query }) => {
@@ -1195,7 +1206,9 @@ function connectionValues(c: Connection, wide: boolean): Record<string, unknown>
 /** A connection as the Agent API lists it (HI-2108): its id, name, account (its name and CLI), its values, and `usable: false` where it can't be used here. */
 function connectionRow(c: Connection, usable: boolean, wide: boolean): Record<string, unknown> {
   const a = accountById(c.account)
-  return { id: c.id, name: c.name, account: a?.name ?? c.account, cli: a?.provider ?? null, ...connectionValues(c, wide), ...(usable ? {} : { usable: false }) }
+  // Its launch settings in short (HI-2670), when not everything.
+  const launch = a ? policySummary(c, a.provider) : null
+  return { id: c.id, name: c.name, account: a?.name ?? c.account, cli: a?.provider ?? null, ...connectionValues(c, wide), ...(launch ? { launch } : {}), ...(usable ? {} : { usable: false }) }
 }
 
 /** An account's connections by name, for a refusal (HI-2108): "On Personal: Personal, Personal · High." */
@@ -1388,13 +1401,26 @@ route('PATCH', '/v1/connections/:ref', async ({ params, body }) =>
     const r = connectionRef(ref, allConnections(), allConnections().map((c) => c.id))
     if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, say(API.connection.severalNamed, { name: ref, ids: r.ids!.join(', ') })) : new HttpError(404, say(API.connection.noneNamed, { name: ref }))
     const v = connectionValuesArg(body)
-    if (!Object.keys(v).length) throw new HttpError(400, say(API.connection.nothingToChange))
-    const c = await checked(() => connectionsCall(() => updateConnection(r.id, v)))
-    return { done: [API.done.updatedConnection, { connection: c.name }], act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
+    // Its launch settings (HI-2670): `launch`, and `confirm` naming what it takes out of the workflow, when it does.
+    const launch = body?.launch === undefined ? undefined : launchArg(body.launch, r.id)
+    if (!Object.keys(v).length && launch === undefined) throw new HttpError(400, say(API.connection.nothingToChange))
+    let c = Object.keys(v).length ? await checked(() => connectionsCall(() => updateConnection(r.id, v))) : getConnection(r.id)!
+    if (launch !== undefined) c = await checked(() => connectionsCall(() => setConnectionLaunch(r.id, launch, typeof body?.confirm === 'string' ? body.confirm : null)))
+    const cli = accountById(c.account)?.provider
+    const done: [AgentMsg, Record<string, string>] = launch !== undefined && !Object.keys(v).length ? [API.done.launchedConnection, { connection: c.name, how: (cli && policySummary(c, cli, true)) || '' }] : [API.done.updatedConnection, { connection: c.name }]
+    return { done, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
   })
 )
 
-/** A workflowRole argument (#1430): builder, reviewer, either or generalist (HI-686). */
+/** A launch argument (HI-2670): the connection's switches, `{ preset: 'terminal' }` for all off, or {} for all on. */
+function launchArg(v: unknown, id: string): ConnectionLaunch {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new HttpError(400, say(API.connection.launchArg))
+  const cli = accountById(getConnection(id)?.account)?.provider
+  if ((v as { preset?: unknown }).preset === 'terminal') return cli ? terminalPreset(cli) : { guidance: false, tools: false, typing: false }
+  return (cli && cleanLaunch(v, cli)) || {}
+}
+
+/** A workflowRole argument (#1430): builder, reviewer, either, generalist (HI-686) or independent (HI-2670). */
 function workflowRoleArg(v: unknown): WorkflowRole {
   if (isWorkflowRole(v)) return v
   throw new HttpError(400, say(API.agent.workflowRoleArg))
@@ -1462,6 +1488,8 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     refuseOldFields(body, getConnection(a.connection)?.account)
     // Another CLI's connection is a change of CLI: only while it is stopped (updateAgent refuses it otherwise).
     const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentMcpArg(body), ...(conn ? { connection: conn.connection } : {}), ...role }, {
+      // What it takes out of the workflow (HI-2670), as a refusal named it, once the user agreed.
+      confirmed: typeof body?.confirm === 'string' ? body.confirm : null,
       // Control and the Assistant's session checked again under the lock, with the write (HI-2328).
       check: (current) => {
         guard()

@@ -53,7 +53,7 @@ export const API = {
     useStartAgent: agentMsg({ id: 'api.agent.useStartAgent', text: 'Use cw_start_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/start) to start agents.' }),
     useStopAgent: agentMsg({ id: 'api.agent.useStopAgent', text: 'Use cw_stop_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/stop) to stop agents.' }),
     waitingOnCards: agentMsg({ id: 'api.agent.waitingOnCards', text: 'waiting on cards', note: 'What a watch waits for, when it has no label.' }),
-    workflowRoleArg: agentMsg({ id: 'api.agent.workflowRoleArg', text: 'workflowRole is "builder", "reviewer", "either" or "generalist".' })
+    workflowRoleArg: agentMsg({ id: 'api.agent.workflowRoleArg', text: 'workflowRole is "builder", "reviewer", "either", "generalist" or "independent".' })
   },
   attachment: {
     alreadyAttached: agentMsg({ id: 'api.attachment.alreadyAttached', text: 'Already attached' }),
@@ -183,7 +183,8 @@ export const API = {
     noneNamed: agentMsg({ id: 'api.connection.noneNamed', text: 'No connection named "{name}", and none has that id.' }),
     noneNamedUsable: agentMsg({ id: 'api.connection.noneNamedUsable', text: 'No connection named "{name}" is usable in this workspace, and none has that id. cw_connection lists them.' }),
     noneNamedUsableShort: agentMsg({ id: 'api.connection.noneNamedUsableShort', text: 'No connection named "{name}" is usable in this workspace, and none has that id.' }),
-    nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k, extraArgs or tag.' }),
+    nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k, extraArgs, tag or launch.' }),
+    launchArg: agentMsg({ id: 'api.connection.launchArg', text: 'launch is an object: guidance, tools and typing (false turns one off) and overrides (its CLI overrides by key, each true or false), or preset "terminal" for all off; an empty object turns everything on again.' }),
     oldFields: agentMsg({ id: 'api.connection.oldFields', text: 'An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} cw_connection lists every one, and makes one when the user agrees.' }),
     severalAccounts: agentMsg({ id: 'api.connection.severalAccounts', text: 'Several accounts are named "{name}": use its id ({ids}).' }),
     severalNamed: agentMsg({ id: 'api.connection.severalNamed', text: 'Several connections are named "{name}": use its id ({ids}).' })
@@ -250,7 +251,8 @@ export const API = {
     templateLoaded: agentMsg({ id: 'api.done.templateLoaded', text: 'Loaded the template "{template}" into {project}: {agents} agents{workflow, select, saved {, and its workflow ({options} options changed)} notSaved {; its workflow was not saved} other {}}' }),
     undid: agentMsg({ id: 'api.done.undid', text: 'Undid {undone} of {total} {count, plural, one {change} other {changes}} of its own{skipped, plural, =0 {} one { ({skippedTotal} field left: changed since or gone)} other { ({skippedTotal} fields left: changed since or gone)}}', note: 'Each number is twice: as a number for its plural (count, skipped) and as written (total, skippedTotal), so a count over 999 has no comma.' }),
     updatedAgent: agentMsg({ id: 'api.done.updatedAgent', text: 'Changed {agent}\'s settings in {project}{live, select, yes { (it applies them when restarted)} other {}}' }),
-    updatedConnection: agentMsg({ id: 'api.done.updatedConnection', text: 'Changed the connection {connection} (agents running on it take it when restarted)' })
+    updatedConnection: agentMsg({ id: 'api.done.updatedConnection', text: 'Changed the connection {connection} (agents running on it take it when restarted)' }),
+    launchedConnection: agentMsg({ id: 'api.done.launchedConnection', text: 'Changed the launch settings of {connection}: {how} (agents running on it take them when restarted)' })
   },
   handover: {
     busy: agentMsg({ id: 'api.handover.busy', text: '{agent} is working, merging or on a card loop\'s card: its conversation isn\'t ended now. Hand it over when it has finished.' }),

@@ -401,7 +401,7 @@ export function cleanRole(role: unknown): string {
 /** A workflow role as saved (#1430): builder, reviewer, either or generalist (HI-686), else refused. */
 export function cleanWorkflowRole(role: unknown): WorkflowRole {
   if (isWorkflowRole(role)) return role
-  throw combworkError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either or generalist.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English." }), undefined, { kind: 'invalid' })
+  throw combworkError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either, generalist or independent.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either, generalist and independent are values: keep them in English." }), undefined, { kind: 'invalid' })
 }
 
 /**

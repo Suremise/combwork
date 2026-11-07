@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "Die Bereiche lassen sich in diesem Layout nicht so anordnen.",
-  "worktrees.agent.badWorkflowRole": "Eine Rolle im Workflow ist builder, reviewer, either oder generalist.",
+  "worktrees.agent.badWorkflowRole": "Eine Rolle im Workflow ist builder, reviewer, either, generalist oder independent.",
   "worktrees.agent.chooseMove": "Wähle, wohin der Agent verschoben werden soll.",
   "worktrees.agent.effortRefused": "{chosen, select, yes {{model}} other {Das Standardmodell der CLI}} unterstützt den Aufwand „{effort}“ nicht. Wähle eine der Stufen, die es unterstützt.",
   "worktrees.agent.enterName": "Gib einen Namen ein.",

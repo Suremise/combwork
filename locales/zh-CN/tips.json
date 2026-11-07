@@ -284,6 +284,8 @@
   "tips.lanesLegend.title": "通道颜色的含义",
   "tips.language.text": "Combwork 会跟随 Windows 的显示语言（如果支持）。“设置”→“常规”→“语言”可以选择其他语言；由 AI 翻译的语言会有标记，欢迎改进。与智能体交流时仍使用英语。",
   "tips.language.title": "用你的语言使用 Combwork",
+  "tips.launchSettings.text": "连接的 ⋯ →“启动设置…”→“如同从终端启动”会让它的智能体在没有 Combwork 的指引、工具或输入的情况下启动，就像你自己在该文件夹中打开了 CLI。它们是独立的：在团队中，但不在工作流程中。",
+  "tips.launchSettings.title": "如同从终端启动的智能体",
   "tips.leftRunning.text": "智能体的命令启动、在其 shell 退出后仍在运行的进程，会在“活动”中显示为“遗留运行”，附带 CPU 时间和“结束…”。超过十分钟后，会有一条通知告知一次，也会告知智能体。",
   "tips.leftRunning.title": "发现命令遗留运行的进程",
   "tips.leftoverBranches.text": "“版本控制”→“更改”会列出遗留分支：被取代或已归档卡片的分支、槽位之前智能体的分支。可先将其与目标分支比较，再使用“删除…”；有自己提交的分支会在删除前列出这些提交。",

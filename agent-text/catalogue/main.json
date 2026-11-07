@@ -159,9 +159,19 @@
     "note": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Combwork checked who it is signed in as.",
     "audience": "both"
   },
+  "main.connections.launch.confirm": {
+    "text": "This makes agents Independent while they are on lanes or hold cards: {agents}. Their lanes pause and their cards stay. Confirm it first (confirm: {fingerprint}).",
+    "note": "An error saving a connection's launch settings or an agent's connection (HI-2670), from a caller that didn't confirm (the Agent API, the Assistant): it would make agents on lanes or holding cards Independent. {agents}: each agent with its lanes and cards; {fingerprint} is a code to send back as confirm: keep it and the word confirm.",
+    "audience": "both"
+  },
   "main.connections.launch.deleted": {
     "text": "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.",
     "note": "Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog.",
+    "audience": "both"
+  },
+  "main.connections.launch.impactChanged": {
+    "text": "What this change takes out of the workflow has changed since you were asked: {agents}. Look at it again (confirm: {fingerprint}).",
+    "note": "An error saving a connection's launch settings or an agent's connection (HI-2670): the agents, lanes or cards it would take out of the workflow ({agents}: each agent with its lanes and cards) changed after the user confirmed, so nothing was saved. {fingerprint} is a code a script sends back to confirm: keep it and the word confirm.",
     "audience": "both"
   },
   "main.connections.launch.noKey": {

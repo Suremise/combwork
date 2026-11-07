@@ -57,7 +57,7 @@
     "note": "HI-2229: the Assistant has no project of its own (\"Default: this project.\" left it calling with none), so it gets arg.project."
   },
   "tool.arg.workflowRole": {
-    "text": "Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name."
+    "text": "Builds cards, reviews them, either (never its own), generalist (never in a lane), or independent (no part in the workflow). Default: from its name."
   },
   "tool.askAssistant.arg.text": {
     "text": "What you ask, whole: the cards, what to do, on whose decision."
@@ -109,8 +109,14 @@
   "tool.connection.arg.account": {
     "text": "add: its account, by id or name, from list."
   },
+  "tool.connection.arg.confirm": {
+    "text": "The fingerprint a refusal named, once the user agreed to make those agents Independent."
+  },
   "tool.connection.arg.connection": {
     "text": "update: its id or name."
+  },
+  "tool.connection.arg.launch": {
+    "text": "update: what of Combwork its sessions get. guidance, tools, typing (false: off; tools off makes its agents Independent), overrides by key; preset \"terminal\": all off; an empty object: all on."
   },
   "tool.connection.arg.mode": {
     "text": "Permission mode."

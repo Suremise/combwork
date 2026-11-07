@@ -239,9 +239,17 @@
     "defaultMessage": "{name}'s login kept changing while Combwork checked it. Try starting {agent} again in a moment.",
     "description": "Starting an agent ({agent}) is refused: its connection's ({name}) login changed again and again while Combwork checked who it is signed in as."
   },
+  "main.connections.launch.confirm": {
+    "defaultMessage": "This makes agents Independent while they are on lanes or hold cards: {agents}. Their lanes pause and their cards stay. Confirm it first (confirm: {fingerprint}).",
+    "description": "An error saving a connection's launch settings or an agent's connection (HI-2670), from a caller that didn't confirm (the Agent API, the Assistant): it would make agents on lanes or holding cards Independent. {agents}: each agent with its lanes and cards; {fingerprint} is a code to send back as confirm: keep it and the word confirm."
+  },
   "main.connections.launch.deleted": {
     "defaultMessage": "The connection chosen for {agent} no longer exists. Choose another in its Agent Settings.",
     "description": "Starting an agent ({agent}) is refused: the connection chosen for it was removed. Agent Settings names a dialog."
+  },
+  "main.connections.launch.impactChanged": {
+    "defaultMessage": "What this change takes out of the workflow has changed since you were asked: {agents}. Look at it again (confirm: {fingerprint}).",
+    "description": "An error saving a connection's launch settings or an agent's connection (HI-2670): the agents, lanes or cards it would take out of the workflow ({agents}: each agent with its lanes and cards) changed after the user confirmed, so nothing was saved. {fingerprint} is a code a script sends back to confirm: keep it and the word confirm."
   },
   "main.connections.launch.noKey": {
     "defaultMessage": "{name} has no key. Add one in Settings → Accounts & Connections, then start {agent}.",

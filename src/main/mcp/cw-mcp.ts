@@ -44,7 +44,7 @@ const T = {
   'arg.agent': agentMsg({ id: 'tool.arg.agent', text: 'Its name or id; optional when the project has one agent.' }),
   'arg.mcpServers': agentMsg({ id: 'tool.arg.mcpServers', text: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). combwork is always given.' }),
   'arg.connection': agentMsg({ id: 'tool.arg.connection', text: 'Its connection, by id or name (cw_connection): its model, effort, mode and CLI. Default: the first usable here.' }),
-  'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }),
+  'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), generalist (never in a lane), or independent (no part in the workflow). Default: from its name.' }),
   'arg.override': agentMsg({ id: 'tool.arg.override', text: "Moves it past the rules the move skips: reason is the user's own why, never made up." }),
   'intent.arg.revision': agentMsg({ id: 'tool.intent.arg.revision', text: "Default: the card's current revision (its commit, or its files' hash)." }),
   'intent.arg.submission': agentMsg({ id: 'tool.intent.arg.submission', text: 'Default: the latest.' }),
@@ -97,6 +97,8 @@ const T = {
   'connection.arg.account': agentMsg({ id: 'tool.connection.arg.account', text: 'add: its account, by id or name, from list.' }),
   'connection.arg.model': agentMsg({ id: 'tool.connection.arg.model', text: 'Empty: the CLI decides (each value below too).' }),
   'connection.arg.mode': agentMsg({ id: 'tool.connection.arg.mode', text: 'Permission mode.' }),
+  'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: what of Combwork its sessions get. guidance, tools, typing (false: off; tools off makes its agents Independent), overrides by key; preset "terminal": all off; an empty object: all on.' }),
+  'connection.arg.confirm': agentMsg({ id: 'tool.connection.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make those agents Independent.' }),
   'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
   'promptAgent.description': agentMsg({ id: 'tool.promptAgent.description', text: 'Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use cw_start_task.' }),
   'messageAgent.description': agentMsg({ id: 'tool.messageAgent.description', text: "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-cw-api, tools.md)" }),
@@ -391,7 +393,7 @@ const settingsArgs = {
   mcpServers: { type: 'array', items: { type: 'string' }, description: say(T['arg.mcpServers']) },
   connection: { type: 'string', description: say(T['arg.connection']) }
 }
-const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: say(T['arg.workflowRole']) }
+const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist', 'independent'], description: say(T['arg.workflowRole']) }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Combwork fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
@@ -764,13 +766,15 @@ const tools: Tool[] = [
         mode: { type: 'string', description: say(T['connection.arg.mode']) },
         context200k: { type: 'string', enum: ['on', 'off', ''] },
         extraArgs: { type: 'string' },
-        tag: { type: 'string' }
+        tag: { type: 'string' },
+        launch: { type: 'object', description: say(T['connection.arg.launch']) },
+        confirm: { type: 'string', description: say(T['connection.arg.confirm']) }
       },
       required: ['action']
     },
     run: async (a) => {
       if (a.action === 'list') return connectionListText((await api('GET', '/v1/connections')) as Parameters<typeof connectionListText>[0])
-      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag', 'launch', 'confirm'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
       // agent-protocol: connectionChangedText's verb, which it words (shared/toolReplies.ts)
       if (a.action === 'add') return connectionChangedText('Made', (await api('POST', '/v1/connections', body)) as ConnectionPublic)
       if (a.action !== 'update') throw new Error(say(T['connection.error.action']))

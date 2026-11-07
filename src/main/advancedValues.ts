@@ -42,15 +42,25 @@ export const advancedValues: AdvancedReader = {
   pattern: (id) => reader.pattern(id)
 }
 
-/** Whether Combwork applies one of its overrides of a CLI (#1167): its off switch (overrideId), on unless turned off. */
-export const overrides = (provider: ProviderId, what: string): boolean => advancedValues.get<boolean>(overrideId(provider, what))
+/**
+ * Whether Combwork applies one of its overrides of a CLI in its own runs of it, not a session's (#1167; HI-2670: Copilot's
+ * sign-in check and model catalogue): the switch is each connection's now, so these follow the CLI's connections (main's
+ * connectionLaunch.ts sets how), off only when every one has it off. A session reads its own connection's (LaunchContext.overrides).
+ */
+let ownRuns: (provider: ProviderId, what: string) => boolean = (provider, what) => advancedValues.get<boolean>(overrideId(provider, what))
+export const overrides = (provider: ProviderId, what: string): boolean => ownRuns(provider, what)
+
+/** Sets how Combwork's own runs of a CLI read its overrides (main, from the connections; tests). */
+export function readOwnRunOverridesWith(fn: (provider: ProviderId, what: string) => boolean): void {
+  ownRuns = fn
+}
 
 /**
  * A provider's override switches as they are now, by id: a launch reads them once as it is prepared
  * (LaunchContext.overrides), so its stages (prepareLaunch, then buildCommand after awaits) agree when one changes meanwhile.
  */
 export function overridesNow(provider: ProviderId): Record<string, boolean> {
-  return Object.fromEntries(ADVANCED_DEFS.filter((d) => d.override && d.group === provider).map((d) => [d.id, advancedValues.get<boolean>(d.id)]))
+  return Object.fromEntries(ADVANCED_DEFS.filter((d) => d.override && d.group === provider).map((d) => [d.id, overrides(provider, d.id.slice(overrideId(provider, '').length))]))
 }
 
 /** One switch as a launch read it when it was prepared (overridesNow), or as it is now for a launch given none. */

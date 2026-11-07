@@ -5,7 +5,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, parseAdvancedFile, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
+import { ADVANCED_DEFS, advancedDef, advancedFileText, advancedUnit, advancedRow, checkAdvanced, cliFacing, groupName, onConnection, parseAdvancedFile, sampleMiss, shownText, type AdvancedDef } from '../src/shared/advanced'
 import { CLAUDE_FOOTER_MODES } from '../src/shared/claude'
 import { COPILOT_FOOTER_MODES } from '../src/shared/copilot'
 import { SETTINGS_CATALOG, checkSettingValue, settingDefault, settingEntry, settingPatch, settingValue, settingValueText } from '../src/shared/settingsCatalog'
@@ -723,7 +723,9 @@ describe('the adapters and the combwork MCP server use them', () => {
 
 describe("the Assistant's settings catalog", () => {
   it('has every advanced value, and a workspace\'s own where one is taken, read, checked and changed like the others', () => {
-    for (const d of ADVANCED_DEFS.filter((x) => !x.setting)) {
+    // A connection's switches (HI-2670) are no longer app-wide: never in the catalogue.
+    for (const d of ADVANCED_DEFS.filter((x) => onConnection(x))) expect(settingEntry(`advanced.${d.id}`), d.id).toBeUndefined()
+    for (const d of ADVANCED_DEFS.filter((x) => !x.setting && !onConnection(x))) {
       const e = settingEntry(`advanced.${d.id}`)
       expect(e, d.id).toBeTruthy()
       expect(e!.hidden).toBe(true)
@@ -731,7 +733,7 @@ describe("the Assistant's settings catalog", () => {
       expect(!!settingEntry(`workspace.advanced.${d.id}`), d.id).toBe(!!d.workspace)
       expect(e!.restart === 'sessions', d.id).toBe(d.applies === 'sessions')
     }
-    const own = ADVANCED_DEFS.filter((d) => !d.setting)
+    const own = ADVANCED_DEFS.filter((d) => !d.setting && !onConnection(d))
     expect(SETTINGS_CATALOG.filter((e) => e.advanced).length).toBe(own.length + own.filter((d) => d.workspace).length)
     const reply = settingEntry('advanced.cw.mcp.replySeconds')!
     expect(settingValue(reply, {} as never, null, null, {})).toBe(300)

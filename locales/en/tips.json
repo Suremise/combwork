@@ -1139,6 +1139,14 @@
     "defaultMessage": "Combwork in your language",
     "description": "A tip's title."
   },
+  "tips.launchSettings.text": {
+    "defaultMessage": "A connection's ⋯ → Launch Settings… → Launch as from a terminal starts its agents with none of Combwork's guidance, tools or typing, as if you had opened the CLI in that folder yourself. They are Independent: in the team, but out of the workflow.",
+    "description": "A tip (HI-2670). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Launch Settings… is a menu entry, Launch as from a terminal a switch). Glossary: independent."
+  },
+  "tips.launchSettings.title": {
+    "defaultMessage": "An agent as if from a terminal",
+    "description": "A tip's title (HI-2670): a connection whose sessions start with none of Combwork's additions."
+  },
   "tips.leftRunning.text": {
     "defaultMessage": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
     "description": "A tip (HI-2111). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Left running is a row's label; End It a button)."

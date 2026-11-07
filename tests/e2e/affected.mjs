@@ -432,6 +432,7 @@ export const AREAS = [
   { paths: ['tests/e2e/notifytarget.cjs', 'src/renderer/src/noticeTarget.ts', 'src/renderer/src/components/Overlays.tsx', 'src/main/events.ts'], suites: ['notifytarget'] },
   { paths: ['src/main/updater.ts', 'src/main/updateFeed.ts', 'src/renderer/src/components/Updates.tsx', 'src/main/buildIdentity.ts', 'src/shared/updates.ts', 'tests/e2e/fakeInstall.cjs'], suites: ['update', 'about'] },
   { paths: ['src/shared/workflow/roles.ts', 'tests/e2e/agentrole.cjs'], suites: ['agentrole', 'agentstable', 'lanestart'] },
+  { paths: ['src/shared/launchPolicy.ts', 'src/main/connectionLaunch.ts', 'src/main/independent.ts', 'src/renderer/src/components/LaunchSettings.tsx', 'tests/e2e/launchsettings.cjs'], suites: ['launchsettings', 'agentrole'] },
   { paths: ['src/renderer/src/components/AgentDialogs.tsx', 'src/renderer/src/components/PermissionMode.tsx'], suites: ['agentrole', 'agents-ui', 'agents', 'mode', 'context', 'codex-handover', 'footerfit', 'dialogs', 'mcpagents'] },
   { paths: ['src/renderer/src/components/AgentPanes.tsx'], suites: ['paneheader', 'pages', 'reorder', 'unmerged', 'sessionname', 'ctxpercent', 'footerfit', 'longsession', 'startfail', 'cardchip', 'agents-ui', 'unpricedcost', 'swap', 'templates', 'narrowmain', 'placement'] },
   { paths: ['src/shared/paneCells.ts'], suites: ['placement', 'swap', 'reorder', 'pages', 'agents'] },

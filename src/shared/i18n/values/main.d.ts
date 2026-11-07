@@ -61,7 +61,9 @@ interface CombworkMessageValues {
   'main.connections.inUse': { name: string | number; users: string | number }
   'main.connections.launch.changedAgain': { agent: string | number }
   'main.connections.launch.changing': { name: string | number; agent: string | number }
+  'main.connections.launch.confirm': { agents: string | number; fingerprint: string | number }
   'main.connections.launch.deleted': { agent: string | number }
+  'main.connections.launch.impactChanged': { agents: string | number; fingerprint: string | number }
   'main.connections.launch.noKey': { name: string | number; agent: string | number }
   'main.connections.launch.none': { cli: string | number; agent: string | number }
   'main.connections.launch.offHere': { n: number; cli: string | number; names: string | number; agent: string | number }

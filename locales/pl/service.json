@@ -7,6 +7,7 @@
   "service.advanced.notJson": "Plik advanced.json nie jest poprawnym JSON-em ({error}).",
   "service.advanced.notObject": "Plik advanced.json powinien zawierać obiekt: {example}.",
   "service.advanced.notValues": "Pole „values” w pliku advanced.json powinno być obiektem ustawienie → wartość.",
+  "service.advanced.onConnection": "„{id}” ustawia się teraz osobno dla każdego połączenia: Ustawienia → Konta i połączenia, menu ⋯ połączenia, Ustawienia uruchamiania.",
   "service.advanced.unknown": "Nie ma ustawienia zaawansowanego „{id}”.",
   "service.answerRelay.title": "{card}: nikt inny nie ma Twojej odpowiedzi",
   "service.assistantAsk.title": "{card}: Asystent nie otrzymał prośby agenta",
