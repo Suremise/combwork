@@ -282,7 +282,10 @@ describe("HR2 on s47: a project's agents count only as its project.json says, re
     ['is not an object', '[]'],
     ['has agents that are not a list', JSON.stringify({ agents: { b1: {} } })],
     ['has an agent without an id', JSON.stringify({ agents: [{ name: 'Nameless', connection: 'c-1' }] })],
-    ['has an agent whose connection is not text', JSON.stringify({ agents: [{ id: 'z1', connection: 7 }] })]
+    ['has an agent whose connection is not text', JSON.stringify({ agents: [{ id: 'z1', connection: 7 }] })],
+    ['has an agent whose role is not text', JSON.stringify({ agents: [{ id: 'z1', workflowRole: { builder: true } }] })],
+    ['has an agent that is not an object', JSON.stringify({ agents: ['b1'] })],
+    ['is null', 'null']
   ] as const) {
     it(`refuses when another open project's project.json ${what}, changing nothing`, async () => {
       two()
