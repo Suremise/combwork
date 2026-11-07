@@ -138,8 +138,10 @@ function sharedTexts(): { name: string; text: string }[] {
   out.push({ name: 'next after one', text: laneNextText({ lane: view, next: { ...next, carryOn: false }, waits: null, queue }) })
   out.push({ name: 'next after two', text: laneNextText({ lane: view, next: { ...next, carryOn: false }, waits: null, queue: [...queue, { card: 3, line: 'merging next' }] }) })
 
-  for (const v of [[], Array.from({ length: 200 }, (_, i) => i + 1), [1.5], [1, 1]]) out.push({ name: `cards ${v.length}`, text: String(laneCards(v)) })
-  out.push({ name: 'rounds', text: String(laneNumber(0, 'rounds', 5)) }, { name: 'wait', text: String(laneNumber(99999, 'waitMinutes', 5)) })
+  // A check's refusal is said with its id (HI-2704): its text.
+  const said = (r: unknown): string => (r && typeof r === 'object' && 'said' in r ? (r as { said: string }).said : String(r))
+  for (const v of [[], Array.from({ length: 200 }, (_, i) => i + 1), [1.5], [1, 1]]) out.push({ name: `cards ${v.length}`, text: said(laneCards(v)) })
+  out.push({ name: 'rounds', text: said(laneNumber(0, 'rounds', 5)) }, { name: 'wait', text: said(laneNumber(99999, 'waitMinutes', 5)) })
   for (const m of [45, 120, 90]) out.push({ name: `wait ${m}`, text: waitText(m) })
   return out
 }

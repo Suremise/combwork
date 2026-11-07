@@ -61,16 +61,16 @@ describe('a build fact', () => {
 
   it('is checked as it arrives, and reads as one line', () => {
     expect(buildFactOf(fact)).toEqual({ ...fact, commit: fact.commit })
-    expect(buildFactOf({ ...fact, kind: 'nightly' })).toEqual({ error: 'kind is one of: beta, baseline, rc, release.' })
-    expect(buildFactOf({ ...fact, commit: 'HEAD' })).toEqual({ error: expect.stringMatching(/^commit is a commit id/) })
-    expect(buildFactOf({ ...fact, installer: '' })).toEqual({ error: expect.stringMatching(/^installer/) })
-    expect(buildFactOf({ ...fact, by: 'ci' })).toEqual({ error: 'by is dist or release.' })
+    expect(buildFactOf({ ...fact, kind: 'nightly' })).toEqual({ error: { said: 'kind is one of: beta, baseline, rc, release.', id: 'api.build.kind' } })
+    expect(buildFactOf({ ...fact, commit: 'HEAD' })).toEqual({ error: { said: expect.stringMatching(/^commit is a commit id/), id: 'api.build.commit' } })
+    expect(buildFactOf({ ...fact, installer: '' })).toEqual({ error: { said: expect.stringMatching(/^installer/), id: 'api.build.installer' } })
+    expect(buildFactOf({ ...fact, by: 'ci' })).toEqual({ error: { said: 'by is dist or release.', id: 'api.build.by' } })
     expect(buildFactSummary(buildFactOf(fact) as never)).toBe('Built Combwork 1.0.0-rc.1 (baseline) from 1fef5341 on 1.0.0')
     expect(buildFactSummary(buildFactOf({ ...fact, kind: 'release', version: '1.0.0', by: 'release' }) as never)).toBe('Uploaded a draft of Combwork 1.0.0 (release) from 1fef5341 on 1.0.0')
   })
 
   it('reads its line and detail back, for the window', () => {
-    const f = buildFactOf(fact) as Exclude<ReturnType<typeof buildFactOf>, { error: string }>
+    const f = buildFactOf(fact) as Exclude<ReturnType<typeof buildFactOf>, { error: unknown }>
     expect(parseBuildSummary(buildFactSummary(f))).toEqual({ by: 'dist', version: '1.0.0-rc.1', kind: 'baseline', commit: '1fef5341', branch: '1.0.0' })
     expect(parseBuildSummary(buildFactSummary({ ...f, kind: 'rc', branch: null, by: 'release' }))).toEqual({ by: 'release', version: '1.0.0-rc.1', kind: 'rc', commit: '1fef5341', branch: null })
     expect(parseBuildSummary('#12 "Ship it" is Done (merged), moved there by B1')).toBeNull()
@@ -85,7 +85,7 @@ describe('a build fact', () => {
 
   // #1534 round 1, finding 4: the window shows a build's line in the user's language (stored and recalled in English).
   it("shows a build's line and detail in every language, and any other entry as written", () => {
-    const f = buildFactOf({ ...fact, by: 'release', kind: 'rc' }) as Exclude<ReturnType<typeof buildFactOf>, { error: string }>
+    const f = buildFactOf({ ...fact, by: 'release', kind: 'rc' }) as Exclude<ReturnType<typeof buildFactOf>, { error: unknown }>
     const e = { source: 'combwork' as const, summary: buildFactSummary(f), detail: buildFactDetail(f) }
     // Stored in English as agents read it; the window says it in the user's language (here English: the same line).
     expect(journalSummary(e)).toBe(e.summary)

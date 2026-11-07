@@ -276,6 +276,26 @@
       "choices": "plain"
     }
   },
+  "api.build.builtAt": {
+    "placeholders": {}
+  },
+  "api.build.by": {
+    "placeholders": {}
+  },
+  "api.build.commit": {
+    "placeholders": {}
+  },
+  "api.build.installer": {
+    "placeholders": {}
+  },
+  "api.build.kind": {
+    "placeholders": {
+      "kinds": "plain"
+    }
+  },
+  "api.build.version": {
+    "placeholders": {}
+  },
   "api.card.archivedArg": {
     "placeholders": {
       "arg": "plain",

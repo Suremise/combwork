@@ -54,6 +54,8 @@ export const EVERYTHING = [
   'src/main/testQuiet.ts',
   // Every IPC call's errors and the Agent API's go through it (#845).
   'src/main/combworkError.ts',
+  // The Agent API's status of plain errors that aren't messages (HI-2704), beside it.
+  'src/shared/kindedError.ts',
   // The language (#767): chosen before every window starts, and every translated text goes through it.
   'src/main/i18n.ts',
   'src/renderer/src/i18n.ts',

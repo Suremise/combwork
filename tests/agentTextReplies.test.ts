@@ -54,7 +54,11 @@ function replies(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []
   const add = (name: string, text: string | { error: string } | number | null | unknown): void => {
     if (typeof text === 'string') out.push({ name, text })
-    else if (text && typeof text === 'object' && 'error' in text) out.push({ name, text: String((text as { error: string }).error) })
+    else if (text && typeof text === 'object' && 'error' in text) {
+      // A check's refusal: its text, or (HI-2704) its said message.
+      const e = (text as { error: unknown }).error
+      out.push({ name, text: typeof e === 'string' ? e : (e as { said: string }).said })
+    }
   }
   add('checks isolated', R.checksView(['typecheck'], 'HI-12', true)?.checksHint)
   add('checks', R.checksView(['typecheck'], 'HI-12', false)?.checksHint)

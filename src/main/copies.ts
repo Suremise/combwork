@@ -31,7 +31,7 @@ import { mkdir } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
 import { placeMatcher, samePlace } from './fsutil'
 import { git, gitErrorLine } from './git'
-import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { agentMsg, inDefaultDialect, say, sayWithId, type AgentMsg, type AgentValues, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
 import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
 import { copyIgnored, listWorktrees } from './worktrees'
@@ -849,7 +849,7 @@ export class CopyPool {
 // --- Isolated runs' copies, asked for apart from the request that asks.
 
 /** A request's answer: the leased copy, `wait` (none free yet: asked again later), or why not. */
-export type RequestAnswer<T> = T | { wait: string } | { refused: string }
+export type RequestAnswer<T> = T | { wait: string } | { refused: Said }
 
 /** A copy being leased for an isolated run (#1435): whose, for what, its answer once there, and when it was last asked about. */
 interface Pending<T> {
@@ -896,11 +896,11 @@ export class IsolatedRequests<T extends { lease: CopyLease }> {
   }
 
   /** `life`: the asking workspace's lifetime; its closing drops the request (its copy given back once it has one). */
-  async ask(owner: string, project: string, asks: string, lease: () => Promise<RequestAnswer<T>>, ticket?: string, life?: AbortSignal): Promise<T | { wait: string; ticket: string } | { refused: string }> {
+  async ask(owner: string, project: string, asks: string, lease: () => Promise<RequestAnswer<T>>, ticket?: string, life?: AbortSignal): Promise<T | { wait: string; ticket: string } | { refused: Said }> {
     const known = ticket ? this.pending.get(ticket) : undefined
     let t = known && known.owner === owner && known.asks === asks ? ticket! : null
     if (!t) {
-      if (life?.aborted) return { refused: say(T.closed) }
+      if (life?.aborted) return { refused: sayWithId(T.closed) }
       while (this.pending.size >= MAX_REQUESTS) this.drop(this.pending.keys().next().value!)
       const id = `t-${randomBytes(8).toString('hex')}`
       t = id
@@ -913,7 +913,7 @@ export class IsolatedRequests<T extends { lease: CopyLease }> {
       }
       const leasing = lease().then(
         (got) => this.settled(p, got),
-        (e: Error) => this.settled(p, { refused: sayStored(T.notLeased, { error: e.message }) })
+        (e: Error) => this.settled(p, { refused: { said: sayStored(T.notLeased, { error: e.message }), id: T.notLeased.id } })
       )
       let timer: NodeJS.Timeout | undefined
       await Promise.race([leasing, new Promise<void>((res) => (timer = setTimeout(res, this.firstWaitMs)))])

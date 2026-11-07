@@ -1,5 +1,4 @@
 {
   "prose|call|{} has changed since revision {}: it is now at revision {}. Read it again, merge your change and write it with expectedRevision {}.": 1,
-  "prose|call|{} no longer exists. Write it without expectedRevision to create it again.": 1,
-  "prose|error|No workspace is open": 1
+  "prose|call|{} no longer exists. Write it without expectedRevision to create it again.": 1
 }

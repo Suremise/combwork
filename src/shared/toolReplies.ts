@@ -18,7 +18,7 @@ import type { QueuePublic } from './workflow/queue'
 import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
 import { idleWatchText } from './idleWatch'
-import { agentMsg, say, type AgentMsg } from './agentText'
+import { agentMsg, say, sayWithId, type AgentMsg, type Said } from './agentText'
 
 /**
  * The replies' text (dialects, HI-2065; HI-2435): said when a reply is built, in its caller's dialect. Numbers are plain
@@ -469,10 +469,10 @@ export function newestComments<T extends { comments: unknown[] }>(v: T, n: numbe
  * GET /v1/tasks/{n}'s `comments=` (HI-2412): null when absent, else a whole number from 0 (0: none of them, all counted in
  * commentsOmitted); anything else is a string saying what's wrong.
  */
-export function commentsParam(raw: string | null): number | null | { error: string } {
+export function commentsParam(raw: string | null): number | null | { error: Said } {
   if (raw === null) return null
   const n = raw.trim() === '' ? NaN : Number(raw)
-  return Number.isInteger(n) && n >= 0 ? n : { error: say(R.commentsInvalid, { raw }) }
+  return Number.isInteger(n) && n >= 0 ? n : { error: sayWithId(R.commentsInvalid, { raw }) }
 }
 
 /**
