@@ -1,9 +1,5 @@
 # Scenario baseline, 3 October 2026
 
-**From 7 November 2026 (HI-2662):** the fake Codex's and the Copilot CLI's default runs are the delivery contracts
-(`delivery.cjs`), not the whole set: a baseline saved from one of them compares by scenario with an older whole-set one,
-and only those scenarios are in it. `--every` makes a whole-set baseline there.
-
 **Fixtures v5** (`scenarios.cjs`), with evidence only of what ran:
 - **Combwork calls**: the Combwork MCP server's own log of executed calls. Transcript names count as mentions only.
 - **Skill reads**: a successful read showing the skill.

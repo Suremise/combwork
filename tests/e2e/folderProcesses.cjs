@@ -235,15 +235,17 @@ function endAsCrash(list, top, rest) {
  * Stops the processes that are the test's own (above), each with its children: those naming `folder` that started at
  * or after `since`, and those of `tree` (processTree's, taken before its Combwork closed) still running. Each is ended as
  * the process it was when listed (endExactly), never by a pid alone, and children before their parents (childrenFirst);
- * what one started meanwhile is found by the next look (a few at most). Returns how many were ended.
+ * what one started meanwhile is found by the next look (a few at most). `list`: a listing just taken (processes()), for
+ * the first look, when nothing was ended since it was taken (HI-2663: a listing costs about a second); later looks list
+ * again. Returns how many were ended.
  */
-function stopProcessesIn(folder, since = 0, tree = []) {
+function stopProcessesIn(folder, since = 0, tree = [], { list: first } = {}) {
   if (process.platform !== 'win32') return 0
   let ended = 0
   for (let look = 0; look < 3; look++) {
     let list
     try {
-      list = processes()
+      list = look === 0 && first ? first : processes()
     } catch {
       return ended
     }

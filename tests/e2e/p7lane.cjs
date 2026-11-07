@@ -485,7 +485,7 @@ function helpers(h) {
     await h.app.close().catch(() => undefined)
   }
 
-  // --- The second start: the restart's Resume All (S35), then the pool (beta) and everyone in the project folder (gamma).
+  // --- The second start: the restart's Resume All (S35), then the pool (beta).
   h = await startCombwork()
   try {
     if (kept.ok) {
@@ -522,11 +522,9 @@ function helpers(h) {
   } catch (e) {
     caught('the pool: ', e)
   }
-  try {
-    await everyoneInTheFolder(h)
-  } catch (e) {
-    caught('everyone in the project folder: ', e)
-  }
+  // Everyone in the project folder with the pool (HR2's round 1 finding 2 on #1428) is reviewerpool's section 2, with this
+  // suite's checks of it (no slot lent, the builder's and the reviewer's folder), and a Codex reviewer leased a copy at the
+  // revision is reviewcopies's: run here too until HI-2663.
   if (kept.ok)
     try {
       await gallery(h, kept)
@@ -653,39 +651,6 @@ async function pool(h) {
     return (await inv('lanes:start', beta, { builder: b2.id, reviewer: null, pool: true, cards: [p5] }).catch((e) => (/ is working| is starting| is waiting/.test(String(e)) ? null : Promise.reject(e))))?.lane ?? null
   }, HUNG_MS)
   check('another lane on the pool, left running', !!l5 && !!(await until(() => x.slotOfLane(beta, l5.id), HUNG_MS)), JSON.stringify(await x.live(beta, b2.id)))
-}
-
-/**
- * C. gamma, everyone in the project folder with the pool (HR2's round 1 finding 2 on #1428): Committed is done, two
- * builders in the project folder, one pooled Codex reviewer; each card is reviewed from the pool in a review copy at its
- * revision and is Done, and no slot is lent.
- */
-async function everyoneInTheFolder(h) {
-  const { inv } = h
-  const x = helpers(h)
-  await inv('workflow:setOptions', gamma, { preset: null, options: { review: 'agent', noSelfReview: true, finish: 'committed', folder: 'project', preChecks: [], identity: fx.identity, okBefore: { mode: 'never', labels: [] }, reviewerMode: 'pool' } })
-  const g1 = await lib.addAgent(inv, gamma, { name: 'G-B1', workflowRole: 'builder' })
-  const g2 = await lib.addAgent(inv, gamma, { name: 'G-B2', workflowRole: 'builder' })
-  const gr = await lib.addAgent(inv, gamma, { name: 'G-R1', workflowRole: 'reviewer', provider: 'codex' })
-  for (const [b, title] of [[g1, 'Folder: first'], [g2, 'Folder: second']]) {
-    const n = await x.create(gamma, title)
-    const l = await inv('lanes:start', gamma, { builder: b.id, reviewer: null, pool: true, cards: [n] })
-    check(`${b.name}'s lane on the pool, with no slot`, l.lane?.pool === true && !l.slot, JSON.stringify(l))
-    const s = await x.intent(gamma, b, n, 'start')
-    check(`${b.name} starts its card in the project folder`, s.status === 200 && same(s.body?.data?.folder ?? gamma, gamma) && same((await x.live(gamma, b.id))?.cwd, gamma), JSON.stringify(s.body))
-    const key = (await x.card(n)).key
-    const rev = commitIn(gamma, { [`${key}.txt`]: `${key}\n` }, title, key)
-    const sub = await x.intent(gamma, b, n, 'submit', { summary: `${title}: ready`, revision: rev })
-    check('…submitted', sub.status === 200, JSON.stringify(sub.body))
-    // The builder moves on in the folder: the reviewer reads the card at its revision in a copy.
-    commitIn(gamma, { 'later.txt': `after ${key}\n` }, `after ${title}`)
-    await until(async () => (await assignedOf(x, n)).includes(gr.id), HUNG_MS)
-    await x.idle(gamma, gr.id)
-    const { s: r, copy } = await x.startReview(gamma, gr, n)
-    must(`G-R1 reviews it from the pool in a review copy at ${rev.slice(0, 7)}`, r.status === 200 && !!copy && git(copy, 'rev-parse', 'HEAD') === rev && same((await x.live(gamma, gr.id))?.cwd, gamma), JSON.stringify(r.body))
-    check('…passes it: Done (committed)', (await x.intent(gamma, gr, n, 'verdict', { pass: true, comment: 'passed' })).status === 200 && (await x.done(n)))
-  }
-  check('no slot was lent in gamma', (await x.slots(gamma)).length === 0, JSON.stringify(await x.slots(gamma)))
 }
 
 /**

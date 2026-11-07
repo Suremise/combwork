@@ -153,9 +153,8 @@ The checks are positive and negative:
 
 ```bash
 npm run scenarios                             # the fake Claude Code: free, deterministic (a failure fails the run)
-npm run scenarios -- --provider fake-codex    # the fake Codex: its delivery contracts (below), through Combwork's Codex adapter
+npm run scenarios -- --provider fake-codex    # the fake Codex: the same, through Combwork's Codex adapter
 npm run scenarios -- --provider fake-copilot  # the real Copilot CLI offline against a scripted model: the same, at no cost
-npm run scenarios -- --provider fake-codex --every    # every scenario there; --only names any scenario on any provider
 npm run scenarios -- --save-baseline fake-main                                  # keep this run's benchmark as a baseline
 npm run scenarios -- --provider codex --repeat 3 --budget 2                     # a model trial, 3 samples a scenario
 npm run scenarios -- --provider claude-code --model haiku --budget 2            # model trials: opt-in
@@ -167,23 +166,12 @@ npm run scenarios -- --dialect "Opus 5.5 v2.json" --provider claude-code --model
 node tests/scenarios/measure.cjs              # what sessions are given about Combwork, measured from real launches
 ```
 
-**Which fake runs which scenarios** (HI-2662, `delivery.cjs`). Combwork's workflow doesn't change by provider, so the
-**common set**, every scenario, runs once on the fake Claude Code (`fake`). The fake Codex and the Copilot CLI run the
-**delivery contracts**: the scenarios whose result depends on how that CLI is given and gives back what Combwork sends
-(its skills, tool calls and replies, prompts typed into its pane, hook context, its shell and process tree, its folder, a
-fresh launch). Each id in `DELIVERY` says which of those it exercises. `tests/scenarioSelection.test.ts` fails a scenario
-whose own definition depends on the provider but isn't there (`providerSensitive`: a `fakeSkips` function, a
-`fakeWakes`, `beforeLaunch` or `beforePrompt`, or the provider read in a callback; a lexical check, so what a helper does
-isn't seen and the list is reviewed by hand too), and checks that every scenario still runs on `fake`. A provider's own
-checks stay where they are (`fakeSkips` by provider). `--every` runs the whole set on a delivery provider, and `--only` a
-named scenario on any provider, for a doubt about it there. A guidance-wide check is then `npm run scenarios` and the
-two providers' default runs: about an hour where the three whole sets took two and a half.
-
 **When a model trial runs** is AGENTS.md's rule (HI-2662, the user's decision, 7 Nov): a card that changes agent-facing
 text runs the scenarios that text affects on each model it reaches, before and after, on the same provider, model,
 effort and dialect, and names them on the card; a release gets 3 to 5 at random (RELEASING.md). A detector or a
 fixture's premise is fixed with a unit test of its actual failure (`tests/scenarioObserve.test.ts` and the like), never
-with a model run: HI-2560's alarms were mostly detector errors.
+with a model run: HI-2560's alarms were mostly detector errors. Which fakes run which scenarios is `fakeScope.cjs`'s
+(below, HI-2663).
 
 **A dialect** (HI-2439; plans/2026-11-03-dialects-design.md, section 6): `--dialect <file>` puts a dialect file in the
 model slot of every agent of the provider's CLI, as a test copy in each scenario workspace's `.combwork/dialects/<CLI>/`.
@@ -221,6 +209,16 @@ its Combwork tool does, so a model trial gets the same fixture as a fake (#1545)
   in a home of the run's own: a scripted stand-in model (`tests/e2e/fake-copilot-api.cjs`) turns the same commands into
   Copilot's own tool calls (its skill tool, the Combwork MCP server's tools), so its hooks, skills and transcript are
   Copilot's. It needs the Copilot CLI installed (the run is skipped without it) and no sign-in.
+  - **Which fakes run a scenario** (HI-2663, `fakeScope.cjs`): every fake reaches Combwork through the same MCP server,
+    so all three run only the scenarios whose script exercises what differs per CLI (skill delivery, launch guidance and
+    modes, the shell, lines Combwork types in, hooks, slot and copy folders), and loss of work, crash and settings
+    races. Those whose checks read only the board and Combwork's records after the server run on `fake` alone
+    (`FAKE_CLAUDE_ONLY`); those whose checks hold by construction on a fake run as model trials only
+    (`MODEL_TRIALS_ONLY`). `tool-sweep` calls, through each CLI, the tools only the fake-alone ones use. A scenario not
+    named there runs on all three. A run says what it leaves out: with `--only`, `NOT RUN <id>: runs on fake only …:
+    --provider fake` (or "model trials only"), and a run left with nothing to run exits 2 without a result, so the
+    provider to name for a regression is in that line. A full set on `fake-codex` or `fake-copilot` runs about a third of
+    the scenarios: the per-CLI ones.
 - **Model trials** cost tokens, and run only in the providers' **test homes**: never the user's own `~/.claude` or
   `~/.codex`, and never a copy of their credentials (refreshing a copy could sign the user out).
   - **Claude Code** uses `%LOCALAPPDATA%\combwork-test\claude` (`CW_TEST_CLAUDE_HOME` overrides it). Sign in to it once, by
@@ -273,8 +271,8 @@ its Combwork tool does, so a model trial gets the same fixture as a fake (#1545)
   table). `results.json` is written as each trial ends (`meta.incomplete` says how many of how many until the run
   has ended), so a run cut short keeps what it had. A run holds its folder while it runs (`runner.json`, its process):
   no other run's start prunes it, however many start meanwhile (HI-2234), and should the folder go all the same, the
-  run makes it again with everything it had written, says so, and carries on. `BASELINE.md` here records the latest baseline. After changing agent-facing text, run the scenarios
-  it affects again and compare, as AGENTS.md says (above, When a model trial runs).
+  run makes it again with everything it had written, says so, and carries on. `BASELINE.md` here records the latest baseline. Run the trials
+  again after changing Combwork's guidance, a skill or a tool's description, and compare.
 - **Progress** (#1457): run in a Combwork agent's session, a run shows in that Combwork's Progress panel with a step per trial,
   named with the results so far (`review-card · 11 ok, 1 failed`), and an estimate from the trials timed before (by
   provider); under `cw-progress` it gives the wrapper's row those steps. `--no-progress` or `CW_PROGRESS=0` turns

@@ -124,8 +124,6 @@ export const EVERYTHING = [
  */
 export const AREAS = [
   { paths: ['tests/e2e/codexDiagnostics.cjs'], suites: ['codex-background'] },
-  // A process that fails to start, reported with its code (#599).
-  { paths: ['tests/e2e/windowsExits.cjs', 'tests/e2e/record.mjs'], suites: ['failfast'] },
   { paths: ['src/main/ptyHost.ts', 'src/main/sessions.ts'], suites: ['stopswitch', 'replysize', 'quit', 'copilotsize', 'termsize'] },
   { paths: ['src/main/agentProcesses.ts', 'src/main/processSupervisor.ts', 'src/main/launchGate.ts', 'src/main/ptyHost.ts', 'src/shared/agentProcesses.ts', 'src/main/sessions.ts', 'tests/e2e/fake-claude/linger.cjs'], suites: ['leftovers', 'leftovers-restart', 'unexpectedclose-leftovers'] },
   { paths: ['tests/e2e/fake-claude/devapp/'], suites: ['leftovers-restart'] },
@@ -302,7 +300,7 @@ export const AREAS = [
   { paths: ['tests/e2e/queuefocused.cjs', 'scripts/focusedTests.mjs'], suites: ['queuefocused'] },
   // The queue's controls (#1353): its model, Pause/Resume, Remove from queue and Retry merge, cw_queue.
   { paths: ['src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/workflow/queueControls.ts', 'src/main/folderFence.ts', 'src/shared/workflow/facts.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeuefolder.cjs', 'tests/e2e/mergequeuecrash.cjs'], suites: ['mergequeuecrash', 'mergequeuefolder'] },
-  { paths: ['src/main/workflow/mergeQueue.ts', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergestrict.cjs'], suites: ['mergestrict', 'workflowoptions'] },
+  { paths: ['src/main/workflow/mergeQueue.ts', 'src/shared/workflow/options.ts', 'src/shared/workflow/optionTexts.ts', 'src/renderer/src/components/WorkflowOptions.tsx', 'tests/e2e/queueFixture.cjs'], suites: ['p5lane', 'workflowoptions'] },
   { paths: ['src/main/workflow/queueControls.ts', 'src/shared/workflow/queue.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/queueHost.ts', 'src/main/cardIntents.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/queuecontrols.cjs'], suites: ['queuecontrols', 'replysize'] },
   // The queue on the card, in the Git tab and in the Merge dialog (#1357).
   { paths: ['src/renderer/src/components/CardQueue.tsx', 'src/renderer/src/components/GitQueueSection.tsx', 'src/renderer/src/components/CardWork.tsx', 'src/renderer/src/components/ForYou.tsx', 'src/renderer/src/components/AgentDialogs.tsx', 'src/shared/workflow/workView.ts', 'src/main/workflow/queueControls.ts', 'src/shared/workflow/queue.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/queuecard.cjs'], suites: ['queuecard'] },
@@ -825,7 +823,8 @@ export const UNIT_SCANS = [
   { test: 'tests/i18n/numbers.test.ts', paths: ['locales/en/'] },
   { test: 'tests/i18nCatalogues.test.ts', paths: ['locales/', 'src/shared/i18n/values/'] },
   { test: 'tests/i18nCatalogues.test.ts', paths: ['src/'], lines: ['msg\\(', '\\btr\\(', 'tRich\\(', 'defaultMessage', 'description', '\\bid:'] },
-  { test: 'tests/i18nGuard.test.ts', paths: ['src/', 'i18n/allow/'] },
+  // A real file and its allowlist (Board.tsx's); the whole source is the CLI's (check:repo, CI), not this test's (HI-2663).
+  { test: 'tests/i18nGuard.test.ts', paths: ['src/renderer/src/components/Board.tsx', 'i18n/allow/'] },
   // Agent text (HI-2065): the guard against new hard-coded agent text over src/ and its lists; the catalogue and schema
   // extracted from the agentMsg() descriptors, current.
   { test: 'tests/agentTextGuard.test.ts', paths: ['src/', 'agent-text/allow/'] },

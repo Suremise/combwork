@@ -335,8 +335,12 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     await tabsLane.locator('.progress-lane-expand').click()
     await shoot('lanes-wait')
     await inv('advanced:set', 'cw.lanes.waitYouMinutes', 1)
-    // The bound a minute: marked once a minute has passed (a condition, bounded for a hung run).
-    check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), 120_000)), await tabsWaited.textContent().catch(() => ''))
+    // The bound a minute: marked once a minute has passed. The window's clock is moved on past it rather than waited
+    // out (HI-2663: that real minute was the suite's longest step); the time shown and its mark are the window's own,
+    // worked out from the lane's real `since` (laneBar.test.ts has the bound's arithmetic).
+    await page.clock.install()
+    await page.clock.fastForward(61_000)
+    check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), HUNG_MS)), await tabsWaited.textContent().catch(() => ''))
     await shoot('lanes-wait-long')
     await inv('advanced:set', 'cw.lanes.waitYouMinutes', null)
     // Six more lanes (solo, their builders started by Combwork): seven in all, more than fit.
