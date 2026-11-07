@@ -71,6 +71,9 @@ const before2587 = (s: string): string =>
 /** Code without its comments and with the folder's name as 1.0 had it: what makes the schema. */
 const code = (s: string): string =>
   before2587(s)
+    // The modules' reads (v1_0.ts's QUERIES) aren't the schema: a later card adds one on a 1.0 index (HI-2709's
+    // links.dependents), and tests/schemaV1_0.test.ts checks each one's plan against the 1.0 tables.
+    .replace(/\nexport const QUERIES\b[\s\S]*?\n\}\n/, '\n')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
     .replace(/\.combwork/g, OLD_DIR)

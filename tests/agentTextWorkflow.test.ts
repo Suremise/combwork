@@ -58,6 +58,8 @@ const FAILURES: Failed[] = [
 ]
 const STATES: QueueState[] = [
   { state: 'queued', target: 'main', position: 2 },
+  // HI-2709: waiting for its blockers to be Done.
+  { state: 'waiting', target: 'main', on: ['HI-4', 'HI-5'] },
   { state: 'testing', target: 'main', step: 'advance' },
   { state: 'testing', target: 'main', step: 'checks' },
   { state: 'testing', target: 'main', step: null },

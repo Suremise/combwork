@@ -48,7 +48,8 @@ describe('the lanes a run sweeps at its start (HI-1453)', () => {
     const run = readFileSync(join(__dirname, 'e2e', 'run.mjs'), 'utf8')
     expect(run).toContain('await endLeftCopies(runContext.LANES_DIR, lib.WORK)')
     expect(run).toContain('left.unrecorded.map(')
-    expect(run).toContain('endCopies([dir]).ended')
+    // A suite's folder alone (HI-2663 passes the runner's one process listing beside it).
+    expect(run).toMatch(/endCopies\(\[dir\](, \{ list: [^}]*\})?\)\.ended/)
     const fp = readFileSync(join(__dirname, 'e2e', 'folderProcesses.cjs'), 'utf8')
     const endCopiesSource = fp.slice(fp.indexOf('function endCopies('), fp.indexOf('module.exports'))
     // What it ends comes from the records alone: the guess at copies (command lines) only fills the list.
