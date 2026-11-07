@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 126
+const FIXTURES_VERSION = 127
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -3569,6 +3569,66 @@ module.exports.SCENARIOS = [
         ['moved neither card past its rules itself', o.cards.h?.column === 'todo' && o.cards.a?.column === 'doing', `${o.cards.h?.column} / ${o.cards.a?.column}`]
       ]
     }
+  },
+  {
+    id: 'card-loop-progress-comment',
+    title: "A card loop builder idle mid-card, told by the Assistant what it waited for and asked for a line on the card (HI-2716): it answers on the card, then carries on and submits it, rather than ending its turn on a watch of its own card in Doing",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    assistantMessages: true,
+    // Combwork starts the lane's first card on Coder itself, with its line (card-loop-submit-watch's, HI-2215): the prompt
+    // below is a model's only as the line says it, and the fake is typed its steps after it, the card already in Doing.
+    startedByCombwork: true,
+    // The fake Codex acts out its wake too (harness.cjs), so the fakes all take the message as a model idle mid-card does.
+    codexWakes: true,
+    async setup(c) {
+      await pairInProject(c)
+      const a = await c.card('a', { title: 'Greeting says Hi, with a test', description: `Two parts. 1. ${CARD_LOOP_GREETING} Commit it. 2. Add greet.test.js, a node:assert test that greet.js greets the name the user picks, run it with node, commit it, and submit the card.`, agent: 'coder' })
+      await c.inv('tasks:update', a, { decision: 'Part 2 tests the name the user picks, "Ann" or "Bo": the Assistant brings their pick in a message once part 1 is committed. Do part 1, then wait for that message; don\'t ask the user yourself.' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      await c.startAssistant()
+      c.head = c.git('rev-parse', 'HEAD').trim()
+    },
+    // Once part 1 is committed and its turn has ended (idle mid-card), the Assistant brings the user's pick and asks for a
+    // line on the card, as on 7 Nov in the cli project (CB1, CB2): typed to it as the doorbell. Then, each time it is quiet
+    // after reading it, where its turn ended: its status, the card's column and its watch.
+    async during(c, status) {
+      const quiet = ['ready', 'finished', 'watching'].includes(status)
+      const column = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column
+      if (!c.sentAt && quiet && column === 'doing' && c.git('rev-parse', 'HEAD').trim() !== c.head) {
+        c.sentAt = Date.now()
+        c.premise = { column, status, test: c.read('greet.test.js') ?? null }
+        c.sent = await c.assistantMessage('coder', `The user picked "Ann" for #${c.cards.a}'s test. A line on the card saying you've got it, please.`)
+      }
+      if (!c.sentAt) return
+      c.got = await c.deliveries('coder')
+      if (quiet && ['acked', 'received'].includes(sentMessage(c)?.state)) c.quiet = { status, column, watch: (await coderLive(c))?.watch ?? null }
+    },
+    // Until the message is acked or has ended, at most 4 minutes after it was left; and before it, until part 1 is in.
+    keepWaiting: async (c) => {
+      const msg = sentMessage(c)
+      return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))
+    },
+    prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you: do it as its decision says, and hand it to your reviewer as your loop says.`,
+    fake: () => `skill card-loop then ${LOOP_COMMIT}`,
+    // The first wake is Combwork's start of the card (its line, before the fake's steps are typed): nothing to do yet.
+    fakeWakes: (c) => ['say Card started.', `boardcomment ${c.cards.a} then cw cw_read_task {"number":${c.cards.a}} then shell: node -e "require('fs').writeFileSync('greet.test.js', '// greets Ann\\n')" then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi, with its test of Ann.')}`],
+    expect: (o, c) => {
+      const msg = sentMessage(c)
+      const review = handedOnAt(o, c, 'a')
+      const answered = (o.cards.a?.comments ?? []).some((x) => /Coder/.test(x.by) && Date.parse(x.at) >= (c.sentAt ?? Infinity) && (!review || Date.parse(x.at) <= review))
+      const q = c.quiet
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['the Assistant told it while it was idle mid-card (part 1 committed, the card in Doing, no test yet; typed: the doorbell)', (c.sent ?? '').startsWith('Told') && !!msg && c.premise?.column === 'doing' && !c.premise?.test, `${c.sent} ${JSON.stringify(c.premise)} ${JSON.stringify(msg)}`],
+        ['read it and acked it', msg?.state === 'acked', JSON.stringify(msg)],
+        ['answered on the card before handing it on', answered, JSON.stringify((o.cards.a?.comments ?? []).map((x) => [x.by, x.at]))],
+        ['carried on: a test of Ann, and the card submitted (Review)', /Ann/.test(c.read('greet.test.js') ?? '') && review > 0 && submissionsOf(o, c, 'a').length > 0 && o.cards.a?.column === 'review', `${o.cards.a?.column}; ${history(o.cards.a).join(' | ')}`],
+        ["didn't end its turn watching its own card in Doing", !!q && q.column !== 'doing', JSON.stringify(q)],
+        ["didn't ask the user whether to carry on", called(o, 'cw_notify').length === 0 && ran(o, 'cw_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
+      ]
+    },
+    // The fake Copilot answers no wake: after the message it stops, so only its fixture is checked there.
+    fakeSkips: (provider) => (provider === 'fake-copilot' ? ['answered on the card before handing it on', 'carried on: a test of Ann, and the card submitted (Review)', "didn't end its turn watching its own card in Doing"] : [])
   },
   {
     id: 'old-move-submit',
