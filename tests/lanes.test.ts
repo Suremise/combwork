@@ -315,7 +315,7 @@ describe('the lanes service', () => {
   beforeAll(async () => {
     const p = join(wsPath, 'alpha')
     mkdirSync(join(p, '.combwork'), { recursive: true })
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'b2', name: 'B2', workflowRole: 'either' }, { id: 'g1', name: 'G1', workflowRole: 'generalist' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     lanes.startLanes()

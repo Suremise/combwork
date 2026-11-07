@@ -4,7 +4,7 @@ import { refusalBody, type Refusal } from '../shared/workflow/refusals'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
-import { agentWorkflowRole } from '../shared/workflow/roles'
+import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
 import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
@@ -102,6 +102,7 @@ const A = {
   itsBranch: agentMsg({ id: 'lane.reorder.itsBranch', text: 'its branch', note: "In place of {line}: where a put-back card's work stays, when its branch's name isn't known." }),
   putBackWhy: agentMsg({ id: 'lane.reorder.putBackWhy', text: 'Put back by a lane reorder applied now ({by})', note: "The reason recorded on a card put back by a reorder applied now (HI-1995), stored on the card's facts; {by} is who reordered." }),
   independent: agentMsg({ id: 'lane.refused.independent', text: "{agent} is Independent: it takes no part in the workflow (its own role, or its connection launches it without Combwork's tools), so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-2670): an Independent agent is never a lane's builder or reviewer." }),
+  wrongSide: agentMsg({ id: 'lane.refused.wrongSide', text: "{agent} is a {part, select, builder {reviewer} other {builder}} by its role, so it has no {part}'s tools: a lane's {part} is a {part} or an either-role agent. Choose another, or change {agent}'s role first.", note: "cw_lane's refusal (HI-2664): an agent's Combwork tools follow its workflow role, so a lane part only for a role that does it. {part} is builder or reviewer." }),
   oldTools: agentMsg({ id: 'lane.refused.oldTools', text: "{agent}'s role changed while it was running, and it still has its old role's tools: it can't take this part of the lane until it restarts. Restart it first (its pane says it needs a restart), then try again.", note: "cw_lane's refusal (HI-2664): an agent keeps the tools it launched with until it restarts, so a lane part needing its new role's tools waits for that." }),
   generalist: agentMsg({ id: 'lane.refused.generalist', text: "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer." }),
   sharedItem: agentMsg({ id: 'lane.warn.sharedItem', text: "{card} is also in {builder}'s lane ({lane})", note: "One card of a start's list another builder's running lane lists too (HI-1821); {lane} is that lane's id. Joined with \"; \" into lane.warn.shared's {items}." }),
@@ -901,18 +902,21 @@ async function agentIn(ws: WorkspaceService, project: string, id: string): Promi
 
 /**
  * A generalist takes no side in the workflow (HI-686): never a lane's builder or reviewer, however the lane is started
- * or joined (the window's Start Lane, the Agent API, the cw_ tools). Refused before anything changes; the other roles
- * as before.
+ * or joined (the window's Start Lane, the Agent API, the cw_ tools). Refused before anything changes. `ids`: the
+ * lane's builder, then its reviewer. Each part only for a role that does it (HI-2664: its tools follow its role, so a
+ * builder named a lane's reviewer would have no cw_verdict), as Start Lane… offers them: a builder or either-role agent
+ * builds, a reviewer or either-role agent reviews.
  */
 async function refuseGeneralist(ws: WorkspaceService, project: string, ids: readonly (string | null | undefined)[]): Promise<void> {
   if (!ws.path) return
   const cfg = await ws.projectConfig(join(ws.path, project)).catch(() => null)
-  for (const id of ids) {
+  for (const [i, id] of ids.entries()) {
     const a = id && cfg ? projectAgents(cfg).find((x) => x.id === id) : undefined
     const role = a ? agentWorkflowRole(a) : null
     if (a && role === 'generalist') throw new LaneError(400, say(A.generalist, { agent: a.name }))
     // Independent (HI-2670): no part in the workflow at all.
     if (a && role === 'independent') throw new LaneError(400, say(A.independent, { agent: a.name }))
+    if (a && role && (i === 0 ? !buildsWork(role) : !reviewsWork(role))) throw new LaneError(400, say(A.wrongSide, { agent: a.name, part: i === 0 ? 'builder' : 'reviewer' }))
   }
 }
 

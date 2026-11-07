@@ -324,6 +324,12 @@
       "project": "plain"
     }
   },
+  "lane.refused.wrongSide": {
+    "placeholders": {
+      "agent": "plain",
+      "part": "select"
+    }
+  },
   "lane.reorder.itsBranch": {
     "placeholders": {}
   },

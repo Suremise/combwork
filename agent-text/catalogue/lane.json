@@ -275,6 +275,10 @@
     "text": "No agent \"{name}\" in {project}; this lane is reviewed by the project's reviewer pool: leave reviewer out.",
     "note": "cw_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane is reviewed by the pool."
   },
+  "lane.refused.wrongSide": {
+    "text": "{agent} is a {part, select, builder {reviewer} other {builder}} by its role, so it has no {part}'s tools: a lane's {part} is a {part} or an either-role agent. Choose another, or change {agent}'s role first.",
+    "note": "cw_lane's refusal (HI-2664): an agent's Combwork tools follow its workflow role, so a lane part only for a role that does it. {part} is builder or reviewer."
+  },
   "lane.reorder.itsBranch": {
     "text": "its branch",
     "note": "In place of {line}: where a put-back card's work stays, when its branch's name isn't known."

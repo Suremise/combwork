@@ -309,6 +309,11 @@ function handMerged(c, n) {
   c.git('merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch)
   return { branch, base }
 }
+/** Implementer builds and Coder reviews (HI-2664: the harness saves them the other way round). */
+async function swapRoles(c) {
+  await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
+  await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
+}
 /** Coder builds and Implementer reviews (their workflow roles), in a project whose work an agent reviews (#1527). */
 async function reviewedPair(c) {
   await pairInProject(c)
@@ -3413,6 +3418,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
+      await swapRoles(c)
       // Implementer starts the card, registers its lane (the subject, Coder, reviewing) and posts its design, with its own
       // token. The start comes before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing this start.
@@ -3487,6 +3493,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
+      await swapRoles(c)
       // Implementer's round 1 sent for review, then its lane (the subject, Coder, reviewing), then its follow-up, with its
       // own token. The moves come before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing the move to Doing.
