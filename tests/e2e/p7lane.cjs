@@ -345,6 +345,7 @@ function helpers(h) {
     const l2 = await x.startLane(alpha, [c1], b2, r2, '1.2.0')
     check('two lanes started from the window, AL-B1 / AL-R1 and AL-B2 / AL-R2', !!l1 && !!l2, JSON.stringify(await inv('lanes:list')))
     check('HI-2556: lane 2 merges into 1.2.0, lane 1 into the project’s main', l2?.target === '1.2.0' && !l1?.target, JSON.stringify([l1?.target, l2?.target]))
+    await x.showTab('lanes')
     check('…its header says "into 1.2.0"', !!(await until(async () => (await x.laneTop(l2.id).locator('[data-lane-target="1.2.0"]').count()) === 1, HUNG_MS)), await x.text(x.laneTop(l2.id)))
     Object.assign(kept, { a1, a2, c1, l1: l1?.id, l2: l2?.id })
     const slotA = await until(() => x.slotOfLane(alpha, l1.id), HUNG_MS)

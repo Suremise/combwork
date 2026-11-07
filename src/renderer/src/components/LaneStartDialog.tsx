@@ -122,6 +122,8 @@ export function LaneStartDialog() {
     setNote('')
     setWaiting(false)
     setApplyNow(false)
+    // Each opening starts on the project's own branch (HI-2556): a pick never carries over to the next lane.
+    setTarget('')
     action.setError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [req])
