@@ -3,8 +3,9 @@
 // variables, the updater, a private USERPROFILE with HOME kept), the workspace's .agents config (fail closed), each
 // agent's private profile (Combwork's servers; a project's own server not given refuses the launch), the
 // launch settings and arguments, conversation ids, and the PC-wide account.
-import { mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
+import { release } from 'os'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { createRequire } from 'module'
@@ -22,7 +23,7 @@ const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { b
 const childBase = (): Record<string, string> => runContext.baseEnv() as Record<string, string>
 const { UnreadableConfig, scannedFolders, workspaceServers } = await import('../src/main/providers/antigravity/projectConfig')
 const { copyOnboarding, onboarded, onboardingComplete, postOnboardingBlock } = await import('../src/main/providers/antigravity/onboarding')
-const { AUTO_MIN_BUILD, GUIDANCE_FILE, agyServer, antigravity, launchGuidance, legacySseServers, windowsBuild, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
+const { AUTO_MIN_BUILD, AUTO_MIN_REVISION, AUTO_SHARED_SERVICING, GUIDANCE_FILE, RULES_MAX_BYTES, agyServer, antigravity, autoSandbox, guidanceBytes, launchGuidance, legacySseServers, regNumber, windowsVersion, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
 const { advanced } = await import('../src/main/advanced')
 const { ensurePcAccounts, homeAccount, pcAccountId, pcWideSignIn } = await import('../src/shared/connectionDefaults')
 const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
@@ -232,15 +233,51 @@ describe("an agent's private profile, written for each launch", () => {
     expect(antigravity.launchNotice({ mcpServers: { [TOOLS_SERVER]: tools }, permissionMode: 'accept-edits' } as never)).toBeNull()
   })
 
-  it('Auto on a Windows older than 11 24H2 (build 26100) is said plainly as the agent starts, never switched silently', () => {
-    expect(windowsBuild('10.0.22631')).toBe(22631)
-    expect(windowsBuild('10.0.26200')).toBe(26200)
-    expect(windowsBuild('x')).toBeNull()
-    expect(AUTO_MIN_BUILD).toBe(26100)
-    const old = windowsBuild() !== null && windowsBuild()! < AUTO_MIN_BUILD
-    const notice = antigravity.launchNotice({ mcpServers: {}, permissionMode: 'auto' } as never)
-    expect(!!notice?.message.includes('Windows 11 24H2')).toBe(old)
-    expect(antigravity.launchNotice({ mcpServers: {}, permissionMode: 'ask' } as never)).toBeNull()
+  it("Auto's sandbox needs 24H2 with the August 2026 update (revision 9168 of 26100 and 26200): below it, or unknown, is said", () => {
+    expect([AUTO_MIN_BUILD, AUTO_SHARED_SERVICING, AUTO_MIN_REVISION]).toEqual([26100, 26200, 9168])
+    expect(autoSandbox({ build: 22631, revision: 9999 })).toBe('old')
+    // HR1's case: 24H2 itself, but before the August 2026 update.
+    expect(autoSandbox({ build: 26100, revision: 8000 })).toBe('old')
+    expect(autoSandbox({ build: 26100, revision: 9167 })).toBe('old')
+    expect(autoSandbox({ build: 26100, revision: 9168 })).toBe('ok')
+    expect(autoSandbox({ build: 26200, revision: 8973 })).toBe('old')
+    expect(autoSandbox({ build: 26200, revision: 9278 })).toBe('ok')
+    expect(autoSandbox({ build: 26300, revision: 1 })).toBe('ok')
+    expect(autoSandbox({ build: 26100, revision: null })).toBe('unknown')
+    expect(autoSandbox({ build: null, revision: 9168 })).toBe('unknown')
+    expect(autoSandbox({ build: 22631, revision: null })).toBe('old')
+    // reg.exe's output: REG_SZ decimal (CurrentBuildNumber), REG_DWORD hex (UBR).
+    const key = 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion'
+    expect(regNumber(`\r\n${key}\r\n    CurrentBuildNumber    REG_SZ    26100\r\n\r\n`)).toBe(26100)
+    expect(regNumber(`\r\n${key}\r\n    UBR    REG_DWORD    0x23d0\r\n\r\n`)).toBe(9168)
+    expect(regNumber(`\r\n${key}\r\n    UBR    REG_SZ    x9\r\n`)).toBeNull()
+    expect(regNumber(null)).toBeNull()
+  })
+
+  it('the Auto notice follows what was read: the version below it named, an unread one said unknown, none in another mode', () => {
+    const a = antigravity as unknown as { windows: unknown }
+    const was = a.windows
+    try {
+      a.windows = { build: 26100, revision: 8000 }
+      expect(antigravity.launchNotice({ mcpServers: {}, permissionMode: 'auto' } as never)?.message).toMatch(/August 2026 update or later\. This PC runs Windows build 26100\.8000/)
+      a.windows = { build: 26100, revision: null }
+      expect(antigravity.launchNotice({ mcpServers: {}, permissionMode: 'auto' } as never)?.message).toMatch(/couldn’t read this PC’s Windows version/)
+      a.windows = null
+      expect(antigravity.launchNotice({ mcpServers: {}, permissionMode: 'auto' } as never)?.message).toMatch(/couldn’t read this PC’s Windows version/)
+      a.windows = { build: 26200, revision: 9168 }
+      expect(antigravity.launchNotice({ mcpServers: {}, permissionMode: 'auto' } as never)).toBeNull()
+      a.windows = { build: 22631, revision: 1 }
+      expect(antigravity.launchNotice({ mcpServers: {}, permissionMode: 'ask' } as never)).toBeNull()
+    } finally {
+      a.windows = was
+    }
+  })
+
+  it('this PC’s version reads from the registry, its build matching os.release', async () => {
+    if (process.platform !== 'win32') return
+    const v = await windowsVersion()
+    expect(v.build).toBe(Number(release().split('.')[2]))
+    expect(v.revision === null || Number.isSafeInteger(v.revision)).toBe(true)
   })
 
   it("a project server the agent wasn't given refuses the launch, naming its file: nothing stands in for it", () => {
@@ -423,5 +460,40 @@ describe("Combwork's guidance in the agent's own GEMINI.md (HI-2547's listing ch
       const text = combworkInstructions('alpha', role)
       expect(Buffer.byteLength(text, 'utf8'), role).toBeLessThan(24000)
     }
+  })
+
+  // HR1: agy truncates a rules file over 24,000 UTF-8 bytes (Google's rules docs), so the whole file is held to it.
+  const big = (bytes: number, unit = 'a'): string => unit.repeat(Math.floor(bytes / Buffer.byteLength(unit, 'utf8')))
+  const tools = { [TOOLS_SERVER]: { command: 'x' } }
+  it("the whole file's size is counted in UTF-8 bytes: guidance, instructions and notes with their separators", () => {
+    expect(RULES_MAX_BYTES).toBe(24000)
+    const g = combworkInstructions('alpha', 'agent')
+    const text = launchGuidance({ guidance: g, instructions: big(3000, 'é'), notes: big(1500, '漢'), mcpServers: tools })
+    expect(guidanceBytes(text)).toBe(Buffer.byteLength(g.trim(), 'utf8') + 3000 + 1500 + 2 + 2 + 1)
+    expect(guidanceBytes('é')).toBe(2)
+  })
+
+  const launch = (instructions: string, notes = '') => {
+    const profile = tempDir('agy-guidance-')
+    return {
+      ctx: { agentId: `size-${Math.random().toString(36).slice(2)}`, workspacePath: profile, cwd: profile, privateDir: profile, resume: false, guidance: 'G', instructions, notes, mcpServers: tools, permissionMode: 'accept-edits', skills: [], extraDirs: [], hookUrl: 'http://127.0.0.1:1/hook', hookAuthFile: 'auth', overrides: {}, env: {} } as never,
+      profile
+    }
+  }
+  it('a launch over the limit is refused before anything is written, naming both sizes (multibyte text, the first byte over)', async () => {
+    // 'G', a separator (2) and a final newline: instructions of 23,996 bytes make exactly 24,000, one more byte is over.
+    const at = launchGuidance({ guidance: 'G', instructions: big(23996), notes: '', mcpServers: tools })
+    expect(guidanceBytes(at)).toBe(24000)
+    const fits = launch(big(23994) + 'é')
+    expect(guidanceBytes(launchGuidance(fits.ctx))).toBe(24000)
+    await expect(antigravity.prepareLaunch(fits.ctx)).resolves.toBeDefined()
+    expect(readFileSync(join(profileFolder((fits.ctx as { agentId: string }).agentId, fits.profile), GUIDANCE_FILE), 'utf8')).toBe(launchGuidance(fits.ctx))
+    const over = launch(big(23995) + 'é')
+    expect(guidanceBytes(launchGuidance(over.ctx))).toBe(24001)
+    await expect(antigravity.prepareLaunch(over.ctx)).rejects.toThrow(/didn't start: .* come to 24,001 bytes, and Antigravity reads at most 24,000 bytes/)
+    // HR1's probe: 24,000 bytes of instructions and 4,096 of notes.
+    const probe = launch(big(24000), big(4096, '漢'))
+    await expect(antigravity.prepareLaunch(probe.ctx)).rejects.toThrow(/Shorten the agent's instructions/)
+    expect(existsSync(profileFolder((probe.ctx as { agentId: string }).agentId, probe.profile))).toBe(false)
   })
 })

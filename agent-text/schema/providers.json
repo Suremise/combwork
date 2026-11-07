@@ -20,6 +20,13 @@
       "conversation": "plain"
     }
   },
+  "providers.antigravity.guidanceTooLong": {
+    "placeholders": {
+      "provider": "plain",
+      "size": "number",
+      "max": "number"
+    }
+  },
   "providers.antigravity.notOwnConversation": {
     "placeholders": {
       "provider": "plain",

@@ -78,7 +78,7 @@ export const ANTIGRAVITY_PERMISSION_MODES: ModeOption[] = [
     },
     text: {
       label: msg({ id: 'agents.antigravity.auto', defaultMessage: 'Auto', description: "Antigravity CLI's permission mode: it runs commands without asking, in its own sandbox. Keep it short." }),
-      description: msg({ id: 'agents.antigravity.autoDescription', defaultMessage: 'Runs commands without asking, inside Antigravity’s own sandbox. Needs Windows 11 24H2 or later, and isn’t available on business or enterprise accounts.', description: "What Antigravity CLI's Auto mode does (the mode picker). Windows 11 24H2 is a Windows version: keep it." })
+      description: msg({ id: 'agents.antigravity.autoDescription', defaultMessage: 'Runs commands without asking, inside Antigravity’s own sandbox. Needs Windows 11 24H2 or later with the August 2026 update, and isn’t available on business or enterprise accounts.', description: "What Antigravity CLI's Auto mode does (the mode picker). Windows 11 24H2 is a Windows version: keep it." })
     }
   },
   {
