@@ -29,6 +29,8 @@ const until = async (fn, ms = 10000) => {
   for (const d of [userData, ws, claudeHome]) fs.rmSync(d, { recursive: true, force: true })
   for (const d of [alpha, claudeHome]) fs.mkdirSync(d, { recursive: true })
   fs.writeFileSync(path.join(claudeHome, 'fake-trusted.json'), JSON.stringify([alpha.toLowerCase()]))
+  // Its input log, for typeLine (HI-2675's prompt: Enter only once the fake read the line).
+  lib.logFakeInput(claudeHome)
   lib.enableProviders(userData)
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
@@ -114,9 +116,8 @@ const until = async (fn, ms = 10000) => {
   const s0 = await inv('settings:update', {})
   await inv('settings:update', { providers: { ...s0.providers, 'claude-code': { ...s0.providers['claude-code'], costSource: 'prices' } } })
   await page.locator('.tab', { hasText: 'Session' }).first().click()
-  await inv('pty:write', key, 'safeguard fallback')
-  await lib.sleep(100)
-  await inv('pty:write', key, '\r')
+  const typed = await lib.typeLine(inv, key, claudeHome, null, 'safeguard fallback', { live })
+  check('two models: the fake takes the prompt', typed.attempt > 0, JSON.stringify(typed.lost))
   // "≈ $1.20 + ?", or "≈ < $0.01 + ?" for the fake's few tokens; never $0.00.
   const part = /^[^$]*≈\s?(<\s?)?\$(?!0\.00\b)\d[\d.,]*\s\+\s\?/
   check('two models: the live cost is an estimate, priced in part', !!(await until(async () => { const l = await live(); return l?.costEstimated && l.costUnpriced && l.costUsd > 0 }, 20000)), JSON.stringify(await live().then((l) => ({ costUsd: l?.costUsd, costEstimated: l?.costEstimated, costUnpriced: l?.costUnpriced }))))
