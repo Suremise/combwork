@@ -1,8 +1,9 @@
 // Runs the scenarios (scenarios.cjs) with a provider and writes what happened.
 //
 //   npm run scenarios                                     # the fake Claude Code: free, deterministic, every check
-//   npm run scenarios -- --provider fake-codex            # the fake Codex, the same
+//   npm run scenarios -- --provider fake-codex            # the fake Codex: its delivery contracts (delivery.cjs, HI-2662)
 //   npm run scenarios -- --provider fake-copilot          # the real Copilot CLI offline against a scripted model: the same
+//   npm run scenarios -- --provider fake-codex --every    # every scenario there (or --only some, on any provider)
 //   npm run scenarios -- --provider claude-code --model haiku --budget 2      # model trials (opt-in, cost tokens)
 //   npm run scenarios -- --provider codex --model gpt-5.6-luna --only work-on-card,review-card
 //   npm run scenarios -- --dialect "my/Opus 5.5 v2.json" --only work-on-card   # a dialect file in the model slot (HI-2439)
@@ -71,6 +72,7 @@ const runContext = require('../e2e/runContext.cjs')
 const { runScenario, dialectForRun, dialectRecord, sourceFingerprint, claudeSignedIn, environmentAdvice, CLAUDE_TEST_HOME, PROVIDERS } = require('./harness.cjs')
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')
+const { DELIVERY_PROVIDERS, scenarioSet } = require('./delivery.cjs')
 const { parseRandom, parseSeed, pickRandom } = require('./randomPick.cjs')
 const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, releaseResults, writeResults, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
 
@@ -139,7 +141,10 @@ if (notSignedIn) {
   process.exit(0)
 }
 
-const listed = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
+// HI-2662: the fake Codex and the Copilot CLI run the delivery contracts (delivery.cjs) unless --every or --only says otherwise.
+const every = argv.includes('--every')
+const listed = scenarioSet(SCENARIOS, provider, { only: only ?? [], every })
+if (DELIVERY_PROVIDERS.includes(provider) && !only?.length && !every) console.log(`${provider}: the ${listed.length} delivery contracts (tests/scenarios/delivery.cjs); the common set runs on the fake provider. --every for all ${SCENARIOS.length}.`)
 const chosen = random ? pickRandom(listed, random.count, random.seed) : listed
 if (random) console.log(`Picked ${chosen.length} of ${listed.length} at random (seed ${random.seed}): ${chosen.map((s) => s.id).join(', ')}. Again: --random ${random.count} --seed ${random.seed}${only?.length ? ` --only ${only.join(',')}` : ''}, or --only ${chosen.map((s) => s.id).join(',')}`)
 // More than a few scenarios (or --repeat) is a heavy run: it waits for a test slot, as the e2e runner's do
