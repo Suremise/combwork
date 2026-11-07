@@ -933,7 +933,7 @@ function SaveDetails({ changes, check, picked, title }: { changes: string[]; che
           <p>{tr(T.keptTargets, { n: check.targets.lanes.length + check.targets.cards.length })}</p>
           <ul>
             {check.targets.lanes.map((l) => (
-              <li key={l.id}>{tr(T.keptLane, { named: l.name ? 'yes' : 'no', name: l.name ?? '', builder: l.builder, target: l.target })}</li>
+              <li key={`${l.id}\n${l.target}`}>{tr(T.keptLane, { named: l.name ? 'yes' : 'no', name: l.name ?? '', builder: l.builder, target: l.target })}</li>
             ))}
             {check.targets.cards.map((c) => (
               <li key={c.number}>{tr(T.keptCard, { card: cardLabelOf({ tasks }, c.number), title: c.title, target: c.target })}</li>

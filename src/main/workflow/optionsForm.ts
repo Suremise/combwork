@@ -260,11 +260,12 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
 /**
  * HI-2674: the cards and lanes a change of the project's target to `to` leaves on another target, each with its own. A
  * card's is the one its start recorded (`Started.target`, what its queue entry takes: an Override doesn't change it); a
- * running lane's, the one its ruleset gives the cards it has still to start (`baseRulesetOf`, §16.5.4). Cards committed
- * where they are (G6 Committed is done) merge nowhere, so are left out.
+ * running lane's, the one a start of each card it has still to start would record, for its builder under its rules
+ * (`baseRulesetOf`, §16.5.4), by the start's own rule (`startTarget`: the card's own, G7, a builder worktree's base, the
+ * default branch; HR3's round 1). Cards committed where they are (G6 Committed is done) merge nowhere, so are left out.
  */
 export async function keptTargets(ws: WorkspaceService, project: { path: string; name: string }, to: string): Promise<KeptTargets> {
-  // As a start resolves an empty one: the default branch (gitPlatform.start).
+  // The new target, empty: the default branch, as a start in a slot resolves it.
   let fallback: Promise<string> | null = null
   const resolved = (t: string | null | undefined): Promise<string> =>
     t ? Promise.resolve(t) : (fallback ??= G.defaultBranch(project.path).then((d) => (d && !isUnknown(d) ? d : ''), () => ''))
@@ -283,10 +284,22 @@ export async function keptTargets(ws: WorkspaceService, project: { path: string;
   for (const l of (await listLanes(ws, { project: project.name })).filter((x) => x.state === 'active' || x.state === 'paused')) {
     const rec = wf.lane(l.id)
     if (!rec || rec.ended || !rec.ruleset) continue
-    const options = wf.store.ruleset(rec.ruleset).options
-    if (options.finish === 'committed') continue
-    const target = await resolved(options.target)
-    if (target && target !== now) out.lanes.push({ id: l.id, name: l.name, builder: l.builder.name, target })
+    const laneOptions = wf.store.ruleset(rec.ruleset).options
+    // Its cards still to start (its queued list, once it applies), each under the rules it would start with; none left,
+    // a card it is given next (its own target none), under the lane's.
+    const listed = (rec.pending ?? rec.cards).flatMap((n) => {
+      const c = store.cards().find((x) => x.id === n)
+      return c && wf.state(c).stage === 'todo' ? [c] : []
+    })
+    const stand = rec.cards.map((n) => store.cards().find((x) => x.id === n)).find((c) => !!c)
+    const next = listed.length ? listed.map((c) => ({ card: c, options: wf.rulesetOf(c).options })) : stand ? [{ card: { ...stand, target: undefined, kind: 'code' as const }, options: laneOptions }] : []
+    const targets = new Set<string>()
+    for (const { card, options } of next) {
+      if (options.finish === 'committed') continue
+      const t = await wf.platform(options).startTarget?.(card, options, l.builder.id)
+      if (t && !isUnknown(t) && t !== now) targets.add(t)
+    }
+    for (const target of targets) out.lanes.push({ id: l.id, name: l.name, builder: l.builder.name, target })
   }
   return out
 }

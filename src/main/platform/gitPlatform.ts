@@ -145,7 +145,7 @@ export class GitPlatform implements PlatformAdapter {
    * project folder, the card's or G7's, or the line the folder works on (always, when finishing is a commit). Kept
    * beside `start`, whose branches it follows: `tests/workflow/boundaries.test.ts` checks the two agree.
    */
-  private async startTarget(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>> {
+  async startTarget(card: CardRecord, o: WorkflowOptions, builder?: string): Promise<Maybe<string | null>> {
     const own = builder && this.wf.cfg.agentFolder ? await this.wf.cfg.agentFolder(builder) : null
     if (own) return card.target || o.target || own.base || G.defaultBranch(this.project)
     if (o.folder === 'slots' && !(card.kind === 'no-code' && this.wf.cfg.slotFor) && (this.slotsHere() || !this.wf.cfg.agentFolder)) return card.target || o.target || G.defaultBranch(this.project)

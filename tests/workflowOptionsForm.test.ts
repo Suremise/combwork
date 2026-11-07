@@ -782,6 +782,30 @@ describe('a change of the target says what keeps its own (HI-2674)', () => {
     // Another change than the target lists none.
     expect((await form.checkWorkflowChange(w, repo, { preset: null, options: { ...pair, target: 'rel2', strict: true } })).targets).toBeUndefined()
   })
+
+  it("a lane with no target of its own lists what its next card's start records: its builder worktree's base, not the default branch (HR3's round 1)", async () => {
+    const { platform: _p, ...pair } = preset('git', 'pair')
+    const { w, repo } = await workspace({ project: { ...pair, target: '' }, preset: 'pair' })
+    git(repo, 'branch', 'rel1')
+    git(repo, 'branch', 'rel2')
+    const later = await inWorkspace(w, () => tasks.createTask({ title: 'Later', project: 'p' }, user))
+    const wf = (await workflowFor(w, repo))!
+    // A builder worktree standing in for a slot (before P7, adopted): its base is the target an empty G7 gives.
+    const agentFolder = wf.cfg.agentFolder
+    wf.cfg.agentFolder = async () => ({ path: repo, base: 'rel1' })
+    try {
+      await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [later.number], name: 'kept', by: 'B1 (p)' })
+      const toRel2 = await form.checkWorkflowChange(w, repo, { preset: 'pair', options: { ...pair, target: 'rel2' } })
+      expect(toRel2.targets?.lanes).toEqual([expect.objectContaining({ name: 'kept', target: 'rel1' })])
+      // To main, the default branch: still listed, its cards going to rel1.
+      expect((await form.checkWorkflowChange(w, repo, { preset: 'pair', options: { ...pair, target: 'main' } })).targets?.lanes).toEqual([expect.objectContaining({ name: 'kept', target: 'rel1' })])
+      await form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, target: 'rel2' } })
+      expect(await store.boardWrite(w, async () => wf.start(`#${later.number}`, agentActor('b1')))).toMatchObject({ ok: true })
+      expect(wf.state(wf.store.card(later.number)).started?.target).toBe(toRel2.targets?.lanes[0]?.target)
+    } finally {
+      wf.cfg.agentFolder = agentFolder
+    }
+  })
 })
 
 describe('the one-time presets notice (#1278, §16.17)', () => {
