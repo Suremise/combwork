@@ -3,7 +3,7 @@
 // "old rules" for that alone), and its cards start from and merge into it; a card's own is the user's or the
 // Assistant's, set only while its branch has no work, and as its lane's.
 import { execFileSync } from 'child_process'
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
@@ -185,6 +185,14 @@ describe("a card's Merges into", () => {
     expect(await store.boardWrite(w, async () => wf.start(`#${idle.number}`, agentActor('b1')))).toMatchObject({ ok: true })
     await expect(inWorkspace(w, () => tasks.setTarget(idle.number, '1.2.0', user))).rejects.toThrow(/has work on its branch made from main/)
     expect(await store.boardWrite(w, async () => wf.putBack(`#${idle.number}`, 'user'))).toMatchObject({ ok: true })
+    // Worked in the project folder: what is uncommitted there counts as its work (HR2's round 2), untracked or tracked.
+    writeFileSync(join(repo, 'uncommitted.txt'), 'left\n')
+    await expect(inWorkspace(w, () => tasks.setTarget(idle.number, '1.2.0', user))).rejects.toThrow(/has work on its branch made from main/)
+    git(repo, 'add', 'uncommitted.txt')
+    await expect(inWorkspace(w, () => tasks.setTarget(idle.number, '1.2.0', user))).rejects.toThrow(/has work on its branch/)
+    git(repo, 'rm', '-q', '--cached', 'uncommitted.txt')
+    rmSync(join(repo, 'uncommitted.txt'))
+    expect(cardTarget(w, idle.number)).toBeNull()
     await inWorkspace(w, () => tasks.setTarget(idle.number, '1.2.0', user))
     expect(cardTarget(w, idle.number)).toBe('1.2.0')
   })

@@ -8,7 +8,7 @@ import { agentMsg, currentChain, inDefaultDialect, overridesAny } from '../share
 import { RETURNED_COMMENT, returnedCommentFrom } from './workflow/queueState'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
-import { branchExists, dropEmptyLines, hasOwnWork, pickTarget, projectTargets } from './workflow/targets'
+import { branchExists, dropEmptyLines, ownWork, pickTarget, projectTargets } from './workflow/targets'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
@@ -2026,6 +2026,7 @@ const TARGET = {
   notListed: msg({ id: 'tasks.error.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}', description: 'HI-2556: an error setting a card’s or lane’s Merges into to a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
   started: msg({ id: 'tasks.error.targetHasWork', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}', description: 'HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.' }),
   missing: msg({ id: 'tasks.error.targetMissing', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}', description: 'HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.' }),
+  moved: msg({ id: 'tasks.error.targetMoved', defaultMessage: '{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.', description: 'HI-2556: an error changing a card’s Merges into: its old branch, found with no work of its own, moved (a commit arrived) before Combwork could remove it, so nothing was changed. {card} is the card’s key (HI-12).' }),
   checkedOut: msg({ id: 'tasks.error.targetCheckedOut', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}', description: 'HI-2556: an error changing a card’s Merges into: its old branch (which has no work of its own and would be removed so its next start begins fresh) is still checked out in a folder. {card} is the card’s key (HI-12), {folder} a folder’s path. unknown yes: git couldn’t say. Keep the select keys.' }),
   inLane: msg({ id: 'tasks.error.targetLane', defaultMessage: '{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.', description: 'HI-2556: an error setting a card’s Merges into to another branch than its lane’s. {card} is the card’s key (HI-12), {builder} the lane’s builder agent, {target} the lane’s branch.' })
 }
@@ -2084,13 +2085,15 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
       const s = wf ? wf.state(wf.store.card(n)) : null
       // No work of its own (HR2's round 1: its slot's changes not committed too), read here under the board's lock, where
       // a start or a put back of it would be written.
-      const work = !s ? false : s.stage !== 'todo' ? true : await hasOwnWork(projectPath, s, wf!.folderOf(s))
+      const own = s && s.stage === 'todo' ? await ownWork(projectPath, s, wf!.folderOf(s)) : null
+      const work = !s ? false : s.stage !== 'todo' ? true : own!.work
       if (work !== false) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: s?.started?.target ?? '' })) // i18n-ignore: select keys
       if (wf) refuseOtherLaneTarget(wf, n, target, def, names)
       // Its old lines go (nothing of its own on them), so its next start makes a fresh one from the new target, never
       // carrying the old target's history; refused while one is checked out somewhere.
       const targets = await projectTargets(ws, projectPath).catch(() => null)
-      const dropped = s && s.lines.length ? await dropEmptyLines(projectPath, s, targets ? [targets.default, ...targets.others] : []) : null
+      const dropped = s && own && s.lines.length ? await dropEmptyLines(projectPath, s, targets ? [targets.default, ...targets.others] : [], own.heads) : null
+      if (dropped === 'moved') throw new TaskConflictError(withValues(TARGET.moved, { card: cardRef(n) }))
       if (dropped) throw new TaskConflictError(withValues(TARGET.checkedOut, { unknown: dropped === 'unknown' ? 'yes' : 'no', card: cardRef(n), folder: typeof dropped === 'object' ? dropped.checkedOut : '' })) // i18n-ignore: select keys
       const before = structuredClone(card)
       note(card, actorName(actor), storedText(HISTORY.target, { own: target ? 'yes' : 'no', target: target ?? '' }))

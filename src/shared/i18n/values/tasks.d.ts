@@ -83,6 +83,7 @@ interface CombworkMessageValues {
   'tasks.error.targetHasWork': { unknown: string; card: string | number; target: string | number }
   'tasks.error.targetLane': { card: string | number; builder: string | number; target: string | number }
   'tasks.error.targetMissing': { unknown: string; target: string | number }
+  'tasks.error.targetMoved': { card: string | number }
   'tasks.error.targetNotAgents': undefined
   'tasks.error.targetNotListed': { hasTargets: string; target: string | number; default: string | number; hasOthers: string; others: string | number }
   'tasks.error.tooLong': { what: string; max: number }

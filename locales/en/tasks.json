@@ -327,6 +327,10 @@
     "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}",
     "description": "HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys."
   },
+  "tasks.error.targetMoved": {
+    "defaultMessage": "{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.",
+    "description": "HI-2556: an error changing a card’s Merges into: its old branch, found with no work of its own, moved (a commit arrived) before Combwork could remove it, so nothing was changed. {card} is the card’s key (HI-12)."
+  },
   "tasks.error.targetNotAgents": {
     "defaultMessage": "Only the user or the Assistant sets which branch a card merges into.",
     "description": "HI-2556: an error, an agent tried to set a card’s Merges into (the branch its work merges into); only the user or the Combwork Assistant can."

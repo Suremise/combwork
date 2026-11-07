@@ -51,42 +51,52 @@ export async function branchExists(projectPath: string, branch: string): Promise
 }
 
 /**
- * Whether a card has work of its own (HI-2556): false when it never started, or each line it had is gone or holds
- * nothing its target doesn't already have, and the folder of its own line (its slot), still on that line, has nothing
- * uncommitted (tracked or not); unknown when git can't say (a pick is then refused).
+ * A card's own work (HI-2556) and the evidence it was decided on: `work` false when it never started, or each line it
+ * had is gone or holds nothing its target doesn't already have, and the folder it worked in holds nothing uncommitted
+ * (tracked or not): its slot while still on its line; the project folder, whatever is uncommitted there (HR2's round 2:
+ * who made it can't be told apart, so it counts). Unknown when git can't say (a pick is then refused). `heads`: each
+ * line's head as it was found empty (null: none), the only ones `dropEmptyLines` may delete.
  */
-export async function hasOwnWork(projectPath: string, s: CardState, folder?: string | null): Promise<boolean | 'unknown'> {
-  if (!s.started && !s.lines.length) return false
+export async function ownWork(projectPath: string, s: CardState, folder?: string | null): Promise<{ work: boolean | 'unknown'; heads: Map<string, string | null> }> {
+  const heads = new Map<string, string | null>()
+  if (!s.started && !s.lines.length) return { work: false, heads }
   const target = s.started?.target ?? null
   const th = target ? await G.lineHead(projectPath, target) : null
-  if (isUnknown(th)) return 'unknown'
+  if (isUnknown(th)) return { work: 'unknown', heads }
   for (const line of s.lines) {
     const lh = await G.lineHead(projectPath, line)
-    if (isUnknown(lh)) return 'unknown'
+    if (isUnknown(lh)) return { work: 'unknown', heads }
+    heads.set(line, lh)
     if (!lh || lh === s.started?.base || lh === th) continue
-    if (!th) return true
+    if (!th) return { work: true, heads }
     const inTarget = await G.isAncestor(projectPath, lh, th)
-    if (isUnknown(inTarget)) return 'unknown'
-    if (!inTarget) return true
+    if (isUnknown(inTarget)) return { work: 'unknown', heads }
+    if (!inTarget) return { work: true, heads }
   }
-  // Its own folder (a slot), as the put back left it: changes not committed there are its work too (HR2's round 1).
-  if (folder && s.started && s.started.folder !== 'project' && existsSync(folder)) {
-    const now = await G.worktreeNow(folder)
-    if (isUnknown(now)) return 'unknown'
-    if (now.line === s.started.line && now.dirty.length) return true
+  // The folder it worked in, as the put back left it: changes not committed there are its work too (HR2's rounds 1, 2).
+  const where = !s.started ? null : s.started.folder === 'project' ? projectPath : folder
+  if (s.started && where && existsSync(where)) {
+    const now = await G.worktreeNow(where)
+    if (isUnknown(now)) return { work: 'unknown', heads }
+    if (now.dirty.length && (s.started.folder === 'project' || now.line === s.started.line)) return { work: true, heads }
   }
-  return false
+  return { work: false, heads }
+}
+
+/** Whether a card has work of its own (`ownWork`'s answer alone). */
+export async function hasOwnWork(projectPath: string, s: CardState, folder?: string | null): Promise<boolean | 'unknown'> {
+  return (await ownWork(projectPath, s, folder)).work
 }
 
 /**
  * The lines a card with no work of its own had (HI-2556), deleted as its target changes, so its next start makes a fresh
- * one from the new target and never carries the old target's history (HR2's round 1). Each only where it still is what
- * was checked (compare and swap) and no worktree has it checked out; `checkedOut`: the folder that has one (the change is
- * then refused, nothing deleted); unknown when git can't say. Only a card's own lines (one built in a slot): a card
- * worked in the project folder has the folder's branch as its line, never dropped, nor any branch in `keep` (the
- * project's targets).
+ * one from the new target and never carries the old target's history (HR2's round 1). Each only at the head `ownWork`
+ * found empty (`heads`, compare and swap: one moved since, by anyone, is refused, never deleted; HR2's round 2) and
+ * while no worktree has it checked out; `checkedOut`: the folder that has one; `moved`: a line that isn't as it was
+ * found; unknown when git can't say. Refused, nothing more is deleted. Only a card's own lines (one built in a slot): a
+ * card worked in the project folder has the folder's branch as its line, never dropped, nor any branch in `keep`.
  */
-export async function dropEmptyLines(projectPath: string, s: CardState, keep: readonly string[]): Promise<{ checkedOut: string } | 'unknown' | null> {
+export async function dropEmptyLines(projectPath: string, s: CardState, keep: readonly string[], heads: ReadonlyMap<string, string | null>): Promise<{ checkedOut: string } | 'moved' | 'unknown' | null> {
   const own = s.started && s.started.folder !== 'project' ? [...new Set(s.lines)].filter((l) => !keep.includes(l) && l !== s.started!.target) : []
   if (!own.length) return null
   const list = await git(projectPath, ['worktree', 'list', '--porcelain'])
@@ -97,16 +107,20 @@ export async function dropEmptyLines(projectPath: string, s: CardState, keep: re
     if (row.startsWith('worktree ')) at = row.slice('worktree '.length)
     else if (row.startsWith('branch refs/heads/')) out.set(row.slice('branch refs/heads/'.length), at) // i18n-ignore: git's porcelain output, parsed
   }
-  const heads: [string, string][] = []
+  const drop: [string, string][] = []
   for (const line of own) {
     if (out.has(line)) return { checkedOut: out.get(line)! }
+    if (!heads.has(line)) return 'unknown'
+    const found = heads.get(line) ?? null
     const h = await G.lineHead(projectPath, line)
     if (isUnknown(h)) return 'unknown'
-    if (h) heads.push([line, h])
+    if ((h ?? null) !== found) return 'moved'
+    if (found) drop.push([line, found])
   }
-  for (const [line, h] of heads) {
+  // Each deleted only if it is still the head found empty: git refuses one moved meanwhile.
+  for (const [line, h] of drop) {
     const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${line}`, h])
-    if (!r.ok) return 'unknown'
+    if (!r.ok) return 'moved'
   }
   return null
 }

@@ -7,7 +7,7 @@ import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, commit, moved, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
-import { dropEmptyLines, hasOwnWork } from '../../src/main/workflow/targets'
+import { dropEmptyLines, hasOwnWork, ownWork } from '../../src/main/workflow/targets'
 
 let env: Env | null = null
 afterEach(() => {
@@ -53,10 +53,12 @@ describe("a card's own work, for a change of its Merges into (HI-2556)", () => {
     const s = () => e.wf.state(card)
     // Its slot still has the line checked out: refused, nothing deleted.
     expect(sh(folder, 'branch', '--show-current')).toBe(line)
-    expect(await dropEmptyLines(e.project, s(), ['main', '1.2.0'])).toEqual({ checkedOut: expect.any(String) })
+    const found = await ownWork(e.project, s(), folder)
+    expect(found.work).toBe(false)
+    expect(await dropEmptyLines(e.project, s(), ['main', '1.2.0'], found.heads)).toEqual({ checkedOut: expect.any(String) })
     expect(sh(e.project, 'branch', '--list', line)).not.toBe('')
     sh(folder, 'switch', '-q', '--detach', 'main')
-    expect(await dropEmptyLines(e.project, s(), ['main', '1.2.0'])).toBeNull()
+    expect(await dropEmptyLines(e.project, s(), ['main', '1.2.0'], found.heads)).toBeNull()
     expect(sh(e.project, 'branch', '--list', line)).toBe('')
     // Retargeted (the board's column, as tasks.setTarget writes it) and started again: from 1.2.0's head, main's own
     // commit nowhere in its line.
@@ -66,5 +68,18 @@ describe("a card's own work, for a change of its Merges into (HI-2556)", () => {
     expect(again.started).toMatchObject({ target: '1.2.0', base: sh(e.project, 'rev-parse', '1.2.0') })
     const mainOnly = sh(e.project, 'log', '-1', '--format=%H', 'main')
     expect(sh(e.project, 'branch', '--contains', mainOnly, '--list', again.started!.line!)).toBe('')
+  })
+
+  it("never deletes a line that moved after it was found empty (HR2's round 2): work that arrived meanwhile stays", async () => {
+    const { e, card, folder, line } = await putBack()
+    const found = await ownWork(e.project, e.wf.state(card), folder)
+    expect(found.work).toBe(false)
+    // Between the check and the clean-up: a commit on the line, from outside Combwork; the slot then moves on.
+    const arrived = commit(folder, { 'arrived.txt': 'arrived\n' }, 'arrived')
+    sh(folder, 'switch', '-q', '--detach', 'main')
+    expect(await dropEmptyLines(e.project, e.wf.state(card), ['main', '1.2.0'], found.heads)).toBe('moved')
+    expect(sh(e.project, 'rev-parse', line)).toBe(arrived)
+    // Found again, it is work: never dropped.
+    expect((await ownWork(e.project, e.wf.state(card), folder)).work).toBe(true)
   })
 })

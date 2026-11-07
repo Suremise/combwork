@@ -346,6 +346,11 @@
       "target": "plain"
     }
   },
+  "tasks.error.targetMoved": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
   "tasks.error.targetNotAgents": {
     "placeholders": {}
   },
