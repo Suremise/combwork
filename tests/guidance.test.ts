@@ -928,7 +928,9 @@ describe('RELEASING.md on the 1.0 path', () => {
   it("Step 4's real-tier command selects every suite of a real CLI, Copilot's too, and none of the rest (HI-2658)", async () => {
     // The manifest needs each CLI's every real suite in one record (scripts/testedClis.mjs): run the command through the
     // runner's own parsing and selection, so a Copilot suite added to suites.mjs, or a dropped --all, fails here.
+    // @ts-expect-error: plain .mjs modules without types
     const { parseArgs, selectSuites } = await import('./e2e/runner.mjs')
+    // @ts-expect-error: plain .mjs modules without types
     const { SUITES } = await import('./e2e/suites.mjs')
     const command = /`npm run e2e -- (--all --only-real [^`]+)`/.exec(section('Steps'))?.[1]
     expect(command, 'Step 4 names its real-tier command').toBeTruthy()
