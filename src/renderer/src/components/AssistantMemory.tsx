@@ -7,7 +7,7 @@ import type { AgentInfo, AssistantMemory as Memory } from '@shared/types'
 import { assistantMemoryProvider, assistantMemoryScope } from '@shared/assistantMemory'
 import { providerName } from '@shared/providers'
 import { msg, tr } from '@shared/i18n'
-import { call } from '../api'
+import { call, errorMessage } from '../api'
 import { agentProviderOf, notify, useStore } from '../store'
 import { cx } from '../util'
 import { DocEditor } from './DocEditor'
@@ -49,6 +49,8 @@ export function AssistantMemoryView({ agent }: { agent: AgentInfo }) {
   const folder = memory.data?.folder ?? null
   const name = providerName(provider)
   const copy = (): void => void navigator.clipboard.writeText(folder!).then(() => notify('success', tr(T.copied)))
+  // Main opens the folder it names for this workspace and provider (HI-2736); a refusal is shown, never dropped.
+  const openFolder = (): void => void call('assistant:openMemoryFolder', provider).catch((e: unknown) => notify('error', errorMessage(e)))
   return (
     <div className="split assistant-memory">
       <div className="split-list" style={{ width: listWidth }}>
@@ -76,7 +78,7 @@ export function AssistantMemoryView({ agent }: { agent: AgentInfo }) {
                   {folder}
                 </span>
                 <IconButton icon="copy" title={tr(T.copyPath)} onClick={copy} />
-                <IconButton icon="folder-opened" title={tr(T.openFolder)} disabled={!files.length} onClick={() => void call('app:openPath', folder)} />
+                <IconButton icon="folder-opened" title={tr(T.openFolder)} disabled={!files.length} onClick={openFolder} />
               </div>
               {!files.length && <div className="pane-empty assistant-memory-empty">{tr(T.empty, { provider: name })}</div>}
               {files.map((f) => (

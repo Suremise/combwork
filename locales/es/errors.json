@@ -1,4 +1,5 @@
 {
+  "errors.assistantMemory.noFolder": "Todavía no hay ninguna carpeta de memoria que abrir.",
   "errors.assistantUndo.gone": "Ese cambio del Asistente ya no se conserva: los cambios se conservan 7 días.",
   "errors.assistantUndo.which": "Elige un cambio del Asistente para deshacer, o los cambios de un mensaje.",
   "errors.changes.notFile": "{file} no es un archivo de la carpeta {folder}.",

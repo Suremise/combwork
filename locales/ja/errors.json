@@ -1,4 +1,5 @@
 {
+  "errors.assistantMemory.noFolder": "開くメモリフォルダーはまだありません。",
   "errors.assistantUndo.gone": "アシスタントのその変更はもう保存されていません。変更は7日間保存されます。",
   "errors.assistantUndo.which": "元に戻すアシスタントの変更を1つ、または1つのメッセージの変更を選んでください。",
   "errors.changes.notFile": "{file}は{folder}内のファイルではありません。",
