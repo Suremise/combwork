@@ -328,8 +328,9 @@ same code while every required check still runs:
   runs only the unit tests.
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
-  bisected over the merge commits since the last full run), for **every RC and release** (RELEASING.md, with the real
-  tier: `--all --real`), and **on request** (the user, or a card that asks for it). Run the real tier on its own
+  bisected over the merge commits since the last full run), **once for a version's first RC** (RELEASING.md, What a
+  release checks, with the real tier: `--all --real`; an RC fix round and the release rerun only the slice a change
+  touched), and **on request** (the user, or a card that asks for it). Run the real tier on its own
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
   suites a change needs, such as a review round's fixes, and isn't any merge's gate.
 - **A flake fix, or a change to a suite's waits**, is proven by focused repeats under load (the `investigate-flake`
