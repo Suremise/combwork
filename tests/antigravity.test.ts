@@ -21,10 +21,12 @@ const { ANTIGRAVITY_ENV_STRIP, antigravityEnv, checkEnv, checkProfile, inProfile
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
 const childBase = (): Record<string, string> => runContext.baseEnv() as Record<string, string>
 const { UnreadableConfig, scannedFolders, workspaceServers } = await import('../src/main/providers/antigravity/projectConfig')
-const { AUTO_MIN_BUILD, agyServer, antigravity, legacySseServers, windowsBuild, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
+const { copyOnboarding, onboarded, onboardingComplete, postOnboardingBlock } = await import('../src/main/providers/antigravity/onboarding')
+const { AUTO_MIN_BUILD, GUIDANCE_FILE, agyServer, antigravity, launchGuidance, legacySseServers, windowsBuild, antigravityArgs, isConversationId, launchSettings, profileConfig, profileFolder, sameServer, statusLineConversation } = await import('../src/main/providers/antigravity/adapter')
 const { advanced } = await import('../src/main/advanced')
 const { ensurePcAccounts, homeAccount, pcAccountId, pcWideSignIn } = await import('../src/shared/connectionDefaults')
 const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
+const { combworkInstructions } = await import('../src/shared/combworkGuidance')
 
 const FIX = join(__dirname, 'fixtures', 'advanced')
 const models = readFileSync(join(FIX, 'models-antigravity-1.5.0.txt'), 'utf8')
@@ -366,5 +368,60 @@ describe('the PC-wide sign-in (like Copilot’s)', () => {
     expect(store.connections.map((c: { account: string }) => c.account).sort()).toEqual(['antigravity', 'copilot'])
     expect(ensurePcAccounts(store, 'later')).toBe(false)
     expect(homeAccount(store, 'antigravity', 'later').createdAt).toBe('now')
+  })
+})
+
+describe("agy's first-run screens, done once in Set up (HI-2547, Darren's (a))", () => {
+  const marker = JSON.stringify({ consumerOnboardingComplete: true, enterpriseOnboardingComplete: false, onboardingComplete: true })
+  const state = 'post_onboarding: {\n  completed_steps: POST_ONBOARDING_STEP_TYPE_MANAGER_WELCOME\n  completed_steps: POST_ONBOARDING_STEP_TYPE_USAGE_MODE\n}\ninstallation_uuid: "11111111-2222-3333-4444-555555555555"\nmigrations: {\n  key: 3\n  value: MIGRATION_STATUS_COMPLETED\n}\n'
+  const cli = (profile: string) => join(profile, '.gemini', 'antigravity-cli')
+
+  it("copies only that they are done (onboarding.json, the post_onboarding block, never the installation id), and only once done", async () => {
+    const from = join(base, 'onb-from')
+    const to = join(base, 'onb-to')
+    mkdirSync(join(cli(from), 'cache'), { recursive: true })
+    expect(await copyOnboarding(from, to)).toBe(false)
+    writeFileSync(join(cli(from), 'cache', 'onboarding.json'), marker)
+    writeFileSync(join(cli(from), 'jetski_state.pbtxt'), state)
+    expect(await copyOnboarding(from, to)).toBe(true)
+    expect(await onboarded(to)).toBe(true)
+    const copied = readFileSync(join(cli(to), 'jetski_state.pbtxt'), 'utf8')
+    expect(copied).toMatch(/^post_onboarding: \{\n  completed_steps: POST_ONBOARDING_STEP_TYPE_MANAGER_WELCOME\n  completed_steps: POST_ONBOARDING_STEP_TYPE_USAGE_MODE\n\}\n$/)
+    expect(copied).not.toContain('installation_uuid')
+    // Done already: nothing again.
+    expect(await copyOnboarding(from, to)).toBe(false)
+    expect(onboardingComplete('{"onboardingComplete":false}')).toBe(false)
+    expect(onboardingComplete('not json')).toBe(false)
+    expect(postOnboardingBlock('installation_uuid: "x"\n')).toBeNull()
+  })
+
+  it("Set up runs agy in the check profile (never the user's own), in a folder of its own there that it trusts, typing nothing", () => {
+    const s = antigravity.setupCommand('C:\\agy\\agy.exe')
+    expect(s.env?.USERPROFILE).toBe(checkProfile())
+    expect(s.cwd).toBe(join(checkProfile(), 'setup'))
+    expect(s.keys).toEqual([])
+    expect(s.args).toContain('--settings')
+    expect(JSON.parse(readFileSync(s.args[s.args.indexOf('--settings') + 1], 'utf8'))).toEqual({ trustedWorkspaces: [join(checkProfile(), 'setup')] })
+    expect(typeof s.done).toBe('function')
+  })
+
+  it("a launch trusts the folders it works in for that launch only (its own, a slot or review copy given)", () => {
+    const s = launchSettings({ hookUrl: 'h', hookAuthFile: 'a', mcpServers: {}, trustedCombworkTools: undefined, cwd: 'C:\\repo', extraDirs: ['C:\\slot'] }, true) as Record<string, unknown>
+    expect(s.trustedWorkspaces).toEqual(['C:\\repo', 'C:\\slot'])
+  })
+})
+
+describe("Combwork's guidance in the agent's own GEMINI.md (HI-2547's listing check: agy auto-loads ~\\.gemini\\GEMINI.md)", () => {
+  it('the guidance (with its tools), the launch instructions and the notes; nothing of the guidance without the tools', () => {
+    const with_ = launchGuidance({ guidance: 'G', instructions: 'I', notes: 'N', mcpServers: { [TOOLS_SERVER]: { command: 'x' } } })
+    expect(with_).toBe('G\n\nI\n\nN\n')
+    expect(launchGuidance({ guidance: 'G', instructions: '', notes: '', mcpServers: {} })).toBe('')
+    expect(GUIDANCE_FILE).toBe(join('.gemini', 'GEMINI.md'))
+  })
+  it("Combwork's own guidance fits agy's per-file cap (24,000 bytes), for an agent and the Assistant", () => {
+    for (const role of ['agent', 'assistant'] as const) {
+      const text = combworkInstructions('alpha', role)
+      expect(Buffer.byteLength(text, 'utf8'), role).toBeLessThan(24000)
+    }
   })
 })

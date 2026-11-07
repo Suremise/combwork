@@ -184,7 +184,21 @@ for (const [name, def] of Object.entries(own)) start(def, project[name])
 for (const [name, def] of Object.entries(project)) if (!own[name]) start(def, null)
 log({ kind: 'mcp', conversation: conv, own: Object.keys(own), project: Object.keys(project) })
 
-process.stdout.write(`Antigravity CLI 1.5.0 (fake) · conversation ${conv}\n> `)
+// Its first-run screens (1.5.0: a colour scheme, then its Terms of Service & Data Use), until cache\onboarding.json says
+// they are done: here the line "accept" completes them, writing what 1.5.0 writes (onboarding.json, jetski_state's
+// post_onboarding block). Nothing else is taken until then.
+const onboardingFile = path.join(cli, 'cache', 'onboarding.json')
+const readOnboarded = () => {
+  try {
+    return JSON.parse(fs.readFileSync(onboardingFile, 'utf8')).onboardingComplete === true
+  } catch {
+    return false
+  }
+}
+let onboarded = readOnboarded()
+log({ kind: 'onboarding', shown: !onboarded, env: pick() })
+if (!onboarded) process.stdout.write('Choose a colour scheme\nTerms of Service & Data Use (type accept)\n> ')
+else process.stdout.write(`Antigravity CLI 1.5.0 (fake) · conversation ${conv}\n> `)
 statusLine('idle')
 // Each request's tokens: its input without the cache read (4000 from the second request on), as 1.5.0 records them.
 const tokens = () => ({ input_tokens: 3000 + 100 * step, cache_read_tokens: step > 1 ? 4000 : 0, output_tokens: 20 })
@@ -294,7 +308,7 @@ async function turn(text) {
 }
 let queue = Promise.resolve()
 const first = flag('-i')
-if (first) queue = queue.then(() => turn(first))
+if (first && onboarded) queue = queue.then(() => turn(first))
 let line = ''
 process.stdin.setEncoding('utf8')
 process.stdin.on('data', (d) => {
@@ -304,6 +318,15 @@ process.stdin.on('data', (d) => {
       line = ''
       if (!t) continue
       if (t === '/exit') return quit()
+      if (!onboarded) {
+        if (t !== 'accept') continue
+        keep(path.join('cache', 'onboarding.json'), JSON.stringify({ consumerOnboardingComplete: true, enterpriseOnboardingComplete: false, onboardingComplete: true }, null, 2))
+        keep('jetski_state.pbtxt', 'post_onboarding: {\n  completed_steps: POST_ONBOARDING_STEP_TYPE_MANAGER_WELCOME\n}\ninstallation_uuid: "fake-installation"\n')
+        onboarded = true
+        log({ kind: 'onboarded', env: pick() })
+        process.stdout.write(`Antigravity CLI 1.5.0 (fake) · conversation ${conv}\n> `)
+        continue
+      }
       // A turn waiting for its answer takes this line; else it is the next prompt.
       if (waiting) {
         const w = waiting

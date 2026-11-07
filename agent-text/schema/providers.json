@@ -34,6 +34,18 @@
       "servers": "plain"
     }
   },
+  "providers.antigravity.setup.action": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.copied": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.needed": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.runs": {
+    "placeholders": {}
+  },
   "providers.antigravity.unreadableConfig": {
     "placeholders": {
       "provider": "plain",
