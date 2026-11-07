@@ -67,6 +67,9 @@ function pick() {
 const resumed = flag('--conversation')
 // The conversation it runs: the one resumed, else a new one; `/new` starts another (1.5.0: SessionStart at its prompt).
 let conv, brain, logs, transcript, short, full, step
+// Whether its status line names the conversation yet: 1.5.0's says conversation_id "" until a new one's first prompt
+// (HI-2548's real run; a resumed one is named from the start).
+let named = false
 const cli = path.join(home, '.gemini', 'antigravity-cli')
 const keep = (rel, text) => {
   fs.mkdirSync(path.dirname(path.join(cli, rel)), { recursive: true })
@@ -74,6 +77,7 @@ const keep = (rel, text) => {
 }
 function openConversation(id) {
   conv = id
+  named = !!resumed && id === resumed
   brain = path.join(home, '.gemini', 'antigravity-cli', 'brain', conv)
   logs = path.join(brain, '.system_generated', 'logs')
   fs.mkdirSync(logs, { recursive: true })
@@ -117,7 +121,7 @@ function statusLine(state, extra = {}) {
   const cmd = settings.statusLine?.command
   if (!cmd) return
   const model = flag('--model') || 'Gemini 3.8 Flash (Low)'
-  const input = JSON.stringify({ conversation_id: conv, session_id: conv, transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: { id: model, display_name: model, effort: flag('--effort') || 'low' }, context_window: { context_window_size: 1048576 }, product: 'antigravity', ...extra })
+  const input = JSON.stringify({ conversation_id: named ? conv : '', session_id: named ? conv : '', transcript_path: transcript.replace(/\\/g, '/'), agent_state: state, cwd: process.cwd(), model: { id: model, display_name: model, effort: flag('--effort') || 'low' }, context_window: { context_window_size: 1048576 }, product: 'antigravity', ...extra })
   spawnSync(process.env.ComSpec || 'cmd.exe', [asAgy(cmd)], { windowsVerbatimArguments: true, input, timeout: 5000, windowsHide: true })
   log({ kind: 'status', state, ...extra })
 }
@@ -132,9 +136,9 @@ function handlers(event) {
     return []
   }
   const out = []
-  for (const named of Object.values(defs)) {
-    if (!named || named.enabled === false) continue
-    for (const entry of named[event] ?? []) {
+  for (const def of Object.values(defs)) {
+    if (!def || def.enabled === false) continue
+    for (const entry of def[event] ?? []) {
       if (TOOL_EVENTS.has(event)) for (const h of entry.hooks ?? []) out.push(h)
       else out.push(entry)
     }
@@ -316,6 +320,7 @@ async function turn(text) {
     return
   }
   lastUserInput = text
+  named = true
   // The prompt shown in its pane, as agy's TUI shows the user's message (a first prompt given with -i too).
   process.stdout.write(`${text}\n`)
   if (!started) {
@@ -444,7 +449,8 @@ process.stdin.setEncoding('utf8')
 process.stdin.on('data', (d) => {
   for (const c of d) {
     if (c === '\r' || c === '\n') {
-      const t = line.trim()
+      // A bracketed paste's marks (their ESC dropped below) aren't text either.
+      const t = line.replace(/\[20[01]~/g, '').trim()
       line = ''
       if (!t) continue
       if (t === '/exit') return quit()
@@ -463,7 +469,9 @@ process.stdin.on('data', (d) => {
         waiting = null
         w(t)
       } else queue = queue.then(() => turn(t))
-    } else line += c
+    } else if (c === '\x15') line = ''
+    // Ctrl+U clears its input, as agy's does (Combwork sends it before a line it types); other control keys aren't text.
+    else if (c >= ' ' || c === '\t') line += c
   }
 })
 process.stdin.on('end', quit)

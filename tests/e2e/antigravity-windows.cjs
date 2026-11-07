@@ -70,8 +70,15 @@ const same = (a, b) => String(a ?? '').toLowerCase() === String(b ?? '').toLower
   const conn = (a) => rows.find((c) => c.id === a.connection)
   check('two connections on the one PC-wide sign-in, each with its own model', !!conn(one) && !!conn(two) && conn(one).id !== conn(two).id && conn(one).account === 'antigravity' && conn(two).account === 'antigravity' && conn(one).model !== conn(two).model, JSON.stringify(rows.filter((c) => c.provider === 'antigravity')))
 
-  // Both at once.
+  // Both at once, each with a prompt once ready (agy 1.5.0 names a conversation only with its first prompt).
+  const say = async (agentId, text) => {
+    await inv('pty:write', lib.ptyKey(proj, agentId), text)
+    await inv('pty:write', lib.ptyKey(proj, agentId), '\r')
+  }
   await Promise.all([one, two].map((a) => inv('session:start', proj, { agentId: a.id })))
+  check('both are ready at once', !!(await until(async () => (await Promise.all([one, two].map(async (a) => (await live(a.id))?.status))).every((s) => s === 'ready'), HUNG_MS)))
+  // A turn in each at once: each one's transcript, usage and status line its own.
+  await Promise.all([say(one.id, 'hello from one ü'), say(two.id, 'hello from two 漢')])
   const convs = await until(async () => {
     const got = await Promise.all([one, two].map(async (a) => (await live(a.id))?.sessionId || null))
     return got.every(Boolean) ? got : null
@@ -88,13 +95,7 @@ const same = (a, b) => String(a ?? '').toLowerCase() === String(b ?? '').toLower
   const rules = l1 ? path.join(l1.env.USERPROFILE, '.gemini', 'GEMINI.md') : ''
   check("…Combwork's guidance in its own profile's rules file", !!rules && fs.existsSync(rules) && /cw_inbox/.test(fs.readFileSync(rules, 'utf8')))
 
-  // A turn in each at once: each one's transcript, usage and status line its own.
   const transcriptOf = (l, conv) => path.join(l.env.USERPROFILE, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript_full.jsonl')
-  const say = async (agentId, text) => {
-    await inv('pty:write', lib.ptyKey(proj, agentId), text)
-    await inv('pty:write', lib.ptyKey(proj, agentId), '\r')
-  }
-  await Promise.all([say(one.id, 'hello from one ü'), say(two.id, 'hello from two 漢')])
   const both = await until(async () => {
     const shown = await Promise.all((convs ?? []).map(async (c) => (await inv('transcript:read', proj, c).catch(() => null))?.items ?? []))
     return shown.every((items) => items.some((i) => i.kind === 'assistant')) ? shown : null

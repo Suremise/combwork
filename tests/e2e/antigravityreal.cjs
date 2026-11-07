@@ -4,7 +4,7 @@
 // agent's, under its test data; never the user's ~\.gemini, which lib.cjs lists before and after) with its updates off.
 // The check profile is marked past agy's first-run screens as Set up leaves it, from the probe profile Darren onboarded
 // (only that they are done, never its installation id). One agent, one launch: its private profile (Combwork's MCP
-// servers, hooks and rules file), its conversation id from the status line, Combwork's tools connected, then one prompt on
+// servers, hooks and rules file), ready once its status line says idle, Combwork's tools connected, then one prompt on
 // the cheapest model at low effort ("Reply with just: OK"): a turn admitted from agy's own hooks and its prompt read from
 // its transcript, the reply in the conversation view, its usage counted, the agent ready again; then it stops, and no agy
 // of this test is left running. The user's agy folders and the PC's credential names are the same afterwards.
@@ -120,8 +120,10 @@ function changes(before, after) {
   const gem = await lib.addAgent(inv, alpha, { name: 'Gem', provider: 'antigravity', model: 'gemini-3.8-flash-low', effort: 'low' })
   const mark = lib.combworkLogLines(userData).length
   await inv('session:start', alpha, { agentId: gem.id })
-  const conv = await until(async () => (await live(gem.id))?.sessionId || null, HUNG_MS)
-  check("the session starts and its conversation id comes from agy's status line", /^[0-9a-f-]{36}$/.test(conv ?? ''), String(conv))
+  // agy 1.5.0 names a new conversation only with its first prompt (its status line's conversation_id is "" until then):
+  // started with none, the agent is ready once its status line says idle (HI-2548).
+  const ready = await until(async () => ((await live(gem.id))?.status === 'ready' ? await live(gem.id) : null), HUNG_MS)
+  check('the session starts, ready once its status line says idle, its conversation not named before a prompt', !!ready && !ready.sessionId, JSON.stringify(ready && { status: ready.status, sessionId: ready.sessionId }))
   const profile = path.join(userData, 'antigravity', 'profiles', gem.id)
   const mcp = JSON.parse(fs.readFileSync(path.join(profile, '.gemini', 'config', 'mcp_config.json'), 'utf8')).mcpServers ?? {}
   check("…in its private profile, with Combwork's MCP servers, hooks and rules file", 'combwork' in mcp && fs.existsSync(path.join(profile, '.gemini', 'config', 'hooks.json')) && /cw_inbox/.test(fs.readFileSync(path.join(profile, '.gemini', 'GEMINI.md'), 'utf8')), JSON.stringify(Object.keys(mcp)))
@@ -133,8 +135,10 @@ function changes(before, after) {
   // --- One prompt (Darren's (b)): a turn from agy's hooks, the reply in the transcript, its usage. Typed once only, whatever
   // Combwork shows (HI-2548's first run: its hooks failing, the turn went unseen and a second attempt sent it again).
   const prompt = 'Reply with just: OK'
-  const taken = await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live(gem.id))?.status === 'working' || ((await inv('transcript:read', alpha, conv).catch(() => null))?.items ?? []).some((i) => i.kind === 'user'), tries: 1, waitMs: HUNG_MS })
+  const taken = await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live(gem.id))?.status === 'working' || !!(await live(gem.id))?.turn?.id, tries: 1, waitMs: HUNG_MS })
   check('the prompt starts a turn (agy sends no prompt hook: its invocation zero and its transcript)', taken > 0, (await live(gem.id))?.status)
+  const conv = await until(async () => (await live(gem.id))?.sessionId || null, HUNG_MS)
+  check('…its conversation named with it (agy names it with its first prompt; Combwork takes it from its first hook)', /^[0-9a-f-]{36}$/.test(conv ?? ''), String(conv))
   const items = await until(async () => {
     const t = (await inv('transcript:read', alpha, conv).catch(() => null))?.items ?? []
     return t.some((i) => i.kind === 'assistant') && (await live(gem.id))?.status !== 'working' ? t : null
