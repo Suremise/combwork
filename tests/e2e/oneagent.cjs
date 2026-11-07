@@ -175,11 +175,13 @@ const check = (name, ok, extra = '') => {
   await page.keyboard.press('Control+Alt+I')
   await lib.fitWindow(app, page, { width: 1500, height: 900 })
 
-  // --- The sidebar's project menu: Resume All's click is unchanged, Resume One Agent ▸ after it.
+  // --- The sidebar's project menu: Resume All Agents' click is unchanged, Resume One Agent ▸ after it. Once the window
+  // has Cy stopped (the header's Resume counts Bo and Cy).
+  await until(async () => (await header.getByRole('button', { name: 'Resume all 2 stopped agents', exact: true }).count()) === 1, HUNG_MS)
   await page.locator('.sidebar').getByText('alpha', { exact: true }).first().click({ button: 'right' })
   await menuOpen()
   const side = await menuLabels()
-  check("the project's sidebar menu has Resume One Agent after Resume All", side.indexOf('Resume One Agent') === side.indexOf('Resume All') + 1 && side.indexOf('Resume All') >= 0, JSON.stringify(side))
+  check("the project's sidebar menu has Resume One Agent after Resume All Agents", side.indexOf('Resume All Agents') >= 0 && side.indexOf('Resume One Agent') === side.indexOf('Resume All Agents') + 1, JSON.stringify(side))
   await page.screenshot({ path: path.join(lib.WORK, 'oneagent-sidebar-menu-dark.png') })
   await pick('Resume One Agent')
   await until(async () => JSON.stringify(await menuLabels()) === JSON.stringify(['Bo', 'Cy']), 5000)
