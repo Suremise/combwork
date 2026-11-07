@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { gitChangedLines, gitRevision, lineDiff, memoryRevision } from './e2e/affectedUnits.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { importGraph, narrowChange, narrowRelated, narrowRelatedInTree, resolveSpecifier, setupFilesOf, wholeUse } from './e2e/relatedTests.mjs'
+import { importGraph, narrowChange, narrowRelated, narrowRelatedInTree, resolveSpecifier, setupFilesOf } from './e2e/relatedTests.mjs'
 import { tempDir } from './tempDir'
 
 const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { baseEnv: () => NodeJS.ProcessEnv }
@@ -234,7 +234,7 @@ describe('a module the graph resolves, or loads it cannot know (HR3, round 1)', 
     const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
     for (const k of ['mixed', 'missing', 'createdComputed', 'globComputed']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)
     const why = lib.why.join('\n')
-    expect(why).toMatch(/tests\/mixed\.test\.ts loads a module by a path worked out at run time \(line 2\)/)
+    expect(why).toMatch(/tests\/mixed\.test\.ts imports a module by a path worked out at run time \(line 2\)/)
     expect(why).toMatch(/tests\/missing\.test\.ts loads \.\.\/src\/main\/gone \(line 2\), which isn't in the repository/)
     expect(why).toMatch(/globs modules by a pattern worked out at run time/)
     // A literal import() taken apart by name, and an unrelated built-key lookup, leave it out.
@@ -262,8 +262,42 @@ describe('a module the graph resolves, or loads it cannot know (HR3, round 1)', 
   })
 })
 
+describe('loaders the graph must see, computed or whole (HR1, round 2)', () => {
+  const base: Files = {
+    'src/main/types.ts': FILES['src/main/types.ts'],
+    'src/main/lib.ts': LIB,
+    'src/main/useB.ts': FILES['src/main/useB.ts'],
+    ...t('viComputed', "import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\nit('v', async () => { const p = '../src/main/' + 'lib'; const ns = await vi.importActual<Record<string, () => number>>(p); ns[process.env.KEY!](); fb() })\n"),
+    ...t('viAliased', "import { vi as v } from 'vitest'\nimport { fb } from '../src/main/lib'\nit('v', async () => { await v.importActual(process.env.P!); fb() })\n"),
+    ...t('requireWhole', "import { createRequire } from 'module'\nconst req = createRequire(import.meta.url)\nit('r', () => { const ns = req('../src/main/lib'); ns[process.env.KEY!]() })\n"),
+    ...t('requireByName', "import { createRequire } from 'module'\nconst req = createRequire(import.meta.url)\nit('r', () => req('../src/main/lib').fb())\n"),
+    ...t('requireHanded', "import { createRequire } from 'module'\nimport { fb } from '../src/main/lib'\nconst req = createRequire(import.meta.url)\nit('r', () => [req].map((r) => r(process.env.P!)) && fb())\n"),
+    ...t('globWhole', "import { fb } from '../src/main/lib'\nconst modules = import.meta.glob('../src/main/*.ts', { eager: true })\nit('g', () => { for (const ns of Object.values(modules)) (ns as Record<string, () => number>)[process.env.KEY!](); fb() })\n"),
+    ...t('literalLookup', "import { fb } from '../src/main/lib'\nit('m', async () => { const { fb: b } = await import('../src/main/lib'); const t: Record<string, number> = {}; void t[`x:${b()}`]; fb() })\n")
+  }
+  const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
+  it('a computed vi.importActual (vi imported under any name) is a path worked out at run time: kept, beside a literal import() by name, left out', () => {
+    for (const k of ['viComputed', 'viAliased']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)
+    expect(lib.why.join('\n')).toMatch(/viComputed\.test\.ts imports the actual a module by a path worked out at run time/)
+    expect(lib.dropped).toContain('tests/literalLookup.test.ts')
+  })
+  it("a createRequire require used whole, or handed on, keeps the test; one taken apart by name doesn't", () => {
+    expect(lib.keep).toContain('tests/requireWhole.test.ts')
+    expect(lib.keep).toContain('tests/requireHanded.test.ts')
+    expect(lib.dropped).toContain('tests/requireByName.test.ts')
+    expect(lib.why.join('\n')).toMatch(/hands on a require function \(req/)
+  })
+  it("import.meta.glob of code is a use of each module it matches, whole", () => {
+    expect(lib.keep).toContain('tests/globWhole.test.ts')
+    expect(lib.why.join('\n')).toMatch(/globs src\/main\/lib\.ts with others, whole/)
+  })
+})
+
 describe('using a module whole', () => {
-  const use = (text: string): string | null => wholeUse(text, 'tests/x.test.ts', 'src/main/lib.ts', (spec: string) => spec === '../src/main/lib')
+  const use = (text: string): string | null => {
+    const files: Files = { 'tests/x.test.ts': text, 'src/main/lib.ts': LIB, 'src/main/types.ts': '', 'src/main/other.ts': '' }
+    return importGraph(Object.keys(files), (f: string) => files[f]).wholeOf('tests/x.test.ts', 'src/main/lib.ts')
+  }
   it('safe: by name, in types, taken apart at once, or not this module', () => {
     expect(use("import * as lib from '../src/main/lib'\nlib.fa(); lib['fb']()\ntype L = typeof lib\n")).toBeNull()
     expect(use("const { fa } = await import('../src/main/lib')\nconst b = (await import('../src/main/lib')).fb\nconst { fb } = require('../src/main/lib')\n")).toBeNull()
@@ -327,5 +361,6 @@ describe('HI-2654 (git history): a WorkspaceService member, so every related tes
     // every test of main: HI-2678 narrows them by which receivers can be a WorkspaceService.
     expect(r.why.join('\n')).toMatch(/src\/main\/workspace\.ts: WorkspaceService\.setAdvanced, class WorkspaceService, .* and \d+ more/)
     expect(r.why.join('\n').length).toBeLessThan(3000)
-  })
+    // It parses every code file the repository's tests reach (about 2,000: 17 s alone, more under a full run's load).
+  }, 120_000)
 })

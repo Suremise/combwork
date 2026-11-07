@@ -7,9 +7,9 @@
 // Why a name is enough, with no residual (HI-2677/s11): a test runs only what the files it loads run, and a unit runs
 // without being named only through an object holding it, reached by a key a search can't see (`x[\`set${k}\`]()`, a key
 // read from a fixture, Object.keys, for-in). That object is one of three, and each is named where it is obtained:
-// - the module's namespace: a file using it other than as `mod.name` keeps the test (wholeUse: `import * as` or a
-//   default import used otherwise, `export *`, `require` or `import()` not taken apart by name at once,
-//   vi.importActual, vi.mock with the original);
+// - the module's namespace: a file using it other than as `mod.name` keeps the test (fileLoads' whole uses: `import *
+//   as` or a default import used otherwise, `export *`, `require`, a createRequire require or `import()` not taken apart
+//   by name at once, vi.importActual, vi.mock with the original, import.meta.glob of it);
 // - a unit holding it (a channel's or a command's table, a const listing it): the units enclosing a changed line are
 //   searched too, and so, in the changed file, every unit naming one of those, until none is added (a function
 //   returning the table, a method calling another by `this.x`, `on('x', fn)` in a function);
@@ -23,11 +23,12 @@
 // added or deleted, unparseable in either revision, a changed line outside every unit (module code, an import that
 // isn't type-only, a constructor) or in a class's field (set as an instance is made), its own module code naming a
 // changed unit (run as it loads), or a unit with no name. For a test: a file it loads whose own imports can't all be
-// known (importGraph's unknownOf: a path worked out at run time, one not in the repository, a file unreadable or
-// unparseable), whatever else of it reaches the change; the import graph read here reaching no changed file from it
-// (Vitest followed a way this doesn't); or a file it loads listing keys by reflection (Object.getOwnPropertyNames,
-// Reflect.ownKeys, Object.getOwnPropertyDescriptors: a method by no name). Whether a file uses the changed module whole
-// is by the graph's resolution of its specifiers (a directory's index, `.js` for `.ts`), not by a file name. A changed
+// known (importGraph's unknownOf: a path worked out at run time in any form that loads, one not in the repository, a
+// require function handed on, a file unreadable or unparseable), whatever else of it reaches the change; the import
+// graph read here reaching no changed file from it (Vitest followed a way this doesn't); or a file it loads listing keys
+// by reflection (Object.getOwnPropertyNames, Reflect.ownKeys, Object.getOwnPropertyDescriptors: a method by no name).
+// Every code file reached is parsed, and its edges, unknowns and whole uses come from the same list of loading forms
+// (fileLoads), resolved as the graph resolves them (a directory's index, `.js` for `.ts`), not by a file name. A changed
 // `import type` counts for nothing: it is erased before a test runs, and typecheck checks it. Changed test files and
 // UNIT_SCANS' picks are affected.mjs's, whatever this leaves out. tests/relatedTests.test.ts checks each rule.
 import { parse } from '@babel/parser'
@@ -54,14 +55,6 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 /** A list for a diagnostic line, bounded (the picker's diagnostics are kept to a few KB). */
 const few = (xs, n = 6) => (xs.length > n ? `${xs.slice(0, n).join(', ')} and ${xs.length - n} more` : xs.join(', '))
 const keyName = (k) => (k?.type === 'Identifier' ? k.name : k?.type === 'StringLiteral' ? k.value : null)
-
-/** The specifiers a file names as imports, by text (import, export from, import(), require(), vi.mock and its kin). */
-export function specifiersOf(text) {
-  const out = new Set()
-  const re = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*|\bvi\.(?:mock|doMock|importActual|importMock)\s*\(\s*)(['"`])([^'"`\n]+)\1/g
-  for (const m of text.matchAll(re)) out.add(m[2])
-  return [...out]
-}
 
 /** A specifier, from a file, as a repo path among files (a Set of lower-cased paths → their path), or null (a package). */
 export function resolveSpecifier(from, spec, known) {
@@ -92,9 +85,6 @@ export function resolveSpecifier(from, spec, known) {
 
 /** A path a specifier may name in the repository: relative, or by an alias (a package's isn't). */
 const repoPath = (s) => s.startsWith('.') || Object.keys(ALIASES).some((a) => s === a || s.startsWith(`${a}/`))
-/** Text that may load a module by a path the text search can't read: parsed to tell (a comment or a string is nothing). */
-const MAYBE_COMPUTED = /\b(?:import|require)\s*\(\s*[^\s'"]|import\.meta\.glob|createRequire/
-
 /** A glob of import.meta.glob, from a file, as a RegExp over repo paths (lower case); a negated one is none. */
 function globRegex(from, glob) {
   if (glob.startsWith('!')) return null
@@ -122,78 +112,163 @@ function globRegex(from, glob) {
   return new RegExp(`^${re}$`)
 }
 
+/** A code file's syntax tree (Babel's), or throws. */
+export function parseCode(text, file) {
+  return parse(text, { sourceType: 'unambiguous', plugins: [...(/\.(ts|tsx|mts|cts)$/i.test(file) ? [['typescript', { dts: /\.d\.ts$/i.test(file) }]] : []), ...(/\.(tsx|jsx|js|mjs|cjs)$/i.test(file) ? ['jsx'] : [])], errorRecovery: false, allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true })
+}
+
 /**
- * The modules a file loads that its text alone doesn't show, by parsing it: { edges, unknown } (unknown: why the file's
- * imports can't all be known: a path worked out at run time, one not in the repository, a glob that isn't a literal,
- * or the file not parsing). import.meta.glob's literal globs are edges to the files they match (a negated one is
- * ignored: more edges, never fewer).
+ * What a code file loads, from its syntax tree, in one pass (HR1's round 2: discovery and whole use from the same
+ * forms): { edges: Set of repo paths, unknown: why what it loads can't all be known, or null, whole: Map(repo path → how
+ * it uses that module whole) }. The forms that load a module:
+ * - static: `import … from`, `export … from`, `export * from` (whole: it re-exports all);
+ * - `import(p)`, `require(p)` and a require from createRequire (a binding, `createRequire(u)(p)`, `module.createRequire`):
+ *   whole unless taken apart by name at once (`const { a } = …`, `(…).a`; `.then` hands it on whole);
+ * - vi.importActual, vi.importMock (whole), vi.mock and vi.doMock (whole when its factory takes the original), by
+ *   whatever name `vi` is imported from vitest;
+ * - import.meta.glob: each literal glob's files are edges, and its code files are used whole (a map of namespaces);
+ * and an `import * as` or default import used other than as `mod.name` (or a literal key) or in a type is whole.
+ * Unknown: a path worked out at run time in any of them, one not in the repository, a glob that isn't a literal, or a
+ * require function handed on (`const r = require`, passed as an argument) rather than called.
  */
-function parsedPaths(text, file, known) {
+export function fileLoads(ast, file, known) {
   const edges = new Set()
+  const whole = new Map()
   let unknown = null
+  const line = (n) => n?.loc?.start.line ?? '?'
   const unsure = (why) => {
     unknown ??= why
   }
-  let ast
-  try {
-    ast = parse(text, { sourceType: 'unambiguous', plugins: [...(/\.(ts|tsx|mts|cts)$/i.test(file) ? [['typescript', { dts: /\.d\.ts$/i.test(file) }]] : []), ...(/\.(tsx|jsx|js|mjs|cjs)$/i.test(file) ? ['jsx'] : [])], errorRecovery: false, allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true })
-  } catch (e) {
-    return { edges, unknown: `doesn't parse (${e.message}), so what it loads isn't known` }
+  const wholly = (t, why) => {
+    if (t && !whole.has(t)) whole.set(t, why)
   }
   const literal = (n) => (n?.type === 'StringLiteral' ? n.value : n?.type === 'TemplateLiteral' && !n.expressions.length ? n.quasis[0].value.cooked : null)
   const to = (spec, node) => {
     const t = resolveSpecifier(file, spec, known)
     if (t) edges.add(t)
-    else if (repoPath(spec)) unsure(`loads ${spec} (line ${node.loc?.start.line ?? '?'}), which isn't in the repository`)
+    else if (repoPath(spec)) unsure(`loads ${spec} (line ${line(node)}), which isn't in the repository`)
+    return t
   }
-  const load = (arg, node) => {
+  // A path a call loads: its target, or null (unknown, or a package).
+  const load = (arg, node, what) => {
     const spec = literal(arg)
-    if (spec == null) unsure(`loads a module by a path worked out at run time (line ${node.loc?.start.line ?? '?'})`)
-    else to(spec, node)
+    if (spec == null) {
+      unsure(`${what} a module by a path worked out at run time (line ${line(node)})`)
+      return null
+    }
+    return to(spec, node)
   }
-  const requires = new Set(['require'])
-  const isCreateRequire = (n) => n?.type === 'CallExpression' && n.callee?.type === 'Identifier' && n.callee.name === 'createRequire'
+  const up = (p) => {
+    let q = p
+    while (q.parentPath && ['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression', 'AwaitExpression'].includes(q.parentPath.node.type)) q = q.parentPath
+    return q
+  }
+  const byName = (q) => {
+    const par = q.parentPath?.node
+    if ((par?.type === 'MemberExpression' || par?.type === 'OptionalMemberExpression') && par.object === q.node) return (!par.computed || par.property.type === 'StringLiteral') && !['then', 'catch', 'finally'].includes(keyName(par.property))
+    if (par?.type === 'VariableDeclarator' && par.init === q.node && par.id.type === 'ObjectPattern') return par.id.properties.every((p) => p.type === 'ObjectProperty' && !p.computed)
+    return false
+  }
+  // The names `vi` and createRequire go by (imported under another name too), and the require functions.
+  const viNames = new Set(['vi'])
+  const crNames = new Set(['createRequire'])
+  for (const st of ast.program.body) {
+    if (st.type !== 'ImportDeclaration') continue
+    for (const sp of st.specifiers) {
+      if (sp.type !== 'ImportSpecifier') continue
+      const imported = keyName(sp.imported)
+      if (st.source.value === 'vitest' && imported === 'vi') viNames.add(sp.local.name)
+      if (/^(node:)?module$/.test(st.source.value) && imported === 'createRequire') crNames.add(sp.local.name)
+    }
+  }
+  const isCreateRequire = (n) => n?.type === 'CallExpression' && ((n.callee.type === 'Identifier' && crNames.has(n.callee.name)) || (n.callee.type === 'MemberExpression' && !n.callee.computed && keyName(n.callee.property) === 'createRequire'))
+  const requireNames = new Set(['require'])
   traverse(ast, {
     VariableDeclarator(p) {
-      if (p.node.id.type === 'Identifier' && isCreateRequire(p.node.init)) requires.add(p.node.id.name)
+      if (p.node.id.type === 'Identifier' && isCreateRequire(p.node.init)) requireNames.add(p.node.id.name)
+    },
+    AssignmentExpression(p) {
+      if (p.node.left.type === 'Identifier' && isCreateRequire(p.node.right)) requireNames.add(p.node.left.name)
     }
   })
   traverse(ast, {
-    'ImportDeclaration|ExportAllDeclaration|ExportNamedDeclaration'(p) {
+    ImportDeclaration(p) {
+      const t = to(p.node.source.value, p.node)
+      if (!t || p.node.importKind === 'type') return
+      for (const sp of p.node.specifiers) {
+        if (sp.type === 'ImportSpecifier') continue
+        for (const ref of p.scope.getBinding(sp.local.name)?.referencePaths ?? []) {
+          if (ref.findParent((a) => a.isTSTypeQuery() || a.isTSTypeReference())) continue
+          if (!byName(up(ref))) wholly(t, `uses ${t} whole as ${sp.local.name} (line ${line(ref.node)})`)
+        }
+      }
+    },
+    ExportAllDeclaration(p) {
+      const t = to(p.node.source.value, p.node)
+      if (p.node.exportKind !== 'type') wholly(t, `re-exports all of ${t} (line ${line(p.node)})`)
+    },
+    ExportNamedDeclaration(p) {
       if (p.node.source) to(p.node.source.value, p.node)
     },
     ImportExpression(p) {
-      load(p.node.source, p.node)
+      const t = load(p.node.source, p.node, 'imports')
+      if (!byName(up(p))) wholly(t, `imports ${t} whole (line ${line(p.node)})`)
+    },
+    Identifier(p) {
+      // A require function anywhere but called (or `require.resolve`, which loads nothing) may load anything.
+      if (!requireNames.has(p.node.name) || !p.isReferencedIdentifier()) return
+      if (p.node.name === 'require' && p.scope.hasBinding('require')) return
+      const par = p.parentPath.node
+      if ((par.type === 'CallExpression' || par.type === 'OptionalCallExpression') && par.callee === p.node) return
+      if (par.type === 'MemberExpression' && par.object === p.node && !par.computed && ['resolve', 'cache', 'main'].includes(keyName(par.property))) return
+      if (par.type === 'VariableDeclarator' && par.id === p.node) return
+      if (par.type === 'AssignmentExpression' && par.left === p.node) return
+      if (p.parentPath.isTSTypeQuery() || p.findParent((a) => a.isTSTypeReference())) return
+      unsure(`hands on a require function (${p.node.name}, line ${line(p.node)}), which may load anything`)
     },
     CallExpression(p) {
       const n = p.node
       const c = n.callee
-      const vi = c.type === 'MemberExpression' && c.object?.type === 'Identifier' && c.object.name === 'vi' && !c.computed && ['mock', 'doMock', 'importActual', 'importMock'].includes(c.property.name)
-      const glob = c.type === 'MemberExpression' && !c.computed && c.property.name === 'glob' && c.object?.type === 'MetaProperty'
-      if (c.type === 'Import' || (c.type === 'Identifier' && requires.has(c.name)) || isCreateRequire(c) || vi) load(n.arguments[0], n)
-      else if (glob) {
+      const member = c.type === 'MemberExpression' && !c.computed ? keyName(c.property) : null
+      if (c.type === 'Import' || (c.type === 'Identifier' && requireNames.has(c.name) && !(c.name === 'require' && p.scope.hasBinding('require'))) || isCreateRequire(c)) {
+        const t = load(n.arguments[0], n, c.type === 'Import' ? 'imports' : 'requires')
+        if (!byName(up(p))) wholly(t, `${c.type === 'Import' ? 'imports' : 'requires'} ${t} whole (line ${line(n)})`)
+        return
+      }
+      if (c.type === 'MemberExpression' && c.object?.type === 'Identifier' && viNames.has(c.object.name) && ['mock', 'doMock', 'importActual', 'importMock'].includes(member)) {
+        const t = load(n.arguments[0], n, member === 'mock' || member === 'doMock' ? 'mocks' : 'imports the actual')
+        if (member === 'importActual' || member === 'importMock') wholly(t, `imports the actual ${t} whole (line ${line(n)})`)
+        else if (n.arguments.some((a, i) => i > 0 && /Function/.test(a.type) && a.params.length > 0)) wholly(t, `mocks ${t} from its original, whole (line ${line(n)})`)
+        return
+      }
+      if (member === 'glob' && c.object?.type === 'MetaProperty') {
         const arg = n.arguments[0]
         const globs = arg?.type === 'ArrayExpression' ? arg.elements.map(literal) : [literal(arg)]
-        if (globs.some((g) => g == null)) unsure(`globs modules by a pattern worked out at run time (line ${n.loc?.start.line ?? '?'})`)
-        else {
-          for (const g of globs) {
-            const re = globRegex(file, g)
-            if (re) for (const [k, f] of known) if (re.test(k)) edges.add(f)
+        if (globs.some((g) => g == null)) {
+          unsure(`globs modules by a pattern worked out at run time (line ${line(n)})`)
+          return
+        }
+        for (const g of globs) {
+          const re = globRegex(file, g)
+          if (!re) continue
+          for (const [k, f] of known) {
+            if (!re.test(k)) continue
+            edges.add(f)
+            if (CODE.test(f)) wholly(f, `globs ${f} with others, whole (line ${line(n)})`)
           }
         }
       }
     }
   })
-  return { edges, unknown }
+  return { edges, unknown, whole }
 }
 
 /**
- * The import graph of a revision's files: { known, closure(file), edgesOf(file), unknownOf(file) }. files: the repo's
- * paths; read(file): its text or null; prefetch(files): reads them ahead (gitRevision's), optional. closure(f): f and
- * every file its imports reach. Imports are found by text (comments too: an edge too many only keeps a test), and by
- * parsing a file whose text may load modules otherwise (a computed import() or require(), createRequire,
- * import.meta.glob) or names a path the text search can't resolve. unknownOf(f): why f's imports can't all be known (a
- * path worked out at run time, one not in the repository, its text unreadable or unparseable), or null.
+ * The import graph of a revision's files: { known, closure(file), edgesOf(file), unknownOf(file), wholeOf(file,
+ * module) }. files: the repo's paths; read(file): its text or null; prefetch(files): reads them ahead (gitRevision's),
+ * optional. Every code file it reaches is parsed (fileLoads), once. closure(f): f and every file its loads reach;
+ * unknownOf(f): why what f loads can't all be known (fileLoads', or its text unreadable or unparseable), or null;
+ * wholeOf(f, m): how f uses module m whole, or null.
  */
 export function importGraph(files, read, prefetch) {
   const known = new Map(files.map(slashes).map((f) => [lower(f), f]))
@@ -201,7 +276,7 @@ export function importGraph(files, read, prefetch) {
   const info = new Map()
   const infoOf = (f) => {
     if (info.has(f)) return info.get(f)
-    const r = { edges: new Set(), unknown: null }
+    let r = { edges: new Set(), unknown: null, whole: new Map() }
     info.set(f, r)
     if (!CODE.test(f)) return r
     const text = read(f)
@@ -209,18 +284,13 @@ export function importGraph(files, read, prefetch) {
       r.unknown = `${f} couldn't be read, so what it loads isn't known`
       return r
     }
-    const specs = specifiersOf(text)
-    let unresolved = false
-    for (const s of specs) {
-      const t = resolveSpecifier(f, s, known)
-      if (t) r.edges.add(t)
-      else if (repoPath(s)) unresolved = true
+    try {
+      r = fileLoads(parseCode(text, f), f, known)
+    } catch (e) {
+      r.unknown = `doesn't parse (${e.message}), so what it loads isn't known`
     }
-    if (unresolved || MAYBE_COMPUTED.test(text)) {
-      const p = parsedPaths(text, f, known)
-      for (const e of p.edges) r.edges.add(e)
-      if (p.unknown) r.unknown = `${f} ${p.unknown}`
-    }
+    if (r.unknown) r.unknown = `${f} ${r.unknown}`
+    info.set(f, r)
     return r
   }
   const closures = new Map()
@@ -238,7 +308,7 @@ export function importGraph(files, read, prefetch) {
     closures.set(start, seen)
     return seen
   }
-  return { known, closure, edgesOf: (f) => infoOf(f).edges, unknownOf: (f) => infoOf(f).unknown }
+  return { known, closure, edgesOf: (f) => infoOf(f).edges, unknownOf: (f) => infoOf(f).unknown, wholeOf: (f, m) => infoOf(f).whole.get(m) ?? null }
 }
 
 /** Whether a file's text names a word: an identifier's boundaries, so `setAdvanced` isn't found in `setAdvancedAll`. */
@@ -351,71 +421,6 @@ function namesOf(parsed, unit) {
 }
 
 /**
- * How a file loads a module in a way a name search can't follow: why, or null. module: its repo path, for the reasons;
- * isModule(spec): whether a specifier in the file is that module, as the import graph resolves it (`../src/service` for
- * src/service/index.ts, `./x.js` for x.ts). `export *` of it; an `import * as` or default import of it used other than as
- * `mod.name` (or a literal key) or in a type; `require` or `import()` of it not taken apart at once (`const { a } = …`,
- * `(…).a`); vi.importActual or vi.importMock of it; vi.mock of it from its original.
- */
-export function wholeUse(text, file, module, isModule) {
-  const src = { test: (spec) => typeof spec === 'string' && isModule(spec) }
-  let ast
-  try {
-    ast = parse(text, { sourceType: 'unambiguous', plugins: [...(/\.(ts|tsx|mts|cts)$/i.test(file) ? [['typescript', { dts: /\.d\.ts$/i.test(file) }]] : []), ...(/\.(tsx|jsx|js|mjs|cjs)$/i.test(file) ? ['jsx'] : [])], errorRecovery: false, allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true, allowImportExportEverywhere: true })
-  } catch (e) {
-    return `doesn't parse (${e.message})`
-  }
-  let hit = null
-  const unsafe = (node, what) => {
-    hit ??= `${what} (line ${node.loc?.start.line ?? '?'})`
-  }
-  const up = (p) => {
-    let q = p
-    while (q.parentPath && ['TSAsExpression', 'TSSatisfiesExpression', 'TSNonNullExpression', 'ParenthesizedExpression', 'AwaitExpression'].includes(q.parentPath.node.type)) q = q.parentPath
-    return q
-  }
-  const byName = (q) => {
-    const par = q.parentPath?.node
-    // `.then` (`import(m).then((ns) => …)`) hands the namespace on whole.
-    if ((par?.type === 'MemberExpression' || par?.type === 'OptionalMemberExpression') && par.object === q.node) return (!par.computed || par.property.type === 'StringLiteral') && !['then', 'catch', 'finally'].includes(keyName(par.property))
-    if (par?.type === 'VariableDeclarator' && par.init === q.node && par.id.type === 'ObjectPattern') return par.id.properties.every((p) => p.type === 'ObjectProperty' && !p.computed)
-    return false
-  }
-  traverse(ast, {
-    ExportAllDeclaration(p) {
-      if (src.test(p.node.source.value)) unsafe(p.node, `re-exports all of ${module}`)
-    },
-    ImportDeclaration(p) {
-      if (!src.test(p.node.source.value) || p.node.importKind === 'type') return
-      for (const sp of p.node.specifiers) {
-        if (sp.type === 'ImportSpecifier') continue
-        const b = p.scope.getBinding(sp.local.name)
-        for (const ref of b?.referencePaths ?? []) {
-          if (ref.findParent((a) => a.isTSTypeQuery() || a.isTSTypeReference())) continue
-          if (!byName(up(ref))) unsafe(ref.node, `uses ${module} whole as ${sp.local.name}`)
-        }
-      }
-    },
-    'CallExpression|ImportExpression'(p) {
-      const n = p.node
-      const isImport = n.type === 'ImportExpression' || n.callee?.type === 'Import'
-      const isRequire = n.type === 'CallExpression' && n.callee?.type === 'Identifier' && n.callee.name === 'require'
-      // vi.importActual(m), vi.importMock(m), and vi.mock(m, (importOriginal) => …): the module's namespace, whole.
-      const viCall = n.type === 'CallExpression' && n.callee?.type === 'MemberExpression' && n.callee.object?.type === 'Identifier' && n.callee.object.name === 'vi' && !n.callee.computed ? n.callee.property.name : null
-      const isActual = viCall === 'importActual' || viCall === 'importMock'
-      const isMock = (viCall === 'mock' || viCall === 'doMock') && n.arguments.some((a, i) => i > 0 && /Function/.test(a.type) && a.params.length > 0)
-      if (!isImport && !isRequire && !isActual && !isMock) return
-      const arg = n.type === 'ImportExpression' ? n.source : n.arguments[0]
-      const spec = arg?.type === 'StringLiteral' ? arg.value : arg?.type === 'TemplateLiteral' && !arg.expressions.length ? arg.quasis[0].value.cooked : null
-      if (spec == null || !src.test(spec)) return
-      if (isMock) unsafe(n, `mocks ${module} from its original, whole`)
-      else if (isActual || !byName(up(p))) unsafe(n, `${isImport ? 'imports' : isRequire ? 'requires' : 'imports the actual'} ${module} whole`)
-    }
-  })
-  return hit
-}
-
-/**
  * The related tests a change needs: { keep: [tests], dropped: [tests], why: [lines] }. related: Vitest's (repo paths);
  * changes: { file: narrowChange's result } for each changed file; graph: importGraph of the revision tested; read: its
  * texts; setupFiles: those every test loads (vitest.config.ts).
@@ -435,13 +440,6 @@ export function narrowRelated({ related, changes, graph, read, setupFiles = [] }
     const k = `${n.key ? 'k' : 'w'}\0${n.name}`
     if (!regexes.has(k)) regexes.set(k, n.key ? keyIn(n.name) : wordIn(n.name))
     return regexes.get(k)
-  }
-  const whole = new Map()
-  const wholeOf = (f, module) => {
-    const k = `${f}\0${module}`
-    // Only a file importing it directly can use it whole (a barrel re-exporting it whole is one, and checked as such).
-    if (!whole.has(k)) whole.set(k, CODE.test(f) && graph.edgesOf(f).has(module) ? wholeUse(textOf(f), f, module, (spec) => resolveSpecifier(f, spec, graph.known) === module) : null)
-    return whole.get(k)
   }
   const setup = setupFiles.flatMap((s) => [...graph.closure(s)])
   const reasons = { all: new Map(), graph: 0, unknown: new Map(), whole: new Map(), reflection: new Map(), named: 0 }
@@ -473,7 +471,7 @@ export function narrowRelated({ related, changes, graph, read, setupFiles = [] }
           reason = ['named']
           break
         }
-        const w = wholeOf(f, c.file)
+        const w = graph.wholeOf(f, c.file)
         if (w) {
           reason = ['whole', `${f} ${w}`]
           break
