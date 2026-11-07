@@ -23,6 +23,8 @@ import { scopeOfHost, withCardNames } from './projectKeys'
 import { queueReturnOf, resubmittedOf } from './queueReturn'
 import { projectPreferences } from './workflow/preferences'
 import { rulesEnforced } from './workflow/recorder'
+import { agentWorkflowRole, reviewsWork } from '../shared/workflow/roles'
+import { sessions } from './sessions'
 
 /**
  * Combwork's loop wakes (#405): a card loop's routine handoffs, delivered by Combwork whether or not the agent set a card watch.
@@ -119,7 +121,8 @@ export async function cardReviewer(ws: WorkspaceService, _projectPath: string, c
  * action named one: the runtime's builder); an agent of the project. Null: no one's.
  */
 async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCard, kind: LoopWakeKind, agent?: string): Promise<{ id: string; name: string } | null> {
-  const agents = projectAgents(await ws.projectConfig(projectPath)).map((a) => ({ id: a.id, name: a.name }))
+  const all = projectAgents(await ws.projectConfig(projectPath))
+  const agents = all.map((a) => ({ id: a.id, name: a.name }))
   // The user's answer reaches the agent waiting on it in or out of a loop (#1269); a loop's handoffs need a reviewer.
   // A pool lane's design closed by its answer or its builder going ahead (HI-2325) leaves the card with no reviewer
   // until the pool gives out its next submission, but the handoff is still the loop's: the answer to its builder, the
@@ -129,6 +132,10 @@ async function targetOf(ws: WorkspaceService, projectPath: string, card: TaskCar
   if (!reviewer && kind !== 'answer' && !poolStep) return null
   const target = kind === 'review' || toReviewer(kind) ? (agent ?? reviewer) : (agent ?? card.agent)
   if (!target || ((kind === 'review' || toReviewer(kind)) && target === card.agent)) return null
+  // A reviewer's handoff to an agent whose role doesn't review (HI-2664: its tools follow its role; its lane pauses,
+  // offSide), or whose running session hasn't loaded a reviewer's tools yet: held, not made, until that's put right.
+  const def = all.find((a) => a.id === target)
+  if ((kind === 'review' || toReviewer(kind)) && def && (!reviewsWork(agentWorkflowRole(def)) || !sessions.sideAllows(projectPath, def.id, 'reviewer'))) return null
   const found = agents.find((a) => a.id === target)
   return found ? { id: found.id, name: `${found.name} (${card.project})` } : null
 }

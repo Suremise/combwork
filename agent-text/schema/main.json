@@ -210,6 +210,14 @@
       "cli": "plain"
     }
   },
+  "main.connections.launch.offSide": {
+    "placeholders": {
+      "agent": "plain",
+      "part": "select",
+      "lane": "plain",
+      "role": "select"
+    }
+  },
   "main.connections.launch.otherProvider": {
     "placeholders": {
       "agent": "plain",

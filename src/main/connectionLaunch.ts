@@ -13,7 +13,7 @@ import { overrideId } from '../shared/advanced'
 import { cleanLaunch, copyAppSwitches, launchesWithoutTools, launchPolicy, type AffectedAgent, type LaunchImpact } from '../shared/launchPolicy'
 import { running } from '../shared/lanes'
 import { msg } from '../shared/i18n'
-import { agentWorkflowRole, inWorkflow, readToolsOffWith } from '../shared/workflow/roles'
+import { agentWorkflowRole, buildsWork, inWorkflow, readToolsOffWith, reviewsWork, type WorkflowRole } from '../shared/workflow/roles'
 import type { AgentDef, Connection, ConnectionLaunch, ProviderId } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
 import { accountById, allAccounts, allConnections, getConnection, NO_CONNECTION, updateConnection } from './accounts'
@@ -322,10 +322,16 @@ export async function agentChangeCheck(ws: WorkspaceService, projectPath: string
     : null
   // Checked now too, so a caller that didn't confirm is told at once, with the set and its fingerprint.
   if (read) assertConfirmed(read.impact, confirmed)
+  // A new role that doesn't do its part in a running lane (HI-2664, HR3's round 2: its tools follow its role, so the lane
+  // couldn't go on): refused, saying what to change first; its lanes and cards as they were. Read as one snapshot, and
+  // checked again under the lock with the write (a lane started or joined meanwhile is worked out again).
+  const role = agentWorkflowRole({ ...before, ...change })
+  const sideToken = !transition && change.workflowRole !== undefined && inWorkflow(role) ? await offSideCheck(ws, project, before, role) : null
   return (current) => {
     // Its role or connection changed meanwhile, or its connection's tools since (what the change makes of it now isn't
     // what was worked out): refused, to be asked again.
     if (current.workflowRole !== before.workflowRole || current.connection !== before.connection || becomes(current) !== transition) throw combworkError(AGENT_CHANGED, { agent: current.name }, { kind: 'conflict' })
+    if (sideToken !== null && impactToken() !== sideToken) throw new ImpactMoved()
     if (!read) return
     // Anything it reads written since (a card given to it meanwhile, too): worked out again by the caller (ImpactMoved).
     if (impactToken() !== read.token) throw new ImpactMoved()
@@ -345,5 +351,26 @@ export class ImpactMoved extends Error {
 
 /** Refused after the tries: the board kept changing between reading what a change affects and saving it. */
 export const impactBusy = (): Error => combworkError(BUSY, undefined, { kind: 'conflict' })
+/**
+ * The running lanes of its project in which an agent with `role` couldn't do its part (HI-2664): their builder that
+ * doesn't build, their reviewer that doesn't review. Any: refused, naming the first. The board's token as read, else.
+ */
+async function offSideCheck(ws: WorkspaceService, project: string, a: Pick<AgentDef, 'id' | 'name'>, role: WorkflowRole): Promise<string> {
+  let off: { lane: string; part: 'builder' | 'reviewer' }[] = []
+  const { token } = await stableImpact(async () => {
+    off = (await rawLanes(ws))
+      .filter((l) => running(l) && l.project.toLowerCase() === project.toLowerCase())
+      .flatMap((l) => [...(l.builder.id === a.id && !buildsWork(role) ? [{ lane: l.id, part: 'builder' as const }] : []), ...(l.reviewer?.id === a.id && !reviewsWork(role) ? [{ lane: l.id, part: 'reviewer' as const }] : [])])
+    return impactOf([])
+  })
+  if (off.length) throw combworkError(OFF_SIDE, { agent: a.name, role, part: off[0].part, lane: off[0].lane }, { kind: 'conflict' })
+  return token
+}
+const OFF_SIDE = msg({
+  id: 'main.connections.launch.offSide',
+  defaultMessage: "{agent} is the {part, select, builder {builder} other {reviewer}} of lane {lane}, which a {role, select, builder {builder} reviewer {reviewer} other {generalist}} isn't: end the lane or give it another {part, select, builder {builder} other {reviewer}} first, or choose a role that does it (Either does both). Nothing was saved.",
+  description: "An error saving an agent's role (HI-2664): the new role doesn't do the agent's part in a running lane (an agent's Combwork tools follow its role). {agent} is its name, {lane} the lane's id, {part} builder or reviewer, {role} the new role."
+})
+
 const AGENT_CHANGED = msg({ id: 'main.connections.launch.agentChanged', defaultMessage: "{agent}'s role or connection was changed meanwhile: nothing was saved. Try again.", description: "An error saving an agent's settings (HI-2670): its role or connection was changed by something else while this change of its role or connection was being checked, so nothing was saved. {agent} is its name." })
 

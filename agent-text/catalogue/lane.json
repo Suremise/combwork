@@ -419,6 +419,10 @@
     "text": "waiting: {card} not merged",
     "note": "A lane waits: its card passed but is not merged yet; a lane takes one card at a time (§16.11.2)."
   },
+  "lane.status.offSide": {
+    "text": "paused: {agent} isn't a {part, select, builder {builder} other {reviewer}} by its role, so it has no {part, select, builder {builder's} other {reviewer's}} tools: give the lane another {part, select, builder {builder} other {reviewer}}, or make {agent} a {part, select, builder {builder} other {reviewer}} or either-role agent",
+    "note": "A lane pauses while its builder or reviewer has a role that doesn't do its part (HI-2664: an agent's Combwork tools follow its role): nothing new is given to it for the lane; its work in flight stays."
+  },
   "lane.status.preparing": {
     "text": "waiting: preparing {slot}",
     "note": "A lane's slot is being prepared (warming, its setup or an install, #1446); {slot} is its name."

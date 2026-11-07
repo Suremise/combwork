@@ -50,7 +50,7 @@ async function project(otherTargets: string[] = ['1.2.0']): Promise<{ w: WS; rep
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'branch', '1.2.0')
   const { platform: _p, ...pair } = preset('git', 'pair')
-  const agents = [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }]
+  const agents = [{ id: 'b1', name: 'B1', workflowRole: 'either' }, { id: 'r1', name: 'R1', workflowRole: 'either' }]
   writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'git', agents, workflow: { platform: 'git', preset: 'pair', options: { ...pair, target: 'main', otherTargets } } }))
   const w = createWorkspaceService()
   await w.open(ws)

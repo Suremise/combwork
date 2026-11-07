@@ -4,7 +4,7 @@ import { refusalBody, type Refusal } from '../shared/workflow/refusals'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
-import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
+import { agentWorkflowRole, buildsWork, inWorkflow, reviewsWork } from '../shared/workflow/roles'
 import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
@@ -510,6 +510,24 @@ function keptLaneFacts(ws: WorkspaceService): Map<number, { key: string; facts: 
   return c.cards
 }
 
+/**
+ * A running lane's builder or reviewer whose role doesn't do its part (HI-2664: a lane from before roles counted, or a
+ * guessed role), by id: its part. Its tools follow its role, so the lane pauses (offSide) and is given nothing new.
+ */
+function offSideOf(ws: WorkspaceService, l: LaneRecord): Map<string, 'builder' | 'reviewer'> {
+  const agents = ws.path ? ws.info()?.projects.find((p) => same(p.name, l.project))?.config.agents : undefined
+  const role = (id: string) => {
+    const a = agents?.find((x) => x.id === id)
+    return a ? agentWorkflowRole(a) : null
+  }
+  const out = new Map<string, 'builder' | 'reviewer'>()
+  const b = role(l.builder.id)
+  if (b && inWorkflow(b) && !buildsWork(b)) out.set(l.builder.id, 'builder')
+  const r = l.reviewer ? role(l.reviewer.id) : null
+  if (l.reviewer && r && inWorkflow(r) && !reviewsWork(r)) out.set(l.reviewer.id, 'reviewer')
+  return out
+}
+
 /** A running lane's agents that are Independent now (HI-2670), by id. */
 function outOfWorkflow(ws: WorkspaceService, l: LaneRecord): Set<string> {
   return new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && !!ws.path && independentIn(ws, join(ws.path, l.project), a.id)).map((a) => a.id))
@@ -536,7 +554,7 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
   const deps = await dueDepsOf(ws, lanes, cards)
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined)))
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined, running(l) ? offSideOf(ws, l) : undefined)))
 }
 
 /**
@@ -1599,7 +1617,7 @@ export function laneNow(ws: WorkspaceService, by: { lane: string } | { card: num
   const atLimit = on ? roundLimitCards(ws, l.cards) : new Set<number>()
   const deaf = new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && hooksMissingFor(join(ws.path!, l.project), a.id)).map((a) => a.id))
   const owners = new Map([...cardOwnersNow(ws, l.cards)].map(([n, o]) => [n, o.lane]))
-  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners, null, !!teamPauseOf(ws), null, outOfWorkflow(ws, l))
+  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners, null, !!teamPauseOf(ws), null, outOfWorkflow(ws, l), offSideOf(ws, l))
 }
 
 /** The running lane of a project agent (as builder, else as reviewer), or null. */

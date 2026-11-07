@@ -520,6 +520,7 @@ interface CombworkMessageValues {
   'board.lanes.moveUp': undefined
   'board.lanes.moved': { lane: string | number; at: string | number; n: number }
   'board.lanes.none': undefined
+  'board.lanes.offSide': { agent: string | number; part: string }
   'board.lanes.oldRules': undefined
   'board.lanes.oldRulesTip': { enforced: string }
   'board.lanes.poolLastVerdict': { name: string | number; pass: string }

@@ -221,7 +221,7 @@ const prose = (seed, n) => {
 
   console.log('\n--- Combwork tools (as an agent)')
   const projects = measure('cw_list_projects', tool('cw_list_projects', {}), 1000)
-  check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, builder\] idle; Tester \[claude-code, builder\] stopped$/m.test(projects), projects)
+  check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, either\] idle; Tester \[claude-code, either\] stopped$/m.test(projects), projects)
   // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
   // Each agent row names its connection (HI-2108: every agent has one, its id and name).
   measure('cw_project_status', tool('cw_project_status', {}), 3300)

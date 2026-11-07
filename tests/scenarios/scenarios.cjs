@@ -309,7 +309,7 @@ function handMerged(c, n) {
   c.git('merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch)
   return { branch, base }
 }
-/** Implementer builds and Coder reviews (HI-2664: the harness saves them the other way round). */
+/** Implementer builds and Coder reviews (HI-2664: the harness saves Coder either and Implementer a reviewer). */
 async function swapRoles(c) {
   await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
   await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })

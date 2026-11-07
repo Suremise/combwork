@@ -4063,7 +4063,7 @@ export interface DueDeps {
  * `teamPause` (HI-2081): its workspace's team is paused (before an update): nothing of it starts or is woken until it
  * resumes; it pauses the lane.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause' | 'independent'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause' | 'independent' | 'offSide'
 
 /**
  * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a
@@ -4123,6 +4123,8 @@ export interface LaneStatus {
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
   /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder; slot (`held` session, HI-2466): the agent whose session holds the slot. */
   agent?: string
+  /** offSide (HI-2664): the lane part `agent`'s role doesn't do. */
+  part?: 'builder' | 'reviewer'
   /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
   why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */

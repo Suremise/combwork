@@ -77,7 +77,7 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     const path = join(base, `ws-${++n}`)
     const alpha = join(path, 'alpha')
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
-    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }], ...cfg }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'b1', name: 'B1' }, { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }], ...cfg }))
     const w = createWorkspaceService()
     await w.open(path)
     return { w, alpha }

@@ -4884,9 +4884,19 @@ repeating them (#533) [note §8].
 - **Tools by side** [HI-2664, Darren's 7 Nov decisions (02:25 and 02:30, the card's): "Changing role should maybe require a
   restart of the session to load different tools"] **Built**: a project agent's combwork server is told its side,
   `CW_SIDE` in its env (`effective()`): `toolSideOf(role)`, its saved role's alone, builder, reviewer or `both` (either,
-  generalist, independent). Its lanes never change it (HR3's round 1): a lane's builder builds and its reviewer reviews
-  (lanes.ts), so a lane never needs the other side's tools, and an either-role agent keeps both sets on any lane. The
-  metrics' launch side (`launchWorkflow`, HI-2049) stays apart. `cw-mcp.ts` leaves out `hiddenForSide(side)`
+  generalist, independent). Its lanes never change it (HR3's round 1), and an either-role agent keeps both sets on any
+  lane. A lane part is only for a role that does it, however the lane is started or joined (the Assistant's (A), 7 Nov:
+  the Agent API, cw_lane and the Assistant, as Start Lane… offers them): its builder `buildsWork`, its reviewer
+  `reviewsWork`, else `400` `lane.refused.wrongSide` ("X is a builder by its role, so it has no reviewer's tools…
+  Choose another, or change X's role first"); a guessed role (no role saved) counts as it reads. **A running lane**
+  (HR3's round 2): a role change that would leave its agent unable to do its part in one is refused before anything is
+  saved (`agentChangeCheck`'s `offSideCheck`, read as one snapshot and again under the lock; `main.connections.launch.offSide`:
+  end the lane, give it another agent, or choose a role that does it), its lanes and cards as they were. A lane already
+  so (from before roles counted, or a guessed role) pauses, `offSide` ("paused: X isn't a reviewer by its role…"),
+  its work in flight kept: its next card isn't started while its builder is off its side (`laneStarts`), and a
+  reviewer's handoff to an agent whose role doesn't review, or whose session hasn't loaded a reviewer's tools yet, is
+  held, not made (`loopWakes` `targetOf`), until that's put right. The metrics' launch side (`launchWorkflow`,
+  HI-2049) stays apart. `cw-mcp.ts` leaves out `hiddenForSide(side)`
   (`shared/assistantTools.ts`): a builder `REVIEWER_ONLY_TOOLS` (cw_start_review, cw_verdict, cw_request_builder,
   cw_focused_skip), a reviewer `BUILDER_ONLY_TOOLS` (cw_start_card, cw_submit, cw_put_back, cw_declare_paths,
   cw_cannot_within_rules, cw_merge_slot, cw_report_merge, cw_reorder_tasks, cw_update_tasks). The Assistant is offered

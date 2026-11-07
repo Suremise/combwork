@@ -493,6 +493,12 @@
       "card": "plain"
     }
   },
+  "lane.status.offSide": {
+    "placeholders": {
+      "agent": "plain",
+      "part": "select"
+    }
+  },
   "lane.status.preparing": {
     "placeholders": {
       "slot": "plain"

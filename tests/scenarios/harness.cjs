@@ -602,9 +602,9 @@ async function runScenario(sc, providerKey, opts = {}) {
     // The project's agents: the one under test (Coder), and another that did earlier work (Implementer, never started),
     // on a connection with the scenario's extra arguments (HI-2122: a connection's, not the project's).
     const launch = { provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' }
-    // Their roles saved (HI-2664: a lane part only for a role that does it, as its tools follow the role): Coder builds and
-    // Implementer reviews unless a scenario changes them.
-    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'builder', ...launch })
+    // Their roles saved (HI-2664: an agent's tools and lane parts follow its role): Coder, the agent under test, does
+    // whatever its scenario asks (either), and Implementer reviews, unless a scenario changes them.
+    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either', ...launch })
     const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', workflowRole: 'reviewer', ...launch })
     // The run's dialect in their model slot (HI-2443: their Dialect setting), applied at their launch.
     if (opts.dialect) for (const a of [coder, implementer]) await inv('agents:update', alpha, a.id, { dialect: opts.dialect.path })

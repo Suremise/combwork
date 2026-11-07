@@ -75,6 +75,7 @@ function sharedTexts(): { name: string; text: string }[] {
     status({ reason: 'hooks', agent: 'R1' }),
     status({ reason: 'hooks' }),
     status({ reason: 'independent', agent: 'R1' }),
+    status({ reason: 'offSide', agent: 'R1', part: 'reviewer' }),
     status({ reason: 'preparing', slot: 'slot-b' }),
     status({ reason: 'preparing' }),
     status({ reason: 'slot', slot: 'slot-b', held: 'session', agent: 'B1' }),
