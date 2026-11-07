@@ -309,7 +309,12 @@ describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2
     ...t('viHanded', "import { vi } from 'vitest'\nimport { fb } from '../src/main/lib'\nconst v = vi\nit('v', () => { void v; fb() })\n"),
     // HR2's round-4 probes: the global object handed on, and a loader taken from it by a literal key.
     ...t('globalHanded', "import { fb } from '../src/main/lib'\nit('g', () => { const g = globalThis; const k = process.env.LOADER!; const f = (g as unknown as Record<string, (s: string) => void>)[k]; f(process.env.SCRIPT!); fb() })\n"),
-    ...t('globalLiteralKey', "import { fb } from '../src/main/lib'\nit('g', () => { const e = globalThis['eval']; e(process.env.SCRIPT!); fb() })\n"),
+    // HR2's round-5 probes: the code constructor taken as a value, by itself and as a global's member.
+    ...t('functionValue', "import { fb } from '../src/main/lib'\nit('f', () => { const F = Function; F(process.env.SCRIPT!)(); fb() })\n"),
+    ...t('globalFunction', "import { fb } from '../src/main/lib'\nit('f', () => { const F = globalThis.Function; F(process.env.SCRIPT!)(); fb() })\n"),
+    // Safe: a local binding that happens to be a member called like one, and `typeof … === 'function'`.
+    ...t('localCall', "import { fb } from '../src/main/lib'\nit('f', () => { const o = { run: (s: string) => s.length }; o.run('x'); void (typeof fb === 'function'); fb() })\n"),
+    ...t('globalLiteralKey',"import { fb } from '../src/main/lib'\nit('g', () => { const e = globalThis['eval']; e(process.env.SCRIPT!); fb() })\n"),
     // Safe: a named member of the global object, through a cast too.
     ...t('globalByName', "import { fb } from '../src/main/lib'\nit('g', () => { globalThis.crypto.getRandomValues(new Uint8Array(1)); void (globalThis as { x?: number }).x; fb() })\n"),
     // Allowed: each a literal form, so they narrow.
@@ -317,9 +322,9 @@ describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2
   }
   const lib = narrow(base, { ...base, 'src/main/lib.ts': LIB_FA })
   it("keeps each of HR2's probes: a createRequire require named require, vi['importActual'], vitest's own export, and the other Vitest loaders computed", () => {
-    for (const k of ['localRequire', 'viComputedKey', 'vitestExport', 'importMock', 'mockComputed', 'doMockComputed', 'viHanded', 'globalHanded', 'globalLiteralKey']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)  })
+    for (const k of ['localRequire', 'viComputedKey', 'vitestExport', 'importMock', 'mockComputed', 'doMockComputed', 'viHanded', 'globalHanded', 'globalLiteralKey', 'functionValue', 'globalFunction']) expect(lib.keep, k).toContain(`tests/${k}.test.ts`)  })
   it('leaves out a file whose loads are all literal allowed forms, naming nothing changed', () => {
-    expect(lib.dropped).toEqual(['tests/globalByName.test.ts', 'tests/literalForms.test.ts'])
+    expect(lib.dropped).toEqual(['tests/globalByName.test.ts', 'tests/literalForms.test.ts', 'tests/localCall.test.ts'])
   })
   it('a worker or a process running JavaScript (the Assistant\'s option 4): in src, it counts only when the change is in what a build entry loads', () => {
     const w: Files = {
@@ -392,10 +397,13 @@ describe('the allowlist and the gate (the Assistant\'s design after round 3; HR2
       ['vi.unmock(p)', 'uses vi other than'],
       ['x.importActual(p)', 'Vitest module loader'],
       ['globalThis[k]()', 'global object other than by a member'],
-      ["globalThis['eval'](s)", 'global object other than by a member'],
+      ["globalThis['eval'](s)", 'global object other than by a member|eval or a Function'],
+      ['const F = Function', 'eval or a Function'],
+      ["const C = x['constructor']", 'eval or a Function'],
+      ['const { constructor: c } = x', 'eval or a Function'],
       ['const g = globalThis', 'global object other than by a member']
     ] as const) expect(unknown(text), text).toMatch(new RegExp(what))
-    for (const text of ["// require(x), import(p), eval\nexport const a = 1\n", "const s = 'require(x) eval(y) import(z)'\n", "type T = typeof import('./y')\nconst u: import('./y').U = 1\n", 'const k = import.meta.url\n', "import { syncBuiltinESMExports } from 'module'\nsyncBuiltinESMExports()\n", "const global = { a: 1 }\nvoid global[k]\n"]) expect(unknown(text), text).toBeNull()
+    for (const text of ["// require(x), import(p), eval\nexport const a = 1\n", "const s = 'require(x) eval(y) import(z)'\n", "type T = typeof import('./y')\nconst u: import('./y').U = 1\n", 'const k = import.meta.url\n', "import { syncBuiltinESMExports } from 'module'\nsyncBuiltinESMExports()\n", "const global = { a: 1 }\nvoid global[k]\n", 'export class A {\n  constructor(private n: number) {}\n  get(): number {\n    return this.n\n  }\n}\n']) expect(unknown(text), text).toBeNull()
   })
 })
 

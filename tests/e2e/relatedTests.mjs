@@ -145,7 +145,10 @@ export const LOADS_CODE = [
   ['import.meta', /\bimport\s*\.\s*meta\b(?!\s*\.\s*(?:url|dirname|filename|env)\b)/],
   ['a Vitest module loader', /importActual|importMock|doMock|unmock|\bmock\s*\(/],
   ['createRequire or the module module', /createRequire|(['"`])(?:node:)?module\1|\b_load\b|mainModule/],
-  ['eval or a Function made from text', /\beval\b|\bFunction\s*\(|\.constructor\b|process\s*\.\s*(?:binding|dlopen)/],
+  // Any reference to eval, Function or constructor, called or not, a global's member or not (`const F = Function`,
+  // `globalThis.Function`, `x['constructor']`, the string kept): handed on, each can run text. A class's own
+  // `constructor() {}` is blanked, being no reference.
+  ['eval or a Function made from text', /\beval\b|\bFunction\b|\bconstructor\b|process\s*\.\s*(?:binding|dlopen)/],
   ['vitest other than by a named import', /\bvitest\b(?![/'"`.-])|(['"`])vitest\1/]
 ]
 /**
@@ -155,7 +158,7 @@ export const LOADS_CODE = [
  * `workers`). Anywhere else (tests, scripts) it runs a script it names, so the file is unknown.
  */
 /** Strings the gate keeps (all others are blanked): the ones that make a process run JavaScript. */
-const KEPT_STRING = /^node(?:\.exe)?(?:\s|$)|ELECTRON_RUN_AS_NODE/i
+const KEPT_STRING = /^node(?:\.exe)?(?:\s|$)|ELECTRON_RUN_AS_NODE|^(?:eval|Function|constructor)$/i
 export const STARTS =/process\s*\.\s*execPath|ELECTRON_RUN_AS_NODE|\bfork\s*\(|\bWorker\s*\(|utilityProcess|(['"`])node(?:\.exe)?(?![\w:.-])/
 /** Vitest's `vi` calls that load no module: any other use of `vi` (another member, `vi[…]`, `vi` handed on, an alias) is the gate's. */
 export const VI_SAFE = ['fn', 'spyOn', 'hoisted', 'resetModules', 'useFakeTimers', 'useRealTimers', 'isFakeTimers', 'advanceTimersByTime', 'advanceTimersByTimeAsync', 'advanceTimersToNextTimer', 'advanceTimersToNextTimerAsync', 'runAllTimers', 'runAllTimersAsync', 'runOnlyPendingTimers', 'runOnlyPendingTimersAsync', 'runAllTicks', 'clearAllTimers', 'getTimerCount', 'setSystemTime', 'getMockedSystemTime', 'getRealSystemTime', 'clearAllMocks', 'resetAllMocks', 'restoreAllMocks', 'isMockFunction', 'mocked', 'waitFor', 'waitUntil', 'stubEnv', 'unstubAllEnvs', 'stubGlobal', 'unstubAllGlobals', 'setConfig', 'resetConfig']
@@ -300,6 +303,10 @@ export function fileLoads(text, file, known) {
     },
     TSImportType(p) {
       blank.push([p.node.start, p.node.end])
+    },
+    // A class's own constructor is a declaration, not a reference to one (its body is still read).
+    ClassMethod(p) {
+      if (p.node.kind === 'constructor' && !p.node.computed) blank.push([p.node.key.start, p.node.key.end])
     },
     // A node flag running a script from text (`-e`, `--eval`, `-p`, `--print`), in a file that starts node (STARTS): the
     // script must be the next element, a constant literal of the file, read as a file of its own, loading no repository
