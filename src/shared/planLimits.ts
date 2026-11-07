@@ -1,3 +1,4 @@
+import type { TextPart } from './advanced'
 import { msg, tr } from './i18n'
 import type { PlanLimit } from './types'
 
@@ -26,8 +27,18 @@ const MODELS_NAME = msg({
  */
 export function limitName(l: Pick<PlanLimit, 'label' | 'models' | 'windowMinutes'>): string {
   if (!l.models) return l.label
-  return tr(MODELS_NAME, { models: l.models, window: l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other' })
+  return tr(MODELS_NAME, limitNameValues(l))
 }
+
+/**
+ * The same name as text (HI-2734): a message with its values, for a message that is said in more than one language (a
+ * plan notice's title, shown in the window's language and told the Agent API in English), so each formats it in its own.
+ */
+export function limitNameText(l: Pick<PlanLimit, 'label' | 'models' | 'windowMinutes'>): TextPart {
+  return l.models ? { m: MODELS_NAME, values: limitNameValues(l) } : l.label
+}
+
+const limitNameValues = (l: Pick<PlanLimit, 'models' | 'windowMinutes'>): { models: string; window: string } => ({ models: l.models ?? '', window: l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other' })
 
 /** Whether a limit has a share used to show and warn of (HI-2734): not an unlimited one, nor one the plan doesn't include. */
 export const hasShare = (l: Pick<PlanLimit, 'unlimited' | 'notIncluded'>): boolean => !l.unlimited && !l.notIncluded

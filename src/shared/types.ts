@@ -719,6 +719,8 @@ export interface PlanLimit {
   notIncluded?: true
   /** When what the limit is (label, window, models) was taken from a report (HI-2734): a delayed report never rolls it back. */
   describedAt?: string
+  /** When what the plan allows (entitlement, unlimited, not included) was last seen as it is (HI-2734): a delayed report of another allowance never replaces it. */
+  allowanceAt?: string
   /** What was used of how much, in the provider's own units, where it says (Copilot's requests). */
   used?: number
   entitlement?: number

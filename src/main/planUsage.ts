@@ -1,9 +1,9 @@
-import { englishText, type TextPart } from '../shared/advanced'
+import { englishText, shownText, type TextPart } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { createHash } from 'crypto'
 import type { ConnectionPlanUsage, PlanLimit, PlanUsage, ProviderId } from '../shared/types'
 import { providerName } from '../shared/providers'
-import { hasShare, limitName } from '../shared/planLimits'
+import { hasShare, limitNameText } from '../shared/planLimits'
 import { formatTime, formatWeekdayTime } from '../shared/dates'
 import { config } from './config'
 import { emit } from './events'
@@ -39,7 +39,14 @@ const resetPassed = (l: Pick<PlanLimit, 'resetsAt'>, now: number): boolean => !!
 function mergeLimit(kept: PlanLimit | undefined, next: PlanLimit, now: number): PlanLimit | undefined {
   if (resetPassed(next, now)) return kept && !resetPassed(kept, now) ? kept : undefined
   if (!kept || resetPassed(kept, now)) return next
-  if (allowanceChanged(kept, next)) return reportedLater(kept, next)
+  // Against the latest the allowance was seen as it is (allowanceAt), not the age of the share kept: a delayed report of
+  // another allowance never replaces a newer one.
+  if (allowanceChanged(kept, next)) return later(allowanceAt(kept), next.reportedAt) === next.reportedAt ? next : kept
+  return seen(mergeSame(kept, next), kept, next)
+}
+
+/** Two readings of the same allowance (#383): the later period's, else the higher share, said as the latest report said it. */
+function mergeSame(kept: PlanLimit, next: PlanLimit): PlanLimit {
   if (!kept.resetsAt || !next.resetsAt) return described(next, kept)
   if (!samePeriod(kept.resetsAt, next.resetsAt)) return Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next : kept
   const resetsAt = Date.parse(next.resetsAt) > Date.parse(kept.resetsAt) ? next.resetsAt : kept.resetsAt
@@ -51,6 +58,26 @@ function mergeLimit(kept: PlanLimit | undefined, next: PlanLimit, now: number): 
   if (out.reportedAt === undefined) delete out.reportedAt
   if (out.reportedBy === undefined) delete out.reportedBy
   return described(out, kept, next.describedAt ?? next.reportedAt)
+}
+
+/** Whether a reading says what the plan allows (HI-2734: Copilot's entitlement, unlimited or not included). */
+const saysAllowance = (l: PlanLimit): boolean => l.entitlement !== undefined || !!l.unlimited || !!l.notIncluded
+
+/** When the allowance a reading has was last seen so (HI-2734): its own clock, else when it was reported. */
+const allowanceAt = (l: PlanLimit): string | undefined => l.allowanceAt ?? l.reportedAt
+
+/** The later of two times (ISO), either missing: the other. */
+function later(a: string | undefined, b: string | undefined): string | undefined {
+  if (!a) return b
+  if (!b) return a
+  return Date.parse(a) > Date.parse(b) ? a : b
+}
+
+/** A merged reading of the same allowance, with when that allowance was last seen: the later of the two reports'. */
+function seen(merged: PlanLimit, kept: PlanLimit, next: PlanLimit): PlanLimit {
+  if (!saysAllowance(merged)) return merged
+  const at = later(allowanceAt(kept), allowanceAt(next))
+  return at ? { ...merged, allowanceAt: at } : merged
 }
 
 /** The fields that say what a limit is, rather than how much of it is used (HI-2734). */
@@ -74,9 +101,6 @@ function described(merged: PlanLimit, kept: PlanLimit, newAt = merged.describedA
 
 /** Whether what the plan allows differs between two readings of a limit (HI-2734): unlimited in one, or two entitlements. */
 const allowanceChanged = (a: PlanLimit, b: PlanLimit): boolean => !!a.unlimited !== !!b.unlimited || !!a.notIncluded !== !!b.notIncluded || (a.entitlement !== undefined && b.entitlement !== undefined && a.entitlement !== b.entitlement)
-
-/** Of two readings, the one reported later (the new one when either's time is unknown or they are the same). */
-const reportedLater = (kept: PlanLimit, next: PlanLimit): PlanLimit => (kept.reportedAt && next.reportedAt && Date.parse(kept.reportedAt) > Date.parse(next.reportedAt) ? kept : next)
 
 /**
  * What to keep of a provider's plan usage after a report: each limit merged by its id (mergeLimit), limits the report
@@ -140,11 +164,12 @@ const USED_ON = msg({ id: 'main.plan.usedOn', defaultMessage: '{share, number, :
  * connection (HI-1756), it names the connection, whose own limit it is. Exported for tests.
  */
 export function planNotice(provider: ProviderId, l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'label' | 'windowMinutes' | 'models'>, level: number, connection?: string): { title: string; body: string; apiTitle: string; apiTitleText: TextPart } {
-  const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: limitName(l), connection: connection ?? '' }
+  // The limit's name as text (HI-2734), so the title is in the window's language and the Agent API's in English, each whole.
+  const values = { share: Math.round(l.usedPercent) / 100, provider: providerName(provider), ...usedWindow(l), label: limitNameText(l), connection: connection ?? '' }
   const m = connection ? USED_ON : USED
   const body = `${level >= 95 ? tr(msg({ id: 'main.plan.pause', defaultMessage: 'Sessions will pause when it runs out.', description: 'A plan-usage notice, at 95% used or more.' })) : tr(msg({ id: 'main.plan.close', defaultMessage: 'You are getting close to the limit.', description: 'A plan-usage notice, below 95% used.' }))}${resetText(l.resetsAt)}`
   // agent-stored: agentField says the events stream's title again in each caller's dialect, from apiTitleText (apiEvents.ts, HI-2465)
-  return { title: tr(m, values), body, apiTitle: englishText({ m, values }), apiTitleText: { m, values } }
+  return { title: shownText({ m, values }), body, apiTitle: englishText({ m, values }), apiTitleText: { m, values } }
 }
 
 /**

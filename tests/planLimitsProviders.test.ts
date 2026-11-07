@@ -25,6 +25,7 @@ const { copilotPlanUsage } = await import('../src/main/providers/copilot/quota')
 const { eventsDetails } = await import('../src/main/providers/copilot/events')
 const { onCombworkEvent } = await import('../src/main/events')
 const { isoTime, limitName, limitWindow } = await import('../src/shared/planLimits')
+const { setLanguage } = await import('../src/shared/i18n')
 
 // HI-2734: the plan's limits as Antigravity and Copilot record them.
 // agy 1.5.0's status lines (HI-2545's run), with a quota (gemini-weekly, 3p-weekly) in most and its plan's name in some.
@@ -216,6 +217,23 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
       expect(merged([metered(300, 90, AT), AT], [none(AT + 60e3), AT + 60e3])).toMatchObject({ notIncluded: true, entitlement: 0 })
     })
 
+    it('a delayed report of another allowance never replaces a newer one, though the share kept is older (HR1, round 1)', () => {
+      // 10:00 entitlement 100 at 90% used; 12:00 the same entitlement at 80% (90% kept, as reported at 10:00); then a
+      // report from 11:00 arrives, of another allowance: unlimited, not included, or an entitlement of 200.
+      const at = Date.parse('2026-11-07T10:00:00Z')
+      const report = (share: number, hours: number, extra: Record<string, unknown> = {}): PlanUsage => ({ provider: 'copilot', plan: null, updatedAt: new Date(at + hours * 3600e3).toISOString(), limits: [{ id: 'premium_interactions', label: 'premium_interactions', models: 'premium', windowMinutes: null, usedPercent: share, resetsAt: resets, entitlement: 100, ...extra }] })
+      const latest = mergePlanUsage(mergePlanUsage(undefined, report(90, 0), at), report(80, 2), at + 7200e3)
+      expect(latest.limits[0]).toMatchObject({ usedPercent: 90, reportedAt: new Date(at).toISOString(), allowanceAt: new Date(at + 7200e3).toISOString() })
+      for (const [name, extra] of [['unlimited', { unlimited: true, entitlement: undefined }], ['not included', { notIncluded: true, entitlement: 0 }], ['entitlement 200', { entitlement: 200 }]] as const) {
+        const late = mergePlanUsage(latest, report(name === 'entitlement 200' ? 10 : 0, 1, extra), at + 7200e3).limits[0]
+        expect([late.unlimited, late.notIncluded, late.entitlement, late.usedPercent], name).toEqual([undefined, undefined, 100, 90])
+        // The share kept says when it was reported: 10:00, not the delayed report's 11:00.
+        expect(late.reportedAt, name).toBe(new Date(at).toISOString())
+      }
+      // A report of another allowance later than every one seen: it stands.
+      expect(mergePlanUsage(latest, report(0, 3, { unlimited: true, entitlement: undefined }), at + 3 * 3600e3).limits[0].unlimited).toBe(true)
+    })
+
     it('the same entitlement: the higher share within the period, as before', () => {
       const l = merged([metered(300, 20, AT), AT], [metered(300, 50, AT + 60e3), AT + 60e3])
       expect(Math.round(l.usedPercent)).toBe(80)
@@ -291,6 +309,22 @@ describe('plan limits of part of a plan, kept and shown (HI-2734)', () => {
     expect(limitWindow({ windowMinutes: WEEK })).toBe('weekly')
     expect(limitWindow({ windowMinutes: 300 })).toBe('fiveHour')
     expect(planNotice('antigravity', { ...gemini, usedPercent: 85 }, 80).title).toBe('85% of your Antigravity Gemini models, weekly limit used')
+  })
+
+  it("a notice's title is in the window's language, the Agent API's whole in English (HR1, round 1)", () => {
+    const gemini = { label: 'gemini-weekly', models: 'gemini', windowMinutes: WEEK, usedPercent: 85, resetsAt: null }
+    try {
+      setLanguage('de', {
+        'project.limit.models': '{models, select, gemini {Gemini-Modelle} other {Andere Modelle}}{window, select, weekly {, wöchentlich} other {}}',
+        'main.plan.used': '{share, number, ::percent} deines {provider}-Limits {window, select, weekly {(wöchentlich)} other {„{label}“}} verbraucht'
+      })
+      const n = planNotice('antigravity', gemini, 80)
+      expect(n.apiTitle).toBe('85% of your Antigravity Gemini models, weekly limit used')
+      expect(n.title).toContain('Gemini-Modelle, wöchentlich')
+      expect(n.title).not.toContain('Gemini models')
+    } finally {
+      setLanguage('en', {})
+    }
   })
 
   it('reads a reset time as ISO, or epoch seconds or milliseconds; nothing else', () => {

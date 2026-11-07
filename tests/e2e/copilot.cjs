@@ -418,7 +418,14 @@ const check = (name, ok, extra = '') => {
     check('…kept with its counts, the premium requests as not in the plan', kept?.limits.find((l) => l.id === 'chat')?.used === 2 && premium?.notIncluded === true && premium.entitlement === 0, JSON.stringify(kept))
     await planItem.click()
     check('…and the Overview shows them, the premium requests as Not in your plan', !!(await lib.until(async () => (await page.getByText('Chat messages limit').count()) > 0 && (await page.getByText('Premium requests limit').count()) > 0 && (await page.getByText('Not in your plan').count()) > 0, 20000, 300)))
-    await page.screenshot({ path: path.join(lib.WORK, 'copilot-plan-limits.png') })
+    // Its cards in view, with the status bar, in both themes (kept with --keep-files: HR1's round 1).
+    await page.getByText('Premium requests limit').first().scrollIntoViewIfNeeded()
+    for (const theme of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme } })
+      await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, 20000, 100)
+      await page.screenshot({ path: path.join(lib.WORK, `copilot-plan-limits-${theme}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
 
     // B stopped from Combwork in the middle of a turn: the turn is cancelled and Copilot still exits by itself, with its totals.
     await send(b.id, 'work 20 then say Never said.', ['working'])

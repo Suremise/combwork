@@ -345,7 +345,14 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await planItem.click()
   const plan = page.locator('.overview-plan', { hasText: 'Antigravity Starter Quota' })
   check('…and the Overview shows them as cards, under the plan', !!(await until(async () => (await plan.count()) > 0 && (await page.getByText('Gemini models, weekly limit').count()) > 0 && (await page.getByText('Other models, weekly limit').count()) > 0, HUNG_MS)))
-  await page.screenshot({ path: path.join(lib.WORK, 'antigravity-plan-limits.png') })
+  // Its cards in view, with the status bar, in both themes (kept with --keep-files: HR1's round 1).
+  await page.getByText('Gemini models, weekly limit').first().scrollIntoViewIfNeeded()
+  for (const theme of ['dark', 'light']) {
+    await inv('settings:update', { appearance: { theme } })
+    await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme, HUNG_MS)
+    await page.screenshot({ path: path.join(lib.WORK, `antigravity-plan-limits-${theme}.png`) })
+  }
+  await inv('settings:update', { appearance: { theme: 'dark' } })
   await stop()
   void ada
   check('the sentinel was never started, all along', !fs.existsSync(marker))
