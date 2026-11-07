@@ -84,9 +84,6 @@ afterEach(() => {
   setLanguage('en', {})
 })
 
-/** A refusal HI-1952 gave a kind: its English matched no statusFor pattern, so it answered 500 until then. */
-const NOW_REFUSED = (english: string): boolean => /^(blockedBy must be a list|#\d+ is in Todo\. A card is reviewed in Review|You aren't reviewing #\d+ now)/.test(english)
-
 /** What a call threw. */
 async function caught(p: Promise<unknown>): Promise<Error> {
   try {
@@ -303,13 +300,13 @@ describe("the board's refusals: English for agents as before, the window's langu
       [await caught(run(() => startTask(todo.number, { kind: 'agent', agentId: 'a1' }, user, 'x'.repeat(4001)))), 'The note is too long (at most 4,000 characters).', 400, 'Die Notiz ist zu lang (höchstens 4.000 Zeichen).']
     ]
     for (const [e, english, status, german] of cases) {
-      // The Agent API's reply (and every reader of .message): the English, as before, with the status its English gave.
+      // The Agent API's reply (and every reader of .message): the English, as before, with the status it always had.
       expect(e.message).toBe(english)
       expect(apiErrorReply(e).body.error).toBe(english)
       expect(apiErrorReply(e).status, english).toBe(status)
-      // A permission refusal was always 403 by its class; any other, by its English: the same status as before either way.
-      // Except the refusals HI-1952 gave a kind, which answered 500 (no pattern matched their English): now 400.
-      if (!(e instanceof tasks.TaskPermissionError) && !NOW_REFUSED(english)) expect(apiErrorReply(new Error(english)).status, `${english}: the status its English always gave`).toBe(status)
+      // Its status is its kind's, or its class's (a permission refusal, 403), never its words': the same English as a
+      // plain error answers 500 (HI-2704).
+      expect(apiErrorReply(new Error(english)).status, `${english}: a plain error's status`).toBe(500)
       // The window (IPC's conversion): in its language, or English where this test has no translation.
       expect((windowError(e) as Error).message).toBe(german ?? english)
       expect(shownError(e)).toBe(german ?? english)
