@@ -303,6 +303,8 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     compactFocus: true,
     contextLimit: true,
     autoCompactReserve: 33_000,
+    // Its parts, for a local model's declared context (HI-2682's probe, 2.1.319): the output budget, at most 20K, and 13K.
+    autoCompactParts: { outputMax: 20_000, buffer: 13_000 },
     imagePaste: true,
     // Its Read tool returns a PDF as a document and an image as an image (checked with 2.1.296).
     attachments: ['image', 'pdf', 'text'],

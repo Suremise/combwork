@@ -101,6 +101,13 @@ export interface ProviderCapabilities {
    * 20K, and a 13K buffer: about 167K on a 200K window); null when Combwork doesn't know.
    */
   autoCompactReserve: number | null
+  /**
+   * HI-2682: that reserve's parts, for a local model whose context Combwork declares: the output it keeps room for (its
+   * output budget, at most `outputMax`) and the buffer. Claude Code 2.1.319 compacted a 32,768 declared context with a
+   * 4,096 budget at 19,447 tokens, after not compacting at 12,401 (HI-2682's probe): consistent with 32,768 − 4,096 −
+   * 13,000 = 15,672, so the figure is an estimate. Absent: Combwork doesn't know.
+   */
+  autoCompactParts?: { outputMax: number; buffer: number }
   /** A pasted image path is attached as an image. */
   imagePaste: boolean
   /**
@@ -370,7 +377,9 @@ export function autoCompactAt(id: ProviderId | null | undefined, window: number 
 /** A setting bringing compaction to a share of the window, as a context tooltip says it (#242). */
 const COMPACT_PERCENT = msg({ id: 'agents.provider.compactPercent', defaultMessage: 'at {share, number, ::percent} of it', description: "Part of a context tooltip: a setting brings the CLI's compaction to a percentage ({share}: \"80%\") of its context window. Lower case: it follows a settings file's name." })
 /** HI-2682: a local model's compaction at its declared window, and the estimate where an auto-compact window caps it. */
-const DECLARED_LINE = msg({ id: 'agents.provider.compactDeclared', defaultMessage: '{provider} compacts by itself at about {at, number}, the local model’s declared context{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}', description: "A context tooltip (HI-2682): where the CLI ({provider}) compacts the conversation of a local model whose context Combwork declared, in tokens ({at}). {why}: what brings it earlier (a settings file, a percentage), none: leave it empty; {estimate}: why it is an estimate, none: leave it empty." })
+const DECLARED_LINE = msg({ id: 'agents.provider.compactDeclared', defaultMessage: '{provider} compacts by itself at about {at, number}: an estimate, the local model’s declared context {window, number} less its output budget {output, number} and a {buffer, number}-token buffer{why, select, none {} other { ({why})}}{estimate, select, none {} other { ({estimate})}}', description: "A context tooltip (HI-2682): where the CLI ({provider}) compacts the conversation of a local model whose context Combwork declared, in tokens ({at}): its declared context ({window}) less the output budget it keeps room for ({output}) and a buffer ({buffer}), all numbers of tokens. {why}: what brings it earlier (a settings file, a percentage), none: leave it empty; {estimate}: why else it is an estimate, none: leave it empty." })
+/** HI-2710: the same, where an auto-compact window set below the declared context is the window it compacts in. */
+const DECLARED_WINDOW_LINE = msg({ id: 'agents.provider.compactDeclaredWindow', defaultMessage: '{provider} compacts by itself at about {at, number}: an estimate, its auto-compact window {window, number}{why, select, none {} other { ({why})}}, below the local model’s declared context {declared, number}, less its output budget {output, number} and a {buffer, number}-token buffer{estimate, select, none {} other { ({estimate})}}', description: "A context tooltip (HI-2710): where the CLI ({provider}) compacts the conversation of a local model whose context Combwork declared ({declared}), when a setting gives it a smaller auto-compact window ({window}): that window less the output budget it keeps room for ({output}) and a buffer ({buffer}), all numbers of tokens ({at}: the result). {why}: what set the window or brings it earlier (a settings file, a percentage), none: leave it empty; {estimate}: why else it is an estimate, none: leave it empty." })
 const DECLARED_CAP = msg({ id: 'agents.provider.compactDeclaredCap', defaultMessage: 'an estimate: an auto-compact window set too is taken as capped by the declared context', description: "Part of a context tooltip (HI-2682), in brackets: why where a local model compacts is an estimate: an auto-compact window is set as well, and Combwork assumes the CLI caps it at the declared context." })
 
 /**
@@ -379,17 +388,26 @@ const DECLARED_CAP = msg({ id: 'agents.provider.compactDeclaredCap', defaultMess
  * a window set somewhere, which also caps it, a percentage bringing it earlier, or auto-compaction off). Without `auto`
  * (a session not running now), the settings weren't read: it says they can change it. Null when Combwork has no rule.
  */
-export function autoCompactLine(provider: ProviderId, contextWindow: number | null, auto?: AutoCompactSetting | null, tr?: Tr, o: { declared?: boolean } = {}): string | null {
+export function autoCompactLine(provider: ProviderId, contextWindow: number | null, auto?: AutoCompactSetting | null, tr?: Tr, o: { declared?: { output: number | null } } = {}): string | null {
   const name = providerDescriptor(provider).name
   const window = typeof auto?.window === 'number' && contextWindow ? Math.min(auto.window, contextWindow) : contextWindow
-  // A local model's declared window (HI-2682, `declared`): Claude Code compacts at it (the docs: "proactive compaction
-  // continues at the declared window"), keeping none of a Claude model's reserve; an auto-compact window set too is capped
-  // by it, said as an estimate.
-  if (o.declared && tr && auto?.window !== 'off' && window) {
-    const at = auto?.percent ? Math.round((window * auto.percent) / 100) : window
+  // A local model's declared window (HI-2682, `declared`): Claude Code keeps room below it for the output budget it was
+  // given (at most its usual output reserve) and its buffer, as HI-2682's probe showed it doing; always an estimate. An
+  // auto-compact window set too is taken as capped by the declared context.
+  const parts = providerDescriptor(provider).capabilities.autoCompactParts
+  if (o.declared && parts && tr && auto?.window !== 'off' && window) {
+    const reserve = Math.min(o.declared.output ?? parts.outputMax, parts.outputMax) + parts.buffer
+    if (window <= reserve) return null
+    const at = auto?.percent ? Math.min(window - reserve, Math.round((window * auto.percent) / 100)) : window - reserve
     const why = [auto?.source, auto?.percent ? tr(COMPACT_PERCENT, { share: auto.percent / 100 }) : null].filter(Boolean).join(', ')
+    const output = Math.min(o.declared.output ?? parts.outputMax, parts.outputMax)
+    // An auto-compact window below the declared context is the window it compacts in (HI-2710): named as that, the
+    // declared context beside it; one at or above it is taken as capped by the declared context.
+    if (contextWindow && window < contextWindow) {
+      return tr(DECLARED_WINDOW_LINE, { provider: name, at, window, declared: contextWindow, output, buffer: parts.buffer, why: why || 'none', estimate: auto?.estimate || 'none' }) // i18n-ignore: select keys, not text
+    }
     const est = [typeof auto?.window === 'number' ? tr(DECLARED_CAP) : null, auto?.estimate || null].filter(Boolean).join('; ')
-    return tr(DECLARED_LINE, { provider: name, at, why: why || 'none', estimate: est || 'none' }) // i18n-ignore: select keys, not text
+    return tr(DECLARED_LINE, { provider: name, at, window, output, buffer: parts.buffer, why: why || 'none', estimate: est || 'none' }) // i18n-ignore: select keys, not text
   }
   let at = auto?.window === 'off' ? null : autoCompactAt(provider, window)
   if (auto?.window !== 'off' && (at === null || !window)) return null
@@ -418,7 +436,7 @@ export function autoCompactLine(provider: ProviderId, contextWindow: number | nu
  * The context in words, for its tooltips: the total, then (when known) its parts: the last request's input and its
  * output, thinking included; then where the CLI compacts by itself (autoCompactLine; `auto` from the running session).
  */
-export function contextLines(u: { provider: ProviderId; contextTokens: number; contextInputTokens?: number; lastOutputTokens?: number; contextWindow: number | null }, auto?: AutoCompactSetting | null, tr?: Tr, o: { declared?: boolean } = {}): string[] {
+export function contextLines(u: { provider: ProviderId; contextTokens: number; contextInputTokens?: number; lastOutputTokens?: number; contextWindow: number | null }, auto?: AutoCompactSetting | null, tr?: Tr, o: { declared?: { output: number | null } } = {}): string[] {
   const n = (x: number): string => x.toLocaleString('en')
   const lines: string[] = []
   if (tr) {

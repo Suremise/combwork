@@ -1671,7 +1671,7 @@ export function PaneFooter({
             // A click opens the session in the Overview, with its compaction history (the Assistant's footer opens nothing).
             <span className="ctx-tip" style={{ whiteSpace: 'pre-line' }}>
               {[
-                ...contextLines({ ...usage, contextWindow: windowShown }, live?.autoCompact, tr, { declared: declaredFor(live?.localLimits, running) }),
+                ...contextLines({ ...usage, contextWindow: windowShown }, live?.autoCompact, tr, declaredFor(live?.localLimits, running) ? { declared: { output: live?.localLimits?.output?.value ?? null } } : {}),
                 ...localLimitsLines(live?.localLimits, usage.contextWindow, running, tr),
                 tr(msg({ id: 'panes.footer.compactions', defaultMessage: '{n, plural, one {# compaction so far} other {# compactions so far}}{over, select, yes { — consider compacting} other {}}', description: "A line of the hover of a pane footer's context: how many times the conversation was compacted, and (over the user's threshold) a suggestion to compact." }), { n: usage.compactions.length, over: over ? 'yes' : 'no' }),
                 ...(bytes !== undefined && !long ? [tr(msg({ id: 'panes.footer.transcriptLine', defaultMessage: 'Transcript: {size}', description: "A line of the hover of a pane footer's context: the size of the conversation's transcript ({size}: \"12 MB\")." }), { size: formatSize(bytes) })] : []),
