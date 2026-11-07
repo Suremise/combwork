@@ -13,6 +13,12 @@
 //     exact audited trees in AUDITED.
 //   - Elsewhere in the program (tests, their helpers, configs) an escape doesn't break it: it pins that file, and every
 //     unit test reaching it is kept for any change to a member (relatedTests.mjs).
+// A WorkspaceService is recognised by any type that is one (an intersection, a constrained type parameter, a subclass
+// or sub-interface, a generic's own type parameter it went into, censused in that generic's body), and code the census
+// can't read fails closed rather than being followed: a function declared only (a .d.ts, a `declare`, an overload's
+// implementation taking less), a value declared without its code, a .js implementation, code outside the program
+// loading workspace.ts. The boundary (Darren's review bar, HI-2677's (a)): a loader or a key deliberately hidden (a
+// path or a name built from pieces to escape a search), which no code here writes.
 // check:repo runs it (workspaceRuleCheck.mjs) on the working tree when a change touches one of its inputs (ruleInput).
 // tests/workspaceRule.test.ts checks each rule.
 import { parse } from '@babel/parser'
@@ -343,12 +349,35 @@ function censusIn(rev, root, scope, budget) {
   // censused (a computed key on it, T into unknown…). Nothing to do when the type parameter is constrained to a
   // tracked type (it is one there already), or for a library's function (not censused: its erasing parameters are
   // caught as slots).
+  // The implementation a call runs, when the census reads its body: the declaration itself, or an overload's
+  // implementation. Null for a declaration only: a .d.ts, a `declare`, an overload with no implementation here, one
+  // in a file this census doesn't walk (its implementation may be a .js file outside the program, HR3's round 3).
+  const implementationOf = (decl) => {
+    const bodied = (d) => !!d && 'body' in d && !!d.body && !d.getSourceFile().isDeclarationFile && walked.has(rel(d.getSourceFile().fileName))
+    if (bodied(decl)) return decl
+    const sym = decl.name ? checker.getSymbolAtLocation(decl.name) : null
+    return (sym?.declarations ?? []).find(bodied) ?? null
+  }
+  // Declarations whose kind has a body (a function, a method, a constructor, an accessor): one without is
+  // declaration-only. An interface's member or a function type has none by nature: what it calls is a value in the
+  // program, censused where it is made (or declared ambient, which the census refuses below).
+  const BODY_KINDS = new Set([K.FunctionDeclaration, K.MethodDeclaration, K.Constructor, K.GetAccessor, K.SetAccessor, K.FunctionExpression, K.ArrowFunction])
   const generic = (call, arg) => {
     const decl = checker.getResolvedSignature(call)?.declaration
-    if (!decl || !decl.typeParameters?.length || !decl.parameters) return null
+    if (!decl || !decl.parameters) return null
     const r = rel(decl.getSourceFile().fileName)
     if (r == null || r.startsWith('node_modules/')) return null
+    const ambient = decl.getSourceFile().isDeclarationFile || BODY_KINDS.has(decl.kind)
+    const impl = ambient ? implementationOf(decl) : decl
+    if (!impl) return `goes to ${decl.name?.getText() ?? 'a function'} (${r}), declared without a body the census reads`
     const i = call.arguments ? call.arguments.indexOf(arg) : -1
+    // An overload: what runs is its implementation, whose parameter must keep the type too (often `unknown`).
+    if (impl !== decl) {
+      const p = impl.parameters[Math.min(i, impl.parameters.length - 1)]
+      const pt = p ? checker.getTypeAtLocation(p) : null
+      if (!pt || erases(pt) || !holds(pt)) return `goes to ${decl.name?.getText() ?? 'a function'}'s implementation as ${pt ? short(pt) : 'nothing'}, which drops it`
+    }
+    if (!decl.typeParameters?.length) return null
     const param = decl.parameters[Math.min(i, decl.parameters.length - 1)]
     if (i < 0 || !param?.type) return null
     const own = decl.typeParameters.filter((tp) => !direct(checker.getTypeAtLocation(tp)))
@@ -415,6 +444,8 @@ function censusIn(rev, root, scope, budget) {
   }
   // Every value: an expression, not a name a declaration, member access or property gives, nor in a type.
   const nodes = []
+  // The files whose code this census reads (the rule's scope for 'src', the program for 'all').
+  const walked = new Set()
   // Object destructurings: binding patterns (declarations, parameters, for-of) and assignment targets.
   const patterns = []
   const assignedTo = (n) => {
@@ -431,6 +462,7 @@ function censusIn(rev, root, scope, budget) {
   for (const sf of sources) {
     const file = rel(sf.fileName)
     if (scope === 'src' && !inScope(file)) continue
+    if (!sf.isDeclarationFile) walked.add(file)
     sf.forEachChild(function walk(n) {
       if (ts.isTypeNode(n) || ts.isExpressionWithTypeArguments(n) || ts.isPropertySignature(n) || ts.isInterfaceDeclaration(n) || ts.isTypeAliasDeclaration(n) || ts.isHeritageClause(n) || ts.isImportDeclaration(n) || ts.isImportEqualsDeclaration(n) || ts.isExportDeclaration(n)) return
       const name = ts.isIdentifier(n) && ((ts.isDeclaration(n.parent) && n.parent.name === n) || (ts.isPropertyAccessExpression(n.parent) && n.parent.name === n) || (ts.isPropertyAssignment(n.parent) && n.parent.name === n) || ts.isQualifiedName(n.parent) || ts.isJsxAttribute(n.parent))
@@ -504,10 +536,28 @@ function censusIn(rev, root, scope, budget) {
   const liveEscapes = inside.filter((e) => !auditedEscapes.has(sig(e)))
   const liveErrors = errors.filter((e) => !auditedErrors.has(`${e.file}\0${e.code}\0${e.text}`))
   const first = liveEscapes[0]
+  // A value of the repository's declared without its code (a .d.ts, a `declare`: its implementation is a .js file or
+  // elsewhere outside the program) whose type holds a tracked one: what it does with one the census can't see.
+  let ambient = null
+  for (const sf of sources) {
+    const file = rel(sf.fileName)
+    const declared = (st) => sf.isDeclarationFile || ts.getCombinedModifierFlags(st) & ts.ModifierFlags.Ambient
+    sf.forEachChild(function find(st) {
+      if (ambient) return
+      if (ts.isModuleDeclaration(st) && st.body) return st.body.forEachChild?.(find)
+      if (ts.isModuleBlock(st)) return st.forEachChild(find)
+      if (!declared(st)) return
+      const names = ts.isVariableStatement(st) ? st.declarationList.declarations.map((d) => d.name) : (ts.isFunctionDeclaration(st) || ts.isClassDeclaration(st)) && st.name ? [st.name] : []
+      for (const name of names) if (holds(checker.getTypeAtLocation(name))) ambient = `${file}:${sf.getLineAndCharacterOfPosition(name.getStart(sf)).line + 1} declares ${name.getText(sf)} without its code, and its type holds a ${CLASS_NAME}: what it does with one the census can't see`
+    })
+    if (ambient) break
+  }
   // What no audit covers: code the census can't see, a member reached without its name, the Proxy edited.
   const structural = outside
     ? outside
-    : protocol
+    : ambient
+      ? ambient
+      : protocol
       ? `${CLASS_NAME} declares ${protocol.name.getText(classFile)}, which is reached without its name being spelled`
       : proxyEdited
         ? `the workspace Proxy in ${CLASS_FILE} isn't its reviewed text (its hash ${proxy?.hash}): review it, then update PROXY_HASH in tests/e2e/workspaceRule.mjs`

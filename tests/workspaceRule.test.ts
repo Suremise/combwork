@@ -28,7 +28,7 @@ const CLASS = `export class WorkspaceService {
 `
 const project = (files: Files): Files => ({ 'tsconfig.node.json': TSCONFIG, 'src/main/workspace.ts': CLASS, ...files })
 const run = (files: Files, opts: { scope?: string; budget?: number } = {}): Census => census(memoryRevision(project(files), 'fixture'), root, opts) as Census
-const use = (body: string, imports = "import { WorkspaceService } from './workspace'\n"): Files => ({ 'src/main/use.ts': `${imports}${body}` })
+const inUse = (body: string, imports = "import { WorkspaceService } from './workspace'\n"): Files => ({ 'src/main/use.ts': `${imports}${body}` })
 const brokenBy = (files: Files): string => {
   const c = run(files)
   expect(c.all ?? null, c.all).toBeNull()
@@ -45,7 +45,7 @@ const holds = (files: Files): Census => {
 describe('what keeps its type: the rule holds', () => {
   it('typed parameters, containers, callbacks, views by name, members by name or a literal key', () => {
     const c = holds(
-      use(`const byPath = new Map<string, WorkspaceService>()
+      inUse(`const byPath = new Map<string, WorkspaceService>()
 export function keep(ws: WorkspaceService): string | null {
   byPath.set('a', ws)
   const list = [...byPath.values()].filter((w) => !!w.path)
@@ -62,7 +62,7 @@ export function keep(ws: WorkspaceService): string | null {
     expect(c.escapes).toEqual([])
   })
   it('a same-named member of another class, its value erased: not a WorkspaceService, so nothing', () => {
-    holds(use(`class Other {
+    holds(inUse(`class Other {
   setAdvanced(): void {}
 }
 export const lost: unknown = new Other()
@@ -88,7 +88,7 @@ describe('each escape breaks the rule, naming where', () => {
   ]
   for (const [what, body] of cases) {
     it(what, () => {
-      expect(brokenBy(use(body))).toMatch(/^src\/main\/use\.ts:\d+: /)
+      expect(brokenBy(inUse(body))).toMatch(/^src\/main\/use\.ts:\d+: /)
     })
   }
   // HR3's round 1: a member chosen by destructuring, its name never spelled.
@@ -101,7 +101,7 @@ describe('each escape breaks the rule, naming where', () => {
   ]
   for (const [what, body] of destructured) {
     it(`destructured by ${what}`, () => {
-      expect(brokenBy(use(body))).toMatch(/is destructured by (a computed key|a rest)/)
+      expect(brokenBy(inUse(body))).toMatch(/is destructured by (a computed key|a rest)/)
     })
   }
   // HR3's round 2: a WorkspaceService by another type, read by a computed key.
@@ -115,14 +115,32 @@ describe('each escape breaks the rule, naming where', () => {
   ]
   for (const [what, body] of forms) {
     it(`read through ${what}`, () => {
-      expect(brokenBy(use(body))).toMatch(/is read by a computed key|is destructured by a computed key/)
+      expect(brokenBy(inUse(body))).toMatch(/is read by a computed key|is destructured by a computed key/)
     })
   }
+  // HR3's round 3: a function declared only (its code a .js file outside the program), and an overload's implementation.
+  it("a declared generic whose implementation is a .js file: the census reads no body, so it's an escape", () => {
+    const files = {
+      'src/main/helper.d.ts': 'export declare function pick<T>(x: T, k: keyof T): T[keyof T]\n',
+      'src/main/helper.js': 'exports.pick = (x, k) => x[k]\n',
+      ...inUse("import { pick } from './helper.js'\nexport function g(ws: WorkspaceService, k: keyof WorkspaceService): unknown {\n  return pick(ws, k)\n}\n")
+    }
+    expect(brokenBy(files)).toMatch(/goes to pick \(src\/main\/helper\.d\.ts\), declared without a body the census reads/)
+  })
+  it('a declared value whose type holds one: the rule fails, as code it cannot see', () => {
+    const files = { 'src/main/store.d.ts': "import type { WorkspaceService } from './workspace'\nexport declare function keep(ws: WorkspaceService): void\n", 'src/main/store.js': 'exports.keep = (ws) => ws[process.env.K]\n' }
+    expect(brokenBy(files)).toMatch(/store\.d\.ts:2 declares keep without its code/)
+  })
+  it("an overload whose implementation takes unknown: an escape; one keeping the type: the rule holds", () => {
+    const over = (implType: string) => inUse(`function f(ws: WorkspaceService): string | null\nfunction f(ws: ${implType}): string | null {\n  return (ws as WorkspaceService).path\n}\nexport const g = (ws: WorkspaceService): string | null => f(ws)\n`)
+    expect(brokenBy(over('unknown'))).toMatch(/goes to f's implementation as unknown/)
+    holds(inUse('function f(ws: WorkspaceService): string | null\nfunction f(ws: WorkspaceService | null): string | null {\n  return ws?.path ?? null\n}\nexport const g = (ws: WorkspaceService): string | null => f(ws)\n'))
+  })
   it("an unconstrained generic that only passes its T on, by name: the rule holds", () => {
-    holds(use('function firstOf<T>(list: readonly { owner: T }[]): T | undefined {\n  return list[0]?.owner\n}\nexport const g = (ws: WorkspaceService): string | null => firstOf([{ owner: ws }])?.path ?? null\n'))
+    holds(inUse('function firstOf<T>(list: readonly { owner: T }[]): T | undefined {\n  return list[0]?.owner\n}\nexport const g = (ws: WorkspaceService): string | null => firstOf([{ owner: ws }])?.path ?? null\n'))
   })
   it('destructured by name, or by a literal key: its names are spelled', () => {
-    holds(use("export function g(ws: WorkspaceService): unknown {\n  const { path, ['setAdvanced']: set } = ws\n  return [path, set]\n}\n"))
+    holds(inUse("export function g(ws: WorkspaceService): unknown {\n  const { path, ['setAdvanced']: set } = ws\n  return [path, set]\n}\n"))
   })
   it('the class handing itself on as an object: this, into an object slot', () => {
     const own = CLASS.replace('  path: string | null = null\n', '  path: string | null = null\n  hold(): void {\n    keep({ holder: this })\n  }\n')
@@ -190,25 +208,25 @@ const workspaceFor = (p: string): WorkspaceService | null => (p ? null : null)
 
 describe("what it can't prove fails closed", () => {
   it('a type error anywhere in the program, an unresolved import of the class among them', () => {
-    expect(brokenBy(use('export const n: number = "text"\n'))).toMatch(/type error \(TS2322/)
-    expect(brokenBy(use('export const f = (ws: WorkspaceService): unknown => ws\n', "import { WorkspaceService } from './no-such-module'\n"))).toMatch(/TS2307/)
+    expect(brokenBy(inUse('export const n: number = "text"\n'))).toMatch(/type error \(TS2322/)
+    expect(brokenBy(inUse('export const f = (ws: WorkspaceService): unknown => ws\n', "import { WorkspaceService } from './no-such-module'\n"))).toMatch(/TS2307/)
   })
   it("a file of the rule's scope outside the program", () => {
-    const files = { ...project(use('export const a = 1\n')), 'tsconfig.node.json': TSCONFIG.replace('"src/**/*"', '"src/main/workspace.ts"') }
+    const files = { ...project(inUse('export const a = 1\n')), 'tsconfig.node.json': TSCONFIG.replace('"src/**/*"', '"src/main/workspace.ts"') }
     expect((census(memoryRevision(files, 'fixture'), root) as Census).all).toMatch(/src\/main\/use\.ts isn't in tsconfig\.node\.json's program/)
   })
   it('no tsconfig, no class, a type walk past its budget, a revision that throws', () => {
     expect((census(memoryRevision({ 'src/main/workspace.ts': CLASS }, 'fixture'), root) as Census).all).toMatch(/tsconfig\.node\.json can't be read/)
     expect(run({ 'src/main/workspace.ts': 'export const x = 1\n' }).all).toMatch(/WorkspaceService isn't declared/)
-    expect(run(use('export const f = (ws: WorkspaceService): string | null => ws.path\n'), { budget: 5 }).all).toMatch(/ran out of its budget/)
+    expect(run(inUse('export const f = (ws: WorkspaceService): string | null => ws.path\n'), { budget: 5 }).all).toMatch(/ran out of its budget/)
     const throwing = { ...memoryRevision(project({}), 'fixture'), list: () => { throw new Error('disk gone') } }
     expect((census(throwing, root) as Census).all).toMatch(/census of fixture failed \(disk gone\)/)
   })
 })
 
 describe('both revisions, and audits bound to an exact tree', () => {
-  const escaping = project(use('export const f = (ws: WorkspaceService): unknown => ws as unknown\n'))
-  const clean = project(use('export const f = (ws: WorkspaceService): string | null => ws.path\n'))
+  const escaping = project(inUse('export const f = (ws: WorkspaceService): unknown => ws as unknown\n'))
+  const clean = project(inUse('export const f = (ws: WorkspaceService): string | null => ws.path\n'))
   it("an escape only in base, removed at head: the rule doesn't hold", () => {
     expect(ruleOn([memoryRevision(escaping, 'base'), memoryRevision(clean, 'head')], root).all).toMatch(/doesn't hold: src\/main\/use\.ts:2: .*\(base\)/)
     expect(ruleOn([memoryRevision(clean, 'base'), memoryRevision(clean, 'head')], root)).toMatchObject({ pinned: [] })

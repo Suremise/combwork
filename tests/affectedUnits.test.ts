@@ -331,6 +331,16 @@ describe('whatever it cannot follow selects every suite, saying why', () => {
       expect(allOf(WS, typed(), typed({ ...other, ...member })), body).toMatch(/doesn't hold: src\/main\/other\.ts:\d+: .*\(head\)/)
     }
   })
+  // HR3's round 3: a helper declared in a .d.ts, its code a .js file outside the program.
+  it('a member handed to a declared helper whose code the census cannot read: every suite, in either revision', () => {
+    const helper = {
+      'src/main/helper.d.ts': 'export declare function pick<T>(x: T, k: keyof T): T[keyof T]\n',
+      'src/main/helper.js': 'exports.pick = (x, k) => x[k]\n',
+      'src/main/other.ts': "import { WorkspaceService } from './workspace'\nimport { pick } from './helper.js'\nexport function g(ws: WorkspaceService, k: keyof WorkspaceService): unknown {\n  return pick(ws, k)\n}\n"
+    }
+    expect(allOf(WS, typed(helper), typed({ ...helper, ...member }))).toMatch(/doesn't hold: src\/main\/other\.ts:4: .*goes to pick \(src\/main\/helper\.d\.ts\), declared without a body the census reads.*\(base\)/)
+    expect(allOf(WS, typed(), typed({ ...helper, ...member }))).toMatch(/goes to pick .*\(head\)/)
+  })
   it('the workspace instance itself: every suite (its Proxy, C3)', () => {
     expect(allOf(WS, typed(), typed({ [WS]: workspaceTs().replace('export const workspace = new WorkspaceService()', 'export const workspace = new WorkspaceService() as WorkspaceService') }))).toMatch(/the workspace instance is a Proxy/)
   })
