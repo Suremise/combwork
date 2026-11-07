@@ -300,6 +300,10 @@
   "tips.leftoverProcesses.title": "End what a stopped agent left running",
   "tips.licenceAudit.text": "Before a release, ask an agent to audit the licences of what your project ships. It reads them from the files, vendored material and installer parts included, and flags anything unclear for you.",
   "tips.licenceAudit.title": "Audit the licences of what you ship",
+  "tips.localModelLimits.text": "On a server account’s models (Settings → Accounts & Connections, Edit Server…), set Context size and Output budget: agents started on that model then compact at its real context rather than an assumed 200,000.",
+  "tips.localModelLimits.title": "Tell Claude Code your local model’s real context",
+  "tips.localModelPicker.text": "An agent on a server account finds the account’s models in Claude Code’s /model, by their exact IDs. Give each a Label in Edit Server… to name it there.",
+  "tips.localModelPicker.title": "Switch local models in Claude Code’s /model",
   "tips.loopDefaults.text": "Rounds and Wait under Card loops in Settings → Version Control set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a workspace and a project can set their own. Saying \"rounds: 3\" when you start one still wins.",
   "tips.loopDefaults.title": "Your rounds and wait for every loop",
   "tips.loopLanes.text": "When two agents build and review cards in turn, Combwork keeps the loop as a lane: its cards in order, the one it's on, and whether it's paused on a blocked card. Ask the Assistant which lanes are running.",
@@ -340,8 +344,8 @@
   "tips.mergeSlot.title": "Agents take turns to merge",
   "tips.mergeStrict.text": "With Combwork merging, Version Control → Workflow can have work up to date with its target before it merges: the merge queue updates a card in its own folder, never on the builder’s branch, and the review still counts if it’s the same change.",
   "tips.mergeStrict.title": "Work up to date before it merges",
-  "tips.mergesInto.title": "Work on the next release beside this one",
   "tips.mergesInto.text": "List a branch such as 1.2.0 under Version Control → Workflow → Other branches work can merge into, then pick it as a lane’s Merges into in Start Lane…, or a card’s in its dialog. Its cards are made from it and merge into it through its own queue.",
+  "tips.mergesInto.title": "Work on the next release beside this one",
   "tips.messageReceipts.text": "Every message the Assistant leaves an agent has an id and is kept, even across a restart: it is received once the agent reads its inbox, and acked once the agent acted on it. One not acked within {minutes, plural, one {# minute} other {# minutes}} shows as overdue (✉) in its pane.",
   "tips.messageReceipts.title": "See where a message got to",
   "tips.modelFallbacks.text": "Combwork asks Claude Code and Codex which models they have and which effort levels each takes. If a CLI can't say, the model, effort and price lists on its Settings page are yours to edit.",
@@ -432,6 +436,8 @@
   "tips.resumeAfterUpdate.title": "Updates leave your agents where they were",
   "tips.resumeAll.text": "After a restart, Resume All Agents in the project header resumes every stopped agent's last session in one go.",
   "tips.resumeAll.title": "Resume all agents at once",
+  "tips.retargetRelease.text": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them.",
+  "tips.retargetRelease.title": "When a release ships, move what’s left onto the next",
   "tips.retryWait.text": "When a Codex, Claude Code or Copilot agent's requests are refused, often by a rate limit, it waits and tries again while its screen says only Working. Combwork reads the wait from the agent's own records, and its status says so.",
   "tips.retryWait.title": "See when an agent is rate-limited",
   "tips.reviewCopies.text": "A reviewer reviews in a review copy: a folder at exactly the submitted revision, which nothing else writes, so the builder can carry on meanwhile. Its checks there count for that submission. Settings → Advanced turns it off.",
@@ -556,7 +562,5 @@
   "tips.workspaceMovedDefender.text": "If Combwork had Defender skip the workspace's folders, Repair… after a move offers to move those exclusions to the new folders, with one administrator prompt, so none is left on a folder that's gone. Exclusions you made yourself stay as they are.",
   "tips.workspaceMovedDefender.title": "Defender exclusions follow a moved workspace",
   "tips.workspaceNotes.text": "Workspace notes, pinned first in Shared Notes, is for what's true of this machine, like a full path. Every agent gets it when it starts, in any folder, so it needn't go in a committed AGENTS.md. A section headed with a project's name is that project's alone.",
-  "tips.workspaceNotes.title": "Notes about this machine for every agent",
-  "tips.retargetRelease.title": "When a release ships, move what’s left onto the next",
-  "tips.retargetRelease.text": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them."
+  "tips.workspaceNotes.title": "Notes about this machine for every agent"
 }

@@ -5,6 +5,8 @@
  * fact. Agent-facing English (the journal is the Assistant's).
  */
 
+import { agentMsg, sayWithId, type Said } from './agentText'
+
 /** What a build was: a beta, the baseline installed for daily use, a release candidate, or a release (RELEASING.md). */
 export const BUILD_KINDS = ['beta', 'baseline', 'rc', 'release'] as const
 export type BuildKind = (typeof BUILD_KINDS)[number]
@@ -25,21 +27,31 @@ export interface BuildFact {
   by: 'dist' | 'release'
 }
 
+/** Why what was sent isn't a build fact (HI-2704): agent messages, so the Agent API's refusal records which. */
+const WHY = {
+  kind: agentMsg({ id: 'api.build.kind', text: 'kind is one of: {kinds}.', note: 'A build fact (POST /v1/builds, or a build marker) refused: its kind is none of these. kinds: the kinds, joined with commas.' }),
+  version: agentMsg({ id: 'api.build.version', text: 'version is required (at most 100 characters).', note: 'A build fact refused: no version, or a longer one.' }),
+  commit: agentMsg({ id: 'api.build.commit', text: 'commit is a commit id (7 to 64 hex characters).', note: 'A build fact refused: its commit is not a commit id.' }),
+  installer: agentMsg({ id: 'api.build.installer', text: "installer is the installer's path (at most 1,000 characters).", note: "A build fact refused: no installer path, or a longer one." }),
+  builtAt: agentMsg({ id: 'api.build.builtAt', text: 'builtAt is a date and time (ISO).', note: 'A build fact refused: builtAt is not a date and time.' }),
+  by: agentMsg({ id: 'api.build.by', text: 'by is dist or release.', note: 'A build fact refused: by is neither dist nor release (keep both as they are).' })
+}
+
 const text = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim() && v.length <= max ? v.trim() : null)
 
 /** A build fact from what was sent or left (a marker), checked; or why it isn't one. */
-export function buildFactOf(v: unknown): BuildFact | { error: string } {
+export function buildFactOf(v: unknown): BuildFact | { error: Said } {
   const o = (v && typeof v === 'object' && !Array.isArray(v) ? v : {}) as Record<string, unknown>
-  if (!BUILD_KINDS.includes(o.kind as BuildKind)) return { error: `kind is one of: ${BUILD_KINDS.join(', ')}.` }
+  if (!BUILD_KINDS.includes(o.kind as BuildKind)) return { error: sayWithId(WHY.kind, { kinds: BUILD_KINDS.join(', ') }) }
   const version = text(o.version, 100)
-  if (!version) return { error: 'version is required (at most 100 characters).' }
+  if (!version) return { error: sayWithId(WHY.version) }
   const commit = typeof o.commit === 'string' && /^[0-9a-f]{7,64}$/i.test(o.commit) ? o.commit.toLowerCase() : null
-  if (!commit) return { error: 'commit is a commit id (7 to 64 hex characters).' }
+  if (!commit) return { error: sayWithId(WHY.commit) }
   const installer = text(o.installer, 1000)
-  if (!installer) return { error: "installer is the installer's path (at most 1,000 characters)." }
+  if (!installer) return { error: sayWithId(WHY.installer) }
   const builtAt = typeof o.builtAt === 'string' && !Number.isNaN(Date.parse(o.builtAt)) ? new Date(o.builtAt).toISOString() : null
-  if (!builtAt) return { error: 'builtAt is a date and time (ISO).' }
-  if (o.by !== 'dist' && o.by !== 'release') return { error: 'by is dist or release.' }
+  if (!builtAt) return { error: sayWithId(WHY.builtAt) }
+  if (o.by !== 'dist' && o.by !== 'release') return { error: sayWithId(WHY.by) }
   return { kind: o.kind as BuildKind, version, commit, branch: o.branch === null || o.branch === undefined ? null : text(o.branch, 200), installer, builtAt, by: o.by }
 }
 

@@ -57,10 +57,10 @@
     "note": "HI-2229: the Assistant has no project of its own (\"Default: this project.\" left it calling with none), so it gets arg.project."
   },
   "tool.arg.target": {
-    "text": "Merges into: one of the project's Other branches work can merge into, or \"\" for its Work merges into. A lane's is fixed once started; a card's changes only while its branch has no work."
+    "text": "Merges into: one of the project's Other branches work can merge into, or \"\" for its Work merges into."
   },
   "tool.arg.workflowRole": {
-    "text": "Builds cards, reviews them, either (never its own), generalist (never in a lane), or independent (no part in the workflow). Default: from its name."
+    "text": "builder, reviewer, either (never its own), generalist (no lanes) or independent (no workflow). Default: by name."
   },
   "tool.askAssistant.arg.text": {
     "text": "What you ask, whole: the cards, what to do, on whose decision."
@@ -119,7 +119,7 @@
     "text": "update: its id or name."
   },
   "tool.connection.arg.launch": {
-    "text": "update: what of Combwork its sessions get. guidance, tools, typing (false: off; tools off makes its agents Independent), overrides by key; preset \"terminal\": all off; an empty object: all on."
+    "text": "update: guidance, tools, typing, overrides by key (false: off); preset: \"terminal\" turns all off; empty object: all on."
   },
   "tool.connection.arg.mode": {
     "text": "Permission mode."
@@ -375,7 +375,7 @@
     "text": "The cards it merges."
   },
   "tool.mergeSlot.description": {
-    "text": "Your project's merge slot: one merge at a time into a branch. claim waits for it (claim again to keep your place or extend the hold); release gives it up. (detail: use-cw-api, tools.md)"
+    "text": "Your project's merge slot: one merge at a time into a branch. claim waits for it; release gives it up. (detail: use-cw-api, tools.md)"
   },
   "tool.mergeSlot.error.action": {
     "text": "action must be claim, release or status"
@@ -429,7 +429,7 @@
     "text": "retarget: the card keys and slot names to move, from the preview named."
   },
   "tool.queue.arg.preview": {
-    "text": "retarget: the preview id a target change's reply gave. Without it, from (the finished target) and target (the new one) give a new preview, moving nothing."
+    "text": "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing."
   },
   "tool.queue.arg.reason": {
     "text": "remove, retry: the user's reason, recorded with the override."
@@ -438,7 +438,7 @@
     "text": "The target branch."
   },
   "tool.queue.description": {
-    "text": "Your project's merge queues, one per target branch, where Combwork merges approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused."
+    "text": "Your project's merge queues, one per target branch, merging approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused."
   },
   "tool.queue.description.assistant": {
     "text": "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}"
@@ -639,7 +639,7 @@
     "text": "Undo changes of your own (kept 7 days, grouped by the user's message): list, then change or group (\"latest\": your newest). What someone changed since stays. Only your own: never the user's or agents'. (detail: use-cw-api, tools.md)"
   },
   "tool.updateAgent.arg.confirm": {
-    "text": "The fingerprint a refusal named, once the user agreed to make this agent Independent (its role, or a connection without Combwork tools) while it is on a lane or holds a card."
+    "text": "The fingerprint a refusal named, once the user agreed to make this agent Independent while on a lane or holding a card."
   },
   "tool.updateAgent.description": {
     "text": "Change an agent's name, role, MCP servers or connection. A running agent takes them when restarted; another CLI's connection only while it is stopped."

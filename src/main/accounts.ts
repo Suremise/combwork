@@ -15,6 +15,7 @@ import { localProfileInUse } from './profileFolders'
 import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
+import { localLimitsTest } from './localLimitsTest'
 import { config } from './config'
 import { emit, onCombworkEvent } from './events'
 import { capturedText, combworkError, CombworkError } from './combworkError'
@@ -1822,8 +1823,12 @@ export function runsLocally(caps: ServerCaps, server: ServerConnection, local: b
 /** A connection as a window sees it: a server connection's models as they run now (effectiveModels). */
 function shownServer(a: Account): Account {
   const caps = a.server ? providerDescriptor(a.provider).capabilities.connections?.server : undefined
-  return caps && a.server ? { ...a, server: { ...a.server, models: effectiveModels(caps, a.server) } } : a
+  if (!caps || !a.server) return a
+  // Each model its ID alone rules out of local-model limits (HI-2682), for its row's advice; never saved.
+  const why = localLimitsTest(caps)
+  return { ...a, server: { ...a.server, models: effectiveModels(caps, a.server).map((m) => { const u = why?.(m.id); return u ? { ...m, unsupported: u } : m }) } }
 }
+
 
 /**
  * A server connection's part of a launch (HI-1772): its key decrypted for this launch's environment (refused without

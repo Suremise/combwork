@@ -54,6 +54,8 @@ export const EVERYTHING = [
   'src/main/testQuiet.ts',
   // Every IPC call's errors and the Agent API's go through it (#845).
   'src/main/combworkError.ts',
+  // The Agent API's status of plain errors that aren't messages (HI-2704), beside it.
+  'src/shared/kindedError.ts',
   // The language (#767): chosen before every window starts, and every translated text goes through it.
   'src/main/i18n.ts',
   'src/renderer/src/i18n.ts',
@@ -224,6 +226,7 @@ export const AREAS = [
   // Accounts (HI-980): the store, its checks and watches, Settings → Accounts, and the fake's sign-in.
   { paths: ['src/main/accounts.ts', 'src/shared/accounts.ts', 'src/renderer/src/components/AccountsSettings.tsx', 'src/renderer/src/components/accountCard.ts', 'tests/e2e/accounts.cjs'], suites: ['accounts', 'connections', 'connections-codex', 'connections-server', 'usagemove'] },
   // Server connections (HI-1772): the key store and its masking, the server's form, models and launch variables.
+  { paths: ['src/shared/localModelLimits.ts', 'src/main/providers/claude/localLimits.ts', 'src/main/localLimitsTest.ts'], suites: ['connections-server', 'serverdiag'] },
   { paths: ['src/main/serverConnections.ts', 'src/main/serverMarks.ts', 'src/main/keyStore.ts', 'src/main/keyMatcher.ts', 'src/main/keyCoverage.ts', 'src/shared/serverConnection.ts', 'src/renderer/src/components/ServerConnections.tsx', 'tests/e2e/connections-server.cjs'], suites: ['connections-server'] },
   // Server diagnostics (HI-2683): its service, judgements, dialog and the plain request it sends.
   { paths: ['src/main/serverDiagnostics.ts', 'src/shared/serverDiagnostics.ts', 'src/renderer/src/components/ServerDiagnostics.tsx', 'tests/e2e/serverdiag.cjs'], suites: ['serverdiag'] },

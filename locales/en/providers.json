@@ -135,6 +135,26 @@
     "defaultMessage": "Claude Code isn't signed in: start it again and sign in in its terminal.",
     "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
+  "providers.claude.localLimits.inFile": {
+    "defaultMessage": "env in {file}",
+    "description": "Where a local model's limit came from (HI-2682): a Claude Code settings file's env block. {file} names the file. env is the block's name: keep it."
+  },
+  "providers.claude.localLimits.oursContext": {
+    "defaultMessage": "Context size on {connection}",
+    "description": "Where a local model's context came from (HI-2682), in an error or a tooltip: the server connection's model field. {connection} is the connection's name. Context size is the field's name: as translated there."
+  },
+  "providers.claude.localLimits.oursOutput": {
+    "defaultMessage": "Output budget on {connection}",
+    "description": "Where a local model's output budget came from (HI-2682), in an error or a tooltip: the server connection's model field, or its default. {connection} is the connection's name. Output budget is the field's name: as translated there."
+  },
+  "providers.claude.localLimits.outputNotBelow": {
+    "defaultMessage": "{agent} wasn’t started: its output budget ({output, number} tokens, {outputFrom}) isn’t below its context size ({context, number} tokens, {contextFrom}). Change one of them, then start it again.",
+    "description": "An error starting an agent on a local model (HI-2682): the output budget Claude Code would get isn't smaller than its context. {agent} is the agent's name; {output} and {context} are numbers of tokens; {outputFrom} and {contextFrom} say where each was set (\"Context size on Local\", \"env in the project's .claude/settings.json\")."
+  },
+  "providers.claude.localLimits.tooSmall": {
+    "defaultMessage": "{agent} wasn’t started: its context size ({context, number} tokens, {contextFrom}) is too small for any output budget. Set a larger context size.",
+    "description": "An error starting an agent on a local model (HI-2682): its context is so small that no output budget fits. {agent} is the agent's name; {context} is a number of tokens; {contextFrom} says where it was set."
+  },
   "providers.cmdTooLong": {
     "defaultMessage": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
     "description": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are."
@@ -334,6 +354,30 @@
   "providers.export.you": {
     "defaultMessage": "You",
     "description": "The Markdown export of a conversation (Sessions tab → Export): the heading over the user's messages."
+  },
+  "providers.localLimits.context": {
+    "defaultMessage": "Context size {value, number} tokens ({from}){estimate, select, yes {: an estimate until Claude Code reports its window} other {}}",
+    "description": "A line of the context tooltip of an agent on a local model (HI-2682): the context its launch gave Claude Code. {value} is a number of tokens; {from} where it was set (\"Context size on Local\", \"env in …settings.json\"). estimate yes: Claude Code hasn't reported its window yet. Keep the select keys."
+  },
+  "providers.localLimits.inFile": {
+    "defaultMessage": "env in {file}",
+    "description": "Where a local model's limit came from, in brackets in its context tooltip (HI-2682): a Claude Code settings file's env block. {file} names the file. env is the block's name: keep it."
+  },
+  "providers.localLimits.notUsed": {
+    "defaultMessage": "{why, select, alias {Context size not used: Claude Code reads {model} as one of its aliases} spelling {Context size not used: IDs with claude, [1m] or a date suffix aren’t supported for it} mapped {Context size not used: {file} maps {model} to a Claude model} unreadable {Context size not used: {file} couldn’t be read, so Combwork can’t tell whether it maps {model}} other {Context size not used: {model} isn’t one of {connection}’s models}}",
+    "description": "A line of the context tooltip of an agent on a local model (HI-2682): why its launch passed no context size. {model} is a model's id, {file} a settings file, {connection} the connection's name. Keep [1m] and the select keys."
+  },
+  "providers.localLimits.ours": {
+    "defaultMessage": "set on {connection}",
+    "description": "Where a local model's limit came from, in brackets in its context tooltip (HI-2682): the server connection's model fields, or their default. {connection} is the connection's name."
+  },
+  "providers.localLimits.output": {
+    "defaultMessage": "Output budget {value, number} tokens ({from}){fallback, select, none {} other {: {fallback} wasn’t below the context, so the default was used}}",
+    "description": "A line of the context tooltip of an agent on a local model (HI-2682): the output budget its launch gave Claude Code. {value} is a number of tokens; {from} where it was set; {fallback}: the budget it replaced, a number already formatted (none: leave that branch empty). Keep the select keys."
+  },
+  "providers.localLimits.switched": {
+    "defaultMessage": "Started on {model} with these: they stay for the session, and Claude Code reports the window of the model it runs now.",
+    "description": "A line of the context tooltip of an agent on a local model (HI-2682): the session runs another model than it started on; the limits its launch passed still apply to the whole session. {model} is a model's id."
   },
   "providers.memory.connection": {
     "defaultMessage": "{file} of connection {name} (its agents, all projects)",

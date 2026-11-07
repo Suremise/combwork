@@ -220,6 +220,21 @@ describe('a Codex agent and its offer of a cheaper model (HI-2609)', () => {
     expect(s.state.modelSwitch).toBeUndefined()
     expect(told).not.toHaveBeenCalled()
   })
+
+  it("a context window is the model's that reported it: another model reported without one has none yet (HI-2682, HR1 round 1)", () => {
+    const e = running('ready', { launchedWith: { model: 'qwen3:8b', effort: null, own: true }, launchedConnection: { id: 'c1', name: 'Local', server: { models: [] } } })
+    internals.applyDetails(e, { modelId: 'qwen3:8b', modelName: 'qwen3:8b', contextWindow: 65536 })
+    expect(e.state.contextWindow).toBe(65536)
+    // Its own model again with no window: kept.
+    internals.applyDetails(e, { modelId: 'qwen3:8b', modelName: 'qwen3:8b' })
+    expect(e.state.contextWindow).toBe(65536)
+    // A switch to another, reported without a window: A's window isn't B's.
+    internals.applyDetails(e, { modelId: 'qwen3.6:35b-a3b', modelName: 'qwen3.6:35b-a3b' })
+    expect(e.state.contextWindow).toBeUndefined()
+    // B's own report: its window.
+    internals.applyDetails(e, { modelId: 'qwen3.6:35b-a3b', modelName: 'qwen3.6:35b-a3b', contextWindow: 32768 })
+    expect(e.state.contextWindow).toBe(32768)
+  })
 })
 
 describe("a Codex launch's arguments: the offer turned off (HI-2609)", () => {

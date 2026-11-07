@@ -350,6 +350,8 @@ interface CombworkMessageValues {
   'main.server.key.inField': { field: string }
   'main.server.key.length': { min: number; max: number }
   'main.server.notServer': undefined
+  'main.server.output.invalid': { max: number }
+  'main.server.output.notBelow': { model: string | number; output: number; context: number }
   'main.server.setUp.noKey': { name: string | number }
   'main.server.unsupported': { cli: string | number }
   'main.server.url.extra': undefined

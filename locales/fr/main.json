@@ -348,6 +348,8 @@
   "main.server.key.inField": "La clé figure dans {field, select, name {le nom} url {l’URL de base} other {la liste des modèles}} : retire-la d’abord de là. Rien n’a été enregistré.",
   "main.server.key.length": "Une clé compte entre {min, number} et {max, number} caractères. Vérifie ce qui a été collé.",
   "main.server.notServer": "Cette connexion ne tire pas son modèle d’un serveur.",
+  "main.server.output.invalid": "Un budget de sortie est un nombre entier de jetons, de 1 à {max, number}.",
+  "main.server.output.notBelow": "Le budget de sortie de {model} ({output, number} jetons) doit être inférieur à sa taille de contexte ({context, number} jetons). Baisse d’abord le budget de sortie, ou vide-le pour utiliser la valeur par défaut.",
   "main.server.setUp.noKey": "{name} n’a pas encore de clé. Ajoute d’abord sa clé, puis configure-la.",
   "main.server.unsupported": "{cli} ne peut pas tirer son modèle d’un serveur dans Combwork.",
   "main.server.url.extra": "L’URL ne peut pas contenir de requête (?…) ni de fragment (#…) : indique la clé dans son propre champ.",

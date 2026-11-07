@@ -558,5 +558,9 @@
   "tips.serverDiagnostics.title": "Un agent sur Ollama ne fait qu’écrire du texte ?",
   "tips.serverDiagnostics.text": "Vérifier le serveur… sur un compte de serveur, dans Paramètres → Comptes et connexions, montre le contexte réel de son modèle et teste un appel d’outil. Un contexte plus petit que le prompt de Claude Code est la raison habituelle pour laquelle un modèle local écrit un appel d’outil au lieu de le faire.",
   "tips.retargetRelease.title": "Quand une version sort, passe le reste sur la suivante",
-  "tips.retargetRelease.text": "Tu passes Le travail est fusionné dans de 1.1.0 à 1.2.0 ? Enregistrer… liste les cartes Todo et les emplacements libres encore sur 1.1.0 qui peuvent suivre 1.2.0, et ce qui reste, avec la raison. Laisse Recibler aussi ce qui peut passer coché pour les déplacer."
+  "tips.retargetRelease.text": "Tu passes Le travail est fusionné dans de 1.1.0 à 1.2.0 ? Enregistrer… liste les cartes Todo et les emplacements libres encore sur 1.1.0 qui peuvent suivre 1.2.0, et ce qui reste, avec la raison. Laisse Recibler aussi ce qui peut passer coché pour les déplacer.",
+  "tips.localModelLimits.text": "Sur les modèles d’un compte de serveur (Paramètres → Comptes et connexions, Modifier le serveur…), définis la taille du contexte et le budget de sortie : les agents démarrés sur ce modèle compactent alors à son contexte réel plutôt qu’à 200 000 supposés.",
+  "tips.localModelPicker.title": "Change de modèle local dans le /model de Claude Code",
+  "tips.localModelPicker.text": "Un agent sur un compte serveur trouve les modèles du compte dans le /model de Claude Code, par leurs ID exacts. Donne à chacun un Libellé dans Modifier le serveur… pour l’y nommer.",
+  "tips.localModelLimits.title": "Indique à Claude Code le vrai contexte de ton modèle local"
 }

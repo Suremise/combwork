@@ -558,5 +558,9 @@
   "tips.serverDiagnostics.title": "Agent na Ollama tylko wypisuje tekst?",
   "tips.serverDiagnostics.text": "Sprawdź serwer… przy koncie serwera w Ustawienia → Konta i połączenia pokazuje rzeczywisty kontekst jego modelu i testuje wywołanie narzędzia. Kontekst mniejszy niż prompt Claude Code to zwykły powód, dla którego model lokalny wypisuje wywołanie narzędzia zamiast je wykonać.",
   "tips.retargetRelease.title": "Po wydaniu przestaw resztę na następne",
-  "tips.retargetRelease.text": "Zmieniasz „Praca jest scalana do” z 1.1.0 na 1.2.0? Zapisz… pokazuje karty Todo i wolne sloty nadal na 1.1.0, które mogą przejść na 1.2.0, oraz to, co zostaje, z powodem. Zostaw zaznaczone „Przestaw też na nowy cel to, co może przejść”, aby je przestawić."
+  "tips.retargetRelease.text": "Zmieniasz „Praca jest scalana do” z 1.1.0 na 1.2.0? Zapisz… pokazuje karty Todo i wolne sloty nadal na 1.1.0, które mogą przejść na 1.2.0, oraz to, co zostaje, z powodem. Zostaw zaznaczone „Przestaw też na nowy cel to, co może przejść”, aby je przestawić.",
+  "tips.localModelLimits.text": "W modelach konta serwera (Ustawienia → Konta i połączenia, Edytuj serwer…) ustaw rozmiar kontekstu i budżet wyjścia: agenci uruchomieni na tym modelu kompaktują wtedy przy jego rzeczywistym kontekście, a nie przy przyjętych 200 000.",
+  "tips.localModelPicker.title": "Przełączaj modele lokalne w /model Claude Code",
+  "tips.localModelPicker.text": "Agent na koncie serwera znajdzie modele konta w /model Claude Code, pod ich dokładnymi identyfikatorami. Nadaj każdemu Etykietę w Edytuj serwer…, by tak się tam nazywał.",
+  "tips.localModelLimits.title": "Podaj Claude Code rzeczywisty kontekst lokalnego modelu"
 }

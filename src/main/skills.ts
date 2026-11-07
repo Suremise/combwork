@@ -332,7 +332,7 @@ export async function listedSkillFiles(dir: string, projectPath?: string): Promi
 /** The folder a provider's project skills are created in (e.g. <project>/.claude/skills): the first it loads them from. */
 function localDir(projectPath: string, id: ProviderId): string {
   const rel = provider(id).skillRoots().local[0]
-  if (!rel) throw combworkError(msg({ id: 'content.skill.noLocalFolder', defaultMessage: '{cli} has no project skills folder.', description: "An error adding a project's own skill for a coding agent CLI ({cli}: \"Codex\") that reads no skills from a project's folder." }), { cli: provider(id).descriptor.name })
+  if (!rel) throw combworkError(msg({ id: 'content.skill.noLocalFolder', defaultMessage: '{cli} has no project skills folder.', description: "An error adding a project's own skill for a coding agent CLI ({cli}: \"Codex\") that reads no skills from a project's folder." }), { cli: provider(id).descriptor.name }, { kind: 'invalid' })
   return join(projectPath, rel)
 }
 

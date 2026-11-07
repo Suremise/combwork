@@ -60,6 +60,7 @@ import type {
   ToastTarget,
   SessionRecord,
   SessionSkipReason,
+  CombworkErrorKind,
   SubSession,
   SessionStatus,
   SkillInfo,
@@ -1116,9 +1117,10 @@ const SESSION_WRITING_MS = 5000
 export class SessionInUse extends CombworkError {
   constructor(
     readonly reason: SessionSkipReason,
-    text: Text
+    text: Text,
+    kind?: CombworkErrorKind
   ) {
-    super(text)
+    super(text, kind ? { kind } : undefined)
   }
 }
 
@@ -2276,7 +2278,7 @@ class SessionManager {
     const resuming = opts.resumeId ? 'yes' : 'no'
     if (!isProviderEnabled(config.settings, providerId)) throw combworkError(msg({ id: 'session.start.providerOff', defaultMessage: '{provider} is turned off. {resuming, select, yes {Turn it on in Settings → Providers to resume this conversation.} other {Turn it on in Settings → Providers to run {agent}.}}', description: "Starting an agent is refused: its coding agent is turned off in Settings → Providers. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
     const info = providerService.info(providerId)
-    if (!info.found || !info.path) throw combworkError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command." }), { provider: name, resuming, agent: agent.name })
+    if (!info.found || !info.path) throw combworkError(msg({ id: 'session.start.providerMissing', defaultMessage: '{resuming, select, yes {{provider} is required to resume this conversation. Install it from Help → Provider Setup.} other {{provider} is required to run {agent}. Install it from Help → Provider Setup.}}', description: "Starting an agent is refused: its coding agent's CLI isn't installed. {provider} is the coding agent's name (Claude Code), {agent} the agent's; {resuming} says whether it resumes a conversation. Help → Provider Setup is a menu command." }), { provider: name, resuming, agent: agent.name }, { kind: 'conflict' })
     await workspace.ensureProject(projectPath)
     times.mark('ensureProject')
     // Where it runs (#1434, agentFolders.ts): the Assistant in the workspace folder, where it can read every project; a
@@ -2833,7 +2835,7 @@ class SessionManager {
     const tempDir = tempSetting ? await prepareAgentTemp({ setting: tempSetting, host: projectPath, agentId: agent.id, assistant: assistantHost, protect: [...(await protectedFolders(openWorkspaces())), projectPath, cwd] }) : null
     times?.mark('tempDir')
     const binPath = (env: Record<string, string>, dir: string | null): Record<string, string> => (policy.tools ? withBinOnPath(env, dir) : env)
-    const ctx = {
+    const ctx: LaunchContext = {
       projectPath,
       agentId: agent.id,
       executable: info.path,
@@ -2869,6 +2871,8 @@ class SessionManager {
       initialPrompt: policy.typing ? l.initialPrompt : undefined,
       allowBackgroundSessions: providerSettings(config.settings, adapter.id).allowBackgroundSessions,
       ...(conn ? { connectionHome: conn.folder } : {}),
+      // Its server connection's models (HI-2682): the adapter passes a local model's limits from them.
+      ...(conn?.server ? { server: { models: conn.server.models, connection: (eff.connectionId && eff.connection === conn.id ? eff.connectionName : null) ?? conn.name } } : {}),
       // On a connection, without the variables its CLI would read as a login in its place (HI-1757).
       // A server connection's own variables (HI-1772: its server, models and key) after those left out, for this launch only.
       tempDir,
@@ -2892,6 +2896,10 @@ class SessionManager {
     }
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
+    // A local model's limits as applied (HI-2682), for its context meter: this launch's, never read again.
+    state.localLimits = ctx.localLimits ?? undefined
+    // The /model lineup it asked Claude Code for (HI-2684), or why none.
+    state.picker = ctx.picker
     l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
@@ -6006,7 +6014,9 @@ class SessionManager {
     if (d.costUsd != null && !onServer) l.reportedCost = d.costUsd
     const reported = d.costUsd != null && !onServer && !usesOwnPrices(st.provider, config.settings)
     const modelSwitch = this.modelSwitchOf(l, d)
-    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: d.contextWindow ?? st.contextWindow }
+    // A window is the model's that reported it (HI-2682, HR1 round 1): another model reported without one has none yet.
+    const window = d.contextWindow ?? (d.modelId && st.modelId && d.modelId !== st.modelId ? undefined : st.contextWindow)
+    const next = { autoCompact, effort: d.effort ?? st.effort, modelName: d.modelName ?? st.modelName, modelId: d.modelId ?? st.modelId, modelSwitch, costUsd: reported ? d.costUsd : st.costUsd, costEstimated: reported ? false : st.costEstimated, planMode: d.planMode ?? st.planMode, permissionMode: d.permissionMode && !isCliOwnMode(l.launchMode) ? d.permissionMode : st.permissionMode, contextWindow: window }
     if (
       next.effort === st.effort &&
       next.modelName === st.modelName &&
@@ -8035,7 +8045,7 @@ class SessionManager {
   async archive(projectPath: string, sessionId: string, archived: boolean): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     assertSessionId(sessionId)
-    if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === sessionId)) throw combworkError(msg({ id: 'session.archive.notKept', defaultMessage: 'Only sessions Combwork keeps can be archived: adopt it first.', description: "Archiving a session is refused: it was started outside Combwork, so Combwork has no copy of it (Adopt keeps one)." }))
+    if (!(await workspace.sessionsFile(projectPath)).sessions.some((s) => s.id === sessionId)) throw combworkError(msg({ id: 'session.archive.notKept', defaultMessage: 'Only sessions Combwork keeps can be archived: adopt it first.', description: "Archiving a session is refused: it was started outside Combwork, so Combwork has no copy of it (Adopt keeps one)." }), undefined, { kind: 'conflict' })
     const action = archived ? 'archive' : 'unarchive'
     const active = this.backupPath(projectPath, sessionId)
     const arch = this.backupPath(projectPath, sessionId, true)
@@ -8177,7 +8187,7 @@ class SessionManager {
   }
 
   private assertNotLive(sessionId: string, action: 'archive' | 'unarchive' | 'delete'): void {
-    if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', withValues(M.stopFirst, { action }))
+    if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', withValues(M.stopFirst, { action }), 'conflict')
   }
 
   /** When Combwork saw each session's CLI exit (its own sessions): their transcripts are finished. At most 500, the oldest go. */
@@ -8200,7 +8210,7 @@ class SessionManager {
    * of Combwork's another program holds is found when it is moved (inUseOnFail).
    */
   private async inUse(projectPath: string, sessionId: string, opts: { writing: boolean }): Promise<SessionInUse | null> {
-    if (this.liveAnywhere(sessionId)) return new SessionInUse('live', msg({ id: 'session.inUse.running', defaultMessage: 'It is running. Stop it first.', description: 'A session is left alone (archive, delete): it is running.' }))
+    if (this.liveAnywhere(sessionId)) return new SessionInUse('live', msg({ id: 'session.inUse.running', defaultMessage: 'It is running. Stop it first.', description: 'A session is left alone (archive, delete): it is running.' }), 'conflict')
     if (beingRead(projectPath, sessionId)) return new SessionInUse('reading', msg({ id: 'session.inUse.reading', defaultMessage: 'Combwork is reading its transcript (an export or a search). Try again in a moment.', description: "A session is left alone (archive, delete) for a moment: Combwork is reading its transcript." }))
     if (viewingWindows(projectPath, sessionId).length) return new SessionInUse('open', msg({ id: 'session.inUse.open', defaultMessage: 'Its transcript is open in Combwork. Close it, then try again.', description: "A session is left alone (archive, delete): its transcript is open in Combwork's Sessions tab." }))
     const t = await this.providerTranscript(projectPath, sessionId).catch(() => null)
@@ -8217,7 +8227,7 @@ class SessionManager {
   private async assertFree(projectPath: string, sessionId: string, action: 'archive' | 'unarchive' | 'delete'): Promise<void> {
     // Unarchiving moves only Combwork's copy back: the CLI still writing its own transcript doesn't matter to it.
     const why = await this.inUse(projectPath, sessionId, { writing: action !== 'unarchive' })
-    if (why?.reason === 'live') throw new SessionInUse('live', withValues(M.stopFirst, { action }))
+    if (why?.reason === 'live') throw new SessionInUse('live', withValues(M.stopFirst, { action }), 'conflict')
     if (why) throw why
   }
 
@@ -8320,7 +8330,7 @@ class SessionManager {
    */
   whileStopped<T>(projectPath: string, sessionId: string, fn: () => Promise<T>): Promise<T> {
     return this.whileReserved(projectPath, sessionId, async () => {
-      if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', msg({ id: 'session.inUse.attaching', defaultMessage: 'It is running, and may attach more files. Stop it first.', description: "Removing a session's attachments is refused: it is running." }))
+      if (this.liveAnywhere(sessionId)) throw new SessionInUse('live', msg({ id: 'session.inUse.attaching', defaultMessage: 'It is running, and may attach more files. Stop it first.', description: "Removing a session's attachments is refused: it is running." }), 'conflict')
       return fn()
     })
   }
@@ -8348,7 +8358,7 @@ class SessionManager {
    */
   private async assertCleanable(projectPath: string, sessionId: string, expected: string[]): Promise<void> {
     const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
-    if (!rec?.archived) throw combworkError(msg({ id: 'session.cleanUp.unarchived', defaultMessage: 'The session is no longer archived.', description: 'Clean Up… left a session alone: it was unarchived since the preview.' }))
+    if (!rec?.archived) throw combworkError(msg({ id: 'session.cleanUp.unarchived', defaultMessage: 'The session is no longer archived.', description: 'Clean Up… left a session alone: it was unarchived since the preview.' }), undefined, { kind: 'conflict' })
     if (this.sessionOpen(projectPath, sessionId)) throw combworkError(M.sessionRunning)
     const want = new Set(expected.map((e) => e.toLowerCase()))
     const has = this.backupFiles(projectPath, sessionId).map((b) => b.toLowerCase())

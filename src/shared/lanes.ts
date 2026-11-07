@@ -4,7 +4,7 @@ import type { StageId } from './workflow/facts'
 import { cardRef } from './projectKeys'
 import { rulesBaseId, targetOfRulesetId } from './workflow/compile'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
-import { agentMsg, say, type AgentMsg } from './agentText'
+import { agentMsg, say, sayWithId, type AgentMsg, type Said } from './agentText'
 
 /**
  * Lanes (#483): a builder and a reviewer taking a project's cards in order, as the card-loop skill registers them. What
@@ -678,19 +678,19 @@ export function readLanes(data: unknown): LaneRecord[] {
 }
 
 /** A lane's cards, from untrusted arguments: whole card numbers, in order, no repeats, at least one. */
-export function laneCards(v: unknown): number[] | string {
-  if (!Array.isArray(v) || !v.length) return say(L.cardsNone)
-  if (v.length > LANE_MAX_CARDS) return say(L.cardsMax, { max: LANE_MAX_CARDS })
-  if (!v.every((n) => whole(n, 1e9))) return say(L.cardsNumbers)
-  if (new Set(v).size !== v.length) return say(L.cardsRepeat)
+export function laneCards(v: unknown): number[] | Said {
+  if (!Array.isArray(v) || !v.length) return sayWithId(L.cardsNone)
+  if (v.length > LANE_MAX_CARDS) return sayWithId(L.cardsMax, { max: LANE_MAX_CARDS })
+  if (!v.every((n) => whole(n, 1e9))) return sayWithId(L.cardsNumbers)
+  if (new Set(v).size !== v.length) return sayWithId(L.cardsRepeat)
   return v as number[]
 }
 
-/** A number of rounds or minutes from untrusted arguments (undefined: the default); a string says what's wrong. */
-export function laneNumber(v: unknown, what: 'rounds' | 'waitMinutes', fallback: number): number | string {
+/** A number of rounds or minutes from untrusted arguments (undefined: the default), or what's wrong. */
+export function laneNumber(v: unknown, what: 'rounds' | 'waitMinutes', fallback: number): number | Said {
   if (v === undefined || v === null) return fallback
   const max = what === 'rounds' ? LANE_MAX_ROUNDS : LANE_MAX_WAIT_MINUTES
-  if (typeof v !== 'number' || !Number.isFinite(v) || Math.round(v) < 1 || Math.round(v) > max) return say(L.numberRange, { what, max })
+  if (typeof v !== 'number' || !Number.isFinite(v) || Math.round(v) < 1 || Math.round(v) > max) return sayWithId(L.numberRange, { what, max })
   return Math.round(v)
 }
 

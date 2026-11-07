@@ -278,13 +278,13 @@ describe('which lanes are listed and kept', () => {
 
   it('checks what a call gives', () => {
     expect(laneCards([3, 1, 2])).toEqual([3, 1, 2])
-    expect(typeof laneCards([])).toBe('string')
-    expect(typeof laneCards([1, 1])).toBe('string')
-    expect(typeof laneCards([1.5])).toBe('string')
+    expect(laneCards([])).toHaveProperty('said')
+    expect(laneCards([1, 1])).toHaveProperty('said')
+    expect(laneCards([1.5])).toHaveProperty('said')
     expect(laneNumber(undefined, 'rounds', 5)).toBe(5)
     expect(laneNumber(360, 'waitMinutes', 120)).toBe(360)
-    expect(typeof laneNumber(0, 'rounds', 5)).toBe('string')
-    expect(typeof laneNumber(99999, 'waitMinutes', 5)).toBe('string')
+    expect(laneNumber(0, 'rounds', 5)).toHaveProperty('said')
+    expect(laneNumber(99999, 'waitMinutes', 5)).toHaveProperty('said')
     expect(laneName('  lanes\nand   loops ')).toBe('lanes and loops')
     expect(laneName('')).toBeNull()
   })

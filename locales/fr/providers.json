@@ -102,5 +102,16 @@
   "providers.transcript.interrupted": "Interrompu par toi",
   "providers.transcript.resumed": "Session reprise",
   "providers.transcript.turnEnded": "Tour terminé : {reason}",
-  "providers.unknown": "Fournisseur inconnu « {provider} ». Il faut peut-être une version plus récente de Combwork."
+  "providers.unknown": "Fournisseur inconnu « {provider} ». Il faut peut-être une version plus récente de Combwork.",
+  "providers.claude.localLimits.inFile": "env dans {file}",
+  "providers.claude.localLimits.oursContext": "Taille du contexte sur {connection}",
+  "providers.claude.localLimits.oursOutput": "Budget de sortie sur {connection}",
+  "providers.claude.localLimits.outputNotBelow": "{agent} n’a pas été démarré : son budget de sortie ({output, number} jetons, {outputFrom}) n’est pas inférieur à sa taille de contexte ({context, number} jetons, {contextFrom}). Modifie l’un des deux, puis démarre-le à nouveau.",
+  "providers.claude.localLimits.tooSmall": "{agent} n’a pas été démarré : sa taille de contexte ({context, number} jetons, {contextFrom}) est trop petite pour tout budget de sortie. Définis une taille de contexte plus grande.",
+  "providers.localLimits.context": "Taille du contexte {value, number} jetons ({from}){estimate, select, yes { : une estimation jusqu’à ce que Claude Code indique sa fenêtre} other {}}",
+  "providers.localLimits.inFile": "env dans {file}",
+  "providers.localLimits.notUsed": "{why, select, alias {Taille du contexte non utilisée : Claude Code lit {model} comme l’un de ses alias} spelling {Taille du contexte non utilisée : les ID avec claude, [1m] ou un suffixe de date ne sont pas pris en charge pour cela} mapped {Taille du contexte non utilisée : {file} associe {model} à un modèle Claude} unreadable {Taille du contexte non utilisée : {file} n’a pas pu être lu, donc Combwork ne peut pas savoir s’il associe {model}} other {Taille du contexte non utilisée : {model} ne fait pas partie des modèles de {connection}}}",
+  "providers.localLimits.ours": "défini sur {connection}",
+  "providers.localLimits.output": "Budget de sortie {value, number} jetons ({from}){fallback, select, none {} other { : {fallback} n’était pas inférieur au contexte, donc la valeur par défaut a été utilisée}}",
+  "providers.localLimits.switched": "Démarré sur {model} avec ces valeurs : elles restent pour la session, et Claude Code indique la fenêtre du modèle qu’il exécute maintenant."
 }

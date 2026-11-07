@@ -215,6 +215,9 @@ export const HEAP_SNAPSHOT_NEAR_LIMIT = 'cw.heapSnapshotNearLimit'
 
 /** Agents resume by themselves after Combwork restarts for an update (HI-1707): read by main's restartResume. */
 export const RESUME_AFTER_UPDATE = 'cw.restart.resumeAfterUpdate'
+/** HI-2682: the model names Claude Code reads as its aliases, and the ID spellings it sizes itself (local-model limits). */
+export const LOCAL_MODEL_ALIASES_ID = 'claude-code.localModel.aliases'
+export const LOCAL_MODEL_SPELLINGS_ID = 'claude-code.localModel.spellings'
 /** How long an agent resumed after a restart has to be ready, in seconds (HI-1707): read by main's restartResume. */
 export const RESTART_READY_SECONDS = 'cw.restart.resumeReadySeconds'
 
@@ -1693,6 +1696,40 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/ollama-cloud-models-0.33.1.txt`, version: '0.33.1', source: 'Ollama', text: 'gemma4:cloud' }, // i18n-ignore: a server's recorded text (#367)
       { from: `${FIX}/advanced/ollama-cloud-models-0.33.1.txt`, version: '0.33.1', source: 'Ollama', text: 'kimi-k2.7-code:cloud' }, // i18n-ignore: a server's recorded text (#367)
       { from: `${FIX}/advanced/ollama-cloud-models-0.33.1.txt`, version: '0.33.1', source: 'Ollama', text: 'gpt-oss:120b-cloud' } // i18n-ignore: a server's recorded text (#367)
+    ]
+  },
+  // HI-2682: a server connection's model IDs Claude Code reads as its own aliases, so it sizes them itself: Combwork passes
+  // no local-model context or output budget for them.
+  {
+    id: LOCAL_MODEL_ALIASES_ID,
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.localModel.aliases.title', defaultMessage: 'Local models: Claude Code’s aliases', description: "An advanced setting's title (Settings → Advanced), listed under its CLI: the model names Claude Code reads as its own aliases (opus, sonnet…)." }),
+    desc: msg({ id: 'settings.advanced.claude-code.localModel.aliases.desc', defaultMessage: "The model names Claude Code reads as its own aliases (opus, sonnet…), as a regular expression. A server connection's model named so gets no Context size or Output budget from Combwork, as Claude Code sizes it itself. Wrong, a local model with one of these names is launched as if Claude Code knew it, or an alias gets limits Claude Code ignores.", description: 'What the advanced setting "Local models: Claude Code’s aliases" is for, and what goes wrong when it is wrong (Settings → Advanced). Context size and Output budget are fields of a server connection’s models: as translated there.' }),
+    kind: 'pattern',
+    default: String.raw`^(?:default|best|opus|sonnet|haiku|fable|opusplan)(?:\[1m\])?$`,
+    flags: 'i',
+    applies: 'sessions',
+    samples: [
+      { from: `${FIX}/advanced/help-model-claude-2.1.319.txt`, version: '2.1.319', text: 'opus' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-model-claude-2.1.319.txt`, version: '2.1.319', text: 'sonnet' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/help-model-claude-2.1.319.txt`, version: '2.1.319', text: 'fable' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  // HI-2682: the spellings Claude Code may resolve to a Claude model or size by its own rules (claude in the ID, [1m], a
+  // stripped date suffix): unsupported for Combwork's local-model limits.
+  {
+    id: LOCAL_MODEL_SPELLINGS_ID,
+    group: 'claude-code',
+    title: msg({ id: 'settings.advanced.claude-code.localModel.spellings.title', defaultMessage: 'Local models: IDs Claude Code sizes itself', description: "An advanced setting's title (Settings → Advanced), listed under its CLI: model ID spellings (claude-…, [1m], a date suffix) Claude Code applies its own context rules to." }),
+    desc: msg({ id: 'settings.advanced.claude-code.localModel.spellings.desc', defaultMessage: "Model ID spellings Claude Code may resolve to a Claude model or size by its own rules (claude in the ID, a [1m] suffix, a date after @), as a regular expression. A server connection's model spelt so gets no Context size or Output budget from Combwork. Wrong, Combwork passes limits Claude Code doesn't apply, or leaves out a local model it would.", description: 'What the advanced setting "Local models: IDs Claude Code sizes itself" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep [1m] and @ as they are. Context size and Output budget are fields of a server connection’s models: as translated there.' }),
+    kind: 'pattern',
+    default: String.raw`claude|\[1m\]|@`,
+    flags: 'i',
+    applies: 'sessions',
+    samples: [
+      { from: `${FIX}/advanced/model-ids-claude-2.1.319.txt`, version: '2.1.319', text: 'anthropic/claude-opus-4-8' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/model-ids-claude-2.1.319.txt`, version: '2.1.319', text: 'claude-sonnet-4-5@20250929' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/model-ids-claude-2.1.319.txt`, version: '2.1.319', text: 'my-gateway-opus[1m]' } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
   {

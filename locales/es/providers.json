@@ -102,5 +102,16 @@
   "providers.transcript.interrupted": "Interrumpido por ti",
   "providers.transcript.resumed": "Sesión reanudada",
   "providers.transcript.turnEnded": "Turno terminado: {reason}",
-  "providers.unknown": "Proveedor desconocido: “{provider}”. Puede que necesite una versión más reciente de Combwork."
+  "providers.unknown": "Proveedor desconocido: “{provider}”. Puede que necesite una versión más reciente de Combwork.",
+  "providers.claude.localLimits.inFile": "env en {file}",
+  "providers.claude.localLimits.oursContext": "Tamaño de contexto en {connection}",
+  "providers.claude.localLimits.oursOutput": "Presupuesto de salida en {connection}",
+  "providers.claude.localLimits.outputNotBelow": "{agent} no se inició: su presupuesto de salida ({output, number} tokens, {outputFrom}) no es menor que su tamaño de contexto ({context, number} tokens, {contextFrom}). Cambia uno de ellos y vuelve a iniciarlo.",
+  "providers.claude.localLimits.tooSmall": "{agent} no se inició: su tamaño de contexto ({context, number} tokens, {contextFrom}) es demasiado pequeño para cualquier presupuesto de salida. Configura un tamaño de contexto mayor.",
+  "providers.localLimits.context": "Tamaño de contexto {value, number} tokens ({from}){estimate, select, yes {: una estimación hasta que Claude Code informe de su ventana} other {}}",
+  "providers.localLimits.inFile": "env en {file}",
+  "providers.localLimits.notUsed": "{why, select, alias {Tamaño de contexto no usado: Claude Code lee {model} como uno de sus alias} spelling {Tamaño de contexto no usado: los ID con claude, [1m] o un sufijo de fecha no se admiten para esto} mapped {Tamaño de contexto no usado: {file} asigna {model} a un modelo de Claude} unreadable {Tamaño de contexto no usado: no se pudo leer {file}, así que Combwork no puede saber si asigna {model}} other {Tamaño de contexto no usado: {model} no es uno de los modelos de {connection}}}",
+  "providers.localLimits.ours": "configurado en {connection}",
+  "providers.localLimits.output": "Presupuesto de salida {value, number} tokens ({from}){fallback, select, none {} other {: {fallback} no era menor que el contexto, así que se usó el predeterminado}}",
+  "providers.localLimits.switched": "Se inició en {model} con estos valores: se mantienen durante la sesión, y Claude Code informa de la ventana del modelo que ejecuta ahora."
 }

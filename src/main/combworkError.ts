@@ -7,7 +7,7 @@
  * The contract, for every service that converts its errors (E10b–f, #842):
  * - **Throw** `combworkError(msg({ id: '<area>.<name>', defaultMessage, description }), values)`, or `new CombworkError(text)` for
  *   text built with `withValues`/`listOf`/`linesOf`. Its `message` is the Default's English, formatted at once:
- *   `errorStatus()`'s patterns, Combwork's log and every `catch` that reads `.message` see exactly what they saw before.
+ *   Combwork's log and every `catch` that reads `.message` see exactly what they saw before.
  *   Where the window's words change and agents' must not (#910), the text is `forAgents(text, agent)`: the window shows
  *   `text`, and agents read `agent`, an agent message (`saidText`) or the message with agents' values.
  * - **The window** gets it in its language: IPC (`ipc.ts`) formats `text` when a call fails (`shownError()`). Electron
@@ -16,8 +16,9 @@
  *   (dialects, HI-2440: each message's override in the request's chain, else its English), whatever language Combwork shows.
  * - **An error inside another error's text** (a cause, a value): pass `errorText(e)` as the value, not `e.message`, so it
  *   follows the outer one's language: the descriptor of a CombworkError, the message of any other error (Node's, a CLI's).
- * - **`kind`** (optional) gives the Agent API's status at once (`invalid` 400, `forbidden` 403, `notFound` 404, `conflict`
- *   409). Without it the status comes from the English message, as before (servers.ts `statusFor`).
+ * - **`kind`** gives the Agent API's status (`invalid` 400, `forbidden` 403, `notFound` 404, `conflict` 409), decided per
+ *   message where it is thrown: the same for every value it is given (HI-2704). Without one, it answers 500 (servers.ts
+ *   `statusFor` reads only errors that aren't Combwork's own).
  * - **Text stored or returned as data** (not thrown: a status, a history entry, a result's reason) keeps its English
  *   field and adds a `Text` beside it: the shared types (`src/shared/types.ts`) list each, with `CombworkErrorData` for a
  *   failure carried in a result.
@@ -56,11 +57,9 @@ export class CombworkError extends Error implements CombworkErrorData {
  * and, optionally, the Agent API's status (`kind`, as a CombworkError's; servers.ts `httpFrom()` keeps the id when it
  * wraps one).
  *
- * A `kind` only where the status today can't depend on the values: a message with no placeholder, or numbers only.
- * A name, key, reason or error text can hold the words servers.ts `statusFor()` matches ("busy", "archived",
- * "Unknown agent"…) and change which of its patterns wins (HR1, HI-2691/s12). Those messages keep `statusFor()`'s
- * classification of their whole text, a cause included, as before. With a `kind`, a dialect whose wording lacks the
- * English words keeps the status (it used to fall to 500): a deliberate change.
+ * Its `kind`, as a CombworkError's, is the message's status whatever its values (HI-2704): a name, key, reason or error
+ * text in it no longer changes it, as servers.ts `statusFor()`'s English patterns used to (HR1, HI-2691/s12). A dialect
+ * whose wording lacks the English words keeps the status too.
  */
 export class SaidError extends Error {
   readonly saidId: string

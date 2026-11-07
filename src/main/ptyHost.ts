@@ -7,6 +7,7 @@ import { launchGate, type GateWord, type LaunchGate } from './launchGate'
 import { envWithCliFolders } from './freshPath'
 import { advanced } from './advanced'
 import { TERMINAL_TYPE } from '../shared/advanced'
+import { KindedError } from '../shared/kindedError'
 
 const log = createLogger('pty')
 const MAX_BUFFER = 512 * 1024
@@ -185,7 +186,7 @@ export function forLog(arg: string): string {
 
 export function spawnPty(key: string, opts: SpawnOptions): IPty {
   // i18n-ignore: a guard for Combwork's own code (callers refuse a second start first, in their own words); the key is internal
-  if (entries.has(key)) throw new Error(`A process is already running for ${key}`)
+  if (entries.has(key)) throw new KindedError(`A process is already running for ${key}`, 'conflict')
   log.info(`spawn ${userText(key)}: ${opts.file} ${JSON.stringify(typeof opts.args === 'string' ? userText(forLog(opts.args)) : argsForLog(opts.args.map(forLog)))}`)
   const size = startSize(key)
   const env = withTerminalType(opts.env)

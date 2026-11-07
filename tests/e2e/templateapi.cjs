@@ -157,7 +157,7 @@ const cfgOf = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 'proje
     const option = planned.body.options[0]
     check("a script's apply is refused (403)", (await apply('plain', { connections: { '*': option.id } })).status === 403)
     const typo = await apply('plain', { connections: { builders: option.id } }, assistant)
-    check('apply: a key that is no role or agent is refused (400), naming the agents', typo.status === 400 && /builders is not "\*", a role \(builder, reviewer, either, generalist\) or one of its agents: 1 \(P-Ann\), 2 \(P-Rob\)/.test(typo.body?.error ?? ''), JSON.stringify(typo.body))
+    check('apply: a key that is no role or agent is refused (400), naming the agents', typo.status === 400 && /builders is not "\*", a role \(builder, reviewer, either, generalist, independent\) or one of its agents: 1 \(P-Ann\), 2 \(P-Rob\)/.test(typo.body?.error ?? ''), JSON.stringify(typo.body))
     const gone = await apply('plain', { connections: { reviewer: 'Nowhere' } }, assistant)
     check('…a connection not usable here is refused (409), nothing changed', gone.status === 409 && /no connection "Nowhere" can be used here/.test(gone.body?.error ?? ''), JSON.stringify(gone.body))
     const applied = await apply('plain', { connections: { '*': option.name } }, assistant)

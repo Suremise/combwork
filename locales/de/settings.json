@@ -1521,5 +1521,20 @@
   "settings.connections.diag.why.unexpected": "Eine unerwartete Antwort.",
   "settings.connections.diag.why.unreachable": "Der Server war nicht erreichbar: Prüfe seine Basis-URL und ob er läuft.",
   "settings.connections.diag.why.wrongArgument": "Der Aufruf des Modells war gültig, passte aber nicht zur Bitte (eine andere Stadt).",
-  "settings.connections.diag.why.wrongTool": "Das Modell hat ein Tool aufgerufen, das ihm nicht angeboten wurde."
+  "settings.connections.diag.why.wrongTool": "Das Modell hat ein Tool aufgerufen, das ihm nicht angeboten wurde.",
+  "settings.advanced.claude-code.localModel.aliases.desc": "Die Modellnamen, die Claude Code als seine eigenen Aliasse liest (opus, sonnet…), als regulärer Ausdruck. Ein so benanntes Modell einer Server-Verbindung erhält von Combwork keine Kontextgröße und kein Ausgabebudget, da Claude Code es selbst bemisst. Falsch: Ein lokales Modell mit einem dieser Namen wird gestartet, als kenne Claude Code es, oder ein Alias erhält Grenzen, die Claude Code ignoriert.",
+  "settings.advanced.claude-code.localModel.aliases.title": "Lokale Modelle: Aliasse von Claude Code",
+  "settings.advanced.claude-code.localModel.spellings.desc": "Schreibweisen von Modell-IDs, die Claude Code einem Claude-Modell zuordnen oder nach eigenen Regeln bemessen kann (claude in der ID, ein [1m]-Suffix, ein Datum nach @), als regulärer Ausdruck. Ein so geschriebenes Modell einer Server-Verbindung erhält von Combwork keine Kontextgröße und kein Ausgabebudget. Falsch: Combwork übergibt Grenzen, die Claude Code nicht anwendet, oder lässt ein lokales Modell aus, bei dem es sie anwenden würde.",
+  "settings.advanced.claude-code.localModel.spellings.title": "Lokale Modelle: IDs, die Claude Code selbst bemisst",
+  "settings.connections.server.context": "Kontextgröße",
+  "settings.connections.server.contextNone": "Nicht festgelegt: 200.000 angenommen",
+  "settings.connections.server.limitsHint": "Kontextgröße und Ausgabebudget werden verwendet, wenn ein Agent mit diesem Modell startet (nicht für IDs, die Claude Code als seine eigenen liest, und nicht, wo die Einstellungen der Sitzung die ID einem Claude-Modell zuordnen). Eine Änderung gilt beim nächsten Start seiner Agenten.",
+  "settings.connections.server.label": "Bezeichnung",
+  "settings.connections.server.pickerHint": "Claude Codes /model listet diese Modelle mit ihren genauen IDs unter ihren Bezeichnungen. Ist kein Claude-Modell darunter, werden seine eigenen Zeilen Opus, Sonnet und Haiku ausgeblendet. Eine Modellauswahl in deinen eigenen Einstellungen wird stattdessen verwendet.",
+  "settings.connections.server.notBelow": "Das Ausgabebudget muss kleiner als die Kontextgröße sein.",
+  "settings.connections.server.output": "Ausgabebudget",
+  "settings.connections.server.outputDefault": "Standard: {n, number}",
+  "settings.connections.server.tight": "Wenig Platz: Die erste Anfrage von Claude Code mit den Werkzeugen von Combwork kann 14.000–28.000 Tokens groß sein, daher startet eine Sitzung womöglich nicht oder komprimiert sofort.",
+  "settings.connections.server.tokens": "Tokens",
+  "settings.connections.server.unsupported": "{why, select, alias {Für dieses Modell nicht unterstützt: Claude Code liest diese ID als einen seiner Aliasse.} other {Für dieses Modell nicht unterstützt: IDs mit claude, [1m] oder einem Datumssuffix werden hier nicht unterstützt.}}"
 }
