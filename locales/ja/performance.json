@@ -197,7 +197,7 @@
   "performance.compare.notComparable": "比較できません：{reasons}数値は表示しますが、差があっても変化を意味するとは限りません。",
   "performance.compare.note.cliVersions": "CLIのバージョンが異なります（{base}と{run}）。",
   "performance.compare.note.estimates": "一部のコストはプロバイダーではなくCombworkの推定値（≈）です。",
-  "performance.compare.note.fakePerCall": "フェイクの Claude Code や Codex では、Combwork の呼び出しごとに専用の combwork MCP サーバーが起動します。API リクエストとツール一覧の開始はセッションごとではなく呼び出しごとに数えられます。",
+  "performance.compare.note.fakePerCall": "フェイクの Claude Code、Codex、Antigravity CLI では、Combwork の呼び出しごとに専用の combwork MCP サーバーが起動します。API リクエストとツール一覧の起動はセッション単位ではなく呼び出し単位で数えられます。",
   "performance.compare.note.fakeUsage": "プロバイダーの使用量は比較しません。フェイクのトークンはシミュレーションで、プロバイダーのものではありません。",
   "performance.compare.note.leftOut": "{n, plural, other {#件のサンプル}}を除外しました：{why}。",
   "performance.compare.note.measuredPartly": "{n, plural, other {#件のサンプル}}は一部しか計測されていません（記録オフ、計測の破棄または欠落）。サイズは判定しません。",

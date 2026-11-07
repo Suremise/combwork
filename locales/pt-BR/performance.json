@@ -197,7 +197,7 @@
   "performance.compare.notComparable": "Não comparáveis: {reasons} Os números são mostrados, mas uma diferença não significa uma mudança.",
   "performance.compare.note.cliVersions": "As versões das CLIs são diferentes ({base} e {run}).",
   "performance.compare.note.estimates": "Alguns custos são estimativas do Combwork (≈), não do provedor.",
-  "performance.compare.note.fakePerCall": "Com o Claude Code ou o Codex simulados, cada chamada Combwork inicia o próprio servidor MCP combwork: as solicitações à API e os inícios da lista de ferramentas contam por chamada, não por sessão.",
+  "performance.compare.note.fakePerCall": "Com o Claude Code, o Codex ou o Antigravity CLI simulados, cada chamada Combwork inicia o próprio servidor MCP combwork: as solicitações à API e os inícios da lista de ferramentas contam por chamada, não por sessão.",
   "performance.compare.note.fakeUsage": "O uso do provedor não é comparado: os tokens de um provedor simulado são simulados, não de um provedor real.",
   "performance.compare.note.leftOut": "{n, plural, =0 {# amostras deixadas de fora} one {# amostra deixada de fora} other {# amostras deixadas de fora}}: {why}.",
   "performance.compare.note.measuredPartly": "{n, plural, =0 {# amostras medidas} one {# amostra medida} other {# amostras medidas}} em parte (registro desativado, medições descartadas ou ausentes): os tamanhos não são avaliados.",

@@ -16,7 +16,7 @@ import { launchOverrides } from '../../advancedValues'
 import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { writeJsonAtomic } from '../../fsutil'
-import { compareVersions, exportSubtitleText, hookForwardCommand, installText, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
+import { compareVersions, exportSubtitleText, installText, syncAgentsSkills, toSpawnable, AGENTS_SKILLS } from '../common'
 import type { Ask, CatalogRead, CommandSpec, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { antigravityEnv, brainDir, checkEnv, checkProfile, inProfile, inUserProfile, profilesRoot } from './home'
 import { antigravityCheckEnv, antigravityInstallCommand, antigravityLoginCommand, antigravityReadiness, antigravityUpdateCommand, checkModels, locateAntigravity } from './install'
@@ -25,7 +25,7 @@ import { UnreadableConfig, workspaceServers, type WorkspaceServer } from './proj
 import { agyStatusDetails } from './status'
 import { AntigravityConversationParser, AntigravityUsageParser, parseAgyTranscript } from './transcript'
 import { isConversationId, knownTitle, learnTitle, listConversations, mediaData, profileOf, subOf, trustedTranscript } from './conversations'
-import { AGY_ALLOW, agyHooks, agyLockReply, agyNoticeGiven, agyNoticeReply, agyNoticeWanted, agyStartContextReply, agyStatusAsk, agyStatusIdle, agyStopContinues, normalizeAgyHook, prepareAgyHook } from './hooks'
+import { AGY_ALLOW, agyForwardCommand, agyHookEnv, agyHooks, agyLockReply, agyNoticeGiven, agyNoticeReply, agyNoticeWanted, agyStartContextReply, agyStatusAsk, agyStatusIdle, agyStopContinues, normalizeAgyHook, prepareAgyHook } from './hooks'
 
 // Google's Antigravity CLI (agy) as a Combwork provider (HI-2544, against 1.5.0; the runtime facts are HI-2543's).
 // Each agent runs in a private agy profile of its own (USERPROFILE: agy reads its home from it alone), kept between launches
@@ -223,7 +223,7 @@ export function launchSettings(ctx: Pick<LaunchContext, 'hookUrl' | 'hookAuthFil
   // agy doesn't stop at its trust question in each (HI-2547; settings.json's trustedWorkspaces, never saved).
   const trusted = [ctx.cwd, ...(ctx.extraDirs ?? [])].filter((d): d is string => !!d)
   return {
-    statusLine: { type: 'command', command: hookForwardCommand(`${ctx.hookUrl}&statusline`, ctx.hookAuthFile), stack_with_default: true },
+    statusLine: { type: 'command', command: agyForwardCommand(`${ctx.hookUrl}&statusline`, 5), stack_with_default: true },
     ...(allow.length ? { permissions: { allow } } : {}),
     ...(trusted.length ? { trustedWorkspaces: trusted } : {})
   }
@@ -385,8 +385,9 @@ export class AntigravityAdapter implements ProviderAdapter {
     await writeFile(join(profile, GUIDANCE_FILE), guidance)
     // The servers' env (and the launch's token) stays in the profile, under Combwork's own data: never the project.
     await writeJsonAtomic(join(profile, '.gemini', 'config', 'mcp_config.json'), made.mcp)
-    // Combwork's hooks, for this launch (its URL and token file): agy reads the profile's hooks.json, never the project's.
-    await writeJsonAtomic(join(profile, '.gemini', 'config', 'hooks.json'), agyHooks(ctx.hookUrl, ctx.hookAuthFile, advanced.get<boolean>('antigravity.hooks.toolHooks')))
+    // Combwork's hooks, for this launch (its URL; its token file in its environment, agyHookEnv): agy reads the profile's
+    // hooks.json, never the project's.
+    await writeJsonAtomic(join(profile, '.gemini', 'config', 'hooks.json'), agyHooks(ctx.hookUrl, advanced.get<boolean>('antigravity.hooks.toolHooks')))
     await writeJsonAtomic(join(ctx.privateDir, 'agy-settings.json'), launchSettings(ctx, launchOverrides(ctx.overrides, ANTIGRAVITY, 'preApproveCombworkTools')))
     return delivered
   }
@@ -411,7 +412,8 @@ export class AntigravityAdapter implements ProviderAdapter {
 
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec {
     const s = toSpawnable(executable, antigravityArgs(ctx, join(ctx.privateDir, 'agy-settings.json')))
-    const env = inProfile(antigravityEnv(ctx.env, launchOverrides(ctx.overrides, ANTIGRAVITY, 'noAutoUpdate'), launchOverrides(ctx.overrides, ANTIGRAVITY, 'stripAccountVars')), profileFolder(ctx.agentId, ctx.workspacePath))
+    // Its hook and status-line commands' quoted values (agy can't pass a quote in a command: agyForwardCommand).
+    const env = inProfile(antigravityEnv(ctx.env, launchOverrides(ctx.overrides, ANTIGRAVITY, 'noAutoUpdate'), launchOverrides(ctx.overrides, ANTIGRAVITY, 'stripAccountVars'), agyHookEnv(ctx.hookAuthFile)), profileFolder(ctx.agentId, ctx.workspacePath))
     // An agent runs in its own profile, never the user's (HI-2698): a bug if it would, so refused.
     if (inUserProfile(env)) throw new Error("an Antigravity agent would run in the user's own profile: refused") // i18n-ignore: an internal check, never shown
     return { ...s, env }

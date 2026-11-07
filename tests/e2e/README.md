@@ -23,11 +23,22 @@ npm run dist && npm run e2e -- --packaged   # also the installed-app suites (dis
 **Two tiers.** The **fake tier** is every suite that starts no real CLI: those with no `needs`, those that run the
 fake Claude Code or fake Codex, and `copilot`, `copilotcopy` and `copilotsize` (`needs: ['copilot']`), which run the real Copilot CLI offline against a
 scripted stand-in model: no sign-in and no cost, so it is in the full set, and skipped where Copilot isn't installed. The **real tier** is the suites that start the real Claude Code (`needs: ['claude']` in
-`suites.mjs`) or the real Codex in its test home (`needs: ['codex']`): they test what fakes can't (hooks reaching Combwork,
+`suites.mjs`), the real Codex in its test home (`needs: ['codex']`), or the installed Antigravity CLI (`needs: ['agy']`,
+`antigravityreal`, HI-2548): they test what fakes can't (hooks reaching Combwork,
 the CLIs' transcript formats, session binding, usage, their trust and mode screens, Codex's sandbox), but they are slow,
 cost tokens and fail for reasons that aren't the code. The full set (`--all`, or nothing named) is the fake tier, and
 the runner lists the real suites it left out ("Not run: the real tier"), in its output and the run record. `--real` adds
 the real tier, `--only-real` runs only it; a suite named always runs.
+
+**The real Antigravity CLI** (`antigravityreal`; Darren's (b) on HI-2548: a launch and one tiny prompt a run, one agent)
+has no test home: agy's sign-in is the PC's (Windows Credential Manager), read by agy, never changed by a test. The
+suite runs agy in its test copy's own profiles (the check profile and the agent's, under its test data; never your
+`~\.gemini`, which lib.cjs lists before and after), its updates off, and marks the check profile past agy's first-run
+screens from `%LOCALAPPDATA%\combwork-test\agy-probe`, a profile onboarded once by hand (only that they are done, never
+its installation id). It is skipped when agy isn't installed or signed in, or that profile isn't there, and fails if
+`~\.gemini`, `%LOCALAPPDATA%\agy`, `%LOCALAPPDATA%\Antigravity` or the PC's agy and Google credential names changed.
+Close your own agy first: one writing to `~\.gemini` meanwhile fails that check. Every fake agy suite stops before any
+session unless Combwork selected the fake (a fake it can't run must never fall back to the real one).
 
 A suite passes when it exits cleanly and prints no `FAIL` line. **Environment failures are a SKIP, not a FAIL**, but
 only where it is certain: a real suite marks each step that waits on the CLI answering (a turn) with

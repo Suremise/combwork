@@ -197,7 +197,7 @@
   "performance.compare.notComparable": "不可比较：{reasons} 数字照常显示，但差异并不代表有变化。",
   "performance.compare.note.cliVersions": "CLI 版本不同（{base} 和 {run}）。",
   "performance.compare.note.estimates": "部分费用是 Combwork 的估算（≈），而不是提供方报告的。",
-  "performance.compare.note.fakePerCall": "使用模拟的 Claude Code 或 Codex 时，每次 Combwork 调用都会启动各自的 combwork MCP 服务器：API 请求和工具列表启动按调用计数，而非按会话。",
+  "performance.compare.note.fakePerCall": "使用模拟的 Claude Code、Codex 或 Antigravity CLI 时，每次 Combwork 调用都会启动自己的 combwork MCP 服务器：API 请求和工具列表启动按调用计数，而不是按会话计数。",
   "performance.compare.note.fakeUsage": "不比较提供方用量：模拟提供方的 Token 是模拟的，并非来自提供方。",
   "performance.compare.note.leftOut": "排除了 {n, plural, other {# 个样本}}：{why}。",
   "performance.compare.note.measuredPartly": "{n, plural, other {# 个样本}}只测量了一部分（记录已关闭、测量数据被丢弃或缺失）：不评判大小。",

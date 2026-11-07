@@ -20,7 +20,7 @@ describe("the scenarios' fake providers", () => {
 
   it('a scenario not named runs on every fake (a new one keeps every provider)', () => {
     expect(fakesFor('work-on-card')).toEqual(FAKES)
-    expect(fakesFor('a-new-scenario')).toEqual(['fake', 'fake-codex', 'fake-copilot'])
+    expect(fakesFor('a-new-scenario')).toEqual(['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity'])
     expect(fakesFor(FAKE_CLAUDE_ONLY[0])).toEqual(['fake'])
     expect(fakesFor(MODEL_TRIALS_ONLY[0])).toEqual([])
   })
@@ -37,6 +37,7 @@ describe("the scenarios' fake providers", () => {
       ['fake', ['work-on-card', 'review-passed', 'tool-sweep'], ['hold-skipped']],
       ['fake-codex', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       ['fake-copilot', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
+      ['fake-antigravity', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       // Model trials run every scenario but the fakes' plumbing check, whatever the fakes' lists say.
       ['claude-code', ['work-on-card', 'review-passed', 'hold-skipped'], ['tool-sweep']],
       ['codex', ['work-on-card', 'review-passed', 'hold-skipped'], ['tool-sweep']]
@@ -58,10 +59,10 @@ describe("the scenarios' fake providers", () => {
     })
   })
 
-  it('splits them as the ownership matrix does (HI-2663): 87 on the fake Claude Code, 16 model trials only, the rest on all three', () => {
+  it('splits them as the ownership matrix does (HI-2663): 87 on the fake Claude Code, 16 model trials only, the rest on every fake', () => {
     expect(FAKE_CLAUDE_ONLY).toHaveLength(87)
     expect(MODEL_TRIALS_ONLY).toHaveLength(16)
     expect(NOT_A_TRIAL).toEqual(['tool-sweep'])
-    expect(ids.filter((id: string) => fakesFor(id).length === 3)).toHaveLength(ids.length - 87 - 16)
+    expect(ids.filter((id: string) => fakesFor(id).length === FAKES.length)).toHaveLength(ids.length - 87 - 16)
   })
 })

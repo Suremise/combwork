@@ -1,7 +1,9 @@
 // Combwork's end-to-end suites (tests/e2e/<name>.cjs), for run.mjs, the affected-suite map and their tests.
 // needs: claude = starts the real Claude Code; codex = the signed-in test Codex home; packaged = dist/win-unpacked;
 // copilot = the installed Copilot CLI, offline against the scripted stand-in model (fake-copilot-api.cjs: no sign-in, no
-// cost), so it stays in the fake tier (the full set) and is skipped where Copilot isn't installed.
+// cost), so it stays in the fake tier (the full set) and is skipped where Copilot isn't installed; agy = the installed
+// Antigravity CLI on the PC's own sign-in, in a test copy's profiles, one tiny prompt a run (Darren's (b) on HI-2548): the
+// real tier, skipped where agy isn't installed or signed in, or no onboarded probe profile is there.
 // claudeHome: 'own' = its Claude Code runs in a home of its own with a made-up API key (no sign-in: the runner asks about none);
 // 'test' = in the signed-in Claude Code test home (CLAUDE_TEST_HOME, never the user's own), for suites that send prompts.
 // Every suite that starts the real Claude Code has one (#368): none runs in the user's ~/.claude (tests/e2esuites.test.ts).
@@ -33,6 +35,8 @@ export const SUITES = [
   { name: 'agentview', needs: ['claude'], claudeHome: 'own' },
   { name: 'agentwatch' },
   { name: 'antigravity' },
+  { name: 'antigravity-windows' },
+  { name: 'antigravityreal', needs: ['agy'] },
   { name: 'antivirus' },
   { name: 'asarfiles' },
   { name: 'assistant' },

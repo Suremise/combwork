@@ -67,6 +67,14 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const checks = await until(async () => (entries('models').length ? entries('models') : null), HUNG_MS)
   check("agy's checks run in Combwork's check profile, never the user's own", !!checks && checks.every((m) => /antigravity[\\/]check$/i.test(m.env?.USERPROFILE ?? '') && m.env.USERPROFILE.toLowerCase().startsWith(userData.toLowerCase())), JSON.stringify(checks?.map((m) => m.env?.USERPROFILE)))
 
+  // Never on any other agy (HI-2548: a fake Combwork couldn't run fell back to the user's real one): stopped here.
+  const fakeAgy = path.join(__dirname, 'fake-agy', 'agy.cmd')
+  const selected = await until(async () => (await inv('provider:refresh', 'antigravity'))?.antigravity?.path ?? null, HUNG_MS)
+  if (String(selected ?? '').toLowerCase() !== fakeAgy.toLowerCase()) {
+    console.log(`FAIL stopped before any session: Combwork selected ${selected ?? 'no agy'}, not the fake`)
+    await app.close()
+    process.exit(1)
+  }
   const gem = await lib.addAgent(inv, alpha, { name: 'Gem', provider: 'antigravity' })
   check('an agent is added on Antigravity', gem?.provider === 'antigravity', JSON.stringify(gem))
 
@@ -138,11 +146,20 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check('…then Provider Setup no longer asks for it', !!(await until(async () => !/one-time setup/.test(await setupShown()), HUNG_MS)))
 
   // --- First conversation.
-  const startNew = async (agentId = gem.id) => {
+  /**
+   * A new conversation: agy 1.5.0 names it only with its first prompt (its status line says conversation_id "" until
+   * then; Combwork takes the id from its first hook), so `prompt` is typed once it is ready.
+   */
+  const startNew = async (agentId, prompt) => {
     const before = entries('session').length
     await inv('session:start', alpha, { agentId })
     await until(async () => entries('session').length > before, HUNG_MS)
+    await until(async () => (await live(agentId))?.status === 'ready', HUNG_MS)
+    const unnamed = !(await live(agentId))?.sessionId
+    await inv('pty:write', lib.ptyKey(alpha, agentId), prompt)
+    await inv('pty:write', lib.ptyKey(alpha, agentId), '\r')
     const conv = await until(async () => (await live(agentId))?.sessionId || null, HUNG_MS)
+    namedAtPrompt.push(unnamed)
     // Recorded as the agent's conversation (its Sessions entry) before anything stops it, as a real turn gives it time to.
     await until(async () => (await inv('session:list', alpha)).some((s) => s.id === conv), HUNG_MS)
     return { conv, launch: entries('session').at(-1) }
@@ -151,6 +168,11 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
     await inv('session:stop', alpha, agentId)
     return until(async () => !(await live(agentId)), HUNG_MS)
   }
+  /** Whether a conversation's transcript (in the agent's profile) has `text`, within the wait. */
+  const inTranscript = async (profile, conv, text) => {
+    const transcript = path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript_full.jsonl')
+    return !!(await until(async () => fs.existsSync(transcript) && fs.readFileSync(transcript, 'utf8').includes(text), HUNG_MS))
+  }
   /** A turn in a conversation (its transcript, which a resume needs, in the agent's profile). */
   const say = async (agentId, profile, conv, text) => {
     const transcript = path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript_full.jsonl')
@@ -158,8 +180,11 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
     await inv('pty:write', lib.ptyKey(alpha, agentId), '\r')
     return !!(await until(async () => fs.existsSync(transcript) && fs.readFileSync(transcript, 'utf8').includes(text), HUNG_MS))
   }
-  const first = await startNew()
-  check("the conversation's id comes from its status line", /^[0-9a-f-]{36}$/.test(first.conv ?? '') && first.conv === first.launch?.conversation, JSON.stringify({ conv: first.conv, launch: first.launch?.conversation }))
+  const namedAtPrompt = []
+  // agy sends SessionStart only with its first prompt: started with none, its status line saying idle is its prompt showing.
+  const first = await startNew(gem.id, 'hello antigravity')
+  check('started with no prompt, it is ready once its status line says idle, its conversation not named yet (HI-2548)', namedAtPrompt[0] === true)
+  check("…its conversation's id comes with its first prompt", /^[0-9a-f-]{36}$/.test(first.conv ?? '') && first.conv === first.launch?.conversation, JSON.stringify({ conv: first.conv, launch: first.launch?.conversation }))
   const e = first.launch?.env ?? {}
   const agentScreens = entries('onboarding').filter((o) => (o.env?.USERPROFILE ?? '').toLowerCase() === (e.USERPROFILE ?? '').toLowerCase())
   check("…past agy's first-run screens (Set up's, copied into its profile)", agentScreens.length > 0 && agentScreens.every((o) => !o.shown) && fs.existsSync(path.join(e.USERPROFILE, '.gemini', 'antigravity-cli', 'cache', 'onboarding.json')), JSON.stringify(agentScreens))
@@ -176,7 +201,7 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   const profileMcp = JSON.parse(fs.readFileSync(path.join(e.USERPROFILE, '.gemini', 'config', 'mcp_config.json'), 'utf8')).mcpServers
   check("its profile's MCP servers are Combwork's own", 'combwork' in profileMcp && !('sentinel' in profileMcp), JSON.stringify(Object.keys(profileMcp)))
   // A turn: written to its conversation.
-  check('its turns are kept in its own conversation, in its profile', await say(gem.id, e.USERPROFILE, first.conv, 'hello antigravity'))
+  check('its turns are kept in its own conversation, in its profile', await inTranscript(e.USERPROFILE, first.conv, 'hello antigravity'))
   // --- Its transcript (HI-2546): the conversation view, its usage and the status line's details.
   check('…and a turn with a tool call', await say(gem.id, e.USERPROFILE, first.conv, 'tool fake result'))
   check('…and one reading an image', await say(gem.id, e.USERPROFILE, first.conv, 'image'))
@@ -264,10 +289,10 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   await page.getByText('alpha', { exact: true }).first().click()
 
   // --- A second new conversation, then each resumed by its own id.
-  const second = await startNew()
+  const second = await startNew(gem.id, 'second conversation')
   check('a second new launch is a new conversation', !!second.conv && second.conv !== first.conv && second.launch?.resumed === false, JSON.stringify({ first: first.conv, second: second.conv }))
   check('…in the same private profile', second.launch?.env?.USERPROFILE === e.USERPROFILE)
-  check('…with turns of its own', await say(gem.id, e.USERPROFILE, second.conv, 'second conversation'))
+  check('…with turns of its own', await inTranscript(e.USERPROFILE, second.conv, 'second conversation'))
   await stop()
   for (const [name, c] of [['the first', first.conv], ['the second', second.conv]]) {
     const before = entries('session').length
@@ -285,9 +310,9 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
   check("a conversation agy no longer has isn't resumed, and says why", entries('session').length === beforeGone && /no longer has that conversation/.test(gone ?? ''), gone ?? 'started')
   // --- Another agent's conversation (in its own profile): never resumed by this one, refused before agy starts.
   const other = await lib.addAgent(inv, alpha, { name: 'Ada', provider: 'antigravity' })
-  const theirs = await startNew(other.id)
+  const theirs = await startNew(other.id, 'hers')
   check('another agent has a private profile of its own', !!theirs.launch?.env?.USERPROFILE && theirs.launch.env.USERPROFILE !== e.USERPROFILE, JSON.stringify(theirs.launch?.env))
-  check('…and its own conversation', await say(other.id, theirs.launch.env.USERPROFILE, theirs.conv, 'hers'))
+  check('…and its own conversation', await inTranscript(theirs.launch.env.USERPROFILE, theirs.conv, 'hers'))
   await stop(other.id)
   const before = entries('session').length
   const refused = await inv('session:start', alpha, { agentId: gem.id, resumeId: theirs.conv }).then(() => null, (err) => String(err?.message ?? err))
@@ -295,13 +320,11 @@ const entries = (kind) => (fs.existsSync(agyLog) ? fs.readFileSync(agyLog, 'utf8
 
   // --- File locks (HI-2545): Ada edits notes.txt and waits on a permission prompt, her turn running, her claim held;
   // Gem's edit of the same file is refused, saying why (1.5.0: only a deny stops an edit), and goes ahead once Ada is done.
-  const ada = await startNew(other.id)
-  const gem2 = await startNew()
+  const ada = await startNew(other.id, 'edit notes.txt then needs approval')
   const transcriptOf = (profile, conv) => fs.readFileSync(path.join(profile, '.gemini', 'antigravity-cli', 'brain', conv, '.system_generated', 'logs', 'transcript_full.jsonl'), 'utf8')
-  await inv('pty:write', lib.ptyKey(alpha, other.id), 'edit notes.txt then needs approval')
-  await inv('pty:write', lib.ptyKey(alpha, other.id), '\r')
   check("Ada's edit runs and her turn waits on its prompt", !!(await until(async () => (await live(other.id))?.status === 'waiting', HUNG_MS)), (await live(other.id))?.status)
-  check("…Gem's edit of the file she holds is refused, saying it is held", (await say(gem.id, e.USERPROFILE, gem2.conv, 'edit notes.txt')) && !!(await until(async () => /tool call denied by pre-tool hook: .*notes\.txt/.test(transcriptOf(e.USERPROFILE, gem2.conv)), HUNG_MS)), transcriptOf(e.USERPROFILE, gem2.conv).slice(-400))
+  const gem2 = await startNew(gem.id, 'edit notes.txt')
+  check("…Gem's edit of the file she holds is refused, saying it is held", (await inTranscript(e.USERPROFILE, gem2.conv, 'edit notes.txt')) && !!(await until(async () => /tool call denied by pre-tool hook: .*notes\.txt/.test(transcriptOf(e.USERPROFILE, gem2.conv)), HUNG_MS)), transcriptOf(e.USERPROFILE, gem2.conv).slice(-400))
   await inv('pty:write', lib.ptyKey(alpha, other.id), 'y')
   await inv('pty:write', lib.ptyKey(alpha, other.id), '\r')
   await until(async () => (await live(other.id))?.status === 'finished', HUNG_MS)

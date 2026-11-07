@@ -203,7 +203,7 @@
   "performance.compare.notComparable": "Not comparable: {reasons} The numbers are shown, but a difference doesn’t mean a change.",
   "performance.compare.note.cliVersions": "CLI versions differ ({base} and {run}).",
   "performance.compare.note.estimates": "Some costs are Combwork’s estimates (≈), not the provider’s.",
-  "performance.compare.note.fakePerCall": "With the fake Claude Code or fake Codex, each Combwork tool call starts a combwork MCP server of its own: API requests and tool-list starts count per call, not per session.",
+  "performance.compare.note.fakePerCall": "With the fake Claude Code, Codex or Antigravity CLI, each Combwork tool call starts a combwork MCP server of its own: API requests and tool-list starts count per call, not per session.",
   "performance.compare.note.fakeUsage": "Provider usage isn’t compared: a fake’s tokens are simulated, not a provider’s.",
   "performance.compare.note.leftOut": "{n, plural, one {# sample} other {# samples}} left out: {why}.",
   "performance.compare.note.measuredPartly": "{n, plural, one {# sample} other {# samples}} measured partly (recording off, measurements dropped or missing): sizes aren’t judged.",

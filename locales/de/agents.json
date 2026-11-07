@@ -16,7 +16,7 @@
   "agents.antigravity.ask": "Fragen",
   "agents.antigravity.askDescription": "Fragt vor Änderungen, Befehlen und anderen Tools, die es nicht ohne Weiteres ausführen darf.",
   "agents.antigravity.auto": "Auto",
-  "agents.antigravity.autoDescription": "Führt Befehle aus, ohne zu fragen, in Antigravitys eigener Sandbox. Benötigt Windows 11 24H2 oder neuer mit dem Update vom August 2026 und ist für Geschäfts- und Unternehmenskonten nicht verfügbar.",
+  "agents.antigravity.autoDescription": "Führt Befehle aus, ohne zu fragen, in Antigravitys eigener Sandbox. Benötigt Windows 11 24H2 oder neuer und ist für Geschäfts- und Unternehmenskonten nicht verfügbar.",
   "agents.antigravity.bypass": "Alle Berechtigungen überspringen",
   "agents.antigravity.bypassDescription": "Genehmigt jedes Tool, jeden Befehl und jede Dateiänderung, ohne zu fragen, überall. Nur verwenden, wo unbeaufsichtigte Änderungen in Ordnung sind.",
   "agents.antigravity.extensionNote": "Du hast Antigravitys Agent in einem Editor. Combwork verwendet die Kopie des Editors nicht. Installiere die eigenständige Antigravity CLI; dein Editor funktioniert weiter wie bisher.",

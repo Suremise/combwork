@@ -4371,6 +4371,11 @@ const launchedIn = (c, name) => {
   if (fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes(`# Your mode: ${name}`)) return true
   // fake-copilot: what Copilot sent its model (the stand-in's log), whose system prompt carries the launch's instructions.
   if (c.modelLog && fs.existsSync(c.modelLog) && fs.readFileSync(c.modelLog, 'utf8').includes(`# Your mode: ${name}`)) return true
+  // Antigravity: the launch's instructions in the agent's own profile's GEMINI.md (HI-2547), the Assistant's among them.
+  if (c.agyProfiles && fs.existsSync(c.agyProfiles) && fs.readdirSync(c.agyProfiles).some((d) => d.startsWith('assistant') && (() => {
+    const f = require('path').join(c.agyProfiles, d, '.gemini', 'GEMINI.md')
+    return fs.existsSync(f) && fs.readFileSync(f, 'utf8').includes(`# Your mode: ${name}`)
+  })())) return true
   // Codex (and the fake): its instructions come as -c developer_instructions, which the session's own rollout records as
   // its first developer message (#462, #520). Its rollout only: the test home keeps earlier runs' sessions.
   const id = c.session?.id

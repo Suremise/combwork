@@ -21,6 +21,10 @@ v3 adds checks that an edited skill was delivered as edited and a deleted one wa
   `baselines/fake-codex.json`). Its board steps and tool calls go through the real Combwork MCP server, so its benchmark
   measures their replies.
 - **Codex** (a model): fixtures v2 (below). No model trial has run under v5 yet; one would be its first benchmark.
+- **Fake Antigravity CLI** (HI-2548, 7 Nov 2026): fixtures v126, all 52 of its set pass
+  (`results/2026-11-07T18-12-02-fake-antigravity` at 87cad8778, no uncommitted changes; baseline
+  `baselines/fake-antigravity.json`; guidance `0757e209cc3f05e7`). The fake agy runs its hooks' commands as agy 1.5.0
+  does (`cmd /c`, its quotes escaped), names a conversation only with its first prompt, and its model calls take 700 ms.
 
 v4 added **card-detail** and **oversize-skill**; v5 adds two controlled pairs: **list-compact** / **list-detail** (the same
 three cards: 144 characters of compact list against 2,283 of explicit detail with the fake Codex, both correct) and

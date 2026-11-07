@@ -26,7 +26,7 @@ export const suiteLimitMs = (name, lang = []) => Math.max(10, name === LANG_SUIT
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i
 
 /** Whether a suite starts a real CLI (Claude Code, or Codex in its test home): the real tier, opt-in with --real. */
-export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex')
+export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex' || n === 'agy')
 
 /**
  * The CW_TEST_ seams a packaged Combwork ignores (src/main reads them in unpackaged builds only, #1591): a suite needing

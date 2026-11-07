@@ -5,7 +5,7 @@ import { spawnSync } from 'child_process'
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { dirname, join } from 'path'
 import { afterAll, describe, expect, it } from 'vitest'
-import { CMD_MAX_CHARS, childArgs, cmdArg, commandLineLength, promptArg, runsThroughCmd, shimTarget, toSpawnable } from '../src/main/providers/common'
+import { CMD_MAX_CHARS, childArgs, cmdArg, commandLineLength, promptArg, run, runsThroughCmd, shimTarget, toSpawnable } from '../src/main/providers/common'
 import { tempDir } from './tempDir'
 
 const base = tempDir('cw-cmdshim-')
@@ -171,5 +171,20 @@ describe('an argument of the line cmd.exe runs', () => {
 
   it('a list without a command line is spawned as it is', () => {
     expect(childArgs({ file: 'x.exe', args: ['a b'] })).toEqual({ args: ['a b'], windowsVerbatimArguments: false })
+  })
+})
+
+// HI-2548: a CLI's checks (its --version, Antigravity's models) run its .cmd through cmd: at a path with spaces and
+// non-ASCII letters, it was read as the path's first word and the CLI not found, so Combwork took another copy.
+describe('a check run through a .cmd at a path with spaces and non-ASCII letters (HI-2548)', () => {
+  it.runIf(windows)('runs it, its arguments passed as they are', async () => {
+    const dir = join(base, 'my tools é 漢字', 'agy bin ß')
+    mkdirSync(dir, { recursive: true })
+    const cmd = join(dir, 'tool.cmd')
+    writeFileSync(cmd, '@echo version 1.5.0 %*\r\n')
+    const r = await run(cmd, ['--version'])
+    expect(r.code, r.stderr).toBe(0)
+    expect(r.stdout.trim()).toBe('version 1.5.0 --version')
+    expect((await run(cmd, ['two words'])).stdout.trim()).toBe('version 1.5.0 "two words"')
   })
 })

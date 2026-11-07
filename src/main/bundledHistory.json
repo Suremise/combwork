@@ -385,6 +385,9 @@
     ]
   },
   "dialects": {
+    "antigravity/cli": [
+      "8c2a6de9c73e6754"
+    ],
     "api/cli": [
       "c91cf96256abb477"
     ],

@@ -5980,6 +5980,18 @@ class SessionManager {
     if (conv && runId !== l.state.runId) log.warn(`${userText(this.label(l.state))}: a status line of run ${runId ?? 'none'} named conversation ${conv}: not this launch's (${l.state.runId}), ignored`)
     else if (conv && !l.state.sessionId) void this.adoptSessionId(l, conv, 'status line') // i18n-ignore: a log line's words
     else if (conv && conv !== l.state.sessionId) log.warn(`${userText(this.label(l.state))}: its status line named conversation ${conv}, not ${l.state.sessionId}: kept ${l.state.sessionId}`)
+    // A CLI whose first hook waits for its first prompt (agy 1.5.0: SessionStart comes with it), started with none: its
+    // status line saying idle is its prompt showing (HI-2548; recorded: authenticating, initializing, then idle before
+    // any prompt). The current launch's only, in hook order, while it is still starting and asked nothing at its start.
+    if (runId === l.state.runId && l.state.status === 'starting' && l.adapter.statusLineIdle?.(body)) {
+      const id = liveId(l.state.projectPath, l.state.agentId)
+      void this.inHookOrder(l.state.runId, () => {
+        if (this.live.get(id) !== l || l.state.runId !== runId || l.state.status !== 'starting' || l.askedAtStart) return
+        this.fact(l.state, { lifecycle: 'running' })
+        l.state.status = 'ready'
+        this.emitState(l.state)
+      })
+    }
     // What only the status line tells of (HI-2545, agy): its permission prompt and a turn ended with no hook. The current
     // launch's own only, about the conversation it runs, applied in hook order and only to a turn that runs then.
     if ((l.adapter.statusLineAsk || l.adapter.statusLineIdle) && runId === l.state.runId) {
@@ -6590,6 +6602,9 @@ class SessionManager {
   private async startReply(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
     const l = this.findLaunch(runId, body.session_id)?.[1]
     if (!l || !this.startContext || !l.adapter.startContextReply) return null
+    // A CLI whose hooks say what they are only once prepared (HI-2545: agy's SessionStart, unprepared, is nothing): its
+    // reply is decided in the launch's order, after prepareHook (handleHookIn), and always settled there (HI-2548).
+    if (l.adapter.prepareHook) return new Promise((settle) => this.noticeReplies.set(body, settle))
     const hook = l.adapter.normalizeHook(body)
     if (hook.ids.sub || hook.event.kind !== 'start') return null
     return this.startContextFor(l, hook.event.source)
@@ -6860,8 +6875,11 @@ class SessionManager {
     const typed = l.adapter.descriptor.capabilities.typedTurnsWithoutPrompt && typedPending(l.hooksWatch)
     // Its notice (#650), from the ledger as it is now, before it is admitted with what it was told.
     if (decide) {
-      reply = await this.noticeIn(runId, l, ledger, body, woke, typed, at).catch((e) => {
-        log.warn(`${userText(label)}: no inbox notice`, e)
+      // A SessionStart whose CLI says what it is only once prepared (HI-2548: agy's, startReply): its start context, the
+      // launch's own start only, never a sub-agent's.
+      const starting = body.hook_event_name === 'SessionStart'
+      reply = await (starting ? (hook.ids.sub || hook.event.kind !== 'start' ? Promise.resolve(null) : this.startContextFor(l, hook.event.source)) : this.noticeIn(runId, l, ledger, body, woke, typed, at)).catch((e) => {
+        log.warn(`${userText(label)}: ${starting ? 'no start context' : 'no inbox notice'}`, e)
         return null
       })
       if (!current()) return
