@@ -221,8 +221,8 @@ const check = (name, ok, extra = '') => {
     // Cancel: a project changed counts as an edit, so it asks to discard first.
     const cancelCard = async () => {
       await edit.getByRole('button', { name: 'Cancel' }).click()
-      const ask = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
-      if (await lib.until(async () => (await ask.count()) === 1 || (await edit.count()) === 0, HUNG_MS) && (await ask.count()) === 1) await ask.getByRole('button', { name: 'Discard', exact: true }).click()
+      const discard = page.locator('.dialog', { hasText: 'Discard unsaved changes?' })
+      if (await lib.until(async () => (await discard.count()) === 1 || (await edit.count()) === 0, HUNG_MS) && (await discard.count()) === 1) await discard.getByRole('button', { name: 'Discard', exact: true }).click()
       await edit.waitFor({ state: 'detached', timeout: HUNG_MS })
     }
     const newCard = async () => {
