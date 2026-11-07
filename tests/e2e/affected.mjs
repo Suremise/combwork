@@ -15,7 +15,7 @@ import { execFileSync, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'fs'
 import { createRequire } from 'module'
 import { SCOPE_FILES as PRESENCE_SCOPE } from '../presenceChecks.mjs'
-import { gitChangedLines, gitRevision, splitOf, unitSelection } from './affectedUnits.mjs'
+import { gitChangedLines, gitRevision, splitOf, typeOnlyChange, unitSelection } from './affectedUnits.mjs'
 import { narrowRelatedInTree } from './relatedTests.mjs'
 import { join, resolve } from 'path'
 import { pathToFileURL } from 'url'
@@ -36,6 +36,8 @@ export const EVERYTHING = [
   'src/main/windows.ts',
   'src/main/workspace.ts',
   'src/main/sessions.ts',
+  // The Agent API (HI-2690 measured why it isn't split by route): 109 files hold a request, most through a helper whose
+  // path is `BASE + path` (lib.cjs's, every suite's own), which no selection can follow to the routes it reaches.
   'src/main/servers.ts',
   // Every Agent API route is matched through it (HI-2258).
   'src/main/routePattern.ts',
@@ -642,8 +644,10 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * board's since its cards step, #1209, as the fact store and the actions worker do since #1215). The dialects service
  * (src/main/dialects) has its area since card 6b (HI-2443) wired it into sessions. The dialect-only release's rules
  * (scripts/dialectRelease.mjs, HI-2442: release.mjs runs them, tests/dialectRelease.test.ts tests them) are unit-only.
+ * So are the Windows Sandbox checks' own files (tests/sandbox/, HI-2690): no e2e suite or scenario loads or reads them
+ * (tests/e2esuites.test.ts checks), the Sandbox runs them on a packaged build, and UNIT_SCANS selects their unit tests.
  */
-export const UNIT_ONLY = ['scripts/dialectRelease.mjs', 'tests/oldNames.mjs', 'tests/oldNamesAllow.json', 'tests/presenceChecks.mjs', 'tests/presenceAllow.json', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
+export const UNIT_ONLY = ['tests/sandbox/', 'scripts/dialectRelease.mjs', 'tests/oldNames.mjs', 'tests/oldNamesAllow.json', 'tests/presenceChecks.mjs', 'tests/presenceAllow.json', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
 
 /** Whether a file is a unit test (tests/*.test.ts, their helpers and fixtures, UNIT_ONLY): npm test covers it, no e2e suite. */
 export const unitTest = (f) => /^tests\/[^/]+\.ts$/i.test(f) || under(f, UNIT_ONLY) || (/^tests\/fixtures\//i.test(f) && !FAKE_FIXTURES.includes(f))
@@ -674,22 +678,43 @@ export const REAL_TIER = [
 ]
 const PROVIDER_OWN = ['src/main/providers/claude/', 'src/main/providers/codex/', 'src/main/providers/copilot/']
 
+/** At most this many reasons a suite (`because`, HI-2690's D5): the first ones, in the changed files' order. */
+export const REASONS_PER_SUITE = 3
+
+/** affectedSuites' reasons as lines, `suite: reason; reason`, in the suites' order (none for every suite). */
+export const becauseLines = (affected) => (affected.all ? [] : affected.suites.map((s) => `${s}: ${(affected.because?.[s] ?? []).join('; ') || 'picked'}`))
+
 /**
  * The suites a set of changed files needs, from the known suite names (realNames: those that start a real CLI):
  * { all: true, why, real } when every fake suite is needed (real: the real-CLI suites also needed), else
- * { suites, why } (why: a line per reason). A real-CLI suite is needed when an area names it, its own file changed, or
- * a file in REAL_TIER (or one no area names) changed. Only DOCS_ONLY files and unit tests select nothing.
+ * { suites, why, because } (why: a line per reason; because: { suite: up to REASONS_PER_SUITE reasons it was picked,
+ * deduplicated, in the files' order }, for a ledger's boundary analysis to cite). A real-CLI suite is needed when an
+ * area names it, its own file changed, or a file in REAL_TIER (or one no area names) changed. DOCS_ONLY files, unit
+ * tests and a change of types only (units[file].typeOnly, splitSelections: HI-2690's D1) select nothing.
  */
 export function affectedSuites(files, suiteNames, realNames = [], units = {}) {
   const picked = new Set()
+  const because = new Map()
   const why = []
   let all = null
   let allReal = null
+  const pick = (s, reason) => {
+    picked.add(s)
+    if (!because.has(s)) because.set(s, [])
+    const r = because.get(s)
+    if (r.length < REASONS_PER_SUITE && !r.includes(reason)) r.push(reason)
+  }
   for (const raw of files) {
     const file = raw.replace(/\\/g, '/')
+    const u = units[file]
+    // Types only: erased before anything runs, so no suite, the real tier's included.
+    if (u?.typeOnly) {
+      why.push(u.typeOnly)
+      continue
+    }
     const own = /^tests\/e2e\/([^/]+)\.cjs$/i.exec(file)
     if (own && suiteNames.includes(own[1])) {
-      picked.add(own[1])
+      pick(own[1], `${file}: its own suite`)
       why.push(`${file}: its own suite`)
       continue
     }
@@ -697,11 +722,17 @@ export function affectedSuites(files, suiteNames, realNames = [], units = {}) {
     const areas = AREAS.filter((a) => under(file, a.paths))
     // A SPLIT file (affectedUnits.mjs), by the units its change touches, when the caller worked them out (its areas'
     // suites are in that, when its change needs them).
-    const u = units[file]
-    if (!u || u.all) for (const a of areas) for (const s of a.suites) picked.add(s)
+    if (!u || u.all) for (const a of areas) for (const s of a.suites) pick(s, `${file} (its area)`)
     if (under(file, EVERYTHING)) {
       if (u && !u.all) {
-        for (const s of u.suites) picked.add(s)
+        // Each suite's trail from unitSelection's lines (`file: unit → consumer: suites`); else the file's changed parts.
+        const trails = new Map()
+        for (const w of u.why) {
+          const m = /^(.*): ([^:]*)$/.exec(w)
+          if (!m || !m[1].includes(' → ')) continue
+          for (const s of m[2].split(', ')) if (!trails.has(s)) trails.set(s, m[1])
+        }
+        for (const s of u.suites) pick(s, trails.get(s) ?? `${file}: by its changed parts (its areas or a seam)`)
         why.push(`${file}: by its changed parts: ${u.suites.length ? [...new Set(u.suites)].join(', ') : 'no suite'}`, ...u.why.map((w) => `  ${w}`))
         continue
       }
@@ -719,7 +750,9 @@ export function affectedSuites(files, suiteNames, realNames = [], units = {}) {
   }
   const real = realNames.filter((n) => allReal || picked.has(n))
   if (all) return { all: true, why: [all, ...(allReal ? [allReal] : [])], real }
-  return { suites: suiteNames.filter((n) => picked.has(n) || (allReal && realNames.includes(n))), why: [...why, ...(allReal ? [allReal] : [])] }
+  const suites = suiteNames.filter((n) => picked.has(n) || (allReal && realNames.includes(n)))
+  if (allReal) for (const s of realNames) if (!picked.has(s)) pick(s, allReal)
+  return { suites, why: [...why, ...(allReal ? [allReal] : [])], because: Object.fromEntries(suites.map((s) => [s, because.get(s) ?? []])) }
 }
 
 /**
@@ -745,10 +778,22 @@ export function placeReference(file, suiteNames) {
  */
 export function splitSelections(files, { cwd = process.cwd(), base, head = null, suiteNames }) {
   const out = {}
-  const split = [...new Set(files.map((f) => f.replace(/\\/g, '/')))].filter((f) => splitOf(f))
-  if (!split.length) return out
+  const all = [...new Set(files.map((f) => f.replace(/\\/g, '/')))]
+  const typed = all.filter((f) => /\.(ts|tsx|mts|cts)$/i.test(f))
+  const split = all.filter((f) => splitOf(f))
+  if (!split.length && !typed.length) return out
   const revs = { base: gitRevision(cwd, base), head: gitRevision(cwd, head) }
+  // A TypeScript file changed in its types alone selects nothing (HI-2690's D1); one this can't tell about, as usual.
+  for (const file of typed) {
+    try {
+      const t = typeOnlyChange({ file, ...revs, lines: gitChangedLines(cwd, base, head, file) })
+      if (t) out[file] = { typeOnly: t, all: null, suites: [], why: [] }
+    } catch {
+      // As usual: its selection below, or its areas'.
+    }
+  }
   for (const file of split) {
+    if (out[file]?.typeOnly) continue
     try {
       out[file] = unitSelection({ file, ...revs, lines: gitChangedLines(cwd, base, head, file), place: (f) => placeReference(f, suiteNames), areaSuites: (f) => [...new Set(AREAS.filter((a) => under(f, a.paths)).flatMap((a) => a.suites))] })
     } catch (e) {
@@ -875,6 +920,12 @@ export const UNIT_SCANS = [
   // The clean-install check's step (HI-2592): the English text, IPC channels, palette commands and Settings selectors it
   // uses, and StartOptions' prompt, which gives the agent its first task.
   { test: 'tests/sandboxClean.test.ts', paths: ['locales/en/', 'src/shared/api.ts', 'src/renderer/src/commands.ts', 'src/renderer/src/components/ui.tsx', 'src/main/sessions.ts'] },
+  // The Windows Sandbox checks' own files (HI-2690's D3: no e2e suite runs them): their unit tests load them by
+  // require, which Vitest's graph may not follow, and read the scripts inside as text.
+  { test: 'tests/sandboxChecks.test.ts', paths: ['tests/sandbox/'] },
+  { test: 'tests/sandboxClean.test.ts', paths: ['tests/sandbox/'] },
+  { test: 'tests/sandboxCompare.test.ts', paths: ['tests/sandbox/'] },
+  { test: 'tests/sandboxReport.test.ts', paths: ['tests/sandbox/'] },
   // The bundled skills and modes (resources/), and the guidance that names them.
   { test: 'tests/assistant.test.ts', paths: ['resources/modes/'] },
   { test: 'tests/modeDescriptions.test.ts', paths: ['resources/modes/'] },
@@ -939,7 +990,8 @@ export function pickTests({ paths, added = [], deleted = [], diffLines = {}, sui
   ]
   const ids = tests.map((t) => t.test)
   if (ids.some((id) => !id) || new Set(ids).size !== ids.length) throw new Error(`picked an empty or repeated test id: ${ids.join(', ')}`)
-  return { tests, why: [...unit.values(), ...affected.why] }
+  // Its stderr lines: the unit tests' reasons, the suites', then why each suite (HI-2690: stdout stays the JSON lines).
+  return { tests, why: [...unit.values(), ...affected.why, ...becauseLines(affected).map((l) => `why ${l}`)] }
 }
 
 /**
