@@ -409,9 +409,11 @@ running or naming a script); in `src/` it runs one of the build's entries (`elec
 it counts only when the change is in what an entry loads, or the entries can't be read; a `node -e` script is read as a
 file of its own. External programs (git, the CLIs) are the boundary. A changed `import type` counts for nothing. A
 `WorkspaceService` member keeps nearly every test of main, since nearly every one names `workspace`: narrowing those
-by which receivers can be one is HI-2678. Measured at 1.2.0's head (HI-2677, round 4): 363 files are unknown (three in
-`src/`: the queue's launcher and git host, whose `node -e` scripts are built from text, and `cw-mcp.ts`), so 189 of 704
-test files can be left out at all, and a one-function change to `settingsTools.ts` still selects all 33 related. When the e2e side is
+by which receivers can be one is HI-2678. Measured at 1.2.0's head (HI-2677, round 5): 370 files are unknown (six in
+`src/`: the queue's launcher and git host, whose `node -e` scripts are built from text, `cw-mcp.ts`, and three renderer
+files handing the global object on), so 187 of 704 test files can be left out at all, and a one-function change to
+`settingsTools.ts` still selects all 27 related. The worker entries' closure holds unknown files (`cw-mcp.ts`, the
+launcher), so every starter counts for now. When the e2e side is
 every suite the pick is still `{"every":true}`, unchanged.
 
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
