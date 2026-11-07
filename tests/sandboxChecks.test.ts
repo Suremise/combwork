@@ -390,6 +390,42 @@ test("the report's upgrade requirements follow the era: from 1.0 as before, from
   assert.deepStrictEqual(names('1.0'), [["The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app's left", true], ["The installer's record is in %LOCALAPPDATA%\\Combwork", false]])
 })
 
+// HR1's HI-2727 round 1: the seeded connection and skill copy compared by content, never by their files' names alone.
+test('the kept connection and skill copy are compared by content: emptied or changed files that keep their names fail', () => {
+  const { connectionSnapshot, connectionDiffers, copyDiffers } = require('./sandbox/inside/kept.cjs')
+  const folders = ['C:/Sandbox/trusted', 'C:/Sandbox/untrusted']
+  const list = { connections: [{ id: 'a-1', provider: 'claude-code', name: 'Sandbox', kind: 'signIn' }, { id: 'a-2', provider: 'codex', name: 'Sandbox' }] }
+  const claude = { oauthAccount: { emailAddress: 'fake@example.com' }, projects: { 'C:/Sandbox/trusted': { hasTrustDialogAccepted: true }, 'C:/Sandbox/untrusted': { hasTrustDialogAccepted: false } } }
+  const files = { 'fake-account.json': JSON.stringify({ email: 'fake@example.com', orgId: 'org-fake' }), '.claude.json': JSON.stringify(claude) }
+  const before = connectionSnapshot(list, 'a-1', files, folders)
+  assert.deepStrictEqual(connectionDiffers(before, before), [])
+  // The CLI trusting a folder of its own as it runs (the lane's slot) is no change to what was seeded.
+  const ran = { ...files, '.claude.json': JSON.stringify({ ...claude, hasCompletedOnboarding: true, projects: { ...claude.projects, 'C:/Users/x/Kept.worktrees/demo/slot-a': { hasTrustDialogAccepted: true } } }) }
+  assert.deepStrictEqual(connectionDiffers(before, connectionSnapshot(list, 'a-1', ran, folders)), [])
+  const after = (l: Json, f: Json) => connectionDiffers(before, connectionSnapshot(l, 'a-1', f, folders))
+  // Every file still there by name, its content lost or changed: each is a difference.
+  assert.deepStrictEqual(after(list, { ...files, 'fake-account.json': '' }), ['its sign-in (fake-account.json) changed'])
+  assert.deepStrictEqual(after(list, { ...files, 'fake-account.json': null }), ['its sign-in (fake-account.json) is gone'])
+  assert.deepStrictEqual(after(list, { ...files, '.claude.json': '{}' }), ['the account .claude.json names: {"emailAddress":"fake@example.com"} → null', 'the trust answer for C:/Sandbox/trusted: true → none', 'the trust answer for C:/Sandbox/untrusted: false → none'])
+  assert.deepStrictEqual(after(list, { ...files, '.claude.json': JSON.stringify({ ...claude, projects: { ...claude.projects, 'C:/Sandbox/untrusted': { hasTrustDialogAccepted: true } } }) }), ['the trust answer for C:/Sandbox/untrusted: false → true'])
+  // The row read by its id, not found somewhere in the list's text: another connection with its name isn't it.
+  assert.deepStrictEqual(after({ connections: [list.connections[1]] }, files), ["connection a-1 isn't listed"])
+  assert.deepStrictEqual(after({ connections: [{ ...list.connections[0], name: 'Renamed' }] }, files), ['its name: Sandbox → Renamed'])
+  // A seed that wrote nothing can't pass.
+  assert.deepStrictEqual(connectionDiffers(connectionSnapshot({}, 'a-1', {}, folders), connectionSnapshot({}, 'a-1', {}, folders)), ['no connection was seeded', 'no sign-in was seeded', 'no account was seeded in .claude.json', "the trust answers weren't all seeded"])
+  // The skill copy: SKILL.md by its content.
+  const skill = '---\nname: cw-sandbox-check\n---\n'
+  assert.deepStrictEqual(copyDiffers({ 'SKILL.md': skill }, { 'SKILL.md': skill }), [])
+  assert.deepStrictEqual(copyDiffers({ 'SKILL.md': skill }, { 'SKILL.md': '' }), ['SKILL.md changed'])
+  assert.deepStrictEqual(copyDiffers({ 'SKILL.md': skill }, { 'SKILL.md': null }), ['SKILL.md is gone'])
+  // The driver uses them for 4.connection-kept and 4.copy-marker, from its seeded content.
+  const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
+  assert.match(drive, /const differs = connectionDiffers\(c\?\.kept, now\)/)
+  assert.match(drive, /copyDiffers\(\{ 'SKILL\.md': COPY_SKILL \}/)
+  assert.ok(drive.includes(`const COPY_SKILL = '${skill.replace(/\n/g, '\\n')}'`))
+  assert.doesNotMatch(drive, /JSON\.stringify\(list\)\.includes/)
+})
+
 test("the driver's provider ids are the descriptors' (2.api-providers checks by id, not a count)", () => {
   const drive = fs.readFileSync(path.join(SANDBOX, 'inside', 'drive.cjs'), 'utf8')
   const ids = JSON.parse((/const PROVIDER_IDS = (\[[^\]]*\])/.exec(drive)?.[1] ?? '[]').replace(/'/g, '"'))

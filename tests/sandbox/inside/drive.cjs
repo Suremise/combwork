@@ -66,6 +66,9 @@ const LOCAL_MARK = 'sandbox-mark.txt'
 // trusted. One folder trusted, one answered no; a third never listed must stay unlisted.
 const TRUST_HOME = path.join('accounts', 'a-sandbox')
 const TRUST_JSON = { hasCompletedOnboarding: true, projects: { 'C:/Sandbox/trusted': { hasTrustDialogAccepted: true }, 'C:/Sandbox/untrusted': { hasTrustDialogAccepted: false } } }
+const TRUST_FOLDERS = Object.keys(TRUST_JSON.projects)
+/** A connection home's files an upgrade must keep by content (kept.cjs connectionSnapshot): their texts, null when missing. */
+const connectionFiles = (home) => Object.fromEntries(['fake-account.json', '.claude.json'].map((n) => [n, (() => { try { return fs.readFileSync(path.join(home, n), 'utf8') } catch { return null } })()]))
 const MARK = { userName: 'Sandbox Check', theme: 'light' }
 // The providers Combwork knows, by their descriptors' ids (src/shared/providers.ts PROVIDERS; a unit test holds them equal).
 const PROVIDER_IDS = ['claude-code', 'codex', 'copilot', 'antigravity']
@@ -95,13 +98,18 @@ const SEED = { connection: 'Sandbox', builder: 'Builder', second: 'Linked before
 const markRecord = () => readJson(path.join(OUT, `${String(prefix).replace(/-after$/, '-mark')}.json`))
 // A skill copy the release before made in the project (its marker, HI-2587), for the upgrade to rename.
 const COPY = path.join('demo', '.agents', 'skills', 'cw-sandbox-check')
+// Its SKILL.md as seeded, which the upgrade must leave as it is.
+const COPY_SKILL = '---\nname: cw-sandbox-check\n---\n'
 const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')) } catch { return null } }
+const readText = (file) => { try { return fs.readFileSync(file, 'utf8') } catch { return null } }
 const res = { step, prefix, at: new Date().toISOString(), checks: [], facts: {}, shots: [] }
 const save = () => fs.writeFileSync(path.join(OUT, `${prefix}.json`), JSON.stringify(res, null, 2))
 // Each check has a stable id ("<scenario>.<what>"): the host's report requires the ids each step must produce.
 const check = (id, name, ok, detail) => { res.checks.push({ id, scenario: Number(String(id).split('.')[0]) || 0, name, ok: !!ok, detail: ok ? undefined : String(detail ?? '').slice(0, 1500) }); save() }
 // When what it reads is ready: conditions Combwork says are met, each bounded (ready.cjs, unit-tested in Combwork's npm test).
 const { until, workspaceSetUp, VIEWS, viewReady, pickBridge, releasesStarted } = require(path.join(__dirname, 'ready.cjs'))
+// What an upgrade must keep of the seeded data, compared by content (kept.cjs, unit-tested with tampered data).
+const { connectionSnapshot, connectionDiffers, copyDiffers } = require(path.join(__dirname, 'kept.cjs'))
 // The names upgrade's record's version (src/main/nameUpgrade.ts NAMES_VERSION; a unit test holds them equal).
 const NAMES_VERSION = 4
 const ps = cmd => execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8', timeout: 60_000 }).trim()
@@ -311,9 +319,17 @@ async function markCombwork() {
   const account = await inv('connections:add', 'claude-code', SEED.connection).catch((e) => ({ error: String(e) }))
   const home = account?.id ? path.join(local, 'accounts', account.id) : null
   if (account?.id) await inv('connections:signIn', account.id).catch((e) => { res.facts.signInError = String(e) })
-  const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')), 30_000))
-  const connection = { id: account?.id ?? null, name: SEED.connection, home, files: home && fs.existsSync(home) ? fs.readdirSync(home).sort() : [], error: account?.error }
-  check('4.connection-made', 'Before the upgrade: a Claude Code connection added and signed in (the fake)', !!found && signedIn, JSON.stringify({ provider: res.facts.provider, connection }))
+  const signedIn = !!home && (await until(async () => fs.existsSync(path.join(home, 'fake-account.json')) && !!readJson(path.join(home, '.claude.json'))?.oauthAccount, 30_000))
+  // Its CLI's trust answers in its home, as Claude Code records a user's (one folder trusted, one answered no), beside
+  // the account its sign-in wrote there, for the upgrade to keep as they are.
+  if (signedIn) {
+    const f = path.join(home, '.claude.json')
+    const j = readJson(f) ?? {}
+    fs.writeFileSync(f, JSON.stringify({ ...j, projects: { ...(j.projects ?? {}), ...TRUST_JSON.projects } }))
+  }
+  const seededNow = home ? connectionSnapshot({ connections: [{ id: account.id, provider: 'claude-code', name: SEED.connection }] }, account.id, connectionFiles(home), TRUST_FOLDERS) : null
+  const connection = { id: account?.id ?? null, name: SEED.connection, home, error: account?.error }
+  check('4.connection-made', 'Before the upgrade: a Claude Code connection added and signed in (the fake), its trust answers in its home', !!found && signedIn && !!seededNow && !connectionDiffers(seededNow, seededNow).length, JSON.stringify({ provider: res.facts.provider, connection, seeded: seededNow }))
 
   // The workspace, its project a git repository with one commit on main.
   fs.mkdirSync(KEPT_PROJECT, { recursive: true })
@@ -343,7 +359,7 @@ async function markCombwork() {
   }
   // A skill copy as Combwork marks it (HI-2587), for the upgrade to leave as it is.
   fs.mkdirSync(path.join(KEPT_WS, COPY), { recursive: true })
-  fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), '---\nname: cw-sandbox-check\n---\n')
+  fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), COPY_SKILL)
   fs.writeFileSync(path.join(KEPT_WS, COPY, '.combwork-copy'), JSON.stringify({ source: 'sandbox', hash: 'h' }) + '\n')
   const logs = fs.readdirSync(path.join(PROFILE, 'logs')).filter((n) => n.endsWith('.log'))
   res.facts.keptWorkspace = { made: !!made, card, second, tree: TREE_BEFORE, workflow: workflow || readJson(path.join(KEPT_PROJECT, TREE_BEFORE, 'project.json'))?.workflow, logs }
@@ -371,9 +387,15 @@ async function markCombwork() {
   for (const n of numbers) cards[n] = await cardView(n)
   const c1 = card?.number ? cards[card.number] : null
   check('4.workspace-made', `Before the upgrade: a workspace with a git project on the ${SEED.preset} preset and two cards (labelled, linked, commented), in ${TREE_BEFORE}, its board ${DB_BEFORE}, the log ${LOG_BEFORE}`, !!made && numbers.length === 2 && !!workflow && !!c1 && c1.labels?.includes(SEED.label) && c1.links?.includes(second.number) && c1.comments?.some((t) => t.includes(SEED.comment)) && logs.includes(LOG_BEFORE), JSON.stringify({ ...res.facts.keptWorkspace, cards, workflowSet: res.facts.workflowSet, gitInit: res.facts.gitInit.map((g) => g.ok) }))
+  // The connection's row as the release before lists it, read by its id (kept.cjs).
+  const listBefore = await inv('connections:list').catch((e) => ({ error: String(e) }))
   res.facts.seed = { connection, cards, card: card?.number ?? null, second: second?.number ?? null, lane: lane ? { ...lane } : null, slotDir, workflow: workflow || null, advanced: { app: ADV.app.value, ws: ADV.ws.value } }
   save()
   await beforeUpgrade(made)
+  // What the connection holds, by content, once the release before has quit (its agent's CLI writes no more):
+  // after-upgrade compares it with what is there then.
+  connection.kept = home ? connectionSnapshot(listBefore, account.id, connectionFiles(home), TRUST_FOLDERS) : null
+  save()
 }
 
 /**
@@ -392,12 +414,13 @@ async function afterCombwork() {
   const fallback = await page.locator('.toast', { hasText: OLD_FALLBACK_NOTICE }).count()
   check('4.no-fallback', 'No notice that Combwork runs from its old folders', fallback === 0, `${fallback} such notice(s)`)
 
-  // The connection: listed by its id and name, its home and the files it had.
+  // The connection, by content (kept.cjs): its row read by its id, its sign-in, the account and trust answers in its home.
   const c = seed?.connection
   const list = await inv('connections:list').catch((e) => ({ error: String(e) }))
-  const files = c?.home && fs.existsSync(c.home) ? fs.readdirSync(c.home) : []
-  res.facts.connectionAfter = { listed: !!c?.id && JSON.stringify(list).includes(c.id), files }
-  check('4.connection-kept', `The connection "${SEED.connection}" kept: listed by its id, its home with the files it had`, !!c?.id && res.facts.connectionAfter.listed && JSON.stringify(list).includes(c.name) && c.files.length > 0 && c.files.every((f) => files.includes(f)), JSON.stringify({ before: c, after: res.facts.connectionAfter }))
+  const now = c?.id && c.home ? connectionSnapshot(list, c.id, connectionFiles(c.home), TRUST_FOLDERS) : null
+  const differs = connectionDiffers(c?.kept, now)
+  res.facts.connectionAfter = { now, differs }
+  check('4.connection-kept', `The connection "${SEED.connection}" kept: its row (by its id), its sign-in, and the account and trust answers in its home, as they were`, !differs.length, JSON.stringify({ differs, before: c?.kept ?? null, after: now }))
 
   // The workspace: its .combwork as it was, nothing of 1.0's made.
   const oldTrees = [path.join(KEPT_WS, OLD_DIR), path.join(KEPT_PROJECT, OLD_DIR)].filter((d) => fs.existsSync(d))
@@ -590,7 +613,7 @@ const steps = {
     if (made) card = await inv('tasks:create', { title: KEPT_CARD, project: 'demo', description: `The plan: ${path.join(KEPT_WS, TREE_BEFORE, 'shared', 'plan.md')}` }).catch((e) => ({ error: String(e) }))
     // A skill copy as the release before marks it (HI-2587), for the upgrade to rename its marker.
     fs.mkdirSync(path.join(KEPT_WS, COPY), { recursive: true })
-    fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), '---\nname: cw-sandbox-check\n---\n')
+    fs.writeFileSync(path.join(KEPT_WS, COPY, 'SKILL.md'), COPY_SKILL)
     fs.writeFileSync(path.join(KEPT_WS, COPY, OLD_COPY_MARKER), JSON.stringify({ source: 'sandbox', hash: 'h' }) + '\n')
     res.facts.keptWorkspace = { made: !!made, card, tree: TREE_BEFORE, logs: fs.readdirSync(path.join(PROFILE, 'logs')).filter((n) => n.endsWith('.log')) }
     check('4.workspace-made', `Before the upgrade: a workspace with a project and a card, in ${TREE_BEFORE}, its board ${OLD_DB}, the log ${OLD_LOG}`, !!made && typeof card?.number === 'number' && res.facts.keptWorkspace.logs.includes(OLD_LOG), JSON.stringify(res.facts.keptWorkspace))
@@ -860,7 +883,10 @@ const steps = {
     let gitignore = ''
     try { gitignore = fs.readFileSync(path.join(dir, '.gitignore'), 'utf8') } catch { /* below */ }
     check('4.workspace-files', "The workspace's .gitignore is Combwork's, for combwork.db, keeping the names upgrade's record out", /\(added by Combwork, #1017\)/.test(gitignore.split(/\r?\n/)[0]) && /^combwork\.db\r?$/m.test(gitignore) && /^combwork-names\.json\r?$/m.test(gitignore) && !gitignore.split(/\r?\n/).some((l) => l.startsWith(OLD_DB)), gitignore.slice(0, 600))
-    check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes(OLD_COPY_MARKER) && readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))?.hash === 'h', JSON.stringify(res.facts.names.copy))
+    // Its content by content (HI-2727 round 1): SKILL.md as seeded, the marker's source and hash as they were.
+    const copyChanged = copyDiffers({ 'SKILL.md': COPY_SKILL }, { 'SKILL.md': readText(path.join(KEPT_WS, COPY, 'SKILL.md')) })
+    const marker = readJson(path.join(KEPT_WS, COPY, '.combwork-copy'))
+    check('4.copy-marker', "The project's skill copy has Combwork's marker (.combwork-copy), its content as it was (SKILL.md, the marker's source and hash)", res.facts.names.copy.includes('.combwork-copy') && !res.facts.names.copy.includes(OLD_COPY_MARKER) && marker?.hash === 'h' && marker?.source === 'sandbox' && !copyChanged.length, JSON.stringify({ files: res.facts.names.copy, marker, changed: copyChanged }))
     check('4.names-done', 'The names upgrade recorded itself done (.combwork\\combwork-names.json)', readJson(path.join(dir, 'combwork-names.json'))?.version === NAMES_VERSION,JSON.stringify(res.facts.names.combwork))
     const oldNames = [...res.facts.names.combwork, ...res.facts.names.logs].filter((n) => n.toLowerCase().startsWith(OLD_NAME.toLowerCase()))
     check('4.no-old-names', "No file under the old names left in the workspace's .combwork or the profile's logs", oldNames.length === 0, JSON.stringify(oldNames))
