@@ -112,6 +112,29 @@ describe("a turn the user's typing began with no prompt hook (HI-2673)", () => {
     expect(st.hooksMissing).toBeUndefined()
   })
 
+  it("a turn taken that way is remembered (HR2's round 1): its Stop or tool end again answers no later prompt", async () => {
+    for (const [agentId, again] of [
+      ['b2', (st: State) => stop(st, 'p2')],
+      ['b3', (st: State) => toolEnd(st, 'p2', 'c2')]
+    ] as const) {
+      const { st, l } = agent(agentId)
+      await fullTurn(st, 'p1', 'c1')
+      // p2 by the user's typing, with no prompt hook: only this hook of it comes, and it answers that Enter.
+      typeBang(st)
+      await again(st)
+      expect(l.hooksWatch.submit, agentId).toBeNull()
+      // The user's next prompt, p3, whose hooks never come; then p2's hook again (a duplicate, or late).
+      typeBang(st)
+      await again(st)
+      expect(l.hooksWatch.submit, agentId).not.toBeNull()
+      await checkPastTheBound(st, l)
+      expect(st.hooksMissing?.after, agentId).toBe('prompt')
+      // Once raised, the same hook again doesn't take it down.
+      await again(st)
+      expect(st.hooksMissing?.after, agentId).toBe('prompt')
+    }
+  })
+
   it('the alarm already raised (its hooks came after the bound): a hook of the turn never seen takes it down', async () => {
     const { st, l } = agent('c')
     await fullTurn(st, 'p1', 'c1')

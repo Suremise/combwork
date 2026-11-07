@@ -89,7 +89,7 @@ import { createLogger, hookJournal, userText } from './logger'
 import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
-import { admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
+import { acceptTurn, admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
 import { lastTitle } from './terminalTitle'
 import { asksYou } from '../shared/inbox'
@@ -6558,7 +6558,10 @@ class SessionManager {
     // never seen (the ledger's `unseen`: no earlier turn's, none let go past its bound, no sub-agent's) can't be late
     // news: its turn is the one that prompt began, with no prompt hook, so it answers the prompt too.
     if (l.hooksWatch) {
-      const ofPrompt = took.verdict !== 'stale' || (typed && !!took.unseen)
+      const accepted = took.verdict === 'stale' && typed && !!took.unseen
+      // Remembered once accepted (HR2's round 1): the same turn's hook again is an earlier turn's, never a later prompt's.
+      if (accepted && ids.turn) acceptTurn(ledger, ids.turn)
+      const ofPrompt = took.verdict !== 'stale' || accepted
       if (ofPrompt) turnHeard(l.hooksWatch)
       // A flag a transcript turn raised (#1371) is answered only by that turn's hooks or a newer turn's, by identity (above):
       // the ledger's current turn may be older than it (its hooks are what went missing), so the ledger's verdict doesn't count.

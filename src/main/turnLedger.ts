@@ -318,6 +318,15 @@ export function admit(ledger: TurnLedger, ev: HookEvent, ids: HookIds, opts: { c
   }
 }
 
+/**
+ * A turn never seen that Combwork took as the one a typed prompt began, without opening it (HI-2673: a stale hook the
+ * health allowance accepted, a Stop alone): remembered from now, like any turn seen, so its hook again (a duplicate, a
+ * late one) is an earlier turn's and answers no later prompt. Past the bound it is let go as any turn is (`forgot`).
+ */
+export function acceptTurn(ledger: TurnLedger, turn: string): void {
+  if (!ledger.seen.has(turn)) remember(ledger, ledger.seen, turn, ledger.maxSeen)
+}
+
 /** The CLI was heard from outside its hooks (its transcript grew, its screen shows it at work). */
 export function heard(ledger: TurnLedger, now = Date.now()): void {
   ledger.heard = Math.max(ledger.heard, now)
