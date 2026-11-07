@@ -6,7 +6,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { createRequire } from 'module'
 import { tempDir } from './tempDir'
 // @ts-expect-error: plain .mjs module without types
-import { assertTestHome, freshenHome, freshenedLine, homeUsers, HomeNotReady, MARKER } from './e2e/testHomes.mjs'
+import { assertTestHome, freshenHome, freshenedLine, homeUsers, HomeNotReady, MARKER, signInStatus } from './e2e/testHomes.mjs'
 // @ts-expect-error: plain .mjs module without types
 import { classify, UNCLASSIFIED } from './e2e/testHomeManifest.mjs'
 // @ts-expect-error: plain .mjs module without types
@@ -514,4 +514,17 @@ describe('HR2 on s34: reuse checks the live holder, nothing is evicted, an unrea
       else expect(statSync(file).isDirectory()).toBe(true)
     })
   }
+})
+
+describe('signInStatus: what each CLI says of its sign-in', () => {
+  it("reads Codex's answer from stderr too (0.166.0 says it there), and Claude Code's JSON", () => {
+    const run = (r: { code: number; stdout?: string; stderr?: string } | null) => () => r
+    expect(signInStatus('codex', 'h', { run: run({ code: 0, stdout: '', stderr: 'Logged in using ChatGPT\n' }) })).toBe('in')
+    expect(signInStatus('codex', 'h', { run: run({ code: 1, stdout: '', stderr: 'Not logged in\n' }) })).toBe('out')
+    expect(signInStatus('codex', 'h', { run: run({ code: 0, stdout: '', stderr: '' }) })).toBe('unknown')
+    expect(signInStatus('codex', 'h', { run: run(null) })).toBe('unknown')
+    expect(signInStatus('claude', 'h', { run: run({ code: 0, stdout: '{"loggedIn": true}' }) })).toBe('in')
+    expect(signInStatus('claude', 'h', { run: run({ code: 1, stdout: '{"loggedIn": false}' }) })).toBe('out')
+    expect(signInStatus('claude', 'h', { run: run({ code: 0, stdout: 'garbled' }) })).toBe('unknown')
+  })
 })

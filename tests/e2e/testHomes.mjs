@@ -21,7 +21,7 @@
 //
 // `--warm-homes` (e2e, scenarios) and a suite's `home: 'warm'` skip it, keeping what earlier runs left, on purpose.
 import { createHash } from 'crypto'
-import { execFileSync } from 'child_process'
+import { spawnSync } from 'child_process'
 import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'fs'
 import { isAbsolute, join, relative, resolve, sep } from 'path'
 import { createRequire } from 'module'
@@ -71,13 +71,10 @@ export function signInStatus(cli, home, { run = runCli } = {}) {
 /** Runs a CLI's status command with only the home's variable added to the run's environment; null when it couldn't. */
 function runCli(args, cli, env) {
   const exe = cli === 'claude' ? ['.local\\bin\\claude.exe'].map((f) => join(process.env.USERPROFILE ?? '', f)).find((f) => existsSync(f)) ?? 'claude' : 'codex'
-  try {
-    const stdout = execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exe}" ${args.join(' ')}`], { env: ctx.childEnv(env), encoding: 'utf8', timeout: 30000, windowsHide: true, windowsVerbatimArguments: true, stdio: ['ignore', 'pipe', 'pipe'] })
-    return { code: 0, stdout, stderr: '' }
-  } catch (e) {
-    if (typeof e?.status !== 'number') return null
-    return { code: e.status, stdout: String(e.stdout ?? ''), stderr: String(e.stderr ?? '') }
-  }
+  // Both streams, whatever it exits with: Codex says "Logged in…" on stderr (0.166.0).
+  const r = spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exe}" ${args.join(' ')}`], { env: ctx.childEnv(env), encoding: 'utf8', timeout: 30000, windowsHide: true, windowsVerbatimArguments: true, stdio: ['ignore', 'pipe', 'pipe'] })
+  if (r.error || typeof r.status !== 'number') return null
+  return { code: r.status, stdout: String(r.stdout ?? ''), stderr: String(r.stderr ?? '') }
 }
 
 /** A process that is a CLI a test run starts: Claude Code, Codex, or node (their npm shims, cw-mcp). */
