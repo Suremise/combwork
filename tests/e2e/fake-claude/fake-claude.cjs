@@ -137,7 +137,7 @@ const { randomUUID } = require('crypto')
 const { spawn } = require('child_process')
 const { callOwnTool, connectOwnServer, parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
 const { shellStderrFile } = require('./shellStderr.cjs')
-const oldRelease = require('./oldRelease.cjs')
+const { oldDialectIn } = require('./oldDialect.cjs')
 
 const args = process.argv.slice(2)
 if (args[0] === '--version') {
@@ -266,13 +266,6 @@ if (!home) {
   process.exit(2)
 }
 
-/**
- * The launch's environment, and its MCP server's, by current names (CW_*). An old release's names are read only in
- * old-release mode (oldRelease.cjs: upgradelane's 0.9 build, HI-2614); a current launch given them stops (below).
- */
-const cwEnv = (env) => oldRelease.envOf(env)
-for (const [k, v] of Object.entries(cwEnv(process.env))) if (process.env[k] === undefined) process.env[k] = v
-
 // Options that take a value, so the first task (the last plain argument) can be told apart.
 const WITH_VALUE = new Set(['--session-id', '--resume', '--name', '--plugin-dir', '--mcp-config', '--settings', '--append-system-prompt-file', '--allowedTools', '--model', '--effort', '--permission-mode', '--system-prompt-snapshot', '--add-dir'])
 const opts = {}
@@ -282,17 +275,17 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i].startsWith('--')) opts[args[i]] = true
   else firstPrompt = args[i]
 }
-// A current launch given an old release's names (HI-2614) stops, naming them, so no current test passes on them.
-if (!oldRelease.on()) {
+// A launch given an old release's names (HI-2614) stops, naming them, so no test passes on them (oldDialect.cjs).
+{
   let servers = {}
   try {
     servers = opts['--mcp-config'] ? (JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers ?? {}) : {}
   } catch {
     servers = {}
   }
-  const found = oldRelease.oldDialectIn(process.env, servers)
+  const found = oldDialectIn(process.env, servers)
   if (found.length) {
-    console.error(`fake-claude: a current launch with an old release's names (${found.join(', ')}); only upgradelane's old release uses them (HI-2614)`)
+    console.error(`fake-claude: a launch with an old release's names (${found.join(', ')}); no test uses them (HI-2614)`)
     process.exit(2)
   }
 }
@@ -888,9 +881,9 @@ function readSkillRef(name, file) {
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: numbered, is_error: text === null }] } })
 }
 
-/** The launch's own MCP server, `combwork` (an old release's only in old-release mode: oldRelease.cjs). Null without one. */
+/** The launch's own MCP server, `combwork`. Null without one. */
 function ownServer() {
-  return oldRelease.serverOf(JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers ?? {})
+  return JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers?.combwork ?? null
 }
 
 /** Calls a Combwork tool through the launch's own Combwork MCP server; the call and its reply go in the transcript. */
@@ -913,7 +906,7 @@ async function boardPatch(n, change) {
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'mcp__combwork__cw_update_task', input: { number: n, ...change } }], usage: { input_tokens: 10, output_tokens: 5 } } })
   let record
   try {
-    const env = cwEnv(ownServer().env)
+    const env = ownServer().env
     const apiToken = JSON.parse(fs.readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token
     const res = await fetch(`${env.CW_API_URL}/v1/tasks/${n}`, {
       method: 'PATCH',
@@ -929,7 +922,7 @@ async function boardPatch(n, change) {
   // Where Combwork's MCP server logs the calls it runs (tests only), this call is logged too, as the server would; `direct`:
   // no Combwork MCP server ran it, so none reports it to Combwork's metrics.
   try {
-    const env = cwEnv(ownServer().env)
+    const env = ownServer().env
     if (env.CW_TEST_MCP_LOG) fs.appendFileSync(env.CW_TEST_MCP_LOG, JSON.stringify({ at: new Date().toISOString(), tool: 'cw_update_task', role: env.CW_ROLE === 'assistant' ? 'assistant' : 'agent', project: env.CW_PROJECT, agent: env.CW_AGENT_ID ?? null, ok: record.status === 200, args: JSON.stringify({ number: n, ...change }), direct: true }) + '\n')
   } catch {
     // No log.

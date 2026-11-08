@@ -872,8 +872,8 @@ export const UNIT_SCANS = [
   // old-name: begin test-area-pick
   { test: 'tests/testArea.test.ts', lines: ['hive-test'] }, // the test area's old name only in its move (HI-2590)
   // old-name: end test-area-pick
-  // No suite gives a profile the fakes' old-release mode (HI-2614) since upgradelane was retired (HI-2741).
-  { test: 'tests/fakeOldRelease.test.ts', paths: ['tests/e2e/'], lines: ['oldRelease'] },
+  // The fakes refuse an old release's names (HI-2614); the mode that read them is gone (HI-2742).
+  { test: 'tests/fakeOldDialect.test.ts', paths: ['tests/e2e/'], lines: ['oldDialect', 'old[-_ ]?[Rr]elease', 'FAKE_OLD'] },
   { test: 'tests/testQuiet.test.ts', paths: ['tests/e2e/', 'tests/scenarios/'], lines: ['_electron\\.launch\\(', 'CW_USER_DATA', 'CW_TEST_QUIET'] },
   // The tools-connected log line (HI-2584): sessions.ts writes it, and suites read it only through lib.combworkToolsConnected.
   { test: 'tests/toolsConnectedLine.test.ts', paths: ['src/main/sessions.ts', 'tests/e2e/', 'tests/scenarios/', 'scripts/'], lines: ['tools connected'] },
