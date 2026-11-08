@@ -1,0 +1,6 @@
+$ opencode session list --standalone
+code 0
+--- stdout
+ses_e428cefc2ffeSDNwiHFcRk8o1D	Execute combwork ping r0	08/11/2026, 23:18:19
+
+--- stderr

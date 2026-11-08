@@ -1,0 +1,6 @@
+$ opencode models --standalone
+code 0
+--- stdout
+probe/qwen3:8b
+
+--- stderr

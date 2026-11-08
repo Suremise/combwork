@@ -1,0 +1,999 @@
+[
+ {
+  "id": "evt_1bd703ca4001LyA9MAN5PT80K7",
+  "type": "server.connected",
+  "data": {}
+ },
+ {
+  "id": "evt_1bd703d910012EEqrISxtjFgLv",
+  "created": 1794179612049,
+  "type": "session.created",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "slug": "crisp-star",
+   "version": "2.2.6",
+   "projectID": "49b7441588fa9d640766ecb1ceb74e76d7a346b2",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "subpath": "",
+   "permissions": [
+    {
+     "action": "shell",
+     "resource": "*",
+     "effect": "ask"
+    }
+   ]
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 0,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd703f7c001W7gF7x2SJTG7c0",
+  "created": 1794179612540,
+  "type": "session.inbox.enqueued",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "inboxID": "msg_1bd703db2001REhS9aAF1tSopX",
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "item": {
+    "type": "user",
+    "payload": {
+     "text": "Use the shell tool to run exactly this command: echo r0-shell-marker . Then reply with the command's output and nothing else."
+    },
+    "delivery": "steer"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 1,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd703f7e001onvhwhpJ5DAqnL",
+  "created": 1794179612542,
+  "type": "session.execution.started",
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 2,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd703f830010L5sYvl2xLQKRK",
+  "created": 1794179612547,
+  "metadata": {
+   "instructions": {
+    "initial": true
+   }
+  },
+  "type": "session.instructions.updated",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "delta": {
+    "core/codemode": "74a1fe4cac15f42fd158773d5d180e363ce6fbfcde6213fc51a7f5d0a79775bc",
+    "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
+    "core/date": "f5037a79687112a772ccf5ed4b2589caebf713959392bc4d0630977e1a6b4009",
+    "core/environment": "996bcfb91c5a9c9a37f473eb59aa94c1ffffe5bd30729270f32861e3b164b6fb"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 3,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1bd703f840010omDth3DXXNfcu",
+  "created": 1794179612548,
+  "type": "session.inbox.delivered",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "inboxID": "msg_1bd703db2001REhS9aAF1tSopX"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 4,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70635a001IchsQPUr4tu2er",
+  "created": 1794179621722,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "cost": 0,
+   "tokens": {
+    "input": 477,
+    "output": 899,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd70635a0029ga5efy3CTyHGO",
+  "created": 1794179621722,
+  "type": "session.renamed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "title": "r0-shell-marker output"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 6,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7066a4001R8WwaQ3rr1rDie",
+  "created": 1794179622564,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179612566
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 7,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7066a6001lAkleESVfQ0sGk",
+  "created": 1794179622566,
+  "type": "session.reasoning.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "native": {
+    "reasoningField": "reasoning"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 8,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70670d001ewOkBISgsLl0t6",
+  "created": 1794179622669,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": "Okay, the user wants me to use the shell tool to run"
+  }
+ },
+ {
+  "id": "evt_1bd706778001zuCz21fsrEhjQY",
+  "created": 1794179622776,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " the command 'echo r0-shell-marker' and then reply"
+  }
+ },
+ {
+  "id": "evt_1bd7067e3001eJaOolqURPGIl0",
+  "created": 1794179622884,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " with the output. Let me check the available tools. The"
+  }
+ },
+ {
+  "id": "evt_1bd706850001q7ZYnDr01u4FFI",
+  "created": 1794179622992,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " shell function is listed, so I need to call that."
+  }
+ },
+ {
+  "id": "evt_1bd7068b800166M88mcYvk9kE3",
+  "created": 1794179623096,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " The parameters required are command, workdir, timeout, and"
+  }
+ },
+ {
+  "id": "evt_1bd706922001IqFG3LGGrD5kIT",
+  "created": 1794179623202,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " background. The user specified exactly the command, so I'll"
+  }
+ },
+ {
+  "id": "evt_1bd70698d0012v7cuFkOnH9kqY",
+  "created": 1794179623309,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " set command to 'echo r0-shell-marker'. The working"
+  }
+ },
+ {
+  "id": "evt_1bd7069f7001TOwk0CSRnXa9z2",
+  "created": 1794179623415,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " directory isn't mentioned, so I'll leave it as the"
+  }
+ },
+ {
+  "id": "evt_1bd706a61001pm7yBU56zLGZ2N",
+  "created": 1794179623521,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " default. Timeout isn't specified either, so I'll use"
+  }
+ },
+ {
+  "id": "evt_1bd706acb001ep1zs881S87nW6",
+  "created": 1794179623627,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " the default. Since the user wants the output immediately, I"
+  }
+ },
+ {
+  "id": "evt_1bd706b34001P0nzWOKDvG4Jnq",
+  "created": 1794179623732,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " shouldn't run it in the background. I'll structure the"
+  }
+ },
+ {
+  "id": "evt_1bd706b9f001ysqwq6OE05J3ve",
+  "created": 1794179623839,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " tool call with these parameters. Let me make sure I'm"
+  }
+ },
+ {
+  "id": "evt_1bd706c0a001OCepVMs2grhrRR",
+  "created": 1794179623946,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": " not missing any other required fields. Everything seems set. Now"
+  }
+ },
+ {
+  "id": "evt_1bd706c75001AoZARTXkGAhw7v",
+  "created": 1794179624053,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "delta": ", I'll format the JSON for the tool call.\n"
+  }
+ },
+ {
+  "id": "evt_1bd706d37001U6s7Dgw4AKvmvD",
+  "created": 1794179624247,
+  "type": "session.tool.input.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "id": "call_oxm8z7a8",
+   "name": "shell"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 9,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd706d49001t9jWs2P1dQFkQW",
+  "created": 1794179624265,
+  "type": "session.reasoning.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "ordinal": 0,
+   "text": "Okay, the user wants me to use the shell tool to run the command 'echo r0-shell-marker' and then reply with the output. Let me check the available tools. The shell function is listed, so I need to call that. The parameters required are command, workdir, timeout, and background. The user specified exactly the command, so I'll set command to 'echo r0-shell-marker'. The working directory isn't mentioned, so I'll leave it as the default. Timeout isn't specified either, so I'll use the default. Since the user wants the output immediately, I shouldn't run it in the background. I'll structure the tool call with these parameters. Let me make sure I'm not missing any other required fields. Everything seems set. Now, I'll format the JSON for the tool call.\n",
+   "native": {
+    "reasoningField": "reasoning"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 10,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd706d4b001mV5rth6hTDAcQh",
+  "created": 1794179624267,
+  "type": "session.tool.input.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "id": "call_oxm8z7a8",
+   "text": "{\"command\":\"echo r0-shell-marker\"}"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 11,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd706d4c001EbVURInSeBxJp7",
+  "created": 1794179624268,
+  "type": "session.tool.called",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "id": "call_oxm8z7a8",
+   "input": {
+    "command": "echo r0-shell-marker"
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 12,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd706d4e001o8caffzJx9yMYM",
+  "created": 1794179624270,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 13,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd706d51002EYWWBb79zSkomk",
+  "created": 1794179624273,
+  "type": "permission.asked",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "id": "per_1bd706d51001E5tzmika3BR58p",
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "action": "shell",
+   "resources": [
+    "echo r0-shell-marker"
+   ],
+   "save": [
+    "echo *"
+   ],
+   "source": {
+    "type": "tool",
+    "messageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+    "id": "call_oxm8z7a8"
+   }
+  }
+ },
+ {
+  "id": "evt_1bd706d87001JlGIKQsSv2T6kR",
+  "created": 1794179624327,
+  "type": "permission.replied",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "requestID": "per_1bd706d51001E5tzmika3BR58p",
+   "reply": "once"
+  }
+ },
+ {
+  "id": "evt_1bd706d90001b1fkStHrCDj3bB",
+  "created": 1794179624336,
+  "type": "shell.created",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "info": {
+    "id": "sh_1bd706d87002mat4YarjNFL12N",
+    "status": "running",
+    "command": "echo r0-shell-marker",
+    "cwd": "<root>\\project",
+    "shell": "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE",
+    "file": "<root>\\xdg\\data\\opencode\\shell\\49b7441588fa9d640766ecb1ceb74e76d7a346b2\\sh_1bd706d87002mat4YarjNFL12N.out",
+    "metadata": {
+     "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ"
+    },
+    "time": {
+     "started": 1794179624327
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd706d900023BwZ7hXBW4hLlt",
+  "created": 1794179624336,
+  "type": "session.tool.progress",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "id": "call_oxm8z7a8",
+   "metadata": {
+    "shellID": "sh_1bd706d87002mat4YarjNFL12N"
+   }
+  }
+ },
+ {
+  "id": "evt_1bd706eee001z7WAlL4XWnR5Zm",
+  "created": 1794179624686,
+  "type": "shell.exited",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "id": "sh_1bd706d87002mat4YarjNFL12N",
+   "exit": 0,
+   "status": "exited"
+  }
+ },
+ {
+  "id": "evt_1bd706eef001T5MsP7z49ktGGx",
+  "created": 1794179624687,
+  "type": "session.tool.success",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "id": "call_oxm8z7a8",
+   "content": [
+    {
+     "type": "text",
+     "text": "r0-shell-marker\r\n"
+    }
+   ],
+   "metadata": {
+    "status": "completed",
+    "truncated": false,
+    "exit": 0
+   },
+   "executed": false
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 14,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1bd706f220019aYz2XlhhxxbCY",
+  "created": 1794179624738,
+  "type": "session.step.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+   "finish": "tool-calls",
+   "rawFinish": "tool_calls",
+   "tokens": {
+    "input": 4834,
+    "output": 195,
+    "reasoning": 0,
+    "cache": {
+     "read": 4,
+     "write": 0
+    }
+   },
+   "cost": 0,
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 15,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd706f25001Q7FT8eFGKZohfS",
+  "created": 1794179624741,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "cost": 0,
+   "tokens": {
+    "input": 5311,
+    "output": 1094,
+    "reasoning": 0,
+    "cache": {
+     "read": 4,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd706fa4001Gys4VE44IBT3Tw",
+  "created": 1794179624868,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179624748
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 16,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd706fa60014klOEGXHmQp9ZQ",
+  "created": 1794179624870,
+  "type": "session.reasoning.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "native": {
+    "reasoningField": "reasoning"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 17,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70700b001ATuGyp6cf2QjGC",
+  "created": 1794179624971,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": "Okay, the user asked to run the command `echo r"
+  }
+ },
+ {
+  "id": "evt_1bd707071001x7PZX72Ls2zqRC",
+  "created": 1794179625073,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": "0-shell-marker` using the shell tool and then reply with"
+  }
+ },
+ {
+  "id": "evt_1bd7070dc001OFH5dd8ZV3wl1G",
+  "created": 1794179625180,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": " the output. I called the shell function with the command,"
+  }
+ },
+ {
+  "id": "evt_1bd707146001XaoYRw2NXgwz00",
+  "created": 1794179625286,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": " and the response was `r0-shell-marker`. Now,"
+  }
+ },
+ {
+  "id": "evt_1bd7071af001834OyEDwTKc73O",
+  "created": 1794179625392,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": " I need to make sure that I just present the output without"
+  }
+ },
+ {
+  "id": "evt_1bd7072190016DIUnPgEf3qmNu",
+  "created": 1794179625497,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": " any extra text. The user specified to reply with the command"
+  }
+ },
+ {
+  "id": "evt_1bd70728d0016u38mmEYwh8ode",
+  "created": 1794179625613,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": "'s output and nothing else. So I'll check if the"
+  }
+ },
+ {
+  "id": "evt_1bd7072f2001f27cmUnBe2mJnT",
+  "created": 1794179625714,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": " output is correctly captured. The response from the tool is straightforward"
+  }
+ },
+ {
+  "id": "evt_1bd70735c001zs18sMgViBzWre",
+  "created": 1794179625820,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": ", so I'll output it as is. No need for"
+  }
+ },
+ {
+  "id": "evt_1bd7073c70017U3viin928jGJU",
+  "created": 1794179625927,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": " any additional explanations or formatting. Just the marker text.\n"
+  }
+ },
+ {
+  "id": "evt_1bd7073d6001C1uAzCuBxI2OY1",
+  "created": 1794179625942,
+  "type": "session.text.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 18,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7073fa001OtCtuaex1Txl6h",
+  "created": 1794179625978,
+  "type": "session.reasoning.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "text": "Okay, the user asked to run the command `echo r0-shell-marker` using the shell tool and then reply with the output. I called the shell function with the command, and the response was `r0-shell-marker`. Now, I need to make sure that I just present the output without any extra text. The user specified to reply with the command's output and nothing else. So I'll check if the output is correctly captured. The response from the tool is straightforward, so I'll output it as is. No need for any additional explanations or formatting. Just the marker text.\n",
+   "native": {
+    "reasoningField": "reasoning"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 19,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7073fc001BwgxrHvZEv34pz",
+  "created": 1794179625980,
+  "type": "session.text.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "delta": "r0-shell-marker"
+  }
+ },
+ {
+  "id": "evt_1bd7073fc002iX2vdqjIqM06Ae",
+  "created": 1794179625980,
+  "type": "session.text.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "ordinal": 0,
+   "text": "r0-shell-marker"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 20,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7073fe001IANu1RliiJ6VZx",
+  "created": 1794179625982,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 21,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd707435001tC2nBN02BEx0D3",
+  "created": 1794179626037,
+  "type": "session.step.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "assistantMessageID": "msg_1bd706f29001CU4IWWcba6HGTy",
+   "finish": "stop",
+   "rawFinish": "stop",
+   "tokens": {
+    "input": 209,
+    "output": 128,
+    "reasoning": 0,
+    "cache": {
+     "read": 4839,
+     "write": 0
+    }
+   },
+   "cost": 0,
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 22,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd707438001lNGpLAfZENY8Zf",
+  "created": 1794179626040,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "cost": 0,
+   "tokens": {
+    "input": 5520,
+    "output": 1222,
+    "reasoning": 0,
+    "cache": {
+     "read": 4843,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd707439001DwweTCYmxKZb8D",
+  "created": 1794179626041,
+  "type": "session.execution.succeeded",
+  "data": {
+   "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ"
+  },
+  "durable": {
+   "aggregateID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "seq": 23,
+   "version": 1
+  }
+ }
+]

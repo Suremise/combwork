@@ -1,0 +1,518 @@
+[
+ {
+  "id": "evt_1bd703ca4001LyA9MAN5PT80K7",
+  "type": "server.connected",
+  "data": {}
+ },
+ {
+  "id": "evt_1bd706d90001b1fkStHrCDj3bB",
+  "created": 1794179624336,
+  "type": "shell.created",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "info": {
+    "id": "sh_1bd706d87002mat4YarjNFL12N",
+    "status": "running",
+    "command": "echo r0-shell-marker",
+    "cwd": "<root>\\project",
+    "shell": "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE",
+    "file": "<root>\\xdg\\data\\opencode\\shell\\49b7441588fa9d640766ecb1ceb74e76d7a346b2\\sh_1bd706d87002mat4YarjNFL12N.out",
+    "metadata": {
+     "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ"
+    },
+    "time": {
+     "started": 1794179624327
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd706eee001z7WAlL4XWnR5Zm",
+  "created": 1794179624686,
+  "type": "shell.exited",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "id": "sh_1bd706d87002mat4YarjNFL12N",
+   "exit": 0,
+   "status": "exited"
+  }
+ },
+ {
+  "id": "evt_1bd70749f001xcpUfXJcTQiuit",
+  "created": 1794179626143,
+  "type": "session.created",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "slug": "misty-nebula",
+   "version": "2.2.6",
+   "projectID": "49b7441588fa9d640766ecb1ceb74e76d7a346b2",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "subpath": "",
+   "permissions": [
+    {
+     "action": "shell",
+     "resource": "*",
+     "effect": "ask"
+    }
+   ]
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 0,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7074a3001TTWHyGYa8x44Qm",
+  "created": 1794179626147,
+  "type": "session.inbox.enqueued",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "inboxID": "msg_1bd7074a200188w9lLW9Y1mx0o",
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "item": {
+    "type": "user",
+    "payload": {
+     "text": "Call the ping_combwork tool once with note \"r0\". Then reply with its result and nothing else."
+    },
+    "delivery": "steer"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 1,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7074a4001t3Pt8o5jAiPu5z",
+  "created": 1794179626148,
+  "type": "session.execution.started",
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 2,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7074a7001JNNYBylrxF1dXe",
+  "created": 1794179626151,
+  "metadata": {
+   "instructions": {
+    "initial": true
+   }
+  },
+  "type": "session.instructions.updated",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "delta": {
+    "core/codemode": "74a1fe4cac15f42fd158773d5d180e363ce6fbfcde6213fc51a7f5d0a79775bc",
+    "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
+    "core/date": "f5037a79687112a772ccf5ed4b2589caebf713959392bc4d0630977e1a6b4009",
+    "core/environment": "996bcfb91c5a9c9a37f473eb59aa94c1ffffe5bd30729270f32861e3b164b6fb"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 3,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1bd7074a8001XdKkpBEe8bAiY9",
+  "created": 1794179626152,
+  "type": "session.inbox.delivered",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "inboxID": "msg_1bd7074a200188w9lLW9Y1mx0o"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 4,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7080bc001ZCIcBPxh4V5wDS",
+  "created": 1794179629244,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "cost": 0,
+   "tokens": {
+    "input": 38,
+    "output": 360,
+    "reasoning": 0,
+    "cache": {
+     "read": 434,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd7080bd001ALe2Zebd3ykfcr",
+  "created": 1794179629245,
+  "type": "session.renamed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "title": "ping_combwork r0"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 6,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70816a0013oPH2j0MUE9wQQ",
+  "created": 1794179629418,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179626162
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 7,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70816c001TvN4fzBXqCYPPL",
+  "created": 1794179629420,
+  "type": "session.reasoning.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "native": {
+    "reasoningField": "reasoning"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 8,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7081d20014pP0CwekOCemrZ",
+  "created": 1794179629522,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": "Okay, the user wants me to call the ping_combwork"
+  }
+ },
+ {
+  "id": "evt_1bd708237001emYHW4jnZYKIy5",
+  "created": 1794179629623,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " tool with the note \"r0\" and then reply with"
+  }
+ },
+ {
+  "id": "evt_1bd7082a1001u5Hh2jm0NytWYR",
+  "created": 1794179629729,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " the result. Let me check the tools available. The"
+  }
+ },
+ {
+  "id": "evt_1bd708306001pNRsvsUJs6FoV4",
+  "created": 1794179629830,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " combwork tool is listed under the Code Mode tools, specifically"
+  }
+ },
+ {
+  "id": "evt_1bd708371001fwxeaDK8fAO5Dj",
+  "created": 1794179629937,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " the ping_combwork function. The parameters require a note,"
+  }
+ },
+ {
+  "id": "evt_1bd7083dc001U1o3YHH72Z07Aj",
+  "created": 1794179630044,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " which the user provided as \"r0\". I need to"
+  }
+ },
+ {
+  "id": "evt_1bd708445001FCFt7vfeXThkFH",
+  "created": 1794179630150,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " structure the function call correctly. The tool's parameters are in"
+  }
+ },
+ {
+  "id": "evt_1bd7084af0012ekh06SCGLpfTG",
+  "created": 1794179630256,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " a JSON object with a note field. So I'll create"
+  }
+ },
+ {
+  "id": "evt_1bd70851a0018Og0AT2JJ0w9PB",
+  "created": 1794179630362,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " the tool call with the note set to \"r0\"."
+  }
+ },
+ {
+  "id": "evt_1bd708585001ZeCwQ2TP3rrm8s",
+  "created": 1794179630469,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " No other parameters are needed. Then, after executing, I"
+  }
+ },
+ {
+  "id": "evt_1bd7085f0001orGN2IbuaUjVlK",
+  "created": 1794179630576,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": "'ll return the result as specified. Make sure the JSON is"
+  }
+ },
+ {
+  "id": "evt_1bd70865a001q4icjek7OeWa2X",
+  "created": 1794179630682,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": " properly formatted and the tool name is exact. Let me double"
+  }
+ },
+ {
+  "id": "evt_1bd7086c4001ivy1Rbl2tUw3SL",
+  "created": 1794179630789,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "delta": "-check the syntax to avoid any errors.\n"
+  }
+ },
+ {
+  "id": "evt_1bd708798001ThDymE1ndkAVDW",
+  "created": 1794179631000,
+  "type": "session.reasoning.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "ordinal": 0,
+   "text": "Okay, the user wants me to call the ping_combwork tool with the note \"r0\" and then reply with the result. Let me check the tools available. The combwork tool is listed under the Code Mode tools, specifically the ping_combwork function. The parameters require a note, which the user provided as \"r0\". I need to structure the function call correctly. The tool's parameters are in a JSON object with a note field. So I'll create the tool call with the note set to \"r0\". No other parameters are needed. Then, after executing, I'll return the result as specified. Make sure the JSON is properly formatted and the tool name is exact. Let me double-check the syntax to avoid any errors.\n",
+   "native": {
+    "reasoningField": "reasoning"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 9,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70879a001aT9fi418MZszNQ",
+  "created": 1794179631002,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 10,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7087cd001QHgQXFGjLVHhTb",
+  "created": 1794179631053,
+  "type": "session.step.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "assistantMessageID": "msg_1bd7074b0001lOhRCvaOBw21Dv",
+   "finish": "stop",
+   "rawFinish": "stop",
+   "tokens": {
+    "input": 29,
+    "output": 181,
+    "reasoning": 0,
+    "cache": {
+     "read": 4804,
+     "write": 0
+    }
+   },
+   "cost": 0,
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 11,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7087cf001zWCLi8JZlBYr7k",
+  "created": 1794179631055,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "cost": 0,
+   "tokens": {
+    "input": 67,
+    "output": 541,
+    "reasoning": 0,
+    "cache": {
+     "read": 5238,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd7087d0001RU2ZPRrR2mZYdY",
+  "created": 1794179631056,
+  "type": "session.execution.succeeded",
+  "data": {
+   "sessionID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f8b62ffeEBGJ2BsSIz6t4c",
+   "seq": 12,
+   "version": 1
+  }
+ }
+]

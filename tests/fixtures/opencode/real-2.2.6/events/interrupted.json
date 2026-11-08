@@ -1,0 +1,325 @@
+[
+ {
+  "id": "evt_1bd703ca4001LyA9MAN5PT80K7",
+  "type": "server.connected",
+  "data": {}
+ },
+ {
+  "id": "evt_1bd706d90001b1fkStHrCDj3bB",
+  "created": 1794179624336,
+  "type": "shell.created",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "info": {
+    "id": "sh_1bd706d87002mat4YarjNFL12N",
+    "status": "running",
+    "command": "echo r0-shell-marker",
+    "cwd": "<root>\\project",
+    "shell": "C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.EXE",
+    "file": "<root>\\xdg\\data\\opencode\\shell\\49b7441588fa9d640766ecb1ceb74e76d7a346b2\\sh_1bd706d87002mat4YarjNFL12N.out",
+    "metadata": {
+     "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ"
+    },
+    "time": {
+     "started": 1794179624327
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd706eee001z7WAlL4XWnR5Zm",
+  "created": 1794179624686,
+  "type": "shell.exited",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "id": "sh_1bd706d87002mat4YarjNFL12N",
+   "exit": 0,
+   "status": "exited"
+  }
+ },
+ {
+  "id": "evt_1bd7087da001wEDYTXjfXCB4zV",
+  "created": 1794179631066,
+  "type": "session.created",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "slug": "nimble-knight",
+   "version": "2.2.6",
+   "projectID": "49b7441588fa9d640766ecb1ceb74e76d7a346b2",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "subpath": "",
+   "permissions": [
+    {
+     "action": "shell",
+     "resource": "*",
+     "effect": "ask"
+    }
+   ]
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 0,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7087de002beJGkmRIhVhkjL",
+  "created": 1794179631070,
+  "type": "session.inbox.enqueued",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "inboxID": "msg_1bd7087de001b78UVv2rLf02oP",
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "item": {
+    "type": "user",
+    "payload": {
+     "text": "Write a 400-word story about a lighthouse."
+    },
+    "delivery": "steer"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 1,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7087df001Wr3JKhLPaWPWuo",
+  "created": 1794179631071,
+  "type": "session.execution.started",
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 2,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7087e2001BdUnEYfqFTvY2W",
+  "created": 1794179631074,
+  "metadata": {
+   "instructions": {
+    "initial": true
+   }
+  },
+  "type": "session.instructions.updated",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "delta": {
+    "core/codemode": "74a1fe4cac15f42fd158773d5d180e363ce6fbfcde6213fc51a7f5d0a79775bc",
+    "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
+    "core/date": "f5037a79687112a772ccf5ed4b2589caebf713959392bc4d0630977e1a6b4009",
+    "core/environment": "996bcfb91c5a9c9a37f473eb59aa94c1ffffe5bd30729270f32861e3b164b6fb"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 3,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1bd7087e3001MtyWzpjBI5cVBT",
+  "created": 1794179631075,
+  "type": "session.inbox.delivered",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "inboxID": "msg_1bd7087de001b78UVv2rLf02oP"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 4,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70a13d001r9LCe07jkYuuOI",
+  "created": 1794179637565,
+  "type": "session.usage.updated",
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "cost": 0,
+   "tokens": {
+    "input": 29,
+    "output": 785,
+    "reasoning": 0,
+    "cache": {
+     "read": 434,
+     "write": 0
+    }
+   }
+  }
+ },
+ {
+  "id": "evt_1bd70a13e001BbplRGHCeHp0um",
+  "created": 1794179637566,
+  "type": "session.renamed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "title": "Lighthouse Story"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 6,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70a1d60018ML6jIAIY1g8m0",
+  "created": 1794179637718,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd7087e9001xdXo87lrgpuv23",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179631084
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 7,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70a1d800196RTTsmfabtHo2",
+  "created": 1794179637720,
+  "type": "session.reasoning.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "assistantMessageID": "msg_1bd7087e9001xdXo87lrgpuv23",
+   "ordinal": 0,
+   "native": {
+    "reasoningField": "reasoning"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 8,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70a215001Ln4531NQ1WMdRw",
+  "created": 1794179637781,
+  "type": "session.reasoning.delta",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "assistantMessageID": "msg_1bd7087e9001xdXo87lrgpuv23",
+   "ordinal": 0,
+   "delta": "Okay, the user wants a 4"
+  }
+ },
+ {
+  "id": "evt_1bd70a215002l7Y9NMVmi7SCPo",
+  "created": 1794179637781,
+  "type": "session.reasoning.ended",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "assistantMessageID": "msg_1bd7087e9001xdXo87lrgpuv23",
+   "ordinal": 0,
+   "text": "Okay, the user wants a 4",
+   "native": {
+    "reasoningField": "reasoning"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 9,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70a217001RiHKv6pF62Krkd",
+  "created": 1794179637783,
+  "type": "session.step.streamed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "assistantMessageID": "msg_1bd7087e9001xdXo87lrgpuv23"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 10,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70a24a001QS31MxS8LA3EUh",
+  "created": 1794179637834,
+  "type": "session.step.failed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "assistantMessageID": "msg_1bd7087e9001xdXo87lrgpuv23",
+   "error": {
+    "type": "aborted",
+    "message": "Step interrupted"
+   },
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 11,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70a24c001yHejLoZvhyxssG",
+  "created": 1794179637836,
+  "type": "session.execution.interrupted",
+  "data": {
+   "sessionID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "reason": "user"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "seq": 12,
+   "version": 1
+  }
+ }
+]

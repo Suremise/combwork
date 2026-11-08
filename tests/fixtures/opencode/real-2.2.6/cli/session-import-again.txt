@@ -1,0 +1,6 @@
+$ opencode session import <export.json> --standalone
+code 0
+--- stdout
+
+--- stderr
+Session already exists

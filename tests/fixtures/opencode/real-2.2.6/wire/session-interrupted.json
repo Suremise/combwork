@@ -1,0 +1,37 @@
+{
+ "status": 200,
+ "body": {
+  "data": {
+   "id": "ses_e428f7827ffethYbW6u1ar6Vi7",
+   "projectID": "49b7441588fa9d640766ecb1ceb74e76d7a346b2",
+   "cost": 0,
+   "tokens": {
+    "input": 29,
+    "output": 785,
+    "reasoning": 0,
+    "cache": {
+     "read": 434,
+     "write": 0
+    }
+   },
+   "outcome": "interrupted",
+   "time": {
+    "created": 1794179631066,
+    "updated": 1794179637834,
+    "busy": 1794179631071,
+    "idle": 1794179637836
+   },
+   "title": "Lighthouse Story",
+   "permissions": [
+    {
+     "action": "shell",
+     "resource": "*",
+     "effect": "ask"
+    }
+   ],
+   "location": {
+    "directory": "<root>\\project"
+   }
+  }
+ }
+}

@@ -1,0 +1,55 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "msg_1bd71fa92001ACNDf7IkqhyJCo",
+    "time": {
+     "created": 1794179725970
+    },
+    "type": "idle",
+    "outcome": "failed",
+    "error": {
+     "type": "provider.transport",
+     "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+    }
+   },
+   {
+    "id": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+    "time": {
+     "created": 1794179725874,
+     "completed": 1794179725968
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [],
+    "snapshot": {
+     "start": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "end": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "files": []
+    },
+    "finish": "error",
+    "error": {
+     "type": "provider.transport",
+     "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+    }
+   },
+   {
+    "id": "msg_1bd70a90b001nW9ymVAzUR2bsh",
+    "time": {
+     "created": 1794179640045
+    },
+    "text": "Reply OK.",
+    "type": "user"
+   }
+  ],
+  "cursor": {
+   "previous": "eyJpZCI6Im1zZ18xYmQ3MWZhOTIwMDFBQ05EZjdJa3FoeUpDbyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+   "next": "eyJpZCI6Im1zZ18xYmQ3MGE5MGIwMDFuVzl5bVZBelVSMmJzaCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+ }
+}

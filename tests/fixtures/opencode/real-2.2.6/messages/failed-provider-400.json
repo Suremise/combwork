@@ -1,0 +1,64 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "msg_1bd73302a0016Spx2qLw3zqpZM",
+    "time": {
+     "created": 1794179805226
+    },
+    "type": "idle",
+    "outcome": "failed",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "r0 provider refused",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"r0 provider refused\",\"type\":\"invalid_request_error\"}}"
+     }
+    }
+   },
+   {
+    "id": "msg_1bd732fc0001HaURa5lK0gPNsg",
+    "time": {
+     "created": 1794179805122,
+     "completed": 1794179805223
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "m",
+     "providerID": "bad",
+     "variant": "default"
+    },
+    "content": [],
+    "snapshot": {
+     "start": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "end": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "files": []
+    },
+    "finish": "error",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "r0 provider refused",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"r0 provider refused\",\"type\":\"invalid_request_error\"}}"
+     }
+    }
+   },
+   {
+    "id": "msg_1bd732fb4001rkTHZsSa5705uS",
+    "time": {
+     "created": 1794179805113
+    },
+    "text": "Reply OK.",
+    "type": "user"
+   }
+  ],
+  "cursor": {
+   "previous": "eyJpZCI6Im1zZ18xYmQ3MzMwMmEwMDE2U3B4MnFMdzN6cXBaTSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+   "next": "eyJpZCI6Im1zZ18xYmQ3MzJmYjQwMDFya1RIWnNTYTU3MDV1UyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+ }
+}
