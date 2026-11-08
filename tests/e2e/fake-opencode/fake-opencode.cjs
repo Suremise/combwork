@@ -274,7 +274,11 @@ async function tui() {
         if (!sid || e.data?.sessionID !== sid) continue
         if (e.type === 'session.text.ended') out(`${e.data.text}\n`)
         else if (e.type === 'session.tool.called') out(`· ${JSON.stringify(e.data.input)}\n`)
-        else if (e.type === 'permission.asked') {
+        else if (e.type === 'permission.asked' && has('--auto')) {
+          // --help: "Auto-approve permissions that are not explicitly denied". The reply 2.2.6 sends then wasn't recorded: once.
+          log({ kind: 'auto-approved', session: sid, action: e.data.action })
+          void api('POST', `/api/session/${sid}/permission/${e.data.id}/reply`, { decision: 'once' })
+        } else if (e.type === 'permission.asked') {
           waiting = { id: e.data.id }
           out(`Permission required: ${e.data.action} ${e.data.resources.join(' ')} — allow once (y), always (a), reject (n)?\n`)
         } else if (/^session\.execution\.(succeeded|failed|interrupted)$/.test(e.type)) out(`${e.type === 'session.execution.succeeded' ? '' : `[${e.type.split('.').pop()}]\n`}> `)
