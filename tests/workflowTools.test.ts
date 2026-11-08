@@ -300,7 +300,7 @@ describe('a settings change restarts only for the tools it moved (HI-2744: board
   const solo = presetOf('solo', 'none')
   const pair = presetOf('pair', 'none')
   /** Project p under `options`, its running agent launched without `launched`, busy; what the settings changes ask. */
-  async function running(options: WorkflowOptions, launched: () => string[]) {
+  async function running(options: WorkflowOptions, launched: () => string[], outcome: () => 'busy' | 'same' = () => 'busy') {
     const w = await workspace(options)
     const p = projectPath(w)
     let cfg = await w.projectConfig(p)
@@ -308,7 +308,7 @@ describe('a settings change restarts only for the tools it moved (HI-2744: board
     forgetAskedRestarts()
     // As the agent's launch read it: the options' own list is first recorded then.
     workflowHiddenNow(w, p, cfg)
-    const restarts = vi.spyOn(sessions, 'restartForTools').mockImplementation(async () => 'busy')
+    const restarts = vi.spyOn(sessions, 'restartForTools').mockImplementation(async () => outcome())
     const emitted = vi.spyOn(w, 'emit')
     const spies: { mockRestore(): void }[] = [
       vi.spyOn(w, 'projectConfig').mockImplementation(async () => cfg),
@@ -351,6 +351,26 @@ describe('a settings change restarts only for the tools it moved (HI-2744: board
     try {
       await a.change(solo)
       expect([a.restarts(), a.asked()]).toEqual([1, 1])
+    } finally {
+      a.done()
+    }
+  })
+
+  it("Pair (Later), back to Solo, Pair again: the way back forgets the question, so it's asked again (HR1's round 1)", async () => {
+    // Launched under Solo; its restart says what the real one would: busy while its launch differs from now, else same.
+    let now = solo
+    const a = await running(solo, () => hidden(solo), () => (hidden(now).join() === hidden(solo).join() ? 'same' : 'busy'))
+    const change = (o: WorkflowOptions) => a.change((now = o))
+    try {
+      await change(pair)
+      expect(a.asked()).toBe(1)
+      await change(solo)
+      expect(a.asked()).toBe(1)
+      await change(pair)
+      expect(a.asked()).toBe(2)
+      // A rename meanwhile, the question outstanding: not asked again (its list is the same).
+      await change({ ...pair, stageNames: { active: 'Building' } })
+      expect(a.asked()).toBe(2)
     } finally {
       a.done()
     }

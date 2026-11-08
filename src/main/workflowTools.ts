@@ -130,7 +130,10 @@ export async function restartForWorkflow(ws: WorkspaceService, projectPath: stri
   for (const a of agents) {
     const live = sessions.liveFor(projectPath, a.id)
     if (!live || (only && !only(a.id))) continue
-    if (moved) {
+    const id = `${projectPath.toLowerCase()}|${a.id}`
+    // Left alone: no question outstanding and no difference in a tool the change moved. One asked about still goes through
+    // restartForTools, so changed back it is forgotten ('same') and asked again by the next change (HR1's HI-2744 round 1).
+    if (moved && !asked.has(id)) {
       const launched = sessions.launchedWorkflowHidden(projectPath, a.id)
       if (launched && ![...launched, ...hiddenNow].some((t) => moved.has(t) && launched.includes(t) !== hiddenNow.includes(t))) continue
     }
@@ -141,7 +144,6 @@ export async function restartForWorkflow(ws: WorkspaceService, projectPath: stri
     // Asked once while it still needs this restart: a later change leaving the list it would get the same (Maximum agents,
     // say) doesn't ask again. Once it no longer needs one (changed back, restarted, restarting), it's forgotten, so a change
     // to that list again asks again (HR1's round 1).
-    const id = `${projectPath.toLowerCase()}|${a.id}`
     if (r !== 'busy') {
       asked.delete(id)
       continue
