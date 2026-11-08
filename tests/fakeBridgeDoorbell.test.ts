@@ -15,7 +15,7 @@ describe('the fakes tell work from a wake in a doorbell', () => {
       '[CW] New in your inbox: 2 tasks (AL-1, AL-12) (m1, m2). Call cw_inbox to read them, act on them, then ack them.',
       '[CW] New in your inbox: 1 task (#12) (m1). Call cw_inbox to read it, act on it, then ack it.',
       '[CW] New in your inbox: 1 task (m5). Call cw_inbox to read it, act on it, then ack it.',
-      '[CW] New in your inbox: 1 task (HIVE-2746) and 1 handover (m1, m2). Call cw_inbox to read them, act on them, then ack them.'
+      '[CW] New in your inbox: 1 task (ABCD-2746) and 1 handover (m1, m2). Call cw_inbox to read them, act on them, then ack them.'
     ])
       expect(bridge.doorbellIsWork(t), t).toBe(true)
   })
