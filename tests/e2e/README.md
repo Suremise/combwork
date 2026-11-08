@@ -99,8 +99,20 @@ fetches the release's `latest.yml`, which GitHub counts as a download. A package
 `CW_TEST_QUIET=1` checks nothing, automatic or manual (Settings → Updates says it's a test copy, and its log says so
 at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Combwork `CW_UPDATE_DELAY` at its maximum (about
 24.8 days: a 0.9's first check never comes) and, in a profile it has saved, automatic checks off (no 6-hourly one).
-The guard: when a suite ends, each packaged Combwork's `combwork.log` must show no `[updates] Checking for update` since it
-was started, or the suite fails, naming the lines. The Sandbox checks run with their network off.
+A build from before 1.1 reads those under its old names (from before HI-2586): given only `CW_*`, a 0.9.3 ran in
+the user's own 0.9 profile with its updater on, downloaded 1.1.0 into the real updater folder and ran the installer,
+which closed the user's Combwork (HI-2741). So `_electron.launch` reads, from a packaged build's own main code, the
+prefix it reads its profile and update delay under, gives it the test environment under that prefix too, and refuses to
+start a build that reads neither. Every packaged Combwork also starts **offline**: `--proxy-server` to a port nothing
+listens on, and, once Playwright reaches its main process, every session (the updater's own partition too) sends what goes
+beyond this machine there and refuses it, noting the address (`keepPackagedOffline`; this machine's own addresses are
+never proxied).
+The guard: when a suite ends, each packaged Combwork must have written its log in its test profile (else it ran in
+another), that log (`combwork.log`, or a 0.9's own) must show no update check, download or install since it was started,
+and it must have tried to reach nothing beyond this machine; and the user's real updater folders
+(`%LOCALAPPDATA%\combwork-updater` and the 0.9 one) and a 0.9's real profile folder, listed read-only when the suite first
+starts a packaged Combwork, must be as they were. Otherwise the suite fails, naming what. Nothing cleans those folders:
+what is in them is the user's. The Sandbox checks run with their network off.
 
 Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's folder there under the old name): `lib.cjs` refuses it and any exe
 outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `CW_E2E_V09` and `CW_EXE`. And
