@@ -384,7 +384,7 @@ async function turn(text) {
   statusLine('working')
   if (isDoorbell(text)) {
     // New work: only tasks and handovers, a card named by its key ("1 task (AL-1) (m1)") or its number.
-    const work = doorbellIsWork(text) || /^\[CW\] New in your inbox: (\d+ (task|tasks|handover|handovers)( \([^)]*\))?( and |, )?)+ \(m\d/.test(text)
+    const work = doorbellIsWork(text)
     const r = await ownCall('cw_inbox', {}, invoked)
     const rows = r.isError ? [] : inboxRows(r.text)
     if (rows.length && follows()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) }, invoked)
