@@ -127,6 +127,10 @@
     "defaultMessage": "Only the stage names change: names aren’t rules, so they apply now, to every card.",
     "description": "The message of the dialog before saving workflow options when only stage names change (glossary 2.2: stage)."
   },
+  "workflow.form.appliesNowBranches": {
+    "defaultMessage": "Only the other branches work can merge into change: they aren’t rules, so they apply now. A lane or card already merging into one keeps it.",
+    "description": "HI-2556: the message of the dialog before saving workflow options when only “Other branches work can merge into” changes (or that and stage names)."
+  },
   "workflow.form.cantSave": {
     "defaultMessage": "These options can’t be saved:",
     "description": "Above the reasons the workflow options can’t be saved, each a sentence of its own."
@@ -283,6 +287,18 @@
     "defaultMessage": "These options can’t be used, so every rule is off in this project:",
     "description": "A note atop Project Settings → Workflow: the saved options contradict each other or can’t be read; the reason follows."
   },
+  "workflow.form.keptCard": {
+    "defaultMessage": "{card} {title}: into {target}",
+    "description": "HI-2674: a card in flight keeping its target branch, in the dialog before saving workflow options. {card} is its key (HI-12), {target} a branch name."
+  },
+  "workflow.form.keptLane": {
+    "defaultMessage": "{named, select, yes {Lane {name} (builder {builder}), its cards still to start too: into {target}} other {Lane of builder {builder}, its cards still to start too: into {target}}}",
+    "description": "HI-2674: a running lane keeping its target branch, in the dialog before saving workflow options. {builder} is an agent’s name, {target} a branch name."
+  },
+  "workflow.form.keptTargets": {
+    "defaultMessage": "{n, plural, one {A target is set as a card or lane starts. This one keeps merging into its own, even if you tick it:} other {A target is set as a card or lane starts. These keep merging into their own, even if you tick them:}}",
+    "description": "HI-2674: in the dialog before saving workflow options that change Work merges into (the target branch), above the lanes and cards in flight that keep their own target. Ticking is the cards’ checkboxes above, which apply the other options."
+  },
   "workflow.form.labels": {
     "defaultMessage": "Labels, separated by commas",
     "description": "The placeholder of the labels field of “Your OK before merging”."
@@ -399,6 +415,10 @@
     "defaultMessage": "Open Advanced",
     "description": "A button beside the note that workflow rules aren’t enforced: opens Settings → Advanced."
   },
+  "workflow.form.otherTargets": {
+    "defaultMessage": "Branches, separated by commas (such as 1.2.0)",
+    "description": "HI-2556: the placeholder of the field “Other branches work can merge into” (branch names besides Work merges into). Keep 1.2.0 as it is."
+  },
   "workflow.form.overMax": {
     "defaultMessage": "This project has {count, plural, one {# agent} other {# agents}}: none is removed, but no agent can be added until it has fewer than {max, number}.",
     "description": "Under the workflow option “Maximum agents” (HI-2001) when the project already has more agents ({count}) than it is set to ({max}): nobody can add one (HI-2058), neither the user nor the Assistant."
@@ -458,6 +478,38 @@
   "workflow.form.removeCheck": {
     "defaultMessage": "Remove",
     "description": "The tooltip of the button removing a check from “Checks pass before review”."
+  },
+  "workflow.form.retargetCard": {
+    "defaultMessage": "{card} {title}: to the new branch",
+    "description": "HI-2680: a card the retarget moves to the new Work merges into, in the dialog before saving. {card} is its key (HI-12)."
+  },
+  "workflow.form.retargetChoice": {
+    "defaultMessage": "Also retarget what can move from {from} to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# free slot} other {# free slots}}",
+    "description": "HI-2680: a tick box in the dialog before saving workflow options that change Work merges into: after saving, move the Todo cards with no work of their own and the free slots still on the old branch {from} to the new one {to}. Card and slot counts."
+  },
+  "workflow.form.retargetDone": {
+    "defaultMessage": "{skipped, plural, =0 {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}} other {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}; # left where they were}}",
+    "description": "HI-2680: a notification after the retarget: how many cards and slots moved to the new branch {to}, and how many were left (each listed with why in its text)."
+  },
+  "workflow.form.retargetFailed": {
+    "defaultMessage": "The options were saved, but nothing was retargeted",
+    "description": "HI-2680: an error’s title: the workflow options were saved, but the retarget that should follow failed. Its text says why."
+  },
+  "workflow.form.retargetKeep": {
+    "defaultMessage": "{what}: {why, select, work {it has work on its branch} started {already started} lane {a running lane keeps its branch until it ends} lent {lent} dirty {it has changes not committed} busy {in use} unmerged {it holds commits {from} lacks} targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} moved {it moved meanwhile} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}",
+    "description": "HI-2680: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name."
+  },
+  "workflow.form.retargetSkipped": {
+    "defaultMessage": "{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside until you remove it: look at its folder first} failed {it couldn’t be moved; Combwork looks at it again} other {Combwork can’t tell}}",
+    "description": "HI-2680: a line of the notification after the retarget: a card or slot left where it was ({what}: its key or name), and why (a select: keep the keys)."
+  },
+  "workflow.form.retargetSlot": {
+    "defaultMessage": "{slot}: free, to the new branch",
+    "description": "HI-2680: a free slot the retarget moves to the new Work merges into (its folder detached at the new branch), in the dialog before saving. {slot} is its name (slot-a)."
+  },
+  "workflow.form.retargetStays": {
+    "defaultMessage": "These stay on {from}:",
+    "description": "HI-2680: in the dialog before saving workflow options, above what the retarget leaves on the old branch {from}, each with why."
   },
   "workflow.form.save": {
     "defaultMessage": "Save…",
@@ -735,6 +787,14 @@
     "defaultMessage": "Your OK before merging",
     "description": "A workflow option (glossary 2.6, G10)."
   },
+  "workflow.option.otherTargets.desc": {
+    "defaultMessage": "Branches a lane or a card can merge into instead (its Merges into), each through its own merge queue with the same merge checks, separated by commas.",
+    "description": "What the workflow option “Other branches work can merge into” does (HI-2556). Merges into is the lane’s and card’s field: as translated there."
+  },
+  "workflow.option.otherTargets.title": {
+    "defaultMessage": "Other branches work can merge into",
+    "description": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it."
+  },
   "workflow.option.preChecks.desc": {
     "defaultMessage": "A card goes to review only once each of these named commands has passed on its work.",
     "description": "What the workflow option “Checks pass before review” does."
@@ -904,8 +964,8 @@
     "description": "How to name a card instead of a bare number: by its key, {key} (such as AM-12)."
   },
   "workflow.refused.check.revisionMismatch.message": {
-    "defaultMessage": "{revision} isn't what's checked out here.",
-    "description": "A refused check run: the revision named is not the checked-out one."
+    "defaultMessage": "{why, select, ambiguous {{revision} is the start of more than one commit here: give more of it. {head} is checked out.} other {{revision} isn't what's checked out here: {head} is.}}",
+    "description": "A refused check run or submission (HI-2671): the revision named ({revision}, as given, a commit id or its start) is not the checked-out commit ({head}, its first 12 characters). why=ambiguous: {revision} is the start of the checked-out commit but also of another one, so more of its characters are needed."
   },
   "workflow.refused.check.revisionMismatch.next": {
     "defaultMessage": "Run the check where {revision} is checked out, or without a revision.",
@@ -930,6 +990,14 @@
   "workflow.refused.evidence.changed.next": {
     "defaultMessage": "Try again: Combwork reads it afresh.",
     "description": "The next step after a refusal because what a rule read changed meanwhile."
+  },
+  "workflow.refused.forward.notAgents.message": {
+    "defaultMessage": "{card} brings one branch up to date with another: only the user or the Assistant acts on it.",
+    "description": "HI-2679: a refused intent: an agent acted on a forward-merge card (Combwork’s own card that merges one of the project’s target branches into another). {card} is its key (HI-12)."
+  },
+  "workflow.refused.forward.notAgents.next": {
+    "defaultMessage": "Leave it to the user or the Assistant.",
+    "description": "HI-2679: the next step after an agent was refused acting on a forward-merge card."
   },
   "workflow.refused.integrate.approved.message": {
     "defaultMessage": "{card} at {revision} isn't approved: {why}",
@@ -1114,6 +1182,14 @@
   "workflow.refused.merge.combworkMerges.nextTesting": {
     "defaultMessage": "The merge queue is merging it into {target} now and moves it to Done once merged: wait for that, or for it to come back.",
     "description": "The next step after a refused merge of a card the merge queue is testing or merging now. {target} is a branch name."
+  },
+  "workflow.refused.merge.waitsForBlockers.message": {
+    "defaultMessage": "{card} depends on {waitsFor}, which isn't Done: it isn't closed as merged before then.",
+    "description": "HI-2709: a refused report of a merge: the card depends on {waitsFor} (card keys, comma-joined), which aren't Done yet. {card} is a card key like AM-12."
+  },
+  "workflow.refused.merge.waitsForBlockers.next": {
+    "defaultMessage": "Wait for {waitsFor} to be Done, then report the merge again.",
+    "description": "HI-2709: the next step after a merge report refused for an unfinished dependency: {waitsFor} are card keys."
   },
   "workflow.refused.move.doingNobody.message": {
     "defaultMessage": "{card} would be in {stage} with nobody on it{also, select, yes {, and the move skips: {rules}} other {}}.",

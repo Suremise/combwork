@@ -235,14 +235,21 @@ interface CombworkMessageValues {
   'project.leftovers.notCounted': { target: string | number }
   'project.leftovers.refresh': undefined
   'project.leftovers.unmerged': { target: string | number }
+  'project.limit.counts': { used: number; entitlement: number }
   'project.limit.heading': { plan: string; when: string | number }
+  'project.limit.models': { models: string; window: string }
   'project.limit.noConnections': { provider: string | number }
-  'project.limit.none': { provider: string | number }
   'project.limit.noneConnection': { name: string | number }
+  'project.limit.notIncluded': undefined
+  'project.limit.notIncludedSub': undefined
+  'project.limit.notReported': { provider: string | number }
+  'project.limit.planOnly': { plan: string | number; provider: string | number }
   'project.limit.resets': { when: string | number }
   'project.limit.tip': { window: string; label: string | number; provider: string | number }
   'project.limit.tipConnection': { window: string; label: string | number; name: string | number }
   'project.limit.title': { window: string; label: string | number }
+  'project.limit.unlimited': undefined
+  'project.limit.unlimitedSub': { hasReset: string; when: string | number }
   'project.limit.used': undefined
   'project.loading': undefined
   'project.mcp.addServer': undefined
@@ -296,6 +303,14 @@ interface CombworkMessageValues {
   'project.none.createFirst': undefined
   'project.none.newProject': undefined
   'project.none.select': undefined
+  'project.oneAgent.archiveOne': undefined
+  'project.oneAgent.carryOn': undefined
+  'project.oneAgent.chooseResume': undefined
+  'project.oneAgent.chooseStop': undefined
+  'project.oneAgent.resumeOne': undefined
+  'project.oneAgent.startNewOne': undefined
+  'project.oneAgent.stopOne': undefined
+  'project.oneAgent.stopped': undefined
   'project.overview.byAgent': undefined
   'project.overview.mergeSlot': undefined
   'project.overview.noAgents': undefined

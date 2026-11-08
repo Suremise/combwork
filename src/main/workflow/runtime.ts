@@ -11,12 +11,12 @@
 import { AsyncLocalStorage } from 'async_hooks'
 import { resolve as resolvePath } from 'path'
 import { agentActor, agentOf, answerFits, askedQuestion, approvedByUser, decisionAnswers, atRoundLimit, FOCUSED_SKIP_GATE, foldCard, LINE_GATE, loopStepSide, MERGE_CHOICE_GATE, openEntry, passingReviewers, QUEUE_ADVANCE_GATE, QUEUE_STUCK_GATE, ROUND_LIMIT_GATE, SLOT_DIRTY_GATE, type Actor, type AskAction, type AskActionKind, type CardKind, type CardState, type Fact, type FactData, type FactKind, type FinishStepId, type ForYouKind, type LoopStepId, type RoundChoice, type StageId } from '../../shared/workflow/facts'
-import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, type Ruleset } from '../../shared/workflow/compile'
+import { awaitsAgentMerge, baseRulesetId, compile, hasStage, skipReviewOf, targetedOf, type Ruleset } from '../../shared/workflow/compile'
 import { evaluate, evaluateAll, notApproved, okBeforeApplies, type GuardInputs, type GuardRefusal } from '../../shared/workflow/guards'
 import { nextStep, type NextStep } from '../../shared/workflow/nextStep'
 import { FOCUSED_PICK, reviewByYou, reviewerAgent, type WorkflowOptions } from '../../shared/workflow/options'
 import { reviewsInProgress, submissionReviewers } from '../../shared/workflow/reviewerPool'
-import { chosenTests, focusedCheckName, reviewProved, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
+import { ACCEPT_MAX, chosenTests, focusedCheckName, reviewProved, standingFocusedRun, validTestId, type FocusedChoice, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
 import { pathChanges, pickAtRevision, type PickOutcome } from './focusedRun'
 import type { GuardId, MoveId } from '../../shared/workflow/pieces'
 import { refusal, type Refusal, type RuleId } from '../../shared/workflow/refusals'
@@ -127,6 +127,47 @@ function focusedForReview(f: FocusedChoice | undefined): Record<string, string |
     ...(f.source === 'manual' ? { focusedChosenBy: say(W.focusedChosenBy, { why: f.state === 'tooBroad' ? say(W.everyTest) : (f.why ?? say(W.pickFailed)) }) } : {}),
     ...(yours.length ? { runYourself: say(W.runYourself, { tests: yours.map((t) => t.id).join(', '), check: focusedCheckName('<test>') }) } : {})
   }
+}
+
+/**
+ * HI-2660: the card's checks recorded at a revision, for its reviewer to reuse: the latest counted run of each name there
+ * (a failure after a pass says failed), not the merge queue's own runs (`entry`), and not a configured check whose command
+ * has changed since (an old command doesn't prove the check as it is now). Names are data, never a command. Only these:
+ * what else the change needs is the reviewer's to judge. Empty: none, and the reply leaves the field out.
+ */
+export function checksAtRevision(checks: readonly FactData['CheckRan'][], revision: string, commands: Readonly<Record<string, string>>): { name: string; result: FactData['CheckRan']['result'] }[] {
+  const latest = new Map<string, FactData['CheckRan']>()
+  for (const c of checks) if (c.counted && !c.entry && c.revision === revision) latest.set(c.name, c)
+  return [...latest.values()].filter((c) => commands[c.name] === undefined || commands[c.name] === c.command).map((c) => ({ name: c.name, result: c.result }))
+}
+
+/**
+ * HI-2660: the focused-test runs a reviewer's pass accepts (`cw_verdict`'s `accept`), each the standing run of that test
+ * at the passed revision (`standingFocusedRun`: its latest counted run there, not the queue's, its command unchanged)
+ * when that run passed; its own id and agent kept. Anything else is a warning and accepts nothing, whoever calls: a bad
+ * id, beyond ACCEPT_MAX, no standing run, or one that failed (an earlier pass never stands behind it).
+ */
+export function acceptedRuns(checks: readonly FactData['CheckRan'][], revision: string | null, accept: readonly unknown[], commands: Readonly<Record<string, string>>): { accepted: NonNullable<FactData['Verdict']['accepted']>; warnings: string[] } {
+  const accepted: NonNullable<FactData['Verdict']['accepted']> = []
+  const warnings: string[] = []
+  const seen = new Set<string>()
+  for (const [i, test] of accept.entries()) {
+    if (i >= ACCEPT_MAX) {
+      warnings.push(say(W.acceptTooMany, { max: ACCEPT_MAX }))
+      break
+    }
+    if (!validTestId(test)) {
+      warnings.push(say(W.acceptInvalid, { test: JSON.stringify(String(test)).slice(0, 80) }))
+      continue
+    }
+    if (seen.has(test)) continue
+    seen.add(test)
+    const run = revision ? standingFocusedRun(checks, test, revision, commands) : undefined
+    if (!run) warnings.push(say(W.acceptNone, { test }))
+    else if (run.result !== 'passed') warnings.push(say(W.acceptFailed, { test }))
+    else accepted.push({ test, run: run.run, ...(run.agent ? { agent: run.agent } : {}) })
+  }
+  return { accepted, warnings }
 }
 
 export interface WorkflowConfig {
@@ -266,7 +307,12 @@ const W = {
   focusedChosenBy: agentMsg({ id: 'runtime.review.focusedChosenBy', text: "its builder, as its picker couldn't choose ({why}): check they cover the change", note: "G20 (HI-1367): start review's focusedChosenBy, when the builder named the focused tests itself. {why}: the picker's reason (runtime.review.everyTest, or its own words)." }),
   everyTest: agentMsg({ id: 'runtime.review.everyTest', text: 'it said every test', note: "Why the focused-test picker couldn't choose: it named every test." }),
   pickFailed: agentMsg({ id: 'runtime.review.pickFailed', text: 'failed', note: "Why the focused-test picker couldn't choose, when it gave no reason." }),
-  runYourself: agentMsg({ id: 'runtime.review.runYourself', text: "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, cw-progress --check \"{check}\" --card <card> -- <its command>", note: "G20 (HI-1367): start review's runYourself: focused tests the merge queue won't run, which count only from the reviewer's own run. {tests}: their ids. {check}: the check's name pattern (focused:<test>)." }),
+  runYourself: agentMsg({ id: 'runtime.review.runYourself', text: "{tests}: the merge queue doesn't run these (a real CLI or the installed app); each counts from your run at this revision, cw-progress --check \"{check}\" --card <card> -- <its command>, or from another's run of it there that your pass accepts (cw_verdict's accept)", note: "G20 (HI-1367): start review's runYourself: focused tests the merge queue won't run, which count only from the reviewer's own run. {tests}: their ids. {check}: the check's name pattern (focused:<test>)." }),
+  acceptOnPass: agentMsg({ id: 'runtime.verdict.acceptOnPass', text: "accept is taken only with a pass: nothing accepted", note: "HI-2660: cw_verdict's accept given with a fail. Agent-facing." }),
+  acceptInvalid: agentMsg({ id: 'runtime.verdict.acceptInvalid', text: "accept: {test} isn't a test id, so it isn't accepted", note: "HI-2660: an accept entry that isn't a valid focused test id. {test}: what was given, quoted, short." }),
+  acceptTooMany: agentMsg({ id: 'runtime.verdict.acceptTooMany', text: 'accept: only the first {max} tests are taken', note: "HI-2660: more than ACCEPT_MAX tests in cw_verdict's accept. {max}: the limit." }),
+  acceptNone: agentMsg({ id: 'runtime.verdict.acceptNone', text: "accept: {test} has no counted run at this revision (or its command changed since), so it isn't accepted", note: "HI-2660: no standing run of focused:<test> at the passed revision to accept. {test}: the test id." }),
+  acceptFailed: agentMsg({ id: 'runtime.verdict.acceptFailed', text: "accept: {test}'s latest counted run at this revision failed, so it isn't accepted", note: "HI-2660: the standing run of focused:<test> at the passed revision didn't pass; an earlier pass never stands behind it. {test}: the test id." }),
   questionDone: agentMsg({ id: 'runtime.wake.questionDone', text: '{card}: your question "{question}" no longer stands: the card is in Done.', note: "An asker's wake when the card reached Done with its question open. {question}: the question, quoted short (#1626)." }),
   boardDone: agentMsg({ id: 'runtime.repair.boardDone', text: 'the board had it in Done while its stage was {stage}', note: "A repair's reason, stored on the card's Moved fact: the board's column and the card's stage disagreed. {stage}: the stage id." }),
   laneStarted: agentMsg({ id: 'runtime.start.laneStarted', text: "Combwork started {card} for you, as your lane's next card: carry on with it.", note: "HI-2092: a lane's builder starting the card Combwork had already started for it: its start's warning." }),
@@ -471,7 +517,10 @@ export class Workflow {
     const p = parseCardRef(ref)
     if (!p.ok) return refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
     const c = 'key' in p.ref ? this.store.cardByKey(p.ref.key) : this.store.cards().find((x) => x.id === (p.ref as { alias: number }).alias)
-    return c ?? refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
+    if (!c) return refusal('card.plainNumber', { key: `${this.cfg.projectKey}-12` }, null)
+    // A forward merge (HI-2679) is the user's and the Assistant's alone: every intent of an agent on it is refused here.
+    if (agentOf(actor) && this.state(c).forward) return refusal('forward.notAgents', { card: c.key }, null)
+    return c
   }
 
   /**
@@ -626,7 +675,10 @@ export class Workflow {
         const written = fn(w, prepared)
         this.closeSettled(w)
         // Into Done by whatever route: its finish, once, in the move's own transaction (HI-2014).
-        if (w.current === 'done' && w.was !== 'done') recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
+        if (w.current === 'done' && w.was !== 'done') {
+          recordFinish(tx, w.card.id, w.actor, w.ruleset?.id ?? null, w.written, { claimed: w.claimed })
+          this.kickDependents(w)
+        }
         return written
       })
       // What the call runs alongside (the board's 0.9 fields), in the same transaction, once this write changed the card.
@@ -1126,6 +1178,64 @@ export class Workflow {
   }
 
   /**
+   * HI-2709: the cards a card in the merge queue waits for, by key: those it is blocked by that aren't Done. Read in a
+   * write (`tx`, the advance's `IntegrationStarted` one), they are that write's: its blocked-by list and each blocker's
+   * stage as they are then, never a record read before. A blocker that can't be read counts as waited for (by its number):
+   * a card is never merged on doubt.
+   */
+  queueWaitingOn(id: number, tx?: Tx): string[] {
+    const read = (n: number): CardRecord | null => {
+      try {
+        return tx ? tx.card(n) : this.store.card(n)
+      } catch {
+        return null
+      }
+    }
+    const card = read(id)
+    if (!card) return []
+    const out: string[] = []
+    for (const b of card.blockedBy) {
+      const dep = read(b)
+      if (!dep) out.push(`#${b}`)
+      else if (dep.stage !== 'done') out.push(dep.key)
+    }
+    return out
+  }
+
+  /**
+   * HI-2709: the one rule every route that closes a card as merged keeps, in its own write (`w.tx`, so a dependency added
+   * while its reads ran counts): not while a card it depends on isn't Done. An agent's merge report is refused so;
+   * reconciliation writes nothing (reconcile.ts integratedOutside); the queue's advance decided it in IntegrationStarted's
+   * write. With the rules not enforced, nothing is refused.
+   */
+  blockersNotDone(w: Write): GuardRefusal | null {
+    if (!this.enforced()) return null
+    const waits = this.closeWaitsFor(w)
+    return waits.length ? ({ rule: 'merge.waitsForBlockers', values: { card: w.card.key, waitsFor: waits.join(', ') } } as GuardRefusal) : null
+  }
+
+  /**
+   * HI-2709: the choke point of every write that records a card as merged (`Integrated`): what it still waits for, read
+   * in that write (empty: it may close). The queue's integrated(), reconciliation's integratedOutside and an agent's merge
+   * report all ask it. `afterAdvance`: the queue's own record of an advance it made, which only records what the target
+   * now has; its authority was IntegrationStarted's write, which asked this then.
+   */
+  closeWaitsFor(w: Write, opts: { afterAdvance?: boolean } = {}): string[] {
+    return opts.afterAdvance ? [] : this.queueWaitingOn(w.card.id, w.tx)
+  }
+
+  /**
+   * HI-2709: a card into Done, in its write: each card it blocks that waits in a merge queue gets that queue run again
+   * (`enqueue`, its entry's target), so a queue that went idle with only waiting entries takes it, with no new approval.
+   */
+  private kickDependents(w: Write): void {
+    for (const dep of this.store.dependents(w.card.id)) {
+      const e = openEntry(foldCard(w.tx.facts(dep), w.tx.card(dep).stage))
+      if (e) w.tx.action(dep, 'enqueue', { target: e.target }, null)
+    }
+  }
+
+  /**
    * A lane's card is finished once it is Done, however it got there (Not checked finishes with no `Integrated`): the
    * lane goes on. Dependencies need more (`waitingFor`).
    */
@@ -1263,6 +1373,39 @@ export class Workflow {
   /** The reviewer to wake: the card's (a lane's), else the pool. */
   reviewerOf(card: CardRecord): string {
     return card.reviewer ?? 'reviewers'
+  }
+
+  /**
+   * Starts a forward merge (HI-2679) on its card, made for it a moment ago: `Started` with no line (the source is never
+   * the card's branch), then its authority (`ForwardRequested`), then straight to Merging with its first entry, the
+   * source frozen at `d.source`. Under its own rules (`forwardOf`), recorded with these facts. Only from the forward
+   * request (queueControls' `forwardMerge`), as the user or the Assistant: refused for a card started before.
+   */
+  async forwardStart(ref: unknown, d: { from: string; to: string; source: string; base: string }, by: 'user' | 'assistant', ruleset: Ruleset, guard?: () => void): Promise<Reply> {
+    const card = this.resolve(ref)
+    if (isRefusal(card)) return card
+    const s = this.state(card)
+    const out = await this.write(card, ruleset, by, (w) => {
+      guard?.()
+      const now = w.state()
+      if (now.started || now.stage !== 'todo') return { rule: 'move.notFromHere', values: { card: card.key, stage: now.stage, move: 'start', moves: '' } } as GuardRefusal // i18n-ignore: intent names
+      w.fact('Started', { folder: 'project', line: null, base: d.base, target: d.to, builder: 'combwork', cardKind: 'code' }) // i18n-ignore: a fact's kind and codes, not text
+      w.fact('ForwardRequested', { from: d.from, to: d.to, source: d.source, by }) // i18n-ignore: a fact's kind and codes, not text
+      w.move('active', 'intent')
+      this.enqueueForward(w, d.source)
+      return null
+    })
+    if (out) return this.refuse(card, by, 'start', out)
+    return this.ok(card, s.stage, this.state(card).stage)
+  }
+
+  /** A forward merge's entry (HI-2679): its source's frozen commit, into its destination, as a merge commit. */
+  private enqueueForward(w: Write, source: string, requeue?: 'retry'): void {
+    const s = w.state()
+    const target = s.started?.target ?? ''
+    w.fact('IntegrationRequested', { entry: `${w.card.key}/e${s.lastSeq + 1}`, revision: source, key: null, target, style: 'merge', ...(requeue ? { requeue } : {}) })
+    w.move('merging', 'derived')
+    w.action('enqueue', { target })
   }
 
   /** Puts a card in the merge queue: a new entry (`IntegrationRequested`). */
@@ -1625,7 +1768,9 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, actor, 'start review', out) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
-    return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused) })
+    // A no-code card's submission has no revision: nothing recorded at one.
+    const recorded = sub.revision ? checksAtRevision(this.state(card).checks, sub.revision, r.options.commands) : []
+    return this.ok(card, 'review', 'review', { submission: sub.id, revision: sub.revision, base: sub.base, files: sub.files, ...focusedForReview(sub.focused), ...(recorded.length ? { checksAtRevision: recorded } : {}) })
   }
 
   /**
@@ -1659,7 +1804,7 @@ export class Workflow {
   }
 
   /** verdict (§16.7.2): always recorded; a pass may finish, ask the user, or go stale at once if the head moved to another change. */
-  async verdict(ref: unknown, actor: Actor, args: { submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string; startReview?: boolean }): Promise<Reply> {
+  async verdict(ref: unknown, actor: Actor, args: { submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string; startReview?: boolean; accept?: readonly unknown[] }): Promise<Reply> {
     const card = this.resolve(ref, actor)
     if (isRefusal(card)) return card
     const s = this.state(card)
@@ -1681,6 +1826,8 @@ export class Workflow {
     const merged = args.pass && card.kind === 'code' && sub?.revision && sub.base && s.started?.target && !this.store.facts(card.id).some((f) => f.kind === 'KindProposed' || f.kind === 'KindDecided') ? await this.platform(r.options).contains(s.started.target, { base: sub.base, revision: sub.revision, key: sub.key }) : null
     const nothingToMerge = !!merged && !isUnknown(merged)
     const present = args.startReview ? await this.reviewersPresent(actor) : null
+    // HI-2660: what the pass accepts of others' focused-test runs, worked out in the write on the card's facts then.
+    let acceptance: ReturnType<typeof acceptedRuns> = { accepted: [], warnings: [] }
     await this.cfg.hooks?.beforeWrite?.('verdict')
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.verdict(ref, actor, args))
     const out = await this.writeWhole(card, r, actor, (w) => {
@@ -1697,7 +1844,8 @@ export class Workflow {
       // Refused after the review it started: undone whole (writeWhole), the review start too.
       if (bad) return args.startReview ? undo(bad) : bad
       const st = w.state()
-      w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment }) // i18n-ignore: a fact's kind and codes, not text
+      acceptance = args.accept?.length ? (args.pass ? acceptedRuns(st.checks, sub?.revision ?? null, args.accept, r.options.commands) : { accepted: [], warnings: [say(W.acceptOnPass)] }) : { accepted: [], warnings: [] }
+      w.fact('Verdict', { reviewer: agent ?? 'user', submission: subId!, revision: sub?.revision ?? null, pass: args.pass, ...(args.failKind ? { failKind: args.failKind } : {}), round: args.pass ? st.rounds : st.rounds + 1, generation: agent ? (st.received[agent] ?? 0) : st.generation, comment: args.comment, ...(acceptance.accepted.length ? { accepted: acceptance.accepted } : {}) }) // i18n-ignore: a fact's kind and codes, not text
       // HI-1734: a code card passing with nothing to merge is proposed no code, as an agent's proposal is (the user
       // confirms; then it finishes with nothing to merge). HI-1449 sat in Approved for two days. Once only: not after a
       // proposal or a decision of its kind (`merged` was only read without either).
@@ -1730,7 +1878,7 @@ export class Workflow {
       return null
     })
     if (out) return this.refuse(card, actor, 'verdict', out)
-    return this.ok(card, 'review', this.state(card).stage)
+    return this.ok(card, 'review', this.state(card).stage, acceptance.accepted.length ? { accepted: acceptance.accepted } : undefined, acceptance.warnings)
   }
 
   /**
@@ -1946,7 +2094,7 @@ export class Workflow {
     }
     if (await this.revalidate(card, s, r.options, before)) return this.regather(card, () => this.reportMerge(ref, actor, args))
     const out = await this.write(card, r, actor, (w) => {
-      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+      const bad = this.stillAt(w, s, 'report merge') ?? this.evidenceChanged(w, r.options, before) ?? this.check(w, 'reportMerge', { agent: agentOf(actor), contained, revision: rev, target }) ?? this.staleUnchecked(w, r, rev) ?? this.blockersNotDone(w) // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (bad) return bad
       if (contained === true) w.fact('Integrated', { revision: rev!, target, result: args.result ?? (!isUnknown(th) && th ? th : rev!), method, by: 'agent' }) // i18n-ignore: a fact's kind and codes, not text
       const open = combwork ? openEntry(w.state()) : undefined
@@ -2505,6 +2653,15 @@ export class Workflow {
       const changed = this.stillAt(w, s, 'remove from queue') // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
       if (changed) return changed
       const e = openEntry(w.state())
+      // A forward merge (HI-2679), queued or returned: it ends, not merged (Done with no `Integrated`), unless it is
+      // advancing now (whose outcome the queue records, in the same lock).
+      if (w.state().forward && w.state().stage !== 'done') {
+        if (e?.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
+        w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
+        if (e) w.fact('IntegrationCancelled', { entry: e.id, reason: 'removed' }) // i18n-ignore: a fact's kind and codes, not text
+        w.move('done', 'user')
+        return null
+      }
       if (!e) return null
       if (e.state === 'started') return { rule: 'queue.advancing', values: { card: card.key, target: e.target } } as GuardRefusal
       w.fact('Override', { rules: ['integrate'], move: 'remove from queue', by, reason }) // i18n-ignore: a fact's kind and codes, not text
@@ -2519,13 +2676,24 @@ export class Workflow {
   }
 
   /** Retry merge (the user's override, or the Assistant's with a reason): requeues an unchanged revision once, even after a red check (§16.8.1). */
-  async retryMerge(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user', guard?: () => void): Promise<Reply> {
+  async retryMerge(ref: unknown, reason = '', by: 'user' | 'assistant' = 'user', guard?: () => void, forward?: { source: string }): Promise<Reply> {
     const card = this.resolve(ref)
     if (isRefusal(card)) return card
     const s = this.state(card)
     const r = this.rulesetOf(card, s)
     const out = await this.write(card, r, by, (w) => {
       guard?.()
+      // A forward merge (HI-2679) the queue returned: a new attempt, its source frozen again at `forward.source` (read by
+      // the caller just before), each time asked; never one still queued or advancing.
+      const fs = w.state()
+      if (fs.forward) {
+        const last = fs.entries.at(-1)
+        // Returned (a conflict, a red check) or its advance declined (Ask each time, HR3's round 1): either may go again.
+        if (fs.stage !== 'active' || (last?.state !== 'failed' && last?.state !== 'cancelled') || !forward?.source) return { rule: 'move.notFromHere', values: { card: card.key, stage: fs.stage, move: 'retry merge', moves: this.movesFrom(fs.stage, r, fs).join(', ') } } as GuardRefusal // i18n-ignore: intent names (the window: texts.ts's MOVE_NAMES)
+        w.fact('Override', { rules: ['requeue.allowed'], move: 'retry merge', by, reason }) // i18n-ignore: a fact's kind and codes, not text
+        this.enqueueForward(w, forward.source, 'retry')
+        return null
+      }
       // For a card the queue returned (Active, its last entry failed), once per revision; or one waiting in Approved
       // where Combwork merges with no entry (taken out of the queue, #1623) and no follow-up waiting: approved and unstale.
       const st = w.state()
@@ -2677,9 +2845,14 @@ export class Workflow {
     this.store.saveLane(l)
   }
 
-  /** Starts a lane (lanes.ts's of that id, else a new one): its cards use the ruleset in force now until it ends. */
-  startLane(id: string, cards: number[], reviewer?: string, rounds?: number): LaneList {
-    return this.store.startLane(id, cards, this.currentRuleset().id, reviewer, rounds)
+  /**
+   * Starts a lane (lanes.ts's of that id, else a new one): its cards use the ruleset in force now until it ends; with a
+   * `target` other than G7's (HI-2556, its Merges into), that ruleset merging into it (`targetedOf`, stored too).
+   */
+  startLane(id: string, cards: number[], reviewer?: string, rounds?: number, target?: string | null): LaneList {
+    const r = targetedOf(this.currentRuleset(), target)
+    this.store.saveRuleset(r)
+    return this.store.startLane(id, cards, r.id, reviewer, rounds)
   }
 
   /** Changes a lane's list: never refused; queued while a card is in flight ("list changes after AM-2"). */

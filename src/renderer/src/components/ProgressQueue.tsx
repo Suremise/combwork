@@ -7,7 +7,7 @@ import { fmt, msg, tr } from '@shared/i18n'
 import { formatDateTime, formatWhen } from '@shared/dates'
 import { attempt } from '../actions'
 import { call } from '../api'
-import { cardLabelOf, confirm, findProject, notify, openVersionControl, set, useLanguage, useStore } from '../store'
+import { cardLabelOf, choose, confirm, findProject, notify, openVersionControl, set, useLanguage, useStore } from '../store'
 import { cx, timeAgo } from '../util'
 import { minutesText } from './MergeSlots'
 import { MergeCard, useMergeFold } from './ProgressMerge'
@@ -42,6 +42,23 @@ const openCard = (n: number): void => set({ taskOpen: n })
 const OPEN_CARD = msg({ id: 'board.queue.openCard', defaultMessage: 'Open card', description: "A button on a merge queue's card in the Progress panel: opens the card it names (a return, a pause that needs the user)." })
 
 /** A target's queue, as the Progress panel's Merges tab shows it. `showProject`: the workspace has several projects. */
+/** HI-2679: a target's forward merges on its queue card (Merges tab, Version Control). */
+const FORWARD_T = {
+  behind: msg({ id: 'board.queue.behind', defaultMessage: '{n, plural, one {{to} is # commit behind {from}} other {{to} is # commits behind {from}}}', description: 'HI-2679: on a merge queue’s card: its branch {to} lacks {n} commits of another of the project’s branches {from}, counted along {from}’s history (each merged card once). Branch names.' }),
+  unknown: msg({ id: 'board.queue.behindUnknown', defaultMessage: 'Can’t tell how far {to} is behind {from}: a branch can’t be read', description: 'HI-2679: on a merge queue’s card: how far its branch {to} is behind {from} couldn’t be read (a branch missing or git couldn’t say).' }),
+  behindTip: msg({ id: 'board.queue.behindTip', defaultMessage: 'Counted along {from}’s history: a card merged with a merge commit or squashed counts once; a rebased card counts each of its commits.', description: 'HI-2679: tooltip of a merge queue card’s “N commits behind” line: what is counted. {from} is a branch name.' }),
+  button: msg({ id: 'board.queue.forward', defaultMessage: 'Bring Up to Date…', description: 'HI-2679: a button on a merge queue’s card: merges another of the project’s branches into this one through its queue (asks which first).' }),
+  askTitle: msg({ id: 'board.queue.forwardAskTitle', defaultMessage: 'Bring {to} up to date with {from}?', description: 'HI-2679: the title of the question before a forward merge. Branch names.' }),
+  askMessage: msg({ id: 'board.queue.forwardAskMessage', defaultMessage: '{from} as it is now is merged into {to} through {to}’s merge queue, with its merge checks, as a merge commit. {from} itself doesn’t change. If it conflicts or a check fails, its card comes back for you to Retry merge or Remove.', description: 'HI-2679: the question before a forward merge: what it does. Retry merge and Remove are the card’s commands: as translated there.' }),
+  askConfirm: msg({ id: 'board.queue.forwardAskConfirm', defaultMessage: 'Queue It', description: 'HI-2679: the confirm button of the question before a forward merge.' }),
+  chooseTitle: msg({ id: 'board.queue.forwardChooseTitle', defaultMessage: 'Bring {to} up to date with…', description: 'HI-2679: the title of the choice of branch for a forward merge into {to}.' }),
+  chooseMessage: msg({ id: 'board.queue.forwardChooseMessage', defaultMessage: 'The branch is merged into {to} as it is now, through {to}’s merge queue, with its merge checks. It doesn’t change itself.', description: 'HI-2679: the message of the choice of branch for a forward merge into {to}.' }),
+  cancel: msg({ id: 'board.queue.forwardCancel', defaultMessage: 'Cancel', description: 'HI-2679: the choice that cancels the forward merge.' }),
+  failed: msg({ id: 'board.queue.forwardFailed', defaultMessage: 'Couldn’t bring the branch up to date', description: 'HI-2679: an error’s title: the forward merge couldn’t be queued. Its text says why.' }),
+  upToDate: msg({ id: 'board.queue.forwardUpToDate', defaultMessage: '{to} already has everything of {from}', description: 'HI-2679: a notification: nothing to bring in, so nothing was queued.' }),
+  already: msg({ id: 'board.queue.forwardAlready', defaultMessage: '{to} is being brought up to date with {from} already', description: 'HI-2679: a notification: a forward merge for this pair is queued or waiting already; nothing new was queued.' })
+}
+
 export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView; runs: readonly ProgressRun[]; now: number; showProject: boolean }) {
   useLanguage()
   const [busy, setBusy] = useState(false)
@@ -69,6 +86,25 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
     }
   }
   const nothing = !v.testing && !v.queued.length && !v.paused && !merged.length && !returns.length
+  // HI-2679: what this target lacks of the project's other targets, and the button that brings it up to date.
+  const behind = (v.forward?.behind ?? []).filter((b) => b.commits !== 0)
+  const forward = async (): Promise<void> => {
+    const offered = behind.filter((b) => b.commits !== null).map((b) => b.from)
+    if (!offered.length) return
+    const from =
+      offered.length === 1
+        ? (await confirm({ title: tr(FORWARD_T.askTitle, { to: v.target, from: offered[0] }), message: tr(FORWARD_T.askMessage, { to: v.target, from: offered[0] }), confirmLabel: tr(FORWARD_T.askConfirm) })) ? offered[0] : null
+        : await choose({ title: tr(FORWARD_T.chooseTitle, { to: v.target }), message: tr(FORWARD_T.chooseMessage, { to: v.target }), choices: [...offered.map((b) => ({ label: b, value: b })), { label: tr(FORWARD_T.cancel), value: '' }] })
+    if (!from) return
+    setBusy(true)
+    try {
+      const r = await attempt(tr(FORWARD_T.failed), () => call('queue:forward', v.projectPath, from, v.target))
+      if (r?.upToDate) notify('info', tr(FORWARD_T.upToDate, { to: v.target, from }))
+      else if (r && !r.queued) notify('info', tr(FORWARD_T.already, { to: v.target, from }))
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <div className={cx('progress-merge-card', 'progress-queue-card', v.paused && 'paused')} data-queue={`${v.project}#${v.target}`} role="group" aria-label={showProject ? `${v.project} · ${name}` : name}>
       <div className="progress-merge-top">
@@ -120,6 +156,11 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
                   {q.key}
                 </button>
                 <span className="progress-queue-title faint">{q.title}</span>
+                {q.waitingOn?.length ? (
+                  <span className="progress-queue-waiting" data-waiting-on={q.waitingOn.join(' ')}>
+                    {tr(WAITING_ON, { cards: q.waitingOn.join(', ') })}
+                  </span>
+                ) : null}
                 <RevisionButton revision={q.revision} />
                 <button type="button" className="btn small subtle progress-queue-remove" aria-label={tr(msg({ id: 'board.queue.removeNamed', defaultMessage: 'Remove {card} from the queue', description: "Accessible name of Remove from queue on a queued card ({card}: its key) on a merge queue's card in the Progress panel." }), { card: q.key })} onClick={() => void removeFromQueue(q.card, q.key)}>
                   {tr(msg({ id: 'board.queue.remove', defaultMessage: 'Remove', description: "A button beside a queued card on a merge queue's card in the Progress panel: Remove from queue (asks first). Keep it short." }))}
@@ -141,6 +182,20 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
         <div className="progress-queue-line faint" data-more-returns={v.returnsMore}>
           <Icon name="error" /> {tr(msg({ id: 'board.queue.moreReturned', defaultMessage: '{n, plural, one {# more returned card: it shows here once you have seen these.} other {# more returned cards: they show here as you see these.}}', description: "Under the returned cards on a merge queue's card in the Progress panel, when more are waiting to be shown ({n}): each shows once those above have been seen. Glossary 2.4: returned." }), { n: v.returnsMore })}
         </div>
+      )}
+      {behind.map((b) => (
+        <div key={`behind:${b.from}`} className="progress-queue-line progress-queue-behind" data-behind={b.from}>
+          <Tooltip content={tr(FORWARD_T.behindTip, { from: b.from })}>
+            <span>
+              <Icon name="git-compare" /> {b.commits === null ? tr(FORWARD_T.unknown, { from: b.from, to: v.target }) : tr(FORWARD_T.behind, { n: b.commits, from: b.from, to: v.target })}
+            </span>
+          </Tooltip>
+        </div>
+      ))}
+      {behind.some((b) => b.commits !== null) && (
+        <button type="button" className="btn small" disabled={busy} data-action="forward" onClick={() => void forward()}>
+          <Icon name="git-merge" /> {tr(FORWARD_T.button)}
+        </button>
       )}
       {nothing && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.empty', defaultMessage: 'Nothing queued.', description: "A merge queue's card in the Progress panel when no card is waiting or being merged." }))}</div>}
       <button type="button" className="progress-queue-link" onClick={() => openVersionControl(v.projectPath, 'queue')}>
@@ -287,6 +342,7 @@ const H = {
   still: msg({ id: 'board.queue.recent.stillPaused', defaultMessage: 'still paused', description: "Beside a pause in the Progress panel's Recent merges: the merge queue is paused now (the pause hasn't ended). Lower case." })
 }
 
+const WAITING_ON = msg({ id: 'board.queue.waitingOn', defaultMessage: 'Waiting for {cards}', description: "HI-2709: beside a queued card on a merge queue's card in the Progress panel: it is blocked by these cards ({cards}: their keys, joined with commas), which aren't Done yet; the queue merges the cards behind it meanwhile, and this one once they are Done. Keep it short." })
 const OPEN_NAMED = msg({ id: 'board.queue.openNamed', defaultMessage: 'Open {card}', description: "Tooltip of a queued card's key on a merge queue's card in the Progress panel: opens the card ({card}: its key)." })
 
 /**

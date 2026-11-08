@@ -9,6 +9,7 @@ interface CombworkMessageValues {
   'service.advanced.notJson': { error: string | number }
   'service.advanced.notObject': { example: string | number }
   'service.advanced.notValues': undefined
+  'service.advanced.onConnection': { id: string | number }
   'service.advanced.unknown': { id: string | number }
   'service.answerRelay.title': { card: string | number }
   'service.assistantAsk.title': { card: string | number }
@@ -71,6 +72,15 @@ interface CombworkMessageValues {
   'service.files.notKept': undefined
   'service.files.outside': undefined
   'service.files.throughLink': undefined
+  'service.forward.byAssistant': undefined
+  'service.forward.byUser': undefined
+  'service.forward.description': { from: string | number; source: string | number; to: string | number; by: string | number }
+  'service.forward.missing': { unknown: string; branch: string | number }
+  'service.forward.noGit': undefined
+  'service.forward.notAgents': undefined
+  'service.forward.notTargets': { from: string | number; to: string | number; targets: string | number }
+  'service.forward.raced': undefined
+  'service.forward.title': { to: string | number; from: string | number }
   'service.fsutil.keptBusy': { file: string | number }
   'service.fsutil.keptUnreadable': { file: string | number }
   'service.fsutil.notCopied': { name: string | number }
@@ -184,6 +194,12 @@ interface CombworkMessageValues {
   'service.laneStarts.freshBlockedBody': { why: string; minutes: number; reason: string | number }
   'service.laneStarts.freshBlockedTitle': { agent: string | number }
   'service.lanes.noWorkspace': undefined
+  'service.lanes.targetBuilder': undefined
+  'service.lanes.targetCard': { card: string | number; cardTarget: string | number; target: string | number }
+  'service.lanes.targetFixed': { builder: string | number; target: string | number }
+  'service.lanes.targetMissing': { unknown: string; target: string | number }
+  'service.lanes.targetNotListed': { hasTargets: string; target: string | number; default: string | number; hasOthers: string; others: string | number }
+  'service.lanes.targetRulesOff': undefined
   'service.lanes.teamPaused': undefined
   'service.lanes.unknown': { id: string | number }
   'service.mcp.addedDropped': { n: number }
@@ -231,6 +247,7 @@ interface CombworkMessageValues {
   'service.workflow.changedMeanwhile': undefined
   'service.workflow.closed': undefined
   'service.workflow.inheritor': { project: string | number }
+  'service.workflow.targetInUse': { branch: string | number; uses: string | number }
   'service.workflowNotice.blocked': { card: string | number; reason: string | number }
   'service.workflowNotice.blockedNoReason': { card: string | number }
   'service.workflowNotice.failed': { card: string | number }

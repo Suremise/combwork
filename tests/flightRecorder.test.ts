@@ -342,7 +342,9 @@ describe('captures and triggers', async () => {
   })
 
   it('a damaged versions file counts as none: no failure, and versions are kept from then on', async () => {
-    const { flightRecorder: fresh } = await import('../src/main/flightRecorder?damaged' as string)
+    // A fresh instance of the module, by a query. Literal, so test selection follows it as an import (HI-2715).
+    // @ts-expect-error: TypeScript doesn't resolve a module path with a query; Vite and Node do
+    const { flightRecorder: fresh } = await import('../src/main/flightRecorder?damaged')
     writeFileSync(join(profile.dir, 'flight-recorder.json'), '{broken')
     set({ 'cw.recorder.version': true })
     const rejected: unknown[] = []

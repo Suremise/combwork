@@ -669,8 +669,11 @@ export interface AppConfig {
    * their order here; an account's first is its base connection, made with it.
    */
   connections?: Connection[]
-  /** One-time changes to this file (HI-2106): `accounts1`, its connections became accounts, and their defaults connections. */
-  migrations?: { accounts1?: AccountsMigration }
+  /**
+   * One-time changes to this file (HI-2106): `accounts1`, its connections became accounts, and their defaults connections;
+   * `launch1` (HI-2670), the app-wide guidance and CLI override switches copied onto every connection, with the ids copied.
+   */
+  migrations?: { accounts1?: AccountsMigration; launch1?: { at: string; copied: string[] } }
   /** Legacy (no longer written since HI-2650): per provider, the account last chosen as a workspace's default (or launched on). */
   lastUsedConnection?: Partial<Record<ProviderId, string>>
   /** HI-1875's one-time move (the most recently used default to the top of each CLI's order) is done. */
@@ -702,6 +705,25 @@ export interface PlanLimit {
   /** When the reading kept was reported, and by which session's agent (#383: sessions relay readings of different ages). */
   reportedAt?: string
   reportedBy?: string
+  /**
+   * Which part of the plan it covers, where a provider has several limits of one window (HI-2734: agy's weekly quotas):
+   * `gemini`, `otherModels` (agy's third-party models), `premium` (Copilot's premium requests), else the provider's own word.
+   */
+  models?: string
+  /**
+   * An unlimited entitlement the provider reported (HI-2734: Copilot): shown as such, no meter, never warned of. Its
+   * usedPercent is 0, a placeholder, never a measured 0: every reader checks hasShare() (shared/planLimits.ts) first.
+   */
+  unlimited?: true
+  /** An allowance of 0 the provider reported (HI-2734: Copilot Free's premium requests): not in the plan, no meter, never warned of; usedPercent a placeholder as for unlimited. */
+  notIncluded?: true
+  /** When what the limit is (label, window, models) was taken from a report (HI-2734): a delayed report never rolls it back. */
+  describedAt?: string
+  /** When what the plan allows (entitlement, unlimited, not included) was last seen as it is (HI-2734): a delayed report of another allowance never replaces it. */
+  allowanceAt?: string
+  /** What was used of how much, in the provider's own units, where it says (Copilot's requests). */
+  used?: number
+  entitlement?: number
 }
 
 /** Subscription limits a provider reported (e.g. a rolling 5-hour window and a weekly limit). */
@@ -821,6 +843,26 @@ export interface Connection {
    * into it: a usage move only compares it (any case) to match an agent to the same-tagged connection on the target.
    */
   tag?: string
+  /**
+   * What Combwork adds to its sessions (HI-2670, shared/launchPolicy.ts): absent, everything, as before. Each switch
+   * stored only when off; the CLI's overrides by their key (`statusLine`, `mcpIsolation`…), only those not at their default.
+   */
+  launch?: ConnectionLaunch
+}
+
+/**
+ * A connection's launch switches (HI-2670): what of Combwork's its sessions get. Off, a session gets none of it, as if its
+ * CLI were started in a terminal in that folder (the "Launch as from a terminal" preset turns everything off).
+ */
+export interface ConnectionLaunch {
+  /** Combwork's guidance, the latest handover and the Workspace notes note. */
+  guidance?: false
+  /** Combwork's tools (the combwork MCP server), its skills, the Agent API and cw-progress; off makes its agents Independent. */
+  tools?: false
+  /** Combwork typing into its sessions: wakes, inbox notices, messages, card prompts, and hooks that add to its context. */
+  typing?: false
+  /** Combwork's overrides of the CLI (`<cli>.override.<key>` in advanced.ts), by key, each only when not its default. */
+  overrides?: Record<string, boolean>
 }
 
 /** What a connection launches with (HI-2106): two connections on one account with the same values are the same setup. */
@@ -874,6 +916,30 @@ export interface ServerModel {
    * sends a window or a launch also has its preset's pattern applied, as set now (withRemote).
    */
   remote?: true
+  /**
+   * The context the user says this model has on this server, in tokens (HI-2683, shared with HI-2682): set only by the
+   * user, never by what a server reports (that stays in its diagnostics, with its source and time, beside this one).
+   * HI-2683 compares it with the advice; HI-2682 launches with it.
+   */
+  context?: number
+  /**
+   * The output budget the user sets for this model, in tokens (HI-2682): Claude Code's CLAUDE_CODE_MAX_OUTPUT_TOKENS for a
+   * session started on it, where the ID is one Combwork passes local-model limits for. Kept smaller than `context` (both
+   * set); none: the default (localModelLimits.defaultOutput).
+   */
+  output?: number
+  /**
+   * The name the user gives this model (HI-2684), shown as its row's label in Claude Code's /model picker: display only,
+   * never sent to the server, never used to match it (dialects, the launch, the footer use `id`). Trimmed, at most
+   * MODEL_LABEL_MAX characters, no control characters; none: the picker shows the ID.
+   */
+  label?: string
+  /**
+   * Why Combwork never passes this model's context and output (HI-2682), judged from its ID alone, in what main sends a
+   * window (never saved): Claude Code reads it as one of its aliases, or it is a spelling (claude, [1m], a date) the
+   * control doesn't support.
+   */
+  unsupported?: 'alias' | 'spelling'
 }
 
 /**
@@ -1580,6 +1646,44 @@ export interface WorkflowCheck {
   lanes: { id: string; name: string | null; builder: string }[]
   /** Its cards in flight (started, not done): each keeps its rules, unless the change is applied to it. */
   inFlight: { number: number; key: string; title: string }[]
+  /** A change of the target (G7, HI-2674): the cards and lanes that keep merging into another one (absent: no target change). */
+  targets?: KeptTargets
+  /** A change of the target (HI-2680): what can follow the new one from the old (Retarget), and what stays. */
+  retarget?: RetargetPreview
+}
+
+/**
+ * HI-2674: a target is decided as a card starts (its `Started` fact) and a lane's cards start under the lane's rules
+ * (§16.5.4), so a change of the project's target moves neither. `to`: the target now (the default branch for none);
+ * `cards` and `lanes`: only those whose own target is another branch, each with it.
+ */
+/**
+ * HI-2680: what a change of Work merges into from `from` to `to` would move (Todo cards whose own target is `from` with no
+ * work of their own; free slots recording it, clean, with nothing `from` lacks), and what stays, with why; running lanes
+ * on `from` are never rewritten. A slot is listed as it was seen (its folder, recorded target, head): the apply moves it
+ * only so.
+ */
+export interface RetargetPreview {
+  from: string
+  to: string
+  cards: { move: { number: number; key: string; title: string }[]; keep: { number: number; key: string; title: string; why: 'work' | 'started' | 'cantCheck' }[] }
+  slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' }[] }
+  lanes: { id: string; name: string | null; builder: string }[]
+}
+
+/** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
+export interface RetargetResult {
+  from: string
+  to: string
+  moved: { cards: { number: number; key: string }[]; slots: string[] }
+  /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
+  skipped: { card?: number; key?: string; slot?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
+}
+
+export interface KeptTargets {
+  to: string
+  cards: { number: number; key: string; title: string; target: string }[]
+  lanes: { id: string; name: string | null; builder: string; target: string }[]
 }
 
 /**
@@ -1960,6 +2064,8 @@ export interface AgentInfo extends AgentDef {
   /** Its connection (HI-2106), while `connection` says its account to today's screens: its id and name. */
   connectionId?: string
   connectionName?: string
+  /** Its connection launches without Combwork's tools (HI-2670): it is Independent, whatever role it has saved. */
+  toolsOff?: true
 }
 
 /**
@@ -2507,6 +2613,10 @@ export interface LiveSessionState {
    * login and usage); `connection`, the named connection on it whose values it launched with (HI-2397), is what the
    * window names. `note`: why it isn't the one chosen (its choice was off).
    */
+  /** A local model's limits as this launch applied them (HI-2682), on a server connection: launch-global. */
+  localLimits?: LaunchedLimits
+  /** The /model picker rows this launch asked Claude Code for (HI-2684), on a server connection, or why none. */
+  picker?: LaunchedPicker
   launchedConnection?: {
     id: string
     name: string
@@ -2598,6 +2708,8 @@ export interface LiveSessionState {
   contextWindow?: number
   /** costUsd was estimated by Combwork from token counts, not reported by the provider. */
   costEstimated?: boolean
+  /** Some of its tokens have no known price (HI-2675, SessionUsage.costUnpriced): costUsd is only the priced part. */
+  costUnpriced?: boolean
   /** A live permission-mode change Combwork has asked for and is waiting to see confirmed. */
   modeSwitching?: PermissionMode
   /** Codex's Plan mode, which is separate from its permission preset. */
@@ -3073,6 +3185,45 @@ export interface CompactionEvent {
 }
 
 /** How a session's CLI was set to compact by itself (#242), as far as Combwork could read at launch. */
+/**
+ * A local model's limits as one launch applied them (HI-2682), after every settings scope's `env` (Claude Code's own
+ * order): launch-global, never read again from the connection. `from` is a settings file's label when one set it, else
+ * null (Combwork's, from the connection's model). Not applied: why, and the file where that is a file's.
+ */
+export interface LaunchedLimits {
+  /** The model the session started on, and its connection's name. */
+  model: string
+  connection: string
+  applied: boolean
+  why?: 'notListed' | 'alias' | 'spelling' | 'mapped' | 'unreadable'
+  whyFile?: string
+  context?: { value: number; from: string | null }
+  /** `fallback`: Combwork's own output that wasn't below the effective context, replaced by the default for it. */
+  output?: { value: number; from: string | null; fallback?: number }
+  /**
+   * The connection's models the launch-wide context also sizes (none mapped in this session's settings, none Claude Code
+   * reads as its own): a switch to one keeps the declared context, an estimate until Claude Code reports (HR1, round 1).
+   */
+  eligible?: string[]
+}
+
+/**
+ * The /model picker lineup a launch on a server connection asked Claude Code for (HI-2684): what was requested, never
+ * what Claude Code shows (an availableModels allowlist still filters the rows, and with none left it keeps its built-in
+ * lineup). `rows`, the exact IDs passed, in order; `omitted`, the connection's IDs left out and why; `replace`, whether
+ * the built-in lineup was asked to be hidden. Absent rows: none was passed, `why` says why (`whyFile`, the scope).
+ */
+export interface LaunchedPicker {
+  connection: string
+  rows?: string[]
+  replace?: boolean
+  omitted?: { id: string; why: 'alias' }[]
+  why?: 'managed' | 'cli' | 'user' | 'unreadable' | 'noRows'
+  whyFile?: string
+  /** A scope with an availableModels allowlist, which may filter the rows (its label). */
+  allowlist?: string
+}
+
 export interface AutoCompactSetting {
   /** 'off': auto-compaction is turned off; a number: the auto-compact window it was set to (tokens); null: the CLI's own default. */
   window: number | 'off' | null
@@ -3119,6 +3270,11 @@ export interface SessionUsage {
   /** API-equivalent cost for the session (USD): reported by the provider, else estimated by Combwork; null if unknown. */
   costUsd: number | null
   costEstimated: boolean
+  /**
+   * Some of its tokens have no known price (HI-2675: a model with none beside priced ones, or a day without a price):
+   * costUsd is only the priced part, shown "+ ?" and counted as unpriced too, never as their $0.
+   */
+  costUnpriced?: true
   /**
    * Tokens used after the provider last reported the cost (Claude Code writes it only at some turns' ends):
    * Combwork adds its estimate for them to the reported cost.
@@ -3175,6 +3331,8 @@ export interface DayUsage extends UsageTokens {
   /** The day's API-equivalent cost: its share of the reported cost, else Combwork's estimate; null when no price is known. */
   costUsd: number | null
   costEstimated: boolean
+  /** Some of the day's tokens have no known price (HI-2675): costUsd is only the priced part, shown "+ ?", never as their $0. */
+  costUnpriced?: true
 }
 
 export interface RecacheEstimate {
@@ -3437,6 +3595,21 @@ export interface MemorySource {
   path: string
   kind: 'claude-md' | 'local-md' | 'auto-memory'
   exists: boolean
+  /**
+   * Whom it applies to (HI-2667): the project's agents (the default), a connection's agents in every project (`connection`,
+   * its name), or the user's in every project. A new file's first lines say so (instructionsStarter).
+   */
+  scope?: { connection: string } | 'user'
+}
+
+/**
+ * The Assistant's own memory (HI-2666): what its CLI (`provider`) saved for the workspace's folder. `folder`: where it
+ * keeps it (there or not yet); null when Combwork doesn't show what this CLI saves.
+ */
+export interface AssistantMemory {
+  provider: ProviderId
+  folder: string | null
+  files: MemorySource[]
 }
 
 export interface GitFileChange {
@@ -3873,6 +4046,8 @@ export type CombworkEvent =
   | { type: 'queue-changed'; workspacePath: string; projectPath: string; target: string }
   /** A project's workflow (project.json's `workflow`: its options, preset, stage names) was written (#1417): views read its stages again. */
   | { type: 'workflow-changed'; workspacePath: string; projectPath: string }
+  /** Busy agents whose tools a workflow change changes (HI-2694): the window asks whether to restart them when their turn is over. */
+  | { type: 'tools-restart-asked'; workspacePath: string; projectPath: string; agents: { id: string; name: string }[] }
   /** A lane ended with every card Done (#1270): once, with what each card brought in (its Integrated result; null: none). */
   | { type: 'lane-ended'; workspacePath: string; lane: string; project: string; results: { card: number; revision: string | null }[] }
   /** The developer console's new events for the sources this window watches (#636): sent to that window only. */
@@ -3953,6 +4128,8 @@ export interface LaneInfo {
    * options from before a change until it ends. Never on an ended lane, nor one with none recorded (from before 1.0).
    */
   oldRules: boolean
+  /** Its Merges into (HI-2556): the branch its cards merge into, when it isn't the project's Work merges into. */
+  target?: string
   /**
    * A running lane's stages: its recorded ruleset's, in board order (#1421: HR4's round 1), which its cards in Todo take
    * too; null for an ended lane, or one with none recorded (its project's options now stand in).
@@ -3993,7 +4170,7 @@ export interface DueDeps {
  * `teamPause` (HI-2081): its workspace's team is paused (before an update): nothing of it starts or is woken until it
  * resumes; it pauses the lane.
  */
-export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause'
+export type LaneWaitReason = 'blocked' | 'hold' | 'you' | 'roundLimit' | 'notMerged' | 'merging' | 'stale' | 'reviewer' | 'listChanges' | 'lineUpdate' | 'hooks' | 'checkCopy' | 'slot' | 'preparing' | 'startWait' | 'teamPause' | 'independent' | 'offSide'
 
 /**
  * A running lane's slot as its row shows it (#1446): its name, whether the lane works in its builder's carried slot (a
@@ -4019,6 +4196,8 @@ export interface LaneStartRequest {
   name?: string | null
   /** For the builder's running lane with a card in flight: the list applied now, that card put back (HI-1995). */
   applyNow?: boolean
+  /** Its Merges into (HI-2556): one of LaneStartInfo.targets' others; null or absent, the project's own. */
+  target?: string | null
 }
 
 /**
@@ -4027,6 +4206,8 @@ export interface LaneStartRequest {
  */
 export interface LaneStartInfo {
   pool: { id: string; name: string }[] | null
+  /** The branches its Merges into offers (HI-2556): the project's Work merges into and the others it lists; null: none to pick. */
+  targets: { default: string; others: string[] } | null
 }
 
 /** What Start lane… did: the lane recorded, and how each agent started (failed: the lane stays, why said). */
@@ -4049,6 +4230,8 @@ export interface LaneStatus {
   ask?: 'approve' | 'decide' | 'test' | 'signIn' | 'other'
   /** hooks: the agent whose hooks aren't arriving, by name; startWait: the builder; slot (`held` session, HI-2466): the agent whose session holds the slot. */
   agent?: string
+  /** offSide (HI-2664): the lane part `agent`'s role doesn't do. */
+  part?: 'builder' | 'reviewer'
   /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
   why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */

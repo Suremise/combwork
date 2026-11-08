@@ -137,7 +137,7 @@ describe('the usage history of a workspace', () => {
     expect((await usageHistory.ingest(p, id, { priority: 1, keepState: 'no' }))?.status).toBe('written')
     appendFileSync(cliFile(id), request(id, 9, 90))
     // The sweep (every ten minutes, and after a workspace's import) finds it changed and reads it.
-    await (usageHistory as unknown as { sweep: (ws: unknown) => Promise<void> }).sweep(w)
+    await usageHistory['sweep'](w)
     await vi.waitFor(async () => expect(outputOf(await run(() => sessions.usageItems(p)), id)).toBe(100), { timeout: 10_000 })
   })
 
@@ -281,14 +281,13 @@ describe('the usage history of a workspace', () => {
     }
     const step = async (id: string) => (await run(() => usageHistory.timelines(p))).find((s) => s.session === id)?.timeline?.step
     expect([await step(resumed), await step(ended)]).toEqual([1, 1])
-    const h = usageHistory as unknown as { enqueue: (k: string, pr: number, q: () => Promise<null>) => Promise<unknown>; rollUp: (ws: unknown, r: unknown) => Promise<void>; rolledUp: Map<string, number> }
     const live = (sessions as unknown as { live: Map<string, unknown> }).live
     // The queue held by a job before it; the roll-up queued behind it, then the session resumed while it waits.
     let open!: () => void
-    const gate = h.enqueue('gate', 0, () => new Promise<null>((r) => (open = () => r(null))))
+    const gate = usageHistory['enqueue']('gate', 0, () => new Promise<null>((r) => (open = () => r(null))))
     await vi.waitFor(() => expect(open).toBeTypeOf('function'))
-    h.rolledUp.clear()
-    const rolled = run(() => h.rollUp(w, { path: w.path, signal: w.lifetime }))
+    usageHistory['rolledUp'].clear()
+    const rolled = run(() => usageHistory['rollUp'](w, { path: w.path!, signal: w.lifetime }))
     live.set(`${p.toLowerCase()}#resumed`, { state: { sessionId: resumed, projectPath: p, provider: 'claude-code' } })
     try {
       open()

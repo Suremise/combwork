@@ -116,6 +116,60 @@ interface CombworkMessageValues {
   'settings.accounts.usageMove.weekly': undefined
   'settings.accounts.usageNone': undefined
   'settings.accounts.usedBy': { assistant: string; n: number }
+  'settings.advanced.antigravity.hooks.editPathField.desc': undefined
+  'settings.advanced.antigravity.hooks.editPathField.title': undefined
+  'settings.advanced.antigravity.hooks.editTools.desc': undefined
+  'settings.advanced.antigravity.hooks.editTools.title': undefined
+  'settings.advanced.antigravity.hooks.knownEvents.desc': undefined
+  'settings.advanced.antigravity.hooks.knownEvents.title': undefined
+  'settings.advanced.antigravity.hooks.knownFields.desc': undefined
+  'settings.advanced.antigravity.hooks.knownFields.title': undefined
+  'settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.desc': undefined
+  'settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.title': undefined
+  'settings.advanced.antigravity.hooks.timeoutSeconds.desc': undefined
+  'settings.advanced.antigravity.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.antigravity.hooks.toolHooks.desc': undefined
+  'settings.advanced.antigravity.hooks.toolHooks.title': undefined
+  'settings.advanced.antigravity.hooks.userStepWaitSeconds.desc': undefined
+  'settings.advanced.antigravity.hooks.userStepWaitSeconds.title': undefined
+  'settings.advanced.antigravity.models.line.desc': undefined
+  'settings.advanced.antigravity.models.line.title': undefined
+  'settings.advanced.antigravity.override.noAutoUpdate.desc': undefined
+  'settings.advanced.antigravity.override.noAutoUpdate.title': undefined
+  'settings.advanced.antigravity.override.preApproveCombworkTools.desc': undefined
+  'settings.advanced.antigravity.override.preApproveCombworkTools.title': undefined
+  'settings.advanced.antigravity.override.stripAccountVars.desc': undefined
+  'settings.advanced.antigravity.override.stripAccountVars.title': undefined
+  'settings.advanced.antigravity.signIn.needed.desc': undefined
+  'settings.advanced.antigravity.signIn.needed.title': undefined
+  'settings.advanced.antigravity.statusLine.confirmField.desc': undefined
+  'settings.advanced.antigravity.statusLine.confirmField.title': undefined
+  'settings.advanced.antigravity.statusLine.idleGraceSeconds.desc': undefined
+  'settings.advanced.antigravity.statusLine.idleGraceSeconds.title': undefined
+  'settings.advanced.antigravity.statusLine.knownFields.desc': undefined
+  'settings.advanced.antigravity.statusLine.knownFields.title': undefined
+  'settings.advanced.antigravity.statusLine.otherModels.desc': undefined
+  'settings.advanced.antigravity.statusLine.otherModels.title': undefined
+  'settings.advanced.antigravity.statusLine.planTier.desc': undefined
+  'settings.advanced.antigravity.statusLine.planTier.title': undefined
+  'settings.advanced.antigravity.statusLine.quota.desc': undefined
+  'settings.advanced.antigravity.statusLine.quota.title': undefined
+  'settings.advanced.antigravity.statusLine.remainingFraction.desc': undefined
+  'settings.advanced.antigravity.statusLine.remainingFraction.title': undefined
+  'settings.advanced.antigravity.statusLine.resetTime.desc': undefined
+  'settings.advanced.antigravity.statusLine.resetTime.title': undefined
+  'settings.advanced.antigravity.statusLine.weeklySuffix.desc': undefined
+  'settings.advanced.antigravity.statusLine.weeklySuffix.title': undefined
+  'settings.advanced.antigravity.transcript.modelChange.desc': undefined
+  'settings.advanced.antigravity.transcript.modelChange.title': undefined
+  'settings.advanced.antigravity.transcript.stepHeader.desc': undefined
+  'settings.advanced.antigravity.transcript.stepHeader.title': undefined
+  'settings.advanced.antigravity.transcript.systemMessage.desc': undefined
+  'settings.advanced.antigravity.transcript.systemMessage.title': undefined
+  'settings.advanced.antigravity.transcript.userRequest.desc': undefined
+  'settings.advanced.antigravity.transcript.userRequest.title': undefined
+  'settings.advanced.antigravity.usage.inputIncludesCache.desc': undefined
+  'settings.advanced.antigravity.usage.inputIncludesCache.title': undefined
   'settings.advanced.claude-code.accounts.dropEnv.desc': undefined
   'settings.advanced.claude-code.accounts.dropEnv.title': undefined
   'settings.advanced.claude-code.accounts.emailField.desc': undefined
@@ -152,6 +206,10 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.hooks.preToolUseTimeoutSeconds.title': undefined
   'settings.advanced.claude-code.hooks.timeoutSeconds.desc': undefined
   'settings.advanced.claude-code.hooks.timeoutSeconds.title': undefined
+  'settings.advanced.claude-code.localModel.aliases.desc': undefined
+  'settings.advanced.claude-code.localModel.aliases.title': undefined
+  'settings.advanced.claude-code.localModel.spellings.desc': undefined
+  'settings.advanced.claude-code.localModel.spellings.title': undefined
   'settings.advanced.claude-code.memory.realPath.desc': undefined
   'settings.advanced.claude-code.memory.realPath.title': undefined
   'settings.advanced.claude-code.memory.setting.desc': undefined
@@ -216,6 +274,8 @@ interface CombworkMessageValues {
   'settings.advanced.claude-code.trust.prompt.title': undefined
   'settings.advanced.claude-code.turnScreen.done.desc': undefined
   'settings.advanced.claude-code.turnScreen.done.title': undefined
+  'settings.advanced.claude-code.update.channelSetting.desc': undefined
+  'settings.advanced.claude-code.update.channelSetting.title': undefined
   'settings.advanced.claudeFooter.desc': { mode: string | number; footer: string | number }
   'settings.advanced.claudeFooter.title': { mode: string | number }
   'settings.advanced.codex.accounts.accountField.desc': undefined
@@ -362,6 +422,22 @@ interface CombworkMessageValues {
   'settings.advanced.copilot.question.field.title': undefined
   'settings.advanced.copilot.question.tool.desc': undefined
   'settings.advanced.copilot.question.tool.title': undefined
+  'settings.advanced.copilot.quota.entitlementField.desc': undefined
+  'settings.advanced.copilot.quota.entitlementField.title': undefined
+  'settings.advanced.copilot.quota.event.desc': undefined
+  'settings.advanced.copilot.quota.event.title': undefined
+  'settings.advanced.copilot.quota.premiumKey.desc': undefined
+  'settings.advanced.copilot.quota.premiumKey.title': undefined
+  'settings.advanced.copilot.quota.remainingPercentField.desc': undefined
+  'settings.advanced.copilot.quota.remainingPercentField.title': undefined
+  'settings.advanced.copilot.quota.resetField.desc': undefined
+  'settings.advanced.copilot.quota.resetField.title': undefined
+  'settings.advanced.copilot.quota.snapshotsField.desc': undefined
+  'settings.advanced.copilot.quota.snapshotsField.title': undefined
+  'settings.advanced.copilot.quota.unlimitedField.desc': undefined
+  'settings.advanced.copilot.quota.unlimitedField.title': undefined
+  'settings.advanced.copilot.quota.usedField.desc': undefined
+  'settings.advanced.copilot.quota.usedField.title': undefined
   'settings.advanced.copilot.ready.footer.desc': undefined
   'settings.advanced.copilot.ready.footer.title': undefined
   'settings.advanced.copilot.retry.context.desc': undefined
@@ -544,6 +620,10 @@ interface CombworkMessageValues {
   'settings.advanced.cw.wait.agentsMaxSeconds.title': undefined
   'settings.advanced.cw.wait.cardMaxSeconds.desc': undefined
   'settings.advanced.cw.wait.cardMaxSeconds.title': undefined
+  'settings.advanced.cw.winget.showSeconds.desc': undefined
+  'settings.advanced.cw.winget.showSeconds.title': undefined
+  'settings.advanced.cw.winget.version.desc': undefined
+  'settings.advanced.cw.winget.version.title': undefined
   'settings.advanced.cw.workflow.enforce.desc': undefined
   'settings.advanced.cw.workflow.enforce.title': undefined
   'settings.advanced.cw.workflow.updateAgentBranch.desc': undefined
@@ -828,6 +908,78 @@ interface CombworkMessageValues {
   'settings.connections.add.title': { cli: string | number }
   'settings.connections.add.titleAny': undefined
   'settings.connections.cancel': undefined
+  'settings.connections.diag.advice': { name: string | number; size: number; cli: string | number }
+  'settings.connections.diag.allocated': undefined
+  'settings.connections.diag.below': { tokens: number }
+  'settings.connections.diag.clear': undefined
+  'settings.connections.diag.close': undefined
+  'settings.connections.diag.configured': undefined
+  'settings.connections.diag.context': undefined
+  'settings.connections.diag.failed': undefined
+  'settings.connections.diag.failedStep': { step: string; why: string | number }
+  'settings.connections.diag.kind': { kind: string }
+  'settings.connections.diag.line': { tokens: number; ago: string | number }
+  'settings.connections.diag.lineBelow': { tokens: number; ago: string | number; name: string | number; size: number }
+  'settings.connections.diag.measured': undefined
+  'settings.connections.diag.meets': { tokens: number }
+  'settings.connections.diag.mine': undefined
+  'settings.connections.diag.mineHint': undefined
+  'settings.connections.diag.model': undefined
+  'settings.connections.diag.notLoaded': undefined
+  'settings.connections.diag.notReported': undefined
+  'settings.connections.diag.ollamaDefault': undefined
+  'settings.connections.diag.open': undefined
+  'settings.connections.diag.passed': { ago: string | number }
+  'settings.connections.diag.prefixed': undefined
+  'settings.connections.diag.readAgain': undefined
+  'settings.connections.diag.reading': undefined
+  'settings.connections.diag.save': undefined
+  'settings.connections.diag.seen': { status: string | number; stop: string; blocks: string }
+  'settings.connections.diag.templateTools': { state: string }
+  'settings.connections.diag.test': undefined
+  'settings.connections.diag.testing': undefined
+  'settings.connections.diag.title': { name: string | number }
+  'settings.connections.diag.tools': undefined
+  'settings.connections.diag.toolsWhat': undefined
+  'settings.connections.diag.trained': undefined
+  'settings.connections.diag.value': { tokens: number; ago: string | number }
+  'settings.connections.diag.why.busy': undefined
+  'settings.connections.diag.why.endpoint': undefined
+  'settings.connections.diag.why.extraCalls': undefined
+  'settings.connections.diag.why.forbidden': undefined
+  'settings.connections.diag.why.incomplete': undefined
+  'settings.connections.diag.why.invalidArguments': undefined
+  'settings.connections.diag.why.modelRejected': undefined
+  'settings.connections.diag.why.noToolCall': undefined
+  'settings.connections.diag.why.promptTooLarge': undefined
+  'settings.connections.diag.why.protocol': undefined
+  'settings.connections.diag.why.refused': undefined
+  'settings.connections.diag.why.resultIgnored': undefined
+  'settings.connections.diag.why.stale': undefined
+  'settings.connections.diag.why.thinkingBudget': undefined
+  'settings.connections.diag.why.toolText': undefined
+  'settings.connections.diag.why.toolsUnsupported': undefined
+  'settings.connections.diag.why.unexpected': undefined
+  'settings.connections.diag.why.unreachable': undefined
+  'settings.connections.diag.why.wrongArgument': undefined
+  'settings.connections.diag.why.wrongTool': undefined
+  'settings.connections.launch.assistant': undefined
+  'settings.connections.launch.cancel': undefined
+  'settings.connections.launch.guidanceText': undefined
+  'settings.connections.launch.intro': undefined
+  'settings.connections.launch.menu': undefined
+  'settings.connections.launch.overrides': { cli: string | number }
+  'settings.connections.launch.partlyBadge': undefined
+  'settings.connections.launch.plainBadge': undefined
+  'settings.connections.launch.preset': undefined
+  'settings.connections.launch.presetText': { cli: string | number }
+  'settings.connections.launch.restart': undefined
+  'settings.connections.launch.save': undefined
+  'settings.connections.launch.title': { name: string | number }
+  'settings.connections.launch.tools': undefined
+  'settings.connections.launch.toolsText': undefined
+  'settings.connections.launch.typing': undefined
+  'settings.connections.launch.typingText': undefined
   'settings.connections.masking.full': undefined
   'settings.connections.masking.gap': { date: string | number }
   'settings.connections.masking.reset': undefined
@@ -841,7 +993,9 @@ interface CombworkMessageValues {
   'settings.connections.server.changeFailed': undefined
   'settings.connections.server.cloud': undefined
   'settings.connections.server.cloudTip': undefined
+  'settings.connections.server.context': undefined
   'settings.connections.server.contextAdvice': { name: string | number; size: number; cli: string | number }
+  'settings.connections.server.contextNone': undefined
   'settings.connections.server.custom': undefined
   'settings.connections.server.docs': { url: string | number }
   'settings.connections.server.edit': undefined
@@ -857,6 +1011,8 @@ interface CombworkMessageValues {
   'settings.connections.server.keyLocal': undefined
   'settings.connections.server.keySave': undefined
   'settings.connections.server.keyTitle': { name: string | number }
+  'settings.connections.server.label': undefined
+  'settings.connections.server.limitsHint': undefined
   'settings.connections.server.local': { name: string | number }
   'settings.connections.server.modelId': undefined
   'settings.connections.server.models': undefined
@@ -864,6 +1020,10 @@ interface CombworkMessageValues {
   'settings.connections.server.moveWarn': undefined
   'settings.connections.server.needUrl': undefined
   'settings.connections.server.needsKey': undefined
+  'settings.connections.server.notBelow': undefined
+  'settings.connections.server.output': undefined
+  'settings.connections.server.outputDefault': { n: number }
+  'settings.connections.server.pickerHint': undefined
   'settings.connections.server.preset': undefined
   'settings.connections.server.read': undefined
   'settings.connections.server.readAfter': undefined
@@ -881,6 +1041,9 @@ interface CombworkMessageValues {
   'settings.connections.server.setKey': undefined
   'settings.connections.server.setUp': undefined
   'settings.connections.server.setUpFailed': undefined
+  'settings.connections.server.tight': undefined
+  'settings.connections.server.tokens': undefined
+  'settings.connections.server.unsupported': { why: string }
   'settings.connections.server.why.failed': { status: string | number }
   'settings.connections.server.why.forbidden': undefined
   'settings.connections.server.why.redirect': { status: string | number }

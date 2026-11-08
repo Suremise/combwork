@@ -22,6 +22,7 @@ import { samePath } from '../../shared/movePaths'
 import type { CardRecord } from './factStore'
 import type { Workflow, Write } from './runtime'
 import { staleWake } from './queueState'
+import { inTargetNow } from '../../shared/workflow/workView'
 
 export interface ReconcileHooks {
   /** Called after the platform was read and before the write: where a test lets another observer act first. */
@@ -323,7 +324,10 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
     // Found in the target, not by Combwork → Done (outside); the queue drops the entry; the lane counts it.
     if (approved.revision !== base) {
       const c = await G.contains(project, target, approved)
-      if (!isUnknown(c) && c) return integratedOutside(wf, card, s, approved.revision, c.method, [])
+      if (!isUnknown(c) && c) {
+        await hooks.afterRead?.()
+        return integratedOutside(wf, card, s, approved.revision, c.method, [])
+      }
     }
     // The pass follows the newest observed head (#1623, the Assistant's call after HR2's round 2): at exactly the approved
     // revision it holds; elsewhere it is the same change (carried over) or stale. Facts record each transition, as
@@ -376,9 +380,21 @@ export async function reconcileGit(wf: Workflow, card0: CardRecord, hooks: Recon
   }
 
   if (card.stage === 'review' && wf.ownLine(s) && s.latest?.revision && s.latest.base && s.latest.revision !== base) {
-    // Merged by hand before its review passed: Done, marked outside the rules (OP-25); never moved back.
-    const c = await G.contains(project, target, { base: s.latest.base, revision: s.latest.revision, key: s.latest.key })
-    if (!isUnknown(c) && c) return integratedOutside(wf, card, s, s.latest.revision, c.method, ['review'])
+    // HI-2709: its change found in its target before its review passed (merged by hand, or carried in another card's
+    // merge: HI-2684 carried HI-2682's) never closes it: a mark, and it stays in Review. Its review decides; once that
+    // passes, the queue (or the merge's report) finds the change in the target and closes it as merged. Marked once per
+    // submission, for the submission it was read for.
+    if (inTargetNow(s)) return
+    const sub = s.latest
+    const c = await G.contains(project, target, { base: sub.base!, revision: sub.revision!, key: sub.key })
+    if (isUnknown(c) || !c) return
+    await hooks.afterRead?.()
+    await wf.write(card, null, 'outside', (w) => {
+      const now = w.state()
+      if (!sameCycle(w, s) || now.stage !== 'review' || now.latest?.id !== sub.id || (now.started?.target ?? '') !== target) return
+      const f = w.tx.appendObserved(card.id, { kind: 'InTarget', actor: 'outside', source: 'observed', dedupe: `intarget:${s.cycle}:${sub.id}`, data: { revision: sub.revision!, target, submission: sub.id } }) // i18n-ignore: a fact's kind and codes, not text
+      if (f) w.written.push(f as Fact)
+    })
     return
   }
 
@@ -440,6 +456,9 @@ async function integratedOutside(wf: Workflow, card: CardRecord, s: CardState, r
   const th = await G.lineHead(wf.cfg.project, target)
   await wf.write(card, wf.rulesetOf(card, s), 'outside', (w) => {
     if (!sameCycle(w, s)) return
+    // HI-2709: never while a card it depends on isn't Done, read in this write (a dependency added while containment was
+    // read counts): nothing written; it waits, as the queue does, and is looked at again once they are Done.
+    if (wf.closeWaitsFor(w).length) return
     // Unique per cycle: two Combworks observing the same merge write one `Integrated` (§16.17).
     const f = w.tx.appendObserved(card.id, { kind: 'Integrated', actor: 'outside', source: 'observed', dedupe: `cycle:${s.cycle}`, data: { revision, target, result: !isUnknown(th) && th ? th : revision, method, by: 'outside', ...(outsideRules.length ? { outsideRules } : {}) } }) // i18n-ignore: a fact's kind and codes, not text
     if (f) w.written.push(f as Fact)

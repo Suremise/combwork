@@ -4,7 +4,7 @@
 // it does for a real CLI. Used by fake-claude and fake-codex for their "cw", "boardmove", "boardreview" and
 // "boardcomment" steps.
 const { spawn } = require('child_process')
-const { toolName } = require('./fake-claude/oldRelease.cjs')
+const { toolName } = require('./fake-claude/oldDialect.cjs')
 
 /**
  * Calls `tool` with `args` on the Combwork MCP server `server` ({ command, args, env }): initialize, tools/list, the call,
@@ -108,8 +108,7 @@ function fromCodexTable(text) {
 
 /**
  * Parses a scripted "cw TOOL {json}" step's arguments: the JSON object after the tool's name (no " then " in it), or
- * none. A tool by its current name (cw_*); an old release's only in old-release mode, refused otherwise (oldRelease.cjs
- * toolName, HI-2614).
+ * none. A tool by its current name (cw_*); an old release's is refused (oldDialect.cjs toolName, HI-2614).
  */
 function parseToolStep(step) {
   const m = /\bcw\s+([a-z]+_[a-z_]+)(?:\s+(\{.*\}))?/i.exec(step)
@@ -128,9 +127,10 @@ const isDoorbell = (text) => String(text).startsWith('[CW] New in your inbox: ')
 
 /**
  * Whether a doorbell names only tasks and handovers (a new piece of work, whose text is the agent's next prompt), not
- * wakes, messages or notices.
+ * wakes, messages or notices. Its cards are named by key ("1 task (AL-1) (m1)", projectKeys.ts' cardRef) or, without
+ * project keys, by number ("1 task (#12) (m1)") (HI-2746).
  */
-const doorbellIsWork = (text) => /^\[CW\] New in your inbox: (\d+ (task|tasks|handover|handovers)( \(#[\d, #]+\))?( and |, )?)+ \(m/.test(String(text))
+const doorbellIsWork = (text) => /^\[CW\] New in your inbox: (\d+ (task|tasks|handover|handovers)( \((#\d+|[A-Za-z]{2,4}-\d+)(, (#\d+|[A-Za-z]{2,4}-\d+))*\))?( and |, )?)+ \(m/.test(String(text))
 
 /**
  * cw_inbox's reply (shared/deliveries.ts inboxText) as its items: { ids, from, card, text }, oldest first. An item's

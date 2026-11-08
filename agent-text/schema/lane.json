@@ -248,6 +248,11 @@
       "agent": "plain"
     }
   },
+  "lane.refused.independent": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
   "lane.refused.joinNoLane": {
     "placeholders": {
       "builder": "plain"
@@ -278,6 +283,11 @@
     "placeholders": {
       "builder": "plain",
       "project": "plain"
+    }
+  },
+  "lane.refused.oldTools": {
+    "placeholders": {
+      "agent": "plain"
     }
   },
   "lane.refused.poolReviewer": {
@@ -312,6 +322,12 @@
     "placeholders": {
       "name": "plain",
       "project": "plain"
+    }
+  },
+  "lane.refused.wrongSide": {
+    "placeholders": {
+      "agent": "plain",
+      "part": "select"
     }
   },
   "lane.reorder.itsBranch": {
@@ -443,6 +459,11 @@
       "agent": "plain"
     }
   },
+  "lane.status.independent": {
+    "placeholders": {
+      "agent": "plain"
+    }
+  },
   "lane.status.itsAgent": {
     "placeholders": {}
   },
@@ -470,6 +491,12 @@
   "lane.status.notMerged": {
     "placeholders": {
       "card": "plain"
+    }
+  },
+  "lane.status.offSide": {
+    "placeholders": {
+      "agent": "plain",
+      "part": "select"
     }
   },
   "lane.status.preparing": {

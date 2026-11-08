@@ -14,7 +14,7 @@ import { AsyncLocalStorage } from 'async_hooks'
 import { appendFileSync, readFileSync } from 'fs'
 import { createInterface } from 'readline'
 import { combworkInstructions, withLatestHandover } from '../../shared/combworkGuidance'
-import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, assistantTools, controlAllows, TOOLS_SERVER } from '../../shared/assistantTools'
+import { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, assistantTools, controlAllows, hiddenForSide, TOOLS_SERVER, WORKER_ONLY_TOOLS, workflowHiddenOf } from '../../shared/assistantTools'
 import { COLUMN_IDS } from '../../shared/tasks'
 import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
@@ -32,6 +32,7 @@ import { cardName, cardRef, namedBy, namesFrom } from '../../shared/projectKeys'
 import { toolListSize } from '../../shared/toolListSize'
 import { ALWAYS_LOAD_META, alwaysLoaded, argumentHint } from '../../shared/combworkToolLoad'
 import { agentMsg, say } from '../../shared/agentText'
+import { ACCEPT_MAX } from '../../shared/workflow/focused'
 
 /**
  * What this server says to agents (dialects, HI-2065; HI-2434): its tools' descriptions, its replies and its errors, each
@@ -44,9 +45,9 @@ const T = {
   'arg.agent': agentMsg({ id: 'tool.arg.agent', text: 'Its name or id; optional when the project has one agent.' }),
   'arg.mcpServers': agentMsg({ id: 'tool.arg.mcpServers', text: 'The project\'s MCP servers it gets: [] none, ["*"] all (default). combwork is always given.' }),
   'arg.connection': agentMsg({ id: 'tool.arg.connection', text: 'Its connection, by id or name (cw_connection): its model, effort, mode and CLI. Default: the first usable here.' }),
-  'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'Builds cards, reviews them, either (never its own), or generalist (never in a lane). Default: from its name.' }),
+  'arg.workflowRole': agentMsg({ id: 'tool.arg.workflowRole', text: 'builder, reviewer, either (never its own), generalist (no lanes) or independent (no workflow). Default: by name.' }),
   'arg.override': agentMsg({ id: 'tool.arg.override', text: "Moves it past the rules the move skips: reason is the user's own why, never made up." }),
-  'intent.arg.revision': agentMsg({ id: 'tool.intent.arg.revision', text: "Default: the card's current revision (its commit, or its files' hash)." }),
+  'intent.arg.revision': agentMsg({ id: 'tool.intent.arg.revision', text: "Default: the card's current revision (its commit, or its files' hash). A commit's short id (7+ characters) will do." }),
   'intent.arg.submission': agentMsg({ id: 'tool.intent.arg.submission', text: 'Default: the latest.' }),
   'putBack.arg.why': agentMsg({ id: 'tool.putBack.arg.why', text: 'Why it goes back.' }),
   'submit.arg.summary': agentMsg({ id: 'tool.submit.arg.summary', text: 'What was done, a line first.' }),
@@ -97,6 +98,9 @@ const T = {
   'connection.arg.account': agentMsg({ id: 'tool.connection.arg.account', text: 'add: its account, by id or name, from list.' }),
   'connection.arg.model': agentMsg({ id: 'tool.connection.arg.model', text: 'Empty: the CLI decides (each value below too).' }),
   'connection.arg.mode': agentMsg({ id: 'tool.connection.arg.mode', text: 'Permission mode.' }),
+  'connection.arg.launch': agentMsg({ id: 'tool.connection.arg.launch', text: 'update: guidance, tools, typing, overrides by key (false: off); preset: "terminal" turns all off; empty object: all on.' }),
+  'updateAgent.arg.confirm': agentMsg({ id: 'tool.updateAgent.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make this agent Independent while on a lane or holding a card.' }),
+  'connection.arg.confirm': agentMsg({ id: 'tool.connection.arg.confirm', text: 'The fingerprint a refusal named, once the user agreed to make those agents Independent.' }),
   'startAgent.description': agentMsg({ id: 'tool.startAgent.description', text: 'Start a stopped agent: a new conversation, or resume=true for its last; with prompt, on that task. For a card, use cw_start_task. A folder new to its CLI asks the user to trust it first: tell them.' }),
   'promptAgent.description': agentMsg({ id: 'tool.promptAgent.description', text: 'Type a task, in full, into an idle running agent. Refused while it is busy or the user just typed there. newConversation=true starts it on the task in a new conversation. For a card, use cw_start_task.' }),
   'messageAgent.description': agentMsg({ id: 'tool.messageAgent.description', text: "Leave a busy or watching agent, or one the user just typed into, a message in its inbox on its current work (a re-brief, the user's answer). Not for the user's OK to push or release: its CLI refuses one passed on, so the user gives it in the agent's own pane. (detail: use-cw-api, tools.md)" }),
@@ -114,16 +118,23 @@ const T = {
   'waitForTasks.arg.agents': agentMsg({ id: 'tool.waitForTasks.arg.agents', text: 'With lanes: agents followed beside them.' }),
   'waitForTasks.arg.events': agentMsg({ id: 'tool.waitForTasks.arg.events', text: 'What a lane watch counts; the default is in tools.md.' }),
   'waitForTasks.arg.usage': agentMsg({ id: 'tool.waitForTasks.arg.usage', text: "With wake: also when an account's use reaches percent." }),
-  'mergeSlot.description': agentMsg({ id: 'tool.mergeSlot.description', text: "Your project's merge slot: one merge at a time into a branch. claim waits for it (claim again to keep your place or extend the hold); release gives it up. (detail: use-cw-api, tools.md)" }),
+  'mergeSlot.description': agentMsg({ id: 'tool.mergeSlot.description', text: "Your project's merge slot: one merge at a time into a branch. claim waits for it; release gives it up. (detail: use-cw-api, tools.md)" }),
   'lane.arg.builder': agentMsg({ id: 'tool.lane.arg.builder', text: 'Agent name or id.' }),
   'lane.arg.pool': agentMsg({ id: 'tool.lane.arg.pool', text: "start: reviewed by the project's reviewer pool." }),
   'lane.arg.builderJoin': agentMsg({ id: 'tool.lane.arg.builderJoin', text: "join: the builder's name." }),
   'lane.arg.reviewer': agentMsg({ id: 'tool.lane.arg.reviewer', text: 'Agent name or id.' }),
   'lane.arg.name': agentMsg({ id: 'tool.lane.arg.name', text: 'A short label for the lane.' }),
+  'arg.target': agentMsg({ id: 'tool.arg.target', text: "Merges into: one of the project's Other branches work can merge into, or \"\" for its Work merges into." }),
   'lane.arg.brief': agentMsg({ id: 'tool.lane.arg.brief', text: "start: the builder's brief (at most 4000 characters)." }),
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
   'queue.arg.target': agentMsg({ id: 'tool.queue.arg.target', text: 'The target branch.' }),
+  'queue.arg.items': agentMsg({ id: 'tool.queue.arg.items', text: 'retarget: the card keys and slot names to move, from the preview named.' }),
+  'queue.arg.preview': agentMsg({ id: 'tool.queue.arg.preview', text: "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing." }),
+  'queue.reply.retargetPreview': agentMsg({ id: 'tool.queue.reply.retargetPreview', text: 'Preview {preview}: can follow {to}: {move}. Stay: {stay}. To move them, ask the user, then retarget with preview and items.', note: 'HI-2680: cw_queue retarget\'s reply without a preview. {move} and {stay} are lists ("-" for none).' }),
+  'queue.reply.retarget': agentMsg({ id: 'tool.queue.reply.retarget', text: 'Moved to {to}: {moved}. Left where they were: {skipped}.', note: 'HI-2680: cw_queue retarget\'s reply. {moved} and {skipped} are lists ("-" for none).' }),
+  'queue.arg.from': agentMsg({ id: 'tool.queue.arg.from', text: 'forward: the branch to bring in; target is the one brought up to date. Both the project\'s targets.' }),
+  'queue.reply.forward': agentMsg({ id: 'tool.queue.reply.forward', text: "{upToDate, select, yes {{to} has everything of {from} already: nothing queued.} other {{queued, select, yes {Queued {card}: bringing {to} up to date with {from} through {to}'s queue.} other {{card} is bringing {to} up to date with {from} already.}}}}", note: 'HI-2679: cw_queue forward\'s reply.' }),
   'queue.arg.reason': agentMsg({ id: 'tool.queue.arg.reason', text: "remove, retry: the user's reason, recorded with the override." }),
   'releaseSlot.arg.slot': agentMsg({ id: 'tool.releaseSlot.arg.slot', text: 'release: the slot, by name (slot-b, hb2).' }),
   'releaseSlot.arg.kind': agentMsg({ id: 'tool.releaseSlot.arg.kind', text: 'release: which, when the slot is both.' }),
@@ -238,7 +249,7 @@ const T = {
   'lane.description.assistant': agentMsg({ id: 'tool.lane.description.assistant', text: "Lanes: a builder and reviewer taking a project's cards in order (card-loop). start (builder, reviewer or pool, cards; brief, given with each card: never prompt it separately), end (abandoned=true: unfinished), list. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
   'lane.description': agentMsg({ id: 'tool.lane.description', text: "Your card loop's lane. start (the builder: cards in order and reviewer; again to change the list), join (the reviewer: builder), next (your next card, or why it waits), list. It ends by itself when every card is Done; abandoning it is the user's. (detail: use-cw-api, tools.md)" }),
   'queue.description.assistant': agentMsg({ id: 'tool.queue.description.assistant', text: "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
-  'queue.description': agentMsg({ id: 'tool.queue.description', text: "Your project's merge queues, one per target branch, where Combwork merges approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused." }),
+  'queue.description': agentMsg({ id: 'tool.queue.description', text: "Your project's merge queues, one per target branch, merging approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused." }),
   'team.description': agentMsg({ id: 'tool.team.description', text: 'Pause the team before an update: Combwork starts no card, wakes no agent with card events and gives no reviews out in your workspace until it resumes, and tells each agent once to park. status says whether it is parked (safe to install) and names what still runs. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only status works.} other {}}' }),
   'releaseSlot.description': agentMsg({ id: 'tool.releaseSlot.description', text: "Release Slot: slots kept for an agent or held by an ended run. list, then release. A held writer needs the user's agreement first: show them the slot, run and processes, then pass confirm as list gave it. Not undoable. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
   'createTask.description': agentMsg({ id: 'tool.createTask.description', text: "Add a card, in todo unless column says otherwise (never done{role, select, assistant {} other { or hold}}). {role, select, assistant {Give it a project: without one it can't be started on an agent.} other {Your project's only.}} Replies with its key and place." }),
@@ -350,7 +361,13 @@ const notices = new AsyncLocalStorage<Set<string>>()
 async function api(method: string, path: string, body?: unknown, replyMs?: number): Promise<unknown> {
   // agent-protocol: an HTTP header
   const headers = { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(WORKSPACE ? { 'X-Combwork-Workspace': encodeURIComponent(WORKSPACE) } : {}) }
-  const res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
+  let res: Awaited<ReturnType<typeof agentApiCall>>
+  try {
+    res = await agentApiCall(API + path, method, headers, body === undefined ? undefined : JSON.stringify(body), replyMs ?? REPLY_SECONDS * 1000)
+  } catch (e) {
+    // No reply (no connection, a timeout): a real error, whatever its message (HI-2553).
+    throw Object.assign(e instanceof Error ? e : new Error(String(e)), { noReply: true })
+  }
   if (res.notice) {
     try {
       notices.getStore()?.add(decodeURIComponent(res.notice))
@@ -365,8 +382,21 @@ async function api(method: string, path: string, body?: unknown, replyMs?: numbe
   } catch {
     // keep text
   }
-  if (res.status < 200 || res.status >= 300) throw new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : say(T['call.error.http'], { status: res.status }))
+  if (res.status < 200 || res.status >= 300) throw Object.assign(new Error(typeof data === 'object' && data && 'refused' in data ? refusedText(data as Refused) : typeof data === 'object' && data && 'error' in data ? String((data as { error: unknown }).error) : say(T['call.error.http'], { status: res.status })), { status: res.status })
   return data
+}
+
+/**
+ * A failed call's kind (HI-2553): by the Agent API's status (409, 401 and 403 refused; another 4xx a wrong call; 5xx a
+ * real error); no reply, a real error; the bridge's own check of the arguments (a plain Error it threw), a wrong call;
+ * anything else (a TypeError, a RangeError: a fault), a real error.
+ */
+function failureOf(e: unknown): 'refused' | 'invalid' | 'failed' {
+  const status = (e as { status?: unknown })?.status
+  if (typeof status === 'number') return status === 409 || status === 401 || status === 403 ? 'refused' : status >= 500 ? 'failed' : 'invalid'
+  if ((e as { noReply?: unknown })?.noReply) return 'failed'
+  // A plain Error, not a subclass: its prototype is Error's own (HI-2697: no `constructor`, which the test picker reads as code).
+  return e instanceof Error && Object.getPrototypeOf(e) === Error.prototype ? 'invalid' : 'failed'
 }
 
 /** How long a wait's reply may take: the wait as Combwork will hold it (at most `max`), and a minute to spare. */
@@ -391,7 +421,7 @@ const settingsArgs = {
   mcpServers: { type: 'array', items: { type: 'string' }, description: say(T['arg.mcpServers']) },
   connection: { type: 'string', description: say(T['arg.connection']) }
 }
-const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist'], description: say(T['arg.workflowRole']) }
+const workflowRoleArg = { type: 'string', enum: ['builder', 'reviewer', 'either', 'generalist', 'independent'], description: say(T['arg.workflowRole']) }
 const agentPath = (a: Record<string, any>): string => `/v1/projects/${proj(a)}/agents/${enc(a.agent || '')}`
 /** Which agent is changing a card, for its history (Combwork fills in the name). */
 const columnArg = { type: 'string', enum: [...COLUMN_IDS] }
@@ -441,9 +471,9 @@ function intentTools(): Tool[] {
       'cw_verdict',
       'verdict',
       say(T['verdict.description']),
-      { pass: { type: 'boolean' }, comment: { type: 'string', description: say(T['verdict.arg.comment']) }, failKind: { type: 'string', enum: ['content', 'explanation'], description: say(T['verdict.arg.failKind']) }, submission },
+      { pass: { type: 'boolean' }, comment: { type: 'string', description: say(T['verdict.arg.comment']) }, failKind: { type: 'string', enum: ['content', 'explanation'], description: say(T['verdict.arg.failKind']) }, accept: { type: 'array', items: { type: 'string' }, maxItems: ACCEPT_MAX }, submission },
       ['pass', 'comment'],
-      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, submission: a.submission })
+      (a) => ({ pass: a.pass, comment: a.comment, failKind: a.failKind, accept: a.accept, submission: a.submission })
     ),
     intent(
       'cw_focused_skip',
@@ -745,8 +775,8 @@ const tools: Tool[] = [
   {
     name: 'cw_update_agent',
     description: say(T['updateAgent.description']),
-    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs }, required: ['project', 'agent'] },
-    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, ...legacyAgentArgs(a) })
+    inputSchema: { type: 'object', properties: { project: projectArg, agent: agentArg, name: { type: 'string' }, workflowRole: workflowRoleArg, ...settingsArgs, confirm: { type: 'string', description: say(T['updateAgent.arg.confirm']) } }, required: ['project', 'agent'] },
+    run: (a) => api('PATCH', agentPath(a), { name: a.name, workflowRole: a.workflowRole, mcpServers: a.mcpServers, connection: a.connection, confirm: a.confirm, ...legacyAgentArgs(a) })
   },
   {
     name: 'cw_connection',
@@ -764,13 +794,15 @@ const tools: Tool[] = [
         mode: { type: 'string', description: say(T['connection.arg.mode']) },
         context200k: { type: 'string', enum: ['on', 'off', ''] },
         extraArgs: { type: 'string' },
-        tag: { type: 'string' }
+        tag: { type: 'string' },
+        launch: { type: 'object', description: say(T['connection.arg.launch']) },
+        confirm: { type: 'string', description: say(T['connection.arg.confirm']) }
       },
       required: ['action']
     },
     run: async (a) => {
       if (a.action === 'list') return connectionListText((await api('GET', '/v1/connections')) as Parameters<typeof connectionListText>[0])
-      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      const body = Object.fromEntries(['account', 'name', 'model', 'effort', 'mode', 'context200k', 'extraArgs', 'tag', 'launch', 'confirm'].filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
       // agent-protocol: connectionChangedText's verb, which it words (shared/toolReplies.ts)
       if (a.action === 'add') return connectionChangedText('Made', (await api('POST', '/v1/connections', body)) as ConnectionPublic)
       if (a.action !== 'update') throw new Error(say(T['connection.error.action']))
@@ -909,7 +941,7 @@ const tools: Tool[] = [
       properties: {
         action: { type: 'string', enum: ['start', 'join', 'next', 'end', 'list'] },
         cards: cardsArg(say(T['lane.arg.cards'])),
-        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: say(T['lane.arg.builder']) }, pool: { type: 'boolean', description: say(T['lane.arg.pool']) } } : { builder: { type: 'string', description: say(T['lane.arg.builderJoin']) } }),
+        ...(ASSISTANT ? { project: { type: 'string' }, builder: { type: 'string', description: say(T['lane.arg.builder']) }, pool: { type: 'boolean', description: say(T['lane.arg.pool']) }, target: { type: 'string', description: say(T['arg.target']) } } : { builder: { type: 'string', description: say(T['lane.arg.builderJoin']) } }),
         reviewer: { type: 'string', description: say(T['lane.arg.reviewer']) },
         rounds: { type: 'number' },
         waitMinutes: { type: 'number' },
@@ -933,7 +965,7 @@ const tools: Tool[] = [
       }
       // An agent's lane is its project's, with itself as the builder (start) or the reviewer (join).
       const me = ASSISTANT ? {} : { project: PROJECT, ...(process.env.CW_AGENT_ID ? { [a.action === 'join' ? 'reviewer' : 'builder']: process.env.CW_AGENT_ID } : {}) }
-      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow']), ...me })) as LaneChange, laneChangeText)
+      if (a.action === 'start') return named((await api('POST', '/v1/lanes', { ...pick(['project', 'builder', 'reviewer', 'pool', 'cards', 'rounds', 'waitMinutes', 'name', 'brief', 'applyNow', 'target']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'join') return named((await api('POST', '/v1/lanes/join', { ...pick(['project', 'builder', 'cards']), ...me })) as LaneChange, laneChangeText)
       if (a.action === 'next') return named((await api('GET', '/v1/lanes/next')) as Parameters<typeof laneNextText>[0], laneNextText)
       if (a.action !== 'end') throw new Error(say(T['lane.error.action']))
@@ -947,10 +979,10 @@ const tools: Tool[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry'] : ['list'] },
+        action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry', 'forward', 'retarget'] : ['list'] },
         ...(ASSISTANT ? { project: projectArg } : {}),
         target: { type: 'string', description: say(T['queue.arg.target']) },
-        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) } } : {})
+        ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) }, from: { type: 'string', description: say(T['queue.arg.from']) }, items: { type: 'array', items: { type: 'string' }, description: say(T['queue.arg.items']) }, preview: { type: 'string', description: say(T['queue.arg.preview']) } } : {})
       },
       required: ['action']
     },
@@ -964,6 +996,20 @@ const tools: Tool[] = [
       const where = { ...(project !== undefined ? { project } : {}), ...(a.target !== undefined ? { target: a.target } : {}) }
       if (a.action === 'pause') return queueText((await api('POST', '/v1/queue/pause', where)) as QueuePublic)
       if (a.action === 'resume') return queueResumedText((await api('POST', '/v1/queue/resume', where)) as { resumed: boolean; queue: QueuePublic })
+      // HI-2679: bring `target` up to date with `from` (a forward merge through target's queue).
+      if (a.action === 'forward') {
+        const r = (await api('POST', '/v1/queue/forward', { project, from: a.from, to: a.target })) as { upToDate: boolean; key: string | null; card: number | null; queued: boolean; from: string; to: string }
+        return say(T['queue.reply.forward'], { upToDate: r.upToDate ? 'yes' : 'no', queued: r.queued ? 'yes' : 'no', card: r.key ?? (r.card !== null ? `#${r.card}` : ''), from: r.from, to: r.to })
+      }
+      // HI-2680: after a project's target moved on, move the named cards and slots from `from` to `target`.
+      if (a.action === 'retarget') {
+        if (!a.preview) {
+          const v = (await api('POST', '/v1/workflow/retarget', { project, from: a.from, to: a.target })) as { preview: string; to: string; move: string[]; stay: { key?: string; slot?: string; lane?: string; why: string }[] }
+          return say(T['queue.reply.retargetPreview'], { preview: v.preview, to: v.to, move: v.move.join(', ') || '-', stay: v.stay.map((s) => `${s.key ?? s.slot ?? s.lane} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
+        }
+        const r = (await api('POST', '/v1/workflow/retarget', { project, preview: a.preview, items: a.items })) as { moved: { cards: { key: string }[]; slots: string[] }; skipped: { key?: string; slot?: string; why: string }[]; to: string }
+        return say(T['queue.reply.retarget'], { moved: [...r.moved.cards.map((c) => c.key), ...r.moved.slots].join(', ') || '-', to: r.to, skipped: r.skipped.map((s) => `${s.key ?? s.slot} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
+      }
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error(say(T['queue.error.action.assistant']))
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)
     }
@@ -1098,6 +1144,7 @@ const tools: Tool[] = [
         context: contextArg,
         kind: { type: 'string', enum: ['code', 'no-code'], description: ASSISTANT ? say(T['createTask.arg.kind.assistant']) : say(T['createTask.arg.kind']) },
         skipReview: { type: 'string', description: ASSISTANT ? say(T['createTask.arg.skipReview.assistant']) : say(T['createTask.arg.skipReview']) },
+        ...(ASSISTANT ? { target: { type: 'string', description: say(T['arg.target']) } } : {}),
         attachments: attachmentsArg('description'),
         lane: {
           type: ['string', 'object'],
@@ -1107,7 +1154,7 @@ const tools: Tool[] = [
       },
       required: ['title']
     },
-    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
+    run: async (a) => createdLaneText((await api('POST', '/v1/tasks', { title: a.title, description: a.description, project: a.project ?? PROJECT, agent: a.agent, column: a.column, labels: a.labels, blocked: a.blocked, blockedBy: a.blockedBy, links: a.links, context: a.context, ...(a.kind !== undefined ? { kind: a.kind } : {}), ...(a.skipReview !== undefined ? { skipReview: a.skipReview } : {}), ...(a.target !== undefined ? { target: a.target } : {}), ...(a.attachments !== undefined ? { attachments: a.attachments } : {}), ...(a.lane !== undefined ? { lane: a.lane } : {}), reply: 'short' })) as TaskChange & { lane?: LaneChange; laneRefused?: string })
   },
   {
     name: 'cw_update_task',
@@ -1141,7 +1188,8 @@ const tools: Tool[] = [
               kind: { type: 'string', enum: ['code', 'no-code'], description: say(T['updateTask.arg.kind']) },
               confirmKind: { type: 'boolean', description: say(T['updateTask.arg.confirmKind']) },
               answers: { type: 'array', items: { type: 'string' }, description: say(T['updateTask.arg.answers']) },
-              skipReview: { type: ['string', 'boolean'], description: say(T['updateTask.arg.skipReview']) }
+              skipReview: { type: ['string', 'boolean'], description: say(T['updateTask.arg.skipReview']) },
+              target: { type: 'string', description: say(T['arg.target']) }
             }
           : { review: { type: 'string', enum: ['start', 'passed', 'failed'], description: say(T['updateTask.arg.review']) } })
       },
@@ -1149,7 +1197,7 @@ const tools: Tool[] = [
     },
     run: async (a) => {
       const body: Record<string, unknown> = { reply: 'short' }
-      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'waitingFor', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
+      for (const k of ['comment', 'column', 'position', 'before', 'blocked', 'waitingFor', 'title', 'description', 'project', 'agent', 'labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context', 'decision', 'review', 'override', 'kind', 'confirmKind', 'skipReview', 'target', 'answers', 'attachments']) if (a[k] !== undefined) body[k] = a[k]
       const text = changedText((await api('PATCH', `/v1/tasks/${enc(String(a.number))}`, body)) as TaskChange)
       // #1346 item 8: an Assistant with its journal on recorded six decisions and wrote none of them down.
       return ASSISTANT && JOURNAL && typeof a.decision === 'string' && a.decision.trim() ? `${text}\n${say(T['updateTask.reply.journalNote'])}` : text
@@ -1371,7 +1419,12 @@ const tools: Tool[] = [
 
 /** Agents get Combwork's common tools; the Assistant also those its control level allows. */
 const allowed = new Set(assistantTools(CONTROL, CHANGE_SETTINGS, JOURNAL))
-const offered = tools.filter((t) => (t.name !== 'cw_console' || DEV_CONSOLE) && (ASSISTANT ? (!ASSISTANT_ONLY_TOOLS.includes(t.name) || allowed.has(t.name)) && !AGENT_ONLY_TOOLS.includes(t.name) : !ASSISTANT_ONLY_TOOLS.includes(t.name)))
+// The Assistant never gets a worker's tools (HI-2664: it coordinates cards, never builds or reviews them); a project agent
+// not its other side's (CW_SIDE, its launch's: a builder no reviewer's moves, a reviewer no builder's).
+const SIDE_HIDDEN = hiddenForSide(process.env.CW_SIDE)
+// Nor the tools its project's workflow made unusable when it launched (HI-2694: CW_WORKFLOW_HIDDEN, launch-only).
+const WORKFLOW_HIDDEN = workflowHiddenOf(process.env.CW_WORKFLOW_HIDDEN)
+const offered = tools.filter((t) => (t.name !== 'cw_console' || DEV_CONSOLE) && (ASSISTANT ? (!ASSISTANT_ONLY_TOOLS.includes(t.name) || allowed.has(t.name)) && !AGENT_ONLY_TOOLS.includes(t.name) && !WORKER_ONLY_TOOLS.includes(t.name) : !ASSISTANT_ONLY_TOOLS.includes(t.name) && !SIDE_HIDDEN.includes(t.name) && !WORKFLOW_HIDDEN.includes(t.name)))
 /** The offered tools a CLI that defers tools gets in full (HI-2229). */
 const FULL = new Set(alwaysLoaded(ASSISTANT))
 
@@ -1408,8 +1461,8 @@ function testLog(name: string, args: unknown, error: string | null, size: { mode
 }
 
 /** Tests only: the tool list as this server first sent it (HI-2186), once a server, as `kind: 'list'` (not a call). */
-function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number }): string | undefined {
-  return testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars })
+function testLogList(size: { tools: number; toolsBytes: number; toolsChars: number; upfrontBytes: number }): string | undefined {
+  return testLine({ kind: 'list', tools: size.tools, bytes: size.toolsBytes, chars: size.toolsChars, upfrontBytes: size.upfrontBytes })
 }
 
 let testSeq = 0
@@ -1450,6 +1503,8 @@ interface CallReport {
   tool: string
   mode: 'compact' | 'detail'
   ok: boolean
+  /** A failed call's kind (HI-2553, failureOf). */
+  kind?: 'refused' | 'invalid' | 'failed'
   chars: number
   bytes: number
   ms: number
@@ -1457,7 +1512,7 @@ interface CallReport {
   testId?: string
 }
 const pending: CallReport[] = []
-let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number; testId?: string } | null = null
+let catalog: { tools: number; toolsBytes: number; toolsChars: number; descriptionChars: number; paramChars: number; upfrontBytes: number; testId?: string } | null = null
 let flushTimer: NodeJS.Timeout | null = null
 /** At most this many calls in one report (the API's limit), sent at most every 2 seconds. */
 const REPORT_MAX = 50
@@ -1473,8 +1528,8 @@ function flushReports(): void {
   flushTimer = null
   if (sending || (!pending.length && !catalog)) return
   const batch = pending.splice(0, REPORT_MAX)
-  const calls = batch.map((c) => ({ tool: c.tool, mode: c.mode, ok: c.ok, chars: c.chars, bytes: c.bytes, ms: c.ms }))
-  const listed = catalog ? { tools: catalog.tools, toolsBytes: catalog.toolsBytes, toolsChars: catalog.toolsChars, descriptionChars: catalog.descriptionChars, paramChars: catalog.paramChars } : null
+  const calls = batch.map((c) => ({ tool: c.tool, mode: c.mode, ok: c.ok, ...(c.kind ? { kind: c.kind } : {}), chars: c.chars, bytes: c.bytes, ms: c.ms }))
+  const listed = catalog ? { tools: catalog.tools, toolsBytes: catalog.toolsBytes, toolsChars: catalog.toolsChars, descriptionChars: catalog.descriptionChars, paramChars: catalog.paramChars, upfrontBytes: catalog.upfrontBytes } : null
   // Tests only: the test log's lines this report carries, and when it went and when Combwork had taken it (HI-2186).
   const testIds = [...batch.map((c) => c.testId), catalog?.testId].filter((x): x is string => !!x)
   const sentAt = new Date().toISOString()
@@ -1565,8 +1620,12 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       if (!listed) {
         listed = true
         const size = { tools: list.length, toolsBytes: Buffer.byteLength(JSON.stringify(list), 'utf8'), ...toolListSize(list) }
-        const testId = testLogList(size)
-        catalog = { ...size, ...(testId ? { testId } : {}) }
+        // What a CLI that defers tools gets at the start (HI-2553): those marked to be sent in full, and the rest's names.
+        const full = list.filter((t) => FULL.has(t.name))
+        const names = list.filter((t) => !FULL.has(t.name)).map((t) => t.name)
+        const upfrontBytes = Math.min(size.toolsBytes, Buffer.byteLength(JSON.stringify(full), 'utf8') + Buffer.byteLength(JSON.stringify(names), 'utf8'))
+        const testId = testLogList({ ...size, upfrontBytes })
+        catalog = { ...size, upfrontBytes, ...(testId ? { testId } : {}) }
         scheduleReports()
       }
       return
@@ -1579,6 +1638,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       calling++
       let text: string
       let ok = true
+      let kind: CallReport['kind']
       let testId: string | undefined
       const said = new Set<string>()
       try {
@@ -1591,6 +1651,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
         reply(id, { content: [{ type: 'text', text }] })
       } catch (e) {
         ok = false
+        kind = failureOf(e)
         // A call that gave arguments its tool doesn't take, or left a required one out, is told what it takes (HI-2229).
         const hint = argumentHint(tool.name, tool.inputSchema, args)
         text = `${say(T['call.error'], { message: (e as Error).message })}${hint ? `\n${hint}` : ''}`
@@ -1599,7 +1660,7 @@ async function handle(msg: { id?: unknown; method?: string; params?: any }): Pro
       }
       // After the reply: the model's text exactly as sent (characters as UTF-16 code units, and UTF-8 bytes).
       calling--
-      reportCall({ tool: tool.name, mode: modeOf(args), ok, chars: text.length, bytes: Buffer.byteLength(text, 'utf8'), ms: performance.now() - started, ...(testId ? { testId } : {}) })
+      reportCall({ tool: tool.name, mode: modeOf(args), ok, ...(kind ? { kind } : {}), chars: text.length, bytes: Buffer.byteLength(text, 'utf8'), ms: performance.now() - started, ...(testId ? { testId } : {}) })
       return
     }
     default:

@@ -9,6 +9,13 @@ module.exports = {
   /** A role's descriptions and parameter descriptions together, every tool it is offered (the Assistant: all of its own). */
   total: { agent: 11000, assistant: 19000 },
   /**
+   * A role's whole tool list as the CLI gets it (HI-2553): the tools array's JSON, UTF-8 bytes (names, descriptions,
+   * schemas), every tool it is offered but cw_console. Set 7 Nov 2026 at about 6% over the list then (agent 24,571 bytes,
+   * 38 tools; the Assistant with Change settings on about 40,400, 59 tools): raised only on purpose, with the card that does.
+   */
+  // HI-2664 (7 Nov): the Assistant lost its ten worker-only tools, about 36,800 bytes without cw_console: lowered to match.
+  listBytes: { agent: 26000, assistant: 39000 },
+  /**
    * A protected rule (a safety or damage boundary, HI-2009's Protected table) that can't be said clearly within the limit
    * keeps its words: its tool's own limit here, with why. None yet.
    */

@@ -32,7 +32,8 @@
 //   CODEX_HOME; with fake-follow-notices.txt (or fake-follow-notices-<agent>.txt) there, it reads its inbox (cw_inbox)
 //   and acks what it listed. "checkpoint": a command (PreToolUse, PostToolUse) whose reply it reads. Combwork's doorbell
 //   ("[CW] New in your inbox: …") it follows as a model does: it reads its inbox; new work it read (a task, a
-//   handover) is its prompt, anything else (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME, with the
+//   handover) is its prompt, anything else (a wake, a message) is answered by its script; what it read is logged in
+//   fake-wakes.jsonl in CODEX_HOME (new work with `work: true`, HI-2747), with the
 //   doorbell's line as it was sent (`doorbell`, HI-1974).
 // - Each prompt is a turn with its own id, which its hooks carry (turn_id) and its rollout records (task_started,
 //   task_complete after Stop), as Codex 0.162.1 does.
@@ -654,14 +655,15 @@ async function runPrompt(text) {
     await hook('UserPromptSubmit', { prompt: text })
   }
   // Combwork's doorbell (#650): it reads its inbox (cw_inbox), as a model does, and acts on what it read (one that follows
-  // notices acks it too); what else it read (a wake, a message) is logged in fake-wakes.jsonl in CODEX_HOME.
+  // notices acks it too); what it read is logged in fake-wakes.jsonl in CODEX_HOME.
   if (isDoorbell(text)) {
     const work = doorbellIsWork(text)
     const r = await ownCall('cw_inbox', {})
     const rows = r.isError ? [] : inboxRows(r.text)
     if (rows.length && followsNotices()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) })
     const read = rows.map((x) => x.text).join(' ')
-    if (!work && process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: read, doorbell: text, at: new Date().toISOString() }) + '\n')
+    // New work is logged too (work: true, HI-2747), as what it read, but is its prompt: no script line answers it.
+    if (process.env.CODEX_HOME) fs.appendFileSync(path.join(process.env.CODEX_HOME, 'fake-wakes.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_'), text: read, doorbell: text, ...(work ? { work } : {}), at: new Date().toISOString() }) + '\n')
     if (rows.length) text = work ? read : nextScripted() || ''
   }
   // As 0.162.1 does (FAKE_CODEX_VERSION), its Working line while a turn runs (#1336: what Combwork's screen reading looks for).

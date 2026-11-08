@@ -89,6 +89,9 @@
   "activity.undo.putBack": {
     "placeholders": {}
   },
+  "activity.undo.queueForwarded": {
+    "placeholders": {}
+  },
   "activity.undo.queuePaused": {
     "placeholders": {}
   },
@@ -102,6 +105,9 @@
     "placeholders": {}
   },
   "activity.undo.request": {
+    "placeholders": {}
+  },
+  "activity.undo.retargeted": {
     "placeholders": {}
   },
   "activity.undo.retriedMerge": {

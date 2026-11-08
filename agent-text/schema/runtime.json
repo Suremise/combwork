@@ -93,6 +93,29 @@
       "files": "plain"
     }
   },
+  "runtime.verdict.acceptFailed": {
+    "placeholders": {
+      "test": "plain"
+    }
+  },
+  "runtime.verdict.acceptInvalid": {
+    "placeholders": {
+      "test": "plain"
+    }
+  },
+  "runtime.verdict.acceptNone": {
+    "placeholders": {
+      "test": "plain"
+    }
+  },
+  "runtime.verdict.acceptOnPass": {
+    "placeholders": {}
+  },
+  "runtime.verdict.acceptTooMany": {
+    "placeholders": {
+      "max": "plain"
+    }
+  },
   "runtime.wake.aheadInLane": {
     "placeholders": {
       "card": "plain",

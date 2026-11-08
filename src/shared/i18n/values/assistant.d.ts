@@ -122,6 +122,19 @@ interface CombworkMessageValues {
   'assistant.loadNames.taken': { project: string | number; name: string | number }
   'assistant.mcpSecret.argument': { start: string | number }
   'assistant.mcpSecret.named': { where: string; key: string | number; ref: string | number }
+  'assistant.memory.choose': undefined
+  'assistant.memory.copied': undefined
+  'assistant.memory.copyPath': undefined
+  'assistant.memory.empty': { provider: string | number }
+  'assistant.memory.heading': undefined
+  'assistant.memory.loading': undefined
+  'assistant.memory.openFolder': undefined
+  'assistant.memory.refresh': undefined
+  'assistant.memory.row': undefined
+  'assistant.memory.section': undefined
+  'assistant.memory.target': undefined
+  'assistant.memory.tip': undefined
+  'assistant.memory.unsupported': { provider: string | number }
   'assistant.modes.create': undefined
   'assistant.modes.createFailed': undefined
   'assistant.modes.defaultBadge': undefined
@@ -724,11 +737,13 @@ interface CombworkMessageValues {
   'assistant.undo.why.projectOpened': undefined
   'assistant.undo.why.prompt': undefined
   'assistant.undo.why.putBack': undefined
+  'assistant.undo.why.queueForwarded': undefined
   'assistant.undo.why.queuePaused': undefined
   'assistant.undo.why.queueResumed': undefined
   'assistant.undo.why.removedFromQueue': undefined
   'assistant.undo.why.reportMerge': undefined
   'assistant.undo.why.request': undefined
+  'assistant.undo.why.retargeted': undefined
   'assistant.undo.why.retriedMerge': undefined
   'assistant.undo.why.slotReleased': undefined
   'assistant.undo.why.start': undefined

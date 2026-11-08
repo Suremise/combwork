@@ -8,6 +8,74 @@
   "providers.action.update": {
     "placeholders": {}
   },
+  "providers.antigravity.checkFailed": {
+    "placeholders": {
+      "provider": "plain",
+      "text": "plain"
+    }
+  },
+  "providers.antigravity.conversationGone": {
+    "placeholders": {
+      "provider": "plain",
+      "conversation": "plain"
+    }
+  },
+  "providers.antigravity.guidanceTooLong": {
+    "placeholders": {
+      "provider": "plain",
+      "size": "number",
+      "max": "number"
+    }
+  },
+  "providers.antigravity.notOwnConversation": {
+    "placeholders": {
+      "provider": "plain",
+      "conversation": "plain"
+    }
+  },
+  "providers.antigravity.projectServers": {
+    "placeholders": {
+      "provider": "plain",
+      "count": "plural",
+      "files": "plain",
+      "servers": "plain"
+    }
+  },
+  "providers.antigravity.setup.action": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.copied": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.needed": {
+    "placeholders": {}
+  },
+  "providers.antigravity.setup.runs": {
+    "placeholders": {}
+  },
+  "providers.antigravity.unreadableConfig": {
+    "placeholders": {
+      "provider": "plain",
+      "file": "plain",
+      "why": "plain"
+    }
+  },
+  "providers.claude.localLimits.outputNotBelow": {
+    "placeholders": {
+      "agent": "plain",
+      "output": "number",
+      "outputFrom": "plain",
+      "context": "number",
+      "contextFrom": "plain"
+    }
+  },
+  "providers.claude.localLimits.tooSmall": {
+    "placeholders": {
+      "agent": "plain",
+      "context": "number",
+      "contextFrom": "plain"
+    }
+  },
   "providers.cmdTooLong": {
     "placeholders": {
       "file": "plain",

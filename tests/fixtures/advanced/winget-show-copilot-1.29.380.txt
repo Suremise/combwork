@@ -1,0 +1,8 @@
+Found GitHub Copilot CLI [GitHub.Copilot]
+Version: 1.0.106
+Publisher: GitHub, Inc.
+Publisher Url: https://github.com/home/
+Publisher Support Url: https://support.github.com/
+Moniker: copilot
+Description: GitHub Copilot CLI brings AI-powered coding assistance directly to your command line, enabling you to build, debug, and understand code through natural language conversations. Powered by the same agentic harness as GitHub's Copilot coding agent, it provides intelligent assistance while staying deeply integrated with your GitHub workflow.
+Homepage: https://github.com/github/copilot-cli

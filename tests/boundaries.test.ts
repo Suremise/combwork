@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { withFileLock, writeTextAtomic, writeTextUnlessChanged } from '../src/main/fsutil'
 import { createWorkspaceService, disposeWorkspaceService, type WorkspaceService } from '../src/main/workspace'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-bounds-')
 const dir = (...p: string[]): string => {
@@ -43,7 +44,7 @@ describe('workspace boundaries', () => {
     const ws = dir('closing', 'ws')
     const w = showing(ws)
     const custom = dir('closing', 'elsewhere', 'worker')
-    ;(w as unknown as { roots: Map<string, string> }).roots.set(custom.toLowerCase(), join(ws, 'proj'))
+    w['roots'].set(custom.toLowerCase(), join(ws, 'proj'))
     expect(w.assertRoot(custom)).toBe(custom)
     expect(w.isAllowedPath(join(custom, 'a.txt'))).toBe(true)
     await w.close()
@@ -55,11 +56,13 @@ describe('workspace boundaries', () => {
   it('lets only one of two windows opening nested folders at once have its workspace', async () => {
     const outer = dir('race', 'outer')
     const inner = dir('race', 'outer', 'client')
-    const [a, b] = [createWorkspaceService(), createWorkspaceService()]
+    // Two declarations, not one destructured from an array literal: its elements' slot is any, which loses their type.
+    const a = createWorkspaceService()
+    const b = createWorkspaceService()
     made.push(a, b)
     // Closing the old workspace takes a moment: the other window's check must still see this one's claim.
     for (const w of [a, b]) {
-      const close = w.close.bind(w)
+      const close = bound(w, w.close)
       w.close = async () => (await new Promise((r) => setTimeout(r, 30)), close())
     }
     const results = await Promise.allSettled([a.open(outer), b.open(inner)])

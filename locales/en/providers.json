@@ -11,6 +11,74 @@
     "defaultMessage": "Update",
     "description": "Provider Setup's button: updates the coding agent's CLI in a terminal."
   },
+  "providers.antigravity.checkFailed": {
+    "defaultMessage": "Couldn't check {provider}'s sign-in: {text}. Choose Check again; if you haven't signed in yet, run agy in a terminal.",
+    "description": "Provider Setup, under Antigravity CLI, when listing its models failed for a reason other than a known sign-in error (a network or service error, a timeout). {provider} is its name, {text} the CLI's own words (not translated). agy is a command: keep it; Check again is a button."
+  },
+  "providers.antigravity.conversationGone": {
+    "defaultMessage": "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.",
+    "description": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation's own store in the agent's profile is gone, though its transcript may be left. {provider} is the CLI's name, {conversation} the conversation's id."
+  },
+  "providers.antigravity.guidanceTooLong": {
+    "defaultMessage": "{provider} didn't start: Combwork's guidance, this agent's instructions and the Workspace notes come to {size, number} bytes, and {provider} reads at most {max, number} bytes of its rules file, cutting off the rest. Shorten the agent's instructions (Agent Settings) or the Workspace notes, then start the agent again.",
+    "description": "Why an Antigravity CLI agent didn't start (its pane): what Combwork gives it as its rules file is over Antigravity's size limit, which would cut it off. {provider} is the CLI's name, {size} and {max} sizes in bytes. Agent Settings and Workspace notes are places in Combwork: keep them."
+  },
+  "providers.antigravity.notOwnConversation": {
+    "defaultMessage": "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.",
+    "description": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id."
+  },
+  "providers.antigravity.notice.auto": {
+    "defaultMessage": "Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later with the August 2026 update or later. This PC runs Windows build {version}, so Antigravity may refuse Auto or ask before commands. Choose another mode in Agent Settings, or update Windows.",
+    "description": "Part of a notice as an Antigravity CLI agent starts in Auto mode on a Windows that can't run its sandbox (older than 11 24H2 with the August 2026 update). {version}: the Windows build and revision, such as 26100.8000. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version."
+  },
+  "providers.antigravity.notice.autoUnknown": {
+    "defaultMessage": "Auto runs commands inside Antigravity’s own sandbox, which needs Windows 11 24H2 or later with the August 2026 update or later. Combwork couldn’t read this PC’s Windows version, so it can’t tell whether Auto applies here: if Antigravity refuses Auto or asks before commands, choose another mode in Agent Settings, or update Windows.",
+    "description": "Part of a notice as an Antigravity CLI agent starts in Auto mode where Combwork couldn't read the Windows version, so it can't tell whether Antigravity's sandbox applies. Auto is a permission mode, Agent Settings a place in Combwork: keep them; Windows 11 24H2 is a version."
+  },
+  "providers.antigravity.notice.setup": {
+    "defaultMessage": "Antigravity isn’t set up yet, so this agent shows its first-run screens (a colour scheme, its terms) in its pane: complete them there, or once for every agent with Set up in Provider Setup.",
+    "description": "Part of a notice as an Antigravity CLI agent starts before the user completed Antigravity's first-run screens in Provider Setup. Set up and Provider Setup are Combwork's names: keep them."
+  },
+  "providers.antigravity.notice.sse": {
+    "defaultMessage": "{count, plural, one {The MCP server {servers} uses} other {The MCP servers {servers} use}} the legacy HTTP+SSE transport, which Antigravity doesn’t support, so this agent runs without {count, plural, one {it} other {them}}. Change {count, plural, one {it} other {them}} to Streamable HTTP in MCP servers to use {count, plural, one {it} other {them}} here.",
+    "description": "Part of a notice as an Antigravity CLI agent starts: MCP servers it was given use a transport Antigravity can't use, so they're left out. {servers}: their names joined as a list; {count}: how many. HTTP+SSE and Streamable HTTP are transports' names, MCP servers a place in Combwork: keep them."
+  },
+  "providers.antigravity.notice.title": {
+    "defaultMessage": "Antigravity can’t use everything this agent was given",
+    "description": "A notice as an Antigravity CLI agent starts: something it was given can't apply (an MCP server's transport, a permission mode on this Windows)."
+  },
+  "providers.antigravity.projectServers": {
+    "defaultMessage": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.",
+    "description": "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork."
+  },
+  "providers.antigravity.setup.action": {
+    "defaultMessage": "Set up",
+    "description": "Provider Setup's button: opens Antigravity CLI's first-run screens in a terminal."
+  },
+  "providers.antigravity.setup.copied": {
+    "defaultMessage": "Each Antigravity agent then starts past those screens: Combwork copies only that they are done into its private profile, never your own Antigravity settings.",
+    "description": "Provider Setup, under Antigravity CLI's Set up: what Combwork does with it."
+  },
+  "providers.antigravity.setup.needed": {
+    "defaultMessage": "Antigravity needs a one-time setup: its first-run screens. Until then each new agent shows them in its pane.",
+    "description": "Provider Setup and Settings → Providers: Antigravity CLI's first-run screens (a colour scheme, its terms of service) aren't done yet."
+  },
+  "providers.antigravity.setup.runs": {
+    "defaultMessage": "**Set up** runs `agy` in a terminal: choose a colour scheme and read and accept its terms there, its data-use choice yours. Combwork types nothing into it, and closes it once you are done.",
+    "description": "Provider Setup, under Antigravity CLI's Set up: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
+  },
+  "providers.antigravity.signIn.runs": {
+    "defaultMessage": "**Sign in** runs `agy` in a terminal: sign in there. Combwork never signs in for you.",
+    "description": "Provider Setup, under Antigravity CLI's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
+  },
+  "providers.antigravity.signIn.shared": {
+    "defaultMessage": "The sign-in is this PC’s: every workspace’s Antigravity agents use it, and signing out signs them all out.",
+    "description": "Provider Setup, under Antigravity CLI's Sign in: its sign-in is shared by every workspace on this PC."
+  },
+  "providers.antigravity.unreadableConfig": {
+    "defaultMessage": "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.",
+    "description": "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words."
+  },
   "providers.autoCompact.autoIn": {
     "defaultMessage": "{key}: \"auto\" in {scope}",
     "description": "Where Claude Code's auto-compaction setting comes from, in the context tooltip of an agent's footer: a settings file sets it to auto. {key} is the setting as written (autoCompactWindow), {scope} the file. \"auto\" is its value: keep it."
@@ -110,6 +178,26 @@
   "providers.claude.hint.signIn": {
     "defaultMessage": "Claude Code isn't signed in: start it again and sign in in its terminal.",
     "description": "Why Claude Code didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
+  },
+  "providers.claude.localLimits.inFile": {
+    "defaultMessage": "env in {file}",
+    "description": "Where a local model's limit came from (HI-2682): a Claude Code settings file's env block. {file} names the file. env is the block's name: keep it."
+  },
+  "providers.claude.localLimits.oursContext": {
+    "defaultMessage": "Context size on {connection}",
+    "description": "Where a local model's context came from (HI-2682), in an error or a tooltip: the server connection's model field. {connection} is the connection's name. Context size is the field's name: as translated there."
+  },
+  "providers.claude.localLimits.oursOutput": {
+    "defaultMessage": "Output budget on {connection}",
+    "description": "Where a local model's output budget came from (HI-2682), in an error or a tooltip: the server connection's model field, or its default. {connection} is the connection's name. Output budget is the field's name: as translated there."
+  },
+  "providers.claude.localLimits.outputNotBelow": {
+    "defaultMessage": "{agent} wasn’t started: its output budget ({output, number} tokens, {outputFrom}) isn’t below its context size ({context, number} tokens, {contextFrom}). Change one of them, then start it again.",
+    "description": "An error starting an agent on a local model (HI-2682): the output budget Claude Code would get isn't smaller than its context. {agent} is the agent's name; {output} and {context} are numbers of tokens; {outputFrom} and {contextFrom} say where each was set (\"Context size on Local\", \"env in the project's .claude/settings.json\")."
+  },
+  "providers.claude.localLimits.tooSmall": {
+    "defaultMessage": "{agent} wasn’t started: its context size ({context, number} tokens, {contextFrom}) is too small for any output budget. Set a larger context size.",
+    "description": "An error starting an agent on a local model (HI-2682): its context is so small that no output budget fits. {agent} is the agent's name; {context} is a number of tokens; {contextFrom} says where it was set."
   },
   "providers.cmdTooLong": {
     "defaultMessage": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
@@ -310,6 +398,30 @@
   "providers.export.you": {
     "defaultMessage": "You",
     "description": "The Markdown export of a conversation (Sessions tab → Export): the heading over the user's messages."
+  },
+  "providers.localLimits.context": {
+    "defaultMessage": "Context size {value, number} tokens ({from}){estimate, select, yes {: an estimate until Claude Code reports its window} other {}}",
+    "description": "A line of the context tooltip of an agent on a local model (HI-2682): the context its launch gave Claude Code. {value} is a number of tokens; {from} where it was set (\"Context size on Local\", \"env in …settings.json\"). estimate yes: Claude Code hasn't reported its window yet. Keep the select keys."
+  },
+  "providers.localLimits.inFile": {
+    "defaultMessage": "env in {file}",
+    "description": "Where a local model's limit came from, in brackets in its context tooltip (HI-2682): a Claude Code settings file's env block. {file} names the file. env is the block's name: keep it."
+  },
+  "providers.localLimits.notUsed": {
+    "defaultMessage": "{why, select, alias {Context size not used: Claude Code reads {model} as one of its aliases} spelling {Context size not used: IDs with claude, [1m] or a date suffix aren’t supported for it} mapped {Context size not used: {file} maps {model} to a Claude model} unreadable {Context size not used: {file} couldn’t be read, so Combwork can’t tell whether it maps {model}} other {Context size not used: {model} isn’t one of {connection}’s models}}",
+    "description": "A line of the context tooltip of an agent on a local model (HI-2682): why its launch passed no context size. {model} is a model's id, {file} a settings file, {connection} the connection's name. Keep [1m] and the select keys."
+  },
+  "providers.localLimits.ours": {
+    "defaultMessage": "set on {connection}",
+    "description": "Where a local model's limit came from, in brackets in its context tooltip (HI-2682): the server connection's model fields, or their default. {connection} is the connection's name."
+  },
+  "providers.localLimits.output": {
+    "defaultMessage": "Output budget {value, number} tokens ({from}){fallback, select, none {} other {: {fallback} wasn’t below the context, so the default was used}}",
+    "description": "A line of the context tooltip of an agent on a local model (HI-2682): the output budget its launch gave Claude Code. {value} is a number of tokens; {from} where it was set; {fallback}: the budget it replaced, a number already formatted (none: leave that branch empty). Keep the select keys."
+  },
+  "providers.localLimits.switched": {
+    "defaultMessage": "Started on {model} with these: they stay for the session, and Claude Code reports the window of the model it runs now.",
+    "description": "A line of the context tooltip of an agent on a local model (HI-2682): the session runs another model than it started on; the limits its launch passed still apply to the whole session. {model} is a model's id."
   },
   "providers.memory.connection": {
     "defaultMessage": "{file} of connection {name} (its agents, all projects)",

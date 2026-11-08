@@ -200,6 +200,8 @@ describe('the canary dialect over the session contract (card 1)', () => {
     out.push({ name: 'notes', text: deliveredNotes('MACHINE NOTE').text, values: ['MACHINE NOTE', 'Workspace notes'] })
     out.push({ name: 'notes cut', text: deliveredNotes('MACHINE NOTE\n'.repeat(500), 600).text, values: ['MACHINE NOTE', 'Workspace notes'] })
     out.push({ name: 'starter', text: instructionsStarter('webapp', 'Codex'), values: ['webapp', 'Codex'] })
+    out.push({ name: 'connection starter', text: instructionsStarter('webapp', 'Codex', { connection: 'Work' }), values: ['Work', 'Codex'] })
+    out.push({ name: 'user starter', text: instructionsStarter('webapp', 'Codex', 'user'), values: ['Codex'] })
     out.push({ name: 'shared starter', text: shareInstructions([{ provider: 'claude-code', file: 'CLAUDE.md', content: null, importLine: '@AGENTS.md' }], null, 'webapp')['AGENTS.md'], values: ['webapp'] })
     return out
   }
@@ -302,7 +304,7 @@ describe('the canary dialect over wakes, doorbells and the inbox (card 4, HI-243
     add('label, column', watchLabel({ cards: [1], column: 'review' }))
     for (const args of [{}, { cards: Array.from({ length: 30 }, (_, i) => i + 1) }, { cards: [1], column: 'x' }, { cards: [1], changes: ['x'] }, { cards: [1], column: 'review', changes: ['comment'] }, { cards: [1], fresh: 'x' }, { cards: [1], fresh: true }]) {
       const r = readCondition(args)
-      if (typeof r === 'string') add(`condition ${JSON.stringify(args)}`, r, ['column', 'comment', 'verdict', 'agent', 'hold', 'todo', 'doing', 'review', 'passed', 'done'])
+      if ('said' in r) add(`condition ${JSON.stringify(args)}`, r.said, ['column', 'comment', 'verdict', 'agent', 'hold', 'todo', 'doing', 'review', 'passed', 'done'])
     }
     add('lanes tail', withLanesTail(wakeLine(change(1))))
     // The doorbell and the inbox's notices.
@@ -390,10 +392,10 @@ describe("the canary dialect over the inbox's, lane, agent and usage watches' an
     add('lane label, named', laneWatchLabel({ ids: ['l-1'], events: [] }, [], [], { 'l-1': { name: 'greetings', builder: 'HB2', twin: true } }), ['greetings'])
     add('lane limit', laneLimitLine({ ids: ['l-1', 'l-2'], events: [] }, 90, [4], [{ name: 'HB2' }]), ['l-2'])
     add('lane waits', laneWakeLine([], { cards: [], waits: [{ name: 'HB1', project: 'alpha', card: 12, what: 'Ship it' }, { name: 'HB2', project: 'alpha', card: null, what: null }], watching: true, following: true }))
-    add('lane cards', readLaneCards({ cards: 'x' }) as string)
-    add('lane changes', readLaneCards({ changes: ['nope'] }) as string, ['column', 'comment', 'verdict', 'agent'])
-    add('lane lanes', readLaneCondition({ lanes: 5 }) as string)
-    add('lane events', readLaneCondition({ lanes: 'all', events: ['nope'] }) as string, ['failed', 'passed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'moved', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-merge', 'paused-user'])
+    add('lane cards', (readLaneCards({ cards: 'x' }) as { said: string }).said)
+    add('lane changes', (readLaneCards({ changes: ['nope'] }) as { said: string }).said, ['column', 'comment', 'verdict', 'agent'])
+    add('lane lanes', (readLaneCondition({ lanes: 5 }) as { said: string }).said)
+    add('lane events', (readLaneCondition({ lanes: 'all', events: ['nope'] }) as { said: string }).said, ['failed', 'passed', 'blocked', 'unblocked', 'reblocked', 'stalled', 'moved', 'merge-due', 'ended', 'abandoned', 'waiting', 'paused-merge', 'paused-user'])
     add('agent label', agentWatchLabel({ agents: [agent], ignoreBackground: false }))
     add('agent limit', agentLimitLine({ agents: [agent], ignoreBackground: false }, 45))
     add('agent reply', replyPart('HB1', '(alpha)', 'hello'))

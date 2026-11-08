@@ -742,3 +742,42 @@ describe('Ollama cloud models: on this PC, but not local (HI-1773, Darren 27 Oct
     expect(await local(a.id)).toBe(false)
   })
 })
+
+describe("a local model's output budget and context on the connection (HI-2682)", () => {
+  const local = (models: { id: string; context?: number; output?: number }[]) => serverOn({ name: 'Local', preset: undefined, baseUrl: 'http://127.0.0.1:11434', models })
+  const saved = (id: string) => accounts.getAccount(id)!.server!.models
+
+  it('sets and clears an output budget, kept beside the context; refused when not below it, nothing changed', async () => {
+    const a = await local([{ id: 'qwen3.6:35b-a3b', context: 32768 }])
+    await servers.setServerModelOutput(a.id, 'qwen3.6:35b-a3b', 6000)
+    expect(saved(a.id)).toEqual([{ id: 'qwen3.6:35b-a3b', context: 32768, output: 6000 }])
+    expect(await outcome(servers.setServerModelOutput(a.id, 'qwen3.6:35b-a3b', 32768))).toMatch(/output budget of qwen3\.6:35b-a3b \(32,768 tokens\) must be smaller than its context size \(32,768 tokens\)/)
+    expect(saved(a.id)[0].output).toBe(6000)
+    expect(await outcome(servers.setServerModelOutput(a.id, 'qwen3.6:35b-a3b', 0))).toMatch(/whole number of tokens/)
+    await servers.setServerModelOutput(a.id, 'qwen3.6:35b-a3b', null)
+    expect(saved(a.id)).toEqual([{ id: 'qwen3.6:35b-a3b', context: 32768 }])
+  })
+
+  it("the context (HI-2683's field) is refused at or under a set output, from either editor; any positive context otherwise, as before", async () => {
+    const a = await local([{ id: 'qwen3.6:35b-a3b', context: 32768, output: 8000 }])
+    expect(await outcome(servers.setServerModelContext(a.id, 'qwen3.6:35b-a3b', 8000))).toMatch(/must be smaller than its context size/)
+    expect(saved(a.id)[0]).toMatchObject({ context: 32768, output: 8000 })
+    expect(await outcome(servers.editServerConnection(a.id, { models: [{ id: 'qwen3.6:35b-a3b', context: 4000, output: 8000 }] }))).toMatch(/qwen3\.6:35b-a3b \(8,000 tokens\) must be smaller than its context size \(4,000 tokens\)/)
+    expect(saved(a.id)[0]).toMatchObject({ context: 32768, output: 8000 })
+    // No output set: HI-2683's contract unchanged (a small positive context is kept).
+    await servers.setServerModelOutput(a.id, 'qwen3.6:35b-a3b', null)
+    await servers.setServerModelContext(a.id, 'qwen3.6:35b-a3b', 3)
+    expect(saved(a.id)[0]).toEqual({ id: 'qwen3.6:35b-a3b', context: 3 })
+  })
+
+  it('the window is told which IDs are unsupported (an alias, a claude/[1m]/date spelling), never saved; values kept', async () => {
+    const a = await local([{ id: 'opus', context: 32768 }, { id: 'claude-opus-4-8' }, { id: 'qwen3.6:35b-a3b' }])
+    const shown = view().connections.find((c) => c.id === a.id)!.server!.models
+    expect(shown.map((m) => [m.id, m.unsupported ?? null])).toEqual([['opus', 'alias'], ['claude-opus-4-8', 'spelling'], ['qwen3.6:35b-a3b', null]])
+    expect(saved(a.id).some((m) => 'unsupported' in m)).toBe(false)
+    expect(saved(a.id)[0].context).toBe(32768)
+    // Sent back by an edit: never saved.
+    await servers.editServerConnection(a.id, { models: shown })
+    expect(saved(a.id).some((m) => 'unsupported' in m)).toBe(false)
+  })
+})

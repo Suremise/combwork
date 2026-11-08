@@ -22,7 +22,7 @@ import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from
 import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
 import { PRICES_CHECKED } from './prices'
-import { ADVANCED_DEFS, advancedDef, advancedTakesText, advancedText, agentText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
+import { LISTED_ADVANCED, advancedDef, advancedTakesText, advancedText, agentText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
 import { agentMsg, say, type AgentMsg } from './agentText'
 import { language, msg } from './i18n'
 import { FORM_GROUPS, takesOption, type OptionKey } from './workflow/options'
@@ -100,7 +100,7 @@ function modeLabel(m: Pick<ModeOption, 'label' | 'text'>): TextPart {
 /** Advanced's values (#367) as catalog rows, drawn by Settings → Advanced's list: one each, and a workspace's own where it takes one. */
 function advancedRows(): Row[] {
   // One of Combwork's settings (Show developer features) keeps its own entry, under its settings key.
-  return ADVANCED_DEFS.filter((d) => !d.setting).flatMap((d): Row[] => {
+  return LISTED_ADVANCED.filter((d) => !d.setting).flatMap((d): Row[] => {
     const title = withValues(msg({ id: 'settings.advancedRow.title', defaultMessage: '{group}: {title}', description: "An advanced setting's title where it is named alone: {group} is Combwork or the CLI it belongs to, {title} the setting's own title." }), { group: groupName(d.group), title: d.text.title })
     const tip = withValues(
       msg({
@@ -661,7 +661,7 @@ function providerRows(p: ProviderDescriptor): Row[] {
         defaultMessage: 'Combwork\'s starting prices are the published ones, checked {checked}: edit any that are out of date, add models and remove them. The table lists the models {provider} has, so a new one shows with "No price" until you enter one. Combwork never fetches prices. On a subscription you are not charged these — they show how heavy the work was.',
         description: 'The info tip of the setting "API prices" (Settings → a provider page: Claude Code, Codex or GitHub Copilot). {checked} is a date; {provider} is its name; "No price" is a badge in the table.'
       }),
-      { checked: PRICES_CHECKED, provider: p.name }
+      { checked: PRICES_CHECKED[p.id], provider: p.name }
     ),
     type: 'custom',
     wide: true
@@ -702,6 +702,7 @@ function optionRows(at: (key: OptionKey) => Pick<Row, 'section' | 'key'> & Parti
     option('finish', 'select', [['combworkMerges', V.finish.combworkMerges], ['agentMerges', V.finish.agentMerges], ['committed', V.finish.committed], ['notChecked', V.finish.notChecked]]),
     option('style', 'select', [['merge', V.style.merge], ['squash', V.style.squash], ['rebase', V.style.rebase]]),
     option('target', 'text'),
+    option('otherTargets', 'custom'),
     option('mergeChecks', 'custom'),
     option('focusedTests', 'boolean'),
     option('mergeInstall', 'select', [['onManifestChange', V.mergeInstall.onManifestChange], ['always', V.mergeInstall.always]]),
@@ -866,7 +867,7 @@ const CUSTOM_VALUES: Record<string, SettingEntry['value']> = {
   'notifications.chimeSound': 'select',
   'general.language': 'select',
   'assistant.mode': 'text',
-  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
+  ...Object.fromEntries(['preChecks', 'mergeChecks', 'commands', 'okBefore', 'identity', 'excluded', 'stageNames', 'otherTargets'].map((k): [string, SettingEntry['value']] => [`project.workflow.${k}`, 'table'])),
   'board.colors': 'table',
   ...Object.fromEntries(
     PROVIDERS.flatMap((p): [string, SettingEntry['value']][] => [
@@ -1200,6 +1201,7 @@ const AGENT = {
   oneOf: agentMsg({ id: 'settings.agent.takes.oneOf', text: 'one of: {choices}', note: "What a select setting takes. {choices} lists its values as written." }),
   branch: agentMsg({ id: 'settings.agent.takes.branch', text: 'a branch name ("" for the repository\'s default branch)', note: 'What a workflow option naming a branch takes. "" is the value as written.' }),
   aValue: agentMsg({ id: 'settings.agent.takes.aValue', text: 'a value', note: "What a workflow option takes when there's nothing more to say." }),
+  otherTargets: agentMsg({ id: 'settings.agent.takes.otherTargets', text: 'a list of branch names besides project.workflow.target, e.g. ["1.2.0"] (each one a lane or card may take as its target)', note: "What the workflow option otherTargets takes (HI-2556). The JSON and project.workflow.target (a setting's id) are code: keep them." }),
   preChecks: agentMsg({ id: 'settings.agent.takes.preChecks', text: 'a list of check names, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option preChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
   mergeChecks: agentMsg({ id: 'settings.agent.takes.mergeChecks', text: 'a list of check names the merge queue runs on the merged result when Combwork merges, e.g. ["typecheck", "lint"] (each with its command in project.workflow.commands)', note: "What the workflow option mergeChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them." }),
   commands: agentMsg({ id: 'settings.agent.takes.commands', text: 'an object of check name → command, e.g. {example}', note: 'What the workflow option commands takes. {example} is JSON: code.' }),
@@ -1384,6 +1386,7 @@ export function workflowTakes(e: SettingEntry, kind: ReturnType<typeof settingKi
     okBefore: () => say(AGENT.okBefore, { shape: '{"mode": "never" | "labels" | "every", "labels": [...]}' }), // agent-protocol: JSON
     identity: () => say(AGENT.identity, { shape: '{"name": ..., "email": ...}' }), // agent-protocol: JSON
     excluded: () => say(AGENT.excluded),
+    otherTargets: () => say(AGENT.otherTargets),
     stageNames: () => say(AGENT.stageNames, { example: '{"active": "Building"}' }) // agent-protocol: JSON
   }
   const choices = (settingOptions(e) ?? []).filter((o) => o.value !== 'inherit').map((o) => o.value)

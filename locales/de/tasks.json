@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "Die Entscheidung ist leer: Entferne sie stattdessen.",
   "tasks.error.decisionGone": "Diese Entscheidung steht nicht mehr auf {card}.",
   "tasks.error.decisionsUsers": "Nur der Benutzer ändert oder entfernt die Entscheidungen einer Karte.",
+  "tasks.error.dependencyTooLate": "{card} wird gerade in {target} gemergt und kann daher nicht mehr auf {cards} warten. Ihre Abhängigkeiten bleiben unverändert.",
   "tasks.error.doingNobodyNew": "Eine Karte, die in „In Arbeit“ angelegt wird, braucht einen Agenten (agent). Frag den Benutzer, was er möchte: einen Agenten daran, einen damit gestarteten Agenten (lege sie in „Offen“ an, dann cw_start_task) oder niemanden daran (lege sie in „Offen“ an und verschiebe sie dann mit override und seinem Grund).",
   "tasks.error.emptyComment": "Der Kommentar ist leer.",
   "tasks.error.emptyDecision": "Die Entscheidung ist leer.",
@@ -77,6 +78,14 @@
   "tasks.error.reviewTaken": "Agent {agent} reviewt {card} bereits (seit {since} UTC).",
   "tasks.error.setAsideGone": "Diese zurückgestellte Karte ist weg oder keine Karte: Sie kann nur verworfen werden.",
   "tasks.error.staysInProject": "Karten bleiben in deinem Projekt ({project}).",
+  "tasks.error.targetChanged": "„Wird gemergt in“ von {card} hat sich seit der Auflistung geändert, daher bleibt die Karte, wie sie ist.",
+  "tasks.error.targetCheckedOut": "{unknown, select, yes {Combwork kann nicht feststellen, ob der alte Branch von {card} noch verwendet wird, daher bleibt sein „Wird gemergt in“ unverändert.} other {Der alte Branch von {card} ist noch in {folder} ausgecheckt, daher bleibt sein „Wird gemergt in“ unverändert. Versuch es erneut, sobald dieser Ordner weitergegangen ist.}}",
+  "tasks.error.targetHasWork": "{unknown, select, yes {Combwork kann nicht feststellen, ob die Karte {card} schon Arbeit auf ihrem Branch hat, daher bleibt ihr „Wird gemergt in“ unverändert.} other {Karte {card} hat schon Arbeit auf ihrem Branch, der aus {target} erstellt wurde, und wird deshalb weiter dorthin gemergt. Um sie zu verschieben, erstelle für sie eine neue Karte auf dem anderen Branch und übernimm die Änderung.}}",
+  "tasks.error.targetLane": "Karte {card} ist in der Lane von {builder}, die in {target} gemergt wird: Die Karten einer Lane werden dorthin gemergt, wohin die Lane gemergt wird. Nimm sie zuerst aus der Lane.",
+  "tasks.error.targetMissing": "{unknown, select, yes {Combwork kann nicht feststellen, ob es den Branch {target} gibt, daher wurde nichts geändert.} other {In diesem Repository gibt es keinen Branch {target}: Leg ihn zuerst an und wähl ihn dann aus.}}",
+  "tasks.error.targetMoved": "Der alte Branch von {card} hat sich geändert, während sein „Wird gemergt in“ geändert wurde, daher bleibt es unverändert. Sieh dir zuerst an, was dort angekommen ist.",
+  "tasks.error.targetNotAgents": "Nur du oder der Assistent legen fest, in welchen Branch eine Karte gemergt wird.",
+  "tasks.error.targetNotListed": "{hasTargets, select, yes {{target} ist hier kein Branch, in den Arbeit gemergt werden kann: Nenne {default}{hasOthers, select, yes { oder einen von {others}} other {}} oder füge ihn unter „Weitere Branches, in die Arbeit gemergt werden kann“ (Versionsverwaltung → Workflow) hinzu.} other {Dieses Projekt mergt Arbeit in keinen Branch, den Combwork wählen kann: „Wird gemergt in“ einer Karte gibt es nur für Git-Projekte.}}",
   "tasks.error.tooLong": "{what, select, title {Der Titel ist zu lang (höchstens {max, number} Zeichen).} description {Die Beschreibung ist zu lang (höchstens {max, number} Zeichen).} comment {Der Kommentar ist zu lang (höchstens {max, number} Zeichen).} decision {Die Entscheidung ist zu lang (höchstens {max, number} Zeichen).} other {Der Grund für die Blockierung ist zu lang (höchstens {max, number} Zeichen).}}",
   "tasks.error.tooManyContext": "Eine Karte kann bis zu {max} zuerst zu lesende Dokumentabschnitte haben.",
   "tasks.error.tooManyDecisions": "Eine Karte kann höchstens {max} Entscheidungen haben.",
@@ -156,6 +165,7 @@
   "tasks.history.takenFromAgent": "Dem Agenten entzogen",
   "tasks.history.takenFromOf": "Agent {agent} von {project} entzogen",
   "tasks.history.takenFromOfWorkspace": "Agent {agent} des Arbeitsbereichs entzogen",
+  "tasks.history.target": "{own, select, yes {Wird gemergt in {target}} other {Wird in den Branch des Projekts gemergt}}",
   "tasks.history.toProject": "Verschoben nach {project}",
   "tasks.history.toWorkspace": "In den Arbeitsbereich verschoben",
   "tasks.history.unarchived": "Aus dem Archiv zurückgeholt",
@@ -186,5 +196,6 @@
   "tasks.error.waitingNotYours": "Nur der eigene Agent von {card}, der Benutzer oder der Assistent kann sie als wartend markieren oder das aufheben.",
   "tasks.error.waitingTooLong": "Der Grund für das Warten ist zu lang (höchstens {max, number} Zeichen).",
   "tasks.history.notWaiting": "Wartet nicht mehr",
-  "tasks.history.waiting": "Wartet: {reason}"
+  "tasks.history.waiting": "Wartet: {reason}",
+  "tasks.error.targetDefaultMoved": "„Arbeit wird gemergt in“ hat sich erneut geändert, während {card} umgestellt wurde, daher bleibt die Karte, wie sie ist."
 }

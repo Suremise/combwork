@@ -13,6 +13,7 @@ import { agentTextSchema, autoModelFile, checkTexts, dialectFileText, loadDialec
 import { contentHash } from '../src/main/fsutil'
 import { CLAUDE_MODEL_GROUPS } from '../src/shared/claude'
 import { CODEX_MODEL_GROUPS } from '../src/shared/codex'
+import { PROVIDERS } from '../src/shared/providers'
 import HISTORY from '../src/main/bundledHistory.json'
 import { tempDir } from './tempDir'
 
@@ -28,8 +29,12 @@ const SHIPPED: Record<string, { name: string; model?: string }> = {
   'codex/cli': { name: 'Codex' },
   'codex/GPT-6 Astra': { name: 'GPT-6 Astra', model: 'gpt-6-astra' },
   'codex/GPT-6.1 Sol': { name: 'GPT-6.1 Sol', model: 'gpt-6.1-sol' },
-  'copilot/cli': { name: 'GitHub Copilot' }
+  'copilot/cli': { name: 'GitHub Copilot' },
+  'antigravity/cli': { name: 'Antigravity' }
 }
+
+/** A CLI file for every provider, and the API's (HI-2720: a new provider's was missed): the folders Combwork ships. */
+const FOLDERS = [...PROVIDERS.map((p) => p.id), 'api'].sort()
 
 const shippedIds = (): string[] =>
   readdirSync(RES, { withFileTypes: true })
@@ -45,10 +50,10 @@ const parsed = (id: string): DialectFile => {
 }
 
 describe('the dialect files Combwork ships', () => {
-  it('include the five model files, a CLI file for each CLI and the API file, in no other folders', () => {
+  it('include the five model files, a CLI file for each provider and the API file, in no other folders', () => {
     const ids = shippedIds()
     for (const id of Object.keys(SHIPPED)) expect(ids, id).toContain(id)
-    expect([...new Set(ids.map((id) => id.split('/')[0]))].sort()).toEqual(['api', 'claude-code', 'codex', 'copilot'])
+    expect([...new Set(ids.map((id) => id.split('/')[0]))].sort()).toEqual(FOLDERS)
   })
 
   it('the five carry their name and real model ID', () => {
@@ -86,7 +91,7 @@ describe('the dialect files Combwork ships', () => {
 
   it('load as a dialects folder: each CLI file in place, every model file picked by Auto for its model', async () => {
     const set = await loadDialects(RES, agentTextSchema())
-    expect(Object.keys(set.folders).sort()).toEqual(['api', 'claude-code', 'codex', 'copilot'])
+    expect(Object.keys(set.folders).sort()).toEqual(FOLDERS)
     for (const [name, folder] of Object.entries(set.folders)) {
       expect(folder.cli?.path, name).toBe(`${name}/cli.json`)
       for (const f of [folder.cli!, ...folder.files]) expect({ broken: f.broken, claimTaken: f.claimTaken, outdated: f.outdated, on: f.on }, f.path).toEqual({ broken: undefined, claimTaken: undefined, outdated: [], on: true })

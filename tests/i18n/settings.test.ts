@@ -55,7 +55,7 @@ describe('the settings catalogue as Settings shows it', () => {
         // A language's own name, the permission and file lock modes' names (the agents area's, #885; the CLI's own setting's,
         // #1284), and the workflow
         // options' words, the Workflow section's own (#1278: the workflow area's, glossary 2.6).
-        if (m.id.startsWith('language.') || m.id.startsWith('workflow.') || /^agents\.(claude|codex|copilot|cliOwn|fileLock)\./.test(m.id)) continue
+        if (m.id.startsWith('language.') || m.id.startsWith('workflow.') || /^agents\.(claude|codex|copilot|antigravity|cliOwn|fileLock)\./.test(m.id)) continue
         expect(m.id, e.id).toMatch(/^settings\./)
         expect(EN[m.id], `${e.id}: ${m.id}`).toEqual({ defaultMessage: m.defaultMessage, description: m.description })
         expect(m.description.length, m.id).toBeGreaterThan(10)

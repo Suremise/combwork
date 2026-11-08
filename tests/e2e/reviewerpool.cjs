@@ -132,7 +132,9 @@ const commitIn = (dir, files, message, trailer) => {
     const lane = async (id) => (await inv('lanes:list', { all: true })).find((l) => l.id === id)
     const slotOf = async (laneId) => (await inv('slots:list', alpha)).find((s) => s.lease?.lane === laneId)
     const create = async (p, title) => (await inv('tasks:create', { title, project: path.basename(p) })).number
-    const idle = (p, id) => until(async () => ['ready', 'finished'].includes((await live(p, id))?.status), HUNG_MS)
+    // Idle in any of the fake's idle states (lib.agentIdle), `watching` among them: a reviewer watching its card is idle,
+    // and a wait for ready or finished alone ran out there each time (HI-2688). Agent ids are unique, so p isn't needed.
+    const idle = (_p, id) => lib.agentIdle(inv, id, HUNG_MS)
     const shoot = async (name, target) => {
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
@@ -269,9 +271,11 @@ const commitIn = (dir, files, message, trailer) => {
     const br2 = await lib.addAgent(inv, beta, { name: 'BE-R2', workflowRole: 'reviewer' })
     const g = await create(beta, 'Pool G')
     const lb = await inv('lanes:start', beta, { builder: bb1.id, reviewer: null, pool: true, cards: [g] })
-    check("beta's lane starts on the pool", lb.lane.pool === true && lb.started.length === 1, JSON.stringify(lb))
+    check("beta's lane starts on the pool, with no slot (everyone in the project folder)", lb.lane.pool === true && lb.started.length === 1 && !lb.slot, JSON.stringify(lb))
     const tb = await tokenOf(beta, bb1.id)
     const gs = await intent(tb, g, 'start')
+    // (p7lane's part C until HI-2663, HR2's round 1 on #1428) The builder starts in the project folder, and stays there.
+    check('BE-B1 starts G in the project folder', gs.status === 200 && same(gs.body?.data?.folder ?? beta, beta) && same((await live(beta, bb1.id))?.cwd, beta), JSON.stringify(gs.body))
     const revG = commitIn(beta, { 'g.txt': 'g\n' }, 'G done', (await card(g)).key)
     const gsub = await intent(tb, g, 'submit', { summary: 'G: ready', revision: revG })
     check('BE-B1 builds and submits G in the project folder', gs.status === 200 && gsub.status === 200 && !!(await until(async () => (await card(g))?.column === 'review', HUNG_MS)), JSON.stringify({ gs: gs.body, gsub: gsub.body }))
@@ -284,15 +288,18 @@ const commitIn = (dir, files, message, trailer) => {
       const s = await intent(token, n, 'start-review')
       const copy = (s.body?.data?.reviewCopy ?? '').match(/Review in (.+?) at /)?.[1] ?? null
       const atRev = !!copy && fs.existsSync(copy) && git(copy, 'rev-parse', 'HEAD') === revG
+      // The reviewer itself stays in the project folder: only its reading is in the copy.
+      const inFolder = same((await live(beta, r.id))?.cwd, beta)
       const v = await intent(token, n, 'verdict', { pass, comment: `${r.name}: passed` })
-      return { ok: s.status === 200 && v.status === 200, atRev, why: JSON.stringify({ s: s.body, v: v.body }) }
+      return { ok: s.status === 200 && v.status === 200, atRev: atRev && inFolder, why: JSON.stringify({ s: s.body, v: v.body, cwd: (await live(beta, r.id))?.cwd }) }
     }
     const first = await review(br1, g, true)
-    check('BE-R1 is given G, reads it in a review copy at the submitted revision, and passes it', first.ok && first.atRev, first.why)
+    check('BE-R1 is given G, reads it in a review copy at the submitted revision (itself in the project folder), and passes it', first.ok && first.atRev, first.why)
     check('…G waits for its second reviewer, another agent', !!(await until(async () => JSON.stringify(await assigned(g)) === JSON.stringify([br1.id, br2.id]), HUNG_MS)) && (await card(g))?.column === 'review', JSON.stringify(await assigned(g)))
     const second = await review(br2, g, true)
-    check('BE-R2 reads it in a review copy too, and passes it', second.ok && second.atRev, second.why)
+    check('BE-R2 reads it in a review copy too (itself in the project folder), and passes it', second.ok && second.atRev, second.why)
     check('G is Done (committed)', !!(await until(async () => (await card(g))?.column === 'done', HUNG_MS)), (await card(g))?.column)
+    check('no slot was lent in beta', (await inv('slots:list', beta)).length === 0, JSON.stringify(await inv('slots:list', beta)))
 
     // --- 3. gamma (HI-2046): one reviewer per lane, but a card started on its builder alone, outside a lane. Submitted,
     // Combwork gives it to the project's stopped reviewer itself: started for the review and told, with no Assistant step.

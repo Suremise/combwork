@@ -29,6 +29,26 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # Electron's binary (HI-2751): npm 11 blocks install scripts, so `npm ci` leaves it out and the first test to
+      # load Electron used to download it mid-run, with no retry: a GitHub 504 failed scattered files. It's fetched
+      # here instead, from a cache keyed by the Electron version, with retries; a failure says "Electron download
+      # failed". The cache is saved as soon as the download succeeds, so a later failing step doesn't lose it.
+      - id: electron
+        run: echo "version=$(node scripts/installElectronCi.mjs --version)" >> $env:GITHUB_OUTPUT
+      - id: electron-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/electron-cache
+          key: electron-${{ runner.os }}-${{ steps.electron.outputs.version }}
+      - name: Install Electron
+        run: node scripts/installElectronCi.mjs
+        env:
+          electron_config_cache: ${{ runner.temp }}/electron-cache
+      - if: steps.electron-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/electron-cache
+          key: ${{ steps.electron-cache.outputs.cache-primary-key }}
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
@@ -36,5 +56,8 @@ jobs:
       - run: npm run i18n:extract -- --check
       - run: npm run i18n:check
       - run: npm run i18n:guard
+      # Agent text (HI-2065): the guard against new hard-coded agent text over every file, as check:repo runs it; its
+      # unit test keeps only its rules' cases (HI-2689).
+      - run: npm run agent-text:guard
       # Informational: missing translations show in English and never fail.
       - run: npm run i18n:coverage

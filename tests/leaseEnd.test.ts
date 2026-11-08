@@ -254,7 +254,9 @@ describe("a carried lease's end never stops an agent with work elsewhere (HI-173
     runs.set('b1', { run: 'run-1', starting: false })
     watching.set('b1', { label: 'Waiting for HI-9 → Review' })
     let writer: { run: string; lease: string } | null = { run: 'run-1', lease: 'l1' }
-    const moving = { ...at(), pool: { ...at().pool, slots: () => [slotWith(writer)] } } as unknown as NonNullable<Parameters<typeof stopLeaseSession>[3]>
+    // at()'s, its slots giving the slot's writer as it is when asked.
+    const moving = at()
+    moving.pool.slots = () => [slotWith(writer)]
     await stopLeaseSession(P, CARRIED, slotWith({ run: 'run-1', lease: 'l1' }), moving)
     expect(asked()).toBe(2)
     // Its next start elsewhere moved it: the slot drains, and its looks end there, never reading the board again.

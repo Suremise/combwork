@@ -207,6 +207,10 @@
     "text": "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.",
     "note": "cw_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer."
   },
+  "lane.refused.independent": {
+    "text": "{agent} is Independent: it takes no part in the workflow (its own role, or its connection launches it without Combwork's tools), so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.",
+    "note": "cw_lane's refusal (HI-2670): an Independent agent is never a lane's builder or reviewer."
+  },
   "lane.refused.joinNoLane": {
     "text": "{builder} has no lane running yet: give the cards too, and the lane starts with you as its reviewer",
     "note": "cw_lane join refused: the builder has no running lane, and no cards were given to start one."
@@ -234,6 +238,10 @@
   "lane.refused.noLaneToPlace": {
     "text": "{builder} has no running lane in {project}: the card was made but not placed. Start one with cw_lane start (its key is in this reply), or pass lane as '{ builder, reviewer }' to start one as you create a card.",
     "note": "cw_create_task's lane refused (HI-2167): the builder named has no running lane to place the card on. '{ builder, reviewer }' is quoted ICU: it shows as { builder, reviewer }."
+  },
+  "lane.refused.oldTools": {
+    "text": "{agent}'s role changed while it was running, and it still has its old role's tools: it can't take this part of the lane until it restarts. Restart it first (its pane says it needs a restart), then try again.",
+    "note": "cw_lane's refusal (HI-2664): an agent keeps the tools it launched with until it restarts, so a lane part needing its new role's tools waits for that."
   },
   "lane.refused.poolReviewer": {
     "text": "A lane reviewed by the pool has no reviewer of its own",
@@ -266,6 +274,10 @@
   "lane.refused.unknownReviewer.pool": {
     "text": "No agent \"{name}\" in {project}; this lane is reviewed by the project's reviewer pool: leave reviewer out.",
     "note": "cw_lane start refused (HI-2273): it names a reviewer that is no agent of the project, and the lane is reviewed by the pool."
+  },
+  "lane.refused.wrongSide": {
+    "text": "{agent} is a {part, select, builder {reviewer} other {builder}} by its role, so it has no {part}'s tools: a lane's {part} is a {part} or an either-role agent. Choose another, or change {agent}'s role first.",
+    "note": "cw_lane's refusal (HI-2664): an agent's Combwork tools follow its workflow role, so a lane part only for a role that does it. {part} is builder or reviewer."
   },
   "lane.reorder.itsBranch": {
     "text": "its branch",
@@ -375,6 +387,10 @@
     "text": "paused: {agent}'s hooks aren't arriving",
     "note": "A lane pauses while its builder's or reviewer's hooks aren't arriving (#1336): nothing is typed into that agent."
   },
+  "lane.status.independent": {
+    "text": "paused: {agent} is Independent now (its connection launches it without Combwork's tools, or its role was changed): give the lane another agent, or end it",
+    "note": "A lane pauses while its builder or reviewer is Independent (HI-2670): Combwork gives that agent nothing. The user gives the lane another agent or ends it."
+  },
   "lane.status.itsAgent": {
     "text": "its agent",
     "note": "Where the agent owed a new conversation isn't known by name: put in place of {agent}."
@@ -402,6 +418,10 @@
   "lane.status.notMerged": {
     "text": "waiting: {card} not merged",
     "note": "A lane waits: its card passed but is not merged yet; a lane takes one card at a time (§16.11.2)."
+  },
+  "lane.status.offSide": {
+    "text": "paused: {agent} isn't a {part, select, builder {builder} other {reviewer}} by its role, so it has no {part, select, builder {builder's} other {reviewer's}} tools: give the lane another {part, select, builder {builder} other {reviewer}}, or make {agent} a {part, select, builder {builder} other {reviewer}} or either-role agent",
+    "note": "A lane pauses while its builder or reviewer has a role that doesn't do its part (HI-2664: an agent's Combwork tools follow its role): nothing new is given to it for the lane; its work in flight stays."
   },
   "lane.status.preparing": {
     "text": "waiting: preparing {slot}",

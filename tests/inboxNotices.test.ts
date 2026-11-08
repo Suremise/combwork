@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import * as electron from 'electron'
 import { inboxNotice, noticeCounts } from '../src/shared/doorbell'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-inbox-notices-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -131,6 +132,69 @@ describe('notices in the hook replies (#650)', () => {
     const e = await leave(st, { kind: 'card-event', card: 607 })
     expect(context(await hook(st, tool('p1', 'c4')))).toBe(`[CW] New in your inbox: 1 message and 1 card event (#607) (${m.id}, ${e.id}). Call cw_inbox now to read them; act on them and ack them, then carry on.`)
     expect(st.status).toBe('working')
+  })
+
+  it("HI-2670: an agent made Independent while it runs gets no notice in its hooks, which still report its status; back in the workflow, its launch's own switches allowing, it is told again, without a restart", async () => {
+    const st = agent()
+    const out = { why: null as 'independent' | 'plain' | null }
+    const keepsOut = vi.spyOn(sessions, 'keepsOut').mockImplementation(() => out.why)
+    try {
+      await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+      const m = await leave(st)
+      // Its connection's tools turned off meanwhile, or Independent chosen for it: nothing in its tool end or its Stop.
+      out.why = 'independent'
+      expect(await hook(st, tool('p1', 'c1'))).toBeNull()
+      expect(st.status).toBe('working')
+      expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false, last_assistant_message: 'Done' })).toBeNull()
+      expect(st.status).toBe('finished')
+      // Its own role again: told at its next turn, as before (its launch had Combwork's tools and typing).
+      out.why = null
+      await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p2', prompt: 'again' })
+      expect(context(await hook(st, tool('p2', 'c2')))).toContain(m.id)
+    } finally {
+      keepsOut.mockRestore()
+    }
+  })
+
+  it('HI-2670 (HR1 on s44): made Independent while its notice is being worked out, it gets none of it', async () => {
+    const st = agent()
+    const real = sessions.inboxNotice!
+    const out = { why: null as 'independent' | 'plain' | null }
+    const keepsOut = vi.spyOn(sessions, 'keepsOut').mockImplementation(() => out.why)
+    let release!: () => void
+    const made = new Promise<void>((r) => (release = r))
+    let asked!: () => void
+    const askedP = new Promise<void>((r) => (asked = r))
+    try {
+      await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+      await leave(st)
+      sessions.inboxNotice = async (state, at) => {
+        asked()
+        await made
+        return real(state, at)
+      }
+      const reply = hook(st, tool('p1', 'c1'))
+      await askedP
+      out.why = 'independent'
+      release()
+      expect(await reply).toBeNull()
+    } finally {
+      sessions.inboxNotice = real
+      keepsOut.mockRestore()
+    }
+  })
+
+  it("HI-2670: a launch without Combwork's typing (its connection's switch as it launched) gets no notice, whatever its role, until it restarts", async () => {
+    const st = agent()
+    const l = s.live.get(`${p.toLowerCase()}#${st.agentId}`) as unknown as { policy?: { guidance: boolean; tools: boolean; typing: boolean; overrides: Record<string, boolean> } }
+    await hook(st, { hook_event_name: 'UserPromptSubmit', prompt_id: 'p1', prompt: 'go' })
+    // One left before (as a session record kept it); a new one is refused, saying why.
+    await leave(st)
+    l.policy = { guidance: true, tools: true, typing: false, overrides: {} }
+    await expect(leave(st)).rejects.toThrow(/as if started from a terminal/)
+    expect(await hook(st, tool('p1', 'c1'))).toBeNull()
+    expect(await hook(st, { hook_event_name: 'Stop', prompt_id: 'p1', stop_hook_active: false, last_assistant_message: 'Done' })).toBeNull()
+    expect(st.status).toBe('finished')
   })
 
   it('drains what is unread before the turn ends, once a turn: carried on, not over, then over at the next Stop', async () => {
@@ -378,20 +442,23 @@ describe('notices in the hook replies (#650)', () => {
     const s3 = sessions as unknown as { recordSession: (p: string, a: { id: string; name: string }, l: unknown) => Promise<void> }
     const lastSession = async (agentId: string) => projectAgents(await run(() => w.projectConfig(p))).find((a) => a.id === agentId)?.lastSessionId
     const record = async (id: string) => (await run(() => w.sessionsFile(p))).sessions.find((x) => x.id === id)
-    /** Holds the next call of a workspace method (its real work waits) until released; says when it is reached. */
+    /** Holds the next call of a workspace method (its real work waits) until released; says when it is reached. Each
+     *  method by its name, not read by a computed key, which loses the workspace's type. */
     const holdNext = (name: 'ensureProject' | 'mutateSessions', skip = 0) => {
-      const real = (w[name] as (...a: unknown[]) => Promise<unknown>).bind(w)
+      type Call = (...a: unknown[]) => Promise<unknown>
+      const real = (name === 'ensureProject' ? bound(w, w.ensureProject) : bound(w, w.mutateSessions)) as Call
       let release = (): void => undefined
       const gate = new Promise<void>((r) => (release = r))
       const at = { reached: false }
       let calls = 0
-      const spy = vi.spyOn(w as unknown as Record<typeof name, (...a: unknown[]) => Promise<unknown>>, name).mockImplementation(async (...a: unknown[]) => {
+      const holding: Call = async (...a) => {
         if (calls++ === skip) {
           at.reached = true
           await gate
         }
         return real(...a)
-      })
+      }
+      const spy = name === 'ensureProject' ? vi.spyOn(w, 'ensureProject').mockImplementation(holding as typeof w.ensureProject) : vi.spyOn(w, 'mutateSessions').mockImplementation(holding as typeof w.mutateSessions)
       return { at, release, spy }
     }
     for (const where of ['config', 'cards'] as const) {

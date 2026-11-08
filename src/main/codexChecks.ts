@@ -101,7 +101,7 @@ export function ownedAppServerRequest(o: Request): Promise<CheckAnswer> {
   return run
 }
 
-type Request = { command: string; args: string[]; cwd: string; env: NodeJS.ProcessEnv; method: string; params: unknown; timeoutMs: number }
+type Request = { command: string; args: string[]; verbatim?: boolean; cwd: string; env: NodeJS.ProcessEnv; method: string; params: unknown; timeoutMs: number }
 
 /** A reserved check, run to its end: each step looks first whether Combwork is quitting, before anything starts. */
 async function runCheck(c: Check, o: Request): Promise<CheckAnswer> {
@@ -157,7 +157,7 @@ function serial<T>(c: Check, fn: () => Promise<T>): Promise<T> {
 /** Starts the launcher, puts it in the job, then runs Codex through it and asks it the one request. */
 async function askThroughLauncher(c: Check, o: Request): Promise<CheckAnswer> {
   if (stopped) return QUITTING
-  const { child, after, before } = startLauncher({ command: o.command, args: o.args }, { cwd: o.cwd, env: o.env })
+  const { child, after, before } = startLauncher({ command: o.command, args: o.args, verbatim: !!o.verbatim }, { cwd: o.cwd, env: o.env })
   c.child = child
   c.closed = false
   child.once('close', () => (c.closed = true))

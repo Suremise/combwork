@@ -33,6 +33,7 @@ interface CombworkMessageValues {
   'workflow.form.allOff': undefined
   'workflow.form.allOffSummary': undefined
   'workflow.form.appliesNow': undefined
+  'workflow.form.appliesNowBranches': undefined
   'workflow.form.cantSave': undefined
   'workflow.form.carried': { agents: string | number }
   'workflow.form.changeLine': { option: string | number; from: string | number; to: string | number }
@@ -72,6 +73,9 @@ interface CombworkMessageValues {
   'workflow.form.inheritTip': { value: string | number }
   'workflow.form.inheritor': { project: string | number }
   'workflow.form.invalid': undefined
+  'workflow.form.keptCard': { card: string | number; title: string | number; target: string | number }
+  'workflow.form.keptLane': { named: string; name: string | number; builder: string | number; target: string | number }
+  'workflow.form.keptTargets': { n: number }
   'workflow.form.labels': undefined
   'workflow.form.labelsValue': { labels: string | number }
   'workflow.form.lane': { builder: string | number; name: string | number }
@@ -101,6 +105,7 @@ interface CombworkMessageValues {
   'workflow.form.off': undefined
   'workflow.form.on': undefined
   'workflow.form.openAdvanced': undefined
+  'workflow.form.otherTargets': undefined
   'workflow.form.overMax': { count: number; max: number }
   'workflow.form.paste': undefined
   'workflow.form.pasteApply': undefined
@@ -116,6 +121,14 @@ interface CombworkMessageValues {
   'workflow.form.previewNow': { value: string | number }
   'workflow.form.readOnly': { agents: string | number }
   'workflow.form.removeCheck': undefined
+  'workflow.form.retargetCard': { card: string | number; title: string | number }
+  'workflow.form.retargetChoice': { from: string | number; to: string | number; cards: number; slots: number }
+  'workflow.form.retargetDone': { skipped: number; to: string | number; cards: number; slots: number }
+  'workflow.form.retargetFailed': undefined
+  'workflow.form.retargetKeep': { what: string | number; why: string; from: string | number }
+  'workflow.form.retargetSkipped': { what: string | number; why: string }
+  'workflow.form.retargetSlot': { slot: string | number }
+  'workflow.form.retargetStays': { from: string | number }
   'workflow.form.save': undefined
   'workflow.form.saveBlocked': undefined
   'workflow.form.saved': undefined
@@ -185,6 +198,8 @@ interface CombworkMessageValues {
   'workflow.option.noSelfReview.title': undefined
   'workflow.option.okBefore.desc': undefined
   'workflow.option.okBefore.title': undefined
+  'workflow.option.otherTargets.desc': undefined
+  'workflow.option.otherTargets.title': undefined
   'workflow.option.preChecks.desc': undefined
   'workflow.option.preChecks.title': undefined
   'workflow.option.pushTarget.desc': undefined
@@ -227,13 +242,15 @@ interface CombworkMessageValues {
   'workflow.refused.approval.given.next': undefined
   'workflow.refused.card.plainNumber.message': undefined
   'workflow.refused.card.plainNumber.next': { key: string | number }
-  'workflow.refused.check.revisionMismatch.message': { revision: string | number }
+  'workflow.refused.check.revisionMismatch.message': { why: string; revision: string | number; head: string | number }
   'workflow.refused.check.revisionMismatch.next': { revision: string | number }
   'workflow.refused.done.contained.change': undefined
   'workflow.refused.done.contained.message': { card: string | number; revision: string | number; target: string | number }
   'workflow.refused.done.contained.next': { revision: string | number; target: string | number }
   'workflow.refused.evidence.changed.message': { card: string | number }
   'workflow.refused.evidence.changed.next': undefined
+  'workflow.refused.forward.notAgents.message': { card: string | number }
+  'workflow.refused.forward.notAgents.next': undefined
   'workflow.refused.integrate.approved.message': { card: string | number; revision: string | number; why: string | number }
   'workflow.refused.integrate.approved.next': undefined
   'workflow.refused.integrate.checksPassed.change': undefined
@@ -280,6 +297,8 @@ interface CombworkMessageValues {
   'workflow.refused.merge.combworkMerges.nextReturned': undefined
   'workflow.refused.merge.combworkMerges.nextStale': { current: string | number }
   'workflow.refused.merge.combworkMerges.nextTesting': { target: string | number }
+  'workflow.refused.merge.waitsForBlockers.message': { card: string | number; waitsFor: string | number }
+  'workflow.refused.merge.waitsForBlockers.next': { waitsFor: string | number }
   'workflow.refused.move.doingNobody.message': { card: string | number; stage: string | number; also: string; rules: string | number }
   'workflow.refused.move.doingNobody.next': { reader: string }
   'workflow.refused.move.needsOverride.change': { reader: string }

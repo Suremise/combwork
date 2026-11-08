@@ -4,6 +4,23 @@ interface CombworkMessageValues {
   'providers.action.install': undefined
   'providers.action.signIn': undefined
   'providers.action.update': undefined
+  'providers.antigravity.checkFailed': { provider: string | number; text: string | number }
+  'providers.antigravity.conversationGone': { provider: string | number; conversation: string | number }
+  'providers.antigravity.guidanceTooLong': { provider: string | number; size: number; max: number }
+  'providers.antigravity.notOwnConversation': { provider: string | number; conversation: string | number }
+  'providers.antigravity.notice.auto': { version: string | number }
+  'providers.antigravity.notice.autoUnknown': undefined
+  'providers.antigravity.notice.setup': undefined
+  'providers.antigravity.notice.sse': { count: number; servers: string | number }
+  'providers.antigravity.notice.title': undefined
+  'providers.antigravity.projectServers': { provider: string | number; count: number; files: string | number; servers: string | number }
+  'providers.antigravity.setup.action': undefined
+  'providers.antigravity.setup.copied': undefined
+  'providers.antigravity.setup.needed': undefined
+  'providers.antigravity.setup.runs': undefined
+  'providers.antigravity.signIn.runs': undefined
+  'providers.antigravity.signIn.shared': undefined
+  'providers.antigravity.unreadableConfig': { provider: string | number; file: string | number; why: string | number }
   'providers.autoCompact.autoIn': { key: string | number; scope: string | number }
   'providers.autoCompact.badSources': undefined
   'providers.autoCompact.disabledIn': { scope: string | number }
@@ -29,6 +46,11 @@ interface CombworkMessageValues {
   'providers.claude.hint.broken': undefined
   'providers.claude.hint.model': undefined
   'providers.claude.hint.signIn': undefined
+  'providers.claude.localLimits.inFile': { file: string | number }
+  'providers.claude.localLimits.oursContext': { connection: string | number }
+  'providers.claude.localLimits.oursOutput': { connection: string | number }
+  'providers.claude.localLimits.outputNotBelow': { agent: string | number; output: number; outputFrom: string | number; context: number; contextFrom: string | number }
+  'providers.claude.localLimits.tooSmall': { agent: string | number; context: number; contextFrom: string | number }
   'providers.cmdTooLong': { file: string | number; max: number; length: number }
   'providers.codex.connections.setUp': undefined
   'providers.codex.developerUnread.agentMessage': undefined
@@ -79,6 +101,12 @@ interface CombworkMessageValues {
   'providers.export.summary': undefined
   'providers.export.thinking': undefined
   'providers.export.you': undefined
+  'providers.localLimits.context': { value: number; from: string | number; estimate: string }
+  'providers.localLimits.inFile': { file: string | number }
+  'providers.localLimits.notUsed': { why: string; model: string | number; file: string | number; connection: string | number }
+  'providers.localLimits.ours': { connection: string | number }
+  'providers.localLimits.output': { value: number; from: string | number; fallback: string }
+  'providers.localLimits.switched': { model: string | number }
   'providers.memory.connection': { file: string | number; name: string | number }
   'providers.memory.user': { file: string | number }
   'providers.readiness.notInstalled': { provider: string | number }

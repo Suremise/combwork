@@ -5,18 +5,20 @@ import { useAgentLimit } from '../advanced'
 import { PROVIDERS, agentProvider, autoProvider, isProviderEnabled, providerDescriptor } from '@shared/providers'
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import type { MergeBranch } from '@shared/types'
-import type { AgentBranchStatus, MergeResult, ProviderId } from '@shared/types'
+import type { AgentBranchStatus, AgentPatch, MergeResult, ProviderId } from '@shared/types'
 import { serverAddedIn } from '@shared/agentMcp'
 import { agentNameProblem, nameTaken, nameTakenMessage, sameAgentName, suggestAgentName, workspaceAgentList } from '@shared/agentNames'
 import type { TemplateAgent } from '@shared/templates'
-import { agentWorkflowRole, ROLE_IN_WORKFLOW, WORKFLOW_ROLE_TEXT, WORKFLOW_ROLES, type WorkflowRole } from '@shared/workflow/roles'
+import { agentWorkflowRole, ROLE_IN_WORKFLOW, ROLE_NEEDS_TOOLS, WORKFLOW_ROLE_TEXT, WORKFLOW_ROLES, type WorkflowRole } from '@shared/workflow/roles'
+import { launchesWithoutTools } from '@shared/launchPolicy'
+import { confirmIndependent } from './LaunchSettings'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
 import * as actions from '../actions'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { call, errorMessage } from '../api'
 import { projectMergeChoice } from '../mergeChoice'
-import { agentProviderOf, bumpUnused, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
-import { msg, tr, tRich } from '@shared/i18n'
+import { agentProviderOf, bumpUnused, choose as askChoice, confirm, focusAfterRemoving, notify, openVersionControl, projectKey, set, setActivity, showAgent, useLanguage, useStore } from '../store'
+import { fmt, msg, tr, tRich } from '@shared/i18n'
 import { ProviderIcon } from './ProviderIcon'
 import { cliReadyOf, ConnectionChoice, connectionCli, firstReadyConnection, noAccountHere, noAccountText, offeredConnections, useConnections } from './ConnectionChoice'
 import { ConnectionDialog } from './ConnectionDefaults'
@@ -86,9 +88,13 @@ export function ProviderChoice({ value, current, onChange }: { value: ProviderId
   )
 }
 
-/** Role in the workflow (#1430): builder, reviewer or either, each with a sentence. */
-function WorkflowRoleChoice({ value, onChange }: { value: WorkflowRole; onChange: (v: WorkflowRole) => void }) {
+/**
+ * Role in the workflow (#1430): builder, reviewer or either, each with a sentence. On a connection that launches without
+ * Combwork's tools (HI-2670, `toolsOff`), Independent is the only choice: the others greyed out, saying why.
+ */
+function WorkflowRoleChoice({ value, onChange, toolsOff = false }: { value: WorkflowRole; onChange: (v: WorkflowRole) => void; toolsOff?: boolean }) {
   useLanguage()
+  const shown: WorkflowRole = toolsOff ? 'independent' : value
   return (
     <>
       <h3 className="agent-dialog-h" id="agent-workflow-role">
@@ -96,15 +102,18 @@ function WorkflowRoleChoice({ value, onChange }: { value: WorkflowRole; onChange
       </h3>
       <div className="workflow-role">
         <div className="workflow-role-choice" role="radiogroup" aria-labelledby="agent-workflow-role">
-          {WORKFLOW_ROLES.map((r) => (
-            <label key={r} className={cx('choice', value === r && 'selected')} data-workflow-role={r}>
-              <input type="radio" checked={value === r} onChange={() => onChange(r)} />
-              <div>
-                <strong>{tr(WORKFLOW_ROLE_TEXT[r].name)}</strong>
-                <div className="faint">{tr(WORKFLOW_ROLE_TEXT[r].text)}</div>
-              </div>
-            </label>
-          ))}
+          {WORKFLOW_ROLES.map((r) => {
+            const off = toolsOff && r !== 'independent'
+            return (
+              <label key={r} className={cx('choice', shown === r && 'selected', off && 'disabled')} data-workflow-role={r} data-needs-tools={off || undefined} title={off ? tr(ROLE_NEEDS_TOOLS) : undefined}>
+                <input type="radio" disabled={off} checked={shown === r} onChange={() => onChange(r)} />
+                <div>
+                  <strong>{tr(WORKFLOW_ROLE_TEXT[r].name)}</strong>
+                  <div className="faint">{off ? tr(ROLE_NEEDS_TOOLS) : tr(WORKFLOW_ROLE_TEXT[r].text)}</div>
+                </div>
+              </label>
+            )
+          })}
         </div>
       </div>
     </>
@@ -176,7 +185,9 @@ export function AddAgentDialog() {
 
   if (!path || !project || !settings) return null
   const close = (): void => set({ addAgentFor: null })
-  const workflowRole = roleChosen ?? agentWorkflowRole({ name: name.trim() })
+  // Its connection launches without Combwork's tools (HI-2670): Independent is the only role it can have.
+  const toolsOff = launchesWithoutTools(view?.connectionRows.find((c) => c.id === connection))
+  const workflowRole = toolsOff ? 'independent' : (roleChosen ?? agentWorkflowRole({ name: name.trim() }))
   const full = project.agents.length >= limit
   // A name another agent of the workspace has (#702): refused, with a free one to use.
   const everyone = workspaceAgentList(workspaceProjects)
@@ -280,7 +291,7 @@ export function AddAgentDialog() {
           ))}
         </datalist>
       </div>
-      <WorkflowRoleChoice value={workflowRole} onChange={setRoleChosen} />
+      <WorkflowRoleChoice value={workflowRole} onChange={setRoleChosen} toolsOff={toolsOff} />
       <h3 className="agent-dialog-h">{tr(MCP_SERVERS)}</h3>
       <McpChoice value={mcp} offered={mcpOffered} where="project" onChange={setMcp} />
       <h3 className="agent-dialog-h">{tr(msg({ id: 'agents.add.where', defaultMessage: 'Where it works', description: 'A heading in the Add Agent dialog, above where the new agent works.' }))}</h3>
@@ -477,6 +488,9 @@ function AgentSettingsModal({
   const [newOn, setNewOn] = useState<string | null>(null)
   // Read as the dialog opens (the dialogs stay mounted while closed, and the workspace may have changed).
   const mcpOffered = useMcpOffered(mcpProject)
+  // Its connection launches without Combwork's tools (HI-2670): Independent is its only role while it is on it.
+  const connections = useConnections()
+  const toolsOff = !suggestOnly && launchesWithoutTools(connections?.connectionRows.find((c) => c.id === f.connection))
   useEffect(() => {
     action.setError(null)
     setF(initial)
@@ -533,7 +547,7 @@ function AgentSettingsModal({
         {!suggestOnly && cliLocked && <div className="hint span2" data-cli-locked>{cliLocked.why}</div>}
         {dialectCli && <DialectChoice cli={dialectCli} value={f.dialect ?? ''} onChange={(dialect) => put({ dialect })} />}
       </div>
-      <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} />
+      <WorkflowRoleChoice value={f.workflowRole} onChange={(workflowRole) => put({ workflowRole })} toolsOff={toolsOff} />
       {suggestOnly && (
         <>
           <h3 className="agent-dialog-h">{tr(CODING_AGENT)}</h3>
@@ -564,6 +578,8 @@ export function AgentSettingsDialog() {
   const settings = useStore((s) => s.settings)
   const projects = useStore((s) => s.workspace?.projects)
   const view = useConnections()
+  // What the user confirmed this save takes out of the workflow (HI-2670: agents:impact's fingerprint), for main to check.
+  const confirmed = useRef<string | null>(null)
   if (!target || !project || !agent) return null
   // Another agent of the workspace's name (#702); its own name stays, even one it shares from before names were unique.
   const nameProblem = (n: string): string | null => {
@@ -575,8 +591,14 @@ export function AgentSettingsDialog() {
   const current = agent.live?.provider ?? agentProvider(agent, settings)
   const close = (): void => set({ agentSettingsFor: null })
   const own = legacyOf(agent)
-  // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430).
-  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agentWorkflowRole(agent), provider: current, mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '', dialect: agent.dialect ?? '' }
+  // Its role as it reads now (the guess, for an agent from before 1.0), stored once the user saves (#1430): its own, not
+  // the Independent its connection may make it (HI-2670), which is kept for the connection's tools coming back.
+  const initial: AgentFields = { name: agent.name, role: agent.role ?? '', workflowRole: agent.workflowRole ?? agentWorkflowRole({ name: agent.name, role: agent.role }), provider: current, mcp: agent.mcpServers ? [...agent.mcpServers] : null, connection: agent.connection ?? '', dialect: agent.dialect ?? '' }
+  // Its role and connection as saved (HI-2670): no role sent while its connection makes it Independent, so its own stays.
+  const roleAndConnection = (f: AgentFields): AgentPatch => ({
+    ...(launchesWithoutTools(view?.connectionRows.find((c) => c.id === f.connection)) ? {} : { workflowRole: f.workflowRole }),
+    ...(f.connection !== initial.connection ? { connection: f.connection || null } : {})
+  })
   return (
     <AgentSettingsModal
       title={tr(msg({ id: 'agents.settings.title', defaultMessage: '{agent} settings', description: 'Title of the Agent Settings dialog. {agent} is the agent.' }), { agent: agent.name })}
@@ -606,6 +628,13 @@ export function AgentSettingsDialog() {
       note={agent.live ? tr(msg({ id: 'agents.settings.appliesNext', defaultMessage: 'Changes apply the next time {agent} starts; the running session keeps its settings until then.', description: 'Under Agent Settings for a running agent ({agent}).' }), { agent: agent.name }) : undefined}
       nameProblem={nameProblem}
       confirmSave={async (f) => {
+        // Made Independent while on a lane or holding cards (HI-2670): asked first, naming them.
+        confirmed.current = null
+        const impact = await call('agents:impact', project.path, agent.id, roleAndConnection(f))
+        if (impact) {
+          if (!(await confirmIndependent(impact))) return false
+          confirmed.current = impact.fingerprint
+        }
         // Another CLI's connection is a change of CLI: its conversations can't come along.
         const cli = connectionCli(view, f.connection) ?? current
         if (cli === current) return true
@@ -617,16 +646,37 @@ export function AgentSettingsDialog() {
         })
       }}
       save={async (f) => {
-        await call('agents:update', project.path, agent.id, {
-          name: f.name,
-          role: f.role,
-          workflowRole: f.workflowRole,
-          mcpServers: f.mcp,
-          ...(f.connection !== initial.connection ? { connection: f.connection || null } : {}),
-          // Its Dialect (HI-2444), when changed: '' is Auto. A change of CLI clears it in main unless one is picked here.
-          ...(f.dialect !== initial.dialect ? { dialect: f.dialect || null } : {})
-        })
+        await call(
+          'agents:update',
+          project.path,
+          agent.id,
+          {
+            name: f.name,
+            role: f.role,
+            mcpServers: f.mcp,
+            ...roleAndConnection(f),
+            // Its Dialect (HI-2444), when changed: '' is Auto. A change of CLI clears it in main unless one is picked here.
+            ...(f.dialect !== initial.dialect ? { dialect: f.dialect || null } : {})
+          },
+          confirmed.current
+        )
         await actions.refreshWorkspace()
+        // A new role gives it another side's tools (HI-2664, Darren's decision): restarted to load them, at once if it is
+        // idle; busy, asked first (restart when its turn is over, or later: it keeps its old tools until it restarts).
+        if (f.workflowRole !== initial.workflowRole) {
+          const r = await call('session:restartForTools', project.path, agent.id, 'ifIdle').catch(() => 'same' as const)
+          if (r === 'busy') {
+            const choice = await askChoice({
+              title: tr(msg({ id: 'agents.side.restartTitle', defaultMessage: 'Restart {agent} for its new role?', description: "Title of the question after an agent's workflow role was changed while it is working (HI-2664): it needs a restart to get its new role's tools. {agent} is its name." }), { agent: agent.name }),
+              message: tr(msg({ id: 'agents.side.restartMessage', defaultMessage: "{agent} is working. Its new role's tools load when it restarts; it carries on in the same conversation.", description: "The question after an agent's role was changed while it is working (HI-2664). {agent} is its name." }), { agent: agent.name }),
+              choices: [
+                { label: tr(msg({ id: 'agents.side.restartWhenDone', defaultMessage: 'Restart When Its Turn Is Over', description: 'Button (HI-2664): the agent restarts once its turn is over, in the same conversation, with its new role\'s tools.' })), value: 'restart' },
+                { label: tr(msg({ id: 'agents.side.later', defaultMessage: 'Later', description: 'Button (HI-2664): the agent keeps its old tools until it restarts.' })), value: 'later' }
+              ]
+            })
+            if (choice === 'restart') await call('session:restartForTools', project.path, agent.id, 'atSafePoint').catch(() => undefined)
+          }
+        }
       }}
       onClose={close}
     />
@@ -638,6 +688,25 @@ export function AgentSettingsDialog() {
  * saves the template with it, #510). Its role in the workflow and note (#1436), never where it works: that is the card's
  * or lane's. No connection (HI-2109: the user picks connections when loading it), but the CLI it suggests.
  */
+/**
+ * Busy agents whose tools a workflow change changes (HI-2694, Darren's decision: as a role change, HI-2664): asked once
+ * whether to restart them when their turn is over, in the same conversation, or later (they keep their old tools until
+ * they restart, and are given no work that needs the new ones meanwhile). Idle ones were restarted already.
+ */
+export async function askWorkflowToolsRestart(projectPath: string, agents: readonly { id: string; name: string }[]): Promise<void> {
+  if (!agents.length) return
+  const names = fmt.list(agents.map((a) => a.name))
+  const choice = await askChoice({
+    title: tr(msg({ id: 'agents.workflowTools.restartTitle', defaultMessage: 'Restart {agents} for the new workflow?', description: "Title of the question after a project's workflow settings changed the Combwork tools of agents that are working (HI-2694): they need a restart to get them. {agents} is their names as a list." }), { agents: names }),
+    message: tr(msg({ id: 'agents.workflowTools.restartMessage', defaultMessage: '{count, plural, one {{agents} is working. The tools its project’s workflow now allows load when it restarts; it carries on in the same conversation.} other {{agents} are working. The tools their project’s workflow now allows load when they restart; each carries on in the same conversation.}}', description: "The question after a project's workflow settings changed the Combwork tools of agents that are working (HI-2694). {agents} is their names as a list; {count} how many." }), { agents: names, count: agents.length }),
+    choices: [
+      { label: tr(msg({ id: 'agents.workflowTools.restartWhenDone', defaultMessage: '{count, plural, one {Restart When Its Turn Is Over} other {Restart When Their Turns Are Over}}', description: 'Button (HI-2694): each agent restarts once its turn is over, in the same conversation, with the tools its new workflow allows.' }), { count: agents.length }), value: 'restart' },
+      { label: tr(msg({ id: 'agents.workflowTools.later', defaultMessage: 'Later', description: 'Button (HI-2694): the agents keep their old tools until they restart.' })), value: 'later' }
+    ]
+  })
+  if (choice === 'restart') for (const a of agents) await call('session:restartForTools', projectPath, a.id, 'atSafePoint').catch(() => undefined)
+}
+
 export function TemplateAgentDialog() {
   useLanguage()
   const req = useStore((s) => s.templateAgentFor)

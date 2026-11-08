@@ -34,6 +34,26 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   check('Ctrl+P: Go to Project', await page.locator('.palette input[placeholder="Go to project"]').count() === 1)
   await page.keyboard.type('bravo'); await page.keyboard.press('Enter'); await lib.until(async () => /bravo/.test(await page.locator('.project-header h1').innerText().catch(() => '')), HUNG_MS)
   check('Go to Project opens it', /bravo/.test(await page.locator('.project-header h1').innerText()))
+  // Opened again, it is empty from its first render (HI-2730): never showing "bravo" for a moment, where keys typed at
+  // once would join it. The input's value attribute follows what it shows, and a record of each change is kept as it
+  // happens, so an old text cleared after the first render is seen even though it is gone before the observer's callback.
+  await page.evaluate(() => {
+    window.__paletteSeen = []
+    const o = new MutationObserver((recs) => {
+      for (const r of recs) {
+        if (r.type === 'attributes' && r.target.closest?.('.palette')) window.__paletteSeen.push(`attr:${r.oldValue ?? ''}`)
+        for (const n of r.addedNodes ?? []) { const i = n.querySelector?.('.palette input'); if (i) window.__paletteSeen.push(`added:${i.getAttribute('value') ?? ''}`) }
+      }
+    })
+    o.observe(document.body, { subtree: true, childList: true, attributes: true, attributeOldValue: true, attributeFilter: ['value'] })
+    window.__paletteObserver = o
+  })
+  await page.keyboard.press('Control+p'); await page.keyboard.type('alpha')
+  await lib.until(async () => (await page.locator('.palette input').inputValue().catch(() => '')) === 'alpha', HUNG_MS)
+  const seen = await page.evaluate(() => { window.__paletteObserver.disconnect(); return window.__paletteSeen })
+  check('opened again after a project was chosen in it, it is empty, keys typed at once its own', (await page.locator('.palette input').inputValue()) === 'alpha' && !seen.some((s) => /bravo/.test(s)), JSON.stringify([await page.locator('.palette input').inputValue(), seen]))
+  // Escape clears what is typed first (#433), then closes it.
+  await lib.until(async () => { if (await page.locator('.palette').count()) await page.keyboard.press('Escape'); return (await page.locator('.palette').count()) === 0 }, HUNG_MS)
   await page.keyboard.press('Control+Tab'); await lib.until(async () => /Overview/.test(await tab().catch(() => '')), HUNG_MS)
   check('Ctrl+Tab: next project tab', /Overview/.test(await tab()), await tab())
   await page.keyboard.press('Control+Shift+Tab'); await lib.until(async () => /Session/.test(await tab().catch(() => '')), HUNG_MS)
@@ -98,7 +118,9 @@ const check = (name, ok, extra = '') => { if (ok) pass++; else fail++; console.l
   await page.keyboard.press('Control+Alt+2'); await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')?.config.layout === 'columns2', HUNG_MS)
   const p = (await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')
   check('Ctrl+Alt+2: two-column layout', p.config.layout === 'columns2', JSON.stringify(p.config.layout))
-  await page.keyboard.press('Control+Alt+1'); await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')?.config.layout === 'single', HUNG_MS)
+  // The layout bravo's agents give is saved as automatic (#134: `auto`, never `single`): that wait ran out, HI-2688.
+  await page.keyboard.press('Control+Alt+1')
+  check('Ctrl+Alt+1: back to one column, the layout its agents give (automatic)', !!(await lib.until(async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')?.config.layout === 'auto', HUNG_MS)), JSON.stringify((await inv('workspace:refresh')).projects.find((x) => x.name === 'bravo')?.config.layout))
 
   // Settings → Keyboard Shortcuts
   await page.keyboard.press('Control+,'); await lib.until(async () => (await page.locator('.settings-nav .row', { hasText: 'Keyboard Shortcuts' }).count()) > 0, HUNG_MS)

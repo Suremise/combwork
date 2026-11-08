@@ -133,7 +133,7 @@
     "note": "What a watch waits for, when it has no label."
   },
   "api.agent.workflowRoleArg": {
-    "text": "workflowRole is \"builder\", \"reviewer\", \"either\" or \"generalist\"."
+    "text": "workflowRole is \"builder\", \"reviewer\", \"either\", \"generalist\" or \"independent\"."
   },
   "api.agentMcp.notAServer": {
     "text": "\"{name}\" isn't an MCP server's name{reserved, select, yes { (the built-in {server} server is always given)} other {}}.",
@@ -191,6 +191,30 @@
   },
   "api.attachment.unknown": {
     "text": "{card} has no attachment called \"{name}\"{listed, select, yes {: {choices}} other { (it has none)}}"
+  },
+  "api.build.builtAt": {
+    "text": "builtAt is a date and time (ISO).",
+    "note": "A build fact refused: builtAt is not a date and time."
+  },
+  "api.build.by": {
+    "text": "by is dist or release.",
+    "note": "A build fact refused: by is neither dist nor release (keep both as they are)."
+  },
+  "api.build.commit": {
+    "text": "commit is a commit id (7 to 64 hex characters).",
+    "note": "A build fact refused: its commit is not a commit id."
+  },
+  "api.build.installer": {
+    "text": "installer is the installer's path (at most 1,000 characters).",
+    "note": "A build fact refused: no installer path, or a longer one."
+  },
+  "api.build.kind": {
+    "text": "kind is one of: {kinds}.",
+    "note": "A build fact (POST /v1/builds, or a build marker) refused: its kind is none of these. kinds: the kinds, joined with commas."
+  },
+  "api.build.version": {
+    "text": "version is required (at most 100 characters).",
+    "note": "A build fact refused: no version, or a longer one."
   },
   "api.card.archivedArg": {
     "text": "{arg} must be a whole number from {min}: \"{raw}\"",
@@ -291,6 +315,10 @@
   "api.card.saidSkipsReview": {
     "text": "Skips review"
   },
+  "api.card.saidTarget": {
+    "text": "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}",
+    "note": "HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project's Work merges into."
+  },
   "api.card.setReviewed": {
     "text": "set it to be reviewed"
   },
@@ -359,6 +387,12 @@
   "api.change.endLane": {
     "text": "end lane {lane}"
   },
+  "api.change.forward": {
+    "text": "bring {to} up to date with {from} in {project}"
+  },
+  "api.change.forwardAny": {
+    "text": "bring a branch up to date with another"
+  },
   "api.change.handOver": {
     "text": "hand {from}'s work over to {to} in {project}"
   },
@@ -426,6 +460,12 @@
   "api.change.resumeTeam": {
     "text": "resume the team"
   },
+  "api.change.retarget": {
+    "text": "move cards and slots from {from} to {to} in {project}"
+  },
+  "api.change.retargetAny": {
+    "text": "move cards and slots to a project's new target"
+  },
   "api.change.retryFresh": {
     "text": "retry lane {lane}'s new conversations"
   },
@@ -492,6 +532,9 @@
   "api.connection.controlOff": {
     "text": "The user's settings don't let you change connections (Settings → Assistant → Control → Change settings is off). Tell the user how to change it in Settings → Accounts & Connections, or that turning Change settings on lets you."
   },
+  "api.connection.launchArg": {
+    "text": "launch is an object: guidance, tools and typing (false turns one off) and overrides (its CLI overrides by key, each true or false), or preset \"terminal\" for all off; an empty object turns everything on again."
+  },
   "api.connection.nameAccount": {
     "text": "Name the account it goes on (account: its id or name, from cw_connection list). Adding an account is the user's, in Settings → Accounts & Connections."
   },
@@ -517,7 +560,7 @@
     "text": "No connection named \"{name}\" is usable in this workspace, and none has that id."
   },
   "api.connection.nothingToChange": {
-    "text": "Nothing to change: give name, model, effort, mode, context200k, extraArgs or tag."
+    "text": "Nothing to change: give name, model, effort, mode, context200k, extraArgs, tag or launch."
   },
   "api.connection.oldFields": {
     "text": "An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} cw_connection lists every one, and makes one when the user agrees."
@@ -637,6 +680,12 @@
   "api.done.createdProject": {
     "text": "Created the project {name}"
   },
+  "api.done.forwardQueued": {
+    "text": "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}"
+  },
+  "api.done.forwardUpToDate": {
+    "text": "{to} has everything of {from} already: nothing queued"
+  },
   "api.done.freshRetried": {
     "text": "{retried, plural, =0 {Lane {lane}: no new conversation was waiting to be retried} one {Lane {lane}: {total} new conversation tried again} other {Lane {lane}: {total} new conversations tried again}}"
   },
@@ -655,6 +704,9 @@
   "api.done.laneStarted": {
     "text": "Lane {lane} {did} in {project}: {builder} / {hasReviewer, select, yes {{reviewer}} other {no reviewer}}, {cards}{putBack, select, yes { ({note})} other {}}",
     "note": "did: started or changed. note: the card a reorder applied now put back."
+  },
+  "api.done.launchedConnection": {
+    "text": "Changed the launch settings of {connection}: {how} (agents running on it take them when restarted)"
   },
   "api.done.messaged": {
     "text": "{typed, select, yes {Gave} other {Left}} {agent} in {project} a message ({id}){tied, select, yes { for {card} round {round}} other {}}{typed, select, yes {} other { (queued)}}"
@@ -676,6 +728,9 @@
   },
   "api.done.reordered": {
     "text": "Put {cards} at the top of {column}"
+  },
+  "api.done.retargeted": {
+    "text": "Moved {cards} cards and {slots} slots from {from} to {to}; {skipped} left where they were, each with why"
   },
   "api.done.slotReleased": {
     "text": "Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}"
@@ -701,7 +756,8 @@
     "note": "Each number is twice: as a number for its plural (count, skipped) and as written (total, skippedTotal), so a count over 999 has no comma."
   },
   "api.done.updatedAgent": {
-    "text": "Changed {agent}'s settings in {project}{live, select, yes { (it applies them when restarted)} other {}}"
+    "text": "Changed {agent}'s settings in {project}{live, select, yes { (it applies them when restarted)} restarting { (restarting it now to load its new role's tools, in the same conversation)} busy { (it is working: it keeps its old role's tools, and gets no work needing the new ones, until it restarts: ask the user to restart it)} other {}}",
+    "note": "HI-2664: a role change restarts an idle agent at once; a busy one keeps its old tools until it restarts, which is the user's to choose."
   },
   "api.done.updatedConnection": {
     "text": "Changed the connection {connection} (agents running on it take it when restarted)"
@@ -766,6 +822,10 @@
   },
   "api.inbox.readArg": {
     "text": "read is true or false"
+  },
+  "api.intent.acceptArg": {
+    "text": "accept must be a list of at most {max} test ids.",
+    "note": "HI-2660: a verdict's accept that isn't a list of focused test ids, or is too long. {max}: the limit."
   },
   "api.intent.actionsArg": {
     "text": "actions is a list of 1 to {max} actions, each '{'kind: {kinds}; reason?: text of at most {reasonMax} characters'}', each kind once."
@@ -878,6 +938,9 @@
   },
   "api.lane.projectRequired": {
     "text": "project is required"
+  },
+  "api.lane.targetText": {
+    "text": "target must be a branch name, or null for the project's own"
   },
   "api.lane.unknown": {
     "text": "No lane {lane}"
@@ -1008,11 +1071,20 @@
   "api.provider.notInstalled": {
     "text": "not installed"
   },
+  "api.queue.forwardArgs": {
+    "text": "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets"
+  },
   "api.queue.notAgents": {
     "text": "Project agents can't {what}: the merge queue's controls are the user's, and the Assistant's within Settings → Assistant → Control. Tell the user if it should be done."
   },
   "api.queue.projectRequired": {
     "text": "project is required"
+  },
+  "api.queue.retargetArgs": {
+    "text": "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)"
+  },
+  "api.queue.retargetGone": {
+    "text": "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again"
   },
   "api.queue.targetArg": {
     "text": "target is a branch name"

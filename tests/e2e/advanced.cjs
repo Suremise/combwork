@@ -58,16 +58,17 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     // The rows on screen: only the tab shown's, each of its group.
     const visibleIds = () => list.locator('.advanced-row').evaluateAll((rows) => rows.filter((r) => r.checkVisibility()).map((r) => r.getAttribute('data-advanced')))
     const t0 = await lib.until(async () => { const t = await tabs(); return t.length ? t : null }, HUNG_MS)
-    check('tabs: Combwork, then each CLI in the providers’ order, Combwork first chosen', JSON.stringify(t0?.map((t) => t.label)) === JSON.stringify(['Combwork', 'Claude Code', 'Codex', 'GitHub Copilot']) && t0[0].selected, JSON.stringify(t0))
+    check('tabs: Combwork, then each CLI in the providers’ order, Combwork first chosen', JSON.stringify(t0?.map((t) => t.label)) === JSON.stringify(['Combwork', 'Claude Code', 'Codex', 'GitHub Copilot', 'Antigravity']) && t0[0].selected, JSON.stringify(t0))
     check('…each with its icon: Combwork’s mark, then each CLI’s own', /tab-hex/.test(t0[0].icon ?? '') && t0.slice(1).every((t) => /provider-icon/.test(t.icon ?? '')), JSON.stringify(t0.map((t) => t.icon)))
     check('…no counts while nothing filters', t0.every((t) => t.count === null))
     const providers = (await inv('settings:get')).providers
     const enabled = (id) => !!providers?.[id]?.enabled
     check('a CLI turned off: its tab dimmed, its name saying so; one on: not', t0.slice(1).every((t) => t.muted === !enabled(t.id) && (!t.muted || /is turned off: these settings apply once you turn it on/.test(t.name ?? ''))), JSON.stringify([t0.map((t) => [t.id, t.muted, t.name]), providers]))
-    const prefix = { cw: 'cw.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.' }
+    // Antigravity's CLI-facing values are two (its switches are on connections, as every CLI's are).
+    const prefix = { cw: 'cw.', 'claude-code': 'claude-code.', codex: 'codex.', copilot: 'copilot.', antigravity: 'antigravity.' }
     for (const t of t0) {
       await tab(t.id).click()
-      check(`the ${t.label} tab shows only its own values`, !!(await lib.until(async () => { const v = await visibleIds(); return (await selectedTab()) === t.id && v.length > 5 && v.every((id) => id.startsWith(prefix[t.id])) }, HUNG_MS)), JSON.stringify((await visibleIds()).slice(0, 5)))
+      check(`the ${t.label} tab shows only its own values`, !!(await lib.until(async () => { const v = await visibleIds(); return (await selectedTab()) === t.id && v.length > (t.id === 'antigravity' ? 1 : 5) && v.every((id) => id.startsWith(prefix[t.id])) }, HUNG_MS)), JSON.stringify((await visibleIds()).slice(0, 5)))
     }
     const muted = t0.find((t) => t.muted)
     if (muted) {
@@ -156,8 +157,9 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     const wsFile = path.join(ws, '.combwork', 'workspace.json')
     check("a workspace's own value goes in workspace.json", !!(await lib.until(() => fs.existsSync(wsFile) && JSON.parse(fs.readFileSync(wsFile, 'utf8')).advanced?.['cw.progress.lanesShown'] === 2, HUNG_MS)))
     check('…and not in advanced.json', !('cw.progress.lanesShown' in readFile().values))
-    const state = await inv('advanced:state')
-    check('the window uses it', state.workspace?.['cw.progress.lanesShown'] === 2, JSON.stringify(state.workspace))
+    // The file is written before the settings in memory change (HI-2651, HI-2654): wait for the window's state, not just the file.
+    let state
+    check('the window uses it', !!(await lib.until(async () => (state = await inv('advanced:state')).workspace?.['cw.progress.lanesShown'] === 2, HUNG_MS)), JSON.stringify(state?.workspace))
     check("Settings' own value stays beside it", (await lanes.getByLabel('Combwork: Progress panel: lanes shown', { exact: true }).inputValue()) === '6')
 
     // --- A workspace's own switch (HI-2344): it inherits Settings' value and shows it, takes on and off, and goes back.
@@ -169,7 +171,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-inherited.png') })
     await resumeOwn.selectOption({ label: 'off' })
     check('…off goes in workspace.json as false', !!(await lib.until(() => wsOwn()['cw.restart.resumeAfterUpdate'] === false, HUNG_MS)), JSON.stringify(wsOwn()))
-    check('…and the window uses it', (await inv('advanced:state')).workspace?.['cw.restart.resumeAfterUpdate'] === false)
+    check('…and the window uses it', !!(await lib.until(async () => (await inv('advanced:state')).workspace?.['cw.restart.resumeAfterUpdate'] === false, HUNG_MS)))
     await resume.screenshot({ path: path.join(lib.WORK, 'advanced-ws-switch-off.png') })
     await resumeOwn.selectOption({ label: 'on' })
     check('…on as true', !!(await lib.until(() => wsOwn()['cw.restart.resumeAfterUpdate'] === true, HUNG_MS)), JSON.stringify(wsOwn()))
@@ -206,6 +208,9 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await foldersOwn.fill('F:\\Workspace evidence')
     await foldersOwn.press('Enter')
     check("…a workspace's own list goes in workspace.json", !!(await lib.until(() => JSON.stringify(wsOwn()['cw.cards.attachmentFolders']) === JSON.stringify(['F:\\Workspace evidence']), HUNG_MS)), JSON.stringify(wsOwn()))
+    // HI-2717: the file is written before the save's answer reaches the window. An emptied box is compared with the window's
+    // value, so one emptied while the window still had none was no change and saved nothing: wait for the window's value.
+    check('…and the window uses it', !!(await lib.until(() => page.evaluate(() => JSON.stringify(window.__cwAdvancedValue('cw.cards.attachmentFolders')) === JSON.stringify(['F:\\Workspace evidence'])), HUNG_MS)), JSON.stringify(await page.evaluate(() => window.__cwAdvancedValue('cw.cards.attachmentFolders'))))
     await foldersOwn.fill('')
     await foldersOwn.press('Enter')
     check("…emptied, it goes from workspace.json: Combwork's list applies", !!(await lib.until(() => !('cw.cards.attachmentFolders' in wsOwn()), HUNG_MS)), JSON.stringify(wsOwn()))
@@ -233,6 +238,8 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     await tempCombwork.fill('%LOCALAPPDATA%\\combwork-test\\agent-tmp')
     await tempCombwork.press('Enter')
     check('…a folder goes in advanced.json, its variable kept', !!(await lib.until(() => JSON.stringify(readFile().values['cw.agents.tempFolder']) === JSON.stringify(['%LOCALAPPDATA%\\combwork-test\\agent-tmp']), HUNG_MS)), JSON.stringify(readFile().values['cw.agents.tempFolder']))
+    // As for the folders above (HI-2717): emptied below, it is compared with the window's value, so wait for that.
+    check('…and the window uses it', !!(await lib.until(() => page.evaluate(() => JSON.stringify(window.__cwAdvancedValue('cw.agents.tempFolder')) === JSON.stringify(['%LOCALAPPDATA%\\combwork-test\\agent-tmp'])), HUNG_MS)), JSON.stringify(await page.evaluate(() => window.__cwAdvancedValue('cw.agents.tempFolder'))))
     await temp.screenshot({ path: path.join(lib.WORK, 'advanced-tempfolder.png') })
     await tempCombwork.fill('D:\\a; E:\\b')
     await tempCombwork.press('Enter')
@@ -302,7 +309,7 @@ const readFile = () => JSON.parse(fs.readFileSync(file, 'utf8'))
     // Settings' own Modified only, at the top, filters the list too.
     await page.locator('.settings-top').getByLabel('Modified only').check()
     check("Settings' Modified only lists only the changed advanced values", !!(await lib.until(async () => (await ids()) === changedIds, HUNG_MS)), await ids())
-    check('…each tab counting its changed ones (Combwork 2, Claude Code 1, Codex 2, GitHub Copilot 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0]', HUNG_MS)), JSON.stringify(await tabs()))
+    check('…each tab counting its changed ones (Combwork 2, Claude Code 1, Codex 2, GitHub Copilot 0, Antigravity 0)', !!(await lib.until(async () => JSON.stringify((await tabs()).map((t) => t.count)) === '[2,1,2,0,0]', HUNG_MS)), JSON.stringify(await tabs()))
     await page.locator('.settings-top').getByLabel('Modified only').uncheck()
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     await list.getByLabel('Modified only').check()

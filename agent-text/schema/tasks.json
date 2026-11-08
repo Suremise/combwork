@@ -113,6 +113,13 @@
   "tasks.error.decisionsUsers": {
     "placeholders": {}
   },
+  "tasks.error.dependencyTooLate": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain",
+      "cards": "plain"
+    }
+  },
   "tasks.error.doingNobodyNew": {
     "placeholders": {}
   },
@@ -317,6 +324,60 @@
   "tasks.error.staysInProject": {
     "placeholders": {
       "project": "plain"
+    }
+  },
+  "tasks.error.targetChanged": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.targetCheckedOut": {
+    "placeholders": {
+      "unknown": "select",
+      "card": "plain",
+      "folder": "plain"
+    }
+  },
+  "tasks.error.targetDefaultMoved": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.targetHasWork": {
+    "placeholders": {
+      "unknown": "select",
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "tasks.error.targetLane": {
+    "placeholders": {
+      "card": "plain",
+      "builder": "plain",
+      "target": "plain"
+    }
+  },
+  "tasks.error.targetMissing": {
+    "placeholders": {
+      "unknown": "select",
+      "target": "plain"
+    }
+  },
+  "tasks.error.targetMoved": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "tasks.error.targetNotAgents": {
+    "placeholders": {}
+  },
+  "tasks.error.targetNotListed": {
+    "placeholders": {
+      "hasTargets": "select",
+      "target": "plain",
+      "default": "plain",
+      "hasOthers": "select",
+      "others": "plain"
     }
   },
   "tasks.error.tooLong": {
@@ -747,6 +808,12 @@
   "tasks.history.takenFromOfWorkspace": {
     "placeholders": {
       "agent": "plain"
+    }
+  },
+  "tasks.history.target": {
+    "placeholders": {
+      "own": "select",
+      "target": "plain"
     }
   },
   "tasks.history.toProject": {

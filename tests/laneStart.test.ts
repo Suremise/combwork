@@ -5,13 +5,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string; cwd?: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), owed: [] as unknown[], noCode: [] as number[], lanesOn: false, view: null as unknown, starts: [] as { n: number; agentId: string; note: string; guard?: (now: unknown) => void }[], startRefuses: null as null | string, placementDue: null as unknown, startGuardView: null as unknown }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), oldTools: new Set<string>(), switching: new Map<string, 'waiting' | 'restarting'>(), owed: [] as unknown[], noCode: [] as number[], lanesOn: false, view: null as unknown, starts: [] as { n: number; agentId: string; note: string; guard?: (now: unknown) => void }[], startRefuses: null as null | string, placementDue: null as unknown, startGuardView: null as unknown }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
     liveFor: (_p: string, id: string) => state.live.get(id) ?? null,
     // A prompt Combwork typed that its CLI hasn't taken yet (HI-2034): `state.pending`.
     agentNow: (_p: string, id: string) => (state.live.has(id) ? { pending: state.pending.has(id) } : null),
+    // Its session has its role's tools (HI-2664): `state.oldTools` hasn't restarted since its role changed.
+    sideAllows: (_p: string, id: string) => !state.oldTools.has(id),
+    // Its switch under way (HI-2739: a restart for its tools): `state.switching`.
+    switchUnderWay: (_p: string, id: string) => state.switching.get(id) ?? null,
     start: async (_p: string, o: { agentId: string }) => {
       state.calls.push(`start ${o.agentId}`)
       state.onStart?.(o.agentId)
@@ -133,6 +137,8 @@ const ws = {
 beforeEach(() => {
   state.live.clear()
   state.pending.clear()
+  state.oldTools.clear()
+  state.switching.clear()
   state.owed.length = 0
   state.calls.length = 0
   state.afterRecord = null
@@ -165,18 +171,18 @@ describe('Start Lane… with the reviewer pool (#1443)', () => {
   }
 
   it("offers the pool only where the project's rules have one, with the agents whose role reviews", async () => {
-    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null })
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null, targets: null })
     state.enforced = true
     state.options = { ...allOff('git'), review: 'agent', noSelfReview: true }
-    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null })
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: null, targets: null })
     pool()
-    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }, { id: 'r2', name: 'R2' }] })
+    expect(await laneStartInfo(ws, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }, { id: 'r2', name: 'R2' }], targets: null })
   })
 
   it('never offers a generalist in the pool, whatever its name (HI-686)', async () => {
     pool()
     const withGeneralist = { ...(ws as object), projectConfig: async () => ({ version: 2, agents: [{ id: 'b1', name: 'B1', workflowRole: 'builder' }, { id: 'r1', name: 'R1' }, { id: 'g1', name: 'GR1', workflowRole: 'generalist' }] }) } as never
-    expect(await laneStartInfo(withGeneralist, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }] })
+    expect(await laneStartInfo(withGeneralist, 'D:\\ws\\alpha')).toEqual({ pool: [{ id: 'r1', name: 'R1' }], targets: null })
   })
 
   it("records the lane with the pool and starts only its builder, whose brief names the pool's reviewers", async () => {
@@ -316,6 +322,18 @@ describe('a lane waiting for a slot, started as Combwork quits (#1628)', () => {
 
   it('not quitting: both are started', async () => {
     waiting()
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
+    expect(state.calls).toEqual(['start b1', 'start r1'])
+  })
+
+  // HI-2664 (HR3's round 1): made the lane's builder or reviewer while running and not restarted since, it has its old
+  // role's tools: the lane keeps waiting, nothing started or typed, and starts once it has restarted with them.
+  it.each(['b1', 'r1'])("%s still on its old role's tools: the lane waits, nothing started, until it has restarted", async (id) => {
+    waiting()
+    state.oldTools.add(id)
+    expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(false)
+    expect(state.calls).toEqual([])
+    state.oldTools.delete(id)
     expect(await startWaitingLane(ws, 'D:\\ws\\alpha', 'lane-1', 'slot-a', () => false)).toBe(true)
     expect(state.calls).toEqual(['start b1', 'start r1'])
   })
@@ -481,6 +499,56 @@ describe('a lane the Assistant or a script starts over stopped agents (HI-1900)'
         expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.")
       })
     }
+
+    // HI-2739: a workflow change restarts an idle agent for its tools (HI-2694), and a lane recorded meanwhile found it
+    // neither idle nor stopped, so it was left in its resumed conversation, never given a new one.
+    for (const status of ['ready', 'working', 'stopped']) {
+      it(`restarting for a switch (its exit typed, ${status}) as the lane is recorded: its new conversation is owed, nothing launched now`, async () => {
+        recorded()
+        state.enforced = true
+        state.options = { ...allOff('git'), review: 'agent' }
+        state.live.set('b2', { status, sessionId: 's-b2' })
+        state.switching.set('b2', 'restarting')
+        const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+        expect(state.calls).toEqual(['start r1'])
+        expect(state.owed).toEqual([{ lane: 'lane-9', agent: 'b2', role: 'builder', oldSession: 's-b2' }])
+        expect(state.live.get('b2')?.sessionId).toBe('s-b2')
+        expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 wasn't free: Combwork gives it the lane in a new conversation once it is, so don't prompt it.")
+      })
+    }
+
+    it('its run ended for a switch, not resumed yet (not live) as the lane is recorded: owed its new conversation, never started over the resume', async () => {
+      recorded()
+      state.switching.set('b2', 'restarting')
+      state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+      const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+      expect(state.calls).toEqual([])
+      expect(state.owed).toEqual([{ lane: 'lane-9', agent: 'b2', role: 'builder', oldSession: null }])
+      expect(l?.started.map((s) => [s.name, s.how])).toEqual([['B2', 'deferred']])
+    })
+
+    it('in a turn with a switch waiting for its safe point (nothing typed): left as it is, as a busy builder is', async () => {
+      recorded()
+      state.enforced = true
+      state.options = { ...allOff('git'), review: 'agent' }
+      state.live.set('b2', { status: 'working', sessionId: 's-b2' })
+      state.switching.set('b2', 'waiting')
+      const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+      expect(state.calls).toEqual(['start r1'])
+      expect(state.owed).toEqual([])
+      expect(recordedLaneNote(l)).toBe("Started R1 with the lane's brief. B2 is running, so Combwork left it as it is: Combwork gives it the lane's first card itself once it is free, so don't prompt it.")
+    })
+
+    it('idle with a switch about to type its exit: not free, so owed its new conversation rather than racing the switch', async () => {
+      recorded()
+      state.live.set('b2', { status: 'ready', sessionId: 's-b2' })
+      state.live.set('r1', { status: 'ready', sessionId: 's-r1' })
+      state.switching.set('b2', 'waiting')
+      const l = await launchRecordedLane(ws, ALPHA, 'lane-9')
+      expect(state.calls).toEqual([])
+      expect(state.owed).toEqual([{ lane: 'lane-9', agent: 'b2', role: 'builder', oldSession: 's-b2' }])
+      expect(l?.started.map((s) => [s.name, s.how])).toEqual([['B2', 'deferred']])
+    })
 
     it('idle as the lane is recorded, not free at its launch (a prompt not taken yet): its new conversation is owed (HI-2034), never the old one kept', async () => {
       recorded()

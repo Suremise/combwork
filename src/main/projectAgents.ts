@@ -14,13 +14,16 @@ import { slotCopyOf } from '../shared/slotDefaults'
 import { toast } from './events'
 import { placeKey, samePlace } from './fsutil'
 import { withRepoLock } from './repoLock'
-import { createLogger } from './logger'
+import { createLogger, userText } from './logger'
 import { checkProject } from './branchWatch'
 import { noteManualChoice } from './agentChoice'
 import { sessions } from './sessions'
 import { endReviews, releaseAgentCards } from './tasks'
 import { laneAgentRemoved } from './lanes'
 import { workspace, workspaceOf } from './workspace'
+import { agentChangeCheck, agentImpact, impactBusy, ImpactMoved } from './connectionLaunch'
+import { boardWrite } from './boardStore'
+import type { LaunchImpact } from '../shared/launchPolicy'
 import * as wt from './worktrees'
 import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
@@ -28,6 +31,7 @@ import { listOf, shownText, withValues, type Text } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
 import { capturedText, CombworkError, combworkError, shownError } from './combworkError'
 import { providerService } from './providerService'
+import { allProviders } from './providers'
 import { accountById, allConnections, firstUsableAccount, assertConnectionHere, connectionProblem, firstAccountHere, getConnection } from './accounts'
 import { ensureMigrated, saveConnections } from './connectionMoves'
 import { baseConnection } from '../shared/accounts'
@@ -399,7 +403,7 @@ export function cleanRole(role: unknown): string {
 /** A workflow role as saved (#1430): builder, reviewer, either or generalist (HI-686), else refused. */
 export function cleanWorkflowRole(role: unknown): WorkflowRole {
   if (isWorkflowRole(role)) return role
-  throw combworkError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either or generalist.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either and generalist are values: keep them in English." }), undefined, { kind: 'invalid' })
+  throw combworkError(msg({ id: 'worktrees.agent.badWorkflowRole', defaultMessage: 'A role in the workflow is builder, reviewer, either, generalist or independent.', description: "An error: an agent's role in the workflow was given as something else. builder, reviewer, either, generalist and independent are values: keep them in English." }), undefined, { kind: 'invalid' })
 }
 
 /**
@@ -413,7 +417,20 @@ export function cleanDialectPick(v: unknown): string | undefined {
   return t && t.toLowerCase() !== 'auto' ? t.slice(0, 400) : undefined
 }
 
-export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void; session?: string | null } = {}): Promise<AgentDef> {
+/**
+ * What a change of an agent's connection or role would take out of the workflow (HI-2670: Settings asks first), or null:
+ * it would be made Independent while on a running lane or holding a card in Doing or Review.
+ */
+export async function agentChangeImpact(projectPath: string, agentId: string, patch: AgentPatch): Promise<LaunchImpact | null> {
+  projectPath = workspace.assertSessionHost(projectPath)
+  if (workspace.isAssistantHome(projectPath)) return null
+  const before = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === agentId)
+  if (!before) return null
+  const after: AgentDef = { ...before, ...(patch.workflowRole !== undefined ? { workflowRole: patch.workflowRole ? cleanWorkflowRole(patch.workflowRole) : undefined } : {}), ...(patch.connection ? { connection: patch.connection } : {}) }
+  return agentImpact(workspaceOf(projectPath), projectPath, basename(projectPath), before, after)
+}
+
+export async function updateAgent(projectPath: string, agentId: string, patch: AgentPatch, opts: { check?: (current: AgentDef) => void; session?: string | null; confirmed?: string | null } = {}): Promise<AgentDef> {
   // The Combwork Assistant's settings for this workspace are its agent's, too (it keeps its name).
   projectPath = workspace.assertSessionHost(projectPath)
   // The Assistant gets Combwork's own tools, not the projects' MCP servers, whatever it is given (sessions.ts).
@@ -478,6 +495,9 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   // an agent sharing its name from before names were unique keeps it while its other settings change, but only while it
   // still has that name. The Assistant's agent is never renamed.
   const name = patch.name
+  // Made Independent (HI-2670: Independent chosen, or a connection without Combwork's tools) while on a lane or holding
+  // a card: only with `confirmed` naming that exact set, read as one snapshot and checked again under the lock with the
+  // write (agentChangeCheck, HR1 on s44): the agent as saved still as read, and nothing it reads written since.
   // Its connection (HI-1769), checked under the lock with the write: one that exists, is the CLI's it will run and is on
   // here. Only the one already saved, for the same CLI, may stay while it is off here (the default runs it meanwhile).
   // Whether the patch changes its CLI was decided from the agent as read before the write (resetting what belongs to the
@@ -485,6 +505,7 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
   const beforeCli = before ? agentProvider(before, config.settings) : null
   const check = (current: AgentDef): void => {
     opts.check?.(current)
+    independentCheck?.(current)
     const was = agentProvider(current, config.settings)
     // A change of CLI only while it is stopped, as it is now: one started while this write waited keeps everything.
     if (patch.provider !== undefined && patch.provider !== was && sessions.liveFor(projectPath, agentId)) throw combworkError(M.stopForProvider, undefined, { kind: 'conflict' })
@@ -500,17 +521,45 @@ export async function updateAgent(projectPath: string, agentId: string, patch: A
     // point is dropped, and none moves it for the rest of that period.
     if (connection !== undefined) noteManualChoice(projectPath, current)
   }
-  const def =
-    name !== undefined
-      ? await withAgentNames(projectPath, async () => {
+  // A change of its role or connection (HI-2670, HR3 on s45): what it takes out of the workflow read, checked under the
+  // project's lock and the file saved all under the board's lock, so no card or lane is given to it in between.
+  const roleChange: Partial<Pick<AgentDef, 'workflowRole' | 'connection'>> = { ...('workflowRole' in clean ? { workflowRole: clean.workflowRole } : {}), ...('connection' in clean ? { connection: clean.connection } : {}) }
+  const fenced = !!before && Object.keys(roleChange).length > 0 && !workspace.isAssistantHome(projectPath)
+  // Read before the board's lock (the lanes can't be read inside a board write), then checked inside it: the snapshot
+  // still current there, and held so through the save.
+  let independentCheck: ((current: AgentDef) => void) | null = null
+  // The locks in their one order (HR3 on s46): the names', then the board's, then the project file's (mutateProjectConfig's).
+  const save = (): Promise<AgentDef> => workspace.updateAgent(projectPath, agentId, clean, check)
+  const fencedSave = (): Promise<AgentDef> => (fenced ? boardWrite(workspaceOf(projectPath), save) : save())
+  const write = async (): Promise<AgentDef> => {
+    return name !== undefined
+      ? withAgentNames(projectPath, async () => {
           const now = projectAgents(await workspace.projectConfig(projectPath)).find((a) => a.id === agentId)
           if (!now || !sameAgentName(now.name, name)) await assertNameFree(projectPath, name, { self: agentId })
-          return workspace.updateAgent(projectPath, agentId, clean, check)
+          return fencedSave()
         })
-      : await workspace.updateAgent(projectPath, agentId, clean, check)
+      : fencedSave()
+  }
+  const fencedWrite = async (): Promise<AgentDef> => {
+    // Something written between the read and the board's lock (any card, on a busy board): read again, a few times.
+    for (let i = 0; i < 3; i++) {
+      independentCheck = await agentChangeCheck(workspaceOf(projectPath), projectPath, basename(projectPath), before!, roleChange, opts.confirmed)
+      try {
+        return await write()
+      } catch (e) {
+        if (!(e instanceof ImpactMoved)) throw e
+      }
+    }
+    throw impactBusy()
+  }
+  const def = fenced ? await fencedWrite() : await write()
   const live = sessions.liveFor(projectPath, agentId)
   if (live && patch.name) live.agentName = patch.name
   await workspaceOf(projectPath).refresh()
+  // A role change, however made (HI-2664, HR3's round 1: Agent Settings, the Agent API, the Assistant): an idle agent is
+  // restarted now to load its new side's tools; a busy one keeps its old tools, and no work needing the new ones, until
+  // it restarts (the window asks; restartForTools).
+  if ('workflowRole' in clean && !workspace.isAssistantHome(projectPath)) await sessions.restartForTools(projectPath, agentId, { when: 'ifIdle' }).catch((e) => log.warn(`${userText(def.name)}: not restarted for its new role`, e))
   return def
 }
 
@@ -547,6 +596,12 @@ export async function removeAgent(projectPath: string, agentId: string, opts: { 
     return { agents: left, ...pendingSetupPatch(now, { add: pending, drop: gone }) }
   })
   await agentsGone(projectPath, [agentId], { releaseCards: !!opts.releaseCards })
+  // What a CLI keeps for this agent alone (Antigravity's profile, HI-2731) goes too: only here, since Remove Agent can't
+  // be undone, while a template load's can (its agents come back with their ids and conversations).
+  const home = workspaceOf(projectPath).path
+  if (home) {
+    for (const p of allProviders()) await p.agentRemoved?.(agentId, home).catch((e) => log.warn(`Could not send ${userText(def.name)}'s ${p.descriptor.name} profile to the Recycle Bin`, e))
+  }
   return result
 }
 

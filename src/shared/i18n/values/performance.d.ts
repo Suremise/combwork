@@ -5,9 +5,15 @@ interface CombworkMessageValues {
   'performance.card.data': undefined
   'performance.card.dataSub': { size: string | number }
   'performance.card.dataTip': undefined
+  'performance.card.failures': undefined
+  'performance.card.failuresSub': { refused: number; invalid: number; unknown: number }
+  'performance.card.failuresTip': undefined
+  'performance.card.failuresValue': { errors: number }
   'performance.card.guidance': undefined
   'performance.card.guidanceSub': { launches: number; core: string | number; catalog: string | number }
   'performance.card.guidanceTip': undefined
+  'performance.card.guidanceTools': { tools: string | number; upfront: string | number }
+  'performance.card.guidanceToolsAll': { tools: string | number }
   'performance.card.latency': undefined
   'performance.card.latencyTip': undefined
   'performance.card.p50': { latency: string | number }
@@ -300,6 +306,12 @@ interface CombworkMessageValues {
   'performance.export.done': undefined
   'performance.export.failed': undefined
   'performance.export.tip': undefined
+  'performance.failures.errorsTip': undefined
+  'performance.failures.invalid': undefined
+  'performance.failures.invalidTip': undefined
+  'performance.failures.refused': undefined
+  'performance.failures.refusedTip': undefined
+  'performance.failures.unsorted': undefined
   'performance.guidance.catalog': undefined
   'performance.guidance.core': undefined
   'performance.guidance.empty': undefined
@@ -341,6 +353,15 @@ interface CombworkMessageValues {
   'performance.providersNote.scripts': undefined
   'performance.range.label': undefined
   'performance.range.name': { range: string }
+  'performance.reasons.count': undefined
+  'performance.reasons.english': { id: string | number }
+  'performance.reasons.heading': undefined
+  'performance.reasons.kind': undefined
+  'performance.reasons.kindValue': { kind: string }
+  'performance.reasons.other': undefined
+  'performance.reasons.reason': undefined
+  'performance.reasons.tip': undefined
+  'performance.reasons.unknown': undefined
   'performance.refresh': undefined
   'performance.role.agent': undefined
   'performance.role.all': undefined
@@ -349,7 +370,6 @@ interface CombworkMessageValues {
   'performance.role.viewer': undefined
   'performance.routes.cancelled': undefined
   'performance.routes.empty': undefined
-  'performance.routes.failed': undefined
   'performance.routes.heading': undefined
   'performance.routes.received': undefined
   'performance.routes.route': undefined
@@ -411,6 +431,9 @@ interface CombworkMessageValues {
   'performance.toolList.starts': undefined
   'performance.toolList.tip': undefined
   'performance.toolList.tools': undefined
+  'performance.toolList.unknownProvider': undefined
+  'performance.toolList.upfront': undefined
+  'performance.toolList.upfrontTip': undefined
   'performance.tools.calls': undefined
   'performance.tools.chars': undefined
   'performance.tools.detail': undefined
@@ -421,11 +444,13 @@ interface CombworkMessageValues {
   'performance.tools.tip': undefined
   'performance.tools.tool': undefined
   'performance.trend.detail': { requests: number; failed: number; cancelled: number; toolCalls: number; chars: number; launches: number; partial: string; duration: string | number }
-  'performance.trend.failed': undefined
+  'performance.trend.errors': undefined
+  'performance.trend.errorsLine': { errors: number }
   'performance.trend.heading': { step: string }
   'performance.trend.label': { step: string }
   'performance.trend.notRecorded': undefined
   'performance.trend.notRecordedLegend': undefined
+  'performance.trend.refused': undefined
   'performance.trend.slot': { when: string | number; detail: string | number }
   'performance.trend.succeeded': undefined
   'performance.trend.waits': { waits: number }

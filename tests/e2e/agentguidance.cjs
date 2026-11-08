@@ -180,22 +180,25 @@ function packagesRequired(entry) {
     }
 
     // ---- Off: the same server, its tools still there, no instructions.
-    await inv('advanced:set', GUIDANCE, false)
+    // Its connection's switch (HI-2670: each connection's, in its Launch Settings, no longer Settings → Advanced's).
+    await lib.setAgentLaunch(inv, alpha, def.id, { guidance: false })
     const off = await combworkServer()
     check("off: the launch still has Combwork's server (its tools)", !!off?.command && off.env?.CW_GUIDANCE === '0', JSON.stringify(off?.env ?? {}).slice(0, 300))
     const without = await initialize(off)
     check('…which answers with no instructions', !!without && !('instructions' in without), JSON.stringify(without).slice(0, 300))
-    await inv('advanced:set', GUIDANCE, true)
+    await lib.setAgentLaunch(inv, alpha, def.id, {})
 
-    // ---- The new rows in Settings → Advanced, in both themes.
+    // ---- Settings → Advanced no longer lists them (HI-2670: each connection's now), nor takes them.
+    const refused = await inv('advanced:set', GUIDANCE, false).then(() => '', (e) => String(e?.message ?? e))
+    check('Settings → Advanced refuses cw.guidance: it is set on each connection now', /set on each connection now/.test(refused), refused)
     await page.keyboard.press('Control+,')
     await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
     const search = page.getByRole('textbox', { name: 'Search settings' })
     for (const [name, query, id] of [['guidance', 'guidance for agents', GUIDANCE], ['statusline', 'status line in place', 'claude-code.override.statusLine']]) {
       await search.fill(query)
       const row = page.locator(`.advanced-row[data-advanced="${id}"]`)
-      // The list's values are the store's, refreshed by advanced:set's event after it returns (HI-1988): wait for the switch too.
-      check(`Advanced lists ${id}, on`, !!(await lib.until(async () => (await row.count()) === 1 && (await row.getByRole('switch').getAttribute('aria-checked')) === 'true', HUNG_MS)), await row.getByRole('switch').getAttribute('aria-checked', { timeout: 1000 }).catch((e) => e.message))
+      // Searched for by its words: not listed (its Launch Settings have it).
+      check(`Advanced no longer lists ${id}`, (await row.count()) === 0)
       for (const theme of ['dark', 'light']) {
         await inv('settings:update', { appearance: { theme } })
         await lib.until(async () => (await page.evaluate(() => document.documentElement.dataset.theme ?? document.body.className)).includes(theme), HUNG_MS)

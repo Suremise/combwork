@@ -1,6 +1,6 @@
 {
   "worktrees.agent.badPlacement": "W tym układzie nie można tak rozmieścić paneli.",
-  "worktrees.agent.badWorkflowRole": "Rola w przepływie pracy to builder, reviewer, either lub generalist.",
+  "worktrees.agent.badWorkflowRole": "Rola w przepływie pracy to builder, reviewer, either, generalist lub independent.",
   "worktrees.agent.chooseMove": "Wybierz, gdzie przenieść agenta.",
   "worktrees.agent.effortRefused": "{chosen, select, yes {{model}} other {Domyślny model CLI}} nie obsługuje wysiłku „{effort}”. Wybierz jeden z obsługiwanych poziomów.",
   "worktrees.agent.enterName": "Wpisz nazwę.",

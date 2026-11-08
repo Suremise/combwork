@@ -54,7 +54,11 @@ function replies(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []
   const add = (name: string, text: string | { error: string } | number | null | unknown): void => {
     if (typeof text === 'string') out.push({ name, text })
-    else if (text && typeof text === 'object' && 'error' in text) out.push({ name, text: String((text as { error: string }).error) })
+    else if (text && typeof text === 'object' && 'error' in text) {
+      // A check's refusal: its text, or (HI-2704) its said message.
+      const e = (text as { error: unknown }).error
+      out.push({ name, text: typeof e === 'string' ? e : (e as { said: string }).said })
+    }
   }
   add('checks isolated', R.checksView(['typecheck'], 'HI-12', true)?.checksHint)
   add('checks', R.checksView(['typecheck'], 'HI-12', false)?.checksHint)
@@ -148,6 +152,7 @@ function replies(): { name: string; text: string }[] {
   add('setting default', R.settingText({ ...detail, value: 'off', project: undefined }))
   add('setting changed', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', project: 'alpha', old: 'on', new: 'off', restart: 'at the next launch' }))
   add('setting changed now', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', old: 'on', new: 'off' }))
+  add('setting changed with a note', R.settingChangedText({ title: 'x', id: 'project.workflow.target', path: 'Version Control → Workflow → Work merges into', project: 'alpha', old: '1.1.0', new: '1.2.0', note: 'It applies to cards started from now on outside running lanes.' }))
   add('setting same', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', project: 'alpha', old: 'on', new: 'on' }))
   const entry = (o: Partial<R.JournalEntryDetail>): R.JournalEntryDetail => ({ id: 12, at: '2026-10-18T00:00:00Z', kind: 'decision', project: 'alpha', summary: 'summary text', importance: 3, source: 'combwork', supersededBy: 13, hasDetail: true, detail: 'detail text', why: 'why text', digestOf: 'x', updatedAt: 'x', links: [{ type: 'card', ref: '12' }], tags: ['lane'], supersedes: [1], ...o })
   add('recall', R.journalRecallText([entry({}), entry({ importance: 2, source: 'agent', hasDetail: false, supersededBy: null, project: null })]))
@@ -243,6 +248,8 @@ describe('the canary dialect over the tool replies (HI-2435)', () => {
     expect(R.noteWrittenText('notes/plan.md', 12345, false, 'abc')).toBe('Wrote notes/plan.md (12,345 characters, revision abc).')
     expect(R.undoText([{ change: 'a-1', what: 'title', undone: ['title'], skipped: [] }])).toBe('Undid 1 of 1 change in full.')
     expect(R.releasableText({ project: 'alpha', carried: [], held: [{ slot: 'slot-a', agent: 'Coder', run: 'r1', combwork: 'h1', processes: null }] })).toBe('slot-a: held by Coder\'s ended run r1, its Combwork h1 (kind writer, confirm {"slot":"slot-a","run":"r1"}). Combwork doesn\'t know which of its processes still run.')
-    expect(R.checksView(['typecheck'], 'HI-12', true)?.checksHint).toBe('before review: run one with cw-progress --check <name> --card "HI-12" (--isolated: in a check copy at the card\'s revision; work-on-card)')
+    expect(R.checksView(['typecheck'], 'HI-12', true)?.checksHint).toBe('before review: cw-progress --check <name> --card "HI-12" (--isolated: in a check copy). Budget, other checks: project notes; work-on-card')
+    // HI-2658: the usual checks (typecheck and lint) with a five-digit key still fit replysize's 200 bytes for the checks fields.
+    expect(Buffer.byteLength(JSON.stringify(R.checksView(['typecheck', 'lint'], 'HI-12345', true)), 'utf8')).toBeLessThanOrEqual(200)
   })
 })

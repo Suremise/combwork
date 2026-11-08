@@ -38,7 +38,7 @@ export function fingerprint(root = process.cwd()) {
 }
 
 /** The real CLIs a run can use (suites.mjs `needs`): the provider each one is, by its id and name. */
-export const REAL_CLIS = { claude: { id: 'claude-code', name: 'Claude Code' }, codex: { id: 'codex', name: 'Codex' }, copilot: { id: 'copilot', name: 'GitHub Copilot' } }
+export const REAL_CLIS = { claude: { id: 'claude-code', name: 'Claude Code' }, codex: { id: 'codex', name: 'Codex' }, copilot: { id: 'copilot', name: 'GitHub Copilot' }, agy: { id: 'antigravity', name: 'Antigravity' } }
 
 /** The file in a suite's folder where its test copies of Combwork note the CLIs they selected (CW_TEST_CLI_LOG). */
 export const CLI_LOG = 'cw-clis.jsonl'
@@ -165,6 +165,21 @@ const windowsOf = (r) => (r.ok === false ? [...(describeExit(r.code) ? [`exit ${
  * first, if it can't be trusted (recordStatus), why. After the table: how the suites were picked (selection), the real CLIs' versions (clis, when real suites
  * ran), the real tier not run (notRun), and the suites skipped for the environment (a real CLI's usage limit, sign-in,
  * network), which are no result for the code. */
+/**
+ * The waits that ran out in each suite (lib.until's "WAIT ran out after … ms at …" lines, HI-2663), most time first:
+ * [{ name, n, seconds, at: [caller…] }]. A wait that ran out and that nothing checked is time spent for nothing.
+ */
+export function waitsRanOut(results) {
+  return results
+    .map((r) => {
+      const lines = [...(r.out ?? '').matchAll(/^WAIT ran out after (\d+) ms at (.+)$/gm)]
+      return { name: r.name, n: lines.length, seconds: Math.round(lines.reduce((s, m) => s + Number(m[1]), 0) / 1000), at: [...new Set(lines.map((m) => m[2].trim()))] }
+    })
+    .filter((w) => w.n)
+    .sort((a, b) => b.seconds - a.seconds)
+}
+export const waitsLine = (waits) => `Waits that ran out (10 s or more each, lib.until; HI-2663): ${waits.map((w) => `${w.name} ${w.n} (${w.seconds}s)`).join(', ')}`
+
 export function recordMarkdown({ code, when, jobs, results, logDir, summary, problems = [], runs = null, notRun = [], clis = {}, homes = [], selection = null, packaged = null }) {
   // A skip's reason can quote the CLI: no | to break the table.
   const skippedCell = (r) => `skipped: ${r.skipped.replace(/\|/g, '/')}`
@@ -180,7 +195,9 @@ export function recordMarkdown({ code, when, jobs, results, logDir, summary, pro
   const windows = results.filter((r) => windowsOf(r).length).map((r) => `${r.name}: ${windowsOf(r).join('; ')}`)
   const devOnly = results.filter((r) => r.notRun).map((r) => r.name)
   const partsLeft = results.filter((r) => r.partsNotRun?.length).map((r) => `${r.name}: ${r.partsNotRun.join('; ')}`)
+  const waits = waitsRanOut(results)
   const notes = [
+    ...(waits.length ? [`${waitsLine(waits)}.`] : []),
     ...(selection ? [selectionLine(selection)] : []),
     ...(windows.length ? [`Windows codes (#599): ${windows.join(' · ')}.`] : []),
     ...(Object.keys(clis).length ? [`Real CLIs (as Combwork selected them): ${cliLine(clis)}.`] : []),

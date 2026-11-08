@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { atMost, whenAll } from '../src/shared/atMost'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-openreads-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -84,7 +85,7 @@ describe("a workspace's reads, one failing (HR2's round 1 finding)", () => {
     const held = gate()
     let failed = false
     let siblingDone = false
-    const original = w.projectInfo.bind(w)
+    const original = bound(w, w.projectInfo)
     const spy = vi.spyOn(w, 'projectInfo').mockImplementation(async (p, ...rest) => {
       if (p.endsWith('alpha')) {
         failed = true

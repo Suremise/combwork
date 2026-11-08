@@ -935,21 +935,41 @@
     "defaultMessage": "Not in {target}",
     "description": "A group of the Changes tab's leftover branches: those with commits {target} hasn't."
   },
+  "project.limit.counts": {
+    "defaultMessage": "{used, number} of {entitlement, number} used",
+    "description": "In the (i) of a plan limit whose provider says its counts (HI-2734: Copilot's requests): how many of how many were used."
+  },
   "project.limit.heading": {
     "defaultMessage": "{plan, select, none {Plan limits, account-wide, as of {when}} other {Plan limits ({plan}), account-wide, as of {when}}}",
     "description": "Above the plan limits. {plan} is the plan's name (none when unknown); {when} how long ago they were reported."
+  },
+  "project.limit.models": {
+    "defaultMessage": "{models, select, gemini {Gemini models} otherModels {Other models} premium {Premium requests} chat {Chat messages} completions {Code completions} other {{models}}}{window, select, weekly {, weekly} other {}}",
+    "description": "The name of a plan limit that covers part of a plan (HI-2734), shown where Combwork says \"{name} limit\": which models or requests it is for (Antigravity's Gemini models, or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}), and, for a weekly one, that it is weekly. \"Other models\" are the models of providers other than Google."
   },
   "project.limit.noConnections": {
     "defaultMessage": "No {provider} account is on in this workspace. Turn one on in Settings → Accounts & Connections to see its plan limits here.",
     "description": "In place of the plan limits (HI-1756) when the workspace has no account on for the coding agent ({provider}). Settings → Accounts & Connections names a section."
   },
-  "project.limit.none": {
-    "defaultMessage": "{provider} reports your plan’s limits while a session runs; they appear here after the next message in any {provider} session. Accounts that use an API key have no plan limits.",
-    "description": "In place of the plan limits before any were reported."
-  },
   "project.limit.noneConnection": {
     "defaultMessage": "Its limits appear after the next message in a session on {name}.",
     "description": "Under a connection ({name}: \"Max 1\", a sign-in the user named) in the plan limits (HI-1756), before any of its limits were reported."
+  },
+  "project.limit.notIncluded": {
+    "defaultMessage": "Not in your plan",
+    "description": "A plan limit's figure when the provider says the plan's allowance for it is 0 (HI-2734: Copilot Free has no premium requests), in place of a percent."
+  },
+  "project.limit.notIncludedSub": {
+    "defaultMessage": "an allowance of 0",
+    "description": "Under a plan limit the plan does not include (HI-2734): its allowance, as the provider reported it, is 0."
+  },
+  "project.limit.notReported": {
+    "defaultMessage": "{provider} hasn’t reported your plan’s limits in its sessions so far. Its sessions report them as they run; accounts that use an API key have none.",
+    "description": "In place of the plan limits while none is known (HI-2734): no session of the coding agent ({provider}) has reported any yet."
+  },
+  "project.limit.planOnly": {
+    "defaultMessage": "Your plan: {plan}. {provider} hasn’t reported this plan’s limits yet.",
+    "description": "In place of the plan limits when the provider said the plan's name but no limits (HI-2734: Antigravity's plan tier). {plan} is the plan's name as the provider says it."
   },
   "project.limit.resets": {
     "defaultMessage": "used · resets {when}",
@@ -966,6 +986,14 @@
   "project.limit.title": {
     "defaultMessage": "{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}",
     "description": "Title of a plan limit figure: the provider's rolling usage window. {label} is the provider's own name for a window Combwork doesn't know."
+  },
+  "project.limit.unlimited": {
+    "defaultMessage": "Unlimited",
+    "description": "A plan limit's figure when the plan has no limit on it (HI-2734: Copilot reports some quotas as unlimited), in place of a percent."
+  },
+  "project.limit.unlimitedSub": {
+    "defaultMessage": "{hasReset, select, yes {no limit · period resets {when}} other {no limit}}",
+    "description": "Under an unlimited plan limit (HI-2734). {when} is when its period resets: \"in 3 days\", or a day and time."
   },
   "project.limit.used": {
     "defaultMessage": "used",
@@ -1178,6 +1206,38 @@
   "project.none.select": {
     "defaultMessage": "Select a project from the sidebar.",
     "description": "Shown when the workspace has projects but none is selected."
+  },
+  "project.oneAgent.archiveOne": {
+    "defaultMessage": "Archive and Start New for One Agent",
+    "description": "Menu item in the project header's Agents ▾, after Archive and Start New (n): opens a menu of the agents with a session to archive, to archive one's and start it new. Title case."
+  },
+  "project.oneAgent.carryOn": {
+    "defaultMessage": "Its sign-in was refused: Resume tells it to carry on",
+    "description": "In Resume (n)'s menu of agents, beside a running agent whose turn stopped when its coding agent's sign-in was refused: choosing it tells it to carry on (it may need signing in first). It doesn't say the sign-in worked."
+  },
+  "project.oneAgent.chooseResume": {
+    "defaultMessage": "Choose an agent to resume",
+    "description": "Tooltip and accessible name of the narrow ▾ beside the project header's Resume (n) button: opens a menu of those agents, to resume one."
+  },
+  "project.oneAgent.chooseStop": {
+    "defaultMessage": "Choose an agent to stop",
+    "description": "Tooltip and accessible name of the narrow ▾ beside the project header's Stop (n) button: opens a menu of the running agents, to stop one."
+  },
+  "project.oneAgent.resumeOne": {
+    "defaultMessage": "Resume One Agent",
+    "description": "Menu item (the project header's ⋯ when narrow, a project's right-click menu): opens a menu of the agents Resume All would resume, to resume one. Title case, as the menu's other items."
+  },
+  "project.oneAgent.startNewOne": {
+    "defaultMessage": "Start New for One Agent",
+    "description": "Menu item in the project header's Agents ▾, after Start New (n): opens a menu of the project's agents, to start a new session for one. Title case."
+  },
+  "project.oneAgent.stopOne": {
+    "defaultMessage": "Stop One Agent",
+    "description": "Menu item (the project header's ⋯ when narrow, a project's right-click menu): opens a menu of the running agents, to stop one. Title case."
+  },
+  "project.oneAgent.stopped": {
+    "defaultMessage": "Stopped",
+    "description": "In the menu of agents an all-agents action would act on (Resume (n)'s ▾…), beside a stopped agent's name: it isn't running."
   },
   "project.overview.byAgent": {
     "defaultMessage": "By agent",

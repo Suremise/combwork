@@ -53,7 +53,7 @@ export const API = {
     useStartAgent: agentMsg({ id: 'api.agent.useStartAgent', text: 'Use cw_start_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/start) to start agents.' }),
     useStopAgent: agentMsg({ id: 'api.agent.useStopAgent', text: 'Use cw_stop_agent (POST /v1/projects/\'{\'name\'}\'/agents/\'{\'agent\'}\'/stop) to stop agents.' }),
     waitingOnCards: agentMsg({ id: 'api.agent.waitingOnCards', text: 'waiting on cards', note: 'What a watch waits for, when it has no label.' }),
-    workflowRoleArg: agentMsg({ id: 'api.agent.workflowRoleArg', text: 'workflowRole is "builder", "reviewer", "either" or "generalist".' })
+    workflowRoleArg: agentMsg({ id: 'api.agent.workflowRoleArg', text: 'workflowRole is "builder", "reviewer", "either", "generalist" or "independent".' })
   },
   attachment: {
     alreadyAttached: agentMsg({ id: 'api.attachment.alreadyAttached', text: 'Already attached' }),
@@ -105,6 +105,7 @@ export const API = {
     saidNoCode: agentMsg({ id: 'api.card.saidNoCode', text: 'Confirmed as no code', note: 'A line of a card change\'s reply and history (stored, said in the Default).' }),
     saidReviewed: agentMsg({ id: 'api.card.saidReviewed', text: 'Reviewed' }),
     saidSkipsReview: agentMsg({ id: 'api.card.saidSkipsReview', text: 'Skips review' }),
+    saidTarget: agentMsg({ id: 'api.card.saidTarget', text: "{own, select, yes {Merges into {target}} other {Merges into the project's branch}}", note: 'HI-2556: a card update set its Merges into: own yes, {target} (a branch); else the project\'s Work merges into.' }),
     setReviewed: agentMsg({ id: 'api.card.setReviewed', text: 'set it to be reviewed' }),
     setSkipReview: agentMsg({ id: 'api.card.setSkipReview', text: 'set it to skip review' }),
     stayInProject: agentMsg({ id: 'api.card.stayInProject', text: 'Cards stay in your project ({project}).' }),
@@ -138,6 +139,10 @@ export const API = {
     messageAgent: agentMsg({ id: 'api.change.messageAgent', text: 'leave {agent} in {project} a message' }),
     onlyAssistant: agentMsg({ id: 'api.change.onlyAssistant', text: 'Only the Assistant can {what} through the Agent API.', note: 'what: what the change is called (api.change.*).' }),
     pauseAQueue: agentMsg({ id: 'api.change.pauseAQueue', text: 'pause a merge queue' }),
+    forwardAny: agentMsg({ id: 'api.change.forwardAny', text: 'bring a branch up to date with another' }),
+    retargetAny: agentMsg({ id: 'api.change.retargetAny', text: "move cards and slots to a project's new target" }),
+    retarget: agentMsg({ id: 'api.change.retarget', text: 'move cards and slots from {from} to {to} in {project}' }),
+    forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}' }),
     pauseQueue: agentMsg({ id: 'api.change.pauseQueue', text: 'pause the merge queue of {project}' }),
     pauseTeam: agentMsg({ id: 'api.change.pauseTeam', text: 'pause the team' }),
     planTemplate: agentMsg({ id: 'api.change.planTemplate', text: 'plan loading a template' }),
@@ -183,7 +188,8 @@ export const API = {
     noneNamed: agentMsg({ id: 'api.connection.noneNamed', text: 'No connection named "{name}", and none has that id.' }),
     noneNamedUsable: agentMsg({ id: 'api.connection.noneNamedUsable', text: 'No connection named "{name}" is usable in this workspace, and none has that id. cw_connection lists them.' }),
     noneNamedUsableShort: agentMsg({ id: 'api.connection.noneNamedUsableShort', text: 'No connection named "{name}" is usable in this workspace, and none has that id.' }),
-    nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k, extraArgs or tag.' }),
+    nothingToChange: agentMsg({ id: 'api.connection.nothingToChange', text: 'Nothing to change: give name, model, effort, mode, context200k, extraArgs, tag or launch.' }),
+    launchArg: agentMsg({ id: 'api.connection.launchArg', text: 'launch is an object: guidance, tools and typing (false turns one off) and overrides (its CLI overrides by key, each true or false), or preset "terminal" for all off; an empty object turns everything on again.' }),
     oldFields: agentMsg({ id: 'api.connection.oldFields', text: 'An agent no longer takes {fields}: it runs on a connection, which holds its model, effort, context and mode, and its CLI follows from it. Pass connection (its id or name). {on} cw_connection lists every one, and makes one when the user agrees.' }),
     severalAccounts: agentMsg({ id: 'api.connection.severalAccounts', text: 'Several accounts are named "{name}": use its id ({ids}).' }),
     severalNamed: agentMsg({ id: 'api.connection.severalNamed', text: 'Several connections are named "{name}": use its id ({ids}).' })
@@ -240,6 +246,9 @@ export const API = {
     prompted: agentMsg({ id: 'api.done.prompted', text: 'Gave {agent} in {project} a task{given, select, yes { ({id})} other {}}' }),
     promptedFresh: agentMsg({ id: 'api.done.promptedFresh', text: 'Gave {agent} in {project} a task in a new conversation' }),
     queuePaused: agentMsg({ id: 'api.done.queuePaused', text: 'Paused the merge queue for {target} in {project}' }),
+    retargeted: agentMsg({ id: 'api.done.retargeted', text: 'Moved {cards} cards and {slots} slots from {from} to {to}; {skipped} left where they were, each with why' }),
+    forwardUpToDate: agentMsg({ id: 'api.done.forwardUpToDate', text: '{to} has everything of {from} already: nothing queued' }),
+    forwardQueued: agentMsg({ id: 'api.done.forwardQueued', text: "{queued, select, yes {Queued {card}: bringing {to} up to date with {from}, through {to}'s merge queue} other {{card} is bringing {to} up to date with {from} already}}" }),
     queueResumed: agentMsg({ id: 'api.done.queueResumed', text: '{resumed, select, yes {Resumed the merge queue for {target} in {project}} other {The merge queue for {target} in {project} is still paused ({hasReason, select, yes {{reason}} other {paused}})}}' }),
     reordered: agentMsg({ id: 'api.done.reordered', text: 'Put {cards} at the top of {column}' }),
     slotReleased: agentMsg({ id: 'api.done.slotReleased', text: 'Released {slot} in {project}{kind, select, carried {: no longer kept for {agent}} other { from {agent}\'s ended run{ended, select, yes {, its listed processes ended first} other {}}}}' }),
@@ -249,8 +258,9 @@ export const API = {
     teamResumed: agentMsg({ id: 'api.done.teamResumed', text: '{was, select, yes {Resumed the team} other {The team was not paused}}' }),
     templateLoaded: agentMsg({ id: 'api.done.templateLoaded', text: 'Loaded the template "{template}" into {project}: {agents} agents{workflow, select, saved {, and its workflow ({options} options changed)} notSaved {; its workflow was not saved} other {}}' }),
     undid: agentMsg({ id: 'api.done.undid', text: 'Undid {undone} of {total} {count, plural, one {change} other {changes}} of its own{skipped, plural, =0 {} one { ({skippedTotal} field left: changed since or gone)} other { ({skippedTotal} fields left: changed since or gone)}}', note: 'Each number is twice: as a number for its plural (count, skipped) and as written (total, skippedTotal), so a count over 999 has no comma.' }),
-    updatedAgent: agentMsg({ id: 'api.done.updatedAgent', text: 'Changed {agent}\'s settings in {project}{live, select, yes { (it applies them when restarted)} other {}}' }),
-    updatedConnection: agentMsg({ id: 'api.done.updatedConnection', text: 'Changed the connection {connection} (agents running on it take it when restarted)' })
+    updatedAgent: agentMsg({ id: 'api.done.updatedAgent', text: 'Changed {agent}\'s settings in {project}{live, select, yes { (it applies them when restarted)} restarting { (restarting it now to load its new role\'s tools, in the same conversation)} busy { (it is working: it keeps its old role\'s tools, and gets no work needing the new ones, until it restarts: ask the user to restart it)} other {}}', note: "HI-2664: a role change restarts an idle agent at once; a busy one keeps its old tools until it restarts, which is the user's to choose." }),
+    updatedConnection: agentMsg({ id: 'api.done.updatedConnection', text: 'Changed the connection {connection} (agents running on it take it when restarted)' }),
+    launchedConnection: agentMsg({ id: 'api.done.launchedConnection', text: 'Changed the launch settings of {connection}: {how} (agents running on it take them when restarted)' })
   },
   handover: {
     busy: agentMsg({ id: 'api.handover.busy', text: '{agent} is working, merging or on a card loop\'s card: its conversation isn\'t ended now. Hand it over when it has finished.' }),
@@ -295,6 +305,7 @@ export const API = {
     testsArg: agentMsg({ id: 'api.intent.testsArg', text: 'tests: {problem}. Give the test ids the change needs, each a string or \'{\' id, needs \'}\' (needs: unit, fake, real, packaged).' }),
     unknownAskKind: agentMsg({ id: 'api.intent.unknownAskKind', text: 'Unknown kind "{value}": {kinds}.' }),
     unknownFailKind: agentMsg({ id: 'api.intent.unknownFailKind', text: 'Unknown failKind "{value}": content or explanation.' }),
+    acceptArg: agentMsg({ id: 'api.intent.acceptArg', text: 'accept must be a list of at most {max} test ids.', note: "HI-2660: a verdict's accept that isn't a list of focused test ids, or is too long. {max}: the limit." }),
     unknownStep: agentMsg({ id: 'api.intent.unknownStep', text: 'Unknown step "{value}": {steps}.' })
   },
   journal: {
@@ -307,6 +318,7 @@ export const API = {
     agentStartsOwn: agentMsg({ id: 'api.lane.agentStartsOwn', text: 'An agent starts its own lane, as its builder: a reviewer joins its builder\'s lane (join)' }),
     applyNowArg: agentMsg({ id: 'api.lane.applyNowArg', text: 'applyNow must be true or false' }),
     briefMax: agentMsg({ id: 'api.lane.briefMax', text: 'brief is at most {max} characters' }),
+    targetText: agentMsg({ id: 'api.lane.targetText', text: "target must be a branch name, or null for the project's own" }),
     briefText: agentMsg({ id: 'api.lane.briefText', text: 'brief must be text (\'\'\' clears it)' }),
     builderRequired: agentMsg({ id: 'api.lane.builderRequired', text: 'builder is required: the name of the lane\'s builder' }),
     cardsArg: agentMsg({ id: 'api.lane.cardsArg', text: 'cards must be the card numbers, in order (at least one)' }),
@@ -382,6 +394,9 @@ export const API = {
     notAgents: agentMsg({ id: 'api.queue.notAgents', text: 'Project agents can\'t {what}: the merge queue\'s controls are the user\'s, and the Assistant\'s within Settings → Assistant → Control. Tell the user if it should be done.' }),
     projectRequired: agentMsg({ id: 'api.queue.projectRequired', text: 'project is required' }),
     targetArg: agentMsg({ id: 'api.queue.targetArg', text: 'target is a branch name' }),
+    retargetArgs: agentMsg({ id: 'api.queue.retargetArgs', text: "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)" }),
+    retargetGone: agentMsg({ id: 'api.queue.retargetGone', text: "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again" }),
+    forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets" }),
     targetRequired: agentMsg({ id: 'api.queue.targetRequired', text: 'target is required: the branch the queue merges into{listed, select, yes { ({targets})} other {}}' })
   },
   settings: {

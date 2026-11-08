@@ -298,15 +298,20 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
     planModeToggle: false,
     promptCacheTtl: true,
     reportsCost: true,
+    // Behind its tool search, but for tools listed with anthropic/alwaysLoad (HI-2229).
+    defersMcpTools: true,
     compactFocus: true,
     contextLimit: true,
     autoCompactReserve: 33_000,
+    // Its parts, for a local model's declared context (HI-2682's probe, 2.1.319): the output budget, at most 20K, and 13K.
+    autoCompactParts: { outputMax: 20_000, buffer: 13_000 },
     imagePaste: true,
     // Its Read tool returns a PDF as a document and an image as an image (checked with 2.1.296).
     attachments: ['image', 'pdf', 'text'],
     lockAsk: true,
     backgroundSessions: true,
     backgroundWakes: true,
+    typedTurnsWithoutPrompt: true,
     // SessionStart comes as it starts (once its folder is trusted), before any prompt.
     startHook: true,
     startupSizeRefresh: false,
@@ -335,6 +340,17 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
         modelEnv: 'ANTHROPIC_MODEL',
         aliasEnv: { opus: 'ANTHROPIC_DEFAULT_OPUS_MODEL', sonnet: 'ANTHROPIC_DEFAULT_SONNET_MODEL', haiku: 'ANTHROPIC_DEFAULT_HAIKU_MODEL' },
         subagentEnv: 'CLAUDE_CODE_SUBAGENT_MODEL',
+        // A local model's limits (HI-2682; code.claude.com/docs/en/model-config, "Which IDs CLAUDE_CODE_MAX_CONTEXT_TOKENS
+        // applies to", checked with 2.1.319): the context for an ID it can't resolve, an output budget, effort sent as
+        // none and no thinking field (the server may still reason). The advanced settings: LOCAL_MODEL_ALIASES_ID and
+        // LOCAL_MODEL_SPELLINGS_ID (advanced.ts; a unit test checks they are the same).
+        localLimits: {
+          contextEnv: 'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
+          outputEnv: 'CLAUDE_CODE_MAX_OUTPUT_TOKENS',
+          fixedEnv: { CLAUDE_CODE_EFFORT_LEVEL: 'auto', MAX_THINKING_TOKENS: '0' },
+          aliasSetting: 'claude-code.localModel.aliases',
+          spellingSetting: 'claude-code.localModel.spellings'
+        },
         listing: { path: 'v1/models', list: 'data', id: 'id' },
         presets: [
           // DeepSeek's Claude Code guide (api-docs.deepseek.com/quick_start/agent_integrations/claude_code, 27 Oct 2026):
@@ -361,6 +377,18 @@ export const CLAUDE_DESCRIPTOR: ProviderDescriptor = {
             remoteModels: 'claude-code.connections.remoteModels',
             contextAdvice: 64_000,
             docs: 'https://docs.ollama.com/integrations/claude-code'
+          },
+          // llama.cpp's llama-server (HI-2683): its Anthropic-compatible Messages API, as HI-2552's spike used it on the test
+          // server (b11608, 7 Nov 2026: structured tool calls through /v1/messages). Port 8080 is llama-server's default; no
+          // key unless it was started with --api-key; its loaded model listed at /v1/models. Tools need its chat template
+          // (llama-server's --jinja): Server diagnostics reads that from /props. No context advice of its own.
+          {
+            id: 'llamacpp',
+            name: 'llama.cpp', // i18n-ignore: a product's name
+            baseUrl: 'http://localhost:8080',
+            keyless: true,
+            listing: { path: '/v1/models', list: 'data', id: 'id' },
+            docs: 'https://github.com/ggml-org/llama.cpp/tree/master/tools/server'
           }
         ]
       }

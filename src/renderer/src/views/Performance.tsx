@@ -1,9 +1,9 @@
-import { Children, useCallback, useEffect, useMemo, useRef } from 'react'
+import { Children, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { fmt, msg, tr, tRich, type Msg } from '@shared/i18n'
 import { providerDescriptor, providerName } from '@shared/providers'
 import { LATENCY_BOUNDS_MS, percentile, type GuidanceSeries, type MetricsReport, type MetricsScope, type ProviderUsageSummary, type SafeguardCount, type TrendPoint } from '@shared/metrics'
-import { DEFAULT_PERF_FILTERS, PERF_RANGES, WORKSPACE_OWN, byRoute, byTool, isEmpty, latencyOrder, pageQuery, providersIn, select, toolListRows, totals, type PerfFilters, type PerfRange, type PerfRole, type PerfSelection, type RouteRow, type ToolListRow, type ToolRow } from '@shared/metricsView'
+import { DEFAULT_PERF_FILTERS, PERF_RANGES, WORKSPACE_OWN, byRoute, byTool, isEmpty, latencyOrder, pageQuery, providersIn, reasonRows, select, toolListRows, totals, type FailureCounts, type PerfFilters, type PerfRange, type PerfRole, type PerfSelection, type ReasonRow, type RouteRow, type ToolListRow, type ToolRow } from '@shared/metricsView'
 import { compareScopeKey, compareScopeOf } from '@shared/benchmark'
 import { FREE_LOCAL, moneyLabel } from '@shared/usageTotals'
 import { formatDateTime, formatDayLabel, formatWeekdayTime } from '@shared/dates'
@@ -20,6 +20,7 @@ import { AntivirusLine } from '../components/Antivirus'
 import { Card } from './WorkspaceOverview'
 import { CardsTable } from './PerformanceCards'
 import { StallsTable } from './PerformanceStalls'
+import { reasonMessages, reasonSentence, type ReasonMessage } from './perfReasons'
 
 /**
  * Performance: what Combwork's own parts cost (shared/metrics.ts, recorded by main/metrics.ts), for the whole workspace (the
@@ -73,7 +74,7 @@ const M = {
   requests: msg({ id: 'performance.card.requests', defaultMessage: 'API requests', description: "Title of a Performance card: how many Agent API requests Combwork answered." }),
   requestsSub: msg({ id: 'performance.card.requestsSub', defaultMessage: '{failed} failed · {cancelled} cancelled', description: "Under the API requests card's number. {failed} and {cancelled} are percentages (\"2%\") or — when there were none." }),
   requestsSubRate: msg({ id: 'performance.card.requestsSubRate', defaultMessage: '{rate, number} an hour recorded · {failed} failed · {cancelled} cancelled', description: "Under the API requests card's number. {rate} is requests per hour while Combwork was recording; {failed} and {cancelled} are percentages (\"2%\")." }),
-  requestsTip: msg({ id: 'performance.card.requestsTip', defaultMessage: 'Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Combwork was recording, not the whole range. Failed: refused, client or server errors. Cancelled: the client went away before the reply. Waits (an isolated check waiting for a check copy) are counted but never failed.', description: 'Tooltip of the API requests card. An hour, Failed and Cancelled are words of the card, Waits a column of the Agent API table: keep them as there.' }),
+  requestsTip: msg({ id: 'performance.card.requestsTip', defaultMessage: 'Agent API requests (agents’ tools, the Assistant, scripts). An hour: over the time Combwork was recording, not the whole range. Failed: refused by a rule, wrong calls and real errors (the Failures card has each). Cancelled: the client went away before the reply. Waits (an isolated check waiting for a check copy) are counted but never failed.', description: 'Tooltip of the API requests card. An hour, Failed and Cancelled are words of the card, Waits a column of the Agent API table: keep them as there.' }),
   latency: msg({ id: 'performance.card.latency', defaultMessage: 'Latency', description: 'Title of a Performance card: how long Agent API requests took.' }),
   p50: msg({ id: 'performance.card.p50', defaultMessage: 'p50 {latency}', description: 'The median request time, on the Latency card. {latency} is a time such as "≤ 25 ms". Keep p50.' }),
   p95: msg({ id: 'performance.card.p95', defaultMessage: 'p95 {latency}', description: 'The 95th percentile of request time, on the Latency card. {latency} is a time such as "≤ 250 ms". Keep p95.' }),
@@ -86,7 +87,9 @@ const M = {
   toolRepliesTip: msg({ id: 'performance.card.toolRepliesTip', defaultMessage: "The text Combwork's tools gave the models (what goes into their context), exactly: characters (UTF-16 code units) and UTF-8 bytes. Not tokens.", description: 'Tooltip of the Tool replies card. Keep UTF-16 and UTF-8.' }),
   guidance: msg({ id: 'performance.card.guidance', defaultMessage: 'Guidance per launch', description: 'Title of a Performance card: the size of what Combwork gave each session at launch, on average.' }),
   guidanceSub: msg({ id: 'performance.card.guidanceSub', defaultMessage: '{launches, plural, one {# launch} other {# launches}} · core {core} · catalog {catalog}', description: "Under the Guidance per launch card's size. {core} and {catalog} are sizes such as \"4 KB\": Combwork's session contract and its skills' catalog." }),
-  guidanceTip: msg({ id: 'performance.card.guidanceTip', defaultMessage: "What Combwork gave each session at launch, on average: its session contract (core), what it adds for the project, the Assistant's role and mode, and its skills' catalog (names and descriptions). Skill bodies are separate: a model reads one only when it uses it.", description: 'Tooltip of the Guidance per launch card. core and catalog are words of the card: keep them as there.' }),
+  guidanceTools: msg({ id: 'performance.card.guidanceTools', defaultMessage: 'Tool list {tools} a start, ≈ {upfront} if deferred', description: "A second line under the Guidance per launch card (HI-2553): the Combwork tools' definitions each session's CLI got, on average, and Combwork's estimate (≈) of what a CLI that defers tools (Claude Code) gets at the start if it does. {tools} and {upfront} are sizes such as \"24 KB\"." }),
+  guidanceToolsAll: msg({ id: 'performance.card.guidanceToolsAll', defaultMessage: 'Tool list {tools} a start', description: "A second line under the Guidance per launch card (HI-2553), when how much was put in the prompt at the start isn't known: the Combwork tools' definitions each session's CLI got, on average. {tools} is a size such as \"24 KB\"." }),
+  guidanceTip: msg({ id: 'performance.card.guidanceTip', defaultMessage: "What Combwork gave each session at launch, on average: its session contract (core), what it adds for the project, the Assistant's role and mode, and its skills' catalog (names and descriptions). Skill bodies are separate: a model reads one only when it uses it. The tool list (its Combwork tools' definitions) is apart: the Combwork tool list table has it by provider.", description: 'Tooltip of the Guidance per launch card. core and catalog are words of the card: keep them as there.' }),
   limits: msg({ id: 'performance.limits.heading', defaultMessage: 'What isn’t measured', description: 'A folded section at the end of the Performance page: what its numbers leave out.' }),
   limitsWindow: msg({ id: 'performance.limits.window', defaultMessage: 'This page reads through Combwork’s window, not the Agent API: refreshing it adds nothing to these numbers.', description: 'The last line of What isn’t measured on the Performance page.' }),
   coverageRange: msg({ id: 'performance.coverage.range', defaultMessage: '{from} to {to} · kept 30 days, hourly for the last 7.', description: "At the top of the Performance page: the range shown. {from} and {to} are dates and times. Metrics are kept 30 days, by the hour for the last 7." }),
@@ -112,7 +115,6 @@ const M = {
   succeeded: msg({ id: 'performance.trend.succeeded', defaultMessage: 'Succeeded', description: "Legend of the requests chart: the bars' colour for requests that succeeded." }),
   trendWaits: msg({ id: 'performance.trend.waits', defaultMessage: '{waits, plural, one {# wait} other {# waits}} for a check copy, not failures', description: 'A second line in the tooltip of a bar of the requests chart, shown when there were any: replies telling an isolated check to ask again because no check copy was free. Lower case.' }),
   waitsLegend: msg({ id: 'performance.trend.waitsLegend', defaultMessage: 'Waits', description: "Legend of the requests chart: the bars' colour for replies that told a check to wait (no check copy free), which aren't failures." }),
-  failed: msg({ id: 'performance.trend.failed', defaultMessage: 'Failed', description: "Legend of the requests chart: the bars' colour for requests that failed." }),
   notRecorded: msg({ id: 'performance.trend.notRecordedLegend', defaultMessage: 'Not recorded', description: 'Legend of the requests chart: the hatched bars, when Combwork recorded nothing.' }),
   assistant: msg({ id: 'performance.who.assistant', defaultMessage: 'Assistant', description: "In a Performance table's Who column: the Combwork Assistant's sessions." }),
   agents: msg({ id: 'performance.who.agents', defaultMessage: 'Agents', description: "In a Performance table's Who column: project agents' sessions." }),
@@ -121,7 +123,7 @@ const M = {
   chars: msg({ id: 'performance.tools.chars', defaultMessage: 'Characters', description: "Column header of the Combwork tools table: its replies' characters." }),
   perCall: msg({ id: 'performance.tools.perCall', defaultMessage: 'Per call', description: "Column header of the Combwork tools table: its replies' characters per call, on average." }),
   detail: msg({ id: 'performance.tools.detail', defaultMessage: 'Detail', description: 'Column header of the Combwork tools table: calls that asked for the full form of the reply.' }),
-  errors: msg({ id: 'performance.tools.errors', defaultMessage: 'Errors', description: 'Column header of the Combwork tools table: calls that failed.' }),
+  errors: msg({ id: 'performance.tools.errors', defaultMessage: 'Errors', description: 'Column header of the Combwork tools and Agent API tables: calls or requests that failed for a real error (HI-2553: not refusals or wrong calls, which have columns of their own).' }),
   p50Header: msg({ id: 'performance.col.p50', defaultMessage: 'p50', description: 'Column header of a Performance table: the median time. Keep it short.' }),
   p95Header: msg({ id: 'performance.col.p95', defaultMessage: 'p95', description: 'Column header of a Performance table: the 95th percentile of time. Keep it short.' }),
   toolsHeading: msg({ id: 'performance.tools.heading', defaultMessage: 'Combwork tools', description: "Heading of the Performance page's table of the Combwork tools agents called." }),
@@ -129,7 +131,28 @@ const M = {
   toolsEmpty: msg({ id: 'performance.tools.empty', defaultMessage: 'No tool calls.', description: 'The Combwork tools table when it has no rows.' }),
   route: msg({ id: 'performance.routes.route', defaultMessage: 'Route', description: "Column header of the Agent API table: the request's method and route (such as GET /api/tasks)." }),
   requestsHeader: msg({ id: 'performance.col.requests', defaultMessage: 'Requests', description: 'Column header of a Performance table: how many requests.' }),
-  failedHeader: msg({ id: 'performance.routes.failed', defaultMessage: 'Failed', description: 'Column header of the Agent API table: requests that failed.' }),
+  failures: msg({ id: 'performance.card.failures', defaultMessage: 'Failures', description: "Title of the Performance page's card of failed Agent API requests, by kind (HI-2553)." }),
+  failuresSub: msg({ id: 'performance.card.failuresSub', defaultMessage: '{refused, plural, one {# refused by a rule} other {# refused by a rule}} · {invalid, plural, one {# wrong call} other {# wrong calls}}{unknown, plural, =0 {} one { · # not sorted} other { · # not sorted}}', description: 'Under the Failures card (HI-2553): the requests a workflow rule or a guard refused, those that were wrong calls (a bad argument, an unknown card), and those recorded before Combwork sorted them.' }),
+  failuresValue: msg({ id: 'performance.card.failuresValue', defaultMessage: '{errors, plural, =0 {No real errors} one {# real error} other {# real errors}}', description: 'The value of the Failures card (HI-2553): Agent API requests that failed for a real error (a server error), shown apart from refusals and wrong calls.' }),
+  failuresTip: msg({ id: 'performance.card.failuresTip', defaultMessage: 'Agent API requests that didn’t succeed, by kind. Real errors: something went wrong in Combwork (a server error). Refused by a rule: a workflow rule or a guard said no and said what to do instead (a submit with nothing new, a move the rules don’t allow, no access); that is the workflow working, not a fault. Wrong calls: a bad argument, an unknown card, a missing file. Not sorted: recorded before Combwork sorted failures. Cancelled requests aren’t counted here.', description: 'Tooltip of the Failures card (HI-2553). Real errors, Refused by a rule, Wrong calls and Not sorted are words of the card: keep them as there.' }),
+  refusedHeader: msg({ id: 'performance.failures.refused', defaultMessage: 'Refused', description: 'Column header of the Agent API and Combwork tools tables (HI-2553): requests or calls a workflow rule or a guard refused.' }),
+  refusedTip: msg({ id: 'performance.failures.refusedTip', defaultMessage: 'A workflow rule or a guard said no, and what to do instead: the workflow working, not a fault.', description: 'Info tip of the Refused column (HI-2553).' }),
+  invalidHeader: msg({ id: 'performance.failures.invalid', defaultMessage: 'Wrong calls', description: 'Column header of the Agent API and Combwork tools tables (HI-2553): requests or calls with a bad argument, an unknown card or a missing file.' }),
+  invalidTip: msg({ id: 'performance.failures.invalidTip', defaultMessage: 'A bad argument, an unknown card, a missing file. A tool agents keep calling wrong may need a clearer description.', description: 'Info tip of the Wrong calls column (HI-2553).' }),
+  errorsTip: msg({ id: 'performance.failures.errorsTip', defaultMessage: 'Real errors: something went wrong in Combwork (a server error), or, for a tool call, no reply came (a timeout, no connection).', description: 'Info tip of the Errors column (HI-2553).' }),
+  unsortedHeader: msg({ id: 'performance.failures.unsorted', defaultMessage: 'Not sorted', description: 'Column header of the Agent API and Combwork tools tables (HI-2553), shown only when there are any: failures recorded before Combwork sorted them by kind.' }),
+  reasonsHeading: msg({ id: 'performance.reasons.heading', defaultMessage: 'Refusals and wrong calls by reason', description: "Heading of the Performance page's table of why Agent API requests were refused or were wrong calls (HI-2553)." }),
+  reasonsTip: msg({ id: 'performance.reasons.tip', defaultMessage: 'The most common reasons Combwork gave, by route, as a general sentence: Combwork keeps which rule or message it was, never what it said, so the card, file or name it was about shows as “…”. Under it, the rule’s (rule:) or message’s (msg:) id; an agent message (agent:), such as the Agent API’s own errors, shows in English, as agents read it. A reason that keeps coming back points to a rule or a tool description to make clearer.', description: 'Info tip beside the Refusals and wrong calls by reason heading (HI-2553). Keep rule:, msg: and agent: as they are (prefixes shown in the table). “…” is how a left-out value shows: keep it.' }),
+  kind: msg({ id: 'performance.reasons.kind', defaultMessage: 'Kind', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): refused or wrong call.' }),
+  kindValue: msg({ id: 'performance.reasons.kindValue', defaultMessage: '{kind, select, refused {Refused} other {Wrong call}}', description: "A cell of the Kind column (HI-2553). {kind} is a key (refused or invalid): don't translate the keys, only the texts." }),
+  reason: msg({ id: 'performance.reasons.reason', defaultMessage: 'Reason', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): the rule or message id.' }),
+  reasonOther: msg({ id: 'performance.reasons.other', defaultMessage: 'No reason recorded (an error without a rule or message id, or past the twelve reasons a route keeps)', description: 'A cell of the Reason column (HI-2553): refusals or wrong calls whose reason Combwork could not tell, or past the twelve reasons kept per route.' }),
+  reasonEnglish: msg({ id: 'performance.reasons.english', defaultMessage: '{id} · in English', description: 'Under a reason in the Reason column (HI-2681): the id of an agent message ({id}: agent:api.card.titleRequired), whose sentence above is shown in English, as agents read it: agent messages are not translated.' }),
+  reasonUnknown: msg({ id: 'performance.reasons.unknown', defaultMessage: 'A reason this version of Combwork doesn’t know', description: 'A cell of the Reason column (HI-2553): a rule or message recorded by another version of Combwork, not found in this one. Its id shows under it.' }),
+  count: msg({ id: 'performance.reasons.count', defaultMessage: 'Count', description: 'Column header of the Refusals and wrong calls by reason table (HI-2553): how many requests.' }),
+  refusedLegend: msg({ id: 'performance.trend.refused', defaultMessage: 'Refused or wrong call', description: "Legend of the requests chart (HI-2553): the bars' colour for requests refused by a rule, wrong calls and cancelled ones: not faults." }),
+  errorsLegend: msg({ id: 'performance.trend.errors', defaultMessage: 'Real errors', description: "Legend of the requests chart (HI-2553): the bars' colour for requests that failed for a real error (a server error)." }),
+  trendErrors: msg({ id: 'performance.trend.errorsLine', defaultMessage: '{errors, plural, one {# real error} other {# real errors}}', description: 'A second line in the tooltip of a bar of the requests chart (HI-2553), shown when there were any: requests that failed for a real error.' }),
   waitsHeader: msg({ id: 'performance.routes.waits', defaultMessage: 'Waits', description: 'Column header of the Agent API table: replies that told the caller to ask again (an isolated check waiting for a check copy), not failures.' }),
   cancelled: msg({ id: 'performance.routes.cancelled', defaultMessage: 'Cancelled', description: 'Column header of the Agent API table: requests the client gave up on.' }),
   sent: msg({ id: 'performance.routes.sent', defaultMessage: 'Sent', description: 'Column header of the Agent API table: the size of the replies Combwork sent.' }),
@@ -140,10 +163,13 @@ const M = {
   providerGroup: msg({ id: 'performance.provider.groupLabel', defaultMessage: 'Filtered by provider', description: 'Name, for screen readers, of the box of the Performance page that its Provider filter changes.' }),
   provider: msg({ id: 'performance.provider.label', defaultMessage: 'Provider', description: "Label of the Performance page's provider filter, and a column header: the CLI (Claude Code, Codex, Copilot)." }),
   allProviders: msg({ id: 'performance.provider.all', defaultMessage: 'All providers', description: "The Performance page's provider filter's choice of no filter." }),
-  providerNote: msg({ id: 'performance.provider.note', defaultMessage: 'Launches and the providers’ usage: the only parts recorded per provider.', description: "Beside the Performance page's Provider filter: what it changes." }),
+  providerNote: msg({ id: 'performance.provider.note', defaultMessage: 'Launches, the Combwork tool list and the providers’ usage: the only parts recorded per provider.', description: "Beside the Performance page's Provider filter: what it changes (HI-2553: the tool list too). Combwork tool list is a table's heading: name it as there." }),
   providerNothing: msg({ id: 'performance.provider.nothing', defaultMessage: 'Nothing from {provider} in the last {range, select, 24h {24 hours} 7d {7 days} other {30 days}}{filtered, select, yes { for this filter} other {}}.', description: "The Performance page's provider box when the provider chosen has nothing. {provider} is its name (Claude Code, Codex, Copilot); {filtered} is yes when the Who filter is set; {range} (24h, 7d or 30d) is a key: don't translate the keys, only the texts." }),
   toolListHeading: msg({ id: 'performance.toolList.heading', defaultMessage: 'Combwork tool list', description: "Heading of the Performance page's table of the Combwork tools' list each session was given (HI-2063). Keep Combwork (the app's name)." }),
-  toolListTip: msg({ id: 'performance.toolList.tip', defaultMessage: 'The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, for every provider (not recorded per provider). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. A dash: not measured (sessions from before Combwork measured it).', description: "Tooltip of the Combwork tool list table on the Performance page (HI-2063). Descriptions, Parameters and Schemas are its columns: name them as there. Keep Combwork (the app's name)." }),
+  toolListTip: msg({ id: 'performance.toolList.tip', defaultMessage: 'The Combwork tools’ names, descriptions and schemas as each session’s CLI got them, once a start, on average, by provider (Unknown: starts from before Combwork recorded it). Characters are the list’s JSON; Descriptions and Parameters are the tools’ descriptions and their parameters’ descriptions in it; Schemas is the rest: names, types, keys, punctuation and escapes. If deferred is an estimate, not a measurement: what Claude Code puts in its prompt at the start when it defers MCP tools (their names, and in full only the few Combwork marks). Whether a launch deferred them isn’t observable. Codex and Copilot get the whole list. The list sits at the start of the prompt, where a provider’s prompt cache can keep it after the first turn; whether it did isn’t measured here. A dash: not measured (sessions from before Combwork measured it).', description: "Tooltip of the Combwork tool list table on the Performance page (HI-2063, HI-2553). Descriptions, Parameters, Schemas and If deferred are its columns: name them as there. Keep Combwork, Claude Code, Codex and Copilot (names)." }),
+  toolListUpfront: msg({ id: 'performance.toolList.upfront', defaultMessage: 'If deferred', description: "Column header of the Combwork tool list table (HI-2553): Combwork's estimate of the bytes a CLI that defers MCP tools (Claude Code) puts in its prompt at the start, if it does, a start, on average. Shown with ≈." }),
+  toolListUpfrontTip: msg({ id: 'performance.toolList.upfrontTip', defaultMessage: 'Combwork’s estimate, not a measurement: what a CLI that defers MCP tools gets at the start if it does, the tools Combwork marks to be sent in full and the others’ names. Claude Code defers them unless its tool search is off (a setting, a model or a gateway can turn it off); whether a launch did, and how the CLI words the list, aren’t observable. A dash: a CLI that doesn’t defer (Codex and Copilot get the whole list: Bytes), or not known.', description: "Info tip of the If deferred column of the Combwork tool list table (HI-2553). Keep Combwork, Claude Code, Codex and Copilot (names); Bytes is a column: name it as there." }),
+  unknownProvider: msg({ id: 'performance.toolList.unknownProvider', defaultMessage: 'Unknown', description: "A cell of the Combwork tool list table's Provider column (HI-2553): starts recorded before Combwork recorded their CLI." }),
   toolListEmpty: msg({ id: 'performance.toolList.empty', defaultMessage: 'No tool lists.', description: 'The Combwork tool list table when it has no rows.' }),
   toolListStarts: msg({ id: 'performance.toolList.starts', defaultMessage: 'Starts', description: 'Column header of the Combwork tool list table: how many session starts were given the list.' }),
   toolListTools: msg({ id: 'performance.toolList.tools', defaultMessage: 'Tools', description: 'Column header of the Combwork tool list table: how many tools a start was given, on average.' }),
@@ -470,13 +496,28 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
                     sub={report.coverage.observedMs >= 60_000 ? tr(M.requestsSubRate, { rate: Math.round(t.requests / (report.coverage.observedMs / 3_600_000)), failed: pct(t.errors, t.requests), cancelled: pct(t.cancelled, t.requests) }) : tr(M.requestsSub, { failed: pct(t.errors, t.requests), cancelled: pct(t.cancelled, t.requests) })}
                     tip={tr(M.requestsTip)}
                   />
+                  {/* Failures by kind (HI-2553): a real error stands out; refusals and wrong calls read as normal. */}
+                  <Card
+                    title={tr(M.failures)}
+                    value={<span className={t.apiFailures.error ? 'perf-real-errors' : undefined}>{tr(M.failuresValue, { errors: t.apiFailures.error })}</span>}
+                    sub={tr(M.failuresSub, { refused: t.apiFailures.refused, invalid: t.apiFailures.invalid, unknown: t.apiFailures.unknown })}
+                    tip={tr(M.failuresTip)}
+                  />
                   <Card title={tr(M.latency)} value={tr(M.p50, { latency: ms(t.p50, t.requests) })} sub={tr(M.p95, { latency: ms(t.p95, t.requests) })} tip={tr(M.latencyTip)} />
                   <Card title={tr(M.data)} value={formatBytes(t.responseBytes)} sub={tr(M.dataSub, { size: formatBytes(t.requestBytes) })} tip={tr(M.dataTip)} />
                   <Card title={tr(M.toolReplies)} value={num(t.toolChars)} sub={tr(M.toolRepliesSub, { calls: t.toolCalls, size: formatBytes(t.toolBytes) })} tip={tr(M.toolRepliesTip)} />
                   <Card
                     title={tr(M.guidance)}
                     value={formatBytes(t.avgGuidanceBytes + t.avgCustomBytes + t.avgRoleBytes + t.avgModeBytes + t.avgSkillCatalogBytes)}
-                    sub={tr(M.guidanceSub, { launches: t.launches, core: formatBytes(t.avgGuidanceBytes), catalog: formatBytes(t.avgSkillCatalogBytes) })}
+                    sub={
+                      <>
+                        {tr(M.guidanceSub, { launches: t.launches, core: formatBytes(t.avgGuidanceBytes), catalog: formatBytes(t.avgSkillCatalogBytes) })}
+                        {/* The tool list beside it (HI-2553): a start's, and Combwork's estimate of what a CLI that defers tools gets at the start. */}
+                        {t.toolListStarts > 0 && (
+                          <div>{t.avgToolListUpfrontBytes !== null ? tr(M.guidanceTools, { tools: formatBytes(t.avgToolListBytes), upfront: formatBytes(t.avgToolListUpfrontBytes) }) : tr(M.guidanceToolsAll, { tools: formatBytes(t.avgToolListBytes) })}</div>
+                        )}
+                      </>
+                    }
                     tip={tr(M.guidanceTip)}
                   />
                 </div>
@@ -485,11 +526,10 @@ function PerformancePage({ workspacePath, scope, filters, setFilters, projects, 
 
                 <ToolsTable sel={all} />
                 <RoutesTable sel={all} />
-                {(all.guidance.length > 0 || all.providers.length > 0 || !!report.providersNote || !!report.providersUnreadable || !!filters.provider) && (
+                <ReasonsTable sel={all} />
+                {(all.guidance.length > 0 || all.providers.length > 0 || all.catalog.length > 0 || !!report.providersNote || !!report.providersUnreadable || !!filters.provider) && (
                   <ByProvider report={report} sel={sel} range={range.value} provider={filters.provider} setProvider={(provider) => setFilters({ provider })} />
                 )}
-                {/* Combwork's tool list isn't per provider: outside the provider's group. */}
-                <ToolListTable sel={all} />
               </>
             )}
             </section>
@@ -599,6 +639,7 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
                       : tr(M.trendDetail, { requests: p.requests, failed: p.failed, cancelled: p.cancelled, toolCalls: p.toolCalls, chars: p.toolChars, launches: p.launches, partial: p.observedMs < slotMs - 60_000 ? 'yes' : 'no', duration: duration(p.observedMs) })
                 })}
                 {p.waits > 0 && <div>{tr(M.trendWaits, { waits: p.waits })}</div>}
+                {!!p.errors && <div>{tr(M.trendErrors, { errors: p.errors })}</div>}
               </div>
             }
           >
@@ -606,7 +647,9 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
               <div className="stack-bar" style={{ height: `${p.requests ? Math.max(3, (p.requests / max) * 100) : 0}%` }}>
                 {p.requests - p.failed - p.waits > 0 && <div className="stack-part" style={{ flexGrow: p.requests - p.failed - p.waits, background: 'var(--series-1)' }} />}
                 {p.waits > 0 && <div className="stack-part" style={{ flexGrow: p.waits, background: 'var(--fg-faint)' }} />}
-                {p.failed > 0 && <div className="stack-part" style={{ flexGrow: p.failed, background: 'var(--error)' }} />}
+                {/* Refused, wrong calls and cancelled ones apart from real errors (HI-2553): only those stand out. */}
+                {p.failed - (p.errors ?? 0) > 0 && <div className="stack-part" style={{ flexGrow: p.failed - (p.errors ?? 0), background: 'var(--series-other)' }} />}
+                {!!p.errors && <div className="stack-part" style={{ flexGrow: p.errors, background: 'var(--error)' }} />}
               </div>
             </div>
           </Tooltip>
@@ -626,7 +669,10 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
           </span>
         )}
         <span>
-          <span className="swatch" style={{ background: 'var(--error)' }} /> {tr(M.failed)}
+          <span className="swatch" style={{ background: 'var(--series-other)' }} /> {tr(M.refusedLegend)}
+        </span>
+        <span>
+          <span className="swatch" style={{ background: 'var(--error)' }} /> {tr(M.errorsLegend)}
         </span>
         <span>
           <span className="swatch unobserved" /> {tr(M.notRecorded)}
@@ -638,22 +684,40 @@ function Trend({ points, step }: { points: TrendPoint[]; step: 'hour' | 'day' })
 
 const roleName = (role: string): string => (role === 'assistant' ? tr(M.assistant) : tr(M.agents))
 
+/**
+ * The failure kind columns (HI-2553): refused by a rule and wrong calls as plain counts, real errors standing out, and
+ * Not sorted (recorded before Combwork sorted them) only when a row has some.
+ */
+function failureColumns<T>(of: (r: T) => FailureCounts, unsorted: boolean): DataColumn<T>[] {
+  const count = (key: keyof FailureCounts, header: string, headerTip?: string, warn = false): DataColumn<T> => ({
+    key: `failures-${key}`,
+    header,
+    ...(headerTip ? { headerTip } : {}),
+    num: true,
+    descFirst: true,
+    cell: (r) => (of(r)[key] ? warn ? <span className="perf-real-errors">{num(of(r)[key])}</span> : num(of(r)[key]) : '—'),
+    sortValue: (r) => of(r)[key]
+  })
+  return [count('refused', tr(M.refusedHeader), tr(M.refusedTip)), count('invalid', tr(M.invalidHeader), tr(M.invalidTip)), count('error', tr(M.errors), tr(M.errorsTip), true), ...(unsorted ? [count('unknown', tr(M.unsortedHeader))] : [])]
+}
+
 /** The Combwork tools table's columns, in the window's language (made again when it changes). */
-const toolColumns = (): DataColumn<ToolRow>[] => [
+const toolColumns = (unsorted: boolean): DataColumn<ToolRow>[] => [
   { key: 'tool', header: tr(M.tool), cell: (r) => r.tool, sortValue: (r) => r.tool, filter: { kind: 'text', value: (r) => r.tool } },
   { key: 'calls', header: tr(M.calls), num: true, descFirst: true, cell: (r) => num(r.calls), sortValue: (r) => r.calls },
   { key: 'chars', header: tr(M.chars), num: true, descFirst: true, cell: (r) => num(r.chars), sortValue: (r) => r.chars },
   { key: 'avg', header: tr(M.perCall), num: true, descFirst: true, cell: (r) => num(r.avgChars), sortValue: (r) => r.avgChars },
   { key: 'detail', header: tr(M.detail), num: true, descFirst: true, cell: (r) => (r.detail ? num(r.detail) : '—'), sortValue: (r) => r.detail },
-  { key: 'errors', header: tr(M.errors), num: true, descFirst: true, cell: (r) => (r.errors ? num(r.errors) : '—'), sortValue: (r) => r.errors },
+  ...failureColumns<ToolRow>((r) => r.failures, unsorted),
   { key: 'p95', header: tr(M.p95Header), num: true, descFirst: true, cell: (r) => ms(r.p95, r.calls), sortValue: (r) => latencyOrder(r.p95, r.calls) }
 ]
 
 function ToolsTable({ sel }: { sel: PerfSelection }) {
   const language = useLanguage()
   const rows = useMemo(() => byTool(sel.mcp), [sel.mcp])
+  const unsorted = rows.some((r) => r.failures.unknown > 0)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const columns = useMemo(() => toolColumns(), [language])
+  const columns = useMemo(() => toolColumns(unsorted), [language, unsorted])
   if (!rows.length) return null
   return (
     <>
@@ -666,9 +730,8 @@ function ToolsTable({ sel }: { sel: PerfSelection }) {
 }
 const BY_CHARS = { key: 'chars', desc: true }
 
-const failedOnly = (r: RouteRow): number => r.failed - r.cancelled
 /** The Agent API table's columns, in the window's language (made again when it changes). */
-const routeColumns = (): DataColumn<RouteRow>[] => [
+const routeColumns = (unsorted: boolean): DataColumn<RouteRow>[] => [
   {
     key: 'route',
     header: tr(M.route),
@@ -682,7 +745,7 @@ const routeColumns = (): DataColumn<RouteRow>[] => [
     filter: { kind: 'text', value: (r) => `${r.method} ${r.route}` }
   },
   { key: 'requests', header: tr(M.requestsHeader), num: true, descFirst: true, cell: (r) => num(r.requests), sortValue: (r) => r.requests },
-  { key: 'failed', header: tr(M.failedHeader), num: true, descFirst: true, cell: (r) => (failedOnly(r) ? `${num(failedOnly(r))} (${pct(failedOnly(r), r.requests)})` : '—'), sortValue: failedOnly },
+  ...failureColumns<RouteRow>((r) => r.failures, unsorted),
   { key: 'cancelled', header: tr(M.cancelled), num: true, descFirst: true, cell: (r) => (r.cancelled ? `${num(r.cancelled)} (${pct(r.cancelled, r.requests)})` : '—'), sortValue: (r) => r.cancelled },
   { key: 'waits', header: tr(M.waitsHeader), num: true, descFirst: true, cell: (r) => (r.waits ? num(r.waits) : '—'), sortValue: (r) => r.waits },
   { key: 'p50', header: tr(M.p50Header), num: true, descFirst: true, cell: (r) => ms(r.p50, r.requests), sortValue: (r) => latencyOrder(r.p50, r.requests) },
@@ -695,8 +758,9 @@ const BY_REQUESTS = { key: 'requests', desc: true }
 function RoutesTable({ sel }: { sel: PerfSelection }) {
   const language = useLanguage()
   const rows = useMemo(() => byRoute(sel.api), [sel.api])
+  const unsorted = rows.some((r) => r.failures.unknown > 0)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const columns = useMemo(() => routeColumns(), [language])
+  const columns = useMemo(() => routeColumns(unsorted), [language, unsorted])
   if (!rows.length) return null
   return (
     <>
@@ -708,12 +772,83 @@ function RoutesTable({ sel }: { sel: PerfSelection }) {
   )
 }
 
+/** A reason's label as the table shows it: a rule's or message's id as it is (code), Other in the window's language. */
+/**
+ * A reason as the table says it (HI-2553 round 1): its sentence (perfReasons.ts, its values left out), else what it
+ * is; with its rule's or message's id as a detail under it.
+ */
+const reasonShown = (reason: string, messages: Record<string, ReasonMessage>): { text: string; id: string; english: boolean } => {
+  if (reason === 'other') return { text: tr(M.reasonOther), id: '', english: false }
+  const said = reasonSentence(reason, messages)
+  // An agent message is English only (HI-2681): shown as it is, marked as English.
+  return { text: said?.text ?? tr(M.reasonUnknown), id: said?.english ? tr(M.reasonEnglish, { id: reason }) : reason, english: !!said?.english }
+}
+/** The reasons table's columns, in the window's language (made again when it changes, or the messages load). */
+const reasonColumns = (messages: Record<string, ReasonMessage>): DataColumn<ReasonRow>[] => [
+  {
+    key: 'route',
+    header: tr(M.route),
+    className: 'nowrap',
+    cell: (r) => (
+      <>
+        <span className="faint">{r.method}</span> {r.route}
+      </>
+    ),
+    sortValue: (r) => r.route,
+    filter: { kind: 'text', value: (r) => `${r.method} ${r.route}` }
+  },
+  { key: 'kind', header: tr(M.kind), className: 'nowrap', cell: (r) => tr(M.kindValue, { kind: r.kind }), sortValue: (r) => r.kind },
+  {
+    key: 'reason',
+    header: tr(M.reason),
+    cell: (r) => {
+      const { text, id, english } = reasonShown(r.reason, messages)
+      return <CellLines main={english ? <span lang="en">{text}</span> : text} sub={id} />
+    },
+    sortValue: (r) => reasonShown(r.reason, messages).text,
+    filter: { kind: 'text', value: (r) => `${reasonShown(r.reason, messages).text} ${r.reason}` }
+  },
+  { key: 'count', header: tr(M.count), num: true, descFirst: true, cell: (r) => num(r.count), sortValue: (r) => r.count }
+]
+const BY_COUNT = { key: 'count', desc: true }
+
+/** Why requests were refused or were wrong calls (HI-2553): the most common reasons by route. */
+function ReasonsTable({ sel }: { sel: PerfSelection }) {
+  const language = useLanguage()
+  const rows = useMemo(() => reasonRows(sel.api), [sel.api])
+  // The messages its `msg:` and `agent:` reasons name, from the English catalogue (loaded only when there are any).
+  const [messages, setMessages] = useState<Record<string, ReasonMessage>>({})
+  const wanted = rows.map((r) => r.reason).filter((r) => (r.startsWith('msg:') || r.startsWith('agent:')) && !messages[r])
+  const wantedKey = [...new Set(wanted)].sort().join('|')
+  useEffect(() => {
+    if (!wantedKey) return
+    let live = true
+    void reasonMessages(wantedKey.split('|')).then((found) => {
+      if (live && Object.keys(found).length) setMessages((had) => ({ ...had, ...found }))
+    })
+    return () => {
+      live = false
+    }
+  }, [wantedKey])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const columns = useMemo(() => reasonColumns(messages), [language, messages])
+  if (!rows.length) return null
+  return (
+    <>
+      <h2 className="section">
+        {tr(M.reasonsHeading)} <InfoTip text={tr(M.reasonsTip)} />
+      </h2>
+      <DataTable id="perf-reasons" rows={rows} columns={columns} rowKey={(r) => r.key} defaultSort={BY_COUNT} defaultPageSize={10} filterFrom={10} empty={tr(M.routesEmpty)} />
+    </>
+  )
+}
+
 /**
  * The sections the provider filter changes (launches' guidance and the providers' usage), under it; its choices are
  * every provider with data in the range and scope, and the current one (#270).
  */
 function ByProvider({ report, sel, range, provider, setProvider }: { report: MetricsReport; sel: PerfSelection; range: PerfRange; provider: string; setProvider: (p: string) => void }) {
-  const none = !sel.guidance.length && !sel.providers.length
+  const none = !sel.guidance.length && !sel.providers.length && !sel.catalog.length
   return (
     <section className="perf-group perf-by-provider" aria-label={tr(M.providerGroup)}>
       <div className="perf-group-head">
@@ -735,6 +870,8 @@ function ByProvider({ report, sel, range, provider, setProvider }: { report: Met
       ) : (
         <>
           <GuidanceTable sel={sel} unmeasured={totals(sel).skillsUnmeasured} />
+          {/* By provider from HI-2553. */}
+          <ToolListTable sel={sel} />
           <ProvidersTable sel={sel} note={report.providersNoteText ? shownText(report.providersNoteText) : report.providersNote} unreadable={report.providersUnreadable} hosts={report.providersHosts} />
           <SafeguardsTable sel={sel} />
         </>
@@ -748,6 +885,7 @@ const charsCell = (v: number | null): string => (v === null ? '—' : fmt.number
 const charsColumn = (key: string, header: string, value: (r: ToolListRow) => number | null): DataColumn<ToolListRow> => ({ key, header, num: true, descFirst: true, cell: (r) => charsCell(value(r)), sortValue: value })
 /** The Combwork tool list table's columns, in the window's language (made again when it changes). */
 const toolListColumns = (): DataColumn<ToolListRow>[] => [
+  { key: 'provider', header: tr(M.provider), className: 'nowrap', cell: (r) => (r.provider === 'unknown' ? tr(M.unknownProvider) : providerName(r.provider)), sortValue: (r) => (r.provider === 'unknown' ? '' : providerName(r.provider)) },
   { key: 'role', header: tr(M.who), className: 'nowrap', cell: (r) => roleName(r.role), sortValue: (r) => roleName(r.role) },
   { key: 'workflow', header: tr(M.workflow), className: 'nowrap', cell: (r) => tr(M.workflowSide, { side: r.workflow }), sortValue: (r) => tr(M.workflowSide, { side: r.workflow }) },
   { key: 'starts', header: tr(M.toolListStarts), num: true, descFirst: true, cell: (r) => num(r.starts), sortValue: (r) => r.starts },
@@ -756,10 +894,11 @@ const toolListColumns = (): DataColumn<ToolListRow>[] => [
   charsColumn('descriptions', tr(M.toolListDescriptions), (r) => r.descriptionChars),
   charsColumn('params', tr(M.toolListParams), (r) => r.paramChars),
   charsColumn('schemas', tr(M.toolListSchemas), (r) => r.schemaChars),
-  { key: 'bytes', header: tr(M.toolListBytes), num: true, descFirst: true, cell: (r) => formatBytes(r.bytes), sortValue: (r) => r.bytes }
+  { key: 'bytes', header: tr(M.toolListBytes), num: true, descFirst: true, cell: (r) => formatBytes(r.bytes), sortValue: (r) => r.bytes },
+  { key: 'upfront', header: tr(M.toolListUpfront), headerTip: tr(M.toolListUpfrontTip), num: true, descFirst: true, cell: (r) => (r.upfront === null ? '—' : `≈ ${formatBytes(r.upfront)}`), sortValue: (r) => r.upfront }
 ]
 
-/** The Combwork tools' list as each session got it, a start (HI-2063): every provider's (not recorded per provider). */
+/** The Combwork tools' list as each session got it, a start (HI-2063), by provider and with what its CLI got up front (HI-2553). */
 function ToolListTable({ sel }: { sel: PerfSelection }) {
   const language = useLanguage()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -771,7 +910,7 @@ function ToolListTable({ sel }: { sel: PerfSelection }) {
       <h2 className="section">
         {tr(M.toolListHeading)} <InfoTip text={tr(M.toolListTip)} />
       </h2>
-      <DataTable id="perf-tool-list" rows={rows} columns={columns} rowKey={(r) => `${r.role} ${r.workflow}`} empty={tr(M.toolListEmpty)} />
+      <DataTable id="perf-tool-list" rows={rows} columns={columns} rowKey={(r) => `${r.provider} ${r.role} ${r.workflow}`} empty={tr(M.toolListEmpty)} />
     </>
   )
 }

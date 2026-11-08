@@ -6,13 +6,31 @@
 
 import { msg, type Msg } from '../i18n/msg'
 
-/** Which side of the workflow an agent takes: it builds cards, reviews them, either, or none (a generalist, HI-686). */
-export type WorkflowRole = 'builder' | 'reviewer' | 'either' | 'generalist'
+/**
+ * Which side of the workflow an agent takes: it builds cards, reviews them, either, or none (a generalist, HI-686); or
+ * no part in it at all (independent, HI-2670): the user works with it in its pane, and Combwork never picks, wakes or
+ * types into it.
+ */
+export type WorkflowRole = 'builder' | 'reviewer' | 'either' | 'generalist' | 'independent'
 
 /** G17 (#1443): one reviewer per lane, or a pool of reviewers lanes share. The option's key is `reviewerMode`. */
 export type ReviewerMode = 'lane' | 'pool'
 
-export const WORKFLOW_ROLES: readonly WorkflowRole[] = ['builder', 'reviewer', 'either', 'generalist']
+export const WORKFLOW_ROLES: readonly WorkflowRole[] = ['builder', 'reviewer', 'either', 'generalist', 'independent']
+
+/**
+ * Whether an agent's connection launches without Combwork's tools (HI-2670), which makes it Independent whatever role it
+ * has saved: main reads its connection by id, the window its AgentInfo's `toolsOff`. Unset (tests, scripts): never.
+ */
+let toolsOffReader: (a: object) => boolean = () => false
+
+/** Sets how agentWorkflowRole tells that an agent's connection launches without Combwork's tools (main, the window). */
+export function readToolsOffWith(fn: (a: object) => boolean): void {
+  toolsOffReader = fn
+}
+
+/** Whether this agent is Independent because its connection launches without Combwork's tools (HI-2670). */
+export const independentByConnection = (a: object): boolean => toolsOffReader(a)
 
 export const isWorkflowRole = (v: unknown): v is WorkflowRole => typeof v === 'string' && (WORKFLOW_ROLES as readonly string[]).includes(v)
 
@@ -22,9 +40,11 @@ const REVIEWER_NAME = /^(?:[a-z]{0,3}|[a-z]{2,4}-)r\d+$/i
 
 /**
  * An agent's workflow role: its own, else the guess from before 1.0. A note that says *review* (or, with no note, a name
- * that does, or one shaped like HR1 or HI-R2) reads as a reviewer; anything else as a builder.
+ * that does, or one shaped like HR1 or HI-R2) reads as a reviewer; anything else as a builder. On a connection that
+ * launches without Combwork's tools (HI-2670), Independent, whatever it has saved: its own role is kept for their return.
  */
 export function agentWorkflowRole(a: { name: string; role?: string; workflowRole?: WorkflowRole }): WorkflowRole {
+  if (toolsOffReader(a)) return 'independent'
   if (isWorkflowRole(a.workflowRole)) return a.workflowRole
   const note = a.role?.trim()
   if (note) return /review/i.test(note) ? 'reviewer' : 'builder'
@@ -97,9 +117,16 @@ export const reviewsWork = (role: WorkflowRole): boolean => role === 'reviewer' 
 
 /**
  * Whether an agent of this role may work on a card it takes (HI-686): any but a reviewer. A generalist taking a card is
- * built where the project's Workflow options say, as any agent's card is: the role adds no rule of its own.
+ * built where the project's Workflow options say, as any agent's card is: the role adds no rule of its own. An
+ * independent agent (HI-2670) takes no part in the workflow, so never one.
  */
-export const takesCards = (role: WorkflowRole): boolean => role !== 'reviewer'
+export const takesCards = (role: WorkflowRole): boolean => role !== 'reviewer' && role !== 'independent'
+
+/**
+ * Whether Combwork may involve an agent of this role in the workflow (HI-2670): pick it for a lane, the reviewer pool, a
+ * card start or the merge queue, wake it, deliver to it or type into it. Only an independent agent never is.
+ */
+export const inWorkflow = (role: WorkflowRole): boolean => role !== 'independent'
 
 /** The window's words for the roles: "Role in the workflow", and each role's name and sentence. */
 export const ROLE_IN_WORKFLOW = msg({ id: 'agents.workflowRole.label', defaultMessage: 'Role in the workflow', description: 'A heading in Add Agent and Agent Settings, above the choice of builder, reviewer or either: which side of the workflow the agent takes (#1430). Glossary: workflow role.' })
@@ -119,5 +146,12 @@ export const WORKFLOW_ROLE_TEXT: Record<WorkflowRole, { name: Msg; text: Msg }> 
   generalist: {
     name: msg({ id: 'agents.workflowRole.generalist', defaultMessage: 'Generalist', description: "A choice of an agent's role in the workflow (HI-686): it takes no side; it does whatever the user asks in its pane, and is never a lane's builder or reviewer. Glossary: generalist." }),
     text: msg({ id: 'agents.workflowRole.generalistText', defaultMessage: 'Does whatever you ask in its pane; takes no side in the workflow.', description: "Under the Generalist choice of an agent's role in the workflow: it isn't a builder or a reviewer of lanes; it works for the user in its own pane." })
+  },
+  independent: {
+    name: msg({ id: 'agents.workflowRole.independent', defaultMessage: 'Independent', description: "A choice of an agent's role in the workflow (HI-2670): it takes no part in the workflow at all; Combwork never gives it cards, wakes it or types into it. Glossary: independent." }),
+    text: msg({ id: 'agents.workflowRole.independentText', defaultMessage: 'Works only with you, in its pane: Combwork never gives it cards, wakes it or types into it.', description: "Under the Independent choice of an agent's role in the workflow (HI-2670): no lane, reviewer pool, card or message of Combwork's reaches it." })
   }
 }
+
+/** Why only Independent can be chosen for an agent whose connection launches without Combwork's tools (HI-2670). */
+export const ROLE_NEEDS_TOOLS = msg({ id: 'agents.workflowRole.needsTools', defaultMessage: "This connection launches without Combwork's tools.", description: "Beside the greyed-out choices of an agent's role (Builder, Reviewer, Either, Generalist) in Add Agent and Agent Settings (HI-2670): the agent's connection is set to launch without Combwork's tools, so it can only be Independent." })

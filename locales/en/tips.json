@@ -111,6 +111,14 @@
     "defaultMessage": "Keep a Combwork window on top",
     "description": "A tip's title."
   },
+  "tips.antigravity.text": {
+    "defaultMessage": "Agents can use Google’s Antigravity CLI. Provider Setup installs it; sign in once in a terminal and every workspace on this PC shares the sign-in. Each agent runs in a private profile of its own.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.antigravity.title": {
+    "defaultMessage": "Run agents on the Antigravity CLI",
+    "description": "A tip's title. Antigravity CLI is a product name."
+  },
   "tips.antivirus.text": {
     "defaultMessage": "On Windows, Microsoft Defender scans every file builds, tests and git touch. Settings → Workspace → Antivirus scanning shows whether it scans your workspace and can exclude its folders, with your consent.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -222,6 +230,14 @@
   "tips.assistantMcp.title": {
     "defaultMessage": "MCP servers for the Assistant only",
     "description": "A tip's title. MCP is a protocol's name: keep it."
+  },
+  "tips.assistantMemory.text": {
+    "defaultMessage": "Besides its journal, the Assistant's coding agent saves notes of its own about working with you. Memory in the Assistant view on the activity bar lists them, MEMORY.md first: open one to read or correct it.",
+    "description": "A tip (HI-2666). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. MEMORY.md is a file's name: keep it."
+  },
+  "tips.assistantMemory.title": {
+    "defaultMessage": "See what the Assistant's coding agent remembers",
+    "description": "A tip's title (HI-2666)."
   },
   "tips.assistantMessages.text": {
     "defaultMessage": "The Assistant can't give a waiting or working agent a new task, but it can leave it a message, such as your answer: delivered as soon as the agent can take it. Its pane shows it as unread (✉) until then; click that to cancel it.",
@@ -470,6 +486,14 @@
   "tips.branchCleanup.title": {
     "defaultMessage": "Clean up merged branches",
     "description": "A tip's title."
+  },
+  "tips.bringUpToDate.text": {
+    "defaultMessage": "A branch’s merge queue card says when it is behind another of the project’s branches. Bring Up to Date… merges that branch into it through its queue, with its merge checks; the other branch doesn’t change.",
+    "description": "A tip (HI-2679). Bring Up to Date… is a button on a merge queue's card: keep it as Combwork shows it."
+  },
+  "tips.bringUpToDate.title": {
+    "defaultMessage": "Bring the next release up to date",
+    "description": "A tip's title (HI-2679): merging one of a project's branches into another through the merge queue."
   },
   "tips.cardAttachments.text": {
     "defaultMessage": "Paste or drop files into a card's description or comment: they are kept with the card when you save or post, shown in it, and listed for the agent that starts it. The pin on a pane's attachment chip copies a file to the agent's card.",
@@ -1139,6 +1163,14 @@
     "defaultMessage": "Combwork in your language",
     "description": "A tip's title."
   },
+  "tips.launchSettings.text": {
+    "defaultMessage": "A connection's ⋯ → Launch Settings… → Launch as from a terminal starts its agents with none of Combwork's guidance, tools or typing, as if you had opened the CLI in that folder yourself. They are Independent: in the team, but out of the workflow.",
+    "description": "A tip (HI-2670). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Launch Settings… is a menu entry, Launch as from a terminal a switch). Glossary: independent."
+  },
+  "tips.launchSettings.title": {
+    "defaultMessage": "An agent as if from a terminal",
+    "description": "A tip's title (HI-2670): a connection whose sessions start with none of Combwork's additions."
+  },
   "tips.leftRunning.text": {
     "defaultMessage": "A process an agent's command started that keeps running after its shell has gone shows in Activity as Left running, with its CPU time and End It. Past ten minutes, a notice says so once, and the agent is told too.",
     "description": "A tip (HI-2111). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Left running is a row's label; End It a button)."
@@ -1170,6 +1202,22 @@
   "tips.licenceAudit.title": {
     "defaultMessage": "Audit the licences of what you ship",
     "description": "A tip's title."
+  },
+  "tips.localModelLimits.text": {
+    "defaultMessage": "On a server account’s models (Settings → Accounts & Connections, Edit Server…), set Context size and Output budget: agents started on that model then compact at its real context rather than an assumed 200,000.",
+    "description": "A tip (HI-2682). Names of Combwork's menus, views, settings and fields: keep them as Combwork shows them (Edit Server… is a button)."
+  },
+  "tips.localModelLimits.title": {
+    "defaultMessage": "Tell Claude Code your local model’s real context",
+    "description": "A tip's title (HI-2682): a local model on a server account, its context size."
+  },
+  "tips.localModelPicker.text": {
+    "defaultMessage": "An agent on a server account finds the account’s models in Claude Code’s /model, by their exact IDs. Give each a Label in Edit Server… to name it there.",
+    "description": "A tip (HI-2684). /model is a Claude Code command: keep it. Label is a field of a server account's models and Edit Server… a button: keep them as Combwork shows them."
+  },
+  "tips.localModelPicker.title": {
+    "defaultMessage": "Switch local models in Claude Code’s /model",
+    "description": "A tip's title (HI-2684): a server account's models in Claude Code's model picker. /model is a command: keep it."
   },
   "tips.loopDefaults.text": {
     "defaultMessage": "Rounds and Wait under Card loops in Settings → Version Control set what loops use when you don't say ({rounds, plural, one {# round} other {# rounds}} and {hours, plural, one {# hour} other {# hours}} to start with); a workspace and a project can set their own. Saying \"rounds: 3\" when you start one still wins.",
@@ -1331,6 +1379,14 @@
     "defaultMessage": "Work up to date before it merges",
     "description": "A tip's title: the workflow option that has Combwork's merge queue bring a card's work up to date with its target branch first (G8, strict)."
   },
+  "tips.mergesInto.text": {
+    "defaultMessage": "List a branch such as 1.2.0 under Version Control → Workflow → Other branches work can merge into, then pick it as a lane’s Merges into in Start Lane…, or a card’s in its dialog. Its cards are made from it and merge into it through its own queue.",
+    "description": "A tip (HI-2556). Names of Combwork's menus, views, settings and fields: keep them as Combwork shows them. Keep 1.2.0 as it is."
+  },
+  "tips.mergesInto.title": {
+    "defaultMessage": "Work on the next release beside this one",
+    "description": "A tip's title (HI-2556): lanes and cards that merge into another branch than the project's."
+  },
   "tips.messageReceipts.text": {
     "defaultMessage": "Every message the Assistant leaves an agent has an id and is kept, even across a restart: it is received once the agent reads its inbox, and acked once the agent acted on it. One not acked within {minutes, plural, one {# minute} other {# minutes}} shows as overdue (✉) in its pane.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. {minutes} is how long before a message shows as overdue (30)."
@@ -1410,6 +1466,14 @@
   "tips.off.title": {
     "defaultMessage": "Tips are off",
     "description": "A notice after \"Don't show tips\" on the tip card."
+  },
+  "tips.oneAgent.text": {
+    "defaultMessage": "The ▾ beside Resume (n) and Stop (n) in the project header lists those agents: choose one to act on it alone. Agents ▾ and a project's right-click menu have the same for Start New, Archive and Start New, Resume All and Stop All.",
+    "description": "A tip (HI-2665). ▾ is the narrow arrow button beside the project header's Resume (n) and Stop (n): keep it. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.oneAgent.title": {
+    "defaultMessage": "Resume or stop just one agent",
+    "description": "A tip's title (HI-2665)."
   },
   "tips.outageResume.text": {
     "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
@@ -1491,6 +1555,14 @@
     "defaultMessage": "Which agent a change came from",
     "description": "A tip's title."
   },
+  "tips.perfFailures.text": {
+    "defaultMessage": "Performance → Failures sorts what didn’t succeed: real errors in red, apart from calls a workflow rule refused and wrong calls. Refusals and wrong calls by reason shows which rule or message came up most: a tool description to make clearer.",
+    "description": "A tip (HI-2553). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Failures is a card, Refusals and wrong calls by reason a table of the Performance view)."
+  },
+  "tips.perfFailures.title": {
+    "defaultMessage": "Refused is not broken",
+    "description": "A tip's title (HI-2553): a request refused by a workflow rule isn't a fault."
+  },
   "tips.performance.text": {
     "defaultMessage": "Performance, in the activity bar, shows what Combwork's API, tools and guidance cost for the last day, week or month: the whole workspace or one project. Each project has its own Performance tab too.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -1506,6 +1578,14 @@
   "tips.permissionMode.title": {
     "defaultMessage": "Switch permission mode",
     "description": "A tip's title."
+  },
+  "tips.planLimitsProviders.text": {
+    "defaultMessage": "The status bar shows how much of your plan is used for Antigravity and Copilot too: Antigravity's weekly quotas for Gemini and for other models, Copilot's monthly premium requests and chats. Hover it for when each resets.",
+    "description": "A tip (HI-2734). Antigravity and Copilot are products' names; Gemini is Google's models' name."
+  },
+  "tips.planLimitsProviders.title": {
+    "defaultMessage": "Every plan's limits in the status bar",
+    "description": "A tip's title (HI-2734)."
   },
   "tips.progressCard.text": {
     "defaultMessage": "A run in the Progress panel shows the card and the revision it ran on under the agent, such as #1061 · a3f2c1d: click the card to open it, or the revision to copy it.",
@@ -1675,6 +1755,14 @@
     "defaultMessage": "Resume all agents at once",
     "description": "A tip's title."
   },
+  "tips.retargetRelease.text": {
+    "defaultMessage": "Changing Work merges into from 1.1.0 to 1.2.0? Save… lists the Todo cards and free slots still on 1.1.0 that can follow 1.2.0, and what stays, with why. Leave Also retarget what can move ticked to move them.",
+    "description": "A tip (HI-2680). Work merges into, Save… and Also retarget what can move are names in Combwork's window: keep them as Combwork shows them. Keep 1.1.0 and 1.2.0 as they are."
+  },
+  "tips.retargetRelease.title": {
+    "defaultMessage": "When a release ships, move what’s left onto the next",
+    "description": "A tip's title (HI-2680): after a project's Work merges into moves on to the next release's branch."
+  },
   "tips.retryWait.text": {
     "defaultMessage": "When a Codex, Claude Code or Copilot agent's requests are refused, often by a rate limit, it waits and tries again while its screen says only Working. Combwork reads the wait from the agent's own records, and its status says so.",
     "description": "A tip (HI-1972, HI-1973). Codex, Claude Code and Copilot are product names; Working is what their screens show."
@@ -1738,6 +1826,14 @@
   "tips.searchTranscripts.title": {
     "defaultMessage": "Search every past session",
     "description": "A tip's title."
+  },
+  "tips.serverDiagnostics.text": {
+    "defaultMessage": "Check Server… on a server account in Settings → Accounts & Connections shows its model's real context and tests a tool call. A context smaller than Claude Code's prompt is the usual reason a local model prints a tool call instead of making it.",
+    "description": "A tip (HI-2683). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (Check Server… is a button)."
+  },
+  "tips.serverDiagnostics.title": {
+    "defaultMessage": "An agent on Ollama just prints text?",
+    "description": "A tip's title (HI-2683): an agent on a local model server writes its tool calls out as text instead of making them. Ollama is a product's name."
   },
   "tips.sessionCleanup.text": {
     "defaultMessage": "The Sessions tab's Clean Up Old Sessions… button archives or deletes every session last active more than {hours, plural, one {# hour} other {# hours}}, {week, plural, one {# day} other {# days}} or {month, plural, one {# day} other {# days}} ago. Running sessions and the one you're reading are left alone.",

@@ -488,6 +488,8 @@ interface CombworkMessageValues {
   'board.laneStart.started': { pair: string | number }
   'board.laneStart.startedText': { n: number }
   'board.laneStart.starting': undefined
+  'board.laneStart.target': undefined
+  'board.laneStart.targetDefault': { branch: string | number }
   'board.laneStart.title': undefined
   'board.laneStart.up': { card: string | number }
   'board.laneStart.waitAndStart': undefined
@@ -518,6 +520,7 @@ interface CombworkMessageValues {
   'board.lanes.moveUp': undefined
   'board.lanes.moved': { lane: string | number; at: string | number; n: number }
   'board.lanes.none': undefined
+  'board.lanes.offSide': { agent: string | number; part: string }
   'board.lanes.oldRules': undefined
   'board.lanes.oldRulesTip': { enforced: string }
   'board.lanes.poolLastVerdict': { name: string | number; pass: string }
@@ -543,6 +546,8 @@ interface CombworkMessageValues {
   'board.lanes.stalled': undefined
   'board.lanes.start': undefined
   'board.lanes.state': { state: string }
+  'board.lanes.target': { branch: string | number }
+  'board.lanes.targetTip': { branch: string | number }
   'board.lanes.teamPause': undefined
   'board.lanes.title': undefined
   'board.lanes.took': { time: string | number }
@@ -661,8 +666,21 @@ interface CombworkMessageValues {
   'board.progress.tabs': undefined
   'board.progress.title': undefined
   'board.progress.waiting': undefined
+  'board.queue.behind': { n: number; to: string | number; from: string | number }
+  'board.queue.behindTip': { from: string | number }
+  'board.queue.behindUnknown': { to: string | number; from: string | number }
   'board.queue.empty': undefined
   'board.queue.filesMore': { n: number }
+  'board.queue.forward': undefined
+  'board.queue.forwardAlready': { to: string | number; from: string | number }
+  'board.queue.forwardAskConfirm': undefined
+  'board.queue.forwardAskMessage': { from: string | number; to: string | number }
+  'board.queue.forwardAskTitle': { to: string | number; from: string | number }
+  'board.queue.forwardCancel': undefined
+  'board.queue.forwardChooseMessage': { to: string | number }
+  'board.queue.forwardChooseTitle': { to: string | number }
+  'board.queue.forwardFailed': undefined
+  'board.queue.forwardUpToDate': { to: string | number; from: string | number }
   'board.queue.inVersionControl': undefined
   'board.queue.merged': { card: string | number; result: string | number }
   'board.queue.moreReturned': { n: number }
@@ -733,6 +751,7 @@ interface CombworkMessageValues {
   'board.queue.testingNoHead': { card: string | number; target: string | number; step: string | number }
   'board.queue.title': { target: string | number }
   'board.queue.transient': { why: string | number }
+  'board.queue.waitingOn': { cards: string | number }
   'board.readOnly.newer': undefined
   'board.restore09.done': undefined
   'board.restore09.doneDetail': { file: string | number }
@@ -892,6 +911,11 @@ interface CombworkMessageValues {
   'board.strip.count': { state: string; n: number }
   'board.strip.oneRun': { state: string }
   'board.strip.runs': { n: number; states: string | number }
+  'board.target.failed': undefined
+  'board.target.field': undefined
+  'board.target.mark': { branch: string | number }
+  'board.target.markTip': { branch: string | number }
+  'board.target.own': { branch: string | number }
   'board.team.cw': undefined
   'board.team.endDetail': undefined
   'board.team.endFailed': { label: string | number }
@@ -947,6 +971,7 @@ interface CombworkMessageValues {
   'board.work.filesNotRead': { note: string; why: string | number }
   'board.work.folder': undefined
   'board.work.folderGone': { folder: string | number }
+  'board.work.inTarget': { target: string | number }
   'board.work.integrated': { method: string; target: string | number; result: string | number }
   'board.work.leftTarget': { target: string | number; revision: string | number }
   'board.work.mergedInPart': { target: string | number }
@@ -1018,5 +1043,6 @@ interface CombworkMessageValues {
   'board.workQueue.stuckRef': { target: string | number }
   'board.workQueue.testing': { step: string | number }
   'board.workQueue.unreadRef': undefined
+  'board.workQueue.waiting': { target: string | number; cards: string | number }
   'board.workflows': undefined
 }

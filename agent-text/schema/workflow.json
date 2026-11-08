@@ -296,6 +296,12 @@
   "workflow.option.okBefore.title": {
     "placeholders": {}
   },
+  "workflow.option.otherTargets.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.otherTargets.title": {
+    "placeholders": {}
+  },
   "workflow.option.preChecks.desc": {
     "placeholders": {}
   },
@@ -401,7 +407,9 @@
   },
   "workflow.refused.check.revisionMismatch.message": {
     "placeholders": {
-      "revision": "plain"
+      "why": "select",
+      "revision": "plain",
+      "head": "plain"
     }
   },
   "workflow.refused.check.revisionMismatch.next": {
@@ -431,6 +439,14 @@
     }
   },
   "workflow.refused.evidence.changed.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.forward.notAgents.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.forward.notAgents.next": {
     "placeholders": {}
   },
   "workflow.refused.integrate.approved.message": {
@@ -598,6 +614,17 @@
   },
   "workflow.refused.merge.combworkMerges.next": {
     "placeholders": {}
+  },
+  "workflow.refused.merge.waitsForBlockers.message": {
+    "placeholders": {
+      "card": "plain",
+      "waitsFor": "plain"
+    }
+  },
+  "workflow.refused.merge.waitsForBlockers.next": {
+    "placeholders": {
+      "waitsFor": "plain"
+    }
   },
   "workflow.refused.move.doingNobody.message": {
     "placeholders": {

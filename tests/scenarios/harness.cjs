@@ -78,7 +78,10 @@ const PROVIDERS = {
   codex: { provider: 'codex', executable: '', mode: 'full-access' },
   // The real Copilot CLI, offline against the scripted stand-in model (tests/e2e/fake-copilot-api.cjs), in a home of the
   // run's own: a fake as far as cost and sign-in go (no credits, none), Copilot's own tools and hooks for the rest.
-  'fake-copilot': { provider: 'copilot', fake: true, executable: '', mode: 'allow-all', standIn: true }
+  'fake-copilot': { provider: 'copilot', fake: true, executable: '', mode: 'allow-all', standIn: true },
+  // The fake Antigravity CLI (HI-2548), in each agent's private profile under the run's own Combwork data; its check
+  // profile already past agy's first-run screens (as after Provider Setup's Set up).
+  'fake-antigravity': { provider: 'antigravity', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-agy', 'agy.cmd'), mode: 'accept-edits' }
 }
 
 const sleep = lib.sleep
@@ -460,6 +463,9 @@ async function runScenario(sc, providerKey, opts = {}) {
   // board can't be read, and takes `<id>-2`… instead).
   const base = path.join(opts.workRoot ?? path.join(lib.WORK, '..', 'scenarios'), id)
   const root = opts.evidence ? freshFolder(base, opts.evidence) : base
+  // Noted on the CLI test home's lease before anything starts here (HI-2606, HR2 on round 1): the CLIs its Combwork
+  // starts name this folder, so a reset waits for them even after this runner has crashed.
+  opts.uses?.folder(root)
   const userData = path.join(root, 'profile')
   const ws = path.join(root, 'ws')
   const alpha = path.join(ws, 'alpha')
@@ -474,6 +480,10 @@ async function runScenario(sc, providerKey, opts = {}) {
   const startViewLog = path.join(root, 'start-views.jsonl')
   // What fake-copilot's stand-in model was sent (it starts just before the launch, below).
   const modelLog = path.join(root, 'copilot-api.jsonl')
+  // What the fake Antigravity CLI did (FAKE_AGY_LOG: each launch, hook, call and notice).
+  const agyLog = path.join(root, 'fake-agy.jsonl')
+  // Where the fake Antigravity CLI reads its wake scripts (FAKE_AGY_WAKES: fake-wakes-<agent>.txt, HI-2745).
+  const agyWakes = path.join(root, 'agy-wakes')
   // Emptied first (with no evidence store: a caller of its own, like an e2e suite). Still in use (something an earlier
   // run left running holds it, #542): this scenario fails, saying so, and the run goes on.
   if (!opts.evidence) {
@@ -509,11 +519,18 @@ async function runScenario(sc, providerKey, opts = {}) {
     lib.trustForCodex(ws)
   }
 
-  lib.enableProviders(userData, ['claude-code', 'codex', ...(p.provider === 'copilot' ? ['copilot'] : [])])
+  lib.enableProviders(userData, ['claude-code', 'codex', ...(p.provider === 'copilot' || p.provider === 'antigravity' ? [p.provider] : [])])
+  // agy's first-run screens done in Combwork's check profile (its data folder's antigravity/check), as Set up leaves it: each
+  // agent's profile starts past them (HI-2547).
+  if (p.provider === 'antigravity') {
+    const cache = path.join(userData, 'antigravity', 'check', '.gemini', 'antigravity-cli', 'cache')
+    fs.mkdirSync(cache, { recursive: true })
+    fs.writeFileSync(path.join(cache, 'onboarding.json'), JSON.stringify({ consumerOnboardingComplete: true, enterpriseOnboardingComplete: false, onboardingComplete: true }))
+  }
   const cfgFile = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'))
   if (p.executable) cfg.settings.providers[p.provider].executablePath = p.executable
-  for (const pid of ['claude-code', 'codex', 'copilot']) cfg.settings.providers[pid] = { ...cfg.settings.providers[pid], enableDangerousMode: true }
+  for (const pid of ['claude-code', 'codex', 'copilot', 'antigravity']) cfg.settings.providers[pid] = { ...cfg.settings.providers[pid], enableDangerousMode: true }
   // A scenario's own General settings (sc.general) on top.
   cfg.settings.general = { ...cfg.settings.general, confirmOnQuit: 'never', ...sc.general }
   cfg.settings.notifications = { ...cfg.settings.notifications, desktopNotifications: false }
@@ -553,11 +570,14 @@ async function runScenario(sc, providerKey, opts = {}) {
       // The real Codex runs its commands in Windows PowerShell, not the Store's PowerShell 7 (#584, lib.cjs).
       ...(providerKey === 'codex' ? { PATH: lib.pathWithoutStoreAliases() } : {}),
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
-      ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {})
+      ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {}),
+      // The fake agy follows Combwork's notices as a model does (#650), and logs what it did.
+      ...(p.provider === 'antigravity' ? { FAKE_AGY_LOG: agyLog, FAKE_AGY_WAKES: agyWakes, FAKE_AGY_FOLLOW_NOTICES: '1', FAKE_AGY_MODEL_MS: '700' } : {})
     }
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))
+    opts.uses?.spawned(app.process())
   } catch (e) {
     await standIn?.close().catch(() => undefined)
     throw e
@@ -597,9 +617,17 @@ async function runScenario(sc, providerKey, opts = {}) {
 
     // The project's agents: the one under test (Coder), and another that did earlier work (Implementer, never started),
     // on a connection with the scenario's extra arguments (HI-2122: a connection's, not the project's).
+    // A fake run starts its fake, never a real CLI Combwork found instead (HI-2548: a fake agy Combwork couldn't run fell
+    // back to the user's real one): stopped before any session.
+    if (p.fake && p.executable) {
+      const selected = await lib.until(async () => (await inv('provider:refresh', p.provider))?.[p.provider]?.path ?? null, HUNG_MS)
+      if (String(selected ?? '').toLowerCase() !== p.executable.toLowerCase()) throw new Error(`setup: Combwork selected ${selected ?? 'no CLI'} for ${p.provider}, not the fake (${p.executable}): stopped before any session`)
+    }
     const launch = { provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' }
-    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', ...launch })
-    const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', ...launch })
+    // Their roles saved (HI-2664: an agent's tools and lane parts follow its role): Coder, the agent under test, does
+    // whatever its scenario asks (either), and Implementer reviews, unless a scenario changes them.
+    const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either', ...launch })
+    const implementer = await lib.addAgent(inv, alpha, { name: 'Implementer', workflowRole: 'reviewer', ...launch })
     // The run's dialect in their model slot (HI-2443: their Dialect setting), applied at their launch.
     if (opts.dialect) for (const a of [coder, implementer]) await inv('agents:update', alpha, a.id, { dialect: opts.dialect.path })
     const ctx = {
@@ -609,6 +637,8 @@ async function runScenario(sc, providerKey, opts = {}) {
       fake: !!p.fake,
       /** What Copilot sent the stand-in model (its system prompt first), for fake-copilot; null for the others. */
       modelLog: standIn ? modelLog : null,
+      /** Antigravity's agents' private profiles (each one's .gemini\GEMINI.md has its launch's guidance); null for the others. */
+      agyProfiles: p.provider === 'antigravity' ? path.join(userData, 'antigravity', 'profiles') : null,
       ws,
       alpha,
       skillsDir: path.join(ws, '.combwork', 'skills'),
@@ -725,6 +755,14 @@ async function runScenario(sc, providerKey, opts = {}) {
     // for the session under test (the Assistant's by its name, #402).
     const wakesOf = sc.role === 'assistant' ? 'Assistant' : coder.name
     if (providerKey === 'fake' && sc.fakeWakes) fs.writeFileSync(path.join(fakeHome, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
+    // The fake Codex and the fake Antigravity CLI answer a wake they read from the same file (fake-codex.cjs and
+    // fake-agy.cjs, nextScripted): only where a scenario asks (scriptedWakes, HI-2716, HI-2745), since the others'
+    // fakeSkips take fakes that don't act on their wakes.
+    const wakesDir = { 'fake-codex': fakeCodexHome, 'fake-antigravity': agyWakes }[providerKey]
+    if (wakesDir && sc.fakeWakes && sc.scriptedWakes) {
+      fs.mkdirSync(wakesDir, { recursive: true })
+      fs.writeFileSync(path.join(wakesDir, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
+    }
     const skillNames = fs.existsSync(ctx.skillsDir) ? fs.readdirSync(ctx.skillsDir).filter((d) => !d.startsWith('.')) : []
 
     // Start the session under test, answer a trust question, wait until it's ready, and send the prompt.

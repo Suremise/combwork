@@ -1921,6 +1921,25 @@ textarea.input {
   flex: 0 0 auto;
   justify-content: flex-end;
 }
+/* Resume (n) and Stop (n) with their ▾ (HI-2665): one button to the eye, two to the keyboard; the ▾ narrow, joined on. */
+.split-btn {
+  display: inline-flex;
+  align-items: stretch;
+}
+/* Each button sits in its tooltip's wrap. */
+.split-btn.has-arrow > .tip-wrap:first-child > .btn {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.split-btn > .tip-wrap + .tip-wrap {
+  margin-left: -1px;
+}
+.split-btn .btn.split-arrow {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  padding-left: 3px;
+  padding-right: 3px;
+}
 
 .banner {
   display: flex;
@@ -5143,6 +5162,46 @@ h2.section#unused-worktrees {
   border-radius: 8px;
   border: 1px solid var(--border);
   color: var(--fg-muted);
+}
+/* A connection launching with less of Combwork's than everything (HI-2670): opens its Launch Settings. */
+.connection-plain {
+  white-space: nowrap;
+  font: inherit;
+  font-size: 11px;
+  padding: 0 6px;
+  margin-left: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+/* A connection's Launch Settings (HI-2670): the preset, then each switch. */
+.launch-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 560px;
+}
+.launch-switches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 16px;
+  border-left: 2px solid var(--border);
+}
+.launch-switch {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.launch-switch .checkbox {
+  margin-top: 2px;
+}
+.launch-overrides-h {
+  margin: 8px 0 0;
+  font-size: 12px;
 }
 /* A connection's tag (HI-2530): beside its name, like First, with a tag icon. */
 .connection-tag {
@@ -9309,6 +9368,22 @@ button.mode-badge.badge:hover {
 }
 .memory-share .codicon { color: var(--info); vertical-align: -2px; }
 .memory-share .btn { margin-top: 6px; display: flex; }
+/* The Assistant's memory folder (HI-2666): its path, cut with "…" (all of it in its hover), and Copy Path and Open Folder. */
+.assistant-memory-folder {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 6px 6px 4px 14px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.assistant-memory-folder .path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ---------- Combwork Assistant: the workspace's overseer, in a panel on the right ---------- */
 .assistant-panel {
@@ -12129,6 +12204,33 @@ textarea.input.task-blocked-input {
 .perf-coverage {
   margin: 0 0 12px;
 }
+/* Server diagnostics (HI-2683): a model's three context values, a label and its value a row; its line elsewhere. */
+.server-diag-values {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+}
+.server-context-line {
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.server-setup-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.server-setup-lines > .flex {
+  align-items: center;
+  gap: 8px;
+}
+
+/* Real errors stand out from refusals and wrong calls (HI-2553). */
+.perf-real-errors {
+  color: var(--error);
+  font-weight: 600;
+}
 .perf-empty {
   display: flex;
   flex-direction: column;
@@ -13346,6 +13448,15 @@ button.progress-card-key:hover {
 }
 .progress-queue-remove {
   flex-shrink: 0;
+}
+/* HI-2709: a queued card blocked by others that aren't Done says so beside its title; the title gives way first. */
+.progress-queue-waiting {
+  flex-shrink: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--warning);
 }
 .progress-queue-actions {
   display: flex;
@@ -15228,3 +15339,12 @@ button.progress-lane-retry {
   color: var(--fg-muted);
   margin-right: 6px;
 }
+
+/* HI-2682: a server connection's model's Context size and Output budget, on a line of their own under its row. */
+.server-model-row { flex-wrap: wrap; }
+.server-model-limits { flex-basis: 100%; padding: 2px 0 6px 0; }
+.server-model-limits > .flex { gap: 16px; flex-wrap: wrap; }
+.server-model-limit { gap: 6px; align-items: center; }
+/* As wide as its placeholder (HI-2708: "Not set: 200,000 assumed" is longer in German and Polish), 13em at least. */
+.server-model-limit .input { field-sizing: content; min-width: 13em; max-width: 100%; }
+.server-model-limits .hint.warn { color: var(--warning); }

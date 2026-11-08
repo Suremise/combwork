@@ -27,8 +27,9 @@ export function ruleLimits<L extends Pick<PlanLimit, 'windowMinutes'>>(rule: Pic
  * Whether a limit's reading reaches a share in its current period: only a reading whose reset is still ahead counts (an
  * expired one, or one with no reset time to tell its period by, never does).
  */
-export function limitDue(l: Pick<PlanLimit, 'usedPercent' | 'resetsAt'>, percent: number, now: number): boolean {
-  return !!l.resetsAt && Date.parse(l.resetsAt) > now && l.usedPercent >= percent
+export function limitDue(l: Pick<PlanLimit, 'usedPercent' | 'resetsAt' | 'unlimited' | 'notIncluded'>, percent: number, now: number): boolean {
+  // Unlimited, or not in the plan (HI-2734): never due.
+  return !l.unlimited && !l.notIncluded && !!l.resetsAt && Date.parse(l.resetsAt) > now && l.usedPercent >= percent
 }
 
 /** Reset times wobble by seconds between reports; a new period moves them by hours (planUsage.ts reads them the same). */

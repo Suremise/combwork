@@ -4,21 +4,23 @@ import { refusalBody, type Refusal } from '../shared/workflow/refusals'
 import { projectPreferences } from './workflow/preferences'
 import { existsSync } from 'original-fs'
 import { CW_DIR, projectAgents } from '../shared/defaults'
-import { agentWorkflowRole } from '../shared/workflow/roles'
+import { agentWorkflowRole, buildsWork, inWorkflow, reviewsWork } from '../shared/workflow/roles'
 import { allDone, isFrozen, keptLanes, laneView, listedLanes, nextBrief, ownOpen, readLanes, running, stampWait, type LaneAgent, type FreshStart, type LaneCardFacts, type LaneChange, type LaneRecord, type LaneSlotHeld, type LaneStartWait, type WaitStamp } from '../shared/lanes'
 import type { CombworkErrorKind, DueDeps, LaneCard, LaneInfo, LaneSlotInfo, TaskCard } from '../shared/types'
 import { columnSince } from '../shared/tasks'
 import { designReviewer, reviewingNow } from '../shared/workflow/reviewerPool'
 import { withValues, type Text } from '../shared/advanced'
-import { msg } from '../shared/i18n'
+import { fmt, msg } from '../shared/i18n'
 import { agentMsg, inDefaultDialect, inDialectOf, say } from '../shared/agentText'
-import { CombworkError } from './combworkError'
+import { CombworkError, saidError } from './combworkError'
 import { onCombworkEvent } from './events'
 import { readFile } from 'original-fs/promises'
 import { placeKey, renameRetrying, withFileLock } from './fsutil'
 import { openTable, readTable, saveTable } from './storeTables'
 import { boardOpen, boardRead, boardWrite, cardOwnersNow, cardPlacesNow, dbGeneration, onDbReplaced, upgradeWaiting } from './boardStore'
 import { FactStore } from './workflow/factStore'
+import { branchExists, pickTarget, projectTargets, type ProjectTargets } from './workflow/targets'
+import { targetedOf, targetOfRulesetId } from '../shared/workflow/compile'
 import { onAction } from './workflow/actionWorker'
 import { foldCard, forYou, SLOT_DIRTY_GATE } from '../shared/workflow/facts'
 import { createDelivery, offerNow } from './deliveries'
@@ -38,6 +40,7 @@ import type { workspaceDb } from './boardStore'
 import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
 import { hooksMissingFor, onHooksHealthChanged } from './hooksHealth'
 import { teamPauseOf } from './teamPause'
+import { independentIn } from './independent'
 
 const log = createLogger('lanes')
 
@@ -76,6 +79,12 @@ export class LaneError extends CombworkError {
 const M = {
   noWorkspace: msg({ id: 'service.lanes.noWorkspace', defaultMessage: 'No workspace is open', description: "An error changing a workspace's lanes (card loops) while no workspace is open in the window." }),
   unknown: msg({ id: 'service.lanes.unknown', defaultMessage: 'Unknown lane {id}', description: 'An error: there is no lane (a card loop) with the id {id}, perhaps removed meanwhile.' }),
+  targetNotListed: msg({ id: 'service.lanes.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a lane’s Merges into is for Git projects.}}', description: 'HI-2556: an error starting a lane (a card loop) whose Merges into is a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
+  targetMissing: msg({ id: 'service.lanes.targetMissing', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so the lane wasn’t started.} other {There is no branch {target} in this repository: make it first, then start the lane on it.}}', description: 'HI-2556: an error starting a lane (a card loop) on a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.' }),
+  targetFixed: msg({ id: 'service.lanes.targetFixed', defaultMessage: '{builder}’s lane merges into {target} until it ends: start a new lane for another branch.', description: 'HI-2556: an error changing a running lane’s Merges into (fixed for its life). {builder} is the lane’s builder agent, {target} its branch.' }),
+  targetCard: msg({ id: 'service.lanes.targetCard', defaultMessage: '{card} merges into {cardTarget}, and this lane into {target}: a lane’s cards merge where it does. Leave it out, or start it in a lane of its own.', description: 'HI-2556: an error putting a card whose own Merges into is another branch than the lane’s into that lane. {card} is the card’s key (HI-12); {cardTarget} and {target} are branch names.' }),
+  targetBuilder: msg({ id: 'service.lanes.targetBuilder', defaultMessage: 'A lane’s Merges into is set by the user or the Assistant, not its builder.', description: 'HI-2556: an error, a lane’s own builder agent named the branch its lane merges into; only the user or the Combwork Assistant (or a script) sets it.' }),
+  targetRulesOff: msg({ id: 'service.lanes.targetRulesOff', defaultMessage: 'A lane merges into another branch only while workflow rules are enforced (Settings → Advanced).', description: 'HI-2556: an error starting a lane with a Merges into other than the project’s while the switch “Workflow rules are enforced” (Settings → Advanced) is off.' }),
   teamPaused: msg({ id: 'service.lanes.teamPaused', defaultMessage: 'The team is paused (before an update): resume the team first, then start the lane.', description: "An error starting a lane (a card loop) while the user or the Combwork Assistant has paused the whole team before an update (HI-2081): nothing of a lane starts until the team resumes (Resume the Team, in the Progress panel's Lanes)." })
 }
 
@@ -92,6 +101,9 @@ const A = {
   reordered: agentMsg({ id: 'lane.tell.reordered', text: 'Your lane was reordered now by {by}: {card} is back in Todo (its work stays on {line}): stop working on it. Its cards are now {cards}. cw_lane next names your next card.', note: "Delivered to a lane's builder after a reorder applied now (HI-1995) put its card in flight back; {by} is who reordered it, {line} its branch (or lane.reorder.itsBranch)." }),
   itsBranch: agentMsg({ id: 'lane.reorder.itsBranch', text: 'its branch', note: "In place of {line}: where a put-back card's work stays, when its branch's name isn't known." }),
   putBackWhy: agentMsg({ id: 'lane.reorder.putBackWhy', text: 'Put back by a lane reorder applied now ({by})', note: "The reason recorded on a card put back by a reorder applied now (HI-1995), stored on the card's facts; {by} is who reordered." }),
+  independent: agentMsg({ id: 'lane.refused.independent', text: "{agent} is Independent: it takes no part in the workflow (its own role, or its connection launches it without Combwork's tools), so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-2670): an Independent agent is never a lane's builder or reviewer." }),
+  wrongSide: agentMsg({ id: 'lane.refused.wrongSide', text: "{agent} is a {part, select, builder {reviewer} other {builder}} by its role, so it has no {part}'s tools: a lane's {part} is a {part} or an either-role agent. Choose another, or change {agent}'s role first.", note: "cw_lane's refusal (HI-2664): an agent's Combwork tools follow its workflow role, so a lane part only for a role that does it. {part} is builder or reviewer." }),
+  oldTools: agentMsg({ id: 'lane.refused.oldTools', text: "{agent}'s role changed while it was running, and it still has its old role's tools: it can't take this part of the lane until it restarts. Restart it first (its pane says it needs a restart), then try again.", note: "cw_lane's refusal (HI-2664): an agent keeps the tools it launched with until it restarts, so a lane part needing its new role's tools waits for that." }),
   generalist: agentMsg({ id: 'lane.refused.generalist', text: "{agent} is a generalist: it takes no side in the workflow, so it is never a lane's builder or reviewer. Choose a builder, a reviewer or an either-role agent.", note: "cw_lane's refusal (HI-686): a generalist agent is never a lane's builder or reviewer." }),
   sharedItem: agentMsg({ id: 'lane.warn.sharedItem', text: "{card} is also in {builder}'s lane ({lane})", note: "One card of a start's list another builder's running lane lists too (HI-1821); {lane} is that lane's id. Joined with \"; \" into lane.warn.shared's {items}." }),
   shared: agentMsg({ id: 'lane.warn.shared', text: "Warning: {items}. A card belongs to one lane: ask the Assistant or the user to take it out of one of them (a builder's own cw_lane start never takes a card off its lane).", note: "cw_lane start's warning (HI-1821, HI-2169): cards on two lanes; {items} are lane.warn.sharedItem's." }),
@@ -192,7 +204,7 @@ export async function readLanesFile(file: string): Promise<{ docs: unknown[] } |
     text = await readFile(file, 'utf8')
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw new Error(say(A.readFailed, { error: (e as Error).message }), { cause: e })
+    throw saidError(A.readFailed, { error: (e as Error).message }, { cause: e })
   }
   let v: unknown
   try {
@@ -205,7 +217,7 @@ export async function readLanesFile(file: string): Promise<{ docs: unknown[] } |
     try {
       await renameRetrying(file, to)
     } catch (e) {
-      throw new Error(say(A.damaged, { error: (e as Error).message }), { cause: e })
+      throw saidError(A.damaged, { error: (e as Error).message }, { cause: e })
     }
     log.warn(`The lanes file was damaged: set aside as ${userText(to)}`)
     return { docs: [] }
@@ -327,6 +339,16 @@ export async function legacyLanes(ws: WorkspaceService): Promise<{ name: string;
 }
 
 /** Changes a workspace's lanes under its lock: fn changes the list it is given (or throws), and says whether it did. */
+/**
+ * HI-2680: runs `fn` holding the lanes' file lock, which every lane start and list change holds while it decides: a
+ * save taking a branch out of the project's targets holds it around its board write, so a lane start on that branch
+ * and the removal are serial (the one that comes second is refused).
+ */
+export function withLanesLock<T>(ws: WorkspaceService, fn: () => Promise<T>): Promise<T> {
+  if (!ws.path) return fn()
+  return withFileLock(fileOf(ws), fn)
+}
+
 async function mutate<T>(ws: WorkspaceService, fn: (lanes: LaneRecord[], checks: (() => void)[], also: ((db: Writer) => void)[]) => T | Promise<T>): Promise<T> {
   if (!ws.path) throw new LaneError(409, M.noWorkspace)
   const result = await readAgain(() => withFileLock(fileOf(ws), async () => {
@@ -498,6 +520,29 @@ function keptLaneFacts(ws: WorkspaceService): Map<number, { key: string; facts: 
   return c.cards
 }
 
+/**
+ * A running lane's builder or reviewer whose role doesn't do its part (HI-2664: a lane from before roles counted, or a
+ * guessed role), by id: its part. Its tools follow its role, so the lane pauses (offSide) and is given nothing new.
+ */
+function offSideOf(ws: WorkspaceService, l: LaneRecord): Map<string, 'builder' | 'reviewer'> {
+  const agents = ws.path ? ws.info()?.projects.find((p) => same(p.name, l.project))?.config.agents : undefined
+  const role = (id: string) => {
+    const a = agents?.find((x) => x.id === id)
+    return a ? agentWorkflowRole(a) : null
+  }
+  const out = new Map<string, 'builder' | 'reviewer'>()
+  const b = role(l.builder.id)
+  if (b && inWorkflow(b) && !buildsWork(b)) out.set(l.builder.id, 'builder')
+  const r = l.reviewer ? role(l.reviewer.id) : null
+  if (l.reviewer && r && inWorkflow(r) && !reviewsWork(r)) out.set(l.reviewer.id, 'reviewer')
+  return out
+}
+
+/** A running lane's agents that are Independent now (HI-2670), by id. */
+function outOfWorkflow(ws: WorkspaceService, l: LaneRecord): Set<string> {
+  return new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && !!ws.path && independentIn(ws, join(ws.path, l.project), a.id)).map((a) => a.id))
+}
+
 /** Lanes as they read now. */
 async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promise<LaneInfo[]> {
   const cards = await cardsOf(ws, lanes)
@@ -508,6 +553,8 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const atLimit = ws.path && rulesEnforced() ? roundLimitCards(ws, lanes.filter((l) => !isFrozen(l)).flatMap((l) => l.cards)) : new Set<number>()
   // Their agents whose hooks aren't arriving (#1336): such a lane pauses.
   const deaf = (l: LaneRecord): Set<string> => new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && !!ws.path && hooksMissingFor(join(ws.path, l.project), a.id)).map((a) => a.id))
+  // And those Independent now (HI-2670): such a lane pauses too.
+  const out = (l: LaneRecord): Set<string> => outOfWorkflow(ws, l)
   // Each project's ruleset now, for the old rules marks (#1421): only read when a running lane recorded one.
   const recorded = lanes.filter((l) => running(l) && l.ruleset).map((l) => l.ruleset!)
   const current = recorded.length ? await rulesetsNow(ws) : new Map<string, string>()
@@ -517,7 +564,7 @@ async function views(ws: WorkspaceService, lanes: readonly LaneRecord[]): Promis
   const owned = ws.path ? cardOwnersNow(ws, [...new Set(lanes.filter(running).flatMap((l) => l.cards))]) : new Map<number, { lane: string | null }>()
   const owners = new Map([...owned].map(([n, o]) => [n, o.lane]))
   const deps = await dueDepsOf(ws, lanes, cards)
-  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null)))
+  return withWaitTimes(ws, lanes.map((l) => laneView(l, cards.get(l.id)!, names.get(l.project.toLowerCase()) ?? undefined, facts.get(l.id), atLimit, rulesEnforced() ? lineWaiting(ws, l.id) : null, running(l) ? deaf(l) : undefined, current.get(l.project.toLowerCase()), l.ruleset ? stagesOf.get(l.ruleset) : null, running(l) ? slotView(ws, l) : null, owners, running(l) && ws.path ? startWaits(ws.path, l.id) : null, !!teamPauseOf(ws), deps.get(l.id) ?? null, running(l) ? out(l) : undefined, running(l) ? offSideOf(ws, l) : undefined)))
 }
 
 /**
@@ -798,11 +845,18 @@ const sameList = (a: readonly number[], b: readonly number[]): boolean => a.leng
  * it until the lane ends); undefined while workflow rules aren't enforced, or when it can't be read (then its cards use
  * the current one, as before).
  */
-async function rulesetNow(ws: WorkspaceService, project: string): Promise<string | undefined> {
+async function rulesetNow(ws: WorkspaceService, project: string, target?: string | null): Promise<string | undefined> {
   if (!ws.path || !(await enforced())) return undefined
   try {
     const wf = await (await service()).workflowFor(ws, join(ws.path, project))
-    return wf ? await boardWrite(ws, async () => wf.currentRuleset(true).id) : undefined
+    // Merging into another branch (HI-2556): the rules now with G7 set to it, stored too.
+    return wf
+      ? await boardWrite(ws, async () => {
+          const r = targetedOf(wf.currentRuleset(true), target)
+          if (target) wf.store.saveRuleset(r)
+          return r.id
+        })
+      : undefined
   } catch (e) {
     log.warn(`the ruleset for a lane of ${userText(project)}`, e)
     return undefined
@@ -876,16 +930,41 @@ async function agentIn(ws: WorkspaceService, project: string, id: string): Promi
 
 /**
  * A generalist takes no side in the workflow (HI-686): never a lane's builder or reviewer, however the lane is started
- * or joined (the window's Start Lane, the Agent API, the cw_ tools). Refused before anything changes; the other roles
- * as before.
+ * or joined (the window's Start Lane, the Agent API, the cw_ tools). Refused before anything changes. `ids`: the
+ * lane's builder, then its reviewer. Each part only for a role that does it (HI-2664: its tools follow its role, so a
+ * builder named a lane's reviewer would have no cw_verdict), as Start Lane… offers them: a builder or either-role agent
+ * builds, a reviewer or either-role agent reviews.
  */
 async function refuseGeneralist(ws: WorkspaceService, project: string, ids: readonly (string | null | undefined)[]): Promise<void> {
   if (!ws.path) return
   const cfg = await ws.projectConfig(join(ws.path, project)).catch(() => null)
-  for (const id of ids) {
+  for (const [i, id] of ids.entries()) {
     const a = id && cfg ? projectAgents(cfg).find((x) => x.id === id) : undefined
-    if (a && agentWorkflowRole(a) === 'generalist') throw new LaneError(400, say(A.generalist, { agent: a.name }))
+    const role = a ? agentWorkflowRole(a) : null
+    if (a && role === 'generalist') throw new LaneError(400, say(A.generalist, { agent: a.name }))
+    // Independent (HI-2670): no part in the workflow at all.
+    if (a && role === 'independent') throw new LaneError(400, say(A.independent, { agent: a.name }))
+    if (a && role && (i === 0 ? !buildsWork(role) : !reviewsWork(role))) throw new LaneError(400, say(A.wrongSide, { agent: a.name, part: i === 0 ? 'builder' : 'reviewer' }))
   }
+}
+
+/**
+ * Whether an agent's running session has a lane part's tools (HI-2664): the session manager's (sessions.sideAllows), set
+ * by launchSides.ts, as laneParts is the other way. Until set (unit tests of the lanes alone): every one has.
+ */
+let partToolsLoaded: (projectPath: string, agentId: string, part: 'builder' | 'reviewer') => boolean = () => true
+export function setPartToolsCheck(f: typeof partToolsLoaded): void {
+  partToolsLoaded = f
+}
+
+/**
+ * An agent whose role changed while it ran and that hasn't restarted since keeps its old side's tools (HI-2664, HR3's
+ * round 1): never given a lane part it can't do yet. Refused before anything changes, saying to restart it first.
+ */
+function refuseOldTools(ws: WorkspaceService, project: string, parts: readonly { agent: { id: string; name: string } | null | undefined; part: 'builder' | 'reviewer' }[]): void {
+  if (!ws.path) return
+  const projectPath = join(ws.path, project)
+  for (const { agent, part } of parts) if (agent && !partToolsLoaded(projectPath, agent.id, part)) throw new LaneError(409, say(A.oldTools, { agent: agent.name }))
 }
 
 /**
@@ -949,6 +1028,12 @@ export interface StartLane {
    * off is the Assistant's, the user's or a script's.
    */
   ownBuilder?: boolean
+  /**
+   * Its Merges into (HI-2556): one of the project's targets (null or the default: the project's own), fixed for the lane's
+   * life; undefined keeps a running lane's. Never a builder's own start's (ownBuilder): the user's, the Assistant's or a
+   * script's.
+   */
+  target?: string | null
   /**
    * A revocable caller's authority (HI-2420, the Assistant's guard): checked again in the lanes' save, with nothing
    * awaited before it, and as a reorder applied now puts its card back; once it no longer holds, nothing is saved.
@@ -1100,6 +1185,41 @@ function carriedNote(builder: string, from: LaneRecord | null, ownName: boolean)
   return say(A.carriedBrief, { builder, lane: from.id, what: brief && name ? 'both' : brief ? 'brief' : 'name' })
 }
 
+/** A project's targets (HI-2556), or null: not a Git project, or none readable. */
+async function projectTargetsOf(ws: WorkspaceService, project: string): Promise<ProjectTargets | null> {
+  return ws.path ? await projectTargets(ws, join(ws.path, project)).catch(() => null) : null
+}
+
+/** A lane's Merges into as a start names it (HI-2556): null for the project's own, else a branch it lists; refused otherwise. */
+async function lanePick(ws: WorkspaceService, project: string, raw: unknown): Promise<string | null> {
+  const t = await projectTargetsOf(ws, project)
+  const p = pickTarget(t, raw)
+  if ('target' in p) {
+    // A listed branch work can start from now (HR2's round 1: listed is not made).
+    const there = p.target && ws.path ? await branchExists(join(ws.path, project), p.target) : true
+    if (there !== true) throw new LaneError(409, withValues(M.targetMissing, { target: p.target ?? '', unknown: there === 'unknown' ? 'yes' : 'no' })) // i18n-ignore: select keys
+    return p.target
+  }
+  throw new LaneError(400, withValues(M.targetNotListed, { hasTargets: t ? 'yes' : 'no', target: typeof raw === 'string' ? raw.trim() : '', default: t?.default ?? '', hasOthers: t?.others.length ? 'yes' : 'no', others: fmt.list(t?.others ?? []) })) // i18n-ignore: select keys
+}
+
+/**
+ * HI-2556: a lane is one target: refused when a card of `cards` has its own Merges into (the board's `target`) and it isn't
+ * the lane's (`target`, null: the project's). Read under the lanes' lock, as the list is.
+ */
+function refuseOtherTargets(ws: WorkspaceService, project: string, cards: readonly number[], target: string | null, def: string | null, scope: string | null): void {
+  const store = FactStore.forBoard(ws, { project, key: '' })
+  for (const n of cards) {
+    let own: string | null = null
+    try {
+      own = store.card(n).target ?? null
+    } catch {
+      continue
+    }
+    if (own && own !== target) throw new LaneError(409, withCardNames(ws, () => withValues(M.targetCard, { card: cardRef(n), cardTarget: own, target: target ?? def ?? '' }), scope))
+  }
+}
+
 /** The team paused (HI-2081, HR1's s8 check): no lane starts or changes its list until it resumes (Start Lane, the API). */
 export function refuseWhileTeamPaused(ws: WorkspaceService): void {
   if (teamPauseOf(ws)) throw new LaneError(409, M.teamPaused)
@@ -1122,6 +1242,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   if (reviewer && reviewer.id === builder.id) throw new LaneError(400, say(A.selfReview))
   if (reviewer && s.pool) throw new LaneError(400, say(A.poolReviewer))
   await refuseGeneralist(ws, s.project, [builder.id, reviewer?.id])
+  refuseOldTools(ws, s.project, [{ agent: builder, part: 'builder' }, { agent: reviewer, part: 'reviewer' }])
   // A named reviewer makes it one reviewer per lane; the pool, none of its own (#1443).
   const pool = s.pool ? true : reviewer ? false : undefined
   // Rounds and wait the start doesn't give (#412): the project's workflow options as they resolve now (HI-1766).
@@ -1136,8 +1257,22 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // once (between cards), bound to that lane.
   // HI-2273: never with a reviewer that is no agent: a running lane's start is then refused (under the lock below), and a
   // new lane has nothing to put back, so whatever lane a start meanwhile makes, nothing is put back before the refusal.
+  // Its Merges into (HI-2556), checked as the start is asked: one of the project's targets, set by the user, the
+  // Assistant or a script, never the lane's own builder; recorded in the lane's ruleset, so only with the rules on.
+  // Checked before anything changes (HR2's round 1: a refused target never leaves a card put back), and again under the
+  // lanes' lock below, as the list is saved.
+  const pick = s.target === undefined ? undefined : await lanePick(ws, s.project, s.target)
+  if (pick && s.ownBuilder) throw new LaneError(403, M.targetBuilder)
+  if (pick && !on) throw new LaneError(409, M.targetRulesOff)
+  const defaultTarget = ws.path ? ((await projectTargetsOf(ws, s.project))?.default ?? null) : null
+  if (ws.path) {
+    const running0 = (await read(ws)).find((l) => running(l) && same(l.project, s.project) && l.builder.id === builder.id)
+    const target0 = running0?.ruleset ? targetOfRulesetId(running0.ruleset) : null
+    if (running0 && on && pick !== undefined && (pick ?? null) !== target0) throw new LaneError(409, withValues(M.targetFixed, { builder: running0.builder.name, target: target0 ?? defaultTarget ?? '' }))
+    refuseOtherTargets(ws, s.project, s.cards, running0 && on ? target0 : (pick ?? null), defaultTarget, s.ownBuilder ? s.project : null)
+  }
   const put = s.applyNow && on && s.unknownReviewer === undefined ? await putBackForReorder(ws, s, builder) : null
-  const ruleset = await rulesetNow(ws, s.project)
+  const ruleset = await rulesetNow(ws, s.project, pick)
   const ended: EndedLane[] = []
   let queuedAfter: number | null = null
   let shared: string | null = null
@@ -1148,6 +1283,9 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   // in flight, checked under the board's lock; a card started meanwhile makes it decide again, and queue it.
   const decide = () => mutate(ws, async (lanes, checks, also) => {
     if (s.commit) checks.push(s.commit)
+    // HI-2680: the picked branch read again under the lanes' lock, against the options as they are now: a removal from
+    // the project's targets that came first refuses this start (`withLanesLock`).
+    if (pick) await lanePick(ws, s.project, pick)
     queuedAfter = null
     ended.length = 0
     carried = null
@@ -1168,6 +1306,11 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const prev = was && on && s.ownBuilder ? (was.pending ?? was.cards) : []
     kept = prev.filter((n) => !given.includes(n))
     const cards = kept.length ? [...given, ...kept] : given
+    // HI-2556: a running lane's Merges into is fixed for its life, and a lane is one target: a card of its own other target
+    // is refused into it.
+    const wasTarget = was?.ruleset ? targetOfRulesetId(was.ruleset) : null
+    if (was && pick !== undefined && (pick ?? null) !== wasTarget) throw new LaneError(409, withValues(M.targetFixed, { builder: was.builder.name, target: wasTarget ?? defaultTarget ?? '' }))
+    refuseOtherTargets(ws, s.project, cards, was ? wasTarget : (pick ?? null), defaultTarget, scope)
     shared = sharedCards(ws, lanes, s.project, builder.id, cards)
     // As it was under this lock, for the Assistant's change (#1282): recorded with the save, in its transaction.
     const before = was ? laneValues(was) : null
@@ -1284,6 +1427,7 @@ export async function joinLane(ws: WorkspaceService, j: { project: string; build
   if (!reviewer || !builder) throw new LaneError(404, say(A.unknownPair))
   if (reviewer.id === builder.id) throw new LaneError(400, say(A.selfReview))
   await refuseGeneralist(ws, j.project, [builder.id, reviewer.id])
+  refuseOldTools(ws, j.project, [{ agent: reviewer, part: 'reviewer' }])
   const found = await mutate(ws, (lanes, checks, also) => {
     if (j.commit) checks.push(j.commit)
     const l = lanes.find((x) => running(x) && same(x.project, j.project) && x.builder.id === builder.id)
@@ -1486,7 +1630,7 @@ export function laneNow(ws: WorkspaceService, by: { lane: string } | { card: num
   const atLimit = on ? roundLimitCards(ws, l.cards) : new Set<number>()
   const deaf = new Set([l.builder, l.reviewer].filter((a): a is LaneAgent => !!a && hooksMissingFor(join(ws.path!, l.project), a.id)).map((a) => a.id))
   const owners = new Map([...cardOwnersNow(ws, l.cards)].map(([n, o]) => [n, o.lane]))
-  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners, null, !!teamPauseOf(ws))
+  return laneView(l, cards, undefined, facts, atLimit, on ? lineWaiting(ws, l.id) : null, deaf, undefined, null, slotView(ws, l), owners, null, !!teamPauseOf(ws), null, outOfWorkflow(ws, l), offSideOf(ws, l))
 }
 
 /** The running lane of a project agent (as builder, else as reviewer), or null. */
@@ -1512,6 +1656,17 @@ export async function lanesHolding(ws: WorkspaceService, cards: readonly number[
     .filter(running)
     .map((l) => ({ id: l.id, builder: l.builder.name, cards: cards.filter((n) => l.cards.includes(n) || !!l.pending?.includes(n)) }))
     .filter((l) => l.cards.length > 0)
+}
+
+/**
+ * HI-2556: the running lanes holding any of `cards`, each with its builder's name and its Merges into: the target its
+ * recorded ruleset marks (`targetOfRulesetId`), null for the project's own.
+ */
+export async function laneTargetsHolding(ws: WorkspaceService, cards: readonly number[]): Promise<{ id: string; builder: string; target: string | null }[]> {
+  if (!ws.path || !cards.length) return []
+  return (await read(ws))
+    .filter((l) => running(l) && cards.some((n) => l.cards.includes(n) || !!l.pending?.includes(n)))
+    .map((l) => ({ id: l.id, builder: l.builder.name, target: l.ruleset ? targetOfRulesetId(l.ruleset) : null }))
 }
 
 /** A workspace's lanes: those listed (running, or ended lately), or with `all` every one kept; `project` narrows them. */
@@ -1716,6 +1871,11 @@ export function startLanes(): void {
     if (e.type === 'workspace-changed') {
       const ws = e.workspace ? openWorkspaces().find((w) => w.path && same(w.path, e.workspace!.path)) : undefined
       if (ws) changed(ws)
+      return
+    }
+    // A connection changed (HI-2670: its tools off makes its agents Independent): every open workspace's lanes look again.
+    if (e.type === 'connections-changed') {
+      openWorkspaces().forEach((w) => changed(w))
       return
     }
     // A project's workflow written (#1421): its lanes' old rules marks may have come or gone. Its team paused or resumed

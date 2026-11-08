@@ -14,6 +14,66 @@
     "note": "Provider Setup's button: updates the coding agent's CLI in a terminal.",
     "audience": "both"
   },
+  "providers.antigravity.checkFailed": {
+    "text": "Couldn't check {provider}'s sign-in: {text}. Choose Check again; if you haven't signed in yet, run agy in a terminal.",
+    "note": "Provider Setup, under Antigravity CLI, when listing its models failed for a reason other than a known sign-in error (a network or service error, a timeout). {provider} is its name, {text} the CLI's own words (not translated). agy is a command: keep it; Check again is a button.",
+    "audience": "both"
+  },
+  "providers.antigravity.conversationGone": {
+    "text": "{provider} didn't resume {conversation}: {provider} no longer has that conversation (it keeps it apart from its transcript, in the agent's profile, and it was removed). Start a new session instead.",
+    "note": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation's own store in the agent's profile is gone, though its transcript may be left. {provider} is the CLI's name, {conversation} the conversation's id.",
+    "audience": "both"
+  },
+  "providers.antigravity.guidanceTooLong": {
+    "text": "{provider} didn't start: Combwork's guidance, this agent's instructions and the Workspace notes come to {size, number} bytes, and {provider} reads at most {max, number} bytes of its rules file, cutting off the rest. Shorten the agent's instructions (Agent Settings) or the Workspace notes, then start the agent again.",
+    "note": "Why an Antigravity CLI agent didn't start (its pane): what Combwork gives it as its rules file is over Antigravity's size limit, which would cut it off. {provider} is the CLI's name, {size} and {max} sizes in bytes. Agent Settings and Workspace notes are places in Combwork: keep them.",
+    "audience": "both"
+  },
+  "providers.antigravity.notOwnConversation": {
+    "text": "{provider} didn't resume {conversation}: it isn't in this agent's own conversations (it may have been removed, or be another agent's). Start a new session instead.",
+    "note": "Why an Antigravity CLI agent didn't resume a conversation (its pane): the conversation isn't among this agent's own. {provider} is the CLI's name, {conversation} the conversation's id.",
+    "audience": "both"
+  },
+  "providers.antigravity.projectServers": {
+    "text": "{provider} didn't start: {count, plural, one {{files} defines} other {{files} define}} MCP servers this agent wasn't given ({servers}), and {provider} would start them in its session. Combwork can't keep them out, so it doesn't start {provider} here. Remove them from that file, or give them to the agent in Combwork's MCP servers.",
+    "note": "Why an Antigravity CLI agent didn't start (its pane): a project or added folder's .agents config defines MCP servers the agent wasn't given, which Antigravity can't be kept from starting. {provider} is the CLI's name, {files} the config files' paths joined as a list, {count} how many files, {servers} the servers' names joined as a list. MCP servers is a place in Combwork.",
+    "audience": "both"
+  },
+  "providers.antigravity.setup.action": {
+    "text": "Set up",
+    "note": "Provider Setup's button: opens Antigravity CLI's first-run screens in a terminal.",
+    "audience": "both"
+  },
+  "providers.antigravity.setup.copied": {
+    "text": "Each Antigravity agent then starts past those screens: Combwork copies only that they are done into its private profile, never your own Antigravity settings.",
+    "note": "Provider Setup, under Antigravity CLI's Set up: what Combwork does with it.",
+    "audience": "both"
+  },
+  "providers.antigravity.setup.needed": {
+    "text": "Antigravity needs a one-time setup: its first-run screens. Until then each new agent shows them in its pane.",
+    "note": "Provider Setup and Settings → Providers: Antigravity CLI's first-run screens (a colour scheme, its terms of service) aren't done yet.",
+    "audience": "both"
+  },
+  "providers.antigravity.setup.runs": {
+    "text": "**Set up** runs `agy` in a terminal: choose a colour scheme and read and accept its terms there, its data-use choice yours. Combwork types nothing into it, and closes it once you are done.",
+    "note": "Provider Setup, under Antigravity CLI's Set up: what it does. **…** marks bold text and `…` a command: keep the marks and the command.",
+    "audience": "both"
+  },
+  "providers.antigravity.unreadableConfig": {
+    "text": "{provider} didn't start: Combwork couldn't read {file} ({why}), which it would load. Fix or remove the file, then start the agent again.",
+    "note": "Why an Antigravity CLI agent didn't start (its pane): a config file in the project (an MCP server or hook list) couldn't be read, so Combwork couldn't keep what it holds out of the agent. {provider} is the CLI's name, {file} a path, {why} the error's own words.",
+    "audience": "both"
+  },
+  "providers.claude.localLimits.outputNotBelow": {
+    "text": "{agent} wasn’t started: its output budget ({output, number} tokens, {outputFrom}) isn’t below its context size ({context, number} tokens, {contextFrom}). Change one of them, then start it again.",
+    "note": "An error starting an agent on a local model (HI-2682): the output budget Claude Code would get isn't smaller than its context. {agent} is the agent's name; {output} and {context} are numbers of tokens; {outputFrom} and {contextFrom} say where each was set (\"Context size on Local\", \"env in the project's .claude/settings.json\").",
+    "audience": "both"
+  },
+  "providers.claude.localLimits.tooSmall": {
+    "text": "{agent} wasn’t started: its context size ({context, number} tokens, {contextFrom}) is too small for any output budget. Set a larger context size.",
+    "note": "An error starting an agent on a local model (HI-2682): its context is so small that no output budget fits. {agent} is the agent's name; {context} is a number of tokens; {contextFrom} says where it was set.",
+    "audience": "both"
+  },
   "providers.cmdTooLong": {
     "text": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
     "note": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are.",

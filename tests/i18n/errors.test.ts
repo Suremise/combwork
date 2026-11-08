@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { tempDir } from '../tempDir'
+import type { CombworkWindow } from '../../src/main/windows'
+import type { WorkspaceService } from '../../src/main/workspace'
 
 // #845 (E10a): errors read by both audiences. A service throws a CombworkError: its message is English (the Agent API, the
 // log), and IPC tells the window its text in the language Combwork shows. The window's text as data beside an English
@@ -15,8 +17,9 @@ vi.mock('electron', async () => {
   return { ...stub, ipcMain, default: { ...stub.default, ipcMain } }
 })
 /** The window a call comes from: Combwork's own, showing a workspace. */
-let callerWorkspace: unknown = null
-vi.mock('../../src/main/windows', async (original) => ({ ...(await original<object>()), windowOf: () => (callerWorkspace ? { ws: callerWorkspace } : null) }))
+let callerWorkspace: WorkspaceService | null = null
+const { mockFactory } = await vi.hoisted(() => import('../keepType'))
+vi.mock('../../src/main/windows', mockFactory<typeof import('../../src/main/windows')>(async (original) => ({ ...(await original()), windowOf: () => (callerWorkspace ? ({ ws: callerWorkspace } as CombworkWindow) : null) })))
 
 const { setLanguage } = await import('../../src/shared/i18n')
 const { msg } = await import('../../src/shared/i18n/msg')
@@ -139,9 +142,9 @@ describe('the Agent API (#845)', () => {
     setLanguage('de', GERMAN)
     expect(apiErrorReply(combworkError(M.gone, { n: 4 }, { kind: 'notFound' }))).toEqual({ status: 404, body: { error: 'Card #4 is gone.' } })
     expect(apiErrorReply(combworkError(msg({ id: 'errors.workspace.none', defaultMessage: 'No workspace is open.', description: 'test' }), undefined, { kind: 'conflict' }))).toEqual({ status: 409, body: { error: 'No workspace is open.' } })
-    // Without a kind, the English message says the status, as for any other error.
-    expect(apiErrorReply(combworkError(msg({ id: 'errors.test.unknownTask', defaultMessage: 'Unknown task #{n}', description: 'test' }), { n: 9 })).status).toBe(404)
-    expect(apiErrorReply(new Error('Unknown task #9'))).toEqual({ status: 404, body: { error: 'Unknown task #9' } })
+    // Without a kind, 500 whatever its words, and a plain error's words don't say a status either (HI-2704).
+    expect(apiErrorReply(combworkError(msg({ id: 'errors.test.unknownTask', defaultMessage: 'Unknown task #{n}', description: 'test' }), { n: 9 })).status).toBe(500)
+    expect(apiErrorReply(new Error('Unknown task #9'))).toEqual({ status: 500, body: { error: 'Unknown task #9' } })
   })
 
   it("leaves the window's text as data out where a whole object goes to agents, and only that", () => {

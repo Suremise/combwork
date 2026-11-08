@@ -68,7 +68,7 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     mkdirSync(join(p, '.combwork'), { recursive: true })
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1'].map((id) => ({ id, name: id.toUpperCase() })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1' }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -458,6 +458,14 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
       expect(await columnOf(x1)).toBe('doing')
       const now = await lanes.getLane(w, lane.id)
       expect([now.state, now.reviewer?.id, now.cards.map((c) => c.number), now.queued]).toEqual(['active', 'r1', [x1, x2], null])
+    })
+
+    it('HI-2556: a Merges into it refuses is refused before its card in flight is put back, changing nothing', async () => {
+      const { cards: [x1, x2] } = await inFlight('d1', ['T one', 'T two'])
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'the user', applyNow: true, target: 'typo' })).rejects.toThrow()
+      await expect(lanes.startLane(w, { project: 'alpha', builder: 'd1', reviewer: 'r1', cards: [x2, x1], by: 'D1 (alpha)', applyNow: true, ownBuilder: true, target: 'typo' })).rejects.toThrow()
+      expect(await columnOf(x1)).toBe('doing')
+      expect((await lanes.laneOf(w, 'alpha', 'd1'))!.cards.map((c) => c.number)).toEqual([x1, x2])
     })
 
     it('refuses while its builder is in a turn, or its card is in Review, changing nothing', async () => {

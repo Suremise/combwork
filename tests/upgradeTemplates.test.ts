@@ -13,6 +13,7 @@ import { tempDir } from './tempDir'
 import { as09 } from './boardDb'
 import { TEMPLATE_VERSION } from '../src/shared/templates'
 import type { CombworkEvent } from '../src/shared/types'
+import { bound } from './keepType'
 
 const base = tempDir('cw-upgrade-templates-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -83,7 +84,7 @@ async function workspace09(): Promise<{ ws: string; wsTemplates: string; pTempla
 /** The quiet notices a workspace's window would be shown. */
 function notices(w: WS): { title: string; message: string }[] {
   const seen: { title: string; message: string }[] = []
-  const emit = w.emit.bind(w)
+  const emit = bound(w, w.emit)
   w.emit = ((e: CombworkEvent) => {
     if (e.type === 'toast') seen.push({ title: e.toast.title, message: e.toast.message ?? '' })
     return emit(e)

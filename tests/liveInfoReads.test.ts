@@ -7,6 +7,7 @@ import { join, resolve } from 'path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-live-reads-')
 process.env.CLAUDE_CONFIG_DIR = join(base, 'claude-home')
@@ -18,10 +19,11 @@ vi.mock('../src/main/skills', async (orig) => {
   const m = await orig<typeof import('../src/main/skills')>()
   return { ...m, combworkSkills: (...a: Parameters<typeof m.combworkSkills>) => (calls.combworkSkills++, m.combworkSkills(...a)) }
 })
-vi.mock('../src/main/mcp', async (orig) => {
-  const m = await orig<typeof import('../src/main/mcp')>()
+const { mockFactory } = await vi.hoisted(() => import('./keepType'))
+vi.mock('../src/main/mcp', mockFactory<typeof import('../src/main/mcp')>(async (orig) => {
+  const m = await orig()
   return { ...m, listMcp: () => (calls.listMcp++, m.listMcp()) }
-})
+}))
 vi.mock('../src/main/revisions', async (orig) => {
   const m = await orig<typeof import('../src/main/revisions')>()
   return { ...m, revisionOf: (p: string) => (calls.revisionOf++, m.revisionOf(p)) }
@@ -118,7 +120,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
 
   /** Holds w's refreshes as they start, until released: { started (each start's count), release() }. */
   function heldRefreshes() {
-    const real = w.refresh.bind(w)
+    const real = bound(w, w.refresh)
     let started = 0
     let open: () => void = () => undefined
     let gate = new Promise<void>((r) => (open = r))
@@ -183,7 +185,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
     const w2 = createWorkspaceService()
     await w2.open(other)
     await w2.refreshesSettled()
-    const real = w2.refresh.bind(w2)
+    const real = bound(w2, w2.refresh)
     let open: () => void = () => undefined
     const gate = new Promise<void>((r) => (open = r))
     let started = 0
@@ -197,7 +199,6 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
         ended = true
       }
     })
-    const state = w2 as unknown as { scheduledRuns: Set<unknown>; refreshTimer: unknown; scheduled: unknown }
     try {
       w2.scheduleRefresh()
       await vi.waitFor(() => expect(started).toBe(1), { timeout: 10_000 })
@@ -207,7 +208,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
       // While it waits, nothing schedules another: a folder made in the workspace root (its watch), a write's ask.
       mkdirSync(join(other, 'made-while-closing'))
       w2.scheduleRefresh()
-      expect([state.refreshTimer, state.scheduled]).toEqual([null, null])
+      expect([w2['refreshTimer'], w2['scheduled']]).toEqual([null, null])
       expect(await pending(closing)).toBe(true)
       open()
       await closing
@@ -215,7 +216,7 @@ describe("a refresh's running agents share the workspace's reads (#1002)", () =>
       // folders once it has closed.
       expect(ended).toBe(true)
       expect(w2.path).toBeNull()
-      expect([started, state.scheduledRuns.size, state.refreshTimer, state.scheduled]).toEqual([1, 0, null, null])
+      expect([started, w2['scheduledRuns'].size, w2['refreshTimer'], w2['scheduled']]).toEqual([1, 0, null, null])
       // Opened again, it schedules and runs its refreshes as before.
       await w2.open(other)
       await w2.refreshesSettled()

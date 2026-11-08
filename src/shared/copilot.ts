@@ -263,6 +263,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     promptCacheTtl: false,
     // Its transcript counts the session's AI credits (session.usage_checkpoint), and one credit is $0.01.
     reportsCost: true,
+    defersMcpTools: false,
     // /compact takes focus instructions.
     compactFocus: true,
     contextLimit: false,
@@ -274,6 +275,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     lockAsk: true,
     backgroundSessions: false,
     backgroundWakes: false,
+    typedTurnsWithoutPrompt: false,
     // Its interface fills the screen: drawn while its terminal changed size, it can stay at the old width (#486).
     startupSizeRefresh: true,
     // A model call it gave up on ends the turn with a session.error and no Stop (1.0.105, HI-1960).

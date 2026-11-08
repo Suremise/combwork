@@ -20,7 +20,7 @@ import { useForYou } from '../forYou'
 import { GitStatusBarItem } from '../views/GitTab'
 import { AGENT_LIMIT_MAX } from '@shared/defaults'
 import { AgentRowsTable, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, WAITING_COLUMN, agentRow, tableText, type AgentTableData, type AgentTableRow } from './AgentsTable'
-import { limitWindow } from '../views/ProjectTabs'
+import { hasShare, limitName, limitWindow } from '@shared/planLimits'
 import { useConnections, useProviderWarnings } from './ConnectionChoice'
 import { connectionsApply, planUsageItems } from '@shared/accounts'
 import { useConnectionsInUse } from '../connectionUsage'
@@ -59,6 +59,10 @@ const M = {
   planLine: msg({ id: 'workspace.statusBar.planLine', defaultMessage: '{provider}{hasPlan, select, yes { ({plan} plan)} other {}}', description: "The first line of the status bar's plan limits tooltip (GitHub issue #1): the coding agent ({provider}: Claude Code) and its plan's name ({plan}: max, pro…)." }),
   limitLine: msg({ id: 'workspace.statusBar.limitLine', defaultMessage: '{window, select, fiveHour {5-hour limit} weekly {Weekly limit} other {{label} limit}}: {used, number, ::percent} used{hasReset, select, yes {, resets {when}} other {}}', description: 'A line of the status bar\'s plan limits tooltip (GitHub issue #1): a rolling usage window, how much of it is used, and when it resets ({when}: "in 2 h 5 min", or a weekday and time).' }),
   reportedBy: msg({ id: 'workspace.statusBar.reportedBy', defaultMessage: 'Reported by {agent}, {when}', description: 'Under a line of the status bar\'s plan limits tooltip (#383): which agent\'s session reported the figure of the limit above ({agent}: its name) and when ({when}: "4 minutes ago").' }),
+  shortModels: msg({ id: 'workspace.statusBar.shortModels', defaultMessage: '{models, select, gemini {Gemini} otherModels {Other} premium {Premium} chat {Chat} completions {Completions} other {{models}}}{window, select, weekly { wk} other {}}', description: "The status bar's plan limits (HI-2734), before the percent of a limit that covers part of a plan: which models or requests (Antigravity's Gemini models or its other providers' models; Copilot's premium requests, chat messages or code completions; else the provider's own word, {models}), and \"wk\" for a weekly one. Keep it very short." }),
+  notIncludedLine: msg({ id: 'workspace.statusBar.notIncludedLine', defaultMessage: '{label}: not in your plan', description: "A line of the status bar's plan limits tooltip (HI-2734) for a limit the plan doesn't include (its allowance is 0): its name ({label}: \"Premium requests\")." }),
+  unlimitedShort: msg({ id: 'workspace.statusBar.unlimitedShort', defaultMessage: 'unlimited', description: "The status bar's plan limits (HI-2734), after a limit's short name, in place of its percent, when the plan has no limit on it. Keep it short." }),
+  unlimitedLine: msg({ id: 'workspace.statusBar.unlimitedLine', defaultMessage: '{label} limit: unlimited{hasReset, select, yes {, its period resets {when}} other {}}', description: "A line of the status bar's plan limits tooltip (HI-2734) for a limit the plan has no cap on: its name ({label}: \"Premium requests\"), and when its period resets ({when})." }),
   asOf: msg({ id: 'workspace.statusBar.asOf', defaultMessage: 'As of {when}. Updates while a session is running.', description: 'The last line of the status bar\'s plan limits tooltip (GitHub issue #1): when the limits were reported ({when}: "4 minutes ago").' }),
   notInstalledUnused: msg({ id: 'workspace.statusBar.notInstalledUnused', defaultMessage: "{provider} isn't installed. Nothing uses it: new agents use another provider.", description: "Tooltip on a coding agent's status bar item: it is turned on but not installed, and nothing needs it." }),
   notInstalled: msg({ id: 'workspace.statusBar.notInstalled', defaultMessage: 'not installed', description: "A coding agent's status bar item, after its icon: it isn't installed. Lower case; keep it short." }),
@@ -262,8 +266,9 @@ function KeepAwakeStatusItem() {
   )
 }
 
-/** "5h" / "Week" for the status bar; other windows by their label. */
+/** "5h" / "Week" for the status bar; a limit of part of a plan by its models (HI-2734: "Gemini wk"); others by their label. */
 function shortLimit(l: PlanLimit): string {
+  if (l.models) return tr(M.shortModels, { models: l.models, window: l.windowMinutes === 7 * 24 * 60 ? 'weekly' : 'other' })
   return tr(M.shortLimit, { window: limitWindow(l), label: l.label })
 }
 
@@ -300,15 +305,20 @@ function PlanUsageStatus() {
 
 /** One item of the status bar's plan limits: a CLI's, or (`label`, its name) a connection's. Nothing while none is current. */
 function PlanItem({ provider, kept, now, label, first, data }: { provider: ProviderId; kept: PlanUsage | undefined; now: number; label?: string; first: string; data: Record<string, string> }) {
-  const limits = (kept?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now)
+  const current = (kept?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now)
+  // One the plan doesn't include (HI-2734) is in the tooltip, not the item: nothing of it is used.
+  const limits = current.filter((l) => !l.notIncluded)
   if (!kept || !limits.length) return null
   const usage = { ...kept, limits }
-  const worst = Math.max(...usage.limits.map((l) => l.usedPercent))
+  const worst = Math.max(...usage.limits.map((l) => (hasShare(l) ? l.usedPercent : 0)))
   // GitHub issue #1: every part in the window's language (the window's name, the percent, when it resets, how long ago).
   const lines = usage.limits.flatMap((l) => [
-    tr(M.limitLine, { window: limitWindow(l), label: l.label, used: Math.round(l.usedPercent) / 100, hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' }),
+    l.unlimited
+      ? tr(M.unlimitedLine, { label: limitName(l), hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' })
+      : tr(M.limitLine, { window: limitWindow(l), label: limitName(l), used: Math.round(l.usedPercent) / 100, hasReset: l.resetsAt ? 'yes' : 'no', when: l.resetsAt ? resetsIn(l.resetsAt) : '' }),
     ...(l.reportedBy && l.reportedAt ? [tr(M.reportedBy, { agent: l.reportedBy, when: timeAgo(l.reportedAt) })] : [])
   ])
+  for (const l of current.filter((x) => x.notIncluded)) lines.push(tr(M.notIncludedLine, { label: limitName(l) }))
   const tip = [first, ...lines, tr(M.asOf, { when: timeAgo(usage.updatedAt) })].join('\n')
   return (
     <Tooltip content={<span style={{ whiteSpace: 'pre-line' }}>{tip}</span>}>
@@ -323,7 +333,7 @@ function PlanItem({ provider, kept, now, label, first, data }: { provider: Provi
         {usage.limits.map((l, i) => (
           <span key={l.id}>
             {i > 0 && <span className="status-sep">·</span>}
-            {shortLimit(l)} {fmt.percent(l.usedPercent / 100)}
+            {shortLimit(l)} {l.unlimited ? tr(M.unlimitedShort) : fmt.percent(l.usedPercent / 100)}
           </span>
         ))}
       </div>

@@ -548,8 +548,10 @@ describe('the review and merge skills follow the gates (#1525)', () => {
     expect(text).toMatch(/run every command with the review copy as its working directory: change into it first/)
     // #1443: a pooled reviewer's start is its assignment, no lane to join.
     expect(text).toMatch(/A reviewer from the project's pool is told of each card it is given in its inbox: that is its start/)
-    // #533: the run records Combwork keeps of the revision are checked, not repeated.
-    expect(text).toMatch(/the runs recorded as the card's checks of that revision/)
+    // #533, HI-2660: the run records of the revision are reused, not repeated; a rerun names its doubt.
+    expect(text).toMatch(/\*\*Reuse the builder's run, don't repeat it\*\*: a result recorded at the exact revision you review stands \(`cw_start_review`'s `checksAtRevision`/)
+    expect(text).toMatch(/\*\*Missing\*\*, so run it: [^\n]*Missing never counts as a pass/)
+    expect(text).toMatch(/\*\*A doubt you name\*\*[^\n]*the verdict says "reran X because Y"\. No doubt, no rerun\./)
   })
 
   it("say where the rules decide, never one case as the rule: self-review, the latest submission, a second reviewer, the user's OK", () => {
@@ -627,7 +629,9 @@ describe('the other bundled skills follow the gates (#1526)', () => {
       if (name === 'use-cw-api') expect(skill.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size + 250)
       else expect(text.replace(/\r/g, '').length, name).toBeLessThanOrEqual(size)
     }
-    expect(catalog.get('use-cw-api')!.refs.get('tools.md')!.replace(/\r/g, '').length).toBeLessThanOrEqual(23000)
+    // 24,000 since HI-2696: 1.2.0's had reached 23,015 (HI-2556's targets, HI-2670's roles and launch settings), and the
+    // detail of six parameters' descriptions moved here to keep the tools' budgets (toolLimits.cjs), about 750 more.
+    expect(catalog.get('use-cw-api')!.refs.get('tools.md')!.replace(/\r/g, '').length).toBeLessThanOrEqual(24000)
   })
 
   it("split-work plans by files around the project's own option for where cards are built, and leaves the order to blockedBy", () => {
@@ -892,9 +896,13 @@ describe("the repository's AGENTS.md", () => {
       /\*\*Merge checks\*\*, this repository's \(#1010\): a merge into main or an integration branch .* runs typecheck, lint and `npm run check:repo` .* and the cards' own focused e2e suites/,
       // HI-2244: where the full unit run happens, now that a merge doesn't run it.
       /The full unit run \(`npm test`\) is a release's checks \(Tests per card, below\), and on request/,
-      // HI-2477: two modes, lean while building (no full unit run per card), thorough when preparing a release.
-      /\*\*Tests per card\*\* \(HI-2003, HI-2477\): two modes\. \*\*While building\*\* is the default.*\*\*Preparing a release\*\* applies only when a release card or an RC is in hand/,
-      /No full unit run \(`npm test`\), before the first submit or after\./,
+      // HI-2477, HI-2658: a budget for each kind of change, lean by default (no full unit run per card), the release's only with one in hand.
+      /\*\*Tests per card: a budget for each kind of change\*\* \(HI-2003, HI-2477, HI-2658\)[^\n]*never to call unrun checks passed/,
+      /\*\*Small fix or feature in one area\*\* \(the default\), \*\*15–30 min\*\*; past 45, look at the scope[^\n]*No full unit run \(`npm test`\), first submit included\./,
+      /\*\*Docs or text, or a test-expectation fix\*\*, \*\*5–15 min\*\*/,
+      /\*\*Shared storage, concurrency, launch or workflow-safety change\*\*, \*\*30–60 min\*\*, its reason named on the card/,
+      /\*\*A merge into the integration branch\*\*, \*\*10–20 min\*\*/,
+      /\*\*Preparing a release\*\* applies only when a release card or an RC is in hand[^\n]*\*\*first RC\*\*, about \*\*2–3 hours\*\*[^\n]*\*\*RC fix round\*\*, \*\*15–45 min\*\*[^\n]*\*\*release of the tested candidate\*\*, \*\*15–30 min\*\*/,
       /It never asks for a full unit run or other wide re-runs\./,
       /\*\*Flake work:\*\* at most 2 spinner workers and 3 repeats per repro \(`--repeat 3`; the `investigate-flake` skill\)\. A flake seen only under a full run's load waits for the release window, unless it blocks merges\./,
       /never open the main checkout .* with one until the 1\.0 baseline is installed \(#1288\)/,
@@ -921,6 +929,22 @@ describe("the repository's AGENTS.md", () => {
 describe('RELEASING.md on the 1.0 path', () => {
   const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
   const section = (heading: string): string => releasing.split(/^## /m).find((s) => s.startsWith(heading)) ?? ''
+  it("Step 4's real-tier command selects every suite of a real CLI, Copilot's too, and none of the rest (HI-2658)", async () => {
+    // The manifest needs each CLI's every real suite in one record (scripts/testedClis.mjs): run the command through the
+    // runner's own parsing and selection, so a Copilot suite added to suites.mjs, or a dropped --all, fails here.
+    // @ts-expect-error: plain .mjs modules without types
+    const { parseArgs, selectSuites } = await import('./e2e/runner.mjs')
+    // @ts-expect-error: plain .mjs modules without types
+    const { SUITES } = await import('./e2e/suites.mjs')
+    const command = /`npm run e2e -- (--all --only-real [^`]+)`/.exec(section('Steps'))?.[1]
+    expect(command, 'Step 4 names its real-tier command').toBeTruthy()
+    const o = parseArgs(command!.split(' '), SUITES.map((s: { name: string }) => s.name))
+    expect(o.error).toBeUndefined()
+    const chosen = selectSuites(SUITES, o).map((s: { name: string }) => s.name).sort()
+    const needsCli = (s: { needs?: string[] }): boolean => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex' || n === 'copilot' || n === 'agy')
+    const wanted = SUITES.filter((s: { needs?: string[] }) => needsCli(s) && !(s.needs ?? []).includes('packaged')).map((s: { name: string }) => s.name).sort()
+    expect(chosen).toEqual(wanted)
+  })
   it('goes from phases on the integration branch to a baseline install, then an RC and the release', () => {
     const path = section('The 1.0 path')
     expect(path).toMatch(/\*\*integration branch\*\* \(`1\.0\.0`\)/)
@@ -940,6 +964,21 @@ describe('RELEASING.md on the 1.0 path', () => {
     expect(checks).toMatch(/\*\*3 to 5 scenarios picked at random\*\* from the trial set, once each, with no repeats \(`npm run scenarios -- --provider <provider> --random 3`/)
     expect(checks).toMatch(/The release card names the seed or the ids/)
     expect(checks).toMatch(/The full set on every provider is not a release step/)
+    // HI-2658: each stage's budget, as AGENTS.md's.
+    expect(checks).toMatch(/\*\*The first release candidate\*\*, about \*\*2–3 hours\*\*/)
+    expect(checks).toMatch(/\*\*An RC fix round\*\*, \*\*15–45 min\*\*/)
+    expect(checks).toMatch(/\*\*The release of the tested candidate\*\*, \*\*15–30 min\*\*/)
+    // HI-2661: the coverage ledger: a fix round reruns what its changes invalidate, a path in no class everything, and
+    // the installers' own bytes are checked; the manifest's allowlist is fail-closed.
+    expect(checks).toMatch(/### The coverage ledger/)
+    expect(checks).toMatch(/\*\*A fix round reruns the invalidated slices and nothing else\.\*\*/)
+    expect(checks).toMatch(/A path in no class invalidates everything, as for a first RC\./)
+    expect(checks).toMatch(/installer's \*\*SHA-256\*\*/)
+    expect(checks).toMatch(/\*\*The installer the user installs, and the one `npm run release` uploads, always get rows of their own bytes:\*\*/)
+    expect(checks).toMatch(/Without one, or where it is uncertain, the full affected set runs: that is the fallback/)
+    // HI-2676: the version-only bump beside the test-only allowlist; anything else asks for the real tier.
+    expect(checks).toMatch(/is either part of a version-only bump or on the test-only allowlist \(`manifestCheck`[^\n]*Anything else means the real tier runs again\./)
+    expect(checks).toMatch(/anything outside `tests\/` other than the version-only bump of those three files, more than that bump in them/)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/The full set is for guidance-wide changes only \(HI-2010, HI-2011, HI-2012\); a publishable RC gets 3 to 5 scenarios picked at random/)
     expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
     // #1534: where each build is recorded.

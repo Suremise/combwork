@@ -8,7 +8,7 @@ import { withAttachmentPaths, type CardAttachment } from '../shared/cardAttachme
 import { existsSync } from 'original-fs'
 import { stat } from 'original-fs/promises'
 import { LISTEN_RETRY_BOUND_MS, listenWithRetry } from './listenRetry'
-import type { AgentApiInfo, AgentDef, AgentInfo, Connection, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, CombworkEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
+import type { AgentApiInfo, AgentDef, AgentInfo, Connection, ConnectionLaunch, AssistantControl, AssistantUndoResult, LaneInfo, EffortLevel, CombworkEvent, LiveSessionState, McpServerInfo, PermissionMode, ProgressRun, ProjectConfig, ProviderId, SkillInfo, TaskCard, TaskColumn, TaskComment, TaskPatch, TaskStartTarget, ToastLevel, ToastMessage, ToastTarget, WorkspaceConnections } from '../shared/types'
 import { callsMade } from '../shared/activity'
 import { DEFAULT_API_PORT, CW_DIR, projectAgents, stopAsksUser, transcriptWarnLimit } from '../shared/defaults'
 import { PROVIDERS, agentProvider, isProviderEnabled, offeredModes, providerDescriptor, providerName } from '../shared/providers'
@@ -33,7 +33,7 @@ import { COLUMN_CHOICES, columnLabel, commentSummary, isTaskColumn, reviewStalle
 import type { HandoverAuthor } from '../shared/combworkGuidance'
 import { inDefaultDialect, inRequestScope } from '../shared/agentText/asyncScope'
 import { apiChainReady, inApiWorkspace, requestApiWorkspace } from './dialects/apiChain'
-import { say, type AgentMsg, type AgentValues } from '../shared/agentText'
+import { isSaid, say, sayWithId, type AgentMsg, type AgentValues, type Said as SaidText } from '../shared/agentText'
 import { API } from './apiText'
 import { cardRequests, commentsParam, laneOrderNote, modelInUse, newestComments, progressLabel, retryWaitsView, taskRow, withoutHistory, type CardRequest, type IntentDone, type ProjectRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskView, type AccountUsagePublic } from '../shared/toolReplies'
 import * as assistant from './assistantControl'
@@ -47,7 +47,7 @@ import { providerService } from './providerService'
 import { agentInstallInfo } from './providers/common'
 import { config } from './config'
 import { refusal, refusalBody } from '../shared/workflow/refusals'
-import { testsGiven, type FocusedTest } from '../shared/workflow/focused'
+import { ACCEPT_MAX, testsGiven, validTestId, type FocusedTest } from '../shared/workflow/focused'
 import { askAssistant, AskRefused } from './assistantAsk'
 import { agentWorkflowRole, isWorkflowRole, workflowPairs, type WorkflowRole } from '../shared/workflow/roles'
 import { deleteEntry, JournalBusy, JournalError, readEntry, recall, updateEntry, writeEntry } from './journal'
@@ -93,7 +93,8 @@ import type { DeliverySender, InboxItem } from '../shared/deliveries'
 import * as tasks from './tasks'
 import { runCardIntent, type CardIntent, type CardRefIn } from './cardIntents'
 import { armIntentWatch } from './intentWatch'
-import { pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
+import { offeredItems, offeredRetarget, offerRetarget, retargetApply, retargetPreview } from './workflow/retarget'
+import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
 import type { QueuePublic, QueueView } from '../shared/workflow/queue'
 import * as taskBatch from './taskBatch'
 import { startTask } from './taskStart'
@@ -102,10 +103,12 @@ import { transcripts } from './transcripts'
 import { contextWorkspace, inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, type WorkspaceService } from './workspace'
 import { accountOnIn, connectionRef, connectionsFor, connectionsOn, usableConnections, workspaceAccounts, type ConnectionPatch } from '../shared/accounts'
 import { accountById, addConnection, allAccounts, allConnections, connectionProblem, firstUsableAccount, getConnection, combworkAccounts, updateConnection } from './accounts'
+import { changeConnection } from './connectionLaunch'
+import { cleanLaunch, policySummary, terminalPreset } from '../shared/launchPolicy'
 import { workspaceNotesFile } from './workspaceNotes'
 import { WORKSPACE_NOTES_PATH } from '../shared/workspaceNotes'
 import { cardStages } from './boardStore'
-import { cardFacts, cardKind, cardReviewSkip, factRow, forYouOfCards } from './workflow/cardWork'
+import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards } from './workflow/cardWork'
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
@@ -117,7 +120,7 @@ import { actorOf, recordDecisionsReceived } from './workflow/recorder'
 import { workflowFor } from './workflow/service'
 import { unsubmittedOf } from './unsubmitted'
 import { idleOwnWatchOf } from './idleWatch'
-import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
+import { apiOutcome, appMetrics, clock as metricsClock, knownRoute, metricsHandle, reasonOf, recordApi, recordCatalog, recordMcp, MCP_REPORT_LIMITS, type MetricsHandle } from './metrics'
 import { metricsReport } from './metricsUsage'
 import { apiLabel, beginWork, hookLabel } from './mainStalls'
 import type { GuidanceSeries, MetricOutcome, MetricsPart, MetricsQuery, MetricsReport } from '../shared/metrics'
@@ -129,7 +132,8 @@ import { hookTokenMatches, refusedHookNote } from './hookTokens'
 import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
-import { agentError, CombworkError, shownError } from './combworkError'
+import { agentError, CombworkError, SaidError, shownError } from './combworkError'
+import { KindedError } from '../shared/kindedError'
 import { agentField, agentText, type TextPart } from '../shared/advanced'
 import { storedForAgents } from '../shared/taskHistory'
 import { CONSOLE_KINDS, combworkName, mayRead, type ConsoleEvent, type ConsoleKind, type ConsoleReader, type ConsoleSource } from '../shared/devConsole'
@@ -155,7 +159,7 @@ function readBody(req: IncomingMessage, onChunk?: (bytes: number) => void): Prom
       size += c.length
       onChunk?.(c.length)
       if (size > MAX_BODY) {
-        reject(new HttpError(413, say(API.http.bodyTooLarge)))
+        reject(new HttpError(413, apiSaid(API.http.bodyTooLarge)))
         req.destroy()
       } else chunks.push(c)
     })
@@ -164,21 +168,33 @@ function readBody(req: IncomingMessage, onChunk?: (bytes: number) => void): Prom
   })
 }
 
+/** An agent message said for an error reply, with its id kept beside the text (HI-2681): what Performance records as its reason. */
+type ApiSaid = SaidText
+const apiSaid = (m: AgentMsg, values?: AgentValues): ApiSaid => sayWithId(m, values)
+
 class HttpError extends Error {
+  /** The agent message it says, by id (HI-2681, metrics.ts reasonOf): never its text. */
+  public saidId?: string
   constructor(
     public status: number,
-    message: string,
+    message: string | ApiSaid,
     /** More of the reply's body, beside `error` (a conflict's current revision). */
     public extra?: Record<string, unknown>,
     /** The text of the CombworkError it answers (httpFrom), said in the request's dialect (dialects, HI-2440). */
     public text?: TextPart
   ) {
-    super(message)
+    super(typeof message === 'string' ? message : message.said)
+    if (typeof message !== 'string') this.saidId = message.id
   }
 }
 
 /** An error answered with another status: its message, and a CombworkError's text, so the reply says it in the caller's dialect. */
-const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => new HttpError(status, (e as Error).message, extra, e instanceof CombworkError ? e.text : undefined)
+const httpFrom = (status: number, e: unknown, extra?: Record<string, unknown>): HttpError => {
+  const h = new HttpError(status, (e as Error).message, extra, e instanceof CombworkError ? e.text : undefined)
+  // An agent message's id (HI-2691, combworkError.ts SaidError): Performance's reason for it, the status still this one.
+  if (e instanceof SaidError) h.saidId = e.saidId
+  return h
+}
 
 /** A reply's body as sent: its JSON as it is, whatever names its data uses (a console event's raw payload, #845). */
 export const replyText = (body: unknown): string => (body === undefined ? '' : JSON.stringify(body))
@@ -235,6 +251,10 @@ export async function startHookServer(): Promise<string> {
         obs = query.has('statusline') ? null : sessions.observeHook(run, {})
         throw e
       }
+      // A CLI whose hook bodies don't name their event (HI-2545: the Antigravity CLI): its hook command names it in the
+      // URL, as Combwork wrote it for the launch. Only a plain event name, and never in place of one the body carries.
+      const event = query.get('event')
+      if (body && typeof body === 'object' && !Array.isArray(body) && body.hook_event_name === undefined && event && /^[A-Za-z]{1,32}$/.test(event)) body.hook_event_name = event
       done = beginWork(hookLabel(query.has('statusline'), body))
       if (query.has('statusline')) {
         // The reply becomes Claude Code's status line, so send nothing; or, chaining the user's own status line (#1285),
@@ -353,6 +373,8 @@ interface ApiRequest {
   authenticated: boolean
   /** Answered with a wait (HI-1831: an error status whose body says to ask again): recorded as `waiting`, not a failure. */
   waiting: boolean
+  /** A refusal's or a wrong call's reason (HI-2553, metrics.ts reasonOf): its rule's or message's id. */
+  reason?: string
   /** The request's workspace, as far as it was known (the developer console's Combwork events). */
   ws: string | null
 }
@@ -426,7 +448,7 @@ export function findWorkspace(want: string): WorkspaceService | null {
   const at = /[\\/]/.test(want) ? placeMatcher(resolvePath(want)) : null
   const hits = openWorkspaces().filter((w) => (at ? at(w.path!) : basename(w.path!).toLowerCase() === v))
   if (hits.length > 1) {
-    throw new HttpError(409, say(API.workspace.severalNamed, { name: want, paths: hits.map((w) => w.path).join(', ') }))
+    throw new HttpError(409, apiSaid(API.workspace.severalNamed, { name: want, paths: hits.map((w) => w.path).join(', ') }))
   }
   return hits[0] ?? null
 }
@@ -436,21 +458,21 @@ function requestWorkspace(req: IncomingMessage, url: URL): WorkspaceService | nu
   const own = assistantCaller()
   if (own) {
     const w = openWorkspaces().find((x) => x.path!.toLowerCase() === own)
-    if (!w) throw new HttpError(409, say(API.workspace.assistantNotOpen))
+    if (!w) throw new HttpError(409, apiSaid(API.workspace.assistantNotOpen))
     return w
   }
   // An agent's calls are about its own workspace, whatever the request names.
   const agent = agentCaller()
   if (agent) {
     const w = openWorkspaces().find((x) => x.path!.toLowerCase() === agent.workspace.toLowerCase())
-    if (!w) throw new HttpError(409, say(API.workspace.agentNotOpen))
+    if (!w) throw new HttpError(409, apiSaid(API.workspace.agentNotOpen))
     return w
   }
   const header = req.headers['x-combwork-workspace']
   const raw = typeof header === 'string' && header ? decodeURIComponent(header) : url.searchParams.get('workspace')
   if (raw) {
     const w = findWorkspace(raw)
-    if (!w) throw new HttpError(404, say(API.workspace.unknown, { name: raw }))
+    if (!w) throw new HttpError(404, apiSaid(API.workspace.unknown, { name: raw }))
     return w
   }
   const open = openWorkspaces()
@@ -464,8 +486,8 @@ const titleKeys = (): string[] => keysForSearch(requireWorkspace()).flatMap((k) 
 function requireWorkspace(): WorkspaceService {
   const w = contextWorkspace()
   if (w) return w
-  if (!openWorkspaces().length) throw new HttpError(409, say(API.workspace.noneOpen))
-  throw new HttpError(400, say(API.workspace.sayWhich))
+  if (!openWorkspaces().length) throw new HttpError(409, apiSaid(API.workspace.noneOpen))
+  throw new HttpError(400, apiSaid(API.workspace.sayWhich))
 }
 
 /**
@@ -474,13 +496,13 @@ function requireWorkspace(): WorkspaceService {
  */
 function projectByName(name: string): string {
   const raw = decodeURIComponent(name)
-  if (!openWorkspaces().length) throw new HttpError(409, say(API.workspace.noneOpen))
+  if (!openWorkspaces().length) throw new HttpError(409, apiSaid(API.workspace.noneOpen))
   const slash = raw.search(/[\\/]/)
   let project = raw
   let candidates: WorkspaceService[]
   if (slash > 0) {
     const w = findWorkspace(raw.slice(0, slash))
-    if (!w) throw new HttpError(404, say(API.workspace.unknown, { name: raw.slice(0, slash) }))
+    if (!w) throw new HttpError(404, apiSaid(API.workspace.unknown, { name: raw.slice(0, slash) }))
     candidates = [w]
     project = raw.slice(slash + 1)
   } else {
@@ -491,8 +513,8 @@ function projectByName(name: string): string {
   // The Assistant looks after its own workspace only.
   if (own) candidates = candidates.filter((w) => w.path!.toLowerCase() === own)
   const hits = candidates.map((w) => join(w.path!, project)).filter((p) => workspace.isProjectPath(p))
-  if (!hits.length) throw new HttpError(404, say(API.workspace.unknownProject, { name: raw }))
-  if (hits.length > 1) throw new HttpError(409, say(API.workspace.projectInSeveral, { project, workspace: basename(dirname(hits[0])) }))
+  if (!hits.length) throw new HttpError(404, apiSaid(API.workspace.unknownProject, { name: raw }))
+  if (hits.length > 1) throw new HttpError(409, apiSaid(API.workspace.projectInSeveral, { project, workspace: basename(dirname(hits[0])) }))
   return hits[0]
 }
 
@@ -505,6 +527,18 @@ function progressOf(projectPath: string, agentId: string) {
   if (!r) return undefined
   const etaMs = timeLeft(r, Date.now())
   return { title: r.title, ...(r.total !== null ? { step: r.step ?? 0, total: r.total } : {}), ...(r.stepName ? { stepName: r.stepName } : {}), ...(r.waiting ? { waiting: r.waiting } : {}), ...(etaMs !== null ? { etaMs } : {}), ...(r.state === 'stale' ? { stale: true } : {}) }
+}
+
+/**
+ * What of Combwork's an agent launches with (HI-2670), in short; null: everything. Its connection's, or, Independent, as
+ * from a terminal whatever its connection says (HI-2731).
+ */
+const launchSummaryOf = (a: AgentInfo): string | null => {
+  const c = getConnection(a.connection)
+  const cli = accountById(c?.account)?.provider ?? a.provider
+  // Its own role (one a tools-off connection makes Independent launches as that connection says).
+  if (cli && a.workflowRole === 'independent') return policySummary({ launch: terminalPreset(cli) }, cli)
+  return c && cli ? policySummary(c, cli) : null
 }
 
 /**
@@ -550,6 +584,8 @@ async function projectSummary(p: string) {
       provider: a.live?.provider ?? agentProvider(a, config.settings),
       // Its role in the workflow (#1430): its own, else the guess from its note or name.
       workflowRole: agentWorkflowRole(a),
+      // What of Combwork's its connection launches it with (HI-2670), when not everything: "plain" or "partly plain: …".
+      ...(launchSummaryOf(a) ? { launch: launchSummaryOf(a) } : {}),
       // Where it works now (#1451): its running session's folder, else where a new conversation would start, short (a
       // slot's name, project, or home: <name>); its slot, and that slot's line.
       folder: places.get(a.id)!.now.at,
@@ -602,10 +638,10 @@ async function agentParam(p: string, value: unknown): Promise<string> {
   if (typeof value !== 'string' || !value) {
     const agents = projectAgents(await workspace.projectConfig(p))
     if (agents.length === 1) return agents[0].id
-    throw agents.length ? new HttpError(400, say(API.agent.sayWhich)) : new HttpError(409, say(API.agent.none))
+    throw agents.length ? new HttpError(400, apiSaid(API.agent.sayWhich)) : new HttpError(409, apiSaid(API.agent.none))
   }
   const a = projectAgents(await workspace.projectConfig(p)).find((x) => x.id === value || x.name.toLowerCase() === value.toLowerCase())
-  if (!a) throw new HttpError(404, say(API.agent.unknownNamed, { name: value }))
+  if (!a) throw new HttpError(404, apiSaid(API.agent.unknownNamed, { name: value }))
   return a.id
 }
 
@@ -645,7 +681,7 @@ async function asRefused<T>(fn: () => Promise<T>): Promise<T> {
  */
 async function assistantChange<T>(need: AssistantControl, what: Said, act: ActivityTarget, fn: (guard: () => void) => Promise<{ done: Said; said?: string; brief?: Said; act?: Partial<ActivityTarget>; result: T } & UndoNotes>): Promise<T> {
   const ws = assistantCaller()
-  if (!ws) throw new HttpError(403, say(API.change.onlyAssistant, { what: sayNow(what) }))
+  if (!ws) throw new HttpError(403, apiSaid(API.change.onlyAssistant, { what: sayNow(what) }))
   // What is recorded (its activity, undo's records) is said in the Default; its refusals in the caller's scope.
   const stored = sayStored(what)
   const line = stored.charAt(0).toUpperCase() + stored.slice(1)
@@ -691,6 +727,8 @@ const FINAL_WHY: Partial<Record<ActivityKind, string>> = {
   'lane-fresh-start': UNDO_FINAL.freshRetried,
   'queue-pause': UNDO_FINAL.queuePaused,
   'queue-resume': UNDO_FINAL.queueResumed,
+  'queue-forward': UNDO_FINAL.queueForwarded,
+  retarget: UNDO_FINAL.retargeted,
   'team-pause': UNDO_FINAL.teamPaused,
   'team-resume': UNDO_FINAL.teamResumed,
   'release-slot': UNDO_FINAL.slotReleased,
@@ -747,7 +785,7 @@ function route(method: string, path: string, handler: Handler): void {
 }
 
 /** The Agent API's contract version: goes up when a route or field changes in a way a client would notice. */
-export const API_VERSION = 14
+export const API_VERSION = 15
 
 /** Who Combwork takes a request's caller for, and what it may reach (GET /v1/status). */
 async function callerInfo(): Promise<Record<string, unknown>> {
@@ -806,7 +844,7 @@ route('GET', '/v1/workspaces', async () => openWorkspaces().map((w) => ({ name: 
 /** A project in a short listing (?view=short): its state and agents, without ids, paths or settings. */
 async function projectRow(p: string): Promise<ProjectRow> {
   const s = await projectSummary(p)
-  return { name: s.name, workspace: s.workspace, active: s.active, branch: s.branch, agents: s.agents.map((a) => ({ name: a.name, provider: a.provider, workflowRole: a.workflowRole, status: a.status, branch: a.branch, backgroundTasks: a.backgroundTasks, ...(a.watching ? { watching: a.watching.label } : {}), ...(a.progress ? { progress: progressLabel(a.progress) } : {}) })) }
+  return { name: s.name, workspace: s.workspace, active: s.active, branch: s.branch, agents: s.agents.map((a) => ({ name: a.name, provider: a.provider, workflowRole: a.workflowRole, ...(a.launch ? { launch: a.launch } : {}), status: a.status, branch: a.branch, backgroundTasks: a.backgroundTasks, ...(a.watching ? { watching: a.watching.label } : {}), ...(a.progress ? { progress: progressLabel(a.progress) } : {}) })) }
 }
 
 route('GET', '/v1/projects', async ({ query }) => {
@@ -848,7 +886,7 @@ route('POST', '/v1/projects/:name/deactivate', async ({ params }) => {
   const p = projectByName(params[0])
   ownProjectOnly(p, [API.own.deactivating])
   assistantMay('agents', [API.change.deactivateProject, { project: basename(p) }], { kind: 'deactivate-project', project: basename(p) })
-  if (sessions.liveFor(p)) throw new HttpError(409, say(API.project.stopBeforeDeactivating))
+  if (sessions.liveFor(p)) throw new HttpError(409, apiSaid(API.project.stopBeforeDeactivating))
   workspace.setActive(p, false)
   await workspaceOf(p).refresh()
   return projectSummary(p)
@@ -862,7 +900,7 @@ route('POST', '/v1/projects/:name/deactivate', async ({ params }) => {
 function ownProjectOnly(p: string, what: Said): void {
   const a = agentCaller()
   if (a && resolvePath(a.projectPath).toLowerCase() !== resolvePath(p).toLowerCase()) {
-    throw new HttpError(403, say(API.agent.ownProjectOnly, { what: sayNow(what), project: basename(a.projectPath) }))
+    throw new HttpError(403, apiSaid(API.agent.ownProjectOnly, { what: sayNow(what), project: basename(a.projectPath) }))
   }
 }
 
@@ -874,14 +912,14 @@ route('GET', '/v1/projects/:name/sessions', async ({ params }) => {
 
 route('POST', '/v1/projects/:name/sessions', async ({ params, body }) => {
   const p = projectByName(params[0])
-  if (assistantCaller()) throw new HttpError(400, say(API.agent.useStartAgent))
+  if (assistantCaller()) throw new HttpError(400, apiSaid(API.agent.useStartAgent))
   ownProjectOnly(p, [API.own.starting])
   return sessions.start(p, { resumeId: body?.resumeId, name: body?.name, agentId: await agentParam(p, body?.agent) })
 })
 
 route('POST', '/v1/projects/:name/stop', async ({ params, query, body }) => {
   const p = projectByName(params[0])
-  if (assistantCaller()) throw new HttpError(400, say(API.agent.useStopAgent))
+  if (assistantCaller()) throw new HttpError(400, apiSaid(API.agent.useStopAgent))
   ownProjectOnly(p, [API.own.stopping])
   const agent = query.get('agent') ?? body?.agent
   // Its cause from the caller's token (HI-1881): an agent's; a script's or another caller's unknown, just "stopped".
@@ -893,7 +931,7 @@ route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
   const p = projectByName(params[0])
   const agent = query.get('agent')
   const id = query.get('sessionId') ?? sessions.liveFor(p, agent ? await agentParam(p, agent) : undefined)?.sessionId ??(await sessions.list(p)).find((s) => s.source === 'combwork')?.id
-  if (!id) throw new HttpError(404, say(API.agent.noSessions))
+  if (!id) throw new HttpError(404, apiSaid(API.agent.noSessions))
   const usage = await sessions.usage(p, id)
   // Where it ran (#1434): its folder, and the slot that is, if any.
   const rec = usage ? await workspace.sessionRecord(p, id).catch(() => undefined) : undefined
@@ -909,12 +947,12 @@ route('GET', '/v1/projects/:name/usage', async ({ params, query }) => {
 })
 
 route('POST', '/v1/projects/:name/input', async ({ params, body }) => {
-  if (assistantCaller()) throw new HttpError(400, say(API.agent.usePromptAgent))
-  if (!config.settings.agentApi.allowSessionInput) throw new HttpError(403, say(API.agent.inputDisabled))
+  if (assistantCaller()) throw new HttpError(400, apiSaid(API.agent.usePromptAgent))
+  if (!config.settings.agentApi.allowSessionInput) throw new HttpError(403, apiSaid(API.agent.inputDisabled))
   const p = projectByName(params[0])
   ownProjectOnly(p, [API.own.typing])
   const agentId = await agentParam(p, body?.agent)
-  if (!sessions.liveFor(p, agentId)) throw new HttpError(409, say(API.agent.notRunning))
+  if (!sessions.liveFor(p, agentId)) throw new HttpError(409, apiSaid(API.agent.notRunning))
   const text = String(body?.text ?? '')
   writePty(sessions.key(p, agentId),text + (body?.submit === false ? '' : '\r'))
   return { ok: true }
@@ -927,20 +965,20 @@ export const handOverFailedToast = (projectPath: string, to: string, e: unknown)
 
 route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
   const own = assistantCaller()
-  if (!own && !config.settings.agentApi.allowSessionInput) throw new HttpError(403, say(API.agent.inputDisabled))
+  if (!own && !config.settings.agentApi.allowSessionInput) throw new HttpError(403, apiSaid(API.agent.inputDisabled))
   const p = projectByName(params[0])
   // A hand-over prompts its agent (HI-2327): another project's agents are not a project agent's to type into, as /input.
   ownProjectOnly(p, [API.own.handingOver])
   const from = await agentParam(p, body?.from)
-  if (typeof body?.to !== 'string' || !body.to) throw new HttpError(400, say(API.handover.toRequired))
+  if (typeof body?.to !== 'string' || !body.to) throw new HttpError(400, apiSaid(API.handover.toRequired))
   const to = await agentParam(p, body.to)
   const handover = body?.handover !== false
   // Known at once rather than later in a notification: from the latest handover, there has to be one.
-  if (!handover && !(await sessions.latestHandover(p))) throw new HttpError(409, say(API.handover.noneYet, { project: basename(p) }))
+  if (!handover && !(await sessions.latestHandover(p))) throw new HttpError(409, apiSaid(API.handover.noneYet, { project: basename(p) }))
   const names = projectAgents(await workspace.projectConfig(p))
   const name = (id: string): string => names.find((a) => a.id === id)?.name ?? id
   // To itself it ends its conversation (#1057): not while it works, merges or is on a running card loop's card.
-  if (from === to && !(await sessions.handOverAllowed(p, from))) throw new HttpError(409, say(API.handover.busy, { agent: name(from) }))
+  if (from === to && !(await sessions.handOverAllowed(p, from))) throw new HttpError(409, apiSaid(API.handover.busy, { agent: name(from) }))
   const act: ActivityTarget = { kind: 'hand-over', project: basename(p), agent: { id: from, name: name(from) }, toAgent: { id: to, name: name(to) } }
   // `allowed`: the Assistant's guard, carried into the hand-over (HI-2420, HR1's round 1): checked before each of its steps.
   const start = async (allowed?: () => void): Promise<void> => {
@@ -956,9 +994,9 @@ route('POST', '/v1/projects/:name/handover', async ({ params, body }) => {
   }
   return assistantChange('agents', [API.change.handOver, { from: name(from), to: name(to), project: basename(p) }], act, async (guard) => {
     // Known at once rather than minutes later: without Combwork's tools agents can't write or read a handover.
-    if (!sessions.combworkMcp(p)) throw new HttpError(409, say(API.handover.noTools))
+    if (!sessions.combworkMcp(p)) throw new HttpError(409, apiSaid(API.handover.noTools))
     for (const id of [from, to]) {
-      if (sessions.userMayBeTyping(p, id)) throw new HttpError(409, say(API.handover.userTyping, { agent: name(id) }))
+      if (sessions.userMayBeTyping(p, id)) throw new HttpError(409, apiSaid(API.handover.userTyping, { agent: name(id) }))
     }
     // Its guard checked as it is set off (HI-2420), and carried into it: the hand-over takes minutes, and each of its steps
     // (asking for the handover, ending a conversation, giving or launching the target) checks it again.
@@ -1024,9 +1062,9 @@ async function settingsCall<T>(fn: () => Promise<T> | T): Promise<T> {
 route('GET', '/v1/settings', ({ query }) =>
   settingsCall(async () => {
     const scope = query.get('scope') || undefined
-    if (scope && !SETTING_SCOPES.includes(scope as SettingScope)) throw new HttpError(400, say(API.settings.scopeIs, { scopes: SETTING_SCOPES.join(', ') }))
+    if (scope && !SETTING_SCOPES.includes(scope as SettingScope)) throw new HttpError(400, apiSaid(API.settings.scopeIs, { scopes: SETTING_SCOPES.join(', ') }))
     const p = settingsProject(query.get('project'))
-    if (scope === 'project' && !p) throw new HttpError(400, say(API.settings.projectNeedsName))
+    if (scope === 'project' && !p) throw new HttpError(400, apiSaid(API.settings.projectNeedsName))
     return settingRows({ query: query.get('query') ?? '', scope: scope as SettingScope | undefined, project: await projectOf(p) })
   })
 )
@@ -1037,7 +1075,7 @@ route('PATCH', '/v1/settings/:id', ({ params, body }) =>
   settingsCall(async () => {
     const e = entryOf(decodeURIComponent(params[0]))
     const p = settingsProject(body?.project)
-    if (e.scope === 'project' && !p) throw new HttpError(400, say(API.settings.sayProject, { setting: e.id }))
+    if (e.scope === 'project' && !p) throw new HttpError(400, apiSaid(API.settings.sayProject, { setting: e.id }))
     return settingsChange(e, body?.value, e.scope === 'project' ? p : null)
   })
 )
@@ -1053,18 +1091,18 @@ async function settingsChange(e: SettingEntry, value: unknown, projectPath: stri
   // Where: a project's setting names its project (` in webapp`).
   const where = projectPath ? { where: 'project', project: basename(projectPath) } : { where: 'none', project: '' }
   const ws = assistantCaller()
-  if (!ws) throw new HttpError(403, say(API.settings.onlyAssistant, { path }))
+  if (!ws) throw new HttpError(403, apiSaid(API.settings.onlyAssistant, { path }))
   // Recorded lines are said in the Default (stored); refusals in the caller's scope.
   const line = sayStored([API.settings.line, { path: storedPath, ...where }])
   // Which setting, never its value (#763).
   const act: ActivityTarget = { kind: 'setting', settingId: e.id, ...(projectPath ? { project: basename(projectPath) } : {}) }
   if (config.settings.assistant?.changeSettings !== true) {
     assistant.record(ws, act, line, sayStored([API.settings.notAllowed]), { reason: sayStored([API.settings.notAllowedReason]) })
-    throw new HttpError(403, say(API.settings.controlOff, { path }))
+    throw new HttpError(403, apiSaid(API.settings.controlOff, { path }))
   }
   if (e.sensitive) {
     assistant.record(ws, act, line, sayStored([API.settings.userOnly]), { reason: sayStored([API.settings.userOnlyReason]) })
-    throw new HttpError(403, say(API.settings.readOnly, { readOnly: settingReadOnly(e) ?? '' }))
+    throw new HttpError(403, apiSaid(API.settings.readOnly, { readOnly: settingReadOnly(e) ?? '' }))
   }
   // Checked before the change: a value it can't take is the Assistant's to fix.
   await settingsCall(() => checkedValue(e, value, projectPath))
@@ -1106,7 +1144,7 @@ const CHANGE_GROUPS_LISTED = 10
  * its line, its card, the fields it set, whether it was undone, and why one can't be (`final`). Only the Assistant's.
  */
 route('GET', '/v1/assistant/changes', async () => {
-  if (!assistantCaller()) throw new HttpError(403, say(API.undo.onlyAssistant))
+  if (!assistantCaller()) throw new HttpError(403, apiSaid(API.undo.onlyAssistant))
   return changeGroups(requireWorkspace())
     .slice(0, CHANGE_GROUPS_LISTED)
     .map((g) => ({ group: g.id, at: g.at, changes: g.changes.map((c) => ({ id: c.id, what: c.what, ...(c.card !== undefined ? { card: c.card } : {}), fields: c.fields, ...(c.final ? { final: c.final } : {}), ...(c.undoneAt ? { undone: true } : {}) })) }))
@@ -1121,10 +1159,10 @@ route('POST', '/v1/assistant/undo', async ({ body }) => {
   const ws = requireWorkspace()
   const change = typeof body?.change === 'string' && body.change ? body.change : undefined
   let group = typeof body?.group === 'string' && body.group ? body.group : undefined
-  if (!change === !group) throw new HttpError(400, say(API.undo.nameOne))
+  if (!change === !group) throw new HttpError(400, apiSaid(API.undo.nameOne))
   if (group === 'latest') {
     group = changeGroups(ws).find((g) => g.changes.some((c) => !c.undoneAt && !c.final))?.id
-    if (!group) throw new HttpError(404, say(API.undo.noneLeft))
+    if (!group) throw new HttpError(404, apiSaid(API.undo.noneLeft))
   }
   return assistantChange('agents', [change ? API.change.undoOne : API.change.undoMessage], { kind: 'undo' }, async (guard) => {
     let results: AssistantUndoResult[]
@@ -1144,7 +1182,7 @@ route('POST', '/v1/assistant/undo', async ({ body }) => {
 
 route('POST', '/v1/projects', async ({ body }) => {
   const name = String(body?.name ?? '').trim()
-  if (!name) throw new HttpError(400, say(API.project.nameRequired))
+  if (!name) throw new HttpError(400, apiSaid(API.project.nameRequired))
   return assistantChange('projects', [API.change.createProject, { name }], { kind: 'create-project', project: name }, async (guard) => {
     // Its guard checked again just before the write (HI-2420): createProject makes the folder before its first await.
     // What follows only sets up the project that is then there (activated, listed), never left half made.
@@ -1162,7 +1200,7 @@ const clip = (t: string, n: number): string => (t.length > n ? `${t.slice(0, n)}
 
 async function agentDefOf(p: string, agentId: string) {
   const a = projectAgents(await workspace.projectConfig(p)).find((x) => x.id === agentId)
-  if (!a) throw new HttpError(404, say(API.agent.unknown))
+  if (!a) throw new HttpError(404, apiSaid(API.agent.unknown))
   return a
 }
 
@@ -1174,7 +1212,7 @@ function agentMcpArg(body: any): { mcpServers?: string[] | null } {
   try {
     return { mcpServers: all ? null : cleanMcpServers(m)! }
   } catch (e) {
-    throw new HttpError(400, say(API.agent.mcpServersArg, { error: (e as Error).message }))
+    throw new HttpError(400, apiSaid(API.agent.mcpServersArg, { error: (e as Error).message }))
   }
 }
 
@@ -1195,7 +1233,9 @@ function connectionValues(c: Connection, wide: boolean): Record<string, unknown>
 /** A connection as the Agent API lists it (HI-2108): its id, name, account (its name and CLI), its values, and `usable: false` where it can't be used here. */
 function connectionRow(c: Connection, usable: boolean, wide: boolean): Record<string, unknown> {
   const a = accountById(c.account)
-  return { id: c.id, name: c.name, account: a?.name ?? c.account, cli: a?.provider ?? null, ...connectionValues(c, wide), ...(usable ? {} : { usable: false }) }
+  // Its launch settings in short (HI-2670), when not everything.
+  const launch = a ? policySummary(c, a.provider) : null
+  return { id: c.id, name: c.name, account: a?.name ?? c.account, cli: a?.provider ?? null, ...connectionValues(c, wide), ...(launch ? { launch } : {}), ...(usable ? {} : { usable: false }) }
 }
 
 /** An account's connections by name, for a refusal (HI-2108): "On Personal: Personal, Personal · High." */
@@ -1214,7 +1254,7 @@ const OLD_AGENT_FIELDS = ['provider', 'model', 'effort', 'mode', 'context200k'] 
 export function refuseOldFields(body: any, account: string | undefined): void {
   const old = OLD_AGENT_FIELDS.filter((k) => body && typeof body === 'object' && k in body)
   if (!old.length) return
-  throw new HttpError(400, say(API.connection.oldFields, { fields: old.join(', '), on: connectionNamesOn(account) }))
+  throw new HttpError(400, apiSaid(API.connection.oldFields, { fields: old.join(', '), on: connectionNamesOn(account) }))
 }
 
 /**
@@ -1228,7 +1268,7 @@ function connectionArg(body: any, projectPath: string): { connection: string | n
   if (v === null || v === '') return { connection: null }
   const here = connectionsHere(workspaceOf(projectPath)).map((c) => c.id)
   const r = connectionRef(String(v), allConnections(), here)
-  if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, say(API.connection.severalNamed, { name: v, ids: r.ids!.join(', ') })) : new HttpError(404, say(API.connection.noneNamedUsable, { name: v }))
+  if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, apiSaid(API.connection.severalNamed, { name: v, ids: r.ids!.join(', ') })) : new HttpError(404, apiSaid(API.connection.noneNamedUsable, { name: v }))
   return { connection: r.id, cli: accountById(getConnection(r.id)?.account)?.provider }
 }
 
@@ -1280,7 +1320,7 @@ function accountUsageRows(ids: readonly string[]): AccountUsagePublic[] {
   for (const id of ids) {
     const a = accountById(id)
     if (!a) continue
-    const limits = (config.get().connectionPlanUsage?.[id]?.limits ?? []).filter((l) => !l.resetsAt || Date.parse(l.resetsAt) > now).map((l) => ({ label: l.label, usedPercent: Math.round(l.usedPercent * 10) / 10, resetsAt: l.resetsAt }))
+    const limits = (config.get().connectionPlanUsage?.[id]?.limits ?? []).filter((l) => !l.unlimited && !l.notIncluded && (!l.resetsAt || Date.parse(l.resetsAt) > now)).map((l) => ({ label: l.label, usedPercent: Math.round(l.usedPercent * 10) / 10, resetsAt: l.resetsAt }))
     const m = a.usageMove
     const move = m ? { percent: m.percent, limit: m.limit, to: accountById(m.to)?.name ?? m.to } : undefined
     if (limits.length || move) rows.push({ account: a.name, limits, ...(move ? { move } : {}) })
@@ -1295,8 +1335,8 @@ route('GET', '/v1/connections/:ref', async ({ params }) => {
   const r = connectionRef(ref, allConnections(), here)
   // A project agent asking after one not usable in its workspace, by id or by name: as if there were none.
   const c = r.ok ? getConnection(r.id) : undefined
-  if (r.ok === false && r.why === 'ambiguous') throw new HttpError(409, say(API.connection.severalNamed, { name: ref, ids: r.ids!.join(', ') }))
-  if (!c || (agentCaller() && !here.includes(c.id))) throw new HttpError(404, say(API.connection.noneNamedUsableShort, { name: ref }))
+  if (r.ok === false && r.why === 'ambiguous') throw new HttpError(409, apiSaid(API.connection.severalNamed, { name: ref, ids: r.ids!.join(', ') }))
+  if (!c || (agentCaller() && !here.includes(c.id))) throw new HttpError(404, apiSaid(API.connection.noneNamedUsableShort, { name: ref }))
   return connectionRow(c, here.includes(c.id), !agentCaller())
 })
 
@@ -1310,7 +1350,7 @@ export function connectionValuesArg(body: any): ConnectionPatch {
   const text = (v: unknown): string | null => (v === null || v === undefined ? null : String(v).trim() || null)
   if (body?.name !== undefined) {
     const n = String(body.name ?? '').trim()
-    if (!n) throw new HttpError(400, say(API.connection.needsName))
+    if (!n) throw new HttpError(400, apiSaid(API.connection.needsName))
     out.name = n
   }
   if (body?.model !== undefined) out.model = text(body.model)
@@ -1323,7 +1363,7 @@ export function connectionValuesArg(body: any): ConnectionPatch {
   if (c !== undefined) {
     if (c === true || c === 'on') out.use200kContext = true
     else if (c === false || c === 'off' || c === null || c === '') out.use200kContext = null
-    else throw new HttpError(400, say(API.connection.context200k))
+    else throw new HttpError(400, apiSaid(API.connection.context200k))
   }
   return out
 }
@@ -1343,7 +1383,7 @@ async function connectionChange<T>(act: ActivityTarget, what: Said, fn: (atTheCh
 
 /** Change settings on (HI-2108): else a connection change is refused, saying where the user changes it. */
 function connectionsAllowed(): void {
-  if (config.settings.assistant?.changeSettings !== true) throw new HttpError(403, say(API.connection.controlOff))
+  if (config.settings.assistant?.changeSettings !== true) throw new HttpError(403, apiSaid(API.connection.controlOff))
 }
 
 /**
@@ -1370,13 +1410,13 @@ async function connectionsCall<T>(fn: () => T | Promise<T>): Promise<T> {
 route('POST', '/v1/connections', async ({ body }) =>
   connectionChange({ kind: 'add-connection' }, [API.change.addConnection], async (checked) => {
     const ref = String(body?.account ?? '').trim()
-    if (!ref) throw new HttpError(400, say(API.connection.nameAccount))
+    if (!ref) throw new HttpError(400, apiSaid(API.connection.nameAccount))
     const accounts = allAccounts()
     const byName = accounts.filter((a) => a.name.trim().toLowerCase() === ref.toLowerCase())
     const account = accounts.find((a) => a.id === ref) ?? (byName.length === 1 ? byName[0] : undefined)
-    if (!account) throw byName.length > 1 ? new HttpError(409, say(API.connection.severalAccounts, { name: ref, ids: byName.map((a) => a.id).join(', ') })) : new HttpError(404, say(API.connection.noAccount, { name: ref }))
+    if (!account) throw byName.length > 1 ? new HttpError(409, apiSaid(API.connection.severalAccounts, { name: ref, ids: byName.map((a) => a.id).join(', ') })) : new HttpError(404, apiSaid(API.connection.noAccount, { name: ref }))
     const v = connectionValuesArg(body)
-    if (!v.name) throw new HttpError(400, say(API.connection.needsName))
+    if (!v.name) throw new HttpError(400, apiSaid(API.connection.needsName))
     const c = await checked(() => connectionsCall(() => addConnection(account.id, { ...v, name: v.name! })))
     return { done: [API.done.addedConnection, { connection: c.name, account: account.name }], act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
   })
@@ -1386,18 +1426,32 @@ route('PATCH', '/v1/connections/:ref', async ({ params, body }) =>
   connectionChange({ kind: 'update-connection' }, [API.change.updateConnection], async (checked) => {
     const ref = decodeURIComponent(params[0] ?? '')
     const r = connectionRef(ref, allConnections(), allConnections().map((c) => c.id))
-    if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, say(API.connection.severalNamed, { name: ref, ids: r.ids!.join(', ') })) : new HttpError(404, say(API.connection.noneNamed, { name: ref }))
+    if (!r.ok) throw r.why === 'ambiguous' ? new HttpError(409, apiSaid(API.connection.severalNamed, { name: ref, ids: r.ids!.join(', ') })) : new HttpError(404, apiSaid(API.connection.noneNamed, { name: ref }))
     const v = connectionValuesArg(body)
-    if (!Object.keys(v).length) throw new HttpError(400, say(API.connection.nothingToChange))
-    const c = await checked(() => connectionsCall(() => updateConnection(r.id, v)))
-    return { done: [API.done.updatedConnection, { connection: c.name }], act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
+    // Its launch settings (HI-2670): `launch`, and `confirm` naming what it takes out of the workflow, when it does.
+    const launch = body?.launch === undefined ? undefined : launchArg(body.launch, r.id)
+    if (!Object.keys(v).length && launch === undefined) throw new HttpError(400, apiSaid(API.connection.nothingToChange))
+    // Values and launch settings together (HR1 on s44): what it affects read first, then, after every await, Change
+    // settings and the Assistant's session checked at the write (atWrite), and both saved or neither.
+    const c = Object.keys(v).length && launch === undefined ? await checked(() => connectionsCall(() => updateConnection(r.id, v))) : await connectionsCall(() => changeConnection(r.id, { values: v, launch, confirmed: typeof body?.confirm === 'string' ? body.confirm : null, atWrite: () => checked(() => undefined) }))
+    const cli = accountById(c.account)?.provider
+    const done: [AgentMsg, Record<string, string>] = launch !== undefined && !Object.keys(v).length ? [API.done.launchedConnection, { connection: c.name, how: (cli && policySummary(c, cli, true)) || '' }] : [API.done.updatedConnection, { connection: c.name }]
+    return { done, act: { connection: c.id }, result: connectionRow(c, connectionsHere(requireWorkspace()).some((x) => x.id === c.id), true) }
   })
 )
 
-/** A workflowRole argument (#1430): builder, reviewer, either or generalist (HI-686). */
+/** A launch argument (HI-2670): the connection's switches, `{ preset: 'terminal' }` for all off, or {} for all on. */
+function launchArg(v: unknown, id: string): ConnectionLaunch {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new HttpError(400, apiSaid(API.connection.launchArg))
+  const cli = accountById(getConnection(id)?.account)?.provider
+  if ((v as { preset?: unknown }).preset === 'terminal') return cli ? terminalPreset(cli) : { guidance: false, tools: false, typing: false }
+  return (cli && cleanLaunch(v, cli)) || {}
+}
+
+/** A workflowRole argument (#1430): builder, reviewer, either, generalist (HI-686) or independent (HI-2670). */
 function workflowRoleArg(v: unknown): WorkflowRole {
   if (isWorkflowRole(v)) return v
-  throw new HttpError(400, say(API.agent.workflowRoleArg))
+  throw new HttpError(400, apiSaid(API.agent.workflowRoleArg))
 }
 
 /** Why a worktree of an agent's own is refused (#1451): the Agent API's short note. */
@@ -1412,9 +1466,9 @@ route('POST', '/v1/projects/:name/agents', async ({ params, body }) => {
     // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
     refuseOldFields(body, getConnection(conn?.connection)?.account ?? firstUsableAccount(ws.path ? ws.config : null)?.id)
     const mcp = agentMcpArg(body)
-    if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, say(API.agent.providerOff, { provider: PROVIDERS.find((x) => x.id === conn.cli)?.name ?? conn.cli }))
+    if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, apiSaid(API.agent.providerOff, { provider: PROVIDERS.find((x) => x.id === conn.cli)?.name ?? conn.cli }))
     // 1.0 (#1451): no agent has a worktree of its own (slots are lent per card or lane): the old arguments are refused.
-    if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, say(NOT_PINNED))
+    if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, apiSaid(NOT_PINNED))
     // Its connection: the one named, else the first usable here (decision A), its CLI following from it.
     const def = await addAgent(p, {
       name: body?.name ? String(body.name) : undefined,
@@ -1462,6 +1516,8 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     refuseOldFields(body, getConnection(a.connection)?.account)
     // Another CLI's connection is a change of CLI: only while it is stopped (updateAgent refuses it otherwise).
     const def = await updateAgent(p, agentId, { ...(body?.name !== undefined ? { name: String(body.name) } : {}), ...agentMcpArg(body), ...(conn ? { connection: conn.connection } : {}), ...role }, {
+      // What it takes out of the workflow (HI-2670), as a refusal named it, once the user agreed.
+      confirmed: typeof body?.confirm === 'string' ? body.confirm : null,
       // Control and the Assistant's session checked again under the lock, with the write (HI-2328).
       check: (current) => {
         guard()
@@ -1470,7 +1526,9 @@ route('PATCH', '/v1/projects/:name/agents/:agent', async ({ params, body }) => {
     })
     if (was) await noteAgent(requireWorkspace(), basename(p), was, def)
     const live = sessions.liveFor(p, agentId)
-    return { done: [API.done.updatedAgent, { agent: def.name, project: basename(p), live: live ? 'yes' : 'no' }], act: { agent: actAgent(def) }, result: def }
+    // A role change (HI-2664): updateAgent restarted it if idle; asked again, what became of it (one restart, never two).
+    const side = live && body?.workflowRole !== undefined ? await sessions.restartForTools(p, agentId, { when: 'ifIdle' }).catch(() => 'same' as const) : 'same'
+    return { done: [API.done.updatedAgent, { agent: def.name, project: basename(p), live: side === 'restarting' || side === 'busy' ? side : live ? 'yes' : 'no' }], act: { agent: actAgent(def) }, result: def }
   })
 })
 
@@ -1479,12 +1537,12 @@ route('POST', '/v1/projects/:name/agents/:agent/start', async ({ params, body })
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   return assistantChange('agents', [API.change.startAgent, { agent: a.name, project: basename(p) }], { kind: 'start-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
-    if (sessions.liveFor(p, agentId)) throw new HttpError(409, say(API.agent.alreadyRunning, { agent: a.name }))
+    if (sessions.liveFor(p, agentId)) throw new HttpError(409, apiSaid(API.agent.alreadyRunning, { agent: a.name }))
     let resumeId: string | undefined
     if (typeof body?.resume === 'string' && body.resume) resumeId = body.resume
     else if (body?.resume) {
       resumeId = (await workspace.projectInfo(p)).agents.find((x) => x.id === agentId)?.resume?.id
-      if (!resumeId) throw new HttpError(409, say(API.agent.noConversation, { agent: a.name }))
+      if (!resumeId) throw new HttpError(409, apiSaid(API.agent.noConversation, { agent: a.name }))
     }
     const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : ''
     const st = prompt ? await startOnTask(p, agentId, a.name, prompt, (line) => sessions.start(p, { agentId, resumeId, prompt: line, allowed: guard })) : await sessions.start(p, { agentId, resumeId, allowed: guard })
@@ -1507,12 +1565,12 @@ route('POST', '/v1/projects/:name/agents/:agent/stop', async ({ params, body, si
       const reason = typeof body?.reason === 'string' ? clip(body.reason.trim(), 300) : ''
       const how = await assistant.ask(ws, assistant.stopQuestion({ agent: a.name, project: basename(p), status: st.status, reason }), { timeoutMs: STOP_ASK_MS, signal })
       // Its question closed, whatever ended it: never left open in the panel with nobody waiting on it (HI-1994).
-      if (how === 'timedOut') throw new HttpError(408, say(API.agent.stopAskTimedOut, { agent: a.name, seconds: String(STOP_ASK_MS / 1000) }))
-      if (how === 'gone') throw new HttpError(409, say(API.agent.stopAskWithdrawn, { agent: a.name }))
-      if (how === 'no') throw new HttpError(409, say(API.agent.stopAskDeclined, { agent: a.name }))
+      if (how === 'timedOut') throw new HttpError(408, apiSaid(API.agent.stopAskTimedOut, { agent: a.name, seconds: String(STOP_ASK_MS / 1000) }))
+      if (how === 'gone') throw new HttpError(409, apiSaid(API.agent.stopAskWithdrawn, { agent: a.name }))
+      if (how === 'no') throw new HttpError(409, apiSaid(API.agent.stopAskDeclined, { agent: a.name }))
       // The answer can come minutes later: only the run the user was asked about, and only if Control still allows it.
       if (sessions.liveFor(p, agentId)?.runId !== st.runId) return { done: [API.done.alreadyStopped, { agent: a.name, project: basename(p) }], result: { ok: true, wasRunning: false } }
-      if (!assistant.allows('agents')) throw new HttpError(403, say(API.agent.stopNotAllowed, { level: assistant.levelName(assistant.controlLevel()) }))
+      if (!assistant.allows('agents')) throw new HttpError(403, apiSaid(API.agent.stopNotAllowed, { level: assistant.levelName(assistant.controlLevel()) }))
     }
     // Control and the Assistant's session that asked, checked again just before the stop (HI-2328).
     guard()
@@ -1527,25 +1585,25 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
   const agentId = await agentParam(p, decodeURIComponent(params[1]))
   const a = await agentDefOf(p, agentId)
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
-  if (!text) throw new HttpError(400, say(API.agent.textRequired))
+  if (!text) throw new HttpError(400, apiSaid(API.agent.textRequired))
   // A new conversation for the task (a new lane, say): the current one ends, as when it hands over to itself.
   const fresh = body?.newConversation === true
   return assistantChange<{ ok: boolean; id?: string; newConversation?: boolean }>('agents', [API.change.promptAgent, { agent: a.name, project: basename(p), fresh: fresh ? 'yes' : 'no' }], { kind: 'prompt-agent', project: basename(p), agent: actAgent(a) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
     // Never over the top of the agent's work, a question to the user, or the user's own typing.
-    if (!st) throw new HttpError(409, say(API.agent.promptNotRunning, { agent: a.name }))
-    if (st.status === 'starting') throw new HttpError(409, say(API.agent.promptStarting, { agent: a.name }))
-    if (st.status === 'waiting') throw new HttpError(409, say(API.agent.promptWaiting, { agent: a.name, said: st.statusMessage ? 'yes' : 'no', message: st.statusMessage ?? '' }))
-    if (st.status === 'working') throw new HttpError(409, say(API.agent.promptWorking, { agent: a.name }))
-    if (st.status === 'signin') throw new HttpError(409, say(API.agent.promptSignIn, { agent: a.name }))
-    if (st.status === 'watching') throw new HttpError(409, say(API.agent.promptWatching, { agent: a.name, waiting: st.watch?.label.replace(/^Waiting/, 'waiting') ?? say(API.agent.waitingOnCards), watch: st.watch?.agents && !st.watch.lanes ? 'agents' : 'cards' }))
+    if (!st) throw new HttpError(409, apiSaid(API.agent.promptNotRunning, { agent: a.name }))
+    if (st.status === 'starting') throw new HttpError(409, apiSaid(API.agent.promptStarting, { agent: a.name }))
+    if (st.status === 'waiting') throw new HttpError(409, apiSaid(API.agent.promptWaiting, { agent: a.name, said: st.statusMessage ? 'yes' : 'no', message: st.statusMessage ?? '' }))
+    if (st.status === 'working') throw new HttpError(409, apiSaid(API.agent.promptWorking, { agent: a.name }))
+    if (st.status === 'signin') throw new HttpError(409, apiSaid(API.agent.promptSignIn, { agent: a.name }))
+    if (st.status === 'watching') throw new HttpError(409, apiSaid(API.agent.promptWatching, { agent: a.name, waiting: st.watch?.label.replace(/^Waiting/, 'waiting') ?? say(API.agent.waitingOnCards), watch: st.watch?.agents && !st.watch.lanes ? 'agents' : 'cards' }))
     if (st.status === 'background') {
-      throw new HttpError(409, say(API.agent.promptBackground, { agent: a.name, tasks: st.backgroundTasks ?? 0, total: String(st.backgroundTasks ?? 0) }))
+      throw new HttpError(409, apiSaid(API.agent.promptBackground, { agent: a.name, tasks: st.backgroundTasks ?? 0, total: String(st.backgroundTasks ?? 0) }))
     }
-    if (sessions.userMayBeTyping(p, agentId)) throw new HttpError(409, say(API.agent.promptUserTyping, { agent: a.name }))
+    if (sessions.userMayBeTyping(p, agentId)) throw new HttpError(409, apiSaid(API.agent.promptUserTyping, { agent: a.name }))
     // A line Combwork typed that its CLI hasn't taken (#430): more typing would be lost behind it, or clear it.
-    if (sessions.lineUntaken(p, agentId)) throw new HttpError(409, say(API.agent.promptNotTaken, { agent: a.name }))
-    if (agentNowFor(p, agentId).pending) throw new HttpError(409, say(API.agent.promptPending, { agent: a.name }))
+    if (sessions.lineUntaken(p, agentId)) throw new HttpError(409, apiSaid(API.agent.promptNotTaken, { agent: a.name }))
+    if (agentNowFor(p, agentId).pending) throw new HttpError(409, apiSaid(API.agent.promptPending, { agent: a.name }))
     if (fresh) {
       // The Assistant's authority (Control, its session) again after the stop and at the launch: it may end meanwhile.
       await startOnTask(p, agentId, a.name, text, (line) => sessions.newConversation(p, agentId, line, guard)).catch((e: Error) => {
@@ -1553,15 +1611,15 @@ route('POST', '/v1/projects/:name/agents/:agent/prompt', async ({ params, body }
         if (e instanceof assistant.ChangeRefused) {
           if (!stopped) throw e
           const why = say(e.status === 403 ? API.agent.freshWhyControl : API.agent.freshWhySession)
-          throw new HttpError(e.status, say(API.agent.freshNotStarted, { agent: a.name, why }))
+          throw new HttpError(e.status, apiSaid(API.agent.freshNotStarted, { agent: a.name, why }))
         }
-        throw new HttpError(409, say(API.agent.freshFailed, { agent: a.name, error: e.message, stopped: stopped ? 'yes' : 'no' }))
+        throw new HttpError(409, apiSaid(API.agent.freshFailed, { agent: a.name, error: e.message, stopped: stopped ? 'yes' : 'no' }))
       })
       return { done: [API.done.promptedFresh, { agent: a.name, project: basename(p) }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, newConversation: true } }
     }
     // A task delivery (#649), given now or not at all: never queued behind the agent's work.
     const r = await deliverNow(p, { agentId, agentName: a.name, conversation: st.sessionId || null, kind: 'task', from: callerSender(), body: text, need: 'free' }).catch((e: Error) => {
-      if (e instanceof NotGiven) throw new HttpError(409, say(API.agent.promptFailed, { agent: a.name, error: e.message }))
+      if (e instanceof NotGiven) throw new HttpError(409, apiSaid(API.agent.promptFailed, { agent: a.name, error: e.message }))
       throw e
     })
     return { done: [API.done.prompted, { agent: a.name, project: basename(p), given: r ? 'yes' : 'no', id: r?.id ?? '' }], said: `: ${clip(text.replace(/\s+/g, ' '), 80)}`, result: { ok: true, ...(r ? { id: r.id } : {}) } }
@@ -1583,20 +1641,20 @@ route('POST', '/v1/projects/:name/agents/:agent/message', async ({ params, body 
     })
   }
   const text = typeof body?.text === 'string' ? body.text.trim() : ''
-  if (!text) throw new HttpError(400, say(API.agent.textRequired))
-  if (text.length > MESSAGE_MAX_CHARS) throw new HttpError(400, say(API.agent.messageTooLong, { max: String(MESSAGE_MAX_CHARS), length: String(text.length) }))
+  if (!text) throw new HttpError(400, apiSaid(API.agent.textRequired))
+  if (text.length > MESSAGE_MAX_CHARS) throw new HttpError(400, apiSaid(API.agent.messageTooLong, { max: String(MESSAGE_MAX_CHARS), length: String(text.length) }))
   // Tied to a card's round (#652): stale, never given, once the card has moved on.
   const card = body?.card === undefined || body?.card === null ? undefined : Number(cardRefIn(body.card))
-  if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, say(API.agent.messageCardArg))
+  if (card !== undefined && !(Number.isInteger(card) && card > 0)) throw new HttpError(400, apiSaid(API.agent.messageCardArg))
   return assistantChange<{ id: string; typed: boolean; queued: number; status: string; tells?: InboxSwitch[]; round?: number; card?: number; names?: Record<string, string> }>('agents', [API.change.messageAgent, { agent: a.name, project: basename(p) }], { kind: 'message-agent', project: basename(p), agent: actAgent(a), ...(card !== undefined ? { card } : {}) }, async (guard) => {
     const st = sessions.liveFor(p, agentId)
-    if (!st) throw new HttpError(409, say(API.agent.messageNotRunning, { agent: a.name }))
+    if (!st) throw new HttpError(409, apiSaid(API.agent.messageNotRunning, { agent: a.name }))
     guard()
     // Its sender saved with it: the Assistant's launch, whose permission is worked out again at every step (#645).
     const r = await leaveMessage(p, agentId, a.name, callerSender(), text, card).catch((e: Error) => {
       throw httpFrom(409, e)
     })
-    if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, say(API.agent.messageNotTyped, { agent: a.name, why: r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}` }))
+    if (r.fate === 'cancelled' || r.fate === 'expired' || r.fate === 'refused' || r.fate === 'stale') throw new HttpError(409, apiSaid(API.agent.messageNotTyped, { agent: a.name, why: r.fate === 'cancelled' ? (r.detail ?? 'cancelled') : `${r.fate}, ${r.detail ?? ''}` }))
     const typed = r.fate === 'typed'
     const tied = r.round && card !== undefined ? { tied: 'yes', card: cardRef(card), round: String(r.round) } : { tied: 'no', card: '', round: '' }
     // Queued: the ways Combwork tells it, by the carrying-on switches on for it now (#1497: its project's own, else Settings').
@@ -1625,10 +1683,10 @@ const startOnTask = <T extends LiveSessionState>(p: string, agentId: string, age
 // The Assistant's journal (#1031): its tools (cw_journal_*) only, only while it is on (Settings → Assistant → Journal).
 // The tools come and go with the Assistant's start; each call checks again, so one turned off meanwhile is refused.
 function journalHome(): { home: string; settings: JournalSettings } {
-  if (!assistantCaller()) throw new HttpError(403, say(API.journal.onlyAssistant))
+  if (!assistantCaller()) throw new HttpError(403, apiSaid(API.journal.onlyAssistant))
   const ws = requireWorkspace()
   const settings = journalSettingsOf(ws)
-  if (!settings.enabled) throw new HttpError(409, say(API.journal.off))
+  if (!settings.enabled) throw new HttpError(409, apiSaid(API.journal.off))
   return { home: ws.assistantHome, settings }
 }
 /** A journal call: the caller's mistakes are 400s, said plainly; one while the journal is being deleted, 409. */
@@ -1643,7 +1701,7 @@ function journalCall<T>(fn: () => T): T {
 }
 const entryId = (raw: string): number => {
   const n = Number(raw)
-  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, say(API.journal.entryId))
+  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, apiSaid(API.journal.entryId))
   return n
 }
 /**
@@ -1677,20 +1735,20 @@ route('POST', '/v1/journal/recall', async ({ body }) => {
 route('GET', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
   const e = journalCall(() => readEntry(home, entryId(params[0])))
-  if (!e) throw new HttpError(404, say(API.journal.noEntry, { entry: params[0] }))
+  if (!e) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: params[0] }))
   return e
 })
 route('PATCH', '/v1/journal/:id', async ({ params, body }) => {
   const { home, settings } = journalHome()
   const id = entryId(params[0])
   const patch = withCardLinks(requireWorkspace(), body, ['addLinks'])
-  if (!journalCall(() => updateEntry(home, settings, id, patch))) throw new HttpError(404, say(API.journal.noEntry, { entry: String(id) }))
+  if (!journalCall(() => updateEntry(home, settings, id, patch))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
   return { id, updated: true }
 })
 route('DELETE', '/v1/journal/:id', async ({ params }) => {
   const { home } = journalHome()
   const id = entryId(params[0])
-  if (!journalCall(() => deleteEntry(home, id))) throw new HttpError(404, say(API.journal.noEntry, { entry: String(id) }))
+  if (!journalCall(() => deleteEntry(home, id))) throw new HttpError(404, apiSaid(API.journal.noEntry, { entry: String(id) }))
   return { id, deleted: true }
 })
 
@@ -1707,7 +1765,7 @@ function inboxOwner(): { host: string; agentId: string } {
   const me = agentCaller()
   if (me) return { host: me.projectPath, agentId: me.agentId }
   if (assistantCaller()) return { host: requireWorkspace().assistantHome, agentId: ASSISTANT_AGENT_ID }
-  throw new HttpError(400, say(API.inbox.noInbox))
+  throw new HttpError(400, apiSaid(API.inbox.noInbox))
 }
 
 // cw_inbox (#647): the caller's deliveries not received yet (a card's events in one item), now received; with ack, marks
@@ -1716,11 +1774,11 @@ function inboxOwner(): { host: string; agentId: string } {
 // isn't the caller's is unknown, like one that doesn't exist.
 route('POST', '/v1/inbox', async ({ body }) => {
   const { host, agentId } = inboxOwner()
-  if (body?.read !== undefined && typeof body.read !== 'boolean') throw new HttpError(400, say(API.inbox.readArg))
+  if (body?.read !== undefined && typeof body.read !== 'boolean') throw new HttpError(400, apiSaid(API.inbox.readArg))
   // Its rows name cards by key, for the Combwork tools' words (#1219).
   const named = <T extends { items: InboxItem[] }>(inbox: T) => ({ ...inbox, ...withNames(inbox.items.flatMap((i) => (i.card ? [i.card] : []))) })
   if (body?.ack !== undefined) {
-    if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, say(API.inbox.ackArg))
+    if (!Array.isArray(body.ack) || !body.ack.length || body.ack.length > 200 || !body.ack.every((x: unknown) => typeof x === 'string' && x.length <= 32)) throw new HttpError(400, apiSaid(API.inbox.ackArg))
     const ids = (body.ack as string[]).map((x) => x.trim())
     return body.read === true ? named(await ackThenRead(host, agentId, ids)) : ackDeliveries(host, agentId, ids)
   }
@@ -1759,7 +1817,7 @@ function safeguardActivity(n: SafeguardNote) {
 async function agentActivity(p: string, agentId: string, detail = false) {
   const info = await workspace.projectInfo(p)
   const a = info.agents.find((x) => x.id === agentId)
-  if (!a) throw new HttpError(404, say(API.agent.unknown))
+  if (!a) throw new HttpError(404, apiSaid(API.agent.unknown))
   const st = a.live
   const sessionId = st?.sessionId || a.lastSessionId || a.resume?.id || ''
   let currentTask: string | null = null
@@ -1877,7 +1935,7 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
   const home = assistantCaller() ? requireWorkspace().assistantHome : null
   const who = me ? { projectPath: me.projectPath, agentId: me.agentId } : home ? { projectPath: home, agentId: 'assistant' } : null
   if (body?.cancel === true) {
-    if (!who) throw new HttpError(400, say(API.watch.noWatchToCancel))
+    if (!who) throw new HttpError(400, apiSaid(API.watch.noWatchToCancel))
     const w = sessions.watchFor(who.projectPath, who.agentId)
     const kind = w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card'
     const had = await cancelWatch(requireWorkspace(), who.projectPath, who.agentId)
@@ -1903,13 +1961,13 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
       .map((s) => ({ p: s.projectPath, id: s.agentId }))
   }
   if (body?.wake === true) {
-    if (!who) throw new HttpError(400, say(API.watch.wakeOnlyAgents))
-    if (targets.some((t) => self(t.p, t.id))) throw new HttpError(400, say(API.watch.notYourself))
+    if (!who) throw new HttpError(400, apiSaid(API.watch.wakeOnlyAgents))
+    if (targets.some((t) => self(t.p, t.id))) throw new HttpError(400, apiSaid(API.watch.notYourself))
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
-    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, apiSaid(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const unique = targets.filter((t, i) => targets.findIndex((u) => resolvePath(u.p).toLowerCase() === resolvePath(t.p).toLowerCase() && u.id === t.id) === i)
     if (!unique.length) return { already: [say(API.watch.noAgentWorking)] }
-    if (unique.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, say(API.watch.maxAgents, { max: String(AGENT_WATCH_MAX_AGENTS) }))
+    if (unique.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, apiSaid(API.watch.maxAgents, { max: String(AGENT_WATCH_MAX_AGENTS) }))
     const agents: WatchedAgent[] = []
     for (const t of unique) agents.push({ projectPath: t.p, agentId: t.id, name: (await agentDefOf(t.p, t.id)).name, project: basename(t.p) })
     const r = await registerAgentWatch(requireWorkspace(), who.projectPath, who.agentId, { agents, ignoreBackground: !throughBackground }, limit)
@@ -1936,10 +1994,10 @@ route('POST', '/v1/agents/wait', async ({ body }) => {
 /** The calling agent as a holder of its project's slot. Scripts and the Assistant can look, not claim. */
 async function slotAgent(p: string): Promise<SlotAgent> {
   const a = agentCaller()
-  if (!a) throw new HttpError(403, say(API.mergeSlot.onlyAgents))
+  if (!a) throw new HttpError(403, apiSaid(API.mergeSlot.onlyAgents))
   ownProjectOnly(p, [API.own.mergeSlot])
   const live = sessions.liveFor(a.projectPath, a.agentId)
-  if (!live) throw new HttpError(409, say(API.mergeSlot.onlyRunning))
+  if (!live) throw new HttpError(409, apiSaid(API.mergeSlot.onlyRunning))
   const def = projectAgents(await workspace.projectConfig(a.projectPath)).find((x) => x.id === a.agentId)
   return { projectPath: a.projectPath, agentId: a.agentId, agentName: def?.name ?? a.agentId, runId: live.runId }
 }
@@ -1964,7 +2022,7 @@ async function refuseCombworkMerges(projectPath: string, cards: number[]): Promi
 async function slotBranchFor(p: string, v: unknown): Promise<string> {
   if (v !== undefined && v !== null) return slotBranch(v)
   const b = await workspace.branch(p)
-  if (!b) throw new HttpError(409, say(API.mergeSlot.noBranch))
+  if (!b) throw new HttpError(409, apiSaid(API.mergeSlot.noBranch))
   return b
 }
 
@@ -1993,7 +2051,7 @@ route('POST', '/v1/projects/:name/merge-slot/claim', async ({ params, body, sign
     const cards = slotCards(cardRefsIn(body?.cards))
     await refuseCombworkMerges(p, cards)
     const t = body?.timeoutSeconds
-    if (t !== undefined && (typeof t !== 'number' || !Number.isFinite(t) || t < 0)) throw new HttpError(400, say(API.watch.timeoutSeconds))
+    if (t !== undefined && (typeof t !== 'number' || !Number.isFinite(t) || t < 0)) throw new HttpError(400, apiSaid(API.watch.timeoutSeconds))
     const waitMs = t === undefined ? DEFAULT_WAIT_MS : Math.min(MAX_WAIT_MS, t * 1000)
     const result = await mergeSlots.claim(agent, p, branch, cards, waitMs, signal)
     slotTestEvent(agent, p, branch, result)
@@ -2047,30 +2105,35 @@ function laneProject(v: unknown): string {
     if (v !== undefined && v !== null && v !== '') ownProjectOnly(projectByName(String(v)), [API.own.lane])
     return a.projectPath
   }
-  if (typeof v !== 'string' || !v) throw new HttpError(400, say(API.lane.projectRequired))
+  if (typeof v !== 'string' || !v) throw new HttpError(400, apiSaid(API.lane.projectRequired))
   return projectByName(v)
 }
 
 /** A lane's numbers and texts from a request body (undefined: not given). */
-function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string } {
-  const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string } = {}
+function laneArgs(body: any): { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string; target?: string | null } {
+  const out: { cards?: number[]; rounds?: number; waitMinutes?: number; name?: string | null; brief?: string; target?: string | null } = {}
   if (body?.cards !== undefined) {
     const c = laneCards(cardRefsIn(body.cards))
-    if (typeof c === 'string') throw new HttpError(400, c)
+    if (isSaid(c)) throw new HttpError(400, c)
     out.cards = c
   }
   for (const k of ['rounds', 'waitMinutes'] as const) {
     if (body?.[k] === undefined) continue
     const v = laneNumber(body[k], k, 0)
-    if (typeof v === 'string') throw new HttpError(400, v)
+    if (isSaid(v)) throw new HttpError(400, v)
     out[k] = v
   }
   if (body?.name !== undefined) out.name = laneName(body.name)
   // The builder's brief (HI-1795): text, or '' to clear it; left out, a running lane keeps its own.
   if (body?.brief !== undefined) {
-    if (typeof body.brief !== 'string') throw new HttpError(400, say(API.lane.briefText))
-    if (body.brief.length > LANE_BRIEF_MAX) throw new HttpError(400, say(API.lane.briefMax, { max: String(LANE_BRIEF_MAX) }))
+    if (typeof body.brief !== 'string') throw new HttpError(400, apiSaid(API.lane.briefText))
+    if (body.brief.length > LANE_BRIEF_MAX) throw new HttpError(400, apiSaid(API.lane.briefMax, { max: String(LANE_BRIEF_MAX) }))
     out.brief = body.brief
+  }
+  // Its Merges into (HI-2556): a branch name, or null or '' for the project's own; checked by the lane's start.
+  if (body?.target !== undefined) {
+    if (body.target !== null && typeof body.target !== 'string') throw new HttpError(400, apiSaid(API.lane.targetText))
+    out.target = body.target === null ? null : body.target.slice(0, 250)
   }
   return out
 }
@@ -2093,7 +2156,7 @@ route('GET', '/v1/lanes', async ({ query }) =>
 route('GET', '/v1/lanes/next', async () =>
   laneCall(async () => {
     const a = agentCaller()
-    if (!a) throw new HttpError(400, say(API.lane.nextIsAgents))
+    if (!a) throw new HttpError(400, apiSaid(API.lane.nextIsAgents))
     const r = await lanes.laneNext(requireWorkspace(), basename(a.projectPath), a.agentId)
     // Its passed cards Combwork merges, each with where it is in the merge queue (#1354): the next waits for them.
     const queue: { card: number; line: string }[] = []
@@ -2125,11 +2188,11 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   const p = laneProject(body?.project)
   const args = laneArgs(body)
   if (place) args.cards = [place.card]
-  if (!args.cards) throw new HttpError(400, say(API.lane.cardsArg))
+  if (!args.cards) throw new HttpError(400, apiSaid(API.lane.cardsArg))
   const a = agentCaller()
   // A project agent registers its own lane: it is the builder.
   const builder = a ? (body?.builder !== undefined && body.builder !== '' && (await agentParam(p, body.builder)) !== a.agentId ? null : a.agentId) : await agentParam(p, body?.builder)
-  if (!builder) throw new HttpError(403, say(API.lane.agentStartsOwn))
+  if (!builder) throw new HttpError(403, apiSaid(API.lane.agentStartsOwn))
   // A reviewer Combwork doesn't know isn't a reason to refuse a new lane: it starts without one, and its reviewer can join it.
   // A running lane's start naming one is refused, naming its reviewer (HI-2273: startLane, under its lock).
   let reviewer: string | null | undefined
@@ -2145,13 +2208,13 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
   }
   // Reviewed by the project's reviewer pool (HI-1581, G17), the Assistant's and a script's: refused as Start Lane…
   // refuses it (the rules have no pool, nobody but the builder reviews), and with a reviewer of its own.
-  if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, say(API.lane.poolArg))
+  if (body?.pool !== undefined && typeof body.pool !== 'boolean') throw new HttpError(400, apiSaid(API.lane.poolArg))
   const pool = body?.pool === true
   // A changed list applied now, its card in flight put back (HI-1995).
-  if (body?.applyNow !== undefined && typeof body.applyNow !== 'boolean') throw new HttpError(400, say(API.lane.applyNowArg))
+  if (body?.applyNow !== undefined && typeof body.applyNow !== 'boolean') throw new HttpError(400, apiSaid(API.lane.applyNowArg))
   const applyNow = body?.applyNow === true
-  if (pool && a) throw new HttpError(403, say(API.lane.poolStartedBy))
-  if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, say(API.lane.poolNoReviewer))
+  if (pool && a) throw new HttpError(403, apiSaid(API.lane.poolStartedBy))
+  if (pool && body?.reviewer !== undefined && body.reviewer !== null && body.reviewer !== '') throw new HttpError(400, apiSaid(API.lane.poolNoReviewer))
   if (pool) await checkLanePool(ws, p, builder)
   // `commit`: the Assistant's guard, checked again in the lanes' save (HI-2420).
   const start = async (commit?: () => void) => {
@@ -2165,7 +2228,7 @@ async function laneStartCall(body: any, place?: lanes.LanePlace): Promise<LaneCh
     }
   }
   const started = async (commit?: () => void) => {
-    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}) })
+    const r = await lanes.startLane(ws, { project: basename(p), builder, reviewer, ...(unknownReviewer !== undefined ? { unknownReviewer } : {}), cards: args.cards!, rounds: args.rounds, waitMinutes: args.waitMinutes, name: args.name, brief: args.brief, ...(args.target !== undefined ? { target: args.target } : {}), briefNotIn: sessions.liveFor(p, builder)?.sessionId ?? null, by: await laneBy(), ...(pool ? { pool: true } : {}), ...(applyNow ? { applyNow: true } : {}), ...(place ? { place } : {}), ...(a ? { ownBuilder: true } : {}), ...(commit ? { commit } : {}) })
     // Its brief given where it goes (HI-1795): outside slots, delivered now (and again by laneBriefs' next look if not).
     // A new lane's brief carried from the builder's lane that had just ended (HI-2097) too.
     const rec = (await lanes.rawLanes(ws)).find((l) => l.id === r.lane.id)
@@ -2214,7 +2277,7 @@ route('POST', '/v1/lanes/join', async ({ body }) =>
     const args = laneArgs(body)
     const a = agentCaller()
     const reviewer = a ? a.agentId : await agentParam(p, body?.reviewer)
-    if (typeof body?.builder !== 'string' || !body.builder) throw new HttpError(400, say(API.lane.builderRequired))
+    if (typeof body?.builder !== 'string' || !body.builder) throw new HttpError(400, apiSaid(API.lane.builderRequired))
     const builder = await agentParam(p, body.builder)
     const joined = async (commit?: () => void) => lanes.joinLane(ws, { project: basename(p), builder, reviewer, cards: args.cards, by: await laneBy(), ...(commit ? { commit } : {}) })
     if (!assistantCaller()) return joined()
@@ -2233,7 +2296,7 @@ route('POST', '/v1/lanes/:id/end', async ({ params, body }) =>
     const id = decodeURIComponent(params[0])
     const a = agentCaller()
     const commit = body?.mergeCommit
-    if (commit !== undefined && commit !== null && (typeof commit !== 'string' || !/^[0-9a-zA-Z._/-]{4,64}$/.test(commit))) throw new HttpError(400, say(API.lane.mergeCommitArg))
+    if (commit !== undefined && commit !== null && (typeof commit !== 'string' || !/^[0-9a-zA-Z._/-]{4,64}$/.test(commit))) throw new HttpError(400, apiSaid(API.lane.mergeCommitArg))
     // With rules enforced Combwork records the merge from the cards' facts (#1270, §16.8.2): an agent's commit is ignored, said.
     const ignored = commit && a && (await lanes.lanesEnforced()) ? { note: say(API.lane.mergeCommitIgnored) } : {}
     const end = async (guard?: () => void) => ({ ...(await lanes.endLane(ws, id, { abandoned: body?.abandoned === true, mergeCommit: commit ?? null, ...(a ? { project: basename(a.projectPath), agent: a.agentId } : {}), ...(guard ? { commit: guard } : {}) })), ...ignored })
@@ -2255,7 +2318,7 @@ route('POST', '/v1/lanes/:id/fresh-start', async ({ params }) =>
     const ws = requireWorkspace()
     const id = decodeURIComponent(params[0])
     const lane = (await lanes.rawLanes(ws)).find((l) => l.id === id)
-    if (!lane) throw new HttpError(404, say(API.lane.unknown, { lane: id }))
+    if (!lane) throw new HttpError(404, apiSaid(API.lane.unknown, { lane: id }))
     const retry = async (guard?: () => void) => ({ retried: await retryFreshStart(ws, id, guard) })
     if (!assistantCaller()) return retry()
     return assistantChange('agents', [API.change.retryFresh, { lane: id }], { kind: 'lane-fresh-start', lane: id, project: lane.project }, async (guard) => {
@@ -2277,19 +2340,19 @@ function queueProject(v: unknown): string {
     if (v !== undefined && v !== null && v !== '') ownProjectOnly(projectByName(String(v)), [API.own.mergeQueue])
     return a.projectPath
   }
-  if (typeof v !== 'string' || !v) throw new HttpError(400, say(API.queue.projectRequired))
+  if (typeof v !== 'string' || !v) throw new HttpError(400, apiSaid(API.queue.projectRequired))
   return projectByName(v)
 }
 
 /** A queue's target from a request: the one given, else the project's only queue's (several or none: say which). */
 async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promise<string> {
   if (v !== undefined && v !== null && v !== '') {
-    if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, say(API.queue.targetArg))
+    if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, apiSaid(API.queue.targetArg))
     return v
   }
   const views = await queueViews(ws, p)
   if (views.length === 1) return views[0].target
-  throw new HttpError(400, say(API.queue.targetRequired, { listed: views.length ? 'yes' : 'no', targets: views.map((x) => x.target).join(', ') }))
+  throw new HttpError(400, apiSaid(API.queue.targetRequired, { listed: views.length ? 'yes' : 'no', targets: views.map((x) => x.target).join(', ') }))
 }
 
 /** A queue as the Agent API gives it: no folder (a stuck advance's neither), and whether an outcome has a log rather than the log itself (lean). */
@@ -2301,14 +2364,14 @@ const publicQueue = ({ projectPath: _p, paused, combworkMerges: _h, inFlight: _i
 
 /** A project agent asking to change a queue: refused, saying whose controls these are. */
 function notAgents(what: Said): void {
-  if (agentCaller()) throw new HttpError(403, say(API.queue.notAgents, { what: sayNow(what) }))
+  if (agentCaller()) throw new HttpError(403, apiSaid(API.queue.notAgents, { what: sayNow(what) }))
 }
 
 route('GET', '/v1/queue', async ({ query }) => {
   const ws = requireWorkspace()
   const p = queueProject(query.get('project'))
   const target = query.get('target') || undefined
-  if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, say(API.queue.targetArg))
+  if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, apiSaid(API.queue.targetArg))
   return (await queueViews(ws, p, target)).map(publicQueue)
 })
 
@@ -2339,7 +2402,7 @@ route('POST', '/v1/queue/resume', async ({ body }) => {
 
 /** Agents (and scripts) don't pause or resume the team: the user's, and the Assistant's within Control agents. */
 function notTeamAgents(what: Said): void {
-  if (agentCaller()) throw new HttpError(403, say(API.team.notAgents, { what: sayNow(what) }))
+  if (agentCaller()) throw new HttpError(403, apiSaid(API.team.notAgents, { what: sayNow(what) }))
 }
 
 /** The team's state as the Assistant sees it: its workspace's in full, any other open one as one line with no names. */
@@ -2411,11 +2474,11 @@ route('GET', '/v1/projects/:name/slots/releasable', async ({ params }) => {
 
 // Release Slot (#1561): a carried slot, or a held writer once confirmed (its slot and run), as the window's ⋯ does.
 route('POST', '/v1/projects/:name/slots/:slot/release', async ({ params, body }) => {
-  if (agentCaller()) throw new HttpError(403, say(API.slot.notAgents))
+  if (agentCaller()) throw new HttpError(403, apiSaid(API.slot.notAgents))
   const p = projectByName(params[0])
   const slot = decodeURIComponent(params[1])
   const kind = body?.kind === undefined ? undefined : body.kind === 'carried' || body.kind === 'writer' ? body.kind : null
-  if (kind === null) throw new HttpError(400, say(API.slot.kindArg))
+  if (kind === null) throw new HttpError(400, apiSaid(API.slot.kindArg))
   const confirm = body?.confirm && typeof body.confirm === 'object' ? (body.confirm as { slot?: unknown; run?: unknown }) : null
   return assistantChange('agents', [API.change.releaseSlot, { slot, project: basename(p) }], { kind: 'release-slot', project: basename(p) }, async (guard) => {
     const r = await releaseSlot(requireWorkspace(), p, slot, { ...(kind ? { kind } : {}), confirm, end: body?.end === true, guard }).catch((e) => {
@@ -2428,12 +2491,12 @@ route('POST', '/v1/projects/:name/slots/:slot/release', async ({ params, body })
 
 /** The Assistant's alone (HI-1502): a template's list, plan and load. Project agents, scripts and the user's token are refused before any template is read. */
 function assistantTemplates(what: Said): void {
-  if (!assistantCaller()) throw new HttpError(403, say(API.template.onlyAssistant, { what: sayNow(what) }))
+  if (!assistantCaller()) throw new HttpError(403, apiSaid(API.template.onlyAssistant, { what: sayNow(what) }))
 }
 
 /** A body's workflow argument: true unless false (HI-1502: its workflow is applied by default, as the window's tick box is). */
 function workflowArg(body: any): boolean {
-  if (body?.workflow !== undefined && typeof body.workflow !== 'boolean') throw new HttpError(400, say(API.template.workflowArg))
+  if (body?.workflow !== undefined && typeof body.workflow !== 'boolean') throw new HttpError(400, apiSaid(API.template.workflowArg))
   return body?.workflow !== false
 }
 
@@ -2490,6 +2553,54 @@ async function queueCard(body: any, kind: 'removeFromQueue' | 'retryMerge'): Pro
 }
 
 route('POST', '/v1/queue/remove', async ({ body }) => queueCard(body, 'removeFromQueue'))
+// HI-2680: after a project's target moved on, what can follow the new one: the Assistant's (within Control agents) and
+// the user's, never a project agent's or a script's. With `preview` (the id a target change's reply, or a preview here,
+// offered): only the items named that the offered preview listed, each as it was seen then (HR1's round 1, finding 4),
+// rechecked as it moves, Control asked at each move. Without: a preview (from, to), offered and listed, moving nothing.
+route('POST', '/v1/workflow/retarget', async ({ body }) => {
+  notAgents([API.change.retargetAny])
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  const id = typeof body?.preview === 'string' ? body.preview.trim().slice(0, 40) : ''
+  const items = Array.isArray(body?.items) ? (body.items as unknown[]).filter((x): x is string => typeof x === 'string').slice(0, 500) : []
+  if (!id) {
+    // A preview is the Assistant's too (the user's is the window's): never a script's.
+    if (!assistantCaller()) throw new HttpError(403, apiSaid(API.change.onlyAssistant, { what: sayNow([API.change.retargetAny]) }))
+    const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
+    const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
+    if (!from || !to) throw new HttpError(400, say(API.queue.retargetArgs))
+    const preview = await retargetPreview(ws, p, from, to)
+    return { preview: offerRetarget(p, preview), from, to, move: [...preview.cards.move.map((c) => c.key), ...preview.slots.move.map((s) => s.name)], stay: [...preview.cards.keep.map((c) => ({ key: c.key, why: c.why })), ...preview.slots.keep.map((s) => ({ slot: s.name, why: s.why })), ...preview.lanes.map((l) => ({ lane: l.name ?? l.builder, why: 'running' }))] }
+  }
+  if (!items.length) throw new HttpError(400, say(API.queue.retargetArgs))
+  const offered = offeredRetarget(id, p)
+  if (!offered) throw new HttpError(409, say(API.queue.retargetGone, { preview: id }))
+  const { from, to } = offered
+  return assistantChange('agents', [API.change.retarget, { project: basename(p), from, to }], { kind: 'retarget', project: basename(p) }, async (guard) => {
+    const { confirmed, unknown } = offeredItems(offered, items)
+    const r = await retargetApply(ws, p, confirmed, await taskActor(), guard)
+    const result = { ...r, skipped: [...r.skipped, ...unknown.map((x) => ({ key: x, why: 'notOffered' as const }))] }
+    return { done: [API.done.retargeted, { from, to, cards: String(r.moved.cards.length), slots: String(r.moved.slots.length), skipped: String(result.skipped.length) }], result }
+  })
+})
+// HI-2679: bring one of a project's targets up to date with another (a forward merge), the Assistant's (within Control
+// agents) and the user's: never a project agent's or a script's.
+route('POST', '/v1/queue/forward', async ({ body }) => {
+  notAgents([API.change.forwardAny])
+  const ws = requireWorkspace()
+  const p = queueProject(body?.project)
+  const from = typeof body?.from === 'string' ? body.from.trim().slice(0, 250) : ''
+  const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
+  if (!from || !to) throw new HttpError(400, say(API.queue.forwardArgs))
+  return assistantChange('agents', [API.change.forward, { project: basename(p), from, to }], { kind: 'queue-forward', project: basename(p) }, async (guard) => {
+    const r = await forwardMerge(ws, p, from, to, await taskActor(), guard).catch((e: unknown) => {
+      throw e instanceof ForwardRefused ? new HttpError(e.kind === 'invalid' ? 400 : e.kind === 'forbidden' ? 403 : 409, agentError(e)) : e
+    })
+    const made = 'upToDate' in r ? null : r
+    const done: Said = made ? [API.done.forwardQueued, { from, to, card: cardName(made.card), queued: made.queued ? 'yes' : 'no' }] : [API.done.forwardUpToDate, { from, to }]
+    return { done, ...(made ? { act: { card: made.card.number, column: made.card.column, project: basename(p) } } : {}), result: { upToDate: !made, card: made?.card.number ?? null, key: made?.card.key ?? null, queued: made?.queued ?? false, from, to } }
+  })
+})
 route('POST', '/v1/queue/retry', async ({ body }) => queueCard(body, 'retryMerge'))
 
 route('GET', '/v1/shared', async () => inWorkspace(requireWorkspace(), () => notesTree()))
@@ -2506,23 +2617,23 @@ route('GET', '/v1/shared/handovers', async ({ query }) => {
 
 route('GET', '/v1/shared/file', async ({ query }) => {
   const rel = query.get('path')
-  if (!rel) throw new HttpError(400, say(API.note.pathRequired))
+  if (!rel) throw new HttpError(400, apiSaid(API.note.pathRequired))
   const abs = inWorkspace(requireWorkspace(), () => assertInShared(rel))
-  return { path: rel, ...(await readNote(abs).catch(() => { throw new HttpError(404, say(API.note.notFound)) })) }
+  return { path: rel, ...(await readNote(abs).catch(() => { throw new HttpError(404, apiSaid(API.note.notFound)) })) }
 })
 
 route('PUT', '/v1/shared/file', async ({ query, body }) => {
   const rel = query.get('path') ?? body?.path
-  if (!rel) throw new HttpError(400, say(API.note.pathRequired))
+  if (!rel) throw new HttpError(400, apiSaid(API.note.pathRequired))
   const abs = inWorkspace(requireWorkspace(), () => assertInShared(rel))
   // Workspace notes reach every agent at launch (#1433): the user's and the Assistant's to write, never a project agent's.
   if (agentCaller() && resolvePath(abs).toLowerCase() === resolvePath(inWorkspace(requireWorkspace(), () => workspaceNotesFile(workspace.sharedDir))).toLowerCase()) {
-    throw new HttpError(403, say(API.note.workspaceNotesReadOnly, { path: WORKSPACE_NOTES_PATH }))
+    throw new HttpError(403, apiSaid(API.note.workspaceNotesReadOnly, { path: WORKSPACE_NOTES_PATH }))
   }
   const content = String(body?.content ?? '')
   // Only a write that leaves it out is unguarded: one given (null, empty, not a string) must be a revision.
   const expected: unknown = body && typeof body === 'object' && 'expectedRevision' in body ? body.expectedRevision : undefined
-  if (expected !== undefined && (typeof expected !== 'string' || !expected)) throw new HttpError(400, say(API.note.expectedRevision))
+  if (expected !== undefined && (typeof expected !== 'string' || !expected)) throw new HttpError(400, apiSaid(API.note.expectedRevision))
   const { revision } = await writeNote(abs, rel, content, { append: !!body?.append, expectedRevision: expected as string | undefined }).catch((e) => {
     throw e instanceof NoteConflict ? new HttpError(409, e.message, { revision: e.current }) : e
   })
@@ -2542,7 +2653,7 @@ const SECTION_MAX = 30_000
 /** The document a docs call names, read: its text and the reference it goes by. */
 async function docOf(query: URLSearchParams): Promise<{ ref: string; text: string }> {
   const path = query.get('path')?.trim()
-  if (!path) throw new HttpError(400, say(API.doc.pathRequired))
+  if (!path) throw new HttpError(400, apiSaid(API.doc.pathRequired))
   let root: string
   let rel: string
   if (path.startsWith(SHARED_PREFIX)) {
@@ -2553,7 +2664,7 @@ async function docOf(query: URLSearchParams): Promise<{ ref: string; text: strin
   } else {
     const name = query.get('project')
     const own = agentCaller()
-    if (!name && !own) throw new HttpError(400, say(API.doc.projectRequired))
+    if (!name && !own) throw new HttpError(400, apiSaid(API.doc.projectRequired))
     const p = name ? projectByName(name) : own!.projectPath
     // An agent: its own project only. The Assistant: its own workspace's (projectByName).
     ownProjectOnly(p, [API.own.readingDocs])
@@ -2569,11 +2680,11 @@ async function docOf(query: URLSearchParams): Promise<{ ref: string; text: strin
   const r = await readDoc(root, rel)
   if (r.ok) return { ref: path, text: r.text }
   const why = {
-    outside: say(API.doc.outside, { path, where: path.startsWith(SHARED_PREFIX) ? 'shared' : 'project' }),
-    hidden: say(API.doc.hidden, { path }),
-    notMarkdown: say(API.doc.notMarkdown, { path }),
-    notFound: say(API.doc.notFound, { path }),
-    tooBig: say(API.doc.tooBig, { path, megabytes: String(Math.round(DOC_MAX / 1048576)) })
+    outside: apiSaid(API.doc.outside, { path, where: path.startsWith(SHARED_PREFIX) ? 'shared' : 'project' }),
+    hidden: apiSaid(API.doc.hidden, { path }),
+    notMarkdown: apiSaid(API.doc.notMarkdown, { path }),
+    notFound: apiSaid(API.doc.notFound, { path }),
+    tooBig: apiSaid(API.doc.tooBig, { path, megabytes: String(Math.round(DOC_MAX / 1048576)) })
   }[r.code]
   throw new HttpError(r.code === 'notFound' ? 404 : 400, why)
 }
@@ -2601,7 +2712,7 @@ route('GET', '/v1/docs/section', async ({ query }) => {
   }
   const found = findHeading(outline, asked)
   const list = (hs: DocHeading[]): string => hs.map((h) => say(API.doc.headingRow, { slug: h.slug, heading: h.text, line: String(h.line) })).join(', ')
-  if ('ambiguous' in found) throw new HttpError(409, say(API.doc.severalSections, { doc: ref, asked, list: list(found.ambiguous) }), { matches: found.ambiguous.map(headingRow) })
+  if ('ambiguous' in found) throw new HttpError(409, apiSaid(API.doc.severalSections, { doc: ref, asked, list: list(found.ambiguous) }), { matches: found.ambiguous.map(headingRow) })
   if ('closest' in found) throw new HttpError(404, found.closest.length ? say(API.doc.noSection, { asked, doc: ref, list: list(found.closest) }) : say(API.doc.noHeadings, { doc: ref }), { closest: found.closest.map(headingRow) })
   const h = found.heading
   const content = sectionText(text, h)
@@ -2644,7 +2755,7 @@ export const handoverCreatedToast = (project: string, title: string, file: strin
   ])
 
 route('POST', '/v1/shared/handovers', async ({ body }) => {
-  if (!body?.title || !body?.content) throw new HttpError(400, say(API.note.titleContentRequired))
+  if (!body?.title || !body?.content) throw new HttpError(400, apiSaid(API.note.titleContentRequired))
   // For a named project, its workspace's notes; else the request's workspace.
   // The project's own name, also when it was given as "<workspace>/<project>".
   const project = body.project ? projectByName(String(body.project)) : null
@@ -2798,6 +2909,8 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const k = cardKind(workspace, c.number)
   // Whether it skips review (#1625), and an agent's proposal of it not answered yet: additive, only when there is one.
   const rs = cardReviewSkip(workspace, c.number)
+  // Its own Merges into (HI-2556): additive, only when it has one.
+  const target = cardTarget(workspace, c.number)
   // Who merges it and where it is with the merge queue, by its own rules (#1354): additive, only when Combwork merges it.
   const merge = c.project && !c.archived ? await queueLineFor(c.project, c.number) : null
   // A code card's checks before review and how to run one (HI-2276): additive, only when its rules name some.
@@ -2805,7 +2918,7 @@ async function taskView(c: TaskCard, agents =new Map<string, Promise<ReturnType<
   const kept = attachmentsOf ? files.filter((a) => !!a.comment && attachmentsOf.has(a.comment)) : files
   const attachments = kept.length ? kept.map((a) => attachmentForAgents(a, c.comments)) : null
   const omitted = files.length - kept.length
-  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(omitted ? { attachmentsOmitted: omitted } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), stage, ...(merge ? { merge } : {}), ...checks }
+  return { ...(elsewhere.length ? { ...view, elsewhere } : view), ...(attachments ? { attachments } : {}), ...(omitted ? { attachmentsOmitted: omitted } : {}), ...(k ? { kind: k.kind, ...(k.kindProposed ? { kindProposed: k.kindProposed } : {}) } : {}), ...(rs?.skip ? { reviewSkipped: rs.skip } : {}), ...(rs?.proposed != null ? { reviewSkipProposed: rs.proposed } : {}), ...(target ? { target } : {}), stage, ...(merge ? { merge } : {}), ...checks }
 }
 
 /** A card attachment as agents read it (HI-1700): its path, name and size, who added it and when, and where it came. */
@@ -2825,7 +2938,7 @@ function callerScope(): string | null {
 function attachmentList(body: any): string[] | null {
   const raw = body?.attachments
   if (raw === undefined || (Array.isArray(raw) && !raw.length)) return null
-  if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string' || !x)) throw new HttpError(400, say(API.attachment.listArg))
+  if (!Array.isArray(raw) || raw.some((x) => typeof x !== 'string' || !x)) throw new HttpError(400, apiSaid(API.attachment.listArg))
   checkBatch(raw.map(() => ({})))
   return raw as string[]
 }
@@ -2843,9 +2956,9 @@ async function withAttachments<T>(paths: string[] | null, project: string | null
   const agent = agentCaller()
   if (project !== null) {
     const known = [...(await ws.listProjectPaths()), ...(await ws.listProjectPaths({ hidden: true }))].some((p) => basename(p).toLowerCase() === project.toLowerCase())
-    if (!known) throw new HttpError(404, say(API.workspace.unknownProject, { name: project }))
-    if (agent && basename(agent.projectPath).toLowerCase() !== project.toLowerCase()) throw new HttpError(403, say(API.card.stayInProject, { project: basename(agent.projectPath) }))
-  } else if (agent) throw new HttpError(403, say(API.card.stayInProject, { project: basename(agent.projectPath) }))
+    if (!known) throw new HttpError(404, apiSaid(API.workspace.unknownProject, { name: project }))
+    if (agent && basename(agent.projectPath).toLowerCase() !== project.toLowerCase()) throw new HttpError(403, apiSaid(API.card.stayInProject, { project: basename(agent.projectPath) }))
+  } else if (agent) throw new HttpError(403, apiSaid(API.card.stayInProject, { project: basename(agent.projectPath) }))
   const caller: AttachCaller = agent ? { kind: 'agent', project: basename(agent.projectPath) } : { kind: 'workspace' }
   const real: string[] = []
   for (const p of paths) real.push(await attachableSource(ws, caller, p))
@@ -2891,11 +3004,11 @@ const taskNumber = (v: string): number => {
   const ref = decodeURIComponent(v).trim()
   if (/^[A-Za-z]{2,4}-\d+$/.test(ref)) {
     const n = cardOfRef(requireWorkspace(), ref, callerScope())
-    if (n === null) throw new HttpError(404, say(API.card.unknown, { card: ref }))
+    if (n === null) throw new HttpError(404, apiSaid(API.card.unknown, { card: ref }))
     return n
   }
   const n = Number(ref.replace(/^#/, ''))
-  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, say(API.card.notANumber, { value: v }))
+  if (!Number.isInteger(n) || n < 1) throw new HttpError(400, apiSaid(API.card.notANumber, { value: v }))
   return n
 }
 
@@ -2906,7 +3019,7 @@ const taskNumber = (v: string): number => {
 function cardRefIn(v: unknown): unknown {
   if (typeof v !== 'string' || !isCardRef(v) || /^\d+$/.test(v.trim())) return v
   const n = cardOfRef(requireWorkspace(), v, callerScope())
-  if (n === null) throw new HttpError(404, say(API.card.unknown, { card: v.trim() }))
+  if (n === null) throw new HttpError(404, apiSaid(API.card.unknown, { card: v.trim() }))
   return n
 }
 const cardRefsIn = <T>(v: T): T => (Array.isArray(v) ? (v.map(cardRefIn) as T) : v)
@@ -2933,7 +3046,7 @@ const withNames = (numbers: number[]): { names?: Record<string, string> } => {
 
 function columnParam(v: unknown): TaskColumn | undefined {
   if (v === undefined || v === null || v === '') return undefined
-  if (!isTaskColumn(v)) throw new HttpError(400, say(API.card.unknownColumn, { column: String(v), choices: COLUMN_CHOICES }))
+  if (!isTaskColumn(v)) throw new HttpError(400, apiSaid(API.card.unknownColumn, { column: String(v), choices: COLUMN_CHOICES }))
   return v
 }
 
@@ -2941,13 +3054,13 @@ function columnParam(v: unknown): TaskColumn | undefined {
 function taskPatch(body: any): TaskPatch {
   const out: TaskPatch = {}
   // Archiving is the user's (#351), one card or a batch: no call of the Agent API's makes it.
-  if (body?.archived !== undefined) throw new HttpError(403, say(API.card.onlyUserArchives))
+  if (body?.archived !== undefined) throw new HttpError(403, apiSaid(API.card.onlyUserArchives))
   for (const k of ['title', 'description', 'project', 'blocked', 'waitingFor'] as const) if (body?.[k] !== undefined) out[k] = body[k] === null ? (null as never) : String(body[k])
   if (body?.agent !== undefined) out.agent = body.agent ? String(body.agent) : null
   if (body?.column !== undefined) out.column = columnParam(body.column)
   if (body?.before !== undefined) out.before = body.before === null ? null : Number(String(cardRefIn(body.before)).replace(/^#/, ''))
   if (body?.position !== undefined && body.position !== null && body.position !== '') {
-    if (body.position !== 'top' && body.position !== 'bottom') throw new HttpError(400, say(API.card.unknownPosition, { position: String(body.position) }))
+    if (body.position !== 'top' && body.position !== 'bottom') throw new HttpError(400, apiSaid(API.card.unknownPosition, { position: String(body.position) }))
     out.position = body.position
   }
   for (const k of ['labels', 'addLabels', 'removeLabels', 'blockedBy', 'links', 'context'] as const) if (body?.[k] !== undefined) out[k] = k === 'blockedBy' || k === 'links' ? cardRefsIn(body[k]) : body[k]
@@ -2956,7 +3069,7 @@ function taskPatch(body: any): TaskPatch {
   // (shape, who, each request) by the route and where it is recorded.
   if (body?.answers !== undefined && body.answers !== null) out.answers = body.answers as string[]
   if (body?.review !== undefined && body.review !== null && body.review !== '') {
-    if (body.review !== 'start' && body.review !== 'passed' && body.review !== 'failed') throw new HttpError(400, say(API.card.unknownReview, { review: String(body.review) }))
+    if (body.review !== 'start' && body.review !== 'passed' && body.review !== 'failed') throw new HttpError(400, apiSaid(API.card.unknownReview, { review: String(body.review) }))
     out.review = body.review
   }
   if (body?.override !== undefined && body.override !== null) out.override = overrideParam(body.override)
@@ -2966,7 +3079,7 @@ function taskPatch(body: any): TaskPatch {
 /** A move's override (#1265, SPEC §16.8.4): `{ reason }`, the Assistant's, why it moves the card across the rules. */
 export function overrideParam(v: unknown): { reason: string } {
   const reason = v && typeof v === 'object' ? (v as { reason?: unknown }).reason : undefined
-  if (typeof reason !== 'string' || !reason.trim()) throw new HttpError(400, say(API.card.overrideArg))
+  if (typeof reason !== 'string' || !reason.trim()) throw new HttpError(400, apiSaid(API.card.overrideArg))
   return { reason: reason.trim() }
 }
 
@@ -3038,7 +3151,7 @@ const ARCHIVED_PAGE = 50
 function pageParam(raw: string | null, arg: string, min: number, fallback: number): number {
   if (raw === null) return fallback
   const n = raw.trim() === '' ? NaN : Number(raw)
-  if (!Number.isInteger(n) || n < min) throw new HttpError(400, say(API.card.archivedArg, { arg, min: String(min), raw }))
+  if (!Number.isInteger(n) || n < min) throw new HttpError(400, apiSaid(API.card.archivedArg, { arg, min: String(min), raw }))
   return n
 }
 
@@ -3066,16 +3179,16 @@ interface LanePlacement {
 async function lanePlacement(v: unknown, input: { project?: unknown; column?: TaskColumn }): Promise<LanePlacement | null> {
   if (v === undefined || v === null) return null
   const o: Record<string, unknown> = typeof v === 'string' ? { builder: v } : typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
-  if (typeof o.builder !== 'string' || !o.builder.trim()) throw new HttpError(400, say(API.card.laneArg))
-  for (const k of Object.keys(o)) if (!['builder', 'reviewer', 'brief', 'name', 'position'].includes(k)) throw new HttpError(400, say(API.card.laneArgField, { field: k }))
-  if (o.position !== undefined && o.position !== 'last' && o.position !== 'next') throw new HttpError(400, say(API.card.lanePosition))
-  if (input.column !== undefined && input.column !== 'todo') throw new HttpError(400, say(API.card.laneNoColumn))
+  if (typeof o.builder !== 'string' || !o.builder.trim()) throw new HttpError(400, apiSaid(API.card.laneArg))
+  for (const k of Object.keys(o)) if (!['builder', 'reviewer', 'brief', 'name', 'position'].includes(k)) throw new HttpError(400, apiSaid(API.card.laneArgField, { field: k }))
+  if (o.position !== undefined && o.position !== 'last' && o.position !== 'next') throw new HttpError(400, apiSaid(API.card.lanePosition))
+  if (input.column !== undefined && input.column !== 'todo') throw new HttpError(400, apiSaid(API.card.laneNoColumn))
   const project = typeof input.project === 'string' && input.project ? input.project : null
-  if (!project) throw new HttpError(400, say(API.card.laneNeedsProject))
+  if (!project) throw new HttpError(400, apiSaid(API.card.laneNeedsProject))
   const p = laneProject(project)
   const builder = await agentParam(p, o.builder.trim())
   const a = agentCaller()
-  if (a && builder !== a.agentId) throw new HttpError(403, say(API.card.laneOwnOnly))
+  if (a && builder !== a.agentId) throw new HttpError(403, apiSaid(API.card.laneOwnOnly))
   laneArgs(o)
   const { position, ...rest } = o
   return { body: { ...rest, project, builder: o.builder.trim() }, position: position === 'next' ? 'next' : 'last', needsLane: typeof v === 'string' }
@@ -3090,11 +3203,18 @@ async function placeOnLane(l: LanePlacement, card: number): Promise<{ lane: Lane
   }
 }
 
+/** A card's Merges into as a call gives it (HI-2556): a branch name, or null (or '') for the project's own. */
+function targetArg(v: unknown): string | null {
+  if (v === null || v === '') return null
+  if (typeof v !== 'string') throw new HttpError(400, apiSaid(API.lane.targetText))
+  return v.slice(0, 250)
+}
+
 route('POST', '/v1/tasks', async ({ body }) => {
   requireWorkspace()
   const title = String(body?.title ?? '').trim()
-  if (!title) throw new HttpError(400, say(API.card.titleRequired))
-  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}) }
+  if (!title) throw new HttpError(400, apiSaid(API.card.titleRequired))
+  const input = { title, description: body?.description, project: body?.project, agent: body?.agent, column: columnParam(body?.column), labels: body?.labels, blocked: body?.blocked, blockedBy: cardRefsIn(body?.blockedBy), links: cardRefsIn(body?.links), context: body?.context, ...(body?.kind !== undefined ? { kind: body.kind } : {}), ...(body?.skipReview !== undefined ? { skipReview: body.skipReview as string } : {}), ...(body?.target !== undefined ? { target: targetArg(body.target) } : {}) }
   const actor = await taskActor()
   // Placed on a lane as it is made (HI-2167): checked before the card is made; placed after, through cw_lane start's
   // own path, so nobody guesses its key.
@@ -3128,18 +3248,20 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   const actor = await taskActor()
   // A decision that answers requests (HI-1932) is that change alone: checked against the body as sent, before any of
   // its other fields (its kind, skipping review, attachments: changed outside the patch) could be.
-  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'attachments'].some((k) => body[k] !== undefined))
+  if (patch.answers !== undefined) tasks.checkDecisionAnswers(actor, body.answers, ['kind', 'confirmKind', 'skipReview', 'target', 'attachments'].some((k) => body[k] !== undefined))
   const changes: string[] = []
   // Its kind (#1277): changed after it was made (the Assistant's, with override.reason), or an agent's proposal answered.
   const kind = body?.kind
   const confirmKind = body?.confirmKind
-  if (confirmKind !== undefined && typeof confirmKind !== 'boolean') throw new HttpError(400, say(API.card.confirmKindArg))
+  if (confirmKind !== undefined && typeof confirmKind !== 'boolean') throw new HttpError(400, apiSaid(API.card.confirmKindArg))
   // Checked before anything is written (HR3's #1277 round 1): a kind no card has is refused whole.
   if (kind !== undefined) tasks.kindOf(kind)
   // The override's reason is the kind change's when no column moves with it.
   if (kind !== undefined && patch.column === undefined) delete patch.override
   // Whether it skips review (#1625): the user's reason (the Assistant's), or false; checked before anything is written.
   const skipReview = body?.skipReview === undefined ? undefined : tasks.reviewSkipArg(body.skipReview)
+  // Its Merges into (HI-2556): a branch, or null for the project's own; checked by tasks.setTarget.
+  const target = body?.target === undefined ? undefined : targetArg(body.target)
   const write = async (commit?: () => void): Promise<TaskCard> => {
     if (confirmKind !== undefined) {
       await tasks.confirmKind(n, confirmKind, actor, { commit })
@@ -3153,16 +3275,20 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       await tasks.setReviewSkip(n, skipReview !== false, actor, { commit, reason: skipReview || '' })
       changes.push(sayStored([skipReview !== false ? API.card.saidSkipsReview : API.card.saidReviewed]))
     }
+    if (target !== undefined) {
+      await tasks.setTarget(n, target, actor, { commit })
+      changes.push(sayStored([API.card.saidTarget, { own: target ? 'yes' : 'no', target: target ?? '' }]))
+    }
     // A change and its comment are saved together: a card watch woken by the change names this comment.
     const c = Object.keys(patch).length ? await tasks.updateTask(n, patch, actor, { said: changes, comment: comment || undefined, commit }) : comment ? await tasks.commentTask(n, comment, actor, { commit }) : await tasks.readTask(n, actor)
     if (comment) changes.push(say(API.card.saidCommented))
     return c
   }
   // Files to keep with it (HI-1700), with its comment if it has one: checked and copied first, published in its change.
-  if (body?.attachments !== undefined && patch.project !== undefined) throw new HttpError(400, say(API.attachment.moveFirst))
+  if (body?.attachments !== undefined && patch.project !== undefined) throw new HttpError(400, apiSaid(API.attachment.moveFirst))
   const paths = attachmentList(body)
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
-  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
+  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined || target !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
     // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
     const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit), commit))
@@ -3170,7 +3296,13 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
     return c
   }
   const nudge = patch.title === undefined ? null : titleNudge(patch.title, actor, titleKeys())
-  const reply = async (c: TaskCard) => ({ ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(nudge ? { nudge } : {}) })
+  // A lane's card moved (HI-2664: the Assistant's move to Todo, now that cw_put_back is a worker's): its lane keeps its own
+  // order and takes it again in it, said as a put-back says it (HI-2267).
+  const reply = async (c: TaskCard) => {
+    const held = patch.column !== undefined ? await lanes.lanesHolding(requireWorkspace(), [c.number]).catch(() => []) : []
+    const notes = [nudge, ...held.map(laneOrderNote)].filter(Boolean).join('\n')
+    return { ...(shortReply(body) ? await taskChange(c, changes) : await taskView(c)), ...(notes ? { nudge: notes } : {}) }
+  }
   if (actor.kind !== 'assistant') {
     const c = await apply()
     const copy = await reviewCopyAfter(actor, c, { start: patch.review === 'start', verdict: patch.review === 'passed' || patch.review === 'failed' || patch.column === 'passed' })
@@ -3266,7 +3398,7 @@ async function batchReply(items: tasks.BatchItem[], short: boolean, unknown: str
 route('POST', '/v1/tasks/reorder', async ({ body }) => {
   requireWorkspace()
   const column = columnParam(body?.column)
-  if (!column) throw new HttpError(400, say(API.card.columnRequired))
+  if (!column) throw new HttpError(400, apiSaid(API.card.columnRequired))
   const cards = cardRefsIn(body?.cards)
   const actor = await taskActor()
   const view = async (list: TaskCard[]): Promise<TaskView[] | TaskReorder> => {
@@ -3303,7 +3435,7 @@ route('GET', '/v1/tasks/:n/attachments/:name', async ({ params, query }) => {
   try {
     name = decodeURIComponent(params[1] ?? '')
   } catch {
-    throw new HttpError(400, say(API.attachment.badName))
+    throw new HttpError(400, apiSaid(API.attachment.badName))
   }
   const r = await readCardAttachment(workspace, { number: c.number, project: c.project ?? null }, name, query.get('offset'))
   if (!('problem' in r)) return r
@@ -3343,7 +3475,7 @@ route('GET', '/v1/tasks/:n/comments/latest', async ({ params, query }) => {
 route('GET', '/v1/tasks/:n/facts', async ({ params, query }) => {
   requireWorkspace()
   const view = query.get('view') ?? 'short'
-  if (view !== 'short' && view !== 'full') throw new HttpError(400, say(API.card.unknownView, { view }))
+  if (view !== 'short' && view !== 'full') throw new HttpError(400, apiSaid(API.card.unknownView, { view }))
   const c = await tasks.readTask(taskNumber(params[0]), await taskActor())
   const got = cardFacts(workspace, c.number)
   const head = { number: c.number, stage: got?.card.stage ?? cardStages(workspace, [c.number]).get(c.number) ?? CATEGORY_STAGE[c.column], ...(got?.card.preWorkflow ? { preWorkflow: true } : {}) }
@@ -3391,21 +3523,21 @@ const WAITS_PER_CALLER = 2
  * the default) }. A project agent names only accounts on in its workspace.
  */
 function readUsageWatch(v: unknown, ws: WorkspaceService): UsageWatch[] {
-  const shape = say(API.watch.usageShape)
+  const shape = apiSaid(API.watch.usageShape)
   if (!Array.isArray(v) || !v.length) throw new HttpError(400, shape)
-  if (v.length > USAGE_WATCH_MAX) throw new HttpError(400, say(API.watch.usageMax, { max: String(USAGE_WATCH_MAX) }))
+  if (v.length > USAGE_WATCH_MAX) throw new HttpError(400, apiSaid(API.watch.usageMax, { max: String(USAGE_WATCH_MAX) }))
   const seen = agentCaller() ? combworkAccounts().filter((a) => accountOnIn(ws.config, a, allAccounts())) : combworkAccounts()
   return v.map((x: { account?: unknown; percent?: unknown; limit?: unknown }) => {
     if (!x || typeof x !== 'object' || typeof x.account !== 'string') throw new HttpError(400, shape)
     const percent = Number(x.percent)
     const limit = x.limit === undefined ? 'any' : x.limit
-    if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new HttpError(400, say(API.watch.usagePercent))
+    if (!Number.isInteger(percent) || percent < 1 || percent > 100) throw new HttpError(400, apiSaid(API.watch.usagePercent))
     if (limit !== 'weekly' && limit !== 'fiveHour' && limit !== 'any') throw new HttpError(400, shape)
     const byId = seen.find((a) => a.id === x.account)
     const byName = seen.filter((a) => a.name.toLowerCase() === String(x.account).toLowerCase())
-    if (!byId && byName.length > 1) throw new HttpError(409, say(API.connection.severalAccounts, { name: x.account, ids: byName.map((a) => a.id).join(', ') }))
+    if (!byId && byName.length > 1) throw new HttpError(409, apiSaid(API.connection.severalAccounts, { name: x.account, ids: byName.map((a) => a.id).join(', ') }))
     const a = byId ?? byName[0]
-    if (!a) throw new HttpError(404, say(API.watch.usageNoAccount, { name: x.account }))
+    if (!a) throw new HttpError(404, apiSaid(API.watch.usageNoAccount, { name: x.account }))
     return { account: a.id, name: a.name, percent, limit }
   })
 }
@@ -3422,30 +3554,30 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   // The workspace as it is now: the call belongs to it, and stops (409) if it closes or the window opens another.
   const wsPath = ws.path
   const life = ws.lifetime
-  if (!wsPath) throw new HttpError(409, say(API.workspace.closed))
+  if (!wsPath) throw new HttpError(409, apiSaid(API.workspace.closed))
   const stillOpen = (): void => {
-    if (life.aborted || !ws.path || ws.path.toLowerCase() !== wsPath.toLowerCase()) throw new HttpError(409, say(API.workspace.closed))
+    if (life.aborted || !ws.path || ws.path.toLowerCase() !== wsPath.toLowerCase()) throw new HttpError(409, apiSaid(API.workspace.closed))
   }
   stillOpen()
   const me = agentCaller()
   const home = assistantCaller() ? ws.assistantHome : null
   const who = me ? { projectPath: me.projectPath, agentId: me.agentId } : home ? { projectPath: home, agentId: 'assistant' } : null
   if (body?.cancel === true) {
-    if (!who) throw new HttpError(400, say(API.watch.noCardWatchToCancel))
+    if (!who) throw new HttpError(400, apiSaid(API.watch.noCardWatchToCancel))
     const w = sessions.watchFor(who.projectPath, who.agentId)
     const had = await cancelWatch(ws, who.projectPath, who.agentId)
     return { done: had ? say(API.watch.cancelledOne, { kind: w?.lanes ? 'lane' : w?.agents ? 'agent' : 'card' }) : say(API.watch.noCardWatch) }
   }
   // A usage watch (HI-2195): accounts' limits reaching a share, alone or beside the cards or lanes; always one that wakes.
   const usage = body?.usage !== undefined ? readUsageWatch(body.usage, ws) : undefined
-  if (usage !== undefined && (body.wake !== true || !who)) throw new HttpError(400, say(API.watch.usageWakes))
+  if (usage !== undefined && (body.wake !== true || !who)) throw new HttpError(400, apiSaid(API.watch.usageWakes))
   if (usage && body.lanes === undefined && body.cards === undefined) {
-    if (body.agents !== undefined || body.column !== undefined) throw new HttpError(400, say(API.watch.usageAlone))
+    if (body.agents !== undefined || body.column !== undefined) throw new HttpError(400, apiSaid(API.watch.usageAlone))
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
-    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, apiSaid(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const r = await registerUsageWatch(ws, who!.projectPath, who!.agentId, usage, limit).catch((e: Error) => {
-      // agent-protocol: the start of the usage watch's own refusal (usageWatch.ts), matched for its status
-      throw httpFrom(e.message.startsWith('Not a project') ? 400 : 409, e)
+      // Its refusal's own status (HI-2704: not its words), else 409.
+      throw httpFrom(ownStatus(e) ?? 409, e)
     })
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
     if ('already' in r) return { usageAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}), ...left }
@@ -3455,20 +3587,20 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   const withUsage = async (label: string): Promise<string> => (usage ? ((await addUsageToWatch(ws, who!.projectPath, who!.agentId, usage))?.label ?? label) : label)
   // A lane watch (#531): whole lanes; always one that wakes. With cards beside them (#726): `cards` and their `changes`.
   if (body?.lanes !== undefined) {
-    if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, say(API.watch.lanesAlone))
+    if (body.column !== undefined || body.fresh !== undefined) throw new HttpError(400, apiSaid(API.watch.lanesAlone))
     const lc = readLaneCondition(body)
-    if (typeof lc === 'string') throw new HttpError(400, lc)
+    if (isSaid(lc)) throw new HttpError(400, lc)
     const extra = readLaneCards(body)
-    if (typeof extra === 'string') throw new HttpError(400, extra)
-    if (body.wake !== true || !who) throw new HttpError(400, say(API.watch.laneWakes))
+    if (isSaid(extra)) throw new HttpError(400, extra)
+    if (body.wake !== true || !who) throw new HttpError(400, apiSaid(API.watch.laneWakes))
     // Agents beside the lanes (HI-1987): each { project, agent }; left out, the last lane watch's are kept, [] drops them.
     let laneAgents: WatchedAgent[] | undefined
     if (body.agents !== undefined) {
-      if (!Array.isArray(body.agents)) throw new HttpError(400, say(API.watch.agentsArg))
-      if (body.agents.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, say(API.watch.maxAgents, { max: String(AGENT_WATCH_MAX_AGENTS) }))
+      if (!Array.isArray(body.agents)) throw new HttpError(400, apiSaid(API.watch.agentsArg))
+      if (body.agents.length > AGENT_WATCH_MAX_AGENTS) throw new HttpError(400, apiSaid(API.watch.maxAgents, { max: String(AGENT_WATCH_MAX_AGENTS) }))
       laneAgents = []
       for (const x of body.agents as { project?: unknown; agent?: unknown }[]) {
-        if (!x || typeof x !== 'object' || typeof x.project !== 'string') throw new HttpError(400, say(API.watch.agentsArg))
+        if (!x || typeof x !== 'object' || typeof x.project !== 'string') throw new HttpError(400, apiSaid(API.watch.agentsArg))
         const p = projectByName(x.project)
         const id = await agentParam(p, x.agent as string | undefined)
         if (!laneAgents.some((a) => resolvePath(a.projectPath).toLowerCase() === resolvePath(p).toLowerCase() && a.agentId === id)) laneAgents.push({ projectPath: p, agentId: id, name: (await agentDefOf(p, id)).name, project: basename(p) })
@@ -3476,7 +3608,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       stillOpen()
     }
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
-    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, apiSaid(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     // Each card named must be one the caller may see, as for a card watch.
     if (extra.cards?.length) {
       const actor = await taskActor()
@@ -3484,15 +3616,16 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
       stillOpen()
     }
     const r = await registerLaneWatch(ws, who.projectPath, who.agentId, lc, limit, { ...extra, ...(laneAgents ? { agents: { agents: laneAgents, ignoreBackground: false } } : {}) }).catch((e: Error) => {
-      throw e instanceof HttpError ? e : httpFrom(/^(No such lane|Unknown task)/.test(e.message) ? 404 : /^(You can't watch yourself|Not a project)/.test(e.message) ? 400 : 409, e)
+      // A refusal's own status (HI-2704: not its words: an unknown lane or card 404, a project or agent it can't watch 400), else 409.
+      throw e instanceof HttpError ? e : httpFrom(ownStatus(e) ?? 409, e)
     })
     // HI-2521: a named lane that has already ended is the answer at once; no watch started, so no usage beside it.
     if ('already' in r) return { lanesAlready: r.already, ...(r.replaced ? { replaced: r.replaced } : {}) }
     return { watching: await withUsage(r.watching.label), limitAt: r.watching.limitAt, events: lc.events,...(r.replaced ? { replaced: r.replaced } : {}), ...(r.cards ? { cards: r.cards, ...withNames([...r.cards.now, ...(r.cards.replaced ?? []), ...(r.cards.dropped ?? [])]) } : {}), ...(r.agents ? { agents: r.agents } : {}) }
   }
-  if (body?.agents !== undefined) throw new HttpError(400, say(API.watch.agentsWithLanes))
+  if (body?.agents !== undefined) throw new HttpError(400, apiSaid(API.watch.agentsWithLanes))
   const cond = readCondition(body ?? {})
-  if (typeof cond === 'string') throw new HttpError(400, cond)
+  if (isSaid(cond)) throw new HttpError(400, cond)
   // Each card must be one the caller may see (a project agent: its project's; others are unknown to it), and stays so:
   // the caller's scope goes with the wait, and every later read is checked against it.
   const actor = await taskActor()
@@ -3500,9 +3633,9 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   for (const n of cond.cards) await tasks.readTask(n, actor)
   stillOpen()
   if (body?.wake === true) {
-    if (!who) throw new HttpError(400, say(API.watch.wakeOnlyAgents))
+    if (!who) throw new HttpError(400, apiSaid(API.watch.wakeOnlyAgents))
     const limit = body?.limitMinutes === undefined ? WATCH_DEFAULT_LIMIT_MINUTES : Number(body.limitMinutes)
-    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, say(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
+    if (!Number.isFinite(limit) || limit < 1 || limit > WATCH_MAX_LIMIT_MINUTES) throw new HttpError(400, apiSaid(API.watch.limitMinutes, { max: String(WATCH_MAX_LIMIT_MINUTES) }))
     const r = await registerWatch(ws, who.projectPath, who.agentId, cond, limit)
     const left = r.lanesLeft ? { lanesLeft: r.lanesLeft } : {}
     // HI-2245: an agent's own cards in Review with commits past their submission: its reply says to hand them over first.
@@ -3516,13 +3649,13 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   const seconds = body?.timeoutSeconds === undefined ? 300 : Number(body.timeoutSeconds)
   // The longest is Settings → Advanced's (#367), under Codex's timeout for Combwork's tools.
   const maxSeconds = waitMaxSeconds('cards')
-  if (!Number.isFinite(seconds) || seconds < 1) throw new HttpError(400, say(API.watch.timeoutRange, { max: String(maxSeconds) }))
+  if (!Number.isFinite(seconds) || seconds < 1) throw new HttpError(400, apiSaid(API.watch.timeoutRange, { max: String(maxSeconds) }))
   const limitMs = Math.min(maxSeconds, seconds) * 1000
   let base: Map<number, CardMark> | null = null
   let sinceAt = Date.now()
   if (body?.since !== undefined) {
     const d = decodeSince(String(body.since))
-    if (!d) throw new HttpError(400, say(API.watch.sinceArg))
+    if (!d) throw new HttpError(400, apiSaid(API.watch.sinceArg))
     base = d.marks
     sinceAt = d.at
   }
@@ -3535,7 +3668,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
   }
   const callerKey = me ? `${me.projectPath.toLowerCase()}#${me.agentId}` : home ? `assistant:${wsPath}` : `api:${wsPath}`
   const running = taskWaits.get(callerKey) ?? 0
-  if (running >= WAITS_PER_CALLER) throw new HttpError(429, say(API.watch.tooManyWaits, { running: String(running) }))
+  if (running >= WAITS_PER_CALLER) throw new HttpError(429, apiSaid(API.watch.tooManyWaits, { running: String(running) }))
   taskWaits.set(callerKey, running + 1)
   try {
     const start = await marksOf()
@@ -3580,7 +3713,7 @@ route('POST', '/v1/tasks/wait', async ({ body: raw }) => {
         finish()
         reject(e)
       }
-      const onClose = (): void => fail(new HttpError(409, say(API.workspace.closed)))
+      const onClose = (): void => fail(new HttpError(409, apiSaid(API.workspace.closed)))
       const run = (): void => {
         if (ended) return
         if (checking) {
@@ -3708,10 +3841,10 @@ function textField(body: any, key: string, required?: false): string | undefined
 function textField(body: any, key: string, required = false): string | undefined {
   const v = body?.[key]
   if (v === undefined || v === null || (typeof v === 'string' && !v.trim())) {
-    if (required) throw new HttpError(400, say(API.intent.fieldRequired, { field: key }))
+    if (required) throw new HttpError(400, apiSaid(API.intent.fieldRequired, { field: key }))
     return undefined
   }
-  if (typeof v !== 'string') throw new HttpError(400, say(API.intent.fieldText, { field: key }))
+  if (typeof v !== 'string') throw new HttpError(400, apiSaid(API.intent.fieldText, { field: key }))
   return v.trim()
 }
 
@@ -3719,10 +3852,10 @@ function textField(body: any, key: string, required = false): string | undefined
 function pathsField(body: any, required: boolean): string[] | undefined {
   const v = body?.paths
   if (v === undefined || v === null) {
-    if (required) throw new HttpError(400, say(API.intent.pathsRequired))
+    if (required) throw new HttpError(400, apiSaid(API.intent.pathsRequired))
     return undefined
   }
-  if (!Array.isArray(v) || v.some((p) => typeof p !== 'string' || !p.trim())) throw new HttpError(400, say(API.intent.pathsArg))
+  if (!Array.isArray(v) || v.some((p) => typeof p !== 'string' || !p.trim())) throw new HttpError(400, apiSaid(API.intent.pathsArg))
   return v.map((p: string) => p.trim())
 }
 
@@ -3730,15 +3863,23 @@ function pathsField(body: any, required: boolean): string[] | undefined {
 function testsField(body: any): FocusedTest[] | undefined {
   if (body?.tests === undefined || body?.tests === null) return undefined
   const t = testsGiven(body.tests)
-  if ('bad' in t) throw new HttpError(400, say(API.intent.testsArg, { problem: t.bad })) // i18n-ignore: agent-facing
+  if ('bad' in t) throw new HttpError(400, apiSaid(API.intent.testsArg, { problem: t.bad })) // i18n-ignore: agent-facing
   return t.tests
+}
+
+/** A verdict body's accept (HI-2660): at most ACCEPT_MAX focused test ids, when given; the runtime checks each again. */
+function acceptField(body: any): string[] | undefined {
+  const v = body?.accept
+  if (v === undefined || v === null) return undefined
+  if (!Array.isArray(v) || v.length > ACCEPT_MAX || !v.every(validTestId)) throw new HttpError(400, apiSaid(API.intent.acceptArg, { max: ACCEPT_MAX }))
+  return v
 }
 
 /** A body's submission number (start-review, verdict), when given. */
 function submissionField(body: any): number | undefined {
   const v = body?.submission
   if (v === undefined || v === null) return undefined
-  if (!Number.isInteger(v) || v < 1) throw new HttpError(400, say(API.intent.submissionArg))
+  if (!Number.isInteger(v) || v < 1) throw new HttpError(400, apiSaid(API.intent.submissionArg))
   return v
 }
 
@@ -3750,7 +3891,7 @@ const CHECKLIST_STEP_MAX = 500
 function checklistField(body: any): { checklist?: string[] } {
   const v = body?.checklist
   if (v === undefined || v === null) return {}
-  if (!Array.isArray(v) || !v.length || v.length > CHECKLIST_MAX || v.some((x) => typeof x !== 'string' || !x.trim() || x.length > CHECKLIST_STEP_MAX)) throw new HttpError(400, say(API.intent.checklistArg, { max: String(CHECKLIST_MAX), stepMax: String(CHECKLIST_STEP_MAX) }))
+  if (!Array.isArray(v) || !v.length || v.length > CHECKLIST_MAX || v.some((x) => typeof x !== 'string' || !x.trim() || x.length > CHECKLIST_STEP_MAX)) throw new HttpError(400, apiSaid(API.intent.checklistArg, { max: String(CHECKLIST_MAX), stepMax: String(CHECKLIST_STEP_MAX) }))
   return { checklist: v.map((x: string) => x.trim()) }
 }
 
@@ -3761,7 +3902,7 @@ const ASK_REASON_MAX = 1000
 function actionsField(body: any): { actions?: AskAction[] } {
   const v = body?.actions
   if (v === undefined || v === null) return {}
-  const bad = (): HttpError => new HttpError(400, say(API.intent.actionsArg, { max: String(ASK_ACTIONS_MAX), kinds: ASK_ACTIONS.join(', '), reasonMax: String(ASK_REASON_MAX) }))
+  const bad = (): HttpError => new HttpError(400, apiSaid(API.intent.actionsArg, { max: String(ASK_ACTIONS_MAX), kinds: ASK_ACTIONS.join(', '), reasonMax: String(ASK_REASON_MAX) }))
   if (!Array.isArray(v) || !v.length || v.length > ASK_ACTIONS_MAX) throw bad()
   const out: AskAction[] = []
   for (const x of v) {
@@ -3779,35 +3920,36 @@ const ASK_KINDS: readonly ForYouKind[] = ['approve', 'decide', 'test', 'signIn',
 export const INTENT_ROUTES: Record<string, (body: any) => CardIntent> = {
   'put-back': (body) => ({ kind: 'putBack', why: textField(body, 'why', true) }),
   submit: (body) => {
-    if (body?.followUp !== undefined && body?.followUp !== null && typeof body.followUp !== 'boolean') throw new HttpError(400, say(API.intent.followUpArg))
+    if (body?.followUp !== undefined && body?.followUp !== null && typeof body.followUp !== 'boolean') throw new HttpError(400, apiSaid(API.intent.followUpArg))
     const tests = testsField(body)
     return { kind: 'submit', summary: textField(body, 'summary', true), revision: textField(body, 'revision'), note: textField(body, 'note'), paths: pathsField(body, false), ...(body?.followUp === true ? { followUp: true } : {}), ...(tests ? { tests } : {}) }
   },
   'declare-paths': (body) => ({ kind: 'declarePaths', paths: pathsField(body, true)! }),
   'start-review': (body) => ({ kind: 'startReview', submission: submissionField(body) }),
   verdict: (body) => {
-    if (body?.pass !== true && body?.pass !== false) throw new HttpError(400, say(API.intent.passArg))
+    if (body?.pass !== true && body?.pass !== false) throw new HttpError(400, apiSaid(API.intent.passArg))
     const failKind = body?.failKind ?? undefined
-    if (failKind !== undefined && failKind !== 'content' && failKind !== 'explanation') throw new HttpError(400, say(API.intent.unknownFailKind, { value: String(failKind) }))
-    return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind }
+    if (failKind !== undefined && failKind !== 'content' && failKind !== 'explanation') throw new HttpError(400, apiSaid(API.intent.unknownFailKind, { value: String(failKind) }))
+    const accept = acceptField(body)
+    return { kind: 'verdict', pass: body.pass, comment: textField(body, 'comment', true), submission: submissionField(body), failKind, ...(accept ? { accept } : {}) }
   },
   'report-merge': (body) => ({ kind: 'reportMerge', result: textField(body, 'result') }),
   'focused-skip': (body) => {
-    if (body?.merge !== true && body?.merge !== false) throw new HttpError(400, say(API.intent.mergeArg))
+    if (body?.merge !== true && body?.merge !== false) throw new HttpError(400, apiSaid(API.intent.mergeArg))
     return { kind: 'focusedSkip', request: textField(body, 'request', true)!, merge: body.merge, why: textField(body, 'why', true)! }
   },
   ask: (body) => {
     const askKind = body?.kind ?? 'other'
-    if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, say(API.intent.unknownAskKind, { value: String(askKind), kinds: ASK_KINDS.join(', ') }))
+    if (!ASK_KINDS.includes(askKind)) throw new HttpError(400, apiSaid(API.intent.unknownAskKind, { value: String(askKind), kinds: ASK_KINDS.join(', ') }))
     const revision = textField(body, 'revision')
-    if (revision !== undefined && (revision.length > 200 || /\s/.test(revision))) throw new HttpError(400, say(API.intent.revisionArg))
+    if (revision !== undefined && (revision.length > 200 || /\s/.test(revision))) throw new HttpError(400, apiSaid(API.intent.revisionArg))
     return { kind: 'ask', askKind, text: textField(body, 'text', true), ...(revision ? { revision } : {}), ...checklistField(body), ...actionsField(body) }
   },
   cannot: (body) => ({ kind: 'cannot', rule: textField(body, 'rule', true), why: textField(body, 'why', true) }),
   request: (body) => ({ kind: 'request', text: textField(body, 'text', true) }),
   'loop-step': (body) => {
     const step = body?.step
-    if (!LOOP_STEPS.includes(step)) throw new HttpError(400, say(API.intent.unknownStep, { value: String(step), steps: LOOP_STEPS.join(', ') }))
+    if (!LOOP_STEPS.includes(step)) throw new HttpError(400, apiSaid(API.intent.unknownStep, { value: String(step), steps: LOOP_STEPS.join(', ') }))
     // An answer and going ahead name the design or follow-up they are about (its reply's `design`), so a late one never
     // settles another.
     const design = step === 'design' || step === 'followUp' ? undefined : textField(body, 'design', true)
@@ -3822,7 +3964,7 @@ route('POST', '/v1/tasks/:n/ask-assistant', async ({ params, body }) => {
   const ws = requireWorkspace()
   const ref = intentRef(params[0])
   const actor = await taskActor()
-  if (actor.kind !== 'agent' || !actor.self) throw new HttpError(403, say(API.intent.askAssistantAgentsOnly))
+  if (actor.kind !== 'agent' || !actor.self) throw new HttpError(403, apiSaid(API.intent.askAssistantAgentsOnly))
   const text = textField(body, 'text', true)
   // An agent's plain number is refused, naming the card's key (S48), as for the intents.
   if (ref.plain) throw new tasks.WorkflowRefusedError(refusal('card.plainNumber', { key: (await tasks.readTask(ref.n, actor)).key ?? `#${ref.n}` }, null))
@@ -3842,13 +3984,13 @@ route('POST', '/v1/tasks/:n/start', async ({ params, body }) => {
   const n = taskNumber(params[0])
   const card = await tasks.readTask(n, await taskActor())
   // 1.0 (#1451): no agent gets a worktree of its own: asking for one is refused, never ignored.
-  if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, say(NOT_PINNED))
+  if (body?.worktree || body?.existingWorktree || body?.branch || body?.base || (body?.location && body.location !== 'project')) throw new HttpError(400, apiSaid(NOT_PINNED))
   // A new agent's connection (HI-2121, as cw_add_agent's: decisions A and D): the one named, else the first usable here.
-  if (body?.agent && body?.connection !== undefined) throw new HttpError(400, say(API.intent.connectionNewAgentOnly))
+  if (body?.agent && body?.connection !== undefined) throw new HttpError(400, apiSaid(API.intent.connectionNewAgentOnly))
   const conn = !body?.agent && card.project && ws.path ? connectionArg(body, join(ws.path, card.project)) : undefined
   // Decision D (HI-2108): provider, model, effort, mode and context are a connection's now, refused naming those there.
   refuseOldFields(body, getConnection(conn?.connection)?.account ?? firstUsableAccount(ws.path ? ws.config : null)?.id)
-  if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, say(API.agent.providerOff, { provider: providerName(conn.cli) }))
+  if (conn?.cli && !isProviderEnabled(config.settings, conn.cli)) throw new HttpError(409, apiSaid(API.agent.providerOff, { provider: providerName(conn.cli) }))
   const target: TaskStartTarget = body?.agent
     ? { kind: 'agent', agentId: String(body.agent) }
     : { kind: 'new-agent', name: body?.name ? String(body.name) : undefined, ...(conn?.connection ? { connection: conn.connection } : {}) }
@@ -3900,17 +4042,17 @@ const SKILL_FILE_MAX = 512 * 1024
 route('GET', '/v1/skills/:name', async ({ params, query }) => inWorkspace(requireWorkspace(), async () => {
   const name = decodeURIComponent(params[0])
   const skill = validSkillName(name) ? (await combworkSkills()).find((s) => s.name.toLowerCase() === name.toLowerCase()) : undefined
-  if (!skill) throw new HttpError(404, say(API.skill.unknown, { name }))
+  if (!skill) throw new HttpError(404, apiSaid(API.skill.unknown, { name }))
   const file = query.get('file') ?? 'SKILL.md'
   // The whole path is checked before anything is read: relative, inside the skill's folder as written and as it
   // really is (a link can't lead out), and a file.
   const parts = file.replace(/\\/g, '/').split('/')
-  if (!file || /^[a-z]:|^\//i.test(file) || parts.some((x) => x === '' || x === '.' || x === '..')) throw new HttpError(400, say(API.skill.fileOutside, { file }))
+  if (!file || /^[a-z]:|^\//i.test(file) || parts.some((x) => x === '' || x === '.' || x === '..')) throw new HttpError(400, apiSaid(API.skill.fileOutside, { file }))
   const abs = join(skill.path, ...parts)
-  if (!insideReal(abs, [skill.path])) throw new HttpError(400, say(API.skill.fileOutside, { file }))
+  if (!insideReal(abs, [skill.path])) throw new HttpError(400, apiSaid(API.skill.fileOutside, { file }))
   const info = await stat(abs).catch(() => null)
-  if (!info?.isFile()) throw new HttpError(404, say(API.skill.noFile, { skill: skill.name, file }))
-  const tooBig = new HttpError(413, say(API.skill.fileTooBig, { file, kilobytes: String(SKILL_FILE_MAX / 1024) }))
+  if (!info?.isFile()) throw new HttpError(404, apiSaid(API.skill.noFile, { skill: skill.name, file }))
+  const tooBig = new HttpError(413, apiSaid(API.skill.fileTooBig, { file, kilobytes: String(SKILL_FILE_MAX / 1024) }))
   if (info.size > SKILL_FILE_MAX) throw tooBig
   // What is read is capped too: the file may have grown since the stat.
   const read = await readCapped(abs, SKILL_FILE_MAX)
@@ -3934,12 +4076,12 @@ route('GET', '/v1/metrics', async ({ query }) => {
   const agent = agentCaller()
   const asked = query.get('project')
   if (agent && (query.get('scope') !== 'project' || (asked && asked.toLowerCase() !== basename(agent.projectPath).toLowerCase()))) {
-    throw new HttpError(403, say(API.metrics.ownProject, { project: basename(agent.projectPath) }))
+    throw new HttpError(403, apiSaid(API.metrics.ownProject, { project: basename(agent.projectPath) }))
   }
   const scope: MetricsQuery['scope'] = query.get('scope') === 'project' ? { kind: 'project', project: asked || (agent ? basename(agent.projectPath) : '') } : { kind: 'workspace' }
-  if (scope.kind === 'project' && !scope.project) throw new HttpError(400, say(API.metrics.scopeNeedsProject))
+  if (scope.kind === 'project' && !scope.project) throw new HttpError(400, apiSaid(API.metrics.scopeNeedsProject))
   const role = query.get('role') ?? undefined
-  if (role !== undefined && role !== 'agent' && role !== 'assistant' && role !== 'api') throw new HttpError(400, say(API.metrics.roleArg))
+  if (role !== undefined && role !== 'agent' && role !== 'assistant' && role !== 'api') throw new HttpError(400, apiSaid(API.metrics.roleArg))
   return metricsReport(w, { scope, from: query.get('from') ?? undefined, to: query.get('to') ?? undefined, trend: query.get('trend') === '1', role, provider: query.get('provider') || undefined, own: query.get('own') === '1' }).then((r) => metricsForAgents(withPersonaAliases(r)), (e) => {
     throw e instanceof HttpError ? e : httpFrom(400, e)
   })
@@ -3954,17 +4096,19 @@ route('GET', '/v1/metrics', async ({ query }) => {
 route('POST', '/v1/metrics/mcp', async ({ body }) => {
   const agent = agentCaller()
   const own = assistantCaller()
-  if (!agent && !own) throw new HttpError(403, say(API.mcp.reportOnlyBridge))
+  if (!agent && !own) throw new HttpError(403, apiSaid(API.mcp.reportOnlyBridge))
   const h = metricsHandle(requireWorkspace())
   const project = agent ? basename(agent.projectPath) : null
   const role = agent ? 'agent' : 'assistant'
   const calls: unknown[] = Array.isArray(body?.calls) ? body.calls : []
-  if (calls.length > MCP_REPORT_LIMITS.events) throw new HttpError(400, say(API.mcp.reportMax, { max: String(MCP_REPORT_LIMITS.events) }))
+  if (calls.length > MCP_REPORT_LIMITS.events) throw new HttpError(400, apiSaid(API.mcp.reportMax, { max: String(MCP_REPORT_LIMITS.events) }))
   let accepted = 0
   for (const c of calls) if (c && typeof c === 'object' && recordMcp(h, project, role, c as Record<string, unknown> as never)) accepted++
   // On the side of the launch its token is for (HI-2049), never the agent's next one; the Assistant's is none.
   const side = agent ? sessions.launchSide(agent.projectPath, agent.agentId, agentCallerRun()) : 'none'
-  if (body?.catalog && typeof body.catalog === 'object' && recordCatalog(h, project, role, side, body.catalog)) accepted++
+  // Its CLI (HI-2553): the launch its token is for (an agent's), or the Assistant's session now.
+  const provider = agent ? sessions.launchProvider(agent.projectPath, agent.agentId, agentCallerRun()) : (sessions.liveFor(requireWorkspace().assistantHome, ASSISTANT_AGENT_ID)?.provider ?? null)
+  if (body?.catalog && typeof body.catalog === 'object' && recordCatalog(h, project, role, side, body.catalog, provider)) accepted++
   return { accepted, refused: calls.length + (body?.catalog ? 1 : 0) - accepted }
 })
 
@@ -3978,9 +4122,9 @@ route('POST', '/v1/launch/connected', async () => {
   if (agent) return { ok: sessions.combworkToolsConnected(agent.projectPath, agent.agentId, agentCallerRun() ?? undefined) }
   const ws = assistantCaller()
   const token = assistantCallerToken()
-  if (!ws || !token) throw new HttpError(403, say(API.mcp.connectedOnlyBridge))
+  if (!ws || !token) throw new HttpError(403, apiSaid(API.mcp.connectedOnlyBridge))
   // The Assistant's token is its running launch's (a new one each start): an earlier launch's no longer matches.
-  if (!assistant.isCurrentToken(ws, token)) throw new HttpError(403, say(API.mcp.earlierLaunch))
+  if (!assistant.isCurrentToken(ws, token)) throw new HttpError(403, apiSaid(API.mcp.earlierLaunch))
   return { ok: sessions.combworkToolsConnected(assistant.assistantHome(ws), ASSISTANT_AGENT_ID) }
 })
 
@@ -4001,7 +4145,7 @@ route('GET', '/v1/mcp', async () => {
 
 route('POST', '/v1/notify', async ({ body }) => {
   const level: ToastLevel = ['info', 'success', 'warning', 'error'].includes(body?.level) ? body.level : 'info'
-  if (!body?.title) throw new HttpError(400, say(API.card.titleRequired))
+  if (!body?.title) throw new HttpError(400, apiSaid(API.card.titleRequired))
   const target = await notifyTarget(body.target)
   toast(level, String(body.title).slice(0, 200), body.message ? String(body.message).slice(0, 2000) : undefined, undefined, body.source ? String(body.source) : 'agent', target)
   return { ok: true, ...(target ? { opens: target.kind === 'agent' ? target.name : target.kind === 'card' ? target.label : target.project } : {}) }
@@ -4013,23 +4157,23 @@ route('POST', '/v1/notify', async ({ body }) => {
  */
 async function notifyTarget(raw: unknown): Promise<ToastTarget | undefined> {
   if (raw === undefined || raw === null) return undefined
-  if (typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, say(API.notify.targetArg))
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new HttpError(400, apiSaid(API.notify.targetArg))
   const t = raw as { agent?: unknown; project?: unknown; card?: unknown }
   const agent = typeof t.agent === 'string' && t.agent ? t.agent : null
   const card = typeof t.card === 'string' || typeof t.card === 'number' ? String(t.card).trim() : ''
-  if (agent && card) throw new HttpError(400, say(API.notify.targetBoth))
+  if (agent && card) throw new HttpError(400, apiSaid(API.notify.targetBoth))
   if (card) {
     const ws = requireWorkspace()
     const n = cardOfRef(ws, card, callerScope())
-    if (n === null) throw new HttpError(404, say(API.card.unknown, { card }))
+    if (n === null) throw new HttpError(404, apiSaid(API.card.unknown, { card }))
     const c = await tasks.getTask(n, ws)
     // Its workspace too: a card's number is its workspace's alone (HR6 round 1, finding 1).
     return { kind: 'card', number: n, label: cardLabel(c), projectPath: c.project && ws.path ? join(ws.path, c.project) : null, workspacePath: ws.path! }
   }
-  if (!agent) throw new HttpError(400, say(API.notify.targetNames))
+  if (!agent) throw new HttpError(400, apiSaid(API.notify.targetNames))
   const own = agentCaller()
   const projectPath = typeof t.project === 'string' && t.project ? projectByName(t.project) : own?.projectPath
-  if (!projectPath) throw new HttpError(400, say(API.notify.sayProject))
+  if (!projectPath) throw new HttpError(400, apiSaid(API.notify.sayProject))
   const id = await agentParam(projectPath, agent)
   const def = projectAgents(await workspace.projectConfig(projectPath)).find((x) => x.id === id)
   return { kind: 'agent', projectPath, agentId: id, name: def?.name ?? agent, project: basename(projectPath) }
@@ -4051,7 +4195,7 @@ async function progressCaller(): Promise<ProgressCaller> {
 
 /** Looking the caller up waited: a workspace that closed meanwhile (its runs cleared) must not get a run back. */
 function progressWorkspaceOpen(ws: WorkspaceService, workspacePath: string, life: WorkspaceService['lifetime']): void {
-  if (life.aborted || ws.path?.toLowerCase() !== workspacePath.toLowerCase()) throw new HttpError(409, say(API.workspace.closed))
+  if (life.aborted || ws.path?.toLowerCase() !== workspacePath.toLowerCase()) throw new HttpError(409, apiSaid(API.workspace.closed))
 }
 
 async function progressCallerIn(workspacePath: string): Promise<ProgressCaller> {
@@ -4109,7 +4253,7 @@ function consoleReader(): ConsoleReader {
 }
 
 function consoleAllowed(): void {
-  if (config.settings.agentApi.devConsole !== true) throw new HttpError(403, say(API.console.off))
+  if (config.settings.agentApi.devConsole !== true) throw new HttpError(403, apiSaid(API.console.off))
 }
 
 const consoleWorkspaceOf = (projectPath: string): string | null => workspaceFor(projectPath)?.path ?? null
@@ -4128,21 +4272,21 @@ async function consoleSource(query: URLSearchParams): Promise<string> {
   try {
     if (which === 'combwork') id = combworkSourceId(requireWorkspace().path!)
     else if (which === 'assistant') id = sessionSourceId(requireWorkspace().assistantHome, ASSISTANT_AGENT_ID)
-    else if (which) throw new HttpError(400, say(API.console.sourceArg))
+    else if (which) throw new HttpError(400, apiSaid(API.console.sourceArg))
     else if (!project && !agent) {
-      if (!me) throw new HttpError(400, say(API.console.saySource))
+      if (!me) throw new HttpError(400, apiSaid(API.console.saySource))
       id = sessionSourceId(me.projectPath, me.agentId)
     } else {
       const p = project ? projectByName(project) : me?.projectPath
-      if (!p) throw new HttpError(400, say(API.console.projectWithAgent))
+      if (!p) throw new HttpError(400, apiSaid(API.console.projectWithAgent))
       id = sessionSourceId(p, await agentParam(p, agent ?? undefined))
     }
   } catch (e) {
     // An agent learns nothing of what it can't read: an unknown project or agent is refused as one it may not read.
-    if (me && !(e instanceof HttpError && e.status === 400)) throw new HttpError(404, say(NOT_READABLE))
+    if (me && !(e instanceof HttpError && e.status === 400)) throw new HttpError(404, apiSaid(NOT_READABLE))
     throw e
   }
-  if (!mayRead(consoleReader(), id, consoleWorkspaceOf)) throw new HttpError(404, say(NOT_READABLE))
+  if (!mayRead(consoleReader(), id, consoleWorkspaceOf)) throw new HttpError(404, apiSaid(NOT_READABLE))
   return id
 }
 
@@ -4180,13 +4324,13 @@ route('GET', '/v1/console/events', async ({ query }) => {
   const source = consoleRow(ws ? consoleSources(ws).find((x) => x.id === id) : undefined, id)
   const seqs = (query.get('seq') ?? '').split(',').map((x) => Number(x.trim())).filter((n) => Number.isInteger(n) && n > 0)
   if (seqs.length) {
-    if (seqs.length > CONSOLE_DETAIL_MAX) throw new HttpError(400, say(API.console.detailMax, { max: String(CONSOLE_DETAIL_MAX) }))
+    if (seqs.length > CONSOLE_DETAIL_MAX) throw new HttpError(400, apiSaid(API.console.detailMax, { max: String(CONSOLE_DETAIL_MAX) }))
     const events = seqs.map((n) => devConsole.event(id, n)).filter((e): e is ConsoleEvent => !!e)
     return { source, events, missing: seqs.filter((n) => !events.some((e) => e.seq === n)) }
   }
   const kinds = (query.get('kinds') ?? '').split(',').map((k) => k.trim()).filter(Boolean)
   const unknown = kinds.filter((k) => !(CONSOLE_KINDS as readonly string[]).includes(k))
-  if (unknown.length) throw new HttpError(400, say(API.console.unknownKinds, { kinds: unknown.slice(0, 5).map((k) => k.slice(0, 30)).join(', '), known: CONSOLE_KINDS.join(', ') }))
+  if (unknown.length) throw new HttpError(400, apiSaid(API.console.unknownKinds, { kinds: unknown.slice(0, 5).map((k) => k.slice(0, 30)).join(', '), known: CONSOLE_KINDS.join(', ') }))
   const since = intParam(query, 'since', 0, 0, Number.MAX_SAFE_INTEGER)
   const limit = intParam(query, 'limit', CONSOLE_ROWS, 1, CONSOLE_ROWS_MAX)
   const after = devConsole.events(id, since).filter((e) => !kinds.length || kinds.includes(e.kind as ConsoleKind))
@@ -4272,15 +4416,15 @@ route('POST', '/v1/progress/resolve', async ({ body }) => {
  * Refused (400) for anything else, with what to do; 409 with `wait` while no copy is free (cw-progress asks again).
  */
 async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: RunLink, ticket?: string): Promise<{ project: string; lease: string; folder: string; copy: string }> {
-  if (caller.source !== 'agent') throw new HttpError(400, say(API.check.isolatedAgentsOnly))
-  if (!link.check) throw new HttpError(400, say(API.check.isolatedNeedsCheck))
-  if (link.card === null || !link.revision) throw new HttpError(400, say(API.check.isolatedNeedsCard))
+  if (caller.source !== 'agent') throw new HttpError(400, apiSaid(API.check.isolatedAgentsOnly))
+  if (!link.check) throw new HttpError(400, apiSaid(API.check.isolatedNeedsCheck))
+  if (link.card === null || !link.revision) throw new HttpError(400, apiSaid(API.check.isolatedNeedsCard))
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
-  if (platformIdOf(caller.projectPath, cfg?.platform) !== 'git') throw new HttpError(400, say(API.check.noVcs))
+  if (platformIdOf(caller.projectPath, cfg?.platform) !== 'git') throw new HttpError(400, apiSaid(API.check.noVcs))
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
-  if ('wait' in got) throw new HttpError(409, say(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })
+  if ('wait' in got) throw new HttpError(409, apiSaid(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })
   if ('refused' in got) throw new HttpError(400, got.refused)
   return { project: caller.projectPath, lease: got.lease.id, folder: got.folder, copy: got.copy }
 }
@@ -4290,11 +4434,11 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
 route('POST', '/v1/progress/isolated', async ({ body }) => {
   const ws = requireWorkspace()
   const a = agentCaller()
-  if (!a) throw new HttpError(403, say(API.check.onlyIsolated))
+  if (!a) throw new HttpError(403, apiSaid(API.check.onlyIsolated))
   const b = bodyObject(body)
   const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : NaN)
   const req = { lease: typeof b.lease === 'string' ? b.lease : '', pid: num(b.pid), after: num(b.after), before: num(b.before) }
-  if (!req.lease || !Number.isInteger(req.pid) || req.pid <= 0 || Number.isNaN(req.after) || Number.isNaN(req.before)) throw new HttpError(400, say(API.check.leaseArgs))
+  if (!req.lease || !Number.isInteger(req.pid) || req.pid <= 0 || Number.isNaN(req.after) || Number.isNaN(req.before)) throw new HttpError(400, apiSaid(API.check.leaseArgs))
   const why = await assignIsolated(ws, a.projectPath, a.agentId, req)
   if (why) throw new HttpError(409, why)
   return { ok: true }
@@ -4412,7 +4556,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
     appMetrics.requestEnded()
     working()
     if (!m.authenticated) appMetrics.unauthenticated()
-    else if (!m.skip && m.handle) recordApi(m.handle, m.project, { route: m.route, method: req.method ?? '', role: m.role, outcome: outcomeOf(res, m), requestBytes: m.requestBytes, responseBytes: m.responseBytes, ms: metricsClock.mono() - started })
+    else if (!m.skip && m.handle) recordApi(m.handle, m.project, { route: m.route, method: req.method ?? '', role: m.role, outcome: outcomeOf(res, m), requestBytes: m.requestBytes, responseBytes: m.responseBytes, ms: metricsClock.mono() - started, ...(m.reason ? { reason: m.reason } : {}) })
     if (m.authenticated && !m.skip && !m.route.startsWith('/v1/console')) captureApiCall(req, res, url, m, who, metricsClock.mono() - started)
   })
   const url = new URL(req.url ?? '/', 'http://127.0.0.1')
@@ -4518,7 +4662,7 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
       try {
         body = JSON.parse(raw)
       } catch {
-        throw new HttpError(400, say(API.http.bodyJson))
+        throw new HttpError(400, apiSaid(API.http.bodyJson))
       }
     }
     const params = url.pathname.match(r.pattern)!.slice(1)
@@ -4545,6 +4689,8 @@ async function serveApi(req: IncomingMessage, res: ServerResponse, url: URL): Pr
     if (status === 500) log.error(`API ${req.method} ${url.pathname}`, e)
     // A wait (resolve's 409 while no check copy is free) is an answer to ask again, not a failure (HI-1831).
     if (e instanceof HttpError && e.extra && 'wait' in e.extra) m.waiting = true
+    // Why it was refused or a wrong call (HI-2553): its rule's or message's id, never its text.
+    if (status >= 400 && status < 500) m.reason = reasonOf(e)
     send(res, status, body)
   }
 }
@@ -4651,20 +4797,36 @@ const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409
 
 /**
  * The status the Agent API answers an error with. The session and workspace services don't know about HTTP: a
- * CombworkError's kind says it, else its English message does (statusFor).
+ * Combwork error's kind says it (CombworkError, SaidError, KindedError), given where it is thrown from its message
+ * alone, never from a name or a quoted value in it (HI-2704). Errors that aren't Combwork's own go by statusFor().
  */
 function errorStatus(e: unknown): number {
-  if (e instanceof CombworkError && e.kind) return KIND_STATUS[e.kind]
+  const own = ownStatus(e)
+  if (own !== undefined) return own ?? 500
   return e instanceof HttpError ? e.status : e instanceof tasks.TaskPermissionError ? 403 : e instanceof tasks.TaskConflictError ? 409 : statusFor(e as Error)
 }
 
+/**
+ * A Combwork error's own status: its kind's, null for one with none (it answers 500, whatever its words), undefined for
+ * an error that isn't Combwork's. A route that wraps a service's refusals keeps it (HI-2704), its own status only for one
+ * with none.
+ */
+function ownStatus(e: unknown): number | null | undefined {
+  if (!(e instanceof CombworkError || e instanceof SaidError || e instanceof KindedError)) return undefined
+  return e.kind ? KIND_STATUS[e.kind] : null
+}
+
+/**
+ * The status of an error that isn't Combwork's own, by its words; anything else with no kind answers 500. Combwork's
+ * own errors give theirs as a kind where they are thrown (HI-2704: the English patterns this held for them are gone, so
+ * a name such as "busy" in a message no longer changes its status).
+ * - `URI malformed`: decodeURIComponent's error, for a request path that doesn't decode (400).
+ * - `EBUSY`: Node's, for a file another program holds open (409, as before HI-2704).
+ */
 function statusFor(e: Error): number {
   const m = String(e?.message ?? '')
-  if (/Invalid session id|URI malformed|Unknown provider|Project names cannot|pinned to worktrees/i.test(m)) return 400
-  if (/already running|already open|already being opened|is starting|Stop it first|Stop the|archived|No session is running|ran in .* Resume it|is required to run|is turned off|no agents yet|No workspace|busy|no handover|changed while the cards|workspace was closed|card watches|not a conversation/i.test(m)) return 409
-  if (/several agents: choose/i.test(m)) return 400
-  if (/Not a project|Unknown (project|agent|task)|no longer exists/i.test(m)) return 404
-  if (/is archived|is done\.|has no project|needs a title|is too long|Unknown column|labels must|up to \d+ labels|^(blockedBy|links):|Choose a project|comment is empty|Unknown position|before or position|can't go before|, not in (On Hold|Todo|Doing|Review|Passed|Done)|A failed review leaves|There is no card #|^cards:|other project first/i.test(m)) return 400
+  if (/URI malformed/.test(m)) return 400
+  if (/^EBUSY\b/.test(m)) return 409
   return 500
 }
 
@@ -4810,4 +4972,8 @@ onAgentTokenEnded(endLaunchStreams)
 onWatchPlacing(watchWhilePlaced)
 
 /** For unit tests: request parts whose refusals tests say through the canary (tests/agentTextApi.test.ts, HI-2436). */
-export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines }
+/** A route's handler by its method and template (HI-2681: tests run a route's real errors through metrics.ts reasonOf). */
+const routeHandler = (method: string, template: string): Handler | undefined => routes.find((r) => r.method === method && r.template === template)?.handler
+/** Runs fn as a project agent's request (HI-2691: tests run its routes' real errors), as serveApi's caller scope does. */
+const asAgent = <T>(workspacePath: string, projectPath: string, agentId: string, fn: () => T): T => callerStore.run({ kind: 'agent', runId: 'test', workspace: workspacePath, projectPath, agentId }, () => inRequestScope({ projectPath, agentId }, fn))
+export const apiTextTestHooks = { notifyTarget, isolatedFor, lanePlacement, readUsageWatch, streamLines, routeHandler, asAgent, httpFrom }

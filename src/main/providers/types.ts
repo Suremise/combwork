@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, LaunchedLimits, LaunchedPicker, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, ServerModel, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
@@ -105,6 +105,12 @@ export interface LaunchContext {
   tempDir?: string | null
   /** The connection's folder this launch runs on (HI-1757: its homeEnv's value in `env`), absent when it runs on the CLI's own home. */
   connectionHome?: string
+  /** A server connection's models as they run now and its name (HI-2682: a local model's limits), absent off one. */
+  server?: { models: ServerModel[]; connection: string }
+  /** What the adapter applied of them (HI-2682), set by prepareLaunch: the launch keeps it for the context meter. */
+  localLimits?: LaunchedLimits | null
+  /** The /model lineup the adapter asked for on a server connection (HI-2684), set by prepareLaunch: kept on the session. */
+  picker?: LaunchedPicker
   /** The user lets sessions move into the CLI's own background service (see capabilities.backgroundSessions). */
   allowBackgroundSessions: boolean
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
@@ -175,7 +181,14 @@ export type TrustReading = boolean | null | { at: string }
 export interface CommandSpec {
   file: string
   args: string[]
+  /**
+   * The command line to start it with instead of `args`, passed on as it is (a .cmd/.bat through cmd.exe, HI-2722:
+   * toSpawnable, whose `args` then say what it runs). Whatever starts the command uses it when it is there.
+   */
+  line?: string
   env?: Record<string, string>
+  /** The folder a setup task runs in (HI-2547: agy's first-run setup, in Combwork's check profile); absent: the user's home. */
+  cwd?: string
   /** Typed into the program once its interface is ready (e.g. Codex's /permissions menu for its sandbox setup). */
   keys?: KeySteps
   /** What its screen shows once the program is ready for `keys` (matched against the screen its output draws: KeyGate). */
@@ -393,6 +406,11 @@ export interface ConversationParserLike {
   /** Bytes consumed, always at a line boundary. */
   offset: number
   feed(buf: Buffer): number
+  /**
+   * Its CLI may write the transcript again in place, not only append (HI-2546: agy): the reader checks the bytes it read are
+   * unchanged whenever the file changes, and reads it again from the start when they aren't.
+   */
+  readonly rewritten?: boolean
 }
 
 /** The answer to a PreToolUse file-lock check, in the provider's hook reply format. */
@@ -422,12 +440,23 @@ export interface ProviderAdapter {
 
   // Installation
   locate(): Promise<AgentInstallInfo>
-  latestVersion(): Promise<string | null>
+  /**
+   * The newest version the installer of `executable` (the one found) can deliver, which updateCommand installs: its own
+   * source's, never one it can't get yet (HI-2729). Null when it can't say.
+   */
+  latestVersion(executable?: string | null): Promise<string | null>
   isNewer(latest: string, current: string): boolean
   installCommand(): CommandSpec
   updateCommand(executable: string): CommandSpec
   /** A known update failure's explanation and explicit retry, if this installer supports one. */
   updateRetry?(executable: string, exitCode: number): UpdateRetry | null
+  /**
+   * What this CLI keeps for one agent of Combwork's (Antigravity's private profile, HI-2731), sent to the Recycle Bin once
+   * the agent is removed, so it is never left behind nor reused. CLIs whose homes are a connection's have none.
+   */
+  agentRemoved?(agentId: string, workspacePath: string): Promise<void>
+  /** An update's exit code that means its installer had nothing newer (HI-2729: WinGet's 0x8A15002B): it ended well. */
+  updateUpToDate?(executable: string, exitCode: number): boolean
   loginCommand(executable: string): CommandSpec
   /**
    * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's
@@ -553,6 +582,43 @@ export interface ProviderAdapter {
   retryLookAfterMs?(): number
   /** Claude Code's status-line JSON. */
   statusLine?(body: Record<string, any>): LiveDetails
+  /**
+   * The conversation a status line names, for a CLI that can't be given one up front (HI-2544: the Antigravity CLI):
+   * a valid id, or null. Combwork takes it for the launch while it has none, and never in place of a known one.
+   */
+  statusLineSession?(body: Record<string, any>): string | null
+  /**
+   * A permission prompt the CLI's status line says it shows, for a CLI that sends no hook for one (HI-2545: the Antigravity
+   * CLI's `tool_confirmation_pending`): the blocking ask, or null when none is pending. Combwork applies it as a hook's ask,
+   * in order with the launch's hooks, once when it begins (Combwork never answers it: the person does, in the CLI).
+   */
+  statusLineAsk?(body: Record<string, any>): Ask | null
+  /**
+   * Reads, before the hook is normalized, what it needs from the CLI's own records (HI-2545: the Antigravity CLI's user
+   * prompt, from its transcript, as its hooks carry none), adding it to `body`. Called in the launch's hook order, off
+   * main's thread for its reads and bounded in time; `launch` says whose hook it is (only that agent's own records are
+   * read). Absent: the hook is normalized as it came.
+   */
+  prepareHook?(body: Record<string, any>, launch: { agentId: string; workspacePath: string; sessionId: string | null; memo: Record<string, unknown>; alive: () => boolean }): Promise<void>
+  /**
+   * The raw events whose reply can carry a notice whatever they normalize to (HI-2545: the Antigravity CLI's PreInvocation
+   * and Stop, whose meaning prepareHook decides): their reply is decided in the launch's order (noticeIn), always settled.
+   */
+  readonly noticeEvents?: readonly string[]
+  /** Whether this prepared hook may carry a notice (absent: as the turn ledger says); `memo` the launch's. */
+  noticeWanted?(body: Record<string, any>, memo: Record<string, unknown>): boolean
+  /** A notice was put in this hook's reply (it won't carry another at its place). */
+  noticeGiven?(body: Record<string, any>, memo: Record<string, unknown>): void
+  /** How long the CLI waits for this event's reply: a notice decided later never reached it, so isn't given. Absent: no limit. */
+  noticeDeadlineMs?(event: string): number | null
+  /** The reply to a PreToolUse Combwork doesn't refuse, for a CLI that takes no answer as a denial (HI-2545: agy's `allow`). */
+  preToolUseDefault?(): Record<string, unknown>
+  /**
+   * Whether the status line says the CLI is idle, for a CLI that sends no hook when its turn ends some ways (HI-2545: a
+   * cancelled permission prompt in the Antigravity CLI): a running turn with no end heard within idleGraceMs is interrupted.
+   */
+  statusLineIdle?(body: Record<string, any>): boolean
+  idleGraceMs?(): number
   /**
    * How a launch's CLI will compact by itself, read from its command, environment and the CLI's settings files (never
    * changed), for the model it runs as (`models`: the id it resolves to, then the choice). Absent: Combwork doesn't know.
@@ -704,13 +770,20 @@ export interface ProviderAdapter {
   usageTitle?(sessionId: string): string | null
   conversationParser(projectPath: string): ConversationParserLike
   /** An image's data URL from the transcript line holding it. */
-  imageData(line: Record<string, any>, loc: ImageLocation): string | null
+  /** `transcriptPath`: the transcript the line is from, for an image kept beside it (agy's media files, HI-2546). */
+  imageData(line: Record<string, any>, loc: ImageLocation, transcriptPath: string): string | null | Promise<string | null>
   /** Heading for a Markdown export. */
   exportSubtitle(sessionId: string, project: string): string
 
   // Project files
   /** `homes`: the connections' homes on in the project's workspace (HI-1755), whose user memory replaces the CLI's own home's. */
   memorySources(projectPath: string, homes?: readonly { id: string; name: string; home: string }[]): Promise<MemorySource[]>
+  /**
+   * The memory the CLI saves by itself for a folder (HI-2666: Claude Code's auto memory), where it keeps it: the folder
+   * (where it would write it, when none is there yet) and its Markdown files, its index first. Absent: Combwork doesn't
+   * show what this CLI saves, if anything.
+   */
+  autoMemory?(folder: string): Promise<{ folder: string; files: MemorySource[] }>
   /** Files in the CLI's own folder Combwork may show and edit (instructions, memory); false for anything else. */
   /** `homes`: the connections' homes (HI-1755) to allow in place of the CLI's own home. */
   fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean

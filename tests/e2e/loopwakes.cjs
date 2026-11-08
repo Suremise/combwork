@@ -70,7 +70,7 @@ const check = (name, ok, extra = '') => {
   await page.getByText('alpha', { exact: true }).first().click()
   const builder = await lib.addAgent(inv, alpha, { name: 'Builder' })
   const reviewer = await lib.addAgent(inv, alpha, { name: 'Reviewer' })
-  const other = await lib.addAgent(inv, alpha, { name: 'Other' })
+  const other = await lib.addAgent(inv, alpha, { name: 'Other', workflowRole: 'reviewer' })
   const newCard = async (title, column = 'doing') => {
     const n = (await inv('tasks:create', { title, project: 'alpha', agent: builder.id })).number
     if (column !== 'todo') await inv('tasks:update', n, { column, agent: builder.id })

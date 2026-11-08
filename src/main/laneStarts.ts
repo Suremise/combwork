@@ -248,6 +248,8 @@ async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fenc
     // pass), which keeps the wait until they are launched (HR1 on HI-2029: a `stoppedOnly` one too): its status says it
     // waits for a slot, and Combwork's start comes after.
     if (!next || laneWaitsForSlot(ws, lane.id) || builderOwed(ws, lane.id)) continue
+    // Its builder's role doesn't build (HI-2664: the lane pauses, offSide): no card started until that's put right.
+    if (lane.status?.reason === 'offSide' && lane.status.part === 'builder') continue
     const projectPath = join(path, lane.project)
     found.waiting.set(builderKey(path, lane.project, lane.builder.id), next.number)
     const wait = (why: LaneStartWhy, waitsFor?: string, held?: LaneSlotHeld | null, waitingOn?: string[]): void => void found.waits.set(waitKey(path, lane.id), { card: next.number, why, agent: lane.builder.name, ...(waitsFor ? { waitsFor } : {}), ...(waitingOn?.length ? { waitingOn } : {}), ...(held ? { held } : {}) })

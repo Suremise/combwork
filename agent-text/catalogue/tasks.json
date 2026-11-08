@@ -129,6 +129,11 @@
     "note": "An error: an agent or the Assistant tried to change or remove a decision on a card; only the user does that (they only record them).",
     "audience": "both"
   },
+  "tasks.error.dependencyTooLate": {
+    "text": "{card} is being merged into {target} now, so it can't wait for {cards} any more. Its dependencies are unchanged.",
+    "note": "An error (HI-2709): a dependency was added to card {card} (its key, such as HI-12) while the merge queue was already moving branch {target} to its merge, too late to hold it; {cards} are the cards added (keys, joined with commas). Nothing was changed.",
+    "audience": "both"
+  },
   "tasks.error.doingNobodyNew": {
     "text": "A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).",
     "note": "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names.",
@@ -362,6 +367,51 @@
   "tasks.error.staysInProject": {
     "text": "Cards stay in your project ({project}).",
     "note": "An error: an agent tried to move a card to another project, or to the whole workspace; its cards stay in its own project ({project}, its folder name).",
+    "audience": "both"
+  },
+  "tasks.error.targetChanged": {
+    "text": "{card}’s Merges into changed since it was listed, so it stays as it is.",
+    "note": "HI-2680: a card left out of a retarget: its Merges into changed between the preview and the move. {card} is its key (HI-12).",
+    "audience": "both"
+  },
+  "tasks.error.targetCheckedOut": {
+    "text": "{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}",
+    "note": "HI-2556: an error changing a card’s Merges into: its old branch (which has no work of its own and would be removed so its next start begins fresh) is still checked out in a folder. {card} is the card’s key (HI-12), {folder} a folder’s path. unknown yes: git couldn’t say. Keep the select keys.",
+    "audience": "both"
+  },
+  "tasks.error.targetDefaultMoved": {
+    "text": "Work merges into changed again while {card} was being moved, so it stays as it is.",
+    "note": "HI-2680: a card left out of a retarget: the project’s Work merges into (an option’s name: as translated there) changed again between the preview and the move. {card} is its key (HI-12).",
+    "audience": "both"
+  },
+  "tasks.error.targetHasWork": {
+    "text": "{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}",
+    "note": "HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.",
+    "audience": "both"
+  },
+  "tasks.error.targetLane": {
+    "text": "{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.",
+    "note": "HI-2556: an error setting a card’s Merges into to another branch than its lane’s. {card} is the card’s key (HI-12), {builder} the lane’s builder agent, {target} the lane’s branch.",
+    "audience": "both"
+  },
+  "tasks.error.targetMissing": {
+    "text": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}",
+    "note": "HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.",
+    "audience": "both"
+  },
+  "tasks.error.targetMoved": {
+    "text": "{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.",
+    "note": "HI-2556: an error changing a card’s Merges into: its old branch, found with no work of its own, moved (a commit arrived) before Combwork could remove it, so nothing was changed. {card} is the card’s key (HI-12).",
+    "audience": "both"
+  },
+  "tasks.error.targetNotAgents": {
+    "text": "Only the user or the Assistant sets which branch a card merges into.",
+    "note": "HI-2556: an error, an agent tried to set a card’s Merges into (the branch its work merges into); only the user or the Combwork Assistant can.",
+    "audience": "both"
+  },
+  "tasks.error.targetNotListed": {
+    "text": "{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}",
+    "note": "HI-2556: an error setting a card’s or lane’s Merges into to a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.",
     "audience": "both"
   },
   "tasks.error.tooLong": {
@@ -772,6 +822,11 @@
   "tasks.history.takenFromOfWorkspace": {
     "text": "Taken from {agent} of the workspace",
     "note": "A line in a card's history: the card was moved to a project, so it no longer belongs to {agent} (an agent's name) of the workspace.",
+    "audience": "both"
+  },
+  "tasks.history.target": {
+    "text": "{own, select, yes {Merges into {target}} other {Merges into the project’s branch}}",
+    "note": "A line in a card's history (HI-2556): the branch its work merges into (its Merges into) was set: own yes, to {target} (a branch); else back to the project's Work merges into. Keep the select keys.",
     "audience": "both"
   },
   "tasks.history.toProject": {

@@ -11,7 +11,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -127,6 +127,11 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.done.contained.message', defaultMessage: "{card} at {revision} isn't in {target}.", description: 'A refused Done: the approved revision is not in the target branch. {target} is a branch name.' }),
     msg({ id: 'workflow.refused.done.contained.next', defaultMessage: 'Merge {revision} into {target}, then report the merge again.', description: 'The next step after a refused report of a merge.' }),
     msg({ id: 'workflow.refused.done.contained.change', defaultMessage: 'This rule is set in Version Control → Who merges.', description: 'Where the rule that checks a merge is changed.' })
+  ),
+  // HI-2709: a card isn't closed as merged while a card it depends on isn't Done (the merge queue waits for it too).
+  'merge.waitsForBlockers': r(
+    msg({ id: 'workflow.refused.merge.waitsForBlockers.message', defaultMessage: "{card} depends on {waitsFor}, which isn't Done: it isn't closed as merged before then.", description: "HI-2709: a refused report of a merge: the card depends on {waitsFor} (card keys, comma-joined), which aren't Done yet. {card} is a card key like AM-12." }),
+    msg({ id: 'workflow.refused.merge.waitsForBlockers.next', defaultMessage: 'Wait for {waitsFor} to be Done, then report the merge again.', description: 'HI-2709: the next step after a merge report refused for an unfinished dependency: {waitsFor} are card keys.' })
   ),
   'merge.combworkMerges': r(
     msg({ id: 'workflow.refused.merge.combworkMerges.message', defaultMessage: "Combwork merges {card}: agents don't merge it or report its merge.", description: "A refused report of a merge, or a claim of the merge slot, for a card whose rules say Combwork merges it (the merge queue). {card} is a card key like AM-12." }),
@@ -260,8 +265,12 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.evidence.changed.next', defaultMessage: 'Try again: Combwork reads it afresh.', description: 'The next step after a refusal because what a rule read changed meanwhile.' })
   ),
   'check.revisionMismatch': r(
-    msg({ id: 'workflow.refused.check.revisionMismatch.message', defaultMessage: "{revision} isn't what's checked out here.", description: 'A refused check run: the revision named is not the checked-out one.' }),
+    msg({ id: 'workflow.refused.check.revisionMismatch.message', defaultMessage: "{why, select, ambiguous {{revision} is the start of more than one commit here: give more of it. {head} is checked out.} other {{revision} isn't what's checked out here: {head} is.}}", description: 'A refused check run or submission (HI-2671): the revision named ({revision}, as given, a commit id or its start) is not the checked-out commit ({head}, its first 12 characters). why=ambiguous: {revision} is the start of the checked-out commit but also of another one, so more of its characters are needed.' }),
     msg({ id: 'workflow.refused.check.revisionMismatch.next', defaultMessage: 'Run the check where {revision} is checked out, or without a revision.', description: 'The next step after a check run named the wrong revision.' })
+  ),
+  'forward.notAgents': r(
+    msg({ id: 'workflow.refused.forward.notAgents.message', defaultMessage: '{card} brings one branch up to date with another: only the user or the Assistant acts on it.', description: 'HI-2679: a refused intent: an agent acted on a forward-merge card (Combwork’s own card that merges one of the project’s target branches into another). {card} is its key (HI-12).' }),
+    msg({ id: 'workflow.refused.forward.notAgents.next', defaultMessage: 'Leave it to the user or the Assistant.', description: 'HI-2679: the next step after an agent was refused acting on a forward-merge card.' })
   )
 }
 

@@ -91,6 +91,40 @@ export function tr<Id extends string>(m: Msg<Id>, ...values: MessageArgs<Id>): s
 }
 
 /**
+ * A message as a general sentence, without the values it was said with (HI-2553: a refusal's reason in Performance, kept
+ * as its message's id only): a placeholder is "…", a number or a plural's count 2 (its general form), a select its
+ * `other` form, a date the epoch, a tag its text. In the current language, as tr() says it.
+ */
+export function trTemplate(m: Msg): string {
+  let ast: MessageFormatElement[]
+  try {
+    ast = parse(m.defaultMessage)
+  } catch {
+    return m.defaultMessage
+  }
+  const values: Record<string, unknown> = {}
+  const walk = (els: MessageFormatElement[]): void => {
+    for (const el of els) {
+      if (el.type === TYPE.argument) values[el.value] ??= '…'
+      else if (el.type === TYPE.number || el.type === TYPE.plural) values[el.value] = 2
+      else if (el.type === TYPE.date || el.type === TYPE.time) values[el.value] = new Date(0)
+      else if (el.type === TYPE.select) values[el.value] ??= 'other'
+      if (el.type === TYPE.tag) {
+        values[el.value] = (chunks: unknown[]) => chunks.join('')
+        walk(el.children)
+      }
+      if (el.type === TYPE.plural || el.type === TYPE.select) for (const o of Object.values(el.options)) walk(o.value)
+    }
+  }
+  walk(ast)
+  try {
+    return String(intl.formatMessage(shown(m), values as Values))
+  } catch {
+    return m.defaultMessage
+  }
+}
+
+/**
  * A message with markup: tags in it (`<b>…</b>`) become what `values` gives for them (a function of their content),
  * and placeholders may be elements. Returns the parts, for React to render.
  */

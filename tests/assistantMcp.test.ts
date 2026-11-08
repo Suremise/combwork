@@ -8,6 +8,7 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-assistantmcp-')
 const profile = join(base, 'profile')
@@ -136,9 +137,8 @@ describe("the Assistant's MCP servers move from the old Advanced switch (HI-1472
     let release = (): void => {}
     const held = new Promise<void>((r) => (release = r))
     let entered = false
-    const inner = w as unknown as { migrateAssistantMcp: (fresh: boolean) => Promise<void> }
-    const original = inner.migrateAssistantMcp.bind(w)
-    inner.migrateAssistantMcp = async (fresh: boolean) => {
+    const original = bound(w, w['migrateAssistantMcp'])
+    w['migrateAssistantMcp'] = async (fresh: boolean) => {
       entered = true
       await held
       return original(fresh)
@@ -166,7 +166,7 @@ describe("the Assistant's MCP servers move from the old Advanced switch (HI-1472
       // As if the move hadn't run yet: the user's save is queued first, the move's after it.
       delete w.config.mcp.assistant
       const user = w.saveWorkspaceConfigWith((c) => ({ mcp: { ...c.mcp, assistant: ['notes'] } }))
-      const move = (w as unknown as { migrateAssistantMcp: (fresh: boolean) => Promise<void> }).migrateAssistantMcp(false)
+      const move = w['migrateAssistantMcp'](false)
       await Promise.all([user, move])
       expect(saved(ws)).toEqual(['notes'])
       expect(w.config.mcp.assistant).toEqual(['notes'])

@@ -39,7 +39,8 @@ function metricsTotals(r, role) {
     for (const m of part.mcp ?? []) {
       if (!theirs(m)) continue
       t.toolCalls += m.count
-      if (m.outcome === 'error') t.toolErrors += m.count
+      // Every failed call, whatever its kind (HI-2553: refused, invalid, failed, or error from before them).
+      if (m.outcome !== 'ok') t.toolErrors += m.count
       if (m.mode === 'detail') t.toolDetailCalls += m.count
       t.toolChars += m.chars
       t.toolBytes += m.bytes
@@ -327,7 +328,7 @@ function benchmarkOf(meta, results, appVersion) {
     run: {
       fixturesVersion: meta.fixturesVersion,
       provider: meta.provider,
-      providerId: meta.provider === 'fake-codex' || meta.provider === 'codex' ? 'codex' : 'claude-code',
+      providerId: meta.provider === 'fake-codex' || meta.provider === 'codex' ? 'codex' : meta.provider === 'fake-antigravity' ? 'antigravity' : 'claude-code',
       real,
       model: meta.model ?? '(default)',
       effort: meta.effort ?? '(default)',
@@ -375,7 +376,7 @@ function resultsHeld(folder, alive = processAlive) {
 
 /**
  * Which kind of run a results folder (`<time>-<provider>[-n]`) holds: 'fake' for the fake providers (fake, fake-codex,
- * fake-copilot: free, run every few minutes), else 'model' (a model trial, which costs money).
+ * fake-copilot, fake-antigravity: free, run every few minutes), else 'model' (a model trial, which costs money).
  */
 function resultsKind(name) {
   return /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-fake(?:-|$)/.test(name) ? 'fake' : 'model'

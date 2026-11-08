@@ -27,7 +27,7 @@ Read the whole change, and the code around it where needed. In order of importan
 4. **Tests**: new behaviour without tests, or tests that don't test it. A new or changed test that sleeps and then checks, reads state once just after an action, depends on another test's leftovers, or raises a timeout with no stated reason is a blocking finding: it fails on a loaded or slower machine.
 5. **Clarity**: only where it will cause real trouble later.
 
-**Don't repeat the builder's run**: check its run record (the summary's, and the runs recorded as the card's checks of that revision): for this code, recent, the checks the change needs, every failure explained. Rerun only what the project's notes ask of a reviewer (else typecheck, lint and the tests the change affects), plus your own probes of the riskiest parts, in the review copy (§1), changing nothing. Note what you ran.
+**Reuse the builder's run, don't repeat it**: a result recorded at the exact revision you review stands (`cw_start_review`'s `checksAtRevision`; a summary's record once its fingerprint and coverage check out). Run only what no record covers, what the workflow asks of you, your own probes, and a rerun for a doubt your verdict names ([checks.md](checks.md)), in the review copy (§1), changing nothing.
 
 ## 4. Report
 
@@ -46,5 +46,5 @@ Say how sure you are when you aren't certain. Then give the verdict, with what y
 Read one only when it applies. Each is in this skill's own folder, beside this SKILL.md, not your working folder:
 
 - [other-targets.md](other-targets.md): not a card, a card with no workflow, a pool's card, work sent uncommitted.
-- [checks.md](checks.md): screenshots to look at, a whole suite to run again, or proof you can't open.
+- [checks.md](checks.md): what you run, screenshots to look at, or proof you can't open.
 - [verdict.md](verdict.md): giving the verdict on a card, or reviewing work again.

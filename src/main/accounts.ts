@@ -6,14 +6,16 @@ import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unli
 import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, UsageMoveRule, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
-import { baseValues, cliDefaults, connectionFor, COPILOT_ACCOUNT, homeAccount, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
+import { baseValues, cliDefaults, connectionFor, homeAccount, pcAccountId, pcWideSignIn, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
 import { acceptable, accountState, baseConnection, cleanTag, connectionsOn, TAG_MAX, launchValues, movedInGroup, resolveAgentConnection, type AgentConnection, type ConnectionPatch, type ConnectionRow, type ConnectionTrust, type ConnectionUser, movedConnection, valuesOf, workspaceAccounts, switchedOn, type ConnectionsView } from '../shared/accounts'
 import { ASSISTANT_NAME } from '../shared/assistant'
+import { launchesWithoutTools } from '../shared/launchPolicy'
 import { profileFolder } from '../shared/appName'
 import { localProfileInUse } from './profileFolders'
 import { agentProvider, extraArgsProblem, isProviderEnabled, modeOption, providerDescriptor, PROVIDERS } from '../shared/providers'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { advanced } from './advanced'
+import { localLimitsTest } from './localLimitsTest'
 import { config } from './config'
 import { emit, onCombworkEvent } from './events'
 import { capturedText, combworkError, CombworkError } from './combworkError'
@@ -549,7 +551,7 @@ export function connectionWith(accountId: string, values: LaunchValues, label?: 
   return out!
 }
 
-const NO_CONNECTION = msg({ id: 'main.connections.notFound', defaultMessage: 'There is no such connection.', description: 'An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).' })
+export const NO_CONNECTION = msg({ id: 'main.connections.notFound', defaultMessage: 'There is no such connection.', description: 'An error (HI-2107): a connection named by its id is not in Settings → Accounts & Connections (removed meanwhile).' })
 const NO_CONNECTION_NAME = msg({ id: 'main.connections.noName', defaultMessage: 'Give the connection a name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): its name is empty.' })
 const NAME_TAKEN = msg({ id: 'main.connections.nameTaken', defaultMessage: '{account} already has a connection named {name}. Choose another name.', description: 'An error saving a connection (Settings → Accounts & Connections, HI-2107): another connection on the same account ({account}, its name) has this name ({name}).' })
 const BAD_MODE = msg({ id: 'main.connections.badMode', defaultMessage: "{cli} has no permission mode {mode}.", description: 'An error saving a connection (HI-2107): the permission mode asked for ({mode}, as given) is not one of the coding agent CLI\'s ({cli}: "Codex").' })
@@ -625,7 +627,7 @@ export function addConnection(accountId: string, input: ConnectionPatch & { name
 export function updateConnection(id: string, patch: ConnectionPatch): Connection {
   const { c, a } = mustConnection(id)
   const name = patch.name === undefined ? c.name : assertNameFree(a, patch.name, id)
-  const next: Connection = { id, account: a.id, name, ...savedValues(a, c, patch), ...savedTag(c.tag, patch) }
+  const next: Connection = { id, account: a.id, name, ...savedValues(a, c, patch), ...savedTag(c.tag, patch), ...(c.launch ? { launch: c.launch } : {}) }
   changeConnections((all) => {
     const i = all.findIndex((x) => x.id === id)
     if (i >= 0) all[i] = next
@@ -640,7 +642,7 @@ export function duplicateConnection(id: string): Connection {
   const taken = new Set(connectionsOn(a.id, allConnections()).map((x) => x.name.trim().toLowerCase()))
   let n = 2
   while (taken.has(`${c.name} (${n})`.toLowerCase())) n++
-  const made: Connection = { ...valuesOf(c), ...(c.tag ? { tag: c.tag } : {}), id: newConnectionId(), account: a.id, name: `${c.name} (${n})` }
+  const made: Connection = { ...valuesOf(c), ...(c.tag ? { tag: c.tag } : {}), ...(c.launch ? { launch: structuredClone(c.launch) } : {}), id: newConnectionId(), account: a.id, name: `${c.name} (${n})` }
   changeConnections((all) => {
     const i = all.findIndex((x) => x.id === id)
     all.splice(i + 1, 0, made)
@@ -737,14 +739,15 @@ function connectionRows(): ConnectionRow[] {
 }
 
 /**
- * The account a CLI's agents use where they have no other here (decision H): its first on in the workspace; Copilot's
- * sign-in (on everywhere); a test home's (the seam) where none is on; else none.
+ * The account a CLI's agents use where they have no other here (decision H): its first on in the workspace; its PC-wide
+ * sign-in's (Copilot's, the Antigravity CLI's: on everywhere); a test home's (the seam) where none is on; else none.
  */
 export function accountHere(cli: ProviderId, cfg: WorkspaceConfig | null): Account | null {
   const ws = cfg ? workspaceAccounts(cfg, cli, list()) : undefined
   const on = ws?.default ? getAccount(ws.default) : undefined
   if (on) return on
-  if (!providerDescriptor(cli).capabilities.connections) return accountById(COPILOT_ACCOUNT) ?? null
+  // Its own PC-wide sign-in (Copilot's, the Antigravity CLI's): never another CLI's (HI-2544).
+  if (pcWideSignIn(cli)) return accountById(pcAccountId(cli)) ?? null
   return seamOn(cli) ? (accountById(seamAccountId(cli)) ?? null) : null
 }
 
@@ -809,6 +812,16 @@ export function renameAccount(id: string, name: string): void {
 const TERMINAL_GONE_MS = 15_000
 
 /**
+ * What else follows an account (HI-2683: a server connection's diagnostics, which register here rather than this module
+ * importing them): told once an account being removed has lost its key, so what was asked for it stops at once and what
+ * was read of it is dropped, never left running to its deadline.
+ */
+const removedHooks: ((id: string) => void)[] = []
+export function onAccountRemoved(fn: (id: string) => void): void {
+  removedHooks.push(fn)
+}
+
+/**
  * Removes an account: refused while anything runs on it (its agents, a launch, its sign-in). With `closeTerminal`
  * (HI-1870: the user said yes to closing it), its sign-in or Set Up terminal is ended first rather than refused; agents
  * on it still refuse. Its folder goes for good (removeFolder); the account stays listed, saying what's left, until that
@@ -845,6 +858,14 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
       } catch (e) {
         log.warn(`connection ${id}'s key couldn't be removed: ${userText(String((e as Error).message ?? e))}`)
         throw combworkError(msg({ id: 'main.accounts.keyRemoveFailed', defaultMessage: "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.", description: "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was." }), { name: a.name }, { kind: 'conflict' })
+      }
+    }
+    // Its key is gone: what was asked for it stops now (HI-2683, HR3 round 1), whatever comes of the rest.
+    for (const fn of removedHooks) {
+      try {
+        fn(id)
+      } catch (e) {
+        log.warn('an account removal hook failed', e)
       }
     }
     // Checks started before are dropped from here (their result would bring it back).
@@ -1702,7 +1723,8 @@ export function agentLaunchView(a: AgentDef, cfg: Pick<ProjectConfig, 'migration
   // Not migrated yet, or no connection yet (its CLI has no account: its own, as kept): as it is.
   if (!cfg.migrations?.accounts1 || !a.connection) return {}
   const c = getConnection(a.connection)
-  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode }
+  // Its connection launches without Combwork's tools (HI-2670): Independent, as the window reads its role.
+  return { model: c?.model, effort: c?.effort, use200kContext: c?.use200kContext, permissionMode: c?.permissionMode, ...(launchesWithoutTools(c) ? { toolsOff: true as const } : {}) }
 }
 
 // ---------------------------------------------------------------------------
@@ -1801,8 +1823,12 @@ export function runsLocally(caps: ServerCaps, server: ServerConnection, local: b
 /** A connection as a window sees it: a server connection's models as they run now (effectiveModels). */
 function shownServer(a: Account): Account {
   const caps = a.server ? providerDescriptor(a.provider).capabilities.connections?.server : undefined
-  return caps && a.server ? { ...a, server: { ...a.server, models: effectiveModels(caps, a.server) } } : a
+  if (!caps || !a.server) return a
+  // Each model its ID alone rules out of local-model limits (HI-2682), for its row's advice; never saved.
+  const why = localLimitsTest(caps)
+  return { ...a, server: { ...a.server, models: effectiveModels(caps, a.server).map((m) => { const u = why?.(m.id); return u ? { ...m, unsupported: u } : m }) } }
 }
+
 
 /**
  * A server connection's part of a launch (HI-1772): its key decrypted for this launch's environment (refused without

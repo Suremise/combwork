@@ -4,7 +4,8 @@
  * series of the report, and their totals. Pure, so both entries share it and tests can check it. A project scope's
  * report holds only that project's part: nothing here can widen it.
  */
-import { LATENCY_BOUNDS_MS, emptyTimed, mergeTimed, percentile, type ApiSeries, type CatalogSeries, type GuidanceSeries, type McpSeries, type MetricsPart, type MetricsQuery, type MetricsReport, type MetricsScope, type ProviderUsageSummary, type SafeguardCount, type Timed } from './metrics'
+import { LATENCY_BOUNDS_MS, emptyTimed, failureKind, mergeTimed, percentile, type ApiSeries, type CatalogSeries, type GuidanceSeries, type McpSeries, type MetricOutcome, type MetricsPart, type MetricsQuery, type MetricsReport, type MetricsScope, type ProviderUsageSummary, type SafeguardCount, type Timed, type ToolOutcome } from './metrics'
+import { PROVIDERS } from './providers'
 
 export type PerfRange = '24h' | '7d' | '30d'
 export const PERF_RANGES: { value: PerfRange; label: string; ms: number }[] = [
@@ -96,11 +97,26 @@ export function select(r: MetricsReport, f: PerfFilters): PerfSelection {
     api: parts.flatMap((p) => p.api).filter((s) => roleOk(f.role, s.role)),
     mcp: parts.flatMap((p) => p.mcp).filter((s) => roleOk(f.role, s.role)),
     guidance: parts.flatMap((p) => p.guidance).filter((s) => roleOk(f.role, s.role) && (!f.provider || s.provider === f.provider)),
-    catalog: parts.flatMap((p) => p.catalog).filter((s) => roleOk(f.role, s.role)),
+    // Per provider from HI-2553; a start recorded before it (`unknown`) is in no provider's.
+    catalog: parts.flatMap((p) => p.catalog).filter((s) => roleOk(f.role, s.role) && (!f.provider || s.provider === f.provider)),
     // Provider usage is per provider and whose sessions (agents' or the Assistant's); scripts have none.
     providers: r.providers.filter((p) => (!f.provider || p.provider === f.provider) && (f.role === 'all' || p.role === f.role)),
     safeguards: (r.safeguards ?? []).filter((g) => (!f.provider || g.provider === f.provider) && (f.role === 'all' || g.role === f.role))
   }
+}
+
+/** Failures by kind (HI-2553): refused by a rule, wrong calls, real errors, and those recorded before their kind was. */
+export interface FailureCounts {
+  refused: number
+  invalid: number
+  error: number
+  unknown: number
+}
+export const noFailures = (): FailureCounts => ({ refused: 0, invalid: 0, error: 0, unknown: 0 })
+/** Adds `n` of an outcome to failure counts (nothing for one that didn't fail). */
+function countFailure(to: FailureCounts, outcome: MetricOutcome | ToolOutcome, n: number): void {
+  const k = failureKind(outcome)
+  if (k) to[k] += n
 }
 
 export interface PerfTotals {
@@ -110,6 +126,17 @@ export interface PerfTotals {
   denied: number
   /** Failed requests other than cancelled ones (errors and refusals). */
   errors: number
+  /** Requests' failures by kind (HI-2553; denied among the refused). */
+  apiFailures: FailureCounts
+  /** Tool calls' failures by kind (HI-2553). */
+  toolFailures: FailureCounts
+  /**
+   * Per tool list start, on average: its bytes, and Combwork's estimate of what a CLI that defers tools got at the start
+   * (deferredEstimate: of the starts of such CLIs that reported it; null where none did).
+   */
+  avgToolListBytes: number
+  avgToolListUpfrontBytes: number | null
+  toolListStarts: number
   /** Replies that said to ask again (an isolated check waiting for a check copy, HI-1831): counted, never failed. */
   waits: number
   requestBytes: number
@@ -142,22 +169,34 @@ export function totals(s: PerfSelection): PerfTotals {
   let cancelled = 0
   let denied = 0
   let waits = 0
+  const apiFailures = noFailures()
+  const toolFailures = noFailures()
   for (const a of s.api) {
     mergeTimed(latency, a)
     if (a.outcome === 'waiting') waits += a.count
     else if (a.outcome !== 'ok') failed += a.count
     if (a.outcome === 'cancelled') cancelled += a.count
     if (a.outcome === 'denied') denied += a.count
+    countFailure(apiFailures, a.outcome, a.count)
   }
+  for (const m of s.mcp) countFailure(toolFailures, m.outcome, m.count)
   const sum = <T>(xs: T[], f: (x: T) => number): number => xs.reduce((n, x) => n + f(x), 0)
   const launches = sum(s.guidance, (g) => g.launches)
   const per = (n: number): number => (launches ? n / launches : 0)
+  const toolListStarts = sum(s.catalog, (c) => c.starts)
+  const loaded = s.catalog.map(deferredEstimate).filter((x): x is { starts: number; bytes: number } => !!x)
+  const loadedStarts = sum(loaded, (x) => x.starts)
   return {
     requests: latency.count,
     failed,
     cancelled,
     denied,
     errors: failed - cancelled,
+    apiFailures,
+    toolFailures,
+    avgToolListBytes: toolListStarts ? sum(s.catalog, (c) => c.toolsBytes) / toolListStarts : 0,
+    avgToolListUpfrontBytes: loadedStarts ? sum(loaded, (x) => x.bytes) / loadedStarts : null,
+    toolListStarts,
     waits,
     requestBytes: sum(s.api, (a) => a.requestBytes),
     responseBytes: sum(s.api, (a) => a.responseBytes),
@@ -165,7 +204,7 @@ export function totals(s: PerfSelection): PerfTotals {
     p50: percentile(latency, 0.5),
     p95: percentile(latency, 0.95),
     toolCalls: sum(s.mcp, (m) => m.count),
-    toolErrors: sum(s.mcp.filter((m) => m.outcome === 'error'), (m) => m.count),
+    toolErrors: sum(s.mcp.filter((m) => m.outcome !== 'ok'), (m) => m.count),
     toolChars: sum(s.mcp, (m) => m.chars),
     toolBytes: sum(s.mcp, (m) => m.bytes),
     detailCalls: sum(s.mcp.filter((m) => m.mode === 'detail'), (m) => m.count),
@@ -182,6 +221,19 @@ export function totals(s: PerfSelection): PerfTotals {
   }
 }
 
+/**
+ * Combwork's estimate of what a catalog series' CLI got at the start if it deferred the tools (HI-2553 round 1), in all:
+ * the up-front part its starts reported (the tools sent in full and the others' names), for a CLI that can defer MCP
+ * tools only; null for one that doesn't (it gets the whole list), a provider not known, or starts that reported none.
+ * An estimate, never an observation: whether that launch's CLI deferred (Claude Code's tool search can be off, a model
+ * or gateway can turn it off) and how it worded the list aren't observable.
+ */
+export function deferredEstimate(c: CatalogSeries): { starts: number; bytes: number } | null {
+  const p = PROVIDERS.find((x) => x.id === c.provider)
+  if (!p?.capabilities.defersMcpTools || !c.upfrontStarts) return null
+  return { starts: c.upfrontStarts, bytes: c.upfrontBytes }
+}
+
 export interface RouteRow {
   key: string
   route: string
@@ -190,6 +242,8 @@ export interface RouteRow {
   failed: number
   cancelled: number
   waits: number
+  /** Its failures by kind (HI-2553). */
+  failures: FailureCounts
   p50: number | null
   p95: number | null
   requestBytes: number
@@ -201,12 +255,13 @@ export function byRoute(api: ApiSeries[]): RouteRow[] {
   const rows = new Map<string, RouteRow & { t: Timed }>()
   for (const a of api) {
     const key = `${a.method} ${a.route}`
-    const r = rows.get(key) ?? { key, route: a.route, method: a.method, requests: 0, failed: 0, cancelled: 0, waits: 0, p50: null, p95: null, requestBytes: 0, responseBytes: 0, t: emptyTimed() }
+    const r = rows.get(key) ?? { key, route: a.route, method: a.method, requests: 0, failed: 0, cancelled: 0, waits: 0, failures: noFailures(), p50: null, p95: null, requestBytes: 0, responseBytes: 0, t: emptyTimed() }
     rows.set(key, r)
     mergeTimed(r.t, a)
     if (a.outcome === 'waiting') r.waits += a.count
     else if (a.outcome !== 'ok') r.failed += a.count
     if (a.outcome === 'cancelled') r.cancelled += a.count
+    countFailure(r.failures, a.outcome, a.count)
     r.requestBytes += a.requestBytes
     r.responseBytes += a.responseBytes
   }
@@ -219,6 +274,8 @@ export interface ToolRow {
   tool: string
   calls: number
   errors: number
+  /** Its failures by kind (HI-2553). */
+  failures: FailureCounts
   detail: number
   chars: number
   bytes: number
@@ -230,10 +287,11 @@ export interface ToolRow {
 export function byTool(mcp: McpSeries[]): ToolRow[] {
   const rows = new Map<string, ToolRow & { t: Timed }>()
   for (const m of mcp) {
-    const r = rows.get(m.tool) ?? { tool: m.tool, calls: 0, errors: 0, detail: 0, chars: 0, bytes: 0, avgChars: 0, p95: null, t: emptyTimed() }
+    const r = rows.get(m.tool) ?? { tool: m.tool, calls: 0, errors: 0, failures: noFailures(), detail: 0, chars: 0, bytes: 0, avgChars: 0, p95: null, t: emptyTimed() }
     rows.set(m.tool, r)
     mergeTimed(r.t, m)
-    if (m.outcome === 'error') r.errors += m.count
+    if (m.outcome !== 'ok') r.errors += m.count
+    countFailure(r.failures, m.outcome, m.count)
     if (m.mode === 'detail') r.detail += m.count
     r.chars += m.chars
     r.bytes += m.bytes
@@ -254,12 +312,41 @@ export function byTool(mcp: McpSeries[]): ToolRow[] {
  * from HI-2063 on), null where none did (unknown, never zero). `schemaChars` is the rest of the parts' characters: the
  * schemas and the list's structure (names, types, keys, punctuation, escapes).
  */
+/** A route's refusals or wrong calls for one reason (HI-2553): the reason's label (REASON_LABEL) and how many. */
+export interface ReasonRow {
+  key: string
+  route: string
+  method: string
+  kind: 'refused' | 'invalid'
+  reason: string
+  count: number
+}
+
+/** Refusals and wrong calls by route and reason, most first, at most `max` (the series' reasons, merged). */
+export function reasonRows(api: ApiSeries[], max = 20): ReasonRow[] {
+  const rows = new Map<string, ReasonRow>()
+  for (const a of api) {
+    if (a.outcome !== 'refused' && a.outcome !== 'invalid') continue
+    for (const [reason, n] of Object.entries(a.reasons ?? {})) {
+      const key = `${a.method} ${a.route} ${a.outcome} ${reason}`
+      const r = rows.get(key) ?? { key, route: a.route, method: a.method, kind: a.outcome, reason, count: 0 }
+      r.count += n
+      rows.set(key, r)
+    }
+  }
+  return [...rows.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key)).slice(0, max)
+}
+
 export interface ToolListRow {
+  /** The CLI the list went to (HI-2553); `unknown` for starts recorded before it. */
+  provider: string
   role: CatalogSeries['role']
   workflow: CatalogSeries['workflow']
   starts: number
   tools: number
   bytes: number
+  /** Combwork's estimate of what the CLI got at the start if it deferred the tools, per start (deferredEstimate); null where none applies. */
+  upfront: number | null
   chars: number | null
   descriptionChars: number | null
   paramChars: number | null
@@ -269,29 +356,38 @@ export interface ToolListRow {
 export function toolListRows(catalog: CatalogSeries[]): ToolListRow[] {
   const by = new Map<string, CatalogSeries>()
   for (const c of catalog) {
-    const key = `${c.role} ${c.workflow ?? 'unknown'}`
-    const t = by.get(key) ?? { role: c.role, workflow: c.workflow ?? 'unknown', starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 }
-    for (const k of ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars'] as const) t[k] += c[k] ?? 0
+    const provider = c.provider ?? 'unknown'
+    const key = `${provider} ${c.role} ${c.workflow ?? 'unknown'}`
+    const t = by.get(key) ?? { provider, role: c.role, workflow: c.workflow ?? 'unknown', starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0, upfrontStarts: 0, upfrontBytes: 0 }
+    for (const k of ['starts', 'tools', 'toolsBytes', 'toolsChars', 'charStarts', 'partStarts', 'partToolsChars', 'descriptionChars', 'paramChars', 'upfrontStarts', 'upfrontBytes'] as const) t[k] += c[k] ?? 0
     by.set(key, t)
   }
   const per = (n: number, of: number): number | null => (of ? n / of : null)
-  return [...by.values()].map((t) => ({
+  return [...by.values()].map((t) => {
+    const loaded = deferredEstimate(t)
+    return {
+    provider: t.provider,
     role: t.role,
     workflow: t.workflow,
     starts: t.starts,
     tools: per(t.tools, t.starts) ?? 0,
     bytes: per(t.toolsBytes, t.starts) ?? 0,
+    upfront: loaded ? per(loaded.bytes, loaded.starts) : null,
     chars: per(t.toolsChars, t.charStarts),
     descriptionChars: per(t.descriptionChars, t.partStarts),
     paramChars: per(t.paramChars, t.partStarts),
     schemaChars: per(t.partToolsChars - t.descriptionChars - t.paramChars, t.partStarts)
-  }))
+    }
+  })
 }
 
 export function providersIn(r: MetricsReport, chosen = ''): string[] {
   const ids = new Set<string>()
   for (const p of r.providers) ids.add(p.provider)
   for (const part of partsOf(r, '')) for (const g of part.guidance) ids.add(g.provider)
+  // The tool list's providers too (HI-2553: recorded apart from launches, in buckets of their own). `unknown` (starts
+  // from before Combwork recorded it) is no provider to choose: those rows show under All providers only.
+  for (const part of partsOf(r, '')) for (const c of part.catalog) if (c.provider && c.provider !== 'unknown') ids.add(c.provider)
   if (chosen) ids.add(chosen)
   return [...ids].filter((p) => p !== '(other)').sort()
 }

@@ -89,6 +89,7 @@ const T = {
   launchTask: agentMsg({ id: 'inbox.noLine.launchTask', text: "its CLI hasn't taken its launch's task yet", note: 'Why Combwork could not type a line into an agent now, in the reply of the call that wanted it.' }),
   toolsWaiting: agentMsg({ id: 'inbox.noLine.toolsWaiting', text: "its Combwork tools haven't connected yet", note: 'Why Combwork could not type a line into an agent now (#865), in the reply of the call that wanted it.' }),
   folder: agentMsg({ id: 'inbox.noLine.folder', text: 'its folder is being changed ({what})', note: "Why Combwork could not type a line into an agent now (#646), in the reply of the call that wanted it. what: what is changing the agent's folder (a Git switch or pull)." }),
+  keptOut: agentMsg({ id: 'inbox.noLine.keptOut', text: "Combwork types nothing into it: it is Independent, or runs without Combwork's tools or typing", note: 'Why Combwork could not type a line into an agent (HI-2670), in the reply of the call that wanted it: the agent is Independent, or its session launched as if from a terminal.' }),
   wakeFirst: agentMsg({ id: 'inbox.noLine.wakeFirst', text: "a watch's wake goes first", note: "Why Combwork could not type a line into an agent now (#1432): a watch's wake is being made for it, in the reply of the call that wanted it." })
 }
 
@@ -100,6 +101,8 @@ const T = {
 export function whyNoLine(projectPath: string, agentId: string, need: DeliveryNeed = 'idle'): string | null {
   const st = sessions.liveFor(projectPath, agentId)
   if (!st) return say(T.notRunning)
+  // Independent, or launched without Combwork's tools or typing (HI-2670): never a line of Combwork's.
+  if (sessions.keepsOut(projectPath, agentId)) return say(T.keptOut)
   if (writing.has(agentKey(projectPath, agentId))) return say(T.typing)
   if (st.hooksMissing) return say(T.hooksMissing)
   // Something on its screen takes its keys (HI-2191): it waits for the user to answer it there.

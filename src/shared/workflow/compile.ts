@@ -60,7 +60,7 @@ export function canonical(v: unknown): string {
  * file locks; HI-2001: Maximum agents) aren't rules either: read as the options are when they're used.
  */
 export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
-  const { stageNames: _names, reviewerMode, pushTarget: _push, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, fileLocks: _locks, maxAgents: _max, ...rules } = o
+  const { stageNames: _names, otherTargets: _others, reviewerMode, pushTarget: _push, commitMessage: _message, loopWakes: _wakes, loopRounds: _rounds, loopWaitHours: _wait, loopStepWaitMinutes: _step, fileLocks: _locks, maxAgents: _max, ...rules } = o
   return (reviewerMode === 'pool' ? { ...rules, reviewerMode } : rules) as WorkflowOptions
 }
 
@@ -174,6 +174,63 @@ export const REVIEW_SKIPPED = '~skipReview'
 
 /** The ruleset a ruleset's id was made from: itself, unless it is one with review skipped (#1625). */
 export const baseRulesetId = (id: string): string => (id.endsWith(REVIEW_SKIPPED) ? id.slice(0, -REVIEW_SKIPPED.length) : id)
+
+/**
+ * What marks a ruleset as its base's merging into another target (HI-2556: a lane's Merges into): its id is the base's
+ * with this and the target (URI-encoded) after it. Comes before REVIEW_SKIPPED when both apply.
+ */
+export const TARGETED = '~target:'
+
+/** An id with a forward merge's mark (HI-2679) taken off: its base's. */
+const unforwarded = (id: string): string => (id.endsWith('~forward') ? id.slice(0, -'~forward'.length) : id)
+
+/**
+ * A ruleset's rules for old rules (§16.5.4, HI-2556): its id with neither a review skip nor another target marked, so a
+ * lane merging into another branch under the options in force is on today's rules.
+ */
+export const rulesBaseId = (id: string): string => {
+  const base = unforwarded(baseRulesetId(id))
+  const at = base.indexOf(TARGETED)
+  return at < 0 ? base : base.slice(0, at)
+}
+
+/** The other target a ruleset's id marks (HI-2556), or null: the one its options name (G7) is its own. */
+export function targetOfRulesetId(id: string): string | null {
+  const base = unforwarded(baseRulesetId(id))
+  const at = base.indexOf(TARGETED)
+  if (at < 0) return null
+  try {
+    return decodeURIComponent(base.slice(at + TARGETED.length)) || null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * The rules of a lane merging into `target` (HI-2556): its base's with G7 set to it, the base found again by its id
+ * (`rulesBaseId`). The base itself when `target` is empty or already its G7.
+ */
+export function targetedOf(r: Ruleset, target: string | null | undefined): Ruleset {
+  if (!target || target === r.options.target) return r
+  const base = r.id.indexOf(TARGETED) < 0 ? r.id : r.id.slice(0, r.id.indexOf(TARGETED))
+  const c = mustCompile({ ...r.options, target })
+  return { ...c, id: base + TARGETED + encodeURIComponent(target) }
+}
+
+/** What marks a forward merge's rules (HI-2679): its id is its base's (`targetedOf` the destination's) with this after it. */
+export const FORWARD = '~forward'
+
+/**
+ * The rules a forward merge (HI-2679) runs under: its base's merging into `to` (G7), with no review (its authority is
+ * its `ForwardRequested`), a merge commit always (G6: never squashing or rebasing a release's history), the source never
+ * brought up to date with the destination (G8 off: that would change the source), and the shared merge checks alone (no
+ * focused tests, G20: they read a card's own change). Found again by its id (`rulesBaseId`).
+ */
+export function forwardOf(r: Ruleset, to: string): Ruleset {
+  const base = targetedOf(r, to)
+  const c = mustCompile({ ...base.options, target: to, review: 'none', reviewers: 1, reviewerMode: 'lane', style: 'merge', strict: false, focusedTests: false })
+  return { ...c, id: base.id + FORWARD }
+}
 
 /**
  * The rules a card that skips review runs under (#1625, SPEC §16.7.3): its base's with no review, so its submission

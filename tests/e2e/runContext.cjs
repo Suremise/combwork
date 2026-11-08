@@ -78,8 +78,7 @@ const PASS_ENV = {
   CW_TEST_QUIET: '0 shows the test copies of Combwork (taking focus, notifying), to watch a run',
   CW_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
   CW_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's cw-progress",
-  CW_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the Sandbox upgrade checks, #1227)',
-  CW_E2E_V09: "boardupgrade's 0.9 build: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
+  CW_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the queue suites on a packaged build, #1578)',
   REPLYSIZE_OUT: "replysize's report file, in the work folder"
 }
 
@@ -88,9 +87,10 @@ const PASS_ENV = {
  * inside a suite (progressreport runs one in its Combwork's agent shell, which drops CW_ variables) knows from these that
  * it is nested, and which ports and folders to keep clear of (runner.mjs); which kinds of test slot its run holds for
  * what runs inside it (E2E_RUN_SLOTS, slots.mjs heldCredit, HI-2070); and where those copies note the CLIs they
- * selected (CW_TEST_CLI_LOG, in the suite's folder: the run record's real CLIs, #365).
+ * selected (CW_TEST_CLI_LOG, in the suite's folder: the run record's real CLIs, #365); and the CLI test homes' leases its
+ * run holds (CW_TEST_HOME_LEASES, testHomeLock.mjs, HI-2606), reused inside it rather than waited for.
  */
-const CARRIED = ['E2E_RUN_SUITE', 'E2E_RUN_DIR', 'E2E_RUN_PORT', 'E2E_RUN_SLOTS', 'CW_TEST_CLI_LOG']
+const CARRIED = ['E2E_RUN_SUITE', 'E2E_RUN_DIR', 'E2E_RUN_PORT', 'E2E_RUN_SLOTS', 'CW_TEST_CLI_LOG', 'CW_TEST_HOME_LEASES']
 
 /** The variables of `parent` named in `names` (any case), under their own spelling. */
 function pick(parent, names) {

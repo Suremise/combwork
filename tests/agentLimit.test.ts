@@ -21,6 +21,7 @@ import { TEMPLATE_CARRIED } from '../src/shared/workflow/templateOptions'
 import { settingEntry, settingReadOnly } from '../src/shared/settingsCatalog'
 import type { AgentDef } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 const base = tempDir('cw-agentlimit-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -236,7 +237,7 @@ describe('Combwork keeps to it', () => {
     )
     const reply = apiErrorReply(refused)
     expect(reply).toEqual({ status: 409, body: { error: refusedAt(12) } })
-    expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('client-error')
+    expect(apiOutcome({ finished: true, status: reply.status, waiting: false })).toBe('refused')
   })
 
   it('the user keeps to it too (HI-2058); at 24, the most any project has', async () => {
@@ -274,7 +275,7 @@ describe('Combwork keeps to it', () => {
 
   it('checked again under the lock: lowered while an agent was being added, it refuses the add', async () => {
     await setOwn(13)
-    const mutate = w.mutateProjectConfig.bind(w)
+    const mutate = bound(w, w.mutateProjectConfig)
     const spy = vi.spyOn(w, 'mutateProjectConfig').mockImplementationOnce(async (p, fn) => {
       // The workflow lowered it after addAgent's first check.
       await setOwn(12)

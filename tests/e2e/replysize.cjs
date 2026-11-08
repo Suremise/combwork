@@ -75,10 +75,21 @@ const prose = (seed, n) => {
 
   // Agents: two in alpha (one running a few turns), one in beta.
   const alpha = path.join(ws, 'alpha')
-  const coder = await lib.addAgent(inv, alpha, { name: 'Coder' })
-  await lib.addAgent(inv, alpha, { name: 'Tester' })
+  // Each builds and reviews the other's lanes (HI-2664: a lane part only for a role that does it).
+  const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either' })
+  await lib.addAgent(inv, alpha, { name: 'Tester', workflowRole: 'either' })
   await lib.addAgent(inv, path.join(ws, 'beta'), { name: 'Builder' })
   const live = async (p, id) => (await inv('session:live')).find((s) => s.projectPath.toLowerCase() === p.toLowerCase() && s.agentId === id)
+  /**
+   * A workflow change restarts alpha's running agents whose tools it changes (HI-2694), with a new token each: before a
+   * call with an agent's own token, each is running again on the list it would launch with now (asked: 'same').
+   */
+  const toolsSettled = async () => {
+    for (const s of (await inv('session:live')).filter((x) => x.projectPath.toLowerCase() === alpha.toLowerCase() && x.status !== 'stopped')) {
+      const ok = await until(async () => (await inv('session:restartForTools', alpha, s.agentId, 'ifIdle')) === 'same' && ['ready', 'finished', 'watching'].includes((await live(alpha, s.agentId))?.status), HUNG_MS)
+      check(`a workflow change: ${s.agentId} running on its tools now`, !!ok, JSON.stringify(await live(alpha, s.agentId)))
+    }
+  }
   await inv('session:start', alpha, { agentId: coder.id })
   await until(async () => (await live(alpha, coder.id))?.status === 'ready', HUNG_MS)
   for (let i = 1; i <= 4; i++) {
@@ -127,9 +138,13 @@ const prose = (seed, n) => {
     const r = JSON.parse(out.split('\n')[0]).result
     return { text: r.content[0].text, isError: !!r.isError }
   }
-  /** The tools a role is offered, as the CLI lists them ('assistant+settings': with Change settings on, every one of its own). */
-  const toolList = (role = 'agent') => {
-    const extra = { CW_DEV_CONSOLE: '1', ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
+  /**
+   * The tools a role is offered, as the CLI lists them ('assistant+settings': with Change settings on, every one of its own);
+   * `side`, a project agent's side of the workflow (HI-2664: CW_SIDE, builder, reviewer or both); `hidden`, the tools its
+   * project's workflow left out of its launch (HI-2694: CW_WORKFLOW_HIDDEN, comma-separated).
+   */
+  const toolList = (role = 'agent', side = undefined, hidden = undefined) => {
+    const extra = { CW_DEV_CONSOLE: '1', ...(side ? { CW_SIDE: side } : {}), ...(hidden ? { CW_WORKFLOW_HIDDEN: hidden } : {}), ...(role.startsWith('assistant') ? { CW_ROLE: 'assistant', CW_ASSISTANT_CONTROL: 'projects', CW_ASSISTANT_SETTINGS: role === 'assistant+settings' ? '1' : '0', CW_JOURNAL: role === 'assistant-nojournal' ? '0' : '1', CW_API_TOKEN_FILE: asTokenFile, CW_API_TOKEN: '', CW_PROJECT: '' } : { CW_API_TOKEN_FILE: path.join(userData, 'agent-api.json'), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }) }
     const out = execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], {
       input: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }) + '\n',
       env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, ...extra }),
@@ -158,7 +173,12 @@ const prose = (seed, n) => {
     for (const [role, list] of [['agent', 'agent'], ['assistant', 'assistant+settings']]) {
       const over = []
       let total = 0
-      for (const t of toolList(list)) {
+      const tools = toolList(list)
+      // The whole list as the CLI gets it, in bytes (HI-2553), cw_console left out as in the totals below.
+      const listBytes = Buffer.byteLength(JSON.stringify(tools.filter((t) => t.name !== 'cw_console')), 'utf8')
+      console.log(`tool list (${role}): ${listBytes} bytes`)
+      check(`tool list (${role}): ${listBytes} bytes, within ${limits.listBytes[role]} (raise it only on purpose: toolLimits.cjs)`, listBytes <= limits.listBytes[role])
+      for (const t of tools) {
         const ex = limits.exceptions[t.name] ?? {}
         const descMax = ex.description ?? limits.description
         const paramMax = ex.parameter ?? limits.parameter
@@ -174,6 +194,28 @@ const prose = (seed, n) => {
       check(`tool descriptions (${role}): each within ${limits.description}, each parameter's within ${limits.parameter}`, over.length === 0, over.join('; '))
       check(`tool descriptions (${role}): ${total} characters in all, within ${limits.total[role]}`, total <= limits.total[role])
     }
+  }
+  // HI-2664: a builder is offered no reviewer's moves and a reviewer no builder's, both sides everything; the Assistant none
+  // of a worker's (it keeps cw_ask_user, its own cw_release_slot, and moves a card with cw_update_task).
+  {
+    const names = (list) => list.map((t) => t.name)
+    const all = names(toolList('agent'))
+    const builder = names(toolList('agent', 'builder'))
+    const reviewer = names(toolList('agent', 'reviewer'))
+    check('tools by side: a builder is offered no reviewer moves, and keeps its own', !builder.some((n) => ['cw_start_review', 'cw_verdict', 'cw_request_builder', 'cw_focused_skip'].includes(n)) && builder.includes('cw_submit') && builder.includes('cw_loop_step'), builder.join(' '))
+    check('…a reviewer no builder moves, and keeps its own', !reviewer.some((n) => ['cw_start_card', 'cw_submit', 'cw_put_back', 'cw_merge_slot', 'cw_report_merge'].includes(n)) && reviewer.includes('cw_verdict') && reviewer.includes('cw_lane') && reviewer.includes('cw_loop_step'), reviewer.join(' '))
+    check('…both sides, and no side given, everything an agent has', names(toolList('agent', 'both')).length === all.length && all.includes('cw_verdict') && all.includes('cw_submit'))
+    // HI-2694: the tools a project's workflow makes unusable are left out too (Solo: no review, Committed is done), and
+    // only those; each side's list measured with and without them.
+    const SOLO = 'cw_focused_skip,cw_report_merge,cw_start_review,cw_verdict'
+    for (const side of ['both', 'builder', 'reviewer']) {
+      const full = toolList('agent', side).filter((t) => t.name !== 'cw_console')
+      const solo = toolList('agent', side, SOLO).filter((t) => t.name !== 'cw_console')
+      console.log(`tool list (${side}, Solo): ${solo.length} tools, ${Buffer.byteLength(JSON.stringify(solo), 'utf8')} bytes (with every workflow tool: ${full.length}, ${Buffer.byteLength(JSON.stringify(full), 'utf8')})`)
+      check(`tools by workflow (${side}): Solo leaves out exactly its four, where the side has them`, names(full).filter((n) => !names(solo).includes(n)).join(',') === names(full).filter((n) => SOLO.split(',').includes(n)).join(','), names(solo).join(' '))
+    }
+    const assistantNames = names(toolList('assistant+settings'))
+    check("the Assistant: none of a worker's tools; cw_ask_user, cw_release_slot and cw_update_task kept", !assistantNames.some((n) => ['cw_submit', 'cw_verdict', 'cw_start_review', 'cw_loop_step', 'cw_put_back', 'cw_request_builder', 'cw_declare_paths', 'cw_focused_skip', 'cw_report_merge', 'cw_cannot_within_rules'].includes(n)) && ['cw_ask_user', 'cw_release_slot', 'cw_update_task'].every((n) => assistantNames.includes(n)), assistantNames.join(' '))
   }
   const sizes = {}
   const texts = {}
@@ -199,7 +241,7 @@ const prose = (seed, n) => {
 
   console.log('\n--- Combwork tools (as an agent)')
   const projects = measure('cw_list_projects', tool('cw_list_projects', {}), 1000)
-  check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, builder\] idle; Tester \[claude-code, builder\] stopped$/m.test(projects), projects)
+  check('projects: a line each, with their agents and their roles in the workflow (#1430)', /^alpha \(on, \w+\): Coder \[claude-code, either\] idle; Tester \[claude-code, either\] stopped$/m.test(projects), projects)
   // About 3,030 characters: each Claude Code agent's connection fields (HI-1771), there for everyone since HI-1774.
   // Each agent row names its connection (HI-2108: every agent has one, its id and name).
   measure('cw_project_status', tool('cw_project_status', {}), 3300)
@@ -296,12 +338,14 @@ const prose = (seed, n) => {
   {
     const rules = await inv('workflow:form', alpha)
     await inv('workflow:setOptions', alpha, { preset: rules.preset, options: { ...rules.own, preChecks: ['quick'], commands: { ...rules.own.commands, quick: 'node check.js' } } })
+    await toolsSettled()
     try {
       const checked = JSON.parse(tool('cw_read_task', { number: todo[0] }).text)
       measure('cw_read_task (checks fields)', JSON.stringify({ checks: checked.checks, checksHint: checked.checksHint }), 200)
-      check('…and its checks where they name one: the names as data, a hint with <name>', JSON.stringify(checked.checks) === '["quick"]' && /^before review: run one with cw-progress --check <name> --card "[A-Z]+-\d+"/.test(checked.checksHint ?? ''), JSON.stringify([checked.checks, checked.checksHint]))
+      check('…and its checks where they name one: the names as data, a hint with <name>', JSON.stringify(checked.checks) === '["quick"]' && /^before review: cw-progress --check <name> --card "[A-Z]+-\d+".*Budget, other checks: project notes; work-on-card$/.test(checked.checksHint ?? ''), JSON.stringify([checked.checks, checked.checksHint]))
     } finally {
       await inv('workflow:setOptions', alpha, { preset: rules.preset, options: rules.own })
+      await toolsSettled()
     }
   }
   const latest = JSON.parse(measure('cw_read_task (latestComment)', tool('cw_read_task', { number: target, latestComment: true }), 1500))
@@ -785,16 +829,19 @@ const prose = (seed, n) => {
   console.log('\n--- Performance metrics')
   const since = new Date(Date.now() - 3600_000).toISOString()
   const launch = fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.token && l.cwd.toLowerCase() === alpha.toLowerCase())
-  const coderToken = launch?.token
-  check("metrics: the agent's own token is known", !!coderToken)
+  // Its agent's latest launch's token, read at each call: a workflow change restarts it with a new one (HI-2694).
+  const launchAgent = launch?.env?.CW_AGENT
+  const latestToken = () => fs.readFileSync(path.join(claudeHome, 'fake-launches.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l)).reverse().find((l) => l.token && l.env?.CW_AGENT === launchAgent && l.cwd.toLowerCase() === alpha.toLowerCase())?.token
+  check("metrics: the agent's own token is known", !!latestToken())
   const asCoder = (method, request) =>
-    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(coderToken), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
+    JSON.parse(execFileSync(process.execPath, [path.join(lib.ROOT, 'out', 'main', 'cw-mcp.js')], { input: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params: request }) + '\n', env: lib.childEnv({ CW_API_URL: API, CW_WORKSPACE: ws, CW_API_TOKEN_FILE: lib.tokenFile(latestToken()), CW_PROJECT: 'alpha', CW_AGENT_ID: coder.id }), timeout: 60000 }).toString().split('\n')[0]).result
   const unicode = (await api('POST', '/v1/tasks', { title: 'Ünïcödé 日本語 🐝 "quoted" \\ back', project: 'alpha', description: 'Ελληνικά — ✓ — \n new line' })).body.number
   const expected = {}
   for (const [name, args] of [['cw_list_tasks', {}], ['cw_list_tasks', { details: true }], ['cw_read_task', { number: unicode }], ['cw_read_task', { number: 999999 }]]) {
     const r = asCoder('tools/call', { name, arguments: args })
     const text = r.content[0].text
-    const key = `${name} ${args.details ? 'detail' : 'compact'} ${r.isError ? 'error' : 'ok'}`
+    // A failed call by its kind (HI-2553): an unknown card is a wrong call (the API's 404).
+    const key = `${name} ${args.details ? 'detail' : 'compact'} ${r.isError ? 'invalid' : 'ok'}`
     const e = (expected[key] ??= { count: 0, chars: 0, bytes: 0 })
     e.count++
     e.chars += text.length
@@ -810,7 +857,7 @@ const prose = (seed, n) => {
   check("metrics: each tool call's reported size is the text the model got, by mode and outcome", JSON.stringify(Object.fromEntries(Object.entries(got).filter(([k]) => k in expected).sort())) === JSON.stringify(Object.fromEntries(Object.entries(expected).sort())), JSON.stringify({ got, expected }))
   // Each launch's side of the workflow its own series (HI-2049): summed here.
   const cats = (alphaPart?.catalog ?? []).filter((c) => c.role === 'agent')
-  const cat = cats.reduce((a, c) => Object.fromEntries(Object.keys(a).map((k) => [k, a[k] + c[k]])), { starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0 })
+  const cat = cats.reduce((a, c) => Object.fromEntries(Object.keys(a).map((k) => [k, a[k] + c[k]])), { starts: 0, tools: 0, toolsBytes: 0, toolsChars: 0, charStarts: 0, partStarts: 0, partToolsChars: 0, descriptionChars: 0, paramChars: 0, upfrontStarts: 0, upfrontBytes: 0 })
   // Once a start: the coder's, and the agent a card was started on, whose fake reads its inbox when its task's doorbell
   // rings (#650: through the Combwork MCP server, which it starts for that call, with a tool list of its own). The catalog sums
   // them: the coder's list as it got it, and the other's.
@@ -824,13 +871,18 @@ const prose = (seed, n) => {
   const listParams = list.reduce((n, t) => n + paramsOf(t.inputSchema), 0)
   check("metrics: the tool list's descriptions and parameters' descriptions, a part of its characters", cat.partStarts === 2 && cat.partToolsChars === cat.toolsChars && cat.descriptionChars >= listDescriptions && cat.descriptionChars < listDescriptions * 3 && cat.paramChars >= listParams && cat.paramChars < listParams * 3 && cat.descriptionChars + cat.paramChars < cat.toolsChars, JSON.stringify({ cat, listDescriptions, listParams }))
   check("metrics: each tool list on the side of the launch whose Combwork MCP server sent it", cats.length > 0 && cats.every((c) => ['builder', 'reviewer', 'either', 'none'].includes(c.workflow)), JSON.stringify(cats.map((c) => [c.workflow, c.starts])))
+  // HI-2553: on its launch's provider (the fake Claude Code), and what a CLI that defers tools got up front: the tools
+  // marked to be sent in full and the others' names, as the coder's list has them.
+  const marked = list.filter((t) => t._meta)
+  const upfront = Buffer.byteLength(JSON.stringify(marked), 'utf8') + Buffer.byteLength(JSON.stringify(list.filter((t) => !t._meta).map((t) => t.name)), 'utf8')
+  check('metrics: each tool list on its launch\'s provider, with its up-front part', cats.every((c) => ['claude-code', 'unknown'].includes(c.provider)) && cats.some((c) => c.provider === 'claude-code') && cat.upfrontStarts === 2 && cat.upfrontBytes >= upfront && cat.upfrontBytes < upfront * 3 && cat.upfrontBytes < cat.toolsBytes, JSON.stringify({ cats: cats.map((c) => [c.provider, c.workflow, c.starts, c.upfrontBytes]), upfront }))
   check("metrics: the Assistant's tool calls are the workspace's own, with detail mode counted", (report.workspace?.mcp ?? []).some((sr) => sr.role === 'assistant' && sr.tool === 'cw_agent_activity' && sr.mode === 'detail'), JSON.stringify(report.workspace?.mcp?.slice(0, 3)))
   const routes = [...Object.values(report.projects), report.workspace].flatMap((pt) => pt.api.map((sr) => sr.route))
   check('metrics: API routes are templates, never paths asked for', routes.includes('/v1/tasks/:n') && !routes.some((r) => /\/\d/.test(r)), routes.join(' '))
   check("metrics: the bridge's own reports aren't counted as API traffic", !routes.includes('/v1/metrics/mcp'))
   check("metrics: an agent's API calls are its project's", (alphaPart?.api ?? []).some((sr) => sr.role === 'agent' && sr.route === '/v1/tasks/:n'))
   // A project agent sees its own project only.
-  const coderApi = (p) => api('GET', p, undefined, coderToken)
+  const coderApi = (p) => api('GET', p, undefined, latestToken())
   check("metrics: an agent can't read the workspace's", (await coderApi('/v1/metrics?scope=workspace')).status === 403)
   const own = await coderApi('/v1/metrics?scope=project&project=alpha')
   check('metrics: an agent reads its own project only', own.status === 200 && Object.keys(own.body.projects).join() === 'alpha' && !own.body.workspace && !own.body.app, JSON.stringify(Object.keys(own.body ?? {})))
@@ -868,15 +920,15 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   check("inbox: the Assistant's ack with read: the ack line, then the read", measure('cw_inbox (ack, read)', tool('cw_inbox', { ack: ['m99'], read: true }, 'assistant'), 200) === 'Nothing acked. Not in your inbox: m99.\nNothing new.', texts['cw_inbox (ack, read)'])
   // A delivery the token's own agent has received (alpha's latest launch: the agent a card was started on, its task):
   // read with its token, it is that agent's to ack, whoever it is.
-  const firstRead = await api('POST', '/v1/inbox', {}, coderToken)
+  const firstRead = await api('POST', '/v1/inbox', {}, latestToken())
   check('inbox: a read with the agent\'s own token: { items, unacked }', firstRead.status === 200 && Object.keys(firstRead.body).filter((k) => k !== 'names').sort().join() === 'items,unacked', firstRead.text)
   const coderMessage = [...(firstRead.body?.unacked ?? []), ...(firstRead.body?.items ?? []).flatMap((i) => i.ids)][0]
   check('…with one received, its to ack', !!coderMessage, firstRead.text)
-  const both = await api('POST', '/v1/inbox', { ack: [coderMessage, 'm99999'], read: true }, coderToken)
+  const both = await api('POST', '/v1/inbox', { ack: [coderMessage, 'm99999'], read: true }, latestToken())
   check("inbox: ack with read, with the agent's own token: acked, an id not its own unknown, then the read", both.status === 200 && both.body.acked?.join() === coderMessage && both.body.unknown?.join() === 'm99999' && Array.isArray(both.body.unread) && Array.isArray(both.body.items) && Array.isArray(both.body.unacked) && !both.body.unacked.includes(coderMessage), both.text)
-  const ackOnly = await api('POST', '/v1/inbox', { ack: [coderMessage] }, coderToken)
+  const ackOnly = await api('POST', '/v1/inbox', { ack: [coderMessage] }, latestToken())
   check('inbox: ack only lists nothing: { acked, unknown, unread }', ackOnly.status === 200 && Object.keys(ackOnly.body).sort().join() === 'acked,unknown,unread' && ackOnly.body.acked.join() === coderMessage, ackOnly.text)
-  check("inbox: read isn't a flag of any kind", (await api('POST', '/v1/inbox', { ack: [coderMessage], read: 'yes' }, coderToken)).status === 400)
+  check("inbox: read isn't a flag of any kind", (await api('POST', '/v1/inbox', { ack: [coderMessage], read: 'yes' }, latestToken())).status === 400)
   check("inbox: the workspace's token has no inbox, combined or not", (await api('POST', '/v1/inbox', { ack: [coderMessage], read: true })).status === 400 && (await api('POST', '/v1/inbox', {})).status === 400)
   const coderBoth = asCoder('tools/call', { name: 'cw_inbox', arguments: { ack: [coderMessage], read: true } }).content[0].text
   check("inbox: the agent's tool, ack with read: the ack line, then the read's", coderBoth.split('\n')[0] === `Acked ${coderMessage}.` && /^(Nothing new\.|\d+ new:)/.test(coderBoth.split('\n')[1] ?? '') && coderBoth.length <= 2000, coderBoth)
@@ -941,7 +993,8 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
       check('…and that lane ends', endLane(first), first)
       check('…the card started again, on a new lane', await startA())
       const second = laneOver()
-      const asBack = measure('cw_put_back (a lane\'s card, as Assistant)', tool('cw_put_back', { card: `#${a}`, why: 'The user wants B first.' }, 'assistant'), 600)
+      // The Assistant moves a card with cw_update_task (HI-2664: cw_put_back is a worker's, never offered to it).
+      const asBack = measure('cw_update_task to Todo (a lane\'s card, as Assistant)', tool('cw_update_task', { number: `#${a}`, column: 'todo', comment: 'The user wants B first.' }, 'assistant'), 600)
       check("…as the Assistant: the lane's line too", asBack.split('\n').some((l) => NOTE.test(l.replace(/^Warning: /, '')) && l.includes(second ?? '?')), asBack)
       const reorderedLane = measure("cw_reorder_tasks (a lane's cards)", tool('cw_reorder_tasks', { column: 'todo', cards: [b, a] }), 500)
       const reorderLines = reorderedLane.split('\n')
@@ -967,11 +1020,13 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   // the rules it started under).
   const alphaRules = await inv('workflow:form', alpha)
   await inv('workflow:setOptions', alpha, { preset: alphaRules.preset, options: { ...alphaRules.own, review: 'agent', noSelfReview: true } })
+  await toolsSettled()
   const builtCard = todo[44]
   const builtStart = intent('cw_start_card', { card: `#${builtCard}` }).text
   const builtFolder = builtStart.match(/folder: ([^;]+);/)?.[1]
   check('a card started for the unsubmitted watch, with its folder', !!builtFolder && fs.existsSync(builtFolder), builtStart)
   await inv('workflow:setOptions', alpha, { preset: alphaRules.preset, options: alphaRules.own })
+  await toolsSettled()
   const builtCommit = (file) => {
     fs.writeFileSync(path.join(builtFolder, file), `${file}\n`)
     lib.git(builtFolder, ['add', file])
@@ -1056,8 +1111,9 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   await inv('connections:setOn', max.id, true)
   const linked = measure('cw_add_agent (connection)', tool('cw_add_agent', { project: 'beta', name: 'Linked', connection: 'Max' }, 'assistant'), 400)
   check('a new agent on a connection: its line names it', /^Added Linked \(id a-\w+\) to beta: claude-code on Max, in the project folder, stopped\.$/.test(linked), linked)
-  // The providers' JSON (about 9,200 characters) with a connection on here: about 60 more.
-  measure('cw_list_providers (connections)', tool('cw_list_providers', {}, 'assistant'), 9500)
+  // The providers' JSON with a connection on here: about 11,430 characters since Antigravity (HI-2544) made it four CLIs
+  // (three were about 9,200; HI-2696 raised the limit for that, the entry's fields unchanged).
+  measure('cw_list_providers (connections)', tool('cw_list_providers', {}, 'assistant'), 12000)
   // beta's status with Linked's connection and each agent's connection fields (about 3,040 characters).
   measure('cw_project_status (connections)', tool('cw_project_status', { project: 'beta' }, 'assistant'), 3500)
   await inv('connections:setOn', max.id, false)

@@ -6,14 +6,18 @@ import { advancedDef, advancedTakes } from '../shared/advanced'
 import { agentMsg, say } from '../shared/agentText'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
 import { SETTINGS_CATALOG, agentSetting, checkSettingValue, effortTakes, settingDefault, settingEntry, settingHelps, settingKind, settingOptions, settingPatch, settingPath, settingReadOnly, settingValue, settingValueText, shownSettingPath, workflowTakes, PLATFORM_SETTING_KEY, type SettingContext, type SettingEntry, type SettingScope } from '../shared/settingsCatalog'
-import { checkOptions, problemText, workflowChanged } from './workflow/rulesets'
+import { checkOptions, problemText, resolvedOf, workflowChanged } from './workflow/rulesets'
 import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platformSwitch'
 import { agentError, CombworkError } from './combworkError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
 import { setSlotDefault } from './slotSettings'
 import { workflowWrite } from './workflow/writes'
 import { withRepoLocks } from './repoLock'
-import { problemEnglish, WorkflowRefused } from './workflow/optionsForm'
+import { keptTargets, problemEnglish, WorkflowRefused } from './workflow/optionsForm'
+import { offerRetarget, refuseRemovedTargets, retargetPreview, slotTargets } from './workflow/retarget'
+import { boardWrite } from './boardStore'
+import { withLanesLock } from './lanes'
+import { projectTargets } from './workflow/targets'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
 import { docOutline } from '../shared/docSections'
@@ -43,6 +47,10 @@ const T = {
   levelsRefused: agentMsg({ id: 'settings.agent.tool.levelsRefused', text: "These workflow defaults can't be saved: {problems} Change the other options first, or tell the user.", note: "A workflow default at Combwork's or the workspace's level that contradicts the others (#1422). {problems} are the reasons, each a sentence." }),
   optionsRefused: agentMsg({ id: 'settings.agent.tool.optionsRefused', text: "These workflow options can't be saved: {problems} Change the other options first, or tell the user.", note: "A project's workflow option that contradicts the others (#1278). {problems} are the reasons, each a sentence." }),
   switchRefused: agentMsg({ id: 'settings.agent.tool.switchRefused', text: '{error} Tell the user, or leave it as it is.', note: "Switching a project's version control refused (#1419). {error} is why, a sentence." }),
+  keptTargets: agentMsg({ id: 'settings.agent.tool.keptTargets', text: 'It applies to cards started from now on outside running lanes. A target is set as a card or lane starts, so these keep merging into their own: {list}.', note: "HI-2674: a change of a project's target (G7), in place of \"It applies now\". {list}: settings.agent.tool.keptLane and keptCard items, joined with \"; \"." }),
+  keptLane: agentMsg({ id: 'settings.agent.tool.keptLane', text: 'lane {named, select, yes {"{name}" } other {}}({builder}) and its cards still to start, into {target}', note: 'HI-2674: a running lane keeping its target. {builder} is its builder agent\'s name; {target} a branch.' }),
+  retarget: agentMsg({ id: 'settings.agent.tool.retarget', text: 'These still on {from} can follow {to} (Todo cards with no work, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.', note: "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names." }),
+  keptCard: agentMsg({ id: 'settings.agent.tool.keptCard', text: '{card} into {target}', note: 'HI-2674: a card in flight keeping its target. {card} is its key (HI-12); {target} a branch.' }),
   noPlatform: agentMsg({ id: 'settings.agent.tool.noPlatform', text: '{project} has no version control recorded yet: its workflow options can be set once Combwork has detected it (reopen the project).', note: "A workflow option set on a project whose version control Combwork hasn't detected yet. {project} is the project's folder name." }),
   // What a setting takes (cw_read_setting).
   advanced: agentMsg({ id: 'settings.agent.tool.takes.advanced', text: "{takes} null: {scope, select, workspace {Settings → Advanced's value} other {Combwork's default}}.", note: "What an advanced setting takes (#367): {takes} is what its value takes; null puts back Settings → Advanced's value (a workspace's own) or Combwork's default." }),
@@ -272,9 +280,32 @@ export async function applySetting(
       })
     // A workflow option is checked against the levels and written in one turn of workflow writes (#1422).
     // Its repository's lock first, as Project Settings' save takes it (#1642 round 5).
-    const next = e.workflow ? await withRepoLocks([projectPath], () => workflowWrite(write), { quiet: true, project: projectPath }) : await write()
+    // HI-2680: the target in force before a change of it, for what can follow the new one (Retarget).
+    const before = e.workflow === 'target' ? ((await projectTargets(workspace, projectPath).catch(() => null))?.default ?? null) : null
+    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, in the board's
+    // write (serial with every writer of those), the file written in it.
+    const slots = e.workflow === 'otherTargets' ? await slotTargets(workspace, projectPath) : []
+    const guarded = e.workflow === 'otherTargets' ? () => withLanesLock(workspace, () => boardWrite(workspace, async () => {
+      const cfg = await workspace.projectConfig(projectPath)
+      const platform = cfg.workflow?.platform
+      if (platform === 'git') {
+        const was = resolvedOf(workspace, projectPath, 'git', cfg).options
+        const will = resolvedOf(workspace, projectPath, 'git', { ...cfg, workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, otherTargets: value as string[] | undefined } } }).options
+        try {
+          await refuseRemovedTargets(workspace, projectPath, was.otherTargets ?? [], value === null ? (will.otherTargets ?? []) : (value as string[]), will.target || null, slots)
+        } catch (err) {
+          throw new SettingRefused(409, agentError(err as CombworkError))
+        }
+      }
+      return write()
+    })) : e.workflow === 'target' ? () => boardWrite(workspace, write) : write // HI-2680: serial with a retarget's moves (`tasks.setTarget`'s `expectDefault`)
+    const next = e.workflow ? await withRepoLocks([projectPath], () => workflowWrite(guarded), { quiet: true, project: projectPath }) : await write()
     if (e.workflow) workflowChanged(workspace, projectPath)
-    return { old, new: settingValue(e, config.settings, next) }
+    const now = settingValue(e, config.settings, next)
+    const changed = e.workflow === 'target' && JSON.stringify(old) !== JSON.stringify(now)
+    const notes = changed ? [await keptTargetsNote(projectPath, next), before ? await retargetNote(projectPath, before) : null].filter(Boolean) : []
+    const note = notes.length ? notes.join(' ') : null
+    return { old, new: now, ...(note ? { note } : {}) }
   }
   if ('advanced' in change) {
     // Settings → Advanced's (advanced.json), or the workspace's own (workspace.json) (#367).
@@ -364,6 +395,30 @@ async function switchSetting(value: unknown, projectPath: string | null, guard?:
   } catch (err) {
     throw err instanceof CombworkError ? new SettingRefused(409, say(T.switchRefused, { error: agentError(err) })) : err
   }
+}
+
+/**
+ * HI-2674: after a change of a Git project's target, the running lanes and cards in flight that keep merging into
+ * another branch (keptTargets), in a line for the reply; null when there are none.
+ */
+/**
+ * HI-2680: after a change of a project's target from `from`: what can follow the new one (its preview in short), and how
+ * the Assistant applies it (`cw_queue` retarget, naming the items); null when nothing can move.
+ */
+async function retargetNote(projectPath: string, from: string): Promise<string | null> {
+  const to = (await projectTargets(workspace, projectPath).catch(() => null))?.default
+  if (!to || to === from) return null
+  const p = await retargetPreview(workspace, projectPath, from, to)
+  const items = [...p.cards.move.map((c) => c.key), ...p.slots.move.map((s) => s.name)]
+  if (!items.length) return null
+  return say(T.retarget, { from, to, items: items.join(', '), preview: offerRetarget(projectPath, p), stay: String(p.cards.keep.length + p.slots.keep.length + p.lanes.length) })
+}
+
+async function keptTargetsNote(projectPath: string, cfg: ProjectConfig): Promise<string | null> {
+  if (cfg.workflow?.platform !== 'git') return null
+  const kept = await keptTargets(workspace, { path: projectPath, name: basename(projectPath) }, resolvedOf(workspace, projectPath, 'git', cfg).options.target ?? '')
+  const list = [...kept.lanes.map((l) => say(T.keptLane, { named: l.name ? 'yes' : 'no', name: l.name ?? '', builder: l.builder, target: l.target })), ...kept.cards.map((c) => say(T.keptCard, { card: c.key, target: c.target }))]
+  return list.length ? say(T.keptTargets, { list: list.join('; ') }) : null
 }
 
 /**

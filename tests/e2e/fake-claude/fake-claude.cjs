@@ -47,7 +47,8 @@
 //   Combwork tool through the real Combwork MCP server of the launch's --mcp-config (fake-bridge.cjs: logged and measured by
 //   Combwork's performance metrics as a real call is), written to the transcript as that MCP call and its reply. Combwork's
 //   doorbell ("[CW] New in your inbox: …", #650) it follows as a model does: it reads its inbox with cw_inbox (and
-//   acks it too when it follows notices, below). New work (a task, a handover) it read is its prompt; what else it read
+//   acks it too when it follows notices, below). New work (a task, a handover) it read is its prompt, logged in
+//   fake-wakes.jsonl with `work: true` (HI-2747); what else it read
 //   (a card watch's wake, "[CW] #12 is in Review…", a message), like a line Combwork types to wake it, is logged in
 //   fake-wakes.jsonl (with `enter`: which Enter since the line was begun sent it, 1 for the first, #664) and answered
 //   with the next line of fake-wakes-<agent>.txt (a test's script of what this agent does next); with a number N in
@@ -137,7 +138,7 @@ const { randomUUID } = require('crypto')
 const { spawn } = require('child_process')
 const { callOwnTool, connectOwnServer, parseToolStep, isDoorbell, doorbellIsWork, inboxRows } = require('../fake-bridge.cjs')
 const { shellStderrFile } = require('./shellStderr.cjs')
-const oldRelease = require('./oldRelease.cjs')
+const { oldDialectIn } = require('./oldDialect.cjs')
 
 const args = process.argv.slice(2)
 if (args[0] === '--version') {
@@ -266,13 +267,6 @@ if (!home) {
   process.exit(2)
 }
 
-/**
- * The launch's environment, and its MCP server's, by current names (CW_*). An old release's names are read only in
- * old-release mode (oldRelease.cjs: upgradelane's 0.9 build, HI-2614); a current launch given them stops (below).
- */
-const cwEnv = (env) => oldRelease.envOf(env)
-for (const [k, v] of Object.entries(cwEnv(process.env))) if (process.env[k] === undefined) process.env[k] = v
-
 // Options that take a value, so the first task (the last plain argument) can be told apart.
 const WITH_VALUE = new Set(['--session-id', '--resume', '--name', '--plugin-dir', '--mcp-config', '--settings', '--append-system-prompt-file', '--allowedTools', '--model', '--effort', '--permission-mode', '--system-prompt-snapshot', '--add-dir'])
 const opts = {}
@@ -282,17 +276,17 @@ for (let i = 0; i < args.length; i++) {
   else if (args[i].startsWith('--')) opts[args[i]] = true
   else firstPrompt = args[i]
 }
-// A current launch given an old release's names (HI-2614) stops, naming them, so no current test passes on them.
-if (!oldRelease.on()) {
+// A launch given an old release's names (HI-2614) stops, naming them, so no test passes on them (oldDialect.cjs).
+{
   let servers = {}
   try {
     servers = opts['--mcp-config'] ? (JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers ?? {}) : {}
   } catch {
     servers = {}
   }
-  const found = oldRelease.oldDialectIn(process.env, servers)
+  const found = oldDialectIn(process.env, servers)
   if (found.length) {
-    console.error(`fake-claude: a current launch with an old release's names (${found.join(', ')}); only upgradelane's old release uses them (HI-2614)`)
+    console.error(`fake-claude: a launch with an old release's names (${found.join(', ')}); no test uses them (HI-2614)`)
     process.exit(2)
   }
 }
@@ -324,7 +318,8 @@ function runMode() {
 // Agent API token Combwork gave it.
 // A server connection's (HI-1772): its ANTHROPIC_* variables too, a dummy key among them (a disposable test log).
 // Its dialect's file (HI-2443: CW_DIALECT_FILE, CW_DIALECT), which cw-progress in its shell reads.
-const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('CW_API_TOKEN') || k.startsWith('CW_DIALECT') || k === 'CW_AGENT' || k === 'CLAUDE_CONFIG_DIR'))
+// A local model's limits (HI-2682): CLAUDE_CODE_MAX_* above, and MAX_THINKING_TOKENS.
+const launchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('CLAUDE_CODE_') || k.startsWith('ANTHROPIC_') || k.startsWith('CW_API_TOKEN') || k.startsWith('CW_DIALECT') || k === 'CW_AGENT' || k === 'CLAUDE_CONFIG_DIR' || k === 'MAX_THINKING_TOKENS'))
 // The agent's own token, as its launch's file held it at the start (HI-2262: the session has the file, never the token
 // in its environment; read now, as the file goes when the run ends). Null without one.
 const launchToken = (() => {
@@ -334,7 +329,15 @@ const launchToken = (() => {
     return null
   }
 })()
-fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv, temp: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(TEMP|TMP)(DIR)?$/i.test(k))), token: launchToken }) + '\n')
+// The /model lineup its --settings gave it (HI-2684), or null.
+const launchPicker = (() => {
+  try {
+    return opts['--settings'] ? (JSON.parse(fs.readFileSync(opts['--settings'], 'utf8')).modelPicker ?? null) : null
+  } catch {
+    return null
+  }
+})()
+fs.appendFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ cwd: process.cwd(), sessionId, pid: process.pid, parent: process.ppid, opts, env: launchEnv, picker: launchPicker, temp: Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(TEMP|TMP)(DIR)?$/i.test(k))), token: launchToken }) + '\n')
 // In a connection's folder (HI-1870: its Set Up, or an agent's first launch there): its first-run screens answered at
 // once, as Claude Code records them in the folder's .claude.json (tests/fixtures/advanced/onboarding-claude-2.1.311.jsonl).
 if (accountFolder) {
@@ -593,10 +596,12 @@ function shell(cmd) {
   })
 }
 
-function wakeScript(text, doorbell = null) {
+// A doorbell's new work (work: true) is logged as what it read, but is its prompt: no script line answers it (HI-2747).
+function wakeScript(text, doorbell = null, work = false) {
   if ((!doorbell && !text.startsWith('[CW]')) || !home) return null
   const agent = String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')
-  fs.appendFileSync(path.join(home, 'fake-wakes.jsonl'), JSON.stringify({ agent, text, ...(doorbell ? { doorbell } : {}), enter: promptEnter, at: new Date().toISOString() }) + '\n')
+  fs.appendFileSync(path.join(home, 'fake-wakes.jsonl'), JSON.stringify({ agent, text, ...(doorbell ? { doorbell } : {}), ...(work ? { work } : {}), enter: promptEnter, at: new Date().toISOString() }) + '\n')
+  if (work) return null
   const file = path.join(home, `fake-wakes-${agent}.txt`)
   if (!fs.existsSync(file)) return null
   const lines = fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim())
@@ -660,7 +665,7 @@ async function runPrompt(text, enter = null) {
   // line Combwork typed to wake it is.
   const doorbell = isDoorbell(text) ? text : null
   if (doorbell) text = (await followDoorbell()) ?? text
-  const woken = doorbell && doorbellIsWork(doorbell) ? null : wakeScript(text, doorbell)
+  const woken = wakeScript(text, doorbell, !!doorbell && doorbellIsWork(doorbell))
   if (woken !== null) text = woken
   const edit = /\bedit\s+(\S+)/i.exec(text)
   if (edit) {
@@ -879,9 +884,9 @@ function readSkillRef(name, file) {
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: numbered, is_error: text === null }] } })
 }
 
-/** The launch's own MCP server, `combwork` (an old release's only in old-release mode: oldRelease.cjs). Null without one. */
+/** The launch's own MCP server, `combwork`. Null without one. */
 function ownServer() {
-  return oldRelease.serverOf(JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers ?? {})
+  return JSON.parse(fs.readFileSync(opts['--mcp-config'], 'utf8')).mcpServers?.combwork ?? null
 }
 
 /** Calls a Combwork tool through the launch's own Combwork MCP server; the call and its reply go in the transcript. */
@@ -904,7 +909,7 @@ async function boardPatch(n, change) {
   write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'mcp__combwork__cw_update_task', input: { number: n, ...change } }], usage: { input_tokens: 10, output_tokens: 5 } } })
   let record
   try {
-    const env = cwEnv(ownServer().env)
+    const env = ownServer().env
     const apiToken = JSON.parse(fs.readFileSync(env.CW_API_TOKEN_FILE, 'utf8')).token
     const res = await fetch(`${env.CW_API_URL}/v1/tasks/${n}`, {
       method: 'PATCH',
@@ -920,7 +925,7 @@ async function boardPatch(n, change) {
   // Where Combwork's MCP server logs the calls it runs (tests only), this call is logged too, as the server would; `direct`:
   // no Combwork MCP server ran it, so none reports it to Combwork's metrics.
   try {
-    const env = cwEnv(ownServer().env)
+    const env = ownServer().env
     if (env.CW_TEST_MCP_LOG) fs.appendFileSync(env.CW_TEST_MCP_LOG, JSON.stringify({ at: new Date().toISOString(), tool: 'cw_update_task', role: env.CW_ROLE === 'assistant' ? 'assistant' : 'agent', project: env.CW_PROJECT, agent: env.CW_AGENT_ID ?? null, ok: record.status === 200, args: JSON.stringify({ number: n, ...change }), direct: true }) + '\n')
   } catch {
     // No log.

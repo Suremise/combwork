@@ -76,9 +76,9 @@ describe('waits (HI-1831)', () => {
   it("an isolated check's resolve answered with a wait is recorded as waiting: counted, never a failure", async () => {
     const { byRoute, totals } = await import('../src/shared/metricsView')
     metrics.knownRoute('/v1/progress/resolve')
-    // How servers.ts tells them: resolve's 409 with `wait` is a wait; a 409 without one, a client error.
+    // How servers.ts tells them: resolve's 409 with `wait` is a wait; a 409 without one, a refusal (HI-2553).
     expect(metrics.apiOutcome({ finished: true, status: 409, waiting: true })).toBe('waiting')
-    expect(metrics.apiOutcome({ finished: true, status: 409, waiting: false })).toBe('client-error')
+    expect(metrics.apiOutcome({ finished: true, status: 409, waiting: false })).toBe('refused')
     expect(metrics.apiOutcome({ finished: false, status: 409, waiting: true })).toBe('cancelled')
     expect(metrics.apiOutcome({ finished: true, status: 200, waiting: false })).toBe('ok')
     const { w } = await open()
@@ -1581,10 +1581,374 @@ describe("HI-2063: the tool list's parts", () => {
 describe('HI-2063: Copy Diagnostics says the tool list a start', () => {
   it('counts only, per role and workflow role; what was not measured is said, never zero', async () => {
     const { toolListLine } = await import('../src/main/diagnostics')
-    const row = { role: 'agent' as const, workflow: 'builder' as const, starts: 3, tools: 98, bytes: 63000.4, chars: 61234.2, descriptionChars: 30120, paramChars: 12004, schemaChars: 19110 }
+    const row = { provider: 'codex', role: 'agent' as const, workflow: 'builder' as const, upfront: null, starts: 3, tools: 98, bytes: 63000.4, chars: 61234.2, descriptionChars: 30120, paramChars: 12004, schemaChars: 19110 }
     expect(toolListLine('Workspace 1', [row, { ...row, role: 'assistant', workflow: 'none', starts: 1, chars: 70000, descriptionChars: null, paramChars: null, schemaChars: null }, { ...row, workflow: 'unknown', chars: null }])).toBe(
-      '- Workspace 1 Combwork tool list (24 h): agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
+      '- Workspace 1 Combwork tool list (24 h): codex agents · builder: 98 tools, 61,234 chars a start (descriptions 30,120, parameters 12,004, schemas 19,110), 63,000 bytes, 3 starts; codex assistant · none: 98 tools, 70,000 chars a start (parts not measured), 63,000 bytes, 1 start; codex agents · unknown: 98 tools, characters not measured, 63,000 bytes, 3 starts'
     )
     expect(toolListLine('Workspace 2', [])).toBe('- Workspace 2 Combwork tool list (24 h): none recorded')
+  })
+})
+
+describe('HI-2553: failures by kind, their reasons, and the tool list by provider', () => {
+  const hourOf = (t: number) => Math.floor(t / HOUR) * HOUR
+  const write = (path: string, data: unknown) => {
+    mkdirSync(join(path, '.combwork', 'metrics'), { recursive: true })
+    writeFileSync(join(path, '.combwork', 'metrics', 'metrics.json'), JSON.stringify(data))
+  }
+
+  it('a rule refusal, a wrong call and a thrown error each land in their own kind, with their reason', async () => {
+    const { apiErrorReply } = await import('../src/main/servers')
+    const { WorkflowRefusedError } = await import('../src/main/tasks')
+    const { refusal } = await import('../src/shared/workflow/refusals')
+    const { combworkError } = await import('../src/main/combworkError')
+    const { msg } = await import('../src/shared/i18n')
+    const { failureKind } = await import('../src/shared/metrics')
+    const ruled = new WorkflowRefusedError(refusal('move.doingNobody', { card: 'AL-1', stage: 'active' }))
+    const wrong = combworkError(msg({ id: 'test.metrics.badArgument', defaultMessage: 'number must be a card', description: 'test' }), undefined, { kind: 'invalid' })
+    const thrown = new TypeError("Cannot read properties of undefined (reading 'x')")
+    const outcome = (e: unknown) => metrics.apiOutcome({ finished: true, status: apiErrorReply(e).status, waiting: false })
+    expect([outcome(ruled), outcome(wrong), outcome(thrown)]).toEqual(['refused', 'invalid', 'server-error'])
+    expect([failureKind(outcome(ruled)), failureKind(outcome(wrong)), failureKind(outcome(thrown))]).toEqual(['refused', 'invalid', 'error'])
+    // Their reasons: the rule's id, the message's id, none; never their text.
+    expect([metrics.reasonOf(ruled), metrics.reasonOf(wrong), metrics.reasonOf(new Error('Unknown task 99'))]).toEqual(['rule:move.doingNobody', 'msg:test.metrics.badArgument', 'other'])
+    // Access is its own outcome, sorted among the refused; a 4xx or a tool failure before HI-2553 is not sorted.
+    expect(metrics.apiOutcome({ finished: true, status: 403, waiting: false })).toBe('denied')
+    expect(metrics.apiOutcome({ finished: true, status: 404, waiting: false })).toBe('invalid')
+    expect([failureKind('denied'), failureKind('client-error'), failureKind('error'), failureKind('failed'), failureKind('ok'), failureKind('waiting'), failureKind('cancelled')]).toEqual(['refused', 'unknown', 'unknown', 'error', null, null, null])
+  })
+
+  it("a route's reasons are counted on its refused and wrong-call series, kept within their cap, and read back from the database", async () => {
+    const { reasonRows, totals, byRoute } = await import('../src/shared/metricsView')
+    const { REASONS_MAX } = await import('../src/shared/metrics')
+    metrics.knownRoute('/v1/tasks/:n/submit')
+    const { w, path } = await open()
+    const h = metrics.metricsHandle(w)
+    const submit = (outcome: 'refused' | 'invalid' | 'server-error', reason?: string) => metrics.recordApi(h, 'alpha', api('/v1/tasks/:n/submit', { method: 'POST', outcome, ...(reason ? { reason } : {}) }))
+    for (let i = 0; i < 3; i++) submit('refused', 'rule:submit.nothingNew')
+    submit('refused', 'rule:move.doingNobody')
+    submit('invalid', 'msg:tasks.unknownCard')
+    // A real error keeps no reason.
+    submit('server-error', 'msg:never.kept')
+    // Past the cap, and a label that isn't one: `other`.
+    for (let i = 0; i < REASONS_MAX + 3; i++) submit('invalid', `msg:many.reason${i}`)
+    submit('invalid', 'a reason with its text in it')
+    const read = () => Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.api)
+    const check = (series: ReturnType<typeof read>) => {
+      const rows = reasonRows(series, 100)
+      expect(rows.find((r) => r.reason === 'rule:submit.nothingNew')).toMatchObject({ route: '/v1/tasks/:n/submit', kind: 'refused', count: 3 })
+      // The cap: REASONS_MAX - 1 more named after msg:tasks.unknownCard, then `other` (4 past it, and the text).
+      expect(rows.find((r) => r.reason === 'other')).toMatchObject({ kind: 'invalid', count: 5 })
+      expect(rows.filter((r) => r.kind === 'invalid').length).toBe(REASONS_MAX + 1)
+      expect(rows.some((r) => r.reason.includes('never') || r.reason.includes('text'))).toBe(false)
+      const t = totals({ api: series, mcp: [], guidance: [], catalog: [], providers: [], safeguards: [] })
+      expect(t.apiFailures).toEqual({ refused: 4, invalid: REASONS_MAX + 5, error: 1, unknown: 0 })
+      expect(byRoute(series)[0].failures).toEqual({ refused: 4, invalid: REASONS_MAX + 5, error: 1, unknown: 0 })
+    }
+    check(read())
+    // Saved and opened again: the same reasons, the same kinds.
+    await w.close()
+    await w.open(path)
+    check(read())
+    await disposeWorkspaceService(w)
+  })
+
+  it("a tool call's kind is the bridge's; one without a kind (an older bridge) is not sorted; a kind on a success is refused", async () => {
+    const { totals, byTool } = await import('../src/shared/metricsView')
+    const { w } = await open()
+    const h = metrics.metricsHandle(w)
+    const call = { tool: 'cw_submit', mode: 'compact', chars: 40, bytes: 40, ms: 5 }
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false, kind: 'refused' })).toBe(true)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false, kind: 'invalid' })).toBe(true)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false, kind: 'failed' })).toBe(true)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false })).toBe(true)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: true, kind: 'refused' })).toBe(false)
+    expect(metrics.recordMcp(h, 'alpha', 'agent', { ...call, ok: false, kind: 'oops' })).toBe(false)
+    const mcp = Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.mcp)
+    expect(mcp.map((m) => m.outcome).sort()).toEqual(['error', 'failed', 'invalid', 'refused'])
+    expect(totals({ api: [], mcp, guidance: [], catalog: [], providers: [], safeguards: [] }).toolFailures).toEqual({ refused: 1, invalid: 1, error: 1, unknown: 1 })
+    expect(byTool(mcp)[0]).toMatchObject({ tool: 'cw_submit', calls: 4, errors: 4, failures: { refused: 1, invalid: 1, error: 1, unknown: 1 } })
+    await disposeWorkspaceService(w)
+  })
+
+  it('the tool list is counted by provider, with what a CLI that defers tools got up front', async () => {
+    const { toolListRows, totals } = await import('../src/shared/metricsView')
+    const { w } = await open()
+    const h = metrics.metricsHandle(w)
+    const list = { tools: 38, toolsBytes: 24000, toolsChars: 23800, upfrontBytes: 3000 }
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', list, 'claude-code')).toBe(true)
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { ...list, upfrontBytes: 3200 }, 'claude-code')).toBe(true)
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'reviewer', list, 'codex')).toBe(true)
+    // A launch that ended (no provider), and an older bridge with no up-front part.
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { tools: 38, toolsBytes: 24000 }, null)).toBe(true)
+    // Up front can't be more than the list.
+    expect(metrics.recordCatalog(h, 'alpha', 'agent', 'builder', { ...list, upfrontBytes: 25000 }, 'codex')).toBe(false)
+    const catalog = Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.catalog)
+    const rows = Object.fromEntries(toolListRows(catalog).map((r) => [r.provider, r]))
+    // An estimate if deferred, for a CLI that can defer (Claude Code) only: never for Codex (it gets the whole list, Bytes),
+    // nor a provider not known (round 1: whether a launch deferred isn't observable, so it is never shown as what it got).
+    expect(rows['claude-code']).toMatchObject({ starts: 2, bytes: 24000, upfront: 3100 })
+    expect(rows.codex).toMatchObject({ starts: 1, bytes: 24000, upfront: null })
+    expect(rows.unknown).toMatchObject({ starts: 1, upfront: null })
+    const t = totals({ api: [], mcp: [], guidance: [], catalog, providers: [], safeguards: [] })
+    expect([t.toolListStarts, t.avgToolListBytes, t.avgToolListUpfrontBytes]).toEqual([4, 24000, (3000 + 3200) / 2])
+    // The provider filter offers the tool list's providers, though no launch or usage has them; never `unknown` (round 1).
+    const { providersIn } = await import('../src/shared/metricsView')
+    const report = { scope: { kind: 'workspace' }, providers: [], projects: {}, workspace: { api: [], mcp: [], guidance: [], catalog: [{ provider: 'codex', starts: 1 }, { provider: 'unknown', starts: 1 }] } } as unknown as Parameters<typeof providersIn>[0]
+    expect(providersIn(report)).toEqual(['codex'])
+    // The provider filter narrows the tool list too.
+    const codexOnly = metrics.queryMetrics(w, { scope: { kind: 'workspace' }, provider: 'codex', from: new Date(T0 - HOUR).toISOString() })
+    expect(Object.values(codexOnly.projects).flatMap((p) => p.catalog).map((c) => c.provider)).toEqual(['codex'])
+    await disposeWorkspaceService(w)
+  })
+
+  it('a catalog series saved before HI-2553 reads back as an unknown provider, with no up-front part', async () => {
+    const { w, path } = await open()
+    await w.close()
+    const old = { role: 'agent', workflow: 'builder', starts: 2, tools: 76, toolsBytes: 48000, toolsChars: 47000, charStarts: 2 }
+    write(path, { version: 1, buckets: [{ start: hourOf(T0) - HOUR, span: 'hour', projects: { alpha: { catalog: { 'agent builder': old } } } }] })
+    await w.open(path)
+    const [c] = metrics.queryMetrics(w, { scope: { kind: 'project', project: 'alpha' }, from: new Date(T0 - 2 * HOUR).toISOString() }).projects.alpha.catalog
+    expect(c).toMatchObject({ provider: 'unknown', starts: 2, upfrontStarts: 0, upfrontBytes: 0 })
+    await disposeWorkspaceService(w)
+  })
+  it('a reason is said as its sentence, its values left out, never echoing its id alone (round 1)', async () => {
+    const { reasonMessages, reasonSentence } = await import('../src/renderer/src/views/perfReasons')
+    const { trTemplate, msg } = await import('../src/shared/i18n')
+    // A rule's: its refusal's first sentence, the card and stage it was about as "…".
+    expect(reasonSentence('rule:move.doingNobody', {})).toEqual({ text: '… would be in … with nobody on it.', english: false })
+    // A message's, found by its id in the English catalogue.
+    const found = await reasonMessages(['msg:workflow.refused.start.slotAvailable.message', 'msg:no.such.message', 'rule:move.doingNobody'])
+    expect(Object.keys(found)).toEqual(['msg:workflow.refused.start.slotAvailable.message'])
+    expect(reasonSentence('msg:workflow.refused.start.slotAvailable.message', found)).toEqual({ text: "… can't start: no slot is free.", english: false })
+    // One it can't say (unknown here, or `other`): none, so the view says what it is instead.
+    expect([reasonSentence('msg:no.such.message', found), reasonSentence('rule:no.such.rule', found), reasonSentence('other', found), reasonSentence('agent:no.such.message', found)]).toEqual([null, null, null, null])
+    // Plurals, selects, numbers and tags in their general form.
+    expect(trTemplate(msg({ id: 'test.template', defaultMessage: '{n, plural, one {# card} other {# cards}} in <b>{name}</b>{kind, select, a {!} other {.}} {size, number}', description: 'test' }))).toBe('2 cards in …. 2')
+  })
+
+  it("the Agent API's own errors keep their message's id (HI-2681): an unknown card's 404 and a bad argument's 400, said in the table, only ids stored", async () => {
+    const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+    const { inWorkspace } = await import('../src/main/workspace')
+    const { reasonMessages, reasonSentence, englishTemplate } = await import('../src/renderer/src/views/perfReasons')
+    const { reasonRows } = await import('../src/shared/metricsView')
+    const { w } = await open()
+    const call = (method: string, template: string, params: string[], body: unknown) => inWorkspace(w, () => apiTextTestHooks.routeHandler(method, template)!({ params, query: new URLSearchParams(), body, signal: new AbortController().signal })).then(() => null, (e: unknown) => e)
+    // cw_read_task of a card there isn't (GET /v1/tasks/:n): its window message; cw_create_task with a column there isn't
+    // (POST /v1/tasks): the Agent API's own agent message, which said() alone used to lose.
+    const unknown = await call('GET', '/v1/tasks/:n', ['9999'], undefined)
+    const badColumn = await call('POST', '/v1/tasks', [], { title: 'A card', column: 'later' })
+    expect([apiErrorReply(unknown).status, apiErrorReply(badColumn).status]).toEqual([404, 400])
+    expect([metrics.reasonOf(unknown), metrics.reasonOf(badColumn)]).toEqual(['msg:tasks.error.unknownTask', 'agent:api.card.unknownColumn'])
+    // Recorded as ids only: nothing it said (the column asked for, the card's number) is kept.
+    const h = metrics.metricsHandle(w)
+    metrics.recordApi(h, 'alpha', api('/v1/tasks/:n', { outcome: 'invalid', reason: metrics.reasonOf(unknown) }))
+    metrics.recordApi(h, 'alpha', api('/v1/tasks', { method: 'POST', outcome: 'invalid', reason: metrics.reasonOf(badColumn) }))
+    const series = Object.values(metrics.queryMetrics(w, { scope: { kind: 'workspace' }, from: new Date(T0 - HOUR).toISOString() }).projects).flatMap((p) => p.api)
+    expect(JSON.stringify(series)).not.toMatch(/later|9999/)
+    const rows = reasonRows(series, 100)
+    expect(rows.map((r) => r.reason).sort()).toEqual(['agent:api.card.unknownColumn', 'msg:tasks.error.unknownTask'])
+    // Each said readably: the window's message in the window's language, the agent message in its English (marked so), values left out.
+    const found = await reasonMessages(rows.map((r) => r.reason))
+    expect(reasonSentence('msg:tasks.error.unknownTask', found)).toEqual({ text: 'Unknown card …', english: false })
+    expect(reasonSentence('agent:api.card.unknownColumn', found)).toEqual({ text: 'Unknown column "…": ….', english: true })
+    // Plurals, selects and numbers in their general form, as trTemplate says a window message.
+    expect(englishTemplate('{n, plural, one {# card} other {# cards}} in {name}{kind, select, a {!} other {.}} {size, number}')).toBe('2 cards in …. 2')
+    await disposeWorkspaceService(w)
+  })
+
+  describe("HI-2691: the services' errors on Agent API paths keep their agent message's id, with statuses and text as before", () => {
+    // An agent message as the catalogue has it (its id and English): what say() and saidError() read of it.
+    // The areas of the messages these tests name (named files: no scan of the folder).
+    const catalogue = Object.assign({}, ...['api', 'inbox', 'notice', 'wake'].map((a) => JSON.parse(readFileSync(join(import.meta.dirname, '..', 'agent-text', 'catalogue', `${a}.json`), 'utf8')))) as Record<string, { text: string }>
+    const agentMsgOf = (id: string) => ({ id, text: catalogue[id].text })
+    const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409 } as const
+    afterEach(async () => (await import('../src/shared/agentText')).setChainResolver(null))
+
+    it('an unknown lane through its real route, wrapped by httpFrom (404), and a project outside the workspace thrown as it is (404): each its id, its text unchanged', async () => {
+      const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+      const { inWorkspace } = await import('../src/main/workspace')
+      const { w, path } = await open()
+      mkdirSync(join(path, 'alpha'))
+      const call = (who: string | null, method: string, template: string, body: unknown) =>
+        inWorkspace(w, () => {
+          const run = () => apiTextTestHooks.routeHandler(method, template)!({ params: [], query: new URLSearchParams(), body, signal: new AbortController().signal })
+          return who ? apiTextTestHooks.asAgent(path, who, 'a-test', run) : run()
+        }).then(() => null, (e: unknown) => e)
+      // cw_wait_for_tasks on lanes Combwork doesn't know: watches.ts's error, wrapped by the route (httpFrom, its own 404).
+      for (const [lanes, text] of [[['nope'], 'No such lane: nope (cw_lane list gives the lanes and their ids)'], [['a', 'b'], 'No such lanes: a, b (cw_lane list gives the lanes and their ids)']] as const) {
+        const e = await call(join(path, 'alpha'), 'POST', '/v1/tasks/wait', { lanes, wake: true })
+        expect([apiErrorReply(e).status, metrics.reasonOf(e), apiErrorReply(e).body.error]).toEqual([404, 'agent:wake.watch.noSuchLane', text])
+      }
+      // Thrown as it is: a card watch from a project that isn't the workspace's (watches.ts, as a route's caller would
+      // reach it once its cards are read), its status the fallback's 404 (untyped: the path is a value), what the API's
+      // catch answers (apiErrorReply) and records (reasonOf).
+      const { registerWatch } = await import('../src/main/watches')
+      const outside = join(base, 'elsewhere')
+      const e = await inWorkspace(w, () => registerWatch(w, outside, 'a-test', { cards: [1] } as never)).then(() => null, (x: unknown) => x)
+      expect([apiErrorReply(e).status, metrics.reasonOf(e), apiErrorReply(e).body.error]).toEqual([404, 'agent:wake.watch.notAProject', `Not a project of this workspace: ${outside}`])
+      await disposeWorkspaceService(w)
+    })
+
+    it('each typed one gives its kind\'s status, and its id: the statuses HI-2704 pins by message are in its tests below', async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { SaidError } = await import('../src/main/combworkError')
+      const typed: [string, Record<string, string> | undefined, keyof typeof KIND_STATUS][] = [
+        ['inbox.create.badKey', undefined, 'invalid'],
+        ['inbox.create.tooLong', { length: '5000', max: '4000' }, 'invalid'],
+        ['notice.team.noWorkspace', undefined, 'conflict'],
+        ['api.workspace.closed', undefined, 'conflict'],
+        ['api.workspace.noneOpen', undefined, 'conflict'],
+        ['wake.watch.cardsTooBig', undefined, 'conflict'],
+        ['wake.watch.cardsFull', undefined, 'conflict'],
+        ['wake.watch.cardsTooMany', { max: '500' }, 'conflict'],
+        ['wake.watch.cardsFullWait', undefined, 'conflict']
+      ]
+      for (const [id, values, kind] of typed) {
+        const e = new SaidError(agentMsgOf(id), values, { kind })
+        expect([id, apiErrorReply(e).status, metrics.reasonOf(e)]).toEqual([id, KIND_STATUS[kind], `agent:${id}`])
+      }
+    })
+
+    it("in a dialect without the English words: a typed error keeps its status, an untyped one answers 500 as in English, each reply its dialect's text", async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { SaidError } = await import('../src/main/combworkError')
+      const { say, setChainResolver } = await import('../src/shared/agentText')
+      const { inRequestScope } = await import('../src/shared/agentText/asyncScope')
+      setChainResolver(() => ({ texts: { 'api.workspace.closed': 'Workspace gone', 'wake.watch.notAProject': 'Projekt fehlt: {project}' }, files: ['test.json'], hash: 'test-2691' }))
+      inRequestScope(null, () => {
+        const closed = agentMsgOf('api.workspace.closed')
+        const typed = apiErrorReply(new SaidError(closed, undefined, { kind: 'conflict' }))
+        // Its words gone, the fallback would say 500; its kind keeps 409, and the reply is the dialect's text, byte for byte.
+        expect(apiErrorReply(new Error(say(closed))).status).toBe(500)
+        expect([typed.status, typed.body.error]).toEqual([409, say(closed)])
+        expect(typed.body.error).toBe('Workspace gone')
+        const notAProject = agentMsgOf('wake.watch.notAProject')
+        const untyped = apiErrorReply(new SaidError(notAProject, { project: 'alpha' }))
+        expect([untyped.status, untyped.body.error]).toEqual([apiErrorReply(new Error(say(notAProject, { project: 'alpha' }))).status, 'Projekt fehlt: alpha'])
+      })
+    })
+  })
+
+  describe("HI-2704: a Combwork error's status is its message's, given as a kind where it is thrown; statusFor() reads only other errors", () => {
+    const read = (dir: string, areas: string[]) => Object.assign({}, ...areas.map((a) => JSON.parse(readFileSync(join(import.meta.dirname, '..', dir, `${a}.json`), 'utf8'))))
+    // The messages these tests name, from their catalogues (named files: no scan of a folder).
+    const agentTexts = read('agent-text/catalogue', ['api', 'wake']) as Record<string, { text: string }>
+    const windowTexts = read('locales/en', ['session', 'content', 'tasks', 'git']) as Record<string, { defaultMessage: string }>
+    const KIND_STATUS = { invalid: 400, forbidden: 403, notFound: 404, conflict: 409 } as const
+    type Kind = keyof typeof KIND_STATUS
+    const src = (f: string) => readFileSync(join(import.meta.dirname, '..', 'src', 'main', f), 'utf8').split(/\r?\n/)
+    // The kind a throw gives: `{ kind: '…' }`, or the last argument of a constructor or helper that takes it alone.
+    const kindAt = (line: string): string | undefined => line.match(/kind: '(\w+)'/)?.[1] ?? line.match(/, '(invalid|forbidden|notFound|conflict)'\)\s*$/)?.[1]
+
+    // Each message converted, where it is thrown (`at`: every such line, `count` of them), its kind there, and the status
+    // it answers (the Assistant's decision on HI-2704/s8: the status its plain English had, except the git.busy ones,
+    // 400 → 409). `values` hold the words the old patterns matched ("busy", "archived", "Unknown agent"): they no longer
+    // change it.
+    // `kinds`: where one message's throws differ (the watches' notAProject: the status each one's route answered before).
+    const rows: { id: string; file: string; at: RegExp; count: number; kind: Kind; kinds?: Kind[]; status: number; values?: Record<string, string> }[] = [
+      { id: 'session.start.providerMissing', file: 'sessions.ts', at: /id: 'session\.start\.providerMissing'/, count: 1, kind: 'conflict', status: 409, values: { resuming: 'yes', provider: 'Codex', agent: 'Unknown agent' } },
+      { id: 'session.archive.notKept', file: 'sessions.ts', at: /id: 'session\.archive\.notKept'/, count: 1, kind: 'conflict', status: 409 },
+      { id: 'session.cleanUp.unarchived', file: 'sessions.ts', at: /id: 'session\.cleanUp\.unarchived'/, count: 1, kind: 'conflict', status: 409 },
+      { id: 'session.inUse.running', file: 'sessions.ts', at: /id: 'session\.inUse\.running'/, count: 1, kind: 'conflict', status: 409 },
+      { id: 'session.inUse.attaching', file: 'sessions.ts', at: /id: 'session\.inUse\.attaching'/, count: 1, kind: 'conflict', status: 409 },
+      { id: 'session.error.stopFirst', file: 'sessions.ts', at: /new SessionInUse\('live', withValues\(M\.stopFirst/, count: 2, kind: 'conflict', status: 409, values: { action: 'delete' } },
+      { id: 'content.skill.noLocalFolder', file: 'skills.ts', at: /id: 'content\.skill\.noLocalFolder'/, count: 1, kind: 'invalid', status: 400, values: { cli: 'busy' } },
+      { id: 'tasks.error.batchGone', file: 'tasks.ts', at: /id: 'tasks\.error\.batchGone'/, count: 1, kind: 'conflict', status: 409 },
+      // folderBusyData's refusals (shared/gitRepo.ts), thrown in one place: 400 by "is done." before (the decision's B).
+      { id: 'git.busy.slotHeld', file: 'gitRepo.ts', at: /throw new CombworkError\(now\b/, count: 1, kind: 'conflict', status: 409, values: { agent: 'HB1', branch: 'main', action: 'switch' } },
+      { id: 'git.busy.yourMerge', file: 'gitRepo.ts', at: /throw new CombworkError\(now\b/, count: 1, kind: 'conflict', status: 409, values: { branch: 'main', action: 'pull' } },
+      // The card and agent watches' 404; the usage and lane watches' 400 (their routes answered it so before, by its words).
+      { id: 'wake.watch.notAProject', file: 'watches.ts', at: /saidError\(T\.notAProject\b/, count: 6, kind: 'notFound', kinds: ['notFound', 'notFound', 'notFound', 'invalid', 'invalid', 'invalid'], status: 404, values: { project: 'busy-work' } },
+      { id: 'wake.watch.notAProject', file: 'watches.ts', at: /saidError\(T\.notAProject\b/, count: 6, kind: 'invalid', kinds: ['notFound', 'notFound', 'notFound', 'invalid', 'invalid', 'invalid'], status: 400, values: { project: 'archived-ideas' } },
+      { id: 'wake.watch.noSuchLane', file: 'watches.ts', at: /saidError\(T\.noSuchLane\b/, count: 1, kind: 'notFound', status: 404, values: { count: 1, lanes: 'busy' } as never },
+      { id: 'wake.watch.self', file: 'watches.ts', at: /saidError\(T\.self\b/, count: 2, kind: 'invalid', status: 400 },      { id: 'wake.watch.cardsReadFailed', file: 'watches.ts', at: /saidError\(T\.cardsReadFailed\b/, count: 1, kind: 'conflict', status: 409, values: { error: 'Unknown agent: x' } },
+      { id: 'wake.watch.cardsDamaged', file: 'watches.ts', at: /saidError\(T\.cardsDamaged\b/, count: 1, kind: 'conflict', status: 409, values: { why: 'damaged', error: 'EPERM: operation not permitted' } }
+    ]
+
+    it.each(rows)('$id: thrown with its kind ($status), whatever its values, recorded by its id', async ({ id, file, at, count, kind, kinds, status, values }) => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { CombworkError, SaidError } = await import('../src/main/combworkError')
+      const { withValues } = await import('../src/shared/advanced')
+      const lines = src(file).filter((l) => at.test(l))
+      expect(lines.map(kindAt)).toEqual(kinds ?? Array.from({ length: count }, () => kind))
+      const agent = agentTexts[id]
+      const e = agent ? new SaidError({ id, text: agent.text }, values, { kind }) : new CombworkError(withValues({ id, defaultMessage: windowTexts[id].defaultMessage } as never, values ?? {}), { kind })
+      expect([apiErrorReply(e).status, metrics.reasonOf(e)]).toEqual([status, `${agent ? 'agent' : 'msg'}:${id}`])
+      // Its words alone no longer give a status: the same text with no kind answers 500.
+      expect(apiErrorReply(new Error(e.message)).status).toBe(500)
+    })
+
+    it("plain errors: Combwork's own say theirs with a KindedError; Node's are still read by their words, and nothing else is", async () => {
+      const { apiErrorReply } = await import('../src/main/servers')
+      const { assertSessionId } = await import('../src/shared/defaults')
+      const thrown = (fn: () => unknown): unknown => {
+        try {
+          fn()
+        } catch (e) {
+          return e
+        }
+        return null
+      }
+      // Its real producer: a session id that could be a path.
+      expect(apiErrorReply(thrown(() => assertSessionId('../x'))).status).toBe(400)
+      expect(src('metricsUsage.ts').some((l) => l.includes("new KindedError('The workspace was closed while its metrics were read', 'conflict')"))).toBe(true)
+      expect(src('ptyHost.ts').some((l) => l.includes("new KindedError(`A process is already running for ${key}`, 'conflict')"))).toBe(true)
+      // Combwork's own with no kind: 500, even where a value or a cause reads like Node's (HR2, HI-2704/r1).
+      const { CombworkError, SaidError } = await import('../src/main/combworkError')
+      const notSaved = { id: 'wake.watch.notSaved', text: 'Could not save the watch: {error}' }
+      for (const e of [new SaidError(notSaved, { error: 'URI malformed' }), new SaidError(notSaved, { error: 'EBUSY: resource busy or locked' }), new CombworkError({ lines: ['Failed to read URI malformed'] })]) expect([e.message, apiErrorReply(e).status]).toEqual([e.message, 500])
+      // What isn't Combwork's: decodeURIComponent's error on a bad path (400), Node's EBUSY (409).
+      expect(apiErrorReply(thrown(() => decodeURIComponent('%'))).status).toBe(400)
+      expect(apiErrorReply(Object.assign(new Error("EBUSY: resource busy or locked, rename 'C:\\x'"), { code: 'EBUSY' })).status).toBe(409)
+      // Words the old patterns read, in an error with no kind: 500 now. processSupervisor's line (400 by "is too long",
+      // the decision's B) and a name.
+      for (const m of ['the helper’s command line is too long', 'Unknown project "busy"', 'Not a project of this workspace: archived']) expect([m, apiErrorReply(new Error(m)).status]).toEqual([m, 500])
+    })
+
+    it('the lane watch route keeps its refusal\'s own status, in English and in a dialect without the English words', async () => {
+      const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+      const { inWorkspace } = await import('../src/main/workspace')
+      const { setChainResolver } = await import('../src/shared/agentText')
+      const { inRequestScope } = await import('../src/shared/agentText/asyncScope')
+      const { w, path } = await open()
+      mkdirSync(join(path, 'alpha'))
+      const call = (body: unknown) =>
+        inWorkspace(w, () => apiTextTestHooks.asAgent(path, join(path, 'alpha'), 'a-test', () => apiTextTestHooks.routeHandler('POST', '/v1/tasks/wait')!({ params: [], query: new URLSearchParams(), body, signal: new AbortController().signal }))).then(
+          () => null,
+          (e: unknown) => e
+        )
+      const english = await call({ lanes: ['nope'], wake: true })
+      expect([apiErrorReply(english).status, metrics.reasonOf(english), apiErrorReply(english).body.error]).toEqual([404, 'agent:wake.watch.noSuchLane', 'No such lane: nope (cw_lane list gives the lanes and their ids)'])
+      setChainResolver(() => ({ texts: { 'wake.watch.noSuchLane': 'Unbekannte Spur: {lanes}' }, files: ['test.json'], hash: 'test-2704' }))
+      try {
+        const said = await inRequestScope(null, () => call({ lanes: ['nope'], wake: true }))
+        expect([apiErrorReply(said).status, metrics.reasonOf(said), apiErrorReply(said).body.error]).toEqual([404, 'agent:wake.watch.noSuchLane', 'Unbekannte Spur: nope'])
+      } finally {
+        setChainResolver(null)
+      }
+      await disposeWorkspaceService(w)
+    })
+
+    it("the shared checks' refusals through their real routes: each records its message's id, its status and text as before", async () => {
+      const { apiErrorReply, apiTextTestHooks } = await import('../src/main/servers')
+      const { inWorkspace } = await import('../src/main/workspace')
+      const { w } = await open()
+      const call = (method: string, template: string, body: unknown) =>
+        inWorkspace(w, () => apiTextTestHooks.routeHandler(method, template)!({ params: [], query: new URLSearchParams(), body, signal: new AbortController().signal })).then(
+          () => null,
+          (e: unknown) => e
+        )
+      const cases: [string, string, unknown, string, string][] = [
+        // readCondition (shared/watch.ts), for a card watch.
+        ['POST', '/v1/tasks/wait', { cards: [] }, 'wake.condition.cards', agentTexts['wake.condition.cards'].text],
+        // buildFactOf (shared/buildFacts.ts), its English made agent messages word for word.
+        ['POST', '/v1/builds', { kind: 'nightly' }, 'api.build.kind', 'kind is one of: beta, baseline, rc, release.']
+      ]
+      for (const [method, template, body, id, text] of cases) {
+        const e = await call(method, template, body)
+        expect([template, apiErrorReply(e).status, metrics.reasonOf(e), apiErrorReply(e).body.error]).toEqual([template, 400, `agent:${id}`, text])
+      }
+      await disposeWorkspaceService(w)
+    })
   })
 })

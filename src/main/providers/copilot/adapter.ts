@@ -21,7 +21,7 @@ import { overrideId } from '../../../shared/advanced'
 import { copilotTranscriptTurns } from './turns'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
 import { readCopilotModels } from './models'
-import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, locateCopilot } from './install'
+import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, copilotUpdateUpToDate, locateCopilot } from './install'
 import { advanced } from '../../advanced'
 import { agentMsg, say } from '../../../shared/agentText'
 
@@ -170,8 +170,8 @@ export class CopilotAdapter implements ProviderAdapter {
     return copilotReadiness(info)
   }
 
-  latestVersion(): Promise<string | null> {
-    return copilotLatestVersion()
+  latestVersion(executable?: string | null): Promise<string | null> {
+    return copilotLatestVersion(executable)
   }
 
   installCommand(): CommandSpec {
@@ -184,6 +184,10 @@ export class CopilotAdapter implements ProviderAdapter {
 
   updateRetry(executable: string, exitCode: number): ReturnType<typeof copilotUpdateRetry> {
     return copilotUpdateRetry(executable, exitCode)
+  }
+
+  updateUpToDate(executable: string, exitCode: number): boolean {
+    return copilotUpdateUpToDate(executable, exitCode)
   }
 
   /** Copilot's own sign-in, run in a terminal for the user to complete (never typed into by Combwork). */
@@ -332,7 +336,7 @@ export class CopilotAdapter implements ProviderAdapter {
       if (theirs) delete env[theirs[0]]
       env.COPILOT_CUSTOM_INSTRUCTIONS_DIRS = theirs?.[1] ? `${theirs[1]},${own}` : own
     }
-    return { file: s.file, args: s.args, env }
+    return { ...s, env }
   }
 
   /** Accept edits in a folder whose path has parentheses approves no edits (copilotCanApproveEdits): the user is told. */
@@ -571,7 +575,7 @@ export class CopilotAdapter implements ProviderAdapter {
     const sources: MemorySource[] = [
       { provider: p, id: 'project', label: 'AGENTS.md', path: join(projectPath, 'AGENTS.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
       { provider: p, id: 'project-github', label: '.github/copilot-instructions.md', path: join(projectPath, '.github', 'copilot-instructions.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
-      { provider: p, id: 'user', label: userMemoryLabel('copilot-instructions.md'), path: join(copilotHome(), 'copilot-instructions.md'), kind: 'claude-md', exists: false }
+      { provider: p, id: 'user', label: userMemoryLabel('copilot-instructions.md'), path: join(copilotHome(), 'copilot-instructions.md'), kind: 'claude-md', exists: false, scope: 'user' }
     ]
     for (const s of sources) s.exists = existsSync(s.path)
     return sources

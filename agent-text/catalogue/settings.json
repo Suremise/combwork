@@ -14,6 +14,276 @@
     "note": "A setting's title (Settings → Accounts & Connections, HI-2107): the list of accounts, each with its connections.",
     "audience": "both"
   },
+  "settings.advanced.antigravity.hooks.editPathField.desc": {
+    "text": "The argument of agy's edit tools that names the file they edit. Wrong, Combwork can't tell which file an edit is of, and file locks don't apply to it.",
+    "note": "What the advanced setting \"Hooks: the file an edit names\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.editPathField.title": {
+    "text": "Hooks: the file an edit names",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.editTools.desc": {
+    "text": "agy's tools that edit a file. Combwork checks file locks on these. Missing one, its edits go ahead whoever holds the file.",
+    "note": "What the advanced setting \"Hooks: tools that edit a file\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.editTools.title": {
+    "text": "Hooks: tools that edit a file",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownEvents.desc": {
+    "text": "The hook events Combwork knows agy sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
+    "note": "What the advanced setting \"Hooks: known events\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownEvents.title": {
+    "text": "Hooks: known events",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownFields.desc": {
+    "text": "The top-level fields Combwork knows agy sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that an agy update changed something. Add a field here once you know it is harmless.",
+    "note": "What the advanced setting \"Hooks: known fields\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.knownFields.title": {
+    "text": "Hooks: known fields",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.desc": {
+    "text": "How long agy waits for Combwork's answer before a tool runs (an edit waits for a file lock). Too short, an edit of a locked file can go ahead before Combwork refuses it.",
+    "note": "What the advanced setting \"Hooks: before a tool, timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.title": {
+    "text": "Hooks: before a tool, timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.desc": {
+    "text": "How long agy waits for Combwork to take one of its hooks. Too short, Combwork misses what agy reports and an agent may look stuck.",
+    "note": "What the advanced setting \"Hooks: timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.title": {
+    "text": "Hooks: timeout",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.desc": {
+    "text": "Whether Combwork's hooks run before and after each of agy's tool calls: they show an agent working on a tool, and refuse an edit of a file another agent has locked. Turned off, Combwork follows agy's tools only by its status line, and file locks don't apply to Antigravity agents.",
+    "note": "What the advanced setting \"Hooks: before and after each tool\" does (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.title": {
+    "text": "Hooks: before and after each tool",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.userStepWaitSeconds.desc": {
+    "text": "How long Combwork waits for what began a turn to be in agy's transcript as the turn starts. Too short, a turn you began counts as one agy began itself.",
+    "note": "What the advanced setting \"Hooks: wait for the prompt in the transcript\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.hooks.userStepWaitSeconds.title": {
+    "text": "Hooks: wait for the prompt in the transcript",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.models.line.desc": {
+    "text": "One line of agy models' list: the model's id (its first group), then its display name (its second). Combwork passes the id and shows the name.",
+    "note": "What the advanced setting \"A model in agy models\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.models.line.title": {
+    "text": "A model in agy models",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of one line of the CLI's model list. agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.desc": {
+    "text": "Combwork starts agy with AGY_CLI_DISABLE_AUTO_UPDATE=true (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Provider Setup updates it when you choose. Turned off, Combwork doesn't set it and agy updates itself as it would outside Combwork (your own AGY_CLI_DISABLE_AUTO_UPDATE still applies).",
+    "note": "What the advanced setting \"Don't let Antigravity update itself\" does (Settings → Advanced, under Antigravity CLI). agy is a command and AGY_CLI_DISABLE_AUTO_UPDATE=true an environment variable: keep them. Update is a button's name and Provider Setup a dialog's.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.title": {
+    "text": "Don't let Antigravity update itself",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.desc": {
+    "text": "Combwork starts agy with an allow rule for Combwork's tools in its settings for that session (for the Assistant, only those its Control settings let it use without asking), so agy doesn't ask before them. Turned off, agy asks before them as its own permission mode says. What an agent or the Assistant may do with them is still decided by Combwork.",
+    "note": "What the advanced setting \"Pre-approve Combwork's tools\" does (Settings → Advanced, under Antigravity CLI). agy is a command: keep it. Control is the name of the Assistant's settings page.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.title": {
+    "text": "Pre-approve Combwork's tools",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.desc": {
+    "text": "Combwork leaves GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT out of agy's environment (its sessions, and checking its sign-in and models), so a key or account another tool set never switches Antigravity agents away from this PC's sign-in. Turned off, agy gets them from Combwork's environment as it would outside Combwork.",
+    "note": "What the advanced setting \"Keep other accounts' variables from Antigravity\" does (Settings → Advanced, under Antigravity CLI). GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT are environment variables and agy a command: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.title": {
+    "text": "Keep other accounts' variables from Antigravity",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.signIn.needed.desc": {
+    "text": "What agy models prints when the PC isn't signed in to Antigravity. Only this says signed out: any other failure (the network, the service, a timeout) is shown as it is, never as a sign-in to do.",
+    "note": "What the advanced setting \"Not signed in (agy models)\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.signIn.needed.title": {
+    "text": "Not signed in (agy models)",
+    "note": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of the CLI's message when it isn't signed in. agy models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.confirmField.desc": {
+    "text": "The status line's field that is true while agy shows a permission prompt (agy sends no hook for one). Wrong, an agent waiting for your answer shows as working.",
+    "note": "What the advanced setting \"Status line: a permission prompt is showing\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.confirmField.title": {
+    "text": "Status line: a permission prompt is showing",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.idleGraceSeconds.desc": {
+    "text": "How long agy's status line must say idle, with no hook ending the turn, before Combwork takes the turn as interrupted (cancelling agy's permission prompt sends no hook). Too short, a turn whose end is on its way can show as interrupted; too long, a cancelled turn shows as working that much longer.",
+    "note": "What the advanced setting \"Status line: idle without a turn end\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.idleGraceSeconds.title": {
+    "text": "Status line: idle without a turn end",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.desc": {
+    "text": "The top-level fields Combwork knows agy sends in its status line. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a status line with a field outside this list saves a capture of the agent's recent events. Add a field here once you know it is harmless.",
+    "note": "What the advanced setting \"Status line: known fields\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.title": {
+    "text": "Status line: known fields",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.otherModels.desc": {
+    "text": "The models part of the quota for other providers' models (not Gemini). Wrong, that limit shows by agy's own name for it.",
+    "note": "What the advanced setting \"Status line: other providers' models\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.otherModels.title": {
+    "text": "Status line: other providers' models",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.planTier.desc": {
+    "text": "The status line's field with your plan's name. Wrong, Antigravity's plan limits show without it.",
+    "note": "What the advanced setting \"Status line: plan's name field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.planTier.title": {
+    "text": "Status line: plan's name field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.quota.desc": {
+    "text": "The status line's field with your plan's quotas, one per group of models (HI-2734). Wrong, Combwork shows no plan limits for Antigravity.",
+    "note": "What the advanced setting \"Status line: plan limits field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.quota.title": {
+    "text": "Status line: plan limits field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.remainingFraction.desc": {
+    "text": "A quota's field with the share of it left, from 0 to 1. Wrong, Combwork shows no plan limits for Antigravity.",
+    "note": "What the advanced setting \"Status line: share left field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.remainingFraction.title": {
+    "text": "Status line: share left field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.resetTime.desc": {
+    "text": "A quota's field with when it resets. Wrong, Antigravity's plan limits show no reset time.",
+    "note": "What the advanced setting \"Status line: reset time field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.resetTime.title": {
+    "text": "Status line: reset time field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.weeklySuffix.desc": {
+    "text": "How a weekly quota's name ends; what comes before it is the models it covers. Wrong, Antigravity's limits show by agy's own names, with no window.",
+    "note": "What the advanced setting \"Status line: a weekly quota\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.statusLine.weeklySuffix.title": {
+    "text": "Status line: a weekly quota",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.modelChange.desc": {
+    "text": "What agy adds to a prompt when its model changes: the model's name is its first group. Wrong, an agent's usage names no model.",
+    "note": "What the advanced setting \"Transcript: the model picked\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.modelChange.title": {
+    "text": "Transcript: the model picked",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.desc": {
+    "text": "The times agy writes before a tool's result in its transcript, which Combwork leaves out when it shows the result. Wrong, results show with those times.",
+    "note": "What the advanced setting \"Transcript: a tool result's times\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.title": {
+    "text": "Transcript: a tool result's times",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.desc": {
+    "text": "A message in agy's transcript from agy itself or another conversation (a subagent's task or answer): who sent it is its first group, what it says its second. Wrong, those messages aren't shown, and a subagent's conversation isn't found under its parent.",
+    "note": "What the advanced setting \"Transcript: agy's messages\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.title": {
+    "text": "Transcript: agy's messages",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.userRequest.desc": {
+    "text": "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.",
+    "note": "What the advanced setting \"Transcript: your prompt\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.transcript.userRequest.title": {
+    "text": "Transcript: your prompt",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.desc": {
+    "text": "Whether a request's input_tokens in agy's transcript already count its cache_read_tokens. Wrong, Combwork counts cached tokens twice, or leaves them out of the context.",
+    "note": "What the advanced setting \"Usage: input tokens include the cache\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy, input_tokens and cache_read_tokens are names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.title": {
+    "text": "Usage: input tokens include the cache",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "text": "The environment variables Combwork leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",
     "note": "What the advanced setting \"Connections: sign-in variables left out\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
@@ -192,6 +462,26 @@
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": {
     "text": "Hooks: timeout",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.localModel.aliases.desc": {
+    "text": "The model names Claude Code reads as its own aliases (opus, sonnet…), as a regular expression. A server connection's model named so gets no Context size or Output budget from Combwork, as Claude Code sizes it itself. Wrong, a local model with one of these names is launched as if Claude Code knew it, or an alias gets limits Claude Code ignores.",
+    "note": "What the advanced setting \"Local models: Claude Code’s aliases\" is for, and what goes wrong when it is wrong (Settings → Advanced). Context size and Output budget are fields of a server connection’s models: as translated there.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.localModel.aliases.title": {
+    "text": "Local models: Claude Code’s aliases",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI: the model names Claude Code reads as its own aliases (opus, sonnet…).",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.localModel.spellings.desc": {
+    "text": "Model ID spellings Claude Code may resolve to a Claude model or size by its own rules (claude in the ID, a [1m] suffix, a date after @), as a regular expression. A server connection's model spelt so gets no Context size or Output budget from Combwork. Wrong, Combwork passes limits Claude Code doesn't apply, or leaves out a local model it would.",
+    "note": "What the advanced setting \"Local models: IDs Claude Code sizes itself\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep [1m] and @ as they are. Context size and Output budget are fields of a server connection’s models: as translated there.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.localModel.spellings.title": {
+    "text": "Local models: IDs Claude Code sizes itself",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI: model ID spellings (claude-…, [1m], a date suffix) Claude Code applies its own context rules to.",
     "audience": "both"
   },
   "settings.advanced.claude-code.memory.realPath.desc": {
@@ -512,6 +802,16 @@
   "settings.advanced.claude-code.turnScreen.done.title": {
     "text": "Screen: turn done",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.update.channelSetting.desc": {
+    "text": "The Claude Code setting that names the release channel `claude update` installs from (stable or latest), which Combwork reads from Claude Code's managed and user settings, never changes, to offer only an update on that channel. Wrong, Combwork compares Claude Code with the latest channel, and may offer an update it can't make.",
+    "note": "What the advanced setting \"Update channel setting\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2729). Keep `claude update` as it is (a command), and stable and latest (the channels' names).",
+    "audience": "both"
+  },
+  "settings.advanced.claude-code.update.channelSetting.title": {
+    "text": "Update channel setting",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The release channel Claude Code updates from (stable or latest).",
     "audience": "both"
   },
   "settings.advanced.claudeFooter.desc": {
@@ -1241,6 +1541,86 @@
   },
   "settings.advanced.copilot.question.tool.title": {
     "text": "Question: tool name",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.entitlementField.desc": {
+    "text": "A quota's field with how much your plan allows (-1: unlimited). Wrong, Combwork shows no plan limits for Copilot.",
+    "note": "What the advanced setting \"Plan limits: allowance field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.entitlementField.title": {
+    "text": "Plan limits: allowance field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.event.desc": {
+    "text": "The event, in Copilot's session file, of a model call that carries your plan's quotas. Wrong, Combwork shows no plan limits for Copilot.",
+    "note": "What the advanced setting \"Plan limits: event\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.event.title": {
+    "text": "Plan limits: event",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.premiumKey.desc": {
+    "text": "The quota of premium requests among them. Wrong, that limit shows by Copilot's own name for it.",
+    "note": "What the advanced setting \"Plan limits: premium requests\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.premiumKey.title": {
+    "text": "Plan limits: premium requests",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.remainingPercentField.desc": {
+    "text": "A quota's field with the percent of it left. Wrong, Combwork shows no plan limits for Copilot.",
+    "note": "What the advanced setting \"Plan limits: percent left field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.remainingPercentField.title": {
+    "text": "Plan limits: percent left field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.resetField.desc": {
+    "text": "A quota's field with when it resets. Wrong, Copilot's plan limits show no reset date.",
+    "note": "What the advanced setting \"Plan limits: reset date field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.resetField.title": {
+    "text": "Plan limits: reset date field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.snapshotsField.desc": {
+    "text": "That event's field with your plan's quotas, one per kind of request. Wrong, Combwork shows no plan limits for Copilot.",
+    "note": "What the advanced setting \"Plan limits: quotas field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.snapshotsField.title": {
+    "text": "Plan limits: quotas field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.unlimitedField.desc": {
+    "text": "A quota's field that is true when your plan has no limit on it. Wrong, an unlimited quota isn't shown as unlimited.",
+    "note": "What the advanced setting \"Plan limits: unlimited field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.unlimitedField.title": {
+    "text": "Plan limits: unlimited field",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.usedField.desc": {
+    "text": "A quota's field with how much of it is used. Wrong, Copilot's limits don't say how many were used.",
+    "note": "What the advanced setting \"Plan limits: used field\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.quota.usedField.title": {
+    "text": "Plan limits: used field",
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
@@ -2154,6 +2534,26 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
+  "settings.advanced.cw.winget.showSeconds.desc": {
+    "text": "How long `winget show` may take to say the newest version WinGet has of a coding agent CLI installed with it (it may update its list of packages first). Past it, Combwork offers no update and doesn't say the CLI is up to date.",
+    "note": "What the advanced setting \"WinGet: time to say its version\" does (Settings → Advanced). Keep `winget show` as it is (a command).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.winget.showSeconds.title": {
+    "text": "WinGet: time to say its version",
+    "note": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\"). WinGet is Windows' package manager: keep its name.",
+    "audience": "both"
+  },
+  "settings.advanced.cw.winget.version.desc": {
+    "text": "How Combwork finds the newest version WinGet has of a coding agent CLI installed with it, in what `winget show` prints: a regular expression whose first group is the version. Provider Setup offers such a CLI an update only once WinGet has a newer one. Wrong, Combwork can't tell, and offers no update and doesn't say it is up to date.",
+    "note": "What the advanced setting \"WinGet: version line\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `winget show` as it is (a command).",
+    "audience": "both"
+  },
+  "settings.advanced.cw.winget.version.title": {
+    "text": "WinGet: version line",
+    "note": "An advanced setting's title (Settings → Advanced), listed under Combwork. WinGet is Windows' package manager: keep its name.",
+    "audience": "both"
+  },
   "settings.advanced.cw.workflow.enforce.desc": {
     "text": "Combwork keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Combwork sees a card's work merged or changed outside Combwork. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Combwork only records what happens to each card's work, without moving cards or waking agents for it.",
     "note": "What the advanced setting \"Workflow rules are enforced\" does, and what turning it off does (Settings → Advanced). Version Control is the name of a tab in Project Settings, and Review, Approved and Done are board stages: use them as Combwork shows them.",
@@ -2705,6 +3105,10 @@
     "text": "{what}, or null to inherit",
     "note": "What a workflow option takes: {what} (settings.agent.takes.*), and null, which inherits the level's value."
   },
+  "settings.agent.takes.otherTargets": {
+    "text": "a list of branch names besides project.workflow.target, e.g. [\"1.2.0\"] (each one a lane or card may take as its target)",
+    "note": "What the workflow option otherTargets takes (HI-2556). The JSON and project.workflow.target (a setting's id) are code: keep them."
+  },
   "settings.agent.takes.preChecks": {
     "text": "a list of check names, e.g. [\"typecheck\", \"lint\"] (each with its command in project.workflow.commands)",
     "note": "What the workflow option preChecks takes. The JSON and project.workflow.commands (a setting's id) are code: keep them."
@@ -2720,6 +3124,18 @@
   "settings.agent.takes.wholeNumber": {
     "text": "a whole number from {min} to {max}",
     "note": "What a number workflow option takes. {min} and {max} are numbers as written."
+  },
+  "settings.agent.tool.keptCard": {
+    "text": "{card} into {target}",
+    "note": "HI-2674: a card in flight keeping its target. {card} is its key (HI-12); {target} a branch."
+  },
+  "settings.agent.tool.keptLane": {
+    "text": "lane {named, select, yes {\"{name}\" } other {}}({builder}) and its cards still to start, into {target}",
+    "note": "HI-2674: a running lane keeping its target. {builder} is its builder agent's name; {target} a branch."
+  },
+  "settings.agent.tool.keptTargets": {
+    "text": "It applies to cards started from now on outside running lanes. A target is set as a card or lane starts, so these keep merging into their own: {list}.",
+    "note": "HI-2674: a change of a project's target (G7), in place of \"It applies now\". {list}: settings.agent.tool.keptLane and keptCard items, joined with \"; \"."
   },
   "settings.agent.tool.levelsRefused": {
     "text": "These workflow defaults can't be saved: {problems} Change the other options first, or tell the user.",
@@ -2772,6 +3188,10 @@
   "settings.agent.tool.restart.sessions": {
     "text": "to sessions started afterwards (running agents show Restart session)",
     "note": "When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it."
+  },
+  "settings.agent.tool.retarget": {
+    "text": "These still on {from} can follow {to} (Todo cards with no work, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.",
+    "note": "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names."
   },
   "settings.agent.tool.switchRefused": {
     "text": "{error} Tell the user, or leave it as it is.",

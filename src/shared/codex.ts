@@ -142,6 +142,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     planModeToggle: true,
     promptCacheTtl: false,
     reportsCost: false,
+    defersMcpTools: false,
     compactFocus: false,
     contextLimit: false,
     autoCompactReserve: null,
@@ -154,6 +155,7 @@ export const CODEX_DESCRIPTOR: ProviderDescriptor = {
     backgroundSessions: false,
     // Codex isn't told when a background terminal ends: it finds out only by checking during a turn.
     backgroundWakes: false,
+    typedTurnsWithoutPrompt: false,
     startupSizeRefresh: false,
     // Its paste-burst detection drops an Enter that a busy Codex reads with the line, bracketed or not; Enter once the line
     // is drawn sends it (#600, checked with 0.163). disable_paste_burst would too, but loses a user's multi-line paste.

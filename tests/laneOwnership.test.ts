@@ -12,6 +12,7 @@ import type { CombworkEvent, LaneCard } from '../src/shared/types'
 import { laneNextText, laneStatus, laneStatusText, type LaneCardFacts } from '../src/shared/lanes'
 import { laneHits, type LaneNow } from '../src/shared/laneWatch'
 import { tempDir } from './tempDir'
+import { bound } from './keepType'
 
 /** The bound for a hung run: the lanes are read again within it after each change. */
 const HUNG_MS = 15_000
@@ -98,7 +99,7 @@ describe('Combwork owns the lane (lanes.ts, #1270)', () => {
   beforeAll(async () => {
     mkdirSync(join(project, '.combwork'), { recursive: true })
     writeFileSync(join(project, 'a.txt'), 'a\n')
-    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1' }] }))
+    writeFileSync(join(project, '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'b1', name: 'B1' }, { id: 'b2', name: 'B2' }, { id: 'r1', name: 'R1', workflowRole: 'either' }] }))
     // Another project, for a card moved there and back (HI-1821).
     mkdirSync(join(wsPath, 'beta', '.combwork'), { recursive: true })
     writeFileSync(join(wsPath, 'beta', '.combwork', 'project.json'), JSON.stringify({ version: 2, platform: 'none', agents: [{ id: 'c1', name: 'C1' }] }))
@@ -354,7 +355,7 @@ describe('Combwork owns the lane (lanes.ts, #1270)', () => {
     await move(a, 'doing')
     const before = ended.length
     // The refresh reads a Done; at its next wait (the project's agents' names) the card is reopened.
-    const real = w.projectConfig.bind(w)
+    const real = bound(w, w.projectConfig)
     let reopened = false
     const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p) => {
       // Only the lanes' read of names, once it has read the card Done (its stack names it): the move's own reads pass.
@@ -384,7 +385,7 @@ describe('Combwork owns the lane (lanes.ts, #1270)', () => {
     // The change reads A in Todo (between cards); at its names lookup A starts. Only the change's own lookup (#1414): the
     // lanes' following refreshes 300 ms after a change and looks the names up too, and a move made there under load isn't
     // one the change waits for, so the change applied B before A's start had landed.
-    const real = w.projectConfig.bind(w)
+    const real = bound(w, w.projectConfig)
     const change = new AsyncLocalStorage<true>()
     let started = false
     const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p) => {
@@ -680,7 +681,7 @@ describe('Combwork owns the lane (lanes.ts, #1270)', () => {
     expect((await lanes.laneNext(w, 'alpha', 'b1')).next).toMatchObject({ card: u })
     // Under the board's lock: U started (given to no agent) while a change is decided reads as the lane's own card in
     // flight, so the change is queued after it.
-    const real = w.projectConfig.bind(w)
+    const real = bound(w, w.projectConfig)
     const change = new AsyncLocalStorage<true>()
     let started = false
     const spy = vi.spyOn(w, 'projectConfig').mockImplementation(async (p) => {

@@ -169,10 +169,12 @@ interface CombworkMessageValues {
   'session.start.closing': undefined
   'session.start.couldNot': { agent: string | number }
   'session.start.fenced': { why: string | number }
+  'session.start.independentTask': { agent: string | number }
   'session.start.moveFailed': { project: string | number; error: string | number }
   'session.start.openCommands': undefined
   'session.start.openIn': { agent: string | number }
   'session.start.otherFolder': { folder: string | number }
+  'session.start.plainTask': { agent: string | number }
   'session.start.projectRunning': undefined
   'session.start.providerMissing': { resuming: string; provider: string | number; agent: string | number }
   'session.start.providerOff': { provider: string | number; resuming: string; agent: string | number }

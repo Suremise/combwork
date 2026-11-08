@@ -29,6 +29,8 @@ interface CombworkMessageValues {
   'tips.allKeysToCli.title': undefined
   'tips.alwaysOnTop.text': undefined
   'tips.alwaysOnTop.title': undefined
+  'tips.antigravity.text': undefined
+  'tips.antigravity.title': undefined
   'tips.antivirus.text': undefined
   'tips.antivirus.title': undefined
   'tips.archiveNew.text': undefined
@@ -57,6 +59,8 @@ interface CombworkMessageValues {
   'tips.assistantLanes.title': undefined
   'tips.assistantMcp.textAdded': undefined
   'tips.assistantMcp.title': undefined
+  'tips.assistantMemory.text': undefined
+  'tips.assistantMemory.title': undefined
   'tips.assistantMessages.text': undefined
   'tips.assistantMessages.title': undefined
   'tips.assistantNoticeOpens.text': undefined
@@ -119,6 +123,8 @@ interface CombworkMessageValues {
   'tips.branchCards.title': undefined
   'tips.branchCleanup.text': undefined
   'tips.branchCleanup.title': undefined
+  'tips.bringUpToDate.text': undefined
+  'tips.bringUpToDate.title': undefined
   'tips.cardAttachments.text': undefined
   'tips.cardAttachments.title': undefined
   'tips.cardAttachmentsCleanup.text': undefined
@@ -286,6 +292,8 @@ interface CombworkMessageValues {
   'tips.lanesLegend.title': undefined
   'tips.language.text': undefined
   'tips.language.title': undefined
+  'tips.launchSettings.text': undefined
+  'tips.launchSettings.title': undefined
   'tips.leftRunning.text': undefined
   'tips.leftRunning.title': undefined
   'tips.leftoverBranches.text': undefined
@@ -294,6 +302,10 @@ interface CombworkMessageValues {
   'tips.leftoverProcesses.title': undefined
   'tips.licenceAudit.text': undefined
   'tips.licenceAudit.title': undefined
+  'tips.localModelLimits.text': undefined
+  'tips.localModelLimits.title': undefined
+  'tips.localModelPicker.text': undefined
+  'tips.localModelPicker.title': undefined
   'tips.loopDefaults.text': { rounds: number; hours: number }
   'tips.loopDefaults.title': undefined
   'tips.loopLanes.text': undefined
@@ -334,6 +346,8 @@ interface CombworkMessageValues {
   'tips.mergeSlot.title': undefined
   'tips.mergeStrict.text': undefined
   'tips.mergeStrict.title': undefined
+  'tips.mergesInto.text': undefined
+  'tips.mergesInto.title': undefined
   'tips.messageReceipts.text': { minutes: number }
   'tips.messageReceipts.title': undefined
   'tips.modelFallbacks.text': undefined
@@ -354,6 +368,8 @@ interface CombworkMessageValues {
   'tips.noCodeCards.title': undefined
   'tips.off.message': undefined
   'tips.off.title': undefined
+  'tips.oneAgent.text': undefined
+  'tips.oneAgent.title': undefined
   'tips.outageResume.text': undefined
   'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }
@@ -374,10 +390,14 @@ interface CombworkMessageValues {
   'tips.perfCompare.title': undefined
   'tips.perfCompareAgents.text': undefined
   'tips.perfCompareAgents.title': undefined
+  'tips.perfFailures.text': undefined
+  'tips.perfFailures.title': undefined
   'tips.performance.text': undefined
   'tips.performance.title': undefined
   'tips.permissionMode.text': { key: string | number }
   'tips.permissionMode.title': undefined
+  'tips.planLimitsProviders.text': undefined
+  'tips.planLimitsProviders.title': undefined
   'tips.progressCard.text': undefined
   'tips.progressCard.title': undefined
   'tips.progressCheck.text': undefined
@@ -420,6 +440,8 @@ interface CombworkMessageValues {
   'tips.resumeAfterUpdate.title': undefined
   'tips.resumeAll.text': undefined
   'tips.resumeAll.title': undefined
+  'tips.retargetRelease.text': undefined
+  'tips.retargetRelease.title': undefined
   'tips.retryWait.text': undefined
   'tips.retryWait.title': undefined
   'tips.reviewCopies.text': undefined
@@ -436,6 +458,8 @@ interface CombworkMessageValues {
   'tips.searchClear.title': undefined
   'tips.searchTranscripts.text': undefined
   'tips.searchTranscripts.title': undefined
+  'tips.serverDiagnostics.text': undefined
+  'tips.serverDiagnostics.title': undefined
   'tips.sessionCleanup.text': { hours: number; week: number; month: number }
   'tips.sessionCleanup.title': undefined
   'tips.sessionSizes.text': undefined

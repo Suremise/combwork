@@ -1,0 +1,8 @@
+{
+  "project.limit.models": {
+    "placeholders": {
+      "models": "select",
+      "window": "select"
+    }
+  }
+}

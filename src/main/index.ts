@@ -55,7 +55,8 @@ import { agentCardText } from '../shared/agentTable'
 import { emit, emitTo, onCombworkEvent, toast } from './events'
 import { advanced, bindAdvancedSettings, mcpAdvancedEnv } from './advanced'
 import { GPU_SWITCH, advancedAtStart, relaunchArgs, startGpu } from './gpu'
-import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT, CW_GUIDANCE } from '../shared/advanced'
+import { HARDWARE_ACCELERATION_OFF, HEAP_SNAPSHOT_NEAR_LIMIT } from '../shared/advanced'
+import { migrateLaunchPolicy, readRolesFromConnections } from './connectionLaunch'
 import { startHeapSnapshots, startMemoryLog } from './memory'
 import { recordLiveCardsSoon } from './cardSessions'
 import { closeAllBoards, onBoardNotice } from './boardStore'
@@ -126,6 +127,7 @@ import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
 import { startLaunchSides } from './launchSides'
+import { startWorkflowTools } from './workflowTools'
 import { checkInstallDir, setLanguageBeforeReady } from './installDir'
 import { exitBeforeProfile, exitBy, logCrashDumps, startCrashDumps, startExitLog } from './exitLog'
 import { checkLastRun, lastUnexpectedClose, startRunMarker, startupStep, tellUnexpectedClose } from './lastRun'
@@ -1007,6 +1009,10 @@ app.whenReady().then(async () => {
   await startI18n(config.settings)
   // Advanced settings (#367): advanced.json's overrides, followed as it changes.
   advanced.load()
+  // Connections' launch settings (HI-2670): the app-wide switches they replaced copied onto them once, and agents on a
+  // connection without Combwork's tools read as Independent from here on.
+  migrateLaunchPolicy()
+  readRolesFromConnections()
   // Agents per project from before HI-2001: Maximum agents in Combwork's workflow defaults now.
   await migrateAgentsPerProject()
   // HI-1997: Combwork's own workflow defaults' commit message from a preset, switched once to the branch's own.
@@ -1137,8 +1143,9 @@ app.whenReady().then(async () => {
         ...(agentId ? { CW_AGENT_ID: agentId } : {}),
         // Whether its instructions tell it to run long commands through cw-progress unasked.
         CW_PROGRESS_COMMANDS: wrapsLongCommands(config.settings.general) ? '1' : '0',
-        // Whether it gives Combwork's guidance as its instructions (#1285: Settings → Advanced, Combwork's guidance for agents).
-        CW_GUIDANCE: advanced.get<boolean>(CW_GUIDANCE) ? '1' : '0',
+        // Whether it gives Combwork's guidance as its instructions (#1285): its connection's switch since HI-2670, which
+        // the launch sets here (sessions.ts's effectiveHere); on until then.
+        CW_GUIDANCE: '1',
         CW_DEV_CONSOLE: s.devConsole === true ? '1' : '0',
         // Its reply timeout and wait caps (#367: Settings → Advanced).
         ...mcpAdvancedEnv(),
@@ -1170,8 +1177,8 @@ app.whenReady().then(async () => {
         const journal = journalSettingsOf(workspaceOf(projectPath))
         return combworkInstructions('', 'assistant', true, undefined, journal.enabled ? journal.scope : null)
       }
-      // Combwork's tools without its guidance (#1285, #966 row 13): the Assistant above always has its own.
-      if (!advanced.get<boolean>(CW_GUIDANCE)) return ''
+      // Combwork's tools without its guidance (#1285, #966 row 13) is its connection's switch (HI-2670): a launch with it
+      // off asks for none. The Assistant above always has its own.
       const project = basename(projectPath)
       const latest = (await handoversFor(workspace, project))[0]
       // Naming only the skills its agents get (#1431).
@@ -1246,6 +1253,8 @@ app.whenReady().then(async () => {
   await clearHookAuth()
   // A launch's side of the workflow for its metrics (HI-2049): before the Agent API or a window can start an agent.
   startLaunchSides()
+  // The tools a project's workflow leaves out of its agents' launches, and the restarts when it changes (HI-2694).
+  startWorkflowTools()
   await startHookServer()
   // After an unexpected close, its port is tried again for a few seconds (HI-2196): the copy just ended may still hold
   // it. Awaited, so the agents resumed after it launch with the API's address.

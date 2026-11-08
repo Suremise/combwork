@@ -164,7 +164,7 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { assistant: { enterEndsPause: false } })
 
   // A second agent, started idle, takes a task; its edit shows as a locked file and a tool call.
-  const second = await api('POST', '/v1/projects/alpha/agents', { name: 'Fixer', start: true })
+  const second = await api('POST', '/v1/projects/alpha/agents', { name: 'Fixer', start: true, workflowRole: 'either' })
   const fixer = second.body?.agent?.id
   check('an agent started idle is ready', !!(await until(async () => (await live(alpha, fixer))?.status === 'ready', HUNG_MS)))
   const given = await api('POST', '/v1/projects/alpha/agents/Fixer/prompt', { text: 'edit a.ts work 6' })

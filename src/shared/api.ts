@@ -7,12 +7,15 @@ import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
 import type { ConnectionPatch, ConnectionsView } from './accounts'
+import type { LaunchImpact } from './launchPolicy'
 import type { ServerModelsRead } from './serverConnection'
+import type { ContextCheck, LastCheck, ToolTest } from './serverDiagnostics'
 import type { MovedNotice } from './connectionDefaults'
 import type { JournalEdit, JournalEntryView, JournalFilter, JournalForgetPreview, JournalForgetResult, JournalPage, JournalSettings } from './journal'
 import type {
   ArchiveBatch,
   Connection,
+  ConnectionLaunch,
   CopyView,
   SlotTestOp,
   SlotOptions,
@@ -96,6 +99,7 @@ import type {
   LaneStartResult,
   ModelPrice,
   MemorySource,
+  AssistantMemory,
   NoteFile,
   PlanUsage,
   ProjectConfig,
@@ -132,6 +136,8 @@ import type {
   TranscriptSearchResult,
   TranscriptTool,
   WorkflowChange,
+  RetargetPreview,
+  RetargetResult,
   WorkflowCheck,
   WorkflowForm,
   PlatformSwitchCheck,
@@ -373,6 +379,8 @@ export interface CombworkRequests {
   'workflow:check': (projectPath: string, change: WorkflowChange) => WorkflowCheck
   /** Saves the project's workflow options, checked again (refused, with every reason); `applyTo`: cards in flight to work under them from now (OP-38). */
   'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
+  /** HI-2680: moves what a confirmed Retarget preview listed, as the user: each item rechecked; what happened to each. */
+  'workflow:retarget': (projectPath: string, preview: RetargetPreview) => RetargetResult
   /** The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): its merge style and commit message saved, the request answered. */
   'workflow:chooseMerge': (projectPath: string, choice: { card: number; request: string; style: WorkflowOptions['style']; commitMessage: CommitMessage }) => void
   /**
@@ -440,6 +448,8 @@ export interface CombworkRequests {
   'queue:seen': (projectPath: string, target: string, entries: string[]) => void
   /** Pause queue (the user's): the target's queue stops before its next entry; saved. A queue paused already keeps its pause. */
   'queue:pause': (projectPath: string, target: string) => QueueView
+  /** HI-2679: brings `to` up to date with `from` (a forward merge through `to`'s queue), as the user. */
+  'queue:forward': (projectPath: string, from: string, to: string) => { upToDate: boolean; card: number | null; queued: boolean }
   /** Resume: clears the pause once its cause, where Combwork can see it, is gone (`resumed`); else the queue is paused again, saying why. */
   'queue:resume': (projectPath: string, target: string) => QueueResumed
   /** Remove from queue (the user's override): the card back to Approved, never merged; refused once its merge has begun. */
@@ -495,13 +505,15 @@ export interface CombworkRequests {
   'tasks:setAside': () => SetAsideCard[]
   'tasks:addSetAside': (file: string) => TaskCard
   'tasks:discardSetAside': (file: string) => void
-  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code'; skipReview?: string }, drafts?: CardDrafts) => TaskCard
+  'tasks:create': (input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; context?: string[]; kind?: 'code' | 'no-code'; skipReview?: string; target?: string | null }, drafts?: CardDrafts) => TaskCard
   /** Changes a card's kind after it was made (#1277): an override, asked first (`ask`) unless `confirm`, with its reason. */
   'tasks:setKind': (n: number, kind: 'code' | 'no-code', opts?: { confirm?: boolean; reason?: string }) => { ask: true } | TaskCard
   /** Answers an agent's proposed kind (#1277): `accept` makes it the card's kind, else the card stays code. */
   'tasks:confirmKind': (n: number, accept: boolean) => TaskCard
   /** Makes a card skip review, or review it after all (#1625), answering an agent's proposal too: `reason`, the user's optional note. */
   'tasks:setReviewSkip': (n: number, skip: boolean, opts?: { reason?: string }) => TaskCard
+  /** Sets the branch a card merges into (HI-2556, its Merges into): one the project lists, or null for its own. */
+  'tasks:setTarget': (n: number, target: string | null) => TaskCard
   /** A card's context reference (#818): its section's text and heading line, or why it doesn't resolve. projectPath: the card's project's (null: a card about the workspace). */
   'docs:section': (projectPath: string | null, ref: string) => { ref: string; content: string; line: number } | { ref: string; problem: string; closest?: string[] }
   /** A change; with `more`, its comment and the dialog's drafts (HI-1700) in the same change. */
@@ -648,7 +660,10 @@ export interface CombworkRequests {
   'agents:memory': () => { running: { agents: number; bytes: number } | null; total: number; free: number }
   /** Changing provider clears the agent's model, effort and mode, and its session to resume (conversations can't move between providers). */
   /** Changes an agent's name and settings; for the Combwork Assistant's home, its settings for this workspace (mode too). */
-  'agents:update': (projectPath: string, agentId: string, patch: AgentPatch) => AgentDef
+  /** `confirmed` (HI-2670): agents:impact's fingerprint, when the change takes the agent off its lanes or cards. */
+  'agents:update': (projectPath: string, agentId: string, patch: AgentPatch, confirmed?: string | null) => AgentDef
+  /** What a change of an agent (its connection or role) would take out of the workflow (HI-2670); null: nothing. */
+  'agents:impact': (projectPath: string, agentId: string, patch: AgentPatch) => LaunchImpact | null
   /**
    * Removes an agent (its session must be stopped). deleteWorktree also removes its worktree and branch; 'merged-clean'
    * only when they are fully merged into the main branch (`mergedInto`, the one the user was shown) and clean then,
@@ -980,6 +995,10 @@ export interface CombworkRequests {
   'file:write': (path: string, content: string, expected?: string) => void
 
   'memory:list': (projectPath: string) => MemorySource[]
+  /** The Assistant's own memory (HI-2666): what `provider` (the one it runs on) saved for the window's workspace's folder. */
+  'assistant:memory': (provider: ProviderId) => AssistantMemory
+  /** Opens that memory's folder in File Explorer (HI-2736): the one assistant:memory names, found again in main. */
+  'assistant:openMemoryFolder': (provider: ProviderId) => void
   /** Whether the given providers all read the project's AGENTS.md (directly or through an import). */
   'memory:instructionsShared': (projectPath: string, providers: ProviderId[]) => boolean
   /** Makes the given providers share AGENTS.md; returns the files written. */
@@ -1099,6 +1118,18 @@ export interface CombworkRequests {
   /** Reads a server connection's models from its server (`request`: this reading's id, for cancelling it and telling a stale reply). */
   'connections:readModels': (id: string, request: string) => ServerModelsRead
   'connections:cancelModels': (id: string, request: string) => void
+  /** A server connection's diagnostics (HI-2683): one model's context as its server reports it (`request`: this check's id). */
+  'connections:readContext': (id: string, model: string, request: string) => ContextCheck
+  /** The tool-call test, one model's (`request`: this check's id). */
+  'connections:testTools': (id: string, model: string, request: string) => ToolTest
+  /** Ends a check, that one only (a newer one for the same model stays). */
+  'connections:cancelCheck': (id: string, model: string, request: string) => void
+  /** The last results of a model's checks, kept while Combwork runs. */
+  'connections:lastCheck': (id: string, model: string) => LastCheck
+  /** The context the user says a model has (null: clears it). */
+  'connections:setModelContext': (id: string, model: string, tokens: number | null) => void
+  /** HI-2682: a server connection's model's output budget (null: the default). */
+  'connections:setModelOutput': (id: string, model: string, tokens: number | null) => void
   /** Opens the CLI on a connection (a server one, or a sign-in one: HI-1826), for its first-run screens; returns the terminal's key. */
   /** Its terminal's key, and where it opened (HI-1871: a workspace folder or a project's; absent, its own folder). */
   'connections:setUp': (id: string) => { key: string; in?: { folder: string; project?: string; workspace?: true } }
@@ -1116,6 +1147,13 @@ export interface CombworkRequests {
   'connection:add': (account: string, input: ConnectionPatch & { name: string }) => Connection
   /** Changes a connection's name or values (each null leaves it to the CLI); running agents on it are offered Restart or Switch Now. */
   'connection:update': (id: string, patch: ConnectionPatch) => Connection
+  /**
+   * What saving these launch settings (HI-2670) would take out of the workflow: agents on running lanes or holding cards
+   * in Doing or Review, made Independent by its Combwork tools going off. Null: nothing to confirm.
+   */
+  'connection:launchImpact': (id: string, launch: ConnectionLaunch | null) => LaunchImpact | null
+  /** Saves a connection's launch settings (HI-2670); `confirmed`, launchImpact's fingerprint, when it has one. */
+  'connection:setLaunch': (id: string, launch: ConnectionLaunch | null, confirmed?: string | null) => Connection
   /** A copy of a connection, after it. */
   'connection:duplicate': (id: string) => Connection
   /** Removes a connection; refused while an agent or the Assistant in an open workspace uses it, naming them. */
@@ -1132,6 +1170,8 @@ export interface CombworkRequests {
   'connections:switchAffected': () => { projectPath: string; agentId: string; result: 'queued' | 'waiting' | 'notRunning' }[]
   /** Switches one agent to the connection chosen for it now, at its next safe point (HI-1755). */
   'session:switchConnection': (projectPath: string, agentId: string) => 'queued' | 'waiting' | 'notRunning'
+  /** An agent whose role changed (HI-2664): restarted to load its side's tools; `ifIdle` says `busy` rather than wait. */
+  'session:restartForTools': (projectPath: string, agentId: string, when: 'ifIdle' | 'atSafePoint') => 'restarting' | 'busy' | 'same' | 'notRunning'
 
   'api:info': () => AgentApiInfo
   'api:regenerateToken': () => AgentApiInfo

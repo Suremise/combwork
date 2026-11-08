@@ -621,7 +621,7 @@ describe('copies: isolated requests apart from the request (HR1 round 1)', () =>
     let leasedAgain = false
     expect(
       await reqs.ask('agent|a', 'p', '3|r', async () => ((leasedAgain = true), { lease: lease('c-no') }), undefined, life.signal)
-    ).toEqual({ refused: 'the workspace closed' })
+    ).toEqual({ refused: { said: 'the workspace closed', id: expect.any(String) } })
     expect(leasedAgain).toBe(false)
     expect(back).toEqual(['c-closed'])
   })

@@ -1,12 +1,16 @@
 // Combwork's end-to-end suites (tests/e2e/<name>.cjs), for run.mjs, the affected-suite map and their tests.
 // needs: claude = starts the real Claude Code; codex = the signed-in test Codex home; packaged = dist/win-unpacked;
 // copilot = the installed Copilot CLI, offline against the scripted stand-in model (fake-copilot-api.cjs: no sign-in, no
-// cost), so it stays in the fake tier (the full set) and is skipped where Copilot isn't installed.
+// cost), so it stays in the fake tier (the full set) and is skipped where Copilot isn't installed; agy = the installed
+// Antigravity CLI on the PC's own sign-in, in a test copy's profiles, one tiny prompt a run (Darren's (b) on HI-2548): the
+// real tier, skipped where agy isn't installed or signed in, or no onboarded probe profile is there.
 // claudeHome: 'own' = its Claude Code runs in a home of its own with a made-up API key (no sign-in: the runner asks about none);
 // 'test' = in the signed-in Claude Code test home (CLAUDE_TEST_HOME, never the user's own), for suites that send prompts.
 // Every suite that starts the real Claude Code has one (#368): none runs in the user's ~/.claude (tests/e2esuites.test.ts).
 // noCombwork (with why): a real suite that runs its CLI without a test copy of Combwork, so the run record has no version Combwork
 // selected for it: npm run tested-clis requires it to pass, and takes the CLI's version from its suites that start Combwork.
+// everything (with what): a suite whose code under test is all in affected.mjs's EVERYTHING, so it is in no area: any
+// change to that code runs every suite already (HI-2689; tests/e2esuites.test.ts fails an area that selects nothing).
 // Suites that start a real CLI (claude, codex) share it with each other, so they run one at a time, in a lane beside
 // the others; those marked serial (with why) and the installer's run last, alone; every other suite is safe to run
 // beside others (its own profile, folders and Agent API port). Sorted by name, so suites added on different
@@ -30,6 +34,9 @@ export const SUITES = [
   { name: 'agenttemp' },
   { name: 'agentview', needs: ['claude'], claudeHome: 'own' },
   { name: 'agentwatch' },
+  { name: 'antigravity' },
+  { name: 'antigravity-windows' },
+  { name: 'antigravityreal', needs: ['agy'] },
   { name: 'antivirus' },
   { name: 'asarfiles' },
   { name: 'assistant' },
@@ -39,6 +46,7 @@ export const SUITES = [
   { name: 'assistantend' },
   { name: 'assistantimages' },
   { name: 'assistantmcp' },
+  { name: 'assistantmemory' },
   { name: 'assistantmode' },
   { name: 'assistantoverview' },
   { name: 'assistantpanel' },
@@ -61,7 +69,6 @@ export const SUITES = [
   { name: 'boardscope' },
   { name: 'boardscroll' },
   { name: 'boardstages' },
-  { name: 'boardupgrade' },
   { name: 'bridgereport' },
   { name: 'buildfacts' },
   { name: 'bursts' },
@@ -87,6 +94,7 @@ export const SUITES = [
   { name: 'cliownmode' },
   { name: 'cliquit', needs: ['claude', 'codex'], claudeHome: 'own' },
   { name: 'closewindow' },
+  { name: 'cmdlauncher' },
   { name: 'codex', needs: ['codex'] },
   { name: 'codex-appserver', needs: ['codex'], noCombwork: 'runs codex app-server and its TUI itself (#653)' },
   { name: 'codex-background', needs: ['codex'] },
@@ -105,7 +113,7 @@ export const SUITES = [
   { name: 'combworkfolder' },
   { name: 'combworktools' },
   { name: 'combworkvcs' },
-  { name: 'commitburst' },
+  { name: 'commitburst', everything: "React's commit watch (commitWatch.ts, commitLoop.tsx, shared/commitWatch.ts), in every test copy's window" },
   { name: 'compact', needs: ['claude'], claudeHome: 'own' },
   { name: 'connectionapi' },
   { name: 'connectiondefaults' },
@@ -139,7 +147,6 @@ export const SUITES = [
   { name: 'donemove' },
   { name: 'drafts' },
   { name: 'editor' },
-  { name: 'failfast' },
   { name: 'filelinks' },
   { name: 'files' },
   { name: 'flightrecorder' },
@@ -173,11 +180,12 @@ export const SUITES = [
   { name: 'image' },
   { name: 'inbox', serial: 'window focus' },
   { name: 'inboxnotices' },
+  { name: 'independentlaunch' },
   { name: 'inputblocked' },
   { name: 'installdir' },
   { name: 'intents' },
   { name: 'isolatedcheck' },
-  { name: 'isolation' },
+  { name: 'isolation', everything: "the run context (runContext.cjs) and testQuiet.ts: what every test copy and its children are given" },
   { name: 'journal' },
   { name: 'journalbrowse' },
   { name: 'keys' },
@@ -191,6 +199,7 @@ export const SUITES = [
   { name: 'lanestart' },
   { name: 'lanewatch' },
   { name: 'launchrace' },
+  { name: 'launchsettings' },
   { name: 'leftovers' },
   { name: 'leftovers-claude', needs: ['claude'], claudeHome: 'test' },
   { name: 'leftovers-codex', needs: ['codex'] },
@@ -213,7 +222,6 @@ export const SUITES = [
   { name: 'mergequeuecrash' },
   { name: 'mergequeuefolder' },
   { name: 'mergeslot' },
-  { name: 'mergestrict' },
   { name: 'mode', needs: ['claude'], claudeHome: 'own' },
   { name: 'models' },
   { name: 'narrowmain' },
@@ -222,6 +230,7 @@ export const SUITES = [
   { name: 'notifytarget' },
   { name: 'numbers' },
   { name: 'onclose' },
+  { name: 'oneagent' },
   { name: 'onelinedesc' },
   { name: 'onopen' },
   { name: 'openguard' },
@@ -294,6 +303,7 @@ export const SUITES = [
   { name: 'restartresume' },
   { name: 'resume' },
   { name: 'resumeall' },
+  { name: 'retarget' },
   { name: 'review' },
   { name: 'reviewcopies' },
   { name: 'reviewcopiesreal', needs: ['claude', 'codex', 'copilot'], claudeHome: 'test' },
@@ -301,6 +311,7 @@ export const SUITES = [
   { name: 'safeguards' },
   { name: 'scenarioteardown' },
   { name: 'searchclear' },
+  { name: 'serverdiag' },
   { name: 'sessioncleanup' },
   { name: 'sessionname' },
   { name: 'sessionorigin' },
@@ -363,6 +374,7 @@ export const SUITES = [
   { name: 'tipcorner' },
   { name: 'tips' },
   { name: 'tipwindows' },
+  { name: 'toolsides' },
   { name: 'tooltips' },
   { name: 'transcript' },
   { name: 'turnledger' },
@@ -374,7 +386,6 @@ export const SUITES = [
   { name: 'unusedslots' },
   { name: 'unusedwt' },
   { name: 'update' },
-  { name: 'upgradelane' },
   { name: 'usagemove' },
   { name: 'vcswitch' },
   { name: 'versioncontrol' },

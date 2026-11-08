@@ -588,6 +588,35 @@ describe('the delivery service (#647)', async () => {
     // A historical typed receipt (#649) still reads back.
     expect(readDelivery({ ...rec({ state: 'received', received: at, offered: at, offers: 1 }), receivedVia: 'typed' })).toMatchObject({ state: 'received', receivedVia: 'typed' })
   })
+  it("HI-2670: an agent made Independent while it runs (or running without Combwork's tools or typing) is given nothing: what waits is refused, its sender told why, nothing is typed; back in the workflow, it is given again without a restart", async () => {
+    const out = { why: null as 'independent' | 'plain' | null }
+    const keepsOut = vi.spyOn(sessions, 'keepsOut').mockImplementation(() => out.why)
+    try {
+      st.status = 'working'
+      await make({ body: 'Waited.' })
+      // Its connection's tools turned off meanwhile (or Independent chosen): the one waiting is refused when next looked at.
+      out.why = 'independent'
+      st.status = 'ready'
+      await deliveries.offerAllForTests()
+      expect(st.typed).toEqual([])
+      expect((await states()).at(-1)).toMatch(/refused: B1 is Independent: Combwork gives it nothing/)
+      // Nothing new, from Combwork or the Assistant.
+      for (const from of [combwork, asst()]) await expect(make({ from, body: 'More.' })).rejects.toThrow(/B1 is Independent/)
+      // A launch without Combwork's typing: the same, saying why.
+      out.why = 'plain'
+      await expect(make({ body: 'More.' })).rejects.toThrow(/as if started from a terminal/)
+      // Back in the workflow (its own role again, or the tools back after a restart): given, and typed.
+      out.why = null
+      const before = (await states()).length
+      await make({ body: 'Again.' })
+      await deliveries.offerAllForTests()
+      expect((await states()).slice(before)).toEqual([expect.stringMatching(/offered$/)])
+      expect(st.typed.length).toBe(1)
+    } finally {
+      keepsOut.mockRestore()
+    }
+  })
+
   it('an ack needs a read (#650 round 1 finding 2): ids named by a doorbell, unread, are not acked, received or told to their source; read, then acked; acked again, still acked', async () => {
     const received: string[] = []
     deliveries.registerSource('ack-probe', { received: (r) => void received.push(r.id) })

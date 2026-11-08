@@ -17,18 +17,18 @@ import { config } from '../config'
 import { CombworkError, combworkError } from '../combworkError'
 import { projectPlatform } from '../platform/registry'
 import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
-import { listLanes } from '../lanes'
+import { listLanes, withLanesLock } from '../lanes'
 import { createLogger, userText } from '../logger'
 import * as G from '../platform/git'
 import { agentText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
 import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/optionTexts'
-import { allOff, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
+import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
 import type { PlatformId } from '../../shared/platform/descriptors'
-import type { ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
+import type { KeptTargets, RetargetPreview, ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
 import { compile, mustCompile, type Ruleset } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
@@ -37,6 +37,8 @@ import { workflowEnforced, workflowFor } from './service'
 import { APPLY_OPTIONS } from './runtime'
 import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
+import { refuseRemovedTargets, retargetPreview, slotTargets } from './retarget'
+import { projectTargets } from './targets'
 import { workflowWrite } from './writes'
 import { withRepoLocks } from '../repoLock'
 import { exitBy } from '../exitLog'
@@ -214,8 +216,8 @@ export function keptNames<T extends Partial<WorkflowOptions>>(options: T): T {
   return { ...options, stageNames: Object.fromEntries(Object.entries(names).map(([k, v]) => [k, typeof v === 'string' ? keptStageName(v) : v])) }
 }
 
-/** Whether a change of these options applies at once (#1417): only names (N5) changed, which aren't rules. */
-export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k))
+/** Whether a change of these options applies at once (#1417): only names (N5), or the branches lanes and cards may pick (HI-2556), changed, which aren't rules. */
+export const namesOnly = (changed: readonly (keyof WorkflowOptions)[]): boolean => changed.length > 0 && changed.every((k) => (NAME_OPTIONS as readonly string[]).includes(k) || (BRANCH_OPTIONS as readonly string[]).includes(k))
 
 /** The options a save would set, their problems, and what changes from the options in force now. */
 function changeOf(ws: WorkspaceService, platform: PlatformId, current: Partial<WorkflowOptions>, change: WorkflowChange, folder: string) {
@@ -253,7 +255,68 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   // Names alone (N5) aren't rules: they apply at once, so no lane or card keeps old rules over them.
   const appliesNow = namesOnly(c.changed)
   const lanes = appliesNow ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
-  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [] }
+  const targets = c.changed.includes('target') ? await keptTargets(ws, project, c.options.target ?? '') : null
+  // HI-2680: what can follow the new target (Retarget), read while the old one is the project's.
+  const retarget = targets ? await retargetOf(ws, project, targets.to) : null
+  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
+}
+
+/**
+ * HI-2674: the cards and lanes a change of the project's target to `to` leaves on another target, each with its own. A
+ * card's is the one its start recorded (`Started.target`, what its queue entry takes: an Override doesn't change it); a
+ * running lane's, the one a start of each card it has still to start would record, for its builder under its rules
+ * (`baseRulesetOf`, §16.5.4), by the start's own rule (`startTarget`: the card's own, G7, a builder worktree's base, the
+ * default branch; HR3's round 1). Cards committed where they are (G6 Committed is done) merge nowhere, so are left out.
+ */
+export async function keptTargets(ws: WorkspaceService, project: { path: string; name: string }, to: string): Promise<KeptTargets> {
+  // The new target, empty: the default branch, as a start in a slot resolves it.
+  let fallback: Promise<string> | null = null
+  const resolved = (t: string | null | undefined): Promise<string> =>
+    t ? Promise.resolve(t) : (fallback ??= G.defaultBranch(project.path).then((d) => (d && !isUnknown(d) ? d : ''), () => ''))
+  const now = await resolved(to)
+  const out: KeptTargets = { to: now, cards: [], lanes: [] }
+  const wf = await workflowFor(ws, project.path)
+  if (!wf) return out
+  const store = FactStore.forBoard(ws, { project: project.name, key: project.name })
+  // The board's cards read once (a whole-project read on main's thread), for the lanes too (HR3's round 2).
+  const all = store.cards()
+  const byId = new Map(all.map((c) => [c.id, c]))
+  const cards = all.flatMap((c) => {
+    const s = wf.state(c)
+    const target = s.started && IN_FLIGHT.has(s.stage) && wf.rulesetOf(c, s).options.finish !== 'committed' ? s.started.target : null
+    return target && target !== now ? [{ c, target }] : []
+  })
+  const keys = cardKeys(ws, cards.map((x) => x.c.id))
+  out.cards = cards.map(({ c, target }) => ({ number: c.id, key: cardLabel({ number: c.id, key: keys.get(c.id) }), title: c.title, target }))
+  for (const l of (await listLanes(ws, { project: project.name })).filter((x) => x.state === 'active' || x.state === 'paused')) {
+    const rec = wf.lane(l.id)
+    if (!rec || rec.ended || !rec.ruleset) continue
+    const laneOptions = wf.store.ruleset(rec.ruleset).options
+    // Its cards still to start (its queued list, once it applies), each under the rules it would start with; none left,
+    // a card it is given next (its own target none), under the lane's.
+    const listed = (rec.pending ?? rec.cards).flatMap((n) => {
+      const c = byId.get(n)
+      return c && wf.state(c).stage === 'todo' ? [c] : []
+    })
+    const stand = listed.length ? undefined : rec.cards.map((n) => byId.get(n)).find((c) => !!c)
+    const next = listed.length ? listed.map((c) => ({ card: c, options: wf.rulesetOf(c).options })) : stand ? [{ card: { ...stand, target: undefined, kind: 'code' as const }, options: laneOptions }] : []
+    const targets = new Set<string>()
+    for (const { card, options } of next) {
+      if (options.finish === 'committed') continue
+      const t = await wf.platform(options).startTarget?.(card, options, l.builder.id)
+      if (t && !isUnknown(t) && t !== now) targets.add(t)
+    }
+    for (const target of targets) out.lanes.push({ id: l.id, name: l.name, builder: l.builder.name, target })
+  }
+  return out
+}
+
+/** HI-2680: a change of the project's target to `to`: what can follow it from the target in force now (null: none to say). */
+async function retargetOf(ws: WorkspaceService, project: { path: string }, to: string): Promise<RetargetPreview | null> {
+  const from = (await projectTargets(ws, project.path).catch(() => null))?.default
+  if (!from || from === to) return null
+  const p = await retargetPreview(ws, project.path, from, to)
+  return p.cards.move.length + p.cards.keep.length + p.slots.move.length + p.slots.keep.length + p.lanes.length ? p : null
 }
 
 /** Options that can't be saved: refused with every reason, each a whole sentence of its own (in the window's language there). */
@@ -322,11 +385,29 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   const plan = planOptions(ws, project, cfg, change, asking && !!o.answer)
   let target = change.options.target ?? ''
   if (!plan.chosen) {
-    await ws.mutateProjectConfig(project.path, (c) => {
-      // The caller's own check (HI-1502: the Assistant's guard), at the write itself: under the project file's lock.
-      o.check?.()
-      return { workflow: planOptions(ws, project, c, change, false).workflow, ...LEGACY_CONSUMED }
-    })
+    const write = () =>
+      ws.mutateProjectConfig(project.path, (c) => {
+        // The caller's own check (HI-1502: the Assistant's guard), at the write itself: under the project file's lock.
+        o.check?.()
+        return { workflow: planOptions(ws, project, c, change, false).workflow, ...LEGACY_CONSUMED }
+      })
+    // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, checked in
+    // the board's write (serial with every writer of those), the file written in it.
+    const was = resolvedOf(ws, project.path, project.platform, cfg).options
+    const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
+    if ((was.otherTargets ?? []).some((b) => !(will.otherTargets ?? []).includes(b) && b !== will.target)) {
+      const slots = await slotTargets(ws, project.path)
+      await withLanesLock(ws, () =>
+        boardWrite(ws, async () => {
+          await refuseRemovedTargets(ws, project.path, was.otherTargets ?? [], will.otherTargets ?? [], will.target || null, slots)
+          await write()
+        })
+      )
+    } else if ((was.target || null) !== (will.target || null)) {
+      // HI-2680: Work merges into written in the board's write too, so a retarget's move (which checks it under the
+      // board's lock, `tasks.setTarget`'s `expectDefault`) and this change are serial.
+      await boardWrite(ws, write)
+    } else await write()
     if (!namesOnly(plan.changed) && o.applyTo?.length && plan.changed.length) await applyToInFlight(ws, project, [...new Set(o.applyTo)], plan.changed)
   } else {
     const store = FactStore.forBoard(ws, { project: project.name, key: project.name })

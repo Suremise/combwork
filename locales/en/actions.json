@@ -811,6 +811,18 @@
     "defaultMessage": "{n, plural, one {Resume the agent?} other {Resume all agents?}}",
     "description": "Title of Resume All's question about expired prompt caches ({n} agents to resume)."
   },
+  "actions.resumeOne.carryOnFailed": {
+    "defaultMessage": "Could not carry on {agent}",
+    "description": "An error's title: telling an agent ({agent}) whose sign-in was refused to carry on failed."
+  },
+  "actions.resumeOne.gone": {
+    "defaultMessage": "That agent is no longer in the project",
+    "description": "A notification's title: the agent chosen from Resume (n)'s menu was removed before it could be resumed."
+  },
+  "actions.resumeOne.notNow": {
+    "defaultMessage": "{agent} can no longer be resumed",
+    "description": "A notification's title: the agent chosen from Resume (n)'s menu ({agent}: its name) started, or its conversation can't resume now, before it could be resumed."
+  },
   "actions.session.listFailed": {
     "defaultMessage": "Could not list sessions",
     "description": "An error's title: reading a project's sessions failed."

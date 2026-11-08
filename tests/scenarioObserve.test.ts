@@ -1745,14 +1745,17 @@ describe('the fixtures fail when nothing was done', () => {
     expect(run([{ tool: 'cw_start_task', ok: true }, { tool: 'cw_wait_for_tasks', ok: true, args: '{"cards":[8],"wake":true}' }])).toContain(waited)
   })
 
-  it('review-record-trusted (#533): the commands that ran are what count, in every form a tool call has; a review that runs no test fails', () => {
+  it('review-record-trusted (#533, HI-2660): the commands that ran are what count, in every form a tool call has; a test run again needs a named doubt', () => {
     const sc = scenario('review-record-trusted')
     const whole = "didn't run the whole suite again"
-    const affected = 'ran the test the change affects (greet.test.js)'
-    const run = (...calls: [string, string][]) => {
-      const checks = sc.expect({ ...base, skillsRead: ['review-agent-work'], tools: calls.map(([name, input]) => ({ name, input, result: '', isError: false })) }, {})
-      return checks.filter(([n]) => n === whole || n === affected).filter(([, ok]) => !ok).map(([n]) => n)
+    const reuse = 'ran no recorded test again, or the verdict names its doubt (reran … because …)'
+    const DOUBT = { by: 'Coder (alpha)', text: 'Round 1: PASSED. Reran greet.test.js because the record predates the test it adds.' }
+    const check = (comments: { by: string; text: string }[], calls: [string, string][]) => {
+      const checks = sc.expect({ ...base, skillsRead: ['review-agent-work'], cards: { b: { comments } }, tools: calls.map(([name, input]) => ({ name, input, result: '', isError: false })) }, {})
+      return checks.filter(([n]) => n === whole || n === reuse).filter(([, ok]) => !ok).map(([n]) => n)
     }
+    // With a doubt the verdict names: only the whole suite fails.
+    const run = (...calls: [string, string][]) => check([DOUBT], calls)
     // As Combwork's transcripts give them: Claude Code's Bash and Codex's shell as the command itself; a Codex script's cmd.
     expect(run(['Bash', 'node --test "greet.test.js"'])).toEqual([])
     expect(run(['Shell', 'node --test .\\greet.test.js'])).toEqual([])
@@ -1766,9 +1769,12 @@ describe('the fixtures fail when nothing was done', () => {
     expect(run(['PowerShell', 'node --test'], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
     expect(run(['Script', 'text(await tools.exec_command({cmd:"npm run test"}))'], ['Bash', 'node --test greet.test.js'])).toEqual([whole])
     expect(run(['Script', 'text(await tools.mcp__combwork__cw_update_task({number:1,review:"passed",comment:"Trusted the npm test record"}))'], ['Bash', 'node --test greet.test.js'])).toEqual([])
-    // No test run at all: the affected test wasn't run.
-    expect(run(['Bash', 'git status --short'])).toEqual([affected])
-    expect(run()).toEqual([affected])
+    // HI-2660: no test run at all reuses the record; a test run again with no doubt named is duplication.
+    expect(check([], [['Bash', 'git status --short']])).toEqual([])
+    expect(check([], [])).toEqual([])
+    expect(check([{ by: 'Coder (alpha)', text: 'Round 1: PASSED.' }], [['Bash', 'node --test greet.test.js']])).toEqual([reuse])
+    // The builder's comment never names the reviewer's doubt.
+    expect(check([{ by: 'Agent API', text: 'Reran greet.test.js because I could.' }], [['Bash', 'node --test greet.test.js']])).toEqual([reuse])
   })
 
   it("review-record-stale (#533): only the reviewer's own verdict counts, and it must say the record is for other code", () => {
@@ -2196,6 +2202,28 @@ describe("assistant-doing-nobody checks each batch by its own reply (HI-2238, HR
   })
 })
 
+describe("assistant-retarget-release takes either way of moving the cards (HI-2680: Codex's trial set each card's Merges into)", () => {
+  const CHECK = "moved them through Combwork: cw_queue retarget by its preview, or each card's Merges into"
+  const call = (name: string, args: unknown, ok = true) => ({ tool: name, args: JSON.stringify(args), ok })
+  const check = (combworkCalls: unknown[]) => {
+    const sc = SCENARIOS.find((s) => s.id === 'assistant-retarget-release')!
+    const o = { combworkCalls, tools: [], finalReply: '', cards: { a: { number: 1, key: 'AL-1' }, b: { number: 2, key: 'AL-2' } } }
+    return Object.fromEntries(sc.expect(o, { cards: { a: 1, b: 2 } }).map(([name, ok]) => [name, ok]))[CHECK]
+  }
+
+  it("passes cw_queue retarget by a preview with items, or each card's Merges into set (as Codex's trial did)", () => {
+    expect(check([call('cw_queue', { action: 'retarget', project: 'alpha', preview: 'rt-5385988d', items: ['AL-1', 'AL-2'] })])).toBe(true)
+    expect(check([call('cw_update_task', { number: 'AL-1', target: '1.2.0' }), call('cw_update_task', { number: 'AL-2', target: '1.2.0' })])).toBe(true)
+    expect(check([call('cw_update_tasks', { numbers: ['AL-1', 'AL-2'], target: '1.2.0' })])).toBe(true)
+  })
+
+  it("fails a preview alone (from and target: moves nothing), a failed call, or one card's only", () => {
+    expect(check([call('cw_queue', { action: 'retarget', project: 'alpha', from: '1.1.0', target: '1.2.0' })])).toBe(false)
+    expect(check([call('cw_queue', { action: 'retarget', project: 'alpha', preview: 'rt-5385988d', items: ['AL-1'] }, false)])).toBe(false)
+    expect(check([call('cw_update_task', { number: 'AL-1', target: '1.2.0' })])).toBe(false)
+  })
+})
+
 describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, by the run's own evidence (HI-2571)", () => {
   type Proc = { pid: number; name: string; label: string; created: string; parent: number }
   const h = helpers as unknown as { leftoversByOwner: (o: unknown) => { cli: Proc[]; agent: Proc[]; more: number } }
@@ -2268,5 +2296,24 @@ describe("watcher-stopped: what a stopped Monitor's pipeline left is the CLI's, 
     // What the CLI left stays visible: an observation, never a failure.
     expect(scenario.observe(stoppedIt)[0][1]).toBe(true)
     expect(scenario.observe(run([], []))[0][1]).toBe(false)
+  })
+})
+
+describe("review-record-trusted's reuse check (HI-2660)", () => {
+  // The record covers every test, so any test run is a rerun: it passes with none, or with a doubt the verdict names.
+  const NAME = 'ran no recorded test again, or the verdict names its doubt (reran … because …)'
+  const scenario = SCENARIOS.find((s) => s.id === 'review-record-trusted')!
+  const shell = (command: string) => ({ name: 'Bash', input: JSON.stringify({ command }), result: '', isError: false })
+  const check = (tools: unknown[], verdict: string) =>
+    scenario.expect({ skillsRead: ['review-agent-work'], combworkCalls: [], combworkMentions: [], replies: [], finalReply: '', tools, gitStatus: '', cards: { b: { history: [{ what: 'Review passed' }], comments: [{ by: 'Coder (alpha)', text: verdict }] } }, allCards: [], notes: [], live: [], tokenLeak: false }, {}).find(([n]) => n === NAME)?.[1]
+  it('passes with no rerun', () => {
+    expect(check([shell('git rev-parse --short HEAD')], 'Round 1: PASSED. Reused the record of this revision.')).toBe(true)
+  })
+  it('passes with a rerun whose doubt the verdict names', () => {
+    expect(check([shell('node --test greet.test.js')], 'Round 1: PASSED. Reran greet.test.js because the record shows 2 tests where the change adds one.')).toBe(true)
+  })
+  it('fails with a rerun and no named doubt', () => {
+    expect(check([shell('node --test greet.test.js')], 'Round 1: PASSED. Reran greet.test.js: 1 passed.')).toBe(false)
+    expect(check([shell('npm test')], 'Round 1: PASSED.')).toBe(false)
   })
 })

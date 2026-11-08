@@ -41,6 +41,8 @@ export interface QueueQueued {
   revision: string
   /** When it was queued (ISO). */
   at: string
+  /** HI-2709: the cards it waits for (keys), blocked by them while they aren't Done: the queue goes on without it. */
+  waitingOn?: string[]
 }
 
 /** An entry's outcome, kept for the panel: merged (with the result), returned to its builder (why, the log, the files), cancelled. */
@@ -159,6 +161,17 @@ export interface QueuePauseInfo {
 }
 
 /** A project's queue for one target. */
+/**
+ * A target's forward merges (HI-2679; the window's model only): the project's other targets it can be brought up to date
+ * with (its Bring up to date… button), and how far behind each one it is: the commits along the other's first-parent
+ * history it lacks (a card merged with a merge commit or squashed counts once, a rebased card once per commit); null when
+ * a head can't be read (unknown, never zero).
+ */
+export interface QueueForward {
+  others: string[]
+  behind: { from: string; commits: number | null }[]
+}
+
 export interface QueueView {
   /** The project's folder name and its folder. */
   project: string
@@ -185,6 +198,8 @@ export interface QueueView {
   pauses: QueuePauseLogged[]
   /** The project's current options have Combwork merge into this target (#1356; the window's model only). */
   combworkMerges: boolean
+  /** Its forward merges (HI-2679; the window's model only), where the project has more than one target. */
+  forward?: QueueForward
   /**
    * The project's cards in flight (started, not Done) whose own ruleset has Combwork merge into this target, by number
    * (#1356; the window's model only): an old ruleset's queue stays shown while they are.

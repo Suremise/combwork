@@ -10,6 +10,7 @@ import { formatToolInput } from '../claude/conversation'
 import { NOTICE_TEXT, firstLine, noticeOf, shortPath, type NewItem } from '../conversation'
 import type { ConversationParserLike, ExternalSession, ImageLocation, LiveDetails } from '../types'
 import { advancedValues as advanced } from '../../advancedValues'
+import { copilotPlanUsage } from './quota'
 
 /**
  * The Copilot CLI's sessions (COPILOT_HOME/session-state/<id>/): events.jsonl holds one JSON event per line,
@@ -122,6 +123,13 @@ export function eventsDetails(text: string, memo: CopilotDetailsMemo = copilotDe
       case 'session.shutdown':
         if (typeof d.totalNanoAiu === 'number') out.costUsd = nanoAiuToUsd(d.totalNanoAiu)
         if (typeof d.totalPremiumRequests === 'number') out.premiumRequests = d.totalPremiumRequests
+        break
+      default:
+        // The plan's limits a model call recorded (HI-2734, quota.ts): the latest valid reading in what was read.
+        if (r.type === advanced.get<string>('copilot.quota.event')) {
+          const u = copilotPlanUsage(d[advanced.get<string>('copilot.quota.snapshotsField')], typeof r.timestamp === 'string' ? r.timestamp : '')
+          if (u) out.planUsage = u
+        }
         break
       case 'abort':
         memo.denied = false

@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "La decisión está vacía: quítala en su lugar.",
   "tasks.error.decisionGone": "Esa decisión ya no está en la tarjeta {card}.",
   "tasks.error.decisionsUsers": "Solo el usuario cambia o quita las decisiones de una tarjeta.",
+  "tasks.error.dependencyTooLate": "{card} se está fusionando en {target} ahora, así que ya no puede esperar a {cards}. Sus dependencias no han cambiado.",
   "tasks.error.doingNobodyNew": "Una tarjeta creada en “En curso” necesita un agente en ella (agent). Pregunta al usuario qué quiere: un agente en ella, un agente que la empiece (créala en “Pendiente” y luego cw_start_task) o nadie en ella (créala en “Pendiente” y luego muévela con override y su motivo).",
   "tasks.error.emptyComment": "El comentario está vacío.",
   "tasks.error.emptyDecision": "La decisión está vacía.",
@@ -77,6 +78,14 @@
   "tasks.error.reviewTaken": "El agente {agent} ya está revisando la tarjeta {card} (desde {since} UTC).",
   "tasks.error.setAsideGone": "Esa tarjeta apartada ya no está, o no es una tarjeta: solo se puede descartar.",
   "tasks.error.staysInProject": "Las tarjetas se quedan en tu proyecto ({project}).",
+  "tasks.error.targetChanged": "Se fusiona en de {card} cambió desde que se listó, así que la tarjeta se queda como está.",
+  "tasks.error.targetCheckedOut": "{unknown, select, yes {Combwork no puede saber si la rama anterior de {card} sigue en uso, así que su «Se fusiona en» no cambia.} other {La rama anterior de {card} sigue extraída en {folder}, así que su «Se fusiona en» no cambia. Vuelve a intentarlo cuando esa carpeta haya pasado a otra cosa.}}",
+  "tasks.error.targetHasWork": "{unknown, select, yes {Combwork no puede saber si {card} tiene trabajo en su rama, así que su “Se fusiona en” se queda como está.} other {{card} tiene trabajo en su rama creada a partir de {target}, así que sigue fusionándose allí. Para moverla, crea una tarjeta nueva para ella en la otra rama y copia el cambio.}}",
+  "tasks.error.targetLane": "{card} está en el carril de {builder}, que se fusiona en {target}: las tarjetas de un carril se fusionan donde se fusiona el carril. Sácala primero del carril.",
+  "tasks.error.targetMissing": "{unknown, select, yes {Combwork no puede saber si existe la rama {target}, así que no se ha cambiado nada.} other {No hay ninguna rama {target} en este repositorio: créala primero y luego elígela.}}",
+  "tasks.error.targetMoved": "La rama anterior de {card} cambió mientras se cambiaba su «Se fusiona en», así que se queda como estaba. Mira primero lo que ha llegado allí.",
+  "tasks.error.targetNotAgents": "Solo tú o el Asistente deciden en qué rama se fusiona una tarjeta.",
+  "tasks.error.targetNotListed": "{hasTargets, select, yes {{target} no es una rama en la que se pueda fusionar trabajo aquí: indica {default}{hasOthers, select, yes { o una de {others}} other {}}, o agrégala en “Otras ramas en las que se puede fusionar el trabajo” (Control de versiones → Flujo de trabajo).} other {Este proyecto no fusiona el trabajo en ninguna rama que Combwork pueda elegir: el “Se fusiona en” de una tarjeta es para proyectos Git.}}",
   "tasks.error.tooLong": "{what, select, title {El título es demasiado largo (como máximo {max, number} caracteres).} description {La descripción es demasiado larga (como máximo {max, number} caracteres).} comment {El comentario es demasiado largo (como máximo {max, number} caracteres).} decision {La decisión es demasiado larga (como máximo {max, number} caracteres).} other {El motivo del bloqueo es demasiado largo (como máximo {max, number} caracteres).}}",
   "tasks.error.tooManyContext": "Una tarjeta puede tener hasta {max} secciones de documentos para leer primero.",
   "tasks.error.tooManyDecisions": "Una tarjeta puede tener hasta {max} decisiones.",
@@ -156,6 +165,7 @@
   "tasks.history.takenFromAgent": "Quitada a su agente",
   "tasks.history.takenFromOf": "Quitada al agente {agent} del proyecto {project}",
   "tasks.history.takenFromOfWorkspace": "Quitada al agente {agent} del espacio de trabajo",
+  "tasks.history.target": "{own, select, yes {Se fusiona en {target}} other {Se fusiona en la rama del proyecto}}",
   "tasks.history.toProject": "Movida al proyecto {project}",
   "tasks.history.toWorkspace": "Movida al espacio de trabajo",
   "tasks.history.unarchived": "Devuelta desde el archivo",
@@ -186,5 +196,6 @@
   "tasks.error.waitingNotYours": "Solo el propio agente de {card}, el usuario o el Asistente pueden marcarla como en espera o quitarlo.",
   "tasks.error.waitingTooLong": "El motivo de la espera es demasiado largo (como máximo {max, number} caracteres).",
   "tasks.history.notWaiting": "Ya no está en espera",
-  "tasks.history.waiting": "En espera: {reason}"
+  "tasks.history.waiting": "En espera: {reason}",
+  "tasks.error.targetDefaultMoved": "El trabajo se fusiona en volvió a cambiar mientras se movía {card}, así que la tarjeta se queda como está."
 }

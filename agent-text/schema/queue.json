@@ -145,6 +145,13 @@
   "queue.line.unenforced": {
     "placeholders": {}
   },
+  "queue.line.waiting": {
+    "placeholders": {
+      "who": "plain",
+      "target": "plain",
+      "cards": "plain"
+    }
+  },
   "queue.line.who": {
     "placeholders": {}
   },

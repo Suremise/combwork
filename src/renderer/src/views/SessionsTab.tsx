@@ -1490,7 +1490,9 @@ function TranscriptThumb({ project, sessionId, image, onOpen }: { project: Proje
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setVisible(true), { rootMargin: '400px' })
+    // Seen from the transcript's own scroller (HI-2726): from the window, the scroller clips the thumb and the margin never
+    // applies there, so one just below what shows loaded only once scrolled to.
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && setVisible(true), { root: el.closest('.transcript'), rootMargin: '400px' })
     io.observe(el)
     return () => io.disconnect()
   }, [])

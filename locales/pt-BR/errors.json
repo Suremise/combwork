@@ -1,4 +1,5 @@
 {
+  "errors.assistantMemory.noFolder": "Ainda não há uma pasta de memória para abrir.",
   "errors.assistantUndo.gone": "Essa alteração do Assistente não é mais mantida: as alterações são mantidas por 7 dias.",
   "errors.assistantUndo.which": "Escolha uma alteração do Assistente para desfazer, ou as alterações de uma mensagem.",
   "errors.changes.notFile": "{file} não é um arquivo de {folder}.",

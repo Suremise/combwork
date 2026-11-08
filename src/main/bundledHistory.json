@@ -67,7 +67,8 @@
       "6c2838fb53f21025",
       "b706867be0d1e21f",
       "07563718ad7aa495",
-      "9699fd9cb16fb4cf"
+      "9699fd9cb16fb4cf",
+      "7d4ed2343a8fb81a"
     ],
     "coordinate-agents": [
       "148fcb5639058ac2",
@@ -207,7 +208,8 @@
       "c3e9cee66dc8af50",
       "1be4da73a79f9625",
       "e3233ecca9df1696",
-      "e085e91f7e2f614f"
+      "e085e91f7e2f614f",
+      "fe3069ac7b327462"
     ],
     "run-lanes": [
       "b42f313edbb95eca",
@@ -269,7 +271,10 @@
       "a66e6adb57744631",
       "cedf490c660c0381",
       "ad984abf4993bfc8",
-      "46d8fbb868d76394"
+      "46d8fbb868d76394",
+      "71be14edebf4bd4d",
+      "08a02689fe91db08",
+      "d1fe5f9e19922642"
     ],
     "use-hive-api": [
       "c0281b780bf4d213",
@@ -324,7 +329,8 @@
       "375851b1e9796c8e",
       "c44e97bb6650c59c",
       "e4e3c955560eb4b5",
-      "7777f637f09d3a31"
+      "7777f637f09d3a31",
+      "353a6cfb4491802f"
     ],
     "workspace-note": [
       "5ecc6339b89ba668",
@@ -379,6 +385,9 @@
     ]
   },
   "dialects": {
+    "antigravity/cli": [
+      "8c2a6de9c73e6754"
+    ],
     "api/cli": [
       "c91cf96256abb477"
     ],

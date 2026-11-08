@@ -10,7 +10,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 // @ts-expect-error: plain .mjs modules without types
 import { SUITES } from './e2e/suites.mjs'
 // @ts-expect-error: plain .mjs modules without types
-import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, UNIT_ONLY, affectedSuites, under, unitTest } from './e2e/affected.mjs'
+import { AREAS, DOCS_ONLY, EVERYTHING, REAL_TIER, REASONS_PER_SUITE, UNIT_ONLY, UNIT_SCANS, affectedSuites, becauseLines, scanSelects, under, unitTest } from './e2e/affected.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { fingerprint } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -19,6 +19,8 @@ import { DEV_SEAMS, PACKAGED_SEAMS, TEST_CHANNELS, devBuildOnly, isRealCli, keep
 import { recordJson, recordMarkdown, selectionLine, selectionOf } from './e2e/record.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { makeDist } from '../scripts/distCopy.mjs'
+// @ts-expect-error: plain .mjs modules without types
+import { sleepExplained } from '../scripts/testWaits.mjs'
 // @ts-expect-error: plain .mjs modules without types
 import { buildLock, buildStamp, buildStamped, buildStampedAt, builtOnce, devBuild, ensureBuild, ensureBuildWithSlot } from './e2e/build.mjs'
 // @ts-expect-error: plain .mjs modules without types
@@ -52,13 +54,18 @@ describe('the e2e suite list', () => {
 
   it('names suites that exist, and every suite file is listed', () => {
     for (const n of names) expect(existsSync(join(dir, `${n}.cjs`)), n).toBe(true)
-    const helpers = ['lib', 'fake-bridge', 'fake-copilot-api', 'runContext', 'evidence', 'codexDiagnostics', 'folderProcesses', 'storeDocs', 'boardRows', 'sessionDeliveryCodec', 'windowsExits', 'layoutReport', 'queueFixture', 'fakeInstall', 'toolLimits']
     const files = execFileSync('git', ['ls-files', 'tests/e2e/*.cjs'], { cwd: root, encoding: 'utf8' })
       .split(/\r?\n/)
       .filter(Boolean)
       .map((f) => f.replace(/^tests\/e2e\//, '').replace(/\.cjs$/, ''))
       .filter((f) => !f.includes('/'))
-    for (const f of files) if (!helpers.includes(f)) expect(names, `${f}.cjs isn't in suites.mjs`).toContain(f)
+    // A helper is a .cjs some e2e file (a suite, lib, the runner) requires (HI-2689: derived, not a list kept by hand);
+    // anything else at the top of tests/e2e must be a suite.
+    const sources = execFileSync('git', ['ls-files', 'tests/e2e'], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter((f) => /\.(c|m)?js$/.test(f)).map((f) => readFileSync(join(root, f), 'utf8'))
+    const required = new Set(sources.flatMap((t) => [...t.matchAll(/require\(\s*(?:path\.join\(__dirname,\s*)?['"]\.\.?\/?([\w.-]+?)(?:\.cjs)?['"]/g)].map((m) => m[1])))
+    for (const f of files) if (!required.has(f)) expect(names, `${f}.cjs isn't in suites.mjs, and no e2e file requires it`).toContain(f)
+    // And each such helper is no suite (a suite is never loaded by another).
+    for (const f of files) if (required.has(f) && names.includes(f)) expect.fail(`${f}.cjs is a suite that another e2e file requires`)
   })
 
   it('says why a suite must run alone', () => {
@@ -149,16 +156,16 @@ describe('the e2e suite list', () => {
   })
 
   it('no fixed wait of 1 s or more without a reason: wait for the condition (lib.until) instead', () => {
-    // A long sleep is slower and flakier than waiting for what the next check needs. The ones left say why: they check
-    // that something does NOT happen, are a loop's poll interval, or are a race's timeout.
+    // A long sleep is slower and flakier than waiting for what the next check needs. The ones left say why, in the one
+    // accepted form npm run test:waits takes too (sleepExplained, HI-2689): a comment beside or above it (they check
+    // that something does NOT happen, or are a loop's poll interval), or a race's timeout.
     const unexplained: string[] = []
     for (const n of names) {
-      readFileSync(join(dir, `${n}.cjs`), 'utf8')
-        .split(/\r?\n/)
-        .forEach((line, i) => {
-          const m = /sleep\((\d+)\)/.exec(line)
-          if (m && Number(m[1]) >= 1000 && !/on purpose|poll interval|Promise\.race/.test(line)) unexplained.push(`${n}.cjs:${i + 1}`)
-        })
+      const lines = readFileSync(join(dir, `${n}.cjs`), 'utf8').split(/\r?\n/)
+      lines.forEach((line, i) => {
+        const m = /sleep\((\d+)\)/.exec(line)
+        if (m && Number(m[1]) >= 1000 && !sleepExplained(lines, i)) unexplained.push(`${n}.cjs:${i + 1}`)
+      })
     }
     expect(unexplained).toEqual([])
   })
@@ -175,11 +182,26 @@ describe('the e2e suite list', () => {
 describe('the suites a change needs (affected.mjs)', () => {
   const areas = AREAS as Area[]
 
-  it('puts every suite in an area, and names only real suites and paths', () => {
+  it('puts every suite in an area, or says it is covered by EVERYTHING; names only real suites and paths', () => {
     const inAreas = new Set(areas.flatMap((a) => a.suites))
-    for (const n of names) expect(inAreas.has(n), `${n} is in no area`).toBe(true)
+    // A suite whose code is all in EVERYTHING (so every change to it runs every suite) says so in suites.mjs, with why
+    // (HI-2689); any other suite is in an area.
+    for (const s of suites as { name: string; everything?: string }[]) {
+      if (s.everything !== undefined) {
+        expect(typeof s.everything === 'string' && s.everything.length > 10, `${s.name}: say what of EVERYTHING it covers`).toBe(true)
+        expect(inAreas.has(s.name), `${s.name} is in an area: drop its everything`).toBe(false)
+      } else expect(inAreas.has(s.name), `${s.name} is in no area`).toBe(true)
+    }
     for (const s of inAreas) expect(names, s).toContain(s)
     for (const p of [...areas.flatMap((a) => a.paths), ...(EVERYTHING as string[])]) expect(existsSync(join(root, p.replace(/\/$/, ''))), p).toBe(true)
+  })
+
+  it('every area selects something EVERYTHING does not: a path outside it, or a real-CLI suite (HI-2689)', () => {
+    // An area whose paths are all in EVERYTHING and whose suites are all fake changes nothing: any change to its paths
+    // runs every fake suite already. Real-CLI suites under EVERYTHING still pick the real tier, so they stay.
+    const real = new Set(realNames)
+    const dead = areas.filter((a) => a.paths.every((p) => under(p.endsWith('/') ? `${p}x` : p, EVERYTHING)) && a.suites.every((s) => !real.has(s)))
+    expect(dead.map((a) => a.paths.join(', '))).toEqual([])
   })
 
   it('covers every source file: in an area, one every suite needs, or one only the unit tests load', () => {
@@ -192,13 +214,13 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(affectedSuites(['tests/e2e/carddialog.cjs', 'docs/SPEC.md', 'CHANGELOG.md'], names).suites).toEqual(['about', 'carddialog'])
     expect(affectedSuites(['docs/USER_GUIDE.md'], names).suites).toEqual(['about', 'tipcorner', 'tips'])
     expect(affectedSuites(['README.md'], names).suites).toEqual([])
-    expect(affectedSuites(['CONTRIBUTING.md'], names)).toEqual({ suites: [], why: [] })
+    expect(affectedSuites(['CONTRIBUTING.md'], names)).toMatchObject({ suites: [], why: [] })
   })
 
   it('maps runtime resources and every user of a shared test helper (review round 1)', () => {
     expect(affectedSuites(['resources/skills/card-loop/SKILL.md'], names).suites).toEqual(expect.arrayContaining(['skills', 'skillaudience', 'skilldelivery', 'cardloop']))
     expect(affectedSuites(['resources/modes/planner.md'], names).suites).toEqual(expect.arrayContaining(['assistant', 'assistant-control']))
-    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['accounts', 'agenttemp', 'attachread', 'attention', 'carryingon', 'codexfolder', 'codexnewline', 'codexnudge', 'codexqueued', 'connectionfirst', 'connections-codex', 'defaultprovider', 'dialectlaunch', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'hooksview', 'lockask', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'slotguidance', 'termsize', 'turnledger', 'wakeputoff', 'workspacenotes'])
+    expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(['accounts', 'agenttemp', 'attachread', 'attention', 'carryingon', 'codexfolder', 'codexnewline', 'codexnudge', 'codexqueued', 'connectionfirst', 'connections-codex', 'defaultprovider', 'dialectlaunch', 'flightrecorder', 'footerfit', 'freshpath', 'hookshealth', 'hookstranscript', 'hooksview', 'independentlaunch', 'lockask', 'models', 'p7lane', 'providerdetect', 'reviewcopies', 'sessiontree', 'skilldelivery', 'slotguidance', 'termsize', 'turnledger', 'wakeputoff', 'workspacenotes'])
     // The shared tab strip selects every suite driving one, its keyboard and attachment users too (HI-1902).
     for (const f of ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts']) expect(affectedSuites([f], names).suites, f).toEqual(expect.arrayContaining(['keys', 'cardattach', 'image', 'vcswitch', 'versioncontrol', 'workflowdefaults', 'advanced']))
     expect(affectedSuites(['tests/e2e/fake-bridge.cjs'], names).all).toBe(true)
@@ -207,9 +229,9 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(affectedSuites(['scripts/release.mjs'], names).suites).toEqual(['testedclis'])
     expect(affectedSuites(['docs/SPEC.md'], names).suites).toEqual(['about'])
     expect(affectedSuites(['tests/progress.test.ts', 'AGENTS.md'], names).suites).toEqual([])
-    expect(affectedSuites(['scripts/notices/winshell.txt'], names, realNames)).toEqual({ suites: ['about'], why: ['scripts/notices/winshell.txt: about'] })
+    expect(affectedSuites(['scripts/notices/winshell.txt'], names, realNames)).toMatchObject({ suites: ['about'], why: ['scripts/notices/winshell.txt: about'] })
     // The skills for developing Combwork are notes for agents, neither shipped nor read by the app (#197).
-    expect(affectedSuites(['.claude/skills/verify-combwork-ui/SKILL.md', '.agents/skills/verify-combwork-ui/SKILL.md'], names, realNames)).toEqual({ suites: [], why: [] })
+    expect(affectedSuites(['.claude/skills/verify-combwork-ui/SKILL.md', '.agents/skills/verify-combwork-ui/SKILL.md'], names, realNames)).toMatchObject({ suites: [], why: [] })
     // Every suite file that uses the fake Codex is selected by it.
     const users = names.filter((n) => readFileSync(join(dir, `${n}.cjs`), 'utf8').includes('fake-codex'))
     expect(affectedSuites(['tests/e2e/fake-codex/fake-codex.cjs'], names).suites).toEqual(expect.arrayContaining(users))
@@ -221,9 +243,9 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(helpers).toEqual(expect.arrayContaining(['tests/electron-stub.ts', 'tests/tempDir.ts', 'tests/noGlobalGit.ts', 'tests/pathAliases.ts', 'tests/watchRealPaths.ts']))
     for (const f of [...helpers, ...(UNIT_ONLY as string[])]) {
       expect(unitTest(f), f).toBe(true)
-      expect(affectedSuites([f], names, realNames), f).toEqual({ suites: [], why: [] })
+      expect(affectedSuites([f], names, realNames), f).toMatchObject({ suites: [], why: [] })
     }
-    expect(affectedSuites(['vitest.config.ts', 'tests/tempDir.ts', 'tests/licenses.test.ts'], names, realNames)).toEqual({ suites: [], why: [] })
+    expect(affectedSuites(['vitest.config.ts', 'tests/tempDir.ts', 'tests/licenses.test.ts'], names, realNames)).toMatchObject({ suites: [], why: [] })
     // The runners' progress reporter isn't the unit tests' alone.
     expect(unitTest('tests/progressReport.mts')).toBe(false)
     expect(affectedSuites(['tests/progressReport.mts'], names).all).toBe(true)
@@ -240,6 +262,46 @@ describe('the suites a change needs (affected.mjs)', () => {
     expect(affectedSuites(['tests/e2e/lib.cjs'], names).all).toBe(true)
     expect(affectedSuites(['src/main/brandNewThing.ts'], names).all).toBe(true)
     expect(affectedSuites(['SRC\\Renderer\\src\\components\\Progress.tsx'], names).suites).toContain('progress')
+  })
+
+  it('the cross-cutting boundaries still mean every suite, each saying why (HI-2690)', () => {
+    for (const f of ['src/main/servers.ts', 'src/renderer/src/App.tsx', 'src/renderer/src/main.tsx', 'src/preload/index.ts', 'src/main/sessions.ts']) {
+      const r = affectedSuites([f], names)
+      expect(r.all, f).toBe(true)
+      expect(r.why[0], f).toMatch(/shared by every part of Combwork/)
+    }
+  })
+
+  it('a change of types only selects nothing, the real tier included; the Sandbox checks’ own files no e2e suite (HI-2690)', () => {
+    // splitSelections marks a types-only change (affectedUnits.mjs's typeOnlyChange, tests/affectedUnits.test.ts).
+    const why = 'src/main/providers/codex/adapter.ts: types only (erased before anything runs; typecheck checks them), so no suite'
+    const typed = affectedSuites(['src/main/providers/codex/adapter.ts'], names, realNames, { 'src/main/providers/codex/adapter.ts': { typeOnly: why, all: null, suites: [], why: [] } })
+    expect(typed).toMatchObject({ suites: [] })
+    expect(typed.why).toEqual([why])
+    const sandbox = affectedSuites(['tests/sandbox/checks.cjs', 'tests/sandbox/inside/drive.cjs', 'tests/sandbox/inside/install.ps1'], names, realNames)
+    expect(sandbox).toMatchObject({ suites: [] })
+  })
+
+  it('no e2e suite or scenario loads or reads the Sandbox checks’ files, and their unit tests stay selected (HI-2690)', () => {
+    const tracked = (...paths: string[]) => execFileSync('git', ['ls-files', ...paths], { cwd: root, encoding: 'utf8' }).split(/\r?\n/).filter(Boolean)
+    for (const f of tracked('tests/e2e', 'tests/scenarios').filter((p) => /\.(c|m)?js$/.test(p) && !/^tests\/e2e\/(affected|affectedUnits|relatedTests|typeProvenance)\.mjs$/.test(p))) {
+      const text = readFileSync(join(root, f), 'utf8')
+      expect(/tests[/\\]sandbox|['"`]\.\.[/\\]sandbox[/\\'"`]|join\([^)]*['"]sandbox['"]\s*,\s*['"](checks|clean|report|inside|wsb|client)/.test(text), f).toBe(false)
+    }
+    for (const t of ['tests/sandboxChecks.test.ts', 'tests/sandboxClean.test.ts', 'tests/sandboxCompare.test.ts', 'tests/sandboxReport.test.ts']) {
+      expect(UNIT_SCANS.some((e: { test: string }) => e.test === t && scanSelects(e, 'tests/sandbox/inside/drive.cjs')), t).toBe(true)
+    }
+  })
+
+  it('says why it picked each suite, at most a few reasons each, deduplicated (HI-2690)', () => {
+    const r = affectedSuites(['tests/e2e/progress.cjs', 'src/renderer/src/components/Progress.tsx', 'src/renderer/src/components/Progress.tsx'], names)
+    expect(r.because.progress[0]).toBe('tests/e2e/progress.cjs: its own suite')
+    expect(r.because.progress).toContain('src/renderer/src/components/Progress.tsx (its area)')
+    expect(new Set(r.because.progress).size).toBe(r.because.progress.length)
+    for (const s of r.suites) expect(r.because[s].length, s).toBeGreaterThan(0)
+    for (const s of r.suites) expect(r.because[s].length, s).toBeLessThanOrEqual(REASONS_PER_SUITE)
+    expect(becauseLines(r)[0]).toMatch(/^\S+: /)
+    expect(becauseLines(affectedSuites(['src/main/servers.ts'], names))).toEqual([])
   })
 
   it('a file no area names falls back to the full set, real tier too, wherever it is (#628)', () => {
@@ -267,7 +329,7 @@ describe('the suites a change needs (affected.mjs)', () => {
       expect(r.why[0], f).toMatch(/shared by every part of Combwork/)
     }
     // The scenarios themselves, and the notes on testing, are checked by npm run scenarios and need no suite.
-    for (const f of ['tests/scenarios/scenarios.cjs', 'tests/scenarios/README.md', 'tests/README.md', 'scripts/testWaits.mjs']) expect(affectedSuites([f], names, realNames), f).toEqual({ suites: [], why: [] })
+    for (const f of ['tests/scenarios/scenarios.cjs', 'tests/scenarios/README.md', 'tests/README.md', 'scripts/testWaits.mjs']) expect(affectedSuites([f], names, realNames), f).toMatchObject({ suites: [], why: [] })
   })
 
   it('picks real-CLI suites only for changes to what they cover (card #191)', () => {
@@ -1533,7 +1595,7 @@ describe('the Combworks a suite starts (lib.cjs testExecutable, keepPackagedQuie
     expect(lib.testExecutable(lib.ELECTRON)).toBe('dev')
     expect(lib.testExecutable(lib.PACKAGED_EXE)).toBe('packaged')
     // old-name: begin old-executables
-    // A 0.9 build's executable (Hive.exe) in a checkout's dist, as boardupgrade and upgradelane start it.
+    // A 0.9 build's executable (Hive.exe) in this checkout's dist.
     expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
     expect(lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'combwork-test', 'builds', 'Combwork.exe'))).toBe('packaged')
     // Combwork's install (HI-2460) and 1.0's from before.
@@ -1660,6 +1722,141 @@ describe('packaged test Combworks never check GitHub for updates (lib.cjs, #1332
     expect(lib.updateChecksLogged({ profile, since: '2026-10-21T10:00:00.000Z' })).toEqual([check])
     expect(lib.updateChecksLogged({ profile, since: '2026-10-21T11:00:00.000Z' })).toEqual([])
   })
+})
+
+describe("an old packaged build can't update, install or reach the user's folders (lib.cjs, HI-2741)", () => {
+  type Launch = { profile: string; since: string; blocked: string }
+  type Lib = {
+    PACKAGED_ARGS: string[]
+    DEAD_PROXY: string
+    packagedDialect: (exe: string) => string
+    inDialect: (env: Record<string, string>, prefix: string) => Record<string, string>
+    keepPackagedOffline: (m: object, a: { file: string; proxy: string }) => { noting: boolean }
+    packagedGuardProblems: (launches: Launch[], before: string[] | null, after?: string[]) => string[]
+    realFoldersListing: (dirs: string[]) => string[]
+    listingChanges: (before: string[], after: string[]) => string[]
+    aliasOldBridge: (m: object, name: string) => boolean
+  }
+  const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
+  const asar = createRequire(import.meta.url)('@electron/asar') as { createPackage: (src: string, dest: string) => Promise<void> }
+
+  /** A packaged build's folder whose main code is `files` (out/main/…), its exe a stand-in. */
+  const build = async (files: Record<string, string>) => {
+    const folder = tempDir('cw-dialect-')
+    const src = join(folder, 'src')
+    for (const [name, text] of Object.entries(files)) {
+      mkdirSync(join(src, 'out', 'main', 'chunks'), { recursive: true })
+      writeFileSync(join(src, 'out', 'main', name), text)
+    }
+    mkdirSync(join(folder, 'app', 'resources'), { recursive: true })
+    await asar.createPackage(src, join(folder, 'app', 'resources', 'app.asar'))
+    return join(folder, 'app', 'Combwork.exe')
+  }
+
+  // old-name: begin old-dialect-tests
+  it("finds the names a build reads its profile and update delay under, from its own code, and refuses a build that reads neither", async () => {
+    expect(lib.packagedDialect(await build({ 'index.js': 'a(process.env.CW_USER_DATA); setTimeout(f, Number(process.env.CW_UPDATE_DELAY))' }))).toBe('CW_')
+    // 0.9.3's, as its main code reads them (out/main/index.js).
+    expect(lib.packagedDialect(await build({ 'index.js': 'if (process.env.HIVE_USER_DATA) x(); Number(process.env.HIVE_UPDATE_DELAY) || FIRST_CHECK_DELAY' }))).toBe('HIVE_')
+    // In a chunk of its main code.
+    expect(lib.packagedDialect(await build({ 'index.js': 'require("./chunks/a.js")', 'chunks/a.js': 'process.env.HIVE_USER_DATA; process.env.HIVE_UPDATE_DELAY' }))).toBe('HIVE_')
+    // Its profile alone isn't enough: its update can't be put off.
+    await expect(async () => lib.packagedDialect(await build({ 'index.js': 'process.env.HIVE_USER_DATA' }))).rejects.toThrow(/reads its profile and its update delay under none of CW_, HIVE_/)
+    expect(() => lib.packagedDialect(join(tempDir('cw-dialect-'), 'Combwork.exe'))).toThrow(/couldn't be read/)
+  })
+
+  it("gives an old build the test environment's CW_ variables under its own names too, its own kept", () => {
+    const env = { CW_USER_DATA: 'C:\\t\\p', CW_UPDATE_DELAY: '2147483647', CW_API_PORT: '47901', HIVE_LANG: 'fr', CLAUDE_CONFIG_DIR: 'C:\\t\\c' }
+    expect(lib.inDialect(env, 'HIVE_')).toEqual({ ...env, HIVE_USER_DATA: 'C:\\t\\p', HIVE_UPDATE_DELAY: '2147483647', HIVE_API_PORT: '47901' })
+    expect(lib.inDialect(env, 'CW_')).toBe(env)
+  })
+
+  it("gives an old build's pages window.combwork, its own bridge (window.hive), on each load and on pages made later", async () => {
+    const pages: { win: Record<string, unknown>; handlers: Record<string, () => void>; loading: boolean }[] = []
+    const page = (loading: boolean) => {
+      const p = { win: { hive: { invoke: () => 'from 0.9' } } as Record<string, unknown>, handlers: {} as Record<string, () => void>, loading }
+      pages.push(p)
+      return {
+        isLoading: () => p.loading,
+        on: (e: string, f: () => void) => void (p.handlers[e] = f),
+        // The page's own world: the code runs with its window.
+        executeJavaScript: async (code: string) => new Function('window', code)(p.win)
+      }
+    }
+    const listeners: Record<string, (e: unknown, wc: unknown) => void> = {}
+    const first = page(false)
+    const modules = { app: { on: (e: string, f: (e: unknown, wc: unknown) => void) => void (listeners[e] = f) }, webContents: { getAllWebContents: () => [first] } }
+    expect(lib.aliasOldBridge(modules, 'hive')).toBe(true)
+    await Promise.resolve()
+    expect((pages[0].win.combwork as { invoke: () => string }).invoke()).toBe('from 0.9')
+    listeners['web-contents-created']({}, page(true))
+    expect(pages[1].win.combwork).toBeUndefined()
+    pages[1].handlers['dom-ready']()
+    await Promise.resolve()
+    expect(pages[1].win.combwork).toBe(pages[1].win.hive)
+  })
+  // old-name: end old-dialect-tests
+
+  it('starts offline: a dead proxy on its command line and on every session, and each request beyond this machine refused and noted', async () => {
+    expect(lib.PACKAGED_ARGS).toContain(`--proxy-server=${lib.DEAD_PROXY}`)
+    const file = join(tempDir('cw-offline-'), 'blocked.log')
+    const sessions: { proxy?: string; listener?: (d: { url: string }, done: (r: { cancel?: boolean }) => void) => void }[] = []
+    const made = () => {
+      const s: (typeof sessions)[number] & Record<string, unknown> = {}
+      s.setProxy = async (c: { proxyRules: string }) => void (s.proxy = c.proxyRules)
+      s.webRequest = { onBeforeRequest: (_f: object, l: (typeof s)['listener']) => void (s.listener = l) }
+      sessions.push(s)
+      return s
+    }
+    const listeners: Record<string, (s: unknown) => void> = {}
+    const defaultSession = made()
+    const modules = { app: { isReady: () => true, whenReady: async () => undefined, on: (e: string, f: (s: unknown) => void) => void (listeners[e] = f) }, session: { defaultSession } }
+    expect(lib.keepPackagedOffline(modules, { file, proxy: lib.DEAD_PROXY })).toEqual({ noting: true })
+    // The updater's partition, made later.
+    listeners['session-created'](made())
+    expect(sessions.map((s) => s.proxy)).toEqual([lib.DEAD_PROXY, lib.DEAD_PROXY])
+    const ask = (s: (typeof sessions)[number], url: string) => new Promise<{ cancel?: boolean }>((res) => s.listener!({ url }, res))
+    expect(await ask(sessions[1], 'https://github.com/Suremise/combwork/releases/download/v1.1.0/latest.yml')).toEqual({ cancel: true })
+    expect(await ask(sessions[0], 'http://127.0.0.1:47901/v1/health')).toEqual({})
+    expect(await ask(sessions[0], 'ws://localhost:9222/devtools')).toEqual({})
+    expect(await ask(sessions[0], 'http://[::1]:5173/')).toEqual({})
+    expect(readFileSync(file, 'utf8')).toMatch(/^\S+ https:\/\/github\.com\/Suremise\/combwork\/releases\/download\/v1\.1\.0\/latest\.yml\n$/)
+  })
+
+  // old-name: begin old-guard-tests
+  it("fails a suite whose packaged build ran outside its test profile, logged an update, tried the network, or changed the user's updater folders", () => {
+    const profile = tempDir('cw-guard-')
+    const since = '2026-01-01T00:00:00.000Z'
+    const blocked = join(profile, 'blocked.log')
+    const launch = { profile, since, blocked }
+    // Nothing logged in its profile: it ran in another (0.9.3 given CW_USER_DATA ran in %APPDATA%\Hive).
+    expect(lib.packagedGuardProblems([launch], null)).toEqual([expect.stringMatching(/wrote no log in its test profile/)])
+    mkdirSync(join(profile, 'logs'))
+    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-11-08T00:38:36.114Z [INFO] [updates] Update settings: check on, download auto, install auto, pre-releases off\n')
+    expect(lib.packagedGuardProblems([launch], null)).toEqual([])
+    // What 0.9.3 logged on 8 Nov, in its own log's name.
+    const lines = ['2026-11-08T00:39:06.119Z [INFO] [updates] Checking for update', '2026-11-08T00:39:19.886Z [INFO] [updates] New version 1.1.0 has been downloaded to C:\\x\\hive-updater\\pending\\Combwork-Setup-1.1.0.exe', '2026-11-08T00:40:06.229Z [INFO] [updates] Executing: C:\\x\\Combwork-Setup-1.1.0.exe with args: --updated,/S']
+    writeFileSync(join(profile, 'logs', 'hive.log'), lines.join('\n') + '\n', { flag: 'a' })
+    expect(lib.packagedGuardProblems([launch], null)).toEqual(lines.map((l) => expect.stringContaining(l)))
+    // A check that failed offline still counts.
+    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-11-08T00:39:07.000Z [WARN] [updates] Update check failed net::ERR_PROXY_CONNECTION_FAILED\n')
+    expect(lib.packagedGuardProblems([launch], null)).toEqual([expect.stringMatching(/Update check failed/)])
+    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-11-08T00:38:36.114Z [INFO] [main] started\n')
+    writeFileSync(blocked, '2026-11-08T00:39:06.200Z https://github.com/Suremise/hive-desktop/releases/latest\n')
+    expect(lib.packagedGuardProblems([launch], null)).toEqual([expect.stringMatching(/tried to reach beyond this machine .*hive-desktop/)])
+    rmSync(blocked)
+    // The user's folders, read only: a change fails it.
+    const updater = tempDir('cw-guard-updater-')
+    writeFileSync(join(updater, 'installer.exe'), 'old')
+    const before = lib.realFoldersListing([updater])
+    expect(lib.packagedGuardProblems([launch], before, lib.realFoldersListing([updater]))).toEqual([])
+    mkdirSync(join(updater, 'pending'))
+    writeFileSync(join(updater, 'pending', 'Combwork-Setup-1.1.0.exe'), 'new')
+    const after = lib.realFoldersListing([updater])
+    expect(lib.listingChanges(before, after)).toEqual([`+ ${join(updater, 'pending', 'Combwork-Setup-1.1.0.exe')}`, `+ ${join(updater, 'pending')}`])
+    expect(lib.packagedGuardProblems([launch], before, after)).toEqual([expect.stringMatching(/updater folders .* changed \(\+ .*Combwork-Setup-1\.1\.0\.exe\)/), expect.stringMatching(/changed \(\+ .*pending\)/)])
+  })
+  // old-name: end old-guard-tests
 })
 
 describe('whether a process still runs (lib.processRunning, #339)', () => {

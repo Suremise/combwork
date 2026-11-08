@@ -387,6 +387,16 @@
     "note": "A workflow option (glossary 2.6, G10).",
     "audience": "both"
   },
+  "workflow.option.otherTargets.desc": {
+    "text": "Branches a lane or a card can merge into instead (its Merges into), each through its own merge queue with the same merge checks, separated by commas.",
+    "note": "What the workflow option “Other branches work can merge into” does (HI-2556). Merges into is the lane’s and card’s field: as translated there.",
+    "audience": "both"
+  },
+  "workflow.option.otherTargets.title": {
+    "text": "Other branches work can merge into",
+    "note": "A workflow option (HI-2556, G7b): branches besides “Work merges into” that a lane or a card can be set to merge into (its “Merges into”). Darren’s name for it.",
+    "audience": "both"
+  },
   "workflow.option.preChecks.desc": {
     "text": "A card goes to review only once each of these named commands has passed on its work.",
     "note": "What the workflow option “Checks pass before review” does.",
@@ -553,8 +563,8 @@
     "audience": "both"
   },
   "workflow.refused.check.revisionMismatch.message": {
-    "text": "{revision} isn't what's checked out here.",
-    "note": "A refused check run: the revision named is not the checked-out one.",
+    "text": "{why, select, ambiguous {{revision} is the start of more than one commit here: give more of it. {head} is checked out.} other {{revision} isn't what's checked out here: {head} is.}}",
+    "note": "A refused check run or submission (HI-2671): the revision named ({revision}, as given, a commit id or its start) is not the checked-out commit ({head}, its first 12 characters). why=ambiguous: {revision} is the start of the checked-out commit but also of another one, so more of its characters are needed.",
     "audience": "both"
   },
   "workflow.refused.check.revisionMismatch.next": {
@@ -585,6 +595,16 @@
   "workflow.refused.evidence.changed.next": {
     "text": "Try again: Combwork reads it afresh.",
     "note": "The next step after a refusal because what a rule read changed meanwhile.",
+    "audience": "both"
+  },
+  "workflow.refused.forward.notAgents.message": {
+    "text": "{card} brings one branch up to date with another: only the user or the Assistant acts on it.",
+    "note": "HI-2679: a refused intent: an agent acted on a forward-merge card (Combwork’s own card that merges one of the project’s target branches into another). {card} is its key (HI-12).",
+    "audience": "both"
+  },
+  "workflow.refused.forward.notAgents.next": {
+    "text": "Leave it to the user or the Assistant.",
+    "note": "HI-2679: the next step after an agent was refused acting on a forward-merge card.",
     "audience": "both"
   },
   "workflow.refused.integrate.approved.message": {
@@ -765,6 +785,16 @@
   "workflow.refused.merge.combworkMerges.next": {
     "text": "Once it is approved, the merge queue merges it and moves it to Done: wait for that, or for it to come back.",
     "note": "The next step after a refused merge of a card Combwork merges, when it isn't in the merge queue yet.",
+    "audience": "both"
+  },
+  "workflow.refused.merge.waitsForBlockers.message": {
+    "text": "{card} depends on {waitsFor}, which isn't Done: it isn't closed as merged before then.",
+    "note": "HI-2709: a refused report of a merge: the card depends on {waitsFor} (card keys, comma-joined), which aren't Done yet. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.merge.waitsForBlockers.next": {
+    "text": "Wait for {waitsFor} to be Done, then report the merge again.",
+    "note": "HI-2709: the next step after a merge report refused for an unfinished dependency: {waitsFor} are card keys.",
     "audience": "both"
   },
   "workflow.refused.move.doingNobody.message": {

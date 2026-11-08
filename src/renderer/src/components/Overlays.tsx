@@ -22,7 +22,7 @@ import { cardLabel } from '@shared/projectKeys'
 import { cardMatches } from '@shared/tasks'
 import type { ConsoleRecordingInfo } from '@shared/devConsole'
 import { ProviderIcon } from './ProviderIcon'
-import { ConnectionSetupLine, useProviderWarnings } from './ConnectionChoice'
+import { ConnectionSetupLine, ServerSetupLines, useProviderWarnings } from './ConnectionChoice'
 import { AgentsDetail, CARD_COLUMN, PROJECT_COLUMN, STATE_COLUMN, type AgentColumn, type AgentTableGroup, type AgentTableRow } from './AgentsTable'
 import { BusyButton, CodeText, CopyableCode, Icon, IconButton, LoadFailed, Modal, SearchInput, STATUS_TEXT, useBackdrop, useBusy } from './ui'
 
@@ -352,12 +352,16 @@ export function CommandPalette() {
   // The rows are labelled in the language shown: made again when it changes, the palette open or not (#795).
   const shownLanguage = useLanguage()
 
-  useEffect(() => {
+  // It opens empty (HI-2730): what was typed last is cleared as it opens, before its first render, not in an effect after
+  // it, when the input has already taken the focus showing the old text and keys typed at once would join it.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
     if (open) {
       setQ('')
       setActive(0)
     }
-  }, [open])
+  }
 
   const items = useMemo(() => {
     const cmdItems = mode === 'projects' ? [] : commands
@@ -935,6 +939,7 @@ export function AgentSetupDialog() {
         </div>
       )}
       {on && <ConnectionSetupLine cli={tab} onOpen={close} />}
+      {on && <ServerSetupLines cli={tab} />}
       {!info || info.checking ? (
         <div className="setup-status">
           <Icon name="loading" spin />

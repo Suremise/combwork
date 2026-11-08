@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction, shortPath } from './pathAliases'
+import { bound, spyOnPrivate } from './keepType'
 
 const base = tempDir('cw-admission-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -342,9 +343,8 @@ describe('the usage worker (#1395)', () => {
     let release!: () => void
     const held = new Promise<void>((r) => (release = r))
     let waiting = false
-    const hist = usageHistory as unknown as { transport: () => Promise<unknown> }
-    const transport = hist.transport.bind(hist)
-    const spy = vi.spyOn(hist, 'transport').mockImplementationOnce(async () => {
+    const transport = bound(usageHistory, usageHistory['transport'])
+    const spy = spyOnPrivate(usageHistory, 'transport', usageHistory['transport']).mockImplementationOnce(async () => {
       waiting = true
       await held
       return transport()

@@ -261,7 +261,11 @@ export interface FactData {
    * dispatch lease, its role no longer reviews, it left the project). The submission waits for the pool again.
    */
   ReviewerReleased: { reviewer: string; submission: number; why: 'leased' | 'notReviewer' | 'gone'; design?: true }
-  Verdict: { reviewer: string; submission: number; revision: string | null; pass: boolean; failKind?: 'content' | 'explanation'; round: number; generation: number; comment: string }
+  /**
+   * `accepted` (HI-2660, a pass only): others' focused-test runs at its revision that the reviewer accepts as review
+   * evidence (realProof = review): each test, the original run's id and the agent that ran it, never relabelled.
+   */
+  Verdict: { reviewer: string; submission: number; revision: string | null; pass: boolean; failKind?: 'content' | 'explanation'; round: number; generation: number; comment: string; accepted?: { test: string; run: string; agent?: string }[] }
   CarriedOver: { from: string; to: string; toBase: string | null; how: 'replay' | 'sameRevision' }
   Updated: { entry: string; from: string; to: string; how: 'mergedTarget' | 'rebased'; carried: boolean }
   LineMoved: { line: string; from: string; to: string; why: 'squashContinuation' }
@@ -328,11 +332,19 @@ export interface FactData {
   /**
    * G20, realProof = review (the user's decision, 28 Oct): a real-CLI or packaged test accepted as proved by its reviewer's
    * counted run at the submitted revision (`run`), review evidence at that revision, never a run at the merged result.
+   * HI-2660: or another agent's run there that its reviewer's pass accepted (`acceptedBy`, that reviewer; `run` the
+   * original run, its agent its own).
    */
-  FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string }
+  FocusedAccepted: { entry: string; revision: string; result: string; test: string; run: string; acceptedBy?: string }
   Integrated: { entry?: string; revision: string; target: string; result: string; method: 'merge' | 'squash' | 'fastForward' | 'sameTree' | 'committed'; by: 'combwork' | 'agent' | 'outside'; outsideRules?: string[] }
   /** Some of an unfinished card's work found in the target (a partial hand merge): a mark, not a move (§16.4.4). */
   MergedInPart: { revision: string; target: string }
+  /**
+   * HI-2709: a card in Review whose submitted change (`submission`, its fact's seq) is found in its target already (a hand
+   * merge, or another card's merge that carried it): a mark, not a move. The card stays in Review and its review decides;
+   * once that passes, the queue (or the merge's report) finds the change in the target and closes it as merged.
+   */
+  InTarget: { revision: string; target: string; submission: number }
   /** A Done card's revision no longer in its target (the target was reset): a mark (§16.4.4). */
   LeftTarget: { revision: string; target: string }
   Accepted: { revision?: string; submission?: number }
@@ -353,6 +365,13 @@ export interface FactData {
    * user's reason, required). `proposed`: the agent's reason it answers, kept for history only.
    */
   ReviewSkipSet: { skip: boolean; by: 'user' | 'assistant'; reason: string; proposed?: string }
+  /**
+   * HI-2679: this card is a forward merge, bringing `to` up to date with `from` (two of its project's targets), asked by the
+   * user or the Assistant (`by`) through Combwork's forward request alone, never from a card's fields. `source`: `from`'s
+   * head as asked (each attempt's own frozen commit is its entry's `revision`). Written right after its `Started` (whose
+   * line is null: the source is never the card's branch); its authority for the queue in place of a review (§16.9).
+   */
+  ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
@@ -462,6 +481,8 @@ export interface CardState {
   approved: { revision: string | null; base: string | null } | null
   /** A content-stale pass (a new revision that isn't the same change), until the builder submits again or its line returns to the approved revision. */
   stale: FactData['Stale'] | null
+  /** HI-2679: a forward merge's request (its `ForwardRequested`), this cycle's; null for every other card. */
+  forward: FactData['ForwardRequested'] | null
   /** Open requests to the user: For you, each with when it was asked. */
   requests: Request[]
   /** Every request made this cycle, by id (answered or not). */
@@ -489,7 +510,7 @@ export interface CardState {
   checks: FactData['CheckRan'][]
   /** G20 (HI-1367): real-CLI and packaged focused tests accepted from their review at the merge (realProof = review). */
   focusedAccepted: FactData['FocusedAccepted'][]
-  marks: { mergedInPart?: FactData['MergedInPart']; leftTarget?: FactData['LeftTarget']; outsideRules?: string[] }
+  marks: { mergedInPart?: FactData['MergedInPart']; inTarget?: FactData['InTarget']; leftTarget?: FactData['LeftTarget']; outsideRules?: string[] }
   blocked: string | null
   /**
    * A card loop's step waiting on the other side (#1382, #1467): the builder's design or follow-up posted for its
@@ -530,6 +551,7 @@ export const emptyState = (): CardState => ({
   received: {},
   approved: null,
   stale: null,
+  forward: null,
   staleSince: null,
   requests: [],
   made: {},
@@ -673,6 +695,10 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
         if (d.rounds) s.moreRounds += d.rounds
         break
       }
+      case 'ForwardRequested': {
+        s.forward = f.data as FactData['ForwardRequested']
+        break
+      }
       case 'IntegrationRequested': {
         const d = f.data as FactData['IntegrationRequested']
         s.entries.push({ id: d.entry, seq: f.seq, revision: d.revision, target: d.target, ...(d.requeue ? { requeue: d.requeue } : {}), state: 'open', phases: [] })
@@ -717,6 +743,9 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'MergedInPart':
         s.marks.mergedInPart = f.data as FactData['MergedInPart']
+        break
+      case 'InTarget':
+        s.marks.inTarget = f.data as FactData['InTarget']
         break
       case 'LeftTarget':
         s.marks.leftTarget = f.data as FactData['LeftTarget']

@@ -44,7 +44,7 @@ export type CardIntent =
   | { kind: 'submit'; summary: string; revision?: string; note?: string; paths?: string[]; followUp?: boolean; tests?: FocusedTest[] }
   | { kind: 'declarePaths'; paths: string[] }
   | { kind: 'startReview'; submission?: number }
-  | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string }
+  | { kind: 'verdict'; submission?: number; pass: boolean; failKind?: 'content' | 'explanation'; comment: string; accept?: string[] }
   | { kind: 'reportMerge'; result?: string }
   | { kind: 'ask'; askKind: ForYouKind; text: string; revision?: string; checklist?: string[]; actions?: AskAction[] }
   | { kind: 'cannot'; rule: string; why: string }
@@ -56,7 +56,7 @@ export type CardIntent =
   /** The merge queue's controls (#1353): the user's, or the Assistant's with a reason (OP-9); never an agent's. */
   /** `guard`: the Assistant's change boundary, checked again inside the write. */
   | { kind: 'removeFromQueue'; reason: string; guard?: () => void }
-  | { kind: 'retryMerge'; reason: string; guard?: () => void }
+  | { kind: 'retryMerge'; reason: string; guard?: () => void; forward?: { source: string } }
 
 const M = {
   queueNotAgents: msg({ id: 'service.intent.queueNotAgents', defaultMessage: 'Only the user, or the Assistant within Settings → Assistant → Control, takes a card out of the merge queue or retries its merge.', description: "An error: an agent or a script asked to remove a card from the merge queue or retry its merge, which only the user and the Combwork Assistant (within its Control setting, a setting name: use it as Combwork shows it) can do." }),
@@ -115,7 +115,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'startReview':
         return w.startReview(named, who, { ...(intent.submission !== undefined ? { submission: intent.submission } : {}) })
       case 'verdict':
-        return w.verdict(named, who, { pass: intent.pass, comment: intent.comment, ...(intent.submission !== undefined ? { submission: intent.submission } : {}), ...(intent.failKind ? { failKind: intent.failKind } : {}) })
+        return w.verdict(named, who, { pass: intent.pass, comment: intent.comment, ...(intent.submission !== undefined ? { submission: intent.submission } : {}), ...(intent.failKind ? { failKind: intent.failKind } : {}), ...(intent.accept?.length ? { accept: intent.accept } : {}) })
       case 'reportMerge':
         return w.reportMerge(named, who, { ...(intent.result ? { result: intent.result } : {}) })
       case 'ask':
@@ -131,7 +131,7 @@ export async function runCardIntent(ref: CardRefIn, actor: TaskActor, intent: Ca
       case 'removeFromQueue':
         return w.removeFromQueue(named, intent.reason, by, intent.guard)
       case 'retryMerge':
-        return w.retryMerge(named, intent.reason, by, intent.guard)
+        return w.retryMerge(named, intent.reason, by, intent.guard, intent.forward)
       default:
         throw new Error(`not an intent here: ${intent.kind}`) // i18n-ignore: a mistake in Combwork's code, never shown
     }

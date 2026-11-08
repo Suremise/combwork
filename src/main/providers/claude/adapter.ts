@@ -27,9 +27,14 @@ import { claudeBackgroundTasks } from './background'
 import { claudeRetryWait } from './retry'
 import { claudeSafeguards } from './safeguards'
 import { claudeTranscriptTurns } from './turns'
+import { claudeUpdateChannel, type UpdateChannel } from './updateChannel'
+import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
 import { readClaudeModels } from './models'
+import { lastModelArg, localLimitsFor } from './localLimits'
+import { pickerFor } from './modelPicker'
+import { localLimitsTest } from '../../localLimitsTest'
 import { ClaudeUsageParser, encodeProjectPath, parseTranscript, transcriptSubSession } from './usage'
 import { atMost } from '../../../shared/atMost'
 import { joined } from '../../../shared/coalesce'
@@ -103,6 +108,28 @@ export function claudeTurnScreen(screen: string): 'idle' | 'working' | null {
 
 export function claudeHome(): string {
   return process.env.CLAUDE_CONFIG_DIR || join(homedir(), '.claude')
+}
+
+/** Claude Code's WinGet package (its docs' "winget install Anthropic.ClaudeCode"). */
+export const CLAUDE_WINGET_ID = 'Anthropic.ClaudeCode'
+
+/**
+ * The newest version the installer of `executable` delivers (HI-2729): a WinGet install's from the WinGet source (it
+ * gets Claude Code's releases days after npm, and `claude update` leaves it alone); any other's, npm's tag of the channel
+ * `claude update` follows (managed, then user settings: stable lags latest by about a week), none when that can't be told.
+ */
+export async function claudeLatestVersion(executable: string | null | undefined, deps: { channel?: () => Promise<UpdateChannel | null>; winget?: typeof wingetVersion } = {}): Promise<string | null> {
+  if (executable && isWingetPath(executable)) return (deps.winget ?? wingetVersion)(CLAUDE_WINGET_ID)
+  try {
+    const channel = await (deps.channel ?? (() => claudeUpdateChannel(claudeHome())))()
+    if (!channel) return null
+    const tags = (await plainHttpsJson('https://registry.npmjs.org/-/package/@anthropic-ai/claude-code/dist-tags', { timeoutMs: 6000 })) as Record<string, unknown>
+    // A channel npm has no tag for isn't latest's: none, not a version `claude update` won't install.
+    const tag = tags?.[channel]
+    return typeof tag === 'string' ? tag : null
+  } catch {
+    return null
+  }
 }
 
 /** The fields Combwork reads from `claude auth status --json` (HI-980), as Settings → Advanced names them. */
@@ -213,6 +240,17 @@ export function appendedInstructions(ctx: LaunchContext): string {
   return [ctx.instructions ?? '', ctx.notes ?? ''].map((t) => t.trim()).filter(Boolean).join('\n\n')
 }
 
+/** Combwork's own --model for a launch (its model, without a 1M suffix where 200K is asked for), or null. */
+const modelArg = (ctx: Pick<LaunchContext, 'model' | 'use200kContext'>): string | null => (ctx.model ? (ctx.use200kContext ? baseModel(ctx.model) : ctx.model) : null)
+
+/**
+ * The model a launch runs as on its command line (HI-2682, HR1's round 1): its arguments' last --model, as buildCommand
+ * puts them (Combwork's own, then the user's extra arguments, which win), or null when none names one.
+ */
+export function launchModel(ctx: Pick<LaunchContext, 'model' | 'use200kContext' | 'extraArgs'>): string | null {
+  return lastModelArg(withoutSettingsArgs(ctx.extraArgs)) ?? modelArg(ctx)
+}
+
 export class ClaudeCodeAdapter implements ProviderAdapter {
   readonly id = CLAUDE_CODE
   readonly descriptor = CLAUDE_DESCRIPTOR
@@ -318,12 +356,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return out
   }
 
-  async latestVersion(): Promise<string | null> {
-    try {
-      return ((await plainHttpsJson('https://registry.npmjs.org/@anthropic-ai/claude-code/latest', { timeoutMs: 6000 })) as { version?: string }).version ?? null
-    } catch {
-      return null
-    }
+  latestVersion(executable?: string | null): Promise<string | null> {
+    return claudeLatestVersion(executable)
   }
 
   isNewer(latest: string, current: string): boolean {
@@ -340,8 +374,14 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     return { file: '/bin/bash', args: ['-lc', 'curl -fsSL https://claude.ai/install.sh | bash'] } // i18n-ignore: a command run in a terminal
   }
 
+  /** `claude update`, except for a WinGet install, which it doesn't update ("Claude is up to date!"): WinGet does (HI-2729). */
   updateCommand(executable: string): CommandSpec {
+    if (isWingetPath(executable)) return wingetUpgradeCommand(CLAUDE_WINGET_ID)
     return { file: executable, args: ['update'] }
+  }
+
+  updateUpToDate(executable: string, exitCode: number): boolean {
+    return isWingetPath(executable) && wingetUpToDate(exitCode)
   }
 
   loginCommand(executable: string): CommandSpec {
@@ -449,6 +489,17 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const started = performance.now()
     // A --settings of the user's is read first: one Combwork can't read stops the launch before anything changes (#330).
     const theirs = await userSettings(ctx.extraArgs, ctx.cwd)
+    // A local model's limits on a server connection (HI-2682), resolved in this launch's own settings scopes: added to its
+    // environment (never the user's config) and recorded as applied. A conflict a settings file causes refuses the launch.
+    const serverCaps = this.descriptor.capabilities.connections?.server
+    const test = ctx.server && serverCaps ? localLimitsTest(serverCaps) : null
+    if (ctx.server && serverCaps && test) {
+      const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+      // The model it runs as, from its final arguments as buildCommand puts them (HR1's round 1): the user's own --model wins.
+      const got = localLimitsFor({ caps: serverCaps, models: ctx.server.models, connection: ctx.server.connection, agent: ctx.name, model: launchModel(ctx), env: ctx.env, scopes, test })
+      Object.assign(ctx.env, got.env)
+      ctx.localLimits = got.record
+    }
     const dir = this.launchDir(ctx.projectPath, ctx.agentId)
     const pluginDir = join(dir, 'plugin')
     const skillsDir = join(pluginDir, 'skills')
@@ -558,6 +609,13 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // The user's --settings merged in: Combwork passes only this file (#330).
     const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'CW_HOOK_TOKEN' })
     if (memoryDir) settings[field] = memoryDir
+    // A server connection's models in /model (HI-2684): their exact IDs and labels, unless a lineup of the user's wins.
+    if (ctx.server && test) {
+      const got = pickerFor({ models: ctx.server.models, connection: ctx.server.connection, scopes, test, owns: (id) => this.ownsModel(id) })
+      if (got.picker) settings.modelPicker = got.picker
+      ctx.picker = got.record
+      log.info(`${userText(ctx.agentId)}'s /model lineup: ${got.picker ? `${got.record.rows!.length} row(s)${got.record.replace ? ', replacing the built-in ones' : ''}` : `none (${got.record.why})`}${got.record.omitted ? `, ${got.record.omitted.length} left out` : ''}`)
+    }
     // Its offer to teach auto mode about the environment, turned off for this launch when the user said so (HI-1959,
     // Settings → Advanced): the skill's override in Combwork's settings file, never where their own --settings name it.
     if (!advanced.get<boolean>('claude-code.autoModeSetup.offer')) {
@@ -612,7 +670,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (refresh && ctx.resume && launchOverrides(ctx.overrides, CLAUDE_CODE, 'promptSnapshotOff') && ctx.cliVersion && compareVersions(ctx.cliVersion, PROMPT_SNAPSHOT_SINCE) >= 0 && !ctx.extraArgs.some((a) => /^--system-prompt-snapshot(=|$)/.test(a))) args.push('--system-prompt-snapshot', 'off')
     if (ctx.trustedCombworkTools?.length && ctx.mcpServers[TOOLS_SERVER] && launchOverrides(ctx.overrides, CLAUDE_CODE, 'preApproveCombworkTools')) args.push('--allowedTools', ctx.trustedCombworkTools.map((t) => `mcp__${TOOLS_SERVER}__${t}`).join(','))
     // With 1M turned off, Claude Code rejects a "[1m]" model as unrecognised (2.1.287): run the base model.
-    if (ctx.model) args.push('--model', ctx.use200kContext ? baseModel(ctx.model) : ctx.model)
+    const model = modelArg(ctx)
+    if (model) args.push('--model', model)
     if (ctx.effort) args.push('--effort', ctx.effort)
     // The CLI's own setting (#1284): no flag, so Claude Code's own settings (defaultMode) decide.
     if (ctx.permissionMode && !isCliOwnMode(ctx.permissionMode)) args.push('--permission-mode', ctx.permissionMode)
@@ -631,7 +690,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       for (const k of Object.keys(env)) if (k.toUpperCase() === 'CLAUDE_CODE_TMPDIR') delete env[k]
       env.CLAUDE_CODE_TMPDIR = ctx.tempDir
     }
-    return { file: s.file, args: s.args, env }
+    return { ...s, env }
   }
 
   autoCompact(ctx: LaunchContext, cmd: CommandSpec, models: string[]): AutoCompactSetting {
@@ -1117,8 +1176,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     const p = this.id
     // The user's own file: each connection's on in the workspace (HI-1755: each is its own home), else ~/.claude's.
     const users: MemorySource[] = homes
-      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('CLAUDE.md', h.name), path: join(h.home, 'CLAUDE.md'), kind: 'claude-md', exists: false })) // i18n-ignore: a file's name
-      : [{ provider: p, id: 'user', label: userMemoryLabel('CLAUDE.md'), path: join(claudeHome(), 'CLAUDE.md'), kind: 'claude-md', exists: false }] // i18n-ignore: a file's name
+      ? homes.map((h) => ({ provider: p, id: `user:${h.id}`, label: connectionMemoryLabel('CLAUDE.md', h.name), path: join(h.home, 'CLAUDE.md'), kind: 'claude-md', exists: false, scope: { connection: h.name } })) // i18n-ignore: a file's name
+      : [{ provider: p, id: 'user', label: userMemoryLabel('CLAUDE.md'), path: join(claudeHome(), 'CLAUDE.md'), kind: 'claude-md', exists: false, scope: 'user' }] // i18n-ignore: a file's name
     const sources: MemorySource[] = [
       { provider: p, id: 'project', label: 'CLAUDE.md', path: join(projectPath, 'CLAUDE.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
       { provider: p, id: 'project-dot', label: '.claude/CLAUDE.md', path: join(projectPath, '.claude', 'CLAUDE.md'), kind: 'claude-md', exists: false }, // i18n-ignore: a file's name
@@ -1126,15 +1185,22 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
       ...users
     ]
     for (const s of sources) s.exists = existsSync(s.path)
-    const dir = await this.transcriptDir(projectPath)
-    const memDir = dir ? join(dir, 'memory') : null
-    if (memDir && (await isDir(memDir))) {
-      const files = (await readdir(memDir)).filter((f) => f.endsWith('.md')).sort((a, b) => (a === 'MEMORY.md' ? -1 : b === 'MEMORY.md' ? 1 : a.localeCompare(b)))
-      for (const f of files) {
-        sources.push({ provider: p, id: `auto:${f}`, label: f, path: join(memDir, f), kind: 'auto-memory', exists: true })
-      }
-    }
+    sources.push(...(await this.autoMemory(projectPath)).files)
     return sources
+  }
+
+  /**
+   * Claude Code's auto memory for a folder: `memory/` in the folder its transcripts are under (`transcriptDir`, which
+   * a connection's home reaches through its junction, HI-1755), else where Claude Code would make it; its `.md` files,
+   * MEMORY.md (the index) first. A project's Memory tab lists them, and the Assistant's memory (HI-2666, its sessions run
+   * in the workspace's folder).
+   */
+  async autoMemory(folder: string): Promise<{ folder: string; files: MemorySource[] }> {
+    const dir = await this.transcriptDir(folder)
+    const memDir = join(dir ?? join(claudeHome(), 'projects', encodeProjectPath(claudeSpelling(folder))), 'memory')
+    if (!(await isDir(memDir))) return { folder: memDir, files: [] }
+    const names = (await readdir(memDir)).filter((f) => f.endsWith('.md')).sort((a, b) => (a === 'MEMORY.md' ? -1 : b === 'MEMORY.md' ? 1 : a.localeCompare(b)))
+    return { folder: memDir, files: names.map((f) => ({ provider: this.id, id: `auto:${f}`, label: f, path: join(memDir, f), kind: 'auto-memory', exists: true })) }
   }
 
   fileAllowed(path: string, write: boolean, homes?: readonly string[]): boolean {

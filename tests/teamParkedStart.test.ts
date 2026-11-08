@@ -7,13 +7,15 @@ import { join } from 'path'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
+import type { WorkspaceService } from '../src/main/workspace'
 
 const HUNG_MS = 10000
 const base = tempDir('cw-teamparked-start-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
-const h = vi.hoisted(() => ({ open: [] as unknown[], installed: 0 }))
-vi.mock('../src/main/workspace', async (orig) => ({ ...(await orig<object>()), openWorkspaces: () => h.open }))
+const h = vi.hoisted(() => ({ open: [] as WorkspaceService[], installed: 0 }))
+const { mockFactory } = await vi.hoisted(() => import('./keepType'))
+vi.mock('../src/main/workspace', mockFactory<typeof import('../src/main/workspace')>(async (orig) => ({ ...(await orig()), openWorkspaces: () => h.open })))
 vi.mock('../src/main/updater', async (orig) => ({ ...(await orig<object>()), restartAndInstall: () => void h.installed++, updateState: () => ({ status: 'ready' }) }))
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')

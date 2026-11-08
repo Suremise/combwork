@@ -84,6 +84,25 @@ describe('Git adapter', () => {
     expect(await G.sameChange(repo, { base, revision: r1 }, { base, revision: bin })).toBe(false)
   })
 
+  it('the key of a change with a binary is the one `--binary` gave, from blob ids rather than contents (HI-2748)', async () => {
+    repo = gitRepo(join(tempDir('git-'), 'r'))
+    writeFileSync(join(repo, 'bin.dat'), Buffer.from([0, 1, 2]))
+    const base = commit(repo, { 'a.txt': 'one\n' }, 'setup')
+    const binaryKey = (a: string, b: string) => execFileSync('git', ['patch-id', '--stable'], { cwd: repo, input: execFileSync('git', ['diff', '--binary', '--no-renames', '-U0', a, b], { cwd: repo }) }).toString().split(' ')[0]
+    const change = (bytes: number[]) => {
+      sh(repo, 'checkout', '-q', '--detach', base)
+      writeFileSync(join(repo, 'bin.dat'), Buffer.from(bytes))
+      return commit(repo, { 'a.txt': 'two\n' }, 'card')
+    }
+    const r1 = change([0, 1, 3])
+    const r2 = change([0, 1, 4])
+    // Keys already stored (submissions, passes) still match: the same id as before.
+    expect(await G.candidateKey(repo, base, r1)).toBe(binaryKey(base, r1))
+    expect(await G.candidateKey(repo, base, r2)).toBe(binaryKey(base, r2))
+    // Another binary content is another key, though the diff no longer carries contents.
+    expect(await G.candidateKey(repo, base, r1)).not.toBe(await G.candidateKey(repo, base, r2))
+  })
+
   it('on a new base with an equal key, the replay decides: whitespace and a moved edit are other changes; a hunk split with other content differs by key (S30)', async () => {
     repo = gitRepo(join(tempDir('git-'), 'r'))
     commit(repo, { 'p.py': 'def f():\n    return 1\n\ndef g():\n    return 1\n' }, 'setup')

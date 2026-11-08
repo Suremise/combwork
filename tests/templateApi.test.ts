@@ -12,6 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, onTestFinished, 
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import type { StoredAgent } from '../src/shared/agentFolders'
+import { bound } from './keepType'
 
 const base = tempDir('cw-template-api-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -317,7 +318,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
       if (revoked) throw new Error('Not allowed by Settings → Assistant → Control')
     }
     // The guard turns down just before the options' write takes the project file's lock.
-    const mutate = w.mutateProjectConfig.bind(w)
+    const mutate = bound(w, w.mutateProjectConfig)
     w.mutateProjectConfig = ((...a: Parameters<typeof mutate>) => {
       revoked = true
       return mutate(...a)
@@ -427,7 +428,7 @@ describe('loading a template for the Assistant, and undoing it', () => {
     it('apply refuses, changing nothing: a key that is no role, place or agent, two keys for one agent, a place out of range, a connection not usable here', async () => {
       accounts()
       setBeta()
-      await expect(apply({ builders: 'c-b' })).rejects.toThrow(/builders is not "\*", a role \(builder, reviewer, either, generalist\) or one of its agents: 1 \(Builder\), 2 \(Second\), 3 \(reviewer\)/)
+      await expect(apply({ builders: 'c-b' })).rejects.toThrow(/builders is not "\*", a role \(builder, reviewer, either, generalist, independent\) or one of its agents: 1 \(Builder\), 2 \(Second\), 3 \(reviewer\)/)
       // Builder, any case, is the agent's name: its place says which when the role's word is the name.
       await expect(apply({ BUILDER: 'c-b', 1: 'c-x' })).rejects.toThrow(/"1" and "BUILDER" both name agent 1 \(Builder\)/)
       await expect(apply({ 4: 'c-b' })).rejects.toThrow(/4 is out of range: there are 3 agents/)

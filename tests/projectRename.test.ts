@@ -306,7 +306,8 @@ describe('what keeps a project by name or path follows a rename, once (#514)', (
     testHooks.retryMs = RETRY
     let retry: (() => void) | null = null
     const schedule = globalThis.setTimeout
-    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: () => void, ms?: number) => {
+    // A stub by name (not a spy handed globalThis), so test selection reads it (HI-2715); unstubbed below.
+    vi.stubGlobal('setTimeout', ((fn: () => void, ms?: number) => {
       if (ms === RETRY && !retry) {
         retry = fn
         return { unref: () => undefined }
@@ -327,6 +328,7 @@ describe('what keeps a project by name or path follows a rename, once (#514)', (
       expect(prefs(ws, 'delta')).toBe('codex')
       progress.clear(ws)
     } finally {
+      vi.unstubAllGlobals()
       testHooks.retryMs = was
       await disposeWorkspaceService(w)
     }

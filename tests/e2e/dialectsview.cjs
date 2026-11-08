@@ -103,10 +103,15 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   check('Clara (a known model, Auto) shows as using the empty shipped Opus 5.5 file', !!(await until(async () => (await row('claude-code/Opus 5.5.json').locator('[data-users]').getAttribute('data-users').catch(() => null)) === '1', HUNG_MS)))
   check("…and the Workspace and CLI files, which her chain has too, not the test copy", (await row('workspace.json').locator('[data-users]').count()) === 1 && (await row(TEST_COPY).locator('[data-users]').count()) === 0)
   await shot('overview')
+  // Every provider's CLI file is listed in its group, Antigravity's too (HI-2720).
+  const agy = row('antigravity/cli.json')
+  check("Antigravity's CLI file is listed, for every Antigravity agent", !!(await until(async () => (await agy.count()) && (await agy.innerText()).includes('Every Antigravity agent'), HUNG_MS)), await agy.innerText().catch(() => ''))
+  await agy.scrollIntoViewIfNeeded()
+  await shot('antigravity')
 
   // --- Each file's on/off switch names the layer its texts fall back to (HI-2524).
   const onTip = (p, want) => lib.hoverTip(page, row(p).locator('.skill-delivered'), (t) => t.includes(want), HUNG_MS)
-  for (const [p, want] of [['claude-code/Opus 5.5.json', 'falls back to the Claude Code file'], [TEST_COPY, 'falls back to the Claude Code file'], ['claude-code/cli.json', 'falls back to the Workspace file'], ['api/cli.json', 'falls back to the Workspace file'], ['workspace.json', "falls back to Combwork's Default"]]) {
+  for (const [p, want] of [['claude-code/Opus 5.5.json', 'falls back to the Claude Code file'], [TEST_COPY, 'falls back to the Claude Code file'], ['claude-code/cli.json', 'falls back to the Workspace file'], ['antigravity/cli.json', 'falls back to the Workspace file'], ['api/cli.json', 'falls back to the Workspace file'], ['workspace.json', "falls back to Combwork's Default"]]) {
     const t = await onTip(p, want)
     check(`${p}'s switch says it ${want}`, t.includes(want), t)
   }

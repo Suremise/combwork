@@ -31,6 +31,10 @@
     "defaultMessage": "advanced.json's \"values\" should be an object of setting → value.",
     "description": "Above Settings → Advanced's list: the \"values\" field of advanced.json (keep both as they are) isn't a set of settings and their values."
   },
+  "service.advanced.onConnection": {
+    "defaultMessage": "\"{id}\" is set on each connection now: Settings → Accounts & Connections, a connection's ⋯ menu, Launch Settings.",
+    "description": "An error changing an advanced setting (HI-2670): this one moved to each connection's launch settings. {id} is the setting's id; Settings → Accounts & Connections and Launch Settings are where it is now: use their translated names."
+  },
   "service.advanced.unknown": {
     "defaultMessage": "No advanced setting \"{id}\".",
     "description": "An error changing an advanced setting: Combwork has none with the id {id}."
@@ -278,6 +282,42 @@
   "service.files.throughLink": {
     "defaultMessage": "Path leads outside the project (through a link)",
     "description": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project."
+  },
+  "service.forward.byAssistant": {
+    "defaultMessage": "the Assistant",
+    "description": "HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant."
+  },
+  "service.forward.byUser": {
+    "defaultMessage": "you",
+    "description": "HI-2679: who asked for a forward merge, in its card’s description: the user."
+  },
+  "service.forward.description": {
+    "defaultMessage": "Combwork merges {from} ({source}) into {to} through {to}’s merge queue, with its merge checks, as a merge commit. Asked by {by}. If it comes back (a conflict or a red check), Retry merge tries again with {from} as it is then; Remove from queue ends it, nothing merged.",
+    "description": "HI-2679: the description of the card Combwork makes for a forward merge. {from} and {to} are branch names, {source} a short commit id, {by} who asked (you, or the Assistant). Retry merge and Remove from queue are the card’s commands: as translated there."
+  },
+  "service.forward.missing": {
+    "defaultMessage": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",
+    "description": "HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys."
+  },
+  "service.forward.noGit": {
+    "defaultMessage": "This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.",
+    "description": "HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue."
+  },
+  "service.forward.notAgents": {
+    "defaultMessage": "Only the user or the Assistant brings one branch up to date with another.",
+    "description": "HI-2679: a forward merge refused: asked by a project agent or a script."
+  },
+  "service.forward.notTargets": {
+    "defaultMessage": "{from} and {to} must be two different branches this project merges work into: {targets}.",
+    "description": "HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them."
+  },
+  "service.forward.raced": {
+    "defaultMessage": "The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.",
+    "description": "HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare."
+  },
+  "service.forward.title": {
+    "defaultMessage": "Bring {to} up to date with {from}",
+    "description": "HI-2679: the title of the card Combwork makes for a forward merge: it merges branch {from} into branch {to} through {to}’s merge queue. Branch names."
   },
   "service.fsutil.keptBusy": {
     "defaultMessage": "{file} is being saved by something else: nothing was changed. Try again in a moment.",
@@ -731,6 +771,30 @@
     "defaultMessage": "No workspace is open",
     "description": "An error changing a workspace's lanes (card loops) while no workspace is open in the window."
   },
+  "service.lanes.targetBuilder": {
+    "defaultMessage": "A lane’s Merges into is set by the user or the Assistant, not its builder.",
+    "description": "HI-2556: an error, a lane’s own builder agent named the branch its lane merges into; only the user or the Combwork Assistant (or a script) sets it."
+  },
+  "service.lanes.targetCard": {
+    "defaultMessage": "{card} merges into {cardTarget}, and this lane into {target}: a lane’s cards merge where it does. Leave it out, or start it in a lane of its own.",
+    "description": "HI-2556: an error putting a card whose own Merges into is another branch than the lane’s into that lane. {card} is the card’s key (HI-12); {cardTarget} and {target} are branch names."
+  },
+  "service.lanes.targetFixed": {
+    "defaultMessage": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch.",
+    "description": "HI-2556: an error changing a running lane’s Merges into (fixed for its life). {builder} is the lane’s builder agent, {target} its branch."
+  },
+  "service.lanes.targetMissing": {
+    "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so the lane wasn’t started.} other {There is no branch {target} in this repository: make it first, then start the lane on it.}}",
+    "description": "HI-2556: an error starting a lane (a card loop) on a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys."
+  },
+  "service.lanes.targetNotListed": {
+    "defaultMessage": "{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a lane’s Merges into is for Git projects.}}",
+    "description": "HI-2556: an error starting a lane (a card loop) whose Merges into is a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys."
+  },
+  "service.lanes.targetRulesOff": {
+    "defaultMessage": "A lane merges into another branch only while workflow rules are enforced (Settings → Advanced).",
+    "description": "HI-2556: an error starting a lane with a Merges into other than the project’s while the switch “Workflow rules are enforced” (Settings → Advanced) is off."
+  },
   "service.lanes.teamPaused": {
     "defaultMessage": "The team is paused (before an update): resume the team first, then start the lane.",
     "description": "An error starting a lane (a card loop) while the user or the Combwork Assistant has paused the whole team before an update (HI-2081): nothing of a lane starts until the team resumes (Resume the Team, in the Progress panel's Lanes)."
@@ -772,7 +836,7 @@
     "description": "On the Performance page, under What isn't measured: the coding agent CLIs' own network traffic."
   },
   "service.metrics.notPerProvider": {
-    "defaultMessage": "Agent API requests, tool calls and the tool list aren’t recorded per provider: they are every provider’s.",
+    "defaultMessage": "Agent API requests and tool calls aren’t recorded per provider: they are every provider’s.",
     "description": "A note on the Performance page while it is filtered by provider: these numbers can't be narrowed to one provider."
   },
   "service.metrics.notSkillReads": {
@@ -918,6 +982,10 @@
   "service.workflow.inheritor": {
     "defaultMessage": "Project {project} inherits these options, and the change would make its options contradict each other:",
     "description": "Why saving workflow defaults (Settings → Workflow defaults or Settings → Workspace) was refused: a project that inherits them would have contradictory options. The reason follows on its own line. {project} is its name."
+  },
+  "service.workflow.targetInUse": {
+    "defaultMessage": "{branch} can’t be taken out of Other branches work can merge into while these use it: {uses}. Retarget or finish them first.",
+    "description": "HI-2680: a save of workflow options refused: it takes a branch out of Other branches work can merge into while cards, lanes, queue entries or slots still use it ({uses}: their keys and names). Other branches work can merge into is the option’s name: as translated there."
   },
   "service.workflowNotice.blocked": {
     "defaultMessage": "{card} is blocked: {reason}",

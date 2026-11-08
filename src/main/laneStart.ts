@@ -14,13 +14,14 @@ import { startTask, START_NOTE_MAX } from './taskStart'
 import { CW_LANE_START } from './tasks'
 import { inWorkspace } from './workspace'
 import { agentWorkflowRole, buildsWork, reviewsWork } from '../shared/workflow/roles'
-import { CombworkError, combworkError } from './combworkError'
+import { CombworkError, combworkError, saidError } from './combworkError'
 import { changeFreshStart, freshStartsNow, holdLaneStart, laneNow, laneRunsWith, lanesEnforced, listLanes, oweFreshStart, rawLanes, refuseWhileTeamPaused, retryFreshStarts, setLaneSlotWait, startLane } from './lanes'
 import { createLogger, userText } from './logger'
 import { whyNoLine } from './lineWriter'
 import { sessions } from './sessions'
 import { getTask } from './tasks'
 import { resolvedOf } from './workflow/rulesets'
+import { projectTargets } from './workflow/targets'
 import { workflowEnforced } from './workflow/service'
 import type { WorkspaceService } from './workspace'
 import type { AgentDef, ProjectConfig } from '../shared/types'
@@ -167,7 +168,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   const release = holdLaneStart(ws, project, builder.id)
   starting.add(key)
   try {
-    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}) })
+    const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}), ...(req.target !== undefined ? { target: req.target } : {}) })
     const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, cards.map((c) => c.number)))
     if (where.inSlots) {
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded
@@ -245,7 +246,9 @@ export async function laneStartInfo(ws: WorkspaceService, projectPath: string): 
   const cfg = await ws.projectConfig(projectPath)
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
-  return { pool: poolOf(cfg, options)?.map((a) => ({ id: a.id, name: a.name })) ?? null }
+  // Its Merges into (HI-2556): offered only with the rules on and another branch listed.
+  const t = options ? await projectTargets(ws, projectPath).catch(() => null) : null
+  return { pool: poolOf(cfg, options)?.map((a) => ({ id: a.id, name: a.name })) ?? null, targets: t && t.others.length ? t : null }
 }
 
 /**
@@ -346,6 +349,10 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
       const free = (): void => {
         if (over()) throw new LaunchOver()
         stillOurs()
+        // Its switch under way (a restart for its tools, a connection switch: HI-2739): its run is about to end and be
+        // resumed, so not free yet, even between the old run's exit and the resume.
+        const switching = sessions.switchUnderWay(projectPath, a.id)
+        if (switching) throw new NotFreeYet(switching)
         const st = sessions.liveFor(projectPath, a.id)
         if (st?.status === 'signin') throw combworkError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
         if (st && (BUSY.has(st.status) || sessions.agentNow(projectPath, a.id)?.pending || whyNoLine(projectPath, a.id, 'free') !== null)) throw new NotFreeYet(st.status)
@@ -372,7 +379,7 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
         })
       })
       // Made and then ended without being given (its launch failed after the record was saved): not started.
-      if (launched.record && NOT_GIVEN.has(launched.record.state)) throw new Error(say(A.notGiven, { agent: a.name, state: launched.record.state }))
+      if (launched.record && NOT_GIVEN.has(launched.record.state)) throw saidError(A.notGiven, { agent: a.name, state: launched.record.state })
       started.push({ agentId: a.id, name: a.name, role, how })
     } catch (e) {
       // Over at its launch (Combwork quitting): not started, and no failure; the next start starts it.
@@ -509,8 +516,9 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const left = [builder, reviewer].filter((a): a is AgentDef => !!a && !!sessions.liveFor(projectPath, a.id))
   // An idle builder outside slots (HI-2232, Darren's decision (a)): given the lane in a new conversation, as Start Lane…
   // gives it (its last stays in the Sessions history); in slots its card's start gives it one there. Never one in a turn
-  // or on a watch: left as it is.
-  const renew = !where.inSlots && left.includes(builder) && IDLE.has(sessions.liveFor(projectPath, builder.id)?.status ?? '') ? builder : null
+  // or on a watch: left as it is. One restarting (its exit typed for a switch, HI-2739: a workflow change just restarted
+  // it for its tools) has no turn to keep: owed its new conversation, given once it has resumed.
+  const renew = !where.inSlots && left.includes(builder) && (IDLE.has(sessions.liveFor(projectPath, builder.id)?.status ?? '') || sessions.switchUnderWay(projectPath, builder.id) === 'restarting') ? builder : null
   const leftOut = left.filter((a) => a !== renew)
   const running = leftOut.map((a) => a.name)
   if (leftOut.length === (reviewer ? 2 : 1)) return { started: [], running, ...who }
@@ -596,6 +604,8 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const builder = agents.find((a) => a.id === lane.builder.id)
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   if (!builder || !buildsWork(agentWorkflowRole(builder)) || (lane.reviewer && !reviewer)) return false
+  // Made a builder (or reviewer) while running and not restarted since (HI-2664): not its part's tools yet, so it waits.
+  if (!sessions.sideAllows(projectPath, builder.id, 'builder') || (reviewer && !sessions.sideAllows(projectPath, reviewer.id, 'reviewer'))) return false
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   if (over()) return false
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id

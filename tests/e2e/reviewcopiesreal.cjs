@@ -6,7 +6,9 @@
 // is named, with whose turn left it and its screen, #1546: a reviewer's shell starts in the project folder, and Haiku
 // ran `node test.js` there before running it in its copy, 2 runs in 3 at RC4, HI-2640). So the Claude Code and Codex
 // reviewers are given what a reviewer is told: start review's own reply line, which names the copy and says their shell stays
-// in their folder (HI-2640; the suite's own words alone didn't, and its start review is the suite's call, not theirs).
+// in their folder (HI-2640; the suite's own words alone didn't, and its start review is the suite's call, not theirs),
+// with their card's key and that its review is started already (HI-2669: that reply doesn't name the card, and Codex,
+// left to find it, started a review of the guidance's example key, AM-12, and stopped to ask for the real one).
 // An edit there
 // is never asked about (granted): a command may be (Claude Code's Accept edits and Copilot's ask before one), and is
 // answered Yes, counted in the output. What each CLI's own home has afterwards never names the copies folder (Combwork
@@ -162,6 +164,7 @@ const namingCopies = () => {
       gitIn(alpha, 'add', '-A')
       gitIn(alpha, 'commit', '-qm', `card ${n}`, '-m', `Combwork-Card: ${key}`)
       r.card = n
+      r.cardKey = key
       r.revision = gitIn(alpha, 'rev-parse', 'HEAD')
       const sub = await call(tb1, 'POST', `/v1/tasks/${encodeURIComponent(key)}/submit`, { summary: `Card ${n} done.`, revision: r.revision })
       check(`B1 builds and submits ${key} for ${r.def.name}`, s.status === 200 && sub.status === 200 && !!(await until(async () => (await card(n))?.column === 'review', HUNG_MS)), JSON.stringify({ s: s.body, sub: sub.body }))
@@ -197,12 +200,23 @@ const namingCopies = () => {
       const prompt =
         r.key === 'copilot'
           ? `write ${built} built then shell Set-Location '${folder}'; node test.js then say done`
-          : `Your review of a card has started. Combwork's reply: "${said}" Work only in that copy (outside your own folder; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" in the copy. Reply done.`
+          : // The card named, its review said to be started already (HI-2669): the start review's reply doesn't name it, and a
+            // reviewer left to find it guessed the example key in Combwork's guidance (AM-12) to start it again.
+            `Your review of card ${r.cardKey} has started already: don't start it again. Combwork's reply: "${said}" Work only in that copy (outside your own folder; you may use it). First create the file build.txt there containing the word built, with your file tools. Then run "node test.js" in the copy. Reply done.`
       // Its turn waits on the real CLI answering: an environment failure in its session meanwhile is a SKIP (lib.cliStep).
       let asked = 0
       let askedBeforeEdit = false
       await lib.cliStep(`${r.def.name}'s turn in its review copy`, { session: key }, async () => {
       const sent = await lib.sendPrompt(inv, key, prompt, { submitted: async () => (await live(r.def.id))?.status === 'working' || fs.existsSync(built), waitMs: HUNG_MS })
+      if (!sent) {
+        // Kept for the next time a CLI takes none of its attempts (HI-2693: Codex sat 8 min with the prompt in its box, and
+        // sendPrompt's line has only the output's last 300 characters): its whole screen as drawn, and the window.
+        const raw = (await inv('pty:buffer', key).catch(() => '')) ?? ''
+        fs.writeFileSync(at(`${r.key}-not-taken.txt`), lib.plainText(raw).slice(-12000))
+        fs.writeFileSync(at(`${r.key}-not-taken.raw`), raw.slice(-24000))
+        await page.screenshot({ path: at(`${r.key}-not-taken.png`) }).catch(() => undefined)
+        console.log(`INFO ${r.def.name}: took none of its prompt's attempts; its screen is kept in ${at(`${r.key}-not-taken.txt`)}, with .raw and .png`)
+      }
       check(`…${r.def.name} takes the prompt`, sent > 0)
       // Edits there are never asked about (granted); a command may be, and is answered Yes.
       const done = await until(async () => {

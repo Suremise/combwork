@@ -29,6 +29,7 @@
   "tasks.error.decisionEmptied": "Decyzja jest pusta: zamiast tego ją usuń.",
   "tasks.error.decisionGone": "Tej decyzji nie ma już na karcie {card}.",
   "tasks.error.decisionsUsers": "Decyzje karty zmienia i usuwa tylko użytkownik.",
+  "tasks.error.dependencyTooLate": "{card} jest właśnie scalana z {target}, więc nie może już czekać na {cards}. Jej zależności się nie zmieniły.",
   "tasks.error.doingNobodyNew": "Karta utworzona na etapie Aktywne potrzebuje agenta (agent). Zapytaj użytkownika, czego chce: agent przy niej, agent uruchomiony na niej (utwórz ją na etapie Do zrobienia, potem cw_start_task) albo nikt przy niej (utwórz ją na etapie Do zrobienia, potem przenieś ją z override i jego powodem).",
   "tasks.error.emptyComment": "Komentarz jest pusty.",
   "tasks.error.emptyDecision": "Decyzja jest pusta.",
@@ -77,6 +78,14 @@
   "tasks.error.reviewTaken": "Agent {agent} już recenzuje kartę {card} (od {since} UTC).",
   "tasks.error.setAsideGone": "Tej odłożonej karty już nie ma albo nie jest kartą: można ją tylko odrzucić.",
   "tasks.error.staysInProject": "Karty zostają w Twoim projekcie ({project}).",
+  "tasks.error.targetChanged": "„Scalanie do” karty {card} zmieniło się od wyświetlenia listy, więc karta zostaje bez zmian.",
+  "tasks.error.targetCheckedOut": "{unknown, select, yes {Combwork nie może ustalić, czy stara gałąź karty {card} jest nadal używana, więc jej „Scalanie do” pozostaje bez zmian.} other {Stara gałąź karty {card} jest nadal wybrana w {folder}, więc jej „Scalanie do” pozostaje bez zmian. Spróbuj ponownie, gdy ten folder przejdzie dalej.}}",
+  "tasks.error.targetHasWork": "{unknown, select, yes {Combwork nie może ustalić, czy karta {card} ma pracę na swojej gałęzi, więc jej „Scalanie do” pozostaje bez zmian.} other {Karta {card} ma pracę na swojej gałęzi utworzonej z {target}, więc nadal jest tam scalana. Aby ją przenieść, utwórz dla niej nową kartę na drugiej gałęzi i skopiuj zmianę.}}",
+  "tasks.error.targetLane": "Karta {card} jest w torze agenta {builder}, który jest scalany do {target}: karty toru są scalane tam, gdzie tor. Najpierw wyjmij ją z toru.",
+  "tasks.error.targetMissing": "{unknown, select, yes {Combwork nie może ustalić, czy gałąź {target} istnieje, więc nic nie zostało zmienione.} other {W tym repozytorium nie ma gałęzi {target}: najpierw ją utwórz, a potem wybierz.}}",
+  "tasks.error.targetMoved": "Stara gałąź karty {card} zmieniła się podczas zmiany jej „Scalanie do”, więc pozostaje bez zmian. Najpierw sprawdź, co tam dotarło.",
+  "tasks.error.targetNotAgents": "Tylko Ty lub Asystent możecie ustawić, do której gałęzi scalana jest karta.",
+  "tasks.error.targetNotListed": "{hasTargets, select, yes {{target} nie jest tu gałęzią, do której można scalać pracę: podaj {default}{hasOthers, select, yes { lub jedną z {others}} other {}} albo dodaj ją w „Inne gałęzie, do których można scalać pracę” (Kontrola wersji → Przepływ pracy).} other {Ten projekt nie scala pracy do żadnej gałęzi, którą Combwork może wybrać: „Scalanie do” karty jest dla projektów Git.}}",
   "tasks.error.tooLong": "{what, select, title {Tytuł jest za długi (limit znaków: {max, number}).} description {Opis jest za długi (limit znaków: {max, number}).} comment {Komentarz jest za długi (limit znaków: {max, number}).} decision {Decyzja jest za długa (limit znaków: {max, number}).} other {Powód blokady jest za długi (limit znaków: {max, number}).}}",
   "tasks.error.tooManyContext": "Karta może mieć najwyżej {max} sekcji dokumentów do przeczytania najpierw.",
   "tasks.error.tooManyDecisions": "Limit decyzji na kartę: {max}.",
@@ -156,6 +165,7 @@
   "tasks.history.takenFromAgent": "Odebrano jej agentowi",
   "tasks.history.takenFromOf": "Odebrano agentowi {agent} z projektu {project}",
   "tasks.history.takenFromOfWorkspace": "Odebrano agentowi {agent} z obszaru roboczego",
+  "tasks.history.target": "{own, select, yes {Scalanie do {target}} other {Scalanie do gałęzi projektu}}",
   "tasks.history.toProject": "Przeniesiono do projektu {project}",
   "tasks.history.toWorkspace": "Przeniesiono do obszaru roboczego",
   "tasks.history.unarchived": "Przywrócono z archiwum",
@@ -186,5 +196,6 @@
   "tasks.error.waitingNotYours": "Tylko własny agent karty {card}, użytkownik lub Asystent może oznaczyć ją jako czekającą albo to wyłączyć.",
   "tasks.error.waitingTooLong": "Powód czekania jest za długi (najwyżej {max, number} znaków).",
   "tasks.history.notWaiting": "Już nie czeka",
-  "tasks.history.waiting": "Czeka: {reason}"
+  "tasks.history.waiting": "Czeka: {reason}",
+  "tasks.error.targetDefaultMoved": "„Praca jest scalana do” zmieniło się ponownie podczas przestawiania karty {card}, więc karta zostaje bez zmian."
 }

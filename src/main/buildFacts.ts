@@ -94,8 +94,8 @@ export async function pickUpBuilds(ws: WorkspaceService): Promise<number> {
       break
     }
     try {
-      const f = text === null ? { error: 'unreadable' } : buildFactOf(JSON.parse(text))
-      if ('error' in f) log.warn(`a build marker that isn't one (${userText(name)}): ${f.error}`)
+      const f = text === null ? null : buildFactOf(JSON.parse(text))
+      if (!f || 'error' in f) log.warn(`a build marker that isn't one (${userText(name)}): ${f ? f.error.said : 'unreadable'}`)
       else if (recordBuild(ws, f).recorded) recorded++
     } catch (e) {
       log.warn(`reading a build marker (${userText(name)})`, e)

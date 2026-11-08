@@ -136,7 +136,8 @@ if (require.main === module) {
       await lib.openWorkspace(inv, page, ws)
       await lib.waitForProvider(inv)
       const agents = []
-      for (const name of ['One', 'Two', 'Three']) agents.push(await lib.addAgent(inv, alpha, { name }))
+      // Two reviews the board's lane (board.cjs): a lane's reviewer is a reviewer or an either-role agent (HI-2664).
+      for (const [name, workflowRole] of [['One'], ['Two', 'reviewer'], ['Three']]) agents.push(await lib.addAgent(inv, alpha, { name, ...(workflowRole ? { workflowRole } : {}) }))
       const apiToken = JSON.parse(fs.readFileSync(path.join(userData, 'agent-api.json'), 'utf8')).token
       const ctx = {
         app,

@@ -235,9 +235,35 @@ describe('workflow scenarios, several agents in one folder', () => {
     refusedBy(await e.wf.submit(card.key, B1, { summary: 'x' }), 'submit.checksPassed')
     const wrong = await runCheck(e.wf, { card, name: 'unit', by: 'B1', revision: sh(folder, 'rev-parse', 'HEAD~1'), exec: async () => ({ ok: true }) })
     expect(isRefusal(wrong) && wrong.rule).toBe('check.revisionMismatch')
+    // HI-2671: the refusal names what is checked out, not only what was given.
+    expect(isRefusal(wrong) && wrong.values).toMatchObject({ head: head.slice(0, 12), why: 'other' })
+    // A short id of the head, as `git log --oneline` shows it (upper case too), is the head.
+    const short = await runCheck(e.wf, { card, name: 'unit', by: 'B1', revision: head.slice(0, 7).toUpperCase(), exec: async () => ({ ok: true }) })
+    expect(short).toMatchObject({ counted: true })
     const good = await runCheck(e.wf, { card, name: 'unit', by: 'B1', revision: head, exec: async () => ({ ok: true }) })
     expect(good).toMatchObject({ counted: true })
-    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    moved(await e.wf.submit(card.key, B1, { summary: 'x', revision: head.slice(0, 7) }))
+    expect(e.wf.state(card).latest?.revision).toBe(head)
+  })
+
+  it("HI-2671: a revision named for a submission or a check: the head's full id or a start of it of 7+ hex characters; a short id of another commit, or anything else, is refused naming the head", async () => {
+    const e = (env = setup({ ...preset('git', 'pair'), preChecks: [], mergeChecks: [] }))
+    const card = e.wf.createCard({ title: 'Named' })
+    moved(await e.wf.start(card.key, B1))
+    const folder = e.wf.folderOf(e.wf.state(card))
+    const before = commit(folder, { 'a.txt': 'a\n' }, 'a')
+    const head = commit(folder, { 'b.txt': 'b\n' }, 'b')
+    const { notTheHead } = await import('../../src/main/platform/gitPlatform')
+    expect(await notTheHead(folder, head, head)).toBeNull()
+    expect(await notTheHead(folder, head.slice(0, 7), head)).toBeNull()
+    expect(await notTheHead(folder, ` ${head.slice(0, 10).toUpperCase()} `, head)).toBeNull()
+    // Another commit's short id; too short; not hex (a branch name, HEAD): refused, naming the head.
+    for (const named of [before.slice(0, 7), head.slice(0, 6), 'HEAD', 'main'])
+      expect(await notTheHead(folder, named, head), named).toEqual({ rule: 'check.revisionMismatch', values: { revision: named.toLowerCase(), head: head.slice(0, 12), why: 'other' } })
+    // A long one is shown shortened.
+    expect((await notTheHead(folder, before, head))?.values).toMatchObject({ revision: `${before.slice(0, 12)}…` })
+    refusedBy(await e.wf.submit(card.key, B1, { summary: 'x', revision: before.slice(0, 7) }), 'check.revisionMismatch')
+    moved(await e.wf.submit(card.key, B1, { summary: 'x', revision: head.slice(0, 8) }))
   })
 
   it("a check run reads the folder's head from its status before and after, and its git dir from `.git` (#1478: S58's runs were a long chain of gits)", async () => {

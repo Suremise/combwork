@@ -7,7 +7,8 @@ import { isProjectId } from '../shared/projectIds'
 import type { NoteFile } from '../shared/types'
 import { hashText, insideReal, readKeptJson, retryWhileSaving, withFileLock, writeKeptJson, writeTextAtomic } from './fsutil'
 import { msg } from '../shared/i18n'
-import { combworkError } from './combworkError'
+import { combworkError, saidError } from './combworkError'
+import { API } from './apiText'
 import { nameJournal, nameJournalNow as nameJournalNowOf, ownerOfName, ownersOfName } from './projectNames'
 import { currentWorkspace, workspace, type WorkspaceService } from './workspace'
 import { trash } from './trash'
@@ -315,7 +316,8 @@ export async function createHandover(project: string, title: string, content: st
   // All in the workspace it began in (a window switched meanwhile writes nothing into the next one).
   const ws = currentWorkspace()
   const at = workspaceAt(ws)
-  if (!at) throw new Error('No workspace is open') // i18n-ignore: the Agent API's handover (agents read English)
+  // The Agent API's handover (agents read English): its status is its kind (HI-2691).
+  if (!at) throw saidError(API.workspace.noneOpen, undefined, { kind: 'conflict' })
   const dir = join(at.shared, 'handovers')
   await mkdir(dir, { recursive: true })
   stillOpen(at)

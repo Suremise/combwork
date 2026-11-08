@@ -80,12 +80,13 @@ Texts are clipped: the task to 300 characters, the reply to 500, the last 3 tool
 - `context`: doc sections to read first, by file and heading slug as `cw_doc_outline` lists them ("docs/PLAN.md#setup", "shared:plans/notes.md#open-questions"), never line numbers. It replaces the card's list (`cw_update_task` too); `[]` clears it.
 - `attachments`: at most 10 files and 100 MB, each copied in (the same file once), and linked at the end of its description; with `cw_update_task`, in its comment, or at the end of its description without one.
 - `lane`: puts it on a lane as it is made, never by a guessed key: a builder's name (last on its running lane), or `{ builder, reviewer, … }` to start one if none.
+- `target` (also `cw_update_task`, `cw_lane`): a lane's is fixed once it starts; a card's changes only while its branch has no work of its own.
 
 ## Submitting and reviewing
 
 - `cw_submit` hands a card's committed work to review (a code card in Git needs its work committed; submitting never commits) and it moves on, to Review or past it where there is no review. As a lane's builder, Combwork then watches it for you. Its reply warns of files outside its paths and other agents' changes in a shared folder. `tests`: focused tests its merge runs beyond those its picker chooses (or all, when it can't choose): each a test id, or `{ id, needs }` (needs: unit, fake, real, packaged).
-- `cw_start_review`: you are its reviewer; the reply names the revision, base, files and the review copy.
-- `cw_verdict`: a pass moves it on (to Passed, or to its merge) once its reviews are in; a fail sends it back to Doing, a round counted, and as a lane's reviewer Combwork watches it for its next round.
+- `cw_start_review`: you review it; the reply names the revision, base, files, review copy and `checksAtRevision` (checks recorded there).
+- `cw_verdict`: a pass moves it on once its reviews are in; a fail sends it back to Doing, a round counted. `accept` (a pass): `runYourself` tests proved by another's run there.
 - `cw_ask_user` and `cw_cannot_within_rules` count no round and are no stall.
 
 ## Card loop steps (`cw_loop_step`)
@@ -112,6 +113,7 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 - `list` (`target` narrows to one queue): the card testing now and its step, the cards waiting in order, the latest outcomes (merged, returned and why, cancelled), and whether it is paused, why and by whom.
 - The Assistant's `pause`: the queue stops before its next card; one being checked finishes its checks and waits, unmerged. `resume`: it runs again; while what paused it is still there (a target checked out, the rules off), it stays paused and says so.
 - `remove` (`card`, `reason`): out of the queue, back to Approved, never merged, its builder woken; refused once its merge has begun. `retry`: queues a card the queue returned (its approved revision, unchanged) once more. Both take the user's reason, recorded with the override.
+- `retarget`, once Work merges into moved on: `from` (the finished target) and `target` (the new one) preview the Todo cards and free slots that can follow; with the user's OK, `preview` and `items` move them.
 - At Look and advise, only `list` works.
 
 ## Release Slot (`cw_release_slot`)
@@ -140,7 +142,7 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 
 `cw_add_agent`, `cw_update_agent`, `cw_start_task`: its connection sets model, effort, context, mode, CLI; `provider`, `model`, `effort`, `mode`, `context200k` refused.
 - `connection`: id or name (`cw_connection`). Default or empty: the first usable here.
-- `workflowRole`: builder, reviewer, either (never its own cards) or generalist (no lanes or reviews). Default: from its name.
+- `workflowRole`: builder, reviewer, either (never its own cards), generalist (no lanes or reviews) or independent (no cards, wakes or typing). Default: from its name. Its Combwork tools follow it: a running agent restarts to load them (asked first when busy). A lane part only takes a role that does it. Made Independent on a lane or holding a card: `confirm`, the refusal's fingerprint, once the user agreed.
 - `mcpServers`: `[]` none, `["*"]` all (default); combwork always.
 - A running agent takes a change when restarted; another CLI's connection only while stopped. A connection gone or off here: its CLI's first usable one runs it.
 - `cw_start_agent`: a folder new to its CLI asks the user to trust it.
@@ -150,6 +152,7 @@ One merge at a time into a branch (default: the project folder's). `claim` waits
 - A named setup (model, effort, context, mode, arguments) on an account (the user's alone).
 - `list`: id, account, CLI, values.
 - `add` on an existing `account`; `update` a `connection` (`""`: the CLI's own). Need Change settings and the user's OK; not undoable.
+- `launch` (`update`): an object, such as `{ "tools": false, "overrides": { … } }`, `{ "preset": "terminal" }` (all off) or `{}` (all on). `tools: false` makes its agents Independent; where that takes one off a lane or a card, `confirm` as for `cw_update_agent`.
 
 ## Documents (`cw_doc_outline` and `cw_read_section`)
 

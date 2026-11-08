@@ -21,7 +21,9 @@ import { allProviders } from './providers'
 import { providerService } from './providerService'
 import { connectionInput, type ConnectionPatch } from '../shared/accounts'
 import { accountsView, addAccount, addConnection, connectionHomes, duplicateConnection, moveConnectionInAccount, removeConnection, updateConnection, dismissConnectionsIntro, keepNewLogin, removeAccount, renameAccount, setUsageMove, moveConnection, setAccountOn, setUpPlace, setUpSignInConnection, signInAccount, getAccount, isServer } from './accounts'
-import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setUpServerConnection } from './serverConnections'
+import { launchImpact, setConnectionLaunch } from './connectionLaunch'
+import { addServerConnection, cancelServerModels, editServerConnection, readServerModels, removeServerKey, setServerKey, setServerModelContext, setServerModelOutput, setUpServerConnection } from './serverConnections'
+import { cancelServerChecks, lastServerCheck, readServerContext, testServerTools } from './serverDiagnostics'
 import { requireMasking } from './keyCoverage'
 import { resetMasking } from './keyStore'
 import { maskDeep, maskKeys } from './keyMatcher'
@@ -69,6 +71,7 @@ import * as tasks from './tasks'
 import { changeProjectKey, createProjectWithKey, keyProjects, sayKeysOnce } from './projectKeys'
 import { startTask } from './taskStart'
 import * as assistantControl from './assistantControl'
+import { assistantMemoryFolder, assistantMemoryFor } from './assistantMemory'
 import { finalWhys } from '../shared/assistantActivity'
 import { changeGroups } from './assistantChanges'
 import { UndoNotFound, userUndo } from './assistantUndo'
@@ -142,7 +145,8 @@ import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
 import { copyViews, stopIsolated } from './copiesApp'
-import { branchQueueCard, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
+import { retargetApply, retargetArg } from './workflow/retarget'
+import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
 import { msg, tr } from '../shared/i18n'
@@ -159,6 +163,7 @@ const M = {
   unknownProvider: msg({ id: 'errors.provider.unknown', defaultMessage: 'Unknown provider "{provider}".', description: "A call named a coding-agent CLI this version of Combwork doesn't know. {provider} is the id it gave." }),
   insideArchive: msg({ id: 'errors.file.insideArchive', defaultMessage: 'Combwork opens no files inside .asar archives.', description: 'Refusal to open a file inside an Electron .asar archive. Keep ".asar" as it is.' }),
   outsideWorkspace: msg({ id: 'errors.file.outsideWorkspace', defaultMessage: "Combwork can only read and write files inside the workspace, and the agents' instruction, memory and skill files.", description: 'Refusal to open or save a file outside what Combwork may touch.' }),
+  noMemoryFolder: msg({ id: 'errors.assistantMemory.noFolder', defaultMessage: "There's no memory folder to open yet.", description: "Refusal of Open Folder beside the Assistant's memory (HI-2736): its coding agent hasn't made the folder yet, or keeps no memory Combwork shows." }),
   noLog: msg({ id: 'errors.log.none', defaultMessage: 'That run reported no log.', description: "Progress panel: a run's log can't be opened because the run never said where it was." }),
   logNotFull: msg({ id: 'errors.log.notFullPath', defaultMessage: 'The run reported its log without a full path: {path}', description: "Progress panel: a run gave its log as a relative path, which Combwork won't open. {path} is that path." }),
   logGone: msg({ id: 'errors.log.gone', defaultMessage: "The log isn't there any more: {path}", description: "Progress panel: a run's log file was deleted or moved. {path} is where it was." }),
@@ -902,6 +907,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'tasks:setKind': (n, kind, opts) => tasks.setKind(n, kind, { kind: 'user' }, opts ?? {}),
     'tasks:confirmKind': (n, accept) => tasks.confirmKind(n, accept === true, { kind: 'user' }),
     'tasks:setReviewSkip': (n, skip, opts) => tasks.setReviewSkip(n, skip === true, { kind: 'user' }, { reason: opts?.reason }),
+    'tasks:setTarget': (n, target) => tasks.setTarget(n, typeof target === 'string' ? target.slice(0, 250) : null, { kind: 'user' }),
     // The window's change never skips a rule unasked (#1275): its moves go through tasks:move, which asks.
     'tasks:update': async (n, patch, more) => {
       const user = { kind: 'user' } as const
@@ -1017,6 +1023,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
+    'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
     'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),
@@ -1049,6 +1056,10 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'queue:history': (p, target) => queueHistory(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:seen': (p, target, entries) => markQueueSeen(workspace, workspace.assertProject(p), queueTarget(target), Array.isArray(entries) ? entries.filter((e): e is string => typeof e === 'string').slice(0, 100) : []),
     'queue:pause': (p, target) => pauseQueue(workspace, workspace.assertProject(p), queueTarget(target), 'user'),
+    'queue:forward': async (p, from, to) => {
+      const r = await forwardMerge(currentWorkspace(), workspace.assertProject(p), queueTarget(from), queueTarget(to), { kind: 'user' })
+      return 'upToDate' in r ? { upToDate: true, card: null, queued: false } : { upToDate: false, card: r.card.number, queued: r.queued }
+    },
     'queue:resume': (p, target) => resumeQueue(workspace, workspace.assertProject(p), queueTarget(target)),
     'queue:remove': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'removeFromQueue', typeof reason === 'string' ? reason : '')).card,
     'queue:retry': async (n, reason) => (await queueCardChange(workspace, n, { kind: 'user' }, 'retryMerge', typeof reason === 'string' ? reason : '')).card,
@@ -1154,7 +1165,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return projectAgents.addLegacyAgent(p, opts)
     },
     'agents:memory': async () => ({ running: await agentsMemory(), total: totalmem(), free: freemem() }),
-    'agents:update': (p, id, patch) => projectAgents.updateAgent(p, id, patch),
+    'agents:update': (p, id, patch, confirmed) => projectAgents.updateAgent(p, id, patch, { confirmed: typeof confirmed === 'string' ? confirmed : null }),
+    'agents:impact': (p, id, patch) => projectAgents.agentChangeImpact(p, id, patch),
     'agents:remove': (p, id, opts) => projectAgents.removeAgent(p, id, opts),
     'agents:worktreeChecks': (p) => projectAgents.worktreeChecks(p),
     'agents:missingWorktree': (p, id) => missingWorktree(workspace.assertProject(p), String(id)),
@@ -1575,7 +1587,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       const r = req && typeof req === 'object' ? req : ({} as LaneStartRequest)
       const cards = Array.isArray(r.cards) ? r.cards.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) > 0).slice(0, 200) : []
       if (typeof r.builder !== 'string' || !r.builder) throw combworkError(M.laneBuilderRequired, undefined, { kind: 'invalid' })
-      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}) })
+      return startLaneFromWindow(currentWorkspace(), workspace.assertProject(p), { builder: r.builder, reviewer: typeof r.reviewer === 'string' && r.reviewer ? r.reviewer : null, pool: r.pool === true, cards, note: typeof r.note === 'string' ? r.note.slice(0, 4000) : '', name: typeof r.name === 'string' ? r.name.slice(0, 200) : null, ...(r.applyNow === true ? { applyNow: true } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target.slice(0, 250) } : {}) })
     },
     'lanes:startInfo': (p) => laneStartInfo(currentWorkspace(), workspace.assertProject(p)),
     'costs:cards': (q) => {
@@ -1702,6 +1714,15 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'file:read': async (p) => readFile(guardFile(p), 'utf8').catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? '' : Promise.reject(e))),
     'file:write': (p, content, expected) => writeTextUnlessChanged(guardFile(p, true), content, expected),
 
+    'assistant:memory': (id) => (workspace.path ? assistantMemoryFor(workspace.path, knownProvider(id)) : { provider: knownProvider(id), folder: null, files: [] }),
+    // Its folder, as assistant:memory names it, never a path the window passes (HI-2736).
+    'assistant:openMemoryFolder': async (id) => {
+      const provider = knownProvider(id)
+      const folder = workspace.path ? await assistantMemoryFolder(workspace.path, provider) : null
+      if (!folder) throw combworkError(M.noMemoryFolder, undefined, { kind: 'notFound' })
+      const failed = await shell.openPath(folder)
+      if (failed) throw new Error(failed)
+    },
     'memory:list': async (p) => {
       const project = workspace.assertProject(p)
       return (await Promise.all(allProviders().map((a) => a.memorySources(project, connectionHomes(a.id, workspace.config))))).flat()
@@ -1813,6 +1834,13 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:removeKey': (id) => removeServerKey(id),
     'connections:readModels': (id, request) => readServerModels(id, String(request)),
     'connections:cancelModels': (id, request) => cancelServerModels(id, String(request)),
+    // Its diagnostics (HI-2683): read-only, asked for by the user; the key stays in main.
+    'connections:readContext': (id, model, request) => readServerContext(id, String(model), String(request)),
+    'connections:testTools': (id, model, request) => testServerTools(id, String(model), String(request)),
+    'connections:cancelCheck': (id, model, request) => cancelServerChecks(id, String(model), String(request)),
+    'connections:lastCheck': (id, model) => lastServerCheck(id, String(model)),
+    'connections:setModelContext': (id, model, tokens) => setServerModelContext(id, String(model), typeof tokens === 'number' ? tokens : null),
+    'connections:setModelOutput': (id, model, tokens) => setServerModelOutput(id, String(model), typeof tokens === 'number' ? tokens : null),
     'connections:setUp': async (id) => {
       await refreshPathBeforeStart()
       // A sign-in connection's Set Up (HI-1826): the CLI on its folder, for the first-run screens its sign-in leaves.
@@ -1832,6 +1860,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:move': (id, index) => moveConnection(id, Number(index)),
     'connection:add': (account, input) => addConnection(String(account), connectionInput(input) as ConnectionPatch & { name: string }),
     'connection:update': (id, patch) => updateConnection(String(id), connectionInput(patch)),
+    'connection:launchImpact': (id, launch) => launchImpact(String(id), launch),
+    'connection:setLaunch': (id, launch, confirmed) => setConnectionLaunch(String(id), launch, typeof confirmed === 'string' ? confirmed : null),
     'connection:duplicate': (id) => duplicateConnection(String(id)),
     'connection:remove': (id) => removeConnection(String(id)),
     'connection:move': (id, index) => moveConnectionInAccount(String(id), Number(index)),
@@ -1840,6 +1870,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'connections:dismissNotice': (keys) => dismissMovedNotice(workspace, Array.isArray(keys) ? keys.filter((k) => typeof k === 'string') : []),
     'connections:dismissIntro': () => dismissConnectionsIntro(),
     'session:switchConnection': (p, agentId) => sessions.switchAtSafePoint(p, agentId),
+    // An agent's role changed (HI-2664): restarted to load its side's tools, at once if idle, else when the user says.
+    'session:restartForTools': (p, agentId, when) => sessions.restartForTools(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
 
     'api:info': () => apiInfo(),
     'api:regenerateToken': async () => {

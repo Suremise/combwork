@@ -133,7 +133,7 @@
   },
   "settings.accounts.copilotNotSignedIn": {
     "defaultMessage": "Not signed in: sign in from Provider Setup",
-    "description": "GitHub Copilot's account when it isn't signed in (HI-2107). Provider Setup names a dialog."
+    "description": "GitHub Copilot's or the Antigravity CLI's account when it isn't signed in (HI-2107, HI-2544). Provider Setup names a dialog."
   },
   "settings.accounts.defaults.failed": {
     "defaultMessage": "Couldn't change the connection's defaults",
@@ -401,7 +401,7 @@
   },
   "settings.accounts.thisPc": {
     "defaultMessage": "Signed in for this PC",
-    "description": "On GitHub Copilot's account (Settings → Accounts & Connections, HI-2107): its one sign-in is the PC's, used in every workspace."
+    "description": "On GitHub Copilot's or the Antigravity CLI's account (Settings → Accounts & Connections, HI-2107, HI-2544): its one sign-in is the PC's, used in every workspace."
   },
   "settings.accounts.usageLabel": {
     "defaultMessage": "{window, select, fiveHour {5-hour} weekly {Weekly} other {{label}}}",
@@ -458,6 +458,222 @@
   "settings.accounts.usedBy": {
     "defaultMessage": "{assistant, select, yes {{n, plural, =0 {Assistant} one {Assistant and # agent} other {Assistant and # agents}}} other {{n, plural, =0 {Not used here} one {# agent} other {# agents}}}}",
     "description": "Who uses a connection, on its row (Settings → Accounts & Connections, HI-2107): the Assistant (assistant is yes) and how many agents ({n}) of the open workspaces. Its tooltip names them. \"Not used here\": none in the open workspaces."
+  },
+  "settings.advanced.antigravity.hooks.editPathField.desc": {
+    "defaultMessage": "The argument of agy's edit tools that names the file they edit. Wrong, Combwork can't tell which file an edit is of, and file locks don't apply to it.",
+    "description": "What the advanced setting \"Hooks: the file an edit names\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.hooks.editPathField.title": {
+    "defaultMessage": "Hooks: the file an edit names",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.hooks.editTools.desc": {
+    "defaultMessage": "agy's tools that edit a file. Combwork checks file locks on these. Missing one, its edits go ahead whoever holds the file.",
+    "description": "What the advanced setting \"Hooks: tools that edit a file\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.hooks.editTools.title": {
+    "defaultMessage": "Hooks: tools that edit a file",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.hooks.knownEvents.desc": {
+    "defaultMessage": "The hook events Combwork knows agy sends. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook named outside this list saves a capture of the agent's recent events.",
+    "description": "What the advanced setting \"Hooks: known events\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.hooks.knownEvents.title": {
+    "defaultMessage": "Hooks: known events",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.hooks.knownFields.desc": {
+    "defaultMessage": "The top-level fields Combwork knows agy sends in its hooks. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a hook with a field outside this list saves a capture of the agent's recent events: often the first sign that an agy update changed something. Add a field here once you know it is harmless.",
+    "description": "What the advanced setting \"Hooks: known fields\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.hooks.knownFields.title": {
+    "defaultMessage": "Hooks: known fields",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.desc": {
+    "defaultMessage": "How long agy waits for Combwork's answer before a tool runs (an edit waits for a file lock). Too short, an edit of a locked file can go ahead before Combwork refuses it.",
+    "description": "What the advanced setting \"Hooks: before a tool, timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.hooks.preToolUseTimeoutSeconds.title": {
+    "defaultMessage": "Hooks: before a tool, timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.desc": {
+    "defaultMessage": "How long agy waits for Combwork to take one of its hooks. Too short, Combwork misses what agy reports and an agent may look stuck.",
+    "description": "What the advanced setting \"Hooks: timeout\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.hooks.timeoutSeconds.title": {
+    "defaultMessage": "Hooks: timeout",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.desc": {
+    "defaultMessage": "Whether Combwork's hooks run before and after each of agy's tool calls: they show an agent working on a tool, and refuse an edit of a file another agent has locked. Turned off, Combwork follows agy's tools only by its status line, and file locks don't apply to Antigravity agents.",
+    "description": "What the advanced setting \"Hooks: before and after each tool\" does (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.hooks.toolHooks.title": {
+    "defaultMessage": "Hooks: before and after each tool",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.hooks.userStepWaitSeconds.desc": {
+    "defaultMessage": "How long Combwork waits for what began a turn to be in agy's transcript as the turn starts. Too short, a turn you began counts as one agy began itself.",
+    "description": "What the advanced setting \"Hooks: wait for the prompt in the transcript\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.hooks.userStepWaitSeconds.title": {
+    "defaultMessage": "Hooks: wait for the prompt in the transcript",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.models.line.desc": {
+    "defaultMessage": "One line of agy models' list: the model's id (its first group), then its display name (its second). Combwork passes the id and shows the name.",
+    "description": "What the advanced setting \"A model in agy models\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it."
+  },
+  "settings.advanced.antigravity.models.line.title": {
+    "defaultMessage": "A model in agy models",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of one line of the CLI's model list. agy models is a command: keep it."
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.desc": {
+    "defaultMessage": "Combwork starts agy with AGY_CLI_DISABLE_AUTO_UPDATE=true (its sessions, and checking its sign-in and models), so it runs the version installed and a download never changes it between a session's restarts; Update in Provider Setup updates it when you choose. Turned off, Combwork doesn't set it and agy updates itself as it would outside Combwork (your own AGY_CLI_DISABLE_AUTO_UPDATE still applies).",
+    "description": "What the advanced setting \"Don't let Antigravity update itself\" does (Settings → Advanced, under Antigravity CLI). agy is a command and AGY_CLI_DISABLE_AUTO_UPDATE=true an environment variable: keep them. Update is a button's name and Provider Setup a dialog's."
+  },
+  "settings.advanced.antigravity.override.noAutoUpdate.title": {
+    "defaultMessage": "Don't let Antigravity update itself",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.desc": {
+    "defaultMessage": "Combwork starts agy with an allow rule for Combwork's tools in its settings for that session (for the Assistant, only those its Control settings let it use without asking), so agy doesn't ask before them. Turned off, agy asks before them as its own permission mode says. What an agent or the Assistant may do with them is still decided by Combwork.",
+    "description": "What the advanced setting \"Pre-approve Combwork's tools\" does (Settings → Advanced, under Antigravity CLI). agy is a command: keep it. Control is the name of the Assistant's settings page."
+  },
+  "settings.advanced.antigravity.override.preApproveCombworkTools.title": {
+    "defaultMessage": "Pre-approve Combwork's tools",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.desc": {
+    "defaultMessage": "Combwork leaves GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT out of agy's environment (its sessions, and checking its sign-in and models), so a key or account another tool set never switches Antigravity agents away from this PC's sign-in. Turned off, agy gets them from Combwork's environment as it would outside Combwork.",
+    "description": "What the advanced setting \"Keep other accounts' variables from Antigravity\" does (Settings → Advanced, under Antigravity CLI). GEMINI_API_KEY, AGY_ADC_AUTH and AGY_ACCOUNT are environment variables and agy a command: keep them."
+  },
+  "settings.advanced.antigravity.override.stripAccountVars.title": {
+    "defaultMessage": "Keep other accounts' variables from Antigravity",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): one of Combwork's overrides of the CLI, on by default."
+  },
+  "settings.advanced.antigravity.signIn.needed.desc": {
+    "defaultMessage": "What agy models prints when the PC isn't signed in to Antigravity. Only this says signed out: any other failure (the network, the service, a timeout) is shown as it is, never as a sign-in to do.",
+    "description": "What the advanced setting \"Not signed in (agy models)\" is (Settings → Advanced, under Antigravity CLI). agy models is a command: keep it."
+  },
+  "settings.advanced.antigravity.signIn.needed.title": {
+    "defaultMessage": "Not signed in (agy models)",
+    "description": "An advanced setting's title (Settings → Advanced, under Antigravity CLI): the pattern of the CLI's message when it isn't signed in. agy models is a command: keep it."
+  },
+  "settings.advanced.antigravity.statusLine.confirmField.desc": {
+    "defaultMessage": "The status line's field that is true while agy shows a permission prompt (agy sends no hook for one). Wrong, an agent waiting for your answer shows as working.",
+    "description": "What the advanced setting \"Status line: a permission prompt is showing\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.statusLine.confirmField.title": {
+    "defaultMessage": "Status line: a permission prompt is showing",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.statusLine.idleGraceSeconds.desc": {
+    "defaultMessage": "How long agy's status line must say idle, with no hook ending the turn, before Combwork takes the turn as interrupted (cancelling agy's permission prompt sends no hook). Too short, a turn whose end is on its way can show as interrupted; too long, a cancelled turn shows as working that much longer.",
+    "description": "What the advanced setting \"Status line: idle without a turn end\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.statusLine.idleGraceSeconds.title": {
+    "defaultMessage": "Status line: idle without a turn end",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.desc": {
+    "defaultMessage": "The top-level fields Combwork knows agy sends in its status line. With Settings → Advanced → Flight recorder: capture something unknown from a CLI on, a status line with a field outside this list saves a capture of the agent's recent events. Add a field here once you know it is harmless.",
+    "description": "What the advanced setting \"Status line: known fields\" is for (Settings → Advanced). Flight recorder: capture something unknown from a CLI is another setting's title: use it as Settings shows it. agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.statusLine.knownFields.title": {
+    "defaultMessage": "Status line: known fields",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.statusLine.otherModels.desc": {
+    "defaultMessage": "The models part of the quota for other providers' models (not Gemini). Wrong, that limit shows by agy's own name for it.",
+    "description": "What the advanced setting \"Status line: other providers' models\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.antigravity.statusLine.otherModels.title": {
+    "defaultMessage": "Status line: other providers' models",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.statusLine.planTier.desc": {
+    "defaultMessage": "The status line's field with your plan's name. Wrong, Antigravity's plan limits show without it.",
+    "description": "What the advanced setting \"Status line: plan's name field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.antigravity.statusLine.planTier.title": {
+    "defaultMessage": "Status line: plan's name field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.statusLine.quota.desc": {
+    "defaultMessage": "The status line's field with your plan's quotas, one per group of models (HI-2734). Wrong, Combwork shows no plan limits for Antigravity.",
+    "description": "What the advanced setting \"Status line: plan limits field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.antigravity.statusLine.quota.title": {
+    "defaultMessage": "Status line: plan limits field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.statusLine.remainingFraction.desc": {
+    "defaultMessage": "A quota's field with the share of it left, from 0 to 1. Wrong, Combwork shows no plan limits for Antigravity.",
+    "description": "What the advanced setting \"Status line: share left field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.antigravity.statusLine.remainingFraction.title": {
+    "defaultMessage": "Status line: share left field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.statusLine.resetTime.desc": {
+    "defaultMessage": "A quota's field with when it resets. Wrong, Antigravity's plan limits show no reset time.",
+    "description": "What the advanced setting \"Status line: reset time field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.antigravity.statusLine.resetTime.title": {
+    "defaultMessage": "Status line: reset time field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.statusLine.weeklySuffix.desc": {
+    "defaultMessage": "How a weekly quota's name ends; what comes before it is the models it covers. Wrong, Antigravity's limits show by agy's own names, with no window.",
+    "description": "What the advanced setting \"Status line: a weekly quota\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.antigravity.statusLine.weeklySuffix.title": {
+    "defaultMessage": "Status line: a weekly quota",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.transcript.modelChange.desc": {
+    "defaultMessage": "What agy adds to a prompt when its model changes: the model's name is its first group. Wrong, an agent's usage names no model.",
+    "description": "What the advanced setting \"Transcript: the model picked\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.transcript.modelChange.title": {
+    "defaultMessage": "Transcript: the model picked",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.desc": {
+    "defaultMessage": "The times agy writes before a tool's result in its transcript, which Combwork leaves out when it shows the result. Wrong, results show with those times.",
+    "description": "What the advanced setting \"Transcript: a tool result's times\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.transcript.stepHeader.title": {
+    "defaultMessage": "Transcript: a tool result's times",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.desc": {
+    "defaultMessage": "A message in agy's transcript from agy itself or another conversation (a subagent's task or answer): who sent it is its first group, what it says its second. Wrong, those messages aren't shown, and a subagent's conversation isn't found under its parent.",
+    "description": "What the advanced setting \"Transcript: agy's messages\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.transcript.systemMessage.title": {
+    "defaultMessage": "Transcript: agy's messages",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.transcript.userRequest.desc": {
+    "defaultMessage": "Where your prompt is in agy's record of it, among what agy adds (the time, a setting changed): its first group. Wrong, Combwork still counts your prompts, but shows them with what agy added.",
+    "description": "What the advanced setting \"Transcript: your prompt\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy is a command: keep it."
+  },
+  "settings.advanced.antigravity.transcript.userRequest.title": {
+    "defaultMessage": "Transcript: your prompt",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.desc": {
+    "defaultMessage": "Whether a request's input_tokens in agy's transcript already count its cache_read_tokens. Wrong, Combwork counts cached tokens twice, or leaves them out of the context.",
+    "description": "What the advanced setting \"Usage: input tokens include the cache\" is for, and what goes wrong when it is wrong (Settings → Advanced). agy, input_tokens and cache_read_tokens are names: keep them."
+  },
+  "settings.advanced.antigravity.usage.inputIncludesCache.title": {
+    "defaultMessage": "Usage: input tokens include the cache",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.claude-code.accounts.dropEnv.desc": {
     "defaultMessage": "The environment variables Combwork leaves out when it runs Claude Code on a connection (its sign-in, its checks, Set Up and its agents), by name: a key, token, request header, server, provider switch or model set on this PC can't stand in for the connection's own. A server connection's own (its server, key and models) are set after. Wrong, a variable Claude Code reads as a login, a header or a server could make a connection run as someone else, or send a key elsewhere.",
@@ -602,6 +818,22 @@
   "settings.advanced.claude-code.hooks.timeoutSeconds.title": {
     "defaultMessage": "Hooks: timeout",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.claude-code.localModel.aliases.desc": {
+    "defaultMessage": "The model names Claude Code reads as its own aliases (opus, sonnet…), as a regular expression. A server connection's model named so gets no Context size or Output budget from Combwork, as Claude Code sizes it itself. Wrong, a local model with one of these names is launched as if Claude Code knew it, or an alias gets limits Claude Code ignores.",
+    "description": "What the advanced setting \"Local models: Claude Code’s aliases\" is for, and what goes wrong when it is wrong (Settings → Advanced). Context size and Output budget are fields of a server connection’s models: as translated there."
+  },
+  "settings.advanced.claude-code.localModel.aliases.title": {
+    "defaultMessage": "Local models: Claude Code’s aliases",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI: the model names Claude Code reads as its own aliases (opus, sonnet…)."
+  },
+  "settings.advanced.claude-code.localModel.spellings.desc": {
+    "defaultMessage": "Model ID spellings Claude Code may resolve to a Claude model or size by its own rules (claude in the ID, a [1m] suffix, a date after @), as a regular expression. A server connection's model spelt so gets no Context size or Output budget from Combwork. Wrong, Combwork passes limits Claude Code doesn't apply, or leaves out a local model it would.",
+    "description": "What the advanced setting \"Local models: IDs Claude Code sizes itself\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep [1m] and @ as they are. Context size and Output budget are fields of a server connection’s models: as translated there."
+  },
+  "settings.advanced.claude-code.localModel.spellings.title": {
+    "defaultMessage": "Local models: IDs Claude Code sizes itself",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI: model ID spellings (claude-…, [1m], a date suffix) Claude Code applies its own context rules to."
   },
   "settings.advanced.claude-code.memory.realPath.desc": {
     "defaultMessage": "A connection's projects folder is a link to Claude Code's own, so Claude Code asked you before each memory it saved there. Each Claude Code agent on a connection is given its project's auto memory folder by its real path: the same folder, so it saves memories without asking, as it does without a connection. Nothing more is allowed, and nothing is written to Claude Code's files. Off, Claude Code asks before each memory on a connection.",
@@ -858,6 +1090,14 @@
   "settings.advanced.claude-code.turnScreen.done.title": {
     "defaultMessage": "Screen: turn done",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.claude-code.update.channelSetting.desc": {
+    "defaultMessage": "The Claude Code setting that names the release channel `claude update` installs from (stable or latest), which Combwork reads from Claude Code's managed and user settings, never changes, to offer only an update on that channel. Wrong, Combwork compares Claude Code with the latest channel, and may offer an update it can't make.",
+    "description": "What the advanced setting \"Update channel setting\" is for, and what goes wrong when it is wrong (Settings → Advanced, HI-2729). Keep `claude update` as it is (a command), and stable and latest (the channels' names)."
+  },
+  "settings.advanced.claude-code.update.channelSetting.title": {
+    "defaultMessage": "Update channel setting",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork. The release channel Claude Code updates from (stable or latest)."
   },
   "settings.advanced.claudeFooter.desc": {
     "defaultMessage": "Claude Code's footer in the {mode} mode (\"{footer}\"). Combwork reads an agent's permission mode from its footer (the mode found last on screen), and switches modes by pressing Shift+Tab until the footer shows the one wanted; wrong, Combwork doesn't see the agent in {mode}, and can't switch to it without a restart.",
@@ -1441,6 +1681,70 @@
   },
   "settings.advanced.copilot.question.tool.title": {
     "defaultMessage": "Question: tool name",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.copilot.quota.entitlementField.desc": {
+    "defaultMessage": "A quota's field with how much your plan allows (-1: unlimited). Wrong, Combwork shows no plan limits for Copilot.",
+    "description": "What the advanced setting \"Plan limits: allowance field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.quota.entitlementField.title": {
+    "defaultMessage": "Plan limits: allowance field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.copilot.quota.event.desc": {
+    "defaultMessage": "The event, in Copilot's session file, of a model call that carries your plan's quotas. Wrong, Combwork shows no plan limits for Copilot.",
+    "description": "What the advanced setting \"Plan limits: event\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.quota.event.title": {
+    "defaultMessage": "Plan limits: event",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.copilot.quota.premiumKey.desc": {
+    "defaultMessage": "The quota of premium requests among them. Wrong, that limit shows by Copilot's own name for it.",
+    "description": "What the advanced setting \"Plan limits: premium requests\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.quota.premiumKey.title": {
+    "defaultMessage": "Plan limits: premium requests",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.copilot.quota.remainingPercentField.desc": {
+    "defaultMessage": "A quota's field with the percent of it left. Wrong, Combwork shows no plan limits for Copilot.",
+    "description": "What the advanced setting \"Plan limits: percent left field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.quota.remainingPercentField.title": {
+    "defaultMessage": "Plan limits: percent left field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.copilot.quota.resetField.desc": {
+    "defaultMessage": "A quota's field with when it resets. Wrong, Copilot's plan limits show no reset date.",
+    "description": "What the advanced setting \"Plan limits: reset date field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.quota.resetField.title": {
+    "defaultMessage": "Plan limits: reset date field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.copilot.quota.snapshotsField.desc": {
+    "defaultMessage": "That event's field with your plan's quotas, one per kind of request. Wrong, Combwork shows no plan limits for Copilot.",
+    "description": "What the advanced setting \"Plan limits: quotas field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.quota.snapshotsField.title": {
+    "defaultMessage": "Plan limits: quotas field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.copilot.quota.unlimitedField.desc": {
+    "defaultMessage": "A quota's field that is true when your plan has no limit on it. Wrong, an unlimited quota isn't shown as unlimited.",
+    "description": "What the advanced setting \"Plan limits: unlimited field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.quota.unlimitedField.title": {
+    "defaultMessage": "Plan limits: unlimited field",
+    "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.copilot.quota.usedField.desc": {
+    "defaultMessage": "A quota's field with how much of it is used. Wrong, Copilot's limits don't say how many were used.",
+    "description": "What the advanced setting \"Plan limits: used field\" is for, and what goes wrong when it is wrong (Settings → Advanced)."
+  },
+  "settings.advanced.copilot.quota.usedField.title": {
+    "defaultMessage": "Plan limits: used field",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
   },
   "settings.advanced.copilot.ready.footer.desc": {
@@ -2170,6 +2474,22 @@
   "settings.advanced.cw.wait.cardMaxSeconds.title": {
     "defaultMessage": "Card waits: longest",
     "description": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork."
+  },
+  "settings.advanced.cw.winget.showSeconds.desc": {
+    "defaultMessage": "How long `winget show` may take to say the newest version WinGet has of a coding agent CLI installed with it (it may update its list of packages first). Past it, Combwork offers no update and doesn't say the CLI is up to date.",
+    "description": "What the advanced setting \"WinGet: time to say its version\" does (Settings → Advanced). Keep `winget show` as it is (a command)."
+  },
+  "settings.advanced.cw.winget.showSeconds.title": {
+    "defaultMessage": "WinGet: time to say its version",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"30 s\"). WinGet is Windows' package manager: keep its name."
+  },
+  "settings.advanced.cw.winget.version.desc": {
+    "defaultMessage": "How Combwork finds the newest version WinGet has of a coding agent CLI installed with it, in what `winget show` prints: a regular expression whose first group is the version. Provider Setup offers such a CLI an update only once WinGet has a newer one. Wrong, Combwork can't tell, and offers no update and doesn't say it is up to date.",
+    "description": "What the advanced setting \"WinGet: version line\" is for, and what goes wrong when it is wrong (Settings → Advanced). Keep `winget show` as it is (a command)."
+  },
+  "settings.advanced.cw.winget.version.title": {
+    "defaultMessage": "WinGet: version line",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork. WinGet is Windows' package manager: keep its name."
   },
   "settings.advanced.cw.workflow.enforce.desc": {
     "defaultMessage": "Combwork keeps each project's workflow rules as cards move: what its Version Control options ask for before a card reaches Review, Approved or Done, and what follows when Combwork sees a card's work merged or changed outside Combwork. Turned off, every rule is off at once in every project: cards move wherever they are put, nothing is refused or asked, and Combwork only records what happens to each card's work, without moving cards or waking agents for it.",
@@ -3307,6 +3627,294 @@
     "defaultMessage": "Cancel",
     "description": "A dialog's button in Settings → Accounts & Connections that closes it without changing anything."
   },
+  "settings.connections.diag.advice": {
+    "defaultMessage": "{name} recommends {size, number} tokens or more for {cli}.",
+    "description": "Server diagnostics: the service's advice ({name}: \"Ollama\", {cli}: \"Claude Code\", {size}: 64,000)."
+  },
+  "settings.connections.diag.allocated": {
+    "defaultMessage": "Allocated now",
+    "description": "A row of Server diagnostics: the context the server has allocated for the loaded model now."
+  },
+  "settings.connections.diag.below": {
+    "defaultMessage": "This model has {tokens, number}: below it. A prompt longer than the context can lose its start, tools included.",
+    "description": "Server diagnostics: the model's context ({tokens}) is below the advice."
+  },
+  "settings.connections.diag.clear": {
+    "defaultMessage": "Clear",
+    "description": "Button in Server diagnostics: clears the context the user typed."
+  },
+  "settings.connections.diag.close": {
+    "defaultMessage": "Close",
+    "description": "Button closing Server diagnostics."
+  },
+  "settings.connections.diag.configured": {
+    "defaultMessage": "Configured",
+    "description": "A row of Server diagnostics: the context set for the model in the server's settings (Ollama's Modelfile num_ctx)."
+  },
+  "settings.connections.diag.context": {
+    "defaultMessage": "Context",
+    "description": "Heading in Server diagnostics: the model's context window, in tokens."
+  },
+  "settings.connections.diag.failed": {
+    "defaultMessage": "Couldn't check the server",
+    "description": "An error's title in Server diagnostics."
+  },
+  "settings.connections.diag.failedStep": {
+    "defaultMessage": "{step, select, 2 {Failed at its result:} other {Failed at the call:}} {why}",
+    "description": "Server diagnostics: the tool-call test failed at its first request (the call) or second (the tool's result). {why} is why, a sentence."
+  },
+  "settings.connections.diag.kind": {
+    "defaultMessage": "{kind, select, llamacpp {llama.cpp server} ollama {Ollama} other {A compatible server: its context isn't readable}}",
+    "description": "Server diagnostics: what the server is, by how it answered. {kind} is a key: don't translate the keys. llama.cpp and Ollama are product names."
+  },
+  "settings.connections.diag.line": {
+    "defaultMessage": "Server context {tokens, number} (read {ago})",
+    "description": "A line in the connection editor and Provider Setup for a server connection: its model's context as last read in Server diagnostics. {ago}: when."
+  },
+  "settings.connections.diag.lineBelow": {
+    "defaultMessage": "Server context {tokens, number} (read {ago}): below {name}'s advice of {size, number}",
+    "description": "The same line when the context is below the service's advice ({name}: \"Ollama\", {size}: 64,000)."
+  },
+  "settings.connections.diag.measured": {
+    "defaultMessage": "Measured on a test server: Claude Code's first request, with Combwork's tools, was about 14,000 to 28,000 tokens. Other models count differently.",
+    "description": "A note in Server diagnostics: a measurement from a test server, a guide, not a rule."
+  },
+  "settings.connections.diag.meets": {
+    "defaultMessage": "This model has {tokens, number}: enough by that advice.",
+    "description": "Server diagnostics: the model's context ({tokens}) meets the advice."
+  },
+  "settings.connections.diag.mine": {
+    "defaultMessage": "Context (if the server doesn't say)",
+    "description": "Label of the box in Server diagnostics where the user types the context their model has on this server, in tokens. Combwork keeps it as theirs."
+  },
+  "settings.connections.diag.mineHint": {
+    "defaultMessage": "Yours, in tokens: compared with the advice here. A server's own figures never replace it.",
+    "description": "Under the context box in Server diagnostics."
+  },
+  "settings.connections.diag.model": {
+    "defaultMessage": "Model",
+    "description": "Label of the model chosen in Server diagnostics."
+  },
+  "settings.connections.diag.notLoaded": {
+    "defaultMessage": "not loaded: Ollama allocates it when the model is first used",
+    "description": "Server diagnostics' Allocated now for an Ollama model that isn't loaded now."
+  },
+  "settings.connections.diag.notReported": {
+    "defaultMessage": "not reported",
+    "description": "A context value in Server diagnostics the server didn't report (never shown as 0)."
+  },
+  "settings.connections.diag.ollamaDefault": {
+    "defaultMessage": "Ollama's own default (OLLAMA_CONTEXT_LENGTH) can't be read over its API: where no Modelfile sets num_ctx, it decides the context.",
+    "description": "A note in Server diagnostics for an Ollama server. OLLAMA_CONTEXT_LENGTH and num_ctx are Ollama's setting names: keep them."
+  },
+  "settings.connections.diag.open": {
+    "defaultMessage": "Check Server…",
+    "description": "Button on a server connection (Settings → Accounts & Connections, the connection editor, Provider Setup): opens its Server diagnostics (its model's context, a tool-call test)."
+  },
+  "settings.connections.diag.passed": {
+    "defaultMessage": "Passed: the model called the tool as asked and answered with its result ({ago}).",
+    "description": "Server diagnostics: the tool-call test passed. {ago} is when (\"just now\")."
+  },
+  "settings.connections.diag.prefixed": {
+    "defaultMessage": "Its base URL has a path (a gateway), so Combwork doesn't ask the server's own paths for its context: not reported.",
+    "description": "Server diagnostics, when the base URL has a path such as /anthropic after the host: the context fields are not asked for."
+  },
+  "settings.connections.diag.readAgain": {
+    "defaultMessage": "Read Again",
+    "description": "Button in Server diagnostics: reads the context from the server again."
+  },
+  "settings.connections.diag.reading": {
+    "defaultMessage": "Reading…",
+    "description": "Server diagnostics while it reads the context from the server."
+  },
+  "settings.connections.diag.save": {
+    "defaultMessage": "Save",
+    "description": "Button in Server diagnostics: saves the context the user typed."
+  },
+  "settings.connections.diag.seen": {
+    "defaultMessage": "Seen: HTTP {status}{stop, select, none {} other {, stop reason {stop}}}{blocks, select, none {} other {, blocks {blocks}}}",
+    "description": "Under a failed tool-call test in Server diagnostics: what the server's reply was, as data. {status}, {stop} and {blocks} are values from the reply (none: not there)."
+  },
+  "settings.connections.diag.templateTools": {
+    "defaultMessage": "{state, select, supported {Its chat template supports tool calls.} unsupported {Its chat template doesn't support tool calls. llama-server needs --jinja for tools: if it was started without it, add it.} inconsistent {Its chat template's tool flags disagree. llama-server needs --jinja for tools: if it was started without it, add it.} other {Its chat template doesn't say whether it supports tools. llama-server needs --jinja for tools: if it was started without it, add it.}}",
+    "description": "Server diagnostics for a llama.cpp server: what its chat template says of tools. {state} is a key: translate the texts only. llama-server and --jinja are a program and its option: keep them."
+  },
+  "settings.connections.diag.test": {
+    "defaultMessage": "Test Tool Calls",
+    "description": "Button in Server diagnostics: runs the tool-call test (two requests to the model)."
+  },
+  "settings.connections.diag.testing": {
+    "defaultMessage": "Testing…",
+    "description": "Server diagnostics while the tool-call test runs (a model may take a while to load)."
+  },
+  "settings.connections.diag.title": {
+    "defaultMessage": "Server diagnostics: {name}",
+    "description": "Title of the Server diagnostics dialog (Settings → Accounts & Connections → a server connection's Check Server…, HI-2683). {name} is the connection's name."
+  },
+  "settings.connections.diag.tools": {
+    "defaultMessage": "Tool calls",
+    "description": "Heading in Server diagnostics: the tool-call test."
+  },
+  "settings.connections.diag.toolsWhat": {
+    "defaultMessage": "Asks the model to call one tool, then gives it the tool's result and checks its answer used it, through the API Claude Code uses. A small structured tool-call check: it doesn't show that every Claude Code tool or a long conversation will work.",
+    "description": "Under the Tool calls heading in Server diagnostics: what the test does and what it proves."
+  },
+  "settings.connections.diag.trained": {
+    "defaultMessage": "Trained maximum",
+    "description": "A row of Server diagnostics: the most context the model was trained for, as the server reports it."
+  },
+  "settings.connections.diag.value": {
+    "defaultMessage": "{tokens, number} tokens · read {ago}",
+    "description": "A context value in Server diagnostics: {tokens} is a number, {ago} when it was read (\"2 min ago\")."
+  },
+  "settings.connections.diag.why.busy": {
+    "defaultMessage": "Other checks are running. Try again in a moment.",
+    "description": "Why a Server diagnostics check was refused: too many at once."
+  },
+  "settings.connections.diag.why.endpoint": {
+    "defaultMessage": "The server has no Messages API at this base URL (Claude Code calls the base URL followed by /v1/messages). Check the base URL.",
+    "description": "Why the tool-call test failed: 404 or 405 from the messages URL. Keep /v1/messages as it is."
+  },
+  "settings.connections.diag.why.extraCalls": {
+    "defaultMessage": "The model made more than the one call asked for.",
+    "description": "Why the tool-call test failed: several tool calls."
+  },
+  "settings.connections.diag.why.forbidden": {
+    "defaultMessage": "The server refused access (403).",
+    "description": "Why the tool-call test failed: 403."
+  },
+  "settings.connections.diag.why.incomplete": {
+    "defaultMessage": "The answer stopped before its end (the output limit).",
+    "description": "Why the tool-call test failed at its second step: cut at the output limit."
+  },
+  "settings.connections.diag.why.invalidArguments": {
+    "defaultMessage": "The model's call had arguments the tool doesn't take.",
+    "description": "Why the tool-call test failed: the call's arguments don't fit the tool's schema."
+  },
+  "settings.connections.diag.why.modelRejected": {
+    "defaultMessage": "The server says it doesn't have this model. Check its id, or load or pull it on the server.",
+    "description": "Why the tool-call test failed: the server said the model is missing."
+  },
+  "settings.connections.diag.why.noToolCall": {
+    "defaultMessage": "The model answered without calling the tool it was asked to use.",
+    "description": "Why the tool-call test failed: an answer with no tool call."
+  },
+  "settings.connections.diag.why.promptTooLarge": {
+    "defaultMessage": "The server says the prompt is larger than the model's context. Give the model a larger context in the server's settings.",
+    "description": "Why the tool-call test failed: the server said the prompt exceeds the context."
+  },
+  "settings.connections.diag.why.protocol": {
+    "defaultMessage": "The server's answer isn't the Messages API's (as Claude Code expects it).",
+    "description": "Why the tool-call test failed: the reply wasn't the Anthropic Messages API's shape."
+  },
+  "settings.connections.diag.why.refused": {
+    "defaultMessage": "The server refused the key (401). Replace the key, then test again.",
+    "description": "Why the tool-call test failed: 401."
+  },
+  "settings.connections.diag.why.resultIgnored": {
+    "defaultMessage": "The model's answer didn't use the tool's result.",
+    "description": "Why the tool-call test failed at its second step: the answer doesn't contain the result, or calls the tool again."
+  },
+  "settings.connections.diag.why.stale": {
+    "defaultMessage": "The connection changed while it was checked. Check again.",
+    "description": "Why a Server diagnostics check was dropped: its server, key or model changed meanwhile, or a newer check started."
+  },
+  "settings.connections.diag.why.thinkingBudget": {
+    "defaultMessage": "The model spent its whole output budget thinking, and wrote no answer.",
+    "description": "Why the tool-call test failed: only thinking, cut at the output limit."
+  },
+  "settings.connections.diag.why.toolText": {
+    "defaultMessage": "The model returned tool-shaped text rather than a tool call: check the loaded context and the server's tool parser.",
+    "description": "Why the tool-call test failed: the model wrote out a tool call as text instead of making one."
+  },
+  "settings.connections.diag.why.toolsUnsupported": {
+    "defaultMessage": "The server says it doesn't support tools for this model (for llama.cpp, --jinja may be missing).",
+    "description": "Why the tool-call test failed: the server said tools are unsupported. --jinja is a llama-server option: keep it."
+  },
+  "settings.connections.diag.why.unexpected": {
+    "defaultMessage": "An unexpected reply.",
+    "description": "Why the tool-call test failed: none of the named reasons; what was seen is shown under it."
+  },
+  "settings.connections.diag.why.unreachable": {
+    "defaultMessage": "Couldn't reach the server: check its base URL and that it is running.",
+    "description": "Why a Server diagnostics check failed: no answer."
+  },
+  "settings.connections.diag.why.wrongArgument": {
+    "defaultMessage": "The model's call was valid but not for what was asked (another city).",
+    "description": "Why the tool-call test failed: a valid call with the wrong argument."
+  },
+  "settings.connections.diag.why.wrongTool": {
+    "defaultMessage": "The model called a tool it wasn't offered.",
+    "description": "Why the tool-call test failed: a call to another tool."
+  },
+  "settings.connections.launch.assistant": {
+    "defaultMessage": "The Assistant uses this connection: it always launches with Combwork's guidance, tools and typing, whatever these say. They apply to the connection's other agents.",
+    "description": "A note in a connection's Launch Settings (HI-2670) when the Combwork Assistant uses it: its role needs them."
+  },
+  "settings.connections.launch.cancel": {
+    "defaultMessage": "Cancel",
+    "description": "A button of a connection's Launch Settings dialog (HI-2670): closes it without saving."
+  },
+  "settings.connections.launch.guidanceText": {
+    "defaultMessage": "How to work with Combwork, the project's latest handover and the Workspace notes note, at each launch.",
+    "description": "Under \"Combwork's guidance for agents\" in a connection's Launch Settings (HI-2670). Workspace notes is the name of a note: use its translated name."
+  },
+  "settings.connections.launch.intro": {
+    "defaultMessage": "What Combwork adds to the sessions this connection launches. Whatever you turn off, Combwork still shows their pane, status, transcript, sessions and usage.",
+    "description": "The first line of a connection's Launch Settings dialog (HI-2670)."
+  },
+  "settings.connections.launch.menu": {
+    "defaultMessage": "Launch Settings…",
+    "description": "An entry of a connection's ⋯ menu (Settings → Accounts & Connections, HI-2670): opens what of Combwork's the sessions it launches get."
+  },
+  "settings.connections.launch.overrides": {
+    "defaultMessage": "Overrides of {cli}",
+    "description": "A heading in a connection's Launch Settings (HI-2670), above Combwork's overrides of the coding agent CLI's own behaviour ({cli}: its name), each with a switch."
+  },
+  "settings.connections.launch.partlyBadge": {
+    "defaultMessage": "Partly plain",
+    "description": "A badge on a connection's row in Settings → Accounts & Connections (HI-2670): some of what Combwork adds to its sessions is turned off. Short."
+  },
+  "settings.connections.launch.plainBadge": {
+    "defaultMessage": "As from a terminal",
+    "description": "A badge on a connection's row in Settings → Accounts & Connections (HI-2670): it launches with none of Combwork's additions. Short."
+  },
+  "settings.connections.launch.preset": {
+    "defaultMessage": "Launch as from a terminal",
+    "description": "The preset at the top of a connection's Launch Settings (HI-2670): turns off everything Combwork adds, so its sessions start as the coding agent CLI would in a terminal in that folder."
+  },
+  "settings.connections.launch.presetText": {
+    "defaultMessage": "Its sessions get what {cli} started in a terminal in that folder would: none of Combwork's guidance, tools, MCP servers, overrides or typing. Its agents are Independent.",
+    "description": "Under \"Launch as from a terminal\" in a connection's Launch Settings (HI-2670). {cli} is the coding agent CLI's name (\"Claude Code\"). Glossary: independent."
+  },
+  "settings.connections.launch.restart": {
+    "defaultMessage": "Running sessions keep what they launched with until they restart. An agent made Independent gets nothing more of Combwork at once.",
+    "description": "A note at the foot of a connection's Launch Settings (HI-2670)."
+  },
+  "settings.connections.launch.save": {
+    "defaultMessage": "Save",
+    "description": "A button of a connection's Launch Settings dialog (HI-2670): saves them."
+  },
+  "settings.connections.launch.title": {
+    "defaultMessage": "{name}: launch settings",
+    "description": "Title of a connection's Launch Settings dialog (HI-2670), opened from its ⋯ menu in Settings → Accounts & Connections. {name} is the connection's name."
+  },
+  "settings.connections.launch.tools": {
+    "defaultMessage": "Combwork's tools",
+    "description": "A switch in a connection's Launch Settings (HI-2670): its sessions get Combwork's MCP server (its tools), skills, the Agent API and cw-progress."
+  },
+  "settings.connections.launch.toolsText": {
+    "defaultMessage": "The combwork MCP server, Combwork's skills, the Agent API and cw-progress. Turned off, the agents on this connection are Independent: no lanes, reviews or cards, until their tools are back.",
+    "description": "Under \"Combwork's tools\" in a connection's Launch Settings (HI-2670). combwork is an MCP server's name and cw-progress a command's: keep them. Glossary: independent."
+  },
+  "settings.connections.launch.typing": {
+    "defaultMessage": "Combwork types into the agent",
+    "description": "A switch in a connection's Launch Settings (HI-2670): Combwork may type wakes, inbox notices, messages and card prompts into its sessions."
+  },
+  "settings.connections.launch.typingText": {
+    "defaultMessage": "Wakes, inbox notices, messages and card prompts, and the replies of its hooks that add to its context. Its status hooks stay either way.",
+    "description": "Under \"Combwork types into the agent\" in a connection's Launch Settings (HI-2670)."
+  },
   "settings.connections.masking.full": {
     "defaultMessage": "Combwork is near the most API keys it can keep masking for. Past it, a new key is refused.",
     "description": "A warning in Settings → Accounts & Connections: Combwork keeps a fingerprint of every API key ever saved (to hide it in logs and exports), and is nearly at its limit."
@@ -3359,9 +3967,17 @@
     "defaultMessage": "Runs in the cloud, not on this PC: its sessions aren't free (local).",
     "description": "Tooltip of \"cloud\" beside a model in a server connection's model list (an Ollama cloud model). \"free (local)\" is how Combwork shows the cost of sessions run only on this PC."
   },
+  "settings.connections.server.context": {
+    "defaultMessage": "Context size",
+    "description": "A field on a server connection's model (HI-2682): the context the model has on this server, in tokens. The same value as Server diagnostics' context size."
+  },
   "settings.connections.server.contextAdvice": {
     "defaultMessage": "{name} recommends a context length of {size, number} tokens or more for {cli}, especially in larger repositories. Set it in {name}'s own settings: Combwork doesn't change them.",
     "description": "Under a server connection's preset (Add Connection): the service ({name}: \"Ollama\") recommends a context window of at least {size} tokens (64,000) for the coding agent CLI ({cli}: \"Claude Code\"). Advice, not a requirement Combwork enforces."
+  },
+  "settings.connections.server.contextNone": {
+    "defaultMessage": "Not set: 200,000 assumed",
+    "description": "The placeholder of a server connection's model's empty Context size field (HI-2682): with none set, Claude Code assumes a 200K context."
   },
   "settings.connections.server.custom": {
     "defaultMessage": "Custom",
@@ -3423,6 +4039,14 @@
     "defaultMessage": "{name}'s API key",
     "description": "Title of the dialog asking a server connection's API key ({name}, its name)."
   },
+  "settings.connections.server.label": {
+    "defaultMessage": "Label",
+    "description": "A field on a server connection's model (HI-2684): the name shown for it in Claude Code's /model picker. Its placeholder is the model's ID."
+  },
+  "settings.connections.server.limitsHint": {
+    "defaultMessage": "Context size and Output budget are used when an agent starts on that model (not for IDs Claude Code reads as its own, nor where the session’s settings map the ID to a Claude model). A change applies when its agents next start.",
+    "description": "Under a server connection's model list (HI-2682): when the models' Context size and Output budget fields are used. Context size and Output budget are the fields' names."
+  },
   "settings.connections.server.local": {
     "defaultMessage": "{name} (on this PC)",
     "description": "A preset of a server connection that runs on the user's own computer ({name}: \"Ollama\")."
@@ -3450,6 +4074,22 @@
   "settings.connections.server.needsKey": {
     "defaultMessage": "Its server needs a key: agents on it are refused until one is added.",
     "description": "A warning on a server connection with no key whose server isn't on this computer."
+  },
+  "settings.connections.server.notBelow": {
+    "defaultMessage": "The output budget must be smaller than the context size.",
+    "description": "Under a server connection's model's fields (HI-2682): its output budget isn't smaller than its context size, so it can't be saved."
+  },
+  "settings.connections.server.output": {
+    "defaultMessage": "Output budget",
+    "description": "A field on a server connection's model (HI-2682): the most tokens the model may write in one reply."
+  },
+  "settings.connections.server.outputDefault": {
+    "defaultMessage": "Default: {n, number}",
+    "description": "The placeholder of a server connection's model's empty Output budget field (HI-2682): the budget used when none is set. {n} is a number of tokens."
+  },
+  "settings.connections.server.pickerHint": {
+    "defaultMessage": "Claude Code’s /model lists these models by their exact IDs, under their labels. With no Claude model among them, its own Opus, Sonnet and Haiku rows are hidden. A lineup in your own settings is used instead.",
+    "description": "Under a server connection's model list (HI-2684): what Claude Code's model picker (/model, a command: keep it) shows on this connection. Label names the field. Opus, Sonnet and Haiku are Claude's model names: keep them."
   },
   "settings.connections.server.preset": {
     "defaultMessage": "Preset",
@@ -3518,6 +4158,18 @@
   "settings.connections.server.setUpFailed": {
     "defaultMessage": "Couldn't open the setup",
     "description": "An error's title: a connection's Set Up terminal couldn't be opened."
+  },
+  "settings.connections.server.tight": {
+    "defaultMessage": "Little room: Claude Code’s first request with Combwork’s tools can be 14,000–28,000 tokens, so a session may not start, or may compact at once.",
+    "description": "A warning under a server connection's model's fields (HI-2682): its context minus its output budget is small. Advice: saving is allowed."
+  },
+  "settings.connections.server.tokens": {
+    "defaultMessage": "tokens",
+    "description": "Beside a server connection's model's Context size and Output budget fields (HI-2682): the unit."
+  },
+  "settings.connections.server.unsupported": {
+    "defaultMessage": "{why, select, alias {Not supported for this model: Claude Code reads this ID as one of its aliases.} other {Not supported for this model: IDs with claude, [1m] or a date suffix aren’t supported here.}}",
+    "description": "Under a server connection's model whose Context size and Output budget fields are off (HI-2682), why. Keep [1m] and the select keys."
   },
   "settings.connections.server.why.failed": {
     "defaultMessage": "The server answered with an error ({status}). Try again later.",

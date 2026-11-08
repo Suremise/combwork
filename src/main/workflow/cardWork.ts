@@ -9,6 +9,8 @@ import { CATEGORY_STAGE, foldCard, STAGE_CATEGORY, ROUND_LIMIT_GATE, type CardKi
 import { forYouItems, kindProposed, reviewSkipOf, workBadge, workView, type ForYouItem, type ForYouSummary, type WorkBadge, type WorkCard, type WorkView } from '../../shared/workflow/workView'
 import { factOf } from './factStore'
 import { QUERIES } from '../schema/v1_0'
+import type { WorkflowToolOptions } from '../../shared/assistantTools'
+import { isAllOff, type WorkflowOptions } from '../../shared/workflow/options'
 
 type Row = Record<string, string | number | null>
 
@@ -98,13 +100,13 @@ function keptValues<T>(db: Db['reader'], kept: Map<number, { key: string; value:
   return cards.map((r) => kept.get(r.number as number)!.value)
 }
 
-const cardOf = (r: Row): WorkCard => ({ card: r.number as number, stage: (r.stage as StageId | null) ?? CATEGORY_STAGE[r.col as Category] ?? 'todo', preWorkflow: !!r.pre_workflow, ...(r.kind === 'no-code' || r.kind === 'code' ? { kind: r.kind } : {}) })
+const cardOf = (r: Row): WorkCard => ({ card: r.number as number, stage: (r.stage as StageId | null) ?? CATEGORY_STAGE[r.col as Category] ?? 'todo', preWorkflow: !!r.pre_workflow, ...(r.kind === 'no-code' || r.kind === 'code' ? { kind: r.kind } : {}), ...(typeof r.target === 'string' && r.target ? { target: r.target } : {}) })
 
 /** A card's view, and its facts; null when there is no such card or the board has no facts yet. */
 export function cardFacts(ws: WorkspaceService, n: number): { card: WorkCard; facts: Fact[] } | null {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return null
-    const r = prepared(db, 'SELECT number, col, stage, pre_workflow, kind FROM cards WHERE number = ?').get(n) as Row | undefined
+    const r = prepared(db, 'SELECT number, col, stage, pre_workflow, kind, target FROM cards WHERE number = ?').get(n) as Row | undefined
     if (!r) return null
     return { card: cardOf(r), facts: (prepared(db, QUERIES['facts.ofCard'].sql).all(n) as Row[]).map(factOf) }
   })
@@ -124,11 +126,11 @@ export function cardWork(ws: WorkspaceService, n: number): WorkView | null {
 export function workBadges(ws: WorkspaceService, rulesetsNow: ReadonlyMap<string, string> = new Map()): WorkBadge[] {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return []
-    const cards = prepared(db, 'SELECT number, col, stage, pre_workflow, kind, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
+    const cards = prepared(db, 'SELECT number, col, stage, pre_workflow, kind, target, project FROM cards WHERE archived = 0 ORDER BY number').all() as Row[]
     // A card's row, its facts' head and its project's ruleset now are what its badge is made from (#1629); a stored
     // ruleset never changes, so a card whose key is as it was keeps its badge.
     const heads = factHeads(db)
-    const keyOf = (r: Row): string => [r.col, r.stage, r.pre_workflow, r.kind, heads.get(r.number as number) ?? '', rulesetsNow.get(String(r.project ?? '').toLowerCase()) ?? ''].join('\n')
+    const keyOf = (r: Row): string => [r.col, r.stage, r.pre_workflow, r.kind, r.target ?? '', heads.get(r.number as number) ?? '', rulesetsNow.get(String(r.project ?? '').toLowerCase()) ?? ''].join('\n')
     let stages: ReturnType<typeof stagesReader> | null = null
     return keptValues(db, keptOf(badges, ws), cards, keyOf, (r, facts) => workBadge(workView(cardOf(r), facts), rulesetsNow.get(String(r.project ?? '').toLowerCase()), (stages ??= stagesReader(db))))
   })
@@ -170,6 +172,45 @@ export function rulesetStages(ws: WorkspaceService, ids: readonly string[]): Map
     for (const id of new Set(ids)) out.set(id, stages(id))
   })
   return out
+}
+
+/**
+ * What a project's work in flight still works under (HI-2694, HR1's s11 point 1): the options of each distinct ruleset its
+ * cards out of Hold, Todo and Done (not archived) have recorded facts under (every cycle's and override's: a superset of
+ * each card's own), and its running lanes' (`lane_runs`); and the stages those cards are in. One snapshot of combwork.db.
+ * Null when the board has no facts yet or a ruleset can't be read: nothing is known, so nothing is hidden for it.
+ */
+export function workRetained(ws: WorkspaceService, project: string): { options: WorkflowToolOptions[]; stages: string[]; allOff: boolean } | null {
+  return boardRead(ws, (db) => {
+    if (!hasFacts(db)) return null
+    const cards = prepared(db, "SELECT number, col, stage FROM cards WHERE archived = 0 AND project = ? COLLATE NOCASE AND col NOT IN ('hold', 'todo', 'done')").all(project) as Row[]
+    const stages = [...new Set(cards.map((r) => String(r.stage ?? CATEGORY_STAGE[r.col as Category] ?? '')))].filter((s) => s && s !== 'hold' && s !== 'todo' && s !== 'done')
+    const ids = new Set<string>()
+    if (cards.length) for (const r of prepared(db, 'SELECT DISTINCT ruleset FROM card_facts WHERE ruleset IS NOT NULL AND card IN (SELECT value FROM json_each(?))').all(JSON.stringify(cards.map((c) => c.number))) as Row[]) ids.add(String(r.ruleset))
+    if (prepared(db, "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'lane_runs'").get()) {
+      for (const r of prepared(db, "SELECT r.ruleset FROM lane_runs r JOIN lanes l ON l.id = r.lane WHERE l.state = 'active' AND l.project = ? COLLATE NOCASE AND r.ruleset IS NOT NULL").all(project) as Row[]) ids.add(String(r.ruleset))
+    }
+    const options: WorkflowToolOptions[] = []
+    let off = false
+    for (const id of ids) {
+      const row = prepared(db, QUERIES['rulesets.byId'].sql).get(id) as { data: string } | undefined
+      let o: Partial<WorkflowToolOptions> | undefined
+      try {
+        o = row ? (JSON.parse(row.data) as { options?: Partial<WorkflowToolOptions> }).options : undefined
+      } catch {
+        o = undefined
+      }
+      if (!o || typeof o.review !== 'string' || typeof o.finish !== 'string') return null
+      // All off is really off (§16.6.4): its cards move freely, so work under it can use every tool.
+      try {
+        if (isAllOff(o as WorkflowOptions)) off = true
+      } catch {
+        return null
+      }
+      options.push({ review: o.review, finish: o.finish, focusedTests: !!o.focusedTests, okBefore: { mode: typeof o.okBefore?.mode === 'string' ? o.okBefore.mode : 'never' } })
+    }
+    return { options, stages, allOff: off }
+  })
 }
 
 /**
@@ -252,6 +293,11 @@ const roundLimits: Kept<boolean> = new WeakMap()
  * A card's kind (#1277, §16.7.3: the `kind` column) and a kind an agent proposed, not answered yet: what the Agent API's
  * card adds after its document's fields, as it does `stage`. Null on a board waiting for its 1.0 upgrade (no column).
  */
+/** A card's own Merges into (HI-2556: its `target` column), or null: none (its lane's, or the project's). */
+export function cardTarget(ws: WorkspaceService, n: number): string | null {
+  return boardRead(ws, (db) => (prepared(db, 'SELECT target FROM cards WHERE number = ?').get(n) as { target: string | null } | undefined)?.target ?? null)
+}
+
 export function cardKind(ws: WorkspaceService, n: number): { kind: CardKind; kindProposed: CardKind | null } | null {
   return boardRead(ws, (db) => {
     if (!hasFacts(db)) return null
@@ -375,6 +421,10 @@ export function factRow(f: Fact, short: (id: string) => string): FactRow {
       case 'MergedInPart':
       case 'LeftTarget': {
         const x = d as FactData['LeftTarget']
+        return `${r(x.revision)}, ${x.target}`
+      }
+      case 'InTarget': {
+        const x = d as FactData['InTarget']
         return `${r(x.revision)}, ${x.target}`
       }
       case 'Moved': {

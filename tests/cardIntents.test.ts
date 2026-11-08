@@ -40,7 +40,7 @@ const toolReplies = await import('../src/shared/toolReplies')
 const { checksView, intentText } = toolReplies
 const { armIntentWatch } = await import('../src/main/intentWatch')
 const watches = await import('../src/main/watches')
-const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, INTENT_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
+const { AGENT_ONLY_TOOLS, ASSISTANT_ONLY_TOOLS, CW_TOOLS, INTENT_TOOLS, WORKER_ONLY_TOOLS, assistantTools } = await import('../src/shared/assistantTools')
 
 advanced.load(join(base, 'profile'))
 type WS = ReturnType<typeof createWorkspaceService>
@@ -74,7 +74,7 @@ async function workspace(options: object = PAIR): Promise<{ w: WS; repo: string;
   git(repo, 'add', '-A')
   git(repo, 'commit', '-qm', 'initial')
   git(repo, 'worktree', 'add', '-q', '-b', 'card', wt, 'main')
-  const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Other' }]
+  const agents = [{ id: 'a1', name: 'Builder', worktree: { path: wt, branch: 'card', base: 'main' } }, { id: 'a2', name: 'Reviewer' }, { id: 'a3', name: 'Other', workflowRole: 'either' }]
   writeFileSync(join(repo, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents, workflow: { platform: 'git', preset: null, options } }))
   const w = createWorkspaceService()
   await w.open(ws)
@@ -435,7 +435,7 @@ describe('a card by intent (#1267)', () => {
     const wf = (await service.workflowFor(w, repo))!
     const card = await create(w)
     const key = wf.store.card(card).key
-    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: run one with cw-progress --check <name> --card "${key}" (--isolated: in a check copy at the card's revision; work-on-card)` }
+    const line = { checks: ['typecheck', 'lint'], checksHint: `before review: cw-progress --check <name> --card "${key}" (--isolated: in a check copy). Budget, other checks: project notes; work-on-card` }
     expect(wf.checksOf(`#${card}`)).toEqual(line)
     await act(w, card, builder, { kind: 'start' })
     expect(wf.checksOf(`#${card}`)).toEqual(line)
@@ -927,6 +927,9 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(parse('verdict', { comment: 'ok' })).toBe(400)
     expect(parse('verdict', { pass: false, comment: 'No', failKind: 'style' })).toBe(400)
     expect(parse('verdict', { pass: false, comment: 'No', failKind: 'explanation' })).toEqual({ kind: 'verdict', pass: false, comment: 'No', submission: undefined, failKind: 'explanation' })
+    // HI-2660: a pass accepting others' focused-test runs, by test id; at most 50, each a test id (the runtime checks again).
+    expect(parse('verdict', { pass: true, comment: 'ok', accept: ['claude-real'] })).toEqual({ kind: 'verdict', pass: true, comment: 'ok', submission: undefined, failKind: undefined, accept: ['claude-real'] })
+    for (const accept of ['claude-real', [''], ['a\u0000b'], [1], Array.from({ length: 51 }, (_, i) => `t${i}`)]) expect(parse('verdict', { pass: true, comment: 'ok', accept }), JSON.stringify(accept).slice(0, 40)).toBe(400)
     // HI-1367: a reviewer's decision on focused tests a merge skipped.
     expect(parse('focused-skip', { request: ' HI-12/r40 ', merge: false, why: ' Signed out ' })).toEqual({ kind: 'focusedSkip', request: 'HI-12/r40', merge: false, why: 'Signed out' })
     expect(parse('focused-skip', { request: 'HI-12/r40', why: 'x' })).toBe(400)
@@ -958,7 +961,7 @@ describe("the intents' routes and tools (#1267)", () => {
   })
 
   it("a card's checks (HI-2276): the names as data, a fixed hint with <name>; never a command built from a name", () => {
-    const hint = (iso: boolean) => `before review: run one with cw-progress --check <name> --card "AL-1"${iso ? " (--isolated: in a check copy at the card's revision; work-on-card)" : ' (work-on-card)'}`
+    const hint = (iso: boolean) => `before review: cw-progress --check <name> --card "AL-1"${iso ? ' (--isolated: in a check copy)' : ''}. Budget, other checks: project notes; work-on-card`
     expect(checksView(['quick'], 'AL-1', true)).toEqual({ checks: ['quick'], checksHint: hint(true) })
     expect(checksView(['quick', 'tests'], 'AL-1', false)).toEqual({ checks: ['quick', 'tests'], checksHint: hint(false) })
     expect(checksView([], 'AL-1', true)).toBeNull()
@@ -967,14 +970,17 @@ describe("the intents' routes and tools (#1267)", () => {
     expect(checksView(names, 'AL-1', true)).toEqual({ checks: names, checksHint: hint(true) })
   })
 
-  it('every agent has the intent tools, Codex too (#913: enabled_tools is CW_TOOLS); the Assistant at Control agents, never start_card', () => {
+  it('every agent has the intent tools, Codex too (#913: enabled_tools is CW_TOOLS); the Assistant only cw_ask_user of them (HI-2664), never start_card', () => {
     for (const t of [...INTENT_TOOLS, 'cw_start_card']) {
       expect(CW_TOOLS).toContain(t)
       expect(ASSISTANT_ONLY_TOOLS).not.toContain(t)
     }
     expect(AGENT_ONLY_TOOLS).toContain('cw_start_card')
     expect(assistantTools('look')).not.toContain('cw_verdict')
-    expect(assistantTools('agents')).toEqual(expect.arrayContaining(INTENT_TOOLS))
+    // The Assistant coordinates cards and never builds or reviews them (HI-2664): of the intents, only asking the user.
+    expect(assistantTools('agents')).toContain('cw_ask_user')
+    for (const t of WORKER_ONLY_TOOLS) expect(assistantTools('projects', true, true)).not.toContain(t)
+    expect(WORKER_ONLY_TOOLS).toEqual(['cw_put_back', 'cw_submit', 'cw_declare_paths', 'cw_start_review', 'cw_verdict', 'cw_report_merge', 'cw_cannot_within_rules', 'cw_request_builder', 'cw_loop_step', 'cw_focused_skip'])
     expect(assistantTools('projects')).not.toContain('cw_start_card')
   })
 })

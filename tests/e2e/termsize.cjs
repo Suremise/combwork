@@ -305,8 +305,10 @@ function sizes(home) {
     const seen = []
     for (let w = from; w !== to; w += from < to ? 1 : -1) {
       const before = await bodyWidth()
+      // A walk starts at the width the window already has: that first step changes nothing to wait for (its wait ran out, HI-2688).
+      const resized = page.viewportSize()?.width !== w
       await page.setViewportSize({ width: w, height: 650 })
-      await lib.until(async () => (await bodyWidth()) !== before, HUNG_MS)
+      if (resized) await lib.until(async () => (await bodyWidth()) !== before, HUNG_MS)
       await settled()
       const n = await panes()
       if (seen.at(-1)?.panes !== n) seen.push({ window: w, body: await bodyWidth(), panes: n })

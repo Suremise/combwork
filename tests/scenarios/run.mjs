@@ -3,6 +3,7 @@
 //   npm run scenarios                                     # the fake Claude Code: free, deterministic, every check
 //   npm run scenarios -- --provider fake-codex            # the fake Codex, the same
 //   npm run scenarios -- --provider fake-copilot          # the real Copilot CLI offline against a scripted model: the same
+//   npm run scenarios -- --provider fake-antigravity      # the fake Antigravity CLI (tests/e2e/fake-agy): the same
 //   npm run scenarios -- --provider claude-code --model haiku --budget 2      # model trials (opt-in, cost tokens)
 //   npm run scenarios -- --provider codex --model gpt-5.6-luna --only work-on-card,review-card
 //   npm run scenarios -- --dialect "my/Opus 5.5 v2.json" --only work-on-card   # a dialect file in the model slot (HI-2439)
@@ -43,6 +44,8 @@ import { devBuild, ensureBuildWithSlot } from '../e2e/build.mjs'
 import { LANES, describeHolder, laneWaitLine, lanesFirst, laneWork, waitForLane } from '../e2e/lanes.mjs'
 import { buildNeedsCpuSlot, creditFor, preMerge, refusedLine, slotPool, waitForSlot, waitLine, waitSummary } from '../e2e/slots.mjs'
 import { waitForCodexHome } from '../e2e/codexHomeLock.mjs'
+import { consumerHooks, waitForTestHome } from '../e2e/testHomeLock.mjs'
+import { freshenHome, freshenedLine, HomeNotReady } from '../e2e/testHomes.mjs'
 import { autoClean } from '../e2e/clean.mjs'
 import { scenariosProgress, slotWaitProgress } from '../progressReport.mts'
 import { endRunTemp, startRunTemp } from '../runTemp.mts'
@@ -72,6 +75,7 @@ const { runScenario, dialectForRun, dialectRecord, sourceFingerprint, claudeSign
 const { copilotInstalled } = require('../e2e/fake-copilot-api.cjs')
 const { SCENARIOS, FIXTURES_VERSION } = require('./scenarios.cjs')
 const { parseRandom, parseSeed, pickRandom } = require('./randomPick.cjs')
+const { selectFor } = require('./fakeScope.cjs')
 const { benchmarkOf, pruneResults, saveBaseline, resultsFolder, releaseResults, writeResults, parseBudget, budgetGate, spendText } = require('./benchmark.cjs')
 
 const argv = process.argv.slice(2)
@@ -100,11 +104,13 @@ try {
   process.exit(2)
 }
 const keep = argv.includes('--keep')
+// --warm-homes (HI-2606): real trials run in the CLI test homes as earlier runs left them; else each is reset first.
+const warmHomes = argv.includes('--warm-homes')
 const repeats = Math.max(1, Math.min(20, Number(arg('repeat', '1')) || 1))
 const baselineName = arg('save-baseline', '')
 const fake = !!PROVIDERS[provider]?.fake
 if (!PROVIDERS[provider]) {
-  console.error(`Unknown provider "${provider}": fake, fake-codex, fake-copilot, claude-code or codex.`)
+  console.error(`Unknown provider "${provider}": fake, fake-codex, fake-copilot, fake-antigravity, claude-code or codex.`)
   process.exit(2)
 }
 // --dialect <file> (HI-2439): a dialect file in the model slot of every agent of the provider's CLI, its chain recorded
@@ -139,7 +145,26 @@ if (notSignedIn) {
   process.exit(0)
 }
 
-const listed = SCENARIOS.filter((s) => !only?.length || only.includes(s.id))
+const unknown = (only ?? []).filter((id) => !SCENARIOS.some((s) => s.id === id))
+if (unknown.length) {
+  console.error(`No such scenario: ${unknown.join(', ')}.`)
+  process.exit(2)
+}
+// Which of them this provider runs (fakeScope.cjs, HI-2663): those it leaves out are said, each with where it does run.
+const scoped = selectFor(
+  SCENARIOS.filter((s) => !only?.length || only.includes(s.id)),
+  provider
+)
+if (scoped.excluded.length) {
+  if (only?.length) for (const x of scoped.excluded) console.log(`NOT RUN ${x.id}: ${x.why}`)
+  else console.log(`Not run on ${provider} (tests/scenarios/fakeScope.cjs): ${scoped.excluded.length} scenario(s), on another provider or as model trials only.`)
+}
+// Nothing left to run is no result, never a clean pass: no results are written.
+if (!scoped.run.length) {
+  console.error(`No scenario to run on ${provider}${only?.length ? ` of those asked for (${only.join(', ')})` : ''}: see NOT RUN above.`)
+  process.exit(2)
+}
+const listed = scoped.run
 const chosen = random ? pickRandom(listed, random.count, random.seed) : listed
 if (random) console.log(`Picked ${chosen.length} of ${listed.length} at random (seed ${random.seed}): ${chosen.map((s) => s.id).join(', ')}. Again: --random ${random.count} --seed ${random.seed}${only?.length ? ` --only ${only.join(',')}` : ''}, or --only ${chosen.map((s) => s.id).join(',')}`)
 // More than a few scenarios (or --repeat) is a heavy run: it waits for a test slot, as the e2e runner's do
@@ -260,6 +285,11 @@ console.log(`Lane ${lane.lane}: Agent API port ${lane.first}, folders in ${workR
 
 // Real Codex trials use lib.CODEX_HOME, as the e2e suites do. Fake Codex has its own per-trial home (harness.cjs).
 const codexLease = !fake && PROVIDERS[provider].provider === 'codex' ? await waitForCodexHome(lib.CODEX_HOME, { kind: 'scenarios', root: lib.ROOT, what: `scenarios: ${chosen.length} (${provider})`, argv }) : null
+// Real Claude Code trials hold its signed-in test home's lease for the run too (HI-2606), so a reset never runs under
+// another run's sessions there.
+const claudeLease = !fake && PROVIDERS[provider].provider === 'claude-code' ? await waitForTestHome('claude', CLAUDE_TEST_HOME, { kind: 'scenarios', root: lib.ROOT, what: `scenarios: ${chosen.length} (${provider})`, argv }) : null
+/** The real CLI's test home a trial runs in, reset before each trial unless --warm-homes (HI-2606), or null (a fake). */
+const realHome = claudeLease ? { cli: 'claude', home: CLAUDE_TEST_HOME, lease: claudeLease } : codexLease ? { cli: 'codex', home: lib.CODEX_HOME, lease: codexLease } : null
 
 // The source this run tests, taken before it starts (and checked again at the end).
 const sourceAtStart = sourceFingerprint()
@@ -290,6 +320,8 @@ const noCostModels = new Set()
 // too, so they are skipped, said once.
 let environment = null
 let saidRest = false
+/** What each trial's test home reset did (HI-2606), for the summary: what was cleared, and what was kept unclassified. */
+const homeResets = []
 /** What the run has so far: its source and settings (`complete` once every trial has run, and checked again then). */
 const metaNow = (complete) => ({
   fixturesVersion: FIXTURES_VERSION,
@@ -328,8 +360,26 @@ for (const [i, { sc, sample, name }] of trials.entries()) {
     keepSoFar()
     continue
   }
+  // Its CLI test home reset to its sign-in first (HI-2606): what an earlier trial left never helps this one. One that
+  // can't be reset (signed out, still in use, its status unreadable) stops the run here, as a sign-in problem does.
+  if (realHome && !warmHomes) {
+    try {
+      // This run's own CLIs (an earlier trial's) are waited for: a scenario run starts nothing else (HR1 on s17).
+      const said = freshenedLine(realHome.cli, await freshenHome(realHome.cli, realHome.home, { lease: realHome.lease, self: { pid: process.pid, started: Math.floor(Date.now() - process.uptime() * 1000) } }))
+      homeResets.push(`${sc.id}: ${said}`)
+    } catch (e) {
+      if (!(e instanceof HomeNotReady)) throw e
+      environment = { why: e.message, advice: environmentAdvice(e.message, provider) }
+      results.push({ scenario: sc.id, title: sc.title, provider, sample, environment: e.message, checks: [], seconds: 0 })
+      console.log(`SKIP environment: ${e.message}`)
+      progress.done(sc.id, 0, 'skipped')
+      keepSoFar()
+      continue
+    }
+  }
   process.stdout.write(`${sc.id} (${provider}${repeats > 1 ? `, ${sample}/${repeats}` : ''})… `)
-  const r = await runScenario(sc, provider, { model, effort, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000 })
+  // What the trial uses the home with, noted on its lease before it starts (HR2 on round 1): kept after a crash too.
+  const r = await runScenario(sc, provider, { model, effort, dialect, keep, workRoot, port: lane.first, evidence, signedOut, timeoutMs: fake ? 60000 : 360000, uses: consumerHooks([realHome?.lease]) })
   r.sample = sample
   if (r.environment) {
     // Not a result of the scenario: no checks, and no cost assumed.
@@ -381,6 +431,7 @@ save(
     `Fixtures v${FIXTURES_VERSION}; source ${meta.source.head}${meta.source.dirty ? ` + changes ${meta.source.dirty}` : ''}; guidance ${meta.guidance}; CLI ${cli}; ${meta.when}; spent ${spendText(meta)}.`,
     ...(random ? ['', `Picked at random: ${random.count} with seed ${random.seed} (again: --random ${random.count} --seed ${random.seed}).`] : []),
     ...(dialect ? ['', `Dialect: ${dialect.path} (${dialect.overrides} override(s)), chain ${dialect.files.join(' → ')}, hash ${dialect.hash || '(the Default)'}.`] : []),
+    ...(realHome ? ['', warmHomes ? 'Test home: warm (--warm-homes), as earlier runs left it.' : `Test home reset before each trial (HI-2606):`, ...homeResets.map((l) => `- ${l}`)] : []),
     '',
     '| Scenario | Result | Checks | Skills read | Combwork tools | Combwork’s cost | Provider cost, time |',
     '|---|---|---|---|---|---|---|',
@@ -391,6 +442,7 @@ console.log(`\nResults: ${out}`)
 const hardFailures = fake ? results.filter((r) => r.error || r.checks?.some((c) => c.ok === false)).length : 0
 const failedTrials = results.filter((r) => r.error || r.checks?.some((c) => c.ok === false)).length
 await progress.finish(!hardFailures, `${results.length - failedTrials - results.filter((r) => r.skipped).length} ok, ${failedTrials} failed${results.some((r) => r.skipped) ? `, ${results.filter((r) => r.skipped).length} skipped` : ''}`, join(out, 'summary.md'))
+claudeLease?.release()
 codexLease?.release()
 // What tests left in combwork-test that is no longer needed (tests/e2e/clean.mjs), this lane's included: let go first.
 lane.release()

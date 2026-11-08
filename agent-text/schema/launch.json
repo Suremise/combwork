@@ -1,0 +1,13 @@
+{
+  "launch.summary.all": {
+    "placeholders": {}
+  },
+  "launch.summary.partly": {
+    "placeholders": {
+      "off": "plain"
+    }
+  },
+  "launch.summary.plain": {
+    "placeholders": {}
+  }
+}

@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { junction } from './pathAliases'
+import { bound } from './keepType'
 
 const base = tempDir('cw-usage-closed-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -49,7 +50,7 @@ describe('the usage history of a workspace that closed', () => {
     await w.open(wsA)
     // The import's list of projects answers only once the window has switched to beta (as a slow one can).
     const g = gate()
-    const list = w.listProjectPaths.bind(w)
+    const list = bound(w, w.listProjectPaths)
     const spy = vi.spyOn(w, 'listProjectPaths').mockImplementationOnce(async (o) => {
       const paths = await list(o)
       await g.held
@@ -90,18 +91,17 @@ describe('the usage history of a workspace that closed', () => {
 
   it("leaves no usage.db open for a transcript read whose workspace closed while it waited", async () => {
     // As a worker thread does: its files stay open until it's told to close them (in-process it closes them when idle).
-    const inner = usageHistory as unknown as { closeInProcess: (() => void) | null }
     await usageHistory.storedSessions(wsB, null)
-    const closeAll = inner.closeInProcess
+    const closeAll = usageHistory['closeInProcess']
     expect(closeAll).toBeTypeOf('function')
-    inner.closeInProcess = null
+    usageHistory['closeInProcess'] = null
     await w.open(wsD)
     const host = join(wsD, 'proj')
     const transcript = join(base, 'delta-transcript.jsonl')
     writeFileSync(transcript, JSON.stringify({ type: 'user', sessionId: 's1', timestamp: new Date().toISOString(), message: { role: 'user', content: 'Task' } }) + '\n')
     // Where the session's saved state is answers only once the window has switched to beta.
     const g = gate()
-    const scope = w.sessionScope.bind(w)
+    const scope = bound(w, w.sessionScope)
     const spy = vi.spyOn(w, 'sessionScope').mockImplementationOnce(async (p) => {
       const s = await scope(p)
       await g.held
@@ -118,7 +118,7 @@ describe('the usage history of a workspace that closed', () => {
       await vi.waitFor(() => rmSync(join(wsD, '.combwork'), { recursive: true }), { timeout: 20000 })
     } finally {
       spy.mockRestore()
-      inner.closeInProcess = closeAll
+      usageHistory['closeInProcess'] = closeAll
       closeAll?.()
     }
   })
@@ -156,7 +156,7 @@ describe('the usage history of a workspace that closed', () => {
     await w.open(wsF)
     const host = join(wsF, 'proj')
     const g = gate()
-    const find = sessions.anyTranscript.bind(sessions)
+    const find = bound(sessions, sessions.anyTranscript)
     const spy = vi.spyOn(sessions, 'anyTranscript').mockImplementationOnce(async (p, s) => {
       await g.held
       return find(p, s)
@@ -186,8 +186,8 @@ describe('the usage history of a workspace that closed', () => {
     // The close's file watcher stops only when the test says, after its real stop: the board is closed by then, the
     // workspace's path not yet cleared.
     const g = gate()
-    const watcher = (w as unknown as { watcher: { close: () => Promise<void> } }).watcher
-    const stop = watcher.close.bind(watcher)
+    const watcher = w['watcher']!
+    const stop = bound(watcher, watcher.close)
     watcher.close = async () => {
       await stop()
       await g.held

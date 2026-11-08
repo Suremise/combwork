@@ -36,6 +36,32 @@ const NAME_IDS = ['4.board-file', '4.board-backups', '4.log-file', '4.workspace-
 /** electron-builder's APP_GUID for appId it.surmise.combwork (HI-2460): its uninstall entry's key. */
 const COMBWORK_GUID = '10a7595a-0e90-558c-b6b6-ae33bdd80748'
 
+/** The eras an upgrade starts from (checks.cjs previousEra, HI-2727): 1.0's names, a 1.1 release candidate's, Combwork's. */
+const ERAS = ['1.0', 'rc', 'combwork']
+/**
+ * The drivers' check ids an upgrade over a release of `era` must produce (HI-2460's, HI-2587's, HI-2727's): mark's
+ * before it, and after-upgrade's.
+ */
+const UPGRADE_IDS = {
+  // 1.0: its folders, Launch at login, workspace, advanced ids and stored values all under the old names, moved.
+  '1.0': {
+    mark: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved', '4.values-written'],
+    after: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.trust-kept', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', '4.advanced-kept', '4.advanced-old-id', ...NAME_IDS]
+  },
+  // A release candidate (HI-2587): its profile, .combwork and cw.* ids are moved already, so only what a 1.1 RC still
+  // keeps under the old names is checked, besides what every upgrade keeps.
+  rc: {
+    mark: ['4.settings-saved', '4.workspace-made', '4.values-written'],
+    after: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', ...NAME_IDS]
+  },
+  // 1.1 and later (HI-2727): Combwork's names already, so nothing is moved; a real workspace (a git project, its cards,
+  // a lane and its slot, a connection, advanced overrides at both levels, a skill copy) is carried over as it was.
+  combwork: {
+    mark: ['4.settings-saved', '4.login-registered', '4.connection-made', '4.workspace-made', '4.advanced-saved', '4.lane-made'],
+    after: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-kept', '4.login-kept', '4.no-fallback', '4.connection-kept', '4.workspace-kept', '4.workspace-card', '4.workflow-kept', '4.values-facts', '4.advanced-kept', '4.lane-kept', '4.slot-kept', ...NAME_IDS]
+  }
+}
+
 // What each run kind must produce: the drivers' check ids and facts, and the screenshots.
 const REQUIRED = {
   fresh: {
@@ -46,9 +72,10 @@ const REQUIRED = {
     },
     shots: ['s1-desktop.jpg', 's1-installed-apps.jpg', 's1-start-dark.png', 's1-start-light.png', 's1-agent-setup-dark.png', 's1-agent-setup-light.png', 's3-missing-dark.png', 's3-found-dark.png', 's3-found-light.png', 's6-workspace.png', 's6-workspace-overview.png', 's6-skills.png', 's6-mcp-servers.png', 's6-assistant.png', 's5-desktop.jpg']
   },
+  // From 1.0 here; required(kind, meta) gives an upgrade's for the era of meta.previousEra (HI-2727).
   upgrade: overPrevious(4, 's4'),
   manual: overPrevious(7, 's7'),
-  'upgrade-rc': overPrevious(10, 's10', true),
+  'upgrade-rc': overPrevious(10, 's10', 'rc'),
   edges: { drivers: { s8: { scenario: 8, ids: ['8.notification'], facts: ['exe'] } }, shots: ['s8-notified.png', 's8-desktop.jpg'] },
   // HI-2592: a new user's first session (drive.cjs clean), then the scan (inside/clean-scan.cjs, its checks clean.cjs's).
   clean: {
@@ -66,28 +93,26 @@ const EDGE_IDS = ['8.wait', '8.wait-unchanged', '8.continues', '8.refuses', '8.r
 /** The profile move's checks profile-move.ps1 must record (HI-2602), in its order. */
 const PROFILE_MOVE_IDS = ['11.old-profile', '11.installer-held', '11.refused', '11.refused-unchanged', '11.moved', '11.record', '11.sign-in-checked', '11.sign-in-once']
 
-/** An upgrade over the previous release (scenario n, its files' prefix pre): the drivers' checks (HI-2460's too) and shots. */
-function overPrevious(n, pre, fromRc = false) {
-  // From a release candidate (HI-2587): its profile, .combwork and cw.* ids are moved already, so only what a 1.1 RC
-  // still keeps under the old names is checked, besides what every upgrade keeps.
-  if (fromRc) {
-    return {
-      drivers: {
-        [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.workspace-made', '4.values-written'], facts: ['version'] },
-        [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', ...NAME_IDS], facts: ['version'] },
-        [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
-      },
-      shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`, `${pre}-toast.jpg`]
-    }
-  }
+/** An upgrade over a release of `era` (scenario n, its files' prefix pre): the drivers' checks and shots. */
+function overPrevious(n, pre, era = '1.0') {
+  const ids = UPGRADE_IDS[era] || UPGRADE_IDS['1.0']
   return {
     drivers: {
-      [`${pre}-mark`]: { scenario: n, ids: ['4.settings-saved', '4.login-registered', '4.workspace-made', '4.advanced-saved', '4.values-written'], facts: ['version'] },
-      [`${pre}-after`]: { scenario: n, ids: ['4.settings-kept', '4.theme-applied', '4.combwork-runs', '4.local-moved', '4.trust-kept', '4.roaming-moved', '4.record', '4.login-moved', '4.no-fallback', '4.workspace-moved', '4.workspace-card', '4.values-options', '4.values-facts', '4.advanced-kept', '4.advanced-old-id', ...NAME_IDS], facts: ['version'] },
+      [`${pre}-mark`]: { scenario: n, ids: ids.mark, facts: ['version'] },
+      [`${pre}-after`]: { scenario: n, ids: ids.after, facts: ['version'] },
       [`${pre}-notify`]: { scenario: n, ids: [`${n}.notification`], facts: ['exe'] }
     },
     shots: [`${pre}-mark-before-upgrade.png`, `${pre}-desktop-before.jpg`, `${pre}-desktop-after.jpg`, `${pre}-after-after-upgrade-light.png`, `${pre}-after-after-upgrade-dark.png`, `${pre}-toast.jpg`]
   }
+}
+
+/** What a run kind must produce in this run: an upgrade's by the era of the release it started from (meta.previousEra). */
+function required(kind, meta) {
+  if (kind === 'upgrade' || kind === 'manual') {
+    const era = ERAS.includes(meta?.previousEra) ? meta.previousEra : '1.0'
+    return era === '1.0' ? REQUIRED[kind] : overPrevious(kind === 'upgrade' ? 4 : 7, kind === 'upgrade' ? 's4' : 's7', era)
+  }
+  return REQUIRED[kind]
 }
 
 const entriesOf = s => (s?.uninstallEntries ? [].concat(s.uninstallEntries) : [])
@@ -114,7 +139,7 @@ function evaluate(meta, files) {
   }
   // A driver's record counts only if the step finished, with every required check id and fact.
   const driver = (kind, key) => {
-    const req = REQUIRED[kind].drivers[key]
+    const req = required(kind, meta).drivers[key]
     const d = need(req.scenario, key)
     if (!d) return null
     if (d.completed !== true) add(req.scenario, `${key}: the driver finished its step`, false, d.error || 'it stopped before the end (interrupted, timed out or failed)')
@@ -134,7 +159,7 @@ function evaluate(meta, files) {
   // Every step the runner took must have succeeded: a failed command or timeout fails the report.
   for (const s of meta.steps || []) add(s.scenario, `Step: ${s.what}`, s.ok, s.detail)
   for (const kind of ran.filter(k => KINDS.includes(k))) {
-    for (const shot of REQUIRED[kind].shots) if (!(meta.shots || []).includes(shot)) add(Number(/^s(\d+)/.exec(shot)?.[1]) || 0, `Screenshot ${shot} collected`, false, 'missing')
+    for (const shot of required(kind, meta).shots) if (!(meta.shots || []).includes(shot)) add(Number(/^s(\d+)/.exec(shot)?.[1]) || 0, `Screenshot ${shot} collected`, false, 'missing')
   }
 
   if (ran.includes('fresh')) {
@@ -163,6 +188,7 @@ function evaluate(meta, files) {
     }
   }
 
+  const eraOf = kind => (kind === 'upgrade-rc' ? 'rc' : ERAS.includes(meta.previousEra) ? meta.previousEra : '1.0')
   for (const [kind, n, pre] of [['upgrade', 4, 's4'], ['manual', 7, 's7'], ['upgrade-rc', 10, 's10']]) {
     if (!ran.includes(kind)) continue
     const prevRun = need(n, `${pre}-prev-run`)
@@ -190,8 +216,16 @@ function evaluate(meta, files) {
       add(n, `Installed in %LOCALAPPDATA%\\Programs\\${app.exeName}; the 1.0 app's folder gone`, ins.combwork?.hasExe === true && ins.old?.exists === false, JSON.stringify(ins))
       add(n, `The installed app code is the new build's (app.asar ${String(ins.combwork?.appAsarSha256).slice(0, 12)}…)`, !!ins.combwork?.appAsarSha256, JSON.stringify(ins.combwork))
       const pr = newSt.profiles || {}
-      add(n, 'The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app\'s left', pr.roamingCombwork?.exists && pr.localCombwork?.exists && !pr.roamingOld?.exists && !pr.localOld?.exists, JSON.stringify({ roaming: [pr.roamingCombwork?.exists, pr.roamingOld?.exists], local: [pr.localCombwork?.exists, pr.localOld?.exists] }))
-      add(n, "The installer's record is in %LOCALAPPDATA%\\Combwork", /"by"\s*:\s*"installer"/.test(String(pr.localCombwork?.record)), String(pr.localCombwork?.record))
+      const folders = JSON.stringify({ roaming: [pr.roamingCombwork?.exists, pr.roamingOld?.exists], local: [pr.localCombwork?.exists, pr.localOld?.exists] })
+      const byInstaller = /"by"\s*:\s*"installer"/.test(String(pr.localCombwork?.record))
+      // From 1.0 the installer moves its profile folders (HI-2461); from 1.1 on there is nothing of 1.0's to move (HI-2727).
+      if (eraOf(kind) === 'combwork') {
+        add(n, 'The profile folders kept where they were: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app\'s made', pr.roamingCombwork?.exists && pr.localCombwork?.exists && !pr.roamingOld?.exists && !pr.localOld?.exists, folders)
+        add(n, 'No profile move by the installer (nothing of 1.0\'s to move): no record in %LOCALAPPDATA%\\Combwork', !byInstaller, String(pr.localCombwork?.record))
+      } else {
+        add(n, 'The profile folders moved: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app\'s left', pr.roamingCombwork?.exists && pr.localCombwork?.exists && !pr.roamingOld?.exists && !pr.localOld?.exists, folders)
+        add(n, "The installer's record is in %LOCALAPPDATA%\\Combwork", byInstaller, String(pr.localCombwork?.record))
+      }
       const run = [].concat(newSt.run || [])
       add(n, "The 1.0 app's Launch at login removed by the installer", !run.some(v => String(v.command).toLowerCase().includes(`\\${OLD_APP.exeName}.exe`.toLowerCase())), JSON.stringify(run))
     }
@@ -239,6 +273,9 @@ function evaluate(meta, files) {
 
   const passed = checks.filter(c => c.ok).length
   const differences = asarNote ? [asarNote] : []
+  // A kind left out for the previous release (HI-2727: the profile move is 1.0's): a note, never a silent gap.
+  for (const [kind, why] of Object.entries(meta.skipped || {})) differences.push(`**${kind}** ${why}.`)
+  if (meta.previousEra && (ran.includes('upgrade') || ran.includes('manual'))) differences.push(`The upgrade starts from **${meta.previousVersion}**, ${meta.previousEra === 'combwork' ? "already under Combwork's names: its data is checked carried over as it was, nothing renamed" : meta.previousEra === 'rc' ? 'a 1.1 release candidate: what it still keeps under the old names is checked moved' : "under 1.0's names: the names upgrade and the profile move are checked"}.`)
   if ((ran.includes('upgrade') || ran.includes('manual')) && meta.previousVersion === meta.installerVersion) {
     differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The previous release's "updated to …" notice can't show.`)
   }
@@ -302,4 +339,4 @@ function markdown(r) {
   return lines.join('\n')
 }
 
-module.exports = { evaluate, markdown, verdict, SCENARIOS, KINDS, REQUIRED, COMBWORK_GUID, PROFILE_MOVE_IDS }
+module.exports = { evaluate, markdown, verdict, required, SCENARIOS, KINDS, REQUIRED, UPGRADE_IDS, ERAS, COMBWORK_GUID, PROFILE_MOVE_IDS }

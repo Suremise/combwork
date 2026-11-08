@@ -15,7 +15,7 @@ import { HISTORY, storedForAgents } from './taskHistory'
 import { COLUMN_CHOICES, COLUMN_IDS, TASK_COLUMNS, columnLabel, isLoopStepEntry } from './tasks'
 import { cardRef } from './projectKeys'
 import { CAME_BACK } from './workflow/queue'
-import { agentMsg, say } from './agentText'
+import { agentMsg, say, sayWithId, type Said } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
 
 /**
@@ -1075,22 +1075,22 @@ export function watchLabel(cond: Pick<WatchCondition, 'cards' | 'column'>): stri
 }
 
 /** A condition from untrusted arguments, or an error saying what is wrong. */
-export function readCondition(args: { cards?: unknown; changes?: unknown; until?: unknown; column?: unknown; fresh?: unknown }): WatchCondition | string {
+export function readCondition(args: { cards?: unknown; changes?: unknown; until?: unknown; column?: unknown; fresh?: unknown }): WatchCondition | Said {
   const raw = Array.isArray(args.cards) ? args.cards : []
   const ns = [...new Set(raw.map(Number))].filter((n) => Number.isInteger(n) && n > 0)
-  if (!ns.length || ns.length !== raw.length) return say(W.badCards)
-  if (ns.length > WATCH_MAX_CARDS) return say(W.tooManyCards, { max: String(WATCH_MAX_CARDS) })
+  if (!ns.length || ns.length !== raw.length) return sayWithId(W.badCards)
+  if (ns.length > WATCH_MAX_CARDS) return sayWithId(W.tooManyCards, { max: String(WATCH_MAX_CARDS) })
   const column = args.column
-  if (column !== undefined && !COLUMNS.includes(column as TaskColumn)) return say(W.badColumn, { choices: COLUMN_CHOICES })
+  if (column !== undefined && !COLUMNS.includes(column as TaskColumn)) return sayWithId(W.badColumn, { choices: COLUMN_CHOICES })
   const list = args.changes ?? args.until
   const given = list !== undefined && list !== 'any'
   // A column alone: arriving in it is all that counts. Otherwise the kinds listed (default: any).
   const changes = !given ? (column ? ['column'] : [...WATCH_CHANGES]) : Array.isArray(list) ? [...new Set(list)] : [list]
-  if (!changes.length || changes.some((c) => !WATCH_CHANGES.includes(c as WatchChange))) return say(W.badChanges, { choices: WATCH_CHANGES.join(', ') })
-  if (column && !changes.includes('column')) return say(W.columnNeedsChange)
-  if (args.fresh !== undefined && typeof args.fresh !== 'boolean') return say(W.badFresh)
+  if (!changes.length || changes.some((c) => !WATCH_CHANGES.includes(c as WatchChange))) return sayWithId(W.badChanges, { choices: WATCH_CHANGES.join(', ') })
+  if (column && !changes.includes('column')) return sayWithId(W.columnNeedsChange)
+  if (args.fresh !== undefined && typeof args.fresh !== 'boolean') return sayWithId(W.badFresh)
   const fresh = args.fresh === true
-  if (fresh && !column) return say(W.freshNeedsColumn)
+  if (fresh && !column) return sayWithId(W.freshNeedsColumn)
   // A column with `column` named among the changes: a move into it, met at once by a card already there (#434). Fresh:
   // only the next move into it (a card already there waits for it to come back).
   const moveInto = !!column && (given || fresh)

@@ -19,6 +19,7 @@ const Q = {
   unenforced: agentMsg({ id: 'queue.line.unenforced', text: "Combwork merges this card (its rules), but workflow rules aren't enforced: merge it yourself and report the merge (cw_report_merge).", note: 'A card read under Combwork merges while Settings → Advanced: workflow rules are enforced is off: nothing refuses, so the agent merges and reports as before 1.0.' }),
   who: agentMsg({ id: 'queue.line.who', text: "Combwork merges this card (its rules): don't merge it yourself.", note: "The first sentence of every queue line for a card Combwork's merge queue merges (#1354): the agent never merges it itself." }),
   queued: agentMsg({ id: 'queue.line.queued', text: '{who} It is in the merge queue for {target}, position {position}; it moves to Done once merged.', note: '{who}: queue.line.who. {target}: the branch it merges into. {position}: 1 is next, after the one testing now.' }),
+  waiting: agentMsg({ id: 'queue.line.waiting', text: '{who} It is in the merge queue for {target}, waiting for {cards} to be Done: it is blocked by them, and the queue merges it once they are.', note: '{who}: queue.line.who. {target}: the branch it merges into. {cards}: the cards it is blocked by that are not Done yet (keys, comma-joined). HI-2709.' }),
   testing: agentMsg({ id: 'queue.line.testing', text: '{who} The merge queue is {step, select, advance {moving {target} to its merge} checks {running the merge checks on its merge into {target}} other {testing its merge into {target}}} now; it moves to Done once merged.', note: "{who}: queue.line.who. {target}: the branch it merges into. {step}: the queue's step with it (advance, checks; other: another or not known here)." }),
   paused: agentMsg({ id: 'queue.line.paused', text: '{who} It is in the merge queue for {target}, which is paused ({reason}, on {card}); {waits}.', note: "{who}: queue.line.who. {reason}: the pause's code (as the window's queue names it). {card}: the card it paused on. {waits}: what it waits for (queue.paused.*), never a step of the agent's own (#1406)." }),
   returned: agentMsg({ id: 'queue.line.returned', text: '{who} {returned}', note: '{who}: queue.line.who. {returned}: what came back and what to do next (queue.returned.*).' }),
@@ -73,6 +74,8 @@ const Q = {
 export type QueueState =
   /** Waiting in the queue: `position` 1 is next, after the one testing now. */
   | { state: 'queued'; target: string; position: number }
+  /** HI-2709: in the queue, but blocked by cards that aren't Done (`on`, their keys): the queue goes on without it. */
+  | { state: 'waiting'; target: string; on: string[] }
   /** The queue's entry now, at its step (null: another Combwork runs the queue, or its advance is recovered, step unknown). */
   | { state: 'testing'; target: string; step: QueueStep | null }
   /** In the queue, which is paused for its target (`card`: the card it paused on; `stuck`: an interrupted advance, asked in For you). */
@@ -96,6 +99,9 @@ export function queueStateOf(wf: Workflow, card: CardRecord, s: CardState = wf.s
     const order = queueOrder(wf, open.target)
     // The one testing now finishes its step even with the queue paused.
     if (order.testing?.entry === open.id) return { state: 'testing', target: open.target, step: order.testing.step }
+    // HI-2709: blocked by cards that aren't Done: it waits for them, whatever the queue is doing.
+    const on = open.state === 'open' ? wf.queueWaitingOn(card.id) : []
+    if (on.length) return { state: 'waiting', target: open.target, on }
     const pause = wf.store.queuePause(open.target) as { reason: PauseReason; card: string; stuck?: unknown } | null
     if (pause) return { state: 'paused', target: open.target, reason: pause.reason, card: pause.card, ...(pause.stuck ? { stuck: true as const } : {}) }
     return { state: 'queued', target: open.target, position: order.queued.findIndex((q) => q.entry === open.id) + 1 }
@@ -161,7 +167,8 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
     const n = live.now
     testing = { ...named(store.card(n.number)), entry: n.entry, revision: n.revision, expected: n.expected, step: n.step, started: n.started, run: live.run }
   } else {
-    const begun = open.find((o) => o.state === 'started') ?? (store.queueLease(target) && !live.running ? open[0] : undefined)
+    // Another Combwork's run: its first entry that isn't waiting for a blocker (HI-2709: the queue goes on without those).
+    const begun = open.find((o) => o.state === 'started') ?? (store.queueLease(target) && !live.running ? open.find((o) => !wf.queueWaitingOn(o.card.id).length) : undefined)
     if (begun) {
       const d = begun.f.data as FactData['IntegrationRequested']
       const st = of(begun.card.id).s.entries.find((x) => x.id === d.entry)?.started
@@ -172,7 +179,9 @@ export function queueOrder(wf: Workflow, target: string, live: QueueLive = wf.qu
     .filter((o) => (o.f.data as FactData['IntegrationRequested']).entry !== testing?.entry)
     .map((o) => {
       const d = o.f.data as FactData['IntegrationRequested']
-      return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at }
+      // HI-2709: what it waits for, as the board is now (a dependency's edit shows at once); still in the list, in its place.
+      const on = o.state === 'open' ? wf.queueWaitingOn(o.card.id) : []
+      return { ...named(o.card), entry: d.entry, revision: d.revision, at: o.f.at, ...(on.length ? { waitingOn: on } : {}) }
     })
   return { open, entries, cards, testing, queued }
 }
@@ -238,6 +247,8 @@ export function queueLine(q: QueueState, enforced = true): string {
   switch (q.state) {
     case 'queued':
       return say(Q.queued, { who, target: q.target, position: q.position })
+    case 'waiting':
+      return say(Q.waiting, { who, target: q.target, cards: q.on.join(', ') })
     case 'testing':
       return say(Q.testing, { who, target: q.target, step: q.step === 'advance' || q.step === 'checks' ? q.step : 'other' })
     case 'paused':

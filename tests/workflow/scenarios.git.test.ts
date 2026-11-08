@@ -1,6 +1,7 @@
 // SPEC §16.18's acceptance scenarios at the core, on real temporary Git repositories (#1118): the moves, gates,
 // refusals and reconciliation of a card with its own line, with the Assistant off.
 import { afterEach, describe, expect, it } from 'vitest'
+import { randomBytes } from 'crypto'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { B1, B2, commit, GIT_HEAVY_MS, moved, R1, R2, refusedBy, setup, sh, type Env } from './harness'
@@ -668,7 +669,7 @@ describe('workflow scenarios, Git', () => {
 
   // GIT_HEAVY_MS (HI-2453's decision, HI-2025's rule): three cards started in folders of their own, two merged by hand and
   // each reconciled, 52 git processes, 7.9 s alone with no wait between them; past 20 s in HI-2499's run of 353 files.
-  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand → Done outside the rules', { timeout: GIT_HEAVY_MS }, async () => {
+  it('S41: a card just started is never Done by observation; part of an Active card\'s work merged by hand is a mark; a Review card merged by hand is marked and stays in Review (HI-2709)', { timeout: GIT_HEAVY_MS }, async () => {
     const e = pair()
     const fresh = e.wf.createCard({ title: 'Just started' })
     moved(await e.wf.start(fresh.key, B1))
@@ -688,10 +689,11 @@ describe('workflow scenarios, Git', () => {
     moved(await e.wf.submit(reviewed.key, B2, { summary: 'x' }))
     sh(e.project, 'merge', '-q', '--no-ff', '-m', 'by hand', sh(f2, 'rev-parse', 'HEAD'))
     await reconcile(e.wf, reviewed)
+    // HI-2709: marked, and still in Review: its review decides (the queue closes it as merged once that passes).
     const r = e.wf.state(reviewed)
-    expect(r.stage).toBe('done')
-    expect(r.integrated).toMatchObject({ by: 'outside' })
-    expect(r.marks.outsideRules).toEqual(['review'])
+    expect(r.stage).toBe('review')
+    expect(r.integrated).toBeNull()
+    expect(r.marks.inTarget).toMatchObject({ target: 'main', submission: r.latest!.id })
   })
 
   it('S44: Solo, one agent in the project folder, no trailers: start, commit, submit → Done; the change is base..HEAD', async () => {
@@ -855,6 +857,27 @@ describe('workflow scenarios, Git', () => {
     expect(s.verdicts).toHaveLength(1)
     expect(s.stage).toBe('active')
     expect((e.store.facts(card.id).find((f) => f.kind === 'Verdict')!.data as FactData['Verdict']).revision).toBe(s.latest!.revision)
+  })
+})
+
+describe('a change with large binaries submits (HI-2748)', () => {
+  it('a 44 MB binary modified in place: the submit reads the change and moves the card to Review', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = pair()
+    // WE-1488's shape: a video in the target, replaced in the card by a bigger one. Random bytes don't compress, so
+    // `git diff --binary` would carry both versions (about 89 MB), past what the change's key read takes.
+    writeFileSync(join(e.project, 'video.mp4'), randomBytes(25_000_000))
+    sh(e.project, 'add', '-A')
+    sh(e.project, 'commit', '-q', '-m', 'the video')
+    const card = e.wf.createCard({ title: 'A new video' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const folder = s.data!.folder as string
+    writeFileSync(join(folder, 'video.mp4'), randomBytes(44_000_000))
+    commit(folder, { 'notes.txt': 'new video\n' }, `${card.key}: a new video`)
+    moved(await e.wf.submit(card.key, B1, { summary: 'done' }))
+    expect(e.wf.state(card).stage).toBe('review')
+    expect(e.wf.state(card).latest!.files).toEqual(expect.arrayContaining([{ status: 'M', path: 'video.mp4' }, { status: 'A', path: 'notes.txt' }]))
+    expect(e.wf.state(card).latest!.key).toMatch(/^[0-9a-f]{40}$/)
   })
 })
 

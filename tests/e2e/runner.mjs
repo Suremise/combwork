@@ -8,7 +8,7 @@ import { join, posix } from 'path'
 const { exitText } = createRequire(import.meta.url)('./windowsExits.cjs')
 
 const VALUE_FLAGS = ['--jobs', '--affected', '--repeat', '--clear-dir', '--lang']
-const PLAIN_FLAGS = ['--all', '--real', '--only-real', '--record', '--fingerprint', '--build', '--packaged', '--no-progress', '--no-wait', '--pre-merge', '--keep-files']
+const PLAIN_FLAGS = ['--all', '--real', '--only-real', '--record', '--fingerprint', '--build', '--packaged', '--no-progress', '--no-wait', '--pre-merge', '--keep-files', '--warm-homes']
 
 /** The suite --lang runs (#769): the i18n screenshot route, the one suite that isn't pinned to English. */
 export const LANG_SUITE = 'i18nshots'
@@ -26,7 +26,7 @@ export const suiteLimitMs = (name, lang = []) => Math.max(10, name === LANG_SUIT
 const LANG_TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/i
 
 /** Whether a suite starts a real CLI (Claude Code, or Codex in its test home): the real tier, opt-in with --real. */
-export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex')
+export const isRealCli = (s) => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex' || n === 'agy')
 
 /**
  * The CW_TEST_ seams a packaged Combwork ignores (src/main reads them in unpackaged builds only, #1591): a suite needing
@@ -130,7 +130,7 @@ export function suiteDevOnly(name, dir) {
  * plus what changed since main). Every suite name given is kept.
  */
 export function parseArgs(argv, suiteNames) {
-  const o = { jobs: 4, repeat: 1, all: false, affected: null, named: [], tier: 'fake', record: false, fingerprint: false, build: false, packaged: false, noWait: false, preMerge: false, keepFiles: false, clearDir: null, lang: [] }
+  const o = { jobs: 4, repeat: 1, all: false, affected: null, named: [], tier: 'fake', record: false, fingerprint: false, build: false, packaged: false, noWait: false, preMerge: false, keepFiles: false, warmHomes: false, clearDir: null, lang: [] }
   const tiers = new Set()
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
@@ -172,6 +172,7 @@ export function parseArgs(argv, suiteNames) {
       if (a === '--no-wait') o.noWait = true
       if (a === '--pre-merge') o.preMerge = true
       if (a === '--keep-files') o.keepFiles = true
+      if (a === '--warm-homes') o.warmHomes = true
     } else {
       o.named.push(a)
     }

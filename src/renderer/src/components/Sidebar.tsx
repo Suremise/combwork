@@ -6,6 +6,7 @@ import { useLanes, type Lane } from '../laneSource'
 import { agentLaunchSettings, agentProvider, modeOption } from '@shared/providers'
 import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume } from '@shared/resumeAll'
+import { oneAgentMore } from '../oneAgentMenu'
 import { hooksMissingText, shownMergeSlot, shownStatusMessage } from '@shared/runtime'
 import * as actions from '../actions'
 import { call } from '../api'
@@ -258,8 +259,11 @@ function projectLanes(lanes: readonly Lane[], p: ProjectInfo): Lane[] {
   return lanes.filter((l) => l.project.toLowerCase() === p.path.toLowerCase())
 }
 
-/** Right-click menu for a project, shared by the full list and the compact rail. */
-function projectMenu(p: ProjectInfo): MenuEntry[] {
+/**
+ * Right-click menu for a project, shared by the full list and the compact rail. `sub` opens a menu in its place: Resume
+ * All's and Stop All's one-agent menus (HI-2665), after them.
+ */
+function projectMenu(p: ProjectInfo, sub: (items: MenuEntry[], keyboard: boolean) => void): MenuEntry[] {
   const running = p.agents.filter((a) => a.live).length
   // One of its agents starting or resuming already (#1177).
   const starting = projectStarting(p.path)
@@ -267,10 +271,11 @@ function projectMenu(p: ProjectInfo): MenuEntry[] {
   return [
     { label: tr(M.newSession), icon: 'add', action: 'start', ...noStart, onClick: () => void actions.newSession(p.path) },
     { label: tr(M.resumeLast), icon: 'debug-continue', action: 'resume', ...noStart, onClick: () => void actions.resumeLast(p.path) },
-    ...(p.agents.length > 1 ? [{ label: tr(M.resumeAll), icon: 'blank', action: 'resume' as const, disabled: !agentsToResume(p.agents).length, onClick: () => void actions.resumeAllAgents(p.path) }] : []),
+    ...(p.agents.length > 1 ? [{ label: tr(M.resumeAll), icon: 'blank', action: 'resume' as const, disabled: !agentsToResume(p.agents).length, onClick: () => void actions.resumeAllAgents(p.path) }, ...oneAgentMore('resume', p, sub, noStart)] : []),
     running > 1
       ? { label: tr(M.stopAll), icon: 'debug-stop', action: 'stop', onClick: () => void actions.stopAllAgents(p.path) }
       : { label: tr(M.stopSession), icon: 'debug-stop', action: 'stop', disabled: !running, onClick: () => void actions.stopSession(p.path, p.agents.find((a) => a.live)?.id) },
+    ...oneAgentMore('stop', p, sub),
     { label: tr(M.addAgent), icon: 'person-add', onClick: () => void actions.quickAddAgent(p.path) },
     { label: tr(M.addAgentDialog), icon: 'blank', onClick: () => set({ addAgentFor: p.path }) },
     { separator: true },
@@ -402,7 +407,7 @@ function ProjectsRail() {
             actions.selectProject(p.path)
           }}
           onDoubleClick={() => p.active && !state && void actions.newSession(p.path)}
-          onContextMenu={(e) => menu.open(e, projectMenu(p))}
+          onContextMenu={(e) => menu.open(e, projectMenu(p, (items, k) => menu.openAt(e.clientX, e.clientY, items, k)))}
           aria-label={tr(M.railLabel, { project: p.name, status })}
           aria-description={table ? agentsText(p, tasks, lanesOf) : undefined}
         >
@@ -474,7 +479,7 @@ function ProjectsPanel() {
         className={cx(/* i18n-ignore: class names */ 'row project-row', selected === p.path && 'selected', !p.active && 'inactive')}
         onClick={() => actions.selectProject(p.path)}
         onDoubleClick={() => p.active && !state && void actions.newSession(p.path)}
-        onContextMenu={(e) => menu.open(e, projectMenu(p))}
+        onContextMenu={(e) => menu.open(e, projectMenu(p, (items, k) => menu.openAt(e.clientX, e.clientY, items, k)))}
       >
         <StatusDot live={state} active={p.active} />
         <div className="project-text">

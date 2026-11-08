@@ -6,8 +6,9 @@ import { ASSISTANT_AGENT_ID } from '../shared/assistant'
 import { agentText, englishText, forAgents, saidText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { agentMsg, currentChain, inDefaultDialect, overridesAny } from '../shared/agentText'
 import { RETURNED_COMMENT, returnedCommentFrom } from './workflow/queueState'
-import { msg, tr, type Msg } from '../shared/i18n'
+import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
+import { branchExists, dropEmptyLines, ownWork, pickTarget, projectTargets } from './workflow/targets'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
@@ -28,9 +29,9 @@ import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
 import { attachmentHref, attachmentMarkdown, attachmentRefs, withStoredIds } from '../shared/cardAttachments'
-import { hasStage, skipReviewOf } from '../shared/workflow/compile'
+import { hasStage, skipReviewOf, targetOfRulesetId } from '../shared/workflow/compile'
 import { isStageId, STAGE_TEXT, stageName, type StageNames } from '../shared/workflow/stages'
-import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
+import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_MAX, decisionAnswers, foldCard, openEntry, STAGE_CATEGORY, type AskActionKind, type FactData, type Request, type RoundChoice, type StageId } from '../shared/workflow/facts'
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
@@ -59,8 +60,8 @@ const BOARD_AGENT = {
 
 /**
  * The board's refusals (#846, E10b of #677) are CombworkErrors: the window reads them in its language, agents (the Agent API,
- * the cw_ tools) in English, exactly as before. A refusal's `kind` is set where it is the status its English always
- * gave (servers.ts `statusFor`); without one, the English still gives it. A column (`{column}`) is its key, and each
+ * the cw_ tools) in English, exactly as before. A refusal's `kind` is its Agent API status (HI-2704: whatever its
+ * values; one with none answers 500). A column (`{column}`) is its key, and each
  * message chooses its words.
  */
 const ERR = {
@@ -71,6 +72,7 @@ const ERR = {
   archived: msg({ id: 'tasks.error.archived', defaultMessage: '{card} is archived. Only the user can bring it back.', description: 'An error: card {card} (its key, such as HI-12) is archived, so an agent or the Assistant cannot change it; only the user can bring it back from the archive.' }),
   waitingNotYours: msg({ id: 'tasks.error.waitingNotYours', defaultMessage: "Only {card}'s own agent, the user or the Assistant can mark it waiting or clear that.", description: "An error, read by agents (HI-2618): an agent tried to mark card {card} (its key, such as HI-12) as waiting on purpose, or clear that mark, but the card isn't its own. A waiting card isn't reported as stalled." }),
   waitingNotActive: msg({ id: 'tasks.error.waitingNotActive', defaultMessage: "{card} isn't in {active}: only a card in {active} can be marked waiting.", description: "An error (HI-2618): only a card in the stage {active} (the board's name for it, such as Active) can be marked as waiting on purpose; card {card} (its key, such as HI-12) is elsewhere." }),
+  dependencyTooLate: msg({ id: 'tasks.error.dependencyTooLate', defaultMessage: "{card} is being merged into {target} now, so it can't wait for {cards} any more. Its dependencies are unchanged.", description: "An error (HI-2709): a dependency was added to card {card} (its key, such as HI-12) while the merge queue was already moving branch {target} to its merge, too late to hold it; {cards} are the cards added (keys, joined with commas). Nothing was changed." }),
   waitingTooLong: msg({ id: 'tasks.error.waitingTooLong', defaultMessage: 'The waiting reason is too long (at most {max, number} characters).', description: "An error (HI-2618): the reason a card waits on purpose is longer than it may be; {max} is the most characters it takes." }),
   noCard: msg({ id: 'tasks.error.noCard', defaultMessage: 'There is no card {card}.', description: 'An error: there is no card {card} (its key, such as HI-12) that the caller may see.' }),
   cardsTooMany: msg({ id: 'tasks.error.cardsTooMany', defaultMessage: 'cards: at most {max, number} cards at once.', description: 'An error: a call listed more than {max} cards. "cards:" is the name of the call\'s field: keep it as it is.' }),
@@ -1013,6 +1015,33 @@ export function labelChange(labels: readonly string[], add: unknown, remove: unk
 }
 
 /**
+ * HI-2709: a card's dependencies changed, in the change's transaction (the board's lock, as the merge queue's writes).
+ * Its queue entry's advance already begun (`IntegrationStarted`, no outcome yet: the advance's authority, SPEC §16.9.1):
+ * a blocker added that isn't Done is refused, since nothing can hold that merge now, rather than saved as a hold the
+ * queue then passes. Waiting in its queue with a blocker taken away: its queue runs again (`enqueue`), with no new approval.
+ */
+function queueDependencyEdit(ws: WorkspaceService, card: TaskCard, had: number[]): void {
+  const store = FactStore.forBoard(ws, { project: card.project, key: '' })
+  const stage = (n: number): StageId | null => {
+    try {
+      return store.card(n).stage
+    } catch {
+      return null
+    }
+  }
+  const own = stage(card.number)
+  if (!own) return
+  const e = openEntry(foldCard(store.facts(card.number), own))
+  if (!e) return
+  if (e.state === 'started') {
+    const late = card.blockedBy.filter((b) => !had.includes(b) && stage(b) !== 'done')
+    if (late.length) throw combworkError(ERR.dependencyTooLate, { card: cardRef(card.number), cards: late.map(cardRef).join(', '), target: e.target }, { kind: 'conflict' })
+    return
+  }
+  if (had.some((b) => !card.blockedBy.includes(b))) store.tx((tx) => tx.action(card.number, 'enqueue', { target: e.target }, null))
+}
+
+/**
  * The cards a list names (blockedBy, links), checked. A confined agent can only name its project's cards; when it
  * changes a card's list, the cards from other projects already on it (`kept`, which it sees only as numbers) stay.
  */
@@ -1368,7 +1397,7 @@ export async function createTask(...args: Parameters<typeof createTaskLocked>): 
 export const DOING_NOBODY_NEW = msg({ id: 'tasks.error.doingNobodyNew', defaultMessage: 'A card made in Active needs an agent on it (agent). Ask the user which they want: an agent on it, an agent started on it (make it in Todo, then cw_start_task), or nobody on it (make it in Todo, then move it with override and their reason).', description: "An error said to the Combwork Assistant (HI-2062): it made a card straight into the Active stage with no agent on it. agent, override and cw_start_task are names of a call's fields and a tool: keep them as they are. Active and Todo are stage names." })
 
 async function createTaskLocked(
-  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string },
+  input: { title: string; description?: string; project?: string; agent?: string | null; column?: TaskColumn; labels?: string[]; blocked?: string | null; blockedBy?: number[]; links?: number[]; context?: string[]; kind?: CardKind; skipReview?: string; target?: string | null },
   actor: TaskActor,
   opts: { commit?: () => void } = {}
 ): Promise<TaskCard> {
@@ -1404,6 +1433,8 @@ async function createTaskLocked(
   if (skipReason === false) throw combworkError(msg({ id: 'tasks.error.badReviewSkipNew', defaultMessage: "A new card reviews as its rules say: give skipReview the user's reason to skip it, or leave it out.", description: "An error: a card was made with skipReview false. Keep skipReview as it is (a field's name)." }), undefined, { kind: 'invalid' })
   if (skipReason !== null && actor.kind !== 'user' && !skipReason) throw new TaskConflictError(SKIP.needsReason)
   if (skipReason !== null && !(await reviewsOf(ws, project, null))?.reviews) throw new TaskConflictError(SKIP.nothingNew)
+  // Its Merges into (HI-2556): the user's or the Assistant's, one of the project's targets (null: the project's own).
+  const target = input.target === undefined ? null : await targetPick(project, input.target, actor)
   const n = await nextNumber(ws)
   const card: TaskCard = {
     number: n,
@@ -1424,16 +1455,18 @@ async function createTaskLocked(
     history: [
       entryOf(now, by, storedText(HISTORY.created, { column })),
       ...(kind === 'no-code' ? [entryOf(now, by, storedText(HISTORY.kind, { how: proposes ? 'proposed' : 'made', kind }))] : []),
-      ...(skipReason !== null ? [entryOf(now, by, storedText(HISTORY.reviewSkip, { how: actor.kind === 'agent' ? 'proposed' : 'set' }))] : [])
+      ...(skipReason !== null ? [entryOf(now, by, storedText(HISTORY.reviewSkip, { how: actor.kind === 'agent' ? 'proposed' : 'set' }))] : []),
+      ...(target ? [entryOf(now, by, storedText(HISTORY.target, { own: 'yes', target }))] : [])
     ],
     archived: false,
     createdAt: now,
     createdBy: by,
     updatedAt: now
   }
-  const store = kind === 'no-code' ? FactStore.forBoard(ws, { project: card.project, key: '' }) : null
+  const store = kind === 'no-code' || target ? FactStore.forBoard(ws, { project: card.project, key: '' }) : null
   // A revocable caller's authority checked as it is written (HI-2415: saveCard's `commit`), so a revoked one makes no card.
-  await saveCard(ws, n, card, null, store && !proposes ? () => store.updateCard(n, { kind }) : undefined, opts.commit)
+  const kept = { ...(kind === 'no-code' && !proposes ? { kind } : {}), ...(target ? { target } : {}) }
+  await saveCard(ws, n, card, null, store && Object.keys(kept).length ? () => store.updateCard(n, kept) : undefined, opts.commit)
   if (store && proposes) store.tx((tx) => tx.append(n, { kind: 'KindProposed', actor: actorOf(actor), source: 'recorded', data: { kind } }))
   if (skipReason !== null) {
     const facts = store ?? FactStore.forBoard(ws, { project: card.project, key: '' })
@@ -2016,6 +2049,97 @@ export async function setReviewSkip(n: number, skip: boolean, actor: TaskActor, 
   )
 }
 
+const TARGET = {
+  agents: msg({ id: 'tasks.error.targetNotAgents', defaultMessage: 'Only the user or the Assistant sets which branch a card merges into.', description: 'HI-2556: an error, an agent tried to set a card’s Merges into (the branch its work merges into); only the user or the Combwork Assistant can.' }),
+  notListed: msg({ id: 'tasks.error.targetNotListed', defaultMessage: '{hasTargets, select, yes {{target} isn’t a branch work can merge into here: name {default}{hasOthers, select, yes { or one of {others}} other {}}, or add it under Other branches work can merge into (Version Control → Workflow).} other {This project merges work into no branch Combwork can pick: a card’s Merges into is for Git projects.}}', description: 'HI-2556: an error setting a card’s or lane’s Merges into to a branch the project doesn’t list. {target} is the branch named, {default} the project’s Work merges into, {others} the others listed (a list). Other branches work can merge into and Version Control → Workflow are names in the window: as translated there. Keep the select keys.' }),
+  started: msg({ id: 'tasks.error.targetHasWork', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card} has work on its branch, so its Merges into stays as it is.} other {{card} has work on its branch made from {target}, so it keeps merging there. To move it, make a new card for it on the other branch and copy the change.}}', description: 'HI-2556: an error changing a card’s Merges into once its branch has work of its own (Darren: no rebase of started work). {card} is the card’s key (HI-12), {target} the branch its work was made from. unknown yes: git couldn’t say. Keep the select keys.' }),
+  missing: msg({ id: 'tasks.error.targetMissing', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}', description: 'HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys.' }),
+  defaultMoved: msg({ id: 'tasks.error.targetDefaultMoved', defaultMessage: 'Work merges into changed again while {card} was being moved, so it stays as it is.', description: 'HI-2680: a card left out of a retarget: the project’s Work merges into (an option’s name: as translated there) changed again between the preview and the move. {card} is its key (HI-12).' }),
+  changed: msg({ id: 'tasks.error.targetChanged', defaultMessage: '{card}’s Merges into changed since it was listed, so it stays as it is.', description: 'HI-2680: a card left out of a retarget: its Merges into changed between the preview and the move. {card} is its key (HI-12).' }),
+  moved: msg({ id: 'tasks.error.targetMoved', defaultMessage: '{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.', description: 'HI-2556: an error changing a card’s Merges into: its old branch, found with no work of its own, moved (a commit arrived) before Combwork could remove it, so nothing was changed. {card} is the card’s key (HI-12).' }),
+  checkedOut: msg({ id: 'tasks.error.targetCheckedOut', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}', description: 'HI-2556: an error changing a card’s Merges into: its old branch (which has no work of its own and would be removed so its next start begins fresh) is still checked out in a folder. {card} is the card’s key (HI-12), {folder} a folder’s path. unknown yes: git couldn’t say. Keep the select keys.' }),
+  inLane: msg({ id: 'tasks.error.targetLane', defaultMessage: '{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.', description: 'HI-2556: an error setting a card’s Merges into to another branch than its lane’s. {card} is the card’s key (HI-12), {builder} the lane’s builder agent, {target} the lane’s branch.' })
+}
+
+/** A card's Merges into as a call names it (HI-2556), checked against the project's targets: null for the default. */
+async function targetPick(project: string, raw: unknown, actor: TaskActor): Promise<string | null> {
+  if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
+  const t = workspace.path && project ? await projectTargets(workspace, join(workspace.path, project)).catch(() => null) : null
+  const p = pickTarget(t, raw)
+  if ('target' in p) {
+    // A listed branch work can start from now (HR2's round 1: listed is not made).
+    const there = p.target && workspace.path ? await branchExists(join(workspace.path, project), p.target) : true
+    if (there !== true) throw new TaskConflictError(withValues(TARGET.missing, { target: p.target ?? '', unknown: there === 'unknown' ? 'yes' : 'no' })) // i18n-ignore: select keys
+    return p.target
+  }
+  throw new TaskConflictError(withValues(TARGET.notListed, { hasTargets: t ? 'yes' : 'no', target: typeof raw === 'string' ? raw.trim() : '', default: t?.default ?? '', hasOthers: t?.others.length ? 'yes' : 'no', others: fmt.list(t?.others ?? []) })) // i18n-ignore: select keys
+}
+
+/**
+ * HI-2556: refused when the card's running lane merges into another branch than `target` (null: the project's, `def`):
+ * read from the runtime's lane record under the board's lock (its ruleset marks a lane's other target).
+ */
+function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, def: string | null, names: ReadonlyMap<string, string>): void {
+  const lane = wf.store.card(n).lane
+  const rec = lane ? wf.lane(lane) : null
+  if (!rec || rec.ended) return
+  const theirs = (rec.ruleset ? targetOfRulesetId(rec.ruleset) : null) ?? def
+  if ((target ?? def) === theirs) return
+  const builder = wf.store.laneBuilder(rec.id)
+  throw new TaskConflictError(withValues(TARGET.inLane, { card: cardRef(n), builder: (builder && names.get(builder)) ?? builder ?? '', target: theirs ?? '' }))
+}
+
+/**
+ * Sets the branch a card merges into (HI-2556, its Merges into): the user's or the Assistant's; one of the project's
+ * targets (null or the default: none of its own). Only while its branch has no work (never started, or nothing of its
+ * own on a line it had), and as its running lane's, if any.
+ */
+export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { commit?: () => void; expect?: string | null; expectDefault?: string } = {}): Promise<TaskCard> {
+  if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
+  const ws = workspace
+  // Its project's runtime, before the board's lock (made the first time, it takes that lock itself).
+  const { workflowFor } = await import('./workflow/service')
+  const first = await getTask(n, ws)
+  const projectPath = ws.path ? join(ws.path, first.project) : first.project
+  const wf = first.project ? await workflowFor(ws, projectPath).catch(() => null) : null
+  const def = first.project ? ((await projectTargets(ws, projectPath).catch(() => null))?.default ?? null) : null
+  const names = new Map(first.project ? projectAgents(await ws.projectConfig(projectPath)).map((a) => [a.id, a.name] as const) : [])
+  return recordingAs(actor, () =>
+    boardLock(ws, async () => {
+      const card = await getTask(n, ws)
+      if (card.archived) throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
+      if (card.project !== first.project) throw new TaskConflictError(withValues(TARGET.notListed, { hasTargets: 'no', target: '', default: '', hasOthers: 'no', others: '' }))
+      const target = await targetPick(card.project, raw, actor)
+      const store = FactStore.forBoard(ws, { project: card.project, key: '' })
+      // HI-2680: a move bound to what its caller saw (a retarget's preview): only from that target, as it is now.
+      if (o.expect !== undefined && (store.card(n).target ?? null) !== o.expect) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))
+      if ((store.card(n).target ?? null) === target) return card
+      const s = wf ? wf.state(wf.store.card(n)) : null
+      // No work of its own (HR2's round 1: its slot's changes not committed too), read here under the board's lock, where
+      // a start or a put back of it would be written.
+      const own = s && s.stage === 'todo' ? await ownWork(projectPath, s, wf!.folderOf(s)) : null
+      const work = !s ? false : s.stage !== 'todo' ? true : own!.work
+      if (work !== false) throw new TaskConflictError(withValues(TARGET.started, { unknown: work === 'unknown' ? 'yes' : 'no', card: cardRef(n), target: s?.started?.target ?? '' })) // i18n-ignore: select keys
+      if (wf) refuseOtherLaneTarget(wf, n, target, def, names)
+      // Its old lines go (nothing of its own on them), so its next start makes a fresh one from the new target, never
+      // carrying the old target's history; refused while one is checked out somewhere.
+      const targets = await projectTargets(ws, projectPath).catch(() => null)
+      // HI-2680 (HR1's round 1, finding 2): a retarget's move only while the project's Work merges into is still the one
+      // it was made for, read here under the board's lock, which every save changing it holds while it writes, before
+      // anything of the card's is changed.
+      if (o.expectDefault !== undefined && targets?.default !== o.expectDefault) throw new TaskConflictError(withValues(TARGET.defaultMoved, { card: cardRef(n) }))
+      const dropped = s && own && s.lines.length ? await dropEmptyLines(projectPath, s, targets ? [targets.default, ...targets.others] : [], own.heads) : null
+      if (dropped === 'moved') throw new TaskConflictError(withValues(TARGET.moved, { card: cardRef(n) }))
+      if (dropped) throw new TaskConflictError(withValues(TARGET.checkedOut, { unknown: dropped === 'unknown' ? 'yes' : 'no', card: cardRef(n), folder: typeof dropped === 'object' ? dropped.checkedOut : '' })) // i18n-ignore: select keys
+      const before = structuredClone(card)
+      note(card, actorName(actor), storedText(HISTORY.target, { own: target ? 'yes' : 'no', target: target ?? '' }))
+      await saveCard(ws, n, card, before, () => store.updateCard(n, { target: target ?? undefined }), o.commit)
+      changed(ws)
+      return card
+    })
+  )
+}
+
 /** An answer the window sent that can't be one (the request's kind decides which fields it takes). */
 const BAD_ANSWER = msg({ id: 'tasks.error.badAnswer', defaultMessage: "That answer doesn't fit the request: approve or decline an approval, answer a question with a reply or a decision, and choose a way on at the round limit (a carry on with 1 to {max} more rounds).", description: "An error answering a request for the user (For you): what was sent doesn't fit the request's kind. {max} is the most rounds a carry on can add (a number)." })
 
@@ -2456,7 +2580,9 @@ async function updateTaskAs(n: number, patch: TaskPatch, actor: TaskActor, opts:
       said.push(storedText(HISTORY.notWaiting))
     }
     if (patch.blockedBy !== undefined) {
+      const had = card.blockedBy
       card.blockedBy = await cardRefs(patch.blockedBy, n, 'blockedBy', scope, card.blockedBy)
+      queueDependencyEdit(ws, card, had)
       said.push(card.blockedBy.length ? storedText(HISTORY.dependsOn, { cards: card.blockedBy.map(cardRef).join(', ') }) : storedText(HISTORY.noDependencies))
     }
     if (patch.links !== undefined) {
@@ -3126,7 +3252,7 @@ async function unarchiveBatchLocked(id: string, actor: TaskActor): Promise<Unarc
   const result = await (async (): Promise<UnarchiveResult> => {
     const batches = await readBatches(ws)
     const batch = batches.find((b) => b.id === id)
-    if (!batch) throw combworkError(msg({ id: 'tasks.error.batchGone', defaultMessage: 'That batch is no longer kept: unarchive its cards from Archived.', description: "An error: the Archive All batch to bring back is no longer kept (Combwork keeps the latest 50); its cards can still be brought back one by one from the board's Archived list." }))
+    if (!batch) throw combworkError(msg({ id: 'tasks.error.batchGone', defaultMessage: 'That batch is no longer kept: unarchive its cards from Archived.', description: "An error: the Archive All batch to bring back is no longer kept (Combwork keeps the latest 50); its cards can still be brought back one by one from the board's Archived list." }), undefined, { kind: 'conflict' })
     const failed = new Set<number>()
     // The batch's own list, read card by card: one that can't be read now still belongs to it.
     const back: TaskCard[] = []

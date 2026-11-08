@@ -9,7 +9,10 @@
 //   status, both endpoints, both modes and both blob ids); any other path is picked again there.
 // - A real-CLI or packaged test is never run by the queue (the user's decision, 28 Oct): it is proved by its reviewer's
 //   counted run at the submitted revision, accepted as review evidence, and one only the queue's own pick adds returns
-//   the card.
+//   the card. HI-2660 (the user's decision, 7 Nov): or by another agent's run there (the builder's) that the reviewer's
+//   pass accepts by its run id, the run keeping its own agent.
+
+import type { CheckRanData } from './facts'
 
 /** What a test needs to run: the queue runs `unit` and `fake` (and a test with no needs); `real` and `packaged` it doesn't. */
 export type FocusedNeed = 'unit' | 'fake' | 'real' | 'packaged'
@@ -160,6 +163,21 @@ export const reviewProved = (t: FocusedTest): boolean => t.needs.includes('real'
 
 /** The check name a review's run of one focused test is recorded under (`cw-progress --check "focused:<id>"`). */
 export const focusedCheckName = (id: string): string => `focused:${id}`
+
+/** At most this many tests a reviewer's pass accepts others' runs of (HI-2660, `cw_verdict`'s `accept`). */
+export const ACCEPT_MAX = 50
+
+/**
+ * HI-2660: the run that stands for a focused test at a revision: its latest counted run of `focused:<id>` there, never
+ * the merge queue's own (`entry`); none when there is no such run, or when a command configured for that name has
+ * changed since (an old command's result doesn't prove the check as it is now). Whether it passed is the caller's to
+ * require: an earlier pass never stands behind a later counted failure.
+ */
+export function standingFocusedRun(checks: readonly CheckRanData[], test: string, revision: string, commands: Readonly<Record<string, string>>): CheckRanData | undefined {
+  const name = focusedCheckName(test)
+  const run = checks.findLast((c) => c.name === name && c.revision === revision && c.counted && !c.entry)
+  return run && (commands[name] === undefined || commands[name] === run.command) ? run : undefined
+}
 
 /** The queue's run of a card's focused tests, as its `CheckRan` names it. */
 export const FOCUSED_CHECK = 'focused tests' // i18n-ignore: codes (a why, a check name), never shown as text

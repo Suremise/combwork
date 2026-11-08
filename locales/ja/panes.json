@@ -158,7 +158,7 @@
   "panes.running.cards": "{n, plural, other {#件のカード}}",
   "panes.running.waitingFor": "待機中",
   "panes.runtime.hooksMissing": "状態不明：{provider}からフックが届いていません",
-  "panes.runtime.hooksMissingNote": "Combworkに{provider}のフックが届いていないため、状態が正しくない可能性があります。{why, select, refused {Combworkがフックを拒否しました：このセッションのトークンが含まれていませんでした。} off {{where}がフックを無効にしています（disableAllHooks）。} newer {この{provider}はCombworkがテストしたバージョンより新しく、更新でフックが変わった可能性があります。} other {{after, select, start {起動後にフックが1つも届いていません。} other {作業を始めたプロンプトの後にフックが1つも届いていません。}}}}フックが届くまで、Combworkはこのエージェントに何も入力しません。セッションを再起動してください。再び起きる場合は、Combworkを更新するか、{provider}の設定でフックが無効になっていないか確認してください。",
+  "panes.runtime.hooksMissingNote": "Combworkに{provider}のフックが届いていないため、状態が正しくない可能性があります。{why, select, refused {Combworkがフックを拒否しました：このセッションのトークンが含まれていませんでした。} off {{where}がフックを無効にしています（disableAllHooks）。} newer {この{provider}はCombworkがテストしたバージョンより新しいバージョンです。} other {{after, select, start {起動後にフックが1つも届いていません。} other {作業を始めたプロンプトの後にフックが1つも届いていません。}}}}フックが届くまで、Combworkはこのエージェントに何も入力しません。セッションを再起動してください。再び起きる場合は、Combworkを更新するか、{provider}の設定でフックが無効になっていないか確認してください。",
   "panes.runtime.needsInput": "入力待ち",
   "panes.runtime.retrying": "{why, select, limited {レート制限中 ({status})} status {リクエスト失敗 ({status})} network {{provider}に接続できません} other {リクエスト失敗}} · {when, select, at {{time}に再試行} other {再試行中…}} {tries, select, of {({attempt, number}/{max, number}回目)} other {({attempt, number}回目)}}",
   "panes.runtime.signin": "サインインが必要",

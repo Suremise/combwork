@@ -12,9 +12,10 @@ function Loop({ n, done }: { n: number; done: () => void }): null {
   return null
 }
 
-const w = window as unknown as { __cwCommitBurst?: unknown; __cwTestCommitLoop?: (n: number) => Promise<void> }
-if (w.__cwCommitBurst) {
-  w.__cwTestCommitLoop = (n) =>
+type Seams = { __cwCommitBurst?: unknown; __cwTestCommitLoop?: (n: number) => Promise<void> }
+// The window's seams by name, never the window itself in a variable (HI-2697: the test picker reads that as unknown code).
+if ((window as unknown as Seams).__cwCommitBurst) {
+  ;(window as unknown as Seams).__cwTestCommitLoop = (n) =>
     new Promise<void>((resolve) => {
       const host = document.createElement('div')
       const root = createRoot(host)

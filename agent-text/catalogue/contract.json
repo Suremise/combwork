@@ -143,9 +143,21 @@
     "text": "Instructions for every agent in this project.",
     "note": "A new AGENTS.md's first line under the project's name, when Combwork makes the CLIs share one and none had any."
   },
+  "contract.instructions.starterConnection": {
+    "text": "Instructions for {provider} agents on this connection, in every project.",
+    "note": "A connection's new instructions file's first line, under the connection's name (Memory creates it): its agents read it in every project. provider: the CLI's name (Claude Code)."
+  },
   "contract.instructions.starterFor": {
     "text": "Instructions for {provider} in this project.",
     "note": "A new instructions file's first line under the project's name (Memory creates it). provider: the CLI's name (Claude Code)."
+  },
+  "contract.instructions.starterUser": {
+    "text": "Instructions for {provider} in every project.",
+    "note": "The user's own new instructions file's first line, under its heading (Memory creates it). provider: the CLI's name (Claude Code)."
+  },
+  "contract.instructions.userHeading": {
+    "text": "All projects",
+    "note": "The heading of the user's own new instructions file (~/.claude/CLAUDE.md and the like), which applies in every project (Memory creates it)."
   },
   "contract.journal.rule": {
     "text": "You keep a journal (the journal skill): recall (cw_journal_recall) before deciding from memory, and write decisions (in the user's words), plans, ideas the user leaves open (no card yet), and why, as they happen. A decision about a card goes on the card first (cw_update_task with decision), where agents check their work against it; the journal only notes it. It replaces your handovers: one the user still wants (for another agent or a person) is the handover skill's.",

@@ -18,8 +18,9 @@ const base = tempDir('cw-board-events-')
 // Every read of the whole board that recording the running agents' cards makes, counted (the reads themselves unchanged):
 // the board's cards in full, or the live cards' heads (HI-1690).
 const boardReads = vi.hoisted(() => ({ n: 0 }))
-vi.mock('../src/main/tasks', async (importOriginal) => {
-  const orig = await importOriginal<typeof import('../src/main/tasks')>()
+const { mockFactory } = await vi.hoisted(() => import('./keepType'))
+vi.mock('../src/main/tasks', mockFactory<typeof import('../src/main/tasks')>(async (importOriginal) => {
+  const orig = await importOriginal()
   return {
     ...orig,
     allTasks: (...a: Parameters<typeof orig.allTasks>) => {
@@ -31,7 +32,7 @@ vi.mock('../src/main/tasks', async (importOriginal) => {
       return orig.liveCardHeads(...a)
     }
   }
-})
+}))
 
 const { createWorkspaceService, disposeWorkspaceService, inWorkspace } = await import('../src/main/workspace')
 const tasks = await import('../src/main/tasks')
@@ -98,7 +99,7 @@ describe('board events (#1011)', () => {
 
   beforeAll(async () => {
     mkdirSync(join(alpha, '.combwork'), { recursive: true })
-    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2' }] }))
+    writeFileSync(join(alpha, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [{ id: 'a1', name: 'Agent 1' }, { id: 'a2', name: 'Agent 2', workflowRole: 'either' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
     off = onCombworkEvent((e: CombworkEvent) => {

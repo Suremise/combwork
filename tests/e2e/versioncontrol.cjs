@@ -125,6 +125,8 @@ function board(sql, ...args) {
     check('the fact line says the folder has no version control', !!(await lib.until(async () => (await text(fact)) === 'This folder has no version control.', HUNG_MS)), await text(fact))
     check('None: Workflow only, where it opens', !!(await lib.until(async () => JSON.stringify(await sections()) === '["workflow"]' && (await selected()) === 'workflow', HUNG_MS)), JSON.stringify(await sections()))
     check("None's page has no Initialise repository…", (await page.locator('[data-git-init]').count()) === 0)
+    // (gitview's, until HI-2663) A project without git has no Git item in the status bar.
+    check('…and no Git item in the status bar', (await page.locator('.statusbar [data-git-status]').count()) === 0)
     check('the workflow link names None', (await text(link)).trim().startsWith('Workflow: None · '), await text(link))
     check('None: the workflow link at the end of the header row', await linkInPlace())
     await shots('none', page.locator('.vc-view'))

@@ -13,6 +13,20 @@ interface CombworkMessageValues {
   'agents.add.useSuggestion': { name: string | number }
   'agents.add.where': undefined
   'agents.add.whereNote': undefined
+  'agents.antigravity.acceptEdits': undefined
+  'agents.antigravity.acceptEditsDescription': undefined
+  'agents.antigravity.ask': undefined
+  'agents.antigravity.askDescription': undefined
+  'agents.antigravity.auto': undefined
+  'agents.antigravity.autoDescription': undefined
+  'agents.antigravity.bypass': undefined
+  'agents.antigravity.bypassDescription': undefined
+  'agents.antigravity.extensionNote': undefined
+  'agents.antigravity.installNote': undefined
+  'agents.antigravity.modelPlaceholder': undefined
+  'agents.antigravity.plan': undefined
+  'agents.antigravity.planDescription': undefined
+  'agents.antigravity.signInHelp': undefined
   'agents.batch.busy': { status: string }
   'agents.batch.outcome': { kind: string }
   'agents.batch.stoppedThen': { note: string; kind: string }
@@ -163,6 +177,14 @@ interface CombworkMessageValues {
   'agents.handOver.stopped': { who: string; from: string | number; other: string | number }
   'agents.handOver.title': { agent: string | number }
   'agents.handOver.writes': { who: string; from: string | number; other: string | number }
+  'agents.independent.card': { card: string | number; column: string | number }
+  'agents.independent.confirm': undefined
+  'agents.independent.confirmLine': { agent: string | number; project: string | number; parts: string | number }
+  'agents.independent.confirmText': undefined
+  'agents.independent.confirmTitle': { n: number }
+  'agents.independent.doing': undefined
+  'agents.independent.lane': { lane: string | number }
+  'agents.independent.review': undefined
   'agents.installSource.native': undefined
   'agents.installSource.settings': undefined
   'agents.installSource.standalone': undefined
@@ -301,6 +323,9 @@ interface CombworkMessageValues {
   'agents.picker.showOlder': undefined
   'agents.place.short': { is: string; name: string | number }
   'agents.place.tip': { is: string; name: string | number; path: string | number }
+  'agents.provider.compactDeclared': { provider: string | number; at: number; window: number; output: number; buffer: number; why: string; estimate: string }
+  'agents.provider.compactDeclaredCap': undefined
+  'agents.provider.compactDeclaredWindow': { provider: string | number; at: number; window: number; why: string; declared: number; output: number; buffer: number; estimate: string }
   'agents.provider.compactDefault': { provider: string | number; at: number }
   'agents.provider.compactDefaultFor': { provider: string | number; at: number; why: string; estimate: string }
   'agents.provider.compactOff': { provider: string | number; source: string | number; estimate: string }
@@ -340,6 +365,10 @@ interface CombworkMessageValues {
   'agents.settings.saving': undefined
   'agents.settings.title': { agent: string | number }
   'agents.settings.worktreeOn': { branch: string | number; base: string | number }
+  'agents.side.later': undefined
+  'agents.side.restartMessage': { agent: string | number }
+  'agents.side.restartTitle': { agent: string | number }
+  'agents.side.restartWhenDone': undefined
   'agents.start.exited': { cli: string | number; code: string | number }
   'agents.switch.confirm': undefined
   'agents.switch.detail': undefined
@@ -360,7 +389,14 @@ interface CombworkMessageValues {
   'agents.workflowRole.eitherText': undefined
   'agents.workflowRole.generalist': undefined
   'agents.workflowRole.generalistText': undefined
+  'agents.workflowRole.independent': undefined
+  'agents.workflowRole.independentText': undefined
   'agents.workflowRole.label': undefined
+  'agents.workflowRole.needsTools': undefined
   'agents.workflowRole.reviewer': undefined
   'agents.workflowRole.reviewerText': undefined
+  'agents.workflowTools.later': undefined
+  'agents.workflowTools.restartMessage': { count: number; agents: string | number }
+  'agents.workflowTools.restartTitle': { agents: string | number }
+  'agents.workflowTools.restartWhenDone': { count: number }
 }

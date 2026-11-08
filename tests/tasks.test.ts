@@ -12,6 +12,7 @@ import { tempDir } from './tempDir'
 import { boardLockKey, editCard, readCard, removeCard, writeCard, writeCardOutside } from './boardDb'
 import { boardTestHooks } from '../src/main/boardStore'
 import { follow } from './followDoorbell'
+import { bound } from './keepType'
 
 const base = tempDir('cw-tasks-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
@@ -1845,7 +1846,7 @@ describe('removal and board under faults', () => {
     s.start = async (_p, o) => void prompts.push(o.prompt)
     const r1 = { kind: 'agent', name: 'Agent 1 (resumer)', self: { project: 'resumer', agentId: 'r1' }, scope: 'resumer' } as const
     // The Assistant that starts it is running: a task it gives is refused once its session has ended (#645, #649).
-    const liveFor = sessions.liveFor.bind(sessions)
+    const liveFor = bound(sessions, sessions.liveFor)
     const running = vi.spyOn(sessions, 'liveFor').mockImplementation((p, id) => (id === 'assistant' ? ({ projectPath: p, agentId: 'assistant', status: 'working', runId: 'run-assistant' } as never) : liveFor(p, id)))
     try {
       for (const from of ['review', 'done'] as const) {
@@ -1885,8 +1886,7 @@ describe('removal and board under faults', () => {
     const { startTask } = await import('../src/main/taskStart')
     const s = sessions as unknown as { start: (...a: unknown[]) => Promise<unknown> }
     const original = s.start
-    const ww = w as unknown as { projectConfig: (p: string) => Promise<unknown> }
-    const config = ww.projectConfig
+    const config = w.projectConfig
     let launches = 0
     s.start = async () => void launches++
     for (const from of ['todo', 'review'] as const) {
@@ -1896,11 +1896,11 @@ describe('removal and board under faults', () => {
       const gate = new Promise<void>((r) => (release = r))
       let reached: () => void = () => undefined
       const atGate = new Promise<void>((r) => (reached = r))
-      ww.projectConfig = async (p) => {
-        ww.projectConfig = config
+      w.projectConfig = async (p) => {
+        w.projectConfig = config
         reached()
         await gate
-        return config.call(w, p)
+        return bound(w, config)(p)
       }
       try {
         const starting = run(() => startTask(c.number, { kind: 'agent', agentId: 'x1' }, user))
@@ -1910,7 +1910,7 @@ describe('removal and board under faults', () => {
         release()
         await handled
       } finally {
-        ww.projectConfig = config
+        w.projectConfig = config
       }
       const now = await run(() => tasks.getTask(c.number))
       expect([now.column, now.agent]).toEqual(['done', null])
@@ -1921,19 +1921,18 @@ describe('removal and board under faults', () => {
 
   /** Pauses the next Start where it looks up the project's agents (after it read the card), until released. */
   function pauseAgentLookup(): { reached: Promise<void>; release: () => void; restore: () => void } {
-    const ww = w as unknown as { projectConfig: (p: string) => Promise<unknown> }
-    const config = ww.projectConfig
+    const config = w.projectConfig
     let release: () => void = () => undefined
     const gate = new Promise<void>((r) => (release = r))
     let reached: () => void = () => undefined
     const atGate = new Promise<void>((r) => (reached = r))
-    ww.projectConfig = async (p) => {
-      ww.projectConfig = config
+    w.projectConfig = async (p) => {
+      w.projectConfig = config
       reached()
       await gate
-      return config.call(w, p)
+      return bound(w, config)(p)
     }
-    return { reached: atGate, release, restore: () => (ww.projectConfig = config) }
+    return { reached: atGate, release, restore: () => (w.projectConfig = config) }
   }
 
   it("refuses a Start whose card was reassigned or moved meanwhile, and keeps that decision", async () => {

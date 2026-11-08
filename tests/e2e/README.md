@@ -23,11 +23,22 @@ npm run dist && npm run e2e -- --packaged   # also the installed-app suites (dis
 **Two tiers.** The **fake tier** is every suite that starts no real CLI: those with no `needs`, those that run the
 fake Claude Code or fake Codex, and `copilot`, `copilotcopy` and `copilotsize` (`needs: ['copilot']`), which run the real Copilot CLI offline against a
 scripted stand-in model: no sign-in and no cost, so it is in the full set, and skipped where Copilot isn't installed. The **real tier** is the suites that start the real Claude Code (`needs: ['claude']` in
-`suites.mjs`) or the real Codex in its test home (`needs: ['codex']`): they test what fakes can't (hooks reaching Combwork,
+`suites.mjs`), the real Codex in its test home (`needs: ['codex']`), or the installed Antigravity CLI (`needs: ['agy']`,
+`antigravityreal`, HI-2548): they test what fakes can't (hooks reaching Combwork,
 the CLIs' transcript formats, session binding, usage, their trust and mode screens, Codex's sandbox), but they are slow,
 cost tokens and fail for reasons that aren't the code. The full set (`--all`, or nothing named) is the fake tier, and
 the runner lists the real suites it left out ("Not run: the real tier"), in its output and the run record. `--real` adds
 the real tier, `--only-real` runs only it; a suite named always runs.
+
+**The real Antigravity CLI** (`antigravityreal`; Darren's (b) on HI-2548: a launch and one tiny prompt a run, one agent)
+has no test home: agy's sign-in is the PC's (Windows Credential Manager), read by agy, never changed by a test. The
+suite runs agy in its test copy's own profiles (the check profile and the agent's, under its test data; never your
+`~\.gemini`, which lib.cjs lists before and after), its updates off, and marks the check profile past agy's first-run
+screens from `%LOCALAPPDATA%\combwork-test\agy-probe`, a profile onboarded once by hand (only that they are done, never
+its installation id). It is skipped when agy isn't installed or signed in, or that profile isn't there, and fails if
+`~\.gemini`, `%LOCALAPPDATA%\agy`, `%LOCALAPPDATA%\Antigravity` or the PC's agy and Google credential names changed.
+Close your own agy first: one writing to `~\.gemini` meanwhile fails that check. Every fake agy suite stops before any
+session unless Combwork selected the fake (a fake it can't run must never fall back to the real one).
 
 A suite passes when it exits cleanly and prints no `FAIL` line. **Environment failures are a SKIP, not a FAIL**, but
 only where it is certain: a real suite marks each step that waits on the CLI answering (a turn) with
@@ -73,8 +84,8 @@ another commit, or from before an edit, is reported.
 **Windows** (#1253): no suite puts a window on the screen or takes the focus. A dev test copy is quiet itself
 (`testQuiet`: off screen, unfocusable, no notifications). A packaged Combwork isn't, unless it is 1.0 with
 `CW_TEST_QUIET=1` (which `combworkEnv` sets); a released 0.9 can't be changed at all. So `lib.cjs`'s `_electron.launch`
-does it from outside for every packaged Combwork a suite starts (`packaged`, `packaged-transcript`, `packaged-workers`, `boardupgrade` and
-`upgradelane`'s 0.9 from `CW_E2E_V09` or the main checkout's `dist\win-unpacked`, `plan` with `CW_EXE`). It
+does it from outside for every packaged Combwork a suite starts (`packaged`, `packaged-transcript`, `packaged-workers`,
+`plan` and the queue suites with `CW_EXE`). It
 starts with `--hidden` (Combwork makes its windows but shows none, as when started at sign-in). As soon as Playwright
 reaches its main process, `keepPackagedQuiet` moves its windows off screen, makes them unfocusable and keeps them off
 the taskbar, then shows them inactive so they draw for screenshots. From then on, showing, focusing, maximising,
@@ -88,11 +99,24 @@ fetches the release's `latest.yml`, which GitHub counts as a download. A package
 `CW_TEST_QUIET=1` checks nothing, automatic or manual (Settings → Updates says it's a test copy, and its log says so
 at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Combwork `CW_UPDATE_DELAY` at its maximum (about
 24.8 days: a 0.9's first check never comes) and, in a profile it has saved, automatic checks off (no 6-hourly one).
-The guard: when a suite ends, each packaged Combwork's `combwork.log` must show no `[updates] Checking for update` since it
-was started, or the suite fails, naming the lines. The Sandbox checks run with their network off.
+A build from before 1.1 reads those under its old names (from before HI-2586): given only `CW_*`, a 0.9.3 started by
+the 0.9 upgrade suites ran in the user's own 0.9 profile with its updater on, downloaded 1.1.0 into the real updater
+folder and ran the installer, which closed the user's Combwork (HI-2741; those suites were retired). So `_electron.launch` reads, from a packaged build's own main code, the
+prefix it reads its profile and update delay under, gives it the test environment under that prefix too, and refuses to
+start a build that reads neither (a 1.0 one named by `CW_EXE` gets its old names, and `window.combwork` as an alias of its
+old bridge). Every packaged Combwork also starts **offline**: `--proxy-server` to a port nothing
+listens on, and, once Playwright reaches its main process, every session (the updater's own partition too) sends what goes
+beyond this machine there and refuses it, noting the address (`keepPackagedOffline`; this machine's own addresses are
+never proxied).
+The guard: when a suite ends, each packaged Combwork must have written its log in its test profile (else it ran in
+another), that log (`combwork.log`, or a 0.9's own) must show no update check, download or install since it was started,
+and it must have tried to reach nothing beyond this machine; and the user's real updater folders
+(`%LOCALAPPDATA%\combwork-updater` and the 0.9 one) and a 0.9's real profile folder, listed read-only when the suite first
+starts a packaged Combwork, must be as they were. Otherwise the suite fails, naming what. Nothing cleans those folders:
+what is in them is the user's. The Sandbox checks run with their network off.
 
 Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's folder there under the old name): `lib.cjs` refuses it and any exe
-outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `CW_E2E_V09` and `CW_EXE`. And
+outside this checkout, the test folders and `CW_EXE`. And
 children of the run context get no `%APPDATA%\Combwork\bin` or `Combwork-Dev\bin` (nor 1.0's, under the old name) on their PATH (an agent session has them):
 those `cw-progress` shims run the installed exe. A `cw-progress` run seen in a process list is itself
 `Programs\Combwork\Combwork.exe` (or 1.0's, under the old name; as Node, no window), not the app.
@@ -304,14 +328,15 @@ same code while every required check still runs:
   from it (#365, RELEASING.md). The runner itself never starts a CLI.
 - **The reviewer** checks the record instead of repeating it (#533): its fingerprint is the code it's reviewing
   (`npm run e2e -- --fingerprint` in the builder's folder), it's recent, the suites the change needs ran, and each
-  failure in it is explained. It then runs the quick checks (`npm run typecheck`, `npm run lint`), the unit tests the
-  change affects (`npx vitest run --changed <base>`, where `<base>` is the commit the card's work started from;
-  uncommitted changes count too; it follows imports, so add the tests that read a changed file, such as a skill's
-  Markdown or a fixture), not the whole unit suite, and only the new or changed suites and those it doubts
-  (the one or two closest to the riskiest change), saying which on the card, and spends the rest of its time on its own probes. It reruns a whole suite or set only when there's no record, the
-  fingerprint differs or the record is stale, a result looks wrong, or the change is to shared test infrastructure (the
-  runner, `lib.cjs`, the run context, the scenario harness, `vitest.config.ts` or a helper in `tests/`), and says in
-  its verdict which and why.
+  failure in it is explained. A valid result stands (HI-2660; the `review-agent-work` skill, §3): the card's checks
+  recorded at the revision (`cw_start_review`'s `checksAtRevision`) and the suites in the record are not run again. It
+  runs what no record covers (a check the change needs that didn't run, or whose command, test or CLI changed since),
+  the `runYourself` tests the merge needs from it (realProof = review) unless it accepts the builder's run of each at
+  the revision (`cw_verdict`'s `accept`), and its own probes, and spends its time on those.
+  It reruns a suite, a set or a unit test only for a doubt it names in its verdict ("reran X because Y"): the record is
+  missing or for other code, a result looks wrong, or the change is to shared test infrastructure (the runner,
+  `lib.cjs`, the run context, the scenario harness, `vitest.config.ts` or a helper in `tests/`). Normally at most one
+  focused rerun.
 - **Follow-up rounds** run only the suites that failed plus those the fixes touch, by name (`--affected` can help pick
   them). **Before a card passes**, every suite it names has run on its final code (the builder's last record). How
   narrow a round's tests are, and what never runs on a card unless it asks, is AGENTS.md's **Tests per card**.
@@ -328,8 +353,9 @@ same code while every required check still runs:
   runs only the unit tests.
 - **The full set runs at checkpoints**: `npm run e2e -- --all --build --record` **on the integration branch when the
   lanes go quiet** (a phase's end, overnight with the load capped, before a long pause; a failure is carded at once and
-  bisected over the merge commits since the last full run), for **every RC and release** (RELEASING.md, with the real
-  tier: `--all --real`), and **on request** (the user, or a card that asks for it). Run the real tier on its own
+  bisected over the merge commits since the last full run), **once for a version's first RC** (RELEASING.md, What a
+  release checks; the real tier then runs on its own, `--all --only-real` with Copilot's suites named, RELEASING Step 4; an RC
+  fix round and the release rerun only the slices a change invalidates, by the release's coverage ledger), and **on request** (the user, or a card that asks for it). Run the real tier on its own
   (`--all --only-real`) **after updating Claude Code or Codex**. `--affected` (below) stays a tool for picking the
   suites a change needs, such as a review round's fixes, and isn't any merge's gate.
 - **A flake fix, or a change to a suite's waits**, is proven by focused repeats under load (the `investigate-flake`
@@ -354,10 +380,131 @@ only the unit tests use select nothing, and `tests/e2esuites.test.ts` checks tha
 suite. Real suites come in when an area names them, or when the change is to Combwork's side of every CLI (`REAL_TIER` in
 `affected.mjs`: `sessions.ts`, the providers, `providerService`, the terminal host, hook status, transcripts,
 `lib.cjs`) or to code no area names; a provider's own adapter (`src/main/providers/claude/`, `codex/`) picks only its
-real suites. Add an area to `affected.mjs` when you add a
+real suites.
+
+A few of those shared files are selected by **the parts of them a change touches** instead (HI-2659, `SPLIT` in
+`affectedUnits.mjs`): `ipc.ts` and `shared/api.ts` by IPC channel, `actions.ts` by action, `commands.ts` by command,
+`workspace.ts` by its top-level functions and `WorkspaceService`'s members, and `runner.mjs`'s seam tables by the seam names added or removed. Each
+changed part is followed to what names it (a channel's callers, an action's, a function's, and theirs while they are in
+those files too; its name spelled in a string, `x['f']`, counts too), and a file that names it counts as it would
+changed: its own suite, its area's suites, or every suite when it is itself shared by everything (`store.ts`,
+`sessions.ts`…) or in no area. A command is also reached by the generic dispatch (palette, menus, shortcuts), mapped to
+`commands.ts`'s own areas' suites. A part public in either revision counts as public, and a public part's trail must
+reach a file that runs it. Lines that are only comments select nothing, unless a comment they're in now covers code, or
+no longer does (`/*` and `*/` added around code). The IPC dispatch's own lines map only for its test seams' branches
+(`CW_TEST_SLOW_IPC`, `FAIL_IPC`, `BLOCK_IPC`, `HOLD_IPC`: the suites that set the seam); the rest of it (the access
+check, the error path) is every suite. **`WorkspaceService`'s members are followed by name because of a rule**
+(HI-2678, Darren's R2; `workspaceRule.mjs`): no value holding a `WorkspaceService` (a view of one, a container, a
+callback returning one; one by an intersection, a subclass or sub-interface, a type parameter constrained to it, or a
+generic's own type parameter it went into) goes where its type is lost (`any`, `unknown`, `object`, an index signature, a cast, a slot whose
+type drops it) or is read by a key the code doesn't spell (a computed key, a destructuring by one or into a rest, a
+spread, `for-in`), and no code outside the program (a script, a suite, a `.mjs` helper) may load `workspace.ts`: by an
+import, or by a loader the import graph can't read beside a path to it (selection's own tooling, which reads it as text,
+aside). The reviewed
+`workspace` Proxy aside (its handlers forward by the name the caller spelled; bound to its tokens, `PROXY_HASH`). With the
+rule holding, every use of a member spells its name, so a name search can only over-select. It is a census of the whole
+`tsconfig.node.json` program with TypeScript 5.9's in-process checker (`typescript-classic`; TypeScript 7's API runs out
+of process and its types weren't reliable for this), about a minute, each revision in a process of its own (the whole
+program's types take about 4 GB: an 8 GB heap) and a picker's two at once; anything it can't prove fails closed (any program
+error, a file of `src/main`, `preload` or `shared` outside the program, a type walk past its budget, a compiler that
+throws). The picker checks it on **both** revisions before following a member (the rule's scope alone, about 30 s each),
+and where it doesn't hold, every suite, naming the escape; check:repo runs it on the merged tree whenever the change
+touches one of its inputs (code, a tsconfig, `package.json` or the lock, its own files: `workspaceRuleCheck.mjs`). A tree
+from before the rule holds only when audited by hand (`workspaceRule.audited.json`: its exact git tree, the rule's and
+the compiler's identity, each escape's proof along its whole flow; `--reaudit <commit>` carries a record to a new rule
+only when the census still finds exactly what was audited, and never covers code outside the program, a member
+reached without its name or an edited Proxy). The `workspace` instance itself stays every suite. So
+HI-2654's `setAdvanced` selects 50 of 387 suites (`advanced`, `assistantsettings`, `consoletext`, `p7settings` among them;
+its two trees are audited), HI-2652's seam 2 suites, and HI-2653's New Project 28 from `actions.ts` (37 with its
+`Overlays.tsx`) (`tests/affectedUnits.test.ts` checks all three, and the suites they need; `tests/workspaceRule.test.ts`
+each of the rule's cases).
+**The escape hatch** errs towards more, each time with a reason in the selection's output: whatever it can't follow
+selects every suite (a line in no function or entry, such as an import or module code; a file it can't parse or read in
+either revision; a public part whose trail reaches nothing that runs it, a cycle of public parts included; any use of
+an import of the module other than a short safe list: `mod.name`, the part called or read by name, a function handed
+off by its name, a type. Every reference to such an import is checked, so an alias, a computed key (`x[k]`),
+`Object.keys`, a spread, a destructuring, an argument, a template or a store is every suite, whatever its form; a module
+re-exported whole; a channel built at run time; a `WorkspaceService` member where its rule doesn't hold), the files still in `EVERYTHING` but not
+`SPLIT` select every suite as before (each with its reason there), and a change you know is cross-cutting though it touches only a few parts (a behaviour every handler
+relies on, a type's meaning) runs `--all`, said on the card. Add an area to `affected.mjs` when you add a
 suite or a source file; `tests/e2esuites.test.ts` checks every suite and source file is covered. What only the unit
 tests use (`tests/*.test.ts` and their helpers in `tests/`, `vitest.config.ts`, CI's workflow: `UNIT_ONLY`) selects no
 suite, so an e2e suite or scenario must never load a `.ts` helper from `tests/` (the unit test fails if one does).
+The Windows Sandbox checks' own files (`tests/sandbox/`) are among them: no suite or scenario loads or reads them (the
+unit test checks), the Sandbox runs them on a packaged build, and `UNIT_SCANS` selects their unit tests (HI-2690).
+
+**A change of types only selects nothing** (HI-2690): a TypeScript file whose changed lines all lie in statements erased
+before anything runs (an interface, a type alias, an overload's signature, a type-only import or export, a `declare`
+value with none, a `declare` module, namespace or global holding only those), each line shared with no other
+statement, or a change of comments alone. It's proved node by node, never by a `.d.ts` extension: an enum of any kind (a
+const enum's values are inlined where it is used), a value, a mixed line or a file that doesn't parse select as usual.
+So does a file read as source data, one a suite, a scenario or a script names (`tipwindows` reads `tips.ts`, `viewer`
+reads `servers.ts`). Typecheck checks the types. **`servers.ts` stays every suite**: 109 files make Agent API requests,
+most through a helper whose path is `BASE + path`, which no selection can follow to the routes it reaches.
+
+**Why each suite**: `--affected` ends with a line a picked suite, `suite: reason; reason` (at most three, the first in
+the changed files' order): its own file, a file in its area, or a shared file's trail (`src/main/ipc.ts: 'advanced:set'
+→ tests/e2e/advanced.cjs`). A coverage ledger's boundary analysis can cite them. The picker writes them to stderr as
+`why …` lines; its JSON lines on stdout are unchanged.
+
+**The picker's unit tests** (`node tests/e2e/affected.mjs --pick`, the merge queue's focused tests) are a changed test
+file, those `UNIT_SCANS` names for a change, and those Vitest relates by import (`vitest list --changed`) **narrowed by
+name** (HI-2677, `relatedTests.mjs`): a related test stays when a file it loads (by the import graph read there, with
+the setup files) names a changed part or what holds it: the table or const it is in, what in its file names it, and for
+a class's member its class and whatever names that (a factory, an instance). It leaves out a test only when none does,
+so a key built at run time can still reach the part only through something named. **Whatever it can't tell keeps every
+related test**, with a reason in the picker's output: a changed file that isn't code, is added, deleted or unparseable,
+has a changed line outside every function, method or entry (module code, an import that isn't type-only, a
+constructor) or in a class's field, or whose module code names a changed part; a test the graph doesn't connect to the
+change; one loading a file that uses the module whole, as the graph resolves its imports (`import * as` other than
+`mod.name`, `export *`, a `require` or `import()` not taken apart by name, `vi.importActual`, `vi.mock` from the
+original, a glob of it) or lists keys by reflection; and one loading an **unknown** file, whatever else reaches the
+change. What a file loads is an allowlist (literal static imports, `import()`, `require()`, a `createRequire` require,
+Vitest's mocks and `importActual`, `import.meta.glob`): those are taken and blanked with the comments, types and strings,
+and a gate reads what is left for any other way to load or run code (`LOADS_CODE`: `require`, `import(`, `import.meta`,
+a Vitest loader, the `module` module, `eval`, `vi` other than its calls that load nothing…), so any form not on the
+list makes its file unknown with no rule of its own. A worker or a node process is unknown outside `src/` (a test
+running or naming a script); in `src/` it runs one of the build's entries (`electron.vite.config.ts`'s main input), so
+it counts only when the change is in what an entry loads, or the entries can't be read; a `node -e` script is read as a
+file of its own. External programs (git, the CLIs) are the boundary, and so is a loader deliberately hidden (eval or
+`Function` reached through globals or built keys, a loader chosen through an environment variable): the gate covers
+the forms this repository's tests use or would plausibly write (Darren's review bar for HI-2677), still catching any
+`eval`, `Function` or `constructor` reference, and a guard can refuse hidden ones in tests if they ever appear. A changed `import type` counts for nothing. A
+`WorkspaceService` member, while its rule holds in both revisions (above), is searched by its own name rather than its
+class's (which nearly every test of main names), and a file outside the app where a `WorkspaceService` loses its type
+(50 test files today, mostly fakes cast through `unknown`) is pinned: every test loading it is kept for any member.
+Measured on this tree (HI-2678): a one-method change to `setAdvanced` keeps 143 of its 365 related tests (12 load a file
+naming it, 6 import `workspace.ts` whole, 43 load a pinned file, the rest are unknown by their own loaders), before 365.
+**The tests kept for a loader** (HI-2715, 7 Nov: 80 of the 371 related to `workspace.ts`, after two fixed at their
+source, `flightRecorder`'s computed `import()` and `projectRename`'s `vi.spyOn(globalThis, …)`) are kept for good reason:
+- naming a script (`'src/a.ts'`, `'cw-mcp.js'`: mostly a fixture's data) while starting a process themselves (30:
+  agentMcp, agentText.laneStart, agentText.progress, agentTextApi, agentTextWorkflow, assistantMcp, cliOwnMode,
+  codexConnections, combworkMove, copilot, core, gitInit, i18n/content, liveInfoReads, mcpCatalog, mcpFromFile,
+  mcpProjects, noneCheckPoint, oldNames, progressReport, queueGitRoute, queueRunner, reviewCopies, shellCommand,
+  slotWriters, teamParked, workflow/focused, workflow/queueChecks, workflowOptionsForm, workspaceNotes);
+- naming a script while reaching only `src` starters: every one of them reaches the three that run a caller's script
+  (`logger.ts`'s `useLogWriter`, `closeCommand/runs.ts`, `workflow/queueJobs.ts`'s supervisor), through the hubs (30:
+  admission, attachments, cardAttachmentRead, cardIntents, cardWork, combworkMove10, dialects, filesIgnore, guidance,
+  i18n/main, i18n/providers, i18n/service, i18n/tasks, i18n/worktrees, loopWakes, observe, projectDeletedInPlace,
+  projectKeys, runChecks, runLink, slotCards, titleNudge, usageMoves, watch, workflow/queueAgents, workflow/queueCommits,
+  workflow/scenarios.git, workflow/scenarios.none, workflow/texts, worktreeChanges);
+- starting a worker or a process with a script they name or write (8: advanced, agentTextLanes, boardStore through
+  `mappedShm.ts`, lanes, nameUpgrade, quietCheck, repairSlots, unusedWorktrees);
+- `eval`, `Function` or `constructor` as content: prototype names under test, a Babel visitor named `Function`
+  (agentText, agentText.slots, agentTextBoth, metrics; agentText.prompt and agentText.settings reach
+  `scripts/agentTextBoth.mjs`'s);
+- a real dynamic load (actionHandlers imports a module it writes; gitRepo names `expect.any(Function)` beside its own
+  query import; copies and slots run `node -e "require('fs')…"`; queueGitHost runs the git host in a `vm` with a
+  require; workflow/queue's regex names `require(`).
+Tried and measured, not taken: reviewing the `src` starters to run only their own entries (P2) clears none, as all 30
+reach the three that run a caller's script; following a named script by its stem and reading every string holding
+loader syntax as script text (P3′) leaves 75 kept and adds 45 related tests through its edges, so it is net worse. The
+lever left is structural: the hubs (`logger.ts`, `git.ts`, `walCheckpoint.ts`…) out of every test's closure. Measured at 1.2.0's head (HI-2677, round 5): 370 files are unknown (six in
+`src/`: the queue's launcher and git host, whose `node -e` scripts are built from text, `cw-mcp.ts`, and three renderer
+files handing the global object on), so 187 of 704 test files can be left out at all, and a one-function change to
+`settingsTools.ts` still selects all 27 related. The worker entries' closure holds unknown files (`cw-mcp.ts`, the
+launcher), so every starter counts for now. When the e2e side is
+every suite the pick is still `{"every":true}`, unchanged.
 
 **Progress in Combwork.** Run from an agent's session in Combwork, the runner shows in that Combwork's Progress panel: **e2e: N
 suites**, a step per suite, and the time left from how long each suite took before (kept in
@@ -455,7 +602,12 @@ Then the profile move the installer couldn't make (scenario 11, `--only profile-
 open while the new installer runs (it moves the roaming folder and leaves the local one, its record in it), Combwork
 started with the file still held (refused, with its error box, nothing made under Combwork's name), then let go and
 started again (it moves the folder itself, its record arriving with it, and checks the sign-ins once: not again at the
-next start). Four throwaway Sandboxes, about 20 minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or
+next start). What the upgrade (scenario 4) seeds and checks follows the previous release's version (HI-2727): from
+1.0, its names moved and the profile move run; from 1.1 on, a real workspace made through that release's own window
+and Agent API (a git project on the Pair (agent merges) preset, two cards labelled, linked and commented, a Claude Code
+connection, advanced overrides at both levels, a skill copy, and a lane over an agent, lent a slot), each read back after
+the upgrade by its id and unchanged, with Git mapped for it. The profile move is 1.0's: from a later previous it isn't
+run (the report says so; `--only profile-move --previous <1.0's installer>` runs it). Four throwaway Sandboxes, about 20 minutes, the network off and Combwork's fake CLIs only: no real CLI, sign-in or
 credential goes in. It writes `report.md` (pass or fail per check, with screenshots) and passes only with every check run.
 
 - **When:** on each release candidate, once it is built and before the user installs it (RELEASING.md step 1, the
@@ -485,16 +637,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   project, not per agent, so until it can give a server to chosen agents only (#537), the server is on only in a
   release-testing project that holds just the release-testing agent (the combwork-mcp repo's
   `servers/windows-sandbox/RELEASE-TESTING.md`).
-- **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227): `upgradelane` and `boardupgrade` run inside the
-  Sandbox against two installs, with `CW_E2E_V09` a copy of the installed 0.9 and `CW_EXE` a copy of the new
-  build installed over it (copies, as `lib.cjs` never starts an installed copy: `Programs\Combwork`, or 1.0's). With `CW_EXE` set,
-  `lib.launch` starts that packaged exe instead of the dev build, saying so in the suite's log; `boardupgrade`'s
-  step 8 needs an unpackaged build's upgrade hold, so it says NOT RUN there. The Sandbox maps Node, Git and the checkout
-  read-only as tool folders; #1227's card has the script.
-  The 0.9 build hands the fake Claude Code its names from before 1.1 (the old-prefix variables, server and
-  tools): only `upgradelane`'s 0.9 profile runs the fake in old-release mode (`lib.fakeClaude(…, { oldRelease: true })`,
-  `fake-claude/fake-claude-old-release.cmd`, `fake-claude/oldRelease.cjs`, HI-2614). Every other launch is current, and
-  the fakes refuse those names there, so no current suite passes on them.
+- **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227) is no longer tested: its suites (`upgradelane`,
+  `boardupgrade`) were retired (HI-2741, Darren on 8 Nov: everyone is on 1.1.0). The upgrades users need (1.0 and 1.1
+  to 1.2) are the Sandbox checks'. The fakes' old-release mode (HI-2614), which only `upgradelane` used, went with it
+  (HI-2742); the fakes refuse an old release's names in every launch (`fake-claude/oldDialect.cjs`).
 - **The queue suites on a packaged build** (#1578; S54 and S55 among them, for #1449 and #1539): `queueFixture.cjs`
   starts Combwork through `lib.launch`, so `CW_EXE` runs them on the build named. A packaged build refuses the test
   copies' channels (`agents:testLegacy`, which makes 0.9 worktree agents, and `slots:test`) and ignores the
@@ -539,6 +685,25 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   when `--affected` needs them. Run them when what they test can't be done with the fake Claude Code (below), and
   prefer the fake where it covers the case. Warn the user first if one could
   reach a sign-in screen; never send key presses to one.
+- **The CLI test homes start each run fresh** (HI-2606; `testHomes.mjs`, `testHomeManifest.mjs`, `testHomeLock.mjs`).
+  Before each suite that uses Claude Code's signed-in test home (`claudeHome: 'test'`) or Codex's (`needs: ['codex']`,
+  `codexHome: 'test'`), and before each real model trial, the runner takes the home's lease (one run at a time per
+  home, machine-wide; Claude Code's before Codex's, reused by what a holder starts, `CW_TEST_HOME_LEASES`) and resets it
+  to its sign-in: memory, transcripts, per-folder trust, MCP servers in `config.toml`, history, skill use, the CLIs' own
+  databases, caches and temp leftovers go; the sign-in (`.credentials.json`, `auth.json`), the PC's Codex sandbox
+  setup, Codex's downloaded packages, and `.claude.json`'s and `config.toml`'s account and onboarding fields stay (runs
+  start signed in and onboarded). The sign-in is never copied, written or put back: copies of a home would share a
+  rotating refresh token and sign each other out. A home that isn't signed in skips the suite for its environment; one
+  still in use is waited for, then refused, never ended: in use means what used it under the lease (the test copies of
+  Combwork a suite started there, noted in the lease's holder record, `holder.state`) or, after taking over from a run
+  that didn't let the home go, what that run left, and every CLI those started; a nested run reusing its parent's lease
+  never resets. One
+  whose status can't be read stops the suite. An entry `testHomeManifest.mjs` doesn't classify (a new CLI version's new
+  file) is kept, never deleted, and named in the suite's log (Darren, 7 Nov): classify it there. `--warm-homes` (e2e
+  and scenarios) skips the reset, keeping what earlier runs left, on purpose; a suite needing state from an earlier,
+  separate run says so with `home: 'warm'` in `suites.mjs` (none does today). Copilot has no long-lived test home: its
+  suites make theirs each run, and its sign-in is in Windows Credential Manager. A suite run on its own (`node
+  tests/e2e/<suite>.cjs`) takes no lease and resets nothing.
 - **`claudehome`** (#345) runs the real Claude Code in a home of its own (`claudeHome: 'own'` in `suites.mjs`), never
   the default one: a new folder each run with onboarding done and a made-up API key approved in its `.claude.json`, so
   Claude Code starts at its prompt with no sign-in, and is sent nothing (no tokens, nothing reaches Anthropic). It
@@ -657,8 +822,8 @@ in the run record. Seeing 0xc0000142, run fewer test runs at once rather than lo
 Windows' "Application Error" dialog even for processes that had the error mode (children of Vitest workers during full
 unit runs beside e2e runs), and the process waits behind it until someone clicks OK. Fewer heavy runs at once makes it
 rarer (a full unit run is a heavy run, above); only a machine-wide setting, left to the machine's owner, would stop it.
-The `failfast` suite checks the reporting (a child ending with 0xc0000142 is seen at once, and said), not that a real
-startup failure shows no dialog.
+`tests/windowsExits.test.ts` checks the reporting (a real child ending with 0xc0000142 is seen at once, and said: the
+`failfast` suite's checks until HI-2663), not that a real startup failure shows no dialog.
 
 ## Housekeeping
 

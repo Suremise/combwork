@@ -18,7 +18,7 @@ import type { QueuePublic } from './workflow/queue'
 import { INBOX_SWITCHES, type InboxSwitch } from './inboxSwitches'
 import { unsubmittedText, type UnsubmittedCard } from './unsubmitted'
 import { idleWatchText } from './idleWatch'
-import { agentMsg, say, type AgentMsg } from './agentText'
+import { agentMsg, say, sayWithId, type AgentMsg, type Said } from './agentText'
 
 /**
  * The replies' text (dialects, HI-2065; HI-2435): said when a reply is built, in its caller's dialect. Numbers are plain
@@ -26,7 +26,7 @@ import { agentMsg, say, type AgentMsg } from './agentText'
  * on `yes`/`no`. Names, keys, paths and other messages' text come in as values.
  */
 const R = {
-  checksHint: agentMsg({ id: 'reply.checks.hint', text: 'before review: run one with cw-progress --check <name> --card "{card}" {isolated, select, yes {(--isolated: in a check copy at the card\'s revision; work-on-card)} other {(work-on-card)}}', note: "A code card's checks before review (HI-2276): how to run one, with <name> left for the agent to fill (a configured name is never quoted into a command, HR1's rounds 1 and 2). {card} is the card's key; isolated: its platform can make a check copy." }),
+  checksHint: agentMsg({ id: 'reply.checks.hint', text: 'before review: cw-progress --check <name> --card "{card}"{isolated, select, yes { (--isolated: in a check copy)} other {}}. Budget, other checks: project notes; work-on-card', note: "A code card's checks before review (HI-2276): how to run one, with <name> left for the agent to fill (a configured name is never quoted into a command, HR1's rounds 1 and 2), and where the rest of a round's tests and their time budget for its kind of change are, the project's notes (HI-2658: a pointer, never a budget of its own; replysize holds the checks fields to 200 bytes). {card} is the card's key; isolated: its platform can make a check copy." }),
   commentsInvalid: agentMsg({ id: 'reply.read.commentsInvalid', text: 'comments must be a whole number from 0: "{raw}"', note: "GET /v1/tasks/{n}'s comments= (HI-2412) was not a whole number from 0. {raw} is what was given." }),
   place: agentMsg({ id: 'reply.card.place', text: '{column} ({position} of {of})', note: "Where a card is now: its column's name and its place in it (an ordinal such as 51st, of how many)." }),
   created: agentMsg({ id: 'reply.card.created', text: '{card} created in {place}{forProject, select, yes { for {project}} other {}}{givenTo, select, yes {, given to {agent}} other {}}: {title}{changed, select, yes {. {changes}} other {}}', note: 'A new card (reply: short): its name (key and number), where it is, its project and agent, its title and the changes made with it (joined by "; ").' }),
@@ -167,7 +167,7 @@ const R = {
   settingReadOnly: agentMsg({ id: 'reply.setting.readOnly', text: 'Read-only to you: {why}', note: "cw_read_setting: the Assistant can't change it, and why." }),
   settingDocs: agentMsg({ id: 'reply.setting.docs', text: 'User guide: "{docs}".', note: "cw_read_setting: the user guide's section on it." }),
   settingSame: agentMsg({ id: 'reply.setting.same', text: '{path}{hasProject, select, yes { ({project})} other {}} was already {value}: nothing changed.', note: 'cw_update_setting when the value was already so.' }),
-  settingChanged: agentMsg({ id: 'reply.setting.changed', text: "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {It applies now.}} The user can undo it in your panel's list.", note: "cw_update_setting's reply: what changed, old → new, and when it applies." }),
+  settingChanged: agentMsg({ id: 'reply.setting.changed', text: "Changed {path}{hasProject, select, yes { in {project}} other {}} ({id}): {old} → {new}. {hasRestart, select, yes {It applies {restart}.} other {{hasNote, select, yes {{note}} other {It applies now.}}}} The user can undo it in your panel's list.", note: "cw_update_setting's reply: what changed, old → new, and when it applies. {note}: what it leaves as it was (a version control switch's or a target change's lanes and cards in flight, HI-2674), in its place of \"It applies now\"." }),
   journalNoMatch: agentMsg({ id: 'reply.journal.noMatch', text: 'No entries match "{query}".', note: 'cw_journal_recall with a query nothing matches (#1031).' }),
   journalNone: agentMsg({ id: 'reply.journal.none', text: 'No entries.', note: 'cw_journal_recall with no entries.' }),
   markEssential: agentMsg({ id: 'reply.journal.mark.essential', text: 'essential', note: "A journal entry's mark: importance 3." }),
@@ -356,6 +356,8 @@ export interface TaskView extends Omit<TaskCard, 'agent' | 'decisions' | 'held'>
   decisions?: Omit<TaskDecision, 'id'>[]
   agent: { id: string; name: string; status: string; backgroundTasks: number } | null
   stalled: string | null
+  /** Its own Merges into (HI-2556), when it has one: the branch its work merges into instead of the project's. */
+  target?: string
   /** With a review going on (TaskCard.review): why it has stalled (its reviewer removed or not running), if it has. */
   reviewStalled?: string
   /**
@@ -467,10 +469,10 @@ export function newestComments<T extends { comments: unknown[] }>(v: T, n: numbe
  * GET /v1/tasks/{n}'s `comments=` (HI-2412): null when absent, else a whole number from 0 (0: none of them, all counted in
  * commentsOmitted); anything else is a string saying what's wrong.
  */
-export function commentsParam(raw: string | null): number | null | { error: string } {
+export function commentsParam(raw: string | null): number | null | { error: Said } {
   if (raw === null) return null
   const n = raw.trim() === '' ? NaN : Number(raw)
-  return Number.isInteger(n) && n >= 0 ? n : { error: say(R.commentsInvalid, { raw }) }
+  return Number.isInteger(n) && n >= 0 ? n : { error: sayWithId(R.commentsInvalid, { raw }) }
 }
 
 /**
@@ -584,7 +586,10 @@ export function intentText(d: IntentDone): string {
   const where = d.from && d.to ? (d.from === d.to ? say(R.intentStill, { stage: d.to }) : `${d.from} → ${d.to}`) : say(R.intentDone)
   // A list's item: a changed file as git's letter and its path ("M greet.js", #1444: start review's files read
   // [object Object]), anything else as it is.
-  const item = (x: unknown): string => (x && typeof x === 'object' && typeof (x as { path?: unknown }).path === 'string' ? `${(x as { status?: string }).status ? `${(x as { status: string }).status} ` : ''}${(x as { path: string }).path}` : typeof x === 'object' ? JSON.stringify(x) : String(x))
+  // A recorded check (HI-2660, start review's checksAtRevision) as its name and result ("typecheck passed"), a name with a
+  // separator or space quoted, so it stays data.
+  const check = (x: { name: string; result: string }): string => `${/^[\w.:@/+-]+$/.test(x.name) ? x.name : JSON.stringify(x.name)} ${x.result}`
+  const item = (x: unknown): string => (x && typeof x === 'object' && typeof (x as { path?: unknown }).path === 'string' ? `${(x as { status?: string }).status ? `${(x as { status: string }).status} ` : ''}${(x as { path: string }).path}` : x && typeof x === 'object' && typeof (x as { name?: unknown }).name === 'string' && typeof (x as { result?: unknown }).result === 'string' ? check(x as { name: string; result: string }) : typeof x === 'object' ? JSON.stringify(x) : String(x))
   const value = (v: unknown): string =>
     Array.isArray(v) ? (v.length > INTENT_LIST_MAX ? say(R.listMore, { items: v.slice(0, INTENT_LIST_MAX).map(item).join(', '), n: v.length - INTENT_LIST_MAX }) : v.map(item).join(', ') || say(R.listNone)) : typeof v === 'object' ? JSON.stringify(v) : String(v)
   const facts = Object.entries(d.data ?? {})
@@ -815,7 +820,8 @@ export interface ProjectRow {
    * `watching`: what a watching agent waits for ("Waiting for #12 → Review"). `progress`: its open progress run, short
    * ("e2e: 12 suites 4/12, about 6 min left").
    */
-  agents: { name: string; provider: string; workflowRole?: string; status: string; branch: string | null; backgroundTasks: number; watching?: string; progress?: string }[]
+  /** `launch` (HI-2670): its connection's launch settings in short, when not everything ("plain: …"). */
+  agents: { name: string; provider: string; workflowRole?: string; launch?: string; status: string; branch: string | null; backgroundTasks: number; watching?: string; progress?: string }[]
 }
 
 /** An agent's open progress run in a few words, title clipped, for the short listing. */
@@ -831,7 +837,7 @@ export function projectRowText(p: ProjectRow, many: boolean): string {
   const agents = p.agents.map((a) =>
     say(R.projectAgent, {
       name: a.name,
-      tags: `${a.provider}${a.workflowRole ? `, ${a.workflowRole}` : ''}${a.branch ? `, ${a.branch}` : ''}`,
+      tags: `${a.provider}${a.workflowRole ? `, ${a.workflowRole}` : ''}${a.launch ? `, ${a.launch}` : ''}${a.branch ? `, ${a.branch}` : ''}`,
       // agent-protocol: the watch's own label (a value), its first word made lower case to follow the name
       state: a.watching ? a.watching.replace(/^Waiting/, 'waiting') : statusText(a.status),
       hasBackground: yn(a.backgroundTasks > 0),
@@ -1121,9 +1127,9 @@ export function settingText(d: SettingDetail): string {
 }
 
 /** cw_update_setting's reply: what changed, old → new, and when it applies. */
-export function settingChangedText(c: { title: string; id: string; path: string; project?: string; changed?: boolean; old: string; new: string; restart?: string }): string {
+export function settingChangedText(c: { title: string; id: string; path: string; project?: string; changed?: boolean; old: string; new: string; restart?: string; note?: string }): string {
   if (c.changed === false || (c.changed === undefined && c.old === c.new)) return say(R.settingSame, { path: c.path, hasProject: yn(c.project), project: c.project ?? '', value: c.new })
-  return say(R.settingChanged, { path: c.path, hasProject: yn(c.project), project: c.project ?? '', id: c.id, old: c.old, new: c.new, hasRestart: yn(c.restart), restart: c.restart ?? '' })
+  return say(R.settingChanged, { path: c.path, hasProject: yn(c.project), project: c.project ?? '', id: c.id, old: c.old, new: c.new, hasRestart: yn(c.restart), restart: c.restart ?? '', hasNote: yn(c.note), note: c.note ?? '' })
 }
 
 // The Assistant's journal (#1031): a recall is a line an entry; an entry in full on request.

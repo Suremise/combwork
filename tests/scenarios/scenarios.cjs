@@ -7,7 +7,7 @@
 // commands: those runs check the harness, the board rules and Combwork's own costs (benchmarks) for free. The real CLIs are the model trials (opt-in, see README.md).
 //
 // Fixture version: bump when a scenario's setup or checks change, so results can be compared across versions.
-const FIXTURES_VERSION = 126
+const FIXTURES_VERSION = 127
 
 /**
  * long-doc-section's design document (#817): about 40,000 characters in 36 sections, one of which (Retry policy) holds
@@ -37,6 +37,14 @@ const argsOf = (x) => {
 /** A fake builder's watch for its card's verdict, as card-loop starts it (a Combwork tool call through the real server). */
 const verdictWatch = (n) => `cw cw_wait_for_tasks {"cards":["#${n}"],"changes":["verdict","column","comment"],"column":"passed","wake":true}`
 const ran = (o, tool) => called(o, tool).filter((c) => c.ok)
+/**
+ * HI-2680: how a session moved Todo cards onto a new target: cw_queue retarget naming a preview and its items, or each
+ * card's own Merges into (cw_update_task with a target; cw_update_tasks with one in its patch). Both worked calls only.
+ */
+const retargetWays = (o) => ({
+  byPreview: ran(o, 'cw_queue').filter((x) => argsOf(x).action === 'retarget' && String(argsOf(x).preview ?? '').startsWith('rt-') && (argsOf(x).items ?? []).length > 0),
+  byCard: [...ran(o, 'cw_update_task').filter((x) => 'target' in argsOf(x)), ...ran(o, 'cw_update_tasks').filter((x) => JSON.stringify(argsOf(x)).includes('"target"'))]
+})
 /**
  * Whether a reply or card puts a decision to the user: a question, or a request without a "?" ("Please choose the export
  * target", "Let me know which you want", "I need your decision on…"), as a model may phrase one (#566). A polite closing
@@ -308,6 +316,11 @@ function handMerged(c, n) {
   c.git('checkout', '-q', base)
   c.git('merge', '-q', '--no-ff', '-m', `Merge branch '${branch}'`, branch)
   return { branch, base }
+}
+/** Implementer builds and Coder reviews (HI-2664: the harness saves Coder either and Implementer a reviewer). */
+async function swapRoles(c) {
+  await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'reviewer' })
+  await c.inv('agents:update', c.alpha, c.agents.implementer.id, { workflowRole: 'builder' })
 }
 /** Coder builds and Implementer reviews (their workflow roles), in a project whose work an agent reviews (#1527). */
 async function reviewedPair(c) {
@@ -1042,6 +1055,13 @@ const verdictOf = (card) => (card?.comments ?? []).filter((x) => /^Coder\b/.test
 // HI-2261: a record said to name another commit than the one reviewed ("names 584ab5f, not the reviewed revision 273f1f2",
 // "the recorded run did not cover the code being reviewed") says it is for other code too.
 const STALE_REASON = /\bstale\b|\bolder\b|outdated|out[ -]of[ -]date|predates|superseded|no longer (matches|current)|(newer|later|subsequent) (commit|change)|commit(ted)? after|after (it|the record|that record)|(doesn't|does not|didn't|did not) match|not the (reviewed|submitted|current) (revision|commit)|(names|is for|covers) (another|a different|an earlier) (commit|revision)|(doesn't|does not|didn't|did not) cover (this|the) (revision|code|commit)/i
+/**
+ * HI-2660: a verdict naming why a recorded test ran again ("reran greet.test.js because …", "re-ran X to check …"): a
+ * rerun for a named doubt. A rerun with none ("reran greet.test.js: passed") is the duplication the review skill rules out.
+ */
+const NAMED_DOUBT = /\bre-?r[au]n\b[^\n]{0,200}?(\bbecause\b|\bsince\b|\bto (check|see|confirm|rule out)\b)/i
+/** The scenario's check that a review reused the record: no recorded test run again, or a verdict naming its doubt. */
+const reusedOrDoubted = (o, card) => testRunsOf(o).length === 0 || NAMED_DOUBT.test(verdictOf(card))
 /** The test runs that ran the whole suite: `npm test`, or `node --test` naming no file. */
 const wholeSuiteRuns = (o) => testRunsOf(o).filter((r) => r.files.length === 0).map((r) => r.command)
 /** The project's test files' sleeps that a check follows with no reason given (`npm run test:waits`'s own finder). */
@@ -1215,10 +1235,11 @@ module.exports.SCENARIOS = [
       ['gave a verdict (passed or failed)', history(o.cards.b).some((h) => /^Review (passed|failed)$/.test(h)), history(o.cards.b).join(' | ')],
       ['checked which code the record is for (git)', runs(o, 'git').length > 0, o.tools.map((t) => t.name).join(',')],
       ["didn't run the whole suite again", wholeSuiteRuns(o).length === 0, wholeSuiteRuns(o).join(' | ')],
-      ['ran the test the change affects (greet.test.js)', testRunsOf(o).some((r) => r.files.some((f) => /(^|[\\/])greet\.test\.js$/.test(f))), o.tools.flatMap(commandsOf).join(' | ').slice(0, 500)],
+      // HI-2660: the record covers every test, so any test run is a rerun: none, or one whose doubt the verdict names.
+      ['ran no recorded test again, or the verdict names its doubt (reran … because …)', reusedOrDoubted(o, o.cards.b), `${o.tools.flatMap(commandsOf).join(' | ').slice(0, 300)} || ${verdictOf(o.cards.b).slice(0, 200)}`],
       ['changed no files (a review only reads)', o.gitStatus.trim() === '', o.gitStatus]
     ],
-    fakeSkips: ['checked which code the record is for (git)', 'ran the test the change affects (greet.test.js)']
+    fakeSkips: ['checked which code the record is for (git)']
   },
   {
     id: 'review-record-stale',
@@ -1716,6 +1737,9 @@ module.exports.SCENARIOS = [
   {
     id: 'review-passed',
     title: 'A review that passes: its verdict moves the card to Passed, not to Done (#170; #1536: a project where an agent reviews and merges come after, so a pass stops in Passed)',
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       // A reviewer agent, and merges reported by the builder, not checked: a pass waits in Passed for the merge.
@@ -2802,6 +2826,7 @@ module.exports.SCENARIOS = [
     id: 'card-loop-lane-join',
     title: "A card loop reviewer joins its builder's lane (#483) by the builder's name, then waits for the first card",
     async setup(c) {
+      await swapRoles(c)
       await c.card('a', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', column: 'doing', agent: 'implementer' })
       await c.card('b', { title: 'Greeting trims the name', description: 'greet.js trims spaces around the name.', agent: 'implementer' })
     },
@@ -3205,6 +3230,9 @@ module.exports.SCENARIOS = [
   {
     id: 'intent-review-request',
     title: "A reviewer starts a review, asks the builder something and fails it (#1267): start review, request to builder and verdict",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -3405,6 +3433,7 @@ module.exports.SCENARIOS = [
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('d', { title: 'Cache invalidation', description: 'cache.js keeps entries forever. Make entries expire and be invalidated on write.', agent: 'implementer' })
+      await swapRoles(c)
       // Implementer starts the card, registers its lane (the subject, Coder, reviewing) and posts its design, with its own
       // token. The start comes before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing this start.
@@ -3475,10 +3504,14 @@ module.exports.SCENARIOS = [
   {
     id: 'card-loop-follow-up-check',
     title: "A card loop reviewer told of a follow-up to check, on a card in Review (#1467): it answers with cw_loop_step naming it, not a verdict",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
       const n = await c.card('f', { title: 'Greeting says Hi', description: 'greet.js returns "Hi, <name>".', agent: 'implementer' })
+      await swapRoles(c)
       // Implementer's round 1 sent for review, then its lane (the subject, Coder, reviewing), then its follow-up, with its
       // own token. The moves come before the lane (HI-2270): over a card in Todo, Combwork starts it on Implementer itself once
       // builderLane stops it (HI-2029), racing the move to Doing.
@@ -3538,6 +3571,68 @@ module.exports.SCENARIOS = [
     }
   },
   {
+    id: 'card-loop-progress-comment',
+    title: "A card loop builder idle mid-card, told by the Assistant what it waited for and asked for a line on the card (HI-2716): it answers on the card, then carries on and submits it, rather than ending its turn on a watch of its own card in Doing",
+    files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
+    assistantMessages: true,
+    // Combwork starts the lane's first card on Coder itself, with its line (card-loop-submit-watch's, HI-2215): the prompt
+    // below is a model's only as the line says it, and the fake is typed its steps after it, the card already in Doing.
+    startedByCombwork: true,
+    // The fake Codex and fake Antigravity act out their wakes too (harness.cjs, HI-2745), so the fakes all take the message
+    // as a model idle mid-card does (the fake Copilot aside: fakeSkips).
+    scriptedWakes: true,
+    async setup(c) {
+      await pairInProject(c)
+      const a = await c.card('a', { title: 'Greeting says Hi, with a test', description: `Two parts. 1. ${CARD_LOOP_GREETING} Commit it. 2. Add greet.test.js, a node:assert test that greet.js greets the name the user picks, run it with node, commit it, and submit the card.`, agent: 'coder' })
+      await c.inv('tasks:update', a, { decision: 'Part 2 tests the name the user picks, "Ann" or "Bo": the Assistant brings their pick in a message once part 1 is committed. Do part 1, then wait for that message; don\'t ask the user yourself.' })
+      await builderLane(c, 'coder', { builder: 'Coder', reviewer: 'Implementer', cards: [a], rounds: 10, waitMinutes: 360 })
+      await c.startAssistant()
+      c.head = c.git('rev-parse', 'HEAD').trim()
+    },
+    // Once part 1 is committed and its turn has ended (idle mid-card), the Assistant brings the user's pick and asks for a
+    // line on the card, as on 7 Nov in the cli project (CB1, CB2): typed to it as the doorbell. Then, each time it is quiet
+    // after reading it, where its turn ended: its status, the card's column and its watch.
+    async during(c, status) {
+      const quiet = ['ready', 'finished', 'watching'].includes(status)
+      const column = (await c.api('GET', `/v1/tasks/${c.cards.a}`)).body?.column
+      if (!c.sentAt && quiet && column === 'doing' && c.git('rev-parse', 'HEAD').trim() !== c.head) {
+        c.sentAt = Date.now()
+        c.premise = { column, status, test: c.read('greet.test.js') ?? null }
+        c.sent = await c.assistantMessage('coder', `The user picked "Ann" for #${c.cards.a}'s test. A line on the card saying you've got it, please.`)
+      }
+      if (!c.sentAt) return
+      c.got = await c.deliveries('coder')
+      if (quiet && ['acked', 'received'].includes(sentMessage(c)?.state)) c.quiet = { status, column, watch: (await coderLive(c))?.watch ?? null }
+    },
+    // Until the message is acked or has ended, at most 4 minutes after it was left; and before it, until part 1 is in.
+    keepWaiting: async (c) => {
+      const msg = sentMessage(c)
+      return !c.sentAt || (Date.now() - c.sentAt < 240000 && !(msg && (msg.state === 'acked' || !!msg.ended)))
+    },
+    prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you: do it as its decision says, and hand it to your reviewer as your loop says.`,
+    fake: () => `skill card-loop then ${LOOP_COMMIT}`,
+    // Its wake: the Assistant's message. Combwork's start of the card before it ("1 task (AL-1)") is work, not a wake: the
+    // fakes take its text as their prompt (fake-bridge.cjs doorbellIsWork, HI-2746).
+    fakeWakes: (c) => [`boardcomment ${c.cards.a} then cw cw_read_task {"number":${c.cards.a}} then shell: node -e "require('fs').writeFileSync('greet.test.js', '// greets Ann\\n')" then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi, with its test of Ann.')}`],
+    expect: (o, c) => {
+      const msg = sentMessage(c)
+      const review = handedOnAt(o, c, 'a')
+      const answered = (o.cards.a?.comments ?? []).some((x) => /Coder/.test(x.by) && Date.parse(x.at) >= (c.sentAt ?? Infinity) && (!review || Date.parse(x.at) <= review))
+      const q = c.quiet
+      return [
+        ['read the card-loop skill', read(o, 'card-loop'), o.skillsRead.join(',')],
+        ['the Assistant told it while it was idle mid-card (part 1 committed, the card in Doing, no test yet; typed: the doorbell)', (c.sent ?? '').startsWith('Told') && !!msg && c.premise?.column === 'doing' && !c.premise?.test, `${c.sent} ${JSON.stringify(c.premise)} ${JSON.stringify(msg)}`],
+        ['read it and acked it', msg?.state === 'acked', JSON.stringify(msg)],
+        ['answered on the card before handing it on', answered, JSON.stringify((o.cards.a?.comments ?? []).map((x) => [x.by, x.at]))],
+        ['carried on: a test of Ann, and the card submitted (Review)', /Ann/.test(c.read('greet.test.js') ?? '') && review > 0 && submissionsOf(o, c, 'a').length > 0 && o.cards.a?.column === 'review', `${o.cards.a?.column}; ${history(o.cards.a).join(' | ')}`],
+        ["didn't end its turn watching its own card in Doing", !!q && q.column !== 'doing', JSON.stringify(q)],
+        ["didn't ask the user whether to carry on", called(o, 'cw_notify').length === 0 && ran(o, 'cw_ask_user').length === 0 && !asksTheUser(o.finalReply), (o.finalReply ?? '').slice(0, 300)]
+      ]
+    },
+    // The fake Copilot answers no wake: after the message it stops, so only its fixture is checked there.
+    fakeSkips: (provider) => (provider === 'fake-copilot' ? ['answered on the card before handing it on', 'carried on: a test of Ann, and the card submitted (Review)', "didn't end its turn watching its own card in Doing"] : [])
+  },
+  {
     id: 'old-move-submit',
     title: "A builder's move to Review is its submission for now (#1268): today's skills, the card's rules (Pair in the project folder), its summary the comment",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
@@ -3564,6 +3659,9 @@ module.exports.SCENARIOS = [
   {
     id: 'old-move-review',
     title: "A reviewer's review start and failed verdict are start review and a verdict for now (#1268): today's skills, the card back in Doing with its builder",
+    // HI-2664: Coder reviews, so its role does (either) and it is the project's free reviewer: Combwork gives it the card
+    // and starts it with its line, as review-card's (HI-2046).
+    startedByCombwork: true,
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     async setup(c) {
       await pairInProject(c)
@@ -4162,6 +4260,43 @@ module.exports.SCENARIOS = [
     ]
   },
   {
+    id: 'assistant-retarget-release',
+    title: "The Assistant asked to move alpha on to the next release (HI-2680): changes Work merges into, then moves the Todo cards still on the old one, by the preview its reply gave",
+    role: 'assistant',
+    control: 'agents',
+    changeSettings: true,
+    async setup(c) {
+      c.git('branch', '1.1.0')
+      c.git('branch', '1.2.0')
+      // Two Todo cards merging into 1.1.0 of their own (set while it was the other listed branch); alpha then merges into 1.1.0.
+      await pairInProject(c, { target: '1.2.0', otherTargets: ['1.1.0'] })
+      await c.card('a', { title: 'Add a dark mode toggle', description: 'A toggle in the settings page that switches the theme.' })
+      await c.card('b', { title: 'Remember the last opened file', description: 'Reopen the file that was open when the app closed.' })
+      for (const k of ['a', 'b']) await c.inv('tasks:setTarget', c.cards[k], '1.1.0')
+      await pairInProject(c, { target: '1.1.0', otherTargets: ['1.2.0'] })
+    },
+    prompt: "We've just released 1.1.0. Make alpha's work merge into 1.2.0 from now on, and move the Todo cards still set to 1.1.0 over to 1.2.0 too: I've checked them, go ahead.",
+    fake: 'cw cw_update_setting {"id":"project.workflow.target","value":"1.2.0","project":"alpha"} then cw cw_queue {"action":"retarget","project":"alpha","from":"1.1.0","target":"1.2.0"}',
+    expect: (o) => {
+      const { byPreview, byCard } = retargetWays(o)
+      return [
+        ["changed alpha's Work merges into to 1.2.0 with cw_update_setting", ran(o, 'cw_update_setting').some((x) => /workflow\.target/.test(String(argsOf(x).id)) && argsOf(x).value === '1.2.0'), o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
+        // Either way moves a card as the user's change does (tasks.setTarget, bound to the target it had): cw_queue retarget
+        // by the preview the reply gave (cards and free slots together), or each card's own Merges into (cw_update_task).
+        ['moved them through Combwork: cw_queue retarget by its preview, or each card\'s Merges into', byPreview.length > 0 || byCard.reduce((n, x) => n + (Array.isArray(argsOf(x).numbers) ? argsOf(x).numbers.length : 1), 0) >= 2, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
+        ['both cards now follow 1.2.0 (no target of their own)', (o.cards.a?.target ?? null) === null && (o.cards.b?.target ?? null) === null, JSON.stringify([o.cards.a?.target, o.cards.b?.target])]
+      ]
+    },
+    observe: (o) => {
+      const { byPreview, byCard } = retargetWays(o)
+      return [
+        ['used cw_queue retarget by its preview', byPreview.length > 0, byPreview.map((x) => x.args).join(' | ')],
+        ["set each card's Merges into instead", byCard.length > 0, byCard.map((x) => x.args).join(' | ')]
+      ]
+    },
+    fakeSkips: ["moved them through Combwork: cw_queue retarget by its preview, or each card's Merges into", 'both cards now follow 1.2.0 (no target of their own)']
+  },
+  {
     id: 'assistant-add-agent-connection',
     title: "The Assistant adds an agent on another agent's connection (HI-2108): names the connection, never a provider, model, effort, mode or context",
     role: 'assistant',
@@ -4238,6 +4373,11 @@ const launchedIn = (c, name) => {
   if (fs.existsSync(file) && fs.readFileSync(file, 'utf8').includes(`# Your mode: ${name}`)) return true
   // fake-copilot: what Copilot sent its model (the stand-in's log), whose system prompt carries the launch's instructions.
   if (c.modelLog && fs.existsSync(c.modelLog) && fs.readFileSync(c.modelLog, 'utf8').includes(`# Your mode: ${name}`)) return true
+  // Antigravity: the launch's instructions in the agent's own profile's GEMINI.md (HI-2547), the Assistant's among them.
+  if (c.agyProfiles && fs.existsSync(c.agyProfiles) && fs.readdirSync(c.agyProfiles).some((d) => d.startsWith('assistant') && (() => {
+    const f = require('path').join(c.agyProfiles, d, '.gemini', 'GEMINI.md')
+    return fs.existsSync(f) && fs.readFileSync(f, 'utf8').includes(`# Your mode: ${name}`)
+  })())) return true
   // Codex (and the fake): its instructions come as -c developer_instructions, which the session's own rollout records as
   // its first developer message (#462, #520). Its rollout only: the test home keeps earlier runs' sessions.
   const id = c.session?.id
@@ -5485,4 +5625,48 @@ module.exports.SCENARIOS.push({
   fakeSkips: ["read the screenshots' text report", "read it before opening any screenshot but the changed screen's", 'opened only the screenshots it flags and those of the screen the card changed']
 })
 
-module.exports.helpers = { laneStartLanded, readOf, called, ran, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+// The Combwork tools only scenarios run on the fake Claude Code alone call (fakeScope.cjs, HI-2663), each once, through
+// this CLI's MCP path: on all three fakes, so Codex's and Copilot's naming and arguments for them stay checked. What a
+// call then does is theirs to check, on the fake Claude Code. Not a model trial (fakeScope.cjs's NOT_A_TRIAL).
+const SWEEP = [
+  ['cw_ask_user', (c) => ({ card: `#${c.cards.s}`, kind: 'decide', text: 'Sweep: which option?' })],
+  ['cw_report_merge', (c) => ({ card: `#${c.cards.s}` })],
+  ['cw_update_tasks', (c) => ({ numbers: [c.cards.s], addLabels: ['sweep'] })],
+  ['cw_doc_outline', () => ({ path: 'README.md' })],
+  ['cw_read_section', () => ({ path: 'README.md', heading: '#alpha' })],
+  ['cw_put_back', (c) => ({ card: `#${c.cards.s}`, why: 'Sweep: put back.' })],
+  ['cw_request_builder', (c) => ({ card: `#${c.cards.s}`, text: 'Sweep: a question for the builder.' })],
+  ['cw_ask_assistant', (c) => ({ card: `#${c.cards.s}`, text: 'Sweep: a request for the Assistant.' })],
+  ['cw_notify', (c) => ({ title: `#${c.cards.s}: sweep`, message: 'Sweep: a notification.' })]
+]
+module.exports.SCENARIOS.push({
+  id: 'tool-sweep',
+  title: "Each Combwork tool the fake-Claude-only scenarios use, called once through this CLI's MCP path (HI-2663): its call reaches Combwork's server with its arguments",
+  files: { 'README.md': '# alpha\n\nA project for the tool sweep.\n' },
+  async setup(c) {
+    // The agent merges, each card in a slot (HI-2738): a finish that offers cw_report_merge, which Committed is done hides
+    // (HI-2694).
+    await pairInProject(c, { finish: 'agentMerges', folder: 'slots' })
+    // Both sides' tools (HI-2664: a builder isn't offered cw_request_builder, a reviewer not cw_put_back).
+    await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'either' })
+    await c.card('s', { title: 'Sweep the tools', description: 'A card for each tool to name.' })
+  },
+  prompt: (c) => `Call each Combwork tool once on card #${c.cards.s}.`,
+  fake: (c) => SWEEP.map(([tool, args]) => `cw ${tool} ${JSON.stringify(args(c))}`).join(' then '),
+  // Each call as the server logged it: the same tool, and every argument as sent (a refusal by a rule is still Combwork's reply).
+  expect: (o, c) =>
+    SWEEP.map(([tool, args]) => {
+      const sent = args(c)
+      // The log keeps a call's arguments as their JSON text.
+      const calls = called(o, tool).map((x) => {
+        try {
+          return typeof x.args === 'string' ? JSON.parse(x.args) : (x.args ?? {})
+        } catch {
+          return {}
+        }
+      })
+      return [`${tool}: reached Combwork with its arguments`, calls.some((a) => Object.entries(sent).every(([k, v]) => JSON.stringify(a[k]) === JSON.stringify(v))), JSON.stringify(calls)]
+    })
+})
+
+module.exports.helpers = { laneStartLanded, readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

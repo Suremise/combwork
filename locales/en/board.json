@@ -1947,6 +1947,14 @@
     "defaultMessage": "Starting…",
     "description": "The Start Lane button while the lane is being started."
   },
+  "board.laneStart.target": {
+    "defaultMessage": "Merges into",
+    "description": "HI-2556: a field label in the Start Lane dialog: the branch the lane’s cards are made from and merge into (Darren’s name for it)."
+  },
+  "board.laneStart.targetDefault": {
+    "defaultMessage": "{branch} (the project’s)",
+    "description": "HI-2556: the first choice of the Start Lane dialog’s Merges into: the project’s Work merges into, {branch} its name."
+  },
   "board.laneStart.title": {
     "defaultMessage": "Start Lane",
     "description": "Title of the Start Lane dialog: a builder and a reviewer agent work through cards in turn (a lane, a card loop), started from the window. Glossary: lane."
@@ -2067,6 +2075,10 @@
     "defaultMessage": "No lanes. When a builder and a reviewer work through cards in turn (a card loop), their lane shows here with each card.",
     "description": "The Progress panel's Lanes tab when there are no lanes. Glossary: lane."
   },
+  "board.lanes.offSide": {
+    "defaultMessage": "paused: {agent} isn’t a {part, select, builder {builder} other {reviewer}} by its role: give the lane another {part, select, builder {builder} other {reviewer}}, or change {agent}’s role",
+    "description": "Why a lane waits, in its header in the Progress panel, lower case (HI-2664): its builder or reviewer {agent} (an agent's name) has a workflow role that doesn't do its part ({part}: builder or reviewer) in the lane, so it has none of that part's tools and Combwork gives it nothing new for the lane."
+  },
   "board.lanes.oldRules": {
     "defaultMessage": "old rules",
     "description": "A lane's mark in its header (Progress panel), lower case: the project's workflow options changed while the lane ran, and it keeps the ones it started with until it ends; its tooltip says so. Glossary: workflow options."
@@ -2166,6 +2178,14 @@
   "board.lanes.state": {
     "defaultMessage": "{state, select, paused {paused} ended {merged} other {abandoned}}",
     "description": "A lane's state in its header in the Progress panel, lower case (a lane: a builder and its reviewer working through cards in turn): paused, merged (it ended: its cards were merged) or abandoned."
+  },
+  "board.lanes.target": {
+    "defaultMessage": "into {branch}",
+    "description": "HI-2556: a lane’s mark in its header (Progress panel), lower case: its cards merge into {branch} (a branch name), not the project’s Work merges into."
+  },
+  "board.lanes.targetTip": {
+    "defaultMessage": "This lane’s cards are made from {branch} and merge into it, not the project’s Work merges into, until the lane ends.",
+    "description": "HI-2556: tooltip and accessible name of a lane header’s Merges into mark (Progress panel). {branch} is a branch name."
   },
   "board.lanes.teamPause": {
     "defaultMessage": "paused: the team is pausing",
@@ -2639,6 +2659,18 @@
     "defaultMessage": "waiting",
     "description": "A run's state on its bar (accessible value) and in a list of runs (build (waiting)), lower case: it waits (for a test slot, say)."
   },
+  "board.queue.behind": {
+    "defaultMessage": "{n, plural, one {{to} is # commit behind {from}} other {{to} is # commits behind {from}}}",
+    "description": "HI-2679: on a merge queue’s card: its branch {to} lacks {n} commits of another of the project’s branches {from}, counted along {from}’s history (each merged card once). Branch names."
+  },
+  "board.queue.behindTip": {
+    "defaultMessage": "Counted along {from}’s history: a card merged with a merge commit or squashed counts once; a rebased card counts each of its commits.",
+    "description": "HI-2679: tooltip of a merge queue card’s “N commits behind” line: what is counted. {from} is a branch name."
+  },
+  "board.queue.behindUnknown": {
+    "defaultMessage": "Can’t tell how far {to} is behind {from}: a branch can’t be read",
+    "description": "HI-2679: on a merge queue’s card: how far its branch {to} is behind {from} couldn’t be read (a branch missing or git couldn’t say)."
+  },
   "board.queue.empty": {
     "defaultMessage": "Nothing queued.",
     "description": "A merge queue's card in the Progress panel when no card is waiting or being merged."
@@ -2646,6 +2678,46 @@
   "board.queue.filesMore": {
     "defaultMessage": "{n, plural, one {# more} other {# more}}",
     "description": "The last item of a list of the files a merge conflict named, when there are more than shown: how many more ({n}). The list joins it to the first few as your language joins a list (HI-1585: no \"and\" written around a list)."
+  },
+  "board.queue.forward": {
+    "defaultMessage": "Bring Up to Date…",
+    "description": "HI-2679: a button on a merge queue’s card: merges another of the project’s branches into this one through its queue (asks which first)."
+  },
+  "board.queue.forwardAlready": {
+    "defaultMessage": "{to} is being brought up to date with {from} already",
+    "description": "HI-2679: a notification: a forward merge for this pair is queued or waiting already; nothing new was queued."
+  },
+  "board.queue.forwardAskConfirm": {
+    "defaultMessage": "Queue It",
+    "description": "HI-2679: the confirm button of the question before a forward merge."
+  },
+  "board.queue.forwardAskMessage": {
+    "defaultMessage": "{from} as it is now is merged into {to} through {to}’s merge queue, with its merge checks, as a merge commit. {from} itself doesn’t change. If it conflicts or a check fails, its card comes back for you to Retry merge or Remove.",
+    "description": "HI-2679: the question before a forward merge: what it does. Retry merge and Remove are the card’s commands: as translated there."
+  },
+  "board.queue.forwardAskTitle": {
+    "defaultMessage": "Bring {to} up to date with {from}?",
+    "description": "HI-2679: the title of the question before a forward merge. Branch names."
+  },
+  "board.queue.forwardCancel": {
+    "defaultMessage": "Cancel",
+    "description": "HI-2679: the choice that cancels the forward merge."
+  },
+  "board.queue.forwardChooseMessage": {
+    "defaultMessage": "The branch is merged into {to} as it is now, through {to}’s merge queue, with its merge checks. It doesn’t change itself.",
+    "description": "HI-2679: the message of the choice of branch for a forward merge into {to}."
+  },
+  "board.queue.forwardChooseTitle": {
+    "defaultMessage": "Bring {to} up to date with…",
+    "description": "HI-2679: the title of the choice of branch for a forward merge into {to}."
+  },
+  "board.queue.forwardFailed": {
+    "defaultMessage": "Couldn’t bring the branch up to date",
+    "description": "HI-2679: an error’s title: the forward merge couldn’t be queued. Its text says why."
+  },
+  "board.queue.forwardUpToDate": {
+    "defaultMessage": "{to} already has everything of {from}",
+    "description": "HI-2679: a notification: nothing to bring in, so nothing was queued."
   },
   "board.queue.inVersionControl": {
     "defaultMessage": "Queue in Version Control",
@@ -2926,6 +2998,10 @@
   "board.queue.transient": {
     "defaultMessage": "{why} (temporary)",
     "description": "A merge queue return that was the environment's failure, not the work's (a check that couldn't start, a network error): its reason ({why}) and that it was temporary."
+  },
+  "board.queue.waitingOn": {
+    "defaultMessage": "Waiting for {cards}",
+    "description": "HI-2709: beside a queued card on a merge queue's card in the Progress panel: it is blocked by these cards ({cards}: their keys, joined with commas), which aren't Done yet; the queue merges the cards behind it meanwhile, and this one once they are Done. Keep it short."
   },
   "board.readOnly.newer": {
     "defaultMessage": "This board was saved by a newer version of Combwork: it is read-only here.",
@@ -3563,6 +3639,26 @@
     "defaultMessage": "{n, plural, one {# run} other {# runs}}: {states}",
     "description": "The folded Progress strip's name: how many runs, then how many are in each state (\"8 runs: 5 running, 2 failed\"). {states} is that list."
   },
+  "board.target.failed": {
+    "defaultMessage": "Where the card merges wasn’t changed",
+    "description": "HI-2556: an error toast’s title: setting a card’s Merges into failed. Its text says why."
+  },
+  "board.target.field": {
+    "defaultMessage": "Merges into",
+    "description": "HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (Darren’s name for it)."
+  },
+  "board.target.mark": {
+    "defaultMessage": "Into {branch}",
+    "description": "HI-2556: a mark on a card’s tile: its work merges into {branch} (a branch name), not the project’s Work merges into."
+  },
+  "board.target.markTip": {
+    "defaultMessage": "This card’s work is made from {branch} and merges into it, not the project’s Work merges into.",
+    "description": "HI-2556: tooltip and accessible name of a card tile’s Merges into mark. {branch} is a branch name."
+  },
+  "board.target.own": {
+    "defaultMessage": "{branch} (the project’s)",
+    "description": "HI-2556: the first choice of the card dialog’s Merges into: the project’s Work merges into, {branch} its name."
+  },
   "board.team.cw": {
     "defaultMessage": "Combwork",
     "description": "Who runs something while the team is paused when no agent does (HI-2081): Combwork itself (a slot's setup, a merge). Combwork is the product's name."
@@ -3782,6 +3878,10 @@
   "board.work.folderGone": {
     "defaultMessage": "Its folder, {folder}, is no longer an agent’s worktree: its files can’t be opened here.",
     "description": "Under a revision's files in the card dialog's Work section: the folder the work was done in ({folder}, a path) isn't any agent's worktree now, so its files aren't opened in another folder instead."
+  },
+  "board.work.inTarget": {
+    "defaultMessage": "Its code is already in {target}: it stays in Review, and is closed as merged once its review passes.",
+    "description": "HI-2709: a mark in the card dialog's Work section, for a card in Review: its submitted work is already in its target ({target}, a branch such as main), merged by hand or inside another card's merge. It isn't taken as merged yet: its own review still decides, and once that passes the card is closed as merged."
   },
   "board.work.integrated": {
     "defaultMessage": "{method, select, merge {Merged into {target} as {result}} squash {Squashed into {target} as {result}} fastForward {{target} moved forward to {result}} sameTree {Already in {target} at {result}} other {Committed in {target} as {result}}}",
@@ -4066,6 +4166,10 @@
   "board.workQueue.unreadRef": {
     "defaultMessage": "not read",
     "description": "In the card dialog's Work section: where the branch points couldn't be read."
+  },
+  "board.workQueue.waiting": {
+    "defaultMessage": "Queued for {target}, waiting for {cards} to be Done",
+    "description": "HI-2709: the card dialog's Work section: the card is in the merge queue for the branch {target} but is blocked by {cards} (their keys, joined with commas), which aren't Done yet; the queue merges the cards behind it meanwhile, and this one once they are. Glossary 2.5: merge queue."
   },
   "board.workflows": {
     "defaultMessage": "Workflows",

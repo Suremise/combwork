@@ -108,12 +108,12 @@ describe("agents' and worktrees' refusals: English for agents as before, the win
       [await caught(run(() => unlinkMissingWorktree(proj, 'a1'))), "Agent 1 doesn't work in a worktree.", 500, 'Agent 1 arbeitet in keinem Worktree.']
     ]
     for (const [e, english, status, german] of cases) {
-      // The Agent API's reply (and every reader of .message): the English, as before, with the status its English gave.
+      // The Agent API's reply (and every reader of .message): the English, as before, with the status it always had.
       expect(e.message).toMatch(english)
       expect(apiErrorReply(e).body.error).toBe(e.message)
       expect(apiErrorReply(e).status, e.message).toBe(status)
-      // Except the refusals HI-1952 gave a kind, which answered 500 (no pattern matched their English): now 400.
-      if (!/^(Enter a name\.|A role is at most)/.test(e.message)) expect(apiErrorReply(new Error(e.message)).status, `${e.message}: the status its English always gave`).toBe(status)
+      // Its status is its kind's, never its words': the same English as a plain error answers 500 (HI-2704).
+      expect(apiErrorReply(new Error(e.message)).status, `${e.message}: a plain error's status`).toBe(500)
       // The window (IPC's conversion): in its language, or English where this test has no translation.
       expect((windowError(e) as Error).message).toMatch(german ?? english)
       expect(shownError(e)).toMatch(german ?? english)

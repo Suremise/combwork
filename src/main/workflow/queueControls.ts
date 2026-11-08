@@ -11,6 +11,12 @@
 // first, and paused again, saying so, when it still holds.
 
 import { app } from 'electron'
+import { CombworkError } from '../combworkError'
+import { fmt, msg, tr } from '../../shared/i18n'
+import { withValues } from '../../shared/advanced'
+import { forwardOf } from '../../shared/workflow/compile'
+import { branchExists, projectTargets } from './targets'
+import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
 import { boardRevision } from '../boardStore'
@@ -32,7 +38,7 @@ import { workflowEnforced, workflowFor } from './service'
 import type { Workflow } from './runtime'
 import type { CardRecord, QueuePause } from './factStore'
 import { MERGE_CHOICE_KEY, QUEUE_ADVANCE_GATE, type Fact, type FactData } from '../../shared/workflow/facts'
-import { HISTORY_MAX, RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type BranchQueueCard, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
+import { HISTORY_MAX, RECENT_MAX, RETURN_SEEN_SHOWN_MS, RETURNS_MAX, type BranchQueueCard, type QueueForward, type QueueRecent, type QueueResumed, type QueueView } from '../../shared/workflow/queue'
 
 /**
  * The targets of a project's queues: every target a card was queued for, and any paused one, in that order; for the
@@ -116,8 +122,52 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const wf = await workflowFor(ws, projectPath)
   if (!wf) return []
   const scope = window ? await queueScope(wf, projectPath) : undefined
-  const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : [])] : []
-  return (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
+  // HI-2679: the window's listing has each of the project's targets that exists, so a destination with nothing queued
+  // yet has its card (its reminder and its Bring up to date… button).
+  const targets = window && scope?.current ? await existingTargets(ws, projectPath) : []
+  const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
+  const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
+  if (window && targets.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, targets)
+  return views
+}
+
+/** The project's targets that exist now (HI-2679): Work merges into and the others listed; none without a Git workflow. */
+async function existingTargets(ws: WorkspaceService, projectPath: string): Promise<string[]> {
+  const t = await projectTargets(ws, projectPath).catch(() => null)
+  if (!t) return []
+  const out: string[] = []
+  for (const b of [t.default, ...t.others]) if ((await branchExists(projectPath, b)) === true) out.push(b)
+  return out
+}
+
+/** A target's forward merges (HI-2679): the project's other targets, and how far behind each it is. */
+async function forwardOfTarget(projectPath: string, to: string, targets: readonly string[]): Promise<QueueForward> {
+  const others = targets.filter((b) => b !== to)
+  const behind: QueueForward['behind'] = []
+  for (const from of others) behind.push({ from, commits: await commitsBehind(projectPath, from, to) })
+  return { others, behind }
+}
+
+/** Counts kept by the two heads they were read at (HI-2679): at most BEHIND_KEPT, the oldest dropped. */
+const behindKept = new Map<string, number>()
+const BEHIND_KEPT = 64
+
+/**
+ * How many commits along `from`'s first-parent history `to` lacks (HI-2679), by `git rev-list --count --first-parent`,
+ * kept by both heads (a git process only when either moved); null when a head can't be read.
+ */
+export async function commitsBehind(projectPath: string, from: string, to: string): Promise<number | null> {
+  const [a, b] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+  if (!a || !b || isUnknown(a) || isUnknown(b)) return null
+  const key = [projectPath.toLowerCase(), a, b].join('\n') // i18n-ignore: a key, never shown
+  const had = behindKept.get(key)
+  if (had !== undefined) return had
+  const r = await git(projectPath, ['rev-list', '--count', '--first-parent', `${b}..${a}`])
+  const n = r.ok ? Number(r.out.trim()) : NaN
+  if (!Number.isInteger(n)) return null
+  behindKept.set(key, n)
+  while (behindKept.size > BEHIND_KEPT) behindKept.delete(behindKept.keys().next().value!)
+  return n
 }
 
 /**
@@ -366,13 +416,92 @@ export async function mergedOutsideQueue(ws: WorkspaceService, projectPath: stri
  * with its reason: the card's intent (cardIntents.ts), then its target's queue told of it (Retry's requeue runs it).
  */
 export async function queueCardChange(ws: WorkspaceService, n: number, actor: TaskActor, kind: 'removeFromQueue' | 'retryMerge', reason: string, guard?: () => void): Promise<{ done: IntentDone; card: TaskCard }> {
-  const r = await runCardIntent({ n, plain: false }, actor, { kind, reason, ...(guard ? { guard } : {}) })
+  // A forward merge's Retry (HI-2679): its source frozen again, at its head now, for the new attempt.
+  const forward = kind === 'retryMerge' ? await forwardSourceNow(ws, n) : null
+  const r = await runCardIntent({ n, plain: false }, actor, { kind, reason, ...(guard ? { guard } : {}), ...(forward ? { forward } : {}) })
   const projectPath = ws.path && r.card.project ? join(ws.path, r.card.project) : null
   const wf = projectPath ? await workflowFor(ws, projectPath).catch(() => null) : null
   const target = wf ? wf.state(wf.store.card(n)).entries.at(-1)?.target : undefined
   if (projectPath && target) queueChanged(ws, projectPath, target)
   return r
 }
+
+/** A forward merge card's source head now (HI-2679), for its Retry; null for any other card, or one that can't be read. */
+async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ source: string } | null> {
+  for (const p of ws.info()?.projects ?? []) {
+    const wf = await workflowFor(ws, p.path).catch(() => null)
+    const rec = wf?.store.cards().find((c) => c.id === n)
+    const f = rec ? wf!.state(rec).forward : null
+    if (!f) continue
+    const head = await G.lineHead(p.path, f.from)
+    return head && !isUnknown(head) ? { source: head } : null
+  }
+  return null
+}
+
+/** What a forward request did (HI-2679): the card it made or found already open for that pair, or nothing to do. */
+export type ForwardDone = { upToDate: true; from: string; to: string } | { card: TaskCard; queued: boolean; from: string; to: string }
+
+/** Thrown for a forward request that can't be made: why, as a message (the caller's window or tool says it). */
+export class ForwardRefused extends CombworkError {}
+
+const FORWARD_TEXT = {
+  title: msg({ id: 'service.forward.title', defaultMessage: 'Bring {to} up to date with {from}', description: 'HI-2679: the title of the card Combwork makes for a forward merge: it merges branch {from} into branch {to} through {to}’s merge queue. Branch names.' }),
+  description: msg({ id: 'service.forward.description', defaultMessage: 'Combwork merges {from} ({source}) into {to} through {to}’s merge queue, with its merge checks, as a merge commit. Asked by {by}. If it comes back (a conflict or a red check), Retry merge tries again with {from} as it is then; Remove from queue ends it, nothing merged.', description: 'HI-2679: the description of the card Combwork makes for a forward merge. {from} and {to} are branch names, {source} a short commit id, {by} who asked (you, or the Assistant). Retry merge and Remove from queue are the card’s commands: as translated there.' }),
+  byUser: msg({ id: 'service.forward.byUser', defaultMessage: 'you', description: 'HI-2679: who asked for a forward merge, in its card’s description: the user.' }),
+  byAssistant: msg({ id: 'service.forward.byAssistant', defaultMessage: 'the Assistant', description: 'HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant.' }),
+  notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} and {to} must be two different branches this project merges work into: {targets}.', description: 'HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them.' }),
+  missing: msg({ id: 'service.forward.missing', defaultMessage: '{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}', description: 'HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.' }),
+  raced: msg({ id: 'service.forward.raced', defaultMessage: 'The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.', description: 'HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.' }),
+  noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
+}
+
+/**
+ * Brings `to` up to date with `from` (HI-2679, SPEC §16.9): a forward merge, the user's or the Assistant's alone (`actor`;
+ * the Assistant's guard checked again inside each write). Both must be the project's existing targets, and different.
+ * Already contained: nothing is made. One open for the pair already: that card. Else a card of Combwork's, started on its
+ * forward rules (`forwardOf`) and queued in `to`'s queue with `from`'s head frozen.
+ */
+export async function forwardMerge(ws: WorkspaceService, projectPath: string, from: string, to: string, actor: TaskActor, guard?: () => void): Promise<ForwardDone> {
+  if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new ForwardRefused(M_FORWARD_AGENTS, { kind: 'forbidden' })
+  const t = await projectTargets(ws, projectPath)
+  const wf = await workflowFor(ws, projectPath)
+  if (!t || !wf || wf.currentRuleset(false).options.finish !== 'combworkMerges') throw new ForwardRefused(FORWARD_TEXT.noGit, { kind: 'invalid' })
+  const all = [t.default, ...t.others]
+  if (from === to || !all.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, targets: fmt.list(all) }), { kind: 'invalid' })
+  // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
+  const [source, dest] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+  for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
+  const contained = await G.isAncestor(projectPath, source as string, dest as string)
+  if (contained === true) return { upToDate: true, from, to }
+  const base = await G.mergeBase(projectPath, source as string, dest as string)
+  const { cardBatch, readTask, createTask, runIntent } = await import('../tasks')
+  const by = actor.kind === 'assistant' ? 'assistant' : 'user'
+  // One board change (HR3's round 1): the open card for the pair looked for, the caller's authority checked, the card made
+  // and started with its facts and entry, all in one transaction under the board's lock, which another Combwork on the
+  // board takes too. Refused or stopped part way, none of it is kept: no card without its forward facts, none twice.
+  const done = await cardBatch(ws, async (): Promise<ForwardDone> => {
+    // One open for this pair: that one (not Done: queued, advancing, or back for a Retry).
+    const open = wf.store.cards().find((c) => {
+      const st = wf.state(c)
+      return !!st.forward && st.forward.from === from && st.forward.to === to && st.stage !== 'done'
+    })
+    if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to }
+    guard?.()
+    const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
+    // Stored by the start's own write, which records it.
+    const ruleset = forwardOf(wf.currentRuleset(false), to)
+    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string) }, by, ruleset, guard), undefined, guard)
+    // Refused (only in a race): thrown, so the card made just now goes with the rest of this change.
+    if (isRefusal(r.reply)) throw new ForwardRefused(FORWARD_TEXT.raced, { kind: 'conflict' })
+    return { card: r.saved ?? made, queued: true, from, to }
+  })
+  if ('card' in done && done.queued) queueChanged(ws, projectPath, to)
+  return done
+}
+
+/** HI-2679: a forward merge asked by a project agent (or a script): the user's and the Assistant's alone. */
+const M_FORWARD_AGENTS = msg({ id: 'service.forward.notAgents', defaultMessage: 'Only the user or the Assistant brings one branch up to date with another.', description: 'HI-2679: a forward merge refused: asked by a project agent or a script.' })
 
 async function needWorkflow(ws: WorkspaceService, projectPath: string): Promise<Workflow> {
   const wf = await workflowFor(ws, projectPath)

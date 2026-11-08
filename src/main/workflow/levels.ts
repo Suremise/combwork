@@ -73,8 +73,9 @@ const reached = (ws: WorkspaceService, level: WorkflowLevel): WorkspaceService[]
  * The projects that inherit an option the change would change, on that platform, in the workspaces the level reaches:
  * what changes for each (the options it doesn't set itself), and the problems its options would then have.
  */
-async function inheritors(ws: WorkspaceService, level: WorkflowLevel, platform: PlatformId, own: Partial<WorkflowOptions>): Promise<{ w: WorkspaceService; path: string; name: string; changed: (keyof WorkflowOptions)[]; problems: OwnWorkflowProblem[] }[]> {
-  const out = []
+type Heir = { w: WorkspaceService; path: string; name: string; changed: (keyof WorkflowOptions)[]; problems: OwnWorkflowProblem[] }
+async function inheritors(ws: WorkspaceService, level: WorkflowLevel, platform: PlatformId, own: Partial<WorkflowOptions>): Promise<Heir[]> {
+  const out: Heir[] = []
   for (const w of reached(ws, level)) {
     for (const p of w.info()?.projects ?? []) {
       if (p.platform?.id !== platform) continue
@@ -117,7 +118,7 @@ export async function checkLevelChange(ws: WorkspaceService, rawLevel: unknown, 
   const projects = []
   for (const h of heirs) {
     const lanes = (await listLanes(h.w, { project: h.name })).filter((l) => l.state === 'active' || l.state === 'paused')
-    projects.push({ name: h.name, path: h.path, workspace: { path: h.w.path ?? '', name: basename(h.w.path ?? '') }, changed: h.changed, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: await cardsInFlight(h.w, h) })
+    projects.push({ name: h.name, path: h.path, workspace: { path: h.w.path ?? '', name: basename(h.w.path ?? '') }, changed: h.changed, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: await cardsInFlight(h.w, { path: h.path, name: h.name }) })
   }
   const refused: WorkflowProblem[] = heirs.flatMap((h) => h.problems.map((problem) => ({ kind: 'inheritor' as const, project: h.name, problem })))
   return { problems: [...after.problems, ...refused], changed, appliesNow: false, lanes: [], inFlight: [], projects }

@@ -335,8 +335,12 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     await tabsLane.locator('.progress-lane-expand').click()
     await shoot('lanes-wait')
     await inv('advanced:set', 'cw.lanes.waitYouMinutes', 1)
-    // The bound a minute: marked once a minute has passed (a condition, bounded for a hung run).
-    check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), 120_000)), await tabsWaited.textContent().catch(() => ''))
+    // The bound a minute: marked once a minute has passed. The window's clock is moved on past it rather than waited
+    // out (HI-2663: that real minute was the suite's longest step); the time shown and its mark are the window's own,
+    // worked out from the lane's real `since` (laneBar.test.ts has the bound's arithmetic).
+    await page.clock.install()
+    await page.clock.fastForward(61_000)
+    check('…past its bound (a minute, Settings → Advanced), the time is marked', !!(await until(async () => ((await tabsWaited.getAttribute('class').catch(() => '')) ?? '').includes('long'), HUNG_MS)), await tabsWaited.textContent().catch(() => ''))
     await shoot('lanes-wait-long')
     await inv('advanced:set', 'cw.lanes.waitYouMinutes', null)
     // Six more lanes (solo, their builders started by Combwork): seven in all, more than fit.
@@ -528,7 +532,9 @@ const lineOf = (head) => head.evaluate((el) => `${el.querySelector('.progress-re
     check('…its card, revision and copy in the hover', !!(await until(async () => {
       if ((await tipText()).includes(`${a.key} · e2d018f · in copy-5`)) return true
       // The runs are docked at the bottom (HI-1925), where the window's notices show: those first.
-      for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click().catch(() => undefined)
+      // Each click is bounded like the hover (HI-2703): a notice whose button can't be clicked
+      // held click()'s default 30 s, the whole of this wait, so the hover never came.
+      for (const x of await page.locator('.toasts button[aria-label="Dismiss"]').all()) await x.click({ timeout: 2000 }).catch(() => undefined)
       await reviewRow.hover({ timeout: 2000 }).catch(() => undefined)
       return false
     }, HUNG_MS)), await tipText())

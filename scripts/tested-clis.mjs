@@ -1,6 +1,7 @@
 // npm run tested-clis [run-record.json…]: writes the release's tested-with manifest (resources/tested-clis.json, #365)
 // from real-tier e2e run records: the latest one (the e2e logs' run-record.json) unless files are given. Run it after
-// `npm run e2e -- --all --real --build --record` on the commit being released, then commit the manifest (RELEASING.md).
+// the real tier's run on the commit being released, or the RC's before a version-only bump (`npm run e2e -- --all --only-real
+// <Copilot's suites> --build --record`, RELEASING.md Step 4), then commit the manifest (RELEASING.md).
 // Several records of the same commit may be given (#1105: the real tier rerun per CLI): each CLI's entry comes from
 // the one in which all its real suites ran and passed. Exits 1 when it couldn't vouch for every CLI (it still writes
 // those it could).
@@ -15,7 +16,7 @@ const runContext = createRequire(import.meta.url)('../tests/e2e/runContext.cjs')
 const files = process.argv.length > 2 ? process.argv.slice(2) : [join(runContext.WORK, 'logs', 'run-record.json')]
 const absent = files.filter((f) => !existsSync(f))
 if (absent.length) {
-  console.error(`No run record at ${absent.join(', ')}. Run the real tier with a record first: npm run e2e -- --all --real --build --record`)
+  console.error(`No run record at ${absent.join(', ')}. Run the real tier with a record first: npm run e2e -- --all --only-real <Copilot's suites> --build --record (RELEASING.md Step 4)`)
   process.exit(1)
 }
 const records = files.map((f) => JSON.parse(readFileSync(f, 'utf8')))

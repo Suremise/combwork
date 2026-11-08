@@ -53,6 +53,7 @@ import { pauseHolds } from '../shared/teamPause'
 import { isAdmitted, refusedOpen } from './openingFence'
 import { cardRef } from '../shared/projectKeys'
 import { scopeOfHost, withCardNames } from './projectKeys'
+import { saidError } from './combworkError'
 
 /**
  * The delivery service (#647, plans/2026-10-12-messaging-redesign.md §3.1). Everything Combwork has for an agent to read is a
@@ -164,6 +165,8 @@ const T = {
   controlDown: agentMsg({ id: 'inbox.refused.controlDown', text: 'the user turned Settings → Assistant → Control down', note: "Why a delivery the Assistant left was refused, as its sender reads it: Control no longer lets it message agents." }),
   assistantEnded: agentMsg({ id: 'inbox.refused.assistantEnded', text: "the Assistant's session that left it ended", note: 'Why a delivery the Assistant left was refused, as its sender reads it.' }),
   noInbox: agentMsg({ id: 'inbox.refused.noInbox', text: '{name} has no inbox: turn on the Agent API', note: "Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. name: the agent's name." }),
+  independent: agentMsg({ id: 'inbox.refused.independent', text: '{name} is Independent: Combwork gives it nothing, and the user works with it in its pane', note: "Why an Independent agent (HI-2670) is given no delivery, as its sender sees it: it takes no part in the workflow. name: the agent's name." }),
+  plain: agentMsg({ id: 'inbox.refused.plain', text: "{name} runs as if started from a terminal, without Combwork's tools or typing, so it has no inbox until it restarts", note: "Why an agent is given no delivery (HI-2670), as its sender sees it: its running session launched without Combwork's tools or without Combwork typing into it (its connection's launch settings). name: the agent's name." }),
   late: agentMsg({ id: 'inbox.expired.late', text: 'not received in time', note: 'Why a delivery expired, as its sender reads it: not read before its expiry.' }),
   runEnded: agentMsg({ id: 'inbox.expired.sessionEnded', text: 'the session it was for has ended', note: 'Why a delivery for one launch of its agent expired, as its sender reads it.' }),
   otherConversation: agentMsg({ id: 'inbox.expired.otherConversation', text: 'its agent is in another conversation now', note: "Why a delivery for one conversation of its agent expired, as its sender reads it." }),
@@ -620,7 +623,7 @@ async function readFileOf(host: string): Promise<{ deliveries: unknown[]; next: 
     got = await readCapped(file, MAX_FILE_BYTES)
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null
-    throw new Error(say(T.readFailed, { error: (e as Error).message }), { cause: e })
+    throw saidError(T.readFailed, { error: (e as Error).message }, { cause: e })
   }
   let data: { next?: unknown; deliveries?: unknown; invalid?: unknown } | null = null
   try {
@@ -684,10 +687,10 @@ async function save(store: Store, d: Draft): Promise<void> {
   // agent-protocol: a mistake in Combwork's code (a record it made that doesn't read back), for the log and its bug report
   for (const r of d.records) if (!readDelivery(JSON.parse(JSON.stringify(r)))) throw new Error(`delivery ${r.id} isn't one Combwork could read back`)
   const text = fileText(d)
-  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw new Error(say(T.tooMany))
+  if (Buffer.byteLength(text) > MAX_FILE_BYTES) throw saidError(T.tooMany)
   // Read from a database since replaced (the upgrade to 1.0, a restore): never saved over what the file has now.
   const guard = (): void => {
-    if (store.gen !== dbGenerationAt(store.place.key)) throw new Error(say(T.dbReplaced))
+    if (store.gen !== dbGenerationAt(store.place.key)) throw saidError(T.dbReplaced)
     try {
       d.commit?.()
     } catch (e) {
@@ -858,6 +861,11 @@ export const setInboxProjectForTests = (fn: ((host: string) => Promise<InboxProj
 }
 /** Why an agent that can't read an inbox is given no delivery (#650's decision), as its sender sees it. */
 const noInbox = (name: string): string => say(T.noInbox, { name })
+/** Why Combwork gives an agent nothing (HI-2670: sessions.keepsOut), as its sender sees it; null when it may. */
+function keptOut(host: string, agentId: string, name: string): string | null {
+  const why = sessions.keepsOut(host, agentId)
+  return why ? say(why === 'independent' ? T.independent : T.plain, { name }) : null
+}
 /** A delivery refused because its agent can't read an inbox: the message says so, and what to do. */
 export class NoInbox extends Error {}
 /** For tests: whether agents can read their inbox (null: as the settings say). */
@@ -875,6 +883,9 @@ function whyNot(store: Store, r: DeliveryRecord): { to: 'refused' | 'expired'; w
   if (why) return { to: 'refused', why }
   // Its agent can't read an inbox (the Agent API turned off since it was made): refused, never typed instead.
   if (!readsInbox(store.host, r.agentId)) return { to: 'refused', why: noInbox(r.agentName ?? r.agentId) }
+  // Independent now, or running without Combwork's tools or typing (HI-2670): refused, its sender told why.
+  const out = keptOut(store.host, r.agentId, r.agentName ?? r.agentId)
+  if (out) return { to: 'refused', why: out }
   // Held by its team's pause (HI-2081): its time stands still while it is held, and is moved on at the resume.
   if (Date.parse(r.expires) <= clock() && !pauseHeld(store, r)) return { to: 'expired', why: say(T.late) }
   const live = sessions.liveFor(store.host, r.agentId)
@@ -999,7 +1010,7 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
   const store = await load(host)
   const r = await transact(store, (d) => {
     const why = senderRefusal(nd.from)
-    if (why) throw new Error(say(T.notSent, { why }))
+    if (why) throw saidError(T.notSent, { why })
     // An action's delivery already made (two runs of it at once here): that one.
     const made = nd.action ? d.records.find((x) => x.action === nd.action) : undefined
     if (made) return made
@@ -1033,13 +1044,13 @@ export async function createDelivery(host: string, nd: NewDelivery, hooks?: Deli
  * null when it was made earlier and isn't live now. Its other checks and refusals are createDelivery's.
  */
 export async function createDeliveryOnce(host: string, nd: NewDelivery & { once: string }): Promise<{ record: DeliveryRecord | null; made: boolean }> {
-  if (nd.once.length > 300) throw new Error(say(T.badKey))
+  if (nd.once.length > 300) throw saidError(T.badKey, undefined, { kind: 'invalid' })
   const { meta, agentName } = checkedNew(host, nd)
   const store = await load(host)
   try {
     const out = await transact(store, (d) => {
       const why = senderRefusal(nd.from)
-      if (why) throw new Error(say(T.notSent, { why }))
+      if (why) throw saidError(T.notSent, { why })
       const live = nd.source && nd.ref !== undefined ? d.records.find((x) => x.source === nd.source && x.ref === nd.ref && x.agentId === nd.agentId && isLive(x)) : undefined
       if (live) return { record: live, made: false }
       const rec = addNew(d, nd, meta, agentName)
@@ -1077,12 +1088,15 @@ export async function deliveryReceiptForTests(host: string, key: string): Promis
 /** A new delivery's checks before anything is read: refused (an Error) as createDelivery says; its meta and name as kept. */
 function checkedNew(host: string, nd: NewDelivery): { meta: DeliveryRecord['meta']; agentName: string | undefined } {
   // Only what reads back is saved (readDelivery's limits): a longer text is refused here, never lost on a restart.
-  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw new Error(say(T.tooLong, { length: String(nd.body.length), max: String(DELIVERY_BODY_MAX_CHARS) }))
-  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw new Error(say(T.badKey))
+  if (nd.body.length > DELIVERY_BODY_MAX_CHARS) throw saidError(T.tooLong, { length: String(nd.body.length), max: String(DELIVERY_BODY_MAX_CHARS) }, { kind: 'invalid' })
+  if ((nd.ref?.length ?? 0) > 300 || (nd.source?.length ?? 0) > 40) throw saidError(T.badKey, undefined, { kind: 'invalid' })
   const meta = nd.meta && Object.fromEntries(Object.entries(nd.meta).slice(0, 20).map(([k, v]) => [k.slice(0, 40), typeof v === 'string' ? v.slice(0, 500) : v]))
   const agentName = nd.agentName?.slice(0, 300)
   // An agent that can't read an inbox is given none (#650's decision): refused now, with the reason its sender sees.
   if (!readsInbox(host, nd.agentId)) throw new NoInbox(noInbox(agentName ?? nd.agentId))
+  // Nor one Combwork keeps out of (HI-2670): an Independent agent, or a session without Combwork's tools or typing.
+  const out = keptOut(host, nd.agentId, agentName ?? nd.agentId)
+  if (out) throw new NoInbox(out)
   return { meta, agentName }
 }
 
@@ -1482,11 +1496,11 @@ export const setCardReaderForTests = (fn: ((host: string, n: number) => Promise<
  */
 export async function roundNow(host: string, n: number): Promise<number> {
   const card = await cardNow(host, n)
-  if (card === undefined) throw new Error(say(T.roundUnread, { card: cardRef(n) }))
-  if (!card) throw new Error(say(T.roundNoCard, { card: cardRef(n) }))
+  if (card === undefined) throw saidError(T.roundUnread, { card: cardRef(n) })
+  if (!card) throw saidError(T.roundNoCard, { card: cardRef(n) })
   const round = roundOf(card)
   const why = staleWhy(card, n, round)
-  if (why) throw new Error(say(T.roundStale, { why }))
+  if (why) throw saidError(T.roundStale, { why })
   return round
 }
 
