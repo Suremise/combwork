@@ -725,7 +725,7 @@ _electron.launch = async (...args) => {
     // In the names the build reads (HI-2741), refused before it starts when they can't be found in it.
     const dialect = packagedDialect(args[0].executablePath)
     if (!realFoldersBefore) realFoldersBefore = realFoldersListing()
-    launched = { profile: env.CW_USER_DATA, since: new Date().toISOString(), blocked: path.join(WORK, `packaged-blocked-${packagedLaunches.length + 1}.log`) }
+    launched = { profile: env.CW_USER_DATA, since: new Date().toISOString(), blocked: path.join(WORK, `packaged-blocked-${packagedLaunches.length + 1}.log`), dialect }
     fs.rmSync(launched.blocked, { force: true })
     args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS], env: inDialect({ ...env, ...NO_UPDATE_CHECK }, dialect) }
     unmaximized(env.CW_USER_DATA)
@@ -760,6 +760,9 @@ _electron.launch = async (...args) => {
       await app.close().catch(() => undefined)
       throw new Error(`A packaged test Combwork (${args[0].executablePath}) couldn't be kept offline (HI-2741): ${offline?.error ?? 'it has no file system to note a refused request in'}`)
     }
+    // A build from before 1.1 has its preload bridge under its old name (HI-2588): its windows get window.combwork too,
+    // so the suites' page code reaches it (HI-2741).
+    if (launched.dialect !== 'CW_') await app.evaluate(aliasOldBridge, OLD_BRIDGE).catch(() => undefined)
     const shown = await app.evaluate(keepPackagedQuiet).catch((e) => ({ error: e.message }))
     if (!Array.isArray(shown) || shown.length) {
       await app.close().catch(() => undefined)
@@ -990,7 +993,25 @@ const OLD_ENV = 'HIVE_'
 const OLD_LOGS = ['hive.1.log', 'hive.log']
 const OLD_UPDATER = 'hive-updater'
 const OLD_PROFILE = 'Hive'
+/** Its preload bridge, window.hive (HI-2588 renamed it window.combwork). */
+const OLD_BRIDGE = 'hive'
 // old-name: end packaged-old-dialect
+
+/**
+ * Run in an old packaged build's main process (HI-2741): each of its pages, as it loads, gets window.combwork, the same
+ * object as its bridge under `name`, so the suites' page code (window.combwork.invoke) reaches it. Nothing else changes.
+ */
+function aliasOldBridge(electron, name) {
+  const code = `if (window.combwork === undefined && window[${JSON.stringify(name)}] !== undefined) Object.defineProperty(window, 'combwork', { configurable: true, get: () => window[${JSON.stringify(name)}] })`
+  const alias = (wc) => {
+    const run = () => void wc.executeJavaScript(code).catch(() => undefined)
+    wc.on('dom-ready', run)
+    if (!wc.isLoading()) run()
+  }
+  electron.app.on('web-contents-created', (_e, wc) => alias(wc))
+  for (const wc of electron.webContents.getAllWebContents()) alias(wc)
+  return true
+}
 const ENV_PREFIXES = ['CW_', OLD_ENV]
 const LOGS = ['combwork.1.log', 'combwork.log', ...OLD_LOGS]
 
@@ -2043,4 +2064,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

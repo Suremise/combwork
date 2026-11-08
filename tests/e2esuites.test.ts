@@ -1735,6 +1735,7 @@ describe("an old packaged build can't update, install or reach the user's folder
     packagedGuardProblems: (launches: Launch[], before: string[] | null, after?: string[]) => string[]
     realFoldersListing: (dirs: string[]) => string[]
     listingChanges: (before: string[], after: string[]) => string[]
+    aliasOldBridge: (m: object, name: string) => boolean
   }
   const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
   const asar = createRequire(import.meta.url)('@electron/asar') as { createPackage: (src: string, dest: string) => Promise<void> }
@@ -1768,6 +1769,31 @@ describe("an old packaged build can't update, install or reach the user's folder
     const env = { CW_USER_DATA: 'C:\\t\\p', CW_UPDATE_DELAY: '2147483647', CW_API_PORT: '47901', HIVE_LANG: 'fr', CLAUDE_CONFIG_DIR: 'C:\\t\\c' }
     expect(lib.inDialect(env, 'HIVE_')).toEqual({ ...env, HIVE_USER_DATA: 'C:\\t\\p', HIVE_UPDATE_DELAY: '2147483647', HIVE_API_PORT: '47901' })
     expect(lib.inDialect(env, 'CW_')).toBe(env)
+  })
+
+  it("gives an old build's pages window.combwork, its own bridge (window.hive), on each load and on pages made later", async () => {
+    const pages: { win: Record<string, unknown>; handlers: Record<string, () => void>; loading: boolean }[] = []
+    const page = (loading: boolean) => {
+      const p = { win: { hive: { invoke: () => 'from 0.9' } } as Record<string, unknown>, handlers: {} as Record<string, () => void>, loading }
+      pages.push(p)
+      return {
+        isLoading: () => p.loading,
+        on: (e: string, f: () => void) => void (p.handlers[e] = f),
+        // The page's own world: the code runs with its window.
+        executeJavaScript: async (code: string) => new Function('window', code)(p.win)
+      }
+    }
+    const listeners: Record<string, (e: unknown, wc: unknown) => void> = {}
+    const first = page(false)
+    const modules = { app: { on: (e: string, f: (e: unknown, wc: unknown) => void) => void (listeners[e] = f) }, webContents: { getAllWebContents: () => [first] } }
+    expect(lib.aliasOldBridge(modules, 'hive')).toBe(true)
+    await Promise.resolve()
+    expect((pages[0].win.combwork as { invoke: () => string }).invoke()).toBe('from 0.9')
+    listeners['web-contents-created']({}, page(true))
+    expect(pages[1].win.combwork).toBeUndefined()
+    pages[1].handlers['dom-ready']()
+    await Promise.resolve()
+    expect(pages[1].win.combwork).toBe(pages[1].win.hive)
   })
   // old-name: end old-dialect-tests
 
