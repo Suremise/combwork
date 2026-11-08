@@ -1012,7 +1012,7 @@ function packagedDialect(exe) {
     // Its main code in chunks: read whole.
     if (!found) found = reads(asar.listPackage(archive).filter((f) => /^[\\/]out[\\/]main[\\/].*\.js$/.test(f)).map((f) => asar.extractFile(archive, f.replace(/^[\\/]/, '')).toString('utf8')).join('\n'))
   } catch (e) {
-    throw new Error(`A packaged test Combwork's code couldn't be read (${archive}), so the names it reads its profile and update delay under aren't known (HI-2741): ${e.message}`)
+    throw new Error(`A packaged test Combwork's code couldn't be read (${archive}), so the names it reads its profile and update delay under aren't known (HI-2741): ${e.message}`, { cause: e })
   }
   if (!found) throw new Error(`A packaged test Combwork (${exe}) reads its profile and its update delay under none of ${ENV_PREFIXES.join(', ')}: it would run in the user's profile and update itself (HI-2741)`)
   dialects.set(key, found)
@@ -1047,7 +1047,7 @@ function keepPackagedOffline(electron, { file, proxy }) {
   const local = (url) => {
     try {
       const host = new URL(url).hostname.replace(/^\[|\]$/g, '').toLowerCase()
-      return host === 'localhost' || host === '::1' || /^127\./.test(host)
+      return host === 'localhost' || host === '::1' || host.startsWith('127.')
     } catch {
       return false
     }

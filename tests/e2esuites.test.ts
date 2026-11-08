@@ -1741,15 +1741,15 @@ describe("an old packaged build can't update, install or reach the user's folder
 
   /** A packaged build's folder whose main code is `files` (out/main/…), its exe a stand-in. */
   const build = async (files: Record<string, string>) => {
-    const root = tempDir('cw-dialect-')
-    const src = join(root, 'src')
+    const folder = tempDir('cw-dialect-')
+    const src = join(folder, 'src')
     for (const [name, text] of Object.entries(files)) {
       mkdirSync(join(src, 'out', 'main', 'chunks'), { recursive: true })
       writeFileSync(join(src, 'out', 'main', name), text)
     }
-    mkdirSync(join(root, 'app', 'resources'), { recursive: true })
-    await asar.createPackage(src, join(root, 'app', 'resources', 'app.asar'))
-    return join(root, 'app', 'Combwork.exe')
+    mkdirSync(join(folder, 'app', 'resources'), { recursive: true })
+    await asar.createPackage(src, join(folder, 'app', 'resources', 'app.asar'))
+    return join(folder, 'app', 'Combwork.exe')
   }
 
   // old-name: begin old-dialect-tests
