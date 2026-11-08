@@ -2711,6 +2711,17 @@ class SessionManager {
     if (this.switchIntents.get(id)?.drop() === 'cancel') this.switches.get(id)?.cancel(why)
   }
 
+  /**
+   * An agent's switch under way (switchAtSafePoint: a connection switch, a usage move, a restart for its tools,
+   * HI-2664/HI-2694), from its queueing until it has resumed or given up: `waiting` for its safe point (nothing typed yet),
+   * `restarting` once its exit was typed (its run ending, or ended and about to resume), null for none. Either way not free
+   * for a new conversation (HI-2739: a lane started meanwhile owes it one instead).
+   */
+  switchUnderWay(projectPath: string, agentId: string): 'waiting' | 'restarting' | null {
+    const op = this.switches.get(liveId(projectPath, agentId))
+    return !op ? null : op.typed ? 'restarting' : 'waiting'
+  }
+
   /** Whether an agent's usage move waits for its safe point (HI-2195). */
   usageMovePending(projectPath: string, agentId: string): boolean {
     return !!this.switchIntents.get(liveId(projectPath, agentId))?.usagePending

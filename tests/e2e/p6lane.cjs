@@ -515,6 +515,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const solo = projectJson(beta).workflow?.options ?? {}
     check('…saved: no review, Committed is done, the project folder', solo.review === 'none' && solo.finish === 'committed' && solo.folder === 'project', JSON.stringify(solo))
     check("beta's stages: On Hold, Todo, Active and Done", (await inv('workflow:stages', beta))?.stages.map((x) => x.id).join(' ') === 'hold todo active done', JSON.stringify(await inv('workflow:stages', beta)))
+    // Committed is done, so Solo leaves cw_report_merge out of its agents' tools (HI-2694): the idle S1 is restarted for it,
+    // with its new launch's token. Its lane is registered once it has (HI-2739: one registered while it restarts owes it its
+    // new conversation, laneStart.test.ts).
+    s = await q.renewed(fx, h, s, beta)
+    check('…S1 restarted for the tools Solo leaves out, with its new token', !!s.token)
     const sc = (await inv('tasks:create', { title: 'Solo work', project: 'beta' })).number
     // A loop of its one card (registered as the card-loop skill does): Pulse shows it while it runs.
     const sl = await api('POST', '/v1/lanes', { project: 'beta', builder: 'S1', reviewer: null, name: 'solo', cards: [sc] })
