@@ -69,9 +69,9 @@ describe("the queue fixture's act (HI-2740)", () => {
     fs.writeFileSync(path.join(dir, 'token.json'), JSON.stringify({ token }))
     fs.writeFileSync(path.join(dir, 'mcp.json'), JSON.stringify({ mcpServers: { combwork: { env: { CW_API_TOKEN_FILE: path.join(dir, 'token.json') } } } }))
     fs.writeFileSync(path.join(home, 'fake-launches.jsonl'), JSON.stringify({ opts: { '--mcp-config': path.join(dir, 'mcp.json') } }) + '\n')
-    const fx = { alpha: 'C:\\ws\\alpha', claudeHome: home }
-    const h = { port: 1, inv: async () => [{ projectPath: fx.alpha, agentId: 'a-1', runId: run }] }
-    return { fx, h }
+    const at = { alpha: 'C:\\ws\\alpha', claudeHome: home }
+    const h = { port: 1, inv: async () => [{ projectPath: at.alpha, agentId: 'a-1', runId: run }] }
+    return { at, h }
   }
   /** Agent API replies: 200 for `valid`, 401 otherwise; the tokens sent, in order. */
   function api(valid: string) {
@@ -85,29 +85,29 @@ describe("the queue fixture's act (HI-2740)", () => {
   }
 
   it("refused (401) after a restart: sent again with the new run's token, kept in who", async () => {
-    const { fx, h } = launched('run-2', 'new')
+    const { at, h } = launched('run-2', 'new')
     const sent = api('new')
     const who: Who = { id: 'a-1', token: 'old' }
-    expect((await act(fx, h, who, 7, 'verdict', { pass: true })).status).toBe(200)
+    expect((await act(at, h, who, 7, 'verdict', { pass: true })).status).toBe(200)
     expect(sent).toEqual(['old', 'new'])
     expect(who.token).toBe('new')
   })
 
   it('its token still good: sent once', async () => {
-    const { fx, h } = launched('run-1', 'same')
+    const { at, h } = launched('run-1', 'same')
     const sent = api('same')
-    expect((await act(fx, h, { id: 'a-1', token: 'same' }, 7, 'start-review')).status).toBe(200)
+    expect((await act(at, h, { id: 'a-1', token: 'same' }, 7, 'start-review')).status).toBe(200)
     expect(sent).toEqual(['same'])
   })
 
   it('another refusal (not a 401): returned as it is, never sent again', async () => {
-    const { fx, h } = launched('run-1', 'same')
+    const { at, h } = launched('run-1', 'same')
     const sent: string[] = []
     globalThis.fetch = (async () => {
       sent.push('x')
       return new Response(JSON.stringify({ error: 'refused', rule: 'review.self' }), { status: 409 })
     }) as unknown as typeof fetch
-    const r = await act(fx, h, { id: 'a-1', token: 'same' }, 7, 'verdict')
+    const r = await act(at, h, { id: 'a-1', token: 'same' }, 7, 'verdict')
     expect(r.status).toBe(409)
     expect(sent).toHaveLength(1)
   })
