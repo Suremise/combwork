@@ -3611,11 +3611,9 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you: do it as its decision says, and hand it to your reviewer as your loop says.`,
     fake: () => `skill card-loop then ${LOOP_COMMIT}`,
-    // The first wake is Combwork's start of the card (its line, before the fake's steps are typed): nothing to do yet. The
-    // fake Claude Code and fake Codex take that line ("1 task (AL-1)") as a wake, their doorbellIsWork (fake-bridge.cjs)
-    // knowing only "(#1)"; the fake Antigravity CLI takes it as the work it is, its launch prompt, so its script starts
-    // at the Assistant's message (HI-2745).
-    fakeWakes: (c) => [...(c.provider === 'antigravity' ? [] : ['say Card started.']), `boardcomment ${c.cards.a} then cw cw_read_task {"number":${c.cards.a}} then shell: node -e "require('fs').writeFileSync('greet.test.js', '// greets Ann\\n')" then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi, with its test of Ann.')}`],
+    // Its wake: the Assistant's message. Combwork's start of the card before it ("1 task (AL-1)") is work, not a wake: the
+    // fakes take its text as their prompt (fake-bridge.cjs doorbellIsWork, HI-2746).
+    fakeWakes: (c) => [`boardcomment ${c.cards.a} then cw cw_read_task {"number":${c.cards.a}} then shell: node -e "require('fs').writeFileSync('greet.test.js', '// greets Ann\\n')" then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi, with its test of Ann.')}`],
     expect: (o, c) => {
       const msg = sentMessage(c)
       const review = handedOnAt(o, c, 'a')
