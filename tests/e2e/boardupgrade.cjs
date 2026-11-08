@@ -37,7 +37,7 @@ const OLD_DIR = '.hive'
 const OLD_DB = 'hive.db'
 /** The dev build's refusal to move a folder 0.9 holds, and its ask naming 0.9 (their texts are HI-2625's, with the messages). */
 const MOVE_REFUSED = /couldn't move .*\.hive to \.combwork: a program has a file in it open/
-const ASK_WHY = /Combwork 1\.0 needs to upgrade this workspace's data\. Hive 0\.9 can then no longer open it; a backup of the board is kept/
+const ASK_WHY = /Combwork 1\.0 needs to upgrade this workspace's data\. Version 0\.9 can then no longer open it; a backup of the board is kept/
 // old-name: end boardupgrade-inputs
 // The board's folder: the 0.9 build's until the dev build moves it to .combwork (HI-2462), the dev build's after (a
 // folder a 0.9 build makes again beside it is that build's own, HI-2506).
