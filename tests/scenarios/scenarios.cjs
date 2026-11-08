@@ -3578,8 +3578,9 @@ module.exports.SCENARIOS = [
     // Combwork starts the lane's first card on Coder itself, with its line (card-loop-submit-watch's, HI-2215): the prompt
     // below is a model's only as the line says it, and the fake is typed its steps after it, the card already in Doing.
     startedByCombwork: true,
-    // The fake Codex acts out its wake too (harness.cjs), so the fakes all take the message as a model idle mid-card does.
-    codexWakes: true,
+    // The fake Codex and fake Antigravity act out their wakes too (harness.cjs, HI-2745), so the fakes all take the message
+    // as a model idle mid-card does (the fake Copilot aside: fakeSkips).
+    scriptedWakes: true,
     async setup(c) {
       await pairInProject(c)
       const a = await c.card('a', { title: 'Greeting says Hi, with a test', description: `Two parts. 1. ${CARD_LOOP_GREETING} Commit it. 2. Add greet.test.js, a node:assert test that greet.js greets the name the user picks, run it with node, commit it, and submit the card.`, agent: 'coder' })
@@ -3610,8 +3611,11 @@ module.exports.SCENARIOS = [
     },
     prompt: (c) => `You are the builder of card #${c.cards.a} in your card loop (the card-loop skill), with Implementer as its reviewer; your lane is registered (rounds 10, wait 6h). Combwork has started the card for you: do it as its decision says, and hand it to your reviewer as your loop says.`,
     fake: () => `skill card-loop then ${LOOP_COMMIT}`,
-    // The first wake is Combwork's start of the card (its line, before the fake's steps are typed): nothing to do yet.
-    fakeWakes: (c) => ['say Card started.', `boardcomment ${c.cards.a} then cw cw_read_task {"number":${c.cards.a}} then shell: node -e "require('fs').writeFileSync('greet.test.js', '// greets Ann\\n')" then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi, with its test of Ann.')}`],
+    // The first wake is Combwork's start of the card (its line, before the fake's steps are typed): nothing to do yet. The
+    // fake Claude Code and fake Codex take that line ("1 task (AL-1)") as a wake, their doorbellIsWork (fake-bridge.cjs)
+    // knowing only "(#1)"; the fake Antigravity CLI takes it as the work it is, its launch prompt, so its script starts
+    // at the Assistant's message (HI-2745).
+    fakeWakes: (c) => [...(c.provider === 'antigravity' ? [] : ['say Card started.']), `boardcomment ${c.cards.a} then cw cw_read_task {"number":${c.cards.a}} then shell: node -e "require('fs').writeFileSync('greet.test.js', '// greets Ann\\n')" then ${fakeSubmit(c.cards.a, 'Ready for review: greet.js says Hi, with its test of Ann.')}`],
     expect: (o, c) => {
       const msg = sentMessage(c)
       const review = handedOnAt(o, c, 'a')
