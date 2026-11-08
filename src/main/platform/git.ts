@@ -457,9 +457,13 @@ export async function filesChanged(repo: string, base: string, headRev: string):
  * The candidate key of a change: `git patch-id --stable` of its whole diff, with no context lines (`-U0`), so a clean
  * rebase whose new neighbours fall within the context keeps its key. A first test only (§16.3.2): different keys mean a
  * different change at once; equal ones go on to the replay. An empty change has no key.
+ *
+ * HI-2748: `--full-index`, never `--binary`. patch-id keys a binary file by its full blob ids, which `--full-index` gives
+ * on the diff's `index` line, so the key is the one `--binary` gave, without the binary's contents in the diff (a 44 MB
+ * video modified in place made an 89 MB diff, past the buffer, and the submit was refused as unreadable).
  */
 export async function candidateKey(repo: string, base: string, headRev: string): Promise<Maybe<string | null>> {
-  const d = await git(repo, ['diff', '--binary', '--no-renames', '-U0', base, headRev], 64 * 1024 * 1024)
+  const d = await git(repo, ['diff', '--full-index', '--no-renames', '-U0', base, headRev], 64 * 1024 * 1024)
   if (!d.ok) return unknown(U.change, { from: base.slice(0, 7), to: headRev.slice(0, 7) })
   if (!d.out.trim()) return null
   const p = await git(repo, ['patch-id', '--stable'], 16 * 1024 * 1024, d.out)
@@ -609,8 +613,8 @@ async function squashedInto(repo: string, target: string, c: { base: string; rev
   if (isUnknown(key)) return key
   // The target's commits since the change's base (bounded, merges left out: a merge's change is covered above), keyed in
   // one pass (`log -p -U0 | patch-id`); only those with the change's key are replayed, as a squash of it. A change with
-  // no key (empty) matches none of them: not listed (#1376).
-  const log = key === null ? null : await git(repo, ['log', '--no-merges', '--max-count=500', '-p', '-U0', '--binary', '--format=commit %H', `${c.base}..${t}`], 256 * 1024 * 1024)
+  // no key (empty) matches none of them: not listed (#1376). `--full-index`, not `--binary`, as candidateKey (HI-2748).
+  const log = key === null ? null : await git(repo, ['log', '--no-merges', '--max-count=500', '-p', '-U0', '--full-index', '--format=commit %H', `${c.base}..${t}`], 256 * 1024 * 1024)
   if (log && !log.ok) return unknown(U.commitsOn, { target })
   const ids = log ? await git(repo, ['patch-id', '--stable'], 16 * 1024 * 1024, log.out) : null
   if (ids && !ids.ok) return unknown(U.commitsOn, { target })
