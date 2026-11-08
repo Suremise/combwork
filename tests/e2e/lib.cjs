@@ -251,17 +251,16 @@ function ownClaudeHome(name) {
  * Combwork with: { CLAUDE_CONFIG_DIR }. A config written before (a 0.1 one, settings of the suite's) is kept.
  */
 /**
- * Points a profile's Claude Code at the fake (fake-claude/), its home made afresh with the folders it trusts. `oldRelease`:
- * the old-release wrapper instead (fake-claude-old-release.cmd, oldRelease.cjs, HI-2614), which no suite uses since
- * upgradelane was retired (HI-2741); every other profile gets the current fake, which refuses an old release's names.
+ * Points a profile's Claude Code at the fake (fake-claude/), its home made afresh with the folders it trusts. The fake
+ * refuses an old release's names (fake-claude/oldDialect.cjs, HI-2614).
  */
-function fakeClaude(userData, home, trusted = [], { oldRelease = false } = {}) {
+function fakeClaude(userData, home, trusted = []) {
   enableProviders(userData)
   const file = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
   cfg.settings = cfg.settings ?? {}
   cfg.settings.providers = cfg.settings.providers ?? {}
-  cfg.settings.providers['claude-code'] = { checkUpdatesOnLaunch: false, ...cfg.settings.providers['claude-code'], executablePath: path.join(__dirname, 'fake-claude', oldRelease ? 'fake-claude-old-release.cmd' : 'fake-claude.cmd') }
+  cfg.settings.providers['claude-code'] = { checkUpdatesOnLaunch: false, ...cfg.settings.providers['claude-code'], executablePath: path.join(__dirname, 'fake-claude', 'fake-claude.cmd') }
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })

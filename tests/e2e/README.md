@@ -639,8 +639,8 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   `servers/windows-sandbox/RELEASE-TESTING.md`).
 - **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227) is no longer tested: its suites (`upgradelane`,
   `boardupgrade`) were retired (HI-2741, Darren on 8 Nov: everyone is on 1.1.0). The upgrades users need (1.0 and 1.1
-  to 1.2) are the Sandbox checks'. The fakes' old-release mode (HI-2614), which only `upgradelane` used, is still there
-  unused; the fakes refuse an old release's names in every current launch.
+  to 1.2) are the Sandbox checks'. The fakes' old-release mode (HI-2614), which only `upgradelane` used, went with it
+  (HI-2742); the fakes refuse an old release's names in every launch (`fake-claude/oldDialect.cjs`).
 - **The queue suites on a packaged build** (#1578; S54 and S55 among them, for #1449 and #1539): `queueFixture.cjs`
   starts Combwork through `lib.launch`, so `CW_EXE` runs them on the build named. A packaged build refuses the test
   copies' channels (`agents:testLegacy`, which makes 0.9 worktree agents, and `slots:test`) and ignores the
