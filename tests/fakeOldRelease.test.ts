@@ -1,5 +1,5 @@
-// The fakes' old-release mode (HI-2614, tests/e2e/fake-claude/oldRelease.cjs): only upgradelane's released 0.9 build
-// launches the fake with it on. A current launch refuses the old dialect (the old release's variables, server and tools)
+// The fakes' old-release mode (HI-2614, tests/e2e/fake-claude/oldRelease.cjs): upgradelane's released 0.9 build
+// launched the fake with it on; that suite is retired (HI-2741), and HI-2742 decides the mode's own retirement. A current launch refuses the old dialect (the old release's variables, server and tools)
 // instead of reading it; in old mode each maps, and the current names still work.
 import { createRequire } from 'node:module'
 import { readdirSync, readFileSync } from 'node:fs'
@@ -58,12 +58,12 @@ describe("the fakes' old-release mode (HI-2614)", () => {
     expect(bridge.parseToolStep('say hello')).toBeNull()
   })
 
-  it("only its wrapper sets the flag, and only upgradelane's old profile is given the wrapper", () => {
+  it("only its wrapper sets the flag, and no suite is given the wrapper since upgradelane was retired (HI-2741)", () => {
     const e2e = join(import.meta.dirname, 'e2e')
     expect(readFileSync(join(e2e, 'fake-claude', 'fake-claude-old-release.cmd'), 'utf8')).toMatch(/^@set CW_FAKE_OLD_RELEASE=1\r?\n@node "%~dp0fake-claude\.cjs" %\*/)
     expect(readFileSync(join(e2e, 'fake-claude', 'fake-claude.cmd'), 'utf8')).not.toMatch(/CW_FAKE_OLD_RELEASE/)
     expect(readFileSync(join(e2e, 'runContext.cjs'), 'utf8')).not.toMatch(/CW_FAKE_OLD_RELEASE/)
     const given = readdirSync(e2e).filter((f) => /\.(cjs|mjs)$/.test(f) && /oldRelease: true/.test(readFileSync(join(e2e, f), 'utf8')))
-    expect(given).toEqual(['upgradelane.cjs'])
+    expect(given).toEqual([])
   })
 })

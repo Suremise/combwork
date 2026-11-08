@@ -84,8 +84,8 @@ another commit, or from before an edit, is reported.
 **Windows** (#1253): no suite puts a window on the screen or takes the focus. A dev test copy is quiet itself
 (`testQuiet`: off screen, unfocusable, no notifications). A packaged Combwork isn't, unless it is 1.0 with
 `CW_TEST_QUIET=1` (which `combworkEnv` sets); a released 0.9 can't be changed at all. So `lib.cjs`'s `_electron.launch`
-does it from outside for every packaged Combwork a suite starts (`packaged`, `packaged-transcript`, `packaged-workers`, `boardupgrade` and
-`upgradelane`'s 0.9 from `CW_E2E_V09` or the main checkout's `dist\win-unpacked`, `plan` with `CW_EXE`). It
+does it from outside for every packaged Combwork a suite starts (`packaged`, `packaged-transcript`, `packaged-workers`,
+`plan` and the queue suites with `CW_EXE`). It
 starts with `--hidden` (Combwork makes its windows but shows none, as when started at sign-in). As soon as Playwright
 reaches its main process, `keepPackagedQuiet` moves its windows off screen, makes them unfocusable and keeps them off
 the taskbar, then shows them inactive so they draw for screenshots. From then on, showing, focusing, maximising,
@@ -99,11 +99,12 @@ fetches the release's `latest.yml`, which GitHub counts as a download. A package
 `CW_TEST_QUIET=1` checks nothing, automatic or manual (Settings → Updates says it's a test copy, and its log says so
 at start), and `lib.cjs`'s `_electron.launch` also gives every packaged Combwork `CW_UPDATE_DELAY` at its maximum (about
 24.8 days: a 0.9's first check never comes) and, in a profile it has saved, automatic checks off (no 6-hourly one).
-A build from before 1.1 reads those under its old names (from before HI-2586): given only `CW_*`, a 0.9.3 ran in
-the user's own 0.9 profile with its updater on, downloaded 1.1.0 into the real updater folder and ran the installer,
-which closed the user's Combwork (HI-2741). So `_electron.launch` reads, from a packaged build's own main code, the
+A build from before 1.1 reads those under its old names (from before HI-2586): given only `CW_*`, a 0.9.3 started by
+the 0.9 upgrade suites ran in the user's own 0.9 profile with its updater on, downloaded 1.1.0 into the real updater
+folder and ran the installer, which closed the user's Combwork (HI-2741; those suites were retired). So `_electron.launch` reads, from a packaged build's own main code, the
 prefix it reads its profile and update delay under, gives it the test environment under that prefix too, and refuses to
-start a build that reads neither. Every packaged Combwork also starts **offline**: `--proxy-server` to a port nothing
+start a build that reads neither (a 1.0 one named by `CW_EXE` gets its old names, and `window.combwork` as an alias of its
+old bridge). Every packaged Combwork also starts **offline**: `--proxy-server` to a port nothing
 listens on, and, once Playwright reaches its main process, every session (the updater's own partition too) sends what goes
 beyond this machine there and refuses it, noting the address (`keepPackagedOffline`; this machine's own addresses are
 never proxied).
@@ -115,7 +116,7 @@ starts a packaged Combwork, must be as they were. Otherwise the suite fails, nam
 what is in them is the user's. The Sandbox checks run with their network off.
 
 Nor does a test ever start the installed app (`%LOCALAPPDATA%\Programs\Combwork`, or 1.0's folder there under the old name): `lib.cjs` refuses it and any exe
-outside this checkout, the test folders, the main checkout's `dist\win-unpacked`, `CW_E2E_V09` and `CW_EXE`. And
+outside this checkout, the test folders and `CW_EXE`. And
 children of the run context get no `%APPDATA%\Combwork\bin` or `Combwork-Dev\bin` (nor 1.0's, under the old name) on their PATH (an agent session has them):
 those `cw-progress` shims run the installed exe. A `cw-progress` run seen in a process list is itself
 `Programs\Combwork\Combwork.exe` (or 1.0's, under the old name; as Node, no window), not the app.
@@ -636,16 +637,10 @@ credential goes in. It writes `report.md` (pass or fail per check, with screensh
   project, not per agent, so until it can give a server to chosen agents only (#537), the server is on only in a
   release-testing project that holds just the release-testing agent (the combwork-mcp repo's
   `servers/windows-sandbox/RELEASE-TESTING.md`).
-- **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227): `upgradelane` and `boardupgrade` run inside the
-  Sandbox against two installs, with `CW_E2E_V09` a copy of the installed 0.9 and `CW_EXE` a copy of the new
-  build installed over it (copies, as `lib.cjs` never starts an installed copy: `Programs\Combwork`, or 1.0's). With `CW_EXE` set,
-  `lib.launch` starts that packaged exe instead of the dev build, saying so in the suite's log; `boardupgrade`'s
-  step 8 needs an unpackaged build's upgrade hold, so it says NOT RUN there. The Sandbox maps Node, Git and the checkout
-  read-only as tool folders; #1227's card has the script.
-  The 0.9 build hands the fake Claude Code its names from before 1.1 (the old-prefix variables, server and
-  tools): only `upgradelane`'s 0.9 profile runs the fake in old-release mode (`lib.fakeClaude(…, { oldRelease: true })`,
-  `fake-claude/fake-claude-old-release.cmd`, `fake-claude/oldRelease.cjs`, HI-2614). Every other launch is current, and
-  the fakes refuse those names there, so no current suite passes on them.
+- **The 1.0 upgrade from installed 0.9** (S53, S60 and restore, #1227) is no longer tested: its suites (`upgradelane`,
+  `boardupgrade`) were retired (HI-2741, Darren on 8 Nov: everyone is on 1.1.0). The upgrades users need (1.0 and 1.1
+  to 1.2) are the Sandbox checks'. The fakes' old-release mode (HI-2614), which only `upgradelane` used, is still there
+  unused; the fakes refuse an old release's names in every current launch.
 - **The queue suites on a packaged build** (#1578; S54 and S55 among them, for #1449 and #1539): `queueFixture.cjs`
   starts Combwork through `lib.launch`, so `CW_EXE` runs them on the build named. A packaged build refuses the test
   copies' channels (`agents:testLegacy`, which makes 0.9 worktree agents, and `slots:test`) and ignores the

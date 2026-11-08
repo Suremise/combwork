@@ -50,8 +50,6 @@
     {"file": "tests/nameUpgradeStub.test.ts", "id": "nameUpgradeStub-inputs", "why": "The 1.0 names the upgrade converts, which the test writes as its input."},
     {"file": "tests/journalNames.test.ts", "id": "journalNames-inputs", "why": "The 1.0 names the upgrade converts, which the test writes as its input."},
     {"file": "tests/renamedFresh.test.ts", "id": "renamedFresh-inputs", "why": "The 1.0 names the upgrade converts, which the test writes as its input."},
-    {"file": "tests/e2e/boardupgrade.cjs", "id": "boardupgrade-inputs", "why": "A 0.9 build's exe, folder and board file the suite runs and checks, and the dev build's texts naming them (HI-2625's messages)."},
-    {"file": "tests/e2e/upgradelane.cjs", "id": "upgradelane-inputs", "why": "A 0.9 build's exe, folder and lane tool the suite runs and checks."},
     {"file": "tests/e2e/queueupgrade.cjs", "id": "queueupgrade-inputs", "why": "0.9's schema_version column the suite writes, and the log line naming 0.9's board."},
     { "file": "src/main/boardStore.ts", "id": "board-names-step", "why": "The names upgrade's input: the old name it finds and converts (HI-2587)." },
     { "file": "src/main/db.ts", "id": "version-column", "why": "The names upgrade's input: the old name it finds and converts (HI-2587)." },

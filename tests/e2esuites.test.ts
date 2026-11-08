@@ -1595,7 +1595,7 @@ describe('the Combworks a suite starts (lib.cjs testExecutable, keepPackagedQuie
     expect(lib.testExecutable(lib.ELECTRON)).toBe('dev')
     expect(lib.testExecutable(lib.PACKAGED_EXE)).toBe('packaged')
     // old-name: begin old-executables
-    // A 0.9 build's executable (Hive.exe) in a checkout's dist, as boardupgrade and upgradelane start it.
+    // A 0.9 build's executable (Hive.exe) in this checkout's dist.
     expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
     expect(lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'combwork-test', 'builds', 'Combwork.exe'))).toBe('packaged')
     // Combwork's install (HI-2460) and 1.0's from before.

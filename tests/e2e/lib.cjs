@@ -252,8 +252,8 @@ function ownClaudeHome(name) {
  */
 /**
  * Points a profile's Claude Code at the fake (fake-claude/), its home made afresh with the folders it trusts. `oldRelease`:
- * the old-release wrapper instead (fake-claude-old-release.cmd, oldRelease.cjs), for upgradelane's released 0.9 build
- * alone (HI-2614); every other profile gets the current fake, which refuses an old release's names.
+ * the old-release wrapper instead (fake-claude-old-release.cmd, oldRelease.cjs, HI-2614), which no suite uses since
+ * upgradelane was retired (HI-2741); every other profile gets the current fake, which refuses an old release's names.
  */
 function fakeClaude(userData, home, trusted = [], { oldRelease = false } = {}) {
   enableProviders(userData)
@@ -314,8 +314,8 @@ async function openWorkspace(inv, page, ws, ms = 20000) {
 }
 
 /**
- * Starts the dev build with a test profile, or the packaged Combwork.exe CW_EXE names (the Sandbox upgrade checks run
- * boardupgrade and upgradelane against an installed build that way, #1227). Returns { app, page, inv } (inv calls an
+ * Starts the dev build with a test profile, or the packaged Combwork.exe CW_EXE names (the queue suites on a packaged
+ * build, #1578). Returns { app, page, inv } (inv calls an
  * IPC channel). readyMs bounds the wait for its window to be ready; one that isn't is closed and the failure thrown.
  */
 async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = 90000 }) {
@@ -920,19 +920,16 @@ const inside = (file, dir) => {
 
 /**
  * Which Combwork a suite starts: 'dev' (this checkout's Electron, the dev build) or 'packaged' (a Combwork.exe: this checkout's
- * dist\win-unpacked, the main checkout's 0.9 one boardupgrade and upgradelane use, one in the test folders, or what
- * CW_E2E_V09 or CW_EXE name). Never the installed Combwork, nor one from anywhere else (#1253): it would open the user's
- * app on their screen. Throws for those.
+ * dist\win-unpacked, one in the test folders, or the one CW_EXE names). Never the installed Combwork, nor one from anywhere
+ * else (#1253): it would open the user's app on their screen. Throws for those. (The main checkout's dist\win-unpacked was
+ * allowed for the 0.9 upgrade suites, retired by HI-2741.)
  */
 function testExecutable(exe) {
   if (comparable(exe) === comparable(ELECTRON)) return 'dev'
-  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Combwork (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (CW_E2E_V09) (#1253)`)
-  const named = [ROOT, TEST_ROOT, process.env.CW_E2E_V09, process.env.CW_EXE && path.dirname(process.env.CW_EXE)].filter(Boolean)
+  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Combwork (${exe}): use this checkout's build (#1253)`)
+  const named = [ROOT, TEST_ROOT, process.env.CW_EXE && path.dirname(process.env.CW_EXE)].filter(Boolean)
   if (named.some((d) => inside(exe, d))) return 'packaged'
-  // Asked of git only now: in Windows Sandbox the checkout is a mapped copy, not a repository (#1227).
-  const main = /^worktree (.+)$/m.exec(git(ROOT, 'worktree list --porcelain'))?.[1]
-  if (!main || !inside(exe, path.join(main, 'dist', 'win-unpacked'))) throw new Error(`A test starts Combwork from this checkout, its dist, the main checkout's dist\\win-unpacked or the test folders, never ${exe} (#1253)`)
-  return 'packaged'
+  throw new Error(`A test starts Combwork from this checkout, its dist, the test folders or CW_EXE, never ${exe} (#1253)`)
 }
 
 /**
