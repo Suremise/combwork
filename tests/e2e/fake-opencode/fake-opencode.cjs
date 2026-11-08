@@ -33,7 +33,8 @@ const has = (...names) => names.some((n) => argv.includes(n))
 const VALUED = ['--server', '--session', '-s', '--prompt', '--hostname', '--port', '--format', '--method', '--answer', '--log-level', '--days', '--year', '--project', '--limit']
 const positional = argv.filter((a, i) => !a.startsWith('-') && !VALUED.includes(argv[i - 1]))
 const fixture = (name) => {
-  const t = fs.readFileSync(path.join(FIX, name), 'utf8')
+  // Checked out with CRLF on Windows (.gitattributes): what 2.2.6 printed had LF.
+  const t = fs.readFileSync(path.join(FIX, name), 'utf8').replace(/\r\n/g, '\n')
   const m = /--- stdout\n([\s\S]*?)\n--- stderr\n([\s\S]*)$/.exec(t)
   return m ? { stdout: m[1], stderr: m[2] } : { stdout: t, stderr: '' }
 }

@@ -12,7 +12,8 @@ const { childEnv } = require('./e2e/runContext.cjs') as { childEnv: (vars?: Reco
 const config = require('./e2e/fake-opencode/config.cjs') as { load: (dir: string, env: Record<string, string>) => { loaded: { kind: string; path: string }[]; instructions: string[] }; startedServers: (cfg: unknown) => Record<string, { environment?: Record<string, string> }> }
 const FAKE = join(__dirname, 'e2e', 'fake-opencode', 'fake-opencode.cjs')
 const REC = join(__dirname, 'fixtures', 'opencode', 'real-2.2.6')
-const rec = (rel: string) => readFileSync(join(REC, rel), 'utf8')
+// Checked out with CRLF on Windows (.gitattributes): the recordings' own line ends were LF.
+const rec = (rel: string) => readFileSync(join(REC, rel), 'utf8').replace(/\r\n/g, '\n')
 const recJson = (rel: string) => JSON.parse(rec(rel))
 const cliRec = (rel: string) => {
   const m = /--- stdout\n([\s\S]*?)\n--- stderr\n([\s\S]*)$/.exec(rec(rel))
