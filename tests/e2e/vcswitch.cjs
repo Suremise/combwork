@@ -142,7 +142,7 @@ function writeProject(dir, cfg) {
     check('…then the Merge queue section goes', !!(await until(async () => !(await sections()).includes('queue'), HUNG_MS)), JSON.stringify(await sections()))
 
     // --- gamma: the repository gone (S20), then git init.
-    const g1 = await q.agent(fx, h, 'G1', { project: gamma })
+    let g1 = await q.agent(fx, h, 'G1', { project: gamma })
     // The lane's reviewer.
     // A lane's reviewer reviews by its role (HI-2664): GR's name reads as a builder's.
     await q.agent(fx, h, 'GR', { project: gamma, workflowRole: 'reviewer' })
@@ -202,6 +202,10 @@ function writeProject(dir, cfg) {
     check('Switch to None: saved', await confirmSwitch())
     check('…the offer gone', !!(await until(async () => (await offer.count()) === 0, HUNG_MS)))
     check('the card in flight keeps its stage and Git rules', (await column(c1)) === 'doing' && (await startedUnder(c1)) === 'git' && !(await h.kinds(c1)).includes('Override'))
+    // None has no merge to report (HI-2694): cw_report_merge, left out under Git's options, is G1's again, so the idle G1
+    // is restarted for it, with its new launch's token (HI-2739: the one read at its start is refused once that run ends).
+    g1 = await q.renewed(fx, h, g1, gamma)
+    check('…G1 restarted for the tools None gives it, with its new token', !!g1.token)
     const c3Start = await q.intent(h, g1, c3, 'start')
     check("a new card starts under None's rules", c3Start.status === 200 && (await startedUnder(c3)) === 'none', JSON.stringify({ c3Start, data: await started(c3) }))
     // Initialise repository… from Git's page (HI-1905): with a lane and a card in flight keeping None's rules, the switch

@@ -349,6 +349,10 @@ async function launchAgents(ws: WorkspaceService, projectPath: string, laneId: s
       const free = (): void => {
         if (over()) throw new LaunchOver()
         stillOurs()
+        // Its switch under way (a restart for its tools, a connection switch: HI-2739): its run is about to end and be
+        // resumed, so not free yet, even between the old run's exit and the resume.
+        const switching = sessions.switchUnderWay(projectPath, a.id)
+        if (switching) throw new NotFreeYet(switching)
         const st = sessions.liveFor(projectPath, a.id)
         if (st?.status === 'signin') throw combworkError(M.busy, { agent: a.name, status: st.status }, { kind: 'conflict' })
         if (st && (BUSY.has(st.status) || sessions.agentNow(projectPath, a.id)?.pending || whyNoLine(projectPath, a.id, 'free') !== null)) throw new NotFreeYet(st.status)
@@ -512,8 +516,9 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   const left = [builder, reviewer].filter((a): a is AgentDef => !!a && !!sessions.liveFor(projectPath, a.id))
   // An idle builder outside slots (HI-2232, Darren's decision (a)): given the lane in a new conversation, as Start Lane…
   // gives it (its last stays in the Sessions history); in slots its card's start gives it one there. Never one in a turn
-  // or on a watch: left as it is.
-  const renew = !where.inSlots && left.includes(builder) && IDLE.has(sessions.liveFor(projectPath, builder.id)?.status ?? '') ? builder : null
+  // or on a watch: left as it is. One restarting (its exit typed for a switch, HI-2739: a workflow change just restarted
+  // it for its tools) has no turn to keep: owed its new conversation, given once it has resumed.
+  const renew = !where.inSlots && left.includes(builder) && (IDLE.has(sessions.liveFor(projectPath, builder.id)?.status ?? '') || sessions.switchUnderWay(projectPath, builder.id) === 'restarting') ? builder : null
   const leftOut = left.filter((a) => a !== renew)
   const running = leftOut.map((a) => a.name)
   if (leftOut.length === (reviewer ? 2 : 1)) return { started: [], running, ...who }
