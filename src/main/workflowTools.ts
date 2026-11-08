@@ -2,7 +2,7 @@
  * The Combwork tools a project's workflow makes unusable (HI-2694, Darren 7 Nov: launch-only): left out of a project
  * agent's tool list when it launches (CW_WORKFLOW_HIDDEN, beside HI-2664's CW_SIDE), and a workflow settings change
  * restarts the agents whose list it changes, as a role change does (sessions.restartForTools: idle at once, busy after
- * asking). Hidden only where every set of rules still in force forbids a tool: the project's options now, and each ruleset
+ * asking), only for the tools that change moved (HI-2744). Hidden only where every set of rules still in force forbids a tool: the project's options now, and each ruleset
  * its work in flight still works under (cardWork.workRetained), so a change never takes a tool from work already started.
  * Nothing is hidden where that can't be known: rules not enforced, no version control recorded, options that don't
  * resolve, a board not readable.
@@ -29,6 +29,13 @@ const log = createLogger('workflowTools')
 const kept = new Map<string, { key: string; hidden: string[] }>()
 
 /**
+ * What each project's options alone hide (hiddenForWorkflow of them, [] when all off or unusable), by its path in lower
+ * case: as first read, then as each settings change left it. A change compares its options' list with this one, so it
+ * restarts only for the tools it moved (HI-2744), never for what the board alone changed meanwhile.
+ */
+const byOptions = new Map<string, string[]>()
+
+/**
  * The tools a project's agents launch without now, sorted; [] when nothing can be hidden or it can't be known. `cfg`: the
  * project's config (the launch's own read); without, the workspace's copy. Kept per project until the board commits
  * anything (boardReadToken: any commit, another process's, the database reopened or replaced) or its options or the
@@ -49,8 +56,11 @@ export function workflowHiddenNow(ws: WorkspaceService, projectPath: string, cfg
   let hidden: string[] = []
   try {
     const r = resolvedOf(ws, projectPath, platform, c)
+    const off = !!r.invalid || isAllOff(r.options)
+    // The first list its options alone hide, as what a later settings change is compared with (restartForWorkflow).
+    if (!byOptions.has(projectPath.toLowerCase())) byOptions.set(projectPath.toLowerCase(), off ? [] : hiddenForWorkflow([r.options]))
     // All off is really off (SPEC §16.6.4: cards move freely, Review included), so it hides nothing, as rules not enforced.
-    const retained = r.invalid || isAllOff(r.options) ? null : workRetained(ws, basename(projectPath))
+    const retained = off ? null : workRetained(ws, basename(projectPath))
     hidden = retained && !retained.allOff ? hiddenForWorkflow([r.options, ...retained.options], retained.stages) : []
   } catch (e) {
     log.warn(`the tools ${userText(basename(projectPath))}'s workflow hides couldn't be read, so none are`, e)
@@ -60,9 +70,22 @@ export function workflowHiddenNow(ws: WorkspaceService, projectPath: string, cfg
   return hidden
 }
 
+/** What a project's options alone hide (byOptions), whether or not the rules are enforced; null when it can't be read. */
+function optionsHidden(ws: WorkspaceService, projectPath: string, cfg: Pick<ProjectConfig, 'workflow'>): string[] | null {
+  const platform = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
+  if (!platform) return null
+  try {
+    const r = resolvedOf(ws, projectPath, platform, cfg)
+    return r.invalid || isAllOff(r.options) ? [] : hiddenForWorkflow([r.options])
+  } catch {
+    return null
+  }
+}
+
 /** Forgets every kept list (tests). */
 export function forgetWorkflowHidden(): void {
   kept.clear()
+  byOptions.clear()
 }
 
 /**
@@ -71,7 +94,7 @@ export function forgetWorkflowHidden(): void {
  * this change (`tools-restart-asked`), and keep their old tools until they restart (sessions.sideAllows holds work that
  * needs the new ones meanwhile).
  */
-export async function restartForWorkflow(ws: WorkspaceService, projectPath: string, only?: (agentId: string) => boolean): Promise<void> {
+export async function restartForWorkflow(ws: WorkspaceService, projectPath: string, only?: (agentId: string) => boolean, o: { settings?: boolean } = {}): Promise<void> {
   if (!ws.path || ws.isAssistantHome(projectPath)) return
   let cfg: ProjectConfig
   try {
@@ -80,7 +103,22 @@ export async function restartForWorkflow(ws: WorkspaceService, projectPath: stri
     return
   }
   const busy: { id: string; name: string }[] = []
-  const target = workflowHiddenNow(ws, projectPath, cfg).join(',')
+  // A settings change (o.settings) restarts only for the tools its options moved (HI-2744): its options' own list before
+  // (read before workflowHiddenNow, which records a project's first) against after. A launch's other differences came
+  // from the board alone (a card finished: kept until its next launch, gainsOfBoard's rule), so a change that moved none
+  // of them, a stage's new name say, restarts no one and asks nothing. Either list unknown: every difference counts.
+  const own = projectPath.toLowerCase()
+  const before = o.settings ? byOptions.get(own) : undefined
+  const hiddenNow = workflowHiddenNow(ws, projectPath, cfg)
+  const target = hiddenNow.join(',')
+  let moved: Set<string> | null = null
+  if (o.settings) {
+    const after = optionsHidden(ws, projectPath, cfg)
+    if (after) {
+      if (before) moved = new Set([...before, ...after].filter((t) => before.includes(t) !== after.includes(t)))
+      byOptions.set(own, after)
+    }
+  }
   const agents = projectAgents(cfg)
   // Its ended launches and removed agents are forgotten: a question is only ever about a launch still running.
   for (const [id, was] of asked) {
@@ -92,6 +130,10 @@ export async function restartForWorkflow(ws: WorkspaceService, projectPath: stri
   for (const a of agents) {
     const live = sessions.liveFor(projectPath, a.id)
     if (!live || (only && !only(a.id))) continue
+    if (moved) {
+      const launched = sessions.launchedWorkflowHidden(projectPath, a.id)
+      if (launched && ![...launched, ...hiddenNow].some((t) => moved.has(t) && launched.includes(t) !== hiddenNow.includes(t))) continue
+    }
     const r = await sessions.restartForTools(projectPath, a.id, { when: 'ifIdle' }).catch((e: unknown) => {
       log.warn(`${userText(a.name)}: not restarted for its project's workflow`, e)
       return 'same' as const
@@ -166,7 +208,7 @@ export function startWorkflowTools(): void {
     }
     if (e.type !== 'workflow-changed') return
     const ws = openWorkspaces().find((w) => w.path && w.path.toLowerCase() === e.workspacePath.toLowerCase())
-    if (ws) void restartForWorkflow(ws, e.projectPath).catch((err: unknown) => log.warn('restarting agents for a workflow change', err))
+    if (ws) void restartForWorkflow(ws, e.projectPath, undefined, { settings: true }).catch((err: unknown) => log.warn('restarting agents for a workflow change', err))
   })
   // Settings → Advanced → Workflow rules are enforced: every project's list changes with it.
   enforcedWas = advanced.get<boolean>(WORKFLOW_ENFORCE)
