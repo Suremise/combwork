@@ -236,19 +236,21 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     const st = fake(alpha)
     const c = await newCard(w)
     await lanes.startLane(w, { project: 'alpha', builder: 'b1', reviewer: 'o1', cards: [c], by: 'B1 (alpha)' })
-    const projects = w.info()!.projects
-    const set = (role: string) => {
-      const p = projects.find((x) => x.name === 'alpha')!
-      p.config.agents = p.config.agents!.map((a) => (a.id === 'o1' ? { ...a, workflowRole: role as never } : a))
+    // Written to project.json, not only the workspace's copy in memory: a refresh under load (one more read of the
+    // projects) otherwise put the file's 'either' back before the check, and the wake was given (HI-2738's full run).
+    // Not updateAgent: it refuses a role change off a running lane's part (HI-2664), the state this test sets up.
+    const set = async (role: string) => {
+      await w.mutateProjectConfig(alpha, (cfg) => ({ agents: cfg.agents!.map((a) => (a.id === 'o1' ? { ...a, workflowRole: role as never } : a)) }))
+      await vi.waitFor(() => expect(w.info()!.projects.find((x) => x.name === 'alpha')!.config.agents!.find((a) => a.id === 'o1')!.workflowRole).toBe(role), HANG)
     }
     try {
-      set('builder')
+      await set('builder')
       await inWorkspace(w, () => tasks.updateTask(c, { column: 'review' }, b1))
       await settled()
       await settled()
       expect(st.typed).toEqual([])
       expect(loopWakes.pendingLoopWakes().map((x) => x.agentId)).toEqual(['o1'])
-      set('either')
+      await set('either')
       await typedUntil(st, 1)
       expect(st.typed.map((t) => t.agent)).toEqual(['o1'])
     } finally {

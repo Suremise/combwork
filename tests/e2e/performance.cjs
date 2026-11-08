@@ -280,7 +280,10 @@ const check = (name, ok, extra = '') => {
   const plain = (await exported())?.json
   check('Export saves the report with its schema, version, units, coverage and trend', plain && plain.schema === 'combwork-metrics/1' && plain.app.version && plain.units.bytes && plain.coverage.observedMs > 0 && plain.report.trend.length === 25 && 'alpha' in plain.report.projects, JSON.stringify(plain).slice(0, 200))
   const clean = (await exported(['Shift']))?.text
-  check('Shift+Export leaves out project names and the workspace path', clean && !/alpha|beta|performance-ws/.test(clean) && JSON.parse(clean).sanitized === true, clean && clean.slice(0, 200))
+  // The app's own version left out of the search: a beta's ("1.2.0-beta.1") is no project name (HI-2738).
+  const cleanJson = clean ? JSON.parse(clean) : null
+  const named = clean ? clean.split(JSON.stringify(cleanJson.app.version)).join('""') : ''
+  check('Shift+Export leaves out project names and the workspace path', clean && !/alpha|beta|performance-ws/.test(named) && cleanJson.sanitized === true, clean && clean.slice(0, 200))
 
   // A project's tab: only its project, no scope choice.
   await page.locator('.activitybar button[aria-label="Projects"]').click()

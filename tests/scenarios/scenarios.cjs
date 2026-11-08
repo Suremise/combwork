@@ -5644,7 +5644,9 @@ module.exports.SCENARIOS.push({
   title: "Each Combwork tool the fake-Claude-only scenarios use, called once through this CLI's MCP path (HI-2663): its call reaches Combwork's server with its arguments",
   files: { 'README.md': '# alpha\n\nA project for the tool sweep.\n' },
   async setup(c) {
-    await pairInProject(c)
+    // The agent merges, each card in a slot (HI-2738): a finish that offers cw_report_merge, which Committed is done hides
+    // (HI-2694).
+    await pairInProject(c, { finish: 'agentMerges', folder: 'slots' })
     // Both sides' tools (HI-2664: a builder isn't offered cw_request_builder, a reviewer not cw_put_back).
     await c.inv('agents:update', c.alpha, c.agents.coder.id, { workflowRole: 'either' })
     await c.card('s', { title: 'Sweep the tools', description: 'A card for each tool to name.' })
