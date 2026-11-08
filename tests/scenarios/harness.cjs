@@ -482,6 +482,8 @@ async function runScenario(sc, providerKey, opts = {}) {
   const modelLog = path.join(root, 'copilot-api.jsonl')
   // What the fake Antigravity CLI did (FAKE_AGY_LOG: each launch, hook, call and notice).
   const agyLog = path.join(root, 'fake-agy.jsonl')
+  // Where the fake Antigravity CLI reads its wake scripts (FAKE_AGY_WAKES: fake-wakes-<agent>.txt, HI-2745).
+  const agyWakes = path.join(root, 'agy-wakes')
   // Emptied first (with no evidence store: a caller of its own, like an e2e suite). Still in use (something an earlier
   // run left running holds it, #542): this scenario fails, saying so, and the run goes on.
   if (!opts.evidence) {
@@ -570,7 +572,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
       ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {}),
       // The fake agy follows Combwork's notices as a model does (#650), and logs what it did.
-      ...(p.provider === 'antigravity' ? { FAKE_AGY_LOG: agyLog, FAKE_AGY_FOLLOW_NOTICES: '1', FAKE_AGY_MODEL_MS: '700' } : {})
+      ...(p.provider === 'antigravity' ? { FAKE_AGY_LOG: agyLog, FAKE_AGY_WAKES: agyWakes, FAKE_AGY_FOLLOW_NOTICES: '1', FAKE_AGY_MODEL_MS: '700' } : {})
     }
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
@@ -753,9 +755,14 @@ async function runScenario(sc, providerKey, opts = {}) {
     // for the session under test (the Assistant's by its name, #402).
     const wakesOf = sc.role === 'assistant' ? 'Assistant' : coder.name
     if (providerKey === 'fake' && sc.fakeWakes) fs.writeFileSync(path.join(fakeHome, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
-    // The fake Codex answers a wake it read from the same file in its home (fake-codex.cjs, nextScripted): only where a
-    // scenario asks (codexWakes, HI-2716), since the others' fakeSkips take a fake Codex that doesn't act on its wakes.
-    if (providerKey === 'fake-codex' && sc.fakeWakes && sc.codexWakes) fs.writeFileSync(path.join(fakeCodexHome, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
+    // The fake Codex and the fake Antigravity CLI answer a wake they read from the same file (fake-codex.cjs and
+    // fake-agy.cjs, nextScripted): only where a scenario asks (scriptedWakes, HI-2716, HI-2745), since the others'
+    // fakeSkips take fakes that don't act on their wakes.
+    const wakesDir = { 'fake-codex': fakeCodexHome, 'fake-antigravity': agyWakes }[providerKey]
+    if (wakesDir && sc.fakeWakes && sc.scriptedWakes) {
+      fs.mkdirSync(wakesDir, { recursive: true })
+      fs.writeFileSync(path.join(wakesDir, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
+    }
     const skillNames = fs.existsSync(ctx.skillsDir) ? fs.readdirSync(ctx.skillsDir).filter((d) => !d.startsWith('.')) : []
 
     // Start the session under test, answer a trust question, wait until it's ready, and send the prompt.
