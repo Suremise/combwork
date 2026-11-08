@@ -251,17 +251,16 @@ function ownClaudeHome(name) {
  * Combwork with: { CLAUDE_CONFIG_DIR }. A config written before (a 0.1 one, settings of the suite's) is kept.
  */
 /**
- * Points a profile's Claude Code at the fake (fake-claude/), its home made afresh with the folders it trusts. `oldRelease`:
- * the old-release wrapper instead (fake-claude-old-release.cmd, oldRelease.cjs), for upgradelane's released 0.9 build
- * alone (HI-2614); every other profile gets the current fake, which refuses an old release's names.
+ * Points a profile's Claude Code at the fake (fake-claude/), its home made afresh with the folders it trusts. The fake
+ * refuses an old release's names (fake-claude/oldDialect.cjs, HI-2614).
  */
-function fakeClaude(userData, home, trusted = [], { oldRelease = false } = {}) {
+function fakeClaude(userData, home, trusted = []) {
   enableProviders(userData)
   const file = path.join(userData, 'config.json')
   const cfg = JSON.parse(fs.readFileSync(file, 'utf8'))
   cfg.settings = cfg.settings ?? {}
   cfg.settings.providers = cfg.settings.providers ?? {}
-  cfg.settings.providers['claude-code'] = { checkUpdatesOnLaunch: false, ...cfg.settings.providers['claude-code'], executablePath: path.join(__dirname, 'fake-claude', oldRelease ? 'fake-claude-old-release.cmd' : 'fake-claude.cmd') }
+  cfg.settings.providers['claude-code'] = { checkUpdatesOnLaunch: false, ...cfg.settings.providers['claude-code'], executablePath: path.join(__dirname, 'fake-claude', 'fake-claude.cmd') }
   fs.writeFileSync(file, JSON.stringify(cfg, null, 2))
   fs.rmSync(home, { recursive: true, force: true })
   fs.mkdirSync(home, { recursive: true })
@@ -314,8 +313,8 @@ async function openWorkspace(inv, page, ws, ms = 20000) {
 }
 
 /**
- * Starts the dev build with a test profile, or the packaged Combwork.exe CW_EXE names (the Sandbox upgrade checks run
- * boardupgrade and upgradelane against an installed build that way, #1227). Returns { app, page, inv } (inv calls an
+ * Starts the dev build with a test profile, or the packaged Combwork.exe CW_EXE names (the queue suites on a packaged
+ * build, #1578). Returns { app, page, inv } (inv calls an
  * IPC channel). readyMs bounds the wait for its window to be ready; one that isn't is closed and the failure thrown.
  */
 async function launch({ userData, env = {}, viewport = { width: 1400, height: 850 }, readyMs = 90000 }) {
@@ -718,11 +717,19 @@ _electron.launch = async (...args) => {
   // suite ends, and a test Combwork's own line names only the checkout, so a suite killed before closing its Combwork (HB1's,
   // 10 Oct) left it running for a day. Chromium's own processes already name it (--user-data-dir).
   if (env.CW_USER_DATA) args[0] = { ...args[0], args: [...(args[0].args ?? []), `--combwork-test-profile=${env.CW_USER_DATA}`] }
+  let launched = null
   if (packaged) {
-    args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS], env: { ...env, ...NO_UPDATE_CHECK } }
+    // Without a profile of its own it would run in the user's (HI-2741: a 0.9 build given only CW_USER_DATA did).
+    if (!env.CW_USER_DATA) throw new Error('A packaged test Combwork needs CW_USER_DATA, its test profile (HI-2741)')
+    // In the names the build reads (HI-2741), refused before it starts when they can't be found in it.
+    const dialect = packagedDialect(args[0].executablePath)
+    if (!realFoldersBefore) realFoldersBefore = realFoldersListing()
+    launched = { profile: env.CW_USER_DATA, since: new Date().toISOString(), blocked: path.join(WORK, `packaged-blocked-${packagedLaunches.length + 1}.log`), dialect }
+    fs.rmSync(launched.blocked, { force: true })
+    args[0] = { ...args[0], args: [...args[0].args, ...PACKAGED_ARGS], env: inDialect({ ...env, ...NO_UPDATE_CHECK }, dialect) }
     unmaximized(env.CW_USER_DATA)
     noUpdateChecks(env.CW_USER_DATA)
-    if (env.CW_USER_DATA) packagedLaunches.push({ profile: env.CW_USER_DATA, since: new Date().toISOString() })
+    packagedLaunches.push(launched)
   }
   const from = Date.now()
   const app = await launchElectron(...args)
@@ -746,6 +753,15 @@ _electron.launch = async (...args) => {
   app.on('close', () => apps.delete(app))
   watchCommitBursts(app)
   if (packaged) {
+    // Offline first (HI-2741): every session's requests beyond this machine are refused and noted, for the guard.
+    const offline = await app.evaluate(keepPackagedOffline, { file: launched.blocked, proxy: DEAD_PROXY }).catch((e) => ({ error: e.message }))
+    if (offline?.error || !offline?.noting) {
+      await app.close().catch(() => undefined)
+      throw new Error(`A packaged test Combwork (${args[0].executablePath}) couldn't be kept offline (HI-2741): ${offline?.error ?? 'it has no file system to note a refused request in'}`)
+    }
+    // A build from before 1.1 has its preload bridge under its old name (HI-2588): its windows get window.combwork too,
+    // so the suites' page code reaches it (HI-2741).
+    if (launched.dialect !== 'CW_') await app.evaluate(aliasOldBridge, OLD_BRIDGE).catch(() => undefined)
     const shown = await app.evaluate(keepPackagedQuiet).catch((e) => ({ error: e.message }))
     if (!Array.isArray(shown) || shown.length) {
       await app.close().catch(() => undefined)
@@ -903,27 +919,27 @@ const inside = (file, dir) => {
 
 /**
  * Which Combwork a suite starts: 'dev' (this checkout's Electron, the dev build) or 'packaged' (a Combwork.exe: this checkout's
- * dist\win-unpacked, the main checkout's 0.9 one boardupgrade and upgradelane use, one in the test folders, or what
- * CW_E2E_V09 or CW_EXE name). Never the installed Combwork, nor one from anywhere else (#1253): it would open the user's
- * app on their screen. Throws for those.
+ * dist\win-unpacked, one in the test folders, or the one CW_EXE names). Never the installed Combwork, nor one from anywhere
+ * else (#1253): it would open the user's app on their screen. Throws for those. (The main checkout's dist\win-unpacked was
+ * allowed for the 0.9 upgrade suites, retired by HI-2741.)
  */
 function testExecutable(exe) {
   if (comparable(exe) === comparable(ELECTRON)) return 'dev'
-  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Combwork (${exe}): use this checkout's build, or a 0.9 build's win-unpacked folder (CW_E2E_V09) (#1253)`)
-  const named = [ROOT, TEST_ROOT, process.env.CW_E2E_V09, process.env.CW_EXE && path.dirname(process.env.CW_EXE)].filter(Boolean)
+  if (INSTALLED.some((d) => d && inside(exe, d))) throw new Error(`A test may never start the installed Combwork (${exe}): use this checkout's build (#1253)`)
+  const named = [ROOT, TEST_ROOT, process.env.CW_EXE && path.dirname(process.env.CW_EXE)].filter(Boolean)
   if (named.some((d) => inside(exe, d))) return 'packaged'
-  // Asked of git only now: in Windows Sandbox the checkout is a mapped copy, not a repository (#1227).
-  const main = /^worktree (.+)$/m.exec(git(ROOT, 'worktree list --porcelain'))?.[1]
-  if (!main || !inside(exe, path.join(main, 'dist', 'win-unpacked'))) throw new Error(`A test starts Combwork from this checkout, its dist, the main checkout's dist\\win-unpacked or the test folders, never ${exe} (#1253)`)
-  return 'packaged'
+  throw new Error(`A test starts Combwork from this checkout, its dist, the test folders or CW_EXE, never ${exe} (#1253)`)
 }
 
 /**
  * What a packaged test Combwork starts with (#1253): --hidden (Combwork makes its windows but never shows them, as when started at
  * sign-in: 0.9 too), so nothing is on screen before keepPackagedQuiet reaches it; and Chromium's occlusion tracking off,
- * so its windows, once shown off screen, still draw (main does that itself for a quiet copy).
+ * so its windows, once shown off screen, still draw (main does that itself for a quiet copy). And offline (HI-2741): every
+ * request beyond this machine goes to a proxy nothing listens on (DEAD_PROXY), so it fails, from its first moment;
+ * Chromium never proxies this machine's own addresses (the Agent API, Playwright's own connection).
  */
-const PACKAGED_ARGS = ['--hidden', '--disable-features=CalculateNativeWinOcclusion']
+const DEAD_PROXY = '127.0.0.1:9'
+const PACKAGED_ARGS = ['--hidden', '--disable-features=CalculateNativeWinOcclusion', `--proxy-server=${DEAD_PROXY}`]
 
 /**
  * A profile saved with its window maximised: Combwork would maximise it as it starts, and maximising shows a hidden window.
@@ -963,29 +979,213 @@ function noUpdateChecks(profile) {
   }
 }
 
+// old-name: begin packaged-old-dialect
 /**
- * The guard (#1332): when a suite ends, the log of each packaged Combwork it started (combwork.log and its older copy) must show
- * no update check since that launch (electron-updater's "Checking for update", in Combwork's [updates] scope), or the suite
- * fails, whatever it said.
+ * What a released build from before 1.1 names under the app's old name (HI-2741): its environment's prefix (HI-2586 renamed
+ * HIVE_* to CW_*: a 0.9 or 1.0 reads only these, its profile, port and update delay among them), its log files, its real
+ * updater's download folder (electron-updater's cache, named in its app-update.yml) and its real profile folder.
+ */
+const OLD_ENV = 'HIVE_'
+const OLD_LOGS = ['hive.1.log', 'hive.log']
+const OLD_UPDATER = 'hive-updater'
+const OLD_PROFILE = 'Hive'
+/** Its preload bridge, window.hive (HI-2588 renamed it window.combwork). */
+const OLD_BRIDGE = 'hive'
+// old-name: end packaged-old-dialect
+
+/**
+ * Run in an old packaged build's main process (HI-2741): each of its pages, as it loads, gets window.combwork, the same
+ * object as its bridge under `name`, so the suites' page code (window.combwork.invoke) reaches it. Nothing else changes.
+ */
+function aliasOldBridge(electron, name) {
+  const code = `if (window.combwork === undefined && window[${JSON.stringify(name)}] !== undefined) Object.defineProperty(window, 'combwork', { configurable: true, get: () => window[${JSON.stringify(name)}] })`
+  const alias = (wc) => {
+    const run = () => void wc.executeJavaScript(code).catch(() => undefined)
+    wc.on('dom-ready', run)
+    if (!wc.isLoading()) run()
+  }
+  electron.app.on('web-contents-created', (_e, wc) => alias(wc))
+  for (const wc of electron.webContents.getAllWebContents()) alias(wc)
+  return true
+}
+const ENV_PREFIXES = ['CW_', OLD_ENV]
+const LOGS = ['combwork.1.log', 'combwork.log', ...OLD_LOGS]
+
+/**
+ * The prefix a packaged build reads its environment under, 'CW_' or OLD_ENV, found in its own main code (HI-2741: a 0.9
+ * build given CW_USER_DATA and CW_UPDATE_DELAY read neither, ran in the user's profile, and updated itself). A build whose
+ * code reads its profile and its update delay under neither is refused before it starts: its isolation can't be given.
+ */
+const dialects = new Map()
+function packagedDialect(exe) {
+  const key = comparable(exe)
+  if (dialects.has(key)) return dialects.get(key)
+  const archive = path.join(path.dirname(exe), 'resources', 'app.asar')
+  const asar = require('@electron/asar')
+  const reads = (code) => ENV_PREFIXES.find((p) => ['USER_DATA', 'UPDATE_DELAY'].every((n) => code.includes(`process.env.${p}${n}`)))
+  let found
+  try {
+    found = reads(asar.extractFile(archive, path.join('out', 'main', 'index.js')).toString('utf8'))
+    // Its main code in chunks: read whole.
+    if (!found) found = reads(asar.listPackage(archive).filter((f) => /^[\\/]out[\\/]main[\\/].*\.js$/.test(f)).map((f) => asar.extractFile(archive, f.replace(/^[\\/]/, '')).toString('utf8')).join('\n'))
+  } catch (e) {
+    throw new Error(`A packaged test Combwork's code couldn't be read (${archive}), so the names it reads its profile and update delay under aren't known (HI-2741): ${e.message}`, { cause: e })
+  }
+  if (!found) throw new Error(`A packaged test Combwork (${exe}) reads its profile and its update delay under none of ${ENV_PREFIXES.join(', ')}: it would run in the user's profile and update itself (HI-2741)`)
+  dialects.set(key, found)
+  return found
+}
+
+/** A test Combwork's environment in the names a build reads (HI-2741): each CW_ variable under `prefix` too, where unset. */
+function inDialect(env, prefix) {
+  if (prefix === 'CW_') return env
+  const out = { ...env }
+  for (const [k, v] of Object.entries(env)) if (k.startsWith('CW_') && out[prefix + k.slice(3)] === undefined) out[prefix + k.slice(3)] = v
+  return out
+}
+
+/**
+ * Run in a packaged test Combwork's main process as soon as Playwright reaches it, before keepPackagedQuiet (HI-2741): every
+ * session, the updater's own partition among them (electron-updater's "electron-updater"), sends what goes beyond this
+ * machine to `proxy`, where nothing listens, and refuses it, noting its address in `file` for the guard
+ * (packagedRequestsBlocked). --proxy-server (PACKAGED_ARGS) does the same from the first moment, before this is reached.
+ * Returns { noting }: whether it can note them (it has the file system).
+ */
+function keepPackagedOffline(electron, { file, proxy }) {
+  const { app, session } = electron
+  const fsMod = process.getBuiltinModule?.('fs') ?? process.mainModule?.require('fs')
+  const note = (what) => {
+    try {
+      fsMod.appendFileSync(file, `${new Date().toISOString()} ${what}\n`)
+    } catch {
+      // Not noted: still refused.
+    }
+  }
+  const local = (url) => {
+    try {
+      const host = new URL(url).hostname.replace(/^\[|\]$/g, '').toLowerCase()
+      return host === 'localhost' || host === '::1' || host.startsWith('127.')
+    } catch {
+      return false
+    }
+  }
+  const offline = (s) => {
+    if (!s || s.combworkTestOffline) return
+    s.combworkTestOffline = true
+    void s.setProxy({ proxyRules: proxy }).catch?.(() => undefined)
+    s.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*', 'ws://*/*', 'wss://*/*'] }, (details, done) => {
+      if (local(details.url)) return done({})
+      note(details.url)
+      done({ cancel: true })
+    })
+  }
+  app.on('session-created', offline)
+  if (app.isReady()) offline(session.defaultSession)
+  else void app.whenReady().then(() => offline(session.defaultSession))
+  return { noting: !!fsMod?.appendFileSync }
+}
+
+/**
+ * The guard (#1332, HI-2741): when a suite ends, each packaged Combwork it started must have written its log in its test
+ * profile (else it ran in another, perhaps the user's), that log (combwork.log or a 0.9's own, and their older
+ * copies) must show no update check, download or install since that launch, and it must have tried to reach nothing
+ * beyond this machine (keepPackagedOffline's notes), or the suite fails, whatever it said.
  */
 const packagedLaunches = []
+// electron-updater's lines (its logger is Combwork's [updates] scope) and Combwork's own: a check, failed or not (offline,
+// it fails), a download, an install.
+const UPDATE_LINE = /\[updates\] (Checking for update|Update check failed|Found version|Downloading update|Download|Update download failed|New version|Executing|Auto install|Install)/
 function updateChecksLogged({ profile, since }) {
   const found = []
-  for (const name of ['combwork.1.log', 'combwork.log']) {
+  for (const name of LOGS) {
     let text = ''
     try {
       text = fs.readFileSync(path.join(profile, 'logs', name), 'utf8')
     } catch {
       continue
     }
-    for (const line of text.split('\n')) if (line.slice(0, 24) >= since && /\[updates\] Checking for update/.test(line)) found.push(line.trim())
+    for (const line of text.split('\n')) if (line.slice(0, 24) >= since && UPDATE_LINE.test(line)) found.push(line.trim())
   }
   return found
 }
+/** Whether a packaged launch logged anything in its test profile since it started (HI-2741). */
+function loggedInProfile({ profile, since }) {
+  return LOGS.some((name) => {
+    try {
+      return fs.statSync(path.join(profile, 'logs', name)).mtime.toISOString() >= since
+    } catch {
+      return false
+    }
+  })
+}
+/** What a packaged launch tried to reach beyond this machine (keepPackagedOffline's notes). */
+function packagedRequestsBlocked({ blocked }) {
+  try {
+    return fs.readFileSync(blocked, 'utf8').split('\n').filter((l) => l.trim())
+  } catch {
+    return []
+  }
+}
+
+/**
+ * The user's real updater folders (electron-updater's caches: Combwork's and a 0.9's, where a downloaded installer waits to
+ * run) and a 0.9's real profile (HI-2741): read only, listed when a suite first starts a packaged Combwork and again when
+ * it ends, which fails if they changed. Never cleaned: what is in them is the user's.
+ */
+const REAL_FOLDERS = () => [
+  path.join(process.env.LOCALAPPDATA ?? '', 'combwork-updater'),
+  path.join(process.env.LOCALAPPDATA ?? '', OLD_UPDATER),
+  path.join(process.env.APPDATA ?? '', OLD_PROFILE)
+]
+function realFoldersListing(dirs = REAL_FOLDERS()) {
+  const out = []
+  const walk = (dir, depth) => {
+    let names = []
+    try {
+      names = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const d of names) {
+      const p = path.join(dir, d.name)
+      try {
+        const s = fs.statSync(p)
+        out.push(`${p}|${d.isDirectory() ? 'dir' : s.size}|${d.isDirectory() ? '' : s.mtimeMs}`)
+      } catch {
+        continue
+      }
+      if (d.isDirectory() && depth < 2) walk(p, depth + 1)
+    }
+  }
+  for (const dir of dirs) {
+    out.push(`${dir}|${fs.existsSync(dir) ? 'there' : 'none'}|`)
+    walk(dir, 0)
+  }
+  return out.sort()
+}
+/** What changed between two listings: + added or changed, - gone. */
+function listingChanges(before, after) {
+  const b = new Set(before)
+  const a = new Set(after)
+  return [...after.filter((x) => !b.has(x)).map((x) => `+ ${x.split('|')[0]}`), ...before.filter((x) => !a.has(x)).map((x) => `- ${x.split('|')[0]}`)]
+}
+let realFoldersBefore = null
+
+/** What the guard finds wrong in a suite's packaged launches (HI-2741): its lines, empty when nothing is. */
+function packagedGuardProblems(launches = packagedLaunches, before = realFoldersBefore, after = before && realFoldersListing()) {
+  const problems = []
+  for (const l of launches) {
+    if (!loggedInProfile(l)) problems.push(`a packaged test Combwork wrote no log in its test profile (${l.profile}) since it started: it may have run in another profile, the user's`)
+    for (const line of updateChecksLogged(l)) problems.push(`a packaged test Combwork checked for, downloaded or installed an update (#1332): ${line}`)
+    for (const line of packagedRequestsBlocked(l)) problems.push(`a packaged test Combwork tried to reach beyond this machine (refused): ${line}`)
+  }
+  if (before) for (const c of listingChanges(before, after)) problems.push(`the user's updater folders or a 0.9's profile changed (${c}): a test Combwork updating, or the installed Combwork's own updater meanwhile`)
+  return problems
+}
 process.on('exit', () => {
-  const found = packagedLaunches.flatMap(updateChecksLogged)
+  const found = packagedGuardProblems()
   if (!found.length) return
-  console.error(`FAILED: a packaged test Combwork checked GitHub for updates (#1332):\n${found.join('\n')}`)
+  console.error(`FAILED: a packaged test Combwork wasn't kept from updating or from the user's folders (#1332, HI-2741):\n${found.join('\n')}`)
   process.exitCode = 1
 })
 
@@ -1860,4 +2060,4 @@ async function addMenuRun(page, label, then, ms = 10000) {
   await menuEntry(page, then).click()
 }
 
-module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, PACKAGED_ARGS, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }
+module.exports = { PACKAGED_EXE, projectConfig, setAgentLaunch, tokenFile, commitBursts, commitChains, acceptCommitChain, watchCommitBursts, burstWatcher, unkey, KEYED, cardLabel, cardDialog, readCard, writeCard, addMenuRun, agentCount, agentMenu, agentsMenu, agentsMenuRun, menuEntry, openMoreTab, openProjectSettings, setOwnOptions, setMaxAgents, paneHeader, showAgent, ROOT, ELECTRON, WORK, CODEX_HOME, CLAUDE_TEST_HOME, TRASH, TEST_GIT_IDENTITY, trashed, tidyUp, ownClaudeHome, probeDir, combworkEnv, childEnv, baseEnv, gitEnv, git, GIT_LOCKED, plainText, trustChoice, haikuAutoMode, haikuAutoCaveat, sleep, port, until, hoverTip, quitWatch, appReady, openWorkspace, hadEstimate, fitWindow, enableProviders, fakeClaude, launch, waitForProvider, addAgent, setLaunch, setProjectLaunch, soloAgent, ptyKey, acceptClaudeTrust, acceptRelaunchTrust, withFileLock, trustForCodex, gitProject, codexSignedIn, pathWithoutStoreAliases, launchDir, launchHook, codexHook, processTree, stopProcessesIn, identify, stillSame, endExactly, endTreeExactly, endChildTree, processRunning, testExecutable, keepPackagedQuiet, keepPackagedOffline, aliasOldBridge, PACKAGED_ARGS, DEAD_PROXY, NO_UPDATE_CHECK, noUpdateChecks, updateChecksLogged, packagedDialect, inDialect, packagedGuardProblems, realFoldersListing, listingChanges, samplePng, environmentProblem, environmentProblems, storePwshRefusals, stepVerdict, checked, cliStep, sendPrompt, combworkLogLines, combworkToolsConnected, TURN_HUNG_MS, agentIdle, logFakeInput, inboxQuiet, inboxPending, agentQuiet, laneBriefDone, typeLine, fakePrompts, skip }

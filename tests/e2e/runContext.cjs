@@ -78,8 +78,7 @@ const PASS_ENV = {
   CW_TEST_QUIET: '0 shows the test copies of Combwork (taking focus, notifying), to watch a run',
   CW_TEST_PROGRESS_TIMINGS: "where the Progress panel's suite timings are kept (tests/progressReport.mts)",
   CW_PROGRESS_CHECK_DEV: "1: packaged-progress checks the dev build's cw-progress",
-  CW_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the Sandbox upgrade checks, #1227)',
-  CW_E2E_V09: "boardupgrade's 0.9 build: a 0.9.x win-unpacked folder (else the main checkout's dist/win-unpacked, when it is 0.9.x)",
+  CW_EXE: 'plan and lib.launch run this packaged Combwork executable instead of the dev build (the queue suites on a packaged build, #1578)',
   REPLYSIZE_OUT: "replysize's report file, in the work folder"
 }
 

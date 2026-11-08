@@ -242,7 +242,7 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     // ===== alpha: added with a builder and a reviewer; Pair from the step.
     // B1 in the project folder (#1578: 1.0 adds no worktree agents): the lane started below is lent a slot, its folder `wt`.
     const b1 = await q.agent(fx, h, 'B1')
-    const r1 = await q.agent(fx, h, 'Reviewer')
+    let r1 = await q.agent(fx, h, 'Reviewer')
     let wt = null
     check('alpha: its notice opens the step at Git', await fromNotice('alpha'))
     check('…Pair suggested for a builder and a reviewer, and shown', !!(await waitHung(async () => (await stepEl.locator('[data-preset="pair"] .vc-step-tag').count()) === 1)) && (await stepEl.locator('[data-preset="pair"]').getAttribute('aria-checked')) === 'true' && (await text(stepEl.locator('.vc-step-why'))) === 'Suggested for a builder and a reviewer.', await text(stepEl))
@@ -254,6 +254,10 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const git = (cwd, ...args) => lib.git(cwd, ['-c', `user.name=${identity.name}`, '-c', `user.email=${identity.email}`, ...args]).trim()
     // Pair, its Maximum agents raised to 3 as a user would (HI-2131, as HI-2091): G14's builder B2 below is alpha's third.
     await inv('workflow:setOptions', alpha, { preset: 'pair', options: { ...options, maxAgents: 3 } })
+    // Pair has no skipped focused tests (HI-2694): the idle Reviewer is restarted without cw_focused_skip, with its new
+    // launch's token (HI-2739). B1 keeps its tools and its run.
+    r1 = await q.renewed(fx, h, r1)
+    check('…the Reviewer restarted for the tools Pair leaves out, with its new token', !!r1.token)
 
     // The board: alpha's stages.
     const laneA = []
@@ -329,6 +333,8 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
 
     /** A lane started from the board: the Todo column's Start Lane with These Cards…, B1 / Reviewer. */
     const startLane = async (cards) => {
+      // Both idle, as the window asks ("Start the lane once it's idle"): the Reviewer's restart above may still be starting.
+      await waitHung(async () => (await idle(b1.id)) && (await idle(r1.id)))
       await showBoard('alpha')
       await waitHung(async () => (await col('todo').locator('.task-card').count()) === cards.length)
       await col('todo').locator('.board-column-header').click({ button: 'right' })
@@ -515,6 +521,11 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const solo = projectJson(beta).workflow?.options ?? {}
     check('…saved: no review, Committed is done, the project folder', solo.review === 'none' && solo.finish === 'committed' && solo.folder === 'project', JSON.stringify(solo))
     check("beta's stages: On Hold, Todo, Active and Done", (await inv('workflow:stages', beta))?.stages.map((x) => x.id).join(' ') === 'hold todo active done', JSON.stringify(await inv('workflow:stages', beta)))
+    // Committed is done, so Solo leaves cw_report_merge out of its agents' tools (HI-2694): the idle S1 is restarted for it,
+    // with its new launch's token. Its lane is registered once it has (HI-2739: one registered while it restarts owes it its
+    // new conversation, laneStart.test.ts).
+    s = await q.renewed(fx, h, s, beta)
+    check('…S1 restarted for the tools Solo leaves out, with its new token', !!s.token)
     const sc = (await inv('tasks:create', { title: 'Solo work', project: 'beta' })).number
     // A loop of its one card (registered as the card-loop skill does): Pulse shows it while it runs.
     const sl = await api('POST', '/v1/lanes', { project: 'beta', builder: 'S1', reviewer: null, name: 'solo', cards: [sc] })

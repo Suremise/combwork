@@ -239,9 +239,9 @@ async function approveCard(fx, h, builder, reviewer, n, title, files, { afterSta
   lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
   lib.git(builder.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', title])
   const revision = lib.git(builder.folder, ['rev-parse', 'HEAD']).trim()
-  steps.submit = await intent(h, builder, n, 'submit', { summary: `${title}: ready` })
-  steps.review = await intent(h, reviewer, n, 'start-review')
-  steps.verdict = await intent(h, reviewer, n, 'verdict', { pass: true, comment: `${title}: passed` })
+  steps.submit = await act(fx, h, builder, n, 'submit', { summary: `${title}: ready` })
+  steps.review = await act(fx, h, reviewer, n, 'start-review')
+  steps.verdict = await act(fx, h, reviewer, n, 'verdict', { pass: true, comment: `${title}: passed` })
   return { revision, steps }
 }
 
@@ -249,6 +249,20 @@ async function approveCard(fx, h, builder, reviewer, n, title, files, { afterSta
 async function intent(h, who, n, name, body = {}) {
   const res = await fetch(`http://127.0.0.1:${h.port}/v1/tasks/${encodeURIComponent(`#${n}`)}/${name}`, { method: 'POST', headers: { Authorization: `Bearer ${who.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
   return { status: res.status, body: await res.json().catch(() => null) }
+}
+
+/**
+ * intent() for an agent a workflow change may have restarted (HI-2740): HI-2694 restarts an idle agent whose tool list
+ * the change alters, and its new launch has a token of its own, the old one refused (401). Refused so: the new run's
+ * token is read (renewed), kept in `who`, and the intent sent again with it. Any other reply is returned as it is.
+ */
+async function act(fx, h, who, n, name, body = {}, project = fx.alpha) {
+  const first = await intent(h, who, n, name, body)
+  if (first.status !== 401) return first
+  const got = await renewed(fx, h, who, project)
+  if (!got.token) return first
+  who.token = got.token
+  return intent(h, who, n, name, body)
 }
 
 /**
@@ -392,4 +406,4 @@ function otherProfile(fx, suffix) {
   return { ...fx, userData }
 }
 
-module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startCombwork, agent, renewed, rejoin,releaseHeld, intent, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }
+module.exports = { HUNG_MS, devSeam, queueProject, prepare, steer, queueOptions, startCombwork, agent, renewed, rejoin,releaseHeld, intent, act, startCard, approve, approveBy, commitOn, mergeOn, head, launches, folderHelpers, showBoard, openByTitle, checkWith, restoreCheck, mergesTab, otherProfile }

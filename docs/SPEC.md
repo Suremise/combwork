@@ -5522,7 +5522,10 @@ agents stopped then once one is lent), then each stopped agent with the generate
 Start Lane gives it: `ready` or `finished` as the lane is recorded and its builder not working in slots (`builderWhere`),
 it is launched with the lane's brief through `newConversation` (`stoppedOnly`'s `renew`), its last conversation kept in
 its Sessions history; found not free at its launch, its new conversation is owed (`freshStart`, as above), never the
-old one kept; stopped meanwhile, it is started with the brief. Its lane is checked again (`laneRunsWith`: running,
+old one kept; stopped meanwhile, it is started with the brief. One restarting as the lane is recorded (HI-2739: a switch
+whose exit was typed, as a workflow change restarts an idle agent for its tools, HI-2694) counts as idle, so it is owed
+its new conversation, given once it has resumed; a switch under way, typed or still waiting for its safe point, is never
+free at a launch (`sessions.switchUnderWay`), so no new conversation races its restart. Its lane is checked again (`laneRunsWith`: running,
 this agent its builder) before its brief is made, just before the old run stops and before the new one spawns
 (`newConversation`'s `allowed`) [HR1's round 1]: a lane ended or given to another builder meanwhile replaces nothing
 and owes nothing. Its brief (`brief`, HI-1795) then reaches the new

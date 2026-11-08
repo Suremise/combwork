@@ -126,11 +126,16 @@ const waitHung = (fn) => lib.until(fn, HUNG_MS, 200)
     // ===== None (nada): N3 a check before review, N4 what the work is, N2 no self-review, N6 dependencies accepted.
     fs.writeFileSync(path.join(nada, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [] }))
     await inv('workspace:refresh')
-    const nb = await q.agent(fx, h, 'NB', { project: nada })
-    const nr = await q.agent(fx, h, 'NR', { project: nada })
+    let nb = await q.agent(fx, h, 'NB', { project: nada })
+    let nr = await q.agent(fx, h, 'NR', { project: nada })
     const noneOptions = { review: 'agent', noSelfReview: true, preChecks: ['quick'], commands: { quick: `"${fx.tool}"` }, finish: 'accept', folder: 'project', dependenciesDone: true }
     const set = await inv('workflow:setOptions', nada, { preset: null, options: noneOptions })
     check("nada is None, its options saved", !!set && (await inv('workflow:stages', nada))?.stages.some((x) => x.id === 'review'), JSON.stringify(await inv('workflow:stages', nada)))
+    // Accept as its finish leaves cw_report_merge out of its agents' tools (HI-2694), so the idle NB and NR are restarted
+    // for it, each launch with its own token (HI-2739: the one read at their start is refused once its run has ended).
+    nb = await q.renewed(fx, h, nb, nada)
+    nr = await q.renewed(fx, h, nr, nada)
+    check('…NB and NR restarted for the tools it leaves out, each with its new token', !!(nb.token && nr.token))
     const nc = (await inv('tasks:create', { title: 'Write the notes', project: 'nada' })).number
     const nd = (await inv('tasks:create', { title: 'After the notes', project: 'nada' })).number
     await inv('tasks:update', nd, { blockedBy: [nc] })
