@@ -22,7 +22,9 @@
 // - each line typed is a turn: written to the transcript, answered "Done: <line>", the status line run again ("quota G O"
 //   also puts the plan's quota in it from then on, HI-2734: Gemini's share left G, the other models' O); a line
 //   "tool <text>" also calls an MCP tool (call_mcp_tool) whose result is <text>, and "image" reads an image (read_file, its
-//   result naming a copy in logs\media); a resume needs the conversation's store (conversations\<id>.db), as 1.5.0's does.
+//   result naming a copy in logs\media); a resume needs the conversation's store (conversations\<id>.db), as 1.5.0's does;
+// - Combwork's doorbell (a line typed at idle, as any prompt is) is read with cw_inbox; a wake or message it read is
+//   answered with the next line of fake-wakes-<agent>.txt in FAKE_AGY_WAKES, when a test wrote one (HI-2745).
 // Every launch is logged to FAKE_AGY_LOG (a JSON line: its arguments, cwd, and the environment the adapter sets).
 const fs = require('fs')
 const path = require('path')
@@ -244,6 +246,18 @@ async function readInbox(invoked) {
   const ids = [...new Set([...String(listed?.text ?? '').matchAll(/\bm\d+\b/g)].map((m) => m[0]))]
   if (ids.length) await ownCall('cw_inbox', { ack: ids }, invoked)
 }
+/**
+ * What it does after a wake it read, as the fake Claude Code and fake Codex do: the next line of fake-wakes-<agent>.txt
+ * in FAKE_AGY_WAKES (taken), or null with none.
+ */
+function nextScripted() {
+  if (!process.env.FAKE_AGY_WAKES) return null
+  const file = path.join(process.env.FAKE_AGY_WAKES, `fake-wakes-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}.txt`)
+  if (!fs.existsSync(file)) return null
+  const [first, ...rest] = fs.readFileSync(file, 'utf8').split('\n')
+  fs.writeFileSync(file, rest.join('\n'))
+  return first.trim() || null
+}
 /** A file read as agy reads one (read_file, its Path). */
 const readFile = (file, invoked) => tool(invoked, { name: 'read_file', args: { Path: file } }, async () => (fs.existsSync(file) ? { text: fs.readFileSync(file, 'utf8') } : { text: `file not found: ${file}`, isError: true }))
 const skillDir = (name) => [name, `cw-${name}`].map((d) => path.join(process.cwd(), '.agents', 'skills', d)).find((d) => fs.existsSync(path.join(d, 'SKILL.md'))) ?? path.join(process.cwd(), '.agents', 'skills', name)
@@ -376,7 +390,8 @@ async function turn(text) {
     if (rows.length && follows()) await ownCall('cw_inbox', { ack: rows.flatMap((x) => x.ids) }, invoked)
     const read = rows.map((x) => x.text).join(' ')
     if (!work) log({ kind: 'wake', text: read, doorbell: text })
-    text = work ? read : ''
+    // A wake it read is answered with its script's next line, as the other fakes do (HI-2745), when there is one.
+    text = work ? read : (rows.length && nextScripted()) || ''
   }
   // The scenarios' steps (tests/scenarios), as the other fakes take them, each step a model call of its own.
   for (const s of text.split(' then ')) await scripted(s, invoked)
