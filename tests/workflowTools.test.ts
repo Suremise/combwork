@@ -216,7 +216,7 @@ describe("a project's list from its options and its work in flight (HR1's s11 po
 
 describe("a busy agent's restart question (HR1's round 1): once while it still needs that restart, again once it didn't", () => {
   /** A project p whose config the change sets, one running agent whose restart says `outcome`, and the questions emitted. */
-  async function busyAgent(o: { settings?: boolean } = {}) {
+  async function busyAgent(how: { settings?: boolean } = {}) {
     const w = await workspace(presetOf('solo', 'none'))
     const p = projectPath(w)
     let cfg = await w.projectConfig(p)
@@ -235,7 +235,7 @@ describe("a busy agent's restart question (HR1's round 1): once while it still n
       change: async (o: WorkflowOptions, r: typeof outcome) => {
         cfg = { ...cfg, workflow: { platform: 'none', options: o } } as never
         outcome = r
-        await restartForWorkflow(w, p, undefined, o)
+        await restartForWorkflow(w, p, undefined, how)
       },
       relaunch: (id: string) => (run = id),
       asked: () => emitted.mock.calls.filter(([e]) => e.type === 'tools-restart-asked').length,
