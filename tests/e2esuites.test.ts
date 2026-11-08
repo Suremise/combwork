@@ -1595,7 +1595,7 @@ describe('the Combworks a suite starts (lib.cjs testExecutable, keepPackagedQuie
     expect(lib.testExecutable(lib.ELECTRON)).toBe('dev')
     expect(lib.testExecutable(lib.PACKAGED_EXE)).toBe('packaged')
     // old-name: begin old-executables
-    // A 0.9 build's executable (Hive.exe) in a checkout's dist, as boardupgrade and upgradelane start it.
+    // A 0.9 build's executable (Hive.exe) in this checkout's dist.
     expect(lib.testExecutable(join(lib.ROOT, 'dist', 'win-unpacked', 'Hive.exe'))).toBe('packaged')
     expect(lib.testExecutable(join(process.env.LOCALAPPDATA ?? '', 'combwork-test', 'builds', 'Combwork.exe'))).toBe('packaged')
     // Combwork's install (HI-2460) and 1.0's from before.
@@ -1722,6 +1722,141 @@ describe('packaged test Combworks never check GitHub for updates (lib.cjs, #1332
     expect(lib.updateChecksLogged({ profile, since: '2026-10-21T10:00:00.000Z' })).toEqual([check])
     expect(lib.updateChecksLogged({ profile, since: '2026-10-21T11:00:00.000Z' })).toEqual([])
   })
+})
+
+describe("an old packaged build can't update, install or reach the user's folders (lib.cjs, HI-2741)", () => {
+  type Launch = { profile: string; since: string; blocked: string }
+  type Lib = {
+    PACKAGED_ARGS: string[]
+    DEAD_PROXY: string
+    packagedDialect: (exe: string) => string
+    inDialect: (env: Record<string, string>, prefix: string) => Record<string, string>
+    keepPackagedOffline: (m: object, a: { file: string; proxy: string }) => { noting: boolean }
+    packagedGuardProblems: (launches: Launch[], before: string[] | null, after?: string[]) => string[]
+    realFoldersListing: (dirs: string[]) => string[]
+    listingChanges: (before: string[], after: string[]) => string[]
+    aliasOldBridge: (m: object, name: string) => boolean
+  }
+  const lib = createRequire(import.meta.url)('./e2e/lib.cjs') as Lib
+  const asar = createRequire(import.meta.url)('@electron/asar') as { createPackage: (src: string, dest: string) => Promise<void> }
+
+  /** A packaged build's folder whose main code is `files` (out/main/…), its exe a stand-in. */
+  const build = async (files: Record<string, string>) => {
+    const folder = tempDir('cw-dialect-')
+    const src = join(folder, 'src')
+    for (const [name, text] of Object.entries(files)) {
+      mkdirSync(join(src, 'out', 'main', 'chunks'), { recursive: true })
+      writeFileSync(join(src, 'out', 'main', name), text)
+    }
+    mkdirSync(join(folder, 'app', 'resources'), { recursive: true })
+    await asar.createPackage(src, join(folder, 'app', 'resources', 'app.asar'))
+    return join(folder, 'app', 'Combwork.exe')
+  }
+
+  // old-name: begin old-dialect-tests
+  it("finds the names a build reads its profile and update delay under, from its own code, and refuses a build that reads neither", async () => {
+    expect(lib.packagedDialect(await build({ 'index.js': 'a(process.env.CW_USER_DATA); setTimeout(f, Number(process.env.CW_UPDATE_DELAY))' }))).toBe('CW_')
+    // 0.9.3's, as its main code reads them (out/main/index.js).
+    expect(lib.packagedDialect(await build({ 'index.js': 'if (process.env.HIVE_USER_DATA) x(); Number(process.env.HIVE_UPDATE_DELAY) || FIRST_CHECK_DELAY' }))).toBe('HIVE_')
+    // In a chunk of its main code.
+    expect(lib.packagedDialect(await build({ 'index.js': 'require("./chunks/a.js")', 'chunks/a.js': 'process.env.HIVE_USER_DATA; process.env.HIVE_UPDATE_DELAY' }))).toBe('HIVE_')
+    // Its profile alone isn't enough: its update can't be put off.
+    await expect(async () => lib.packagedDialect(await build({ 'index.js': 'process.env.HIVE_USER_DATA' }))).rejects.toThrow(/reads its profile and its update delay under none of CW_, HIVE_/)
+    expect(() => lib.packagedDialect(join(tempDir('cw-dialect-'), 'Combwork.exe'))).toThrow(/couldn't be read/)
+  })
+
+  it("gives an old build the test environment's CW_ variables under its own names too, its own kept", () => {
+    const env = { CW_USER_DATA: 'C:\\t\\p', CW_UPDATE_DELAY: '2147483647', CW_API_PORT: '47901', HIVE_LANG: 'fr', CLAUDE_CONFIG_DIR: 'C:\\t\\c' }
+    expect(lib.inDialect(env, 'HIVE_')).toEqual({ ...env, HIVE_USER_DATA: 'C:\\t\\p', HIVE_UPDATE_DELAY: '2147483647', HIVE_API_PORT: '47901' })
+    expect(lib.inDialect(env, 'CW_')).toBe(env)
+  })
+
+  it("gives an old build's pages window.combwork, its own bridge (window.hive), on each load and on pages made later", async () => {
+    const pages: { win: Record<string, unknown>; handlers: Record<string, () => void>; loading: boolean }[] = []
+    const page = (loading: boolean) => {
+      const p = { win: { hive: { invoke: () => 'from 0.9' } } as Record<string, unknown>, handlers: {} as Record<string, () => void>, loading }
+      pages.push(p)
+      return {
+        isLoading: () => p.loading,
+        on: (e: string, f: () => void) => void (p.handlers[e] = f),
+        // The page's own world: the code runs with its window.
+        executeJavaScript: async (code: string) => new Function('window', code)(p.win)
+      }
+    }
+    const listeners: Record<string, (e: unknown, wc: unknown) => void> = {}
+    const first = page(false)
+    const modules = { app: { on: (e: string, f: (e: unknown, wc: unknown) => void) => void (listeners[e] = f) }, webContents: { getAllWebContents: () => [first] } }
+    expect(lib.aliasOldBridge(modules, 'hive')).toBe(true)
+    await Promise.resolve()
+    expect((pages[0].win.combwork as { invoke: () => string }).invoke()).toBe('from 0.9')
+    listeners['web-contents-created']({}, page(true))
+    expect(pages[1].win.combwork).toBeUndefined()
+    pages[1].handlers['dom-ready']()
+    await Promise.resolve()
+    expect(pages[1].win.combwork).toBe(pages[1].win.hive)
+  })
+  // old-name: end old-dialect-tests
+
+  it('starts offline: a dead proxy on its command line and on every session, and each request beyond this machine refused and noted', async () => {
+    expect(lib.PACKAGED_ARGS).toContain(`--proxy-server=${lib.DEAD_PROXY}`)
+    const file = join(tempDir('cw-offline-'), 'blocked.log')
+    const sessions: { proxy?: string; listener?: (d: { url: string }, done: (r: { cancel?: boolean }) => void) => void }[] = []
+    const made = () => {
+      const s: (typeof sessions)[number] & Record<string, unknown> = {}
+      s.setProxy = async (c: { proxyRules: string }) => void (s.proxy = c.proxyRules)
+      s.webRequest = { onBeforeRequest: (_f: object, l: (typeof s)['listener']) => void (s.listener = l) }
+      sessions.push(s)
+      return s
+    }
+    const listeners: Record<string, (s: unknown) => void> = {}
+    const defaultSession = made()
+    const modules = { app: { isReady: () => true, whenReady: async () => undefined, on: (e: string, f: (s: unknown) => void) => void (listeners[e] = f) }, session: { defaultSession } }
+    expect(lib.keepPackagedOffline(modules, { file, proxy: lib.DEAD_PROXY })).toEqual({ noting: true })
+    // The updater's partition, made later.
+    listeners['session-created'](made())
+    expect(sessions.map((s) => s.proxy)).toEqual([lib.DEAD_PROXY, lib.DEAD_PROXY])
+    const ask = (s: (typeof sessions)[number], url: string) => new Promise<{ cancel?: boolean }>((res) => s.listener!({ url }, res))
+    expect(await ask(sessions[1], 'https://github.com/Suremise/combwork/releases/download/v1.1.0/latest.yml')).toEqual({ cancel: true })
+    expect(await ask(sessions[0], 'http://127.0.0.1:47901/v1/health')).toEqual({})
+    expect(await ask(sessions[0], 'ws://localhost:9222/devtools')).toEqual({})
+    expect(await ask(sessions[0], 'http://[::1]:5173/')).toEqual({})
+    expect(readFileSync(file, 'utf8')).toMatch(/^\S+ https:\/\/github\.com\/Suremise\/combwork\/releases\/download\/v1\.1\.0\/latest\.yml\n$/)
+  })
+
+  // old-name: begin old-guard-tests
+  it("fails a suite whose packaged build ran outside its test profile, logged an update, tried the network, or changed the user's updater folders", () => {
+    const profile = tempDir('cw-guard-')
+    const since = '2026-01-01T00:00:00.000Z'
+    const blocked = join(profile, 'blocked.log')
+    const launch = { profile, since, blocked }
+    // Nothing logged in its profile: it ran in another (0.9.3 given CW_USER_DATA ran in %APPDATA%\Hive).
+    expect(lib.packagedGuardProblems([launch], null)).toEqual([expect.stringMatching(/wrote no log in its test profile/)])
+    mkdirSync(join(profile, 'logs'))
+    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-11-08T00:38:36.114Z [INFO] [updates] Update settings: check on, download auto, install auto, pre-releases off\n')
+    expect(lib.packagedGuardProblems([launch], null)).toEqual([])
+    // What 0.9.3 logged on 8 Nov, in its own log's name.
+    const lines = ['2026-11-08T00:39:06.119Z [INFO] [updates] Checking for update', '2026-11-08T00:39:19.886Z [INFO] [updates] New version 1.1.0 has been downloaded to C:\\x\\hive-updater\\pending\\Combwork-Setup-1.1.0.exe', '2026-11-08T00:40:06.229Z [INFO] [updates] Executing: C:\\x\\Combwork-Setup-1.1.0.exe with args: --updated,/S']
+    writeFileSync(join(profile, 'logs', 'hive.log'), lines.join('\n') + '\n', { flag: 'a' })
+    expect(lib.packagedGuardProblems([launch], null)).toEqual(lines.map((l) => expect.stringContaining(l)))
+    // A check that failed offline still counts.
+    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-11-08T00:39:07.000Z [WARN] [updates] Update check failed net::ERR_PROXY_CONNECTION_FAILED\n')
+    expect(lib.packagedGuardProblems([launch], null)).toEqual([expect.stringMatching(/Update check failed/)])
+    writeFileSync(join(profile, 'logs', 'hive.log'), '2026-11-08T00:38:36.114Z [INFO] [main] started\n')
+    writeFileSync(blocked, '2026-11-08T00:39:06.200Z https://github.com/Suremise/hive-desktop/releases/latest\n')
+    expect(lib.packagedGuardProblems([launch], null)).toEqual([expect.stringMatching(/tried to reach beyond this machine .*hive-desktop/)])
+    rmSync(blocked)
+    // The user's folders, read only: a change fails it.
+    const updater = tempDir('cw-guard-updater-')
+    writeFileSync(join(updater, 'installer.exe'), 'old')
+    const before = lib.realFoldersListing([updater])
+    expect(lib.packagedGuardProblems([launch], before, lib.realFoldersListing([updater]))).toEqual([])
+    mkdirSync(join(updater, 'pending'))
+    writeFileSync(join(updater, 'pending', 'Combwork-Setup-1.1.0.exe'), 'new')
+    const after = lib.realFoldersListing([updater])
+    expect(lib.listingChanges(before, after)).toEqual([`+ ${join(updater, 'pending', 'Combwork-Setup-1.1.0.exe')}`, `+ ${join(updater, 'pending')}`])
+    expect(lib.packagedGuardProblems([launch], before, after)).toEqual([expect.stringMatching(/updater folders .* changed \(\+ .*Combwork-Setup-1\.1\.0\.exe\)/), expect.stringMatching(/changed \(\+ .*pending\)/)])
+  })
+  // old-name: end old-guard-tests
 })
 
 describe('whether a process still runs (lib.processRunning, #339)', () => {

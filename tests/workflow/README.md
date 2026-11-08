@@ -40,7 +40,7 @@ with that phase rather than left out.
 | S36 | Every option combination walked Todo → Done; contradictions refused | — | `workflow/combinations.test.ts` "S36: every combination" |
 | S38 | A no-code card with no review → Done, no `Integrated` (Git and None) | `nocode` | `cardIntents.test.ts` "… (S25, S38)"; `workflow/scenarios.git.test.ts` "S38: …"; `workflow/scenarios.none.test.ts` "S38 (None)" |
 | S39 | All off: a blocked card starts with a warning; the user drags freely | `boardgates` (S39) | `gates.test.ts` "S39: …"; `workflow/scenarios.git.test.ts` "S39: …" |
-| S40 | A running lane at the upgrade: adopted, its old moves translated | `upgradelane` | `agentMoves.test.ts` "S40: an upgraded lane's old moves"; `workflow/lanes.test.ts` "S40: …" |
+| S40 | A running lane at the upgrade: adopted, its old moves translated | `upgradelane` (retired, HI-2741) | `agentMoves.test.ts` "S40: an upgraded lane's old moves"; `workflow/lanes.test.ts` "S40: …" |
 | S41 | Just started isn't Done; part merged is a mark; a Review card merged by hand is Done outside the rules | — | `reconciler.test.ts` "S41: …"; `workflow/scenarios.git.test.ts` "S41: …" |
 | S43 | P4's form: one card at a time, the next waits for Done (P5: the queue) | `p4lane` (the next card refused until Done); `progressgates` | `laneOwnership.test.ts` "S43 (P4): …" |
 | S44 | Solo, the project folder, no trailers: start → commit → submit → Done | — | `workflow/scenarios.git.test.ts` "S44: …" |
@@ -222,4 +222,4 @@ The P7 switches' "the window sets it" is `p7settings` (Settings → Advanced's r
 |---|---|
 | S10, S30 | Carry-over and staleness at core level: `workflow/scenarios.git.test.ts` "S10: …", "S30: …"; `workflow/gitAdapter.test.ts` (S10, S30); in the app, the stale mark (`progressgates`) |
 | S37, S46 | P3's observations of a hand squash (containment by the stored key, the "no longer in main" mark): `workflow/queue.test.ts` "S37: …", "S46: …" |
-| S50, S53, S59, S60, S62 | Passed in P3: `workflow/observe.test.ts` "S50 (core)", "S59", "S62"; e2e `upgradelane` (S53), `boardupgrade` (S53, S60, restore) |
+| S50, S53, S59, S60, S62 | Passed in P3: `workflow/observe.test.ts` "S50 (core)", "S59", "S62"; e2e `upgradelane` (S53), `boardupgrade` (S53, S60, restore), both retired by HI-2741 |
