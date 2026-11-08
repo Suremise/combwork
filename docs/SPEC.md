@@ -5004,7 +5004,12 @@ repeating them (#533) [note §8].
   change** (`workflow-changed`, at every level and from every writer, and the *Workflow rules are enforced* switch) runs
   `sessions.restartForTools` (HI-2664's, generalised: side and workflow list compared) for each running agent of the
   project, either way: idle at once, same conversation; busy ones are asked once in the window (`tools-restart-asked`:
-  Restart When Its Turn Is Over / Later; not asked again while the list it would get is the same). **A board change** that
+  Restart When Its Turn Is Over / Later; not asked again while the list it would get is the same). Only for the tools the
+  change moved (HI-2744): what the project's options alone hide before (`byOptions`: as first read, then as each change
+  left it) against after; an agent whose launch differs from now only in other tools (the board took them since: a card
+  left Review) is left alone, so a change that moves no tool (a stage renamed, Maximum agents) restarts and asks no one;
+  one with a question outstanding is always looked at, so a change back forgets it and the next change asks again.
+  Not known before (never read), or the switch: every difference counts. **A board change** that
   makes a tool usable again with no settings change (a card moved into Review by hand on a project without review: its
   stage keeps the review tools) restarts the running agents launched without it the same way (`gainsOfBoard`, after
   `tasks-changed` settles, only projects with an agent running without some tool); one that only makes tools unusable (a

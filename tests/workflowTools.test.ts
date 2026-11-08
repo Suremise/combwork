@@ -216,7 +216,7 @@ describe("a project's list from its options and its work in flight (HR1's s11 po
 
 describe("a busy agent's restart question (HR1's round 1): once while it still needs that restart, again once it didn't", () => {
   /** A project p whose config the change sets, one running agent whose restart says `outcome`, and the questions emitted. */
-  async function busyAgent() {
+  async function busyAgent(how: { settings?: boolean } = {}) {
     const w = await workspace(presetOf('solo', 'none'))
     const p = projectPath(w)
     let cfg = await w.projectConfig(p)
@@ -235,7 +235,7 @@ describe("a busy agent's restart question (HR1's round 1): once while it still n
       change: async (o: WorkflowOptions, r: typeof outcome) => {
         cfg = { ...cfg, workflow: { platform: 'none', options: o } } as never
         outcome = r
-        await restartForWorkflow(w, p)
+        await restartForWorkflow(w, p, undefined, how)
       },
       relaunch: (id: string) => (run = id),
       asked: () => emitted.mock.calls.filter(([e]) => e.type === 'tools-restart-asked').length,
@@ -272,6 +272,17 @@ describe("a busy agent's restart question (HR1's round 1): once while it still n
     }
   })
 
+  it('as the settings change runs it (only the tools it moved count): unchanged for a launch whose list is not known', async () => {
+    const a = await busyAgent({ settings: true })
+    try {
+      await a.change(pair, 'busy')
+      await a.change({ ...pair, maxAgents: 7 }, 'busy')
+      expect(a.asked()).toBe(1)
+    } finally {
+      a.done()
+    }
+  })
+
   it('a new launch of the agent is asked afresh', async () => {
     const a = await busyAgent()
     try {
@@ -279,6 +290,98 @@ describe("a busy agent's restart question (HR1's round 1): once while it still n
       a.relaunch('run-2')
       await a.change(pair, 'busy')
       expect(a.asked()).toBe(2)
+    } finally {
+      a.done()
+    }
+  })
+})
+
+describe('a settings change restarts only for the tools it moved (HI-2744: boardstages asked about R1 on a stage rename)', () => {
+  const solo = presetOf('solo', 'none')
+  const pair = presetOf('pair', 'none')
+  /** Project p under `options`, its running agent launched without `launched`, busy; what the settings changes ask. */
+  async function running(options: WorkflowOptions, launched: () => string[], outcome: () => 'busy' | 'same' = () => 'busy') {
+    const w = await workspace(options)
+    const p = projectPath(w)
+    let cfg = await w.projectConfig(p)
+    forgetWorkflowHidden()
+    forgetAskedRestarts()
+    // As the agent's launch read it: the options' own list is first recorded then.
+    workflowHiddenNow(w, p, cfg)
+    const restarts = vi.spyOn(sessions, 'restartForTools').mockImplementation(async () => outcome())
+    const emitted = vi.spyOn(w, 'emit')
+    const spies: { mockRestore(): void }[] = [
+      vi.spyOn(w, 'projectConfig').mockImplementation(async () => cfg),
+      vi.spyOn(sessions, 'liveFor').mockImplementation(() => ({ runId: 'run-1' }) as never),
+      vi.spyOn(sessions, 'launchedWorkflowHidden').mockImplementation(() => launched()),
+      restarts,
+      emitted
+    ]
+    return {
+      w,
+      change: async (o: WorkflowOptions) => {
+        cfg = { ...cfg, workflow: { platform: 'none', options: o } } as never
+        await restartForWorkflow(w, p, undefined, { settings: true })
+      },
+      restarts: () => restarts.mock.calls.length,
+      asked: () => emitted.mock.calls.filter(([e]) => e.type === 'tools-restart-asked').length,
+      done: () => spies.forEach((x) => x.mockRestore())
+    }
+  }
+
+  it('launched while a card was in Review, which has since left it: a stage renamed restarts and asks nothing', async () => {
+    let launchedWith: string[] = []
+    const a = await running(solo, () => launchedWith)
+    try {
+      const card = await cardUnder(a.w, solo, 'review')
+      launchedWith = workflowHiddenNow(a.w, projectPath(a.w))
+      expect(launchedWith).not.toContain('cw_verdict')
+      // The card leaves Review: the board alone takes the review tools (kept until the agent's next launch).
+      await store.boardWrite(a.w, async () => FactStore.forBoard(a.w, { project: 'p', key: 'P' }).tx((tx) => tx.setStage(card, 'done')))
+      expect(workflowHiddenNow(a.w, projectPath(a.w))).toContain('cw_verdict')
+      await a.change({ ...solo, stageNames: { active: 'Building' } })
+      expect([a.restarts(), a.asked()]).toEqual([0, 0])
+    } finally {
+      a.done()
+    }
+  })
+
+  it('a change that moves a tool its launch has differently restarts it (busy: asked)', async () => {
+    const a = await running(pair, () => hidden(pair))
+    try {
+      await a.change(solo)
+      expect([a.restarts(), a.asked()]).toEqual([1, 1])
+    } finally {
+      a.done()
+    }
+  })
+
+  it("Pair (Later), back to Solo, Pair again: the way back forgets the question, so it's asked again (HR1's round 1)", async () => {
+    // Launched under Solo; its restart says what the real one would: busy while its launch differs from now, else same.
+    let now = solo
+    const a = await running(solo, () => hidden(solo), () => (hidden(now).join() === hidden(solo).join() ? 'same' : 'busy'))
+    const change = (o: WorkflowOptions) => a.change((now = o))
+    try {
+      await change(pair)
+      expect(a.asked()).toBe(1)
+      await change(solo)
+      expect(a.asked()).toBe(1)
+      await change(pair)
+      expect(a.asked()).toBe(2)
+      // A rename meanwhile, the question outstanding: not asked again (its list is the same).
+      await change({ ...pair, stageNames: { active: 'Building' } })
+      expect(a.asked()).toBe(2)
+    } finally {
+      a.done()
+    }
+  })
+
+  it('what the options hid before not known (never read): every difference counts, as before', async () => {
+    const a = await running(pair, () => hidden(pair))
+    try {
+      forgetWorkflowHidden()
+      await a.change({ ...pair, stageNames: { active: 'Building' } })
+      expect(a.restarts()).toBe(1)
     } finally {
       a.done()
     }
