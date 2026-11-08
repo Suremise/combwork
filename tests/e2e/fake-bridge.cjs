@@ -127,9 +127,10 @@ const isDoorbell = (text) => String(text).startsWith('[CW] New in your inbox: ')
 
 /**
  * Whether a doorbell names only tasks and handovers (a new piece of work, whose text is the agent's next prompt), not
- * wakes, messages or notices.
+ * wakes, messages or notices. Its cards are named by key ("1 task (AL-1) (m1)", projectKeys.ts' cardRef) or, without
+ * project keys, by number ("1 task (#12) (m1)") (HI-2746).
  */
-const doorbellIsWork = (text) => /^\[CW\] New in your inbox: (\d+ (task|tasks|handover|handovers)( \(#[\d, #]+\))?( and |, )?)+ \(m/.test(String(text))
+const doorbellIsWork = (text) => /^\[CW\] New in your inbox: (\d+ (task|tasks|handover|handovers)( \((#\d+|[A-Za-z]{2,4}-\d+)(, (#\d+|[A-Za-z]{2,4}-\d+))*\))?( and |, )?)+ \(m/.test(String(text))
 
 /**
  * cw_inbox's reply (shared/deliveries.ts inboxText) as its items: { ids, from, card, text }, oldest first. An item's
