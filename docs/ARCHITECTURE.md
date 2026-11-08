@@ -898,7 +898,7 @@ the Progress runs (`ProgressRun` gains `card` and
 - **Unit tests** (`tests/*.test.ts`, Vitest) cover pure logic: migrations, settings resolution, parsers (with CLI transcript fixtures in `tests/fixtures`), prices, kept files and path guards. `electron` resolves to `tests/electron-stub.ts` (vitest alias), so they need no Electron binary.
 - **End-to-end suites** (`tests/e2e`, `npm run e2e`) drive the dev build with Playwright `_electron`; see `tests/e2e/README.md`. They need the CLIs and sign-ins, so they run locally, not in CI.
 - **Lint**: oxlint with `.oxlintrc.json` (typescript-eslint doesn't support TypeScript 7 yet). `npm run lint` fails on warnings and runs in `npm run build`.
-- **CI** (`.github/workflows/ci.yml`): typecheck, lint and unit tests on Windows for every push to `main` and pull request.
+- **CI** (`.github/workflows/ci.yml`): typecheck, lint and unit tests on Windows for every push to `main` and pull request. Electron's binary is installed before them by `scripts/installElectronCi.mjs`, with retries and a cache keyed by the Electron version (HI-2751).
 
 ## Renderer structure
 
