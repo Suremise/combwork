@@ -1,0 +1,8 @@
+{
+ "status": 404,
+ "body": {
+  "_tag": "SessionNotFoundError",
+  "sessionID": "ses_TPLt1XJL62ZsBDcM7RNtbvfxxx",
+  "message": "Session not found: ses_TPLt1XJL62ZsBDcM7RNtbvfxxx"
+ }
+}

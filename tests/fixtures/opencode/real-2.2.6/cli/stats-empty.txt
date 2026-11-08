@@ -1,0 +1,10 @@
+$ opencode stats --standalone
+code 0
+--- stdout
+opencode stats · 2026 so far · all projects
+
+no activity in this range
+
+opencode.ai
+
+--- stderr

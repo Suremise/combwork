@@ -1,0 +1,11 @@
+$ opencode auth login probe --method key --standalone
+code 1
+--- stdout
+[90mT[39m  Connect an integration
+[90m|[39m
+[31mx[39m  API key input requires an interactive terminal
+[90m|[39m
+[90m—[39m  Failed
+
+
+--- stderr

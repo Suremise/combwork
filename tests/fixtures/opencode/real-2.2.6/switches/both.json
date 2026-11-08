@@ -1,0 +1,34 @@
+{
+ "variant": "both",
+ "env": {
+  "OPENCODE_DISABLE_PROJECT_CONFIG": "1",
+  "OPENCODE_DISABLE_CLAUDE_CODE": "1"
+ },
+ "configSources": [
+  "<root>\\cfg\\opencode.json",
+  "<root>\\cfg"
+ ],
+ "codewords": [
+  "CODEWORD-GLOBAL-CFG"
+ ],
+ "tools": [
+  "edit",
+  "glob",
+  "grep",
+  "question",
+  "read",
+  "shell",
+  "skill",
+  "subagent",
+  "webfetch",
+  "websearch",
+  "write",
+  "execute"
+ ],
+ "mcpPings": [
+  "ping_combwork"
+ ],
+ "markers": [
+  "start-combwork T-OURS"
+ ]
+}

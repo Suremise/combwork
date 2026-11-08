@@ -1,0 +1,15 @@
+$ opencode session list --format json --standalone
+code 0
+--- stdout
+[
+  {
+    "id": "ses_e428cefc2ffeSDNwiHFcRk8o1D",
+    "title": "Execute combwork ping r0",
+    "updated": 1794179899898,
+    "created": 1794179797178,
+    "projectId": "c7b299fcebfe87d32ce1a5a9a419fe634b929caf",
+    "directory": "<root>\\project"
+  }
+]
+
+--- stderr

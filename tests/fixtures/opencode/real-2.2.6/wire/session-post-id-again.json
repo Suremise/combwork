@@ -1,0 +1,26 @@
+{
+ "status": 200,
+ "body": {
+  "data": {
+   "id": "ses_TPLt1XJL62ZsBDcM7RNtbvfxxx",
+   "projectID": "b360c067ad1fce6b3a18f3cbfc4baf360e536438",
+   "cost": 0,
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "time": {
+    "created": 1794179590013,
+    "updated": 1794179590013
+   },
+   "location": {
+    "directory": "<root>\\project"
+   }
+  }
+ }
+}

@@ -1,0 +1,6 @@
+$ opencode session export ses_absentabsentabsentabsent00 --standalone
+code 1
+--- stdout
+
+--- stderr
+Session not found: ses_absentabsentabsentabsent00

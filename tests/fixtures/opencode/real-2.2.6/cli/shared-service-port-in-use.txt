@@ -1,0 +1,1 @@
+Error: Managed service port 28894 on 127.0.0.1 is already in use by another process. Configure another port with `opencode service set port <port>` and start the service again.

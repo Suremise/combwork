@@ -1,0 +1,147 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "msg_1bd707439001DwweTCYmxKZb8D",
+    "time": {
+     "created": 1794179626041
+    },
+    "type": "idle",
+    "outcome": "succeeded"
+   },
+   {
+    "id": "msg_1bd706f29001CU4IWWcba6HGTy",
+    "time": {
+     "created": 1794179624748,
+     "streamed": 1794179625982,
+     "completed": 1794179626037
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "Okay, the user asked to run the command `echo r0-shell-marker` using the shell tool and then reply with the output. I called the shell function with the command, and the response was `r0-shell-marker`. Now, I need to make sure that I just present the output without any extra text. The user specified to reply with the command's output and nothing else. So I'll check if the output is correctly captured. The response from the tool is straightforward, so I'll output it as is. No need for any additional explanations or formatting. Just the marker text.\n",
+      "native": {
+       "reasoningField": "reasoning"
+      },
+      "time": {
+       "created": 1794179624870,
+       "completed": 1794179625978
+      }
+     },
+     {
+      "type": "text",
+      "text": "r0-shell-marker"
+     }
+    ],
+    "snapshot": {
+     "start": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "end": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "files": []
+    },
+    "finish": "stop",
+    "rawFinish": "stop",
+    "cost": 0,
+    "tokens": {
+     "input": 209,
+     "output": 128,
+     "reasoning": 0,
+     "cache": {
+      "read": 4839,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1bd703f8d001MyMGf37DsURKbF",
+    "time": {
+     "created": 1794179612566,
+     "streamed": 1794179624270,
+     "completed": 1794179624738
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "Okay, the user wants me to use the shell tool to run the command 'echo r0-shell-marker' and then reply with the output. Let me check the available tools. The shell function is listed, so I need to call that. The parameters required are command, workdir, timeout, and background. The user specified exactly the command, so I'll set command to 'echo r0-shell-marker'. The working directory isn't mentioned, so I'll leave it as the default. Timeout isn't specified either, so I'll use the default. Since the user wants the output immediately, I shouldn't run it in the background. I'll structure the tool call with these parameters. Let me make sure I'm not missing any other required fields. Everything seems set. Now, I'll format the JSON for the tool call.\n",
+      "native": {
+       "reasoningField": "reasoning"
+      },
+      "time": {
+       "created": 1794179622566,
+       "completed": 1794179624265
+      }
+     },
+     {
+      "type": "tool",
+      "id": "call_oxm8z7a8",
+      "name": "shell",
+      "executed": false,
+      "state": {
+       "status": "completed",
+       "input": {
+        "command": "echo r0-shell-marker"
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "r0-shell-marker\r\n"
+        }
+       ],
+       "metadata": {
+        "status": "completed",
+        "truncated": false,
+        "exit": 0
+       }
+      },
+      "time": {
+       "created": 1794179624247,
+       "ran": 1794179624268,
+       "completed": 1794179624687
+      }
+     }
+    ],
+    "snapshot": {
+     "start": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "end": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "files": []
+    },
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "cost": 0,
+    "tokens": {
+     "input": 4834,
+     "output": 195,
+     "reasoning": 0,
+     "cache": {
+      "read": 4,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1bd703db2001REhS9aAF1tSopX",
+    "time": {
+     "created": 1794179612548
+    },
+    "text": "Use the shell tool to run exactly this command: echo r0-shell-marker . Then reply with the command's output and nothing else.",
+    "type": "user"
+   }
+  ],
+  "cursor": {
+   "previous": "eyJpZCI6Im1zZ18xYmQ3MDc0MzkwMDFEd3dlVENZbXhLWmI4RCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+   "next": "eyJpZCI6Im1zZ18xYmQ3MDNkYjIwMDFSRWhTOWFBRjF0U29wWCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+ }
+}

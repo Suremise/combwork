@@ -1,0 +1,37 @@
+{
+ "status": 200,
+ "body": {
+  "data": {
+   "id": "ses_e428fc2ecffex263I9wXsnv2XZ",
+   "projectID": "49b7441588fa9d640766ecb1ceb74e76d7a346b2",
+   "cost": 0,
+   "tokens": {
+    "input": 5520,
+    "output": 1222,
+    "reasoning": 0,
+    "cache": {
+     "read": 4843,
+     "write": 0
+    }
+   },
+   "outcome": "succeeded",
+   "time": {
+    "created": 1794179612049,
+    "updated": 1794179626037,
+    "busy": 1794179612542,
+    "idle": 1794179626041
+   },
+   "title": "r0-shell-marker output",
+   "permissions": [
+    {
+     "action": "shell",
+     "resource": "*",
+     "effect": "ask"
+    }
+   ],
+   "location": {
+    "directory": "<root>\\project"
+   }
+  }
+ }
+}

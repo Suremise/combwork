@@ -1,0 +1,1 @@
+[ { "id": "probe", "name": "Probe Ollama", "connections": [ { "type": "credential", "id": "cred_1bd03c080001QUT8PewAXRIHRx", "label": "a-saved", "method": "key" }, { "type": "env", "name": "PROBE_API_KEY" } ] } ]
