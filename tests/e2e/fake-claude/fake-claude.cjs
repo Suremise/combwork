@@ -47,7 +47,8 @@
 //   Combwork tool through the real Combwork MCP server of the launch's --mcp-config (fake-bridge.cjs: logged and measured by
 //   Combwork's performance metrics as a real call is), written to the transcript as that MCP call and its reply. Combwork's
 //   doorbell ("[CW] New in your inbox: …", #650) it follows as a model does: it reads its inbox with cw_inbox (and
-//   acks it too when it follows notices, below). New work (a task, a handover) it read is its prompt; what else it read
+//   acks it too when it follows notices, below). New work (a task, a handover) it read is its prompt, logged in
+//   fake-wakes.jsonl with `work: true` (HI-2747); what else it read
 //   (a card watch's wake, "[CW] #12 is in Review…", a message), like a line Combwork types to wake it, is logged in
 //   fake-wakes.jsonl (with `enter`: which Enter since the line was begun sent it, 1 for the first, #664) and answered
 //   with the next line of fake-wakes-<agent>.txt (a test's script of what this agent does next); with a number N in
@@ -595,10 +596,12 @@ function shell(cmd) {
   })
 }
 
-function wakeScript(text, doorbell = null) {
+// A doorbell's new work (work: true) is logged as what it read, but is its prompt: no script line answers it (HI-2747).
+function wakeScript(text, doorbell = null, work = false) {
   if ((!doorbell && !text.startsWith('[CW]')) || !home) return null
   const agent = String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')
-  fs.appendFileSync(path.join(home, 'fake-wakes.jsonl'), JSON.stringify({ agent, text, ...(doorbell ? { doorbell } : {}), enter: promptEnter, at: new Date().toISOString() }) + '\n')
+  fs.appendFileSync(path.join(home, 'fake-wakes.jsonl'), JSON.stringify({ agent, text, ...(doorbell ? { doorbell } : {}), ...(work ? { work } : {}), enter: promptEnter, at: new Date().toISOString() }) + '\n')
+  if (work) return null
   const file = path.join(home, `fake-wakes-${agent}.txt`)
   if (!fs.existsSync(file)) return null
   const lines = fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim())
@@ -662,7 +665,7 @@ async function runPrompt(text, enter = null) {
   // line Combwork typed to wake it is.
   const doorbell = isDoorbell(text) ? text : null
   if (doorbell) text = (await followDoorbell()) ?? text
-  const woken = doorbell && doorbellIsWork(doorbell) ? null : wakeScript(text, doorbell)
+  const woken = wakeScript(text, doorbell, !!doorbell && doorbellIsWork(doorbell))
   if (woken !== null) text = woken
   const edit = /\bedit\s+(\S+)/i.exec(text)
   if (edit) {
