@@ -30,7 +30,7 @@
 
 ### Changed
 
-- **GitHub Copilot 1.0.107 tested** (HI-2780), beside 1.0.106: Provider Setup ticks either. 1.0.107 is a republish of 1.0.106 with no changes of its own (the same release notes and help); WinGet offered only 1.0.106 when this was tested.
+- **GitHub Copilot 1.0.107 tested** (HI-2780), beside 1.0.106: Provider Setup ticks either. 1.0.107's release notes are 1.0.106's, and no differences were found in what was checked (its help, its terminal output, its model listing, Combwork's Copilot suites); WinGet offered only 1.0.106 when this was tested.
 
 ### Fixed
 
