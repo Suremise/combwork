@@ -273,6 +273,7 @@ export class OpencodeAdapter implements ProviderAdapter {
       privateDir: ctx.privateDir,
       owner: p.owner,
       marks: p.marks,
+      hookUrl: ctx.hookUrl,
       readyMs: advanced.number('opencode.server.readySeconds') * 1000
     })
     return { file: POWERSHELL, args: LAUNCHER_ARGS, env: { ...env, ...launcher } }

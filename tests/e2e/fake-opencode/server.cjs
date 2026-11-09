@@ -87,6 +87,17 @@ async function startServer(opts) {
     return e
   }
   const session = (sid) => store.read(env).sessions[sid]
+  let logReads = 0
+  /** A submission, as the TUI's prompt makes one (an inbox item), its turn queued after the session's others; `done` once it ended. */
+  function submit(sid, text) {
+    const inboxID = store.newId('msg')
+    const now = Date.now()
+    pushMessage(sid, { id: inboxID, time: { created: now }, text, type: 'user' })
+    emit('session.inbox.enqueued', { inboxID, sessionID: sid, item: { type: 'user', payload: { text }, delivery: 'steer' } }, { sid, durable: true, location: loc(sid) })
+    const q = (queues.get(sid) || Promise.resolve()).then(() => runTurn(sid, text, inboxID))
+    queues.set(sid, q.catch(() => undefined))
+    return { inboxID, now, text, done: q.catch(() => undefined) }
+  }
   const loc = (sid) => session(sid)?.info.location
 
   function createSession(body) {
@@ -142,6 +153,8 @@ async function startServer(opts) {
       emit('session.renamed', { sessionID: sid, title }, d)
     }
     // The stream lost mid-turn (HI-2758 Q5): what happens meanwhile reaches no one, and is never replayed.
+    // A test's over-long frame (never 2.2.6's): one event of the session's whose data line is 300 KB.
+    if (/\blong frame\b/i.test(text)) emit('session.step.started', { sessionID: sid, assistantMessageID: store.newId('msg'), padding: 'x'.repeat(300 * 1024) }, d)
     if (/\bdrop events\b/i.test(text))
       for (const c of [...clients]) {
         clients.delete(c)
@@ -458,8 +471,12 @@ async function startServer(opts) {
     }
     // The durable log (HI-2760's recording of 2.2.6): only its watermark, the session's last durable seq, as one frame.
     if ((m = /^\/api\/experimental\/session\/([^/]+)\/log$/.exec(p)) && req.method === 'GET') {
+      if (!session(m[1])) return notFound(res, m[1])
+      // A test's race (FAKE_OPENCODE_RACE_ON_LOG=n, never 2.2.6's): before the n-th watermark is answered, a whole turn
+      // runs to its end, as if submitted between a snapshot's last message page and its second watermark.
+      logReads++
+      if (Number(env.FAKE_OPENCODE_RACE_ON_LOG) === logReads) await submit(m[1], 'raced').done
       const s = session(m[1])
-      if (!s) return notFound(res, m[1])
       res.writeHead(200, { 'cache-control': 'no-cache, no-transform', 'content-type': 'text/event-stream' })
       return res.end(`data: ${JSON.stringify({ type: 'log.synced', aggregateID: m[1], seq: Math.max(0, s.seq ?? 0) })}\n\n`)
     }
@@ -467,13 +484,7 @@ async function startServer(opts) {
       const sid = m[1]
       if (!session(sid)) return notFound(res, sid)
       const body = (await bodyOf(req)) || {}
-      const text = String(body.text ?? '')
-      const inboxID = store.newId('msg')
-      const now = Date.now()
-      pushMessage(sid, { id: inboxID, time: { created: now }, text, type: 'user' })
-      emit('session.inbox.enqueued', { inboxID, sessionID: sid, item: { type: 'user', payload: { text }, delivery: 'steer' } }, { sid, durable: true, location: loc(sid) })
-      const q = (queues.get(sid) || Promise.resolve()).then(() => runTurn(sid, text, inboxID))
-      queues.set(sid, q.catch(() => undefined))
+      const { inboxID, now, text } = submit(sid, String(body.text ?? ''))
       return json(res, 200, { data: { id: inboxID, sessionID: sid, time: { created: now }, type: 'user', payload: { text }, delivery: 'steer' } })
     }
     if ((m = /^\/api\/session\/([^/]+)\/interrupt$/.exec(p)) && req.method === 'POST') {
