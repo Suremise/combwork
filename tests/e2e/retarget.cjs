@@ -10,6 +10,8 @@
 // - HI-2753: a card in flight on 1.2.0 when 1.2.0 is released into integration: Save…'s Retarget offers it, its branch
 //   and work kept; saved, it moves (a Retargeted fact, its line where it was, its history says so) and submits.
 //   Another card in flight there moved from its dialog's Merges into (open for a started card), its line kept.
+// - HI-2825: cards never started, On Hold: the Assistant's update sets one's Merges into with its column and blocked;
+//   another's dialog saves its Merges into, the card staying On Hold.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -153,6 +155,28 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     check('…the slot is out of the pool (dirty), its folder untouched', (await slots()).find((s) => s.name === slot.name)?.state === 'dirty' && git(slot.folder, 'rev-parse', 'HEAD') === git(fx.alpha, 'rev-parse', 'main'), JSON.stringify(await slots()))
     const actions = await inv('assistant:actions')
     check('…listed in its actions', actions.some((x) => x.ok && x.kind === 'retarget' && x.project === 'alpha'), JSON.stringify(actions.map((x) => [x.kind, x.text])))
+
+    // --- HI-2825: cards never started, On Hold (no Started, no line): their Merges into changes to a listed branch.
+    // The Assistant's update, its Merges into with the column and blocked fields it was refused with: all apply together.
+    const held = async (title) => (await inv('tasks:create', { title, project: 'alpha', column: 'hold', blocked: 'later' })).number
+    const nA = await held('Never started: the Assistant moves it')
+    const upd = await api(assistant, 'PATCH', `/v1/tasks/${await keyOf(nA)}`, { target: '1.2.0', column: 'todo', blocked: null })
+    const cA = await card(nA)
+    check("HI-2825: the Assistant changes a never-started held card's Merges into, with its column and blocked", upd.status === 200 && (await ownTarget(nA)) === '1.2.0' && cA?.column === 'todo' && !cA?.blocked, JSON.stringify({ status: upd.status, body: upd.body, column: cA?.column, blocked: cA?.blocked }))
+    // The card dialog: picked there, it saves, the card stays On Hold.
+    const nU = await held('Never started: changed in its dialog')
+    await q.showBoard(page)
+    await waitHung(async () => (await page.locator(`.task-card[data-task="${nU}"]`).count()) > 0)
+    await q.openByTitle(page, nU)
+    const heldField = page.locator('.dialog select#card-target')
+    await heldField.waitFor({ timeout: HUNG_MS })
+    await waitHung(async () => !(await heldField.isDisabled()))
+    await heldField.selectOption('1.2.0')
+    const savedU = await waitHung(async () => ((await ownTarget(nU)) === '1.2.0' ? true : null)).catch(() => null)
+    check("HI-2825: a never-started held card's dialog saves its Merges into, the card On Hold still", !!savedU && (await card(nU))?.column === 'hold', JSON.stringify({ target: await ownTarget(nU), column: (await card(nU))?.column, error: await text(page.locator('.dialog .error, .dialog [role="alert"]').first()) }))
+    await page.locator('.dialog').first().screenshot({ path: path.join(fx.shots, 'retarget-dialog-never-started.png') }).catch(() => undefined)
+    await page.keyboard.press('Escape')
+    await page.locator('.dialog select#card-target').waitFor({ state: 'detached', timeout: HUNG_MS })
     await inv('session:stop', home, 'assistant')
 
     // --- HI-2753: a card in flight on 1.2.0 when 1.2.0 is released into integration. Save…'s Retarget offers it, with its
