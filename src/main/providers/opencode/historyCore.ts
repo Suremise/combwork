@@ -1,4 +1,6 @@
-import { spawn as spawnChild, execFile, type ChildProcess } from 'child_process'
+import { spawn as spawnChild, type ChildProcess } from 'child_process'
+import { endTree } from '../../progressReporters/wrapper'
+import { request as httpRequest } from 'http'
 import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
 import { buildMirror, mirrorState, newestMessage, parseExport, withStatus, type MirrorHeader, type MirrorProblem, type LimitsReading, opencodePlanUsage } from './mirror'
@@ -116,7 +118,7 @@ interface Job {
  * A read that failed: its kind (what the history's notice says, translated), what the log says (English), and the CLI's or
  * OpenCode's own words where they gave some (`said`: shown after the notice as they are; never Combwork's own words).
  */
-class Failed extends Error {
+export class Failed extends Error {
   constructor(
     readonly problem: MirrorProblem,
     detail: string,
@@ -126,27 +128,58 @@ class Failed extends Error {
   }
 }
 
+/**
+ * A GET to an agent's own OpenCode server on this PC (http on a loopback address only), never through fetch: fetch hands
+ * a `Content-Encoding: br` reply to Node's Brotli decoder (#1582). It asks for no encoding and refuses an encoded reply;
+ * the answer is at most `maxBytes`, counted as it comes; `signal` ends it. Failures are Failed, with what went wrong.
+ */
+export function plainLocalGet(url: string, headers: Record<string, string>, signal: AbortSignal, maxBytes: number): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    let u: URL
+    try {
+      u = new URL(url)
+    } catch {
+      return reject(new Failed('timeout', 'not a URL')) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
+    }
+    if (u.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname)) return reject(new Failed('timeout', 'not a server on this PC')) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
+    const req = httpRequest(u, { method: 'GET', headers: { ...headers, 'accept-encoding': 'identity' }, signal }, (res) => {
+      const encoding = String(res.headers['content-encoding'] ?? 'identity').toLowerCase()
+      if (encoding !== 'identity') {
+        res.destroy()
+        return reject(new Failed('parse', `an encoded answer (${encoding})`)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
+      }
+      const chunks: Buffer[] = []
+      let n = 0
+      res.on('data', (b: Buffer) => {
+        n += b.length
+        if (n > maxBytes) {
+          res.destroy()
+          reject(new Failed('size', `an answer was over ${maxBytes} bytes`)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
+        } else chunks.push(b)
+      })
+      res.on('end', () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') }))
+      res.on('error', (e) => reject(new Failed('timeout', e.message)))
+    })
+    req.on('error', (e) => reject(new Failed('timeout', e.message)))
+    req.end()
+  })
+}
+
 const key = (home: string, sessionId: string): string => `${home.toLowerCase()}|${sessionId}`
 
 export interface CoreDeps {
-  fetch: typeof fetch
+  /** A GET to the run's own server: plainLocalGet's answer (tests: a fake server). */
+  get: (url: string, headers: Record<string, string>, signal: AbortSignal, maxBytes: number) => Promise<{ status: number; body: string }>
   spawn: (file: string, args: string[], opts: { env: Record<string, string>; cwd?: string; verbatim?: boolean }) => ChildProcess
-  killTree: (pid: number) => void
+  /** Ends a process and what it started, by identity (cw-progress's endTree, #603/#655). */
+  endTree: (child: ChildProcess) => void
   now: () => number
 }
 
 const defaultDeps: CoreDeps = {
-  fetch: (...a) => fetch(...a),
+  get: (url, headers, signal, maxBytes) => plainLocalGet(url, headers, signal, maxBytes),
   spawn: (file, args, o) => spawnChild(file, args, { env: o.env, cwd: o.cwd, windowsHide: true, windowsVerbatimArguments: !!o.verbatim, stdio: ['ignore', 'pipe', 'pipe'] }),
-  killTree: (pid) => {
-    if (process.platform === 'win32') execFile('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }, () => undefined)
-    else
-      try {
-        process.kill(pid, 'SIGKILL')
-      } catch {
-        /* already gone */
-      }
-  },
+  endTree: (child) => endTree(child),
   now: () => Date.now()
 }
 
@@ -237,7 +270,7 @@ export class HistoryCore {
         this.closed = true
         this.queue = []
         for (const run of [...this.runs.values()]) this.dropRun(run)
-        for (const c of this.children) if (c.pid) this.deps.killTree(c.pid)
+        for (const c of this.children) this.deps.endTree(c)
         this.children.clear()
         return true
     }
@@ -342,46 +375,17 @@ export class HistoryCore {
     if (!run.url || !run.password) throw new Failed('timeout', 'the server is not known yet') // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
     const ms = Math.min(this.bounds.requestMs, deadline - this.deps.now())
     if (ms <= 0) throw new Failed('timeout', 'the read took too long') // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
-    const timer = AbortSignal.timeout(ms)
-    const signal = AbortSignal.any([timer, run.abort.signal])
-    let res: Response
-    try {
-      res = await this.deps.fetch(run.url + path, { headers: { authorization: 'Basic ' + Buffer.from(`opencode:${run.password}`).toString('base64') }, signal }) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
-    } catch (e) {
-      throw new Failed('timeout', e instanceof Error ? e.message : String(e)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
-    }
+    const signal = AbortSignal.any([AbortSignal.timeout(ms), run.abort.signal])
+    const res = await this.deps.get(run.url + path, { authorization: 'Basic ' + Buffer.from(`opencode:${run.password}`).toString('base64') }, signal, this.bounds.maxBytes) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
     if (res.status !== 200) throw new Failed('timeout', `${path.split('?')[0]} answered ${res.status}`) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
-    const text = await this.boundedText(res, signal)
     try {
-      return JSON.parse(text)
+      return JSON.parse(res.body)
     } catch {
       // The log's watermark is an SSE frame (`data: {…}`).
-      const m = /^data:\s*(\{.*\})\s*$/m.exec(text)
+      const m = /^data:\s*(\{.*\})\s*$/m.exec(res.body)
       if (m) return JSON.parse(m[1])
       throw new Failed('parse', `${path.split('?')[0]} wasn't JSON`) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
     }
-  }
-
-  private async boundedText(res: Response, signal: AbortSignal): Promise<string> {
-    if (!res.body) return ''
-    const reader = res.body.getReader()
-    const chunks: Uint8Array[] = []
-    let n = 0
-    for (;;) {
-      if (signal.aborted) {
-        await reader.cancel().catch(() => undefined)
-        throw new Failed('timeout', 'the read was stopped') // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
-      }
-      const { done, value } = await reader.read()
-      if (done) break
-      n += value.byteLength
-      if (n > this.bounds.maxBytes) {
-        await reader.cancel().catch(() => undefined)
-        throw new Failed('size', `an answer was over ${this.bounds.maxBytes} bytes`) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
-      }
-      chunks.push(value)
-    }
-    return Buffer.concat(chunks).toString('utf8')
   }
 
   /** The session's durable watermark (`log?after=0`'s log.synced seq), as HI-2760's launcher reads it. */
@@ -501,7 +505,7 @@ export class HistoryCore {
       const kill = (f: Failed): void => {
         if (why) return
         why = f
-        if (child.pid) this.deps.killTree(child.pid)
+        this.deps.endTree(child)
       }
       const timer = setTimeout(() => kill(new Failed('timeout', `the export took over ${Math.round(this.bounds.exportMs / 1000)} s`)), this.bounds.exportMs) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       const watch = setInterval(() => {

@@ -345,6 +345,10 @@ function contentText(c: unknown): string {
 
 const errorText = (e: unknown): string => (isObj(e) && typeof e.message === 'string' ? e.message : '')
 
+/** OpenCode's shell tool, formatted as Claude Code's (formatToolInput shows its command as it is). */
+// agent-protocol: a tool's name, not wording
+const SHELL_AS = 'Bash' // i18n-ignore: a tool's name
+
 /** A tool part as the viewer shows it: its input, its result once it has one, and its exit where it ran a command. */
 export function opencodeTool(part: Obj, root: string | null): TranscriptTool {
   const name = typeof part.name === 'string' && part.name ? part.name : 'tool'
@@ -355,7 +359,26 @@ export function opencodeTool(part: Obj, root: string | null): TranscriptTool {
   const isError = state.status === 'error'
   const result = done ? (isError ? errorText(state.error) || contentText(state.content) : contentText(state.content)) : null
   const exit = isObj(state.metadata) && typeof state.metadata.exit === 'number' ? state.metadata.exit : undefined
-  return { toolUseId: typeof part.id === 'string' ? part.id : '', name, summary, input: formatToolInput(name === 'shell' ? 'Bash' : name, input), result, isError, images: [], ...(exit !== undefined ? { exitCode: exit } : {}) } // i18n-ignore: Bash is a tool's name (formatToolInput shows a command as it is)
+  const id = typeof part.id === 'string' ? part.id : ''
+  const calls = codeModeCalls(id, state, result)
+  return { toolUseId: id, name, summary, input: formatToolInput(name === 'shell' ? SHELL_AS : name, input), result, isError, images: [], ...(exit !== undefined ? { exitCode: exit } : {}), ...(calls ? { calls, script: true as const } : {}) }
+}
+
+/**
+ * The tools a Code Mode `execute` called (2.2.6 offers MCP tools to the model only through it: HI-2763's R0), as its
+ * metadata records them (`toolCalls`: `{tool: "<server>.<tool>", status, input}`, messages/mcp-through-execute.json),
+ * each a tool of its own in the order called, as a Codex script's calls are (HI-2240). 2.2.6 records no result of its
+ * own for a call: a script's one call has the script's result, any other none. Null for a tool that records none.
+ */
+function codeModeCalls(id: string, state: Obj, result: string | null): TranscriptTool[] | null {
+  const recorded = isObj(state.metadata) && Array.isArray(state.metadata.toolCalls) ? state.metadata.toolCalls.filter(isObj) : null
+  if (!recorded || !recorded.length) return null
+  return recorded.map((c, i) => {
+    const name = typeof c.tool === 'string' && c.tool ? c.tool : 'tool'
+    const input = isObj(c.input) ? c.input : {}
+    const ended = c.status === 'completed' || c.status === 'error'
+    return { toolUseId: `${id}#${i}`, name, summary: firstLine(formatToolInput(name, input)), input: formatToolInput(name, input), result: ended && recorded.length === 1 ? result : null, isError: c.status === 'error', images: [] }
+  })
 }
 
 /** A message's items, in order. */

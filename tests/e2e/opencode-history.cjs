@@ -56,7 +56,6 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
     const agent = await lib.addAgent(inv, alpha, { name: 'Oc', provider: 'opencode' })
     const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id && s.status !== 'stopped') ?? null
     const key = lib.ptyKey(alpha, agent.id)
-    const screen = async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '')
     const type = async (text) => {
       await inv('pty:write', key, text)
       await inv('pty:write', key, '\r')
@@ -65,7 +64,7 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
     await inv('session:start', alpha, { agentId: agent.id })
     await lib.until(async () => lines().some((e) => e.kind === 'tui'), HUNG_MS)
     const sid = (await lib.until(async () => (await live())?.sessionId ?? null, HUNG_MS)) ?? ''
-    check('the agent has its session', /^ses_/.test(sid), sid)
+    check('the agent has its session', sid.startsWith('ses_'), sid)
 
     // --- Two turns: a reply, and a tool call through Code Mode's execute.
     let ends = turnEnds().length
@@ -85,7 +84,7 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
     check('the Sessions tab shows the conversation: its prompts', ['hello', 'tool history-marker'].every((t) => all.some((x) => x.kind === 'user' && x.text === t)), JSON.stringify(all.map((x) => x.kind)))
     check('…the replies', all.some((x) => x.kind === 'assistant' && /hello/.test(x.text)), JSON.stringify(all.filter((x) => x.kind === 'assistant').map((x) => x.text)))
     check('…and the tool call, with its result', all.some((x) => x.kind === 'tool' && x.tool?.name === 'execute' && /history-marker/.test(x.tool?.result ?? '')), JSON.stringify(all.filter((x) => x.kind === 'tool').map((x) => x.tool)))
-    check("…read through the server's settled reads (the log's watermark, the session, its messages by page)", http((e) => /\/log$/.test(e.path)).length >= 2 && http((e) => /\/message$/.test(e.path)).length >= 1, JSON.stringify(http((e) => /\/api\/(experimental\/)?session\//.test(e.path)).map((e) => e.path).slice(-6)))
+    check("…read through the server's settled reads (the log's watermark, the session, its messages by page)", http((e) => e.path.endsWith('/log')).length >= 2 && http((e) => e.path.endsWith('/message')).length >= 1, JSON.stringify(http((e) => /\/api\/(experimental\/)?session\//.test(e.path)).map((e) => e.path).slice(-6)))
 
     // --- Usage: the session's own totals, its title's request included; OpenCode's cost, $0, not an estimate.
     const usage = await lib.until(async () => {

@@ -6,7 +6,7 @@ import { readFileSync, existsSync, writeFileSync, mkdirSync, utimesSync } from '
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { HISTORY_TEXT, OpencodeConversationParser, buildMirror, inconsistentBreakdowns, mirrorState, opencodePlanUsage, opencodeUsage, parseExport, parseMirrorUsage, placeholderMirror, withStatus, withoutStatus } from '../src/main/providers/opencode/mirror'
-import { HistoryCore, dbFiles, mirrorPath, statePath, type CoreEvent } from '../src/main/providers/opencode/historyCore'
+import { Failed, HistoryCore, dbFiles, mirrorPath, plainLocalGet, statePath, type CoreEvent } from '../src/main/providers/opencode/historyCore'
 import { OpencodeHistory, historyWorkerForTests } from '../src/main/providers/opencode/history'
 import { serverInfoPath } from '../src/main/providers/opencode/launcher'
 import { englishText } from '../src/shared/advanced'
@@ -128,7 +128,10 @@ describe("OpenCode's conversation from its mirror (HI-2762)", () => {
     const items = conversation(mirrorOf({ info: { id: 's', time: {} }, messages: m }))
     const tool = items.find((i) => i.kind === 'tool') as any
     expect(tool.tool.name).toBe('execute')
-    expect(tool.tool.result).toBeTruthy()
+    expect(tool.tool.result).toBe('pong from combwork (token T-OURS)')
+    // The call it made, as 2.2.6 recorded it (metadata.toolCalls), a tool of its own with the script's one result.
+    expect(tool.tool.script).toBe(true)
+    expect(tool.tool.calls).toEqual([expect.objectContaining({ name: 'combwork.ping_combwork', input: 'note: r0', result: 'pong from combwork (token T-OURS)', isError: false })])
   })
 
   it('ends with a translated notice and OpenCode\'s own words when the newest read failed; the history before it unchanged', () => {
@@ -223,16 +226,16 @@ interface FakeServer {
   reads: string[]
 }
 
-function fakeFetch(srv: FakeServer): typeof fetch {
+function fakeGet(srv: FakeServer): (url: string, headers: Record<string, string>) => Promise<{ status: number; body: string }> {
   let marks = 0
-  return (async (input: any, init?: any) => {
+  return async (input, headers) => {
     const url = new URL(String(input))
-    if (init?.headers?.authorization !== 'Basic ' + Buffer.from('opencode:pw').toString('base64')) return new Response('{}', { status: 401 })
+    if (headers.authorization !== 'Basic ' + Buffer.from('opencode:pw').toString('base64')) return { status: 401, body: '{}' }
     srv.reads.push(url.pathname + url.search)
-    const json = (b: unknown) => new Response(JSON.stringify(b), { status: 200 })
+    const json = (b: unknown) => ({ status: 200, body: JSON.stringify(b) })
     if (url.pathname.endsWith('/log')) {
       await srv.onWatermark?.(++marks)
-      return new Response(`data: ${JSON.stringify({ type: 'log.synced', aggregateID: srv.info.id, seq: srv.w })}\n\n`, { status: 200 })
+      return { status: 200, body: `data: ${JSON.stringify({ type: 'log.synced', aggregateID: srv.info.id, seq: srv.w })}\n\n` }
     }
     if (url.pathname === `/api/session/${srv.info.id}`) return json({ data: srv.info })
     if (url.pathname === `/api/session/${srv.info.id}/message`) {
@@ -243,12 +246,17 @@ function fakeFetch(srv: FakeServer): typeof fetch {
       return json({ data: page, cursor: { previous: 'p', ...(from + limit < newestFirst.length ? { next: String(from + limit) } : { next: 'end' }) } })
     }
     if (url.pathname === '/api/experimental/usage/limits') return json(srv.limits ?? { location: {}, data: null })
-    return new Response('{}', { status: 404 })
-  }) as typeof fetch
+    return { status: 404, body: '{}' }
+  }
 }
 
 function newCore(srv: FakeServer, events: CoreEvent[] = []): HistoryCore {
-  const core = new HistoryCore((e) => events.push(e), { fetch: fakeFetch(srv), spawn: (f, a, o) => require('child_process').spawn(f, a, { env: o.env, cwd: o.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }), killTree: (pid) => process.kill(pid), now: () => Date.now() })
+  const g = fakeGet(srv)
+  const core = new HistoryCore((e) => events.push(e), { get: async (url, headers, _signal, maxBytes) => {
+    const r = await g(url, headers)
+    if (Buffer.byteLength(r.body) > maxBytes) throw new Failed('size', 'too large')
+    return r
+  }, spawn: (f, a, o) => require('child_process').spawn(f, a, { env: o.env, cwd: o.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }), endTree: (c) => c.kill(), now: () => Date.now() })
   return core
 }
 
@@ -500,5 +508,32 @@ describe("the OpenCode history's main side (HI-2762)", () => {
     expect(await h.mirrorFor(home, 'ses_ffffffffffffffffffffffffff')).toBe(p)
     expect(mirrorState(readFileSync(p, 'utf8')).header?.state).toBe('complete')
     await h.stop()
+  })
+})
+
+describe("the history's reads of an agent's server (HI-2762, #1582)", () => {
+  it('reads only a server on this PC, refuses an encoded answer and stops at its size bound', async () => {
+    const http = await import('http')
+    const srv = http.createServer((q, res) => {
+      if (q.url === '/br') {
+        res.writeHead(200, { 'content-encoding': 'br' })
+        return res.end('x')
+      }
+      res.writeHead(200, { 'content-type': 'application/json' })
+      res.end(JSON.stringify({ asked: q.headers['accept-encoding'], pad: 'x'.repeat(q.url === '/big' ? 5000 : 0) }))
+    })
+    await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()))
+    const base = `http://127.0.0.1:${(srv.address() as { port: number }).port}`
+    const signal = new AbortController().signal
+    try {
+      const ok = await plainLocalGet(`${base}/ok`, {}, signal, 1000)
+      expect(JSON.parse(ok.body).asked).toBe('identity')
+      await expect(plainLocalGet(`${base}/br`, {}, signal, 1000)).rejects.toMatchObject({ problem: 'parse' })
+      await expect(plainLocalGet(`${base}/big`, {}, signal, 1000)).rejects.toMatchObject({ problem: 'size' })
+      await expect(plainLocalGet('http://example.com/', {}, signal, 1000)).rejects.toMatchObject({ problem: 'timeout' })
+      await expect(plainLocalGet('https://127.0.0.1/', {}, signal, 1000)).rejects.toMatchObject({ problem: 'timeout' })
+    } finally {
+      await new Promise((r) => srv.close(r))
+    }
   })
 })
