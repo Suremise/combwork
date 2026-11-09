@@ -1,5 +1,16 @@
 import { agentList, agentMsg, say } from './agentText'
 import type { WorkflowOptions } from './workflow/options'
+import { targetOfRulesetId } from './workflow/compile'
+
+/**
+ * The options a lane goes by (HI-2832): the project's, with the lane's own Merges into (HI-2556: a lane's `target`, or
+ * the target its recorded ruleset marks) where it has one, so its brief names the branch its work goes to and its slot
+ * is lent for that branch, never the project's Work merges into. Null while the rules are off.
+ */
+export function laneOptions(options: WorkflowOptions | null, lane: { ruleset?: string; target?: string }): WorkflowOptions | null {
+  const target = lane.target || (lane.ruleset ? targetOfRulesetId(lane.ruleset) : null)
+  return options && target ? { ...options, target } : options
+}
 
 /**
  * The brief a lane started from the window gives its builder and its reviewer (#1280, SPEC §16.11.3): the cards in
