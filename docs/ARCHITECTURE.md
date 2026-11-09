@@ -281,6 +281,12 @@ in SPEC §16.3.6. Until a module has moved, the code above is how it works. Port
 `platform/gitRepoPorts.ts` is Git's, delegating to `git.ts`, `gitTool.ts`, `repoLock.ts`, `folderFence.ts` and
 `refHold.ts` unchanged, and `platform/repoPorts.ts` finds a folder's or a platform's (`repoContext`,
 `withFolderRepoLocks`). A caller moved to it imports only those two (`tests/repoPortsImports.test.ts`, check:repo).
+Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the contracts (`HistoryPort`, `ObservePort`),
+`platform/gitHistory.ts` is Git's, delegating to `platform/git.ts` and the exact `git()` commands its callers ran, and
+`platform/historyPorts.ts` finds one (`historyOf(platform)`, null for None; `observePort`, the watcher for every
+platform). Reconciliation, the recorder, targets, retarget, check brackets (`runChecks`, `queueChecks`) and the focused
+pick's diff read through it (`tests/historyPortsImports.test.ts`, check:repo); Git's adapter passes its port to
+`reconcileHistory` and `attributeFolder`.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

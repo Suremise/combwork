@@ -894,6 +894,8 @@ export const UNIT_SCANS = [
   // HI-2784: the callers moved to the repository context port, its contract, and who imports Git's implementation of it.
   { test: 'tests/repoPortsImports.test.ts', paths: ['src/main/settingsTools.ts', 'src/main/workflow/levels.ts', 'src/main/workflow/optionsForm.ts', 'src/main/workflow/platformSwitch.ts', 'src/main/platform/repoContext.ts', 'src/main/platform/repoPorts.ts'] },
   { test: 'tests/repoPortsImports.test.ts', paths: ['src/'], lines: ['gitRepoPorts'] },
+  { test: 'tests/historyPortsImports.test.ts', paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/targets.ts', 'src/main/workflow/retarget.ts', 'src/main/workflow/runChecks.ts', 'src/main/workflow/focusedRun.ts', 'src/main/workflow/queueChecks.ts', 'src/main/platform/history.ts', 'src/main/platform/historyPorts.ts'] },
+  { test: 'tests/historyPortsImports.test.ts', paths: ['src/'], lines: ['gitHistory'] },
   { test: 'tests/exitLog.test.ts', paths: ['src/main/'], lines: ['app\\.quit', 'app\\.exit', 'process\\.exit', 'app\\.relaunch', 'quitAndInstall', 'exitBy'] },
   // Each function in main taking the board's lock or a database lease is listed by file and name (HI-1368): a new
   // one, or a change to a listed file (a rename of its function), can break it.

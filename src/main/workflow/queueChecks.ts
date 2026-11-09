@@ -26,8 +26,7 @@ import { spawn as nodeSpawn, type ChildProcess, type SpawnOptions } from 'child_
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, rmdirSync, rmSync, statSync, unlinkSync, writeSync } from 'original-fs'
 import { join } from 'path'
 import { StringDecoder } from 'string_decoder'
-import { git } from '../git'
-import * as G from '../platform/git'
+import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import { endTree, resolveCommand, shellSpec } from '../progressReporters/wrapper'
 import { snapshot } from './checks'
@@ -554,16 +553,13 @@ export interface QueueBracket {
  * Git's tracked files and git dir of the queue's folder, for a stat snapshot (the git dir from its `.git`: #1386); null
  * each when git couldn't say, never an empty list in place of one unread (HR5's #1386 round 1).
  */
-async function tracked(folder: string): Promise<{ files: string[] | null; gitDir: string | null }> {
-  const ls = await git(folder, ['ls-files', '-z'])
-  const own = G.gitDirSync(folder)
-  const gd = own ? null : await git(folder, ['rev-parse', '--absolute-git-dir'])
-  return { files: ls.ok ? ls.out.split('\0').filter(Boolean) : null, gitDir: own ?? (gd?.ok ? gd.out.trim() : null) }
+function tracked(folder: string): Promise<{ files: string[] | null; gitDir: string | null }> {
+  return lineHistory().queueCheckFiles(folder)
 }
 
 /** The folder's head and uncommitted changes, in worktreeNow's two gits (#1386); null each when git can't say. */
 async function headAndDirty(folder: string): Promise<{ head: string | null; dirty: string[] | null }> {
-  const now = await G.worktreeNow(folder)
+  const now = await lineHistory().workspaceNow(folder)
   return isUnknown(now) ? { head: null, dirty: null } : { head: now.head, dirty: now.dirty }
 }
 

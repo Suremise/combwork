@@ -2258,8 +2258,11 @@ becomes the port's Git implementation.
 | 2 Workspaces | `workspaceMove.ts`, `combworkMove.ts`, `nameUpgradeProjects.ts` | `WorkspacePort.relocate` (Git); historic migrations stay Git-only by name | R9 |
 | 3 Evidence | `platform/git.ts` (`head`, `resolve`, `dirty`, `change`, `candidateKey`, `replayTree`, `sameChange`, `contains`, `firstParents`, `commits`, `messages`, `identity`, `pin`), `platform/repoRefs.ts`, `snapshotLine.ts` | `HistoryPort` (Git: stays) | R6 |
 | 3 Evidence | `platform/observe.ts`, `watching.ts` | `ObservePort` with the write record (Git: stays) | R6 |
-| 3 Evidence | `workflow/reconcile.ts`, `reconciler.ts`, `recorder.ts`, `targets.ts`, `retarget.ts`, `runChecks.ts`, `focusedRun.ts`, `queueChecks.ts`, `checks.ts`, `adoption.ts`, `upgrade.ts`, `lineUpdates.ts`, `runLink.ts` | Common, calling `HistoryPort` / `ObservePort` | R6 |
-| 3 Evidence | `shared/workflow/guards.ts` `submit.trailer`, `submit.identity` commands | The remedy from `HistoryPort` | R6 or R9 |
+| 3 Evidence | `workflow/reconcile.ts`, `reconciler.ts`, `recorder.ts`, `targets.ts`, `retarget.ts`, `runChecks.ts`, `focusedRun.ts`, `queueChecks.ts` | Common, calling `HistoryPort` / `ObservePort` (moved: HI-2787's R6) | R6 |
+| 3 Evidence | Reached only with lines, their callers not carrying the project's platform yet: `targets.ts` (`branchExists`, `ownWork`, `dropEmptyLines`), `retarget.ts`'s preview, `focusedRun.ts`'s `pathChanges`, `queueChecks.ts`'s brackets | Through the port, by `lineHistory()` (the platform with lines; Git alone in 1.4.0); routed by the project's platform once their callers carry it | R9 |
+| 3 Evidence | `workflow/checks.ts`, `adoption.ts`, `upgrade.ts`, `lineUpdates.ts`, `runLink.ts` (not moved by R6: still import Git) | Common, calling `HistoryPort` / `ObservePort` | R9 |
+| 3 Evidence | `platform/gitPlatform.ts`'s own reads (Git's adapter: its reconciliation, attribution and the watcher go through the ports since R6) | Composed over `HistoryPort` | R9 |
+| 3 Evidence | `shared/workflow/guards.ts` `submit.trailer`, `submit.identity` commands | The remedy from `HistoryPort` | R9 |
 | 4 Integration | `workflow/mergeQueue.ts` candidate steps (prepare, reset, clean, merge, squash, rebase, conflicts, commit, `refs/cw/queue` pins), `queueControls.ts` | `IntegrationPort.prepareCandidate`, `inspectCandidate` | R7 |
 | 4 Integration | `mergeQueue.ts` advance, journal, rollback, recovery, push; `queueRunner.ts`, `queueHost.ts` | `IntegrationPort.advance`, `recover`, `publish`; the state machine stays common | R8 |
 | 5 Operations | `gitRepo.ts` reads, `gitCompare.ts`, `branchWatch.ts` | `RepoReads` (Git: stays) | R2 |
@@ -2270,7 +2273,11 @@ becomes the port's Git implementation.
 
 The shapes, for R1 to start from (R1 built port 1 as `src/main/platform/repoContext.ts`, refined there: `run` answers
 `RunResult`, Git's `GitResult`; `RepoLocks` adds `withRepoLocks` and `changingFolder`; contexts come from
-`repoPorts.ts`):
+`repoPorts.ts`. R6 built port 3 as `src/main/platform/history.ts`: `HistoryPort`'s reads take the working folder they
+ask in, not a `RepoContext` (every caller holds one, and a context per read would add reads to each: rule 1), and keep
+the two check brackets' tracked-file reads apart (`checkFiles`, a run's; `queueCheckFiles`, the queue's, whose
+unreadable list is null); `ObservePort` is the watcher, common to every platform (None's write record too); both come
+from `historyPorts.ts`, `historyOf(platform)` null for None):
 
 ```ts
 interface RepoContext { platform: PlatformId; store: string; workspace: string; root: string; folder: string; subfolder?: boolean }
