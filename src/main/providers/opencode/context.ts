@@ -2,6 +2,7 @@
 // launch's own server with its password (tests/fixtures/opencode/real-2.2.6/wire/instruction-entries.json). OpenCode
 // renders an entry in the system prompt as <context key="…">value</context>, and a later change to it as a
 // <system-update> superseding the previous value, without starting a turn. Combwork owns one key and touches no other.
+import { request as httpRequest } from 'http'
 import { readFile } from 'original-fs/promises'
 import type { StartContextDelivery, StartContextTrigger } from '../types'
 import { serverInfoPath } from './launcher'
@@ -53,17 +54,27 @@ export async function deliverContext(runId: string, sessionId: string, text: str
   const tooLarge = text !== null && Buffer.byteLength(JSON.stringify(text), 'utf8') > CONTEXT_MAX_BYTES
   const remove = body === null || tooLarge
   try {
-    const res = await fetch(`${url}/api/experimental/session/${encodeURIComponent(sessionId)}/instructions/entries/${CONTEXT_KEY}`, {
-      method: remove ? 'DELETE' : 'PUT',
-      headers: { authorization: 'Basic ' + Buffer.from(`opencode:${run.password}`).toString('base64'), ...(remove ? {} : { 'content-type': 'application/json' }) }, // i18n-ignore: an HTTP authorization header, never shown
-      ...(remove ? {} : { body: body! }),
-      signal
-    })
-    await res.arrayBuffer().catch(() => undefined)
-    if (remove) return res.status === 204 || res.status === 404 ? (tooLarge ? 'tooLarge' : 'removed') : 'refused'
-    return res.status === 204 ? 'put' : 'refused'
+    const status = await send(`${url}/api/experimental/session/${encodeURIComponent(sessionId)}/instructions/entries/${CONTEXT_KEY}`, remove ? 'DELETE' : 'PUT', run.password, remove ? null : body, signal)
+    // A removal 2.2.6 answers 204 whether or not the entry was there (wire/instruction-entries.json deleteAbsent).
+    if (remove) return status === 204 || status === 404 ? (tooLarge ? 'tooLarge' : 'removed') : 'refused'
+    return status === 204 ? 'put' : 'refused'
   } catch {
     // Cut off by the signal: it may have reached the server, so its outcome is unknown, never a success.
     return signal.aborted ? 'uncertain' : 'refused'
   }
+}
+
+/** One request to the launch's own loopback server (Node's http: no fetch outside Combwork's local API), its status. */
+function send(url: string, method: 'PUT' | 'DELETE', password: string, body: string | null, signal: AbortSignal): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const headers: Record<string, string> = { authorization: 'Basic ' + Buffer.from(`opencode:${password}`).toString('base64'), 'accept-encoding': 'identity' } // i18n-ignore: an HTTP authorization header, never shown
+    if (body !== null) Object.assign(headers, { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body, 'utf8')) })
+    const req = httpRequest(url, { method, headers, signal }, (res) => {
+      res.resume()
+      res.on('end', () => resolve(res.statusCode ?? 0))
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.end(body ?? undefined)
+  })
 }
