@@ -242,7 +242,6 @@ export class OpencodeAdapter implements ProviderAdapter {
       agent: opencodeAgentOf(mode),
       mcpServers: ctx.mcpServers,
       instructions: existsSync(agentsMd) ? [agentsMd] : [],
-      extraDirs: ctx.extraDirs ?? [],
       ambient: ambientIntegrations(),
       saved,
       strip,

@@ -15,7 +15,7 @@ process.env.CW_USER_DATA = join(base, 'userdata')
 const { isRejectedPath, isSupportedVersion, newestV2, parseOpencodeVersion, installScript, opencodeUpdateCommand } = await import('../src/main/providers/opencode/install')
 const { parseOpencodeModels } = await import('../src/main/providers/opencode/models')
 const { ambientBlockers, credentialPattern, opencodeEnv, opencodeRoots } = await import('../src/main/providers/opencode/home')
-const { chosenAmbient, checkConfig, externalDirRule, launchConfig, loginConfig, mcpPolicies, opencodeServer, parseAuthList, providerPolicies } = await import('../src/main/providers/opencode/config')
+const { chosenAmbient, checkConfig, launchConfig, loginConfig, mcpPolicies, opencodeServer, parseAuthList, providerPolicies } = await import('../src/main/providers/opencode/config')
 const { isSessionId, newSessionId, protectedArg, launchGuidance } = await import('../src/main/providers/opencode/adapter')
 const { LAUNCHER_SOURCE, launcherEnv } = await import('../src/main/providers/opencode/launcher')
 const { OPENCODE_DESCRIPTOR, isClaudeAgentModel, isOpencodeModelId, opencodeAgentOf, opencodeModeFlags, opencodeModelLabel } = await import('../src/shared/opencode')
@@ -204,38 +204,6 @@ describe('the policies and the private config (design s7 to s16)', () => {
     expect(launchConfig({ model: null, agent: null, mcpServers: {}, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: false })).not.toHaveProperty('update')
   })
 
-  describe("a granted folder (HI-2772): 2.2.6's external_directory allowed for it alone", () => {
-    // 2.2.6's own matcher (Kw in the pinned opencode.exe, 98cb0aa8…): both sides' backslashes as slashes, * any run, ? one
-    // character, any case. Its resource for a path outside the session's folder is that folder, slashed, and /*
-    // (FileAccess.resolve's externalDirectory); the last rule that matches decides, else it asks.
-    const kw = (value: string, pattern: string): boolean => {
-      let a = pattern.replaceAll('\\', '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.')
-      if (a.endsWith(' .*')) a = a.slice(0, -3) + '( .*)?'
-      return new RegExp('^' + a + '$', 'si').test(value.replaceAll('\\', '/'))
-    }
-    const resourceOf = (dir: string): string => `${dir.replaceAll('\\', '/')}/*`
-    const COPIES = 'D:\\My Work\\ws.worktrees\\proj\\copies'
-
-    it('one allow rule per folder, its resource the folder with forward slashes and /*, a trailing separator dropped', () => {
-      expect(externalDirRule(COPIES)).toEqual({ action: 'external_directory', resource: 'D:/My Work/ws.worktrees/proj/copies/*', effect: 'allow' })
-      expect(externalDirRule(`${COPIES}\\`).resource).toBe(externalDirRule(COPIES).resource)
-      expect(externalDirRule('D:/My Work/ws.worktrees/proj/copies/').resource).toBe(externalDirRule(COPIES).resource)
-    })
-
-    it('matches every folder in the copies (spaces, either slash, any case) and never a sibling such as copies-other', () => {
-      const rule = externalDirRule(COPIES).resource
-      for (const dir of [COPIES, `${COPIES}\\copy-1`, `${COPIES}\\copy-1\\src\\deep`, 'd:/my work/WS.WORKTREES/proj/Copies/copy-2']) expect(kw(resourceOf(dir), rule), dir).toBe(true)
-      for (const dir of [`${COPIES}-other`, `${COPIES}-other\\copy-1`, 'D:\\My Work\\ws.worktrees\\proj', 'D:\\My Work\\ws.worktrees\\proj2\\copies', 'D:\\My Work\\ws\\proj']) expect(kw(resourceOf(dir), rule), dir).toBe(false)
-    })
-
-    it("in the launch config's permissions, the action it names external_directory only (an edit there is still the mode's); none when no folder is granted", () => {
-      const cfg = launchConfig({ model: null, agent: 'plan', mcpServers: {}, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: false, extraDirs: [COPIES] })
-      expect(cfg.permissions).toEqual([externalDirRule(COPIES)])
-      expect((cfg.policies as { action: string }[]).some((p) => p.action === 'external_directory')).toBe(false)
-      for (const extraDirs of [undefined, []]) expect(launchConfig({ model: null, agent: null, mcpServers: {}, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: false, extraDirs })).not.toHaveProperty('permissions')
-    })
-  })
-
   it("saved credentials from `opencode auth list --format json` (HI-2758's shape): methods by integration, env connections apart", () => {
     const r = parseAuthList(JSON.stringify([{ id: 'probe', name: 'Probe Ollama', connections: [{ type: 'credential', id: 'cred_1', label: 'a-saved', method: 'key' }, { type: 'env', name: 'PROBE_API_KEY' }] }, { id: 'anthropic', name: 'Anthropic', connections: [{ type: 'env', name: 'ANTHROPIC_API_KEY' }] }]))!
     expect([...r.saved]).toEqual([['probe', ['key']]])
@@ -361,22 +329,19 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     expect(providerRules(terminal)).toEqual(['claude-agent:deny'])
   }, 60000)
 
-  it("a reviewer's granted folder in the private config, new or resumed (HI-2772); none granted, no permissions", async () => {
+  it("a reviewer's granted folder adds no rule to the private config, new or resumed (HI-2772: 2.2.6 reaches it by default; a rule the user let in still decides)", async () => {
     const { sessionMark } = await import('../src/main/providers/opencode/launcher')
     const copies = join(base, 'ws space.worktrees', 'proj', 'copies')
     const written = (c: { privateDir: string }) => JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8'))
     const fresh = ctx({ extraDirs: [copies], permissionMode: 'build' }) as { privateDir: string }
     await opencode.prepareLaunch(fresh as never)
-    expect(written(fresh).permissions).toEqual([externalDirRule(copies)])
     const resumed = ctx({ extraDirs: [copies], resume: true }) as { privateDir: string; connectionHome: string; sessionId: string }
     mkdirSync(join(resumed.connectionHome, 'combwork-sessions'), { recursive: true })
     writeFileSync(sessionMark(resumed.connectionHome, resumed.sessionId), '{}')
     await opencode.prepareLaunch(resumed as never)
-    expect(written(resumed).permissions).toEqual([externalDirRule(copies)])
-    for (const extraDirs of [undefined, []]) {
-      const none = ctx({ extraDirs }) as { privateDir: string }
-      await opencode.prepareLaunch(none as never)
-      expect(written(none)).not.toHaveProperty('permissions')
+    for (const c of [fresh, resumed]) {
+      expect(written(c)).not.toHaveProperty('permissions')
+      expect(JSON.stringify(written(c))).not.toContain('external_directory')
     }
   }, 60000)
 

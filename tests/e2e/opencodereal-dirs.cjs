@@ -1,13 +1,15 @@
-// The real OpenCode (the pinned 2.2.6) given a folder outside its own (HI-2772, #1439), through Combwork's production launch,
+// The real OpenCode (the pinned 2.2.6) and folders outside its own (HI-2772, #1439), through Combwork's production launch,
 // under Darren's HI-2758 option A as opencodereal.cjs: no account, key, sign-in or cloud call; model turns only to the PC's
-// local Ollama qwen3:8b through a logging proxy here; the project's own OpenCode config kept out (the default). Two agents
-// in Build mode (never Approve all), each in a fresh session: a reviewer, whose launch is granted the project's review
-// copies folder (its private config's external_directory rule), reads a marker file there and writes a sibling file, the
-// bytes checked on disk; a builder, granted nothing, asked to overwrite a file there, is asked for external_directory,
-// which is rejected (Esc, 2.2.6's escapeKey), and the file stays as it was. An ask that isn't external_directory (an edit's,
-// the mode's own) is answered once (Enter) and recorded apart. A model that never tries the tool in three prompts is
-// INCONCLUSIVE, not a pass. The evidence (the build, the rules each launch wrote, the asks, the files, each model request)
-// goes to the suite's log and TRACE.
+// local Ollama qwen3:8b through a logging proxy here; the project's own OpenCode config kept out (the default). Combwork
+// adds no permission rule for a reviewer's review copies: 2.2.6's default rules (`* * allow` first) let any agent reach
+// them, so what this records is that baseline. Three agents, each in its own fresh session: a reviewer in Build reads a
+// marker file in the copies folder (proved by its session record's read result for that turn) and writes a new file
+// there (its bytes on disk); a reviewer in Plan, asked to write there, doesn't (its own edit deny: the file absent, and
+// what it tried, from its record); a builder in Build, lent no copy, reaches the copies folder too, unasked. Any
+// permission asked is recorded and rejected (Esc, 2.2.6's escapeKey), never approved. A turn is one by its own id (the
+// turn ledger's) reaching its end; each attempt has its own files and marker. A step the model never tries in three
+// prompts is INCONCLUSIVE, not a pass. The evidence goes to the suite's log and TRACE (scrubbed into
+// tests/fixtures/opencode/real-2.2.6/probes/external-directory.json).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const os = require('os')
@@ -84,7 +86,7 @@ const ollamaModels = () => new Promise((resolve) => {
 })
 
 const TRACE = path.join(lib.WORK, 'opencodedirs-trace.json')
-const trace = { build: { path: PINNED, sha256: PINNED_SHA256, version: null }, upstream: `${OLLAMA.host}:${OLLAMA.port}`, launches: {}, asks: [], results: {}, phases: [], requests: [] }
+const trace = { build: { path: PINNED, sha256: PINNED_SHA256, version: null }, upstream: `${OLLAMA.host}:${OLLAMA.port}`, copies: null, launches: {}, asks: [], turns: [], results: {}, phases: [], requests: [] }
 let phase = 'launch'
 const enter = (name) => {
   phase = name
@@ -121,6 +123,28 @@ function proxy() {
   return new Promise((resolve) => srv.listen(0, '127.0.0.1', () => resolve({ port: srv.address().port, close: () => new Promise((c) => (srv.closeAllConnections?.(), srv.close(c))) })))
 }
 
+
+/** A session's record as Combwork keeps it (the account's combwork-sessions/<id>.jsonl): its messages in order. */
+function recordOf(accountHome, sessionId) {
+  const file = path.join(accountHome, 'combwork-sessions', `${sessionId}.jsonl`)
+  if (!sessionId || !fs.existsSync(file)) return []
+  return fs.readFileSync(file, 'utf8').split('\n').flatMap((l) => {
+    try {
+      const x = JSON.parse(l)
+      return x.type === 'combwork.message' ? [x.message] : []
+    } catch {
+      return []
+    }
+  })
+}
+/** The tool calls of the turn a user message holding `nonce` started: its assistant messages up to the next user message. */
+function toolsOfTurn(messages, nonce) {
+  const at = messages.findIndex((m) => m.type === 'user' && String(m.text ?? '').includes(nonce))
+  if (at < 0) return null
+  const next = messages.findIndex((m, i) => i > at && m.type === 'user')
+  return messages.slice(at + 1, next < 0 ? undefined : next).flatMap((m) => (m.content ?? []).filter((c) => c.type === 'tool')).map((c) => ({ name: c.name, status: c.state?.status ?? null, input: c.state?.input ?? null, result: (c.state?.content ?? []).map((x) => x.text ?? '').join('\n').slice(0, 400), error: c.state?.error?.message ?? null }))
+}
+
 ;(async () => {
   if (!fs.existsSync(PINNED) || crypto.createHash('sha256').update(fs.readFileSync(PINNED)).digest('hex') !== PINNED_SHA256) {
     console.log(`SKIP environment: the pinned OpenCode 2.2.6 isn't at ${PINNED}, or isn't the release's build (tests/e2e/README.md)`)
@@ -145,6 +169,7 @@ function proxy() {
   const seam = { id: 'cwtest', baseURL: `http://127.0.0.1:${px.port}/v1`, model: MODEL }
   const { app, inv, page } = await lib.launch({ userData, env: { CW_API_PORT: lib.port(47905), CW_TEST_OPENCODE_PROVIDER: JSON.stringify(seam), CW_TEST_CLI_HOME_CONNECTION: '0' } })
   const opencodeLeft = () => processes().filter((p) => String(p.commandLine ?? '').toLowerCase().includes(PINNED.toLowerCase()))
+  const fwd = (p) => p.replace(/\\/g, '/')
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
     await lib.openWorkspace(inv, page, ws)
@@ -160,139 +185,158 @@ function proxy() {
 
     const account = await inv('connections:add', 'opencode', 'OpenCode · Local test')
     await inv('connections:setOn', account.id, true)
+    const accountHome = path.join(userData, 'accounts', account.id)
     const conn = (await inv('connections:list')).connectionRows.find((c) => c.account === account.id) ?? (await inv('connection:add', account.id, { name: 'Test · OpenCode' }))
-    const reviewer = await lib.addAgent(inv, alpha, { name: 'Rv', provider: 'opencode', workflowRole: 'reviewer' })
-    const builder = await lib.addAgent(inv, alpha, { name: 'Bd', provider: 'opencode', workflowRole: 'builder' })
-    for (const a of [reviewer, builder]) await inv('agents:update', alpha, a.id, { connection: conn.id })
+    const agents = {
+      build: await lib.addAgent(inv, alpha, { name: 'Rb', provider: 'opencode', workflowRole: 'reviewer' }),
+      plan: await lib.addAgent(inv, alpha, { name: 'Rp', provider: 'opencode', workflowRole: 'reviewer' }),
+      builder: await lib.addAgent(inv, alpha, { name: 'Bd', provider: 'opencode', workflowRole: 'builder' })
+    }
+    for (const a of Object.values(agents)) await inv('agents:update', alpha, a.id, { connection: conn.id })
+    await lib.setLaunch(inv, alpha, agents.plan.id, { permissionMode: 'plan' })
 
-    /** The newest launch's written opencode.json, after `since` launches. */
+    // The copies folder Combwork lends reviewers (one fixed path), a probe folder in it.
+    const copies = path.join(`${ws}.worktrees`, 'alpha', 'copies')
+    const probe = path.join(copies, `probe-${crypto.randomBytes(3).toString('hex')}`)
+    fs.mkdirSync(probe, { recursive: true })
+    trace.copies = fwd(copies)
+
     const launchRoot = path.join(userData, 'launches')
     const configs = () => (fs.existsSync(launchRoot) ? fs.readdirSync(launchRoot).map((d) => path.join(launchRoot, d, 'opencode-config', 'opencode.json')).filter((f) => fs.existsSync(f)) : [])
-    /** Starts an agent, and returns its launch's written config once there, the seam's restriction checked (option A). */
-    const start = async (agent, label) => {
-      const known = new Set(configs())
+    const sessionsMade = () => (fs.existsSync(path.join(accountHome, 'combwork-sessions')) ? fs.readdirSync(path.join(accountHome, 'combwork-sessions')).filter((f) => /^ses_\w+\.json$/.test(f)) : [])
+    /** Starts an agent in a new session: its written config (the seam's restriction checked) and its session's id. */
+    const start = async (label, agent) => {
+      const knownCfg = new Set(configs())
+      const knownSes = new Set(sessionsMade())
       enter(`${label}: launch`)
       await inv('session:start', alpha, { agentId: agent.id })
-      const file = await until(async () => configs().find((f) => !known.has(f)) ?? null, HUNG_MS)
+      const file = await until(async () => configs().find((f) => !knownCfg.has(f)) ?? null, HUNG_MS)
       const written = file ? JSON.parse(fs.readFileSync(file, 'utf8')) : null
       const providerRules = (written?.policies ?? []).filter((p) => p.action === 'provider.use')
       const held = providerRules[0]?.resource === '*' && providerRules[0]?.effect === 'deny' && providerRules.filter((p) => p.effect === 'allow').every((p) => p.resource === seam.id) && written?.model === `${seam.id}/${MODEL}`
-      trace.launches[label] = { permissions: written?.permissions ?? null, defaultAgent: written?.default_agent ?? null, providerPolicies: providerRules }
+      trace.launches[label] = { defaultAgent: written?.default_agent ?? null, permissions: written?.permissions ?? null, externalDirectoryRules: JSON.stringify(written ?? {}).includes('external_directory'), providerPolicies: providerRules }
       check(`${label}: the launch config denies every provider but the local test one`, held, JSON.stringify(trace.launches[label]))
-      return held ? written : null
+      check(`${label}: …and adds no permission rule (no permissions, no external_directory)`, !!written && !('permissions' in written) && !trace.launches[label].externalDirectoryRules, JSON.stringify(written?.permissions))
+      const sessionId = (await until(async () => sessionsMade().find((f) => !knownSes.has(f)) ?? null, HUNG_MS))?.replace(/\.json$/, '') ?? null
+      const drawn = !!(await until(async () => (/ctrl\+p commands/.test(await screen(agent)) ? true : null), HUNG_MS))
+      check(`${label}: its TUI is drawn in its pane`, drawn, (await screen(agent)).slice(-300))
+      return held && drawn ? { written, sessionId } : null
     }
     const key = (agent) => lib.ptyKey(alpha, agent.id)
     const screen = async (agent) => lib.plainText((await inv('pty:buffer', key(agent)).catch(() => '')) ?? '')
-    const drawn = async (agent) => !!(await until(async () => (/ctrl\+p commands/.test(await screen(agent)) ? true : null), HUNG_MS))
     /**
-     * One prompt, then until `done()` or the turn ends: each ask it raises recorded; an external_directory ask answered
-     * as `onExternal` says (Esc rejects), any other ask (an edit's: the mode's own) answered once (Enter).
+     * One prompt, its own turn: done when the turn ledger names a turn other than the one before the prompt and that turn
+     * is over (a fast turn needn't be seen running; an earlier turn's end can't count). Any permission it asks is
+     * recorded and rejected (Esc).
      */
-    const turn = async (agent, label, prompt, { done, onExternal }) => {
+    const turn = async (label, agent, prompt) => {
       enter(label)
+      const prior = (await live(agent.id))?.turn?.id ?? null
       const requests = trace.requests.length
       await lib.sendPrompt(inv, key(agent), prompt, { submitted: async () => trace.requests.length > requests, tries: 1, waitMs: HUNG_MS })
-      const answered = new Set()
-      const result = await until(async () => {
-        if (await done()) return { done: true }
+      const seen = new Set()
+      const t = await until(async () => {
         const s = await live(agent.id)
-        if (s?.status === 'waiting' && s.statusMessage && !answered.has(s.statusMessage)) {
-          answered.add(s.statusMessage)
-          const external = /^external_directory\b/.test(s.statusMessage)
-          trace.asks.push({ phase: label, message: s.statusMessage, answered: external ? onExternal : 'once (Enter)' })
-          await inv('pty:write', key(agent), external && onExternal === 'reject' ? '\x1b' : '\r')
-          if (external && onExternal === 'reject') return { done: false, rejected: true }
+        if (s?.status === 'waiting' && s.statusMessage && !seen.has(s.statusMessage)) {
+          seen.add(s.statusMessage)
+          trace.asks.push({ phase: label, message: s.statusMessage, answered: 'reject (Esc)' })
+          await inv('pty:write', key(agent), '\x1b')
         }
-        if (s?.status === 'finished' && trace.requests.length > requests) return { done: await done() }
-        return null
+        return s?.turn?.id && s.turn.id !== prior && s.turn.state === 'over' ? s.turn.id : null
       }, TURN_MS, 500)
-      return result ?? { done: false }
+      trace.turns.push({ phase: label, turn: t, prior })
+      return t
     }
-
-    // --- Review copies: the project's copies folder, a probe folder in it with a marker file.
-    const reviewerCfg = await start(reviewer, 'reviewer')
-    if (!reviewerCfg) {
-      console.log('FAIL stopped before any prompt: the launch config would let OpenCode reach other providers (option A)')
-      failed++
-      return
+    /** Up to TRIES prompts, each with its own nonce (made by `attempt(n)`), until `tried(nonce)` says the model did it. */
+    const attempts = async (label, agent, attempt, tried) => {
+      for (let n = 1; n <= TRIES; n++) {
+        const a = attempt(n)
+        const t = await turn(`${label} ${n}`, agent, a.prompt)
+        if (!t) {
+          console.log(`INFO ${label} ${n}: no turn of its own ended within ${TURN_MS / 1000} s`)
+          continue
+        }
+        if (await tried(a)) return a
+      }
+      return null
     }
-    const grant = (reviewerCfg.permissions ?? []).find((p) => p.action === 'external_directory')
-    const copies = grant ? grant.resource.replace(/\/\*$/, '').replace(/\//g, path.sep) : null
-    check("the reviewer's launch config grants the project's copies folder, external_directory only, nothing else in its permissions", !!copies && reviewerCfg.permissions.length === 1 && grant.effect === 'allow' && fs.existsSync(copies) && path.resolve(copies).toLowerCase() === path.resolve(`${ws}.worktrees`, 'alpha', 'copies').toLowerCase(), JSON.stringify(reviewerCfg.permissions))
-    check('…in Build mode', reviewerCfg.default_agent === 'build', String(reviewerCfg.default_agent))
-    if (!copies) return
-    const probe = path.join(copies, `probe-${Date.now()}`)
-    fs.mkdirSync(probe, { recursive: true })
-    const marker = `cw-marker-${crypto.randomBytes(4).toString('hex')}`
-    fs.writeFileSync(path.join(probe, 'marker.txt'), `${marker}\n`)
-    const writeMarker = `cw-written-${crypto.randomBytes(4).toString('hex')}`
-    const written = path.join(probe, 'written.txt')
-    const kept = path.join(probe, 'kept.txt')
-    fs.writeFileSync(kept, 'kept as it was\n')
-    const keptBytes = fs.readFileSync(kept)
-    check("its TUI is drawn in the reviewer's pane", await drawn(reviewer), (await screen(reviewer)).slice(-400))
+    const stop = async (label, agent) => {
+      enter(`${label}: stop`)
+      await inv('session:stop', alpha, agent.id)
+      check(`${label}: it stops`, !!(await until(async () => !(await live(agent.id)), HUNG_MS)))
+    }
+    /** The record's tools for a nonce's turn once Combwork has it (live, or written when the session stopped). */
+    const toolsFor = async (sessionId, nonce, ms = HUNG_MS) => (await until(async () => toolsOfTurn(recordOf(accountHome, sessionId), nonce), ms)) ?? null
 
-    // --- The reviewer reads the marker, granted: no external_directory ask.
-    const fwd = (p) => p.replace(/\\/g, '/')
-    let read = { done: false }
-    for (let i = 1; i <= TRIES && !read.done; i++)
-      read = await turn(reviewer, `reviewer: read ${i}`, `Use your read tool on the file ${fwd(path.join(probe, 'marker.txt'))} and reply with only its contents.`, {
-        done: async () => {
-          const s = await screen(reviewer)
-          return s.slice(s.lastIndexOf('marker.txt')).includes(marker)
-        },
-        onExternal: 'once (Enter): the grant failed'
-      })
-    const readAsks = trace.asks.filter((a) => a.phase.startsWith('reviewer: read'))
-    trace.results.read = { done: read.done, asks: readAsks }
-    if (read.done) check('granted: the reviewer read the marker in the copies folder, never asked for external_directory', !readAsks.some((a) => /^external_directory/.test(a.message)), JSON.stringify(readAsks))
+    // --- 1. A reviewer in Build: reads a marker there (its record's read result), writes a new file (bytes on disk).
+    const rb = await start('reviewer (Build)', agents.build)
+    if (!rb) return
+    check('reviewer (Build): in Build mode', rb.written.default_agent === 'build', String(rb.written.default_agent))
+    const read = await attempts('reviewer (Build): read', agents.build, (n) => {
+      const marker = `cw-marker-${crypto.randomBytes(4).toString('hex')}`
+      const file = path.join(probe, `marker-${n}.txt`)
+      fs.writeFileSync(file, `${marker}\n`)
+      return { nonce: `marker-${n}.txt`, marker, file, prompt: `Use your read tool on the file ${fwd(file)} and reply with only its contents.` }
+    }, async (a) => (await toolsFor(rb.sessionId, a.nonce, 15000))?.some((x) => x.name === 'read' && x.result.includes(a.marker)) ?? (await screen(agents.build)).includes(a.marker))
+    const write = await attempts('reviewer (Build): write', agents.build, (n) => {
+      const marker = `cw-written-${crypto.randomBytes(4).toString('hex')}`
+      const file = path.join(probe, `written-${n}.txt`)
+      return { nonce: marker, marker, file, prompt: `Use your write tool to create the file ${fwd(file)} containing exactly this one line: ${marker}` }
+    }, async (a) => fs.existsSync(a.file) && fs.readFileSync(a.file, 'utf8').includes(a.marker))
+    await stop('reviewer (Build)', agents.build)
+    // From the record as the stop left it: the read's result in the turn its prompt started.
+    const readTools = read ? await toolsFor(rb.sessionId, read.nonce) : null
+    trace.results.read = read ? { file: path.basename(read.file), tools: readTools } : null
+    if (read) check('reviewer (Build): read the marker in the copies folder, its record has the read with it for that turn, unasked', !!readTools?.some((x) => x.name === 'read' && x.result.includes(read.marker)) && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): read')), JSON.stringify({ readTools, asks: trace.asks }))
     else {
       inconclusive++
-      console.log(`INCONCLUSIVE the reviewer never showed the marker in ${TRIES} prompts (the model may not have called its read tool): ${JSON.stringify(readAsks)}`)
+      console.log(`INCONCLUSIVE reviewer (Build): no read of the marker in ${TRIES} prompts`)
     }
-
-    // --- …and writes a sibling file there, its bytes checked on disk.
-    let write = { done: false }
-    for (let i = 1; i <= TRIES && !write.done; i++)
-      write = await turn(reviewer, `reviewer: write ${i}`, `Use your write tool to create the file ${fwd(written)} containing exactly this one line: ${writeMarker}`, {
-        done: async () => fs.existsSync(written) && fs.readFileSync(written, 'utf8').includes(writeMarker),
-        onExternal: 'once (Enter): the grant failed'
-      })
-    const writeAsks = trace.asks.filter((a) => a.phase.startsWith('reviewer: write'))
-    trace.results.write = { done: write.done, bytes: fs.existsSync(written) ? fs.readFileSync(written, 'utf8') : null, asks: writeAsks }
-    if (write.done) check('granted: the reviewer wrote the file in the copies folder (its bytes on disk), never asked for external_directory', !writeAsks.some((a) => /^external_directory/.test(a.message)), JSON.stringify(writeAsks))
+    trace.results.write = write ? { file: path.basename(write.file), bytes: fs.readFileSync(write.file, 'utf8'), tools: await toolsFor(rb.sessionId, write.marker) } : null
+    if (write) check('reviewer (Build): wrote a new file in the copies folder, its bytes on disk, unasked', fs.readFileSync(write.file, 'utf8').trim() === write.marker && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): write')), JSON.stringify({ result: trace.results.write, asks: trace.asks }))
     else {
       inconclusive++
-      console.log(`INCONCLUSIVE no ${path.basename(written)} with the marker after ${TRIES} prompts: ${JSON.stringify(trace.results.write)}`)
+      console.log(`INCONCLUSIVE reviewer (Build): no file written in ${TRIES} prompts`)
     }
-    enter('reviewer: stop')
-    await inv('session:stop', alpha, reviewer.id)
-    check('the reviewer stops', !!(await until(async () => !(await live(reviewer.id)), HUNG_MS)))
 
-    // --- The builder, granted nothing, in a fresh session: asked for external_directory, rejected, the file kept.
-    const builderCfg = await start(builder, 'builder')
-    if (!builderCfg) return
-    check("the builder's launch config grants no folder (no permissions)", !('permissions' in builderCfg), JSON.stringify(builderCfg.permissions))
-    check("its TUI is drawn in the builder's pane", await drawn(builder), (await screen(builder)).slice(-400))
-    let asked = { done: false }
-    for (let i = 1; i <= TRIES && !asked.rejected; i++)
-      asked = await turn(builder, `builder: write ${i}`, `Use your write tool to replace the contents of the file ${fwd(kept)} with exactly: overwritten`, { done: async () => false, onExternal: 'reject' })
-    const builderAsks = trace.asks.filter((a) => a.phase.startsWith('builder:'))
-    trace.results.contrast = { asks: builderAsks, keptUnchanged: fs.readFileSync(kept).equals(keptBytes) }
-    if (asked.rejected) {
-      check('not granted: the builder was asked for external_directory, for the copies folder', builderAsks.some((a) => a.message.startsWith('external_directory') && a.message.toLowerCase().includes(fwd(probe).toLowerCase())), JSON.stringify(builderAsks))
-      const after = await until(async () => ((await live(builder.id))?.status !== 'waiting' ? true : null), HUNG_MS)
-      check('…rejected (Esc), it asks no more and the file is as it was', !!after && fs.readFileSync(kept).equals(keptBytes), JSON.stringify(trace.results.contrast))
-    } else {
+    // --- 2. A reviewer in Plan, a fresh session: asked to write there, it doesn't (its own edit deny).
+    const rp = await start('reviewer (Plan)', agents.plan)
+    if (!rp) return
+    check('reviewer (Plan): in Plan mode', rp.written.default_agent === 'plan', String(rp.written.default_agent))
+    const planFiles = []
+    const planned = await attempts('reviewer (Plan): write', agents.plan, (n) => {
+      const marker = `cw-plan-${crypto.randomBytes(4).toString('hex')}`
+      const file = path.join(probe, `plan-${n}.txt`)
+      planFiles.push(file)
+      return { nonce: marker, marker, file, prompt: `Use your write tool to create the file ${fwd(file)} containing exactly this one line: ${marker}` }
+    }, async (a) => !!(await toolsFor(rp.sessionId, a.marker, 15000))?.some((x) => /^(write|edit|patch)$/.test(x.name)))
+    await stop('reviewer (Plan)', agents.plan)
+    const planTools = planned ? await toolsFor(rp.sessionId, planned.marker) : null
+    trace.results.plan = { tried: planned ? planTools : null, filesWritten: planFiles.filter((f) => fs.existsSync(f)).map((f) => path.basename(f)) }
+    check('reviewer (Plan): no file it was asked to write exists', planFiles.every((f) => !fs.existsSync(f)), JSON.stringify(trace.results.plan))
+    if (planned) check('…its write was refused (an error result, not completed)', !!planTools?.filter((x) => /^(write|edit|patch)$/.test(x.name)).every((x) => x.status === 'error'), JSON.stringify(planTools))
+    else {
       inconclusive++
-      console.log(`INCONCLUSIVE the builder raised no external_directory ask in ${TRIES} prompts: ${JSON.stringify(builderAsks)}`)
-      check('…and the file is as it was', fs.readFileSync(kept).equals(keptBytes))
+      console.log(`INCONCLUSIVE reviewer (Plan): never called a write tool in ${TRIES} prompts (2.2.6's Plan may offer none): ${JSON.stringify(trace.results.plan)}`)
     }
-    enter('builder: stop')
-    await inv('session:stop', alpha, builder.id)
-    await until(async () => !(await live(builder.id)), HUNG_MS)
+
+    // --- 3. A builder in Build, lent no copy: reaches the copies folder too, unasked (2.2.6's baseline).
+    const bd = await start('builder (Build)', agents.builder)
+    if (!bd) return
+    const reached = await attempts('builder (Build): write', agents.builder, (n) => {
+      const marker = `cw-builder-${crypto.randomBytes(4).toString('hex')}`
+      const file = path.join(probe, `builder-${n}.txt`)
+      return { nonce: marker, marker, file, prompt: `Use your write tool to create the file ${fwd(file)} containing exactly this one line: ${marker}` }
+    }, async (a) => fs.existsSync(a.file) && fs.readFileSync(a.file, 'utf8').includes(a.marker))
+    await stop('builder (Build)', agents.builder)
+    trace.results.baseline = reached ? { file: path.basename(reached.file), bytes: fs.readFileSync(reached.file, 'utf8'), asks: trace.asks.filter((a) => a.phase.startsWith('builder')) } : null
+    if (reached) console.log(`BASELINE builder (Build), lent no copy and given no rule, wrote ${path.basename(reached.file)} in the copies folder ${trace.results.baseline.asks.length ? 'after an ask' : 'unasked'} (2.2.6's default rules)`)
+    else {
+      inconclusive++
+      console.log(`INCONCLUSIVE builder (Build): no file written in ${TRIES} prompts`)
+    }
     check('every model request went to the local proxy for ' + MODEL, trace.requests.length > 0 && trace.requests.every((r) => r.path.startsWith('/v1/') && (r.model === null || r.model === MODEL)), JSON.stringify(trace.requests.slice(0, 5)))
-    check('none of this test\'s opencode is left running', !!(await until(async () => (opencodeLeft().length ? null : true), HUNG_MS)), JSON.stringify(opencodeLeft().map((p) => p.pid)))
+    check("none of this test's opencode is left running", !!(await until(async () => (opencodeLeft().length ? null : true), HUNG_MS)), JSON.stringify(opencodeLeft().map((p) => p.pid)))
   } finally {
     enter('closed')
     await app.close().catch(() => undefined)

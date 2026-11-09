@@ -275,8 +275,9 @@ async function startServer(opts) {
     const read = (file) => toolStep('read', { filePath: file }, async () => (fs.existsSync(file) ? { text: fs.readFileSync(file, 'utf8'), metadata: { truncated: false } } : { text: `File not found: ${file}`, isError: true }))
     /**
      * 2.2.6's external_directory, for an edit outside the session's folder (HI-2772, from the pinned opencode.exe:
-     * FileAccess.resolve and authorizeExternal): its resource the file's folder, slashed, and /*; the last rule of the
-     * config's `permissions` then the session's that matches decides (Kw: slashes either way, any case), else it asks.
+     * FileAccess.resolve and authorizeExternal): its resource the file's folder, slashed, and /*; the last matching rule
+     * decides (Kw: slashes either way, any case), of the agent's defaults (Agent.Info's: `* * allow` first, so nothing
+     * asks by default, as the real tier's opencodereal-dirs saw), then the config's `permissions`, then the session's.
      * Only the edit checks it here: what else 2.2.6 checks it for, the fake doesn't model.
      */
     const external = (file) => {
@@ -284,7 +285,7 @@ async function startServer(opts) {
       if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return null
       const resource = `${path.dirname(file).replace(/\\/g, '/')}/*`
       const kw = (value, pattern) => new RegExp('^' + String(pattern).replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'si').test(value.replace(/\\/g, '/'))
-      const rules = [...(cfg.global.permissions || []), ...(session(sid).info.permissions || [])]
+      const rules = [{ action: '*', resource: '*', effect: 'allow' }, ...(cfg.global.permissions || []), ...(session(sid).info.permissions || [])]
       const effect = rules.findLast((p) => kw('external_directory', p.action) && kw(resource, p.resource ?? '*'))?.effect ?? 'ask'
       return { effect, resource }
     }
