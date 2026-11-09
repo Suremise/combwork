@@ -2652,6 +2652,20 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'now',
     samples: [{ from: `${FIX}/advanced/ready-copilot-1.0.95.txt`, version: '1.0.95', text: '← open sidebar · Interactive · Manual Approval · / commands · ? help' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // Its turn's state in the terminal (HI-2802): read only while its hooks are missing.
+  {
+    id: 'copilot.terminal.turn',
+    group: 'copilot',
+    title: msg({ id: 'settings.advanced.copilot.terminal.turn.title', defaultMessage: 'Turn state in the terminal', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.copilot.terminal.turn.desc', defaultMessage: "What Copilot writes to its terminal (an OSC sequence, without its ESC ]) as a turn starts and ends; the first group is the state (working, done). Combwork reads it only while an agent's hooks aren't arriving, to show it working or finished; wrong, such an agent shows only that its status is unknown.", description: 'What the advanced setting "Turn state in the terminal" is for, and what goes wrong when it is wrong (Settings → Advanced). "OSC sequence" and "ESC ]" are terminal terms: keep them.' }),
+    kind: 'pattern',
+    default: String.raw`^7501;state=(\w+)`,
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/terminal-turn-copilot-1.0.106.json`, version: '1.0.106', text: '7501;state=working:app=copilot' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/terminal-turn-copilot-1.0.106.json`, version: '1.0.106', text: '7501;state=done:app=copilot' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
   ...COPILOT_FOOTER_MODES.map(
     (m): AdvancedSource => ({
       id: `copilot.footer.${m.key}`,

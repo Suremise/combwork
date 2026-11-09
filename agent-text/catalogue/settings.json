@@ -1684,6 +1684,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
+  "settings.advanced.copilot.terminal.turn.desc": {
+    "text": "What Copilot writes to its terminal (an OSC sequence, without its ESC ]) as a turn starts and ends; the first group is the state (working, done). Combwork reads it only while an agent's hooks aren't arriving, to show it working or finished; wrong, such an agent shows only that its status is unknown.",
+    "note": "What the advanced setting \"Turn state in the terminal\" is for, and what goes wrong when it is wrong (Settings → Advanced). \"OSC sequence\" and \"ESC ]\" are terminal terms: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.terminal.turn.title": {
+    "text": "Turn state in the terminal",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.copilot.trust.prompt.desc": {
     "text": "Copilot's question before a folder's first session. Combwork shows the agent as waiting for you while it is on screen.",
     "note": "What the advanced setting \"Trust question\" is for, and what goes wrong when it is wrong (Settings → Advanced).",

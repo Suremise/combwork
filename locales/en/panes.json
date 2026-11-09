@@ -675,6 +675,14 @@
     "defaultMessage": "Stopped",
     "description": "An agent's status: its session isn't running."
   },
+  "panes.runtime.terminalTurn": {
+    "defaultMessage": "{state, select, working {Working} done {Finished} other {Ready}} (from its terminal: no hooks from {provider})",
+    "description": "An agent's status (its pane, the agents table) while its coding agent ({provider}, a product name) sends Combwork no hooks: what its terminal says instead (state: working, finished, or ready with nothing begun). Keep it short; keep the select keys."
+  },
+  "panes.runtime.terminalTurnNote": {
+    "defaultMessage": "Meanwhile its status comes from its terminal, which says only whether it is working or finished: it can't show when it asks you something, such as a permission.",
+    "description": "Added to the notice on an agent whose coding agent sends Combwork no hooks, when Combwork reads its status from the coding agent's terminal output instead: that output says working or finished, never that the agent waits for the user (a permission prompt)."
+  },
   "panes.runtime.working": {
     "defaultMessage": "Working…",
     "description": "An agent's status: it is working on a turn."

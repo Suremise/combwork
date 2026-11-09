@@ -97,7 +97,7 @@ import { latestStop, memoModel, memoTools, memoTurn, newTurn, noteSafeguard, pla
 import { applyStatus, idleNow, NO_STATUS, type StatusState } from './statusLineState'
 import { acceptTurn, admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
-import { lastTitle } from './terminalTitle'
+import { lastTerminalTurn, lastTitle, type TerminalTurn } from './terminalTitle'
 import { asksYou } from '../shared/inbox'
 import type { DeliveryHooks, NewDelivery } from './deliveries'
 import { readyFor } from './readiness'
@@ -510,6 +510,11 @@ interface LiveSession {
   titleRead?: boolean
   /** The unfinished title sequence the last output ended with. */
   titleCarry?: string
+  /** For a CLI that writes its turn's state to the terminal (ProviderAdapter.terminalTurn, HI-2802): its pattern, now. */
+  terminalTurnOf?: () => RegExp | null
+  /** What it last wrote of its turn, this launch, and the unfinished OSC sequence the last output ended with. */
+  terminalSaid?: TerminalTurn
+  terminalCarry?: string
   /** Asks its hooks reported that are still open, and the one it waits on (HookStatusInput). */
   open?: Ask[]
   waitingOn?: Ask | null
@@ -3078,6 +3083,9 @@ class SessionManager {
     l.hookHistory = []
     l.hookBlock = undefined
     l.titleAttention = adapter.titleAttention?.(info.version, ctx) ?? undefined
+    l.terminalTurnOf = adapter.terminalTurn ? () => adapter.terminalTurn!() : undefined
+    l.terminalSaid = undefined
+    l.terminalCarry = ''
     l.turnScreen = adapter.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
     // Whether its hooks reach Combwork (#1336), and what can say why they don't.
@@ -3156,6 +3164,7 @@ class SessionManager {
           this.inputBlockedDrawn(id, l)
         })
         this.watchTitle(id, data)
+        this.watchTerminalTurn(id, data)
         this.watchReadyOutput(id, data)
         this.recognisePrompt(l, data)
       },
@@ -3624,6 +3633,33 @@ class SessionManager {
     }).catch((e) => log.warn('title: could not apply it', e))
   }
 
+  /**
+   * For CLIs that write their turn's state to the terminal (Copilot's OSC 7501, HI-2802): what it last said is kept all
+   * along (a turn may end before its hooks are found missing), and shown only while they are (terminalTurnShown).
+   */
+  private watchTerminalTurn(id: string, data: string): void {
+    const l = this.live.get(id)
+    if (!l?.terminalTurnOf || (!l.terminalCarry && !data.includes('\x1b'))) return
+    const re = l.terminalTurnOf()
+    if (!re) return
+    const { turn, carry } = lastTerminalTurn(re, l.terminalCarry ?? '', data)
+    l.terminalCarry = carry
+    if (!turn || turn === l.terminalSaid) return
+    l.terminalSaid = turn
+    if (!l.state.hooksMissing) return
+    // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+    devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'turn state', provider: l.state.provider, made: { terminal: turn }, summary: `terminal: its turn ${turn} (its hooks missing)` }))
+    this.terminalTurnShown(l)
+  }
+
+  /** While its hooks are missing (#1336), what its terminal last said of its turn (HI-2802) is its status's last resort. */
+  private terminalTurnShown(l: LiveSession): void {
+    const h = l.state.hooksMissing
+    if (!h || !l.terminalSaid || h.terminal === l.terminalSaid) return
+    l.state.hooksMissing = { ...h, terminal: l.terminalSaid }
+    this.emitState(l.state)
+  }
+
   /** For CLIs whose first hook waits for the first prompt: the prompt showing in the terminal means ready. */
   private watchReadyOutput(id: string, data: string): void {
     const l = this.live.get(id)
@@ -3999,7 +4035,7 @@ class SessionManager {
       : undefined
     const snippet = cause ? cause.snippet : why === 'partial' || why === 'org'
     const turn = after === 'transcript' ? l.hooksWatch?.flagged : null
-    st.hooksMissing = { since: new Date().toISOString(), after, ...(turn ? { turn } : {}), ...(why ? { why } : {}), ...(cause && why === cause.why ? { offIn: cause.where, setting: cause.setting, ...(cause.also ? { also: cause.also } : {}) } : {}), ...(snippet ? { snippet } : {}) }
+    st.hooksMissing = { since: new Date().toISOString(), after, ...(turn ? { turn } : {}), ...(why ? { why } : {}), ...(cause && why === cause.why ? { offIn: cause.where, setting: cause.setting, ...(cause.also ? { also: cause.also } : {}) } : {}), ...(snippet ? { snippet } : {}), ...(l.terminalSaid ? { terminal: l.terminalSaid } : {}) }
     this.emitState(st)
     noteHooksMissing(st.projectPath, st.agentId, true)
     const label = this.label(st)

@@ -6,6 +6,9 @@
 // (CW_TEST_HOOKS_HOLD), so each turn is over before any check looks. Combwork's bound at 3 s.
 // - a healthy quick turn is never flagged; with its hooks lost, a quick marked turn is: "transcript", naming that turn's
 //   interactionId, never the healthy one's;
+// - meanwhile (HI-2802) its status comes from Copilot's OSC 7501 in its terminal: the deaf turn finished, and a slower
+//   turn, its hooks still lost, working then finished, labelled as from its terminal (the sequences are printed to the
+//   suite's log: tests/fixtures/advanced/terminal-turn-copilot-<version>.json, the advanced setting's, comes from it);
 // - its hooks back, the next turn's hook clears it.
 // Skipped where Copilot isn't installed.
 const lib = require('./lib.cjs')
@@ -107,6 +110,21 @@ const jsonl = (file) => {
     check('with its hooks lost, a quick marked turn, over before any check (held)', !!deaf)
     const flagged = await until(async () => (await live())?.hooksMissing, HUNG_MS)
     check("released, its events show the turn no hook came after: hooks missing by the transcript, naming that turn's interactionId", flagged?.after === 'transcript' && flagged?.turn === deaf && deaf !== healthy, JSON.stringify({ flagged, deaf, healthy }))
+    // Its status from its terminal meanwhile (HI-2802): Copilot's OSC 7501 says the deaf turn finished, and a turn that
+    // takes a while, its hooks still lost, shows working, then finished, labelled as from its terminal.
+    const raw = (await inv('pty:buffer', key).catch(() => '')) ?? ''
+    const osc = [...raw.matchAll(/\x1b\]((?:7501|9;4);[^\x07\x1b]*)(?:\x07|\x1b\\)/g)].map((m) => m[1])
+    check('Copilot writes its turn state to its terminal (OSC 7501: idle, working, done)', ['idle', 'working', 'done'].every((s) => osc.some((p) => p.startsWith(`7501;state=${s}`))), JSON.stringify(osc.slice(0, 12)))
+    // Recording the fixture the advanced setting's samples come from (tests/fixtures/advanced/terminal-turn-copilot-<v>.json).
+    console.log(`its terminal's sequences (Copilot ${info?.version ?? '?'}): ${JSON.stringify(osc)}`)
+    check('with its hooks missing, the finished turn shows as finished, from its terminal', flagged?.terminal === 'done', JSON.stringify(flagged))
+    const paneText = () => page.evaluate(() => document.body.innerText)
+    check('its pane says so: "Finished (from its terminal…)"', !!(await until(async () => (await paneText()).includes('Finished (from its terminal'), HUNG_MS)))
+    await inv('pty:write', key, 'work 4 then say Still deaf.')
+    await until(async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '').includes('say Still deaf.'), HUNG_MS)
+    await inv('pty:write', key, '\r')
+    check('a turn that takes a while, its hooks still lost: working, from its terminal', !!(await until(async () => (await live())?.hooksMissing?.terminal === 'working', HUNG_MS)), JSON.stringify((await live())?.hooksMissing))
+    check('…and finished once it ends, still missing its hooks', !!(await until(async () => { const h = (await live())?.hooksMissing; return h?.terminal === 'done' && h }, HUNG_MS)), JSON.stringify((await live())?.hooksMissing))
     fs.rmSync(drop, { force: true })
     await inv('pty:write', key, 'say Back again.')
     await until(async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '').includes('say Back again.'), HUNG_MS)

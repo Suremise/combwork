@@ -1687,6 +1687,12 @@
       "reason": "plain"
     }
   },
+  "api.status.terminalTurn": {
+    "placeholders": {
+      "state": "select",
+      "provider": "plain"
+    }
+  },
   "api.status.unknownState": {
     "placeholders": {
       "state": "plain"

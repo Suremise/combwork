@@ -1028,6 +1028,12 @@
   "settings.advanced.copilot.signIn.hookMessage.title": {
     "placeholders": {}
   },
+  "settings.advanced.copilot.terminal.turn.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.terminal.turn.title": {
+    "placeholders": {}
+  },
   "settings.advanced.copilot.trust.prompt.desc": {
     "placeholders": {}
   },

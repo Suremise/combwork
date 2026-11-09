@@ -170,6 +170,8 @@ interface CombworkMessageValues {
   'panes.runtime.silent': { known: string; minutes: number }
   'panes.runtime.starting': undefined
   'panes.runtime.stopped': undefined
+  'panes.runtime.terminalTurn': { state: string; provider: string | number }
+  'panes.runtime.terminalTurnNote': undefined
   'panes.runtime.working': undefined
   'panes.safeguard.asks': undefined
   'panes.safeguard.idle': undefined

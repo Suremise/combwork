@@ -153,6 +153,11 @@ export class CopilotAdapter implements ProviderAdapter {
   get startupQuestion(): RegExp {
     return advanced.pattern('copilot.trust.prompt')
   }
+  // Its turn's state in an OSC 7501 sequence (HI-2802, recorded with 1.0.106; 1.0.107 is the same release): "state=working" as a turn
+  // starts, "state=done" as it ends. An advanced setting (#367), read at each launch.
+  terminalTurn(): RegExp {
+    return advanced.pattern('copilot.terminal.turn')
+  }
   // Copilot writes a session's token totals (session.shutdown) only as it exits by itself (#465). Ctrl+C cancels what
   // runs (a turn, a dialog), and twice in a row exits ("ctrl+c again to exit"); three cover a turn or dialog first, at a
   // lane's end (quit), where its turn is over. Stop types them on conditions instead (HI-2272, exitKeys.ts): a key that

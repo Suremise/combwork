@@ -427,6 +427,8 @@
   "settings.advanced.copilot.quota.usedField.desc": "Pole przydziału z tym, ile z niego wykorzystano. Jeśli jest błędne, limity Copilot nie mówią, ile wykorzystano.",
   "settings.advanced.copilot.quota.usedField.title": "Limity planu: pole użycia",
   "settings.advanced.copilot.ready.footer.desc": "Copilot informuje o starcie dopiero przy pierwszym prompcie, więc Combwork uznaje jego stopkę na ekranie za znak gotowości.",
+  "settings.advanced.copilot.terminal.turn.title": "Stan tury w terminalu",
+  "settings.advanced.copilot.terminal.turn.desc": "Co Copilot zapisuje w swoim terminalu (sekwencja OSC, bez jej ESC ]), gdy tura się zaczyna i kończy; pierwsza grupa to stan (working, done). Combwork odczytuje to tylko wtedy, gdy hooki agenta nie docierają, aby pokazać, że pracuje lub skończył; jeśli wartość jest błędna, taki agent pokazuje tylko, że jego stan jest nieznany.",
   "settings.advanced.copilot.ready.footer.title": "Stopka gotowości",
   "settings.advanced.copilot.retry.context.desc": "Gdzie hook błędu Copilot mówi, że błąd do naprawienia był wywołaniem modelu, które ponawia (limit zapytań albo usługa nieosiągalna). Combwork pokazuje agenta jako czekającego na ponowienie, dopóki Copilot nie pójdzie dalej. Błędne: czekający agent pokazuje tylko „Pracuje”.",
   "settings.advanced.copilot.retry.context.title": "Ponowienie: kontekst błędu",

@@ -427,6 +427,8 @@
   "settings.advanced.copilot.quota.usedField.desc": "Le champ d’un quota qui indique combien en est utilisé. S’il est faux, les limites de Copilot n’indiquent pas combien ont été utilisées.",
   "settings.advanced.copilot.quota.usedField.title": "Limites du forfait : champ de l’utilisation",
   "settings.advanced.copilot.ready.footer.desc": "Copilot ne signale son démarrage qu’au premier prompt : Combwork considère donc son pied à l’écran comme le signe qu’il est prêt.",
+  "settings.advanced.copilot.terminal.turn.title": "État du tour dans le terminal",
+  "settings.advanced.copilot.terminal.turn.desc": "Ce que Copilot écrit dans son terminal (une séquence OSC, sans son ESC ]) quand un tour commence et se termine ; le premier groupe est l’état (working, done). Combwork ne le lit que tant que les hooks d’un agent n’arrivent pas, pour le montrer au travail ou ayant terminé ; s’il est faux, un tel agent montre seulement que son statut est inconnu.",
   "settings.advanced.copilot.ready.footer.title": "Pied « prêt »",
   "settings.advanced.copilot.retry.context.desc": "Où le hook d’erreur de Copilot indique qu’une erreur récupérable était un appel au modèle qu’il relance (limite de débit, ou service injoignable). Combwork affiche l’agent en attente d’un nouvel essai jusqu’à ce que Copilot continue. Si c’est faux, un agent en attente affiche seulement « Au travail ».",
   "settings.advanced.copilot.retry.context.title": "Nouvel essai : contexte de l’erreur",

@@ -597,6 +597,12 @@ export interface ProviderAdapter {
    * absent) when its title doesn't say: its hooks then tell Combwork (see hookStatus).
    */
   titleAttention?(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null
+  /**
+   * For CLIs that write their turn's state to the terminal in an OSC sequence (Copilot's OSC 7501, HI-2802): a test of an
+   * OSC payload whose first group is the state ("working", "done", else idle). Read only while the launch's hooks are
+   * missing, as a status of last resort: it says working and finished, never that a person must act.
+   */
+  terminalTurn?(): RegExp | null
   lockReply(decision: LockDecision): Record<string, unknown>
   /**
    * The reply that puts Combwork's fixed notice text before the model at this hook (#650: the CLI's own event name, as the

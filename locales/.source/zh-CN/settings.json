@@ -448,6 +448,8 @@
   "settings.advanced.copilot.signIn.errorType.title": "Sign-in refused: error type",
   "settings.advanced.copilot.signIn.hookMessage.desc": "The message of Copilot's ErrorOccurred hook that means a model call was refused for the sign-in: the turn ends signed out. Another error that ends the turn ends it as failed.",
   "settings.advanced.copilot.signIn.hookMessage.title": "Sign-in refused: ErrorOccurred hook",
+  "settings.advanced.copilot.terminal.turn.desc": "What Copilot writes to its terminal (an OSC sequence, without its ESC ]) as a turn starts and ends; the first group is the state (working, done). Combwork reads it only while an agent's hooks aren't arriving, to show it working or finished; wrong, such an agent shows only that its status is unknown.",
+  "settings.advanced.copilot.terminal.turn.title": "Turn state in the terminal",
   "settings.advanced.copilot.trust.prompt.desc": "Copilot's question before a folder's first session. Combwork shows the agent as waiting for you while it is on screen.",
   "settings.advanced.copilot.trust.prompt.title": "Trust question",
   "settings.advanced.copilot.turnFailed.errorType.desc": "A session error's type, in Copilot's session file, that means its turn ended because a model call failed after Copilot's retries (it sends no Stop then): Combwork ends the turn as failed, with Copilot's message. Wrong, such an agent shows working until you look.",

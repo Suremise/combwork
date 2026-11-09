@@ -427,6 +427,8 @@
   "settings.advanced.copilot.quota.usedField.desc": "クォータのうち、使用済みの量を持つフィールドです。誤っていると、Copilotの制限に使用数が表示されません。",
   "settings.advanced.copilot.quota.usedField.title": "プランの制限：使用量のフィールド",
   "settings.advanced.copilot.ready.footer.desc": "Copilotは最初のプロンプトまで起動したことを知らせないため、Combworkは画面にこのフッターがあれば準備完了と判断します。",
+  "settings.advanced.copilot.terminal.turn.title": "ターミナルのターン状態",
+  "settings.advanced.copilot.terminal.turn.desc": "ターンの開始時と終了時にCopilotがターミナルに書き込む内容（OSCシーケンス、ESC ]を除く）。最初のグループが状態（working、done）です。Combworkはエージェントのフックが届かない間だけこれを読み取り、作業中か完了かを表示します。誤っていると、そのエージェントは状態不明としか表示されません。",
   "settings.advanced.copilot.ready.footer.title": "準備完了のフッター",
   "settings.advanced.copilot.retry.context.desc": "Copilotのエラーのフックが、回復可能なエラーが再試行するモデルの呼び出しだったと示す場所（レート制限、またはサービスに接続できない場合）。CombworkはCopilotが先に進むまで、エージェントを再試行待ちとして表示します。間違っていると、待機中のエージェントは「作業中」とだけ表示されます。",
   "settings.advanced.copilot.retry.context.title": "再試行：エラーのコンテキスト",
