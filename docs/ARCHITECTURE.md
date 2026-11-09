@@ -333,7 +333,10 @@ processes in its own worker (`platform/jjWorker.ts` over `jjProcess.ts`, never G
 trusted (`jjSupported`; a newer one is `untested`); and `platform/jjDetect.ts` is read-only detection
 (`jjContextOf`: the workspace, its shared repository and Git store, linked, colocated, a nearer Git root, or unknown
 with a code). Neither is in `repoPorts.ts`; only Copy Diagnostics and the tests reach them (`tests/jjReal.test.ts` on
-the pinned jj, `npm run jj:fetch`).
+the pinned jj, `npm run jj:fetch`). `platform/jjAdvanceProbe.ts` (J1, HI-2794) is evidence only, for the closed
+gate:advance (SPEC §16.3.6, "Open: jj's target advance"). It is one advance attempt step by step, plus a classifier
+of what it observed, and only its tests reach it (`tests/jjAdvanceProbeReal.test.ts`; `tests/integrationPortsImports.test.ts`
+fails on any import of it from `src`).
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
