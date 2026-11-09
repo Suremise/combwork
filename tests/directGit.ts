@@ -4,12 +4,14 @@
 // Bash already has git's own folder first, and there this changes nothing.
 //
 // Only that case, and only for one installation: the first folder on PATH holding git.exe is `<root>\cmd`, and git's
-// exec path is `<root>\mingw64\libexec\git-core` with `<root>\mingw64\bin\git.exe` there; then `<root>\mingw64\bin` goes
-// immediately before that `cmd` entry, so every folder ahead of it keeps its place. Anything else: PATH as it was.
+// exec path is `<root>\<mingw>\libexec\git-core` with `<root>\<mingw>\bin\git.exe` there, `<mingw>` any layout the
+// product knows (GIT_MINGW_DIRS: mingw64, ucrt64 on Git for Windows' UCRT64 builds, HI-2812, …); then `<root>\<mingw>\bin`
+// goes immediately before that `cmd` entry, so every folder ahead of it keeps its place. Anything else: PATH as it was.
 // Run after tests/noGlobalGit.ts, in each worker before any test.
 import { execFileSync } from 'child_process'
 import { existsSync } from 'fs'
 import { basename, delimiter, dirname, join, resolve } from 'path'
+import { GIT_MINGW_DIRS } from '../src/shared/gitLayout'
 
 /** PATH with Git for Windows' own bin folder just before its launcher's, or null to leave it as it is. */
 export function directGitPath(path: string, execPath: string, exists: (p: string) => boolean = existsSync): string | null {
@@ -17,8 +19,10 @@ export function directGitPath(path: string, execPath: string, exists: (p: string
   const at = parts.findIndex((p) => p && exists(join(p, 'git.exe')))
   if (at < 0 || basename(resolve(parts[at])).toLowerCase() !== 'cmd') return null
   const root = dirname(resolve(parts[at]))
-  const bin = join(root, 'mingw64', 'bin')
-  if (resolve(execPath).toLowerCase() !== join(root, 'mingw64', 'libexec', 'git-core').toLowerCase() || !exists(join(bin, 'git.exe'))) return null
+  const mingw = GIT_MINGW_DIRS.find((m) => resolve(execPath).toLowerCase() === join(root, m, 'libexec', 'git-core').toLowerCase())
+  if (!mingw) return null
+  const bin = join(root, mingw, 'bin')
+  if (!exists(join(bin, 'git.exe'))) return null
   return [...parts.slice(0, at), bin, ...parts.slice(at)].join(delimiter)
 }
 
