@@ -366,7 +366,7 @@ export const AREAS = [
   { paths: ['tests/e2e/slotbroker.cjs', 'src/main/systemBrokers.ts', 'src/main/connectionSwitch.ts', 'src/main/agentProcesses.ts', 'src/main/processSupervisor.ts'], suites: ['slotbroker'] },
   { paths: ['tests/e2e/slotrelease.cjs', 'src/main/agentFolders.ts', 'src/renderer/src/components/SlotsAndCopies.tsx'], suites: ['slotrelease'] },
   // HI-2786: the workspace lifecycle port the slot pool, its card hooks and a 0.9 worktree's recreation act on folders through.
-  { paths: ['src/main/platform/workspacePort.ts', 'src/main/platform/gitWorkspacePort.ts', 'src/main/platform/workspacePorts.ts'], suites: ['slotpool', 'slotrecovery', 'slotrelease', 'slotcards', 'repairslots', 'wtrecreate', 'legacyworktree'] },
+  { paths: ['src/main/platform/workspacePort.ts', 'src/main/platform/gitWorkspacePort.ts', 'src/main/platform/workspacePorts.ts'], suites: ['slotpool', 'slotrecovery', 'slotrelease', 'slotcards', 'repairslots', 'wtrecreate', 'legacyworktree', 'agentslots', 'lanesslots'] },
   { paths: ['tests/e2e/slotwindows.cjs', 'src/main/agentFolders.ts', 'src/main/agentProcesses.ts', 'src/main/index.ts'], suites: ['slotwindows'] },
   { paths: ['tests/e2e/slotreleaseapi.cjs', 'src/main/slotRelease.ts', 'src/main/agentFolders.ts', 'src/main/slotMigration.ts'], suites: ['slotreleaseapi'] },
   // The Agent API's agents on slots (#1451): where each is, and adding none in a worktree.
@@ -899,6 +899,8 @@ export const UNIT_SCANS = [
   // HI-2786: the callers moved to the workspace lifecycle port, its contract and registry, and who imports Git's.
   { test: 'tests/repoPortsImports.test.ts', paths: ['src/main/slots.ts', 'src/main/slotCards.ts', 'src/main/agentWorktree.ts', 'src/main/platform/workspacePort.ts', 'src/main/platform/workspacePorts.ts'] },
   { test: 'tests/repoPortsImports.test.ts', paths: ['src/'], lines: ['gitWorkspacePort'] },
+  // HI-2789: copies, a Resume's claim, a lane's start, agents' worktrees and the providers' context reads moved to the ports.
+  { test: 'tests/repoPortsImports.test.ts', paths: ['src/main/accounts.ts', 'src/main/providers/common.ts', 'src/main/providers/claude/memoryDir.ts', 'src/main/copies.ts', 'src/main/agentFolders.ts', 'src/main/lanes.ts', 'src/main/projectAgents.ts'] },
   { test: 'tests/exitLog.test.ts', paths: ['src/main/'], lines: ['app\\.quit', 'app\\.exit', 'process\\.exit', 'app\\.relaunch', 'quitAndInstall', 'exitBy'] },
   // Each function in main taking the board's lock or a database lease is listed by file and name (HI-1368): a new
   // one, or a change to a listed file (a rename of its function), can break it.

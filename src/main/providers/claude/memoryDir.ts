@@ -1,6 +1,6 @@
-import { basename, dirname, isAbsolute, join, resolve } from 'path'
+import { join, resolve } from 'path'
 import { lstat, realpath, stat } from 'original-fs/promises'
-import { git } from '../../git'
+import { mainTree } from '../../platform/repoPorts'
 import { encodeProjectPath } from './usage'
 
 /**
@@ -43,13 +43,10 @@ export function memoryKey(base: string): string {
  * repository"): no setting then.
  */
 export async function memoryBase(cwd: string): Promise<string | null> {
-  const r = await git(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir', '--show-toplevel'], undefined, undefined, { timeout: GIT_MS }).catch(() => null)
-  if (!r) return null
-  if (!r.ok) return /not a git repository/i.test(r.err) ? cwd : null
-  const [common, top] = r.out.trim().split(/\r?\n/)
-  // The common git folder's parent is the main working tree when it is a `.git` folder; else the top level.
-  const main = common && basename(common).toLowerCase() === '.git' ? dirname(common) : top
-  return main && isAbsolute(main) ? resolve(main) : null
+  // The repository's main working tree, from the context port (HI-2789: Git's, as this read it before).
+  const m = await mainTree(cwd, { timeout: GIT_MS })
+  if (!m) return null
+  return 'none' in m ? cwd : m.main
 }
 
 /**
