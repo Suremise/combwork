@@ -31,6 +31,11 @@ async function startServer(opts) {
   const cfgFor = (dir) => config.load(dir || cwd, env)
   const boot = cfgFor(cwd)
   for (const l of boot.loaded) log({ kind: 'loaded', ...l })
+  // Each instructions file's text, as the real one puts it in the model's system prompt (a scenario reads a launch's mode
+  // in it, as it reads Copilot's stand-in's log), cut at 256 KB.
+  for (const l of boot.loaded) if (l.kind === 'instructions') {
+    try { log({ kind: 'instructions-text', path: l.path, text: fs.readFileSync(l.path, 'utf8').slice(0, 262144) }) } catch { /* gone: nothing to show */ }
+  }
   const auth = 'Basic ' + Buffer.from(`opencode:${opts.password ?? ''}`).toString('base64')
   const clients = new Set()
   const pending = new Map() // permission id → { request, resolve }
@@ -68,9 +73,14 @@ async function startServer(opts) {
   // --- Events.
   let evCount = 0
   const eventId = () => store.newId('evt')
+  /** The types each stream asked for (`?types=`, HI-2760's recording: only those, plus server.connected); none: all. */
+  const wanted = new WeakMap()
   function send(e) {
     const block = `data: ${JSON.stringify(e)}\n\n`
-    for (const c of clients) if (!c.writableEnded) c.write(block)
+    for (const c of clients) {
+      const only = wanted.get(c)
+      if (!c.writableEnded && (!only || only.has(e.type))) c.write(block)
+    }
     evCount++
   }
   /** One event; durable ones carry the session's next seq (kept with the session, so a restart carries on). */
@@ -88,6 +98,17 @@ async function startServer(opts) {
     return e
   }
   const session = (sid) => store.read(env).sessions[sid]
+  let logReads = 0
+  /** A submission, as the TUI's prompt makes one (an inbox item), its turn queued after the session's others; `done` once it ended. */
+  function submit(sid, text) {
+    const inboxID = store.newId('msg')
+    const now = Date.now()
+    pushMessage(sid, { id: inboxID, time: { created: now }, text, type: 'user' })
+    emit('session.inbox.enqueued', { inboxID, sessionID: sid, item: { type: 'user', payload: { text }, delivery: 'steer' } }, { sid, durable: true, location: loc(sid) })
+    const q = (queues.get(sid) || Promise.resolve()).then(() => runTurn(sid, text, inboxID))
+    queues.set(sid, q.catch(() => undefined))
+    return { inboxID, now, text, done: q.catch(() => undefined) }
+  }
   const loc = (sid) => session(sid)?.info.location
 
   function createSession(body) {
@@ -143,6 +164,8 @@ async function startServer(opts) {
       emit('session.renamed', { sessionID: sid, title }, d)
     }
     // The stream lost mid-turn (HI-2758 Q5): what happens meanwhile reaches no one, and is never replayed.
+    // A test's over-long frame (never 2.2.6's): one event of the session's whose data line is 300 KB.
+    if (/\blong frame\b/i.test(text)) emit('session.step.started', { sessionID: sid, assistantMessageID: store.newId('msg'), padding: 'x'.repeat(300 * 1024) }, d)
     if (/\bdrop events\b/i.test(text))
       for (const c of [...clients]) {
         clients.delete(c)
@@ -319,7 +342,9 @@ async function startServer(opts) {
         const toolLine = /^tool (.+)$/.exec(work)
         if (!ctl.aborted && toolLine) await toolStep('execute', { code: 'return "fake"' }, async () => ({ text: toolLine[1], metadata: { truncated: false } }))
       }
-      if (!ctl.aborted) {
+      // A model with no route fails before any step: only the user message and the idle marker (HI-2760's recording,
+      // wire/message-paging.json); a provider that answers with an error takes a step first (events/failed-provider-400.json).
+      if (!ctl.aborted && failure?.type !== 'provider.no-route') {
         await step(async (msgId) => {
           if (failure) return failStep(msgId, failure)
           if (/\bslow\b/i.test(text)) await waitOrAbort(ctl, 60000)
@@ -431,6 +456,8 @@ async function startServer(opts) {
       res.writeHead(200, { 'cache-control': 'no-cache, no-transform', connection: 'keep-alive', 'content-type': 'text/event-stream', vary: 'Origin', 'x-accel-buffering': 'no', 'x-content-type-options': 'nosniff' })
       res.write(`data: ${JSON.stringify({ id: eventId(), type: 'server.connected', data: {} })}\n\n`)
       res.write(': heartbeat\n\n')
+      const types = url.searchParams.getAll('types')
+      if (types.length) wanted.set(res, new Set(types))
       clients.add(res)
       const hb = setInterval(() => res.write(': heartbeat\n\n'), 10000)
       req.on('close', () => {
@@ -463,19 +490,25 @@ async function startServer(opts) {
     }
     if ((m = /^\/api\/session\/([^/]+)\/message$/.exec(p)) && req.method === 'GET') {
       const s = session(m[1])
-      return s ? json(res, 200, { data: [...s.messages].reverse(), cursor: { previous: null, next: null } }) : notFound(res, m[1])
+      if (!s) return notFound(res, m[1])
+      return messagePage(res, s.messages, url.searchParams)
+    }
+    // The durable log (HI-2760's recording of 2.2.6): only its watermark, the session's last durable seq, as one frame.
+    if ((m = /^\/api\/experimental\/session\/([^/]+)\/log$/.exec(p)) && req.method === 'GET') {
+      if (!session(m[1])) return notFound(res, m[1])
+      // A test's race (FAKE_OPENCODE_RACE_ON_LOG=n, never 2.2.6's): before the n-th watermark is answered, a whole turn
+      // runs to its end, as if submitted between a snapshot's last message page and its second watermark.
+      logReads++
+      if (Number(env.FAKE_OPENCODE_RACE_ON_LOG) === logReads) await submit(m[1], 'raced').done
+      const s = session(m[1])
+      res.writeHead(200, { 'cache-control': 'no-cache, no-transform', 'content-type': 'text/event-stream' })
+      return res.end(`data: ${JSON.stringify({ type: 'log.synced', aggregateID: m[1], seq: Math.max(0, s.seq ?? 0) })}\n\n`)
     }
     if ((m = /^\/api\/session\/([^/]+)\/prompt$/.exec(p)) && req.method === 'POST') {
       const sid = m[1]
       if (!session(sid)) return notFound(res, sid)
       const body = (await bodyOf(req)) || {}
-      const text = String(body.text ?? '')
-      const inboxID = store.newId('msg')
-      const now = Date.now()
-      pushMessage(sid, { id: inboxID, time: { created: now }, text, type: 'user' })
-      emit('session.inbox.enqueued', { inboxID, sessionID: sid, item: { type: 'user', payload: { text }, delivery: 'steer' } }, { sid, durable: true, location: loc(sid) })
-      const q = (queues.get(sid) || Promise.resolve()).then(() => runTurn(sid, text, inboxID))
-      queues.set(sid, q.catch(() => undefined))
+      const { inboxID, now, text } = submit(sid, String(body.text ?? ''))
       return json(res, 200, { data: { id: inboxID, sessionID: sid, time: { created: now }, type: 'user', payload: { text }, delivery: 'steer' } })
     }
     if ((m = /^\/api\/session\/([^/]+)\/interrupt$/.exec(p)) && req.method === 'POST') {
@@ -549,6 +582,42 @@ async function startServer(opts) {
 }
 
 // A model call's time (FAKE_OPENCODE_MODEL_MS; the scenarios', so a turn is seen under way as a real one is; else none).
+/**
+ * A session's messages as GET /api/session/<id>/message pages them (HI-2760's recording of 2.2.6,
+ * tests/fixtures/opencode/real-2.2.6/wire/message-paging.json): `limit` at most 200 (else a 400), `order` desc (the
+ * default, newest first) or asc, and `cursor`, an opaque token (base64 JSON {id, order, direction}): `next` continues past
+ * the page's last message in its order, `previous` goes back before its first. Every page has both cursors.
+ */
+function messagePage(res, messages, q) {
+  const json = (status, body) => {
+    res.writeHead(status, { 'content-type': 'application/json' })
+    res.end(JSON.stringify(body))
+  }
+  const limitText = q.get('limit')
+  const limit = limitText === null ? 100 : Number(limitText)
+  if (!Number.isInteger(limit) || limit < 1) return json(400, { _tag: 'InvalidRequestError', message: 'Expected a positive integer\n  at ["limit"]', kind: 'Query' })
+  if (limit > 200) return json(400, { _tag: 'InvalidRequestError', message: 'Expected a value less than or equal to 200\n  at ["limit"]', kind: 'Query' })
+  let order = q.get('order') === 'asc' ? 'asc' : 'desc'
+  let page
+  const token = q.get('cursor')
+  const ordered = () => (order === 'desc' ? [...messages].reverse() : [...messages])
+  if (token) {
+    let c
+    try {
+      c = JSON.parse(Buffer.from(token, 'base64').toString('utf8'))
+    } catch {
+      return json(400, { _tag: 'InvalidRequestError', message: 'Invalid cursor', kind: 'Query' })
+    }
+    order = c.order === 'asc' ? 'asc' : 'desc'
+    const all = ordered()
+    const at = all.findIndex((m) => m.id === c.id)
+    if (at < 0) return json(400, { _tag: 'InvalidRequestError', message: 'Invalid cursor', kind: 'Query' })
+    page = c.direction === 'previous' ? all.slice(Math.max(0, at - limit), at) : all.slice(at + 1, at + 1 + limit)
+  } else page = ordered().slice(0, limit)
+  const cursor = (id, direction) => Buffer.from(JSON.stringify({ id, order, direction })).toString('base64')
+  return json(200, { data: page, cursor: page.length ? { previous: cursor(page[0].id, 'previous'), next: cursor(page[page.length - 1].id, 'next') } : { previous: null, next: null } })
+}
+
 const MODEL_MS = Number(process.env.FAKE_OPENCODE_MODEL_MS ?? 0)
 const follows = (env) => env.FAKE_OPENCODE_FOLLOW_NOTICES === '1'
 /** What it does after a wake it read: the next line of fake-wakes-<agent>.txt in FAKE_OPENCODE_WAKES (taken), or null. */

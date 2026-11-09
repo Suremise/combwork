@@ -51,12 +51,30 @@ const NOT_A_TRIAL = ['tool-sweep']
 const FAKES = ['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity', 'fake-opencode']
 
 /**
- * A fake provider whose runs wait for a card, every scenario left out with why (HI-2761): the harness knows a prompt was
- * taken from the agent's status (working) or its transcript, and an OpenCode agent has neither before HI-2760 (its turn
- * status from the server's events) and HI-2762 (its history). HI-2761's first try, run 2026-11-09T01-29-58-fake-opencode:
- * every prompt "never taken", the fake's turns run all the same. The card that gives OpenCode its status lifts this.
+ * A fake provider whose runs wait for a card, every scenario left out with why (HI-2761). fake-opencode waited for HI-2760
+ * (its agents' turn status: the harness knows a prompt was taken from the agent's status), which lifted it. None waits now.
  */
-const PROVIDER_WAITS = { 'fake-opencode': "waits for HI-2760: an OpenCode agent has no turn status before it, so the harness can't see a prompt taken (tests/scenarios/fakeScope.cjs)" }
+const PROVIDER_WAITS = {}
+
+/**
+ * Scenarios a fake provider leaves out until a card lands, each group with why (HI-2760). fake-opencode's own run
+ * (2026-11-09T01-59-16-fake-opencode, then 02-32-38 for those not about the transcript):
+ * - the harness reads what an agent did (its skill reads, Combwork's replies, its last reply, the line Combwork typed) from
+ *   its transcript, and an OpenCode agent has none before HI-2762 (its history); every other check of these passed;
+ * - an OpenCode Assistant gets no state view at its start: HI-2771.
+ */
+const SCENARIO_WAITS = {
+  'fake-opencode': [
+    {
+      why: "waits for HI-2762: the harness reads its checks from the agent's transcript, which an OpenCode agent has none of before it (tests/scenarios/fakeScope.cjs)",
+      ids: ['work-on-card', 'review-card', 'review-interrupted', 'decision-while-waiting', 'inbox-rebrief', 'merge-main-moved', 'merge-slot-queued', 'merge-checks-fail', 'pick-up-latest', 'wrap-up', 'lasting-decision', 'plan-only', 'raw-api', 'watcher-stopped', 'edited-skill', 'skill-reference-read', 'skill-changed', 'card-loop-merge-refused', 'card-loop-merge-decision', 'card-loop-lane', 'card-loop-submit-watch', 'intent-submit-refused', 'review-in-copy', 'card-loop-design-check', 'card-loop-progress-comment', 'assistant-lane-brief', 'assistant-new-lane', 'coordinator-team-lanes', 'assistant-settings-suggest', 'qa-triage-report', 'licence-audit', 'board-hygiene']
+    },
+    { why: "waits for HI-2771: an OpenCode Assistant gets no state view at its start (tests/scenarios/fakeScope.cjs)", ids: ['assistant-journal-recall'] }
+  ]
+}
+
+/** Why a provider leaves this scenario out until a card lands (SCENARIO_WAITS), or null. */
+const waitOf = (providerKey, id) => (SCENARIO_WAITS[providerKey] ?? []).find((w) => w.ids.includes(id))?.why ?? null
 
 /** The fakes a scenario runs on: every fake, ['fake'], or [] (model trials only). */
 function fakesFor(id) {
@@ -68,7 +86,11 @@ function fakesFor(id) {
 /** What's wrong with the lists, against the scenarios' ids: [] when nothing. */
 function scopeProblems(ids) {
   const named = [...FAKE_CLAUDE_ONLY, ...MODEL_TRIALS_ONLY, ...NOT_A_TRIAL]
+  const waiting = Object.entries(SCENARIO_WAITS).flatMap(([p, ws]) => ws.flatMap((w) => w.ids.map((id) => ({ p, id }))))
   return [
+    ...waiting.filter((w) => !ids.includes(w.id)).map((w) => `${w.id}: no such scenario (${w.p}'s waits)`),
+    ...waiting.filter((w, i) => waiting.findIndex((x) => x.p === w.p && x.id === w.id) !== i).map((w) => `${w.id}: listed twice (${w.p}'s waits)`),
+    ...waiting.filter((w) => !fakesFor(w.id).includes(w.p)).map((w) => `${w.id}: ${w.p} doesn't run it anyway (${w.p}'s waits)`),
     ...named.filter((id) => !ids.includes(id)).map((id) => `${id}: no such scenario`),
     ...named.filter((id, i) => named.indexOf(id) !== i).map((id) => `${id}: listed twice`),
     ...NOT_A_TRIAL.filter((id) => MODEL_TRIALS_ONLY.includes(id)).map((id) => `${id}: runs nowhere (neither a model trial nor on a fake)`)
@@ -88,7 +110,9 @@ function selectFor(listed, providerKey) {
     if (PROVIDER_WAITS[providerKey]) excluded.push({ id: s.id, why: PROVIDER_WAITS[providerKey] })
     else if (fake) {
       const on = fakesFor(s.id)
-      if (on.includes(providerKey)) run.push(s)
+      const wait = waitOf(providerKey, s.id)
+      if (on.includes(providerKey) && wait) excluded.push({ id: s.id, why: wait })
+      else if (on.includes(providerKey)) run.push(s)
       else excluded.push({ id: s.id, why: on.length ? `runs on ${on.join(', ')} only (tests/scenarios/fakeScope.cjs): --provider ${on[0]}` : 'model trials only: no fake runs it (tests/scenarios/fakeScope.cjs)' })
     } else if (NOT_A_TRIAL.includes(s.id)) excluded.push({ id: s.id, why: "the fakes' plumbing only: model trials leave it out (tests/scenarios/fakeScope.cjs)" })
     else run.push(s)
@@ -96,4 +120,4 @@ function selectFor(listed, providerKey) {
   return { run, excluded }
 }
 
-module.exports = { FAKES, PROVIDER_WAITS, FAKE_CLAUDE_ONLY, MODEL_TRIALS_ONLY, NOT_A_TRIAL, fakesFor, scopeProblems, selectFor }
+module.exports = { FAKES, PROVIDER_WAITS, SCENARIO_WAITS, FAKE_CLAUDE_ONLY, MODEL_TRIALS_ONLY, NOT_A_TRIAL, fakesFor, scopeProblems, selectFor }

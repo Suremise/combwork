@@ -1,0 +1,10 @@
+{
+  "source": "HI-2760's probe (HB1, 9 Nov 2026, offline): a new session, then 6 prompts on a provider the config denies, each failing at once (a user message and an idle marker). Each page as [type, text or outcome]; cursors present or not (they are opaque base64 JSON {id, order, direction}).",
+  "default": { "status": 200, "count": 12, "page": [["idle", "failed"], ["user", "prompt 6"], ["idle", "failed"], ["user", "prompt 5"], ["idle", "failed"], ["user", "prompt 4"], ["idle", "failed"], ["user", "prompt 3"], ["idle", "failed"], ["user", "prompt 2"], ["idle", "failed"], ["user", "prompt 1"]], "cursors": ["previous", "next"] },
+  "limit3desc": { "status": 200, "page": [["idle", "failed"], ["user", "prompt 6"], ["idle", "failed"]], "cursors": ["previous", "next"], "cursorShape": { "order": "desc", "direction": "next" } },
+  "next": { "status": 200, "page": [["user", "prompt 5"], ["idle", "failed"], ["user", "prompt 4"]], "cursors": ["previous", "next"] },
+  "third": { "status": 200, "page": [["idle", "failed"], ["user", "prompt 3"], ["idle", "failed"]], "cursors": ["previous", "next"] },
+  "backFromSecond": { "status": 200, "page": [["idle", "failed"], ["user", "prompt 6"], ["idle", "failed"]] },
+  "limit4asc": { "status": 200, "page": [["user", "prompt 1"], ["idle", "failed"], ["user", "prompt 2"], ["idle", "failed"]], "cursors": ["previous", "next"], "cursorShape": { "order": "asc", "direction": "next" } },
+  "limit1000": { "status": 400, "body": { "_tag": "InvalidRequestError", "message": "Expected a value less than or equal to 200\n  at [\"limit\"]", "kind": "Query" } }
+}

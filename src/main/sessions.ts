@@ -6871,6 +6871,15 @@ class SessionManager {
       await l.adapter.prepareHook(body, { agentId: st.agentId, workspacePath: workspaceOf(st.projectPath).path!, sessionId: st.sessionId, memo: (l.hookMemo ??= {}), alive: () => this.live.get(id) === l }).catch((e) => log.warn(`${userText(this.label(st))}: could not read what its hook needs`, e))
       if (this.live.get(id) !== l) return
     }
+    // A body that stands for several hooks (HI-2760: OpenCode's forwarded events and snapshots, which its prepareHook
+    // turns into zero or more): each is handled in turn, in this same place in the launch's order, as a hook of its own.
+    if (Array.isArray(body.combworkExpanded)) {
+      for (const sub of body.combworkExpanded as Record<string, any>[]) {
+        if (this.live.get(id) !== l) return
+        await this.handleHookIn(runId, sub, arrived, hooksBefore, at, null, null)
+      }
+      return
+    }
     const hook = l.adapter.normalizeHook(body)
     const label = this.label(st)
     flightRecorder.arrived(st, () => label, 'hook', body)
