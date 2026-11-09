@@ -5,8 +5,8 @@
 import { readFileSync, existsSync, writeFileSync, mkdirSync, utimesSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { HISTORY_TEXT, OpencodeConversationParser, buildMirror, inconsistentBreakdowns, mirrorState, opencodePlanUsage, opencodeUsage, parseExport, parseMirrorUsage, placeholderMirror, subagentSessions, withStatus, withoutStatus } from '../src/main/providers/opencode/mirror'
-import { Failed, HistoryCore, dbFiles, mirrorPath, plainLocalGet, statePath, type CoreEvent } from '../src/main/providers/opencode/historyCore'
+import { HISTORY_TEXT, OpencodeConversationParser, buildMirror, forkCopies, inconsistentBreakdowns, mirrorState, opencodeImageData, opencodePlanUsage, opencodeUsage, parseExport, parseMirrorUsage, placeholderMirror, subagentSessions, withStatus, withoutStatus } from '../src/main/providers/opencode/mirror'
+import { Failed, HistoryCore, dbFiles, markPath, mirrorPath, plainLocalGet, statePath, type CoreEvent } from '../src/main/providers/opencode/historyCore'
 import { OpencodeHistory, historyWorkerForTests } from '../src/main/providers/opencode/history'
 import { serverInfoPath } from '../src/main/providers/opencode/launcher'
 import { englishText } from '../src/shared/advanced'
@@ -889,4 +889,363 @@ describe("OpenCode's subagent sessions (HI-2773)", () => {
     await h.stop()
     await historyWorkerForTests(null)
   }, 30_000)
+})
+
+// ---- HI-2774's R0: images, revert, forks and sessions Combwork didn't make (2.2.6, local Ollama, deny-all policy)
+
+const REVERT = fixture('wire/revert-steps.json')
+const FORK = fixture('wire/fork.json')
+const oldestFirst = (x: { info: any; messages: any[] }): { info: any; messages: any[] } => ({ info: x.info, messages: [...x.messages].reverse() })
+const IMAGES = oldestFirst(REVERT.before)
+const READ_IMAGE = { info: { ...IMAGES.info, id: 'ses_readimageREADIMAGEreadimag' }, messages: recorded('messages/read-image.json') }
+
+/** A conversation parsed from text fed in pieces cut at `cuts` (bytes), and the parser, for its images. */
+function parsedIn(text: string, cuts: number[] = []): OpencodeConversationParser {
+  const p = new OpencodeConversationParser(null)
+  const buf = Buffer.from(text)
+  let pending = Buffer.alloc(0)
+  let at = 0
+  for (const cut of [...cuts, buf.length]) {
+    pending = Buffer.concat([pending, buf.subarray(at, cut)])
+    at = cut
+    pending = pending.subarray(p.feed(pending))
+  }
+  return p
+}
+/** An image's data URL, read back as the transcript service does: its line's bytes, parsed, and the adapter's imageData. */
+const imageOf = (text: string, p: OpencodeConversationParser, id: number): string | null => {
+  const loc = p.images[id]
+  return opencodeImageData(JSON.parse(Buffer.from(text).subarray(loc.offset, loc.offset + loc.length).toString('utf8')), loc)
+}
+const PNG_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8DwnwGMgRQAH+4D/dJQfRoAAAAASUVORK5CYII='
+
+describe("OpenCode's images in the history (HI-2774)", () => {
+  it("shows an attached image (by file and inline) from the user message's own data, as recorded, and the text-only model's refusal", () => {
+    // Non-ASCII text before the images, and the file fed in pieces cut inside a character: byte offsets, not characters.
+    const msgs = IMAGES.messages.map((m) => (m.type === 'user' && m.text.startsWith('Say the word ONE') ? { ...m, text: 'Say the word ONE — naïve ✓' } : m))
+    const text = buildMirror({ w: 1 }, IMAGES.info, msgs)
+    const cut = Buffer.from(text).indexOf(Buffer.from('✓')) + 1
+    const p = parsedIn(text, [cut, cut + 7])
+    const users = p.items.filter((i) => i.kind === 'user') as Extract<TranscriptItem, { kind: 'user' }>[]
+    expect(users.map((u) => u.images.length)).toEqual([0, 1, 1, 0, 0])
+    expect(users[0].text).toBe('Say the word ONE — naïve ✓')
+    expect(imageOf(text, p, users[1].images[0].id)).toBe(PNG_URL)
+    expect(imageOf(text, p, users[2].images[0].id)).toBe(PNG_URL)
+    // Relative to the message's wrapper line.
+    expect(p.images[users[1].images[0].id].path).toEqual(['message', 'files', 0])
+    // qwen3 isn't multimodal: OpenCode's own words, recorded, on each failed turn after the image.
+    expect(p.items.filter((i) => i.kind === 'notice' && /Multimodal data provided/.test((i as any).text)).length).toBeGreaterThanOrEqual(4)
+  })
+
+  it("shows a tool's image from its embedded data URL, its text without a placeholder for it", () => {
+    const text = buildMirror({ w: 1 }, READ_IMAGE.info, READ_IMAGE.messages)
+    const p = parsedIn(text)
+    const tool = p.items.find((i) => i.kind === 'tool') as Extract<TranscriptItem, { kind: 'tool' }>
+    expect(tool.tool.name).toBe('read')
+    expect(tool.tool.result).toBe('Image read successfully')
+    expect(tool.tool.images).toHaveLength(1)
+    expect(imageOf(text, p, tool.tool.images[0].id)).toBe(PNG_URL)
+    expect(p.images[tool.tool.images[0].id].path).toEqual(['message', 'content', 1, 'state', 'content', 1])
+  })
+
+  it('never resolves an image a URI only names (a file, a server): no data, no image', () => {
+    const user = { id: 'msg_u', time: { created: 1 }, type: 'user', text: 'see', files: [{ mime: 'image/png', source: { type: 'uri', uri: 'file:///C:/secret.png' }, name: 'secret.png' }, { data: 'iVBOR', mime: 'text/plain', name: 'notes.txt' }] }
+    const tool = { id: 'msg_a', time: { created: 2 }, type: 'assistant', content: [{ type: 'tool', id: 'call_x', name: 'read', state: { status: 'completed', input: { path: 'x.png' }, content: [{ type: 'file', uri: 'file:///C:/x.png', mime: 'image/png', name: 'x.png' }, { type: 'file', uri: 'https://example.com/x.png', mime: 'image/png' }] } }] }
+    const text = buildMirror({ w: 1 }, { ...IMAGES.info, revert: undefined }, [user, tool])
+    const p = parsedIn(text)
+    expect(p.images).toEqual([])
+    expect((p.items.find((i) => i.kind === 'tool') as any).tool.result).toBe('[file]\n[file]')
+    expect(opencodeImageData({ message: tool }, { offset: 0, length: 0, path: ['message', 'content', 0, 'state', 'content', 0] })).toBeNull()
+  })
+
+  it('serves an image from the rewritten mirror after a rewrite moved it (each parse has its own places)', () => {
+    const first = buildMirror({ w: 1 }, IMAGES.info, IMAGES.messages)
+    const longer = buildMirror({ w: 2 }, IMAGES.info, [{ id: 'msg_0', time: { created: 1 }, type: 'user', text: 'x'.repeat(5000) }, ...IMAGES.messages])
+    const a = parsedIn(first)
+    const b = parsedIn(longer)
+    const id = (p: OpencodeConversationParser) => (p.items.find((i) => i.kind === 'user' && (i as any).images.length) as any).images[0].id
+    expect(b.images[id(b)].offset).toBeGreaterThan(a.images[id(a)].offset + 5000)
+    expect(imageOf(longer, b, id(b))).toBe(PNG_URL)
+  })
+})
+
+describe("OpenCode's reverts in the history (HI-2774)", () => {
+  const sid = REVERT.before.info.id
+  const at = (step: 'before' | 'staged' | 'unstaged' | 'committed') => ({ ...oldestFirst(REVERT[step]), w: { before: 40, staged: 41, unstaged: 42, committed: 43 }[step] })
+  const notices = (text: string) => conversation(text).filter((i) => i.kind === 'notice' && (i as any).message?.id === 'providers.transcript.opencodeRevertStaged')
+
+  it('recorded: stage marks a message and changes nothing else, unstage clears it (an extra idle marker), commit drops what follows; time.updated moves at each', () => {
+    expect(REVERT.stageReply.body.data.messageID).toBe(REVERT.staged.info.revert.messageID)
+    expect(REVERT.staged.messages.length).toBe(REVERT.before.messages.length)
+    expect(REVERT.unstaged.info.revert).toBeUndefined()
+    expect(REVERT.unstaged.messages.length).toBe(REVERT.before.messages.length + 1)
+    expect(REVERT.committed.messages.some((m: any) => m.id === REVERT.staged.info.revert.messageID)).toBe(false)
+    const times = ['before', 'staged', 'unstaged', 'committed'].map((s) => REVERT[s].info.time.updated)
+    expect([...times].sort((a, b) => a - b)).toEqual(times)
+    expect(new Set(times).size).toBe(4)
+    // The session's tokens are as before: the undone requests still count.
+    expect(REVERT.committed.info.tokens).toEqual(REVERT.before.info.tokens)
+  })
+
+  it("follows a stage, an unstage and a commit through the worker's polls: the notice comes and goes, the undone messages go, info's totals stay", async () => {
+    const home = tempDir('cw-oc-revert-')
+    const sessions: Record<string, { info: any; messages: any[]; w: number }> = { [sid]: at('before') }
+    const core = subCore(sessions)
+    await ask(core, { type: 'begin', home, sessionId: sid, runId: 'r1' })
+    await ask(core, { type: 'server', runId: 'r1', url: 'http://127.0.0.1:1', password: 'pw' })
+    await ask(core, { type: 'refresh', runId: 'r1', force: true })
+    await ask(core, { type: 'idle' })
+    const read = () => readFileSync(mirrorPath(home, sid), 'utf8')
+    expect(notices(read())).toHaveLength(0)
+    const poll = async (step: 'staged' | 'unstaged' | 'committed') => {
+      sessions[sid] = at(step)
+      await ask(core, { type: 'refresh', runId: 'r1' })
+      await ask(core, { type: 'idle' })
+      return read()
+    }
+    const staged = await poll('staged')
+    expect(notices(staged)).toHaveLength(1)
+    const items = conversation(staged)
+    const n = items.findIndex((i) => (i as any).message?.id === 'providers.transcript.opencodeRevertStaged')
+    expect(items[n + 1]).toMatchObject({ kind: 'user', text: 'Say the word TWO and nothing else.' })
+    expect(notices(await poll('unstaged'))).toHaveLength(0)
+    const committed = await poll('committed')
+    expect(notices(committed)).toHaveLength(0)
+    expect(conversation(committed).some((i) => i.kind === 'user' && i.text.startsWith('Say the word TWO'))).toBe(false)
+    expect(parseMirrorUsage(committed, sid).inputTokens).toBe(REVERT.committed.info.tokens.input)
+  })
+
+  it('sees a stage even when time.updated stayed the same (the revert is compared too)', async () => {
+    const home = tempDir('cw-oc-revert-')
+    const sessions: Record<string, { info: any; messages: any[]; w: number }> = { [sid]: at('before') }
+    const core = subCore(sessions)
+    await ask(core, { type: 'begin', home, sessionId: sid, runId: 'r1' })
+    await ask(core, { type: 'server', runId: 'r1', url: 'http://127.0.0.1:1', password: 'pw' })
+    await ask(core, { type: 'refresh', runId: 'r1', force: true })
+    await ask(core, { type: 'idle' })
+    sessions[sid] = { ...at('staged'), info: { ...REVERT.staged.info, time: REVERT.before.info.time } }
+    await ask(core, { type: 'refresh', runId: 'r1' })
+    await ask(core, { type: 'idle' })
+    expect(notices(readFileSync(mirrorPath(home, sid), 'utf8'))).toHaveLength(1)
+  })
+
+  it("drops a committed revert's images with its messages, and puts no notice anywhere for a message it doesn't have", () => {
+    const imageUser = IMAGES.messages.findIndex((m) => m.type === 'user' && m.files?.length)
+    const committed = buildMirror({ w: 1 }, REVERT.committed.info, IMAGES.messages.slice(0, imageUser))
+    expect(parsedIn(committed).images).toEqual([])
+    const elsewhere = buildMirror({ w: 1 }, { ...REVERT.staged.info, revert: { messageID: 'msg_notInThisMirror0000000000', files: [] } }, IMAGES.messages)
+    expect(notices(elsewhere)).toHaveLength(0)
+  })
+})
+
+describe("OpenCode's forks (HI-2774)", () => {
+  const FORKED = oldestFirst(FORK.forkAfterTurn)
+  const FRESH = oldestFirst(FORK.fork)
+  const forkNotice = (items: TranscriptItem[]) => items.findIndex((i) => (i as any).message?.id === 'providers.transcript.opencodeForked')
+  const somewhere = (items: TranscriptItem[]) => items.findIndex((i) => (i as any).message?.id === 'providers.transcript.opencodeForkedSomewhere')
+
+  it("recorded: a new root session naming its source and boundary, the messages before it copied with their times, its own tokens from 0", () => {
+    expect(FORK.forkReply.body.data.fork).toEqual({ sessionID: FORK.source.info.id, boundary: { type: 'before', messageID: expect.stringMatching(/^msg_/) } })
+    expect(FRESH.info.tokens.input).toBe(0)
+    expect(FRESH.messages.every((m) => m.time.created < FRESH.info.time.created)).toBe(true)
+    expect(forkCopies(FRESH.info, FRESH.messages)).toBe(3)
+    expect(forkCopies(FORKED.info, FORKED.messages)).toBe(3)
+  })
+
+  it("counts only the fork's own requests, prompts and cost, its days and timeline kept; its copies are shown, the notice after them", () => {
+    const u = parseMirrorUsage(buildMirror({ w: 1 }, FORKED.info, FORKED.messages), FORKED.info.id)
+    expect(u.requests).toBe(1)
+    expect(u.inputTokens).toBe(28)
+    expect(u.cacheReadTokens).toBe(4758)
+    expect(u.userMessages).toBe(1)
+    expect(u.lastPrompt).toBe('Say the word FORKED and nothing else.')
+    expect(u.costUsd).toBe(0)
+    expect(Object.values(u.days ?? {}).reduce((n, d) => n + d.requests, 0)).toBe(1)
+    expect(u.timeline!.rows.reduce((n, r) => n + r[1], 0)).toBe(28)
+    expect(u.firstActivity).toBe(new Date(FORKED.messages[3].time.created).toISOString())
+    const fresh = parseMirrorUsage(buildMirror({ w: 1 }, FRESH.info, FRESH.messages), FRESH.info.id)
+    expect(fresh.requests).toBe(0)
+    expect(fresh.inputTokens).toBe(0)
+    const items = conversation(buildMirror({ w: 1 }, FORKED.info, FORKED.messages))
+    const n = forkNotice(items)
+    expect(n).toBeGreaterThan(0)
+    expect(items.slice(0, n).filter((i) => i.kind === 'user').map((i) => (i as any).text)).toEqual(['Say the word ONE and nothing else.'])
+    expect(items[n + 1]).toMatchObject({ kind: 'user', text: 'Say the word FORKED and nothing else.' })
+    expect(somewhere(items)).toBe(-1)
+  })
+
+  it("can't tell a copy made at the fork's very time: nothing is counted from the messages, info's totals stand, and no boundary is guessed", () => {
+    const at = FORKED.info.time.created
+    const inherited = { ...FORKED.messages[0], time: { created: at } }
+    const compacted = { id: 'msg_cmp', type: 'compaction', status: 'completed', reason: 'auto', time: { created: at }, tokens: { input: 900, output: 90, reasoning: 0, cache: { read: 0, write: 0 } }, summary: 'inherited' }
+    const msgs = [inherited, FORKED.messages[1], compacted, ...FORKED.messages.slice(3)]
+    expect(forkCopies(FORKED.info, msgs)).toBeNull()
+    const u = parseMirrorUsage(buildMirror({ w: 1 }, FORKED.info, msgs), FORKED.info.id)
+    // Only what was made after the fork is the fork's; the equal-time prompt and compaction are neither counted nor guessed.
+    expect(u.userMessages).toBe(1)
+    expect(u.lastPrompt).toBe('Say the word FORKED and nothing else.')
+    expect(u.compactions).toEqual([])
+    expect(u.requests).toBe(1)
+    expect(u.inputTokens).toBe(FORKED.info.tokens.input)
+    expect(u.days).toBeUndefined()
+    expect(u.timeline).toBeUndefined()
+    const items = conversation(buildMirror({ w: 1 }, FORKED.info, msgs))
+    expect(somewhere(items)).toBe(0)
+    expect(forkNotice(items)).toBe(-1)
+  })
+
+  it("never takes a subagent its source started as the fork's: copied tool parts name the source's subagents", async () => {
+    const home = tempDir('cw-oc-forkkids-')
+    const events: CoreEvent[] = []
+    const core = subCore({}, [], events)
+    const forkInfo = { ...PARENT.info, id: 'ses_forkOfParentFORKOFPARENT0', fork: { sessionID: PARENT.info.id, boundary: { type: 'through', messageID: 'msg_x' } }, time: { created: PARENT.info.time.updated + 100, updated: PARENT.info.time.updated + 100 }, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } } }
+    const copies = PARENT.messages.map((m, i) => ({ ...m, id: `msg_copy${i}` }))
+    await ask(core, { type: 'export', home, sessionId: forkInfo.id, reason: 'runEnd', command: printing(home, 'fork.json', JSON.stringify({ info: forkInfo, messages: copies })) })
+    await ask(core, { type: 'idle' })
+    expect(mirrorState(readFileSync(mirrorPath(home, forkInfo.id), 'utf8')).header).toMatchObject({ external: true, fork: PARENT.info.id, forkCopies: copies.length })
+    expect(events.filter((e) => e.event === 'children')).toEqual([])
+  })
+
+  it('calls provenance unknown for a missing fork time, a missing message time, or a copy after its own; a fork of a fork follows the same rule', () => {
+    const noTime = { ...FORKED.info, time: { updated: FORKED.info.time.updated } }
+    expect(forkCopies(noTime, FORKED.messages)).toBeNull()
+    expect(parseMirrorUsage(buildMirror({ w: 1 }, noTime, FORKED.messages), FORKED.info.id)).toMatchObject({ requests: 0, userMessages: 0, inputTokens: 28 })
+    expect(forkCopies(FORKED.info, [{ ...FORKED.messages[0], time: {} }, ...FORKED.messages.slice(1)])).toBeNull()
+    expect(forkCopies(FORKED.info, [...FORKED.messages.slice(3), FORKED.messages[0]])).toBeNull()
+    const again = { ...FORKED.info, id: 'ses_forkOfForkFORKOFFORK0000', fork: { sessionID: FORKED.info.id, boundary: { type: 'before', messageID: 'msg_x' } }, time: { created: FORKED.info.time.updated + 10, updated: FORKED.info.time.updated + 20 } }
+    expect(forkCopies(again, FORKED.messages)).toBe(6)
+    expect(parseMirrorUsage(buildMirror({ w: 1 }, again, FORKED.messages), again.id).requests).toBe(0)
+  })
+})
+
+describe("OpenCode sessions Combwork didn't make: discovery and adoption's mark (HI-2774)", () => {
+  /** An export of a minimal session, as `session export` prints one (cli/session-export-empty-new.txt's shape). */
+  const exportOf = (id: string, updated: number, dir: string) => JSON.stringify({ info: { id, projectID: 'p', cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: updated - 5, updated }, location: { directory: dir } }, messages: [] })
+  const listOf = (rows: { id: string; updated: number }[], dir: string) => JSON.stringify(rows.map((r) => ({ id: r.id, updated: r.updated, created: r.updated - 5, projectId: 'p', directory: dir })))
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `ses_disc${String(i).padStart(2, '0')}AAAAAAAAAAAAAAAAAAAA`)
+
+  it("recorded: session list gives every root session, the TUI-made and the fork with Combwork's", () => {
+    const rows = JSON.parse(cliStdout('cli/session-list-json-external.txt'))
+    expect(rows.map((r: any) => r.id).sort()).toEqual([FORK.source.info.id, FORK.fork.info.id, 'ses_e403f932affeEEwzcBWI8UJ5m6'].sort())
+    expect(rows.every((r: any) => typeof r.updated === 'number' && typeof r.directory === 'string')).toBe(true)
+  })
+
+  it('drains a backlog over several passes with the database unchanged, skipping a failing session until it may be tried again, then stops', async () => {
+    const home = tempDir('cw-oc-disc-')
+    const dir = join(home, 'project')
+    const events: CoreEvent[] = []
+    const core = subCore({}, [], events)
+    const all = ids(19)
+    const failing = all[0]
+    const list = printing(home, 'list.json', listOf(all.map((id, i) => ({ id, updated: 1000 + i })), dir))
+    const exported: string[] = []
+    const pass = async (): Promise<string[] | null> => {
+      events.length = 0
+      const queued = await ask(core, { type: 'discover', home, folder: dir, command: list, reason: 'repair' })
+      await ask(core, { type: 'idle' })
+      if (!queued) return null
+      const got = events.flatMap((e) => (e.event === 'discovered' ? e.sessions : []))
+      for (const id of got) {
+        const cmd = id === failing ? { file: process.execPath, args: ['-e', "process.stderr.write('Session not found'); process.exit(1)"], env: childEnv() } : printing(home, `${id}.json`, exportOf(id, 1000 + all.indexOf(id), dir))
+        await ask(core, { type: 'export', home, sessionId: id, reason: 'repair', command: cmd })
+      }
+      await ask(core, { type: 'idle' })
+      exported.push(...got.filter((id) => id !== failing))
+      return got
+    }
+    const first = await pass()
+    expect(first).toHaveLength(8)
+    expect(first).toContain(failing)
+    expect((await pass())!.length).toBe(8)
+    const third = await pass()
+    expect(third).toHaveLength(3)
+    expect(third).not.toContain(failing)
+    // Everything else exported once, as external mirrors in their folder; the failing one waits for its retry rule.
+    expect(new Set(exported).size).toBe(18)
+    expect(mirrorState(readFileSync(mirrorPath(home, all[5]), 'utf8')).header).toMatchObject({ state: 'complete', external: true, directory: dir })
+    // The scan that handed out the last ones was complete; with the database unchanged, no more passes.
+    expect(await pass()).toBeNull()
+  }, 30_000)
+
+  it("recorded: session list gives only the current folder's project's sessions, so each folder is scanned in itself, and the repair pass scans again only folders that are due", async () => {
+    expect(cliStdout('cli/session-list-elsewhere.txt').trim()).toBe('[]')
+    expect(cliStdout('cli/session-list-help.txt')).toMatch(/List top-level sessions in the current project/)
+    const home = tempDir('cw-oc-disc-')
+    const a = join(home, 'a')
+    const b = join(home, 'b')
+    const core = subCore({})
+    await ask(core, { type: 'discover', home, folder: a, command: printing(home, 'a.json', listOf([], a)), reason: 'runEnd' })
+    await ask(core, { type: 'discover', home, folder: b, command: printing(home, 'b.json', listOf(ids(9).map((id) => ({ id, updated: 1 })), b)), reason: 'runEnd' })
+    await ask(core, { type: 'idle' })
+    // a's scan was complete and the database unchanged; b's left one: only b is due again.
+    expect(await ask(core, { type: 'discoveryFolders', homes: [home] })).toEqual([{ home, folder: b }])
+    expect(await ask(core, { type: 'discover', home, folder: a, command: printing(home, 'a.json', listOf([], a)), reason: 'repair' })).toBe(false)
+    // A change to the account's database makes both due.
+    const [db] = dbFiles(home)
+    mkdirSync(join(home, 'opencode'), { recursive: true })
+    writeFileSync(db, 'x')
+    const later = new Date(Date.now() + 60_000)
+    utimesSync(db, later, later)
+    expect(((await ask(core, { type: 'discoveryFolders', homes: [home] })) as any[]).map((d) => d.folder).sort()).toEqual([a, b].sort())
+  })
+
+  it("hands out no session with a mark, a parent or a live run, nor one whose mirror is as new as listed", async () => {
+    const home = tempDir('cw-oc-disc-')
+    const dir = join(home, 'project')
+    const events: CoreEvent[] = []
+    const core = subCore({}, [], events)
+    const [marked, child, live, fresh, wanted] = ids(5)
+    mkdirSync(join(home, 'combwork-sessions'), { recursive: true })
+    writeFileSync(markPath(home, marked), JSON.stringify({ id: marked, directory: dir }))
+    writeFileSync(mirrorPath(home, child), buildMirror({ w: 1 }, { id: child, parentID: 'ses_parentPARENTparentPAREN', time: { updated: 1 }, location: { directory: dir } }, []))
+    writeFileSync(mirrorPath(home, fresh), buildMirror({ w: -1, source: 'export', updated: 2000, external: true }, { id: fresh, time: { updated: 2000 }, location: { directory: dir } }, []))
+    await ask(core, { type: 'begin', home, sessionId: live, runId: 'r1' })
+    await ask(core, { type: 'discover', home, folder: dir, command: printing(home, 'list.json', listOf([marked, child, live, fresh, wanted].map((id) => ({ id, updated: 2000 })), dir)), reason: 'runEnd' })
+    await ask(core, { type: 'idle' })
+    expect(events.filter((e) => e.event === 'discovered')).toEqual([{ event: 'discovered', home, sessions: [wanted] }])
+  })
+
+  it('ends nothing into a removed account: a discovery under way is waited for, and hands nothing out', async () => {
+    const home = tempDir('cw-oc-disc-')
+    const gate = join(home, 'gate')
+    const begun = join(home, 'begun')
+    const events: CoreEvent[] = []
+    const core = subCore({}, [], events)
+    const list = listOf([{ id: ids(1)[0], updated: 1 }], home)
+    const slow = { file: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(begun)}, 'x'); const t = setInterval(() => { if (require('fs').existsSync(${JSON.stringify(gate)})) { clearInterval(t); process.stdout.write(${JSON.stringify(list)}) } }, 20)`], env: childEnv() }
+    await ask(core, { type: 'discover', home, folder: home, command: slow, reason: 'repair' })
+    for (let i = 0; i < 1000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, 5))
+    expect(existsSync(begun)).toBe(true)
+    // The removal stops the listing (its process ended by tree), and is answered once it has.
+    await ask(core, { type: 'removeRoot', home })
+    writeFileSync(gate, 'x')
+    await ask(core, { type: 'idle' })
+    expect(events.filter((e) => e.event === 'discovered')).toEqual([])
+    expect(await ask(core, { type: 'discover', home, folder: home, command: slow, reason: 'repair' })).toBe(false)
+  }, 30_000)
+
+  it("writes an adoption's mark only for a complete external mirror of that session and folder, never over another, never into a removed account", async () => {
+    const home = tempDir('cw-oc-adopt-')
+    const dir = join(home, 'project')
+    const core = subCore({})
+    const [sid, other, placeholder] = ids(3)
+    mkdirSync(join(home, 'combwork-sessions'), { recursive: true })
+    writeFileSync(mirrorPath(home, sid), buildMirror({ w: -1, source: 'export', updated: 5, external: true }, { id: sid, time: { updated: 5 }, location: { directory: dir } }, []))
+    writeFileSync(mirrorPath(home, placeholder), placeholderMirror())
+    expect(await ask(core, { type: 'adoptMark', home, sessionId: placeholder, directory: dir })).toEqual({ ok: false, why: 'notRead' })
+    expect(await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: join(home, 'elsewhere') })).toEqual({ ok: false, why: 'otherFolder' })
+    expect(await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })).toEqual({ ok: true, created: true })
+    expect(JSON.parse(readFileSync(markPath(home, sid), 'utf8'))).toEqual({ id: sid, directory: dir })
+    // Again: the same mark, taken as it is (a rollback leaves it).
+    expect(await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })).toEqual({ ok: true, created: false })
+    writeFileSync(markPath(home, other), JSON.stringify({ id: other, directory: join(home, 'elsewhere') }))
+    writeFileSync(mirrorPath(home, other), buildMirror({ w: -1, source: 'export', updated: 5, external: true }, { id: other, time: { updated: 5 }, location: { directory: dir } }, []))
+    expect(await ask(core, { type: 'adoptMark', home, sessionId: other, directory: dir })).toEqual({ ok: false, why: 'otherMark' })
+    expect(JSON.parse(readFileSync(markPath(home, other), 'utf8')).directory).toBe(join(home, 'elsewhere'))
+    await ask(core, { type: 'unmark', home, sessionId: sid })
+    expect(existsSync(markPath(home, sid))).toBe(false)
+    await ask(core, { type: 'removeRoot', home })
+    expect(await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })).toEqual({ ok: false, why: 'other' })
+    expect(existsSync(markPath(home, sid))).toBe(false)
+  })
 })

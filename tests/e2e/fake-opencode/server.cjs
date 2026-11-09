@@ -101,15 +101,59 @@ async function startServer(opts) {
   }
   const session = (sid) => store.read(env).sessions[sid]
   let logReads = 0
-  /** A submission, as the TUI's prompt makes one (an inbox item), its turn queued after the session's others; `done` once it ended. */
-  function submit(sid, text) {
+  /**
+   * A submission, as the TUI's prompt makes one (an inbox item), its turn queued after the session's others; `done` once it
+   * ended. `files`: the prompt's attachments (`{uri}`), kept as 2.2.6 keeps them (HI-2774's R0, wire/prompt-files.json):
+   * the file's data in base64, its mime, its source (`uri`, or `inline` for a data: URI) and name.
+   */
+  function submit(sid, text, files = []) {
     const inboxID = store.newId('msg')
     const now = Date.now()
-    pushMessage(sid, { id: inboxID, time: { created: now }, text, type: 'user' })
-    emit('session.inbox.enqueued', { inboxID, sessionID: sid, item: { type: 'user', payload: { text }, delivery: 'steer' } }, { sid, durable: true, location: loc(sid) })
+    const kept = files.map(attachment).filter(Boolean)
+    pushMessage(sid, { id: inboxID, time: { created: now }, text, type: 'user', ...(kept.length ? { files: kept } : {}) })
+    emit('session.inbox.enqueued', { inboxID, sessionID: sid, item: { type: 'user', payload: { text, ...(kept.length ? { files: kept } : {}) }, delivery: 'steer' } }, { sid, durable: true, location: loc(sid) })
     const q = (queues.get(sid) || Promise.resolve()).then(() => runTurn(sid, text, inboxID))
     queues.set(sid, q.catch(() => undefined))
-    return { inboxID, now, text, done: q.catch(() => undefined) }
+    return { inboxID, now, text, files: kept, done: q.catch(() => undefined) }
+  }
+  const MIMES = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
+  /** A prompt's attachment as 2.2.6 stores it, from a file: URI (read) or a data: URI (inline); null for anything else. */
+  function attachment(f) {
+    const uri = String(f?.uri ?? '')
+    const inline = /^data:([\w/.+-]+);base64,(.*)$/s.exec(uri)
+    if (inline) return { data: inline[2], mime: inline[1], source: { type: 'inline' }, name: f.name ?? 'attachment' }
+    if (!uri.startsWith('file:')) return null
+    try {
+      const file = require('url').fileURLToPath(uri)
+      return { data: fs.readFileSync(file).toString('base64'), mime: MIMES[path.extname(file).toLowerCase()] ?? 'application/octet-stream', source: { type: 'uri', uri }, name: f.name ?? path.basename(file) }
+    } catch {
+      return null
+    }
+  }
+  /** Whether a session's history holds an image (an attachment's or a tool's): the text-only models then refuse every request. */
+  const holdsImage = (sid) => session(sid).messages.some((m) => (m.files ?? []).some((f) => String(f.mime ?? '').startsWith('image/')) || (m.content ?? []).some((p) => p.type === 'tool' && (p.state?.content ?? []).some((c) => c.type === 'file' && String(c.uri ?? '').startsWith('data:image/'))))
+  /** 2.2.6's refusal with a text-only model (qwen3:8b), recorded (messages/image-attached.json): every request after an image. */
+  const MULTIMODAL = { type: 'provider.invalid-request', message: 'Multimodal data provided, but model does not support multimodal requests.', status: 400, response: { body: '{"error":{"message":"Multimodal data provided, but model does not support multimodal requests.","type":"invalid_request_error","param":null,"code":null}}\n' } }
+  /**
+   * A fork, as `POST /fork` makes one (HI-2774's R0, wire/fork.json): a new root session naming its source and boundary,
+   * titled "<title> (fork #n)", the messages before the boundary copied under new ids with their own times, its tokens
+   * from 0; session.forked says so.
+   */
+  function forkSession(sid, before) {
+    const src = session(sid)
+    const at = before ? src.messages.findIndex((m) => m.id === before) : src.messages.length
+    const copies = src.messages.slice(0, at < 0 ? src.messages.length : at).map((m) => ({ ...JSON.parse(JSON.stringify(m)), id: store.newId('msg') }))
+    const id = store.newId('ses')
+    const now = Date.now()
+    const forks = Object.values(store.read(env).sessions).filter((s) => s.info.fork?.sessionID === sid).length
+    const boundary = before ? { type: 'before', messageID: before } : { type: 'through', messageID: src.messages[src.messages.length - 1]?.id }
+    const info = { id, fork: { sessionID: sid, boundary }, projectID: src.info.projectID, cost: 0, tokens: zeroTokens(), time: { created: now, updated: now }, title: `${src.info.title ?? 'Session'} (fork #${forks + 1})`, location: src.info.location }
+    store.change((db) => {
+      db.sessions[id] = { info, messages: copies, seq: -1 }
+    }, env)
+    emit('session.forked', { sessionID: id, parentID: sid, boundary }, { sid: id, durable: true, location: info.location })
+    log({ kind: 'fork', session: sid, fork: id })
+    return info
   }
   const loc = (sid) => session(sid)?.info.location
 
@@ -239,7 +283,7 @@ async function startServer(opts) {
           part({ status: 'error', input, error })
           emit('session.tool.failed', { sessionID: sid, assistantMessageID: msgId, id: callId, error, executed: false }, { ...d, version: 2 })
         } else {
-          part({ status: 'completed', input, content: [{ type: 'text', text: r.text }], metadata: r.metadata })
+          part({ status: 'completed', input, content: r.content ?? [{ type: 'text', text: r.text }], metadata: r.metadata })
           emit('session.tool.success', { sessionID: sid, assistantMessageID: msgId, id: callId, content: [{ type: 'text', text: r.text }], metadata: r.metadata, executed: false }, d)
         }
         endStep(msgId, 'tool-calls', 'tool_calls')
@@ -393,6 +437,19 @@ async function startServer(opts) {
       if (sh) await shell(sh[1].trim())
       const sub = /\bsubagent:\s*(.+)$/i.exec(s)
       if (sub) await subagent(sub[1].trim())
+      // `read` on an image, as 2.2.6 returns one (HI-2774's R0, messages/read-image.json): its data embedded as a data: URI.
+      const img = /\breadimage:\s*(\S+)/i.exec(s)
+      if (img) await toolStep('read', { path: img[1] }, async () => {
+        const file = path.resolve(l.directory, img[1])
+        if (!fs.existsSync(file)) return { text: `File not found: ${img[1]}`, isError: true }
+        const uri = `data:${MIMES[path.extname(file).toLowerCase()] ?? 'image/png'};base64,${fs.readFileSync(file).toString('base64')}`
+        return { text: 'Image read successfully', content: [{ type: 'text', text: 'Image read successfully' }, { type: 'file', uri, mime: uri.slice(5, uri.indexOf(';')), name: path.basename(file) }], metadata: { truncated: false } }
+      })
+      // The TUI's `/fork` and `/new` (a test's stand-ins for the user's keys there: the TUI's own screens weren't recorded,
+      // the API's results were): a fork of this session before this turn, and a new session in this folder with a turn.
+      if (/^\s*fork\s*$/i.test(s)) forkSession(sid, inboxID)
+      const fresh = /\bnewsession:\s*(.+)$/i.exec(s)
+      if (fresh) await submit(createSession({ location: l }).id, fresh[1].trim()).done
       // A file in the session's folder, or "a path" anywhere (an absolute one outside: external_directory, HI-2772).
       const patch = /\bpatch\s+(?:"([^"]+)"|([\w.-]+))/i.exec(s)
       if (patch) await edit(path.resolve(l.directory, patch[1] ?? patch[2]))
@@ -403,6 +460,7 @@ async function startServer(opts) {
       // A policy-denied provider fails the turn, not the session's creation or model change (HB1's 2.2.6 run, HI-2759).
       if (!provider) failure = { type: 'provider.no-route', message: `Model unavailable: ${model.providerID}/${model.id}` }
       else if (/^fail\b/i.test(text)) failure = { type: 'provider.invalid-request', message: 'fake provider refused', status: 400 }
+      else if (holdsImage(sid)) failure = MULTIMODAL
       if (!failure) {
         let work = text
         if (isDoorbell(text)) {
@@ -421,6 +479,8 @@ async function startServer(opts) {
         if (!ctl.aborted && /^needs approval\b/i.test(work)) await shell('echo hi')
         const toolLine = /^tool (.+)$/.exec(work)
         if (!ctl.aborted && toolLine) await toolStep('execute', { code: 'return "fake"' }, async () => ({ text: toolLine[1], metadata: { truncated: false } }))
+        // A tool's image in the history (`readimage`): the next request is refused, as recorded (messages/read-image.json).
+        if (holdsImage(sid)) failure = MULTIMODAL
       }
       // A model with no route fails before any step: only the user message and the idle marker (HI-2760's recording,
       // wire/message-paging.json); a provider that answers with an error takes a step first (events/failed-provider-400.json).
@@ -649,8 +709,13 @@ async function startServer(opts) {
       const sid = m[1]
       if (!session(sid)) return notFound(res, sid)
       const body = (await bodyOf(req)) || {}
-      const { inboxID, now, text } = submit(sid, String(body.text ?? ''))
-      return json(res, 200, { data: { id: inboxID, sessionID: sid, time: { created: now }, type: 'user', payload: { text }, delivery: 'steer' } })
+      const { inboxID, now, text, files } = submit(sid, String(body.text ?? ''), Array.isArray(body.files) ? body.files : [])
+      return json(res, 200, { data: { id: inboxID, sessionID: sid, time: { created: now }, type: 'user', payload: { text, ...(files.length ? { files } : {}) }, delivery: 'steer' } })
+    }
+    if ((m = /^\/api\/session\/([^/]+)\/fork$/.exec(p)) && req.method === 'POST') {
+      if (!session(m[1])) return notFound(res, m[1])
+      const body = (await bodyOf(req)) || {}
+      return json(res, 200, { data: forkSession(m[1], typeof body.before === 'string' ? body.before : null) })
     }
     if ((m = /^\/api\/session\/([^/]+)\/compact$/.exec(p)) && req.method === 'POST') {
       const sid = m[1]

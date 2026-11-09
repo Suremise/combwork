@@ -775,6 +775,13 @@ export interface ProviderAdapter {
    */
   subSessionOf(path: string, sessionId: string, mtimeMs?: number): Promise<SubSession | null>
   /**
+   * A conversation started outside Combwork is being adopted (sessions.adopt), not a sub-session: for a CLI that resumes
+   * only what Combwork recorded in its own data (OpenCode's mark, HI-2774), that record is made now, or the adoption is
+   * refused with a translated reason (thrown). Resolves with how to take back what it made if the adoption's record can't
+   * be written (null: nothing to take back). `folders`: the host's session folders, the only ones a session may have run in.
+   */
+  adopting?(projectPath: string, sessionId: string, transcriptPath: string, folders: string[]): Promise<(() => Promise<void>) | null>
+  /**
    * What the CLI keeps by a folder's path rather than in it (Claude Code: ~/.claude/projects/<path as name>/, its
    * transcripts and auto memory), for a folder that moved (#146). With apply, copied to the new path's name: never moved
    * or deleted, and a file already there with other content is kept. One copy per folder the CLI keeps `from`'s data in

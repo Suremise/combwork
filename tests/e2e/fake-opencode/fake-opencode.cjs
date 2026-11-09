@@ -323,6 +323,10 @@ async function tui() {
       return
     }
     out(`${t}\n`)
+    // `attach:<file> <text>`: a test's stand-in for an image pasted into the TUI (its screens weren't recorded), sent as the
+    // prompt API's attachment, as recorded (HI-2774's R0, wire/prompt-files.json).
+    const att = /^attach:(\S+)\s+(.*)$/s.exec(t)
+    if (att) return void (await api('POST', `/api/session/${sid}/prompt`, { text: att[2], files: [{ uri: require('url').pathToFileURL(path.resolve(dir, att[1])).href, name: path.basename(att[1]) }] }))
     await api('POST', `/api/session/${sid}/prompt`, { text: t })
   }
   let line = ''

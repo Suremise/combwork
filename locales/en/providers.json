@@ -431,6 +431,10 @@
     "defaultMessage": "User {file} (all projects)",
     "description": "In the Memory view: the user's own instructions file, which every project's agents read. {file} is its name (CLAUDE.md)."
   },
+  "providers.opencode.adoptRefused": {
+    "defaultMessage": "Combwork can't take this OpenCode session over: {why, select, notRead {it hasn't been read from OpenCode yet} otherFolder {it ran in a folder that isn't this project's} otherMark {Combwork already has another session under its id} other {it isn't one of its account's sessions any more}}.",
+    "description": "An error when adopting (taking over) a session from the Sessions tab: an OpenCode session made outside Combwork (in OpenCode's own window) couldn't be adopted. {why} picks the reason. OpenCode is a product's name."
+  },
   "providers.opencode.claudeAgentModel": {
     "defaultMessage": "{provider} didn't start: {model} is a model of OpenCode's Claude Agent provider, which Combwork doesn't run through OpenCode. Run Claude Code as its own provider instead, or choose another model.",
     "description": "Why an OpenCode agent didn't start (its pane): its model belongs to OpenCode's nested Claude Agent provider, which Combwork never allows. {provider} is OpenCode, {model} the model's id. Claude Agent and Claude Code are product names: keep them."
@@ -531,6 +535,14 @@
     "defaultMessage": "Interrupted by you",
     "description": "A notice in a conversation, in the Sessions tab's transcript viewer and its Markdown export: the user stopped the agent's turn."
   },
+  "providers.transcript.opencodeForked": {
+    "defaultMessage": "Forked from another session: everything above was copied from it.",
+    "description": "A notice in an OpenCode session's history (the Sessions tab's transcript viewer): this session is a fork (a copy made to continue separately) of another session; the messages above the notice came from that session, those below are this one's own."
+  },
+  "providers.transcript.opencodeForkedSomewhere": {
+    "defaultMessage": "This session was forked from another one: some of it was copied from that session.",
+    "description": "A notice at the start of an OpenCode session's history (the Sessions tab's transcript viewer): this session is a fork (a copy made to continue separately) of another session, and Combwork can't tell where the copied part ends."
+  },
   "providers.transcript.opencodeIncomplete": {
     "defaultMessage": "Combwork couldn't read the end of this session from {provider}: {problem}. What's shown is what it had read before.",
     "description": "A notice at the end of an OpenCode session's history (the Sessions tab's transcript viewer): Combwork's newest read of the session from OpenCode failed, so the end may be missing. {provider} is OpenCode; {problem} says why, one of the providers.transcript.opencodeProblem.* messages."
@@ -550,6 +562,10 @@
   "providers.transcript.opencodeProblem.timeout": {
     "defaultMessage": "it took too long",
     "description": "Why Combwork couldn't read an OpenCode session's end ({problem} in providers.transcript.opencodeIncomplete): OpenCode didn't answer in time."
+  },
+  "providers.transcript.opencodeRevertStaged": {
+    "defaultMessage": "OpenCode has this message and everything after it marked to be undone.",
+    "description": "A notice in an OpenCode session's history (the Sessions tab's transcript viewer), placed before a message: the user chose to undo (revert) the conversation from here in OpenCode, and hasn't confirmed it yet, so what follows is still shown. OpenCode is a product's name."
   },
   "providers.transcript.resumed": {
     "defaultMessage": "Session resumed",

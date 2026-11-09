@@ -1,5 +1,5 @@
 import { randomBytes } from 'crypto'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { existsSync } from 'original-fs'
 import { mkdir, readdir, stat, writeFile } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
@@ -23,7 +23,7 @@ import { copyOpencodeSkills, opencodeSkillsDir } from './skills'
 import { accountModels, checkHome, testProvider, latestOpencode, locateOpencode, opencodeInstallCommand, opencodeLoginCommand, opencodeReadiness, opencodeUpdateCommand, savedCredentials } from './install'
 import { expandOpencodeHook, normalizeOpencodeHook } from './events'
 import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerToken, sessionMark, sessionMarks } from './launcher'
-import { OpencodeConversationParser, OpencodeUsageParser, mirrorState, parseMirrorUsage, type MirrorHeader } from './mirror'
+import { OpencodeConversationParser, OpencodeUsageParser, mirrorState, opencodeImageData, parseMirrorUsage, type MirrorHeader } from './mirror'
 import { mirrorDir, mirrorPath } from './historyCore'
 import { opencodeHistory } from './history'
 import { contextTrigger, deliverContext, trackContextRun } from './context'
@@ -284,7 +284,7 @@ export class OpencodeAdapter implements ProviderAdapter {
     if (!p) throw new Error('an OpenCode launch was built before it was prepared') // i18n-ignore: an internal check, never shown
     this.prepared.delete(ctx.runId)
     // Its history is read from its server, with its password, kept only here (history.ts).
-    opencodeHistory.track(ctx.runId, ctx.privateDir, p.password)
+    opencodeHistory.track(ctx.runId, ctx.privateDir, p.password, ctx.cwd)
     // So is Combwork's state view put in its session (HI-2771: context.ts), for this run's session only.
     trackContextRun(ctx.runId, ctx.privateDir, p.password, ctx.sessionId)
     const mode = ctx.permissionMode || OPENCODE_DESCRIPTOR.defaultPermissionMode
@@ -376,10 +376,12 @@ export class OpencodeAdapter implements ProviderAdapter {
   async transcriptPath(_folder: string, sessionId: string): Promise<string | null> {
     if (!isSessionId(sessionId)) return null
     for (const home of this.allHomes()) if (existsSync(sessionMark(home, sessionId))) return opencodeHistory.mirrorFor(home, sessionId)
-    // A subagent's session (HI-2773): no mark (Combwork didn't make it), its mirror once a read of it completed.
+    // A subagent's session (HI-2773), or one its TUI made (HI-2774): no mark (Combwork didn't make it), its mirror once a
+    // read of it completed.
     for (const home of this.allHomes()) {
       const p = mirrorPath(home, sessionId)
-      if ((await this.header(p))?.parent) return p
+      const h = await this.header(p)
+      if (h?.parent || h?.external) return p
     }
     return null
   }
@@ -411,9 +413,10 @@ export class OpencodeAdapter implements ProviderAdapter {
   }
 
   /**
-   * The subagents' sessions that ran in a folder (HI-2773): the mirrors without a mark whose first line names a parent and
-   * that folder, each a sub-session of its parent. Ids the caller has (Combwork's own sessions) aren't looked at, and a
-   * mirror folder's subagents are found again only when the folder changed (HI-1681's rule: a listing stats only those).
+   * The sessions Combwork didn't make that ran in a folder: subagents' (HI-2773), each a sub-session of its parent, and
+   * those its TUI made (HI-2774, found by discovery: `external`), a fork a sub-session of its source, any other a session
+   * of its own. Ids the caller has (Combwork's own sessions) aren't looked at, and a mirror folder's are found again only
+   * when the folder changed (HI-1681's rule: a listing stats only those).
    */
   async listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
     const here = placeMatcher(folder)
@@ -426,14 +429,15 @@ export class OpencodeAdapter implements ProviderAdapter {
         const st = await stat(p).catch(() => null)
         if (!st) continue
         const h = await this.header(p, st.mtimeMs)
-        if (!h?.parent || typeof h.directory !== 'string' || !here(h.directory)) continue
-        out.push({ id, transcriptPath: p, modified: st.mtime.toISOString(), bytes: st.size, mtimeMs: st.mtimeMs, sub: subagentOf(h.parent) })
+        if (!h || !(h.parent || h.external) || typeof h.directory !== 'string' || !here(h.directory)) continue
+        const sub = subOf(h)
+        out.push({ id, transcriptPath: p, modified: st.mtime.toISOString(), bytes: st.size, mtimeMs: st.mtimeMs, ...(sub ? { sub } : {}) })
       }
     }
     return out
   }
 
-  /** The subagents' mirrors in a mirror folder, by the folder's mtime (a mirror's rename into place changes it). */
+  /** The mirrors of sessions Combwork didn't make in a mirror folder, by the folder's mtime (a rename into place changes it). */
   private childDirs = new Map<string, { mtime: number; ids: string[] }>()
   private async childIds(dir: string): Promise<string[]> {
     const st = await stat(dir).catch(() => null)
@@ -446,15 +450,34 @@ export class OpencodeAdapter implements ProviderAdapter {
     const ids: string[] = []
     for (const n of await readdir(dir).catch(() => [] as string[])) {
       const id = n.endsWith('.jsonl') ? n.slice(0, -'.jsonl'.length) : ''
-      if (isSessionId(id) && (await this.header(join(dir, n)))?.parent) ids.push(id)
+      const h = isSessionId(id) ? await this.header(join(dir, n)) : null
+      if (h?.parent || h?.external) ids.push(id)
     }
     this.childDirs.set(dir, { mtime: st.mtimeMs, ids })
     return ids
   }
 
   async subSessionOf(path: string, _sessionId: string, mtimeMs?: number): Promise<SubSession | null> {
-    const parent = (await this.header(path, mtimeMs))?.parent
-    return parent ? subagentOf(parent) : null
+    const h = await this.header(path, mtimeMs)
+    return h ? subOf(h) : null
+  }
+
+  /**
+   * Adopting a session its TUI made (HI-2774): Combwork's mark goes into the account holding it, in order with that
+   * account's removal (the history's worker writes it), so it resumes as one Combwork made, on that account. Only a complete
+   * mirror, in one of the accounts set up now, of a session that ran in one of the host's folders; never over another mark.
+   * A sub-session (a subagent's, a fork) is adopted as one, with no mark. Refused, translated, with why.
+   */
+  async adopting(_projectPath: string, sessionId: string, transcriptPath: string, folders: string[]): Promise<(() => Promise<void>) | null> {
+    const h = await this.header(transcriptPath)
+    if (!h?.external || h.fork || h.parent) return null
+    const home = this.allHomes().find((root) => resolve(mirrorPath(root, sessionId)).toLowerCase() === resolve(transcriptPath).toLowerCase())
+    if (!home) throw combworkError(ADOPT_REFUSED, { why: 'other' }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    if (h.state !== 'complete') throw combworkError(ADOPT_REFUSED, { why: 'notRead' }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    if (typeof h.directory !== 'string' || !folders.some((f) => placeMatcher(f)(h.directory!))) throw combworkError(ADOPT_REFUSED, { why: 'otherFolder' }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    const r = await opencodeHistory.adoptMark(home, sessionId, h.directory)
+    if (!r.ok) throw combworkError(ADOPT_REFUSED, { why: r.why }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    return r.created ? () => opencodeHistory.unmark(home, sessionId) : null
   }
 
   parseUsage(text: string, sessionId: string): SessionUsage {
@@ -470,8 +493,8 @@ export class OpencodeAdapter implements ProviderAdapter {
     return new OpencodeConversationParser(projectPath)
   }
 
-  imageData(_line: Record<string, any>, _loc: ImageLocation): string | null {
-    return null
+  imageData(line: Record<string, any>, loc: ImageLocation): string | null {
+    return opencodeImageData(line, loc)
   }
 
   exportSubtitle(sessionId: string, project: string): string {
@@ -502,6 +525,12 @@ export class OpencodeAdapter implements ProviderAdapter {
 
 /** A subagent's session as a sub-session: its kind is OpenCode's own name for the tool that starts one (2.2.6: `subagent`). */
 const subagentOf = (parentId: string): SubSession => ({ parentId, kind: 'subagent' }) // i18n-ignore: OpenCode's own name
+
+/** A mirror's sub-session, from its first line: a subagent's under its parent, an external fork under its source (HI-2774: OpenCode calls it a fork). */
+const subOf = (h: MirrorHeader): SubSession | null => (h.parent ? subagentOf(h.parent) : h.external && h.fork ? { parentId: h.fork, kind: 'fork' } : null) // i18n-ignore: OpenCode's own name
+
+/** An adoption of a session OpenCode's TUI made, refused (HI-2774): why, in the window's language. */
+const ADOPT_REFUSED = msg({ id: 'providers.opencode.adoptRefused', defaultMessage: "Combwork can't take this OpenCode session over: {why, select, notRead {it hasn't been read from OpenCode yet} otherFolder {it ran in a folder that isn't this project's} otherMark {Combwork already has another session under its id} other {it isn't one of its account's sessions any more}}.", description: "An error when adopting (taking over) a session from the Sessions tab: an OpenCode session made outside Combwork (in OpenCode's own window) couldn't be adopted. {why} picks the reason. OpenCode is a product's name." })
 
 /** What a launch puts in its private config's AGENTS.md: Combwork's guidance (with its tools), the launch's instructions, the notes. */
 export function launchGuidance(ctx: Pick<LaunchContext, 'guidance' | 'instructions' | 'notes' | 'mcpServers'>): string {

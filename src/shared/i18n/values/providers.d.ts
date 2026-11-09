@@ -109,6 +109,7 @@ interface CombworkMessageValues {
   'providers.localLimits.switched': { model: string | number }
   'providers.memory.connection': { file: string | number; name: string | number }
   'providers.memory.user': { file: string | number }
+  'providers.opencode.adoptRefused': { why: string }
   'providers.opencode.claudeAgentModel': { provider: string | number; model: string | number }
   'providers.opencode.connections.setUp': undefined
   'providers.opencode.effortNeedsModel': { provider: string | number; effort: string | number }
@@ -134,11 +135,14 @@ interface CombworkMessageValues {
   'providers.transcript.aborted': undefined
   'providers.transcript.apiError': undefined
   'providers.transcript.interrupted': undefined
+  'providers.transcript.opencodeForked': undefined
+  'providers.transcript.opencodeForkedSomewhere': undefined
   'providers.transcript.opencodeIncomplete': { provider: string | number; problem: string | number }
   'providers.transcript.opencodeProblem.exit': undefined
   'providers.transcript.opencodeProblem.parse': undefined
   'providers.transcript.opencodeProblem.size': undefined
   'providers.transcript.opencodeProblem.timeout': undefined
+  'providers.transcript.opencodeRevertStaged': undefined
   'providers.transcript.resumed': undefined
   'providers.transcript.turnEnded': { reason: string | number }
   'providers.unknown': { provider: string | number }

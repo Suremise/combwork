@@ -1,0 +1,89 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "ses_e403f932affeEEwzcBWI8UJ5m6",
+    "projectID": "3d3d56c1a692effdb53f488b54b58ae0b6a674fc",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794218421464,
+     "updated": 1794218421464
+    },
+    "location": {
+     "directory": "<root>\\project"
+    }
+   },
+   {
+    "id": "ses_e403fa0feffeN1e5vqozf4owt9",
+    "fork": {
+     "sessionID": "ses_e403ffb46ffeRo33fkB8wbcBeQ",
+     "boundary": {
+      "type": "before",
+      "messageID": "msg_1bfc03761001XFihvp89M3iJ5u"
+     }
+    },
+    "projectID": "3d3d56c1a692effdb53f488b54b58ae0b6a674fc",
+    "cost": 0,
+    "tokens": {
+     "input": 28,
+     "output": 188,
+     "reasoning": 0,
+     "cache": {
+      "read": 4758,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794218417921,
+     "updated": 1794218419699,
+     "busy": 1794218417934,
+     "idle": 1794218419701
+    },
+    "title": "Say the word ONE (fork #1)",
+    "location": {
+     "directory": "<root>\\project"
+    }
+   },
+   {
+    "id": "ses_e403ffb46ffeRo33fkB8wbcBeQ",
+    "projectID": "3d3d56c1a692effdb53f488b54b58ae0b6a674fc",
+    "cost": 0,
+    "tokens": {
+     "input": 5219,
+     "output": 978,
+     "reasoning": 0,
+     "cache": {
+      "read": 4,
+      "write": 0
+     }
+    },
+    "outcome": "failed",
+    "time": {
+     "created": 1794218394815,
+     "updated": 1794218415927,
+     "busy": 1794218415901,
+     "idle": 1794218415929
+    },
+    "title": "Say the word ONE",
+    "location": {
+     "directory": "<root>\\project"
+    }
+   }
+  ],
+  "cursor": {
+   "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTQwM2Y5MzJhZmZlRUV3emNCV0k4VUo1bTYiLCJ0aW1lIjoxNzk0MjE4NDIxNDY0LCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
+   "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTQwM2ZmYjQ2ZmZlUm8zM2ZrQjh3YmNCZVEiLCJ0aW1lIjoxNzk0MjE4NDE1OTI3LCJkaXJlY3Rpb24iOiJuZXh0In19"
+  }
+ }
+}

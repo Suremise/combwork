@@ -8312,8 +8312,9 @@ class SessionManager {
         const same = !!st && !!kept?.read.path && samePlace(kept.read.path, ext.transcriptPath) && kept.read.size === st.size && kept.read.mtime === st.mtimeMs
         const usage = kept ? this.titled(kept.usage) : null
         if (!same) void usageHistory.ingestExternal(projectPath, { id: ext.id, provider: adapter.id, transcriptPath: ext.transcriptPath }).catch(() => undefined)
-        // Known to be empty: not listed. Not known yet: listed without figures until the worker has it.
-        if (usage && usage.requests === 0) continue
+        // Known to be empty: not listed. Not known yet: listed without figures until the worker has it. A sub-session is
+        // listed under its session though it made no request of its own (an OpenCode fork holding only what it copied, HI-2774).
+        if (usage && usage.requests === 0 && !ext.sub) continue
         items.push({
           id: ext.id,
           provider: adapter.id,
@@ -8972,7 +8973,28 @@ class SessionManager {
     const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
     const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider, { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }) : null
     // A sub-session (a Codex guardian review, say) stays one: never an agent's session to resume.
-    const sub = src ? (await providerAdapter(provider).listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub : undefined
+    const adapter = providerAdapter(provider)
+    // Found in another of the host's folders, it is still one: its transcript's first line says so too (HI-2774).
+    const sub = src ? ((await adapter.listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub ?? (await adapter.subSessionOf(src.path, sessionId).catch(() => null)) ?? undefined) : undefined
+    // A conversation the CLI keeps by a record of Combwork's (OpenCode's mark, HI-2774) is taken over in the CLI's data
+    // first, or refused with why; what that made is taken back if the record can't be written, so nothing half-adopted stays.
+    let undo: (() => Promise<void>) | null = null
+    if (src && !sub && adapter.adopting) {
+      const file = await workspace.sessionsFile(projectPath)
+      const cfg = await workspace.projectConfig(projectPath)
+      undo = await adapter.adopting(projectPath, sessionId, src.path, this.sessionFolders(projectPath, file.sessions, cfg))
+    }
+    try {
+      await this.writeAdopted(projectPath, sessionId, provider, src, sub, usage)
+    } catch (e) {
+      if (undo) await undo().catch((u) => log.warn(`Taking back an adoption's record in ${userText(projectPath)}`, u))
+      throw e
+    }
+    if (src && config.settings.sessions.backupTranscripts) await syncCopy(src.path, this.backupPath(projectPath, sessionId)).catch(() => undefined)
+  }
+
+  /** An adopted session's record (a seam for tests: its write failing must take back what the adoption made). */
+  writeAdopted = async (projectPath: string, sessionId: string, provider: ProviderId, src: { path: string } | null, sub: SubSession | undefined, usage: SessionUsage | null): Promise<void> => {
     await workspace.upsertSession(projectPath, {
       ...(sub ? { sub } : {}),
       id: sessionId,
@@ -8984,7 +9006,6 @@ class SessionManager {
       lastActiveAt: usage?.lastActivity ?? new Date().toISOString(),
       ...(src && !providerDescriptor(provider).capabilities.fixedSessionId ? { transcriptPath: src.path } : {})
     })
-    if (src && config.settings.sessions.backupTranscripts) await syncCopy(src.path, this.backupPath(projectPath, sessionId)).catch(() => undefined)
   }
 }
 
