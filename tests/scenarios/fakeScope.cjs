@@ -51,12 +51,10 @@ const NOT_A_TRIAL = ['tool-sweep']
 const FAKES = ['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity', 'fake-opencode']
 
 /**
- * A fake provider whose runs wait for a card, every scenario left out with why (HI-2761): the harness knows a prompt was
- * taken from the agent's status (working) or its transcript, and an OpenCode agent has neither before HI-2760 (its turn
- * status from the server's events) and HI-2762 (its history). HI-2761's first try, run 2026-11-09T01-29-58-fake-opencode:
- * every prompt "never taken", the fake's turns run all the same. The card that gives OpenCode its status lifts this.
+ * A fake provider whose runs wait for a card, every scenario left out with why (HI-2761). fake-opencode waited for HI-2760
+ * (its agents' turn status: the harness knows a prompt was taken from the agent's status), which lifted it. None waits now.
  */
-const PROVIDER_WAITS = { 'fake-opencode': "waits for HI-2760: an OpenCode agent has no turn status before it, so the harness can't see a prompt taken (tests/scenarios/fakeScope.cjs)" }
+const PROVIDER_WAITS = {}
 
 /** The fakes a scenario runs on: every fake, ['fake'], or [] (model trials only). */
 function fakesFor(id) {

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 // @ts-expect-error: plain CommonJS modules without types
 import { SCENARIOS } from './scenarios/scenarios.cjs'
 // @ts-expect-error: plain CommonJS modules without types
-import { FAKES, FAKE_CLAUDE_ONLY, MODEL_TRIALS_ONLY, NOT_A_TRIAL, fakesFor, scopeProblems, selectFor } from './scenarios/fakeScope.cjs'
+import { FAKES, FAKE_CLAUDE_ONLY, MODEL_TRIALS_ONLY, NOT_A_TRIAL, PROVIDER_WAITS, fakesFor, scopeProblems, selectFor } from './scenarios/fakeScope.cjs'
 
 type Scenario = { id: string }
 type Selection = { run: Scenario[]; excluded: { id: string; why: string }[] }
@@ -38,8 +38,8 @@ describe("the scenarios' fake providers", () => {
       ['fake-codex', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       ['fake-copilot', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       ['fake-antigravity', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
-      // Every one left out until HI-2760 gives OpenCode agents their turn status (PROVIDER_WAITS, HI-2761).
-      ['fake-opencode', [], ['work-on-card', 'review-passed', 'hold-skipped', 'tool-sweep']],
+      // As every fake since HI-2760 gave OpenCode agents their turn status (the hold HI-2761 set, PROVIDER_WAITS).
+      ['fake-opencode', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       // Model trials run every scenario but the fakes' plumbing check, whatever the fakes' lists say.
       ['claude-code', ['work-on-card', 'review-passed', 'hold-skipped'], ['tool-sweep']],
       ['codex', ['work-on-card', 'review-passed', 'hold-skipped'], ['tool-sweep']]
@@ -49,8 +49,16 @@ describe("the scenarios' fake providers", () => {
       expect(sel.excluded.map((x) => x.id)).toEqual(left)
     })
 
-    it('says why a provider whose runs wait for a card leaves every scenario out', () => {
-      expect(new Set(pick('fake-opencode', ['work-on-card', 'tool-sweep']).excluded.map((x) => x.why))).toEqual(new Set([expect.stringMatching(/waits for HI-2760/)]))
+    it('a provider whose runs wait for a card leaves every scenario out, saying why; none waits now', () => {
+      expect(PROVIDER_WAITS).toEqual({})
+      PROVIDER_WAITS['fake-opencode'] = 'waits for HI-0: why'
+      try {
+        const sel = pick('fake-opencode', ['work-on-card', 'tool-sweep'])
+        expect(sel.run).toEqual([])
+        expect(new Set(sel.excluded.map((x) => x.why))).toEqual(new Set(['waits for HI-0: why']))
+      } finally {
+        delete PROVIDER_WAITS['fake-opencode']
+      }
     })
 
     it('says where each scenario it leaves out does run', () => {
