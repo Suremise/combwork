@@ -129,6 +129,24 @@ export class OpencodeAdapter implements ProviderAdapter {
     return { ok: true, loggedIn: true, plan: names.length ? names.join(', ') : null }
   }
 
+  /** The root OpenCode runs on outside an account (Combwork's own: opencodeHome), never the user's own data. */
+  configHome(): string {
+    return opencodeHome(null)
+  }
+
+  /** No account folder is shared with another (capabilities.connections.shared is empty): a name maps into the home only. */
+  accountSharedTarget(name: string): string {
+    return join(opencodeHome(null), name)
+  }
+
+  /**
+   * No file at an account folder's top tells a sign-in apart: OpenCode keeps its credentials in its database, which every
+   * check and session writes (its WAL, its logs, Combwork's check config), so none is watched as a login.
+   */
+  accountLoginFile(): boolean {
+    return false
+  }
+
   /** The account's own roots are set by the adapter whole: none of them may be dropped as a login variable. */
   accountEnvDrop(): readonly string[] {
     return []
