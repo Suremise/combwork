@@ -1,19 +1,19 @@
 import { existsSync } from 'original-fs'
-import { mkdir, readFile } from 'original-fs/promises'
-import { basename, dirname, join, resolve } from 'path'
+import { mkdir } from 'original-fs/promises'
+import { basename, dirname, join } from 'path'
 import type { AgentDef, WorktreeGone } from '../shared/types'
 import { projectAgents, slugify } from '../shared/defaults'
 import { samePath } from '../shared/movePaths'
 import { config } from './config'
 import { samePlace } from './fsutil'
-import { git } from './git'
 import { msg } from '../shared/i18n'
 import { CombworkError, combworkError } from './combworkError'
 import { withValues } from '../shared/advanced'
 import { createLogger, userText } from './logger'
 import { sessions } from './sessions'
 import { workspace, workspaceOf } from './workspace'
-import { copyIgnored, createWorktree, currentBranch, GIT_FAILED, listWorktrees, uniqueFolder } from './worktrees'
+import { GIT_FAILED, uniqueFolder } from './worktrees'
+import { slotWorkspaces } from './platform/workspacePorts'
 import { workflowFor } from './workflow/service'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
 import type { StoredAgent } from '../shared/agentFolders'
@@ -36,7 +36,10 @@ const M = {
   noTree: msg({ id: 'worktrees.missing.noTree', defaultMessage: "{agent} doesn't work in a worktree.", description: 'An error: the agent {agent} (its name) works in the project folder, so it has no worktree to recreate or unlink.' })
 }
 
-const branchExists = async (repo: string, branch: string): Promise<boolean> => (await git(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`])).ok
+/** The workspace lifecycle port worktrees are recreated with (SPEC §16.3.6 Port 2, HI-2786's R4). */
+const port = slotWorkspaces
+
+const branchExists = (repo: string, branch: string): Promise<boolean> => port().lineExists(repo, branch)
 
 /**
  * The agent's worktree when its folder is missing, with whether its branch survives; null when there's nothing missing.
@@ -87,19 +90,9 @@ export async function moveCardFolders(projectPath: string, from: string, to: str
 /**
  * The worktree entries `git worktree prune` would remove (their folders are missing), by the path each was at. Pruning
  * drops git's link to a worktree, which a moved one still needs to be repaired, so it only runs when it would remove
- * nothing but the entries being recreated.
+ * nothing but the entries being recreated. The port's (Git: gitWorkspacePort.ts).
  */
-export async function prunable(repo: string): Promise<string[]> {
-  const r = await git(repo, ['worktree', 'prune', '--dry-run', '--verbose'])
-  if (!r.ok) return []
-  const common = (await git(repo, ['rev-parse', '--git-common-dir'])).out.trim()
-  const out: string[] = []
-  for (const m of `${r.out}\n${r.err}`.matchAll(/^Removing worktrees\/([^:]+):/gm)) {
-    const gitdir = await readFile(join(resolve(repo, common), 'worktrees', m[1], 'gitdir'), 'utf8').catch(() => '')
-    out.push(gitdir.trim() ? dirname(resolve(gitdir.trim())) : `(${m[1]})`)
-  }
-  return out
-}
+export const prunable = (repo: string): Promise<string[]> => port().prunable(repo)
 
 /** Whether a folder's parent exists or can be made (an unplugged drive, say, can't). */
 async function usableParent(p: string): Promise<boolean> {
@@ -154,23 +147,23 @@ export async function recreateWorktree(projectPath: string, agentId: string, opt
   if (others.length) {
     throw new PruneBlocked(msg({ id: 'worktrees.missing.wouldPrune', defaultMessage: "Recreating runs git worktree prune, which would also drop git's link to {folders} (missing too). Locate, recreate or remove {n, plural, one {that worktree} other {those worktrees}} first.", description: "An error: recreating a missing worktree runs git worktree prune (a git command: keep it), which would also forget the other missing worktrees {folders} (a list of folders); {n} is how many." }), others)
   }
-  await git(projectPath, ['worktree', 'prune'])
-  if ((await listWorktrees(projectPath)).some((l) => samePlace(l.path, old.path))) throw combworkError(msg({ id: 'worktrees.missing.stillListed', defaultMessage: 'git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.', description: "An error: git still has the missing worktree {folder} on its list, so it can't be recreated there. git worktree prune is a git command: keep it." }), { folder: old.path })
+  await port().prune(projectPath)
+  if (((await port().list(projectPath)) ?? []).some((l) => samePlace(l.path, old.path))) throw combworkError(msg({ id: 'worktrees.missing.stillListed', defaultMessage: 'git still lists {folder} as a worktree (it may be locked): unlock it, or run git worktree prune, then try again.', description: "An error: git still has the missing worktree {folder} on its list, so it can't be recreated there. git worktree prune is a git command: keep it." }), { folder: old.path })
   const fallback = (): string => uniqueFolder(join(workspaceOf(projectPath).worktreesRoot, basename(projectPath), slugify(a.name)))
   let dest = opts.prefer ?? old.path
   if (existsSync(dest) || !(await usableParent(dest))) dest = fallback()
   const onBranch = await branchExists(projectPath, old.branch)
   let base = old.base
   if (onBranch) {
-    const r = await git(projectPath, ['worktree', 'add', dest, old.branch])
+    const r = await port().attach(projectPath, dest, old.branch)
     if (!r.ok) throw r.err.trim() ? new Error(r.err.trim()) : combworkError(GIT_FAILED, { command: 'git worktree add' }) // i18n-ignore: a git command, as it is
   } else {
-    const from = (await branchExists(projectPath, old.base)) ? old.base : await currentBranch(projectPath)
+    const from = (await branchExists(projectPath, old.base)) ? old.base : await port().currentLine(projectPath)
     if (!from) throw combworkError(msg({ id: 'worktrees.missing.noBranch', defaultMessage: "{agent}'s branch {branch} is gone, and the project folder isn't on a branch to start a new one from.", description: "An error: the missing worktree of the agent {agent} (its name) can't be recreated: its branch {branch} is gone too, and there's no branch to make a new one from." }), { agent: a.name, branch: old.branch })
-    await createWorktree(projectPath, dest, old.branch, from)
+    await port().createOnNewLine(projectPath, dest, old.branch, from)
     base = from
   }
-  const copied = await copyIgnored(projectPath, dest, slotCopyOf(cfg, slotLevelsOf(config.settings, workspaceOf(projectPath))).value).catch(() => [] as string[])
+  const copied = await port().copyIgnored(projectPath, dest, slotCopyOf(cfg, slotLevelsOf(config.settings, workspaceOf(projectPath))).value).catch(() => [] as string[])
   log.info(`${onBranch ? 'Recreated' : 'Created a new'} worktree for ${userText(a.name)} at ${userText(dest)} on ${userText(old.branch)}${copied.length ? `; copied ${userText(copied.join(', '))}` : ''}`)
   // At a new place, its sessions and the CLIs' data for the old folder are to follow it (workspaceMove.ts finishes
   // that): the move is recorded in the same locked change as the new path, so a failure or exit after it can't lose it.

@@ -1,0 +1,83 @@
+{
+  "lend a new slot": [
+    "<ws>/project :: worktree add --detach <ws>.worktrees/project/slot-a <id>",
+    "<ws>/project :: ls-files --others --ignored --exclude-standard --directory -z",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
+  ],
+  "prepare a new line": [
+    "<ws>.worktrees/project/slot-a :: symbolic-ref -q head",
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q refs/heads/cw/am/am-1-one",
+    "<ws>.worktrees/project/slot-a :: switch --no-guess -c cw/am/am-1-one <id>",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
+  ],
+  "prepare the line it is on": [
+    "<ws>.worktrees/project/slot-a :: symbolic-ref -q head",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
+  ],
+  "prepare a line it has": [
+    "<ws>.worktrees/project/slot-a :: symbolic-ref -q head",
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: switch --no-guess cw/am/am-1-one",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
+  ],
+  "release, settled and detached": [
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
+    "<ws>/project :: worktree list --porcelain",
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse head refs/heads/main --symbolic-full-name head",
+    "<ws>.worktrees/project/slot-a :: switch --detach <id>"
+  ],
+  "lend it again": [
+    "<ws>/project :: worktree list --porcelain",
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
+  ],
+  "remove, kept unmerged": [
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
+    "<ws>/project :: merge-base <id> <id>",
+    "<ws>/project :: merge-base --is-ancestor <id> <id>",
+    "<ws>/project :: diff --full-index --no-renames -u0 <id> <id>",
+    "<ws>/project :: patch-id --stable",
+    "<ws>/project :: log --no-merges --max-count=500 -p -u0 --full-index --format=commit %h <id>..<id>",
+    "<ws>/project :: patch-id --stable",
+    "<ws>/project :: merge-tree --write-tree --no-messages --merge-base=<id> <id> <id>",
+    "<ws>/project :: rev-parse --verify -q <id>^{tree}"
+  ],
+  "remove, kept dirty": [
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all"
+  ],
+  "remove": [
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
+    "<ws>/project :: worktree remove <ws>.worktrees/project/slot-a"
+  ],
+  "lend a slot gone from disk": [
+    "<ws>/project :: worktree prune",
+    "<ws>/project :: worktree add --detach <ws>.worktrees/project/slot-a <id>",
+    "<ws>/project :: ls-files --others --ignored --exclude-standard --directory -z",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
+    "<ws>/project :: worktree list --porcelain",
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse head refs/heads/main --symbolic-full-name head"
+  ],
+  "retarget": [
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
+    "<ws>.worktrees/project/slot-a :: switch -q --detach <id>",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
+    "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
+  ],
+  "recreate a gone slot": [
+    "<ws>/project :: worktree prune",
+    "<ws>/project :: worktree add <ws>.worktrees/project/kept-again cw/kept",
+    "<ws>/project :: worktree list --porcelain",
+    "<ws>.worktrees/project/kept-again :: branch --show-current"
+  ]
+}

@@ -281,6 +281,13 @@ in SPEC §16.3.6. Until a module has moved, the code above is how it works. Port
 `platform/gitRepoPorts.ts` is Git's, delegating to `git.ts`, `gitTool.ts`, `repoLock.ts`, `folderFence.ts` and
 `refHold.ts` unchanged, and `platform/repoPorts.ts` finds a folder's or a platform's (`repoContext`,
 `withFolderRepoLocks`). A caller moved to it imports only those two (`tests/repoPortsImports.test.ts`, check:repo).
+Port 2, workspace lifecycle (HI-2786's R4): `platform/workspacePort.ts` is the contract (a workspace's reads, its
+creation, preparation, detach, recreation and removal, a merged card line's deletion), `platform/gitWorkspacePort.ts`
+Git's over worktrees (the same git commands as before; `worktrees.ts` stays its helpers), and
+`platform/workspacePorts.ts` finds it (`slotWorkspaces()`, by the isolation capability). The slot pool (`slots.ts`,
+which takes it as `PoolDeps.workspaces`), its card hooks (`slotCards.ts`) and a 0.9 worktree's recreation
+(`agentWorktree.ts`) keep the leases, operations, jobs and refusals and act on folders only through it;
+`tests/slotTraces.test.ts` holds the pool's git commands to their recorded traces.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

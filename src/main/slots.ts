@@ -46,12 +46,12 @@ import { dirname, join } from 'path'
 import { BOARD_MIGRATIONS } from './boardStore'
 import { openDb } from './db'
 import { samePlace } from './fsutil'
-import { git, gitErrorLine } from './git'
-import { withRepoLocks } from './repoLock'
+import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import * as G from './platform/git'
 import { isUnknown } from './platform/types'
-import { copyIgnored, listWorktrees } from './worktrees'
+import type { WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import { slotWorkspaces } from './platform/workspacePorts'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
 import { idleKey } from '../shared/laneBar'
 import { cardRef } from '../shared/projectKeys'
@@ -1124,6 +1124,8 @@ export interface OpHolder {
 
 export interface PoolDeps {
   store: SlotStore
+  /** How its slots' folders are made, inspected, prepared and removed (HI-2786's R4); unset: `slotWorkspaces()`, Git's worktrees. */
+  workspaces?: WorkspacePort
   /** The project's folder (its repository). */
   project: string
   /** Where its slots go: `<workspace>.worktrees/<project>` (worktreesRoot). */
@@ -1337,6 +1339,11 @@ export class SlotPool {
     this.store = deps.store
   }
 
+  /** The workspace lifecycle port its slots are made and inspected with (SPEC §16.3.6 Port 2): the deps', else the slots' platform's. */
+  private get port(): WorkspacePort {
+    return this.deps.workspaces ?? slotWorkspaces()
+  }
+
   private now(): number {
     return this.deps.now?.() ?? Date.now()
   }
@@ -1543,7 +1550,7 @@ export class SlotPool {
     if (!s || s.writer) return
     const last = this.store.lastLease(name)
     if (last?.to && !last.endRev && (await folderThere(s.folder))) {
-      const rev = await G.head(s.folder)
+      const rev = await this.port.head(s.folder)
       if (!isUnknown(rev)) await this.store.finalizeEndRev(last.id, rev)
     }
     await this.settle(name)
@@ -1607,11 +1614,11 @@ export class SlotPool {
   private async detach(s: Slot): Promise<boolean> {
     const last = this.store.lastLease(s.name)
     if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return true
-    const h = await G.heads(s.folder, s.target)
+    const h = await this.port.heads(s.folder, s.target)
     if (isUnknown(h.line)) return false
     if (!h.line) return true
     if (isUnknown(h.target) || !h.target) return false
-    const r = await git(s.folder, ['switch', '--detach', h.target])
+    const r = await this.port.detach(s.folder, h.target)
     if (!r.ok) {
       log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
       return false
@@ -1623,13 +1630,14 @@ export class SlotPool {
   /** What a slot is on disk now: gone (no folder, or git doesn't list it), dirty, or ready. */
   private async look(s: Slot): Promise<SlotState> {
     if (!(await this.present(s))) return 'gone'
-    const d = await G.dirty(s.folder)
+    const d = await this.port.dirty(s.folder)
     return isUnknown(d) || d.length ? 'dirty' : 'ready'
   }
 
   private async present(s: Slot): Promise<boolean> {
     if (!(await folderThere(s.folder))) return false
-    const listed = await listWorktrees(this.deps.project).catch(() => null)
+    // A listing that fails is an empty one here, as listWorktrees answered (the port says null: R4 keeps the pool's reading).
+    const listed = await this.port.list(this.deps.project).then((l) => l ?? [], () => null)
     return !listed || listed.some((l) => samePlace(l.path, s.folder))
   }
 
@@ -1727,7 +1735,7 @@ export class SlotPool {
    * then classified from the folder against its intent and finished by its operation. Every exit is classified the same way.
    */
   async retarget(name: string, expect: { folder: string; target: string | null; head: string }, baseline: string, to: string, still: () => boolean | Promise<boolean>): Promise<RetargetEnd> {
-    const toHead = await G.lineHead(this.deps.project, to)
+    const toHead = await this.port.lineHead(this.deps.project, to)
     if (isUnknown(toHead) || !toHead) return { kind: 'kept', why: 'cantCheck', detail: `can't read ${to}` } // agent-protocol: a reason's detail for the log and the result, as git's are (English)
     const token = newToken()
     return this.op(token, async (): Promise<RetargetEnd> => {
@@ -1737,16 +1745,16 @@ export class SlotPool {
       let detail: string | undefined
       // A failure part way (git, the store, the caller's check; HR1's round 1, finding 3): settled from the folder as any exit.
       const failed = (e: unknown): void => void ((why = 'failed'), (detail = e instanceof Error ? e.message : String(e)))
-      await withRepoLocks([this.deps.project], async () => {
+      await withFolderRepoLocks([this.deps.project], async () => {
         const pre = await this.retargetable(expect.folder, expect.head, baseline)
         if (pre) return void ((why = pre.why), (detail = pre.detail))
         if (!(await still())) return void (why = 'refused')
         if (expect.head !== toHead) {
-          const sw = await git(expect.folder, ['switch', '-q', '--detach', toHead])
-          if (!sw.ok) return void ((why = 'cantCheck'), (detail = gitErrorLine(sw.err)))
+          const sw = await this.port.detach(expect.folder, toHead, { quiet: true })
+          if (!sw.ok) return void ((why = 'cantCheck'), (detail = this.port.errorLine(sw.err)))
         }
-        const head = await G.head(expect.folder)
-        const d = await G.dirty(expect.folder)
+        const head = await this.port.head(expect.folder)
+        const d = await this.port.dirty(expect.folder)
         if (isUnknown(head) || head !== toHead || isUnknown(d) || d.length) return
         await this.store.retargetSwitched(name, token)
       }, { quiet: true, project: this.deps.project }).catch(failed)
@@ -1764,13 +1772,13 @@ export class SlotPool {
   /** Whether a free slot's folder can move (HI-2680): there, clean (tracked and untracked), at `head`, and in `baseline`. */
   private async retargetable(folder: string, head: string, baseline: string): Promise<{ why: 'dirty' | 'moved' | 'unmerged' | 'cantCheck'; detail?: string } | null> {
     if (!(await folderThere(folder))) return { why: 'cantCheck', detail: 'its folder is gone' } // agent-protocol: a reason's detail for the log and the result, as git's are (English)
-    const d = await G.dirty(folder)
+    const d = await this.port.dirty(folder)
     if (isUnknown(d)) return { why: 'cantCheck', detail: d.what }
     if (d.length) return { why: 'dirty' }
-    const h = await G.head(folder)
+    const h = await this.port.head(folder)
     if (isUnknown(h)) return { why: 'cantCheck', detail: h.what }
     if (h !== head) return { why: 'moved' }
-    const b = await G.lineHead(this.deps.project, baseline)
+    const b = await this.port.lineHead(this.deps.project, baseline)
     if (isUnknown(b) || !b) return { why: 'cantCheck', detail: `can't read ${baseline}` } // agent-protocol: a reason's detail for the log and the result, as git's are (English)
     const inIt = h === b || (await G.isAncestor(this.deps.project, h, b))
     if (isUnknown(inIt)) return { why: 'cantCheck', detail: inIt.what }
@@ -1787,10 +1795,10 @@ export class SlotPool {
     const i = this.store.retargetOf(name)
     const s = this.store.slot(name)
     if (!i || !s) return { kind: 'kept', why: 'changed' }
-    const seen = await withRepoLocks([this.deps.project], async () => {
+    const seen = await withFolderRepoLocks([this.deps.project], async () => {
       if (!(await folderThere(s.folder))) return 'gone' as const
-      const d = await G.dirty(s.folder)
-      const h = await G.head(s.folder)
+      const d = await this.port.dirty(s.folder)
+      const h = await this.port.head(s.folder)
       if (isUnknown(d) || isUnknown(h)) return 'unreadable' as const
       if (d.length) return 'dirty' as const
       if (h === i.toHead && (i.stage === 'switched' || h !== i.oldHead)) return 'to' as const
@@ -1885,7 +1893,7 @@ export class SlotPool {
   }
 
   private async defaultTarget(): Promise<string | null> {
-    const t = await G.defaultBranch(this.deps.project)
+    const t = await this.port.defaultLine(this.deps.project)
     return isUnknown(t) ? null : t
   }
 
@@ -1936,11 +1944,11 @@ export class SlotPool {
           // Gone from disk while free: made again where it was (git's stale entry pruned first).
           if (await folderThere(slot.folder)) return await fail(sayStored(T.notListed))
           await this.store.fenced(name, token, () => undefined)
-          await git(this.deps.project, ['worktree', 'prune'])
+          await this.port.prune(this.deps.project)
           made = true
         } else {
           // Free since its last lease: what is in it now, not what was there then.
-          const d = await G.dirty(slot.folder)
+          const d = await this.port.dirty(slot.folder)
           if (isUnknown(d) || d.length) return await pass('dirty', 'notClean')
           // Held (a session in it, or a process: a file or folder in it open): passed over, saying what holds it.
           const session = !!this.deps.sessionIn?.(slot.folder)
@@ -1955,12 +1963,12 @@ export class SlotPool {
       // Still this operation's, right before the worktree is made or anything is copied into it.
       await this.store.fenced(name, token, () => undefined)
       if (made) {
-        const at = target ? await G.lineHead(this.deps.project, target) : await G.head(this.deps.project)
+        const at = target ? await this.port.lineHead(this.deps.project, target) : await this.port.head(this.deps.project)
         if (isUnknown(at) || !at) return await fail(sayStored(T.gitRead, { what: target ?? 'HEAD' }))
-        const r = await git(this.deps.project, ['worktree', 'add', '--detach', slot.folder, at])
-        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: gitErrorLine(r.err) || 'failed' }))
+        const r = await this.port.create(this.deps.project, slot.folder, at)
+        if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: this.port.errorLine(r.err) || 'failed' }))
         log.info(`Made slot ${userText(name)} at ${at.slice(0, 7)} in ${userText(slot.folder)}`)
-        if (opts.copy.trim()) await copyIgnored(this.deps.project, slot.folder, opts.copy).catch((e) => log.warn(`Could not copy files into slot ${userText(name)}`, e))
+        if (opts.copy.trim()) await this.port.copyIgnored(this.deps.project, slot.folder, opts.copy).catch((e) => log.warn(`Could not copy files into slot ${userText(name)}`, e))
       }
       const hash = await lockHash(slot.folder)
       // An existing slot is installed again only when asked (#1438: with G15 off nothing is installed for a card).
@@ -1969,7 +1977,7 @@ export class SlotPool {
         const failed = await this.install(name, token, slot, made ? 'setup' : 'install', opts.setup, hash)
         if (failed) return await fail(failed.error, failed.logPath)
       }
-      const rev = await G.head(slot.folder)
+      const rev = await this.port.head(slot.folder)
       const fields: SlotFields = { warmError: null, warmLog: null, ...(needed ? { installRev: isUnknown(rev) ? null : rev, installHash: hash } : {}), ...(made && target ? { target } : {}) }
       // Released meanwhile: the slot as it is now, not lent.
       const after = this.store.lease(lease.id)?.to ? await this.look(slot) : 'lent'
@@ -2015,20 +2023,20 @@ export class SlotPool {
       }
       try {
         const slot = this.store.slot(name)!
-        const on = await G.branch(slot.folder)
+        const on = await this.port.line(slot.folder)
         if (isUnknown(on)) {
           await end()
           return { error: sayStored(T.branchUnread, { slot: name }) }
         }
         const there = on === p.line
         if (!there) {
-          const d = await G.dirty(slot.folder)
+          const d = await this.port.dirty(slot.folder)
           if (isUnknown(d) || d.length) {
             await end()
             return { error: isUnknown(d) ? sayStored(T.filesUnread, { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
           }
         }
-        const had = there ? null : await G.lineHead(slot.folder, p.line)
+        const had = there ? null : await this.port.lineHead(slot.folder, p.line)
         if (isUnknown(had)) {
           await end()
           return { error: sayStored(T.gitRead, { what: p.line }) }
@@ -2047,10 +2055,10 @@ export class SlotPool {
           return notYet
         }
         if (!there) {
-          const sw = async (): Promise<{ notYet: string } | Awaited<ReturnType<typeof git>>> => {
+          const sw = async (): Promise<{ notYet: string } | WorkspaceStep> => {
             const notYet = await last()
             if (notYet) return { notYet }
-            return git(slot.folder, had ? ['switch', '--no-guess', p.line] : ['switch', '--no-guess', '-c', p.line, p.base])
+            return this.port.prepare(slot.folder, p.line, had ? null : p.base)
           }
           const r = await (p.around ? p.around(sw) : sw())
           if ('notYet' in r) {
@@ -2091,7 +2099,7 @@ export class SlotPool {
   }
 
   private async headOf(folder: string): Promise<string> {
-    const h = await G.head(folder)
+    const h = await this.port.head(folder)
     return isUnknown(h) ? '' : h
   }
 
@@ -2123,9 +2131,9 @@ export class SlotPool {
         if (existsSync(intent.to)) return await giveUp(`${intent.to} is already there`) // agent-protocol: the log's reason (Repair logs it), never an agent's
         const others = (await prunable()).filter((p) => !samePlace(p, intent.from))
         if (others.length) return await giveUp(`git's prune would also forget ${others.join(', ')}`) // agent-protocol: the log's reason (Repair logs it), never an agent's
-        await git(this.deps.project, ['worktree', 'prune'])
+        await this.port.prune(this.deps.project)
         await mkdir(dirname(intent.to), { recursive: true })
-        const r = await git(this.deps.project, ['worktree', 'add', intent.to, intent.line])
+        const r = await this.port.attach(this.deps.project, intent.to, intent.line)
         if (!r.ok) return await giveUp(r.err.trim() || 'git worktree add failed') // agent-protocol: the log's reason (Repair logs it), never an agent's
         // From here git may have made it (HR1's round 2): its operation and intent stay unless this records the result,
         // so a recovery (this Combwork's next look, its token no longer running) finishes it from what git says.
@@ -2145,12 +2153,13 @@ export class SlotPool {
 
   /** Whether git lists a worktree at a recreation's `to`, on its line; null when git can't say (never taken for no). */
   private async madeOn(intent: RecreateIntent): Promise<boolean | null> {
-    const listed = await listWorktrees(this.deps.project).catch(() => null)
+    // A listing that fails is an empty one here, as listWorktrees answered (R4 keeps the pool's reading).
+    const listed = await this.port.list(this.deps.project).then((l) => l ?? [], () => null)
     if (!listed) return null
     if (!listed.some((w) => samePlace(w.path, intent.to))) return false
-    const on = await git(intent.to, ['branch', '--show-current'])
-    if (!on.ok) return null
-    return on.out.trim().toLowerCase() === intent.line.toLowerCase()
+    const on = await this.port.shownLine(intent.to)
+    if (on === null) return null
+    return on.toLowerCase() === intent.line.toLowerCase()
   }
 
   /**
@@ -2272,9 +2281,9 @@ export class SlotPool {
           if (copies.length) return await keep({ why: 'editedSkillCopy', copies })
           // Still ours, nothing leased meanwhile, right before the one step that can't be undone.
           if (!(await this.store.fenced(name, token, (db, now) => !openLeaseIn(db, this.store.project, name) && !now.job))) return await keep({ why: 'busy', state: from })
-          const r = await git(this.deps.project, ['worktree', 'remove', slot.folder])
+          const r = await this.port.remove(this.deps.project, slot.folder)
           if (!r.ok) return await keep({ why: 'gitRefused', detail: r.err.trim().split(/\r?\n/)[0] || sayStored(T.removeFailed) })
-        } else await git(this.deps.project, ['worktree', 'prune'])
+        } else await this.port.prune(this.deps.project)
         await this.store.fenced(name, token, (db) => {
           db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(this.store.project, name)
           db.prepare('DELETE FROM board_meta WHERE key = ?').run(asideKey(this.store.project, name))
@@ -2320,14 +2329,14 @@ export class SlotPool {
     for (const card of this.store.cardsOf(s.name)) if (await this.deps.inFlight?.(card)) return { why: 'inFlight', card }
     if (!(await folderThere(s.folder))) return null
     if (probe && !(await quiet(s.folder))) return { why: 'process' }
-    const d = await G.dirty(s.folder)
+    const d = await this.port.dirty(s.folder)
     if (isUnknown(d)) return { why: 'cantCheck', detail: d.what }
     if (d.length) return { why: 'dirty', files: d.length }
-    const head = await G.head(s.folder)
+    const head = await this.port.head(s.folder)
     if (isUnknown(head)) return { why: 'cantCheck', detail: head.what }
     const target = s.target ?? (await this.defaultTarget())
     if (!target) return { why: 'cantCheck', detail: sayStored(T.noTarget) }
-    const t = await G.lineHead(this.deps.project, target)
+    const t = await this.port.lineHead(this.deps.project, target)
     if (isUnknown(t) || !t) return { why: 'cantCheck', detail: sayStored(T.noBranch, { target }) }
     if (t === head) return null
     const base = await G.mergeBase(this.deps.project, t, head)
