@@ -3,7 +3,7 @@ import { endTree } from '../../progressReporters/wrapper'
 import { request as httpRequest } from 'http'
 import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
-import { buildMirror, mirrorState, newestMessage, ownMessages, parseExport, sessionSettled, subagentSessions, withStatus, type MirrorHeader, type MirrorProblem, type LimitsReading, opencodePlanUsage } from './mirror'
+import { buildMirror, mirrorState, newestMessage, ownMessages, parseExport, placeholderMirror, sessionSettled, subagentSessions, withStatus, type MirrorHeader, type MirrorProblem, type LimitsReading, opencodePlanUsage } from './mirror'
 
 // The OpenCode history's worker core (HI-2762, design s7/s10/s13): every read of a session from its agent's private server,
 // every `opencode session export`, and every write of a session's mirror (mirror.ts) happens here, in a thread of its own
@@ -74,7 +74,8 @@ export type CoreRequest = { id: number } & (
   | { type: 'discover'; home: string; folder: string; command: CommandSpec; reason: 'runEnd' | 'repair' }
   | { type: 'discoveryFolders'; homes: string[] }
   | { type: 'adoptMark'; home: string; sessionId: string; directory: string }
-  | { type: 'unmark'; home: string; sessionId: string }
+  | { type: 'adoptCommit'; home: string; sessionId: string; lease: string }
+  | { type: 'adoptDone'; home: string; sessionId: string; lease: string; ok: boolean; created: boolean }
   | { type: 'idle' }
   | { type: 'shutdown' }
 )
@@ -234,6 +235,13 @@ const defaultDeps: CoreDeps = {
 
 export class HistoryCore {
   private sessions = new Map<string, Session>()
+  /**
+   * Adoptions under way, by session key (HI-2774, HR2 on round 1): each adoption's lease, pending (its mark checked or
+   * made) or committing (its record being written); whether one of them made the mark, and whether one committed. The
+   * mark is taken back only once none is left and none committed, and only if one of them made it.
+   */
+  private adoptions = new Map<string, { created: boolean; committed: boolean; leases: Map<string, 'pending' | 'committing'> }>()
+  private leaseCount = 0
   /** Each session's subagents' sessions (by its key: their ids), from its last published read. */
   private kids = new Map<string, Set<string>>()
   private runs = new Map<string, Run>()
@@ -312,6 +320,9 @@ export class HistoryCore {
         // Its discovery too (HI-2774): a queued one goes, a running one is waited for below.
         this.queue = this.queue.filter((j) => !j.key.startsWith(`${h}|`))
         await Promise.all([...this.exporting].filter(([k]) => k.startsWith(`${h}|`)).map(([, p]) => p))
+        // An adoption writing its record in the root is waited for (its rollback, if any, done too); one not committing yet
+        // is refused at its commit, the root being removed now (HR2 on HI-2774, round 1).
+        while ([...this.adoptions].some(([k, a]) => k.startsWith(`${h}|`) && [...a.leases.values()].includes('committing'))) await new Promise((res) => setTimeout(res, 5))
         return true
       }
       case 'restoreRoot':
@@ -346,12 +357,40 @@ export class HistoryCore {
       case 'discoveryFolders':
         // The repair pass: each account's folders scanned before whose scan is due again.
         return r.homes.filter((h) => !this.removed.has(h.toLowerCase())).flatMap((home) => Object.values(this.readDiscovery(home)).filter((d) => this.discoveryDue(home, d.folder)).map((d) => ({ home, folder: d.folder })))
-      case 'adoptMark':
-        return this.adoptMark(r.home, r.sessionId, r.directory)
-      case 'unmark':
-        // Only ever the mark an adoption just made (main says so): taken back when its record couldn't be written.
-        rmSync(markPath(r.home, r.sessionId), { force: true })
+      case 'adoptMark': {
+        const m = this.adoptMark(r.home, r.sessionId, r.directory)
+        if (!m.ok) return m
+        const k = key(r.home, r.sessionId)
+        const a = this.adoptions.get(k) ?? { created: false, committed: false, leases: new Map() }
+        const lease = `${this.epochBase}-${++this.leaseCount}`
+        a.created ||= m.created
+        a.leases.set(lease, 'pending')
+        this.adoptions.set(k, a)
+        return { ...m, lease }
+      }
+      case 'adoptCommit': {
+        // The adoption's record is about to be written: refused when its root is going (or went) away meanwhile, or its
+        // lease isn't known (a worker since restarted); else the root's removal waits for it to be done.
+        const a = this.adoptions.get(key(r.home, r.sessionId))
+        if (this.removed.has(r.home.toLowerCase()) || this.closed || !a?.leases.has(r.lease) || !existsSync(markPath(r.home, r.sessionId))) return false
+        a.leases.set(r.lease, 'committing')
         return true
+      }
+      case 'adoptDone': {
+        const k = key(r.home, r.sessionId)
+        const a = this.adoptions.get(k)
+        if (!a) {
+          // A lease a restarted worker never knew: its own mark taken back if its record wasn't written.
+          if (!r.ok && r.created) rmSync(markPath(r.home, r.sessionId), { force: true })
+          return true
+        }
+        a.leases.delete(r.lease)
+        if (r.ok) a.committed = true
+        if (a.leases.size) return true
+        this.adoptions.delete(k)
+        if (!a.committed && a.created) rmSync(markPath(r.home, r.sessionId), { force: true })
+        return true
+      }
       case 'bounds':
         this.bounds = { ...this.bounds, ...r.bounds }
         return this.bounds
@@ -777,6 +816,13 @@ export class HistoryCore {
     }
     found.sort((a, b) => a.tried - b.tried)
     const batch = found.slice(0, this.bounds.repairBatch).map((f) => f.id)
+    // Each handed out is kept for the repair pass before the scan counts as done (HR2 on HI-2774, round 1): a placeholder
+    // mirror and a pending retry record, so an export main never queued (a restart, a full queue, no command) is still
+    // made by the repair pass, which reads the mirror folder.
+    for (const id of batch) {
+      if (!existsSync(mirrorPath(home, id))) writeFileSync(mirrorPath(home, id), placeholderMirror(), { flag: 'wx' })
+      this.writeState({ home, sessionId: id }, { ...this.readState({ home, sessionId: id }), pending: true })
+    }
     this.writeDiscovery(home, { folder, dbMtime: db, complete: found.length <= batch.length, at: now })
     if (batch.length) this.emit({ event: 'discovered', home, sessions: batch })
   }

@@ -1234,18 +1234,84 @@ describe("OpenCode sessions Combwork didn't make: discovery and adoption's mark 
     writeFileSync(mirrorPath(home, placeholder), placeholderMirror())
     expect(await ask(core, { type: 'adoptMark', home, sessionId: placeholder, directory: dir })).toEqual({ ok: false, why: 'notRead' })
     expect(await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: join(home, 'elsewhere') })).toEqual({ ok: false, why: 'otherFolder' })
-    expect(await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })).toEqual({ ok: true, created: true })
+    const a = (await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })) as any
+    expect(a).toMatchObject({ ok: true, created: true, lease: expect.any(String) })
     expect(JSON.parse(readFileSync(markPath(home, sid), 'utf8'))).toEqual({ id: sid, directory: dir })
-    // Again: the same mark, taken as it is (a rollback leaves it).
-    expect(await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })).toEqual({ ok: true, created: false })
+    // Again: the same mark, taken as it is.
+    const b = (await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })) as any
+    expect(b).toMatchObject({ ok: true, created: false })
     writeFileSync(markPath(home, other), JSON.stringify({ id: other, directory: join(home, 'elsewhere') }))
     writeFileSync(mirrorPath(home, other), buildMirror({ w: -1, source: 'export', updated: 5, external: true }, { id: other, time: { updated: 5 }, location: { directory: dir } }, []))
     expect(await ask(core, { type: 'adoptMark', home, sessionId: other, directory: dir })).toEqual({ ok: false, why: 'otherMark' })
     expect(JSON.parse(readFileSync(markPath(home, other), 'utf8')).directory).toBe(join(home, 'elsewhere'))
-    await ask(core, { type: 'unmark', home, sessionId: sid })
+    // Both end without a record: the mark one of them made goes once the last has.
+    await ask(core, { type: 'adoptDone', home, sessionId: sid, lease: a.lease, ok: false, created: true })
+    expect(existsSync(markPath(home, sid))).toBe(true)
+    await ask(core, { type: 'adoptDone', home, sessionId: sid, lease: b.lease, ok: false, created: false })
     expect(existsSync(markPath(home, sid))).toBe(false)
     await ask(core, { type: 'removeRoot', home })
     expect(await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })).toEqual({ ok: false, why: 'other' })
     expect(existsSync(markPath(home, sid))).toBe(false)
+  })
+
+  it("never takes back a mark another adoption of the session committed with, whichever made it (HR2, round 1)", async () => {
+    const home = tempDir('cw-oc-adopt-')
+    const dir = join(home, 'project')
+    const core = subCore({})
+    const [sid] = ids(1)
+    mkdirSync(join(home, 'combwork-sessions'), { recursive: true })
+    writeFileSync(mirrorPath(home, sid), buildMirror({ w: -1, source: 'export', updated: 5, external: true }, { id: sid, time: { updated: 5 }, location: { directory: dir } }, []))
+    const a = (await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })) as any
+    const b = (await ask(core, { type: 'adoptMark', home, sessionId: sid, directory: dir })) as any
+    expect([a.created, b.created]).toEqual([true, false])
+    // B commits its record; A, which made the mark, fails after: the mark B depends on stays.
+    expect(await ask(core, { type: 'adoptCommit', home, sessionId: sid, lease: b.lease })).toBe(true)
+    await ask(core, { type: 'adoptDone', home, sessionId: sid, lease: b.lease, ok: true, created: false })
+    await ask(core, { type: 'adoptDone', home, sessionId: sid, lease: a.lease, ok: false, created: true })
+    expect(existsSync(markPath(home, sid))).toBe(true)
+  })
+
+  it("makes an account's removal wait for an adoption writing its record, and refuses one not committing yet (HR2, round 1)", async () => {
+    const home = tempDir('cw-oc-adopt-')
+    const dir = join(home, 'project')
+    const core = subCore({})
+    const [writing, waiting] = ids(2)
+    mkdirSync(join(home, 'combwork-sessions'), { recursive: true })
+    for (const id of [writing, waiting]) writeFileSync(mirrorPath(home, id), buildMirror({ w: -1, source: 'export', updated: 5, external: true }, { id, time: { updated: 5 }, location: { directory: dir } }, []))
+    const w = (await ask(core, { type: 'adoptMark', home, sessionId: writing, directory: dir })) as any
+    const p = (await ask(core, { type: 'adoptMark', home, sessionId: waiting, directory: dir })) as any
+    expect(await ask(core, { type: 'adoptCommit', home, sessionId: writing, lease: w.lease })).toBe(true)
+    let removed = false
+    const removing = ask(core, { type: 'removeRoot', home }).then(() => (removed = true))
+    // The one not committing is refused now; the one committing holds the removal until it is done.
+    expect(await ask(core, { type: 'adoptCommit', home, sessionId: waiting, lease: p.lease })).toBe(false)
+    await ask(core, { type: 'adoptDone', home, sessionId: waiting, lease: p.lease, ok: false, created: true })
+    expect(existsSync(markPath(home, waiting))).toBe(false)
+    expect(removed).toBe(false)
+    await ask(core, { type: 'adoptDone', home, sessionId: writing, lease: w.lease, ok: true, created: true })
+    await removing
+    expect(removed).toBe(true)
+  })
+
+  it("keeps a discovered session for the repair pass though main never exported it (a restart, a full queue: HR2, round 1)", async () => {
+    const home = tempDir('cw-oc-disc-')
+    const dir = join(home, 'project')
+    const events: CoreEvent[] = []
+    const core = subCore({}, [], events)
+    const [lost] = ids(1)
+    await ask(core, { type: 'discover', home, folder: dir, command: printing(home, 'list.json', listOf([{ id: lost, updated: 7 }], dir)), reason: 'runEnd' })
+    await ask(core, { type: 'idle' })
+    expect(events.filter((e) => e.event === 'discovered')).toEqual([{ event: 'discovered', home, sessions: [lost] }])
+    // Nothing exported; a new worker over the same account: the scan was complete, the repair pass has it.
+    await ask(core, { type: 'shutdown' })
+    const again = subCore({})
+    expect(await ask(again, { type: 'discoveryFolders', homes: [home] })).toEqual([])
+    expect(again.repairCandidates([home])).toEqual([{ home, sessionId: lost }])
+    // Its placeholder is no session anyone lists or adopts until its export lands.
+    expect(mirrorState(readFileSync(mirrorPath(home, lost), 'utf8')).header).toMatchObject({ state: 'placeholder' })
+    await ask(again, { type: 'export', home, sessionId: lost, reason: 'repair', command: printing(home, 'lost.json', exportOf(lost, 7, dir)) })
+    await ask(again, { type: 'idle' })
+    expect(mirrorState(readFileSync(mirrorPath(home, lost), 'utf8')).header).toMatchObject({ state: 'complete', external: true })
+    expect(again.repairCandidates([home])).toEqual([])
   })
 })

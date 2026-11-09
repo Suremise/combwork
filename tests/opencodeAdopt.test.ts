@@ -108,6 +108,66 @@ describe("adopting an OpenCode session Combwork didn't make (HI-2774)", () => {
     expect(await record(id)).toBeUndefined()
   })
 
+  it('keeps the mark of an adoption that succeeded while another of the same session failed (HR2, round 1)', async () => {
+    const id = external()
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((r) => (release = r))
+    let calls = 0
+    sessions.writeAdopted = async (...a) => {
+      // The first adoption's record waits, then fails; the second's is written.
+      if (++calls === 1) {
+        await gate
+        throw new Error('disk full')
+      }
+      return realWrite(...a)
+    }
+    const first = run(() => sessions.adopt(p, id))
+    const second = run(() => sessions.adopt(p, id))
+    release()
+    await expect(first).rejects.toThrow('disk full')
+    await second
+    expect(await record(id)).toMatchObject({ id })
+    expect(JSON.parse(readFileSync(markPath(home, id), 'utf8'))).toEqual({ id, directory: p })
+  })
+
+  it("refuses when its account goes after the mark was made but before the record: no record, no mark (HR2, round 1)", async () => {
+    const id = external()
+    const real = history.opencodeHistory.adoptCommit.bind(history.opencodeHistory)
+    history.opencodeHistory.adoptCommit = async (...a) => {
+      await history.opencodeHistory.removeRoot(home)
+      return real(...a)
+    }
+    try {
+      await expect(run(() => sessions.adopt(p, id))).rejects.toThrow(/isn't one of its account's sessions any more/)
+    } finally {
+      history.opencodeHistory.adoptCommit = real
+      await history.historyWorkerForTests('in-process')
+    }
+    expect(existsSync(markPath(home, id))).toBe(false)
+    expect(await record(id)).toBeUndefined()
+  })
+
+  it("holds its account's removal while its record is written, and lets it go once the record is (HR2, round 1)", async () => {
+    const id = external()
+    let removed = false
+    let removing: Promise<unknown> = Promise.resolve()
+    sessions.writeAdopted = async (...a) => {
+      removing = history.opencodeHistory.removeRoot(home).then(() => (removed = true))
+      // The removal waits on this adoption's record (polled a few times while it is being written).
+      for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r))
+      expect(removed).toBe(false)
+      return realWrite(...a)
+    }
+    try {
+      await run(() => sessions.adopt(p, id))
+      await removing
+      expect(removed).toBe(true)
+      expect(await record(id)).toMatchObject({ id })
+    } finally {
+      await history.historyWorkerForTests('in-process')
+    }
+  })
+
   it('adopts a fork as a sub-session of its source, with no mark: never resumed', async () => {
     const source = newId()
     const id = external(p, source)

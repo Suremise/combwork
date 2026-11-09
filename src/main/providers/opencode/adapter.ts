@@ -15,7 +15,7 @@ import { combworkError } from '../../combworkError'
 import { POWERSHELL } from '../../launchGate'
 import { compareVersions, exportSubtitleText, readFirstLine, toSpawnable } from '../common'
 import { placeMatcher } from '../../places'
-import type { CatalogRead, CommandSpec, ConnectionStatus, StartContextDelivery, StartContextTrigger, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import type { AdoptionHandle, CatalogRead, CommandSpec, ConnectionStatus, StartContextDelivery, StartContextTrigger, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { localDataRoot } from '../antigravity/home'
 import { AMBIENT_DIRS, AMBIENT_FILES, DATA_ENV, ambientIntegrations, opencodeEnv, opencodeHome } from './home'
 import { chosenAmbient, launchConfig, projectDecidesMcp, withTestProvider, writeConfigDir, type SavedCredentials } from './config'
@@ -468,7 +468,7 @@ export class OpencodeAdapter implements ProviderAdapter {
    * mirror, in one of the accounts set up now, of a session that ran in one of the host's folders; never over another mark.
    * A sub-session (a subagent's, a fork) is adopted as one, with no mark. Refused, translated, with why.
    */
-  async adopting(_projectPath: string, sessionId: string, transcriptPath: string, folders: string[]): Promise<(() => Promise<void>) | null> {
+  async adopting(_projectPath: string, sessionId: string, transcriptPath: string, folders: string[]): Promise<AdoptionHandle | null> {
     const h = await this.header(transcriptPath)
     if (!h?.external || h.fork || h.parent) return null
     const home = this.allHomes().find((root) => resolve(mirrorPath(root, sessionId)).toLowerCase() === resolve(transcriptPath).toLowerCase())
@@ -477,7 +477,15 @@ export class OpencodeAdapter implements ProviderAdapter {
     if (typeof h.directory !== 'string' || !folders.some((f) => placeMatcher(f)(h.directory!))) throw combworkError(ADOPT_REFUSED, { why: 'otherFolder' }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
     const r = await opencodeHistory.adoptMark(home, sessionId, h.directory)
     if (!r.ok) throw combworkError(ADOPT_REFUSED, { why: r.why }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
-    return r.created ? () => opencodeHistory.unmark(home, sessionId) : null
+    const { lease, created } = r
+    return {
+      // Just before the record: still an account set up now, and not one being removed (the worker says, in order with it).
+      commit: async () => {
+        const configured = this.allHomes().some((root) => resolve(root).toLowerCase() === resolve(home).toLowerCase())
+        if (!configured || !(await opencodeHistory.adoptCommit(home, sessionId, lease))) throw combworkError(ADOPT_REFUSED, { why: 'other' }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+      },
+      done: (ok) => opencodeHistory.adoptDone(home, sessionId, lease, ok, created)
+    }
   }
 
   parseUsage(text: string, sessionId: string): SessionUsage {

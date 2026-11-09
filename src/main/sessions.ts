@@ -80,7 +80,7 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
-import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
@@ -8967,6 +8967,21 @@ class SessionManager {
   async adopt(projectPath: string, sessionId: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     assertSessionId(sessionId)
+    // One adoption of a session at a time (HR2 on HI-2774): its provider's record and Combwork's are made, or taken back,
+    // as one, never interleaved with another's.
+    const k = `${projectPath.toLowerCase()}|${sessionId}`
+    const before = this.adoptions.get(k) ?? Promise.resolve()
+    const mine = before.catch(() => undefined).then(() => this.adoptNow(projectPath, sessionId))
+    const kept = mine.catch(() => undefined)
+    this.adoptions.set(k, kept)
+    void kept.then(() => {
+      if (this.adoptions.get(k) === kept) this.adoptions.delete(k)
+    })
+    return mine
+  }
+  private adoptions = new Map<string, Promise<unknown>>()
+
+  private async adoptNow(projectPath: string, sessionId: string): Promise<void> {
     const src = await this.providerTranscript(projectPath, sessionId)
     const provider = src?.provider ?? 'claude-code'
     // As its record says, if it has one (HI-1829): a conversation that ran on a server is never read Claude-priced.
@@ -8978,18 +8993,20 @@ class SessionManager {
     const sub = src ? ((await adapter.listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub ?? (await adapter.subSessionOf(src.path, sessionId).catch(() => null)) ?? undefined) : undefined
     // A conversation the CLI keeps by a record of Combwork's (OpenCode's mark, HI-2774) is taken over in the CLI's data
     // first, or refused with why; what that made is taken back if the record can't be written, so nothing half-adopted stays.
-    let undo: (() => Promise<void>) | null = null
+    let handle: AdoptionHandle | null = null
     if (src && !sub && adapter.adopting) {
       const file = await workspace.sessionsFile(projectPath)
       const cfg = await workspace.projectConfig(projectPath)
-      undo = await adapter.adopting(projectPath, sessionId, src.path, this.sessionFolders(projectPath, file.sessions, cfg))
+      handle = await adapter.adopting(projectPath, sessionId, src.path, this.sessionFolders(projectPath, file.sessions, cfg))
     }
     try {
+      await handle?.commit()
       await this.writeAdopted(projectPath, sessionId, provider, src, sub, usage)
     } catch (e) {
-      if (undo) await undo().catch((u) => log.warn(`Taking back an adoption's record in ${userText(projectPath)}`, u))
+      if (handle) await handle.done(false).catch((u) => log.warn(`Taking back an adoption's record in ${userText(projectPath)}`, u))
       throw e
     }
+    if (handle) await handle.done(true).catch((u) => log.warn(`Ending an adoption in ${userText(projectPath)}`, u))
     if (src && config.settings.sessions.backupTranscripts) await syncCopy(src.path, this.backupPath(projectPath, sessionId)).catch(() => undefined)
   }
 

@@ -223,6 +223,12 @@ export interface CommandSpec {
 export type KeyStep = { keys: string; waitMs?: number; heldOn?: (screen: string) => boolean } | { pick: (screen: string) => string | null; what: string; waitMs?: number }
 export type KeySteps = KeyStep[]
 
+/** An adoption under way, as a provider takes it over in its own data (ProviderAdapter.adopting, HI-2774). */
+export interface AdoptionHandle {
+  commit(): Promise<void>
+  done(ok: boolean): Promise<void>
+}
+
 export interface ExternalSession {
   id: string
   transcriptPath: string
@@ -777,10 +783,12 @@ export interface ProviderAdapter {
   /**
    * A conversation started outside Combwork is being adopted (sessions.adopt), not a sub-session: for a CLI that resumes
    * only what Combwork recorded in its own data (OpenCode's mark, HI-2774), that record is made now, or the adoption is
-   * refused with a translated reason (thrown). Resolves with how to take back what it made if the adoption's record can't
-   * be written (null: nothing to take back). `folders`: the host's session folders, the only ones a session may have run in.
+   * refused with a translated reason (thrown). Resolves with the adoption's handle (null: nothing to do): `commit()` just
+   * before the record is written (throws a translated refusal when it can no longer be, e.g. its account is going away),
+   * and `done(ok)` after (ok: the record was written), which takes back what it made only when no adoption committed.
+   * `folders`: the host's session folders, the only ones a session may have run in.
    */
-  adopting?(projectPath: string, sessionId: string, transcriptPath: string, folders: string[]): Promise<(() => Promise<void>) | null>
+  adopting?(projectPath: string, sessionId: string, transcriptPath: string, folders: string[]): Promise<AdoptionHandle | null>
   /**
    * What the CLI keeps by a folder's path rather than in it (Claude Code: ~/.claude/projects/<path as name>/, its
    * transcripts and auto memory), for a folder that moved (#146). With apply, copied to the new path's name: never moved

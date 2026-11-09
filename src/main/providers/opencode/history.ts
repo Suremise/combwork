@@ -279,13 +279,21 @@ export class OpencodeHistory {
    * An adoption's mark in the account holding the session (HI-2774), written by the worker in order with removals and
    * publication: `created` says whether this call made it (only then is it taken back if the adoption fails), `why` why not.
    */
-  async adoptMark(home: string, sessionId: string, directory: string): Promise<{ ok: true; created: boolean } | { ok: false; why: 'notRead' | 'otherFolder' | 'otherMark' | 'other' }> {
-    return (await this.thread.ask({ type: 'adoptMark', home, sessionId, directory }, 5000)) as { ok: true; created: boolean } | { ok: false; why: 'notRead' | 'otherFolder' | 'otherMark' | 'other' }
+  async adoptMark(home: string, sessionId: string, directory: string): Promise<{ ok: true; created: boolean; lease: string } | { ok: false; why: 'notRead' | 'otherFolder' | 'otherMark' | 'other' }> {
+    return (await this.thread.ask({ type: 'adoptMark', home, sessionId, directory }, 5000)) as { ok: true; created: boolean; lease: string } | { ok: false; why: 'notRead' | 'otherFolder' | 'otherMark' | 'other' }
   }
 
-  /** Takes back the mark an adoption made, when its record couldn't be written. */
-  async unmark(home: string, sessionId: string): Promise<void> {
-    await this.thread.ask({ type: 'unmark', home, sessionId }, 5000)
+  /**
+   * The adoption's record is about to be written (HR2 on HI-2774): false when its account is being removed (or the worker
+   * no longer knows the lease); true, and the account's removal then waits until adoptDone says the record was written or not.
+   */
+  async adoptCommit(home: string, sessionId: string, lease: string): Promise<boolean> {
+    return (await this.thread.ask({ type: 'adoptCommit', home, sessionId, lease }, 5000)) === true
+  }
+
+  /** The adoption ended (`ok`: its record written): its mark is taken back only when no adoption of the session committed. */
+  async adoptDone(home: string, sessionId: string, lease: string, ok: boolean, created: boolean): Promise<void> {
+    await this.thread.ask({ type: 'adoptDone', home, sessionId, lease, ok, created }, 5000)
   }
 
   private async exportSession(home: string, sessionId: string, reason: 'runEnd' | 'repair'): Promise<void> {
