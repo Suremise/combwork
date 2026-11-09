@@ -186,6 +186,8 @@ export const AREAS = [
   { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitdirect', 'gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
   { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
+  // HI-2807: New branch… from a ref, a missing target's offer, Start the next version (gitview drives all three).
+  { paths: ['src/renderer/src/components/NewBranchForm.tsx', 'src/renderer/src/components/NextVersion.tsx', 'src/main/workflow/nextVersion.ts', 'src/shared/nextVersion.ts'], suites: ['gitview', 'workflowoptions', 'retarget'] },
   // The shared tab strip (HI-1837, HI-1839) and every suite driving one: Version Control's sections, Settings' workflow
   // defaults, Advanced's per CLI, Keyboard Shortcuts' categories, the Attachments tab's pane and card tabs.
   { paths: ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'agentslots', 'gitbranchcards', 'lanesslots', 'lanestages', 'mergedialogslots', 'slotrelease', 'unusedslots', 'p6lane', 'workflowdefaults', 'workflowoptions', 'advanced', 'keys', 'cardattach', 'image', 'i18nshots'] },
