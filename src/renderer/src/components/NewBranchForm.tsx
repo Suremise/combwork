@@ -70,7 +70,9 @@ export function NewBranchForm({ projectPath, onChange, initialStart, blocked, sw
   const atFolder = !!resolved && !!folderCommit && resolved.commit === folderCommit
   // Untouched, it switches only where it starts at the folder's own commit (and the folder may move).
   const shownSwitch = !blocked && (touched ? switchNow : atFolder)
-  useEffect(() => onChange({ name: name.trim(), start: start.trim(), resolved: resolved ?? null, switchNow: shownSwitch }), [onChange, name, start, resolved, shownSwitch])
+  useEffect(() => {
+    onChange({ name: name.trim(), start: start.trim(), resolved: resolved ?? null, switchNow: shownSwitch })
+  }, [onChange, name, start, resolved, shownSwitch])
   const list = `${id}-points`
   return (
     <div className="new-branch-form" data-new-branch="">

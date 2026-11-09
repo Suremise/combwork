@@ -54,7 +54,9 @@ function NextVersionForm({ projectPath, plan, retarget, onName }: { projectPath:
       clearTimeout(t)
     }
   }, [projectPath, name])
-  useEffect(() => onName(name.trim()), [onName, name])
+  useEffect(() => {
+    onName(name.trim())
+  }, [onName, name])
   const shown = name.trim() || plan.name
   if (!plan.start) return <div className="s-desc error">{tr(M.noStart, { from: plan.from })}</div>
   return (
