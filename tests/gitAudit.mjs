@@ -14,6 +14,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'fs'
 import { dirname, join, relative, resolve } from 'path'
+import ts from 'typescript-classic'
 
 /** Git's own modules: an import of one from outside Git's implementation is an edge the audit classifies. */
 const GIT_FILES = new Set([
@@ -43,6 +44,12 @@ const GIT_FILES = new Set([
 /** Whether a module (repo path, no extension) is Git's: one of GIT_FILES, or a platform module named git… (platform/git.ts, gitHistory.ts…). */
 export const isGitModule = (m) => GIT_FILES.has(m) || /^src\/main\/platform\/git([A-Z]\w*)?$/.test(m)
 
+/** A file that could name a Git module: only these are parsed (the rest can't import one). */
+const MAY_NAME_GIT = new RegExp(String.raw`git|worktree|repoLock|folderFence|branchWatch|branchMerge|refHold|require\(|import\(\s*[^'"${'`'}\s]`, 'i')
+
+/** A dynamic import or require whose specifier isn't a string (built from pieces): it could load anything, so it is an edge too. */
+const HIDDEN = '(computed specifier)'
+
 /** Every .ts/.tsx file under `dir` (repo paths, forward slashes). */
 function sources(root, dir = 'src') {
   const out = []
@@ -65,8 +72,30 @@ export function gitEdges(root, over = {}) {
   const out = []
   for (const { file, text } of filesOf(root, over)) {
     if (isGitModule(file.replace(/\.tsx?$/, ''))) continue
+    // Each file's edges kept by its text (a test's runs reparse only the file it changes).
+    const key = `${root}|${file}`
+    const kept = parsed.get(key)
+    if (kept?.text === text) {
+      out.push(...kept.edges)
+      continue
+    }
+    const edges = fileEdges(root, file, text)
+    parsed.set(key, { text, edges })
+    out.push(...edges)
+  }
+  return out.sort((a, b) => (a.file + a.module).localeCompare(b.file + b.module))
+}
+
+/** gitEdges' answers per file, by its text. */
+const parsed = new Map()
+
+/** One file's Git edges (gitEdges'). */
+function fileEdges(root, file, text) {
+  const out = []
+  {
     const found = new Map()
     const add = (spec, names) => {
+      if (spec === `./${HIDDEN}`) return void found.set(HIDDEN, null)
       // The renderer's alias for src/shared (electron.vite.config.ts).
       const path = spec.startsWith('@shared/') ? `src/shared/${spec.slice('@shared/'.length)}` : spec.startsWith('.') ? relative(root, resolve(root, dirname(file), spec)) : null
       if (path === null) return
@@ -76,18 +105,53 @@ export function gitEdges(root, over = {}) {
       if (names === null || had === null) found.set(module, null)
       else found.set(module, [...new Set([...(had ?? []), ...names])].sort())
     }
-    for (const m of text.matchAll(/^(?:import|export)\s+(?:type\s+)?(?:\{([^}]*)\}|\*\s+as\s+(\w+)|\w+(?:\s*,\s*\{([^}]*)\})?|\*)\s+from\s+'([^']+)'/gm)) {
-      const list = m[1] ?? m[3]
-      // A namespace (`* as wt`): the members the file uses through it.
-      const used = m[2] ? [...new Set([...text.matchAll(new RegExp(`\\b${m[2]}\\.(\\w+)`, 'g'))].map((u) => u[1]))] : null
-      add(m[4], list !== undefined ? list.split(',').map((n) => n.trim().replace(/^type\s+/, '').replace(/\s+as\s+\w+$/, '')).filter(Boolean) : used)
+    // TypeScript's own parser (HR1's HI-2792 round 1: a regex missed double quotes, indentation and side-effect imports).
+    // Only a file whose text could name a Git module is parsed.
+    if (!MAY_NAME_GIT.test(text)) return out
+    const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    /** The members used through a namespace's name (`wt.createWorktree`), anywhere in the file. */
+    const membersOf = (alias) => {
+      const used = new Set()
+      const visit = (n) => {
+        if (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === alias) used.add(n.name.text)
+        if (ts.isQualifiedName(n) && ts.isIdentifier(n.left) && n.left.text === alias) used.add(n.right.text)
+        ts.forEachChild(n, visit)
+      }
+      visit(sf)
+      return [...used]
     }
-    // A dynamic import: the names destructured from it (`const { a } = await import('./x')`), else the whole module.
-    for (const m of text.matchAll(/(?:\{([^}]*)\}\s*=\s*await\s+)?\bimport\(\s*'([^']+)'\s*\)/g)) add(m[2], m[1] ? m[1].split(',').map((n) => n.trim().replace(/:\s*\w+$/, '')).filter(Boolean) : null)
+    /** The names a module specifier's clause takes: named ones (by their exported name), `default`, a namespace's members; [] for a side effect. */
+    const clauseNames = (clause) => {
+      if (!clause) return []
+      const names = clause.name ? ['default'] : []
+      const b = clause.namedBindings
+      if (b && ts.isNamespaceImport(b)) names.push(...membersOf(b.name.text))
+      else if (b) names.push(...b.elements.map((e) => (e.propertyName ?? e.name).text))
+      return names
+    }
+    const visit = (n) => {
+      if (ts.isImportDeclaration(n) && ts.isStringLiteral(n.moduleSpecifier)) add(n.moduleSpecifier.text, clauseNames(n.importClause))
+      else if (ts.isImportEqualsDeclaration(n) && ts.isExternalModuleReference(n.moduleReference) && ts.isStringLiteral(n.moduleReference.expression)) add(n.moduleReference.expression.text, membersOf(n.name.text))
+      else if (ts.isExportDeclaration(n) && n.moduleSpecifier && ts.isStringLiteral(n.moduleSpecifier)) {
+        const c = n.exportClause
+        add(n.moduleSpecifier.text, !c ? null : ts.isNamespaceExport(c) ? null : c.elements.map((e) => (e.propertyName ?? e.name).text))
+      } else if (ts.isCallExpression(n) && (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === 'require')) && n.arguments.length) {
+        const arg = n.arguments[0]
+        // A dynamic import or require: the names destructured from it (`const { a } = await import('./x')`), else the whole module.
+        let up = n.parent
+        while (up && (ts.isAwaitExpression(up) || ts.isParenthesizedExpression(up))) up = up.parent
+        const bound = up && ts.isVariableDeclaration(up) && ts.isObjectBindingPattern(up.name) ? up.name.elements.map((e) => (e.propertyName && ts.isIdentifier(e.propertyName) ? e.propertyName : e.name).text) : null
+        if (ts.isStringLiteralLike(arg)) add(arg.text, bound)
+        // A specifier the parser can't read (built from pieces) is a hidden loader: named as such, so the audit fails it.
+        else add(`./${HIDDEN}`, null)
+      }
+      ts.forEachChild(n, visit)
+    }
+    visit(sf)
     // Repo paths without the extension (a script's path in the table would read as one it runs: the WorkspaceService rule).
     for (const [module, names] of found) out.push({ file: file.replace(/\.tsx?$/, ''), module, names })
   }
-  return out.sort((a, b) => (a.file + a.module).localeCompare(b.file + b.module))
+  return out
 }
 
 /** The "platform with lines" seams (HI-2792): each call of these lookups, counted per file. */

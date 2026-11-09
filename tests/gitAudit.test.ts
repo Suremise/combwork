@@ -36,6 +36,39 @@ describe('the Git/None cutover audit', () => {
     expect(run({ [file]: `import * as G from './platform/git'\nG.head('x')\n${text(file)}` }).unlisted).toEqual(['src/main/sessions -> src/main/platform/git'])
   })
 
+  it('fails a new Git import however it is written: double quotes, indented, a side effect, a re-export, a require (HR1, round 1)', () => {
+    const file = 'src/main/sessions.ts'
+    const git = ['src/main/sessions -> src/main/git']
+    for (const line of [
+      'import { git } from "./git";',
+      "  import { git } from './git'",
+      "import './git'",
+      'import "./git"',
+      "export { git } from './git'",
+      "export * from './git'",
+      "import type { GitResult } from './git'",
+      "import G = require('./git')",
+      "const g = require('./git')",
+      'const later = () => import("./git")',
+      'const { git: run } = await import("./git")'
+    ]) {
+      expect(run({ [file]: `${line}\n${text(file)}` }).unlisted, line).toEqual(git)
+    }
+  })
+
+  it('fails an import whose specifier is built from pieces (it could load a Git module)', () => {
+    const file = 'src/main/sessions.ts'
+    expect(run({ [file]: `${text(file)}\nconst m = './gi' + 't'\nconst later = () => import(m)\n` }).unlisted).toEqual(['src/main/sessions -> (computed specifier)'])
+  })
+
+  it('takes the names of a double-quoted dynamic import destructured, and fails one beyond the edge', () => {
+    const file = 'src/main/projectFolders.ts'
+    const t = text(file)
+    expect(t).toContain("await import('./unusedWorktrees')")
+    expect(run({ [file]: t.replace("await import('./unusedWorktrees')", 'await import("./unusedWorktrees")') }).extraNames).toEqual([])
+    expect(run({ [file]: t.replace("const { keptText } = await import('./unusedWorktrees')", 'const { keptText, unusedWorktrees } = await import("./unusedWorktrees")') }).extraNames).toEqual(['src/main/projectFolders -> src/main/unusedWorktrees: unusedWorktrees'])
+  })
+
   it('fails a new Git import in a file with none, a dynamic one included', () => {
     const file = 'src/main/diagnostics.ts'
     expect(run({ [file]: `${text(file)}\nconst t = async () => (await import('./gitTool')).gitTool()\n` }).unlisted).toEqual(['src/main/diagnostics -> src/main/gitTool'])
