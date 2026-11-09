@@ -42,18 +42,24 @@ export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env
   // A workspace closing (HI-2779): checks still running for its hosts are dropped, and the hosts in use checked again.
   WorkspaceService.closingListeners.add(() => {
     newGeneration()
-    for (const p of allProviders()) if (p.descriptor.capabilities.githubHost && providerService.info(p.id).found) void providerService.refresh(p.id)
+    // Superseded at once, and checked again (forgetCatalog: a refresh running for the old routes publishes nothing).
+    for (const p of allProviders()) {
+      if (!p.descriptor.capabilities.githubHost) continue
+      providerService.forgetCatalog(p.id)
+      void providerService.refresh(p.id)
+    }
   })
   onGithubHostsChanged((ws, projectPath) => {
     newGeneration()
-    // Nothing of the old hosts' catalogues shows while they are checked again.
+    // A refresh running for the old hosts is superseded now, in this turn, and nothing of their catalogues shows while they
+    // are checked again (the replacement starts once the workspace has read the projects again, below).
     for (const p of allProviders()) if (p.descriptor.capabilities.githubHost) providerService.forgetCatalog(p.id)
     // Checked on the projects as they are now (the change is in project.json: the workspace reads it again first).
     void ws
       .refresh()
       .catch(() => undefined)
       .then(() => {
-        for (const p of allProviders()) if (p.descriptor.capabilities.githubHost && providerService.info(p.id).found) void providerService.refresh(p.id)
+        for (const p of allProviders()) if (p.descriptor.capabilities.githubHost) void providerService.refresh(p.id)
       })
     const root = ws.path?.toLowerCase() ?? ''
     const inScope = (path: string): boolean => (projectPath ? path.toLowerCase() === projectPath.toLowerCase() : !!root && path.toLowerCase().startsWith(root))

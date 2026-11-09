@@ -155,6 +155,44 @@ const logged = () => (fs.existsSync(fakeLog) ? fs.readFileSync(fakeLog, 'utf8').
     check('the enterprise project’s host (no sign-in there) has no catalogue, not the tenant’s', !!routeOf(enterprise) && routeOf(enterprise) !== routeOf(ws) && !info.hostCatalogs?.[routeOf(enterprise)], JSON.stringify(info.hostRouteOf))
     await setup.locator('button', { hasText: 'Close' }).last().click()
 
+    // --- The rendered picker, opened for a project (HR2's round 2): Add Agent → New Connection… on Copilot's account, in
+    // alpha (tenant.ghe.com: its listing, gpt-5 offered, claude-sonnet-5.5 listed apart as unavailable) and in enterprise
+    // (Copilot on github.com, no sign-in there: no listing, so the fallback list, with no tenant model marked unavailable).
+    const view = await inv('connections:list')
+    const copilotAccount = [...view.connections, ...view.homes].find((a) => a.provider === 'copilot')
+    // Combwork's own accounts are turned on per workspace; Copilot's is the PC's own home (decision C), on as it is.
+    if (copilotAccount && view.connections.some((a) => a.id === copilotAccount.id)) await inv('connections:setOn', copilotAccount.id, true)
+    const copilotRow = (await inv('connections:list')).connectionRows.find((r) => r.account === copilotAccount?.id)
+    check('Copilot has an account and a connection to choose', !!copilotAccount && !!copilotRow, JSON.stringify({ account: copilotAccount?.id, row: copilotRow?.id }))
+    const pickerFor = async (project) => {
+      await page.getByText(project, { exact: true }).first().click()
+      // The Add menu is the Session tab's.
+      await page.locator('.tabs .tab', { hasText: 'Session' }).first().click()
+      await lib.addMenuRun(page, 'Configure Agent and Add…')
+      const add = page.locator('.dialog', { hasText: 'Add an agent' })
+      const select = add.locator('#add-agent-connection')
+      await lib.until(async () => (await select.count()) === 1, HUNG_MS)
+      await select.selectOption(copilotRow.id)
+      await add.locator('[data-new-connection]').click()
+      const form = page.locator('[data-connection-form]')
+      await form.waitFor({ timeout: HUNG_MS })
+      const groups = await form.locator('.model-picker select').first().locator('optgroup').evaluateAll((gs) => gs.map((g) => ({ label: g.label, models: [...g.querySelectorAll('option')].map((o) => ({ value: o.value, disabled: o.disabled })) })))
+      await shot(`picker-${project}`, form)
+      await page.locator('.dialog').last().getByRole('button', { name: 'Cancel' }).click()
+      await form.waitFor({ state: 'detached', timeout: HUNG_MS })
+      await add.getByRole('button', { name: 'Cancel', exact: true }).click()
+      await lib.until(async () => (await add.count()) === 0, HUNG_MS)
+      return groups
+    }
+    if (copilotRow) {
+      const tenantGroups = await pickerFor('alpha')
+      const offered = tenantGroups.filter((g) => !/Not available/.test(g.label)).flatMap((g) => g.models.map((m) => m.value))
+      const unavailable = tenantGroups.filter((g) => /Not available/.test(g.label)).flatMap((g) => g.models.map((m) => m.value))
+      check('alpha’s New Connection… picker: tenant.ghe.com’s listing (gpt-5 offered, claude-sonnet-5.5 unavailable to the account)', JSON.stringify(offered) === JSON.stringify(['gpt-5']) && JSON.stringify(unavailable) === JSON.stringify(['claude-sonnet-5.5']), JSON.stringify(tenantGroups))
+      const enterpriseGroups = await pickerFor('enterprise')
+      check('enterprise’s picker: its own host has no listing, so the fallback list, never the tenant’s (nothing marked unavailable)', enterpriseGroups.length > 0 && !enterpriseGroups.some((g) => /Not available/.test(g.label)) && JSON.stringify(enterpriseGroups) !== JSON.stringify(tenantGroups), JSON.stringify(enterpriseGroups))
+    }
+
     // --- Settings → Version Control → Workspace defaults → GitHub.
     await page.keyboard.press('Control+,')
     const nav = page.locator('.settings-nav .row', { hasText: 'Version Control' }).first()

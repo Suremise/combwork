@@ -118,13 +118,15 @@ class ProviderService {
   }
 
   /**
-   * Drops what a provider's catalogue was read in before a change of its context (HI-2779: a GitHub host changed): its
-   * catalogue and its hosts' catalogues go, so nothing shows another host's list while it is checked again.
+   * A change of a provider's context (HI-2779: a GitHub host changed, a workspace closed): a refresh still running for
+   * the old one is superseded at once, in this call (its result, a failure's restoring included, is dropped where it would
+   * publish), and its catalogue and its hosts' catalogues go, so nothing shows another host's list. The caller starts the
+   * refresh that replaces it.
    */
   forgetCatalog(id: ProviderId): void {
+    this.refreshes.set(id, (this.refreshes.get(id) ?? 0) + 1)
     const cur = this.info(id)
-    if (!cur.catalog && !cur.hostCatalogs) return
-    this.set(id, { ...cur, catalog: null, hostCatalogs: {}, defaultModel: this.resolveDefaultModel(id, null) })
+    this.set(id, { ...cur, catalog: null, hostCatalogs: {}, hostRouteOf: {}, defaultModel: this.resolveDefaultModel(id, null) })
   }
 
   /** Records the model seen answering in a session started without a model choice. */

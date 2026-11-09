@@ -176,7 +176,7 @@ export function ModeMenuHost() {
   return (
     <>
       {menu && project && settings && a && <ContextMenu x={menu.x} y={menu.y} above={menu.above} items={menuItems(project, a, settings, view, (account, connection) => setEditing({ account, connection }))} onClose={() => set({ modeMenu: null })} />}
-      {editing && <ConnectionDialog account={editing.account} connection={editing.connection} onClose={() => setEditing(null)} />}
+      {editing && <ConnectionDialog account={editing.account} connection={editing.connection} projectPath={project?.path ?? null} onClose={() => setEditing(null)} />}
     </>
   )
 }

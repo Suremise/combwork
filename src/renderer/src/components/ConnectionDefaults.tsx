@@ -99,7 +99,7 @@ export function effortUnusableText(c: Pick<Connection, 'model' | 'effort'>, cli:
  * server's), Permission mode and Extra arguments. `connection` given: it is edited; else one is added on `account`.
  * Saving changes it for everything that uses it: running agents on it are offered Restart, or Switch Now for a mode.
  */
-export function ConnectionDialog({ account: accountId, connection: id, onClose }: { account: string; connection?: string; onClose: (saved?: Connection) => void }) {
+export function ConnectionDialog({ account: accountId, connection: id, projectPath = null, onClose }: { account: string; connection?: string; projectPath?: string | null; onClose: (saved?: Connection) => void }) {
   const settings = useStore((s) => s.settings)
   const [view, setView] = useState<ConnectionsView | null>(null)
   useEffect(() => {
@@ -121,14 +121,14 @@ export function ConnectionDialog({ account: accountId, connection: id, onClose }
       </Modal>
     )
   }
-  return <ConnectionForm account={account} row={row} settings={settings} onClose={onClose} />
+  return <ConnectionForm account={account} row={row} settings={settings} projectPath={projectPath} onClose={onClose} />
 }
 
 /** Under a mode choice: the provider's warning when it may not run that mode with that model (as the CLI says, #125). */
-function ModeCaveat({ provider, mode, model }: { provider: ProviderId; mode: string | null | undefined; model: string | null | undefined }) {
-  // The open workspace's GitHub host's models (HI-2779), for a CLI signing in on one.
+function ModeCaveat({ provider, mode, model, projectPath = null }: { provider: ProviderId; mode: string | null | undefined; model: string | null | undefined; projectPath?: string | null }) {
+  // The GitHub host's models (HI-2779): the project's it was opened for, else the open workspace's.
   const workspacePath = useStore((s) => s.workspace?.path ?? null)
-  const info = infoAt(useStore((s) => s.providers[provider]), { workspacePath })
+  const info = infoAt(useStore((s) => s.providers[provider]), { projectPath, workspacePath })
   const settings = useStore((s) => s.settings)
   useLanguage()
   const caps = modelCaps(provider, model, info, settings)
@@ -141,12 +141,14 @@ function ModeCaveat({ provider, mode, model }: { provider: ProviderId; mode: str
   )
 }
 
-function ConnectionForm({ account: a, row, settings, onClose }: { account: Account; row: ConnectionRow | undefined; settings: AppSettings | null; onClose: (saved?: Connection) => void }) {
+function ConnectionForm({ account: a, row, settings, projectPath, onClose }: { account: Account; row: ConnectionRow | undefined; settings: AppSettings | null; projectPath: string | null; onClose: (saved?: Connection) => void }) {
   const cli = a.provider
   const p = providerDescriptor(cli)
   const server = isServer(a)
+  // The models of the GitHub host (HI-2779) of the project it was opened for (an agent's dialogs), else the open workspace's
+  // (Settings → Accounts & Connections): a connection is the workspace's, but the agent choosing it runs on its project's host.
   const workspacePath = useStore((s) => s.workspace?.path ?? null)
-  const info = infoAt(useStore((s) => s.providers[cli]), { workspacePath })
+  const info = infoAt(useStore((s) => s.providers[cli]), { projectPath, workspacePath })
   const [name, setName] = useState(row?.name ?? '')
   const [model, setModel] = useState(row?.model ?? '')
   const [effort, setEffort] = useState<string>(row?.effort ?? '')
@@ -214,11 +216,11 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
           <div className="hint">{tr(M.tagHint)}</div>
         </div>
         <label>{tr(M.model)}</label>
-        <ModelPicker provider={cli} connection={a} value={model} base={{ value: '', label: cliModel ? tr(M.cliDefaultIs, { provider: server ? a.name : p.name, which: server ? cliModel : modelLabel(cliModel, cli) }) : tr(M.cliDefault, { provider: server ? a.name : p.name }) }} onChange={setModel} />
+        <ModelPicker provider={cli} connection={a} projectPath={projectPath} value={model} base={{ value: '', label: cliModel ? tr(M.cliDefaultIs, { provider: server ? a.name : p.name, which: server ? cliModel : modelLabel(cliModel, cli) }) : tr(M.cliDefault, { provider: server ? a.name : p.name }) }} onChange={setModel} />
         {!server && (
           <>
             <label>{tr(M.effort)}</label>
-            <EffortPicker provider={cli} connection={a} model={runModel} value={effort} base={{ value: '', label: defEffort ? tr(M.cliDefaultIs, { provider: p.name, which: effortName(cli, defEffort, settings ?? undefined, tr) }) : tr(M.cliDefault, { provider: p.name }) }} onChange={setEffort} />
+            <EffortPicker provider={cli} connection={a} projectPath={projectPath} model={runModel} value={effort} base={{ value: '', label: defEffort ? tr(M.cliDefaultIs, { provider: p.name, which: effortName(cli, defEffort, settings ?? undefined, tr) }) : tr(M.cliDefault, { provider: p.name }) }} onChange={setEffort} />
           </>
         )}
         {!server && p.capabilities.contextLimit && (
@@ -241,7 +243,7 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
             ))}
           </select>
           {/* A mode the model that would run may not take (Claude Code's Auto with Haiku, #129): said under it (HI-2145). */}
-          <ModeCaveat provider={cli} mode={mode || p.defaultPermissionMode} model={runModel} />
+          <ModeCaveat provider={cli} mode={mode || p.defaultPermissionMode} model={runModel} projectPath={projectPath} />
         </div>
         <label htmlFor="connection-args">{tr(M.args)}</label>
         <div>
