@@ -78,6 +78,12 @@ const w = (f, s) => {
     await inv('mcp:add', alpha, 'given_tool', { def: shown.def, revision: shown.revision })
     const live = async (agentId) => (await inv('session:live')).find((s) => s.agentId === agentId && s.status !== 'stopped') ?? null
     const agent = await lib.addAgent(inv, alpha, { name: 'Oc', provider: 'opencode' })
+    // The workspace's OpenCode CLI file (HI-2764) with one text of Combwork's guidance changed: every OpenCode agent's.
+    const MARK = 'OC-DIALECT-MARK: put scratch files in a temp folder, never in the project.'
+    const cliFile = path.join(ws, '.combwork', 'dialects', 'opencode', 'cli.json')
+    await lib.until(async () => fs.existsSync(cliFile), HUNG_MS)
+    fs.writeFileSync(cliFile, JSON.stringify({ name: 'OpenCode', texts: { 'contract.agent.scratch': { text: MARK, why: 'HI-2764: a test of the OpenCode CLI file' } } }, null, 2))
+    const agentNow = async () => (await inv('workspace:refresh')).projects.find((x) => x.name === 'alpha').agents.find((x) => x.id === agent.id)
     const account = await inv('connections:add', 'opencode', 'OpenCode · Local')
     await inv('connections:setOn', account.id, true)
     const conn = (await inv('connections:list')).connectionRows.find((c) => c.account === account.id) ?? (await inv('connection:add', account.id, { name: 'Test · OpenCode' }))
@@ -93,6 +99,8 @@ const w = (f, s) => {
       const written = configDir ? JSON.parse(fs.readFileSync(path.join(configDir, 'opencode.json'), 'utf8')) : null
       const guidance = configDir && fs.existsSync(path.join(configDir, 'AGENTS.md')) ? fs.readFileSync(path.join(configDir, 'AGENTS.md'), 'utf8') : ''
       const skills = lines().slice(from).filter((e) => e.pid === serve?.pid && e.kind === 'skill').map((e) => e.path)
+      await lib.until(async () => await live(agent.id), HUNG_MS)
+      const launched = (await lib.until(async () => (await agentNow())?.live?.launched ?? null, HUNG_MS)) ?? null
       let after = []
       if (typed) {
         await lib.until(async () => await live(agent.id), HUNG_MS)
@@ -107,7 +115,7 @@ const w = (f, s) => {
       await inv('session:stop', alpha, agent.id)
       await lib.until(async () => !(await live(agent.id)), HUNG_MS)
       check(`${label}: it launched`, !!serve && !!mcp, JSON.stringify({ serve: !!serve, mcp }))
-      return { serve, mcp, written, guidance, skills, configDir, after }
+      return { serve, mcp, written, guidance, skills, configDir, after, launched }
     }
     const mcpRules = (c) => (c?.policies ?? []).filter((p) => p.action === 'mcp.use')
 
@@ -121,6 +129,11 @@ const w = (f, s) => {
     check('…every server denied but those given', JSON.stringify(rules[0]) === JSON.stringify({ action: 'mcp.use', resource: '*', effect: 'deny' }) && rules.slice(1).map((r) => `${r.resource}:${r.effect}`).sort().join() === 'combwork:allow,given_tool:allow', JSON.stringify(managed.written?.policies))
     check("…Combwork's skills in its private config folder's skills, offered to the model", managed.skills.length > 0 && managed.skills.every((p) => under(p, path.join(managed.configDir, 'skills'))), JSON.stringify(managed.skills))
     check("…Combwork's guidance in that folder's AGENTS.md", /cw_inbox/.test(managed.guidance), managed.guidance.slice(0, 200))
+    // HI-2764: the OpenCode CLI file is in its chain, and its changed text is what the agent was told.
+    const layers = managed.launched?.dialect?.layers ?? []
+    check("…its launch record's dialect chain has the workspace's OpenCode CLI file", layers.some((l) => l.layer === 'cli' && l.file === 'opencode/cli.json') && /^[0-9a-f]{16}$/.test(managed.launched?.dialect?.hash ?? ''), JSON.stringify(managed.launched?.dialect))
+    check('…and the text changed in it is in the guidance it was given, in place of the Default', managed.guidance.includes(MARK) && !managed.guidance.includes('Put scratch, probes and logs in a temp folder'), managed.guidance.slice(0, 600))
+    check("…its Combwork server given that chain's file (CW_DIALECT_FILE), as its shell is", !!managed.written?.mcp?.servers?.combwork?.environment?.CW_DIALECT_FILE && managed.serve?.env?.CW_DIALECT_FILE === managed.written.mcp.servers.combwork.environment.CW_DIALECT_FILE, JSON.stringify({ server: managed.written?.mcp?.servers?.combwork?.environment?.CW_DIALECT_FILE, shell: managed.serve?.env?.CW_DIALECT_FILE }))
     managed = await launch('managed, used', `skill ${skillName} then cw cw_inbox {}`)
     const skillCall = managed.after.find((e) => e.kind === 'skill-tool')
     check("…a skill loaded with OpenCode's skill tool, by its id", !!skillCall && skillCall.id === skillName && skillCall.found === true, JSON.stringify(skillCall))
