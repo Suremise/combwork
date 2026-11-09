@@ -67,6 +67,7 @@
   "shell.command.help.restoreBoard09": "Przywróć kopię zapasową tablicy z 0.9…",
   "shell.command.help.shortcuts": "Skróty klawiszowe",
   "shell.command.help.tips": "Wskazówki…",
+  "shell.command.hooks.adminSnippet": "Fragment dla administratora Claude Code…",
   "shell.command.layout": "Układ: {layout}",
   "shell.command.mcp.import": "Skopiuj serwery MCP projektu do obszaru roboczego",
   "shell.command.notes.open": "Otwórz notatkę wspólną",

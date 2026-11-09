@@ -208,6 +208,11 @@
     "note": "Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.",
     "audience": "both"
   },
+  "providers.readiness.updateStayed": {
+    "text": "{provider} stayed on {version} after updating to {offered}: an organisation's policy may set its version or channel, or the update didn't take. Check again later, or update again.",
+    "note": "Provider Setup and Settings → Providers: the coding agent was updated but is still on its old version (HI-2777). {provider} is its name, {version} the version it stayed on, {offered} the one offered. \"Check again\" and \"update\" name the buttons beside it.",
+    "audience": "both"
+  },
   "providers.settings.hooksOff": {
     "text": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Combwork's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Combwork doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
     "note": "Starting a Claude Code agent is refused: its settings turn Claude Code's hooks off. {source} is inline (settings written in the argument itself) or file; {file} is the file's path as the user wrote it. Keep --settings, disableAllHooks and the setting names as they are; \"Agent Settings\" and \"Settings → Claude Code\" are where to change it, as Combwork shows them.",

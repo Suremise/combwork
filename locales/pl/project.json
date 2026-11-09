@@ -9,6 +9,7 @@
   "project.agents.settings": "Ustawienia agenta…",
   "project.agents.turnedOff": "{provider} jest wyłączony w Ustawienia → Dostawcy",
   "project.apply.new": "{live, select, yes {Zmiany dotyczą nowych sesji – uruchom ponownie działającą sesję, aby je zastosować.} other {Zmiany dotyczą nowych sesji.}}",
+  "project.banner.adminSnippet": "Fragment dla administratora…",
   "project.banner.change": "Zmień",
   "project.banner.chooseInSettings": "Wybierz w Ustawieniach",
   "project.banner.connectionSetup": "W tym obszarze roboczym nie jest włączone żadne konto {cli}, więc agenci tego projektu nie mogą się uruchomić. Dodaj konto i je zaloguj.",

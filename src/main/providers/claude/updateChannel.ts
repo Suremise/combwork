@@ -1,4 +1,5 @@
 import { join } from 'path'
+import { app } from 'electron'
 import { readdir, readFile } from 'original-fs/promises'
 import { advanced } from '../../advanced'
 import { run } from '../common'
@@ -49,6 +50,36 @@ export async function resolveUpdateChannel(sources: ChannelSources, field: strin
   if (user.state === 'unreadable') return null
   const own = user.state === 'read' ? channelOf(user.settings[field]) : undefined
   return own === undefined ? 'latest' : own
+}
+
+/** A managed source Claude Code uses, by where it is (HI-2777: what a hooks warning names). */
+export type AdminSourceKind = 'hklm' | 'file' | 'hkcu'
+
+/**
+ * The managed sources Claude Code uses from those on this PC, highest first (its docs' "How Claude Code combines managed
+ * sources"): the first admin source holding a policy (HKLM, then the file with its drop-ins), alone, or with the ones
+ * below it when it asks for "merge"; with none, HKCU. Null when that can't be told (one it would use can't be read).
+ * Server-managed settings, above them all, aren't on this PC: when an organisation has them, these aren't used.
+ */
+export async function usedAdminSources(sources: Pick<ChannelSources, 'hklm' | 'files' | 'hkcu'>): Promise<{ kind: AdminSourceKind; settings: Record<string, unknown> }[] | null> {
+  const admin: [AdminSourceKind, ManagedDoc][] = [
+    ['hklm', await sources.hklm()],
+    ['file', await sources.files()]
+  ]
+  const at = admin.findIndex(([, d]) => present(d))
+  if (at < 0) {
+    const hkcu = await sources.hkcu()
+    return hkcu.state === 'read' && hasPolicy(hkcu) ? [{ kind: 'hkcu', settings: hkcu.settings }] : []
+  }
+  const [kind, selected] = admin[at]
+  if (selected.state !== 'read') return null
+  if (selected.settings.managedSourcesBehavior !== 'merge') return [{ kind, settings: selected.settings }]
+  const out: { kind: AdminSourceKind; settings: Record<string, unknown> }[] = []
+  for (const [k, d] of admin.slice(at)) {
+    if (d.state === 'unreadable') return null
+    if (d.state === 'read') out.push({ kind: k, settings: d.settings })
+  }
+  return out
 }
 
 async function managedChannel(admin: ManagedDoc[], sources: ChannelSources, field: string): Promise<UpdateChannel | null | undefined> {
@@ -143,14 +174,28 @@ async function registryDoc(key: string, runFn: typeof run): Promise<ManagedDoc> 
   return parent.code === 0 && !parent.ended && !listsSubkey(parent.stdout, key.slice(at + 1)) ? { state: 'absent' } : { state: 'unreadable' }
 }
 
+/**
+ * A test's own managed settings folder (HI-2777: CW_TEST_CLAUDE_MANAGED_DIR, unpackaged builds only), read in place of
+ * Program Files' and with no registry policy, so tests never depend on or touch the PC's own. Null otherwise.
+ */
+export function testManagedDir(): string | null {
+  return (!app.isPackaged && process.env.CW_TEST_CLAUDE_MANAGED_DIR) || null
+}
+
+/** The folder of Claude Code's managed settings file (managed-settings.json and managed-settings.d). */
+export function claudeManagedDir(programFiles = process.env.ProgramFiles || 'C:\\Program Files'): string {
+  return testManagedDir() ?? join(programFiles, 'ClaudeCode')
+}
+
 /** The sources on this PC: Windows' managed locations, and the user's settings in `home`. */
 export function windowsChannelSources(home: string, runFn: typeof run = run, programFiles = process.env.ProgramFiles || 'C:\\Program Files', platform: NodeJS.Platform = process.platform): ChannelSources {
   const win = platform === 'win32'
   const none = async (): Promise<ManagedDoc> => ({ state: 'absent' })
+  const test = testManagedDir()
   return {
-    hklm: win ? () => registryDoc('HKLM\\SOFTWARE\\Policies\\ClaudeCode', runFn) : none,
-    files: win ? () => managedFiles(join(programFiles, 'ClaudeCode')) : none,
-    hkcu: win ? () => registryDoc('HKCU\\SOFTWARE\\Policies\\ClaudeCode', runFn) : none,
+    hklm: win && !test ? () => registryDoc('HKLM\\SOFTWARE\\Policies\\ClaudeCode', runFn) : none,
+    files: win ? () => managedFiles(test ?? join(programFiles, 'ClaudeCode')) : none,
+    hkcu: win && !test ? () => registryDoc('HKCU\\SOFTWARE\\Policies\\ClaudeCode', runFn) : none,
     user: () => jsonDoc(join(home, 'settings.json'))
   }
 }

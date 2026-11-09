@@ -112,6 +112,7 @@
   "session.newConversation.pending": "CLIがまだ受け取っていないプロンプトを渡したばかりです。",
   "session.notice.finished": "{agent}：完了",
   "session.notice.finishedBody": "エージェントが作業を終えました。",
+  "session.notice.hooksDoubledTitle": "{agent}のフックが2回ずつ届いています",
   "session.notice.hooksMissingTitle": "Combworkに{agent}のフックが届いていません",
   "session.notice.lineLost": "送信される前に、CLIの画面がこの行を受け取ってしまいました。まだ必要なら、もう一度送ってください：{text}",
   "session.notice.lineLostTitle": "{agent}はCombworkが入力した行を受け取れませんでした",

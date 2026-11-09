@@ -51,6 +51,9 @@ interface CombworkMessageValues {
   'providers.claude.localLimits.oursOutput': { connection: string | number }
   'providers.claude.localLimits.outputNotBelow': { agent: string | number; output: number; outputFrom: string | number; context: number; contextFrom: string | number }
   'providers.claude.localLimits.tooSmall': { agent: string | number; context: number; contextFrom: string | number }
+  'providers.claude.policy.file': undefined
+  'providers.claude.policy.hkcu': undefined
+  'providers.claude.policy.hklm': undefined
   'providers.cmdTooLong': { file: string | number; max: number; length: number }
   'providers.codex.connections.setUp': undefined
   'providers.codex.developerUnread.agentMessage': undefined
@@ -122,6 +125,7 @@ interface CombworkMessageValues {
   'providers.readiness.notInstalled': { provider: string | number }
   'providers.readiness.signedOut': { provider: string | number }
   'providers.readiness.update': { provider: string | number; version: string | number }
+  'providers.readiness.updateStayed': { provider: string | number; version: string | number; offered: string | number }
   'providers.settings.hooksOff': { source: string; file: string | number }
   'providers.settings.noFile': undefined
   'providers.settings.noValue': undefined

@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, LaunchedLimits, LaunchedPicker, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, ServerModel, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, HookCause, CatalogModel, EffortLevel, LaunchedLimits, LaunchedPicker, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, ServerModel, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
@@ -63,6 +63,12 @@ export interface LaunchContext {
   extraArgs: string[]
   /** Hook endpoint for this launch, with its run id (…/hook?run=<runId>). */
   hookUrl: string
+  /**
+   * The fixed hook URL on Combwork's Agent API port (HI-2777: …/hook, the run told by its token), or null while the Agent
+   * API isn't listening. Claude Code's hooks post here, identical to the admin snippet's, so a session given both runs
+   * each once. It is the launch's CW_HOOK_URL too (hookUrl's server, without the run, when null).
+   */
+  fixedHookUrl?: string | null
   /**
    * The file holding this launch's hook Authorization header, for hook commands (`curl -H @<file>`): in Combwork's user
    * data, never the project, so no generated file holds the token (#345). HTTP hooks read `CW_HOOK_TOKEN` instead.
@@ -667,6 +673,17 @@ export interface ProviderAdapter {
    * never changed: the settings' name in the window's language, or null when none does (or Combwork can't tell).
    */
   hooksOffIn?(ctx: LaunchContext): string | null
+  /**
+   * What on the PC would keep Combwork's hooks from the launch's sessions (HI-2777), read once at launch, never changed:
+   * a setting and where it was found, or null when nothing local does. Absent: hooksOffIn alone says.
+   */
+  hookCause?(ctx: LaunchContext): Promise<HookCause | null>
+  /**
+   * A hook's occurrence identity (HI-2777), where the CLI gives one: its own id for one tool call or one prompt, so a
+   * delivery of it that arrives twice (two differing handlers run) is handled once. Null for a hook without one, which
+   * is never matched. Absent: no hook is.
+   */
+  hookOccurrence?(body: Record<string, any>): string | null
   /**
    * The launch's hooks for its Hooks dialog (HI-982), once its command is built: Combwork's own as passed for it, and the CLI's
    * others as far as this provider can establish them. Read-only, never changing a hook or a CLI's config. Absent: the

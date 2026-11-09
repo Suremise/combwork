@@ -6,7 +6,8 @@ import { modeInEffect } from '@shared/cliOwnMode'
 import { agentsToResume, stalledOnSignIn } from '@shared/resumeAll'
 import { batchCounts } from '@shared/startAll'
 import { ONE_AGENT_TEXT, oneAgentEntries, oneAgentMore } from '../oneAgentMenu'
-import { hooksMissingNote } from '@shared/runtime'
+import { HOOKS_DOUBLED_NOTE, hooksMissingNote } from '@shared/runtime'
+import { providerDescriptor } from '@shared/providers'
 import { MAIN_TABS, MORE_TABS, tabCommand } from '@shared/projectTabs'
 import { allStopped, mostUrgent, projectAgentStates, projectStateShort, projectStateSummary } from '@shared/agentState'
 import { fmt, msg, tr, tRich } from '@shared/i18n'
@@ -93,6 +94,7 @@ const M = {
   switchFailed: msg({ id: 'project.banner.switchFailed', defaultMessage: "Couldn't arrange the restart", description: "An error's title: Restart When Its Turn Is Over failed." }),
   restartNeeded: msg({ id: 'project.banner.restartNeeded', defaultMessage: "Skills, MCP servers, dialects or settings changed since {many, select, yes {{agent}'s} other {this}} session started. Restart the session to apply them — the conversation continues.", description: "Banner over a running session whose skills, MCP servers, dialect files (HI-2444) or settings changed. {agent} is the focused agent's name (when there are several)." }),
   restart: msg({ id: 'project.banner.restart', defaultMessage: 'Restart session', description: 'Button in that banner.' }),
+  adminSnippet: msg({ id: 'project.banner.adminSnippet', defaultMessage: 'Admin snippet…', description: "Button in the banner saying an agent's hooks don't reach Combwork (or arrive twice): opens the admin snippet, a block of Claude Code settings an organisation's administrator pastes into its managed settings. The … says it opens a dialog: keep it." }),
   unmanagedMcp: msg({ id: 'project.banner.unmanagedMcp', defaultMessage: 'This project defines MCP servers that are not in the workspace: <b>{names}</b>. They stay disabled until copied to the workspace.', description: 'Banner of a project with MCP servers of its own. {names} is their names. <b> is bold.' }),
   copyToWorkspace: msg({ id: 'project.banner.copyToWorkspace', defaultMessage: 'Copy to workspace', description: "Button: copies the project's own MCP servers to the workspace." }),
   dangerous: msg({ id: 'project.banner.dangerous', defaultMessage: '{modes} {count, plural, one {is} other {are}} on in this project: the agent runs every command and edit without asking.', description: 'Banner when an agent of the project runs in a permission mode that never asks. {modes} names the modes (with the agents when there are several).' }),
@@ -655,8 +657,22 @@ export function ProjectView({ visible }: { visible: boolean }) {
       {live?.hooksMissing && (
         <div className="banner warn hooks-missing">
           <Icon name="warning" /> {hooksMissingNote(live, tr)}
+          {live.hooksMissing.snippet && (
+            <button className="btn small" onClick={() => set({ adminSnippetOpen: true })}>
+              {tr(M.adminSnippet)}
+            </button>
+          )}
           <button className="btn small primary" onClick={() => void restart()}>
             {tr(M.restart)}
+          </button>
+        </div>
+      )}
+      {/* Its hooks arrive twice (HI-2777): an admin snippet that no longer matches Combwork's own handlers. */}
+      {live?.hooksDoubled && !live.hooksMissing && (
+        <div className="banner warn hooks-doubled">
+          <Icon name="warning" /> {tr(HOOKS_DOUBLED_NOTE, { provider: providerDescriptor(live.provider).name })}
+          <button className="btn small" onClick={() => set({ adminSnippetOpen: true })}>
+            {tr(M.adminSnippet)}
           </button>
         </div>
       )}

@@ -545,6 +545,220 @@ Combwork only ever ends processes the agent's session started: never one you sta
 - **From the Progress panel**: a run's details have **Show in Activity**, for the agent that ran it, and a lane's right-click menu has **Show in Activity**, for its builder and reviewer.
 - It reads nothing while it isn't shown or the window is minimised, and only the projects with an agent running.
 
+### Claude Code under an organisation's policy <a id="claude-code-managed-policy"></a>
+
+An organisation can manage Claude Code's settings for its users: in its admin console (Claude Code's *server-managed settings*, fetched when Claude Code signs in), in `C:\Program Files\ClaudeCode\managed-settings.json`, or in the registry (`HKLM\SOFTWARE\Policies\ClaudeCode`). Those settings come before anything Combwork passes. Three of them change what Combwork can do:
+
+- **`allowManagedHooksOnly`**: only hooks the organisation manages run. Combwork's own hooks don't, so Combwork can't tell what its agents are doing, can't hold file locks, and can't give an agent its messages. Its status line goes too (the policy allows only a managed one), and with it the agent's cost, plan limits, model and effort.
+- **`allowManagedPermissionRulesOnly`**: only the organisation's permission rules count. Combwork passes none of its own to agents: the one thing it relies on is pre-approving the Combwork Assistant's Combwork tools (`--allowedTools`). Under this policy the Assistant asks before each of its tool calls, no agent gets **always allow** in a permission prompt, and your own allow rules stop applying: expect more prompts. An agent waiting on a prompt shows as needing you, as always. If the organisation wants the Assistant's tools pre-approved, its admin can add rules such as `mcp__combwork__cw_list_tasks` to the managed `permissions.allow`; they aren't in Combwork's snippet, which never approves more than your **Settings → Assistant → Control** does.
+- **The update channel or version** (`autoUpdatesChannel`, `minimumVersion`, `requiredMaximumVersion`). If an update Combwork ran for Claude Code ends with the version where it was, or a later check finds an older version than the last (a session's updater put it back), Provider Setup says *Claude Code stayed on 2.1.311 after updating to 2.1.319: an organisation's policy may set its version or channel, or the update didn't take*. **Update** stays there; the note goes when the version changes, or after a day.
+
+**When an agent's hooks don't arrive**, the banner over its panes says what Combwork found on this computer: the setting and where it is (*Combwork found allowManagedHooksOnly in Claude Code's managed settings file…*). It can only read what is on the computer: an organisation's server-managed settings, if it has any, decide over it. When nothing on the computer explains hooks missing from a session's start, the banner says an organisation's remote policy may. Where the snippet would help, the banner has **Admin snippet…**.
+
+#### The admin snippet <a id="claude-code-admin-snippet"></a>
+
+**Admin snippet…** (on the banner, or **Claude Code Admin Snippet…** in the command palette) shows a block of Claude Code settings for the organisation's administrator to paste into its managed settings once. It gives Claude Code Combwork's hooks, and Combwork's status line, for every session, every account and every project on the computer, without working around the policy:
+
+- It holds no password or token. Each hook carries the token of the session it comes from, which only Combwork's own sessions have; Combwork takes nothing without it.
+- In a session Combwork didn't start, its hooks send nothing (the SessionStart hook and the status line), or are answered without anything happening (the others).
+- Its hooks post to `http://127.0.0.1:<port>/hook`, Combwork's **Agent API** port (47821 for the installed app; Settings → Agent API). If that port changes, the administrator pastes a new snippet: Combwork says so if a session's other hooks stop while its SessionStart still arrives. A development build of Combwork (47822) needs its own hooks too: tick **Also for a development build** in the dialog.
+- Its status line replaces any status line the organisation's managed settings set, in every Claude Code session on the computer, and shows nothing. Untick it in the dialog to leave it out; Combwork then can't show cost, plan limits, model or effort.
+- If the managed settings set **`allowedHttpHookUrls`**, add `http://127.0.0.1:47821/hook*` to it; if they set **`httpHookAllowedEnvVars`**, add `CW_HOOK_TOKEN`.
+- Combwork's own hooks are the snippet's, handler for handler, so where the policy doesn't allow only managed hooks, Claude Code runs each once. If they differ (a hook timeout changed in Settings → Advanced after the snippet was pasted, or an older snippet), Claude Code runs both: Combwork takes each tool call and prompt once, other hooks may count twice, and a banner asks for the snippet to be pasted again.
+
+The dialog fills in your port and your hook timeouts. For port 47821 and the default timeouts it is:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQAiAAoAZQB4AGkAdAAgADAA",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 10,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQA/AHMAdABhAHQAdQBzAGwAaQBuAGUAIgAKAGUAeABpAHQAIAAwAA==",
+    "padding": 0
+  }
+}
+```
+
+Its SessionStart hook and status line run one PowerShell command, encoded so Git Bash and PowerShell (the shells Claude Code runs hooks in) pass it alike. Decoded, it is:
+
+```powershell
+$ProgressPreference='SilentlyContinue'
+$u=$env:CW_HOOK_URL; $a=$env:CW_HOOK_AUTH_FILE
+if (-not $u -or -not $a) { exit 0 }
+Set-Location -LiteralPath (Split-Path -LiteralPath $a)
+curl.exe -s -m 5 -X POST -H "@$(Split-Path $a -Leaf)" -H "Content-Type: application/json" --data-binary "@-" "$($u)"
+exit 0
+```
+
+`CW_HOOK_URL` and `CW_HOOK_AUTH_FILE` are set by Combwork for each session it starts. The auth file is in Combwork's own data, not the project, and goes when the session ends.
+
 ### Reading past sessions <a id="reading-past-sessions"></a>
 
 The **Sessions** tab shows every session of the project on the left as a tree, like the Files tab: by **provider** (Claude Code, Codex), then by **agent**, then the sessions themselves, newest first, with when each was last used, its context size and the size of its transcript file (amber past **Settings → Sessions → Warn when a transcript is over**, with a tip to hand it over to a new conversation; **—** when the CLI no longer has the file). Sessions started outside Combwork (in VS Code or a terminal) and adopted ones go under **Not from an agent**; started outside Combwork, they show as *external*: **Adopt** them to manage them in Combwork. A session keeps its own agent: if you remove an agent and add another with the same name, the old sessions stay under **Coder (removed)** (or **Removed agent**, for sessions from before Combwork kept agents' names). Each session says where it ran, such as **Project folder** or **Worktree · cw/reviewer** (hover for the full folder), and the **Ran in** line over its transcript names the agent too. **Resume in …** says which agent would resume it now, and its ▾ menu shows where each agent works. Tick **Archived** to include archived sessions. On a busy machine with many sessions, the tab shows Combwork's own sessions first, with *Looking for sessions started outside Combwork…* above them until the rest are found.
