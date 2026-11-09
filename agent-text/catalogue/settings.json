@@ -2710,8 +2710,8 @@
     "audience": "both"
   },
   "settings.advanced.opencode.override.keepProjectConfigOut.desc": {
-    "text": "Combwork runs OpenCode with OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1, so a project's own opencode.json and .opencode folder (its MCP servers, plugins and agents), a config in a folder above it, and Claude Code's folders never load; the project's AGENTS.md is given to OpenCode by Combwork. Turned off, all of those load as they would outside Combwork, plugins' code included, and a project's MCP server can take the place of one Combwork gave the agent.",
-    "note": "What the advanced setting \"Keep the project's OpenCode config out\" does (Settings → Advanced, under OpenCode). OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1 are environment variables, opencode.json, .opencode and AGENTS.md file and folder names: keep them.",
+    "text": "Combwork runs OpenCode with OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1, so nothing of the project's own OpenCode setup loads, and Combwork gives OpenCode the project's AGENTS.md itself. Turned off, OpenCode loads what it would outside Combwork: the project's opencode.json and any opencode.json in a folder above it, its .opencode folder (MCP servers, agents, and plugins, whose code runs), the skills in its .agents and .claude folders and in your home folder's .claude, and the instructions its config names. A project's MCP server with the same name as one Combwork gave the agent then replaces it, Combwork's own tools included.",
+    "note": "What the advanced setting \"Keep the project's OpenCode config out\" does (Settings → Advanced, under OpenCode), as OpenCode 2.2.6 was recorded loading each (HI-2763, HI-2761). OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1 are environment variables; opencode.json, .opencode, .agents, .claude and AGENTS.md are file and folder names: keep them.",
     "audience": "both"
   },
   "settings.advanced.opencode.override.keepProjectConfigOut.title": {
