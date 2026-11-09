@@ -234,6 +234,7 @@ interface CombworkMessageValues {
   'git.repoLock.noGitDir': { folder: string | number; why: string | number }
   'git.repoLock.waiting': { profile: string | number }
   'git.repoLock.waitingFor': { seconds: number }
+  'git.repoOp.notOffered': undefined
   'git.retry': undefined
   'git.section.branches': undefined
   'git.section.changes': undefined

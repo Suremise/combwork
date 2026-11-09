@@ -232,6 +232,7 @@
   "git.repoLock.noGitDir": "Combworkは{folder}のgitフォルダーを見つけられなかったため、何も変更しませんでした：{why}",
   "git.repoLock.waiting": "別のCombworkがこのリポジトリにマージしています（{profile}）",
   "git.repoLock.waitingFor": "Combworkは、それが終わるまで最大{seconds, number}秒待ちます。",
+  "git.repoOp.notOffered": "このプロジェクトのバージョン管理では、その操作はできません。",
   "git.retry": "再試行",
   "git.section.branches": "ブランチとリモート",
   "git.section.changes": "変更",

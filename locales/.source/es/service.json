@@ -253,6 +253,7 @@
   "service.providers.taskDone": "{task} finished",
   "service.providers.taskFailed": "{task} exited with code {code}",
   "service.providers.unknownHost": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
+  "service.repoOps.notOffered": "Version control ({platform}) doesn’t offer that here.",
   "service.slots.notPrepared": "Combwork couldn't get {slot} ready for {card}: {why}",
   "service.slots.resumeFailed": "Combwork couldn't resume {agent}'s conversation in {slot} for {card} (three tries): {why}. Resume {agent} from Sessions, or start it fresh, and Combwork gives it {card}.",
   "service.slots.resumeHeld": "Combwork can't give {card} to {agent} yet: {agent}'s conversation in {slot} can't resume now ({why}). Combwork gives it {card} once it can.",

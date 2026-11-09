@@ -232,6 +232,7 @@
   "git.repoLock.noGitDir": "O Combwork não encontrou a pasta git de {folder}, então nada foi alterado: {why}",
   "git.repoLock.waiting": "Outro Combwork está fazendo merge neste repositório ({profile})",
   "git.repoLock.waitingFor": "O Combwork aguarda até ele terminar, por no máximo {seconds, number} s.",
+  "git.repoOp.notOffered": "O controle de versão deste projeto não oferece isso.",
   "git.retry": "Tentar de novo",
   "git.section.branches": "Branches e remotes",
   "git.section.changes": "Alterações",

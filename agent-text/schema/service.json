@@ -870,6 +870,11 @@
       "cli": "plain"
     }
   },
+  "service.repoOps.notOffered": {
+    "placeholders": {
+      "platform": "plain"
+    }
+  },
   "service.slots.notPrepared": {
     "placeholders": {
       "slot": "plain",

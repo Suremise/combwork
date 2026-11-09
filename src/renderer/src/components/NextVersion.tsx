@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import type { NextVersionPlan, RetargetResult, WorkflowForm } from '@shared/types'
 import { call, errorMessage } from '../api'
+import { offered, repoOp } from '../repoOps'
 import { confirm, notify } from '../store'
 import { cx } from '../util'
 import { RetargetDetails, retargetSkippedText } from './WorkflowOptions'
@@ -122,6 +123,8 @@ export async function startNextVersion(projectPath: string, saved: (form: Workfl
 
 /** Start the next version…, under Work merges into while it reads as a version (and nothing is unsaved). */
 export function NextVersionButton({ from, disabled, onStart }: { from: string; disabled: boolean; onStart: () => void }) {
+  // It makes a line: offered with New branch… (HI-2788).
+  if (!offered('git:createBranch')) return null
   return (
     <div className="s-desc workflow-next-version">
       <button className="btn small" data-action="next-version" disabled={disabled} title={tr(M.tip, { from })} onClick={onStart}>
@@ -137,7 +140,7 @@ export function NextVersionButton({ from, disabled, onStart }: { from: string; d
  * again.
  */
 export function MissingBranches({ projectPath, missing, branches, from, created }: { projectPath: string; missing: string[]; branches: string[]; from: string; created: () => void }) {
-  if (!missing.length) return null
+  if (!missing.length || !offered('git:createBranch')) return null
   return (
     <>
       {missing.map((b) => (
@@ -153,7 +156,7 @@ function MissingBranch({ projectPath, branch, branches, from, created }: { proje
   const create = async (): Promise<void> => {
     setBusy(true)
     try {
-      const done = await call('git:createBranch', projectPath, branch, true, { ref: pick, commit: '' })
+      const done = await repoOp('git:createBranch', projectPath, branch, true, { ref: pick, commit: '' })
       notify('success', done)
       created()
     } catch (e) {

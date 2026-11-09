@@ -931,6 +931,10 @@
     "defaultMessage": "Combwork waits for it to finish, up to {seconds, number} s.",
     "description": "The notification's text under \"Another Combwork is merging into this repository\": how long this Combwork waits for the other one, in seconds."
   },
+  "git.repoOp.notOffered": {
+    "defaultMessage": "This project’s version control doesn’t offer that.",
+    "description": "HI-2788: an error when an action that changes a repository is asked for although its version control doesn’t list it. Not reached in 1.4.0: Git lists every action."
+  },
   "git.retry": {
     "defaultMessage": "Retry",
     "description": "Button: reads git again."

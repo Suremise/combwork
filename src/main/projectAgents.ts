@@ -25,6 +25,7 @@ import { agentChangeCheck, agentImpact, impactBusy, ImpactMoved } from './connec
 import { boardWrite } from './boardStore'
 import type { LaunchImpact } from '../shared/launchPolicy'
 import * as wt from './worktrees'
+import { lineRepoOps } from './platform/repoOpsPorts'
 import { slotWorkspaces } from './platform/workspacePorts'
 import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
@@ -729,7 +730,7 @@ export function setUserMergeSlot(fn: typeof userMergeSlot): void {
 export async function mergeInProject(projectPath: string, worktree: wt.WorktreeRef, opts: { squash: boolean; message: string; moveBranch?: boolean; target?: string }): Promise<MergeResult> {
   // The merge slot of the branch merged into: the target named (#1450's branch merges), else the project folder's.
   const into = opts.target ?? (await workspace.branch(projectPath))
-  const run = (): Promise<MergeResult> => withRepoLock(projectPath, () => wt.mergeWorktree(projectPath, worktree, opts), { project: projectPath })
+  const run = (): Promise<MergeResult> => withRepoLock(projectPath, () => lineRepoOps('mergeLine').mergeWorkspace(projectPath, worktree, opts), { project: projectPath })
   return into ? await userMergeSlot(projectPath, into, run) : await run()
 }
 

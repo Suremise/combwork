@@ -232,6 +232,7 @@
   "git.repoLock.noGitDir": "Combwork 找不到 {folder} 的 git 文件夹，因此没有做任何更改：{why}",
   "git.repoLock.waiting": "另一个 Combwork 正在向此仓库合并（{profile}）",
   "git.repoLock.waitingFor": "Combwork 会等它完成，最多 {seconds, number} 秒。",
+  "git.repoOp.notOffered": "此项目的版本控制不提供该操作。",
   "git.retry": "重试",
   "git.section.branches": "分支与远程仓库",
   "git.section.changes": "更改",

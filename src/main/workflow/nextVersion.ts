@@ -10,7 +10,8 @@
 // and while nothing uses it; when it can't be, the error says what was left.
 
 import { CombworkError, combworkError, errorText } from '../combworkError'
-import { makeBranchAt, removeMadeBranch, type MadeBranchKept } from '../gitRepo'
+import { lineRepoOps } from '../platform/repoOpsPorts'
+import type { MadeLineKept } from '../platform/repoOps'
 import { lineRepoReads } from '../platform/repoReadsPorts'
 import { withFolderRepoLocks } from '../platform/repoPorts'
 import { createLogger, userText } from '../logger'
@@ -41,7 +42,7 @@ export class NextVersionPartial extends CombworkError {
   constructor(
     readonly branch: { project: string; name: string; commit: string },
     why: unknown,
-    kept: MadeBranchKept
+    kept: MadeLineKept
   ) {
     super(withValues(M.partial, { name: branch.name, commit: branch.commit.slice(0, 7), why: errorText(why), kept: kept.why }), { kind: 'conflict' })
   }
@@ -97,13 +98,13 @@ async function startLocked(ws: WorkspaceService, projectPath: string, a: Paramet
   const otherTargets = [...new Set([...others, release])].filter((b) => b !== name)
   // Work merges into's own branch, never a tag of its name; made with the caller's authority checked right before git.
   if ((await lineRepoReads().resolveStart(projectPath, release))?.kind !== 'branch') throw combworkError(M.notBranch, { from: release }, { kind: 'invalid' })
-  const start: ResolvedStart = await makeBranchAt(projectPath, name, from, a.check)
+  const start: ResolvedStart = await lineRepoOps('createLine').makeLine(projectPath, name, from, a.check)
   let saved: WorkflowForm
   try {
     saved = await saveWorkflowOptions(ws, projectPath, { preset: base.preset, options: { ...base.options, target: name, otherTargets }, base }, { ...(a.check ? { check: a.check } : {}) })
   } catch (e) {
     // Put back as it was: the branch goes only at its commit and while nothing uses it; else what was left is said.
-    const r = await removeMadeBranch(projectPath, name, start.commit)
+    const r = await lineRepoOps('createLine').removeMadeLine(projectPath, name, start.commit)
     if (r.removed) throw e
     log.warn(`Start the next version: ${userText(name)} kept after a refused save (${r.why})`)
     throw new NextVersionPartial({ project: projectPath, name, commit: start.commit }, e, r)

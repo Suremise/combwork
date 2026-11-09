@@ -253,6 +253,7 @@
   "service.providers.taskDone": "{task} terminée",
   "service.providers.taskFailed": "{task} terminée avec le code {code}",
   "service.providers.unknownHost": "Aucun projet n’utilise plus cet hôte GitHub pour {cli}. Clique sur Vérifier à nouveau, puis connecte-toi.",
+  "service.repoOps.notOffered": "La gestion de versions ({platform}) ne propose pas cela ici.",
   "service.slots.notPrepared": "Combwork n’a pas pu préparer l’emplacement {slot} pour la carte {card} : {why}",
   "service.slots.resumeFailed": "Combwork n’a pas pu reprendre la conversation de {agent} dans l’emplacement {slot} pour la carte {card} (trois essais) : {why}. Reprends {agent} depuis Sessions, ou repars de zéro, et Combwork lui donnera {card}.",
   "service.slots.resumeHeld": "Combwork ne peut pas encore donner la carte {card} à {agent} : la conversation de {agent} dans l’emplacement {slot} ne peut pas reprendre pour l’instant ({why}). Combwork lui donnera {card} dès que possible.",

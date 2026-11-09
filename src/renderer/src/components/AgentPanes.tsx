@@ -26,6 +26,7 @@ import * as actions from '../actions'
 import { freshShort, freshTip } from '../freshResume'
 import { HAND_OVER_TEXT, handOverNow, onRunningLane } from '@shared/handOver'
 import { call } from '../api'
+import { offered } from '../repoOps'
 import { templateList, templatesStillHere } from '../templateList'
 import { NO_IDS, NO_PROJECTS, agentPage, get, agentProviderOf, clearStartFailure, closeTile, focusAgent, focusedAgentId, isAssistantPath, notify, openActivity, openInSessionsTab, paneAssignment, paneCells, projectKey, prompt, revealAgent, seenAgents, set, setProjectTab, showAgent, openVersionControl, showAttachments, showInOverview, showPage, shownLayout, startingKey, startingLabel, useLanguage, useStarting, useStore } from '../store'
 import { useLiveUsage, useLiveUsageState } from '../usage'
@@ -500,7 +501,7 @@ function agentMenu(project: ProjectInfo, a: AgentInfo, pick: () => void, usage?:
       ? // Its branch under Review Changes (the pane's header showed it as a mark before #977).
         [
           { label: tr(msg({ id: 'panes.menu.reviewChanges', defaultMessage: 'Review Changes', description: "Menu item (a worktree agent's menu): shows its changes in the Git tab." })), icon: 'git-compare', detail: own.branch, onClick: () => reviewChanges(project, a) },
-          { label: tr(MERGE), icon: 'git-merge', disabled: !!blocked, detail: blocked ?? (unmerged?.badge ? unmerged.text : undefined), onClick: () => set({ mergeFor: { project: project.path, agentId: a.id } }) },
+          ...(offered('agents:merge') ? [{ label: tr(MERGE), icon: 'git-merge', disabled: !!blocked, detail: blocked ?? (unmerged?.badge ? unmerged.text : undefined), onClick: () => set({ mergeFor: { project: project.path, agentId: a.id } }) }] : []),
           { separator: true },
           { label: tr(REMOVE_AGENT), icon: 'close', action: 'remove' as const, onClick: () => void actions.removeAgent(project.path, a.id) },
           { label: tr(msg({ id: 'panes.menu.discard', defaultMessage: 'Discard Worktree and Branch…', description: "Menu item (a worktree agent's menu): removes the agent and deletes its worktree and branch (asks first)." })), icon: 'trash', danger: true, onClick: () => void actions.discardAgent(project.path, a.id) }

@@ -3,6 +3,7 @@ import { exactIgnoreLine, extensionOf, extIgnoreLine, type IgnoreRule, type Igno
 import { msg, tr } from '@shared/i18n'
 import * as actions from '../actions'
 import { call } from '../api'
+import { offered, repoOp } from '../repoOps'
 import { bumpGit, confirm, notify, set, showVersionControl } from '../store'
 import type { MenuEntry } from './ui'
 
@@ -76,7 +77,7 @@ export function showChangesOf(projectPath: string, file: string): void {
 }
 
 async function exclude(ctx: GitMenuContext, target: IgnoreTarget, ext: boolean): Promise<void> {
-  const done = await actions.attempt(tr(T.excludeFailed), () => call('files:gitExclude', ctx.project.path, arg(ctx.items), target, ext))
+  const done = await actions.attempt(tr(T.excludeFailed), () => repoOp('files:gitExclude', ctx.project.path, arg(ctx.items), target, ext))
   if (!done) return
   ctx.reload()
   bumpGit(ctx.project.path)
@@ -92,7 +93,7 @@ async function untrack(ctx: GitMenuContext, tracked: FileGitItem[]): Promise<voi
     confirmLabel: tr(T.untrackButton)
   })
   if (!ok) return
-  const done = await actions.attempt(tr(T.untrackFailed), () => call('files:gitUntrack', ctx.project.path, tracked.map((t) => ({ rel: t.rel, isDir: t.isDir }))))
+  const done = await actions.attempt(tr(T.untrackFailed), () => repoOp('files:gitUntrack', ctx.project.path, tracked.map((t) => ({ rel: t.rel, isDir: t.isDir }))))
   if (!done) return
   ctx.reload()
   bumpGit(ctx.project.path)
@@ -100,7 +101,7 @@ async function untrack(ctx: GitMenuContext, tracked: FileGitItem[]): Promise<voi
 }
 
 async function include(ctx: GitMenuContext, item: FileGitItem): Promise<void> {
-  const done: FileGitDone | undefined = await actions.attempt(tr(T.includeFailed), () => call('files:gitInclude', ctx.project.path, [{ rel: item.rel, isDir: item.isDir }]))
+  const done: FileGitDone | undefined = await actions.attempt(tr(T.includeFailed), () => repoOp('files:gitInclude', ctx.project.path, [{ rel: item.rel, isDir: item.isDir }]))
   if (!done) return
   ctx.reload()
   bumpGit(ctx.project.path)
@@ -141,6 +142,7 @@ function excludeChoices(ctx: GitMenuContext): MenuEntry[] {
 export function gitMenuEntries(ctx: GitMenuContext): MenuEntry[] {
   const { project, info, items } = ctx
   if (!info.repo) {
+    if (!offered('git:init')) return []
     return [
       { separator: true },
       {
@@ -159,9 +161,9 @@ export function gitMenuEntries(ctx: GitMenuContext): MenuEntry[] {
   const tracked = states.filter((s) => s.tracked)
   const out: MenuEntry[] = []
   // Excluding what git ignores already does nothing: offered while something selected isn't ignored.
-  if (states.some((s) => !s.rule)) out.push({ label: tr(T.exclude), icon: 'eye-closed', more: true, onClick: () => ctx.openMenu(excludeChoices(ctx)) })
-  if (tracked.length) out.push({ label: tr(T.untrack), icon: 'remove', onClick: () => void untrack(ctx, tracked) })
-  if (single?.rule?.removable) out.push({ label: tr(T.include), icon: 'eye', onClick: () => void include(ctx, single) })
+  if (states.some((s) => !s.rule) && offered('files:gitExclude')) out.push({ label: tr(T.exclude), icon: 'eye-closed', more: true, onClick: () => ctx.openMenu(excludeChoices(ctx)) })
+  if (tracked.length && offered('files:gitUntrack')) out.push({ label: tr(T.untrack), icon: 'remove', onClick: () => void untrack(ctx, tracked) })
+  if (single?.rule?.removable && offered('files:gitInclude')) out.push({ label: tr(T.include), icon: 'eye', onClick: () => void include(ctx, single) })
   if (single?.rule) out.push({ label: tr(T.why), icon: 'question', onClick: () => why(ctx, single) })
   const st = single && !single.isDir ? ctx.status(single.rel) : undefined
   if (st && CHANGED.has(st)) out.push({ label: tr(T.showChanges), icon: 'diff', onClick: () => showChangesOf(project.path, single!.rel) })

@@ -253,6 +253,7 @@
   "service.providers.taskDone": "{task}が完了しました",
   "service.providers.taskFailed": "{task}が終了コード{code}で終了しました",
   "service.providers.unknownHost": "現在、{cli}でそのGitHubホストを使っているプロジェクトはありません。「再確認」してからサインインしてください。",
+  "service.repoOps.notOffered": "バージョン管理（{platform}）では、ここでその操作はできません。",
   "service.slots.notPrepared": "Combworkは{card}のために{slot}を準備できませんでした：{why}",
   "service.slots.resumeFailed": "Combworkは{card}のために{slot}にある{agent}の会話を再開できませんでした（3回試行）：{why}。セッション履歴から{agent}を再開するか、新しく開始すると、Combworkが{card}を渡します。",
   "service.slots.resumeHeld": "Combworkはまだ{agent}に{card}を渡せません：{slot}にある{agent}の会話を今は再開できません（{why}）。再開できるようになり次第、Combworkが{card}を渡します。",

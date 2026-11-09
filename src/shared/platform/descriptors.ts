@@ -7,9 +7,40 @@ export type PlatformId = 'none' | 'git'
 
 export type Capability = 'revisions' | 'isolation' | 'integration' | 'containment' | 'sameness' | 'authorship' | 'observe'
 
+/**
+ * What the window can change in a platform's repository (SPEC §16.3.6 port 5, HI-2788's R3): an operation is offered only
+ * when its platform lists it, and main refuses one that isn't (never mapped to a near equivalent, R5.2). Platform words:
+ * a line is Git's branch.
+ */
+export type Operation =
+  | 'switchLine'
+  | 'createLine'
+  | 'deleteLines'
+  | 'deleteRemoteLines'
+  | 'updateLine'
+  | 'mergeLine'
+  | 'addRemote'
+  | 'renameRemote'
+  | 'setRemoteUrl'
+  | 'removeRemote'
+  | 'fetch'
+  | 'pull'
+  | 'push'
+  | 'pushTo'
+  | 'setUpstream'
+  | 'createTag'
+  | 'setIdentity'
+  | 'init'
+  | 'ignoreRules'
+
+/** Every operation, in one place: Git lists them all (it has each today). */
+export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules']
+
 export interface PlatformDescriptor {
   id: PlatformId
   capabilities: readonly Capability[]
+  /** What the window can change in its repository (port 5's operations, HI-2788); None has none. */
+  operations: readonly Operation[]
   /** A revision as shown: Git's 7 characters; None's content hash shortened the same way. */
   revisionShort: (id: string) => string
 }
@@ -18,12 +49,16 @@ const short = (id: string): string => id.slice(0, 7)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], revisionShort: short },
-  // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16).
-  none: { id: 'none', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], revisionShort: short }
+  git: { id: 'git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], operations: OPERATIONS, revisionShort: short },
+  // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
+  // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
+  none: { id: 'none', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], operations: [], revisionShort: short }
 }
 
 export const hasCapability = (platform: PlatformId, c: Capability): boolean => PLATFORMS[platform].capabilities.includes(c)
+
+/** Whether a platform offers an operation in its repository (port 5, HI-2788). */
+export const hasOperation = (platform: PlatformId, op: Operation): boolean => PLATFORMS[platform].operations.includes(op)
 
 /** Whether a value read from a file (project.json's `platform`) names a platform Combwork has. */
 export const isPlatformId = (v: unknown): v is PlatformId => typeof v === 'string' && Object.hasOwn(PLATFORMS, v)

@@ -232,6 +232,7 @@
   "git.repoLock.noGitDir": "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}",
   "git.repoLock.waiting": "Another Combwork is merging into this repository ({profile})",
   "git.repoLock.waitingFor": "Combwork waits for it to finish, up to {seconds, number} s.",
+  "git.repoOp.notOffered": "This project’s version control doesn’t offer that.",
   "git.retry": "Retry",
   "git.section.branches": "Branches & remotes",
   "git.section.changes": "Changes",

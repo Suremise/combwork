@@ -98,7 +98,7 @@ import { NextVersionPartial, startNextVersion } from './workflow/nextVersion'
 import { projectTargets } from './workflow/targets'
 import { withRepoLock } from './repoLock'
 import type { NextVersionResult } from '../shared/types'
-import { makeBranchAt } from './gitRepo'
+import { lineRepoOps } from './platform/repoOpsPorts'
 import { branchStartArg } from '../shared/nextVersion'
 import type { Value } from './assistantChanges'
 import { ForwardRefused, forwardMerge, pauseQueue, queueCardChange, queueViews, resumeQueue } from './workflow/queueControls'
@@ -2704,7 +2704,7 @@ route('POST', '/v1/git/branch', async ({ body }) => {
       // The guard at once, and again right before git creates it (after its reads).
       async () => {
         guard()
-        return makeBranchAt(p, name, from, guard)
+        return lineRepoOps('createLine').makeLine(p, name, from, guard)
       },
       { project: p }
     ).catch((e: unknown) => {
