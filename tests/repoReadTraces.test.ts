@@ -2,7 +2,8 @@
 // summary, the Branches & remotes info, the leftovers, History's pages, what can be compared, a pinned compare with its
 // pages and a file's diff, a pin that moved and a branch that isn't one (their errors), an agent's line status and the
 // Merge dialog's branches, through the repository reads port. The same git commands (folder and argv; sorted, since
-// some run together) and the same answers as the code before the port: the expected traces were recorded at a49568305 with
+// some run together) and the same answers as the code before the port: the expected traces were recorded at cd19d0e60,
+// before the port (its tests/repoReadCalls.ts calls the functions directly), with
 // `CW_RECORD_REPO_TRACES=1 npx vitest run tests/repoReadTraces.test.ts`, into tests/fixtures/repoReadTraces.json.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'

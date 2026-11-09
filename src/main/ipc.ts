@@ -35,14 +35,13 @@ import { setPinned } from './pin'
 import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
 import { gitDiff, gitStatus } from './git'
-import { compareBranches, compareDiff, compareLines } from './gitCompare'
 import { initCheck, initRepo } from './gitInit'
-import { addRemote, branchDrops, branchUpdatePlan, checkBranchName, createBranch, createTag, missingBranches, resolveStart, startPoints, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, leftoverInfo, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
+import { addRemote, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, removeRemote, renameRemote, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
 import { combworkWorktreeOf, mergeUnused, removalPreview, removeUnusedWorktree, unusedBranchOf, unusedBranchStatus, unusedWorktrees } from './unusedWorktrees'
-import { branchMergeStatus, lineCard, lineConfirmed, mergeBranch, mergeBranches } from './branchMerge'
+import { lineCard, lineConfirmed, mergeBranch } from './branchMerge'
 import { createLogger, logsDir, userText } from './logger'
 import { closeCommandsRun, closeCommandState, closeWithCommand, controlRun, dismiss, dontWait, runByHand, runOpenCommands } from './closeCommand/closeCommands'
 import { cleanCombwork, cleanWorkspace } from '../shared/commands'
@@ -148,6 +147,7 @@ import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from '
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
+import { lineRepoReads } from './platform/repoReadsPorts'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
@@ -1319,8 +1319,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       return r
     },
     'worktrees:removalPreview': (p, path) => removalPreview(p, path),
-    'worktrees:mergeBranches': (p) => mergeBranches(p),
-    'worktrees:branchMergeStatus': (p, branch, target) => branchMergeStatus(p, branch, target),
+    // The Merge dialog's reads, through the repository reads port (HI-2785).
+    'worktrees:mergeBranches': (p) => lineRepoReads().mergeLines(p),
+    'worktrees:branchMergeStatus': (p, branch, target) => lineRepoReads().lineMergeStatus(p, branch, target),
     'worktrees:branchCards': async (p, branch) => {
       const path = workspace.assertProject(p)
       return { queue: await branchQueueCard(workspace, path, branch), line: await lineCard(path, branch) }
@@ -1766,14 +1767,16 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       p = workspace.assertProject(p)
       // The slots as the board records them: a plain read, never the slot pool or the 0.9 migration (it runs as the project opens).
       const slots = (await boardSlots(p)).map((s) => ({ name: s.name, folder: s.folder, card: s.open?.card ?? null, agent: s.open?.agent ?? null, target: s.target ?? null }))
-      return compareLines(p, await workTargetOf(p), slots)
+      const reads = lineRepoReads()
+      return reads.compareLines(p, await reads.workTarget(p), slots)
     },
     'git:leftovers': async (p) => {
       p = workspace.assertProject(p)
-      return leftoverInfo(p, await workTargetOf(p))
+      const reads = lineRepoReads()
+      return reads.leftovers(p, await reads.workTarget(p))
     },
-    'git:compare': (p, base, head, page, pinBase, pinHead) => compareBranches(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1, { base: pinBase, head: pinHead }),
-    'git:compareDiff': (p, base, head, f, pinned) => compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? ''), pinned && typeof pinned === 'object' ? pinned : null),
+    'git:compare': (p, base, head, page, pinBase, pinHead) => lineRepoReads().compare(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), Number(page) || 1, { base: pinBase, head: pinHead }),
+    'git:compareDiff': (p, base, head, f, pinned) => lineRepoReads().compareDiff(workspace.assertProject(p), String(base ?? ''), String(head ?? ''), String(f ?? ''), pinned && typeof pinned === 'object' ? pinned : null),
     // The file of the diff shown (#495): in the folder the Changes tab shows, which may be an unused worktree outside the
     // workspace that file IPC (guardFile) doesn't reach; inside it by its real location too, so a link can't lead out.
     'changes:openFile': (root, f) => {
@@ -1784,10 +1787,12 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'git:tool': (recheck) => (recheck ? checkGit() : gitTool()),
     // The Git view (#607): the project folder only, read and changed by the user from the window (never an agent tool).
-    'git:summary': (p) => repoSummary(workspace.assertProject(p)),
+    // Its reads go through the repository reads port (HI-2785's R2), its changes are gitRepo.ts' until R3.
+    'git:summary': (p) => lineRepoReads().summary(workspace.assertProject(p)),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
-      const info = await repoInfo(p, await workTargetOf(p))
+      const reads = lineRepoReads()
+      const info = await reads.info(p, await reads.workTarget(p))
       // Combwork's own worktrees said as such (HI-1710): its review copies and the merge queue's folder.
       return { ...info, worktrees: info.worktrees.map((w) => {
         const combwork = combworkWorktreeOf(p, w.path)
@@ -1796,27 +1801,28 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
     'git:deleteBranches': (p, items, unmerged) => deleteBranches(p, Array.isArray(items) ? items : [], !!unmerged),
     'git:deleteRemoteBranches': (p, remote, items) => deleteRemoteBranches(p, String(remote ?? ''), Array.isArray(items) ? items : []),
-    'git:branchDrops': (p, name) => branchDrops(p, String(name ?? '')),
+    'git:branchDrops': (p, name) => lineRepoReads().lineDrops(p, String(name ?? '')),
     'git:history': async (p, ref, page) => {
       p = workspace.assertProject(p)
-      return repoHistory(p, { ref: typeof ref === 'string' ? ref : null, page: Number(page) || 1, workTarget: await workTargetOf(p) })
+      const reads = lineRepoReads()
+      return reads.history(p, { ref: typeof ref === 'string' ? ref : null, page: Number(page) || 1, workTarget: await reads.workTarget(p) })
     },
     'git:switch': (p, branch) => switchBranch(p, String(branch ?? '')),
     // Update from <target> (HI-1180): what it would do, for its dialog, and the update itself.
-    'git:updatePlan': (p, branch) => branchUpdatePlan(p, String(branch ?? '')),
+    'git:updatePlan': (p, branch) => lineRepoReads().updatePlan(p, String(branch ?? '')),
     'git:updateBranch': (p, branch, how) => updateBranch(p, String(branch ?? ''), how === 'rebase' ? 'rebase' : 'merge'),
     'git:createBranch': (p, name, stay, from) => createBranch(p, String(name ?? ''), !!stay, branchStartArg(from)),
-    'git:checkBranchName': (p, name) => checkBranchName(p, String(name ?? '')),
-    'git:resolveStart': (p, ref) => resolveStart(p, String(ref ?? '')),
-    'git:startPoints': (p) => startPoints(p),
-    'git:missingBranches': (p, names) => missingBranches(p, names),
+    'git:checkBranchName': (p, name) => lineRepoReads().checkLineName(p, String(name ?? '')),
+    'git:resolveStart': (p, ref) => lineRepoReads().resolveStart(p, String(ref ?? '')),
+    'git:startPoints': (p) => lineRepoReads().startPoints(p),
+    'git:missingBranches': (p, names) => lineRepoReads().missingLines(p, names),
     'git:addRemote': (p, name, url) => addRemote(p, String(name ?? ''), String(url ?? '')),
     'git:setRemoteUrl': (p, name, url) => setRemoteUrl(p, String(name ?? ''), String(url ?? '')),
     'git:fetch': (p) => fetchAll(p),
     'git:pull': (p) => pull(p),
     'git:push': (p, remote) => push(p, remote ? String(remote) : undefined),
     'git:pushTo': (p, remote, scope, branch) => pushToRemote(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
-    'git:remoteTracking': (p, remote) => remoteTracking(p, String(remote ?? '')),
+    'git:remoteTracking': (p, remote) => lineRepoReads().remoteTracking(p, String(remote ?? '')),
     'git:removeRemote': (p, name, expected) => removeRemote(p, String(name ?? ''), Array.isArray(expected) ? expected.map(String) : undefined),
     'git:renameRemote': (p, from, to) => renameRemote(p, String(from ?? ''), String(to ?? '')),
     'git:setUpstream': (p, branch, remote, remoteBranch, pushFirst) => setUpstream(p, String(branch ?? ''), remote == null ? null : String(remote), String(remoteBranch ?? ''), !!pushFirst),
