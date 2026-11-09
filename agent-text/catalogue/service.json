@@ -294,6 +294,41 @@
     "note": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project.",
     "audience": "both"
   },
+  "service.filesGit.busy": {
+    "text": "Another git command is using the repository. Try again in a moment.",
+    "note": "An error from the Files tab's Git menu: git's index is locked by another git command (an agent's commit, say).",
+    "audience": "both"
+  },
+  "service.filesGit.failed": {
+    "text": "Git could not do it: {why}",
+    "note": "An error from the Files tab's Git menu. {why} is git's own message (English).",
+    "audience": "both"
+  },
+  "service.filesGit.notIgnored": {
+    "text": "Git no longer ignores it.",
+    "note": "An error from the Files tab's Git menu: the file isn't ignored any more.",
+    "audience": "both"
+  },
+  "service.filesGit.notRepo": {
+    "text": "This project is not a git repository.",
+    "note": "An error from the Files tab's Git menu (HI-2743): the project folder isn't in a git repository.",
+    "audience": "both"
+  },
+  "service.filesGit.notUtf8": {
+    "text": "{file} is not UTF-8 text, so Combwork leaves it alone.",
+    "note": "An error from the Files tab's Git menu: the ignore file ({file}) isn't UTF-8, so Combwork won't rewrite it.",
+    "audience": "both"
+  },
+  "service.filesGit.nothing": {
+    "text": "Choose a file or folder in the project.",
+    "note": "An error from the Files tab's Git menu: it was given nothing to act on.",
+    "audience": "both"
+  },
+  "service.filesGit.ruleChanged": {
+    "text": "The rule that ignores it has changed. Look again with Why is this ignored?.",
+    "note": "An error from Include again in the Files tab's Git menu: the line it would remove isn't there any more, or it isn't one Combwork can remove. Why is this ignored? is the menu item (files.git.why).",
+    "audience": "both"
+  },
   "service.forward.missing": {
     "text": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",
     "note": "HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.",

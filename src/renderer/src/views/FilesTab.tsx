@@ -19,6 +19,7 @@ import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { cx, formatBytes, formatKeybinding, FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
 import { CW_DIR } from '@shared/defaults'
+import { gitMenuEntries, ignoredByText } from '../components/FilesGitMenu'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
 const absOf = (project: ProjectInfo, rel: string): string => (rel ? `${project.path}\\${rel.replace(/\//g, '\\')}` : project.path)
@@ -227,7 +228,8 @@ export function FilesTab({ project }: { project: ProjectInfo }) {
   const shown = view.path === project.path ? '' : root
   const jump = useStore((s) => (s.filesJump?.project === project.path && s.filesJump.root === shown ? s.filesJump : null))
   const selector = <RootSelector project={project} value={root} onChange={(id) => set((s) => ({ filesRoot: { ...s.filesRoot, [project.path]: id } }))} />
-  return <FilesBrowser key={view.path} project={view} selector={selector} jump={jump} />
+  // The Git menu (HI-2743) acts on the project folder only, never on an agent's slot or worktree.
+  return <FilesBrowser key={view.path} project={view} selector={selector} jump={jump} mainCheckout={view.path === project.path} />
 }
 
 type Goto = { rel: string; line?: number; col?: number; nonce: number }
@@ -261,7 +263,7 @@ type Row = { entry: FileEntry; depth: number } | { edit: true; depth: number; is
 // Files
 // ---------------------------------------------------------------------------
 
-function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selector: React.ReactNode; jump: Goto | null }) {
+function FilesBrowser({ project, selector, jump, mainCheckout }: { project: ProjectInfo; selector: React.ReactNode; jump: Goto | null; mainCheckout: boolean }) {
   const listWidth = usePaneSize('files', 360)
   const [dirs, setDirs] = useState<Record<string, FileEntry[]>>({})
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
@@ -292,6 +294,8 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
   const findError = filtering ? find.error : null
   const [findTry, setFindTry] = useState(0)
   const [git, setGit] = useState<Record<string, string>>({})
+  const gitRef = useRef(git)
+  gitRef.current = git
   const [dropTarget, setDropTarget] = useState<string | null>(null)
   const [, setClipVersion] = useState(0)
   useDraftVersion()
@@ -605,6 +609,40 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
     ]
   }
 
+  /**
+   * The right-click menu of a row. In the project folder its Git section (HI-2743) needs git's view of the selection
+   * (tracked, ignored by which rule), so the menu opens once main has said; without it, it opens without that section.
+   */
+  const openRowMenu = (ev: React.MouseEvent, e: FileEntry): void => {
+    ev.preventDefault()
+    ev.stopPropagation()
+    const base = menuFor(e)
+    if (!mainCheckout) return menu.openAt(ev.clientX, ev.clientY, base)
+    const { clientX: x, clientY: y } = ev
+    const items = selected.includes(e.relPath) ? selEntries : [e]
+    const unchanged = unchangedSelection()
+    void call('files:gitInfo', project.path, items.map((i) => ({ rel: i.relPath, isDir: i.isDir }))).then(
+      (info) => {
+        if (!unchanged()) return
+        const gitEntries = gitMenuEntries({
+          project,
+          items,
+          info,
+          status: (rel) => gitRef.current[rel],
+          openMenu: (choices) => menu.openAt(x, y, choices, false),
+          reload: reloadAll,
+          showAt: (rel, line) => {
+            setFilter('')
+            reveal(rel)
+            setGoto({ rel, line, nonce: Date.now() })
+          }
+        })
+        menu.openAt(x, y, [...base, ...gitEntries])
+      },
+      () => unchanged() && menu.openAt(x, y, base)
+    )
+  }
+
   const onKeyDown = (ev: React.KeyboardEvent): void => {
     if (editing || (ev.target as HTMLElement).tagName === 'INPUT') return
     const mod = ev.ctrlKey || ev.metaKey
@@ -778,7 +816,7 @@ function FilesBrowser({ project, selector, jump }: { project: ProjectInfo; selec
                 hasDraft={!r.entry.isDir && hasDraft(absOf(project, r.entry.relPath))}
                 onContextMenu={(ev) => {
                   if (!selected.includes(r.entry.relPath)) setSelected([r.entry.relPath])
-                  menu.open(ev, menuFor(r.entry))
+                  openRowMenu(ev, r.entry)
                 }}
                 onDragStart={(ev) => onDragStart(ev, r.entry)}
                 onDragOver={(ev) => dragOverDir(ev, r.entry.isDir ? r.entry.relPath : parentOf(r.entry.relPath))}
@@ -837,7 +875,8 @@ function FileRow(props: {
       data-rel={e.relPath}
       className={cx('row', 'file-row', props.selected && 'selected', props.cut && 'cut', e.ignored && 'ignored', props.dropTarget && e.isDir && 'drop-target')}
       style={{ paddingLeft: 8 + depth * 14 }}
-      title={e.relPath}
+      title={e.ignoredBy ? `${e.relPath}
+${ignoredByText(e.ignoredBy)}` : e.relPath}
       draggable
       onClick={props.onClick}
       onContextMenu={props.onContextMenu}

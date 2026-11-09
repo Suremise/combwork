@@ -212,6 +212,8 @@
   "tips.editTemplates.title": "Modifier un modèle sur place",
   "tips.fileLinks.text": "Les chemins de fichiers qu’affiche un agent, comme src/app.ts:42, sont des liens : fais Ctrl+clic sur l’un d’eux pour ouvrir le fichier dans l’onglet Fichiers à cette ligne.",
   "tips.fileLinks.title": "Ctrl+clic sur un chemin dans le terminal",
+  "tips.filesGit.text": "Fais un clic droit sur un fichier ou un dossier dans l’onglet Fichiers : Exclure de Git l’ajoute à .gitignore (ou seulement au .git/info/exclude de ce PC), Ne plus suivre retire de git un fichier commité mais le laisse sur le disque, et Pourquoi est-ce ignoré ? ouvre la règle d’un fichier grisé.",
+  "tips.filesGit.title": "Garder un fichier hors de git depuis l’onglet Fichiers",
   "tips.filesTab.text": "L’onglet Fichiers parcourt et modifie le projet, prévisualise le Markdown, le CSV, le HTML et les images, et garde les modifications non enregistrées quand tu passes d’un fichier à l’autre.",
   "tips.filesTab.title": "Modifier des fichiers sans quitter Combwork",
   "tips.flightRecorder.text": "Active un déclencheur de l’enregistreur de vol dans Paramètres → Avancé (arrêts de sécurité, quelque chose d’inconnu venant d’une CLI, un changement de version d’une CLI, un agent devenu silencieux), et Combwork enregistre les événements récents de la console de développement de l’agent, masqués, au moment même où cela se produit, avec une notification.",

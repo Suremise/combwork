@@ -220,6 +220,8 @@ interface CombworkMessageValues {
   'tips.editTemplates.title': undefined
   'tips.fileLinks.text': undefined
   'tips.fileLinks.title': undefined
+  'tips.filesGit.text': undefined
+  'tips.filesGit.title': undefined
   'tips.filesTab.text': undefined
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined

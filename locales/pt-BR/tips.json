@@ -212,6 +212,8 @@
   "tips.editTemplates.title": "Edite um modelo ali mesmo",
   "tips.fileLinks.text": "Caminhos de arquivo que um agente imprime, como src/app.ts:42, são links: use Ctrl+clique em um para abrir o arquivo na aba Arquivos, naquela linha.",
   "tips.fileLinks.title": "Ctrl+clique em um caminho no terminal",
+  "tips.filesGit.text": "Clique com o botão direito em um arquivo ou pasta na aba Arquivos: Excluir do Git o adiciona ao .gitignore (ou só ao .git/info/exclude deste PC), Parar de rastrear tira do git um arquivo com commit, mas o deixa no disco, e Por que está ignorado? abre a regra de um arquivo esmaecido.",
+  "tips.filesGit.title": "Deixe um arquivo fora do git pela aba Arquivos",
   "tips.filesTab.text": "A aba Arquivos navega e edita o projeto, mostra prévias de Markdown, CSV, HTML e imagens, e guarda as edições não salvas quando você troca de arquivo.",
   "tips.filesTab.title": "Edite arquivos sem sair do Combwork",
   "tips.flightRecorder.text": "Ative um gatilho do gravador de voo em Configurações → Avançado (paradas de segurança, algo desconhecido vindo de uma CLI, uma mudança de versão da CLI, um agente em silêncio), e o Combwork salva os eventos recentes do console do desenvolvedor do agente, com dados sensíveis ocultos, no momento em que acontece, com um aviso.",

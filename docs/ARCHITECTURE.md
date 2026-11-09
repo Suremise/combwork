@@ -53,6 +53,7 @@ This document explains how Combwork is put together, for anyone changing the cod
 | `src/main/windows.ts` | Combwork's windows (one workspace each) and where each event and terminal's output goes |
 | `src/shared/notify.ts`, `src/main/notify.ts`, `src/main/outcomes.ts`, `src/main/notices.ts`, `src/shared/bursts.ts`, `src/renderer/src/components/Popups.tsx`, `entryConditions.ts`, `components/Overlays.tsx` (`NotificationCenter`) | The one notification system (HI-2320, SPEC §14 Notifications): the routing table (`notifyRoute`), main's one way in (`tell()`, which `toast()` uses: one owner window, offers resolved by `resolveOffer`), finishes grouped, the pop-ups (notifications and the tip, one stack), the bell's list with each entry's buttons, and window-made entries' conditions |
 | `src/main/files.ts` | Files/Images tab back end: project file operations, find, live watch, session images |
+| `src/main/filesGit.ts` | The Files tab's Git menu (HI-2743): Exclude from git, Stop tracking, Include again, the rule behind an ignored file; the project folder only (`shared/gitIgnoreRules.ts` holds the line logic, `components/FilesGitMenu.ts` the menu) |
 | `src/main/transcripts.ts`, `src/main/providers/conversation.ts` | Sessions tab transcript viewer: per-provider incremental parsers, search, Markdown export |
 | `src/shared/api.ts` | The typed IPC contract — add channels here first |
 | `src/renderer/src/commands.ts` | Every command + keybinding (menus, palette, shortcuts) |

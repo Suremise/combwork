@@ -212,6 +212,8 @@
   "tips.editTemplates.title": "Edita una plantilla en su sitio",
   "tips.fileLinks.text": "Las rutas de archivo que imprime un agente, como src/app.ts:42, son enlaces: haz Ctrl+clic en una para abrir el archivo en la pestaña Archivos en esa línea.",
   "tips.fileLinks.title": "Ctrl+clic en una ruta en la terminal",
+  "tips.filesGit.text": "Haz clic derecho en un archivo o carpeta en la pestaña Archivos: Excluir de Git lo agrega a .gitignore (o solo a .git/info/exclude de este PC), Dejar de seguir saca de git un archivo confirmado pero lo deja en el disco, y ¿Por qué se ignora? abre la regla de un archivo atenuado.",
+  "tips.filesGit.title": "Deja un archivo fuera de git desde la pestaña Archivos",
   "tips.filesTab.text": "La pestaña Archivos explora y edita el proyecto, muestra vistas previas de Markdown, CSV, HTML e imágenes, y conserva las ediciones sin guardar al cambiar de archivo.",
   "tips.filesTab.title": "Edita archivos sin salir de Combwork",
   "tips.flightRecorder.text": "Activa un disparador de la caja negra en Configuración → Avanzado (paradas de seguridad, algo desconocido de una CLI, un cambio de versión de la CLI, un agente que se quedó en silencio), y Combwork guarda los eventos recientes de la consola de desarrollador del agente, con los datos sensibles ocultos, en el momento en que ocurre, con un aviso.",

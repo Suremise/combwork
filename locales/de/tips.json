@@ -212,6 +212,8 @@
   "tips.editTemplates.title": "Eine Vorlage direkt bearbeiten",
   "tips.fileLinks.text": "Dateipfade, die ein Agent ausgibt, etwa src/app.ts:42, sind Links: Strg+Klick öffnet die Datei im Tab „Dateien“ an dieser Zeile.",
   "tips.fileLinks.title": "Strg+Klick auf einen Pfad im Terminal",
+  "tips.filesGit.text": "Klicke im Tab Dateien mit der rechten Maustaste auf eine Datei oder einen Ordner: Von Git ausschließen fügt sie zu .gitignore hinzu (oder nur zu .git/info/exclude dieses PCs), Nicht mehr verfolgen nimmt eine committete Datei aus Git, lässt sie aber auf der Festplatte, und Warum wird das ignoriert? öffnet die Regel einer abgeblendeten Datei.",
+  "tips.filesGit.title": "Eine Datei im Tab Dateien aus Git heraushalten",
   "tips.filesTab.text": "Im Tab „Dateien“ durchsuchst und bearbeitest du das Projekt, siehst eine Vorschau von Markdown, CSV, HTML und Bildern, und ungespeicherte Änderungen bleiben beim Wechseln erhalten.",
   "tips.filesTab.title": "Dateien bearbeiten, ohne Combwork zu verlassen",
   "tips.flightRecorder.text": "Schalte in Einstellungen → Erweitert einen Auslöser des Flugschreibers ein (Sicherheitsstopps, Unbekanntes von einer CLI, ein Wechsel der CLI-Version, ein still gewordener Agent), und Combwork speichert die letzten Ereignisse der Entwicklerkonsole des Agenten in dem Moment, in dem es passiert, geschwärzt und mit einer Meldung.",

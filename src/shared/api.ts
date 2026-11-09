@@ -1,5 +1,6 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
+import type { IgnoreTarget } from './gitIgnoreRules'
 import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
 import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { SessionHooks } from './hooks'
@@ -75,6 +76,8 @@ import type {
   FallbackModel,
   FileContent,
   FileEntry,
+  FileGitDone,
+  FileGitInfo,
   GitDiff,
   HiddenProject,
   GitStatus,
@@ -1026,6 +1029,16 @@ export interface CombworkRequests {
   /** The files with unsaved edits in the renderer (absolute paths), so quitting can ask about them. */
   'files:setUnsaved': (paths: string[]) => void
   'files:unwatch': (projectPath: string) => void
+  /** The Files tab's Git menu (HI-2743): whether the project is a repository, its branch, and each item's tracked and ignored state. */
+  'files:gitInfo': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitInfo
+  /** Exclude from git: a line per item (or one `*.ext` line) in the top .gitignore (`shared`) or .git/info/exclude (`local`). */
+  'files:gitExclude': (projectPath: string, items: { rel: string; isDir: boolean }[], target: IgnoreTarget, ext: boolean) => FileGitDone
+  /** Stop tracking, keep the file: `git rm --cached`. */
+  'files:gitUntrack': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
+  /** Include again: removes the plain line that ignores the item. */
+  'files:gitInclude': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
+  /** Why is this ignored?: opens the file of the rule that ignores the item in its app (a rule outside the Files tab's tree). */
+  'files:gitOpenRule': (projectPath: string, items: { rel: string; isDir: boolean }[]) => void
 
   'attachments:list': (projectPath: string) => SessionAttachmentGroup[]
   /** A kept attachment's text, for the viewer's previews. */

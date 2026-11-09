@@ -249,6 +249,31 @@
   "service.files.throughLink": {
     "placeholders": {}
   },
+  "service.filesGit.busy": {
+    "placeholders": {}
+  },
+  "service.filesGit.failed": {
+    "placeholders": {
+      "why": "plain"
+    }
+  },
+  "service.filesGit.notIgnored": {
+    "placeholders": {}
+  },
+  "service.filesGit.notRepo": {
+    "placeholders": {}
+  },
+  "service.filesGit.notUtf8": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
+  "service.filesGit.nothing": {
+    "placeholders": {}
+  },
+  "service.filesGit.ruleChanged": {
+    "placeholders": {}
+  },
   "service.forward.missing": {
     "placeholders": {
       "unknown": "select",

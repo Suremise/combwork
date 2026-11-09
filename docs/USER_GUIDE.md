@@ -1722,6 +1722,18 @@ The **Files** tab is a file browser for the project folder.
 
 Names are coloured by git status like in VS Code (modified, new), folders containing changes get a dot, and git-ignored files and the `.combwork` folder are dimmed. `.git` is hidden. The tree updates by itself when files change on disk.
 
+### Git in the Files tab <a id="git-in-the-files-tab"></a>
+
+Right-click a file or folder in the project folder for its **Git** section. It's a short menu, not a git client: staging, committing and discarding changes are in the **Version Control** tab.
+
+- **Exclude from Git** opens a menu of what to ignore: **This file** or **This folder** (exactly that path, so nothing else of the same name), or **All \*.log files** for a file's extension. Under **Shared with everyone** it adds a line to the project's `.gitignore`, which you commit, so collaborators and agents get it too; under **Only on this PC** it adds the line to `.git/info/exclude`, which git never commits. Each choice shows the line and the file it goes in. A line already there isn't added twice, and the file keeps its line endings. The change to `.gitignore` shows in the Version Control tab like any other. Several selected entries are excluded by their exact paths.
+- **Stop Tracking, Keep the File…** is offered for files and folders git tracks, because excluding a file git already tracks does nothing on its own. After you confirm, git stops tracking it (`git rm --cached`) and the file stays on disk; the Version Control tab shows the removal as a deletion to commit. Exclude it too, or git offers it as new again.
+- **Include Again** takes out the line that ignores a dimmed file, when that line is one Combwork can remove: a plain line in `.gitignore` or `.git/info/exclude` naming exactly that path, or the file's `*.ext` line.
+- **Why Is This Ignored?** opens the file of the rule that ignores a dimmed entry, at its line: in the Files tab for a `.gitignore` in the project, otherwise (`.git/info/exclude`, your global excludes file) in its app. Hover a dimmed entry to see the same rule, such as ``Ignored by .gitignore:12 `*.log` ``. A rule Include Again can't remove (a wider pattern, a negation, a `.gitignore` in a subfolder, your global file) is changed there by hand.
+- **Show Changes**, for a changed or new file, opens its diff in the Version Control tab's Changes.
+
+The Git section acts on the project folder, on the branch it has checked out, which its confirmation or notification names; it isn't offered while the Files tab shows an agent's slot or worktree. In a project that isn't a git repository it offers **Initialise Repository…** instead.
+
 ### Viewing and editing files <a id="viewing-and-editing-files"></a>
 
 Select a file and it opens on the right, ready to edit, with syntax highlighting for code, SQL, XML, JSON, YAML and many more. **Ctrl+S** (or **Save**) saves it. Some file types also get a nicer view, and the buttons above the file switch between them:

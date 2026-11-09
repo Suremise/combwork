@@ -212,6 +212,8 @@
   "tips.editTemplates.title": "直接编辑模板",
   "tips.fileLinks.text": "智能体输出的文件路径（如 src/app.ts:42）都是链接：按住 Ctrl 单击即可在“文件”标签页中打开该文件并定位到那一行。",
   "tips.fileLinks.title": "在终端中 Ctrl+单击路径",
+  "tips.filesGit.text": "在“文件”标签页中右键单击文件或文件夹：“从 Git 中排除”会将其添加到 .gitignore（或仅添加到本机的 .git/info/exclude），“停止跟踪，保留文件”会将已提交的文件移出 git 但保留在磁盘上，“为什么被忽略？”会打开灰显文件的规则。",
+  "tips.filesGit.title": "在“文件”标签页中让文件不进入 git",
   "tips.filesTab.text": "“文件”标签页可以浏览和编辑项目，预览 Markdown、CSV、HTML 和图片，切换时会保留未保存的编辑。",
   "tips.filesTab.title": "不离开 Combwork 即可编辑文件",
   "tips.flightRecorder.text": "在“设置”→“高级”中打开一个飞行记录器触发条件（安全拦截、来自 CLI 的未知内容、CLI 版本变化、无响应的智能体），事情一发生，Combwork 就会保存该智能体最近的开发者控制台事件（已脱敏），并显示通知。",
