@@ -34,7 +34,7 @@ export interface OpMembers {
   renameRemote: 'renameRemote'
   setRemoteUrl: 'setRemoteUrl'
   removeRemote: 'removeRemote'
-  fetch: 'fetch'
+  fetch: 'fetchRemotes'
   pull: 'pull'
   push: 'push'
   pushTo: 'pushTo'
@@ -77,7 +77,7 @@ export interface RepoOps {
   renameRemote(projectPath: string, from: string, to: string): Promise<string>
   setRemoteUrl(projectPath: string, name: string, url: string): Promise<string>
   removeRemote(projectPath: string, name: string, expected?: string[]): Promise<string>
-  fetch(projectPath: string): Promise<string>
+  fetchRemotes(projectPath: string): Promise<string>
   pull(projectPath: string): Promise<string>
   push(projectPath: string, remote?: string): Promise<string>
   pushTo(projectPath: string, remote: string, scope: PushScope, line?: string): Promise<string>

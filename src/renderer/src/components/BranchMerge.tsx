@@ -3,7 +3,7 @@ import type { AgentBranchStatus, MergeBranch, MergeBranchList, MergeResult } fro
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import { msg, tr, tRich } from '@shared/i18n'
 import * as actions from '../actions'
-import { call, errorMessage } from '../api'
+import { call, errorMessage } from '../api'
 import { repoOp } from '../repoOps'
 import { projectMergeChoice } from '../mergeChoice'
 import { confirm, notify, set, useLanguage, useStore } from '../store'

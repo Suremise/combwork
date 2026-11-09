@@ -2,7 +2,7 @@ import type { FileEntry, FileGitDone, FileGitInfo, FileGitItem, FileGitRuleText,
 import { exactIgnoreLine, extensionOf, extIgnoreLine, type IgnoreRule, type IgnoreTarget } from '@shared/gitIgnoreRules'
 import { msg, tr } from '@shared/i18n'
 import * as actions from '../actions'
-import { call } from '../api'
+import { call } from '../api'
 import { offered, repoOp } from '../repoOps'
 import { bumpGit, confirm, notify, set, showVersionControl } from '../store'
 import type { MenuEntry } from './ui'

@@ -32,7 +32,7 @@ export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBran
   'git:renameRemote': (p, from, to) => opsAt('git:renameRemote').renameRemote(p, String(from ?? ''), String(to ?? '')),
   'git:setRemoteUrl': (p, name, url) => opsAt('git:setRemoteUrl').setRemoteUrl(p, String(name ?? ''), String(url ?? '')),
   'git:removeRemote': (p, name, expected) => opsAt('git:removeRemote').removeRemote(p, String(name ?? ''), Array.isArray(expected) ? expected.map(String) : undefined),
-  'git:fetch': (p) => opsAt('git:fetch').fetch(p),
+  'git:fetch': (p) => opsAt('git:fetch').fetchRemotes(p),
   'git:pull': (p) => opsAt('git:pull').pull(p),
   'git:push': (p, remote) => opsAt('git:push').push(p, remote ? String(remote) : undefined),
   'git:pushTo': (p, remote, scope, branch) => opsAt('git:pushTo').pushTo(p, String(remote ?? ''), scope === 'all' ? 'all' : 'branch', branch ? String(branch) : undefined),
