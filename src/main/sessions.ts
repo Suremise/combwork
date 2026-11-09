@@ -90,7 +90,7 @@ import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, sam
 import { createLogger, hookJournal, userText } from './logger'
 import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
-import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
+import { latestStop, memoModel, memoTools, memoTurn, newTurn, noteSafeguard, placeEvent, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
 import { applyStatus, idleNow, NO_STATUS, type StatusState } from './statusLineState'
 import { acceptTurn, admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
@@ -519,6 +519,8 @@ interface LiveSession {
   /** Bytes of the transcript already read for safeguard stops (#606), and what the adapter keeps between reads (its model, its last tool calls). */
   guardOffset?: number
   guardMemo?: Record<string, unknown>
+  /** HI-2754: when its latest prompt came (ms), the user's or one Combwork typed: a stop before it hit an older turn. */
+  promptAt?: number
   /** A blocking ask naming no tool, from a CLI that tells a safeguard prompt by its screen, until the screen says whether it is one (#606). `applied`: the status rules took it (else the turn ledger found it stale). */
   guardAsk?: { ask: Ask; at: number; applied: boolean }
   /** When it began waiting on a safeguard prompt (#606): typed into since, or the prompt gone from its screen, it may be answered. */
@@ -5411,7 +5413,8 @@ class SessionManager {
       return
     }
     const before = st.safeguard
-    const next = noteSafeguard(before, ev)
+    // HI-2754: a stop no older than the latest prompt hit the latest turn; one read late is history only.
+    const next = placeEvent(before, ev, l.promptAt)
     if (!next) return
     st.safeguard = next
     this.emitState(st)
@@ -5479,7 +5482,11 @@ class SessionManager {
       const model = memoModel(memo)
       const turn = memoTurn(memo)
       // Counted unless the CLI's record of it in this turn was read first.
-      if (!turn || !this.guardSeen(l, turn, 'screen')) noted = noteSafeguard(noted, { kind: 'stop', at, model, tools: memoTools(memo) }) ?? noted
+      if (!turn || !this.guardSeen(l, turn, 'screen')) {
+        const counted = noteSafeguard(noted, { kind: 'stop', at, model, tools: memoTools(memo) })
+        // HI-2754: the prompt on screen is this turn's stop.
+        if (counted) noted = latestStop(counted, at, l.promptAt)
+      }
       // Kept on the session's record with its turn, so Performance counts it though the transcript may never record it
       // (HB3's didn't), and once if it does (withScreenStops), whenever Combwork reads it.
       if (st.sessionId) {
@@ -7426,11 +7433,21 @@ class SessionManager {
     const carriedOn = !!st.signIn && worked
     if (carriedOn) st.signIn = undefined
     const needed = asksYou(st)
+    // HI-2754: a prompt starts a new turn: a stop before it no longer says the latest turn was stopped.
+    let turnStarted = false
+    if (ev?.kind === 'prompt') {
+      l.promptAt = Date.now()
+      const fresh = newTurn(st.safeguard)
+      if (fresh !== st.safeguard) {
+        st.safeguard = fresh
+        turnStarted = true
+      }
+    }
     const facts = this.fact(st, this.factsOf(l, step, ev, carriedOn))
     const stepped = applyStep(st, step)
     const guarded = this.settleSafeguard(l)
     // A turn's end is reported even when the status stays (its background task count may have changed).
-    if (stepped || step.actions.includes('turnEnded') || carriedOn || facts || guarded) this.emitState(st)
+    if (stepped || step.actions.includes('turnEnded') || carriedOn || facts || guarded || turnStarted) this.emitState(st)
     // At its prompt now: its screen looked at once for its question by itself (HI-2191), which its CLI may have drawn
     // before this hook was carried out, with nothing drawn since to look at it by.
     if (stepped && cause !== 'screen' && AT_PROMPT.has(st.status)) this.idleScreenDrawn(id, l)

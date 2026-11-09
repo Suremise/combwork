@@ -1023,9 +1023,17 @@
     "defaultMessage": "{card} passed review: the lane waits for it to be merged",
     "description": "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) passed review but isn't merged yet, so the next card can't start."
   },
+  "service.workflowNotice.safeguardGuidance": {
+    "defaultMessage": "Check {provider}’s guidance on its safety filter.",
+    "description": "HI-2754: the line after a stalled card's safeguard stop in a lane's notification, for a coding agent ({provider}) with no help of its own about it."
+  },
   "service.workflowNotice.stalled": {
     "defaultMessage": "{card} has stalled",
     "description": "A line of a lane's notification: a card (its key, e.g. HI-12) has stalled: nothing has happened on it for a long time, or its agent stopped."
+  },
+  "service.workflowNotice.stalledSafeguard": {
+    "defaultMessage": "{card} has stalled. {agent}’s latest turn was stopped by {provider}’s safety filter at {time} ({stops, plural, one {# stop} other {# stops}} this session): look at its pane.",
+    "description": "HI-2754: a line of a lane's notification: a card (its key, e.g. HI-12) has stalled, and the agent it waits on ({agent}) is idle because its latest turn was stopped by its coding agent's safety filter ({provider}: Codex, Claude Code) at a time ({time}: \"18:54\", hours and minutes on a 24-hour clock), with how many stops this session. The provider's own help, or safeguardGuidance, follows on the next line."
   },
   "service.workspace.advancedNotHere": {
     "defaultMessage": "{setting} can't be set for a workspace.",

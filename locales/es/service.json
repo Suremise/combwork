@@ -256,6 +256,8 @@
   "service.workflowNotice.merging": "{card} se está fusionando: el carril espera",
   "service.workflowNotice.notMerged": "{card} superó la revisión: el carril espera a que se fusione",
   "service.workflowNotice.stalled": "{card} está estancada",
+  "service.workflowNotice.stalledSafeguard": "{card} está estancada. El último turno de {agent} lo detuvo el filtro de seguridad de {provider} a las {time} ({stops, plural, one {# parada} many {# paradas} other {# paradas}} en esta sesión): revisa su panel.",
+  "service.workflowNotice.safeguardGuidance": "Consulta la guía de {provider} sobre su filtro de seguridad.",
   "service.workspace.advancedNotHere": "{setting} no se puede configurar para un espacio de trabajo.",
   "service.workspace.agentGone": "Ese agente ya no existe.",
   "service.workspace.badName": "Los nombres de proyecto no pueden empezar por “.” ni contener {chars}",

@@ -15,6 +15,9 @@ import { createLogger } from './logger'
 import { wakesOn } from './loopWakes'
 import { sessions } from './sessions'
 import { HISTORY } from '../shared/taskHistory'
+import { providerDescriptor, providerName } from '../shared/providers'
+import { safeguardTime } from '../shared/safeguards'
+import type { StallSafeguard } from '../shared/stallSafeguard'
 import type { StoredText } from '../shared/types'
 import { allTasks, commentAsCombwork, getTask, noteOnCard } from './tasks'
 import { lanesNowIn } from './watches'
@@ -50,6 +53,8 @@ const M = {
   blocked: msg({ id: 'service.workflowNotice.blocked', defaultMessage: '{card} is blocked: {reason}', description: "A line of a lane's notification: a card (its key, e.g. HI-12) was marked blocked, with the reason given ({reason}, the user's or an agent's own words)." }),
   blockedNoReason: msg({ id: 'service.workflowNotice.blockedNoReason', defaultMessage: '{card} is blocked', description: "A line of a lane's notification: a card (its key, e.g. HI-12) was marked blocked." }),
   stalled: msg({ id: 'service.workflowNotice.stalled', defaultMessage: '{card} has stalled', description: "A line of a lane's notification: a card (its key, e.g. HI-12) has stalled: nothing has happened on it for a long time, or its agent stopped." }),
+  stalledSafeguard: msg({ id: 'service.workflowNotice.stalledSafeguard', defaultMessage: '{card} has stalled. {agent}’s latest turn was stopped by {provider}’s safety filter at {time} ({stops, plural, one {# stop} other {# stops}} this session): look at its pane.', description: "HI-2754: a line of a lane's notification: a card (its key, e.g. HI-12) has stalled, and the agent it waits on ({agent}) is idle because its latest turn was stopped by its coding agent's safety filter ({provider}: Codex, Claude Code) at a time ({time}: \"18:54\", hours and minutes on a 24-hour clock), with how many stops this session. The provider's own help, or safeguardGuidance, follows on the next line." }),
+  safeguardGuidance: msg({ id: 'service.workflowNotice.safeguardGuidance', defaultMessage: 'Check {provider}’s guidance on its safety filter.', description: "HI-2754: the line after a stalled card's safeguard stop in a lane's notification, for a coding agent ({provider}) with no help of its own about it." }),
   mergeDue: msg({ id: 'service.workflowNotice.mergeDue', defaultMessage: 'Every card passed review: its merge is due', description: "A line of a lane's notification: all of the lane's cards passed review, so its work is ready to be merged." }),
   notMerged: msg({ id: 'service.workflowNotice.notMerged', defaultMessage: '{card} passed review: the lane waits for it to be merged', description: "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) passed review but isn't merged yet, so the next card can't start." }),
   merging: msg({ id: 'service.workflowNotice.merging', defaultMessage: '{card} is being merged: the lane waits for it', description: "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) is in the merge queue, so the next card can't start." }),
@@ -115,11 +120,15 @@ async function commentFromAction(a: ActionRow, ws: WorkspaceService): Promise<vo
 /** How much of an agent's question a request's notice shows (its first sentence or two). */
 const NOTICE_GIST = 200
 
-/** A lane notice's event as its action keeps it: what happened, to which card (none: the lane's merge), and why. */
+/**
+ * A lane notice's event as its action keeps it: what happened, to which card (none: the lane's merge), and why; a stall's
+ * `safeguard` (HI-2754): its cause's agent idle with its latest turn stopped by a safety filter, as found with the stall.
+ */
 interface Told {
   event: LaneEvent
   card: number | null
   detail?: string
+  safeguard?: StallSafeguard
 }
 
 /** A `laneNotice` action: a lane's events, one notice, each card named as the window names it (#1221). */
@@ -133,6 +142,7 @@ async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService, ctx: Par
     const card = e.card !== null ? (labels.get(e.card) ?? `#${e.card}`) : ''
     if (e.event === 'failed') return withValues(M.failed, { card })
     if (e.event === 'blocked') return e.detail ? withValues(M.blocked, { card, reason: e.detail }) : withValues(M.blockedNoReason, { card })
+    if (e.event === 'stalled' && e.card !== null && e.safeguard) return safeguardLines(card, e.safeguard)
     if (e.event === 'stalled') return e.card === null ? M.mergeStalled : withValues(M.stalled, { card })
     // `paused`: an action kept before HI-1991 split it.
     if (e.event === 'paused-merge' || (e.event as string) === 'paused') return withValues(e.detail === 'merging' ? M.merging : M.notMerged, { card })
@@ -140,6 +150,17 @@ async function laneNoticeFromAction(a: ActionRow, ws: WorkspaceService, ctx: Par
   })
   const workspacePath = ws.path
   if (lines.length) await ctx.dispatch(() => tell(at.projectPath, withValues(M.lane, { lane: String(a.payload.lane ?? '') }), lines, { kind: 'work', card: { number: at.card.number, label: cardLabel(at.card) }, workspacePath }))
+}
+
+/**
+ * HI-2754: a stalled card's lines when its cause's agent is idle with its latest turn stopped by its provider's safety
+ * filter: what happened, then the provider's own help (its descriptor's translated text), else a neutral pointer to its
+ * guidance. The agent and the stop are as the stall found them (carried in the action), never looked up again.
+ */
+export function safeguardLines(card: string, g: StallSafeguard): TextPart {
+  const provider = providerName(g.provider)
+  const help = providerDescriptor(g.provider).text?.safeguardHelp ?? null
+  return { lines: [withValues(M.stalledSafeguard, { card, agent: g.agent, provider, time: safeguardTime(g.at), stops: g.stops }), help ?? withValues(M.safeguardGuidance, { provider })] }
 }
 
 // --- What lane notices last told, with the board.
@@ -243,7 +264,7 @@ async function look(ws: WorkspaceService): Promise<boolean> {
           // On a card of the lane still on the board (the action's card), the first it names.
           const on = [...hit.parts.flatMap((p) => (p.n !== null ? [p.n] : [])), ...laneCards].find(exists)
           if (on === undefined) continue
-          const events: Told[] = hit.parts.map((p) => ({ event: p.event, card: p.n, ...(p.detail ? { detail: p.detail } : {}) }))
+          const events: Told[] = hit.parts.map((p) => ({ event: p.event, card: p.n, ...(p.detail ? { detail: p.detail } : {}), ...(p.safeguard ? { safeguard: p.safeguard } : {}) }))
           db.prepare("INSERT INTO card_actions (card, kind, payload, fact) VALUES (?, 'laneNotice', ?, NULL)").run(on, JSON.stringify({ lane: hit.label, events })) // i18n-ignore: SQL
           for (const e of events) {
             const card = e.card !== null && exists(e.card) ? e.card : current

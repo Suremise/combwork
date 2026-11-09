@@ -257,7 +257,9 @@ interface CombworkMessageValues {
   'service.workflowNotice.mergeStalled': undefined
   'service.workflowNotice.merging': { card: string | number }
   'service.workflowNotice.notMerged': { card: string | number }
+  'service.workflowNotice.safeguardGuidance': { provider: string | number }
   'service.workflowNotice.stalled': { card: string | number }
+  'service.workflowNotice.stalledSafeguard': { card: string | number; agent: string | number; provider: string | number; time: string | number; stops: number }
   'service.workspace.advancedNotHere': { setting: string | number }
   'service.workspace.agentGone': undefined
   'service.workspace.badName': { chars: string | number }
