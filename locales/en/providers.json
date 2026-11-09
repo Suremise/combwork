@@ -439,6 +439,10 @@
     "defaultMessage": "Set Up runs `opencode auth login` on this account, so you can connect it to the model providers you use. Answer in the terminal; Combwork types nothing into it.",
     "description": "Settings → Accounts & Connections, above an OpenCode account's Set Up terminal: what Set Up is for. opencode auth login is a command: keep it. Set Up names a button."
   },
+  "providers.opencode.noModel": {
+    "defaultMessage": "{provider} didn't start: Combwork keeps OpenCode to the provider in the connection's model, and this connection names none, so OpenCode would choose one itself, perhaps one of its free cloud models. Choose the connection's model (a provider and model, such as ollama/qwen3:8b) in Agent Settings, or turn off \"Keep OpenCode to the connection's own provider\" in Settings → Advanced.",
+    "description": "Why an OpenCode agent didn't start (its pane): Combwork only allows the provider of the connection's model, and no model (or no valid provider/model id) is set. {provider} is OpenCode. ollama/qwen3:8b is a model id: keep it. Agent Settings and Settings → Advanced are places in Combwork; the quoted text is an advanced setting's title: use that setting's translated title."
+  },
   "providers.opencode.noOwner": {
     "defaultMessage": "{provider} didn't start: Combwork couldn't read its own process's identity, which the agent's private OpenCode server is tied to so that it ends with Combwork. Windows PowerShell may be blocked on this PC.",
     "description": "Why an OpenCode agent didn't start (its pane): Combwork couldn't get the identity it ties the agent's server's lifetime to. {provider} is OpenCode. Windows PowerShell is a program's name: keep it."

@@ -1604,6 +1604,8 @@
   "settings.advanced.opencode.override.noAutoUpdate.desc": "Combwork 在 OpenCode 的私有配置中使用 update: \"disable\" 并设置 OPENCODE_DISABLE_AUTOUPDATE=1 来运行它（它的智能体，以及检查其账号和模型），因此它运行已安装的版本，在智能体重启之间绝不会更改；“配置提供方”中的“更新”会在你选择时更新它。关闭后，OpenCode 可能会像在 Combwork 之外一样自行更新。",
   "settings.advanced.opencode.override.noAutoUpdate.title": "不让 OpenCode 自行更新",
   "settings.advanced.opencode.override.stripCredentials.desc": "Combwork 会从 OpenCode 的环境中去掉它作为提供方密钥或令牌读取的变量（也包括其智能体运行命令所用的 shell：其中有 GITHUB_TOKEN 和 HF_TOKEN），并且除非账号为其保存了凭据，否则拒绝 Amazon Bedrock、Google Vertex 和 Azure，因此这台电脑上的 AWS 配置文件、gcloud 登录或 Azure CLI 登录绝不会在未经要求的情况下被使用。OpenCode 的 Claude Agent 提供方无论如何都会被拒绝。关闭后，OpenCode 会获得这些变量，并可能像在 Combwork 之外一样使用这些登录。",
+  "settings.advanced.opencode.override.ownProviderOnly.title": "让 OpenCode 只使用连接自己的提供方",
+  "settings.advanced.opencode.override.ownProviderOnly.desc": "Combwork 的 OpenCode 私有配置会拒绝除连接模型中的提供方（ollama/qwen3:8b 中的 ollama）以外的所有提供方，因此 OpenCode 代表智能体所做的任何事都不会发送给其他提供方：无论是设置为其他提供方模型的标题或压缩、回退到其他提供方模型的图像请求，还是 OpenCode 的免费云端模型。开启此项的连接必须指定其模型。它决定 OpenCode 使用哪个提供方，而不是该提供方的地址指向哪里，也不是防火墙：网页搜索、MCP 服务器、插件和命令仍然可以访问网络。关闭后，OpenCode 可能像在 Combwork 之外一样使用它能使用的任何提供方；Claude Agent 无论如何都会被拒绝。",
   "settings.advanced.opencode.override.stripCredentials.title": "不向 OpenCode 传递其他凭据",
   "settings.advanced.opencode.server.readySeconds.desc": "OpenCode 智能体的私有服务器有多长时间作出响应，超时后启动会放弃并结束它。太短时，慢速电脑上的智能体无法启动。",
   "settings.advanced.opencode.server.readySeconds.title": "服务器：启动时间",

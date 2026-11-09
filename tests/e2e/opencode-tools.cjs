@@ -82,6 +82,7 @@ const w = (f, s) => {
     await inv('connections:setOn', account.id, true)
     const conn = (await inv('connections:list')).connectionRows.find((c) => c.account === account.id) ?? (await inv('connection:add', account.id, { name: 'Test · OpenCode' }))
     await inv('agents:update', alpha, agent.id, { connection: conn.id })
+    await lib.setLaunch(inv, alpha, agent.id, { model: 'opencode/big-pickle' }) // a connection kept to its own provider names its model (HI-2769)
 
     /** One launch: its serve's line, what it started and loaded, its written config and guidance; `typed` typed into its pane. */
     async function launch(label, typed = null) {

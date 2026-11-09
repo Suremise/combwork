@@ -126,6 +126,7 @@
   "providers.localLimits.output": "出力上限 {value, number}トークン（{from}）{fallback, select, none {} other {：{fallback}がコンテキストより小さくなかったため、既定値を使いました}}",
   "providers.localLimits.switched": "この値で{model}として開始：値はセッション中ずっと有効で、Claude Codeは現在動いているモデルのウィンドウを報告します。",
   "providers.opencode.claudeAgentModel": "{provider}は起動しませんでした：{model}はOpenCodeのClaude Agentプロバイダーのモデルで、CombworkはこれをOpenCode経由では実行しません。代わりにClaude Codeを独立したプロバイダーとして実行するか、別のモデルを選んでください。",
+  "providers.opencode.noModel": "{provider}は起動しませんでした：CombworkはOpenCodeを接続のモデルにあるプロバイダーだけに限っていますが、この接続にはモデルが指定されていないため、OpenCodeが自分でモデルを選ぶことになります（無料クラウドモデルのいずれかかもしれません）。エージェント設定で接続のモデル（ollama/qwen3:8bのようなプロバイダーとモデル）を選ぶか、「設定」→「詳細」で「OpenCodeを接続のプロバイダーだけに限る」をオフにしてください。",
   "providers.opencode.connections.setUp": "セットアップは、このアカウントで`opencode auth login`を実行し、使っているモデルプロバイダーに接続できるようにします。ターミナルで答えてください。Combworkは何も入力しません。",
   "providers.opencode.noOwner": "{provider}は起動しませんでした：Combworkが自身のプロセスの識別情報を読み取れませんでした。エージェントのプライベートOpenCodeサーバーは、Combworkと一緒に終了するようにこれに結び付けられています。このPCではWindows PowerShellがブロックされている可能性があります。",
   "providers.opencode.otherAccount": "{provider}は{session}を再開しませんでした：このセッションは別のOpenCodeアカウントのデータにあり、このエージェントが今使っているアカウントのものではありません。新しいセッションを始めるか、エージェントをそのアカウントに戻してください。",

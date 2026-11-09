@@ -1705,6 +1705,12 @@
   "settings.advanced.opencode.override.noAutoUpdate.title": {
     "placeholders": {}
   },
+  "settings.advanced.opencode.override.ownProviderOnly.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.ownProviderOnly.title": {
+    "placeholders": {}
+  },
   "settings.advanced.opencode.override.stripCredentials.desc": {
     "placeholders": {}
   },

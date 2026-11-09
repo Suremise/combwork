@@ -566,5 +566,7 @@
   "tips.localModelPicker.text": "Un agente en una cuenta de servidor encuentra los modelos de la cuenta en el /model de Claude Code, por sus ID exactos. Dale a cada uno una Etiqueta en Editar servidor… para nombrarlo ahí.",
   "tips.localModelLimits.title": "Dile a Claude Code el contexto real de tu modelo local",
   "tips.opencode.text": "Los agentes pueden usar OpenCode 2. Configuración de proveedores lo instala; cada cuenta de OpenCode tiene sus propios inicios de sesión en proveedores y sus propias sesiones, y cada agente ejecuta un servidor privado de OpenCode que termina con él.",
+  "tips.opencodeOwnProvider.title": "OpenCode se limita al proveedor de la conexión",
+  "tips.opencodeOwnProvider.text": "Un agente de OpenCode usa solo el proveedor del modelo de su conexión, así que nada de lo que hace va a otro proveedor ni a los modelos gratuitos en la nube de OpenCode. Indica el modelo de la conexión, como ollama/qwen3:8b; Configuración → Avanzado → OpenCode lo desactiva.",
   "tips.opencode.title": "Ejecutar agentes con OpenCode"
 }

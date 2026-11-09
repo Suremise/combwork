@@ -83,8 +83,9 @@ const PROVIDERS = {
   // profile already past agy's first-run screens (as after Provider Setup's Set up).
   'fake-antigravity': { provider: 'antigravity', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-agy', 'agy.cmd'), mode: 'accept-edits' },
   // The fake OpenCode (HI-2763, scenarios HI-2761): its private server and TUI per agent, on the run's own OpenCode test
-  // home (XDG_DATA_HOME, the CLI-home seam's), Combwork's skills in each launch's private config folder.
-  'fake-opencode': { provider: 'opencode', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-opencode', 'opencode.cmd'), mode: 'build' }
+  // home (XDG_DATA_HOME, the CLI-home seam's), Combwork's skills in each launch's private config folder. Its agents name a
+  // model (the fake's own default): a connection kept to its own provider must (HI-2769).
+  'fake-opencode': { provider: 'opencode', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-opencode', 'opencode.cmd'), mode: 'build', model: 'opencode/big-pickle' }
 }
 
 const sleep = lib.sleep
@@ -552,7 +553,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       changeSettings: sc.changeSettings === true,
       // Its mode (#259): the scenario's, else Combwork's default.
       ...(sc.mode ? { mode: sc.mode } : {}),
-      providers: { ...cfg.settings.assistant?.providers, [p.provider]: { model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' } }
+      providers: { ...cfg.settings.assistant?.providers, [p.provider]: { model: opts.model ?? p.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' } }
     }
   }
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
@@ -632,7 +633,7 @@ async function runScenario(sc, providerKey, opts = {}) {
       const selected = await lib.until(async () => (await inv('provider:refresh', p.provider))?.[p.provider]?.path ?? null, HUNG_MS)
       if (String(selected ?? '').toLowerCase() !== p.executable.toLowerCase()) throw new Error(`setup: Combwork selected ${selected ?? 'no CLI'} for ${p.provider}, not the fake (${p.executable}): stopped before any session`)
     }
-    const launch = { provider: p.provider, model: opts.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' }
+    const launch = { provider: p.provider, model: opts.model ?? p.model ?? '', effort: opts.effort ?? '', permissionMode: p.mode, extraArgs: p.extraArgs ?? '' }
     // Their roles saved (HI-2664: an agent's tools and lane parts follow its role): Coder, the agent under test, does
     // whatever its scenario asks (either), and Implementer reviews, unless a scenario changes them.
     const coder = await lib.addAgent(inv, alpha, { name: 'Coder', workflowRole: 'either', ...launch })

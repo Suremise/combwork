@@ -566,5 +566,7 @@
   "tips.localModelPicker.text": "サーバーアカウントのエージェントは、Claude Codeの/modelでそのアカウントのモデルを正確なIDで選べます。サーバーを編集…で各モデルにラベルを付けると、その名前で表示されます。",
   "tips.localModelLimits.title": "ローカルモデルの実際のコンテキストをClaude Codeに伝える",
   "tips.opencode.text": "エージェントはOpenCode 2を使えます。「プロバイダーのセットアップ」でインストールします。OpenCodeの各アカウントは独自のプロバイダーへのサインインとセッションを持ち、各エージェントは自分と一緒に終了するプライベートなOpenCodeサーバーを実行します。",
+  "tips.opencodeOwnProvider.title": "OpenCodeは接続のプロバイダーだけを使う",
+  "tips.opencodeOwnProvider.text": "OpenCodeのエージェントは接続のモデルにあるプロバイダーだけを使うため、その作業がほかのプロバイダーやOpenCodeの無料クラウドモデルに送られることはありません。接続のモデル（ollama/qwen3:8bなど）を指定してください。「設定」→「詳細」→「OpenCode」でオフにできます。",
   "tips.opencode.title": "OpenCodeでエージェントを実行する"
 }

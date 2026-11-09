@@ -26,8 +26,11 @@ export const EXTERNAL_METHOD: Record<string, string> = { 'amazon-bedrock': 'aws-
  * account saved a credential for it on purpose (`saved`, null when the listing failed: every one denied). With `strip`
  * off (the Advanced switch), the ambient ones are allowed: the user's explicit exception. Claude Agent never is.
  */
-export function providerPolicies(ambient: readonly string[], saved: SavedCredentials | null, strip: boolean): Policy[] {
-  const out: Policy[] = [{ action: 'provider.use', resource: CLAUDE_AGENT_PROVIDER, effect: 'deny' }]
+export function providerPolicies(ambient: readonly string[], saved: SavedCredentials | null, strip: boolean, own: string | null = null): Policy[] {
+  // The connection's own provider only (HI-2769, ownProviderOnly; HI-2768's allowlist): every provider denied, its own
+  // allowed, first, so the denies after it still win (Claude Agent, an ambient chain the account didn't choose).
+  const out: Policy[] = own ? [{ action: 'provider.use', resource: '*', effect: 'deny' }, { action: 'provider.use', resource: own, effect: 'allow' }] : []
+  out.push({ action: 'provider.use', resource: CLAUDE_AGENT_PROVIDER, effect: 'deny' })
   if (!strip) return out
   for (const id of ambient) if (!saved?.get(id)?.length) out.push({ action: 'provider.use', resource: id, effect: 'deny' })
   return out
@@ -105,6 +108,8 @@ export interface LaunchConfigInput {
   saved: SavedCredentials | null
   strip: boolean
   noUpdate: boolean
+  /** The connection's own provider, the only one allowed (HI-2769, ownProviderOnly), or none: OpenCode's own rules. */
+  ownProvider?: string | null
   /**
    * The project's own config decides its MCP servers, as in a terminal (HI-2761): only for the whole "as from a terminal"
    * preset with no server given and the project's config let in (projectDecidesMcp). Otherwise every server is denied but
@@ -134,7 +139,7 @@ export function launchConfig(i: LaunchConfigInput): Record<string, unknown> {
     ...(i.agent ? { default_agent: i.agent } : {}),
     mcp: { servers },
     // Claude Agent stays denied in every case; the MCP servers left to the project only as projectDecidesMcp says.
-    policies: [...providerPolicies(i.ambient, i.saved, i.strip), ...(i.projectDecidesMcp ? [] : mcpPolicies(Object.keys(servers)))],
+    policies: [...providerPolicies(i.ambient, i.saved, i.strip, i.ownProvider ?? null), ...(i.projectDecidesMcp ? [] : mcpPolicies(Object.keys(servers)))],
     ...(i.instructions.length ? { instructions: i.instructions } : {})
   }
 }
