@@ -426,7 +426,10 @@ function commits(wt, n) {
     await closeMenu()
     return !off
   }
+  // A turn's end reaches the fake's screen before Combwork's Stop hook and usage do, and ⋯'s items are as they were when it
+  // opened: so offered is waited for, never read once (HI-2816: rc.1's loaded run opened ⋯ while Compact… was still off).
   const compactVia = async (focus) => {
+    await until(compactOffered, HUNG_MS)
     await (await compactItem()).click()
     const dialog = page.locator('[role=dialog]', { hasText: 'Compact alpha' })
     await until(() => dialog.isVisible(), HUNG_MS)
@@ -448,7 +451,7 @@ function commits(wt, n) {
     return at > b.lastIndexOf('Compacting conversation…') && b.indexOf('❯', at) > at
   }
   await turn()
-  check('idle: Compact… is offered in ⋯', await compactOffered())
+  check('idle: Compact… is offered in ⋯', !!(await until(compactOffered, HUNG_MS)))
   check('the dialog closes after a long focus is entered', await compactVia(LONG_FOCUS))
   check('the agent is compacting', !!(await until(async () => (await live(long.id))?.statusMessage === 'Compacting the conversation…', 5000)))
   check('its header says so', !!(await until(async () => (await statusOf()).includes('Compacting'), HUNG_MS)), await statusOf())

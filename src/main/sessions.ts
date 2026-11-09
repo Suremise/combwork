@@ -558,6 +558,8 @@ interface LiveSession {
   turnSeen?: object
   /** This launch resumes a conversation (a failed start's Retry resumes it again). */
   resumed?: boolean
+  /** A resumed launch's transcript size at Combwork's first look, while it starts (HI-2816): only growth past it says the CLI is up. */
+  resumedBytes?: number
   /** The Combwork Assistant's mode (its id) its conversation was last given, started in or told: recorded with it. */
   mode?: string
   /** This launch gave its conversation instructions of Combwork's own (SessionRecord.promptAdded): recorded with it. */
@@ -5260,8 +5262,11 @@ class SessionManager {
   /** What follows from the live transcript growing: status, usage, details, compaction, cost. */
   private async transcriptChanged(l: LiveSession, projectPath: string, agentId: string, src: string, size: number, force: boolean, hooks: number): Promise<void> {
     const sessionId = l.state.sessionId
-    // Fallback if hooks never arrive: a transcript means the session is up.
-    if (l.state.status === 'starting') {
+    // Fallback if hooks never arrive: a transcript means the session is up. Not a resumed conversation's as it was, there
+    // before its CLI started (HI-2816: a held or slow resume showed ready, and deliveries tried to type into it): only
+    // what it gains after Combwork's first look.
+    const before = l.resumed ? (l.resumedBytes ??= size) : -1
+    if (l.state.status === 'starting' && size > before) {
       this.fact(l.state, { lifecycle: 'running' })
       l.state.status = 'ready'
       this.emitState(l.state)
