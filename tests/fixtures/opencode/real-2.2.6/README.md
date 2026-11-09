@@ -6,6 +6,7 @@ What the real OpenCode v2.2.6 did, recorded for the fake opencode (`tests/e2e/fa
 - **Conditions:** Darren's HI-2758 option A (8 Nov 2026). Every launch had a new throwaway root under `%LOCALAPPDATA%\combwork-test\tmp`, a minimal environment, updates off, a private `serve` on 127.0.0.1 stopped by tree, and no accounts, keys or cloud calls. Model turns went only to local Ollama `qwen3:8b`, through a logging proxy.
 - **Sources:**
   - HI-2758's probe (HB1): `cli/version.txt`, `help.txt`, `models-with-ollama-and-builtins.txt`, `auth-list-saved-and-env.json`, `shared-service-port-in-use.txt` and `events/shell-permission-reject.json`;
+  - HI-2760's probe (HB1, 9 Nov 2026, offline: no model call, prompts on a denied provider failing at once): `wire/message-paging.json` (`limit`, `order`, `cursor`), `wire/log-synced.txt` (the durable log's watermark) and `events/event-types-filter.txt` (`/api/event?types=`, with each event's durable seq);
   - HI-2763's R0 (HB2, 8 Nov 2026, 23:13–23:19 UTC): everything else.
 - **Scrubbed:** machine paths are `<root>`/`<home>`/`<bin>`, the host is `<host>`, and the user is `<user>`. Event files drop the recorder's own `t`, which never goes over the wire. The SSE framing is exactly as sent in `events/sse-framing.txt`. `wire/integration.json` keeps the first 4 of the 240 integrations.
 

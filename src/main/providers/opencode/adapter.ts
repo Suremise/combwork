@@ -19,6 +19,7 @@ import { localDataRoot } from '../antigravity/home'
 import { AMBIENT_DIRS, AMBIENT_FILES, DATA_ENV, ambientIntegrations, opencodeEnv, opencodeHome } from './home'
 import { chosenAmbient, launchConfig, withTestProvider, writeConfigDir, type SavedCredentials } from './config'
 import { accountModels, checkHome, testProvider, latestOpencode, locateOpencode, opencodeInstallCommand, opencodeLoginCommand, opencodeReadiness, opencodeUpdateCommand, savedCredentials } from './install'
+import { expandOpencodeHook, normalizeOpencodeHook } from './events'
 import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerToken, sessionMark, sessionMarks } from './launcher'
 
 // OpenCode 2 as a Combwork provider (HI-2759, against 2.2.6; the runtime facts are HI-2758's). Each launch runs its own
@@ -277,9 +278,15 @@ export class OpencodeAdapter implements ProviderAdapter {
     return { file: POWERSHELL, args: LAUNCHER_ARGS, env: { ...env, ...launcher } }
   }
 
-  // ---- Hooks: OpenCode sends none (its server's events are HI-2760's).
-  normalizeHook(): NormalizedHook {
-    return { event: { kind: 'ignore' }, sessionId: null, transcriptPath: null, mode: null, editedPaths: [], ids: { turn: null, call: null, sub: null, continued: false } }
+  // ---- Hooks (HI-2760): the launcher posts its server's events and settled snapshots; the tracker (events.ts), in the
+  // launch's hook order, turns each into the hooks it stands for.
+  async prepareHook(body: Record<string, any>, launch: { memo: Record<string, unknown> }): Promise<void> {
+    const expanded = expandOpencodeHook(launch.memo, body)
+    if (expanded) body.combworkExpanded = expanded
+  }
+
+  normalizeHook(body: Record<string, any>): NormalizedHook {
+    return normalizeOpencodeHook(body)
   }
 
   lockReply(_d: LockDecision): Record<string, unknown> {

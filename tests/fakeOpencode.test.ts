@@ -310,6 +310,66 @@ describe('fake opencode: a policy-denied model, as HB1 recorded 2.2.6 (HI-2759)'
   })
 })
 
+describe('fake opencode: paging, the durable log and the types filter, as HB1 recorded 2.2.6 (HI-2760)', () => {
+  it('pages messages by limit, order and cursor, refuses a limit over 200, gives the durable watermark, and streams only the types asked for', async () => {
+    const r = root()
+    const s = await serve(r.env, r.project)
+    // A filtered stream beside the full one: only the types asked for, plus server.connected.
+    const types = ['session.inbox.enqueued', 'session.execution.started', 'session.execution.failed', 'session.execution.succeeded']
+    const filtered: Ev[] = []
+    const ac = new AbortController()
+    void (async () => {
+      const res = await fetch(s.url + '/api/event?' + types.map((t) => 'types=' + encodeURIComponent(t)).join('&'), { headers: { authorization: 'Basic ' + Buffer.from(`opencode:${s.password}`).toString('base64') }, signal: ac.signal })
+      const dec = new TextDecoder()
+      let buf = ''
+      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+        buf += dec.decode(chunk, { stream: true })
+        for (let i; (i = buf.indexOf('\n\n')) >= 0; ) {
+          const block = buf.slice(0, i)
+          buf = buf.slice(i + 2)
+          if (block.startsWith('data: ')) filtered.push(JSON.parse(block.slice(6)))
+        }
+      }
+    })().catch(() => undefined)
+    await until(() => filtered[0], 'server.connected')
+    const sid = (await s.api('POST', '/api/session', { location: { directory: r.project } })).body.data.id
+    const log = async () => {
+      const res = await fetch(s.url + `/api/experimental/session/${sid}/log?after=0`, { headers: { authorization: 'Basic ' + Buffer.from(`opencode:${s.password}`).toString('base64') } })
+      return JSON.parse((await res.text()).trim().replace(/^data: /, ''))
+    }
+    expect(await log()).toEqual({ type: 'log.synced', aggregateID: sid, seq: 0 })
+    expect((await s.api('POST', `/api/session/${sid}/model`, { providerID: 'denied', id: 'x' })).status).toBe(204)
+    for (let i = 1; i <= 6; i++) {
+      await s.api('POST', `/api/session/${sid}/prompt`, { text: `prompt ${i}` })
+      await until(() => filtered.filter((e) => e.type === 'session.execution.failed').length === i, `turn ${i}'s end`)
+    }
+    const paging = recJson('wire/message-paging.json')
+    const shape = (b: { data: { type: string; text?: string; outcome?: string }[] }) => b.data.map((m) => [m.type, m.text ?? m.outcome])
+    const all = await s.api('GET', `/api/session/${sid}/message`)
+    expect(shape(all.body).filter(([t]) => t === 'user' || t === 'idle')).toEqual(paging.default.page)
+    const p1 = await s.api('GET', `/api/session/${sid}/message?limit=3&order=desc`)
+    expect(shape(p1.body)).toEqual(paging.limit3desc.page)
+    expect(JSON.parse(Buffer.from(p1.body.cursor.next, 'base64').toString())).toMatchObject(paging.limit3desc.cursorShape)
+    const p2 = await s.api('GET', `/api/session/${sid}/message?limit=3&cursor=${encodeURIComponent(p1.body.cursor.next)}`)
+    expect(shape(p2.body)).toEqual(paging.next.page)
+    const p3 = await s.api('GET', `/api/session/${sid}/message?limit=3&cursor=${encodeURIComponent(p2.body.cursor.next)}`)
+    expect(shape(p3.body)).toEqual(paging.third.page)
+    expect(shape((await s.api('GET', `/api/session/${sid}/message?limit=3&cursor=${encodeURIComponent(p2.body.cursor.previous)}`)).body)).toEqual(paging.backFromSecond.page)
+    const asc = await s.api('GET', `/api/session/${sid}/message?limit=4&order=asc`)
+    expect(shape(asc.body)).toEqual(paging.limit4asc.page)
+    expect(JSON.parse(Buffer.from(asc.body.cursor.next, 'base64').toString())).toMatchObject(paging.limit4asc.cursorShape)
+    expect(await s.api('GET', `/api/session/${sid}/message?limit=1000`)).toEqual({ status: 400, body: paging.limit1000.body })
+    // The filtered stream: only those types, each durable; the watermark is the last durable seq.
+    expect([...new Set(filtered.map((e) => e.type))].sort()).toEqual(['server.connected', 'session.execution.failed', 'session.execution.started', 'session.inbox.enqueued'])
+    const seqs = filtered.filter((e) => e.durable).map((e) => e.durable!.seq)
+    expect(seqs).toEqual([...seqs].sort((a, b) => a - b))
+    expect((await log()).seq).toBe(Math.max(...s.events.filter((e) => e.durable?.aggregateID === sid).map((e) => e.durable!.seq), ...seqs))
+    expect(paging.default.count).toBe(12)
+    ac.abort()
+    await s.stop()
+  })
+})
+
 // The hostile project R0 recorded (tests/fixtures/opencode/real-2.2.6/switches), rebuilt here: what loads with each switch.
 function hostile(r: ReturnType<typeof root>) {
   const w = (f: string, s: string | object) => {
