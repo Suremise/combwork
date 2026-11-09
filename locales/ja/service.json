@@ -256,6 +256,8 @@
   "service.workflowNotice.merging": "{card}をマージ中です：レーンは完了を待っています",
   "service.workflowNotice.notMerged": "{card}はレビューに合格しました：レーンはマージを待っています",
   "service.workflowNotice.stalled": "{card}は停滞しています",
+  "service.workflowNotice.stalledSafeguard": "{card}は停滞しています。{agent}の最新のターンは{time}に{provider}の安全フィルターで停止されました（このセッションで{stops, plural, other {#回}}）。ペインを確認してください。",
+  "service.workflowNotice.safeguardGuidance": "安全フィルターについては{provider}のガイダンスを確認してください。",
   "service.workspace.advancedNotHere": "{setting}はワークスペースごとには設定できません。",
   "service.workspace.agentGone": "そのエージェントはもう存在しません。",
   "service.workspace.badName": "プロジェクト名は「.」で始めることも、{chars}を含めることもできません",

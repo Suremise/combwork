@@ -256,6 +256,8 @@
   "service.workflowNotice.merging": "{card} 正在合并：通道正在等待",
   "service.workflowNotice.notMerged": "{card} 已通过评审：通道正在等待合并",
   "service.workflowNotice.stalled": "{card} 已停滞",
+  "service.workflowNotice.stalledSafeguard": "{card} 已停滞。{agent} 的最近一轮在 {time} 被 {provider} 的安全过滤器停止（本会话共 {stops, plural, other {# 次}}）：请查看其窗格。",
+  "service.workflowNotice.safeguardGuidance": "请查看 {provider} 关于其安全过滤器的指南。",
   "service.workspace.advancedNotHere": "{setting} 不能针对工作区设置。",
   "service.workspace.agentGone": "该智能体已不存在。",
   "service.workspace.badName": "项目名称不能以“.”开头，也不能包含 {chars}",

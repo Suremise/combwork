@@ -5,6 +5,8 @@
 // the Agent API) with one notification, cleared once the agent works again; an agent that ends its turn without starting
 // a watch, with its card in Review, is flagged the same way; one that keeps watching never is. Dev build, throwaway
 // profile, workspace and CLAUDE_CONFIG_DIR; the grace and the wait for a wake to be taken are shortened for the test.
+// HI-2754: in a lane, a builder whose woken turn its CLI's safety classifier stopped: the stall keeps its reason and
+// says the stop beside it (the Agent API's stalled, the user's lane notification); a turn since leaves it out.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
 const fs = require('fs')
@@ -267,6 +269,32 @@ const check = (name, ok, extra = '') => {
   await inv('watch:cancel', alpha, reviewer.id)
   check('…ends with no watch, and its grace check runs', !!(await until(async () => (await inv('loops:checks', alpha, reviewer.id)) > depBefore, HUNG_MS)), String(await inv('loops:checks', alpha, reviewer.id)))
   check('…and a card with no reviewer is never stalled for an agent that only watches it', !/^Reviewer\b/.test((await stalledOf(dep)) ?? '') && !((await live(reviewer.id))?.notWatching ?? []).includes(dep), JSON.stringify({ stalled: await stalledOf(dep), mark: (await live(reviewer.id))?.notWatching }))
+
+  // --- 6. HI-2754: in a running lane, the builder woken on its card has its turn stopped by Claude Code's safety
+  // classifier (the fake's "safeguard": its note in the transcript) and ends with no watch. After the grace the card's
+  // stall keeps its reason and says the stop beside it, and the user's lane notification says the same, with Claude
+  // Code's own advice. A turn since (a prompt) leaves it out again.
+  const c6 = (await inv('tasks:create', { title: 'Stopped by the filter', project: 'alpha' })).number
+  const lane6 = await inv('lanes:start', alpha, { builder: builder.id, reviewer: reviewer.id, cards: [c6], name: 'Filter' }).catch((e) => ({ error: String(e) }))
+  check('a lane starts with #6 for the builder', !!(await until(async () => (await inv('tasks:list')).find((c) => c.number === c6)?.column === 'doing', HUNG_MS)), JSON.stringify(lane6))
+  // Its start's line taken and its turn over before the watch (a prompt after the stop would be a turn since).
+  await until(async () => ['ready', 'finished', 'watching'].includes((await live(builder.id))?.status), HUNG_MS)
+  script('Builder', ['safeguard'])
+  await say(builder.id, wait(c6, { changes: ['comment'] }))
+  check('the builder watches #6', !!(await until(async () => (await live(builder.id))?.status === 'watching', HUNG_MS)), await why(builder.id))
+  await inv('tasks:comment', c6, 'Round 1: failed. 1. Fix the greeting.')
+  check('…is woken, its turn stopped by the safety classifier (its latest turn noted), ending with no watch', !!(await until(async () => !!(await live(builder.id))?.safeguard?.latest && ['ready', 'finished'].includes((await live(builder.id))?.status), 20000)), JSON.stringify((await live(builder.id))?.safeguard ?? null))
+  const filtered = await until(async () => {
+    const s = (await stalledOf(c6)) ?? ''
+    return /^Builder isn't watching #\d+: its turn ended with no card watch\. Builder's latest turn was stopped by Claude Code's safety filter at \d\d:\d\d \(1 stop this session\)\. Look at its pane before nudging it, and tell the user\.$/.test(s) ? s : null
+  }, 20000)
+  check("after the grace the stall keeps its reason and says the stop beside it", !!filtered, String(await stalledOf(c6)))
+  const told6 = () => notices().filter((n) => JSON.stringify(n).includes('has stalled. Builder’s latest turn was stopped by Claude Code’s safety filter'))
+  check("the user's lane notification says it, with Claude Code's own advice", !!(await until(async () => told6().length > 0, 60000)) && /\/feedback reports a false positive/.test(JSON.stringify(told6()[0])), JSON.stringify(notices().slice(-3)))
+  await page.screenshot({ path: path.join(lib.WORK, 'loopwatch-safeguard-stall.png') }).catch(() => undefined)
+  // A new turn (a prompt): its latest turn wasn't stopped, so the stall, if any, says nothing of it.
+  await say(builder.id, 'work 1')
+  check('…a turn since leaves the stop out', !!(await until(async () => !(await live(builder.id))?.safeguard?.latest && !/safety filter/.test((await stalledOf(c6)) ?? ''), 20000)), String(await stalledOf(c6)))
 
   await inv('session:stop', alpha)
   await until(async () => (await inv('session:live')).length === 0, 15000)

@@ -256,6 +256,8 @@
   "service.workflowNotice.merging": "{card} wird gerade gemergt: Die Lane wartet darauf",
   "service.workflowNotice.notMerged": "{card} hat das Review bestanden: Die Lane wartet auf den Merge",
   "service.workflowNotice.stalled": "{card} ist festgefahren",
+  "service.workflowNotice.stalledSafeguard": "{card} ist festgefahren. Der letzte Turn von {agent} wurde um {time} vom Sicherheitsfilter von {provider} gestoppt ({stops, plural, one {# Stopp} other {# Stopps}} in dieser Sitzung): Sieh dir seinen Bereich an.",
+  "service.workflowNotice.safeguardGuidance": "Sieh in der Anleitung von {provider} zu seinem Sicherheitsfilter nach.",
   "service.workspace.advancedNotHere": "{setting} kann nicht für einen Arbeitsbereich festgelegt werden.",
   "service.workspace.agentGone": "Diesen Agenten gibt es nicht mehr.",
   "service.workspace.badName": "Projektnamen dürfen nicht mit „.“ beginnen oder {chars} enthalten",

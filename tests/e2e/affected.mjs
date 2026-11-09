@@ -411,7 +411,7 @@ export const AREAS = [
   { paths: ['src/main/watches.ts', 'src/shared/watch.ts', 'src/shared/agentWatch.ts', 'src/shared/usageWatch.ts', 'src/main/loopCheck.ts', 'src/main/intentWatch.ts'], suites: ['agentmessage', 'deliveries', 'agentwatch', 'cardloop', 'decisionwake', 'lanewatch', 'loopwakes', 'loopwatch', 'quitwait', 'replysize', 'replytell', 'wakepaste', 'wakeuntaken', 'watchrelease'] },
   { paths: ['src/renderer/src/components/watchLine.ts'], suites: ['agentstable', 'agentwatch', 'cardloop'] },
   // Lane watches (#531), and stalls as cards and lanes tell them.
-  { paths: ['src/shared/laneWatch.ts', 'src/main/cardStall.ts', 'src/main/agentStarts.ts'], suites: ['lanewatch', 'watchrelease', 'loopwatch', 'replysize'] },
+  { paths: ['src/shared/laneWatch.ts', 'src/main/cardStall.ts', 'src/main/agentStarts.ts', 'src/shared/stallSafeguard.ts'], suites: ['lanewatch', 'watchrelease', 'loopwatch', 'replysize'] },
   { paths: ['src/main/taskbar.ts', 'src/shared/taskbar.ts'], suites: ['taskbar', 'progress'] },
   { paths: ['src/main/titleBar.ts', 'src/shared/titleBar.ts'], suites: ['carddialog'] },
   // A window fitted to the display it opens on (#812).

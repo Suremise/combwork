@@ -256,6 +256,8 @@
   "service.workflowNotice.merging": "{card} está em merge: a raia espera",
   "service.workflowNotice.notMerged": "{card} passou na revisão: a raia espera o merge",
   "service.workflowNotice.stalled": "{card} está travado",
+  "service.workflowNotice.stalledSafeguard": "{card} está travado. O último turno de {agent} foi interrompido pelo filtro de segurança do {provider} às {time} ({stops, plural, one {# interrupção} other {# interrupções}} nesta sessão): veja o painel dele.",
+  "service.workflowNotice.safeguardGuidance": "Consulte as orientações do {provider} sobre o filtro de segurança dele.",
   "service.workspace.advancedNotHere": "A configuração {setting} não pode ser definida para um espaço de trabalho.",
   "service.workspace.agentGone": "Esse agente não existe mais.",
   "service.workspace.badName": "Nomes de projeto não podem começar com “.” nem conter {chars}",

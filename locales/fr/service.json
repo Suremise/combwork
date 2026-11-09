@@ -256,6 +256,8 @@
   "service.workflowNotice.merging": "La carte {card} est en cours de fusion : le couloir attend",
   "service.workflowNotice.notMerged": "La carte {card} a été validée en relecture : le couloir attend sa fusion",
   "service.workflowNotice.stalled": "La carte {card} est à l’arrêt",
+  "service.workflowNotice.stalledSafeguard": "La carte {card} est à l’arrêt. Le dernier tour de {agent} a été arrêté par le filtre de sécurité de {provider} à {time} ({stops, plural, one {# arrêt} many {# arrêts} other {# arrêts}} dans cette session) : regarde son volet.",
+  "service.workflowNotice.safeguardGuidance": "Consulte les indications de {provider} sur son filtre de sécurité.",
   "service.workspace.advancedNotHere": "Le paramètre {setting} ne peut pas être défini pour un espace de travail.",
   "service.workspace.agentGone": "Cet agent n’existe plus.",
   "service.workspace.badName": "Le nom d’un projet ne peut pas commencer par « . » ni contenir {chars}",

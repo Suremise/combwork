@@ -102,6 +102,41 @@ export interface SafeguardNote {
   idle?: boolean
   /** The switch hasn't been looked at (its pane not on screen since): it stays in the attention inbox until then. */
   unseen?: boolean
+  /**
+   * HI-2754: the stop that hit the agent's latest turn (`latestStop`): set by a stop no older than the latest prompt,
+   * cleared by the next prompt. The count and the last stop's details are history; this alone says its latest turn was
+   * stopped (never that it is still blocked).
+   */
+  latest?: { at: string }
+}
+
+/**
+ * HI-2754: the note once a stop it counted is placed against the agent's turns. The latest turn is the one since the
+ * latest prompt (`promptAt`, ms: the user's or one Combwork typed; none yet this launch: since its start). A stop no older
+ * than that hit it; an older one read late (a transcript read after a newer prompt) is history only. Turn ids aren't
+ * compared: the CLIs' native ids and the turn ledger's aren't one namespace, so the prompt's time is the boundary.
+ */
+export function latestStop(note: SafeguardNote, at: number, promptAt: number | undefined): SafeguardNote {
+  if (promptAt !== undefined && at < promptAt) return note
+  return { ...note, latest: { at: new Date(at).toISOString() } }
+}
+
+/**
+ * HI-2754: a safeguard event read from the CLI's records placed on the agent's note, as the session does it: counted
+ * (noteSafeguard: null when nothing changes), and a stop placed against its turns (latestStop, `promptAt` its latest
+ * prompt's time).
+ */
+export function placeEvent(note: SafeguardNote | undefined, ev: SafeguardEvent, promptAt: number | undefined): SafeguardNote | null {
+  const counted = noteSafeguard(note, ev)
+  if (!counted) return null
+  return ev.kind === 'stop' ? latestStop(counted, ev.at, promptAt) : counted
+}
+
+/** HI-2754: the note once a new turn starts (a prompt): its latest turn hasn't been stopped. Unchanged with none. */
+export function newTurn(note: SafeguardNote | undefined): SafeguardNote | undefined {
+  if (!note?.latest) return note
+  const { latest: _l, ...rest } = note
+  return rest
 }
 
 /**
@@ -118,8 +153,9 @@ export function noteSafeguard(note: SafeguardNote | undefined, ev: SafeguardEven
     // A switch noted earlier stands until the model changes back: it is the model the agent still runs on.
     if (note?.switched) out.switched = note.switched
     if (note?.unseen) out.unseen = true
-    // So does a prompt about it still waiting (only an answer ends it).
+    // So does a prompt about it still waiting (only an answer ends it), and the latest turn's stop until it is placed.
     if (note?.prompt) out.prompt = true
+    if (note?.latest) out.latest = note.latest
     return out
   }
   if (!note && !ev.flagged) return null
