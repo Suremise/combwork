@@ -151,7 +151,7 @@ const logged = () => (fs.existsSync(fakeLog) ? fs.readFileSync(fakeLog, 'utf8').
     const info = (await inv('provider:info')).copilot
     const routeOf = (p) => info.hostRouteOf?.[p.toLowerCase()]
     const tenantCatalog = info.hostCatalogs?.[routeOf(ws)]
-    check('the workspace’s host has its own catalogue, with its context', !!tenantCatalog && tenantCatalog.models.map((m) => m.value).join() === 'gpt-5,claude-sonnet-5.5' && /^tenant\.ghe\.com\|/.test(tenantCatalog.context ?? ''), JSON.stringify({ route: routeOf(ws), tenantCatalog }))
+    check('the workspace’s host has its own catalogue, with its context', !!tenantCatalog && tenantCatalog.models.map((m) => m.value).join() === 'gpt-5,claude-sonnet-5.5' && (tenantCatalog.context ?? '').startsWith('tenant.ghe.com|'), JSON.stringify({ route: routeOf(ws), tenantCatalog }))
     check('the enterprise project’s host (no sign-in there) has no catalogue, not the tenant’s', !!routeOf(enterprise) && routeOf(enterprise) !== routeOf(ws) && !info.hostCatalogs?.[routeOf(enterprise)], JSON.stringify(info.hostRouteOf))
     await setup.locator('button', { hasText: 'Close' }).last().click()
 
