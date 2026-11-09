@@ -3189,6 +3189,23 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/integrations-opencode-2.2.6.json`, version: '2.2.6', text: '"label": "AWS profile (SSO or named profile)"', shows: "One of OpenCode's sign-ins that reads what the PC already has, which Combwork denies" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
+    // HI-2769 (Darren's option a, after HI-2768's source research): side jobs set to another provider's model, and image
+    // generation's fallback across providers, can't leave the connection's provider while this is on.
+    id: overrideId('opencode', 'ownProviderOnly'),
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.override.ownProviderOnly.title', defaultMessage: "Keep OpenCode to the connection's own provider", description: "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.opencode.override.ownProviderOnly.desc',
+      defaultMessage: "Combwork's private OpenCode config denies every provider but the one in the connection's model (ollama in ollama/qwen3:8b), so nothing OpenCode does on the agent's behalf goes to another provider: not a title or compaction set to another provider's model, nor an image request falling back to another provider's model, nor OpenCode's free cloud models. A connection with this on must name its model. It decides which provider OpenCode uses, not where the provider's address points, and isn't a firewall: web search, MCP servers, plugins and commands can still reach the network. Turned off, OpenCode may use any provider it can, as it would outside Combwork; Claude Agent stays denied either way.",
+      description: 'What the advanced setting "Keep OpenCode to the connection\'s own provider" does (Settings → Advanced, under OpenCode). ollama and ollama/qwen3:8b are a provider\'s and a model\'s ids, and Claude Agent a provider\'s name: keep them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/models-opencode-2.2.6.txt`, version: '2.2.6', text: 'opencode/big-pickle', shows: "One of OpenCode's free cloud models it offers with no account, which this keeps a local connection from" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
     id: 'opencode.version',
     group: 'opencode',
     title: msg({ id: 'settings.advanced.opencode.version.title', defaultMessage: 'The version in opencode --version', description: "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the CLI's version line. opencode --version is a command: keep it." }),

@@ -82,6 +82,7 @@ const w = (f, s) => {
     // The agent on a connection of that account, so its switches can be set (they are the connection's).
     const conn = (await inv('connections:list')).connectionRows.find((c) => c.account === account.id) ?? (await inv('connection:add', account.id, { name: 'Test · OpenCode' }))
     await inv('agents:update', alpha, agent.id, { connection: conn.id })
+    await lib.setLaunch(inv, alpha, agent.id, { model: 'opencode/big-pickle' }) // a connection kept to its own provider names its model (HI-2769)
 
     /** One launch: what its serve was given and what it loaded and started (the log's lines from its serve's pid). */
     async function launch(label) {

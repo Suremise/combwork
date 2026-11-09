@@ -80,6 +80,7 @@ const texts = (dataHome) => Object.values(store(dataHome).sessions).flatMap((s) 
     const onAccount = async (acc, project, agentId) => {
       const conn = (await inv('connections:list')).connectionRows.find((c) => c.account === acc.id) ?? (await inv('connection:add', acc.id, { name: `Test · ${acc.id}` }))
       await inv('agents:update', project, agentId, { connection: conn.id })
+      await lib.setLaunch(inv, project, agentId, { model: 'opencode/big-pickle' }) // a connection kept to its own provider names its model (HI-2769)
     }
     await onAccount(accA, alpha, a.id)
     await onAccount(accB, beta, b.id)

@@ -53,7 +53,7 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
     }
     const account = await inv('connections:add', 'opencode', 'OpenCode · History')
     await inv('connections:setOn', account.id, true)
-    const agent = await lib.addAgent(inv, alpha, { name: 'Oc', provider: 'opencode' })
+    const agent = await lib.addAgent(inv, alpha, { name: 'Oc', provider: 'opencode', model: 'opencode/big-pickle' })
     const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id && s.status !== 'stopped') ?? null
     const key = lib.ptyKey(alpha, agent.id)
     const type = async (text) => {

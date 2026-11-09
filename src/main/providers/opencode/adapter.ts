@@ -37,6 +37,7 @@ const REFUSED = {
   protectedArg: msg({ id: 'providers.opencode.protectedArg', defaultMessage: "{provider} didn't start: the agent's extra arguments include {arg}, which Combwork sets itself for every OpenCode launch. Remove it from the agent's extra arguments (Agent Settings).", description: "Why an OpenCode agent didn't start (its pane): its extra command-line arguments include one Combwork controls (its server, its session, its mode). {provider} is OpenCode, {arg} the argument as typed. Agent Settings is a place in Combwork." }),
   otherAccount: msg({ id: 'providers.opencode.otherAccount', defaultMessage: "{provider} didn't resume {session}: it is in another OpenCode account's data, not the account this agent runs on now. Start a new session, or move the agent back to that account.", description: "Why an OpenCode agent didn't resume a session (its pane): each OpenCode account keeps its own sessions, and this one was made on another account. {provider} is OpenCode, {session} the session's id." }),
   historyBusy: msg({ id: 'providers.opencode.historyBusy', defaultMessage: "{provider} didn't start: Combwork's reader of OpenCode sessions didn't answer in time, so it couldn't take this session over from an earlier run. Start the agent again.", description: "Why an OpenCode agent didn't start (its pane): Combwork's background reader of OpenCode session histories didn't confirm in time that it let go of the session's earlier run. {provider} is OpenCode." }),
+  noModel: msg({ id: 'providers.opencode.noModel', defaultMessage: "{provider} didn't start: Combwork keeps OpenCode to the provider in the connection's model, and this connection names none, so OpenCode would choose one itself, perhaps one of its free cloud models. Choose the connection's model (a provider and model, such as ollama/qwen3:8b) in Agent Settings, or turn off \"Keep OpenCode to the connection's own provider\" in Settings → Advanced.", description: "Why an OpenCode agent didn't start (its pane): Combwork only allows the provider of the connection's model, and no model (or no valid provider/model id) is set. {provider} is OpenCode. ollama/qwen3:8b is a model id: keep it. Agent Settings and Settings → Advanced are places in Combwork; the quoted text is an advanced setting's title: use that setting's translated title." }),
   noOwner: msg({ id: 'providers.opencode.noOwner', defaultMessage: "{provider} didn't start: Combwork couldn't read its own process's identity, which the agent's private OpenCode server is tied to so that it ends with Combwork. Windows PowerShell may be blocked on this PC.", description: "Why an OpenCode agent didn't start (its pane): Combwork couldn't get the identity it ties the agent's server's lifetime to. {provider} is OpenCode. Windows PowerShell is a program's name: keep it." })
 }
 
@@ -209,6 +210,13 @@ export class OpencodeAdapter implements ProviderAdapter {
     const arg = protectedArg(ctx.extraArgs)
     if (arg) throw combworkError(REFUSED.protectedArg, { provider: NAME, arg })
     if (!isSessionId(ctx.sessionId)) throw new Error(`not an OpenCode session id: ${ctx.sessionId}`) // i18n-ignore: an internal check, never shown
+    // The connection's own provider only (HI-2769): the provider part of its model, which it must name (with none, 2.2.6
+    // chooses from its catalogue, its free cloud models included: HI-2768). A real-tier run's test provider is its model.
+    const ownOnly = launchOverrides(ctx.overrides, OPENCODE, 'ownProviderOnly')
+    const tp = testProvider()
+    const model = tp ? `${tp.id}/${tp.model}` : (ctx.model?.trim() ?? '')
+    if (ownOnly && !isOpencodeModelId(model)) throw combworkError(REFUSED.noModel, { provider: NAME })
+    const ownProvider = ownOnly ? model.slice(0, model.indexOf('/')) : null
     const owner = await ownerToken()
     if (!owner && process.platform === 'win32') throw combworkError(REFUSED.noOwner, { provider: NAME })
     const home = opencodeHome(ctx.connectionHome)
@@ -238,6 +246,7 @@ export class OpencodeAdapter implements ProviderAdapter {
       saved,
       strip,
       noUpdate,
+      ownProvider,
       projectDecidesMcp: projectDecidesMcp({ asFromTerminal: ctx.asFromTerminal === true, servers: Object.keys(ctx.mcpServers).length, keepOut })
     })
     await writeConfigDir(configDir, withTestProvider(cfg, testProvider(), true), launchGuidance(ctx))

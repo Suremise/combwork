@@ -140,6 +140,11 @@
       "provider": "plain"
     }
   },
+  "providers.opencode.noModel": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
   "providers.opencode.noOwner": {
     "placeholders": {
       "provider": "plain"

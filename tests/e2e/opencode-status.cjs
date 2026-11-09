@@ -49,7 +49,7 @@ const turnEnds = () => lines().filter((e) => e.kind === 'turn-end')
     }
     const account = await inv('connections:add', 'opencode', 'OpenCode · Status')
     await inv('connections:setOn', account.id, true)
-    const agent = await lib.addAgent(inv, alpha, { name: 'Oc', provider: 'opencode' })
+    const agent = await lib.addAgent(inv, alpha, { name: 'Oc', provider: 'opencode', model: 'opencode/big-pickle' })
     const live = async () => (await inv('session:live')).find((s) => s.agentId === agent.id && s.status !== 'stopped') ?? null
     const key = lib.ptyKey(alpha, agent.id)
     const screen = async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '')

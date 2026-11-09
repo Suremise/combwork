@@ -374,6 +374,8 @@ interface CombworkMessageValues {
   'tips.opencode.title': undefined
   'tips.opencodeHistory.text': undefined
   'tips.opencodeHistory.title': undefined
+  'tips.opencodeOwnProvider.text': undefined
+  'tips.opencodeOwnProvider.title': undefined
   'tips.outageResume.text': undefined
   'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }

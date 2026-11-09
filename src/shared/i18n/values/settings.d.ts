@@ -668,6 +668,8 @@ interface CombworkMessageValues {
   'settings.advanced.opencode.override.keepProjectConfigOut.title': undefined
   'settings.advanced.opencode.override.noAutoUpdate.desc': undefined
   'settings.advanced.opencode.override.noAutoUpdate.title': undefined
+  'settings.advanced.opencode.override.ownProviderOnly.desc': undefined
+  'settings.advanced.opencode.override.ownProviderOnly.title': undefined
   'settings.advanced.opencode.override.stripCredentials.desc': undefined
   'settings.advanced.opencode.override.stripCredentials.title': undefined
   'settings.advanced.opencode.server.readySeconds.desc': undefined

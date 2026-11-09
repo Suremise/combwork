@@ -2759,6 +2759,16 @@
     "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
     "audience": "both"
   },
+  "settings.advanced.opencode.override.ownProviderOnly.desc": {
+    "text": "Combwork's private OpenCode config denies every provider but the one in the connection's model (ollama in ollama/qwen3:8b), so nothing OpenCode does on the agent's behalf goes to another provider: not a title or compaction set to another provider's model, nor an image request falling back to another provider's model, nor OpenCode's free cloud models. A connection with this on must name its model. It decides which provider OpenCode uses, not where the provider's address points, and isn't a firewall: web search, MCP servers, plugins and commands can still reach the network. Turned off, OpenCode may use any provider it can, as it would outside Combwork; Claude Agent stays denied either way.",
+    "note": "What the advanced setting \"Keep OpenCode to the connection's own provider\" does (Settings → Advanced, under OpenCode). ollama and ollama/qwen3:8b are a provider's and a model's ids, and Claude Agent a provider's name: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.ownProviderOnly.title": {
+    "text": "Keep OpenCode to the connection's own provider",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
   "settings.advanced.opencode.override.stripCredentials.desc": {
     "text": "Combwork leaves the variables OpenCode reads as a provider's key or token out of its environment (the shell its agents run commands in too: GITHUB_TOKEN and HF_TOKEN among them), and denies Amazon Bedrock, Google Vertex and Azure unless the account saved a credential for them, so an AWS profile, a gcloud login or an Azure CLI sign-in on this PC is never used unasked. OpenCode's Claude Agent provider is denied either way. Turned off, OpenCode gets those variables and may use those sign-ins as it would outside Combwork.",
     "note": "What the advanced setting \"Keep other credentials from OpenCode\" does (Settings → Advanced, under OpenCode). GITHUB_TOKEN and HF_TOKEN are environment variables; Amazon Bedrock, Google Vertex, Azure, gcloud, Azure CLI and Claude Agent are names: keep them.",

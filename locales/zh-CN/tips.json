@@ -566,6 +566,8 @@
   "tips.localModelPicker.text": "服务器账户上的智能体可以在 Claude Code 的 /model 中找到该账户的模型，按准确的 ID 列出。在编辑服务器…中为每个模型设置标签，即可在那里显示该名称。",
   "tips.localModelLimits.title": "告诉 Claude Code 本地模型的实际上下文",
   "tips.opencode.text": "智能体可以使用 OpenCode 2。“配置提供方”会安装它；每个 OpenCode 账号都有自己的提供方登录和会话，每个智能体都运行一个随它一起结束的私有 OpenCode 服务器。",
+  "tips.opencodeOwnProvider.title": "OpenCode 只使用连接的提供方",
+  "tips.opencodeOwnProvider.text": "OpenCode 智能体只使用其连接模型中的提供方，因此它所做的任何事都不会发送给其他提供方或 OpenCode 的免费云端模型。请指定连接的模型，例如 ollama/qwen3:8b；可在“设置”→“高级”→“OpenCode”中关闭。",
   "tips.opencode.title": "使用 OpenCode 运行智能体",
   "tips.opencodeHistory.text": "OpenCode 代理的对话显示在“会话”标签页中，其令牌和费用按 OpenCode 的报告显示在概览和其窗格的页脚中。$0 的费用并不能衡量你的套餐额度；只有 OpenCode Go 或 Console 才显示限额。",
   "tips.opencodeHistory.title": "OpenCode 代理的历史记录、令牌和费用"

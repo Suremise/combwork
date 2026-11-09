@@ -154,6 +154,35 @@ describe('the policies and the private config (design s7 to s16)', () => {
     expect(loginConfig(true).policies).toContainEqual({ action: 'provider.use', resource: 'claude-agent', effect: 'deny' })
   })
 
+  it("the connection's own provider only (HI-2769): every provider denied, its own allowed, the denies after it still winning; checks and sign-ins keep every provider", () => {
+    // 2.2.6's rule within a document (HI-2768): the last matching statement wins; none: allowed.
+    const allowed = (policies: { action: string; resource: string; effect: string }[], provider: string): boolean => {
+      let effect = 'allow'
+      for (const p of policies) if (p.action === 'provider.use' && (p.resource === '*' || p.resource === provider)) effect = p.effect
+      return effect === 'allow'
+    }
+    const saved = new Map([['amazon-bedrock', ['key']]])
+    const own = providerPolicies(AMBIENT, saved, true, 'ollama')
+    expect(own.slice(0, 3)).toEqual([
+      { action: 'provider.use', resource: '*', effect: 'deny' },
+      { action: 'provider.use', resource: 'ollama', effect: 'allow' },
+      { action: 'provider.use', resource: 'claude-agent', effect: 'deny' }
+    ])
+    expect(['ollama', 'opencode', 'opencode-go', 'openai', 'claude-agent', 'google-vertex'].filter((p) => allowed(own, p))).toEqual(['ollama'])
+    // An ambient provider as its own: allowed only with a saved credential (stripCredentials still decides); Claude Agent never.
+    expect(allowed(providerPolicies(AMBIENT, saved, true, 'amazon-bedrock'), 'amazon-bedrock')).toBe(true)
+    expect(allowed(providerPolicies(AMBIENT, saved, true, 'google-vertex'), 'google-vertex')).toBe(false)
+    expect(allowed(providerPolicies(AMBIENT, saved, false, 'google-vertex'), 'google-vertex')).toBe(true)
+    expect(allowed(providerPolicies(AMBIENT, saved, true, 'claude-agent'), 'claude-agent')).toBe(false)
+    // Off (none given): OpenCode's own rules, as before.
+    expect(providerPolicies(AMBIENT, saved, true)).toEqual(providerPolicies(AMBIENT, saved, true, null))
+    expect(providerPolicies(AMBIENT, saved, true).some((p) => p.resource === '*')).toBe(false)
+    const cfg = launchConfig({ model: 'ollama/qwen3:8b', agent: null, mcpServers: {}, instructions: [], ambient: AMBIENT, saved, strip: true, noUpdate: false, ownProvider: 'ollama' })
+    expect((cfg.policies as { action: string; resource: string }[]).filter((p) => p.action === 'provider.use').slice(0, 2).map((p) => p.resource)).toEqual(['*', 'ollama'])
+    expect((checkConfig(AMBIENT, saved, true, true).policies as { resource: string; action: string }[]).some((p) => p.action === 'provider.use' && p.resource === '*')).toBe(false)
+    expect((loginConfig(true).policies as { resource: string; action: string }[]).some((p) => p.action === 'provider.use' && p.resource === '*')).toBe(false)
+  })
+
   it("an ambient chain is chosen only by a saved credential with that integration's external method, never by a key or another integration's row", () => {
     expect([...chosenAmbient(new Map([['amazon-bedrock', ['aws-profile']]]))]).toEqual(['amazon-bedrock'])
     expect([...chosenAmbient(new Map([['amazon-bedrock', ['key']], ['anthropic', ['aws-profile']], ['azure', ['key']]]))]).toEqual([])
@@ -247,7 +276,7 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     expect(await opencode.prepareLaunch(c as never)).toEqual({})
     const cfg = JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8'))
     expect(cfg).toMatchObject({ update: 'disable', model: 'ollama/qwen3:8b', default_agent: 'plan', instructions: [join(c.cwd, 'AGENTS.md')], mcp: { servers: { [TOOLS_SERVER]: { type: 'local', command: ['node', 'cw-mcp.js'], environment: { CW_TOKEN: 't' } } } } })
-    expect(cfg.policies.map((p: { resource: string; effect: string }) => `${p.resource}:${p.effect}`)).toEqual(['claude-agent:deny', 'amazon-bedrock:deny', 'google-vertex:deny', 'azure:deny', '*:deny', `${TOOLS_SERVER}:allow`])
+    expect(cfg.policies.map((p: { resource: string; effect: string }) => `${p.resource}:${p.effect}`)).toEqual(['*:deny', 'ollama:allow', 'claude-agent:deny', 'amazon-bedrock:deny', 'google-vertex:deny', 'azure:deny', '*:deny', `${TOOLS_SERVER}:allow`])
     expect(JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'service.json'), 'utf8'))).toEqual({ disabled: true })
     expect(readFileSync(join(c.privateDir, 'opencode-config', 'AGENTS.md'), 'utf8')).toBe('Combwork guidance\n')
     const cmd = opencode.buildCommand(FAKE, c as never)
@@ -277,6 +306,27 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     await opencode.prepareLaunch(c as never)
     expect(opencode.buildCommand(FAKE, c as never).env).toMatchObject({ CW_OC_INTENT: 'resume' })
     expect(existsSync(sessionMark(c.connectionHome, c.sessionId))).toBe(true)
+  }, 60000)
+
+  it("the connection's own provider only (HI-2769): no model or a malformed one refused, new or resumed; an unknown but valid id taken; the switch off (or the terminal preset) takes none and adds no allowlist", async () => {
+    const OWN = 'opencode.override.ownProviderOnly'
+    const providerRules = (c: { privateDir: string }) => (JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8')).policies as { action: string; resource: string; effect: string }[]).filter((p) => p.action === 'provider.use').map((p) => `${p.resource}:${p.effect}`)
+    for (const model of [null, '', '   ', 'qwen3', '/qwen3']) await expect(opencode.prepareLaunch(ctx({ model }))).rejects.toThrow(/names none.*Keep OpenCode to the connection's own provider/)
+    // A resume is refused the same way, before anything about its session.
+    await expect(opencode.prepareLaunch(ctx({ model: null, resume: true }))).rejects.toThrow(/names none/)
+    // A provider/model id OpenCode may know though Combwork doesn't: allowed, its provider the only one.
+    const c = ctx({ model: 'mylab/some-model:7b' }) as { privateDir: string }
+    await opencode.prepareLaunch(c as never)
+    expect(providerRules(c).slice(0, 2)).toEqual(['*:deny', 'mylab:allow'])
+    // Off: no model needed, and OpenCode's own rules (Claude Agent still denied).
+    const ctxOverrides = { 'opencode.override.noAutoUpdate': true, 'opencode.override.keepProjectConfigOut': true, 'opencode.override.stripCredentials': true }
+    const off = ctx({ model: null, overrides: { ...ctxOverrides, [OWN]: false } }) as { privateDir: string }
+    await opencode.prepareLaunch(off as never)
+    expect(providerRules(off)).toEqual(['claude-agent:deny', 'amazon-bedrock:deny', 'google-vertex:deny', 'azure:deny'])
+    // The Independent role's terminal preset: every override off.
+    const terminal = ctx({ model: null, overrides: { 'opencode.override.noAutoUpdate': false, 'opencode.override.keepProjectConfigOut': false, 'opencode.override.stripCredentials': false, [OWN]: false } }) as { privateDir: string }
+    await opencode.prepareLaunch(terminal as never)
+    expect(providerRules(terminal)).toEqual(['claude-agent:deny'])
   }, 60000)
 
   it("gives the launch's first task to the TUI as --prompt (a Combwork start, the Assistant's), none without one", async () => {
