@@ -5,7 +5,7 @@ import { CardChip, WatchedCardChip, WatchedCardChips } from '../components/CardC
 import { cardsWait } from '../components/watchLine'
 import { KeybindingsEditor } from '../components/Keybindings'
 import type { CompactionEvent, GitDiff, GitStatus, McpServerInfo, MemorySource, PlanLimit, PlanUsage, ProjectConfig, ProjectInfo, ProviderId, SessionListItem, SessionUsage, SkillInfo, UnusedWorktree } from '@shared/types'
-import { unpricedModel, unpricedText, usesOwnPrices } from '@shared/prices'
+import { unpricedModel, unpricedText, usesOwnPrices, zeroCostNote } from '@shared/prices'
 import { formatDateTime, formatDayLabel } from '@shared/dates'
 import { agentChoosesMcp, agentGetsMcp, agentMcpText, serverAddedIn } from '@shared/agentMcp'
 import { gitFixText, gitProblemText } from '@shared/gitTool'
@@ -847,7 +847,7 @@ function SessionDetails({ project, items }: { project: ProjectInfo; items: Sessi
                   title={tr(M.cost)}
                   value={`${costEstimated ? '≈ ' : ''}${moneyLabel(cost)}${costPartUnpriced ? ' + ?' : ''}`}
                   sub={tr(costEstimated ? M.sessionEstimated : M.sessionAtPrices)}
-                  tip={tr(M.sessionCostTip, { estimated: costEstimated ? 'yes' : 'no', company: provider.company, provider: provider.name })}
+                  tip={[tr(M.sessionCostTip, { estimated: costEstimated ? 'yes' : 'no', company: provider.company, provider: provider.name }), zeroCostNote(cost, costEstimated, totalIn + u.outputTokens, provider.name)].filter(Boolean).join('\n\n')}
                 />
               )}
               {cost === null && unpricedModel(u.provider, u.model, settings) && (
@@ -924,14 +924,14 @@ export function PlanLimits({ provider }: { provider: ProviderId }) {
                 <strong>{name}</strong>
                 {email && <span className="faint"> {email}</span>}
               </div>
-              <LimitCards kept={byConnection[id]} now={now} provider={p.name} tip={(l) => tr(M.limitTipConnection, { window: limitWindow(l), label: limitName(l), name })} none={tr(M.noConnectionLimits, { name })} />
+              <LimitCards kept={byConnection[id]} now={now} provider={p.name} tip={(l) => tr(M.limitTipConnection, { window: limitWindow(l), label: limitName(l), name })} none={p.text?.noPlanLimits ? tr(p.text.noPlanLimits) : tr(M.noConnectionLimits, { name })} />
             </div>
           )
         })}
       </>
     )
   }
-  return <LimitCards kept={kept} now={now} tip={(l) => tr(M.limitTip, { window: limitWindow(l), label: limitName(l), provider: providerName(provider) })} none={tr(M.noLimits, { provider: p.name })} provider={p.name} />
+  return <LimitCards kept={kept} now={now} tip={(l) => tr(M.limitTip, { window: limitWindow(l), label: limitName(l), provider: providerName(provider) })} none={p.text?.noPlanLimits ? tr(p.text.noPlanLimits) : tr(M.noLimits, { provider: p.name })} provider={p.name} />
 }
 
 /** A CLI's or a connection's limits as cards, or `none` before any is current. */

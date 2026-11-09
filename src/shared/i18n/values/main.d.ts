@@ -7,6 +7,7 @@ interface CombworkMessageValues {
   'main.accounts.inUse': { name: string | number }
   'main.accounts.keyRemoveFailed': { name: string | number }
   'main.accounts.leftover': { name: string | number }
+  'main.accounts.letGoFailed': { name: string | number }
   'main.accounts.makeFailed': { error: string | number }
   'main.accounts.noHome': { cli: string | number; folder: string | number }
   'main.accounts.noName': undefined

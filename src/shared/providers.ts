@@ -34,6 +34,11 @@ export interface ProviderText {
   safeguardHelp: Msg | null
   /** The custom model ID box's placeholder (modelPlaceholder). */
   modelPlaceholder: Msg
+  /**
+   * What the plan limits say while none is known, where the provider's sessions report them only in some cases (HI-2762:
+   * OpenCode, only for an OpenCode Go or Console workspace): in place of the general "hasn't reported" note.
+   */
+  noPlanLimits?: Msg
 }
 
 /** A field as the window shows it: its message in the language shown now, else its English (#800). */

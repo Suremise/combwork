@@ -23,6 +23,10 @@
     "defaultMessage": "{name} is half removed: remove it again first.",
     "description": "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used."
   },
+  "main.accounts.letGoFailed": {
+    "defaultMessage": "{name} wasn't removed: Combwork couldn't stop its own work in its folder in time. Nothing was changed; Remove tries again.",
+    "description": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): something of Combwork's still writing into its folder (an OpenCode session's history being read) didn't stop in time, so nothing was removed."
+  },
   "main.accounts.makeFailed": {
     "defaultMessage": "Couldn't make the connection's folder: {error}",
     "description": "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English."

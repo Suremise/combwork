@@ -568,5 +568,7 @@
   "tips.opencode.text": "Agenci mogą używać OpenCode 2. Konfiguracja dostawców je instaluje; każde konto OpenCode ma własne logowania do dostawców i własne sesje, a każdy agent uruchamia prywatny serwer OpenCode, który kończy się razem z nim.",
   "tips.opencodeOwnProvider.title": "OpenCode trzyma się dostawcy połączenia",
   "tips.opencodeOwnProvider.text": "Agent OpenCode używa tylko dostawcy z modelu swojego połączenia, więc nic, co robi, nie trafia do innego dostawcy ani do darmowych modeli chmurowych OpenCode. Podaj model połączenia, np. ollama/qwen3:8b; wyłączysz to w Ustawienia → Zaawansowane → OpenCode.",
-  "tips.opencode.title": "Uruchamiaj agentów w OpenCode"
+  "tips.opencode.title": "Uruchamiaj agentów w OpenCode",
+  "tips.opencodeHistory.text": "Rozmowa agenta OpenCode jest widoczna na karcie Sesje, a jego tokeny i koszt w Przeglądzie i stopce jego panelu, tak jak podaje je OpenCode. Koszt $0 nie mierzy limitu Twojego planu; limity są widoczne tylko dla OpenCode Go lub Console.",
+  "tips.opencodeHistory.title": "Historia, tokeny i koszt agenta OpenCode"
 }

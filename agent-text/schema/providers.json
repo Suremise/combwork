@@ -135,6 +135,11 @@
       "model": "plain"
     }
   },
+  "providers.opencode.historyBusy": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
   "providers.opencode.noModel": {
     "placeholders": {
       "provider": "plain"

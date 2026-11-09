@@ -5,6 +5,7 @@
   "main.accounts.inUse": "A conexão {name} está em uso: pare os agentes que rodam nela e feche o login dela, depois remova.",
   "main.accounts.keyRemoveFailed": "A conexão {name} não foi removida: a chave dela não pôde ser excluída. Nada foi alterado; Remover tenta de novo.",
   "main.accounts.leftover": "A conexão {name} foi removida só em parte: remova de novo primeiro.",
+  "main.accounts.letGoFailed": "{name} não foi removido: o Combwork não conseguiu parar a tempo o próprio trabalho na pasta dele. Nada foi alterado; Remover tenta de novo.",
   "main.accounts.makeFailed": "Não foi possível criar a pasta da conexão: {error}",
   "main.accounts.noHome": "A pasta do {cli} ({folder}) ainda não existe: rode o {cli} uma vez e depois adicione a conexão.",
   "main.accounts.noName": "Dê um nome à conexão.",

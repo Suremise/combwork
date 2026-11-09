@@ -178,6 +178,7 @@ interface CombworkMessageValues {
   'project.cost.unknown': undefined
   'project.cost.unpriced': { model: string | number; provider: string | number }
   'project.cost.withFree': { cost: string | number }
+  'project.cost.zeroReported': { provider: string | number }
   'project.empty.addAgent': { project: string | number; provider: string | number }
   'project.empty.allSessions': undefined
   'project.empty.markActive': undefined

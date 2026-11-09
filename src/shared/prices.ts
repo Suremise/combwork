@@ -156,6 +156,20 @@ const UNPRICED = msg({
 /** What to say about a cost that is unknown because the model has no price: where to add one. */
 export const unpricedText = (model: string, providerName: string): string => tr(UNPRICED, { model, provider: providerName })
 
+const ZERO_REPORTED = msg({
+  id: 'project.cost.zeroReported',
+  defaultMessage: '{provider} reported this session’s cost as $0. A subscription, a free model or a model on this PC can still use your plan’s allowance: $0 isn’t a measure of it.',
+  description: "Added to the hover of a session's cost when the coding agent itself reported $0 for a session that used tokens (HI-2762: OpenCode gives $0 for a model it has no price for). {provider} is the coding agent (OpenCode…). $0 is the amount as shown: keep it."
+})
+
+/**
+ * A reported cost of $0 for a session that used tokens (HI-2762): said as such, never a price (a subscription's or a local
+ * model's use isn't free of allowance). Null when it doesn't apply: an estimate, a cost above 0, or no tokens.
+ */
+export function zeroCostNote(cost: number | null, estimated: boolean, tokens: number, providerName: string): string | null {
+  return cost === 0 && !estimated && tokens > 0 ? tr(ZERO_REPORTED, { provider: providerName }) : null
+}
+
 /** A session's API-equivalent cost from its token counts; null when the model's price is unknown. */
 export function estimateCost(usage: Pick<SessionUsage, 'provider' | 'model' | 'inputTokens' | 'cacheReadTokens' | 'cacheWriteTokens' | 'outputTokens'>, settings?: Pick<AppSettings, 'providers'> | null): number | null {
   const p = modelPrice(usage.provider, usage.model, settings)

@@ -1050,9 +1050,10 @@ async function runScenario(sc, providerKey, opts = {}) {
     // Tool calls the parser shortened for display are read in full (for the token check and read evidence), a Codex
     // script's calls too (HI-2246).
     const items = await readWhole(transcript?.items ?? [], (itemId) => inv('transcript:tool', host, sessionId, itemId))
-    // Codex in code mode (HI-2235): each script's calls as Combwork's parser gives them (HI-2240, HI-2246), in the script's
-    // place. A script whose calls aren't known is no tool: what it ran is unobservable (codeMode.unknown).
-    const code = p.provider === 'codex' ? withScriptCalls(items) : { items, scripts: 0, calls: 0, unknown: 0 }
+    // Codex in code mode (HI-2235), and OpenCode's Code Mode `execute` (HI-2762): each script's calls as Combwork's parser
+    // gives them (HI-2240, HI-2246), in the script's place. A script whose calls aren't known is no tool: what it ran is
+    // unobservable (codeMode.unknown).
+    const code = p.provider === 'codex' || p.provider === 'opencode' ? withScriptCalls(items) : { items, scripts: 0, calls: 0, unknown: 0 }
     const observed = observeTranscript(code.items, skillNames, skillRefsOf(ctx.skillsDir, skillNames))
     observed.codeMode = { scripts: code.scripts, calls: code.calls, unknown: code.unknown }
     observed.status = s?.status ?? 'stopped'

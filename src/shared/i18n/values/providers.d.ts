@@ -111,6 +111,7 @@ interface CombworkMessageValues {
   'providers.memory.user': { file: string | number }
   'providers.opencode.claudeAgentModel': { provider: string | number; model: string | number }
   'providers.opencode.connections.setUp': undefined
+  'providers.opencode.historyBusy': { provider: string | number }
   'providers.opencode.noModel': { provider: string | number }
   'providers.opencode.noOwner': { provider: string | number }
   'providers.opencode.otherAccount': { provider: string | number; session: string | number }
@@ -131,6 +132,11 @@ interface CombworkMessageValues {
   'providers.transcript.aborted': undefined
   'providers.transcript.apiError': undefined
   'providers.transcript.interrupted': undefined
+  'providers.transcript.opencodeIncomplete': { provider: string | number; problem: string | number }
+  'providers.transcript.opencodeProblem.exit': undefined
+  'providers.transcript.opencodeProblem.parse': undefined
+  'providers.transcript.opencodeProblem.size': undefined
+  'providers.transcript.opencodeProblem.timeout': undefined
   'providers.transcript.resumed': undefined
   'providers.transcript.turnEnded': { reason: string | number }
   'providers.unknown': { provider: string | number }

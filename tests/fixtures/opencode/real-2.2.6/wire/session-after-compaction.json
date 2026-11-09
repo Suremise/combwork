@@ -1,0 +1,30 @@
+{
+ "status": 200,
+ "body": {
+  "data": {
+   "id": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+   "projectID": "b05801101c0d8d6702cdf5f26a4fc23274112634",
+   "cost": 0,
+   "tokens": {
+    "input": 5798,
+    "output": 972,
+    "reasoning": 0,
+    "cache": {
+     "read": 4767,
+     "write": 0
+    }
+   },
+   "outcome": "succeeded",
+   "time": {
+    "created": 1794190289212,
+    "updated": 1794190296359,
+    "busy": 1794190296360,
+    "idle": 1794190300588
+   },
+   "title": "OK reply",
+   "location": {
+    "directory": "<root>\\project"
+   }
+  }
+ }
+}

@@ -1483,6 +1483,14 @@
     "defaultMessage": "Run agents on OpenCode",
     "description": "A tip's title. OpenCode is a product name."
   },
+  "tips.opencodeHistory.text": {
+    "defaultMessage": "An OpenCode agent's conversation shows in the Sessions tab, and its tokens and cost in the Overview and its pane's footer, as OpenCode reports them. A $0 cost isn't a measure of your plan's allowance; limits show only for OpenCode Go or Console.",
+    "description": "A tip (HI-2762). Names of Combwork's views: keep them as Combwork shows them. OpenCode, OpenCode Go and Console are product names. $0 is an amount: keep it."
+  },
+  "tips.opencodeHistory.title": {
+    "defaultMessage": "An OpenCode agent's history, tokens and cost",
+    "description": "A tip's title (HI-2762). OpenCode is a product name."
+  },
   "tips.opencodeOwnProvider.text": {
     "defaultMessage": "An OpenCode agent uses only the provider in its connection's model, so nothing it does goes to another provider or to OpenCode's free cloud models. Name the connection's model, such as ollama/qwen3:8b; Settings → Advanced → OpenCode turns this off.",
     "description": "A tip. Names of Combwork's menus, views and settings: keep them as Combwork shows them. OpenCode is a product name; ollama/qwen3:8b is a model id: keep it."

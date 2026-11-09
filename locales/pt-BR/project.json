@@ -176,6 +176,7 @@
   "project.cost.unknown": "Desconhecido",
   "project.cost.unpriced": "O Combwork não tem preço de API para {model}, então não consegue estimar o custo desta sessão. Adicione um em Configurações → {provider} → Preços de API.",
   "project.cost.withFree": "{cost} + grátis (local)",
+  "project.cost.zeroReported": "{provider} informou que esta sessão custou $0. Uma assinatura, um modelo gratuito ou um modelo neste PC ainda pode consumir a cota do seu plano: $0 não é uma medida dela.",
   "project.empty.addAgent": "Adicione um agente para trabalhar no projeto {project}: Adicionar agente adiciona um agente {provider} com as configurações padrão (▾ para escolher outro provedor, um worktree ou configurações). Nova sessão adiciona um agente e o inicia.",
   "project.empty.allSessions": "Todas as sessões",
   "project.empty.markActive": "Marque este projeto como ativo para executar sessões e ver o status dele. Você também pode iniciar uma sessão diretamente.",

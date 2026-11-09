@@ -287,6 +287,7 @@ interface CombworkMessageValues {
   'agents.opencode.extensionNote': undefined
   'agents.opencode.installNote': undefined
   'agents.opencode.modelPlaceholder': undefined
+  'agents.opencode.noPlanLimits': undefined
   'agents.opencode.plan': undefined
   'agents.opencode.planDescription': undefined
   'agents.opencode.signInHelp': undefined

@@ -176,6 +176,7 @@
   "project.cost.unknown": "不明",
   "project.cost.unpriced": "Combworkには{model}のAPI料金がないため、このセッションのコストを推定できません。「設定」→「{provider}」→「API価格」で追加してください。",
   "project.cost.withFree": "{cost} + 無料（ローカル）",
+  "project.cost.zeroReported": "{provider} はこのセッションのコストを $0 と報告しました。サブスクリプション、無料のモデル、この PC 上のモデルでもプランの利用枠は消費されます。$0 はその目安にはなりません。",
   "project.empty.addAgent": "{project}で作業するには、エージェントを追加してください。「エージェントを追加」は{provider}のエージェントを既定の設定で追加します（▾で別のプロバイダー、ワークツリー、設定を選べます）。「新しいセッション」はエージェントを追加して開始します。",
   "project.empty.allSessions": "すべてのセッション",
   "project.empty.markActive": "セッションを実行して状態を確認するには、このプロジェクトを作業中にしてください。セッションを直接開始することもできます。",

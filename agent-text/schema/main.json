@@ -31,6 +31,11 @@
       "name": "plain"
     }
   },
+  "main.accounts.letGoFailed": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
   "main.accounts.makeFailed": {
     "placeholders": {
       "error": "plain"
