@@ -139,16 +139,45 @@ describe("the probe's steps over a fake runner", () => {
   }
   const mutations = (calls: string[][]): string[] => calls.filter((c) => c.includes('--no-integrate-operation') || c.includes('integrate') || c.includes('export')).map((c) => (c.includes('--no-integrate-operation') ? 'prepare' : c.includes('export') ? 'export' : 'integrate'))
 
-  it('checks the lease before each mutation, journals each phase before its command, and runs nothing after losing it', async () => {
-    const want = { preparing: [], integrating: ['prepare'], exporting: ['prepare', 'integrate'] }
-    for (const [n, before] of [[1, 'preparing'], [2, 'integrating'], [3, 'exporting']] as const) {
+  const want = { preparing: [], integrating: ['prepare'], exporting: ['prepare', 'integrate'] }
+  const MUTATING = ['preparing', 'integrating', 'exporting'] as const
+
+  it('a lease already gone before a mutation: nothing journaled for it, nothing more runs', async () => {
+    for (const before of MUTATING) {
       const { runner, calls } = fake()
       const phases: string[] = []
-      let leases = 0
-      const out = await runProbe({ ...intent, jjRepo: jjRepo() }, { runner, git: gitOk, journal: (r) => void phases.push(r.phase), leaseHeld: () => ++leases < n })
+      let held = true
+      // Revoked as the step before it is journaled (or at base, for the first mutation).
+      const revokeOn = { preparing: 'based', integrating: 'prepared', exporting: 'integrated' }[before]
+      const out = await runProbe({ ...intent, jjRepo: jjRepo() }, { runner, git: gitOk, journal: (r) => void (phases.push(r.phase), r.phase === revokeOn && (held = false)), leaseHeld: () => held })
       expect(out.verdict).toEqual({ kind: 'leaseLost', before })
       expect(mutations(calls)).toEqual(want[before])
-      expect(phases[phases.length - 1]).not.toBe(before)
+      expect(phases[phases.length - 1]).toBe(revokeOn)
+    }
+  })
+
+  it("HI-2794 round 1: a lease revoked while the phase's journal write waits stops the command; the phase stays journaled", async () => {
+    for (const before of MUTATING) {
+      const { runner, calls } = fake()
+      const phases: string[] = []
+      let held = true
+      const out = await runProbe({ ...intent, jjRepo: jjRepo() }, {
+        runner,
+        git: gitOk,
+        // The journal's durable write is asynchronous: the lease is revoked while it waits.
+        journal: async (r) => {
+          phases.push(r.phase)
+          if (r.phase === before) {
+            await Promise.resolve()
+            held = false
+          }
+        },
+        leaseHeld: () => held
+      })
+      expect(out.verdict).toEqual({ kind: 'leaseLost', before })
+      expect(mutations(calls)).toEqual(want[before])
+      expect(out.record.phase).toBe(before)
+      expect(phases[phases.length - 1]).toBe(before)
     }
   })
 

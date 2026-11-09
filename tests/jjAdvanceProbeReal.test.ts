@@ -84,9 +84,9 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
   type Repo = Awaited<ReturnType<typeof repo>>
 
   /** The probe's deps: the real runner, the store's Git, a journal kept in memory, and a fixture's hook and lease. */
-  function deps(r: Repo, o: { hook?: (p: JjProbePoint, rec: JjProbeRecord) => void; lease?: (calls: number) => boolean } = {}) {
+  function deps(r: Repo, o: { hook?: (p: JjProbePoint, rec: JjProbeRecord) => void; revokeAt?: JjProbeRecord['phase'] } = {}) {
     const journal: JjProbeRecord[] = []
-    let leaseCalls = 0
+    let held = true
     const d: JjProbeDeps = {
       runner,
       git: async (args): Promise<RunResult> => {
@@ -98,10 +98,15 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
           return { out: '', ok: false, buf: Buffer.alloc(0), err: String(x.stderr ?? ''), code: x.status ?? -1 }
         }
       },
-      journal: (rec) => {
+      // A lease revoked while the journal writes `revokeAt` (the round 1 case: revoked during the durable write).
+      journal: async (rec) => {
         journal.push(structuredClone(rec))
+        if (rec.phase === o.revokeAt) {
+          await Promise.resolve()
+          held = false
+        }
       },
-      leaseHeld: () => (o.lease ? o.lease(++leaseCalls) : true),
+      leaseHeld: () => held,
       hook: o.hook
     }
     return { d, journal, last: (): JjProbeRecord => journal[journal.length - 1] }
@@ -261,20 +266,18 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
         expect(r.ref('other')).toBe(r.X)
       })
 
-      it('a lease lost before each mutation: nothing more runs, and recovery finds the attempt not applied', async () => {
-        for (const [n, before] of [[1, 'preparing'], [2, 'integrating'], [3, 'exporting']] as const) {
+      it('a lease revoked while each mutation phase is journaled: its command never starts, and recovery stays conservative for the journaled phase', async () => {
+        // preparing: no marked operation in any head's history (positive evidence) → notApplied. integrating: the phase says
+        // integration may have begun, so O absent is still Unknown, never "it didn't start". exporting: jj at R, Git at E.
+        const want = { preparing: { kind: 'notApplied' }, integrating: { kind: 'unknown', code: 'integrateUncertain' }, exporting: { kind: 'partialExport' } }
+        for (const before of ['preparing', 'integrating', 'exporting'] as const) {
           const r = await repo(mode)
-          const k = deps(r, { lease: (calls) => calls < n })
+          const k = deps(r, { revokeAt: before })
           const out = await runProbe(r.intent(), k.d)
           expect(out.verdict).toEqual({ kind: 'leaseLost', before })
-          if (before !== 'exporting') {
-            expect(r.bookmark()).toBe(r.E)
-            expect(await recoverProbe(out.record, k.d)).toMatchObject({ kind: 'notApplied' })
-          } else {
-            // Integrated, not exported: jj says R, Git says E.
-            expect([r.bookmark(), r.ref()]).toEqual([r.R, r.E])
-            expect((await recoverProbe(out.record, k.d)).kind).toBe('partialExport')
-          }
+          expect(out.record.phase).toBe(before)
+          expect([r.bookmark(), r.ref()]).toEqual(before === 'exporting' ? [r.R, r.E] : [r.E, r.E])
+          expect(await recoverProbe(out.record, k.d)).toMatchObject(want[before])
         }
       })
 

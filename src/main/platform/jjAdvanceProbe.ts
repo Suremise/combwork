@@ -414,11 +414,15 @@ export async function runProbe(intent: JjAdvanceIntent, deps: JjProbeDeps): Prom
     await deps.journal(record)
   }
   const done = (verdict: JjProbeVerdict): JjProbeRun => ({ verdict, record })
-  /** Before each mutation: journal the phase, then check the lease. */
+  /**
+   * Before each mutation: an early lease check (an optimisation), the phase journaled, then the lease checked again
+   * after the journal's write, immediately before the command is dispatched: a lease revoked while the journal waited
+   * stops it. The phase stays journaled either way (recovery reads it conservatively: never "it didn't start").
+   */
   const mutate = async (phase: JjProbePhase): Promise<boolean> => {
     if (!(await deps.leaseHeld())) return false
     await journal({ phase })
-    return true
+    return !!(await deps.leaseHeld())
   }
   await journal({})
   try {
