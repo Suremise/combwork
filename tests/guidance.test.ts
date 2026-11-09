@@ -941,7 +941,7 @@ describe('RELEASING.md on the 1.0 path', () => {
     const o = parseArgs(command!.split(' '), SUITES.map((s: { name: string }) => s.name))
     expect(o.error).toBeUndefined()
     const chosen = selectSuites(SUITES, o).map((s: { name: string }) => s.name).sort()
-    const needsCli = (s: { needs?: string[] }): boolean => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex' || n === 'copilot' || n === 'agy')
+    const needsCli = (s: { needs?: string[] }): boolean => (s.needs ?? []).some((n) => n === 'claude' || n === 'codex' || n === 'copilot' || n === 'agy' || n === 'opencode')
     const wanted = SUITES.filter((s: { needs?: string[] }) => needsCli(s) && !(s.needs ?? []).includes('packaged')).map((s: { name: string }) => s.name).sort()
     expect(chosen).toEqual(wanted)
   })
