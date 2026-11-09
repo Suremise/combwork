@@ -656,6 +656,12 @@ interface CombworkMessageValues {
   'settings.advanced.opencode.ambient.integrations.title': undefined
   'settings.advanced.opencode.env.credentials.desc': undefined
   'settings.advanced.opencode.env.credentials.title': undefined
+  'settings.advanced.opencode.history.pollSeconds.desc': undefined
+  'settings.advanced.opencode.history.pollSeconds.title': undefined
+  'settings.advanced.opencode.history.repairMinutes.desc': undefined
+  'settings.advanced.opencode.history.repairMinutes.title': undefined
+  'settings.advanced.opencode.history.retryMinutes.desc': undefined
+  'settings.advanced.opencode.history.retryMinutes.title': undefined
   'settings.advanced.opencode.models.line.desc': undefined
   'settings.advanced.opencode.models.line.title': undefined
   'settings.advanced.opencode.override.keepProjectConfigOut.desc': undefined

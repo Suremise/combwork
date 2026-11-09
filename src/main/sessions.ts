@@ -131,7 +131,7 @@ import { dialectModelSuggestions } from './dialects/suggestions'
 import { apiChainChanged, forgetApiChain, requestApiChain } from './dialects/apiChain'
 import type { DialectUsage } from '../shared/dialects'
 import { SESSION } from './sessionText'
-import { reportPlanUsage } from './planUsage'
+import { forgetConnectionUsage, reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
 import { flightRecorder } from './flightRecorder'
 import { DETAILS_FIELDS, HOOK_FIELDS, HOOK_MADE_FIELDS, STATUSLINE_FIELDS, safeWord } from '../shared/devConsole'
@@ -6004,6 +6004,29 @@ class SessionManager {
     const count = workspaceOf(st.projectPath).info()?.projects.find((p) => p.path.toLowerCase() === st.projectPath.toLowerCase())?.agents.length ?? 1
     // agent-protocol: a fallback name, never seen (every launch has its agent's name)
     return count > 1 ? `${project} · ${st.agentName ?? 'Agent'}` : project // i18n-ignore: a fallback name, never seen (every launch has its agent's name)
+  }
+
+  /**
+   * Live details a provider's own reader found for a launch outside its hooks and transcript (HI-2762: OpenCode's history,
+   * read from its server): its cost, its plan's limits. Taken as a status line's are; nothing for a launch that ended.
+   */
+  reportDetails(runId: string, d: LiveDetails): void {
+    const id = this.runs.get(runId)
+    const l = id ? this.live.get(id) : undefined
+    if (!l || l.state.runId !== runId) return
+    this.applyDetails(l, d)
+  }
+
+  /**
+   * A launch's own report that its connection has no plan limits now (HI-2762: OpenCode's server says its account isn't
+   * signed in to a service with any): what was kept for that connection goes. Not for a launch that ended, nor one on no
+   * connection (its provider's limits are other launches' too).
+   */
+  clearPlanUsage(runId: string): void {
+    const id = this.runs.get(runId)
+    const l = id ? this.live.get(id) : undefined
+    if (!l || l.state.runId !== runId || !l.state.launchedConnection) return
+    forgetConnectionUsage(l.state.launchedConnection.id)
   }
 
   /** A provider's status report (Claude Code's status line): the session's model, effort and cost, and the plan's limits. */

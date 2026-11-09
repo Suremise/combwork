@@ -285,6 +285,7 @@
   "agents.opencode.extensionNote": "You have an OpenCode copy inside an editor. Combwork doesn't use the editor's copy. Install the standalone OpenCode 2; your editor keeps working as before.",
   "agents.opencode.installNote": "Install OpenCode 2 from its official standalone Windows download: Install fetches the newest 2.x release from GitHub, checks it against the release’s SHA256SUMS and puts `opencode.exe` in %LOCALAPPDATA%\\Programs\\OpenCode. OpenCode 1 (`opencode-ai`) and the archived opencode project aren’t supported. If OpenCode 2 is installed somewhere else, set its path in Settings → OpenCode.",
   "agents.opencode.modelPlaceholder": "Model ID, e.g. ollama/qwen3:8b",
+  "agents.opencode.noPlanLimits": "OpenCode reports plan limits only for an OpenCode Go or Console workspace it's signed in to. Other providers' limits aren't available through it, so none are shown.",
   "agents.opencode.plan": "Plan",
   "agents.opencode.planDescription": "OpenCode’s Plan agent: it plans and reads, and asks before changing anything.",
   "agents.opencode.signInHelp": "Connect the account to a model provider again: Settings → Accounts & Connections → the OpenCode account → Sign in (it runs opencode auth login).",

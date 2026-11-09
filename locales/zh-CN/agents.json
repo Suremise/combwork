@@ -404,6 +404,7 @@
   "agents.opencode.extensionNote": "你在编辑器中有一份 OpenCode 副本。Combwork 不使用编辑器的副本。请安装独立的 OpenCode 2；你的编辑器会照常工作。",
   "agents.opencode.installNote": "从官方独立 Windows 下载安装 OpenCode 2：“安装”会从 GitHub 获取最新的 2.x 版本，用该版本的 SHA256SUMS 校验，并将 `opencode.exe` 放到 %LOCALAPPDATA%\\Programs\\OpenCode。不支持 OpenCode 1（`opencode-ai`）和已归档的 opencode 项目。如果 OpenCode 2 安装在其他位置，请在“设置”→“OpenCode”中设置其路径。",
   "agents.opencode.modelPlaceholder": "模型 ID，例如 ollama/qwen3:8b",
+  "agents.opencode.noPlanLimits": "OpenCode 只报告它已登录的 OpenCode Go 或 Console 工作区的套餐限额。其他提供方的限额无法通过它获得，因此不显示。",
   "agents.opencode.plan": "Plan",
   "agents.opencode.planDescription": "OpenCode 的 Plan 智能体：它进行规划和读取，在更改任何内容之前询问。",
   "agents.opencode.signInHelp": "将账号重新连接到模型提供方：“设置”→“账号与连接”→ OpenCode 账号 →“登录”（它会运行 opencode auth login）。"

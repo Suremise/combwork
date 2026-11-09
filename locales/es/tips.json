@@ -566,5 +566,7 @@
   "tips.localModelPicker.text": "Un agente en una cuenta de servidor encuentra los modelos de la cuenta en el /model de Claude Code, por sus ID exactos. Dale a cada uno una Etiqueta en Editar servidor… para nombrarlo ahí.",
   "tips.localModelLimits.title": "Dile a Claude Code el contexto real de tu modelo local",
   "tips.opencode.text": "Los agentes pueden usar OpenCode 2. Configuración de proveedores lo instala; cada cuenta de OpenCode tiene sus propios inicios de sesión en proveedores y sus propias sesiones, y cada agente ejecuta un servidor privado de OpenCode que termina con él.",
-  "tips.opencode.title": "Ejecutar agentes con OpenCode"
+  "tips.opencode.title": "Ejecutar agentes con OpenCode",
+  "tips.opencodeHistory.text": "La conversación de un agente de OpenCode aparece en la pestaña Sesiones, y sus tokens y su coste en el Resumen y en el pie de su panel, tal como los informa OpenCode. Un coste de $0 no mide la cuota de tu plan; solo hay límites para OpenCode Go o Console.",
+  "tips.opencodeHistory.title": "El historial, los tokens y el coste de un agente de OpenCode"
 }

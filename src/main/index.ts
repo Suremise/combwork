@@ -123,6 +123,7 @@ import { abandonWindowStorage } from './storage'
 import { agentTokenFile } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
 import { startMergeSlots } from './mergeSlotHost'
+import { startOpencodeHistory, stopOpencodeHistory } from './opencodeHistoryHost'
 import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
@@ -1353,6 +1354,8 @@ app.whenReady().then(async () => {
   // Long runs agents report (the Progress panel): stale runs, and the setting.
   startProgress()
   startMergeSlots()
+  // OpenCode agents' history, usage and plan limits, read from their servers (HI-2762).
+  startOpencodeHistory()
   startLanes()
   // A lane's next card, started on its builder once the card before it is Done (HI-1990).
   startLaneStarts()
@@ -1434,6 +1437,7 @@ app.on('will-quit', () => {
   // Any other way out (the updater's install, a renderer crash's quit) clears it too.
   clearDiscoveryNow()
   killAll()
+  stopOpencodeHistory()
   stopOrphanWatch()
   closeProcessTracking()
   unwatchAll()

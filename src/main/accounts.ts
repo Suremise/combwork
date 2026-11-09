@@ -814,12 +814,14 @@ const TERMINAL_GONE_MS = 15_000
 /**
  * What else follows an account (HI-2683: a server connection's diagnostics, which register here rather than this module
  * importing them): told once an account being removed has lost its key, so what was asked for it stops at once and what
- * was read of it is dropped, never left running to its deadline.
+ * was read of it is dropped, never left running to its deadline. A hook that returns a promise (HI-2762: the OpenCode
+ * history letting go of the folder) is waited for, at most REMOVED_HOOK_MS, before the folder is removed.
  */
-const removedHooks: ((id: string) => void)[] = []
-export function onAccountRemoved(fn: (id: string) => void): void {
+const removedHooks: ((id: string) => void | Promise<void>)[] = []
+export function onAccountRemoved(fn: (id: string) => void | Promise<void>): void {
   removedHooks.push(fn)
 }
+const REMOVED_HOOK_MS = 5000
 
 /**
  * Removes an account: refused while anything runs on it (its agents, a launch, its sign-in). With `closeTerminal`
@@ -861,13 +863,16 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
       }
     }
     // Its key is gone: what was asked for it stops now (HI-2683, HR3 round 1), whatever comes of the rest.
+    const waits: Promise<void>[] = []
     for (const fn of removedHooks) {
       try {
-        fn(id)
+        const p = fn(id)
+        if (p) waits.push(p.catch((e) => log.warn('an account removal hook failed', e)))
       } catch (e) {
         log.warn('an account removal hook failed', e)
       }
     }
+    if (waits.length) await Promise.race([Promise.all(waits), new Promise((r) => setTimeout(r, REMOVED_HOOK_MS))])
     // Checks started before are dropped from here (their result would bring it back).
     generations.set(id, generation(id) + 1)
     unwatch(id)

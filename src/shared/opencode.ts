@@ -128,8 +128,8 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
     liveModeSwitch: 'none',
     planModeToggle: false,
     promptCacheTtl: false,
-    // Its sessions record a cost (HI-2762 reads it): not yet.
-    reportsCost: false,
+    // Each request's cost as OpenCode prices it, and the session's total (HI-2762): $0 for a model it gives no price.
+    reportsCost: true,
     defersMcpTools: false,
     compactFocus: false,
     contextLimit: false,
@@ -167,7 +167,8 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
     extensionNote: msg({ id: 'agents.opencode.extensionNote', defaultMessage: "You have an OpenCode copy inside an editor. Combwork doesn't use the editor's copy. Install the standalone OpenCode 2; your editor keeps working as before.", description: 'Provider Setup → OpenCode, when only an editor copy was found: why Combwork needs the standalone CLI.' }),
     signInHelp: msg({ id: 'agents.opencode.signInHelp', defaultMessage: 'Connect the account to a model provider again: Settings → Accounts & Connections → the OpenCode account → Sign in (it runs opencode auth login).', description: 'How to sign an OpenCode account in to a model provider again. opencode auth login is a command: keep it; Settings → Accounts & Connections is a place in Combwork and Sign in a button.' }),
     safeguardHelp: null,
-    modelPlaceholder: msg({ id: 'agents.opencode.modelPlaceholder', defaultMessage: 'Model ID, e.g. ollama/qwen3:8b', description: 'Placeholder of the custom model ID box (OpenCode). Keep the model ID exactly as it is.' })
+    modelPlaceholder: msg({ id: 'agents.opencode.modelPlaceholder', defaultMessage: 'Model ID, e.g. ollama/qwen3:8b', description: 'Placeholder of the custom model ID box (OpenCode). Keep the model ID exactly as it is.' }),
+    noPlanLimits: msg({ id: 'agents.opencode.noPlanLimits', defaultMessage: "OpenCode reports plan limits only for an OpenCode Go or Console workspace it's signed in to. Other providers' limits aren't available through it, so none are shown.", description: "In place of the plan limits for OpenCode (Overview, the status bar's hover) while none is known: OpenCode gives limits only for its own OpenCode Go or Console service. OpenCode, OpenCode Go and Console are product names: keep them." })
   },
   modelLabel: opencodeModelLabel,
   canSwitchLive: () => false

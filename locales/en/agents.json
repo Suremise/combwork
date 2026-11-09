@@ -1143,6 +1143,10 @@
     "defaultMessage": "Model ID, e.g. ollama/qwen3:8b",
     "description": "Placeholder of the custom model ID box (OpenCode). Keep the model ID exactly as it is."
   },
+  "agents.opencode.noPlanLimits": {
+    "defaultMessage": "OpenCode reports plan limits only for an OpenCode Go or Console workspace it's signed in to. Other providers' limits aren't available through it, so none are shown.",
+    "description": "In place of the plan limits for OpenCode (Overview, the status bar's hover) while none is known: OpenCode gives limits only for its own OpenCode Go or Console service. OpenCode, OpenCode Go and Console are product names: keep them."
+  },
   "agents.opencode.plan": {
     "defaultMessage": "Plan",
     "description": "OpenCode's Plan agent as a mode: it plans first. Keep it short; Plan is the name OpenCode gives that agent."
