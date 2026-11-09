@@ -287,7 +287,11 @@ Git's over worktrees (the same git commands as before; `worktrees.ts` stays its 
 `platform/workspacePorts.ts` finds it (`slotWorkspaces()`, by the isolation capability). The slot pool (`slots.ts`,
 which takes it as `PoolDeps.workspaces`), its card hooks (`slotCards.ts`) and a 0.9 worktree's recreation
 (`agentWorktree.ts`) keep the leases, operations, jobs and refusals and act on folders only through it;
-`tests/slotTraces.test.ts` holds the pool's git commands to their recorded traces.
+`tests/slotTraces.test.ts` holds the pool's git commands to their recorded traces. R5 (HI-2789): copies (`copies.ts`),
+a Resume's claim (`agentFolders.ts`), a lane's start (`lanes.ts`) and agents' worktrees (`projectAgents.ts`'s listing and
+making) use the workspace port too, and the providers' context reads (Claude Code's memory base, the trust check's roots
+in `accounts.ts`, the skill copies' exclude) are port 1's `mainTree`, `trustRoot` and `excludeFile` (`repoPorts.ts`);
+`tests/contextTraces.test.ts` holds their commands and answers.
 Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the contracts (`HistoryPort`, `ObservePort`),
 `platform/gitHistory.ts` is Git's, delegating to `platform/git.ts` and the exact `git()` commands its callers ran, and
 `platform/historyPorts.ts` finds one (`historyOf(platform)`, null for None; `observePort`, the watcher for every

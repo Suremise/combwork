@@ -2046,7 +2046,14 @@ workspace's folder rather than a `RepoContext` (building a context could add a g
 `restoreLine` delete and put back a Done card's merged line (§16.10.1), each a compare and swap. Unaccounted work (a
 head contained in its target) stays the containment reads (R6's history port). `slots.ts`, `slotCards.ts` and
 `agentWorktree.ts` use only the port for these (the import rule in `tests/repoPortsImports.test.ts`), and
-`tests/slotTraces.test.ts` holds the pool's git commands (folder, argv, order) to those recorded before it.
+`tests/slotTraces.test.ts` holds the pool's git commands (folder, argv, order) to those recorded before it. R5
+(HI-2789) moved the rest of the workspace's consumers: copies (`copies.ts`: made with `create`, put at exactly their
+revision with `resetTo`, removed with `remove`'s `force`, which only a copy, holding nobody's work, is given), a Resume's
+claim (`agentFolders.ts`), a lane's start (`lanes.ts`) and agents' worktrees' listing and making (`projectAgents.ts`; a
+0.9 worktree's guarded removal, reuse check and the Merge dialog stay `worktrees.ts`' for R3 and R9's audit). Port 1
+gained the providers' context reads, asked of each platform with repositories in turn: `mainTree` (Claude Code's memory
+base), `trustRoot` (the trust check's roots, `accounts.ts`) and `excludeFile` (the skill copies' exclude,
+`providers/common.ts`). `tests/contextTraces.test.ts` holds their git commands and answers to those recorded before.
 
 **Invariants:**
 - **R2.1** **Unknown means keep it.** A workspace whose state can't be read is never removed, reset, re-lent or

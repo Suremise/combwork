@@ -10,8 +10,11 @@ describe('callers moved to the repository context port', () => {
   const root = join(__dirname, '..')
   /** R1's Git modules: the runner, its worker and tool check, the queue's host, the locks, the fence and ref holds. */
   const GIT_SEAMS = ['src/main/git', 'src/main/gitTool', 'src/main/gitWorker', 'src/main/workflow/gitHost', 'src/main/repoLock', 'src/main/repoLockCore', 'src/main/repoLockWorker', 'src/main/folderFence', 'src/main/platform/refHold', 'src/main/platform/gitRepoPorts']
-  /** The callers moved (HI-2784): each takes repository locks through repoPorts.ts. */
-  const MOVED = ['src/main/settingsTools.ts', 'src/main/workflow/levels.ts', 'src/main/workflow/optionsForm.ts', 'src/main/workflow/platformSwitch.ts', 'src/main/slots.ts']
+  /**
+   * The callers moved: each takes repository locks (HI-2784), or reads a folder's repository context (HI-2789: the trust
+   * check's roots, Claude Code's memory base, the skill copies' exclude), through repoPorts.ts.
+   */
+  const MOVED = ['src/main/settingsTools.ts', 'src/main/workflow/levels.ts', 'src/main/workflow/optionsForm.ts', 'src/main/workflow/platformSwitch.ts', 'src/main/slots.ts', 'src/main/accounts.ts', 'src/main/providers/common.ts', 'src/main/providers/claude/memoryDir.ts', 'src/main/copies.ts', 'src/main/agentFolders.ts', 'src/main/lanes.ts']
 
   /** A file's imports (static, dynamic and re-exports), as repo paths without an extension. */
   const importsOf = (file: string): string[] => {
@@ -49,7 +52,7 @@ describe('callers moved to the repository context port', () => {
 // no git runner, and from worktrees.ts only what runs no git (a free folder's name, a message).
 describe('callers moved to the workspace lifecycle port', () => {
   const root = join(__dirname, '..')
-  const CALLERS = ['src/main/slots.ts', 'src/main/slotCards.ts', 'src/main/agentWorktree.ts']
+  const CALLERS = ['src/main/slots.ts', 'src/main/slotCards.ts', 'src/main/agentWorktree.ts', 'src/main/copies.ts', 'src/main/agentFolders.ts', 'src/main/lanes.ts']
   const read = (file: string): string => readFileSync(join(root, file), 'utf8')
   /** The names a file imports from `spec` (relative, as written). */
   const namesFrom = (file: string, spec: string): string[] =>
@@ -62,6 +65,13 @@ describe('callers moved to the workspace lifecycle port', () => {
       ...(/from '\.\/platform\/gitWorkspacePort'/.test(read(f)) ? [`${f} imports Git's port itself`] : [])
     ])
     expect(found).toEqual([])
+  })
+
+  it("copies, a Resume's claim and a lane's start read folders through the port alone, and agents' worktrees are listed and made through it (HI-2789)", () => {
+    const viaGit = ['src/main/copies.ts', 'src/main/agentFolders.ts', 'src/main/lanes.ts'].filter((f) => /from '\.\/platform\/git'|import\('\.\/platform\/git'\)/.test(read(f)))
+    expect(viaGit).toEqual([])
+    // projectAgents.ts keeps worktrees.ts for a 0.9 worktree's guarded removal, its reuse check and the Merge dialog (R3's, R9's audit).
+    expect(read('src/main/projectAgents.ts').match(/\bwt\.(listWorktrees|currentBranch|createWorktree|copyIgnored)\b/g)).toBeNull()
   })
 
   it("the port's contract imports only types; only its registry imports Git's implementation", () => {

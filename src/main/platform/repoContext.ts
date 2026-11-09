@@ -157,4 +157,18 @@ export interface RepoPorts {
    * a deliverable, never an agent's edit.
    */
   metadataDirs: readonly string[]
+  /**
+   * The folder a provider keys a repository's shared state by (HI-2789: Claude Code's memory): the repository's main
+   * working tree, whichever of its workspaces `folder` is (`main` null when it can't be named as an absolute folder);
+   * `none` when the tool says `folder` is in no repository; null when it can't tell (a timeout, another failure).
+   */
+  mainTree(folder: string, o: { timeout: number }): Promise<{ main: string | null } | { none: true } | null>
+  /**
+   * The folder a provider's trust is asked for (HI-2789, the trust check's roots): the main working tree holding
+   * `folder`, checked to be one (`root` null when it can't be: a bare repository, a listing that disagrees); `none` when
+   * the tool says `folder` is in no repository; `unknown` for anything else (a timeout, the tool missing).
+   */
+  trustRoot(folder: string, o: { timeout: number }): Promise<{ root: string | null } | { none: true } | { unknown: true }>
+  /** The store's own exclude file, where Combwork keeps its copies out of the repository (Git: info/exclude in the common git dir); null when it can't be named. */
+  excludeFile(folder: string, o: { timeout: number }): Promise<string | null>
 }

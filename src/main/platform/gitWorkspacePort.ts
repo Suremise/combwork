@@ -57,7 +57,13 @@ export const gitWorkspacePort: WorkspacePort = {
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
   prepare: (folder, line, base) => step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base])),
   detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),
-  remove: (repo, folder) => step(git(repo, ['worktree', 'remove', folder])),
+  resetTo: async (folder, revision) => {
+    const co = await git(folder, ['checkout', '--detach', '--force', revision])
+    if (!co.ok) return { ok: false, failed: 'checkout', err: co.err }
+    const cl = await git(folder, ['clean', '-fd'])
+    return cl.ok ? { ok: true } : { ok: false, failed: 'clean', err: cl.err }
+  },
+  remove: (repo, folder, o) => step(git(repo, o?.force ? ['worktree', 'remove', '--force', folder] : ['worktree', 'remove', folder])),
   dropLine: (repo, line, at) => step(git(repo, ['update-ref', '-d', `refs/heads/${line}`, at])),
   restoreLine: (repo, line, revision) => step(git(repo, ['update-ref', `refs/heads/${line}`, revision, ''])),
   errorLine: gitErrorLine

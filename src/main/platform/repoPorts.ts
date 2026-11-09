@@ -58,6 +58,36 @@ export function withRepoLocks<T>(ctxs: readonly RepoContext[], fn: () => Promise
   return from(0)
 }
 
+/**
+ * The context reads providers make of a folder (HI-2789, R5): each platform with repositories asked in turn, the first
+ * that doesn't say "in no repository" answering. With none claiming it, the folder is in no repository.
+ */
+export async function mainTree(folder: string, o: { timeout: number }): Promise<{ main: string | null } | { none: true } | null> {
+  for (const p of ORDER) {
+    const a = await p.mainTree(folder, o)
+    if (!a || !('none' in a)) return a
+  }
+  return { none: true }
+}
+
+/** The trust check's root of a folder (HI-2789): as mainTree, by each platform's `trustRoot`. */
+export async function trustRoot(folder: string, o: { timeout: number }): Promise<{ root: string | null } | { none: true } | { unknown: true }> {
+  for (const p of ORDER) {
+    const a = await p.trustRoot(folder, o)
+    if (!('none' in a)) return a
+  }
+  return { none: true }
+}
+
+/** The exclude file of the repository holding a folder (HI-2789): the first platform naming one; null when none does. */
+export async function excludeFile(folder: string, o: { timeout: number }): Promise<string | null> {
+  for (const p of ORDER) {
+    const f = await p.excludeFile(folder, o)
+    if (f) return f
+  }
+  return null
+}
+
 /** withRepoLocks over the repositories holding `folders` (repoContexts): a folder in no repository takes none. */
 export async function withFolderRepoLocks<T>(folders: readonly string[], fn: () => Promise<T>, o?: RepoLockOptions): Promise<T> {
   return withRepoLocks(await repoContexts(folders), fn, o)
