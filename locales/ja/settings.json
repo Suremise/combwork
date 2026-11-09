@@ -1592,5 +1592,21 @@
   "settings.connections.server.outputDefault": "既定値：{n, number}",
   "settings.connections.server.tight": "余裕が少なめ：Combworkのツールを含むClaude Codeの最初のリクエストは14,000～28,000トークンになることがあり、セッションが開始しないか、すぐに圧縮されることがあります。",
   "settings.connections.server.tokens": "トークン",
-  "settings.connections.server.unsupported": "{why, select, alias {このモデルではサポートされていません：Claude CodeはこのIDを自身のエイリアスとして読みます。} other {このモデルではサポートされていません：claude、[1m]、日付の接尾辞を含むIDはここではサポートされていません。}}"
+  "settings.connections.server.unsupported": "{why, select, alias {このモデルではサポートされていません：Claude CodeはこのIDを自身のエイリアスとして読みます。} other {このモデルではサポートされていません：claude、[1m]、日付の接尾辞を含むIDはここではサポートされていません。}}",
+  "settings.advanced.opencode.ambient.integrations.desc": "このPCにすでにあるサインイン（AWSプロファイル、gcloudのログイン、Azure CLIのもの）を使えるOpenCodeのプロバイダー（IDで指定）。アカウントがそのプロバイダーの資格情報を保存していない限り、Combworkはそれぞれを拒否します。間違っていると、エージェントがそうしたサインインを頼まれずに使う可能性があります。",
+  "settings.advanced.opencode.ambient.integrations.title": "このPCのサインインを使うプロバイダー",
+  "settings.advanced.opencode.env.credentials.desc": "「ほかの資格情報をOpenCodeに渡さない」がオンの間、CombworkがOpenCodeに渡さない環境変数の名前：OpenCodeのプロバイダーがキーやトークンとして読むすべての変数と、クラウド各社のもの（AWS、Azure、Google）。Combwork自身の変数は常に残ります。間違っていると、このPCで設定されたキーが頼まれずにOpenCodeのエージェントに届く可能性があります。",
+  "settings.advanced.opencode.env.credentials.title": "OpenCodeに渡さない資格情報",
+  "settings.advanced.opencode.models.line.desc": "opencode modelsの一覧の1行：モデルのID。プロバイダーとモデルをprovider/modelの形で表したもの（最初のグループ）です。間違っていると、OpenCodeのモデルが提示されません。",
+  "settings.advanced.opencode.models.line.title": "opencode modelsのモデル",
+  "settings.advanced.opencode.override.keepProjectConfigOut.desc": "CombworkはOpenCodeをOPENCODE_DISABLE_PROJECT_CONFIG=1とOPENCODE_DISABLE_CLAUDE_CODE=1で実行します。そのため、プロジェクト独自のopencode.jsonと.opencodeフォルダー（そのMCPサーバー、プラグイン、エージェント）、上位フォルダーの設定、Claude Codeのフォルダーは読み込まれません。プロジェクトのAGENTS.mdはCombworkがOpenCodeに渡します。オフにすると、これらはプラグインのコードも含めてCombworkの外と同じように読み込まれ、プロジェクトのMCPサーバーがCombworkがエージェントに与えたサーバーに取って代わることがあります。",
+  "settings.advanced.opencode.override.keepProjectConfigOut.title": "プロジェクトのOpenCode設定を読み込まない",
+  "settings.advanced.opencode.override.noAutoUpdate.desc": "CombworkはOpenCodeを、プライベート設定のupdate: \"disable\"とOPENCODE_DISABLE_AUTOUPDATE=1で実行します（エージェント、およびアカウントとモデルの確認）。そのため、インストール済みのバージョンが実行され、エージェントの再起動の合間に変わることはありません。「プロバイダーのセットアップ」の「更新」で、選んだときに更新されます。オフにすると、OpenCodeはCombworkの外と同じように自動更新することがあります。",
+  "settings.advanced.opencode.override.noAutoUpdate.title": "OpenCodeの自動更新を止める",
+  "settings.advanced.opencode.override.stripCredentials.desc": "CombworkはOpenCodeがプロバイダーのキーやトークンとして読む変数をその環境から除きます（エージェントがコマンドを実行するシェルからも：GITHUB_TOKENやHF_TOKENなど）。また、アカウントが資格情報を保存していない限りAmazon Bedrock、Google Vertex、Azureを拒否するため、このPCのAWSプロファイル、gcloudのログイン、Azure CLIのサインインが頼まれずに使われることはありません。OpenCodeのClaude Agentプロバイダーはどちらの場合も拒否されます。オフにすると、OpenCodeはこれらの変数を受け取り、Combworkの外と同じようにこれらのサインインを使うことがあります。",
+  "settings.advanced.opencode.override.stripCredentials.title": "ほかの資格情報をOpenCodeに渡さない",
+  "settings.advanced.opencode.server.readySeconds.desc": "OpenCodeエージェントのプライベートサーバーが応答するまでに与えられる時間。過ぎると起動をあきらめてサーバーを終了します。短すぎると、遅いPCではエージェントが起動しません。",
+  "settings.advanced.opencode.server.readySeconds.title": "サーバー：起動までの時間",
+  "settings.advanced.opencode.version.desc": "opencode --versionが出力するもの：バージョンは最初のグループです。CombworkはOpenCode 2以降のみを使います。間違っていると、OpenCodeが見つかりません。",
+  "settings.advanced.opencode.version.title": "opencode --versionのバージョン"
 }

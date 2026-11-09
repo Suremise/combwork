@@ -431,6 +431,30 @@
     "defaultMessage": "User {file} (all projects)",
     "description": "In the Memory view: the user's own instructions file, which every project's agents read. {file} is its name (CLAUDE.md)."
   },
+  "providers.opencode.claudeAgentModel": {
+    "defaultMessage": "{provider} didn't start: {model} is a model of OpenCode's Claude Agent provider, which Combwork doesn't run through OpenCode. Run Claude Code as its own provider instead, or choose another model.",
+    "description": "Why an OpenCode agent didn't start (its pane): its model belongs to OpenCode's nested Claude Agent provider, which Combwork never allows. {provider} is OpenCode, {model} the model's id. Claude Agent and Claude Code are product names: keep them."
+  },
+  "providers.opencode.connections.setUp": {
+    "defaultMessage": "Set Up runs `opencode auth login` on this account, so you can connect it to the model providers you use. Answer in the terminal; Combwork types nothing into it.",
+    "description": "Settings → Accounts & Connections, above an OpenCode account's Set Up terminal: what Set Up is for. opencode auth login is a command: keep it. Set Up names a button."
+  },
+  "providers.opencode.noOwner": {
+    "defaultMessage": "{provider} didn't start: Combwork couldn't read its own process's identity, which the agent's private OpenCode server is tied to so that it ends with Combwork. Windows PowerShell may be blocked on this PC.",
+    "description": "Why an OpenCode agent didn't start (its pane): Combwork couldn't get the identity it ties the agent's server's lifetime to. {provider} is OpenCode. Windows PowerShell is a program's name: keep it."
+  },
+  "providers.opencode.otherAccount": {
+    "defaultMessage": "{provider} didn't resume {session}: it is in another OpenCode account's data, not the account this agent runs on now. Start a new session, or move the agent back to that account.",
+    "description": "Why an OpenCode agent didn't resume a session (its pane): each OpenCode account keeps its own sessions, and this one was made on another account. {provider} is OpenCode, {session} the session's id."
+  },
+  "providers.opencode.protectedArg": {
+    "defaultMessage": "{provider} didn't start: the agent's extra arguments include {arg}, which Combwork sets itself for every OpenCode launch. Remove it from the agent's extra arguments (Agent Settings).",
+    "description": "Why an OpenCode agent didn't start (its pane): its extra command-line arguments include one Combwork controls (its server, its session, its mode). {provider} is OpenCode, {arg} the argument as typed. Agent Settings is a place in Combwork."
+  },
+  "providers.opencode.v1Found": {
+    "defaultMessage": "{count, plural, one {The opencode found is} other {The opencode copies found are}} not OpenCode 2: OpenCode 1 (opencode-ai), the archived opencode project or an editor’s copy. Combwork needs OpenCode 2: Install puts it in its own folder, and your other copy keeps working.",
+    "description": "Provider Setup → OpenCode, when only copies Combwork doesn't support were found. opencode and opencode-ai are names: keep them; Install is a button."
+  },
   "providers.readiness.notInstalled": {
     "defaultMessage": "{provider} is not installed.",
     "description": "Provider Setup and Settings → Providers: Combwork didn't find the coding agent's CLI. {provider} is its name (Claude Code)."

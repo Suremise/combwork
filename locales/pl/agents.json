@@ -396,5 +396,15 @@
   "agents.workflowTools.restartTitle": "Uruchomić ponownie {agents} dla nowego przepływu pracy?",
   "agents.workflowTools.restartMessage": "{count, plural, one {{agents} pracuje. Narzędzia, na które pozwala teraz przepływ pracy projektu, wczytają się po ponownym uruchomieniu; agent kontynuuje tę samą rozmowę.} few {{agents} pracują. Narzędzia, na które pozwala teraz przepływ pracy ich projektu, wczytają się po ponownym uruchomieniu; każdy kontynuuje tę samą rozmowę.} many {{agents} pracują. Narzędzia, na które pozwala teraz przepływ pracy ich projektu, wczytają się po ponownym uruchomieniu; każdy kontynuuje tę samą rozmowę.} other {{agents} pracują. Narzędzia, na które pozwala teraz przepływ pracy ich projektu, wczytają się po ponownym uruchomieniu; każdy kontynuuje tę samą rozmowę.}}",
   "agents.workflowTools.restartWhenDone": "{count, plural, one {Uruchom ponownie po zakończeniu tury} few {Uruchom ponownie po zakończeniu ich tur} many {Uruchom ponownie po zakończeniu ich tur} other {Uruchom ponownie po zakończeniu ich tur}}",
-  "agents.workflowTools.later": "Później"
+  "agents.workflowTools.later": "Później",
+  "agents.opencode.auto": "Zatwierdzaj wszystko",
+  "agents.opencode.autoDescription": "Bez pytania zatwierdza każde uprawnienie, którego reguły OpenCode wyraźnie nie zabraniają. Używaj tylko tam, gdzie zmiany bez nadzoru są dopuszczalne.",
+  "agents.opencode.build": "Build",
+  "agents.opencode.buildDescription": "Agent Build OpenCode z własnymi regułami uprawnień: pyta przed tym, czego nie dopuszczają.",
+  "agents.opencode.extensionNote": "Masz kopię OpenCode w edytorze. Combwork nie używa kopii z edytora. Zainstaluj samodzielne OpenCode 2; Twój edytor działa dalej jak dotąd.",
+  "agents.opencode.installNote": "Zainstaluj OpenCode 2 z oficjalnego samodzielnego pakietu dla Windows: Instaluj pobiera najnowsze wydanie 2.x z GitHuba, sprawdza je z plikiem SHA256SUMS wydania i umieszcza `opencode.exe` w %LOCALAPPDATA%\\Programs\\OpenCode. OpenCode 1 (`opencode-ai`) i zarchiwizowany projekt opencode nie są obsługiwane. Jeśli OpenCode 2 jest zainstalowane gdzie indziej, ustaw jego ścieżkę w Ustawienia → OpenCode.",
+  "agents.opencode.modelPlaceholder": "ID modelu, np. ollama/qwen3:8b",
+  "agents.opencode.plan": "Plan",
+  "agents.opencode.planDescription": "Agent Plan OpenCode: planuje i czyta, a przed jakąkolwiek zmianą pyta.",
+  "agents.opencode.signInHelp": "Połącz konto ponownie z dostawcą modeli: Ustawienia → Konta i połączenia → konto OpenCode → Zaloguj się (uruchamia opencode auth login)."
 }

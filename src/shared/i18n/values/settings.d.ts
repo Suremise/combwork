@@ -652,6 +652,22 @@ interface CombworkMessageValues {
   'settings.advanced.off': undefined
   'settings.advanced.on': undefined
   'settings.advanced.openLogs': undefined
+  'settings.advanced.opencode.ambient.integrations.desc': undefined
+  'settings.advanced.opencode.ambient.integrations.title': undefined
+  'settings.advanced.opencode.env.credentials.desc': undefined
+  'settings.advanced.opencode.env.credentials.title': undefined
+  'settings.advanced.opencode.models.line.desc': undefined
+  'settings.advanced.opencode.models.line.title': undefined
+  'settings.advanced.opencode.override.keepProjectConfigOut.desc': undefined
+  'settings.advanced.opencode.override.keepProjectConfigOut.title': undefined
+  'settings.advanced.opencode.override.noAutoUpdate.desc': undefined
+  'settings.advanced.opencode.override.noAutoUpdate.title': undefined
+  'settings.advanced.opencode.override.stripCredentials.desc': undefined
+  'settings.advanced.opencode.override.stripCredentials.title': undefined
+  'settings.advanced.opencode.server.readySeconds.desc': undefined
+  'settings.advanced.opencode.server.readySeconds.title': undefined
+  'settings.advanced.opencode.version.desc': undefined
+  'settings.advanced.opencode.version.title': undefined
   'settings.advanced.reset.desc': undefined
   'settings.advanced.reset.tip': undefined
   'settings.advanced.reset.title': undefined

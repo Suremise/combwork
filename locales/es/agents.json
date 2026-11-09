@@ -396,5 +396,15 @@
   "agents.workflowTools.restartTitle": "¿Reiniciar {agents} para el nuevo flujo de trabajo?",
   "agents.workflowTools.restartMessage": "{count, plural, one {{agents} está trabajando. Las herramientas que ahora permite el flujo de trabajo de su proyecto se cargan al reiniciarse; sigue en la misma conversación.} many {{agents} están trabajando. Las herramientas que ahora permite el flujo de trabajo de su proyecto se cargan al reiniciarse; cada uno sigue en la misma conversación.} other {{agents} están trabajando. Las herramientas que ahora permite el flujo de trabajo de su proyecto se cargan al reiniciarse; cada uno sigue en la misma conversación.}}",
   "agents.workflowTools.restartWhenDone": "{count, plural, one {Reiniciar cuando termine su turno} many {Reiniciar cuando terminen sus turnos} other {Reiniciar cuando terminen sus turnos}}",
-  "agents.workflowTools.later": "Más tarde"
+  "agents.workflowTools.later": "Más tarde",
+  "agents.opencode.auto": "Aprobar todo",
+  "agents.opencode.autoDescription": "Aprueba sin preguntar todos los permisos que las reglas de OpenCode no deniegan explícitamente. Úsalo solo donde los cambios sin supervisión sean aceptables.",
+  "agents.opencode.build": "Build",
+  "agents.opencode.buildDescription": "El agente Build de OpenCode con sus propias reglas de permisos: pregunta antes de lo que no permiten.",
+  "agents.opencode.extensionNote": "Tienes una copia de OpenCode dentro de un editor. Combwork no usa la copia del editor. Instala OpenCode 2 independiente; tu editor sigue funcionando como antes.",
+  "agents.opencode.installNote": "Instala OpenCode 2 desde su descarga oficial independiente para Windows: Instalar obtiene la versión 2.x más reciente de GitHub, la comprueba con el SHA256SUMS de la versión y coloca `opencode.exe` en %LOCALAPPDATA%\\Programs\\OpenCode. OpenCode 1 (`opencode-ai`) y el proyecto opencode archivado no son compatibles. Si OpenCode 2 está instalado en otro lugar, indica su ruta en Configuración → OpenCode.",
+  "agents.opencode.modelPlaceholder": "ID de modelo, p. ej. ollama/qwen3:8b",
+  "agents.opencode.plan": "Plan",
+  "agents.opencode.planDescription": "El agente Plan de OpenCode: planifica y lee, y pregunta antes de cambiar nada.",
+  "agents.opencode.signInHelp": "Vuelve a conectar la cuenta a un proveedor de modelos: Configuración → Cuentas y conexiones → la cuenta de OpenCode → Iniciar sesión (ejecuta opencode auth login)."
 }

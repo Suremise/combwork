@@ -2679,6 +2679,86 @@
     "note": "Under an advanced setting whose value no longer finds what the CLI was recorded showing (Settings → Advanced). {cli} is the CLI's name, {version} its version; {shown} is the CLI's own text, in English.",
     "audience": "both"
   },
+  "settings.advanced.opencode.ambient.integrations.desc": {
+    "text": "OpenCode's providers that can use a sign-in this PC already has (an AWS profile, a gcloud login, the Azure CLI's), by their ids: Combwork denies each unless the account saved a credential for it. Wrong, an agent could use one of those sign-ins unasked.",
+    "note": "What the advanced setting \"Providers using this PC's sign-ins\" is (Settings → Advanced, under OpenCode). AWS, gcloud and Azure CLI are names.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.ambient.integrations.title": {
+    "text": "Providers using this PC's sign-ins",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): OpenCode's providers that can use a sign-in the PC already has.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.env.credentials.desc": {
+    "text": "The names of the environment variables Combwork leaves out of OpenCode while Keep other credentials from OpenCode is on: every variable OpenCode's providers read as a key or token, and the clouds' own (AWS, Azure, Google). Combwork's own variables are always kept. Wrong, a key set on this PC could reach an OpenCode agent unasked.",
+    "note": "What the advanced setting \"Credentials left out of OpenCode\" is (Settings → Advanced, under OpenCode). Keep other credentials from OpenCode is the name of another setting; AWS, Azure and Google are names.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.env.credentials.title": {
+    "text": "Credentials left out of OpenCode",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the environment variables' names Combwork leaves out.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.line.desc": {
+    "text": "One line of opencode models' list: the model's id, its provider and model as provider/model (its first group). Wrong, no OpenCode models are offered.",
+    "note": "What the advanced setting \"A model in opencode models\" is (Settings → Advanced, under OpenCode). opencode models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.line.title": {
+    "text": "A model in opencode models",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of one line of the CLI's model list. opencode models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.keepProjectConfigOut.desc": {
+    "text": "Combwork runs OpenCode with OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1, so a project's own opencode.json and .opencode folder (its MCP servers, plugins and agents), a config in a folder above it, and Claude Code's folders never load; the project's AGENTS.md is given to OpenCode by Combwork. Turned off, all of those load as they would outside Combwork, plugins' code included, and a project's MCP server can take the place of one Combwork gave the agent.",
+    "note": "What the advanced setting \"Keep the project's OpenCode config out\" does (Settings → Advanced, under OpenCode). OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1 are environment variables, opencode.json, .opencode and AGENTS.md file and folder names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.keepProjectConfigOut.title": {
+    "text": "Keep the project's OpenCode config out",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.noAutoUpdate.desc": {
+    "text": "Combwork runs OpenCode with update: \"disable\" in its private config and OPENCODE_DISABLE_AUTOUPDATE=1 (its agents, and checking its accounts and models), so it runs the version installed and never changes between an agent's restarts; Update in Provider Setup updates it when you choose. Turned off, OpenCode may update itself as it would outside Combwork.",
+    "note": "What the advanced setting \"Don't let OpenCode update itself\" does (Settings → Advanced, under OpenCode). update: \"disable\" is a config setting and OPENCODE_DISABLE_AUTOUPDATE=1 an environment variable: keep them. Update is a button's name and Provider Setup a dialog's.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.noAutoUpdate.title": {
+    "text": "Don't let OpenCode update itself",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.stripCredentials.desc": {
+    "text": "Combwork leaves the variables OpenCode reads as a provider's key or token out of its environment (the shell its agents run commands in too: GITHUB_TOKEN and HF_TOKEN among them), and denies Amazon Bedrock, Google Vertex and Azure unless the account saved a credential for them, so an AWS profile, a gcloud login or an Azure CLI sign-in on this PC is never used unasked. OpenCode's Claude Agent provider is denied either way. Turned off, OpenCode gets those variables and may use those sign-ins as it would outside Combwork.",
+    "note": "What the advanced setting \"Keep other credentials from OpenCode\" does (Settings → Advanced, under OpenCode). GITHUB_TOKEN and HF_TOKEN are environment variables; Amazon Bedrock, Google Vertex, Azure, gcloud, Azure CLI and Claude Agent are names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.stripCredentials.title": {
+    "text": "Keep other credentials from OpenCode",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.server.readySeconds.desc": {
+    "text": "How long an OpenCode agent's private server gets to answer before the launch gives up and ends it. Too short, an agent on a slow PC doesn't start.",
+    "note": "What the advanced setting \"Server: time to start\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.server.readySeconds.title": {
+    "text": "Server: time to start",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.version.desc": {
+    "text": "What opencode --version prints: the version is its first group. Combwork uses only OpenCode 2 or later. Wrong, OpenCode isn't found.",
+    "note": "What the advanced setting \"The version in opencode --version\" is (Settings → Advanced, under OpenCode). opencode --version is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.version.title": {
+    "text": "The version in opencode --version",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the CLI's version line. opencode --version is a command: keep it.",
+    "audience": "both"
+  },
   "settings.advanced.reset.desc": {
     "text": "Restore every setting in Settings to its default, the advanced settings in advanced.json too. Workspaces and projects, and a workspace's own advanced values, are not affected.",
     "note": "What the setting \"Reset all settings\" does, under its title (Settings → Advanced).",

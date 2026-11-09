@@ -1475,6 +1475,14 @@
     "defaultMessage": "Resume or stop just one agent",
     "description": "A tip's title (HI-2665)."
   },
+  "tips.opencode.text": {
+    "defaultMessage": "Agents can use OpenCode 2. Provider Setup installs it; each OpenCode account keeps its own provider sign-ins and sessions, and each agent runs a private OpenCode server that ends with it.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. OpenCode is a product name."
+  },
+  "tips.opencode.title": {
+    "defaultMessage": "Run agents on OpenCode",
+    "description": "A tip's title. OpenCode is a product name."
+  },
   "tips.outageResume.text": {
     "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

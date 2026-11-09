@@ -233,6 +233,7 @@ export const SUITES = [
   { name: 'oneagent' },
   { name: 'onelinedesc' },
   { name: 'onopen' },
+  { name: 'opencode-launch' },
   { name: 'openguard' },
   { name: 'openspeed' },
   { name: 'orphans' },

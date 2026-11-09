@@ -3,6 +3,7 @@ import { CLAUDE_CODE, baseModel } from './claude'
 import { CODEX } from './codex'
 import { COPILOT } from './copilot'
 import { ANTIGRAVITY } from './antigravity'
+import { OPENCODE } from './opencode'
 import { providerDescriptor, providerSettings } from './providers'
 import { msg, tr } from './i18n'
 
@@ -23,7 +24,7 @@ const claude = (input: number, output: number, cachedInput = input / 10): ModelP
 const openai = (input: number, cachedInput: number, output: number, cacheWrite?: number): ModelPrice => ({ input, cachedInput, output, ...(cacheWrite !== undefined ? { cacheWrite } : {}) })
 
 /** When each provider's shipped prices were last checked against its published ones (Settings → <provider> → API prices says so). */
-export const PRICES_CHECKED: Record<ProviderId, string> = { [CLAUDE_CODE]: '2026-09-30', [CODEX]: '2026-11-07', [COPILOT]: '2026-09-30', [ANTIGRAVITY]: '2026-11-07' }
+export const PRICES_CHECKED: Record<ProviderId, string> = { [CLAUDE_CODE]: '2026-09-30', [CODEX]: '2026-11-07', [COPILOT]: '2026-09-30', [ANTIGRAVITY]: '2026-11-07', [OPENCODE]: '2026-11-09' }
 
 export const SHIPPED_PRICES: Record<ProviderId, Record<string, ModelPrice>> = {
   [CLAUDE_CODE]: {
@@ -67,7 +68,10 @@ export const SHIPPED_PRICES: Record<ProviderId, Record<string, ModelPrice>> = {
   [COPILOT]: {},
   // Antigravity runs against the user's Google plan and publishes no per-token prices (checked 7 Nov 2026, HI-2544): no
   // table ships, and its sessions show as unpriced. Prices a user adds are used.
-  [ANTIGRAVITY]: {}
+  [ANTIGRAVITY]: {},
+  // OpenCode reaches many vendors' models through the account's own sign-ins and keys, each priced by its vendor (checked
+  // 9 Nov 2026, HI-2759): no table ships, and its sessions show as unpriced. Prices a user adds are used.
+  [OPENCODE]: {}
 }
 
 /** Claude Code's aliases, and the dated ids its transcripts show, map to the table's ids. */

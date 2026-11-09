@@ -370,6 +370,8 @@ interface CombworkMessageValues {
   'tips.off.title': undefined
   'tips.oneAgent.text': undefined
   'tips.oneAgent.title': undefined
+  'tips.opencode.text': undefined
+  'tips.opencode.title': undefined
   'tips.outageResume.text': undefined
   'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }

@@ -137,5 +137,23 @@
   },
   "mode.copilot.plan.label": {
     "placeholders": {}
+  },
+  "mode.opencode.auto.desc": {
+    "placeholders": {}
+  },
+  "mode.opencode.auto.label": {
+    "placeholders": {}
+  },
+  "mode.opencode.build.desc": {
+    "placeholders": {}
+  },
+  "mode.opencode.build.label": {
+    "placeholders": {}
+  },
+  "mode.opencode.plan.desc": {
+    "placeholders": {}
+  },
+  "mode.opencode.plan.label": {
+    "placeholders": {}
   }
 }
