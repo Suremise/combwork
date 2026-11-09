@@ -269,7 +269,7 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
     const file = join(outside, 'probe.txt')
     const ask = [{ action: 'external_directory', resource: '*', effect: 'ask' }]
     const projectAllows = { permissions: [{ action: 'external_directory', resource: `${outside.replace(/\\/g, '/')}/*`, effect: 'allow' }] }
-    const run = async (letIn: boolean) => {
+    const attempt = async (letIn: boolean) => {
       writeFileSync(file, 'before\n')
       const r = root(letIn ? { OPENCODE_DISABLE_PROJECT_CONFIG: '' } : {}, { ...ourConfig(), permissions: ask })
       writeFileSync(join(r.project, 'opencode.json'), JSON.stringify(projectAllows))
@@ -285,9 +285,9 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
       return { asked: asked.type === 'permission.asked', text: readFileSync(file, 'utf8') }
     }
     // Kept out (Combwork's default): asked, rejected, unchanged.
-    expect(await run(false)).toEqual({ asked: true, text: 'before\n' })
+    expect(await attempt(false)).toEqual({ asked: true, text: 'before\n' })
     // Let in: the project's allow comes after Combwork's ask, so the edit goes through unasked.
-    expect(await run(true)).toMatchObject({ asked: false, text: expect.stringMatching(/^before\nedited by /) })
+    expect(await attempt(true)).toMatchObject({ asked: false, text: expect.stringMatching(/^before\nedited by /) })
   })
 
   it("a session's model and variant: created with them, set again with the nested body, no variant the default; refused as 2.2.6 refused (HI-2767)", async () => {
