@@ -179,7 +179,8 @@ function proxy() {
     }
     const key = lib.ptyKey(alpha, agent.id)
     const screen = async () => lib.plainText((await inv('pty:buffer', key).catch(() => '')) ?? '')
-    check("its TUI is drawn in the pane (2.2.6's new-session screen)", !!(await until(async () => (/Ask anything/.test(await screen()) ? true : null), HUNG_MS)), (await screen()).slice(-400))
+    // 2.2.6's screen: its footer (`ctrl+p commands`, as R0's tui/session-absent-server.json) and the agent's model by name.
+    check("its TUI is drawn in the pane, on the test provider's model", !!(await until(async () => (/ctrl\+p commands/.test(await screen()) && /qwen3:8b Combwork test/.test(await screen()) ? true : null), HUNG_MS)), (await screen()).slice(-400))
     check('…and the machine-wide service never started', (await portOpen(28894)) === serviceBefore)
 
     // --- One prompt, answered in the pane; every request to the proxy, for the local model.
