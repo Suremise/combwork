@@ -2495,8 +2495,11 @@ export interface InboxSummary {
  * local: an organisation's remote settings, when it has them, decide over it.
  */
 export interface HookCause {
-  /** off: hooks turned off (disableAllHooks); managedOnly: managed settings allow only their own; blocked: an HTTP hook allowlist. */
-  why: 'off' | 'managedOnly' | 'blocked'
+  /**
+   * off: hooks turned off (disableAllHooks); managedOnly: managed settings allow only their own; blocked: an HTTP hook
+   * allowlist; unreadable: a source Combwork couldn't read (`where`), so it can't tell.
+   */
+  why: 'off' | 'managedOnly' | 'blocked' | 'unreadable'
   setting: string
   where: string
   /** Whether the admin snippet would help (not when managed settings turn every hook off). */
@@ -2513,11 +2516,12 @@ export interface HooksMissing {
   /** transcript: the turn that showed it, by the transcript's id for it (Claude Code's promptId, Codex's turn_id, Copilot's interactionId). */
   turn?: string
   /**
-   * refused: wrong token; off, managedOnly, blocked: a setting found on the PC (HI-2777: setting, offIn); partial: its
+   * refused: wrong token; off, managedOnly, blocked: a setting found on the PC (HI-2777: setting, offIn); unreadable: a
+   * settings source Combwork couldn't read (offIn), so it can't tell; partial: its
    * SessionStart came but no other hook (an admin snippet naming another port, or an allowlist); org: nothing local
    * explains hooks absent from the start (an organisation's remote policy may); newer: an untested CLI.
    */
-  why?: 'refused' | 'off' | 'newer' | 'managedOnly' | 'blocked' | 'partial' | 'org'
+  why?: 'refused' | 'off' | 'newer' | 'managedOnly' | 'blocked' | 'unreadable' | 'partial' | 'org'
   /** off, managedOnly, blocked: the setting's name (HI-2777). */
   setting?: string
   /** Whether the admin snippet would help (HI-2777): the warning offers it. */

@@ -129,7 +129,7 @@ import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
 import { hookTokenMatches, refusedHookNote, runForHookToken } from './hookTokens'
-import { claimTwin, hasContext, type TwinEntry } from './hookTwins'
+import { carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
 import { fixedHookUrl, type ClaudeSnippetFacts } from '../shared/claudeHookHandlers'
 import { launchHookTimeouts } from './providers/claude/adapter'
 import { unusedWorktreeCounts } from './unusedWorktrees'
@@ -220,14 +220,6 @@ let hookServer: http.Server | null = null
 
 /** How long a duplicate delivery waits for its first one's reply, or for the response carrying its context (HI-2777). */
 const TWIN_WAIT_MS = 15_000
-
-/** A twin's or first delivery's response carrying context: the entry hears how it ended (HI-2777). */
-function carrying(res: ServerResponse, entry: TwinEntry): void {
-  res.once('finish', () => entry.sent(true))
-  res.once('close', () => {
-    if (!res.writableFinished) entry.sent(false)
-  })
-}
 
 /** Whether the fixed hook URL's ignored calls were logged (once a run of Combwork). */
 let ignoredTold = false

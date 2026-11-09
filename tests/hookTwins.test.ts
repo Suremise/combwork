@@ -1,8 +1,9 @@
 // Hook deliveries that arrive twice (HI-2777: Combwork's and a differing admin snippet's handler both run). Only an
 // occurrence with the CLI's own identity is matched: handled once, its duplicates given the same decision, its context in
 // one delivered response at a time, never another occurrence's reply; the rest handled each time.
+import http from 'http'
 import { describe, expect, it } from 'vitest'
-import { TWINS_PER_RUN, claimTwin, decisionOnly, endTwins, hasContext, hooksDoubled } from '../src/main/hookTwins'
+import { TWINS_PER_RUN, carrying, claimTwin, decisionOnly, endTwins, hasContext, hooksDoubled } from '../src/main/hookTwins'
 
 const deny = { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'x.txt is locked by Bo' } }
 const notice = { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'You have a message' } }
@@ -129,5 +130,67 @@ describe('duplicate hook deliveries (HI-2777)', () => {
     expect(decisionOnly(notice)).toBeNull()
     expect(hasContext(notice)).toBe(true)
     expect(hasContext(deny)).toBe(false)
+  })
+})
+
+/**
+ * A real local HTTP exchange whose response the client abandons: `serve` gets the server's response once its client
+ * has gone (its close already happened, as when Claude Code gives up while the reply is decided).
+ */
+async function abandonedResponse(): Promise<{ res: http.ServerResponse; done: () => void }> {
+  let take!: (r: http.ServerResponse) => void
+  const got = new Promise<http.ServerResponse>((r) => (take = r))
+  const server = http.createServer((_req, res) => {
+    res.once('close', () => take(res))
+  })
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r))
+  const port = (server.address() as { port: number }).port
+  const req = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/hook' })
+  req.on('error', () => undefined)
+  // The client goes once its request is on its way.
+  req.flushHeaders()
+  req.write('{}', () => req.destroy())
+  const res = await got
+  return { res, done: () => server.close() }
+}
+
+describe('a response that closed before it could carry context (review round 1)', () => {
+  it("the first delivery's response closed while its reply was decided: a twin takes the context, the decision kept", async () => {
+    const { res, done } = await abandonedResponse()
+    try {
+      expect(res.closed || res.destroyed).toBe(true)
+      const r = run()
+      const a = claimTwin(r, 'PostToolUse:closed')!
+      const withDeny = { ...notice, decision: 'block', reason: 'held' }
+      a.entry.computed(withDeny)
+      a.entry.sending()
+      // Its close event has passed: carrying hears it at once, rather than never.
+      carrying(res, a.entry)
+      const twin = await claimTwin(r, 'PostToolUse:closed')!.entry.twinReply(5000)
+      expect(twin).toEqual({ reply: withDeny, carries: true })
+      endTwins(r)
+    } finally {
+      done()
+    }
+  })
+
+  it('a twin that claimed the context but whose own response had closed releases it to the next, which keeps the decision too', async () => {
+    const { res, done } = await abandonedResponse()
+    try {
+      const r = run()
+      const a = claimTwin(r, 'PostToolUse:twin')!
+      a.entry.computed(notice)
+      a.entry.sending()
+      a.entry.sent(false)
+      const first = await claimTwin(r, 'PostToolUse:twin')!.entry.twinReply(5000)
+      expect(first.carries).toBe(true)
+      // The twin's own response was gone while it waited: it can't carry it.
+      carrying(res, a.entry)
+      const next = await claimTwin(r, 'PostToolUse:twin')!.entry.twinReply(5000)
+      expect(next).toEqual({ reply: notice, carries: true })
+      endTwins(r)
+    } finally {
+      done()
+    }
   })
 })

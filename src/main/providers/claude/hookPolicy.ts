@@ -25,30 +25,35 @@ export function urlAllowed(url: string, patterns: readonly string[]): boolean {
 
 const obj = (j: unknown): Record<string, unknown> | null => (j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : null)
 
+/** What usedAdminSources answered: the managed sources used, or the first that couldn't be read. */
+export type AdminRead = { used: { kind: AdminSourceKind; settings: Record<string, unknown> }[] } | { unreadable: AdminSourceKind }
+
 /**
  * The cause Combwork can see of a launch's hooks not arriving, first that applies, or null:
- * 1. the managed sources Claude Code uses turn hooks off (disableAllHooks): every hook is off, managed ones too, so the
+ * 1. a managed source it would use can't be read: what it holds can't be told (said, never taken as none);
+ * 2. the managed sources Claude Code uses turn hooks off (disableAllHooks): every hook is off, managed ones too, so the
  *    admin snippet can't help;
- * 2. they allow only their own hooks (allowManagedHooksOnly): the snippet can (a disableAllHooks in a scope below doesn't
- *    turn managed hooks off, so it is named beside it);
- * 3. an HTTP hook allowlist (allowedHttpHookUrls, or httpHookAllowedEnvVars without the token's variable; Claude Code
+ * 3. they allow only their own hooks (allowManagedHooksOnly): the snippet can (a disableAllHooks in a scope below doesn't
+ *    turn managed hooks off, so it is named beside it). Merged sources (managedSourcesBehavior "merge") lock it if any
+ *    of them does, the first that does named;
+ * 4. an HTTP hook allowlist (allowedHttpHookUrls, or httpHookAllowedEnvVars without the token's variable; Claude Code
  *    merges them across files) doesn't let the hook through;
- * 4. the settings scope that decides disableAllHooks (the first, highest first, that sets it) turns them off.
- * `admin` is usedAdminSources' answer (null: couldn't be told), `scopes` settingsScopes' (its managed file is in `admin`).
+ * 5. the settings scope that decides disableAllHooks (the first, highest first, that sets it) turns them off;
+ * 6. a settings scope Combwork couldn't read (or can't tell whether Claude Code reads): it can't be told.
+ * `admin` is usedAdminSources' answer (null: it failed), `scopes` settingsScopes' (its managed file is in `admin`).
  */
-export function hookCause(admin: { kind: AdminSourceKind; settings: Record<string, unknown> }[] | null, scopes: readonly SettingsScope[], need: { url: string; envVar: string }): HookCause | null {
-  const managed = admin ?? []
+export function hookCause(admin: AdminRead | null, scopes: readonly SettingsScope[], need: { url: string; envVar: string }): HookCause | null {
+  if (admin && 'unreadable' in admin) return { why: 'unreadable', setting: '', where: LABELS[admin.unreadable](), snippet: true } // i18n-ignore: a select key, never shown
+  const managed = admin?.used ?? []
   const others = scopes.filter((s) => s.kind !== 'managed')
-  const adminSetting = (key: string): { kind: AdminSourceKind; value: unknown } | null => {
-    for (const a of managed) if (a.settings[key] !== undefined && a.settings[key] !== null) return { kind: a.kind, value: a.settings[key] }
-    return null
-  }
+  // A lock any used source sets: the first that sets it on.
+  const locked = (key: string): AdminSourceKind | null => managed.find((a) => a.settings[key] === true)?.kind ?? null
   const deciding = others.find((s) => typeof obj(s.json)?.disableAllHooks === 'boolean')
   const lowerOff = deciding && obj(deciding.json)!.disableAllHooks === true ? deciding.label : undefined
-  const off = adminSetting('disableAllHooks')
-  if (off?.value === true) return { why: 'off', setting: 'disableAllHooks', where: LABELS[off.kind](), snippet: false } // i18n-ignore: select keys and setting names, never shown
-  const only = adminSetting('allowManagedHooksOnly')
-  if (only?.value === true) return { why: 'managedOnly', setting: 'allowManagedHooksOnly', where: LABELS[only.kind](), snippet: true, ...(lowerOff ? { also: lowerOff } : {}) } // i18n-ignore: select keys and setting names, never shown
+  const off = locked('disableAllHooks')
+  if (off) return { why: 'off', setting: 'disableAllHooks', where: LABELS[off](), snippet: false } // i18n-ignore: select keys and setting names, never shown
+  const only = locked('allowManagedHooksOnly')
+  if (only) return { why: 'managedOnly', setting: 'allowManagedHooksOnly', where: LABELS[only](), snippet: true, ...(lowerOff ? { also: lowerOff } : {}) } // i18n-ignore: select keys and setting names, never shown
   // The allowlists, merged across every file that sets one.
   const files = [...managed.map((a) => ({ where: LABELS[a.kind](), json: a.settings as unknown })), ...others.map((s) => ({ where: s.label, json: s.json }))]
   const allow = (key: string, ok: (entries: string[]) => boolean): HookCause | null => {
@@ -60,6 +65,8 @@ export function hookCause(admin: { kind: AdminSourceKind; settings: Record<strin
   const blocked = allow('allowedHttpHookUrls', (e) => urlAllowed(need.url, e)) ?? allow('httpHookAllowedEnvVars', (e) => e.includes(need.envVar))
   if (blocked) return blocked
   if (lowerOff) return { why: 'off', setting: 'disableAllHooks', where: lowerOff, snippet: false } // i18n-ignore: select keys and setting names, never shown
+  const unsure = others.find((s) => s.unsure !== undefined)
+  if (unsure) return { why: 'unreadable', setting: '', where: unsure.label, snippet: true } // i18n-ignore: a select key, never shown
   return null
 }
 

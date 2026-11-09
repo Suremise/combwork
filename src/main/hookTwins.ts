@@ -99,6 +99,31 @@ export class TwinEntry {
   }
 }
 
+/** What carrying() needs of an HTTP response. */
+export interface CarryingResponse {
+  readonly destroyed: boolean
+  readonly closed: boolean
+  readonly writableFinished: boolean
+  once(event: 'finish' | 'close', f: () => void): unknown
+}
+
+/**
+ * A response carrying an entry's context (its first delivery's, or a twin's that claimed it): the entry hears how it
+ * ended, finished (written in full) or not. One already closed (the CLI gave up while the reply was being decided, or a
+ * twin's while it waited for its claim) can't carry it: the entry hears that at once, so a later delivery may, never
+ * waiting on an event that has passed.
+ */
+export function carrying(res: CarryingResponse, entry: TwinEntry): void {
+  if (res.destroyed || res.closed) {
+    entry.sent(false)
+    return
+  }
+  res.once('finish', () => entry.sent(true))
+  res.once('close', () => {
+    if (!res.writableFinished) entry.sent(false)
+  })
+}
+
 /** Whether a reply carries context (a notice, SessionStart's guidance). */
 export function hasContext(reply: unknown): boolean {
   const r = reply as Record<string, any> | null

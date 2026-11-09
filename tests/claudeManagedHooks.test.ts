@@ -3,11 +3,15 @@
 // managed settings (one test per shape, and their combinations), and the snippet's command run through both shells
 // Claude Code uses, with a Unicode folder for the auth file.
 import { spawn } from 'child_process'
+import { createRequire } from 'module'
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import http from 'http'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { tempDir } from './tempDir'
+
+// A child's environment from the run context's allowlist, never this shell's (tests/README.md, Isolation).
+const runContext = createRequire(import.meta.url)('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
 
 const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('cw-managed-hooks-'))
 vi.mock('electron', () => ({ app: { getPath: () => userData, getVersion: () => '0.0.0-test', isPackaged: false } }))
@@ -87,82 +91,133 @@ describe('the admin snippet (HI-2777)', () => {
   })
 })
 
-/** A managed source as usedAdminSources gives it. */
-const file = (settings: Record<string, unknown>) => ({ kind: 'file' as const, settings })
-const scope = (kind: 'cli' | 'local' | 'project' | 'user', json: unknown, label = `${kind} settings`) => ({ kind, label, json })
+/** Managed sources as usedAdminSources gives them. */
+const used = (...docs: { kind: 'hklm' | 'file' | 'hkcu'; settings: Record<string, unknown> }[]) => ({ used: docs })
+const file = (settings: Record<string, unknown>) => used({ kind: 'file', settings })
+const scope = (kind: 'cli' | 'local' | 'project' | 'user', json: unknown, label = `${kind} settings`, unsure?: string) => ({ kind, label, json, ...(unsure ? { unsure } : {}) })
 const NEED = { url: URL47821, envVar: 'CW_HOOK_TOKEN' }
+const read = (settings: Record<string, unknown>) => async () => ({ state: 'read' as const, settings })
+const absent = async () => ({ state: 'absent' as const })
+const unreadable = async () => ({ state: 'unreadable' as const })
 
 describe("what would keep Combwork's hooks away, from recorded managed settings (HI-2777)", () => {
   it('the registry policy (HKLM) allowing only managed hooks: named, with the snippet offered', () => {
     const doc = parseRegSettings('HKEY_LOCAL_MACHINE\\SOFTWARE\\Policies\\ClaudeCode\r\n    Settings    REG_SZ    {"allowManagedHooksOnly":true}\r\n')
     expect(doc.state).toBe('read')
-    const c = hookCause([{ kind: 'hklm', settings: (doc as { settings: Record<string, unknown> }).settings }], [], NEED)
+    const c = hookCause(used({ kind: 'hklm', settings: (doc as { settings: Record<string, unknown> }).settings }), [], NEED)
     expect(c).toMatchObject({ why: 'managedOnly', setting: 'allowManagedHooksOnly', snippet: true })
     expect(c!.where).toMatch(/HKLM/)
   })
 
-  it('the managed settings file, merged with its drop-ins (later ones winning)', async () => {
+  it('the managed settings file, merged with its drop-ins (a later scalar winning)', async () => {
     const dir = join(base, 'managed-file')
     mkdirSync(join(dir, 'managed-settings.d'), { recursive: true })
     writeFileSync(join(dir, 'managed-settings.json'), JSON.stringify({ allowManagedHooksOnly: false }))
     writeFileSync(join(dir, 'managed-settings.d', '50-hooks.json'), JSON.stringify({ allowManagedHooksOnly: true }))
-    const used = await usedAdminSources({ hklm: async () => ({ state: 'absent' }), files: () => managedFiles(dir), hkcu: async () => ({ state: 'absent' }) })
-    expect(hookCause(used, [], NEED)).toMatchObject({ why: 'managedOnly', where: "Claude Code's managed settings file" })
+    const got = await usedAdminSources({ hklm: absent, files: () => managedFiles(dir), hkcu: absent })
+    expect(hookCause(got, [], NEED)).toMatchObject({ why: 'managedOnly', where: "Claude Code's managed settings file" })
+  })
+
+  it("a drop-in's allowlist entries join the base file's, never replace them (review round 1)", async () => {
+    const dir = join(base, 'managed-lists')
+    mkdirSync(join(dir, 'managed-settings.d'), { recursive: true })
+    writeFileSync(join(dir, 'managed-settings.json'), JSON.stringify({ allowedHttpHookUrls: ['http://127.0.0.1:47821/hook*'], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] }))
+    writeFileSync(join(dir, 'managed-settings.d', '10-corp.json'), JSON.stringify({ allowedHttpHookUrls: ['https://hooks.corp.example/*'], httpHookAllowedEnvVars: ['OTHER'] }))
+    expect(await managedFiles(dir)).toEqual({ state: 'read', settings: { allowedHttpHookUrls: ['http://127.0.0.1:47821/hook*', 'https://hooks.corp.example/*'], httpHookAllowedEnvVars: ['CW_HOOK_TOKEN', 'OTHER'] } })
+    expect(hookCause(await usedAdminSources({ hklm: absent, files: () => managedFiles(dir), hkcu: absent }), [], NEED)).toBeNull()
+  })
+
+  it('merged managed sources lock allowManagedHooksOnly if any of them does: a higher false never hides a lower true (review round 1)', async () => {
+    const got = await usedAdminSources({ hklm: read({ managedSourcesBehavior: 'merge', allowManagedHooksOnly: false }), files: read({ allowManagedHooksOnly: true }), hkcu: absent })
+    expect(hookCause(got, [], NEED)).toMatchObject({ why: 'managedOnly', where: "Claude Code's managed settings file" })
+    // First wins (no merge): the file isn't used, so its lock isn't either.
+    expect(hookCause(await usedAdminSources({ hklm: read({ allowManagedHooksOnly: false }), files: read({ allowManagedHooksOnly: true }), hkcu: absent }), [], NEED)).toBeNull()
   })
 
   it('managed disableAllHooks: every hook is off, managed ones too, so no snippet; it wins over allowManagedHooksOnly', () => {
-    expect(hookCause([file({ disableAllHooks: true, allowManagedHooksOnly: true })], [], NEED)).toMatchObject({ why: 'off', setting: 'disableAllHooks', snippet: false })
+    expect(hookCause(file({ disableAllHooks: true, allowManagedHooksOnly: true }), [], NEED)).toMatchObject({ why: 'off', setting: 'disableAllHooks', snippet: false })
   })
 
   it('allowManagedHooksOnly with a lower disableAllHooks: managed only is the cause (a lower one never stops managed hooks), the other named beside it', () => {
-    expect(hookCause([file({ allowManagedHooksOnly: true })], [scope('user', { disableAllHooks: true }, "Claude Code's settings.json")], NEED)).toEqual({ why: 'managedOnly', setting: 'allowManagedHooksOnly', where: "Claude Code's managed settings file", snippet: true, also: "Claude Code's settings.json" })
+    expect(hookCause(file({ allowManagedHooksOnly: true }), [scope('user', { disableAllHooks: true }, "Claude Code's settings.json")], NEED)).toEqual({ why: 'managedOnly', setting: 'allowManagedHooksOnly', where: "Claude Code's managed settings file", snippet: true, also: "Claude Code's settings.json" })
   })
 
   it("an HTTP hook allowlist without Combwork's URL (they merge across files; * matches anything)", () => {
-    expect(hookCause([file({ allowedHttpHookUrls: ['https://hooks.example.com/*'] })], [], NEED)).toMatchObject({ why: 'blocked', setting: 'allowedHttpHookUrls', snippet: true })
+    expect(hookCause(file({ allowedHttpHookUrls: ['https://hooks.example.com/*'] }), [], NEED)).toMatchObject({ why: 'blocked', setting: 'allowedHttpHookUrls', snippet: true })
     // Another file's entry lets it through: the lists are merged.
-    expect(hookCause([file({ allowedHttpHookUrls: ['https://hooks.example.com/*'] })], [scope('user', { allowedHttpHookUrls: ['http://127.0.0.1:*'] })], NEED)).toBeNull()
+    expect(hookCause(file({ allowedHttpHookUrls: ['https://hooks.example.com/*'] }), [scope('user', { allowedHttpHookUrls: ['http://127.0.0.1:*'] })], NEED)).toBeNull()
     expect(urlAllowed(URL47821, ['http://127.0.0.1:47821/hook*'])).toBe(true)
     expect(urlAllowed(URL47821, ['HTTP://127.0.0.1:*'])).toBe(true)
     expect(urlAllowed(URL47821, ['http://localhost:*'])).toBe(false)
   })
 
   it("an env allowlist without the token's variable (hooks would arrive with no token)", () => {
-    expect(hookCause([file({ httpHookAllowedEnvVars: ['OTHER'] })], [], NEED)).toMatchObject({ why: 'blocked', setting: 'httpHookAllowedEnvVars' })
-    expect(hookCause([file({ httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] })], [], NEED)).toBeNull()
+    expect(hookCause(file({ httpHookAllowedEnvVars: ['OTHER'] }), [], NEED)).toMatchObject({ why: 'blocked', setting: 'httpHookAllowedEnvVars' })
+    expect(hookCause(file({ httpHookAllowedEnvVars: ['CW_HOOK_TOKEN'] }), [], NEED)).toBeNull()
   })
 
   it('disableAllHooks in the deciding scope that is not managed (the first that sets it, highest first)', () => {
-    expect(hookCause([], [scope('project', { disableAllHooks: false }), scope('user', { disableAllHooks: true })], NEED)).toBeNull()
-    expect(hookCause([], [scope('local', { disableAllHooks: true }, 'local file'), scope('user', { disableAllHooks: false })], NEED)).toMatchObject({ why: 'off', where: 'local file', snippet: false })
+    expect(hookCause(used(), [scope('project', { disableAllHooks: false }), scope('user', { disableAllHooks: true })], NEED)).toBeNull()
+    expect(hookCause(used(), [scope('local', { disableAllHooks: true }, 'local file'), scope('user', { disableAllHooks: false })], NEED)).toMatchObject({ why: 'off', where: 'local file', snippet: false })
   })
 
   it('none: nothing local keeps them away', () => {
-    expect(hookCause([], [scope('user', { hooks: {} })], NEED)).toBeNull()
-    expect(hookCause(null, [], NEED)).toBeNull()
+    expect(hookCause(used(), [scope('user', { hooks: {} })], NEED)).toBeNull()
   })
 
-  it("which managed sources count, as Claude Code chooses them: HKLM over the file (first wins), HKCU only with no admin source, merge on request", async () => {
-    const read = (settings: Record<string, unknown>) => async () => ({ state: 'read' as const, settings })
-    const absent = async () => ({ state: 'absent' as const })
-    expect(await usedAdminSources({ hklm: read({ allowManagedHooksOnly: false }), files: read({ allowManagedHooksOnly: true }), hkcu: absent })).toEqual([{ kind: 'hklm', settings: { allowManagedHooksOnly: false } }])
-    expect(await usedAdminSources({ hklm: absent, files: absent, hkcu: read({ allowManagedHooksOnly: true }) })).toEqual([{ kind: 'hkcu', settings: { allowManagedHooksOnly: true } }])
-    expect(await usedAdminSources({ hklm: absent, files: read({ disableAllHooks: false }), hkcu: read({ allowManagedHooksOnly: true }) })).toEqual([{ kind: 'file', settings: { disableAllHooks: false } }])
-    const merged = await usedAdminSources({ hklm: read({ managedSourcesBehavior: 'merge', other: 1 }), files: read({ allowManagedHooksOnly: true }), hkcu: absent })
-    expect(hookCause(merged, [], NEED)).toMatchObject({ why: 'managedOnly', where: "Claude Code's managed settings file" })
-    // One it would use that can't be read: can't be told.
-    expect(await usedAdminSources({ hklm: async () => ({ state: 'unreadable' }), files: absent, hkcu: absent })).toBeNull()
+  it("a source Combwork couldn't read is said, never taken as none (review round 1): HKLM, the file, a drop-in, HKCU, a settings scope", async () => {
+    const dir = join(base, 'managed-bad-dropin')
+    mkdirSync(join(dir, 'managed-settings.d'), { recursive: true })
+    writeFileSync(join(dir, 'managed-settings.json'), JSON.stringify({ disableAllHooks: false }))
+    writeFileSync(join(dir, 'managed-settings.d', '20-broken.json'), '{ not json')
+    const cases: [string, Parameters<typeof usedAdminSources>[0], RegExp][] = [
+      ['HKLM', { hklm: unreadable, files: absent, hkcu: absent }, /HKLM/],
+      ['the file', { hklm: absent, files: unreadable, hkcu: absent }, /managed settings file/],
+      ['a drop-in', { hklm: absent, files: () => managedFiles(dir), hkcu: absent }, /managed settings file/],
+      ['HKCU, with no admin source', { hklm: absent, files: absent, hkcu: unreadable }, /HKCU/],
+      ['a merged source below', { hklm: read({ managedSourcesBehavior: 'merge' }), files: unreadable, hkcu: absent }, /managed settings file/]
+    ]
+    for (const [name, sources, where] of cases) {
+      const c = hookCause(await usedAdminSources(sources), [], NEED)
+      expect(c?.why, name).toBe('unreadable')
+      expect(c?.where, name).toMatch(where)
+      expect(c?.snippet, name).toBe(true)
+    }
+    expect(hookCause(used(), [scope('user', null, "Claude Code's settings.json", "couldn't be read (EACCES)")], NEED)).toMatchObject({ why: 'unreadable', where: "Claude Code's settings.json" })
+    // A definite cause in a scope it could read still comes first.
+    expect(hookCause(used(), [scope('local', { disableAllHooks: true }, 'local file'), scope('user', null, 'user file', 'unreadable')], NEED)).toMatchObject({ why: 'off', where: 'local file' })
+  })
+
+  it('which managed sources count, as Claude Code chooses them: HKLM over the file (first wins), HKCU only with no admin source', async () => {
+    expect(await usedAdminSources({ hklm: read({ allowManagedHooksOnly: false }), files: read({ allowManagedHooksOnly: true }), hkcu: absent })).toEqual(used({ kind: 'hklm', settings: { allowManagedHooksOnly: false } }))
+    expect(await usedAdminSources({ hklm: absent, files: absent, hkcu: read({ allowManagedHooksOnly: true }) })).toEqual(used({ kind: 'hkcu', settings: { allowManagedHooksOnly: true } }))
+    expect(await usedAdminSources({ hklm: absent, files: read({ disableAllHooks: false }), hkcu: read({ allowManagedHooksOnly: true }) })).toEqual(used({ kind: 'file', settings: { disableAllHooks: false } }))
   })
 })
 
-/** Runs `command` through `shell` with `input` on stdin; its stdout. */
+// The longest a shell run here takes: a bound for a hung one, never how long it should take.
+const CHILD_HUNG_MS = 20000
+
+/** Runs `command` through `shell` with `input` on stdin, in the run context's environment plus `env`; bounded. */
 function run(shell: string, args: string[], input: string, env: Record<string, string>): Promise<{ code: number | null; out: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(shell, args, { env: { ...process.env, ...env }, windowsHide: true })
+  return new Promise((resolve, reject) => {
+    const child = spawn(shell, args, { env: runContext.childEnv(env), windowsHide: true })
     let out = ''
     child.stdout.on('data', (c) => (out += c))
     child.stderr.resume()
-    child.on('close', (code) => resolve({ code, out }))
+    // A child that doesn't end is ended, and the test fails: never left behind.
+    const t = setTimeout(() => {
+      child.kill()
+      reject(new Error(`${shell} didn't end within ${CHILD_HUNG_MS} ms`))
+    }, CHILD_HUNG_MS)
+    child.on('error', (e) => {
+      clearTimeout(t)
+      reject(e)
+    })
+    child.on('close', (code) => {
+      clearTimeout(t)
+      resolve({ code, out })
+    })
     child.stdin.end(input, 'utf8')
   })
 }
