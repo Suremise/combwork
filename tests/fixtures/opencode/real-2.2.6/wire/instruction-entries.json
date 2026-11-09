@@ -1,0 +1,47 @@
+{
+ "note": "HI-2771 (HB2, 9 Nov 2026, 08:55-09:10 UTC, the pinned build in a throwaway root, local Ollama only): a session's instruction entries through 2.2.6's experimental routes (`opencode api --standalone`; the 413 through a private `opencode serve`), and where a model request carried one (a logging proxy, two prompts). A status of 204 is shown where the API printed nothing (exit 0).",
+ "put": {
+  "request": { "method": "PUT", "path": "/api/experimental/session/<session>/instructions/entries/combwork.state-view", "body": { "value": "SVMARK view" } },
+  "status": 204
+ },
+ "list": {
+  "request": { "method": "GET", "path": "/api/experimental/session/<session>/instructions/entries" },
+  "status": 200,
+  "body": { "data": [{ "key": "combwork.state-view", "value": "SVMARK view" }] }
+ },
+ "badKey": {
+  "request": { "method": "PUT", "path": "/api/experimental/session/<session>/instructions/entries/Bad_Key", "body": { "value": "x" } },
+  "status": 400,
+  "body": { "_tag": "InvalidRequestError", "message": "Expected a string matching the RegExp ^[a-z0-9][a-z0-9._-]*$\n  at [\"key\"]", "kind": "Params" }
+ },
+ "noValue": {
+  "request": { "method": "PUT", "path": "/api/experimental/session/<session>/instructions/entries/combwork.state-view", "body": {} },
+  "status": 400,
+  "body": { "_tag": "InvalidRequestError", "message": "Missing key\n  at [\"value\"]", "kind": "Payload" }
+ },
+ "putTooLarge": {
+  "request": { "method": "PUT", "path": "/api/experimental/session/<session>/instructions/entries/combwork.state-view", "body": { "value": "<270000 times x>" } },
+  "status": 413,
+  "body": { "_tag": "InstructionEntryValueTooLargeError", "actualBytes": 270002, "maxBytes": 262144, "message": "Instruction entry value is 270002 bytes; the limit is 262144 bytes" },
+  "measured": "the value's JSON (270000 characters and its two quotes), not the request's body"
+ },
+ "delete": {
+  "request": { "method": "DELETE", "path": "/api/experimental/session/<session>/instructions/entries/combwork.state-view" },
+  "status": 204,
+  "after": { "data": [] }
+ },
+ "deleteAbsent": {
+  "request": { "method": "DELETE", "path": "/api/experimental/session/<session>/instructions/entries/combwork.state-view" },
+  "status": 204
+ },
+ "missingSession": {
+  "request": { "method": "PUT", "path": "/api/experimental/session/ses_doesnotexist0000000000000/instructions/entries/combwork.state-view", "body": { "value": "x" } },
+  "status": 404,
+  "body": { "_tag": "SessionNotFoundError", "sessionID": "ses_doesnotexist0000000000000", "message": "Session not found: ses_doesnotexist0000000000000" }
+ },
+ "rendered": {
+  "putBeforeTheFirstPrompt": "In the request's system prompt (message 0, role system), after the environment block: <context key=\"combwork.state-view\">\\nSVMARK-ONE board: #12 Doing\\n</context>",
+  "putAgainAfterATurn": "The system prompt keeps the first value; the next request adds a user message: <system-update>\\nThe context under \"combwork.state-view\" changed and supersedes the previous value:\\n&lt;context key=\"combwork.state-view\"&gt;\\nSVMARK-TWO board: #12 Review\\n&lt;/context&gt;\\n</system-update>",
+  "aPutStartsNoTurn": true
+ }
+}

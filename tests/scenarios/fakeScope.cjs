@@ -60,14 +60,11 @@ const PROVIDER_WAITS = {}
  * Scenarios a fake provider leaves out until a card lands, each group with why (HI-2760). fake-opencode's own run
  * (2026-11-09T01-59-16-fake-opencode, then 02-32-38 for those not about the transcript). The ones that read the agent's
  * transcript ran once HI-2762 gave OpenCode agents their history (2026-11-09T02-52-58-fake-opencode).
- * - an OpenCode Assistant gets no state view at its start: HI-2771.
- * HI-2772 lifted review-in-copy's (an OpenCode reviewer is lent its review copy: 2.2.6's default rules reach it, no grant written).
+ * HI-2772 lifted review-in-copy's (an OpenCode reviewer is lent its review copy: 2.2.6's default rules reach it, no grant
+ * written), and HI-2771 assistant-journal-recall's (an OpenCode Assistant's state view goes into its session as an
+ * instruction entry). None waits now.
  */
-const SCENARIO_WAITS = {
-  'fake-opencode': [
-    { why: "waits for HI-2771: an OpenCode Assistant gets no state view at its start (tests/scenarios/fakeScope.cjs)", ids: ['assistant-journal-recall'] }
-  ]
-}
+const SCENARIO_WAITS = {}
 
 /** Why a provider leaves this scenario out until a card lands (SCENARIO_WAITS), or null. */
 const waitOf = (providerKey, id) => (SCENARIO_WAITS[providerKey] ?? []).find((w) => w.ids.includes(id))?.why ?? null

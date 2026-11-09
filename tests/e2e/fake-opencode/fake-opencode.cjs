@@ -316,6 +316,12 @@ async function tui() {
       return
     }
     if (!sid) sid = (await api('POST', '/api/session', { location: { directory: dir } })).body?.data?.id
+    // Its /compact asks the server for a compaction (wire/compact-reply.json), never a prompt (HI-2771).
+    if (t.trim() === '/compact') {
+      out('/compact\n')
+      await api('POST', `/api/session/${sid}/compact`, {})
+      return
+    }
     out(`${t}\n`)
     await api('POST', `/api/session/${sid}/prompt`, { text: t })
   }

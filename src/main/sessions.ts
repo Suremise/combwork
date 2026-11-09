@@ -6641,6 +6641,9 @@ class SessionManager {
   }
 
   private hookReplyHere(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
+    // A CLI whose start context goes into its session (HI-2771): its start step answers once it is done (or out of time).
+    const intoSession = this.sessionContextStep(runId, body)
+    if (intoSession) return intoSession
     if (body.hook_event_name === 'SessionStart') return this.startReply(runId, body)
     const afterCompaction = this.compactionContextReply(runId, body)
     if (afterCompaction) return afterCompaction
@@ -6700,6 +6703,65 @@ class SessionManager {
     if (hook.event.kind === 'compactStart') this.contextDue.add(l)
     else if (hook.event.kind === 'prompt' && this.contextDue.delete(l)) return this.startContextFor(l, 'compact')
     return null
+  }
+
+  /** The whole start step's budget (HI-2771): building the view and putting it, well inside the launcher's 5 s wait. */
+  static readonly SESSION_CONTEXT_MS = 2500
+  /** Each launch's start context in its session (HI-2771): its start step taken, compactions refreshed, its queue, its generation. */
+  private sessionContexts = new WeakMap<LiveSession, { started: boolean; compactions: Set<string>; chain: Promise<void>; gen: number }>()
+
+  /**
+   * On a CLI whose start context goes into its session (startContextTrigger): at its launch's start (its first baseline,
+   * before its TUI takes input) the step that puts or removes it, answered once done or out of time; at a compaction's
+   * end (each compaction once, however often it is seen), a refresh queued behind it, answered at once. Null for any other post.
+   */
+  private sessionContextStep(runId: string | null, body: Record<string, any>): Promise<null> | null {
+    const l = this.findLaunch(runId, body.session_id)?.[1]
+    const trigger = l?.adapter.deliverStartContext ? l.adapter.startContextTrigger?.(body) : null
+    if (!l || !trigger) return null
+    const s = this.sessionContexts.get(l) ?? { started: false, compactions: new Set<string>(), chain: Promise.resolve(), gen: 0 }
+    this.sessionContexts.set(l, s)
+    if (trigger.source === 'start') {
+      if (s.started) return null
+      s.started = true
+      return this.deliverSessionContext(l, s, l.resumed ? 'resume' : 'startup')
+    }
+    if (s.compactions.has(trigger.id)) return null
+    s.compactions.add(trigger.id)
+    void this.deliverSessionContext(l, s, 'compact')
+    return null
+  }
+
+  /**
+   * One delivery, queued behind the launch's last (one at a time, so an older view never lands after a newer one), within
+   * SESSION_CONTEXT_MS: the view built and put (the Assistant's, its journal on, guidance on, not kept out), else Combwork's
+   * entry removed. Dropped before it sends when a newer delivery was asked for, the launch is no longer this agent's
+   * running one, or its session changed; its request cut off at the deadline is uncertain, never taken as delivered.
+   */
+  private deliverSessionContext(l: LiveSession, s: { chain: Promise<void>; gen: number }, source: string): Promise<null> {
+    const gen = ++s.gen
+    const sessionId = l.state.sessionId
+    const current = (signal: AbortSignal): boolean => !signal.aborted && gen === s.gen && this.live.get(liveId(l.state.projectPath, l.state.agentId)) === l && l.state.sessionId === sessionId
+    const barred = (): boolean => l.policy?.guidance === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
+    const run = s.chain.then(async () => {
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), SessionManager.SESSION_CONTEXT_MS)
+      try {
+        if (!current(ac.signal) || !sessionId) return
+        const built = !barred() && this.startContext ? this.startContext(l.state, source).catch(() => null) : Promise.resolve(null)
+        const text = await Promise.race([built, new Promise<null>((done) => ac.signal.addEventListener('abort', () => done(null), { once: true }))])
+        // Asked again once it is made (as startContextFor): out of time, superseded, or barred meanwhile, nothing is sent.
+        if (!current(ac.signal)) return
+        const outcome = await l.adapter.deliverStartContext!(l.state.runId, sessionId, text && !barred() ? text : null, ac.signal)
+        log.info(`start context into ${l.state.agentId}'s session (${source}): ${outcome}`)
+      } catch (e) {
+        log.warn('start context into a session', e)
+      } finally {
+        clearTimeout(timer)
+      }
+    })
+    s.chain = run.catch(() => undefined)
+    return run.then(() => null, () => null)
   }
 
   /** The start context for a launch, in its CLI's reply form, or null (none, or it couldn't be made). */

@@ -4,6 +4,7 @@ import { onAccountRemoving } from './accounts'
 import { localDataRoot } from './providers/antigravity/home'
 import { opencode } from './providers/opencode/adapter'
 import { opencodeHistory } from './providers/opencode/history'
+import { untrackContextRun } from './providers/opencode/context'
 import { opencodeCommand } from './providers/opencode/install'
 import { providerService } from './providerService'
 import { sessions } from './sessions'
@@ -27,6 +28,8 @@ export function startOpencodeHistory(): void {
     command: (executable, args, home) => opencodeCommand(executable, args, home)
   })
   sessions.onLaunchEnded.add((_projectPath, _agentId, runId) => void opencodeHistory.ended(runId))
+  // The run's server credentials for its state view go with it (HI-2771).
+  sessions.onLaunchEnded.add((_projectPath, _agentId, runId) => untrackContextRun(runId))
   onAccountRemoving((id) => opencodeHistory.removeRoot(join(localDataRoot(), 'accounts', id)))
 }
 

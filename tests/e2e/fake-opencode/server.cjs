@@ -124,6 +124,9 @@ async function startServer(opts) {
     const info = { id, projectID: store.projectId(dir), ...(model ? { model } : {}), cost: 0, tokens: zeroTokens(), time: { created: now, updated: now }, ...(body.permissions ? { permissions: body.permissions } : {}), location: { directory: dir } }
     store.change((db) => {
       db.sessions[id] = { info, messages: [], seq: -1 }
+      // A test's entry of someone else's on each new session (FAKE_OPENCODE_SEED_ENTRY "key=value"), never Combwork's.
+      const seed = /^([a-z0-9][a-z0-9._-]*)=(.*)$/.exec(env.FAKE_OPENCODE_SEED_ENTRY || '')
+      if (seed) (db.entries ??= {})[id] = { [seed[1]]: seed[2] }
     }, env)
     emit('session.created', { sessionID: id, slug: SLUGS[Math.floor(Math.random() * SLUGS.length)], version: VERSION, projectID: info.projectID, location: info.location, subpath: '', ...(body.permissions ? { permissions: body.permissions } : {}), ...(model ? { model } : {}) }, { sid: id, durable: true, location: info.location })
     log({ kind: 'session', created: id, dir, ...(model ? { model } : {}) })
@@ -409,6 +412,40 @@ async function startServer(opts) {
     log({ kind: 'turn-end', session: sid, outcome })
   }
 
+  /**
+   * A compaction, as 2.2.6 ran one asked for (events/compaction.json, messages/compaction.json, HI-2771): its inbox item,
+   * its own execution (started, delivered, compaction started, a delta, usage, ended), its message, and succeeded.
+   */
+  function compact(sid, id) {
+    const now = Date.now()
+    emit('session.inbox.enqueued', { inboxID: id, sessionID: sid, item: { type: 'compaction', payload: {}, delivery: 'steer' } }, { sid, durable: true, location: loc(sid) })
+    const q = (queues.get(sid) || Promise.resolve()).then(async () => {
+      const d = { sid, durable: true, location: loc(sid) }
+      const model = modelOf(sid)
+      log({ kind: 'compaction', session: sid, id })
+      emit('session.execution.started', { sessionID: sid }, { sid, durable: true })
+      emit('session.inbox.delivered', { sessionID: sid, inboxID: id }, d)
+      emit('session.compaction.started', { sessionID: sid, reason: 'manual', inputID: id }, d)
+      emit('session.compaction.delta', { sessionID: sid, text: '<template>\n' })
+      const summary = '<template>\n## Objective\n- (the fake compaction)\n</template>'
+      const tokens = { input: 575, output: 467, reasoning: 0, cache: { read: 0, write: 0 } }
+      updateInfo(sid, (info) => (info.tokens = addTokens(info.tokens, tokens)))
+      emit('session.usage.updated', { sessionID: sid, cost: 0, tokens: session(sid).info.tokens })
+      pushMessage(sid, { type: 'compaction', id, time: { created: now }, status: 'completed', reason: 'manual', model, summary, cost: 0, tokens })
+      emit('session.compaction.ended', { sessionID: sid, reason: 'manual', model, text: summary }, d)
+      pushMessage(sid, { id: store.newId('msg'), time: { created: Date.now() }, type: 'idle', outcome: 'succeeded' })
+      updateInfo(sid, (info) => {
+        info.outcome = 'succeeded'
+        info.time.idle = Date.now()
+        info.time.updated = Date.now()
+      })
+      emit('session.execution.succeeded', { sessionID: sid }, { sid, durable: true })
+      log({ kind: 'compaction-end', session: sid, id })
+    })
+    queues.set(sid, q.catch(() => undefined))
+    return { id, now }
+  }
+
   /** A permission request: permission.asked, then waits for a reply (or the turn's interrupt). */
   function ask(sid, l, req, ctl) {
     const id = store.newId('per')
@@ -470,6 +507,13 @@ async function startServer(opts) {
           resolve(null)
         }
       })
+    })
+  /** A request's body as sent (its UTF-8 text), for a limit on its bytes. */
+  const rawBodyOf = (req) =>
+    new Promise((resolve) => {
+      const chunks = []
+      req.on('data', (x) => chunks.push(Buffer.from(x)))
+      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
     })
   const listing = (dir, data) => ({ location: { directory: dir || cwd }, data })
 
@@ -547,6 +591,59 @@ async function startServer(opts) {
       const body = (await bodyOf(req)) || {}
       const { inboxID, now, text } = submit(sid, String(body.text ?? ''))
       return json(res, 200, { data: { id: inboxID, sessionID: sid, time: { created: now }, type: 'user', payload: { text }, delivery: 'steer' } })
+    }
+    if ((m = /^\/api\/session\/([^/]+)\/compact$/.exec(p)) && req.method === 'POST') {
+      const sid = m[1]
+      if (!session(sid)) return notFound(res, sid)
+      const body = (await bodyOf(req)) || {}
+      const { id, now } = compact(sid, typeof body.id === 'string' && body.id ? body.id : store.newId('msg'))
+      return json(res, 200, { data: { id, sessionID: sid, time: { created: now }, type: 'compaction', payload: {}, delivery: 'steer' } })
+    }
+    // The session's instruction entries (2.2.6's experimental routes, wire/instruction-entries.json, HI-2771): put,
+    // listed and removed, each logged with what it answered; the key pattern and the body limit as 2.2.6 has them.
+    if ((m = /^\/api\/experimental\/session\/([^/]+)\/instructions\/entries(?:\/([^/]+))?$/.exec(p))) {
+      const sid = m[1]
+      const key = m[2] === undefined ? null : decodeURIComponent(m[2])
+      const raw = req.method === 'PUT' ? await rawBodyOf(req) : null
+      const answer = (status, body) => {
+        log({ kind: 'instruction-entry', method: req.method, session: sid, key, status, ...(req.method === 'PUT' && status === 204 ? { value: JSON.parse(raw).value } : {}), keys: Object.keys(store.read(env).entries?.[sid] ?? {}), at: Date.now() })
+        if (body === undefined) {
+          res.writeHead(status)
+          return res.end()
+        }
+        return json(res, status, body)
+      }
+      // A test's failure, from FAKE_OPENCODE_ENTRY_HANG/REFUSE or, read at each request, the file FAKE_OPENCODE_ENTRY_MODE names.
+      const mode = (() => {
+        try {
+          return env.FAKE_OPENCODE_ENTRY_MODE ? fs.readFileSync(env.FAKE_OPENCODE_ENTRY_MODE, 'utf8').trim() : ''
+        } catch {
+          return ''
+        }
+      })()
+      if ((env.FAKE_OPENCODE_ENTRY_HANG || mode === 'hang') && req.method !== 'GET') return log({ kind: 'instruction-entry', method: req.method, session: sid, key, status: 'hung', at: Date.now() })
+      if (!session(sid)) return answer(404, { _tag: 'SessionNotFoundError', sessionID: sid, message: `Session not found: ${sid}` })
+      if (key === null && req.method === 'GET') return answer(200, { data: Object.entries(store.read(env).entries?.[sid] ?? {}).map(([k, value]) => ({ key: k, value })) })
+      if (key === null || !/^[a-z0-9][a-z0-9._-]*$/.test(key)) return answer(400, { _tag: 'InvalidRequestError', message: 'Expected a string matching the RegExp ^[a-z0-9][a-z0-9._-]*$\n  at ["key"]', kind: 'Params' })
+      if (req.method === 'PUT') {
+        let parsed = null
+        try {
+          parsed = JSON.parse(raw)
+        } catch {}
+        // 2.2.6 counts the value's JSON, not the body's (wire/instruction-entries.json putTooLarge).
+        const bytes = parsed && 'value' in parsed ? Buffer.byteLength(JSON.stringify(parsed.value), 'utf8') : 0
+        if (bytes > 262144) return answer(413, { _tag: 'InstructionEntryValueTooLargeError', actualBytes: bytes, maxBytes: 262144, message: `Instruction entry value is ${bytes} bytes; the limit is 262144 bytes` })
+        if (!parsed || !('value' in parsed)) return answer(400, { _tag: 'InvalidRequestError', message: 'Missing key\n  at ["value"]', kind: 'Payload' })
+        if (env.FAKE_OPENCODE_ENTRY_REFUSE || mode === 'refuse') return answer(500, { _tag: 'UnknownError', message: 'fake: entry refused' })
+        store.change((db) => ((db.entries ??= {})[sid] = { ...db.entries[sid], [key]: parsed.value }), env)
+        return answer(204)
+      }
+      if (req.method === 'DELETE') {
+        store.change((db) => {
+          if (db.entries?.[sid]) delete db.entries[sid][key]
+        }, env)
+        return answer(204)
+      }
     }
     if ((m = /^\/api\/session\/([^/]+)\/interrupt$/.exec(p)) && req.method === 'POST') {
       const ctl = turns.get(m[1])

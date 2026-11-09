@@ -174,4 +174,129 @@ describe('the start context in the hook replies (#1065)', () => {
     expect(await replay(st, [pre, prompt])).toEqual([null, null])
     sessions.startContext = saved
   })
+
+  describe("into the session itself (HI-2771: a CLI whose hooks take no reply, OpenCode's instruction entries)", () => {
+    type Call = { runId: string; sessionId: string; text: string | null; at: number; aborted: boolean }
+    const S = sessions as unknown as { live: Map<string, unknown>; constructor: { SESSION_CONTEXT_MS: number } }
+    const BASELINE = { hook_event_name: 'OpencodeSnapshot', snapshot: {} }
+    const compactEnd = (id: string) => ({ hook_event_name: 'OpencodeEvent', event: { type: 'session.compaction.ended', id } })
+    /** A CLI that takes the context into its session: each delivery recorded; `hold` makes the next one wait for its signal. */
+    function intoSession(opts: { hold?: boolean } = {}) {
+      const calls: Call[] = []
+      const adapter = {
+        ...copilot,
+        normalizeHook: () => ({ event: { kind: 'other' }, ids: { turn: null, call: null, sub: null, continued: false } }),
+        noticeReply: () => null,
+        startContextReply: undefined,
+        startContextTrigger: (body: Record<string, any>) => (body.hook_event_name === 'OpencodeSnapshot' ? { source: 'start' } : body.event?.type === 'session.compaction.ended' ? { source: 'compact', id: body.event.id } : null),
+        deliverStartContext: async (runId: string, sessionId: string, text: string | null, signal: AbortSignal) => {
+          const call = { runId, sessionId, text, at: Date.now(), aborted: false }
+          calls.push(call)
+          if (opts.hold) await new Promise<void>((done) => signal.addEventListener('abort', () => done(), { once: true }))
+          call.aborted = signal.aborted
+          return signal.aborted ? 'uncertain' : text === null ? 'removed' : 'put'
+        }
+      }
+      return { adapter, calls }
+    }
+    const settle = () => new Promise((r) => setTimeout(r, 50))
+
+    it('at its first baseline (the view, before the reply), never at a resync; resumed, as a resume; each compaction once', async () => {
+      given.length = 0
+      const { adapter, calls } = intoSession()
+      const st = agent(adapter)
+      expect(await replay(st, [BASELINE])).toEqual([null])
+      // Delivered before the baseline's reply came back.
+      expect(calls.map((c) => c.text)).toEqual(['[CW] view (startup)'])
+      await replay(st, [BASELINE, compactEnd('evt_1'), compactEnd('evt_1')])
+      await settle()
+      expect(calls.map((c) => c.text)).toEqual(['[CW] view (startup)', '[CW] view (compact)'])
+      expect(calls.every((c) => c.runId === st.runId && c.sessionId === st.sessionId)).toBe(true)
+      const resumed = agent(intoSession().adapter)
+      ;(S.live.get(`${p.toLowerCase()}#${resumed.agentId}`) as { resumed?: boolean }).resumed = true
+      await replay(resumed, [BASELINE])
+      expect(given.slice(-1)).toEqual(['resume'])
+    })
+
+    it("removes Combwork's entry where no view is due (none made: the journal off, not the Assistant), and with guidance off never makes one", async () => {
+      const saved = sessions.startContext
+      try {
+        sessions.startContext = async () => null
+        const off = intoSession()
+        await replay(agent(off.adapter), [BASELINE])
+        expect(off.calls.map((c) => c.text)).toEqual([null])
+        sessions.startContext = saved
+        given.length = 0
+        const plain = intoSession()
+        const st = agent(plain.adapter)
+        ;(S.live.get(`${p.toLowerCase()}#${st.agentId}`) as { policy?: unknown }).policy = { guidance: false }
+        await replay(st, [BASELINE])
+        expect([plain.calls.map((c) => c.text), given]).toEqual([[null], []])
+      } finally {
+        sessions.startContext = saved
+      }
+    })
+
+    it('within its budget: a view that takes too long is never sent, a request still out is cut off (uncertain), and the reply comes in time', async () => {
+      const saved = sessions.startContext
+      const budget = S.constructor.SESSION_CONTEXT_MS
+      S.constructor.SESSION_CONTEXT_MS = 200
+      try {
+        let release!: () => void
+        sessions.startContext = () => new Promise((r) => (release = () => r('[CW] late view')))
+        const slow = intoSession()
+        const t0 = Date.now()
+        expect(await replay(agent(slow.adapter), [BASELINE])).toEqual([null])
+        expect(Date.now() - t0).toBeLessThan(2000)
+        release()
+        await settle()
+        expect(slow.calls).toEqual([])
+        sessions.startContext = saved
+        const hung = intoSession({ hold: true })
+        const t1 = Date.now()
+        expect(await replay(agent(hung.adapter), [BASELINE])).toEqual([null])
+        expect(Date.now() - t1).toBeLessThan(2000)
+        expect(hung.calls.map((c) => [c.text, c.aborted])).toEqual([['[CW] view (startup)', true]])
+      } finally {
+        S.constructor.SESSION_CONTEXT_MS = budget
+        sessions.startContext = saved
+      }
+    })
+
+    it('one at a time: a newer refresh supersedes an older one still being made, and a launch no longer running gets none', async () => {
+      const saved = sessions.startContext
+      try {
+        const { adapter, calls } = intoSession()
+        const st = agent(adapter)
+        await replay(st, [BASELINE])
+        let release!: () => void
+        let made = 0
+        sessions.startContext = async (_s, source) => {
+          if (++made === 1) await new Promise<void>((r) => (release = r))
+          return `[CW] view ${made} (${source})`
+        }
+        await replay(st, [compactEnd('evt_a')])
+        await replay(st, [compactEnd('evt_b')])
+        await settle()
+        release()
+        await settle()
+        // The first refresh, superseded while it was made, sent nothing; the second did.
+        expect(calls.map((c) => c.text)).toEqual(['[CW] view (startup)', '[CW] view 2 (compact)'])
+        // Replaced by another launch of the agent while its view was made: nothing for the old one.
+        made = 0
+        await replay(st, [compactEnd('evt_c')])
+        S.live.set(`${p.toLowerCase()}#${st.agentId}`, { ...(S.live.get(`${p.toLowerCase()}#${st.agentId}`) as object) })
+        release()
+        await settle()
+        expect(calls.length).toBe(2)
+      } finally {
+        sessions.startContext = saved
+      }
+    })
+
+    it("leaves the other CLIs' reply-based start context as it was", async () => {
+      const replies = await replay(agent(codex), [codexHooks.hooks[0]])
+      expect((replies[0]?.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext).toBe('[CW] view (startup)')
+    })
+  })
 })

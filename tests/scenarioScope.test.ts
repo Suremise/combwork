@@ -61,15 +61,20 @@ describe("the scenarios' fake providers", () => {
       }
     })
 
-    it("leaves out each scenario that waits for a card on that provider, saying which card; the others' runs keep it", () => {
-      const sel = pick('fake-opencode', ['work-on-card', 'assistant-journal-recall', 'tool-sweep', 'slot-start'])
-      expect(runIds(sel).sort()).toEqual(['slot-start', 'tool-sweep', 'work-on-card'])
-      const why = Object.fromEntries(sel.excluded.map((x) => [x.id, x.why]))
-      expect(why['assistant-journal-recall']).toMatch(/^waits for HI-2771: /)
-      expect(runIds(pick('fake-codex', ['work-on-card', 'assistant-journal-recall']))).toEqual(['work-on-card', 'assistant-journal-recall'])
-      // Each wait names a scenario that provider would otherwise run, once.
-      expect(Object.values(SCENARIO_WAITS).flat().every((w) => /^waits for HI-\d+: /.test((w as { why: string }).why))).toBe(true)
-      expect(scopeProblems([...ids.filter((i) => i !== 'assistant-journal-recall')])).toContain("assistant-journal-recall: no such scenario (fake-opencode's waits)")
+    it("leaves out each scenario that waits for a card on that provider, saying which card; the others' runs keep it; none waits now (HI-2771 lifted the last)", () => {
+      expect(SCENARIO_WAITS).toEqual({})
+      const waits = SCENARIO_WAITS as Record<string, { why: string; ids: string[] }[]>
+      waits['fake-opencode'] = [{ why: 'waits for HI-0: why', ids: ['assistant-journal-recall'] }]
+      try {
+        const sel = pick('fake-opencode', ['work-on-card', 'assistant-journal-recall', 'tool-sweep', 'slot-start'])
+        expect(runIds(sel).sort()).toEqual(['slot-start', 'tool-sweep', 'work-on-card'])
+        expect(Object.fromEntries(sel.excluded.map((x) => [x.id, x.why]))['assistant-journal-recall']).toBe('waits for HI-0: why')
+        expect(runIds(pick('fake-codex', ['work-on-card', 'assistant-journal-recall']))).toEqual(['work-on-card', 'assistant-journal-recall'])
+        // Each wait names a scenario that provider would otherwise run, once.
+        expect(scopeProblems([...ids.filter((i) => i !== 'assistant-journal-recall')])).toContain("assistant-journal-recall: no such scenario (fake-opencode's waits)")
+      } finally {
+        delete waits['fake-opencode']
+      }
     })
 
     it('says where each scenario it leaves out does run', () => {
