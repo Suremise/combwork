@@ -241,6 +241,7 @@ export const SUITES = [
   { name: 'opencode-status' },
   { name: 'opencode-tools' },
   { name: 'opencodereal', needs: ['opencode'] },
+  { name: 'opencodereal-dirs', needs: ['opencode'] },
   { name: 'openguard' },
   { name: 'openspeed' },
   { name: 'orphans' },

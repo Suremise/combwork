@@ -35,7 +35,8 @@ export const LAUNCHER_EXIT = {
   serverEnded: 129,
   ownerEnded: 130,
   tuiStart: 131,
-  input: 132
+  input: 132,
+  modelSet: 134
 } as const
 
 /** The C# the launcher compiles (Add-Type, .NET Framework 4's csc: C# 5, no newer syntax). */
@@ -586,6 +587,27 @@ public static class CwOpencode {
     return null;
   }
 
+  /** The "model" object of a 2.2.6 session reply as text (a flat {id, providerID, variant}), or null. */
+  static string ModelOf(string json) {
+    int i = json.IndexOf("\"model\"", StringComparison.Ordinal); if (i < 0) return null;
+    i = json.IndexOf('{', i); if (i < 0) return null;
+    int e = json.IndexOf('}', i); if (e < 0) return null;
+    return json.Substring(i, e - i + 1);
+  }
+
+  /** Whether a session reply's model is exactly provider/id with that variant (none chosen: "default", or none recorded). */
+  static bool ModelIs(string json, string provider, string id, string variant) {
+    string m = ModelOf(json); if (m == null) return false;
+    if (Field(m, "providerID") != provider || Field(m, "id") != id) return false;
+    string v = Field(m, "variant");
+    return variant == "" ? (v == null || v == "default") : v == variant;
+  }
+
+  /** A session's model as 2.2.6 takes it: {providerID, id} and the variant only when one is chosen (none: the default). */
+  static string ModelRef(string provider, string id, string variant) {
+    return "{\"providerID\":" + J(provider) + ",\"id\":" + J(id) + (variant == "" ? "" : ",\"variant\":" + J(variant)) + "}";
+  }
+
   static string Norm(string p) { try { p = Path.GetFullPath(p); } catch (Exception) { } return p.TrimEnd('\\', '/').ToLowerInvariant(); }
 
   /** serve's output to the log, at most max bytes (then one line saying so). */
@@ -605,6 +627,10 @@ public static class CwOpencode {
   public static int Run() {
     string exe = E("CW_OC_EXE"), cwd = E("CW_OC_CWD"), session = E("CW_OC_SESSION"), intent = E("CW_OC_INTENT"), info = E("CW_OC_INFO"), log = E("CW_OC_LOG"), owner = E("CW_OC_OWNER"), marks = E("CW_OC_MARKS"), hookUrl = E("CW_OC_HOOK_URL"), streamVia = E("CW_OC_STREAM_VIA");
     string pw = E("OPENCODE_PASSWORD");
+    // The session's model and effort (HI-2767): provider/model, and its variant ("" = the model's default); "" = none set.
+    string model = E("CW_OC_MODEL"), variant = E("CW_OC_VARIANT");
+    int slash = model.IndexOf('/');
+    string modelProvider = slash > 0 ? model.Substring(0, slash) : "", modelId = slash > 0 ? model.Substring(slash + 1) : "";
     int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 30000;
     long logMax; if (!long.TryParse(E("CW_OC_LOG_MAX"), out logMax) || logMax < 4096) logMax = 1048576;
     exe0 = exe; sayLog = log == "" ? null : log;
@@ -656,8 +682,10 @@ public static class CwOpencode {
       if (got == 200) { Say("a session " + session + " already exists: Combwork doesn't take another's session."); return ${LAUNCHER_EXIT.sessionClash}; }
       if (got != 404) { Say("OpenCode's server couldn't be asked for the session (HTTP " + got + ")."); return ${LAUNCHER_EXIT.sessionCreate}; }
       if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
-      int made = Http("POST", url + "/api/session", auth, "{\"id\":" + J(session) + ",\"location\":{\"directory\":" + J(cwd) + "}}", out reply);
+      int made = Http("POST", url + "/api/session", auth, "{\"id\":" + J(session) + ",\"location\":{\"directory\":" + J(cwd) + "}" + (modelId == "" ? "" : ",\"model\":" + ModelRef(modelProvider, modelId, variant)) + "}", out reply);
       if (made != 200 || Field(reply, "id") != session) { Say("OpenCode didn't create the session (HTTP " + made + ")."); return ${LAUNCHER_EXIT.sessionCreate}; }
+      // Created with the connection's model and effort, as its reply says, before any prompt can be typed (HI-2767).
+      if (modelId != "" && !ModelIs(reply, modelProvider, modelId, variant)) { Say("OpenCode created the session without the connection's model and effort (" + model + (variant == "" ? "" : ", " + variant) + ")."); return ${LAUNCHER_EXIT.modelSet}; }
       // Combwork's record that this account's data holds the session (its resume looks for it here: sessionMark).
       try { Directory.CreateDirectory(marks); File.WriteAllText(Path.Combine(marks, session + ".json"), "{\"id\":" + J(session) + ",\"directory\":" + J(cwd) + "}"); } catch (Exception e) { Say("Combwork couldn't record the session (" + e.Message + ")."); return ${LAUNCHER_EXIT.infoWrite}; }
     } else {
@@ -665,6 +693,17 @@ public static class CwOpencode {
       if (got != 200) { Say("OpenCode's server couldn't be asked for the session (HTTP " + got + ")."); return ${LAUNCHER_EXIT.sessionMismatch}; }
       string dir = Field(reply, "directory");
       if (Field(reply, "id") != session || dir == null || !dirs.Contains(Norm(dir))) { Say("session " + session + " belongs to another folder: not resumed."); return ${LAUNCHER_EXIT.sessionMismatch}; }
+      // The connection's model and effort set on the resumed session, then read back (HI-2767): no variant resets it to the
+      // model's default. Anything else (refused, no answer, another model or variant kept) ends the launch: never the old
+      // effort under the new one's name, and never a new session.
+      if (modelId != "") {
+        if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
+        string setReply;
+        int set = Http("POST", url + "/api/session/" + Uri.EscapeDataString(session) + "/model", auth, "{\"model\":" + ModelRef(modelProvider, modelId, variant) + "}", out setReply);
+        if (set < 200 || set > 299) { Say("OpenCode didn't set the session's model and effort (HTTP " + set + "): not resumed."); return ${LAUNCHER_EXIT.modelSet}; }
+        int back = Http("GET", url + "/api/session/" + Uri.EscapeDataString(session), auth, null, out reply);
+        if (back != 200 || !ModelIs(reply, modelProvider, modelId, variant)) { Say("OpenCode didn't keep the connection's model and effort (" + model + (variant == "" ? "" : ", " + variant) + ") on the session: not resumed."); return ${LAUNCHER_EXIT.modelSet}; }
+      }
     }
     if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
     try {
@@ -739,6 +778,9 @@ export interface LauncherInput {
   /** Combwork's hook endpoint for this launch, where the event stream and snapshots go (HI-2760); none: not followed. */
   hookUrl?: string
   readyMs: number
+  /** The session's model (provider/model) to set at its start, and its variant (HI-2767); none: the session's as it is. */
+  model?: string | null
+  variant?: string | null
 }
 
 /** Where Combwork records the sessions it created in an account's data (the launcher writes one as it creates it). */
@@ -766,7 +808,9 @@ export function launcherEnv(i: LauncherInput): Record<string, string> {
     CW_OC_OWNER: i.owner,
     CW_OC_MARKS: i.marks,
     CW_OC_HOOK_URL: i.hookUrl ?? '',
-    CW_OC_READY_MS: String(i.readyMs)
+    CW_OC_READY_MS: String(i.readyMs),
+    CW_OC_MODEL: i.model ?? '',
+    CW_OC_VARIANT: i.model ? (i.variant ?? '') : ''
   }
 }
 

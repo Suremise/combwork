@@ -38,6 +38,8 @@ const REFUSED = {
   otherAccount: msg({ id: 'providers.opencode.otherAccount', defaultMessage: "{provider} didn't resume {session}: it is in another OpenCode account's data, not the account this agent runs on now. Start a new session, or move the agent back to that account.", description: "Why an OpenCode agent didn't resume a session (its pane): each OpenCode account keeps its own sessions, and this one was made on another account. {provider} is OpenCode, {session} the session's id." }),
   historyBusy: msg({ id: 'providers.opencode.historyBusy', defaultMessage: "{provider} didn't start: Combwork's reader of OpenCode sessions didn't answer in time, so it couldn't take this session over from an earlier run. Start the agent again.", description: "Why an OpenCode agent didn't start (its pane): Combwork's background reader of OpenCode session histories didn't confirm in time that it let go of the session's earlier run. {provider} is OpenCode." }),
   noModel: msg({ id: 'providers.opencode.noModel', defaultMessage: "{provider} didn't start: Combwork keeps OpenCode to the provider in the connection's model, and this connection names none, so OpenCode would choose one itself, perhaps one of its free cloud models. Choose the connection's model (a provider and model, such as ollama/qwen3:8b) in Agent Settings, or turn off \"Keep OpenCode to the connection's own provider\" in Settings → Advanced.", description: "Why an OpenCode agent didn't start (its pane): Combwork only allows the provider of the connection's model, and no model (or no valid provider/model id) is set. {provider} is OpenCode. ollama/qwen3:8b is a model id: keep it. Agent Settings and Settings → Advanced are places in Combwork; the quoted text is an advanced setting's title: use that setting's translated title." }),
+  effortNeedsModel: msg({ id: 'providers.opencode.effortNeedsModel', defaultMessage: "{provider} didn't start: the connection's effort is {effort}, which OpenCode sets as a variant of the model, and the connection names no model. Choose its model (a provider and model, such as ollama/qwen3:8b) or the default effort in Agent Settings.", description: "Why an OpenCode agent didn't start (its pane): an effort level is chosen, but OpenCode sets effort as a variant of a model and no model is chosen. {provider} is OpenCode, {effort} the effort as chosen (e.g. high). ollama/qwen3:8b is a model id: keep it. Agent Settings is a place in Combwork." }),
+  effortNotListed: msg({ id: 'providers.opencode.effortNotListed', defaultMessage: "{provider} didn't start: the connection's effort is {effort}, and OpenCode doesn't list {effort} as a variant of {model} on this account, so Combwork can't set it. Choose one of the model's efforts, or the default, in Agent Settings. If OpenCode's models couldn't be read just now, start the agent again.", description: "Why an OpenCode agent didn't start (its pane): the chosen effort level isn't one of the variants OpenCode lists for the chosen model on this account (or the list couldn't be read). {provider} is OpenCode, {effort} the effort as chosen (e.g. high), {model} the model's id. Agent Settings is a place in Combwork." }),
   noOwner: msg({ id: 'providers.opencode.noOwner', defaultMessage: "{provider} didn't start: Combwork couldn't read its own process's identity, which the agent's private OpenCode server is tied to so that it ends with Combwork. Windows PowerShell may be blocked on this PC.", description: "Why an OpenCode agent didn't start (its pane): Combwork couldn't get the identity it ties the agent's server's lifetime to. {provider} is OpenCode. Windows PowerShell is a program's name: keep it." })
 }
 
@@ -68,6 +70,9 @@ interface Prepared {
   password: string
   owner: string
   chosen: Set<string>
+  /** The session's model (provider/model) and its variant to set at the start (HI-2767), or none. */
+  model: string | null
+  variant: string | null
 }
 
 /** The folder an account's (or the check root's) data is in, as accounts give it (capabilities.connections.homeEnv). */
@@ -221,6 +226,17 @@ export class OpencodeAdapter implements ProviderAdapter {
     if (!owner && process.platform === 'win32') throw combworkError(REFUSED.noOwner, { provider: NAME })
     const home = opencodeHome(ctx.connectionHome)
     await mkdir(home, { recursive: true })
+    // The session's model and effort, set at each start and resume before its TUI opens (HI-2767): the connection's model,
+    // and its effort as that model's variant, only one this account's OpenCode lists for exactly that model (an unknown
+    // variant 2.2.6 takes silently). No effort chosen: no variant, which sets the model's own default.
+    const sessionModel = isOpencodeModelId(model) ? model : null
+    const effort = ctx.effort && ctx.effort !== 'inherit' ? ctx.effort : null
+    if (effort && !sessionModel) throw combworkError(REFUSED.effortNeedsModel, { provider: NAME, effort })
+    if (effort && sessionModel) {
+      const listed = (await accountModels(ctx.executable, home, ctx.env).catch(() => null))?.find((m) => m.value === sessionModel)
+      if (!listed?.efforts?.includes(effort)) throw combworkError(REFUSED.effortNotListed, { provider: NAME, effort, model: sessionModel })
+    }
+    const variant = effort
     // Each account keeps its own sessions: one made on another account's data isn't there to resume (design s7, s10).
     if (ctx.resume && !existsSync(sessionMark(home, ctx.sessionId))) throw combworkError(REFUSED.otherAccount, { provider: NAME, session: ctx.sessionId })
     // The session's history is this run's to read from now (design s13 §2): no older run's read publishes after this.
@@ -256,7 +272,7 @@ export class OpencodeAdapter implements ProviderAdapter {
     for (const f of AMBIENT_FILES) await writeFile(join(ambientDir, f), '')
     for (const d of AMBIENT_DIRS) await mkdir(join(ambientDir, d), { recursive: true })
     await writeFile(launcherSourcePath(ctx.privateDir), LAUNCHER_SOURCE)
-    this.prepared.set(ctx.runId, { home, marks: sessionMarks(home), configDir, ambientDir, password: randomBytes(24).toString('hex'), owner, chosen: strip ? chosenAmbient(saved) : new Set() })
+    this.prepared.set(ctx.runId, { home, marks: sessionMarks(home), configDir, ambientDir, password: randomBytes(24).toString('hex'), owner, chosen: strip ? chosenAmbient(saved) : new Set(), model: sessionModel, variant })
     return delivered
   }
 
@@ -290,6 +306,8 @@ export class OpencodeAdapter implements ProviderAdapter {
       // The launcher's argument list is joined with U+001F, so none stays in it.
       tuiArgs: [...opencodeModeFlags(mode), ...(ctx.initialPrompt ? ['--prompt', ctx.initialPrompt.replace(/\u001f/g, ' ')] : []), ...ctx.extraArgs.flatMap((a) => a.split(/\s+/)).filter(Boolean)],
       dirs: [ctx.cwd, ctx.projectPath],
+      model: p.model,
+      variant: p.variant,
       privateDir: ctx.privateDir,
       owner: p.owner,
       marks: p.marks,

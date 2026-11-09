@@ -7,7 +7,9 @@
 // one, the rest of the launch recipe as in production), and the suite checks that the written config holds it before it
 // types anything: else it stops there. One agent, one launch: the TUI drawn in its pane, one prompt ("Reply with just:
 // OK") answered there, its requests all to the proxy for qwen3:8b; stopped, no opencode of this test left and the
-// machine-wide service's port as it was; started again, the same session resumed with its history.
+// machine-wide service's port as it was; started again, the same session resumed with its history. Its connection's
+// effort (HI-2767) is the model's variant: low for the typed prompt (its requests carry reasoning_effort low, and the
+// session's model has variant low), high on the resume (set on the session with no model request).
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const os = require('os')
@@ -105,10 +107,13 @@ function proxy() {
     req.on('end', () => {
       const body = Buffer.concat(chunks)
       let model = null
+      let effort = null
       try {
-        model = JSON.parse(body.toString('utf8')).model ?? null
+        const j = JSON.parse(body.toString('utf8'))
+        model = j.model ?? null
+        effort = j.reasoning_effort ?? null
       } catch {}
-      const entry = { at: new Date().toISOString(), phase, method: req.method, path: req.url, model, upstream: trace.upstream, status: null }
+      const entry = { at: new Date().toISOString(), phase, method: req.method, path: req.url, model, reasoning_effort: effort, upstream: trace.upstream, status: null }
       seen.push(entry)
       const headers = { ...req.headers, host: `${OLLAMA.host}:${OLLAMA.port}` }
       delete headers.authorization
@@ -174,6 +179,22 @@ function proxy() {
     const conn = (await inv('connections:list')).connectionRows.find((c) => c.account === account.id) ?? (await inv('connection:add', account.id, { name: 'Test · OpenCode' }))
     await inv('agents:update', alpha, agent.id, { connection: conn.id })
     const accountHome = path.join(userData, 'accounts', account.id)
+    // Its effort (HI-2767): low, a variant 2.2.6 lists for the test provider's model, as the catalogue read it.
+    const variants = await until(async () => (await inv('provider:refresh', 'opencode'))?.opencode?.catalog?.models?.find((m) => m.value === `${seam.id}/${MODEL}`)?.efforts ?? null, HUNG_MS)
+    check("the catalogue has the test model's variants from 2.2.6 (low, medium, high)", JSON.stringify(variants) === '["low","medium","high"]', JSON.stringify(variants))
+    await lib.setLaunch(inv, alpha, agent.id, { model: `${seam.id}/${MODEL}`, effort: 'low' })
+    /** The session's model as Combwork's record of it has it (its mirror of the server's session). */
+    const recordedModel = (sid) => {
+      const f = path.join(accountHome, 'combwork-sessions', `${sid}.jsonl`)
+      if (!sid || !fs.existsSync(f)) return null
+      for (const l of fs.readFileSync(f, 'utf8').split('\n')) {
+        try {
+          const x = JSON.parse(l)
+          if (x.type === 'combwork.session') return x.info?.model ?? null
+        } catch {}
+      }
+      return null
+    }
     enter('launch')
     await inv('session:start', alpha, { agentId: agent.id })
 
@@ -211,6 +232,8 @@ function proxy() {
     }, TURN_MS)
     check('…its reply is shown in the pane', !!answered, (await screen()).slice(-600))
     check(`…every model request went to the local proxy for ${MODEL}`, px.seen.length > 0 && px.seen.every((r) => r.path.startsWith('/v1/') && (r.model === null || r.model === MODEL)), JSON.stringify(px.seen))
+    const asked = px.seen.filter((r) => r.phase === 'prompt' && r.reasoning_effort !== null)
+    check('…the typed prompt\'s requests carry its effort: reasoning_effort low (HI-2767)', asked.length > 0 && asked.every((r) => r.reasoning_effort === 'low'), JSON.stringify(px.seen.map((r) => [r.phase, r.reasoning_effort])))
     const sessionFiles = fs.existsSync(path.join(accountHome, 'combwork-sessions')) ? fs.readdirSync(path.join(accountHome, 'combwork-sessions')) : []
     const sessionId = sessionFiles.map((f) => f.replace(/\.json$/, '')).find((f) => f.startsWith('ses_')) ?? null
     check("…its session recorded in the account (Combwork picked its id)", !!sessionId, JSON.stringify(sessionFiles))
@@ -219,10 +242,13 @@ function proxy() {
     enter('stop')
     await inv('session:stop', alpha, agent.id)
     check('it stops', !!(await until(async () => !(await live(agent.id)), HUNG_MS)))
+    const low = await until(async () => recordedModel(sessionId)?.variant ?? null, HUNG_MS)
+    check("…its session's model as Combwork recorded it: the test model, variant low", low === 'low' && recordedModel(sessionId)?.id === MODEL, JSON.stringify(recordedModel(sessionId)))
     check('…and no opencode of this test is left running', !!(await until(async () => (opencodeLeft().length ? null : true), HUNG_MS)), JSON.stringify(opencodeLeft().map((p) => p.pid)))
 
     // --- Started again: the same session, its history in the pane.
     const requests = px.seen.length
+    await lib.setLaunch(inv, alpha, agent.id, { model: `${seam.id}/${MODEL}`, effort: 'high' })
     enter('resume')
     await inv('session:start', alpha, { agentId: agent.id, resumeId: sessionId })
     check('started again, the session is resumed with its history', !!(await until(async () => ((await screen()).includes(prompt) ? true : null), HUNG_MS)), (await screen()).slice(-600))
@@ -231,6 +257,8 @@ function proxy() {
     await inv('session:stop', alpha, agent.id)
     await until(async () => !(await live(agent.id)), HUNG_MS)
     check('…and stopped again, none left running', !!(await until(async () => (opencodeLeft().length ? null : true), HUNG_MS)))
+    const high = await until(async () => (recordedModel(sessionId)?.variant === 'high' ? 'high' : null), HUNG_MS)
+    check('…its effort changed to high meanwhile, set on the resumed session with no model request (HI-2767)', high === 'high' && px.seen.length === requests, JSON.stringify({ model: recordedModel(sessionId), requests: px.seen.slice(requests) }))
   } finally {
     enter('closed')
     await app.close().catch(() => undefined)

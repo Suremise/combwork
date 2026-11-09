@@ -13,12 +13,13 @@ process.env.CW_USER_DATA = join(base, 'userdata')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
 const { isRejectedPath, isSupportedVersion, newestV2, parseOpencodeVersion, installScript, opencodeUpdateCommand } = await import('../src/main/providers/opencode/install')
-const { parseOpencodeModels } = await import('../src/main/providers/opencode/models')
+const { isVariantId, parseOpencodeModels, parseOpencodeModelsApi } = await import('../src/main/providers/opencode/models')
 const { ambientBlockers, credentialPattern, opencodeEnv, opencodeRoots } = await import('../src/main/providers/opencode/home')
 const { chosenAmbient, checkConfig, launchConfig, loginConfig, mcpPolicies, opencodeServer, parseAuthList, providerPolicies } = await import('../src/main/providers/opencode/config')
 const { isSessionId, newSessionId, protectedArg, launchGuidance } = await import('../src/main/providers/opencode/adapter')
 const { LAUNCHER_SOURCE, launcherEnv } = await import('../src/main/providers/opencode/launcher')
 const { OPENCODE_DESCRIPTOR, isClaudeAgentModel, isOpencodeModelId, opencodeAgentOf, opencodeModeFlags, opencodeModelLabel } = await import('../src/shared/opencode')
+const { effortName } = await import('../src/shared/models')
 const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
 
 const FIX = join(__dirname, 'fixtures', 'advanced')
@@ -75,6 +76,36 @@ describe('the catalog (opencode models)', () => {
     expect(isClaudeAgentModel('Claude-Agent/opus')).toBe(true)
     expect(isClaudeAgentModel('anthropic/claude-opus-5-5')).toBe(false)
     expect(opencodeModelLabel('nolabel')).toBe('nolabel')
+  })
+
+  it("with variants (HI-2767): `opencode api GET /api/model`'s models, each model's variants its efforts, as 2.2.6 listed them", () => {
+    expect(parseOpencodeModelsApi(fixture('models-api-opencode-2.2.6.json'))).toEqual([{ value: 'cwtest/qwen3:8b', label: 'qwen3:8b (cwtest)', efforts: ['low', 'medium', 'high'] }])
+  })
+
+  it("variants are kept to safe ids and a bound; a model listing none offers none; Claude Agent's and odd entries are left out; a reply that isn't a listing is null", () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({ id: `v${i}` }))
+    const text = JSON.stringify({
+      data: [
+        { providerID: 'ollama', id: 'qwen3:8b', variants: [{ id: 'low' }, { id: 'high' }, { id: 'low' }, { id: '-bad' }, { id: 'a b' }, { id: '"q"' }, { id: 7 }, {}, null] },
+        { providerID: 'ollama', id: 'many', variants: many },
+        { providerID: 'ollama', id: 'none' },
+        { providerID: 'claude-agent', id: 'claude-opus-5-5', variants: [{ id: 'high' }] },
+        { providerID: 'x' },
+        'junk',
+        { providerID: 'ollama', id: 'qwen3:8b', variants: [{ id: 'max' }] }
+      ]
+    })
+    expect(parseOpencodeModelsApi(text)!.map((m) => [m.value, m.efforts])).toEqual([['ollama/qwen3:8b', ['low', 'high']], ['ollama/many', many.slice(0, 32).map((v) => v.id)], ['ollama/none', []]])
+    for (const bad of ['', 'not json', '{"data":{}}', '[]', 'null']) expect(parseOpencodeModelsApi(bad), bad).toBeNull()
+    expect(parseOpencodeModelsApi('{"data":[]}')).toEqual([])
+    // The field names are advanced settings (#367).
+    expect(parseOpencodeModelsApi(JSON.stringify({ data: [{ providerID: 'p', id: 'm', levels: [{ name: 'deep' }] }] }), { variants: 'levels', variantId: 'name' })![0].efforts).toEqual(['deep'])
+    expect([isVariantId('high'), isVariantId('x-1.2_b'), isVariantId(''), isVariantId('a/b'), isVariantId('x'.repeat(41))]).toEqual([true, true, false, false, false])
+  })
+
+  it('an effort only a model reports is named with the shared names in the language shown, else capitalised', () => {
+    expect([effortName('opencode', 'low'), effortName('opencode', 'high'), effortName('opencode', 'turbo')]).toEqual(['Low', 'High', 'Turbo'])
+    expect(effortName('opencode', 'medium', undefined, ((m: { defaultMessage: string }) => `[${m.defaultMessage}]`) as never)).toBe('[Medium]')
   })
 })
 
@@ -245,9 +276,18 @@ describe('sessions, modes and the launch', () => {
     const env = launcherEnv({ executable: 'C:\\oc\\opencode.exe', cwd: 'C:\\p', sessionId: 'ses_x', intent: 'resume', tuiArgs: ['--auto'], dirs: ['C:\\p', 'C:\\q'], privateDir: 'C:\\priv', owner: '1:2', marks: 'C:\\acct\\combwork-sessions', readyMs: 30000 })
     expect(env).toMatchObject({ CW_OC_EXE: 'C:\\oc\\opencode.exe', CW_OC_INTENT: 'resume', CW_OC_TUI_ARGS: '--auto', CW_OC_DIRS: 'C:\\p\u001fC:\\q', CW_OC_INFO: 'C:\\priv\\opencode-server.json', CW_OC_OWNER: '1:2' })
     for (const step of ['0x2000', 'AssignProcessToJobObject(job, GetCurrentProcess())', '"serve", "--hostname", "127.0.0.1"', '/api/info', '"--server", url, "--session", session', 'WaitHandle.WaitAny', 'c != created']) expect(LAUNCHER_SOURCE, step).toContain(step)
-    // New sessions only are created; a resume never POSTs.
+    // New sessions only are created; a resume never creates one: its one POST sets its model and effort (HI-2767).
     const resume = LAUNCHER_SOURCE.slice(LAUNCHER_SOURCE.indexOf('} else {\n      if (got == 404)'))
-    expect(resume.slice(0, resume.indexOf('try {'))).not.toContain('POST')
+    const resumeSteps = resume.slice(0, resume.indexOf('try {'))
+    expect(resumeSteps).not.toContain('url + "/api/session", auth')
+    expect(resumeSteps.match(/Http\("POST"/g)).toEqual(['Http("POST"'])
+    expect(resumeSteps).toContain('Http("POST", url + "/api/session/" + Uri.EscapeDataString(session) + "/model", auth, "{\\"model\\":" + ModelRef(modelProvider, modelId, variant) + "}"')
+    expect(resumeSteps).toContain('!ModelIs(reply, modelProvider, modelId, variant)')
+    // The model and effort reach it in its environment: a variant only with a model.
+    const launchBase = { executable: 'x', cwd: 'C:\\p', sessionId: 'ses_x', intent: 'new' as const, tuiArgs: [], dirs: [], privateDir: 'C:\\priv', owner: '', marks: 'm', readyMs: 1 }
+    expect(launcherEnv({ ...launchBase, model: 'ollama/qwen3:8b', variant: 'high' })).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: 'high' })
+    expect(launcherEnv({ ...launchBase, model: 'ollama/qwen3:8b', variant: null })).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: '' })
+    expect(launcherEnv({ ...launchBase, model: null, variant: 'high' })).toMatchObject({ CW_OC_MODEL: '', CW_OC_VARIANT: '' })
   })
 })
 
@@ -328,6 +368,45 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     await opencode.prepareLaunch(terminal as never)
     expect(providerRules(terminal)).toEqual(['claude-agent:deny'])
   }, 60000)
+
+  it("a reviewer's granted folder adds no rule to the private config, new or resumed (HI-2772: 2.2.6 reaches it by default; a rule the user let in still decides)", async () => {
+    const { sessionMark } = await import('../src/main/providers/opencode/launcher')
+    const copies = join(base, 'ws space.worktrees', 'proj', 'copies')
+    const written = (c: { privateDir: string }) => JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8'))
+    const fresh = ctx({ extraDirs: [copies], permissionMode: 'build' }) as { privateDir: string }
+    await opencode.prepareLaunch(fresh as never)
+    const resumed = ctx({ extraDirs: [copies], resume: true }) as { privateDir: string; connectionHome: string; sessionId: string }
+    mkdirSync(join(resumed.connectionHome, 'combwork-sessions'), { recursive: true })
+    writeFileSync(sessionMark(resumed.connectionHome, resumed.sessionId), '{}')
+    await opencode.prepareLaunch(resumed as never)
+    for (const c of [fresh, resumed]) {
+      expect(written(c)).not.toHaveProperty('permissions')
+      expect(JSON.stringify(written(c))).not.toContain('external_directory')
+    }
+  }, 60000)
+
+  it("an effort is the model's variant, checked against this account's listing of exactly that model (HI-2767); refused when it can't be set", async () => {
+    const withModels = (models: string, over: Record<string, unknown> = {}) => ctx({ env: childEnv({ OPENAI_API_KEY: 'sk-ambient', CW_AGENT: 'Agent 1', FAKE_OPENCODE_MODELS: models }), ...over })
+    // Listed for the model: passed to the launcher with it.
+    const listed = withModels('ollama/qwen3:8b#low|high', { effort: 'high' }) as never
+    await opencode.prepareLaunch(listed)
+    expect(opencode.buildCommand(FAKE, listed).env).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: 'high' })
+    // No effort chosen: the model alone, which sets its default.
+    const none = withModels('ollama/qwen3:8b#low|high') as never
+    await opencode.prepareLaunch(none)
+    expect(opencode.buildCommand(FAKE, none).env).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: '' })
+    // Not one of its variants, another model's variant, or the listing failing (the fallback has no variants): refused.
+    await expect(opencode.prepareLaunch(withModels('ollama/qwen3:8b#low|high', { effort: 'max' }))).rejects.toThrow(/doesn't list max as a variant of ollama\/qwen3:8b/)
+    await expect(opencode.prepareLaunch(withModels('ollama/qwen3:8b#low,ollama/other#max', { effort: 'max' }))).rejects.toThrow(/doesn't list max as a variant of ollama\/qwen3:8b/)
+    const failing = ctx({ effort: 'low', env: childEnv({ CW_AGENT: 'Agent 1', FAKE_OPENCODE_MODELS: 'ollama/qwen3:8b#low', FAKE_OPENCODE_API_FAIL: '1' }) })
+    await expect(opencode.prepareLaunch(failing)).rejects.toThrow(/doesn't list low as a variant/)
+    // An effort with no model to set it on (the own-provider switch off): refused, never guessed.
+    const off = { 'opencode.override.noAutoUpdate': true, 'opencode.override.keepProjectConfigOut': true, 'opencode.override.stripCredentials': true, 'opencode.override.ownProviderOnly': false }
+    await expect(opencode.prepareLaunch(ctx({ model: null, effort: 'low', overrides: off }))).rejects.toThrow(/names no model/)
+    const noModel = ctx({ model: null, overrides: off }) as never
+    await opencode.prepareLaunch(noModel)
+    expect(opencode.buildCommand(FAKE, noModel).env).toMatchObject({ CW_OC_MODEL: '', CW_OC_VARIANT: '' })
+  }, 120000)
 
   it("gives the launch's first task to the TUI as --prompt (a Combwork start, the Assistant's), none without one", async () => {
     const c = ctx({ initialPrompt: '[CW] Work on "AL-1"\u001fnow', permissionMode: 'build' }) as never

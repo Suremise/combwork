@@ -119,12 +119,14 @@ async function startServer(opts) {
     const dir = body.location?.directory || cwd
     const existing = session(id)
     if (existing) return existing.info
-    const info = { id, projectID: store.projectId(dir), ...(body.model ? { model: body.model } : {}), cost: 0, tokens: zeroTokens(), time: { created: now, updated: now }, ...(body.permissions ? { permissions: body.permissions } : {}), location: { directory: dir } }
+    // Its model as given, its variant too (wire/session-model-set.json, HI-2767); a test's failure creates it without it.
+    const model = body.model && env.FAKE_OPENCODE_MODEL_SET !== 'drop-on-create' ? { id: body.model.id, providerID: body.model.providerID, ...(body.model.variant !== undefined ? { variant: body.model.variant } : {}) } : null
+    const info = { id, projectID: store.projectId(dir), ...(model ? { model } : {}), cost: 0, tokens: zeroTokens(), time: { created: now, updated: now }, ...(body.permissions ? { permissions: body.permissions } : {}), location: { directory: dir } }
     store.change((db) => {
       db.sessions[id] = { info, messages: [], seq: -1 }
     }, env)
-    emit('session.created', { sessionID: id, slug: SLUGS[Math.floor(Math.random() * SLUGS.length)], version: VERSION, projectID: info.projectID, location: info.location, subpath: '', ...(body.permissions ? { permissions: body.permissions } : {}), ...(body.model ? { model: body.model } : {}) }, { sid: id, durable: true, location: info.location })
-    log({ kind: 'session', created: id, dir })
+    emit('session.created', { sessionID: id, slug: SLUGS[Math.floor(Math.random() * SLUGS.length)], version: VERSION, projectID: info.projectID, location: info.location, subpath: '', ...(body.permissions ? { permissions: body.permissions } : {}), ...(model ? { model } : {}) }, { sid: id, durable: true, location: info.location })
+    log({ kind: 'session', created: id, dir, ...(model ? { model } : {}) })
     return info
   }
   const updateInfo = (sid, fn) => store.change((db) => fn(db.sessions[sid].info, db.sessions[sid]), env)
@@ -273,12 +275,32 @@ async function startServer(opts) {
       return lastCall
     }
     const read = (file) => toolStep('read', { filePath: file }, async () => (fs.existsSync(file) ? { text: fs.readFileSync(file, 'utf8'), metadata: { truncated: false } } : { text: `File not found: ${file}`, isError: true }))
-    const edit = (file) =>
-      toolStep('edit', { filePath: file, oldString: '', newString: 'edited' }, async () => {
+    /**
+     * 2.2.6's external_directory, for an edit outside the session's folder (HI-2772, from the pinned opencode.exe:
+     * FileAccess.resolve and authorizeExternal): its resource the file's folder, slashed, and /*; the last matching rule
+     * decides (Kw: slashes either way, any case), of the agent's defaults (Agent.Info's: `* * allow` first, so nothing
+     * asks by default, as the real tier's opencodereal-dirs saw), then the config's `permissions`, then the session's.
+     * Only the edit checks it here: what else 2.2.6 checks it for, the fake doesn't model.
+     */
+    const external = (file) => {
+      const rel = path.relative(l.directory, file)
+      if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return null
+      const resource = `${path.dirname(file).replace(/\\/g, '/')}/*`
+      const kw = (value, pattern) => new RegExp('^' + String(pattern).replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'si').test(value.replace(/\\/g, '/'))
+      const rules = [{ action: '*', resource: '*', effect: 'allow' }, ...(cfg.global.permissions || []), ...(session(sid).info.permissions || [])]
+      const effect = rules.findLast((p) => kw('external_directory', p.action) && kw(resource, p.resource ?? '*'))?.effect ?? 'ask'
+      return { effect, resource }
+    }
+    const edit = (file) => {
+      const ext = external(file)
+      if (ext) log({ kind: 'external-directory', file, ...ext })
+      if (ext?.effect === 'deny') return toolStep('edit', { filePath: file, oldString: '', newString: 'edited' }, async () => ({ text: `Permission denied: external_directory ${ext.resource}`, isError: true }))
+      return toolStep('edit', { filePath: file, oldString: '', newString: 'edited' }, async () => {
         fs.appendFileSync(file, `edited by ${env.CW_AGENT || 'agent'}\n`)
         log({ kind: 'edit', agent: env.CW_AGENT || 'agent', file: path.basename(file), allowed: true })
         return { text: 'Edit applied successfully.', metadata: { truncated: false } }
-      })
+      }, ext?.effect === 'ask' ? { action: 'external_directory', resources: [ext.resource], save: [ext.resource] } : null)
+    }
     // A skill as 2.2.6 offers one: only those it loaded (config.cjs: the config folder's skills, and the project's or the
     // home's as the switches let them), by its folder's name, its id (skills/config-dir.json, HI-2761's R0b).
     const loadedSkills = () => cfg.loaded.filter((x) => x.kind === 'skill').map((x) => x.path)
@@ -319,8 +341,9 @@ async function startServer(opts) {
       })
       const sh = /\bshell:\s*(.+)$/i.exec(s)
       if (sh) await shell(sh[1].trim())
-      const patch = /\bpatch\s+([\w.-]+)/i.exec(s)
-      if (patch) await edit(path.resolve(l.directory, patch[1]))
+      // A file in the session's folder, or "a path" anywhere (an absolute one outside: external_directory, HI-2772).
+      const patch = /\bpatch\s+(?:"([^"]+)"|([\w.-]+))/i.exec(s)
+      if (patch) await edit(path.resolve(l.directory, patch[1] ?? patch[2]))
     }
 
     let failure = null
@@ -486,10 +509,19 @@ async function startServer(opts) {
       return s ? json(res, 200, { data: s.info }) : notFound(res, m[1])
     }
     if ((m = /^\/api\/session\/([^/]+)\/model$/.exec(p)) && req.method === 'POST') {
-      // 204 even for a policy-denied provider: the denial shows at the next prompt (HB1's 2.2.6 run, HI-2759).
+      // 204 even for a policy-denied provider: the denial shows at the next prompt (HB1's 2.2.6 run, HI-2759). The body is
+      // {model: {providerID, id, variant?}}, and no variant sets "default" (wire/session-model-set.json, HI-2767).
       const body = (await bodyOf(req)) || {}
+      const missing = !body.model ? '["model"]' : typeof body.model.providerID !== 'string' ? '["model"]["providerID"]' : typeof body.model.id !== 'string' ? '["model"]["id"]' : null
+      if (missing) return json(res, 400, { _tag: 'InvalidRequestError', message: `Missing key\n  at ${missing}`, kind: 'Payload' })
+      if (body.model.variant !== undefined && typeof body.model.variant !== 'string') return json(res, 400, { _tag: 'InvalidRequestError', message: 'Expected string\n  at ["model"]["variant"]', kind: 'Payload' })
       if (!session(m[1])) return notFound(res, m[1])
-      updateInfo(m[1], (info) => (info.model = { id: body.id ?? body.modelID, providerID: body.providerID }))
+      // A test's failure (FAKE_OPENCODE_MODEL_SET): refused, taken but not kept, or never answered.
+      const fail = env.FAKE_OPENCODE_MODEL_SET
+      log({ kind: 'model-set', session: m[1], model: body.model, fail: fail || null })
+      if (fail === 'refuse') return json(res, 500, { _tag: 'UnknownError', message: 'fake: model not set' })
+      if (fail === 'hang') return undefined
+      if (fail !== 'stale') updateInfo(m[1], (info) => (info.model = { id: body.model.id, providerID: body.model.providerID, variant: body.model.variant ?? 'default' }))
       res.writeHead(204)
       return res.end()
     }
@@ -553,7 +585,7 @@ async function startServer(opts) {
     // wire/usage-limits-signed-out.json).
     if (p === '/api/experimental/usage/limits' && req.method === 'GET') return json(res, 200, { location: { directory: url.searchParams.get('location[directory]') || process.cwd() }, data: null })
     if (p === '/api/mcp' && req.method === 'GET') return json(res, 200, listing(null, Object.entries(mcpStatus).map(([name, status]) => ({ name, status }))))
-    if (p === '/api/model' && req.method === 'GET') return json(res, 200, listing(null, modelsOf(boot, env).map((x) => ({ id: x.id, modelID: x.id, providerID: x.providerID, name: x.name }))))
+    if (p === '/api/model' && req.method === 'GET') return json(res, 200, listing(null, modelsOf(boot, env).map((x) => ({ id: x.id, modelID: x.id, providerID: x.providerID, name: x.name, variants: x.variants }))))
     if (p === '/api/integration' && req.method === 'GET') return json(res, 200, listing(null, integrations(boot, env)))
     if ((m = /^\/api\/integration\/([^/]+)\/connect\/key$/.exec(p)) && req.method === 'POST') {
       const body = (await bodyOf(req)) || {}
@@ -641,13 +673,20 @@ function nextScripted(env) {
 // The built-in `opencode` provider's free models 2.2.6 listed with no account (cli/models-with-ollama-and-builtins.txt).
 const BUILTIN = ['beam-free', 'big-pickle', 'crouton-alpha-free', 'deepseek-v4.1-flash-free', 'flint-40b-free', 'glm-5.3-flash-free', 'mimo-v2.6-flash-free', 'nemotron-3.5-lightning-free', 'nemotron-3.5-super-vl-free', 'pulse-alpha-free']
 /** The models a config offers: its providers' models, the built-in ones and FAKE_OPENCODE_MODELS, each provider.use allows. */
+/** An openai-compatible model's variants, as 2.2.6 listed them (cli/api-model.json, HI-2767). */
+const OPENAI_COMPATIBLE_VARIANTS = ['low', 'medium', 'high'].map((id) => ({ id, settings: { reasoningEffort: id } }))
+/**
+ * The models it lists, each with its variants (HI-2767): a configured openai-compatible provider's as recorded, none for
+ * the built-ins (not recorded); FAKE_OPENCODE_MODELS adds models, each `provider/model` or `provider/model#v1|v2`.
+ */
 function modelsOf(cfg, env = process.env) {
   const out = []
-  for (const [pid, p] of Object.entries(cfg.providers || {})) for (const [mid, m] of Object.entries(p.models || {})) out.push({ providerID: pid, id: mid, name: m.name || mid })
-  for (const id of BUILTIN) out.push({ providerID: 'opencode', id, name: id })
-  for (const full of String(env.FAKE_OPENCODE_MODELS || '').split(',').filter(Boolean)) {
+  for (const [pid, p] of Object.entries(cfg.providers || {})) for (const [mid, m] of Object.entries(p.models || {})) out.push({ providerID: pid, id: mid, name: m.name || mid, variants: /openai-compatible/.test(p.package || '') ? OPENAI_COMPATIBLE_VARIANTS : [] })
+  for (const id of BUILTIN) out.push({ providerID: 'opencode', id, name: id, variants: [] })
+  for (const entry of String(env.FAKE_OPENCODE_MODELS || '').split(',').filter(Boolean)) {
+    const [full, listed = ''] = entry.split('#')
     const i = full.indexOf('/')
-    out.push({ providerID: full.slice(0, i), id: full.slice(i + 1), name: full.slice(i + 1) })
+    out.push({ providerID: full.slice(0, i), id: full.slice(i + 1), name: full.slice(i + 1), variants: listed.split('|').filter(Boolean).map((id) => ({ id, settings: { reasoningEffort: id } })) })
   }
   return out.filter((x) => config.allowed(cfg, 'provider.use', x.providerID)).sort((a, b) => `${a.providerID}/${a.id}`.localeCompare(`${b.providerID}/${b.id}`))
 }

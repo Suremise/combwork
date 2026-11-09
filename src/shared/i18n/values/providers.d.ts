@@ -111,6 +111,8 @@ interface CombworkMessageValues {
   'providers.memory.user': { file: string | number }
   'providers.opencode.claudeAgentModel': { provider: string | number; model: string | number }
   'providers.opencode.connections.setUp': undefined
+  'providers.opencode.effortNeedsModel': { provider: string | number; effort: string | number }
+  'providers.opencode.effortNotListed': { provider: string | number; effort: string | number; model: string | number }
   'providers.opencode.historyBusy': { provider: string | number }
   'providers.opencode.noModel': { provider: string | number }
   'providers.opencode.noOwner': { provider: string | number }
