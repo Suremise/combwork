@@ -423,6 +423,18 @@
     "defaultMessage": "Only on this PC",
     "description": "A heading in the Exclude from Git menu (shown in capitals): the choices under it write .git/info/exclude, which git never commits. Each choice's second line names the file."
   },
+  "files.git.ruleAt": {
+    "defaultMessage": "Line {line} of {file}: `{pattern}`",
+    "description": "Above the rule file in Why Is This Ignored?'s viewer: the line ({line}) of the file ({file}, such as .git/info/exclude) whose rule ({pattern}) ignores it, highlighted below. Keep the backquotes."
+  },
+  "files.git.ruleClose": {
+    "defaultMessage": "Close",
+    "description": "Button: closes Why Is This Ignored?'s viewer."
+  },
+  "files.git.ruleTitle": {
+    "defaultMessage": "Why {name} is ignored",
+    "description": "Title of the viewer Why Is This Ignored? opens (HI-2743) for a rule file the Files tab doesn't show (.git/info/exclude, the global excludes file). {name} is the ignored file's or folder's name."
+  },
   "files.git.section": {
     "defaultMessage": "Git",
     "description": "Heading of the Git section of the Files tab's right-click menu (HI-2743). Usually kept as Git."

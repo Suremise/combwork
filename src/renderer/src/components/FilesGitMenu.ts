@@ -1,4 +1,4 @@
-import type { FileEntry, FileGitDone, FileGitInfo, FileGitItem, ProjectInfo } from '@shared/types'
+import type { FileEntry, FileGitDone, FileGitInfo, FileGitItem, FileGitRuleText, ProjectInfo } from '@shared/types'
 import { exactIgnoreLine, extensionOf, extIgnoreLine, type IgnoreRule, type IgnoreTarget } from '@shared/gitIgnoreRules'
 import { msg, tr } from '@shared/i18n'
 import * as actions from '../actions'
@@ -35,7 +35,10 @@ export const FILES_GIT_TEXT = {
   excludeFailed: msg({ id: 'files.git.excludeFailed', defaultMessage: 'Could not exclude from Git', description: 'Title of an error notification in the Files tab.' }),
   untrackFailed: msg({ id: 'files.git.untrackFailed', defaultMessage: 'Could not stop tracking', description: 'Title of an error notification in the Files tab.' }),
   includeFailed: msg({ id: 'files.git.includeFailed', defaultMessage: 'Could not include it again', description: 'Title of an error notification in the Files tab.' }),
-  whyFailed: msg({ id: 'files.git.whyFailed', defaultMessage: 'Could not open the rule', description: 'Title of an error notification in the Files tab: Why Is This Ignored? could not open the ignore file.' })
+  whyFailed: msg({ id: 'files.git.whyFailed', defaultMessage: 'Could not open the rule', description: 'Title of an error notification in the Files tab: Why Is This Ignored? could not open the ignore file.' }),
+  ruleTitle: msg({ id: 'files.git.ruleTitle', defaultMessage: 'Why {name} is ignored', description: "Title of the viewer Why Is This Ignored? opens (HI-2743) for a rule file the Files tab doesn't show (.git/info/exclude, the global excludes file). {name} is the ignored file's or folder's name." }),
+  ruleAt: msg({ id: 'files.git.ruleAt', defaultMessage: 'Line {line} of {file}: `{pattern}`', description: "Above the rule file in Why Is This Ignored?'s viewer: the line ({line}) of the file ({file}, such as .git/info/exclude) whose rule ({pattern}) ignores it, highlighted below. Keep the backquotes." }),
+  ruleClose: msg({ id: 'files.git.ruleClose', defaultMessage: 'Close', description: "Button: closes Why Is This Ignored?'s viewer." })
 }
 
 const T = FILES_GIT_TEXT
@@ -59,6 +62,8 @@ export interface GitMenuContext {
   reload: () => void
   /** Shows a file of the tab at a line (Why is this ignored?). */
   showAt: (rel: string, line: number) => void
+  /** Shows a rule file the tab doesn't, at the rule's line (Why is this ignored?). */
+  showRule: (rule: FileGitRuleText, name: string) => void
 }
 
 const arg = (items: { relPath: string; isDir: boolean }[]): { rel: string; isDir: boolean }[] => items.map((i) => ({ rel: i.relPath, isDir: i.isDir }))
@@ -105,8 +110,9 @@ async function include(ctx: GitMenuContext, item: FileGitItem): Promise<void> {
 function why(ctx: GitMenuContext, item: FileGitItem): void {
   const rule = item.rule
   if (!rule) return
-  if (rule.file) ctx.showAt(rule.file, rule.line)
-  else void actions.attempt(tr(T.whyFailed), () => call('files:gitOpenRule', ctx.project.path, [{ rel: item.rel, isDir: item.isDir }]))
+  if (rule.file) return ctx.showAt(rule.file, rule.line)
+  const name = ctx.items.find((i) => i.relPath === item.rel)?.name ?? item.rel
+  void actions.attempt(tr(T.whyFailed), () => call('files:gitRuleText', ctx.project.path, [{ rel: item.rel, isDir: item.isDir }])).then((r) => r && ctx.showRule(r, name))
 }
 
 /** The Exclude from Git choices: the selection's exact paths, or one file's extension; in .gitignore, or only on this PC. */

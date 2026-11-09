@@ -257,6 +257,11 @@
       "why": "plain"
     }
   },
+  "service.filesGit.linked": {
+    "placeholders": {
+      "file": "plain"
+    }
+  },
   "service.filesGit.notIgnored": {
     "placeholders": {}
   },
@@ -273,6 +278,11 @@
   },
   "service.filesGit.ruleChanged": {
     "placeholders": {}
+  },
+  "service.filesGit.tooLarge": {
+    "placeholders": {
+      "file": "plain"
+    }
   },
   "service.forward.missing": {
     "placeholders": {

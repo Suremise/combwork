@@ -1348,10 +1348,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:gitExclude': (p, items, target, ext) => filesGit.gitExclude(p, items, target, ext === true),
     'files:gitUntrack': (p, items) => filesGit.gitUntrack(p, items),
     'files:gitInclude': (p, items) => filesGit.gitInclude(p, items),
-    'files:gitOpenRule': async (p, items) => {
-      const err = await shell.openPath(await filesGit.ignoreRuleFile(p, items))
-      if (err) throw filesGit.openFailed(err)
-    },
+    'files:gitRuleText': (p, items) => filesGit.ignoreRuleText(p, items),
 
     'attachments:list': (p) => files.listAttachments(p),
     'attachments:read': (p, path) => files.readAttachment(p, path),

@@ -3751,6 +3751,15 @@ export interface FileGitInfo {
   items: FileGitItem[]
 }
 
+/** The file of a rule outside the Files tab's tree, for Why is this ignored?'s viewer: as git names it, its full path, its text, and the rule's line and pattern. */
+export interface FileGitRuleText {
+  file: string
+  path: string
+  text: string
+  line: number
+  pattern: string
+}
+
 /** A Git menu action done: the ignore file written (none for Stop tracking), the lines added or removed, how many items, and the branch it changed. */
 export interface FileGitDone {
   file: string | null

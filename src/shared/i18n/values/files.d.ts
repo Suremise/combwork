@@ -107,6 +107,9 @@ interface CombworkMessageValues {
   'files.git.included': { line: string | number; file: string | number; branch: string }
   'files.git.initialise': undefined
   'files.git.onThisPc': undefined
+  'files.git.ruleAt': { line: string | number; file: string | number; pattern: string | number }
+  'files.git.ruleClose': undefined
+  'files.git.ruleTitle': { name: string | number }
   'files.git.section': undefined
   'files.git.showChanges': undefined
   'files.git.status': { status: string }

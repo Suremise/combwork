@@ -2,11 +2,16 @@
 // .gitignore or .git/info/exclude), Stop tracking (git rm --cached, the file kept), Include again (only its own plain
 // line), and how check-ignore -v is read. Pure helpers, then real git in a throwaway repository.
 import { execFileSync } from 'child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+import { createRequire } from 'module'
 import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { appendIgnoreLines, exactIgnoreLine, extensionOf, extIgnoreLine, lineEnding, parseCheckIgnore, removableRule, removeIgnoreLine } from '../src/shared/gitIgnoreRules'
 import { tempDir } from './tempDir'
+// The run's allowlisted environment and test git config for every git child (never this process's environment), and a
+// bound for a hung one.
+const { gitEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
+const GIT_HUNG_MS = 30000
 
 describe('ignore lines', () => {
   it('names exactly one path: anchored, a folder with a trailing slash, pattern characters escaped', () => {
@@ -105,12 +110,12 @@ afterAll(async () => {
 
 let n = 0
 let proj = ''
-const sh = (...args: string[]): string => execFileSync('git', ['-C', proj, ...args], { encoding: 'utf8' })
+const sh = (...args: string[]): string => execFileSync('git', ['-C', proj, ...args], { encoding: 'utf8', env: gitEnv(), timeout: GIT_HUNG_MS })
 const read = (rel: string): string => readFileSync(join(proj, rel), 'utf8')
 beforeEach(() => {
   proj = join(ws, `proj${++n}`)
   mkdirSync(join(proj, 'src', 'gen'), { recursive: true })
-  execFileSync('git', ['init', '-q', proj])
+  execFileSync('git', ['init', '-q', proj], { env: gitEnv(), timeout: GIT_HUNG_MS })
   sh('config', 'user.email', 'test@example.invalid')
   sh('config', 'user.name', 'Test')
   writeFileSync(join(proj, '.gitignore'), 'node_modules/\r\n')
@@ -190,6 +195,53 @@ describe('the Git menu on a real repository', () => {
     mkdirSync(plain, { recursive: true })
     writeFileSync(join(plain, 'a.txt'), '')
     expect((await filesGit.gitInfo(plain, [{ rel: 'a.txt', isDir: false }])).repo).toBe(false)
+  })
+
+  it('takes a selected path literally: Stop Tracking src/[ab].txt leaves src/a.txt tracked (pathspec magic off)', async () => {
+    writeFileSync(join(proj, 'src', '[ab].txt'), 'x')
+    writeFileSync(join(proj, 'src', 'b.txt'), 'b')
+    sh('add', '.')
+    sh('commit', '-q', '-m', 'brackets')
+    const info = await filesGit.gitInfo(proj, [{ rel: 'src/[ab].txt', isDir: false }, { rel: 'src/?.ts', isDir: false }])
+    expect(info.items.map((i) => i.tracked)).toEqual([true, false])
+    const done = await filesGit.gitUntrack(proj, [{ rel: 'src/[ab].txt', isDir: false }])
+    expect(done.count).toBe(1)
+    const left = sh('ls-files', 'src').split('\n')
+    expect(left).not.toContain('src/[ab].txt')
+    expect(left).toEqual(expect.arrayContaining(['src/a.ts', 'src/b.txt']))
+  })
+
+  it('never writes through a .gitignore that is a link, leaving its target alone', async (ctx) => {
+    const outside = join(base, `outside${n}.txt`)
+    writeFileSync(outside, 'user data\n')
+    rmSync(join(proj, '.gitignore'))
+    try {
+      symlinkSync(outside, join(proj, '.gitignore'), 'file')
+    } catch (e) {
+      // A file symbolic link needs Developer Mode or an elevated process on Windows: the junction case below still runs.
+      if ((e as NodeJS.ErrnoException).code === 'EPERM') return ctx.skip()
+      throw e
+    }
+    await expect(filesGit.gitExclude(proj, [{ rel: 'scratch.txt', isDir: false }], 'shared', false)).rejects.toThrow(/link/)
+    expect(readFileSync(outside, 'utf8')).toBe('user data\n')
+  })
+
+  it('never writes .git/info/exclude through a folder linked outside the repository', async () => {
+    const outsideDir = join(base, `outside-info${n}`)
+    mkdirSync(outsideDir, { recursive: true })
+    writeFileSync(join(outsideDir, 'exclude'), 'theirs\n')
+    rmSync(join(proj, '.git', 'info'), { recursive: true, force: true })
+    symlinkSync(outsideDir, join(proj, '.git', 'info'), 'junction')
+    await expect(filesGit.gitExclude(proj, [{ rel: 'scratch.txt', isDir: false }], 'local', false)).rejects.toThrow(/link/)
+    expect(readFileSync(join(outsideDir, 'exclude'), 'utf8')).toBe('theirs\n')
+  })
+
+  it("gives Why is this ignored? a rule file's text and the rule's line, finding the rule itself", async () => {
+    writeFileSync(join(proj, '.git', 'info', 'exclude'), '# local\n*.bak\n')
+    writeFileSync(join(proj, 'old.bak'), '')
+    const r = await filesGit.ignoreRuleText(proj, [{ rel: 'old.bak', isDir: false }])
+    expect(r).toMatchObject({ file: '.git/info/exclude', line: 2, pattern: '*.bak', text: '# local\n*.bak\n' })
+    await expect(filesGit.ignoreRuleText(proj, [{ rel: 'src/a.ts', isDir: false }])).rejects.toThrow()
   })
 
   it('never acts outside the project folder or in .git', async () => {

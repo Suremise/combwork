@@ -262,6 +262,35 @@ const check = (name, ok, extra = '') => {
   check('untrack: git no longer tracks it, the file stays on disk', !!(await lib.until(() => gitOut('ls-files', 'src/util.ts') === '' && exists('src/util.ts'), HUNG_MS)))
   check('untrack: the removal is a staged deletion', /^D {2}src\/util\.ts/m.test(gitOut('status', '--porcelain')))
 
+  // Only on this PC, then Why Is This Ignored?: .git/info/exclude isn't in the tree, so Combwork's viewer shows it at the rule's line.
+  const excludeFile = () => fs.readFileSync(path.join(proj, '.git', 'info', 'exclude'), 'utf8')
+  check('exclude (this PC): offered again', (await gitMenu('made-outside.txt')) && (await shown(menuItem('Exclude from Git'))))
+  await menuItem('Exclude from Git').click()
+  await shown(page.locator('.menu .menu-header', { hasText: 'Only on this PC' }))
+  await menuItem('This file').nth(1).click()
+  check('exclude (this PC): writes .git/info/exclude, not .gitignore', !!(await lib.until(() => excludeFile().split(/\r?\n/).includes('/made-outside.txt'), HUNG_MS)) && ignoreFile() === 'dist/\n', JSON.stringify(excludeFile()))
+  const ruleLine = excludeFile().split(/\r?\n/).indexOf('/made-outside.txt') + 1
+  check('why (this PC): offered with Include Again', (await gitMenu('made-outside.txt')) && (await shown(menuItem('Why Is This Ignored?'))) && (await menuItem('Include Again').count()) === 1)
+  await menuItem('Why Is This Ignored?').click()
+  const ruleAt = page.locator('.ignore-rule-at')
+  check('why (this PC): the viewer names the file, line and rule', !!(await lib.until(async () => (await ruleAt.innerText({ timeout: 1000 }).catch(() => '')) === `Line ${ruleLine} of .git/info/exclude: \`/made-outside.txt\``, HUNG_MS)), await ruleAt.innerText().catch(() => ''))
+  // Monaco puts the cursor on the rule's line: its line number is the current one.
+  check('why (this PC): the editor is at the rule\'s line', !!(await lib.until(async () => (await page.locator('.ignore-rule-file .line-numbers.active-line-number').innerText({ timeout: 1000 }).catch(() => '')).trim() === String(ruleLine), HUNG_MS)))
+  await page.screenshot({ path: path.join(shots, '7-git-why-viewer.png') })
+  await page.locator('.dialog-footer').getByRole('button', { name: 'Close' }).click()
+  await lib.until(async () => (await ruleAt.count()) === 0, HUNG_MS)
+  await gitMenu('made-outside.txt')
+  await shown(menuItem('Include Again'))
+  await menuItem('Include Again').click()
+  check('include (this PC): removes its line from .git/info/exclude', !!(await lib.until(() => !excludeFile().split(/\r?\n/).includes('/made-outside.txt'), HUNG_MS)))
+
+  // Show Changes: a modified file's diff in Version Control → Changes.
+  check('show changes: offered for a modified file', (await gitMenu('src/app.ts')) && (await shown(menuItem('Show Changes'))))
+  await menuItem('Show Changes').click()
+  check('show changes: opens Changes at that file', !!(await lib.until(async () => (await page.locator('.row.selected[data-path="src/app.ts"]').count()) === 1, HUNG_MS)))
+  await page.locator('.tab', { hasText: 'Files' }).click()
+  await lib.until(async () => (await row('made-outside.txt').count()) === 1, HUNG_MS)
+
     // Attachments tab (#387): the old .combwork/images moved into .combwork/attachments, every kind listed, filters by kind.
   await page.locator('.tab', { hasText: 'Attachments' }).click()
   await lib.until(async () => (await page.locator('.thumb').count()) === 8, 10000)

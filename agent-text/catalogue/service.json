@@ -304,6 +304,11 @@
     "note": "An error from the Files tab's Git menu. {why} is git's own message (English).",
     "audience": "both"
   },
+  "service.filesGit.linked": {
+    "text": "{file} is a link, or leads outside the repository, so Combwork leaves it alone. Change it by hand.",
+    "note": "An error from the Files tab's Git menu (HI-2743): the ignore file ({file}: .gitignore or .git/info/exclude) is a symbolic link or junction, or its folder leads outside the repository, so Combwork won't write through it.",
+    "audience": "both"
+  },
   "service.filesGit.notIgnored": {
     "text": "Git no longer ignores it.",
     "note": "An error from the Files tab's Git menu: the file isn't ignored any more.",
@@ -327,6 +332,11 @@
   "service.filesGit.ruleChanged": {
     "text": "The rule that ignores it has changed. Look again with Why is this ignored?.",
     "note": "An error from Include again in the Files tab's Git menu: the line it would remove isn't there any more, or it isn't one Combwork can remove. Why is this ignored? is the menu item (files.git.why).",
+    "audience": "both"
+  },
+  "service.filesGit.tooLarge": {
+    "text": "{file} is too large to show here.",
+    "note": "An error from Why Is This Ignored? in the Files tab's Git menu: the rule's file ({file}) is too large to show in Combwork's viewer.",
     "audience": "both"
   },
   "service.forward.missing": {

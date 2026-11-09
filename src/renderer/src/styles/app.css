@@ -15348,3 +15348,7 @@ button.progress-lane-retry {
 /* As wide as its placeholder (HI-2708: "Not set: 200,000 assumed" is longer in German and Polish), 13em at least. */
 .server-model-limit .input { field-sizing: content; min-width: 13em; max-width: 100%; }
 .server-model-limits .hint.warn { color: var(--warning); }
+/* Why Is This Ignored?'s viewer (HI-2743): the rule's line, then its file, read-only. */
+.ignore-rule-at { margin-bottom: 8px; font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.ignore-rule-file { height: min(50vh, 420px); border: 1px solid var(--border); }
+.ignore-rule-file .monaco { height: 100%; }

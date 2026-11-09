@@ -19,7 +19,9 @@ import { useScopedLoad } from '../scopedLoad'
 import { agentFolder, awayFromProject, legacyOf, placeText } from '../agentPlace'
 import { cx, formatBytes, formatKeybinding, FILES_MIME, IMAGE_EXT, imageUrl, quotePath, timeAgo } from '../util'
 import { CW_DIR } from '@shared/defaults'
-import { gitMenuEntries, ignoredByText } from '../components/FilesGitMenu'
+import { FILES_GIT_TEXT, gitMenuEntries, ignoredByText } from '../components/FilesGitMenu'
+import { CodeEditor } from '../components/Editors'
+import type { FileGitRuleText } from '@shared/types'
 
 const parentOf = (rel: string): string => (rel.includes('/') ? rel.slice(0, rel.lastIndexOf('/')) : '')
 const absOf = (project: ProjectInfo, rel: string): string => (rel ? `${project.path}\\${rel.replace(/\//g, '\\')}` : project.path)
@@ -294,6 +296,8 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
   const findError = filtering ? find.error : null
   const [findTry, setFindTry] = useState(0)
   const [git, setGit] = useState<Record<string, string>>({})
+  // Why is this ignored?'s viewer, for a rule file the tree doesn't show (HI-2743).
+  const [ruleView, setRuleView] = useState<{ rule: FileGitRuleText; name: string; nonce: number } | null>(null)
   const gitRef = useRef(git)
   gitRef.current = git
   const [dropTarget, setDropTarget] = useState<string | null>(null)
@@ -635,7 +639,8 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
             setFilter('')
             reveal(rel)
             setGoto({ rel, line, nonce: Date.now() })
-          }
+          },
+          showRule: (rule, name) => setRuleView({ rule, name, nonce: Date.now() })
         })
         menu.openAt(x, y, [...base, ...gitEntries])
       },
@@ -849,7 +854,33 @@ function FilesBrowser({ project, selector, jump, mainCheckout }: { project: Proj
         )}
       </div>
       {menu.element}
+      {ruleView && <IgnoreRuleViewer view={ruleView} onClose={() => setRuleView(null)} />}
     </div>
+  )
+}
+
+/** Why is this ignored?'s viewer (HI-2743): a rule file outside the tree, read-only, at the rule's line. */
+function IgnoreRuleViewer({ view, onClose }: { view: { rule: FileGitRuleText; name: string; nonce: number }; onClose: () => void }) {
+  const { rule } = view
+  return (
+    <Modal
+      title={tr(FILES_GIT_TEXT.ruleTitle, { name: view.name })}
+      icon="question"
+      wide
+      onClose={onClose}
+      footer={
+        <button className="btn" onClick={onClose}>
+          {tr(FILES_GIT_TEXT.ruleClose)}
+        </button>
+      }
+    >
+      <div className="ignore-rule-at" data-rule-line={rule.line}>
+        {tr(FILES_GIT_TEXT.ruleAt, { line: rule.line, file: rule.file, pattern: rule.pattern })}
+      </div>
+      <div className="ignore-rule-file" title={rule.path}>
+        <CodeEditor value={rule.text} language="plaintext" readOnly goto={{ line: rule.line, nonce: view.nonce }} />
+      </div>
+    </Modal>
   )
 }
 

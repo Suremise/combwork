@@ -78,6 +78,7 @@ import type {
   FileEntry,
   FileGitDone,
   FileGitInfo,
+  FileGitRuleText,
   GitDiff,
   HiddenProject,
   GitStatus,
@@ -1037,8 +1038,8 @@ export interface CombworkRequests {
   'files:gitUntrack': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
   /** Include again: removes the plain line that ignores the item. */
   'files:gitInclude': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
-  /** Why is this ignored?: opens the file of the rule that ignores the item in its app (a rule outside the Files tab's tree). */
-  'files:gitOpenRule': (projectPath: string, items: { rel: string; isDir: boolean }[]) => void
+  /** Why is this ignored?: the file of the rule that ignores the item, its text and line, for Combwork's viewer (a rule outside the Files tab's tree). */
+  'files:gitRuleText': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitRuleText
 
   'attachments:list': (projectPath: string) => SessionAttachmentGroup[]
   /** A kept attachment's text, for the viewer's previews. */

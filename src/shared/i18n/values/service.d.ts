@@ -74,11 +74,13 @@ interface CombworkMessageValues {
   'service.files.throughLink': undefined
   'service.filesGit.busy': undefined
   'service.filesGit.failed': { why: string | number }
+  'service.filesGit.linked': { file: string | number }
   'service.filesGit.notIgnored': undefined
   'service.filesGit.notRepo': undefined
   'service.filesGit.notUtf8': { file: string | number }
   'service.filesGit.nothing': undefined
   'service.filesGit.ruleChanged': undefined
+  'service.filesGit.tooLarge': { file: string | number }
   'service.forward.byAssistant': undefined
   'service.forward.byUser': undefined
   'service.forward.description': { from: string | number; source: string | number; to: string | number; by: string | number }

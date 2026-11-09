@@ -1,10 +1,10 @@
-import { mkdir, readFile, writeFile } from 'original-fs/promises'
+import { lstat, mkdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { dirname, isAbsolute, relative, resolve, sep } from 'path'
 import { appendIgnoreLines, exactIgnoreLine, extensionOf, extIgnoreLine, parseCheckIgnore, removableRule, removeIgnoreLine, type IgnoreRule, type IgnoreTarget } from '../shared/gitIgnoreRules'
-import type { FileGitInfo, FileGitItem, FileGitDone } from '../shared/types'
+import type { FileGitInfo, FileGitItem, FileGitDone, FileGitRuleText } from '../shared/types'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
-import { withFileLock } from './fsutil'
+import { insideReal, withFileLock } from './fsutil'
 import { INDEX_BUSY, branchOfRef, git, gitErrorLine, gitReading } from './git'
 import { decodeUtf8 } from './files'
 import { createLogger, userText } from './logger'
@@ -25,8 +25,16 @@ const M = {
   notUtf8: msg({ id: 'service.filesGit.notUtf8', defaultMessage: '{file} is not UTF-8 text, so Combwork leaves it alone.', description: "An error from the Files tab's Git menu: the ignore file ({file}) isn't UTF-8, so Combwork won't rewrite it." }),
   ruleChanged: msg({ id: 'service.filesGit.ruleChanged', defaultMessage: 'The rule that ignores it has changed. Look again with Why is this ignored?.', description: "An error from Include again in the Files tab's Git menu: the line it would remove isn't there any more, or it isn't one Combwork can remove. Why is this ignored? is the menu item (files.git.why)." }),
   notIgnored: msg({ id: 'service.filesGit.notIgnored', defaultMessage: 'Git no longer ignores it.', description: "An error from the Files tab's Git menu: the file isn't ignored any more." }),
-  nothing: msg({ id: 'service.filesGit.nothing', defaultMessage: 'Choose a file or folder in the project.', description: "An error from the Files tab's Git menu: it was given nothing to act on." })
+  nothing: msg({ id: 'service.filesGit.nothing', defaultMessage: 'Choose a file or folder in the project.', description: "An error from the Files tab's Git menu: it was given nothing to act on." }),
+  linked: msg({ id: 'service.filesGit.linked', defaultMessage: '{file} is a link, or leads outside the repository, so Combwork leaves it alone. Change it by hand.', description: "An error from the Files tab's Git menu (HI-2743): the ignore file ({file}: .gitignore or .git/info/exclude) is a symbolic link or junction, or its folder leads outside the repository, so Combwork won't write through it." }),
+  tooLarge: msg({ id: 'service.filesGit.tooLarge', defaultMessage: '{file} is too large to show here.', description: "An error from Why Is This Ignored? in the Files tab's Git menu: the rule's file ({file}) is too large to show in Combwork's viewer." })
 }
+
+/** The most of a rule's file Why is this ignored? shows. */
+const MAX_RULE_FILE = 1024 * 1024
+
+/** A path as a literal pathspec: `src/[ab].txt` names that file, never `src/a.txt` and `src/b.txt` as a glob would. */
+const literal = (rel: string): string => `:(literal)${rel}`
 
 /** At most this many items in one action (a selection of the tree). */
 const MAX_ITEMS = 500
@@ -41,6 +49,8 @@ interface Repo {
   prefix: string
   /** `.git/info/exclude` as git names it in check-ignore's output (relative to the top). */
   infoExclude: string
+  /** The repository's git folder (`.git`, shared by its worktrees): where `info/exclude` must really be. */
+  gitDir: string
   branch: string | null
 }
 
@@ -63,12 +73,12 @@ function gitFailed(err: string): Error {
 /** The project's repository, or null when the project folder isn't in one. */
 async function repoOf(projectPath: string): Promise<Repo | null> {
   const cwd = workspace.assertProject(projectPath)
-  const r = await git(cwd, ['rev-parse', '--show-toplevel', '--show-prefix', '--git-path', 'info/exclude'])
+  const r = await git(cwd, ['rev-parse', '--show-toplevel', '--show-prefix', '--git-path', 'info/exclude', '--git-common-dir'])
   if (!r.ok) {
     if (/not a git repository/i.test(r.err)) return null
     throw gitFailed(r.err)
   }
-  const [top, prefix, exclude] = r.out.split(/\r?\n/)
+  const [top, prefix, exclude, common] = r.out.split(/\r?\n/)
   const topAbs = resolve(top)
   const head = await git(cwd, ['symbolic-ref', '-q', 'HEAD'])
   return {
@@ -76,6 +86,7 @@ async function repoOf(projectPath: string): Promise<Repo | null> {
     top: topAbs,
     prefix: prefix ?? '',
     infoExclude: relative(topAbs, resolve(cwd, exclude ?? '.git/info/exclude')).split(sep).join('/'),
+    gitDir: resolve(cwd, common || '.git'),
     branch: head.ok ? branchOfRef(head.out) : null
   }
 }
@@ -104,7 +115,7 @@ async function trackedOf(repo: Repo, list: Item[]): Promise<Set<string>> {
   const tracked = new Set<string>()
   for (let i = 0; i < list.length; i += 200) {
     const chunk = list.slice(i, i + 200)
-    const r = await gitReading(repo.cwd, ['ls-files', '-z', '--', ...chunk.map((x) => x.rel)])
+    const r = await gitReading(repo.cwd, ['ls-files', '-z', '--', ...chunk.map((x) => literal(x.rel))])
     if (!r.ok) throw gitFailed(r.err)
     // Each tracked file and the folders it is in (a folder of thousands of files is read once, not once per item).
     const have = new Set<string>()
@@ -144,9 +155,25 @@ export async function gitInfo(projectPath: string, list: unknown): Promise<FileG
   }
 }
 
-/** The ignore file a target writes: the repository's top .gitignore, or .git/info/exclude. */
-function targetFile(repo: Repo, target: IgnoreTarget): { abs: string; name: string } {
-  return target === 'shared' ? { abs: resolve(repo.top, '.gitignore'), name: '.gitignore' } : { abs: resolve(repo.top, repo.infoExclude), name: repo.infoExclude }
+/**
+ * The ignore file a target writes: the repository's top .gitignore, or .git/info/exclude, with the folder it must
+ * really be in (the repository's top, or its git folder).
+ */
+function targetFile(repo: Repo, target: IgnoreTarget): { abs: string; name: string; within: string } {
+  return target === 'shared' ? { abs: resolve(repo.top, '.gitignore'), name: '.gitignore', within: repo.top } : { abs: resolve(repo.top, repo.infoExclude), name: repo.infoExclude, within: repo.gitDir }
+}
+
+/**
+ * Refuses to read or write an ignore file that is a link (a symbolic link or junction), or whose folders lead outside
+ * where it belongs, as the Files tab refuses paths through a link out of the project: Combwork never rewrites a file
+ * elsewhere through one. Checked under the file's lock, just before it is read and written.
+ */
+async function assertOwnFile(t: { abs: string; name: string; within: string }): Promise<void> {
+  const st = await lstat(t.abs).catch((e: NodeJS.ErrnoException) => {
+    if (e.code === 'ENOENT') return null
+    throw e
+  })
+  if ((st && (st.isSymbolicLink() || !st.isFile())) || !insideReal(t.abs, [t.within])) throw combworkError(M.linked, { file: t.name })
 }
 
 async function readIgnoreFile(abs: string, name: string): Promise<string> {
@@ -175,6 +202,7 @@ export async function gitExclude(projectPath: string, list: unknown, target: Ign
     lines = [extIgnoreLine(e)]
   } else lines = its.map((x) => exactIgnoreLine(repoRel(repo, x.rel), x.isDir))
   const added = await withFileLock(t.abs, async () => {
+    await assertOwnFile(t)
     const before = await readIgnoreFile(t.abs, t.name)
     const r = appendIgnoreLines(before, lines)
     if (r.added.length) {
@@ -194,7 +222,7 @@ export async function gitUntrack(projectPath: string, list: unknown): Promise<Fi
   const tracked = await trackedOf(repo, its)
   const rels = its.filter((x) => tracked.has(x.rel))
   if (!rels.length) return { file: null, lines: [], count: 0, branch: repo.branch }
-  const r = await git(repo.cwd, ['rm', '--cached', '--quiet', ...(rels.some((x) => x.isDir) ? ['-r'] : []), '--', ...rels.map((x) => x.rel)])
+  const r = await git(repo.cwd, ['rm', '--cached', '--quiet', ...(rels.some((x) => x.isDir) ? ['-r'] : []), '--', ...rels.map((x) => literal(x.rel))])
   if (!r.ok) throw gitFailed(r.err)
   log.info(`Stopped tracking ${rels.length} items in ${userText(repo.cwd)}`)
   return { file: null, lines: [], count: rels.length, branch: repo.branch }
@@ -210,6 +238,7 @@ export async function gitInclude(projectPath: string, list: unknown): Promise<Fi
   if (!target) throw combworkError(M.ruleChanged)
   const t = targetFile(repo, target)
   await withFileLock(t.abs, async () => {
+    await assertOwnFile(t)
     const out = removeIgnoreLine(await readIgnoreFile(t.abs, t.name), rule.line, rule.pattern)
     if (out === null) throw combworkError(M.ruleChanged)
     await writeFile(t.abs, out, 'utf8')
@@ -219,16 +248,19 @@ export async function gitInclude(projectPath: string, list: unknown): Promise<Fi
 }
 
 /**
- * Why is this ignored?, for a rule outside the Files tab's tree (.git/info/exclude, the global excludes file): the
- * rule's file, for opening in its app. Main finds the rule again itself, so the window can only open the file a rule is in.
+ * Why is this ignored?, for a rule outside the Files tab's tree (.git/info/exclude, the global excludes file, a
+ * .gitignore above the project folder): the rule's file, its text and line, for Combwork's viewer. Main finds the rule
+ * again itself, so the window can only show the file a rule is in.
  */
-export async function ignoreRuleFile(projectPath: string, list: unknown): Promise<string> {
+export async function ignoreRuleText(projectPath: string, list: unknown): Promise<FileGitRuleText> {
   const repo = await needRepo(projectPath)
   const [it] = items(list)
   const rule = (await rulesOf(repo, [it])).get(it.rel)
   if (!rule) throw combworkError(M.notIgnored)
-  return isAbsolute(rule.source) ? resolve(rule.source) : resolve(repo.top, rule.source)
+  const abs = isAbsolute(rule.source) ? resolve(rule.source) : resolve(repo.top, rule.source)
+  const st = await stat(abs)
+  if (st.size > MAX_RULE_FILE) throw combworkError(M.tooLarge, { file: rule.source })
+  const text = decodeUtf8(await readFile(abs))
+  if (text === null) throw combworkError(M.notUtf8, { file: rule.source })
+  return { file: rule.source, path: abs, text: text.replace(/^\uFEFF/, ''), line: rule.line, pattern: rule.pattern }
 }
-
-/** Opening a rule's file failed: Windows' reason, in the Git menu's words. */
-export const openFailed = (why: string): Error => combworkError(M.failed, { why })
