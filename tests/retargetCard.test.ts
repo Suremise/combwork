@@ -6,7 +6,7 @@
 // changes before and while git holds the refs, someone else's lock left alone, a git that ends before the write, a
 // prepare that never answers, two moves at once, a reviewed card's evidence, a lane moved with its card, and a restart
 // keeping its line.
-import { execFileSync, spawn } from 'child_process'
+import { execFileSync, spawn, spawnSync } from 'child_process'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,6 +14,8 @@ import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
 vi.setConfig({ testTimeout: 60_000 })
+/** A bound for a hung run only, never a timing (tests/README.md). */
+const HUNG_MS = 10_000
 
 const base = tempDir('cw-retargetcard-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -377,7 +379,7 @@ describe('a card in flight on an integration branch that ended (HI-2753)', () =>
     execFileSync('cmd', ['/c', 'del', lock])
     const other = spawn('git', ['update-ref', '--stdin'], { cwd: repo, stdio: ['pipe', 'pipe', 'pipe'] })
     other.stdin.write(`start\nverify refs/heads/${line} ${head(repo, line)}\nprepare\n`)
-    await vi.waitFor(() => expect(existsSync(lock)).toBe(true))
+    await vi.waitFor(() => expect(existsSync(lock)).toBe(true), { timeout: HUNG_MS })
     await expect(inWorkspace(w, () => tasks.setTarget(n, 'main', user))).rejects.toThrow(/Another git operation holds/)
     expect(existsSync(lock)).toBe(true)
     other.stdin.end()
@@ -399,7 +401,11 @@ describe('a card in flight on an integration branch that ended (HI-2753)', () =>
     const lock = join(repo, '.git', 'refs', 'heads', ...line.split('/')) + '.lock'
     for (const how of ['stdin', 'kill'] as const) {
       hold.refHoldTestHooks.prepared = async (child) => {
-        if (how === 'kill') child.kill()
+        // Killed hard, its whole tree (HI-2809): where PATH's git is Git for Windows' launcher (`cmd\git.exe`, as on
+        // GitHub's runner), the real git is its child, and killing the launcher alone leaves that git to see its input
+        // close and abort, removing its locks itself. Its status unread: the launcher can end by itself once its git is
+        // killed, before taskkill reaches it; the lock left (below) is what proves the kill.
+        if (how === 'kill') spawnSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore', windowsHide: true })
         else child.stdin?.destroy()
         await new Promise((r) => (child.exitCode !== null ? r(null) : child.once('exit', r)))
       }
