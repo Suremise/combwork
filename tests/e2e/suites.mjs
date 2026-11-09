@@ -90,7 +90,7 @@ export const SUITES = [
   { name: 'claude-real', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudehome', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudemanaged' },
-  { name: 'claudemanagedreal', needs: ['claude'], claudeHome: 'test' },
+  { name: 'claudemanagedreal', needs: ['claude'], claudeHome: 'test', noCombwork: 'runs claude -p itself against a stub server of its own (HI-2777)' },
   { name: 'claudesettings', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudestatusline', needs: ['claude'], claudeHome: 'own' },
   { name: 'cliownmode' },
