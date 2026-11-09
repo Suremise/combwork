@@ -183,7 +183,7 @@ export const AREAS = [
   // git.ts's processes, started off main's thread (HI-1783): git.ts's suites.
   { paths: ['src/main/gitWorker.ts'], suites: ['gitdirect', 'unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
   // Git missing or too old (#346): Provider Setup's Git row, the status bar and every git-dependent screen.
-  { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitdirect', 'gitmissing', 'providers'] },
+  { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts', 'src/shared/gitLayout.ts'], suites: ['gitdirect', 'gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
   { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts', 'src/main/platform/repoOps.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/shared/repoOpChannels.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
   // HI-2807: New branch… from a ref, a missing target's offer, Start the next version (gitview drives all three).
