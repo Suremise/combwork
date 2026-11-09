@@ -14,13 +14,14 @@ import * as G from '../platform/git'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
 import type { TaskActor } from '../tasks'
-import { cardKeys } from '../boardStore'
+import { boardChanged, boardWrite, cardKeys } from '../boardStore'
 import { cardLabel } from '../../shared/projectKeys'
-import { listLanes } from '../lanes'
+import { listLanes, withLanesLock } from '../lanes'
 import { projectAgents } from '../../shared/defaults'
-import { targetOfRulesetId } from '../../shared/workflow/compile'
+import { targetedOf, targetOfRulesetId } from '../../shared/workflow/compile'
 import { workflowFor } from './service'
 import { hasOwnWork, projectTargets } from './targets'
+import { checkCardMove, IN_FLIGHT_STAGES, laneOf, laneStill, type MoveWhy } from './retargetCard'
 import type { RetargetPreview, RetargetResult } from '../../shared/types'
 import { combworkError } from '../combworkError'
 import { fmt, msg } from '../../shared/i18n'
@@ -31,6 +32,9 @@ const log = createLogger('retarget')
 
 /** Where a card in flight, a Todo card and a lane stand (codes the window and the tools say in words). */
 type KeepWhy = RetargetPreview['cards']['keep'][number]['why']
+
+/** A move in flight's refusal as a retarget's reason to keep a card (or its lane) where it is (HI-2753). */
+const keepOf = (why: MoveWhy): KeepWhy => (why === 'queued' || why === 'notInTarget' || why === 'reviewed' || why === 'noLine' ? why : why === 'notStarted' || why === 'lane' ? 'started' : 'cantCheck')
 
 /**
  * What a change of Work merges into from `from` to `to` would move, and what stays with why (HI-2680), read-only. Slots
@@ -44,24 +48,61 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   const cards = store.cards()
   const keys = cardKeys(ws, cards.map((c) => c.id))
   const row = (c: (typeof cards)[number]) => ({ number: c.id, key: cardLabel({ number: c.id, key: keys.get(c.id) }), title: c.title })
+  // Running lanes on `from` (HI-2753): each moves with its card in flight, when that card can (at most one in flight).
+  const running = (await listLanes(ws, { project: wf.store.scope.project })).filter((x) => x.state === 'active' || x.state === 'paused')
+  const laneTarget = (id: string): string | null => {
+    const rec = wf.lane(id)
+    return rec?.ruleset ? (targetOfRulesetId(rec.ruleset) ?? store.ruleset(rec.ruleset).options.target ?? null) : null
+  }
+  const onFrom = new Set(running.filter((l) => (laneTarget(l.id) || null) === from && !wf.lane(l.id)?.ended).map((l) => l.id))
+  // Only once `from` has ended (HI-2753): gone, or all of it in `to` (merged, as an integration branch is at its release).
+  // A change between branches that both go on leaves started cards and running lanes on their own (HI-2674).
+  const fromNow = await G.lineHead(projectPath, from)
+  const toNow = await G.lineHead(projectPath, to)
+  const ended = !isUnknown(fromNow) && !isUnknown(toNow) && !!toNow && (!fromNow || fromNow === toNow || (await G.isAncestor(projectPath, fromNow, toNow)) === true)
+  const inFlight = (c: (typeof cards)[number], s: ReturnType<typeof wf.state>): boolean => IN_FLIGHT_STAGES.includes(s.stage) && s.started?.target === from
+  const grouped = new Set<number>()
+  out.laneMoves = []
+  for (const l of running.filter((x) => onFrom.has(x.id))) {
+    const flying = cards.filter((c) => c.lane === l.id && inFlight(c, wf.state(c)))
+    for (const c of flying) grouped.add(c.id)
+    const lane = { id: l.id, name: l.name, builder: l.builder.name }
+    if (!ended || flying.length > 1) {
+      out.lanes.push(lane)
+      for (const c of flying) out.cards.keep.push({ ...row(c), why: 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
+      continue
+    }
+    const c = flying[0]
+    const checked = c ? await checkCardMove(wf, projectPath, c, to) : null
+    if (checked && !checked.ok) {
+      const why = keepOf(checked.why)
+      out.lanes.push({ ...lane, why })
+      out.cards.keep.push({ ...row(c), why })
+      continue
+    }
+    const rec = wf.lane(l.id)!
+    out.laneMoves.push({ ...lane, ruleset: rec.ruleset!, cards: [...rec.cards], pending: rec.pending ? [...rec.pending] : null, card: c && checked?.ok ? { ...row(c), head: checked.check.head, own: c.target ?? null } : null })
+  }
   for (const c of cards) {
     const s = wf.state(c)
-    if (s.stage === 'done') continue
+    if (s.stage === 'done' || grouped.has(c.id)) continue
     const own = c.target ?? null
-    // Started on it: fixed until Done (HI-2674), whatever its own target says.
+    // Started on it (HI-2753): moves with its work kept when that work is provably its own, else stays with why.
     if (s.stage !== 'todo' && s.stage !== 'hold' && s.started?.target === from) {
-      out.cards.keep.push({ ...row(c), why: 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
+      if (!inFlight(c, s) || !ended) {
+        out.cards.keep.push({ ...row(c), why: 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
+        continue
+      }
+      const lane = laneOf(wf, c)
+      const checked = lane && (lane.target ?? null) !== to && !onFrom.has(lane.id) ? null : await checkCardMove(wf, projectPath, c, to)
+      if (checked?.ok) out.cards.move.push({ ...row(c), started: { head: checked.check.head, own } })
+      else out.cards.keep.push({ ...row(c), why: checked ? keepOf(checked.why) : 'started' }) // i18n-ignore: a reason's code, said in words where it is shown
       continue
     }
     if (own !== from) continue
     const w = await hasOwnWork(projectPath, s, wf.folderOf(s))
     if (w === false) out.cards.move.push(row(c))
     else out.cards.keep.push({ ...row(c), why: (w === 'unknown' ? 'cantCheck' : 'work') as KeepWhy }) // i18n-ignore: a reason's code, said in words where it is shown
-  }
-  for (const l of (await listLanes(ws, { project: wf.store.scope.project })).filter((x) => x.state === 'active' || x.state === 'paused')) {
-    const rec = wf.lane(l.id)
-    const t = rec?.ruleset ? (targetOfRulesetId(rec.ruleset) ?? store.ruleset(rec.ruleset).options.target ?? null) : null
-    if ((t || null) === from) out.lanes.push({ id: l.id, name: l.name, builder: l.builder.name })
   }
   const { poolFor } = await import('../slotsApp')
   const pool = await poolFor(ws, projectPath).catch(() => null)
@@ -110,9 +151,9 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
  * which every save holds). What happened to each is said, a failure part way included (HR1's round 1, finding 3): never
  * thrown past the items already moved.
  */
-export async function retargetApply(ws: WorkspaceService, projectPath: string, preview: Pick<RetargetPreview, 'from' | 'to' | 'cards' | 'slots'>, actor: TaskActor, still: () => void = () => undefined): Promise<RetargetResult> {
+export async function retargetApply(ws: WorkspaceService, projectPath: string, preview: Pick<RetargetPreview, 'from' | 'to' | 'cards' | 'slots' | 'laneMoves'>, actor: TaskActor, still: () => void = () => undefined): Promise<RetargetResult> {
   const { from, to } = preview
-  const out: RetargetResult = { from, to, moved: { cards: [], slots: [] }, skipped: [] }
+  const out: RetargetResult = { from, to, moved: { cards: [], slots: [], lanes: [] }, skipped: [] }
   const targetNow = async (): Promise<boolean> => (await projectTargets(ws, projectPath).catch(() => null))?.default === to
   const allowed = (): boolean => {
     try {
@@ -124,6 +165,27 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
   }
   let stop: 'targetChanged' | 'refused' | null = null
   const { setTarget } = await import('../tasks')
+  // HI-2753: running lanes first, each with its card in flight in one write (the card's), or alone: its cards then follow.
+  for (const l of preview.laneMoves ?? []) {
+    const name = l.name ?? l.builder
+    if (!stop && !(await targetNow())) stop = 'targetChanged'
+    if (!stop && !allowed()) stop = 'refused'
+    if (stop) {
+      out.skipped.push({ lane: name, ...(l.card ? { card: l.card.number, key: l.card.key } : {}), why: stop })
+      continue
+    }
+    try {
+      if (l.card) {
+        await setTarget(l.card.number, to, actor, { commit: still, expect: l.card.own, expectDefault: to, expectHead: l.card.head, expectFrom: from, withLane: { id: l.id, ruleset: l.ruleset, cards: l.cards, pending: l.pending } })
+        out.moved.cards.push({ number: l.card.number, key: l.card.key })
+      } else await moveLaneAlone(ws, projectPath, l, from, to, still)
+      out.moved.lanes!.push(name)
+    } catch (e) {
+      if (!(await targetNow())) stop = 'targetChanged'
+      else if (!allowed()) stop = 'refused'
+      out.skipped.push({ lane: name, ...(l.card ? { card: l.card.number, key: l.card.key } : {}), why: stop ?? 'changed', detail: (e as Error).message }) // i18n-ignore: a reason's code, said in words where it is shown
+    }
+  }
   for (const c of preview.cards.move) {
     if (!stop && !(await targetNow())) stop = 'targetChanged'
     if (!stop && !allowed()) stop = 'refused'
@@ -132,7 +194,7 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
       continue
     }
     try {
-      await setTarget(c.number, to, actor, { commit: still, expect: from, expectDefault: to })
+      await setTarget(c.number, to, actor, c.started ? { commit: still, expect: c.started.own, expectDefault: to, expectHead: c.started.head, expectFrom: from } : { commit: still, expect: from, expectDefault: to })
       out.moved.cards.push({ number: c.number, key: c.key })
     } catch (e) {
       // Refused at its write: the target moved on again, the caller's authority withdrawn, or the card changed.
@@ -160,6 +222,29 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
     else out.skipped.push({ slot: s.name, why: end.state === 'gone' ? 'gone' : 'setAside', ...(end.detail ? { detail: end.detail } : {}) }) // i18n-ignore: a reason's code, said in words where it is shown
   }
   return out
+}
+
+/**
+ * HI-2753: a running lane on `from` with no card in flight moved to `to`: its rules merging into `to`, so its next cards
+ * start there. Under the lanes' lock and the board's, only as it was seen (its ruleset), with the project's target still
+ * `to`, still no card of it in flight on `from`, and the caller still allowed.
+ */
+async function moveLaneAlone(ws: WorkspaceService, projectPath: string, l: NonNullable<RetargetPreview['laneMoves']>[number], from: string, to: string, still: () => void): Promise<void> {
+  const wf = await workflowFor(ws, projectPath)
+  if (!wf) throw new Error('no workflow') // i18n-ignore: a reason's detail (English)
+  await withLanesLock(ws, () =>
+    boardWrite(ws, async () => {
+      const rec = wf.lane(l.id)
+      if (!rec || !laneStill(wf, { id: l.id, ruleset: l.ruleset, cards: l.cards, pending: l.pending })) throw new Error('the lane changed meanwhile') // i18n-ignore: a reason's detail (English)
+      if (wf.store.cards().some((c) => c.lane === l.id && IN_FLIGHT_STAGES.includes(wf.state(c).stage) && wf.state(c).started?.target === from)) throw new Error('a card of the lane started meanwhile') // i18n-ignore: a reason's detail (English)
+      if ((await projectTargets(ws, projectPath).catch(() => null))?.default !== to) throw new Error('the target changed meanwhile') // i18n-ignore: a reason's detail (English)
+      still()
+      const r = targetedOf(wf.store.ruleset(l.ruleset), to)
+      wf.store.saveRuleset(r)
+      wf.store.saveLane({ ...rec, ruleset: r.id })
+      boardChanged(ws)
+    })
+  )
 }
 
 /**
@@ -210,11 +295,12 @@ export function retargetArg(raw: unknown): RetargetPreview {
     str(r.from) &&
     str(r.to) &&
     Array.isArray(r.cards?.move) &&
-    r.cards!.move.every((c) => Number.isInteger(c?.number) && typeof c.key === 'string') &&
+    r.cards!.move.every((c) => Number.isInteger(c?.number) && typeof c.key === 'string' && (c.started === undefined || (str(c.started?.head) && (c.started.own === null || str(c.started.own))))) &&
     Array.isArray(r.slots?.move) &&
-    r.slots!.move.every((s) => str(s?.name) && str(s.folder) && (s.target === null || str(s.target)) && str(s.head))
+    r.slots!.move.every((s) => str(s?.name) && str(s.folder) && (s.target === null || str(s.target)) && str(s.head)) &&
+    (r.laneMoves === undefined || (Array.isArray(r.laneMoves) && r.laneMoves.every((l) => str(l?.id) && str(l.ruleset) && typeof l.builder === 'string' && Array.isArray(l.cards) && l.cards.every(Number.isInteger) && (l.pending === null || (Array.isArray(l.pending) && l.pending.every(Number.isInteger))) && (l.card === null || (Number.isInteger(l.card?.number) && typeof l.card.key === 'string' && str(l.card.head) && (l.card.own === null || str(l.card.own)))))))
   if (!ok) throw new Error('A retarget is a preview: from, to, cards.move and slots.move') // i18n-ignore: a mistake in a caller, never the window's
-  return { from: r!.from!, to: r!.to!, cards: { move: r!.cards!.move, keep: [] }, slots: { move: r!.slots!.move, keep: [] }, lanes: [] }
+  return { from: r!.from!, to: r!.to!, cards: { move: r!.cards!.move, keep: [] }, slots: { move: r!.slots!.move, keep: [] }, lanes: [], ...(r!.laneMoves ? { laneMoves: r!.laneMoves } : {}) }
 }
 
 const IN_USE = msg({ id: 'service.workflow.targetInUse', defaultMessage: '{branch} can’t be taken out of Other branches work can merge into while these use it: {uses}. Retarget or finish them first.', description: 'HI-2680: a save of workflow options refused: it takes a branch out of Other branches work can merge into while cards, lanes, queue entries or slots still use it ({uses}: their keys and names). Other branches work can merge into is the option’s name: as translated there.' })
@@ -259,7 +345,10 @@ export function offeredRetarget(id: string, projectPath: string, now = Date.now(
 /** An offered preview narrowed to the items named (card keys, slot names; case aside), and the names it doesn't list. */
 export function offeredItems(preview: RetargetPreview, items: readonly string[]): { confirmed: RetargetPreview; unknown: string[] } {
   const named = new Set(items.map((x) => x.toLowerCase()))
-  const confirmed = { ...preview, cards: { move: preview.cards.move.filter((c) => named.has(c.key.toLowerCase())), keep: [] }, slots: { move: preview.slots.move.filter((s) => named.has(s.name.toLowerCase())), keep: [] } }
-  const listed = new Set([...confirmed.cards.move.map((c) => c.key.toLowerCase()), ...confirmed.slots.move.map((s) => s.name.toLowerCase())])
+  // A lane is named by its name or builder, or by its card in flight's key (HI-2753: the two move together).
+  const laneNames = (l: NonNullable<RetargetPreview['laneMoves']>[number]): string[] => [l.name ?? l.builder, ...(l.card ? [l.card.key] : [])].map((x) => x.toLowerCase())
+  const lanes = (preview.laneMoves ?? []).filter((l) => laneNames(l).some((x) => named.has(x)))
+  const confirmed = { ...preview, cards: { move: preview.cards.move.filter((c) => named.has(c.key.toLowerCase())), keep: [] }, slots: { move: preview.slots.move.filter((s) => named.has(s.name.toLowerCase())), keep: [] }, laneMoves: lanes }
+  const listed = new Set([...confirmed.cards.move.map((c) => c.key.toLowerCase()), ...confirmed.slots.move.map((s) => s.name.toLowerCase()), ...lanes.flatMap(laneNames)])
   return { confirmed, unknown: [...new Set(items.filter((x) => !listed.has(x.toLowerCase())))] }
 }

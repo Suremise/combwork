@@ -183,7 +183,8 @@ describe("a card's Merges into", () => {
     const wf = (await workflowFor(w, repo))!
     const idle = await card(w, 'Put back with nothing')
     expect(await store.boardWrite(w, async () => wf.start(`#${idle.number}`, agentActor('b1')))).toMatchObject({ ok: true })
-    await expect(inWorkspace(w, () => tasks.setTarget(idle.number, '1.2.0', user))).rejects.toThrow(/has work on its branch made from main/)
+    // Started, in the project folder (no line of its own): a move in flight needs a slot's line (HI-2753), so it stays.
+    await expect(inWorkspace(w, () => tasks.setTarget(idle.number, '1.2.0', user))).rejects.toThrow(/works in the project folder, not on a branch of its own, so it stays on main/)
     expect(await store.boardWrite(w, async () => wf.putBack(`#${idle.number}`, 'user'))).toMatchObject({ ok: true })
     // Worked in the project folder: what is uncommitted there counts as its work (HR2's round 2), untracked or tracked.
     writeFileSync(join(repo, 'uncommitted.txt'), 'left\n')

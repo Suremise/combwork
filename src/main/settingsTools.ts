@@ -49,7 +49,7 @@ const T = {
   switchRefused: agentMsg({ id: 'settings.agent.tool.switchRefused', text: '{error} Tell the user, or leave it as it is.', note: "Switching a project's version control refused (#1419). {error} is why, a sentence." }),
   keptTargets: agentMsg({ id: 'settings.agent.tool.keptTargets', text: 'It applies to cards started from now on outside running lanes. A target is set as a card or lane starts, so these keep merging into their own: {list}.', note: "HI-2674: a change of a project's target (G7), in place of \"It applies now\". {list}: settings.agent.tool.keptLane and keptCard items, joined with \"; \"." }),
   keptLane: agentMsg({ id: 'settings.agent.tool.keptLane', text: 'lane {named, select, yes {"{name}" } other {}}({builder}) and its cards still to start, into {target}', note: 'HI-2674: a running lane keeping its target. {builder} is its builder agent\'s name; {target} a branch.' }),
-  retarget: agentMsg({ id: 'settings.agent.tool.retarget', text: 'These still on {from} can follow {to} (Todo cards with no work, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.', note: "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names." }),
+  retarget: agentMsg({ id: 'settings.agent.tool.retarget', text: 'These still on {from} can follow {to} (Todo cards with no work, cards started with only their own work, running lanes with their card, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.', note: "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names." }),
   keptCard: agentMsg({ id: 'settings.agent.tool.keptCard', text: '{card} into {target}', note: 'HI-2674: a card in flight keeping its target. {card} is its key (HI-12); {target} a branch.' }),
   noPlatform: agentMsg({ id: 'settings.agent.tool.noPlatform', text: '{project} has no version control recorded yet: its workflow options can be set once Combwork has detected it (reopen the project).', note: "A workflow option set on a project whose version control Combwork hasn't detected yet. {project} is the project's folder name." }),
   // What a setting takes (cw_read_setting).
@@ -409,7 +409,7 @@ async function retargetNote(projectPath: string, from: string): Promise<string |
   const to = (await projectTargets(workspace, projectPath).catch(() => null))?.default
   if (!to || to === from) return null
   const p = await retargetPreview(workspace, projectPath, from, to)
-  const items = [...p.cards.move.map((c) => c.key), ...p.slots.move.map((s) => s.name)]
+  const items = [...(p.laneMoves ?? []).map((l) => (l.card ? `${l.name ?? l.builder} (${l.card.key})` : (l.name ?? l.builder))), ...p.cards.move.map((c) => c.key), ...p.slots.move.map((s) => s.name)]
   if (!items.length) return null
   return say(T.retarget, { from, to, items: items.join(', '), preview: offerRetarget(projectPath, p), stay: String(p.cards.keep.length + p.slots.keep.length + p.lanes.length) })
 }

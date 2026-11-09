@@ -867,6 +867,16 @@
     "note": "The next step after a refused declaration of a card's paths: name files outside the excluded folder {folder} (#1511).",
     "audience": "both"
   },
+  "workflow.refused.platform.targetGone.message": {
+    "text": "{card} was started on {target}, which no longer exists in this repository.",
+    "note": "HI-2753: a refused move (a submit): the branch the card was started on and merges into (its target, {target}) was deleted, as an integration branch is once it has been merged. {card} is a card key like AM-12.",
+    "audience": "both"
+  },
+  "workflow.refused.platform.targetGone.next": {
+    "text": "The user or the Assistant can move it to another branch with its work kept: set its Merges into, or retarget Work merges into.",
+    "note": "HI-2753: the next step when the branch a card started on is gone: the user or the Combwork Assistant moves the card to another branch (its Merges into, or a retarget after changing Work merges into). Merges into and Work merges into are names in the window: as translated there.",
+    "audience": "both"
+  },
   "workflow.refused.platform.unknown.message": {
     "text": "{card}: Combwork couldn't read {what}, so the rule {rule} can't be checked.",
     "note": "A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.",

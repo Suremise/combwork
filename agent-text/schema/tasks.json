@@ -363,6 +363,21 @@
       "target": "plain"
     }
   },
+  "tasks.error.targetMoveRefused": {
+    "placeholders": {
+      "why": "select",
+      "card": "plain",
+      "from": "plain",
+      "rule": "select",
+      "to": "plain",
+      "builder": "plain",
+      "laneTarget": "plain",
+      "ref": "plain",
+      "lock": "plain",
+      "hasDetail": "select",
+      "detail": "plain"
+    }
+  },
   "tasks.error.targetMoved": {
     "placeholders": {
       "card": "plain"
@@ -715,6 +730,12 @@
   "tasks.history.restored": {
     "placeholders": {
       "project": "plain"
+    }
+  },
+  "tasks.history.retargeted": {
+    "placeholders": {
+      "from": "plain",
+      "to": "plain"
     }
   },
   "tasks.history.returned": {

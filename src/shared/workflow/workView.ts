@@ -21,7 +21,8 @@ export const APPLY_OPTIONS = 'applyOptions'
  */
 export function ownRuleset(facts: readonly Fact[], s: Pick<CardState, 'started' | 'stage' | 'cycle'>): string | null {
   if (!s.started || s.stage === 'todo') return null
-  const applied = facts.filter((x) => x.seq > s.cycle && x.kind === 'Override' && !!x.ruleset && (x.data as FactData['Override']).move === APPLY_OPTIONS).at(-1)
+  // The options applied to it since (an Override), or its target moved (HI-2753: its rules then, merging into the new one).
+  const applied = facts.filter((x) => x.seq > s.cycle && !!x.ruleset && ((x.kind === 'Override' && (x.data as FactData['Override']).move === APPLY_OPTIONS) || x.kind === 'Retargeted')).at(-1)
   return (applied ?? facts.find((x) => x.seq === s.cycle))?.ruleset ?? null
 }
 
@@ -558,6 +559,8 @@ export interface WorkBadge {
   kindProposed: CardKind | null
   /** Its own Merges into (HI-2556), the card's now; absent: none (its lane's, shown on the lane, or the project's). */
   target?: string
+  /** HI-2753: in flight (Doing to Merging), the branch it started on and merges into now (`Started.target`, or a move's). */
+  startedOn?: string
   /** It skips review (#1625): who set it and their reason (the Review skipped mark); and an agent's proposal, its reason. */
   reviewSkip: ReviewSkip | null
   reviewSkipProposed: string | null
@@ -640,6 +643,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     kind: v.kind,
     kindProposed: v.kindProposed,
     ...(v.cardTarget ? { target: v.cardTarget } : {}),
+    ...(v.target && (v.stage === 'active' || v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging') ? { startedOn: v.target } : {}),
     reviewSkip: v.reviewSkip,
     reviewSkipProposed: v.reviewSkipProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,

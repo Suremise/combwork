@@ -194,7 +194,7 @@
   "service.lanes.noWorkspace": "未打开工作区",
   "service.lanes.targetBuilder": "通道的“合并到”只能由你或助手设置，不能由它的构建者设置。",
   "service.lanes.targetCard": "{card} 合并到 {cardTarget}，而此通道合并到 {target}：通道中的卡片与通道合并到同一分支。请不要把它放进此通道，或在单独的通道中启动它。",
-  "service.lanes.targetFixed": "{builder} 的通道在结束前都合并到 {target}：要使用其他分支，请启动新的通道。",
+  "service.lanes.targetFixed": "{builder} 的通道在结束前都合并到 {target}：要使用其他分支，请启动新的通道。{target} 合并到其他分支后，更改“工作合并到”的目标即可把通道及其卡片移到那里（“同时为可移动的内容更改目标”）。",
   "service.lanes.targetMissing": "{unknown, select, yes {Combwork 无法确定分支 {target} 是否存在，因此未启动通道。} other {此仓库中没有分支 {target}：请先创建它，再在其上启动通道。}}",
   "service.lanes.targetNotListed": "{hasTargets, select, yes {{target} 不是此处工作可合并到的分支：请指定 {default}{hasOthers, select, yes {或 {others} 之一} other {}}，或在“版本控制”→“工作流程”的“工作可合并到的其他分支”中添加它。} other {此项目没有 Combwork 可选的合并分支：通道的“合并到”仅适用于 Git 项目。}}",
   "service.lanes.targetRulesOff": "只有开启“强制执行工作流程规则”时（“设置”→“高级”），通道才能合并到其他分支。",
