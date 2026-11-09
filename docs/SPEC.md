@@ -2256,7 +2256,7 @@ works.
 | Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
 | Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private copies rebased, squashed or merged; conflicts typed | J4 |
-| **Integration: target advance** | CAS (§16.9.2) | — | **Open** (below) | **gate: advance** (J1) |
+| **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
 | Publish | G18's push of a captured head containing the owed result (R4.6) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
@@ -2466,6 +2466,58 @@ contract fixes:
   never a boolean.
 - **If J1 can't prove it,** jj has no automatic advance (gate: advance stays closed, rule 6), and the trade-off comes
   back to Darren; Git's guarantees are never weakened to match.
+
+**J1's finding (HI-2794, 9 Nov): the tested jj 0.47.1 CLI protocol does not meet R4.1, and no conforming protocol has
+been proved.** gate:advance stays **closed**. **Decided** (Darren, 9 Nov [HI-2794]: "Let's do A and not request them to
+change anything right now"): jj has **no automatic advance**. jj work goes on toward **user-performed integration**: the
+user merges, and Combwork's containment checks (J3) record the result. An attended advance (a merge the user starts,
+with a preview) isn't taken, and nothing is asked of the jj project for now: that is carded on hold, for later, if
+Combwork's use grows. J4/J5 build no advance of their own on jj. The evidence is an **unregistered diagnostic probe**, `platform/jjAdvanceProbe.ts`: in no
+port, writing no fact, imported by nothing in `src` (`tests/integrationPortsImports.test.ts`). Its verdicts are
+observations, never a CAS result: `advancedObserved` is not Integrated evidence and `notApplied` is not permission to
+retry. It tries the strongest protocol the CLI offers, one step at a time, each mutation journaled first and the lease
+checked just before it:
+1. **Base:** the single operation head P0, read pinned (`--at-op`, which never merges), with the Git refs and every
+   worktree's HEAD. It refuses unless T = `T@git` = the Git ref = E, nothing else is pending export, and no worktree has
+   T checked out.
+2. **Prepare:** `jj --at-op P0 --no-integrate-operation bookmark move T --from E --to R`. This is a conditional set
+   evaluated in exactly P0; it gives an operation O that isn't a head yet, with its id. The probe validates O: its
+   parent is P0, it carries the attempt's marker (`--config=combwork.txn=…`, kept in its `args`), and its view differs
+   from P0's only in T.
+3. **Integrate:** `jj op integrate O`. This doesn't export.
+4. **Export:** `jj git export`. Per ref, this is a real Git compare-and-swap against `T@git`.
+5. **Observe:** every head and its ancestry back to P0, each view, the Git refs and the worktrees, each read twice.
+   Anything torn, incomplete, unexpected or unexplained is Unknown.
+
+`tests/jjAdvanceProbeReal.test.ts` runs it on the pinned jj in both Git-backed modes, with racers placed by hooks
+between steps and between the observation's reads. It shows where the protocol falls short:
+- **(a) No single conditional operation.** The precondition holds in P0, but O becomes part of the repository only
+  when it is integrated. Nothing re-checks T at that moment. Every step exits 0 whatever happened.
+- **(b) A race doesn't refuse the late writer.** A concurrent move of T to X from the same operation lands as well, and
+  T is left **conflicted**. So does a move backwards. **(b′) Moves along one line of history aren't conflicts:** jj's
+  operation merge takes the descendant silently. A racer moving T to R's descendant wins (the probe says Unknown), and
+  our R over a racer's ancestor of it removes their move with nothing to show it (observed as advanced).
+- **(c) Two visible steps.** Between integrate and export, jj says R and Git says E. A Git move there makes the export
+  fail (exit 0, a warning), and so does a stale `refs/heads/T.lock`: `partialExport`.
+- **(d) The export isn't confined to T.** It writes every pending bookmark and tag, someone else's included, and it
+  **detaches** Git checkouts of what it moves, clean or dirty, in the main worktree and in linked ones (exit 0). A
+  checkout made and detached during the attempt can't be seen by comparing before and after.
+- **(e) Later imports.** After an external Git move, the next ordinary jj command imports it and conflicts T (and may
+  abandon commits).
+- **ABA** is invisible, as it is with Git's CAS.
+- **Recovery:**
+  - Prepared but not integrated, and an object made with no operation: `notApplied`, because no marked operation is in
+    any head's complete history.
+  - Integrated but not exported: `partialExport`, or observed as advanced once another jj command exports.
+  - Crashed inside the export (simulated: the ref written, its operation not recorded): `partialExport`.
+  - Another agent's operation after integrate: Unknown.
+  - A lease lost before each mutation: nothing more runs.
+  - A checkout made stale doesn't apply to a bookmark move, since it rewrites no commit: that case is J4's (candidate
+    preparation), and the owed push is J5's.
+
+On jj 0.47.1, a read is a write when operation heads have diverged: any command not pinned with `--at-op`, even with
+`--ignore-working-copy`, merges them into a new "reconcile divergent operations" operation. Ports that must not write
+(R5.3) read pinned.
 
 ##### Type map
 
