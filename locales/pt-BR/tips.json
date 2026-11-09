@@ -564,5 +564,7 @@
   "tips.localModelLimits.text": "Nos modelos de uma conta de servidor (Configurações → Contas e conexões, Editar servidor…), defina o tamanho do contexto e o orçamento de saída: os agentes iniciados nesse modelo passam a compactar no contexto real dele, em vez de em 200.000 supostos.",
   "tips.localModelPicker.title": "Troque de modelo local no /model do Claude Code",
   "tips.localModelPicker.text": "Um agente numa conta de servidor encontra os modelos da conta no /model do Claude Code, pelos IDs exatos. Dê a cada um um Rótulo em Editar servidor… para nomeá-lo lá.",
-  "tips.localModelLimits.title": "Informe ao Claude Code o contexto real do seu modelo local"
+  "tips.localModelLimits.title": "Informe ao Claude Code o contexto real do seu modelo local",
+  "tips.opencode.text": "Os agentes podem usar o OpenCode 2. A Configuração de provedores o instala; cada conta do OpenCode tem os próprios logins em provedores e as próprias sessões, e cada agente roda um servidor privado do OpenCode que termina junto com ele.",
+  "tips.opencode.title": "Rodar agentes no OpenCode"
 }

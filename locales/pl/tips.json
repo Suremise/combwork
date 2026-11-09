@@ -564,5 +564,7 @@
   "tips.localModelLimits.text": "W modelach konta serwera (Ustawienia → Konta i połączenia, Edytuj serwer…) ustaw rozmiar kontekstu i budżet wyjścia: agenci uruchomieni na tym modelu kompaktują wtedy przy jego rzeczywistym kontekście, a nie przy przyjętych 200 000.",
   "tips.localModelPicker.title": "Przełączaj modele lokalne w /model Claude Code",
   "tips.localModelPicker.text": "Agent na koncie serwera znajdzie modele konta w /model Claude Code, pod ich dokładnymi identyfikatorami. Nadaj każdemu Etykietę w Edytuj serwer…, by tak się tam nazywał.",
-  "tips.localModelLimits.title": "Podaj Claude Code rzeczywisty kontekst lokalnego modelu"
+  "tips.localModelLimits.title": "Podaj Claude Code rzeczywisty kontekst lokalnego modelu",
+  "tips.opencode.text": "Agenci mogą używać OpenCode 2. Konfiguracja dostawców je instaluje; każde konto OpenCode ma własne logowania do dostawców i własne sesje, a każdy agent uruchamia prywatny serwer OpenCode, który kończy się razem z nim.",
+  "tips.opencode.title": "Uruchamiaj agentów w OpenCode"
 }

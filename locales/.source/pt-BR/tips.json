@@ -368,6 +368,8 @@
   "tips.off.title": "Tips are off",
   "tips.oneAgent.text": "The ▾ beside Resume (n) and Stop (n) in the project header lists those agents: choose one to act on it alone. Agents ▾ and a project's right-click menu have the same for Start New, Archive and Start New, Resume All and Stop All.",
   "tips.oneAgent.title": "Resume or stop just one agent",
+  "tips.opencode.text": "Agents can use OpenCode 2. Provider Setup installs it; each OpenCode account keeps its own provider sign-ins and sessions, and each agent runs a private OpenCode server that ends with it.",
+  "tips.opencode.title": "Run agents on OpenCode",
   "tips.outageResume.text": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",
   "tips.outageResume.title": "Agents can carry on after a connection drops",
   "tips.overview.text": "The Workspace Overview shows what every project used, what runs now and the board, by day. {key}",

@@ -486,8 +486,12 @@ export interface ProviderAdapter {
    * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
    */
   typedNewline?(version: string | null): TypedNewline | null
-  /** A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder). */
-  accountLoginCommand?(executable: string): CommandSpec
+  /**
+   * A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder).
+   * `home`: the connection's folder; the spec's `env`, when it has one, is put over the sign-in's environment (HI-2759:
+   * OpenCode's roots and its sign-in config are derived from the folder).
+   */
+  accountLoginCommand?(executable: string, home?: string): CommandSpec
   /**
    * Environment variables the CLI reads as a login (HI-1757: Codex's CODEX_ACCESS_TOKEN), left out wherever it runs on a
    * connection (its sign-in, its checks, its sessions: withoutAccountEnv), so they can't stand in for the connection's own.
@@ -527,6 +531,8 @@ export interface ProviderAdapter {
   /** Where this launch's CLI reads a delivered Combwork skill (its copy), for measuring what the session got. */
   skillCopyPath(ctx: LaunchContext, skill: string): string
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec
+  /** A new session's id, for a provider Combwork picks it for (capabilities.fixedSessionId) in a form of its own (HI-2759: OpenCode's `ses_…`); absent: a UUID. */
+  newSessionId?(): string
   /** Something the user should know about this launch (a mode the CLI can't fully give there), shown once per agent while Combwork runs. */
   launchNotice?(ctx: LaunchContext): { title: string; message: string } | null
   /** Something in a folder agents work in (any provider's) that stops this CLI working there (#509: a stray .codex), or null. */

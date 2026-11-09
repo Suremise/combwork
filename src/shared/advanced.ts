@@ -3142,6 +3142,118 @@ const SOURCES: readonly AdvancedSource[] = [
       { from: `${FIX}/advanced/env-antigravity-1.5.0.txt`, version: '1.5.0', text: 'AGY_ADC_AUTH', shows: 'A variable named in the agy 1.5.0 binary that Combwork leaves out' } // i18n-ignore: a CLI's recorded text (#367)
     ]
   },
+  // OpenCode 2 (HI-2759, against 2.2.6; HI-2758's recipe): its overrides, the CLI text Combwork reads, its server's wait.
+  {
+    id: overrideId('opencode', 'noAutoUpdate'),
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.override.noAutoUpdate.title', defaultMessage: "Don't let OpenCode update itself", description: "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.opencode.override.noAutoUpdate.desc',
+      defaultMessage: 'Combwork runs OpenCode with update: "disable" in its private config and OPENCODE_DISABLE_AUTOUPDATE=1 (its agents, and checking its accounts and models), so it runs the version installed and never changes between an agent\'s restarts; Update in Provider Setup updates it when you choose. Turned off, OpenCode may update itself as it would outside Combwork.',
+      description: 'What the advanced setting "Don\'t let OpenCode update itself" does (Settings → Advanced, under OpenCode). update: "disable" is a config setting and OPENCODE_DISABLE_AUTOUPDATE=1 an environment variable: keep them. Update is a button\'s name and Provider Setup a dialog\'s.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/help-opencode-2.2.6.txt`, version: '2.2.6', text: 'upgrade, update    Upgrade OpenCode to the latest or a specific version', shows: "OpenCode's own update command, which Provider Setup's Update replaces" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('opencode', 'keepProjectConfigOut'),
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.override.keepProjectConfigOut.title', defaultMessage: "Keep the project's OpenCode config out", description: "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.opencode.override.keepProjectConfigOut.desc',
+      defaultMessage: "Combwork runs OpenCode with OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1, so a project's own opencode.json and .opencode folder (its MCP servers, plugins and agents), a config in a folder above it, and Claude Code's folders never load; the project's AGENTS.md is given to OpenCode by Combwork. Turned off, all of those load as they would outside Combwork, plugins' code included, and a project's MCP server can take the place of one Combwork gave the agent.",
+      description: 'What the advanced setting "Keep the project\'s OpenCode config out" does (Settings → Advanced, under OpenCode). OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1 are environment variables, opencode.json, .opencode and AGENTS.md file and folder names: keep them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/help-opencode-2.2.6.txt`, version: '2.2.6', text: 'Directory to start OpenCode in (optional)', shows: 'The project folder OpenCode is started in, whose own config these switches keep out' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: overrideId('opencode', 'stripCredentials'),
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.override.stripCredentials.title', defaultMessage: 'Keep other credentials from OpenCode', description: "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default." }),
+    desc: msg({
+      id: 'settings.advanced.opencode.override.stripCredentials.desc',
+      defaultMessage: "Combwork leaves the variables OpenCode reads as a provider's key or token out of its environment (the shell its agents run commands in too: GITHUB_TOKEN and HF_TOKEN among them), and denies Amazon Bedrock, Google Vertex and Azure unless the account saved a credential for them, so an AWS profile, a gcloud login or an Azure CLI sign-in on this PC is never used unasked. OpenCode's Claude Agent provider is denied either way. Turned off, OpenCode gets those variables and may use those sign-ins as it would outside Combwork.",
+      description: 'What the advanced setting "Keep other credentials from OpenCode" does (Settings → Advanced, under OpenCode). GITHUB_TOKEN and HF_TOKEN are environment variables; Amazon Bedrock, Google Vertex, Azure, gcloud, Azure CLI and Claude Agent are names: keep them.'
+    }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions',
+    override: true,
+    samples: [{ from: `${FIX}/advanced/integrations-opencode-2.2.6.json`, version: '2.2.6', text: '"label": "AWS profile (SSO or named profile)"', shows: "One of OpenCode's sign-ins that reads what the PC already has, which Combwork denies" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'opencode.version',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.version.title', defaultMessage: 'The version in opencode --version', description: "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the CLI's version line. opencode --version is a command: keep it." }),
+    desc: msg({ id: 'settings.advanced.opencode.version.desc', defaultMessage: "What opencode --version prints: the version is its first group. Combwork uses only OpenCode 2 or later. Wrong, OpenCode isn't found.", description: 'What the advanced setting "The version in opencode --version" is (Settings → Advanced, under OpenCode). opencode --version is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`^\s*opencode\s+v(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]*[0-9A-Za-z])?)\s*$`,
+    flags: 'mi',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/version-opencode-2.2.6.txt`, version: '2.2.6', text: 'opencode v2.2.6', shows: 'OpenCode 2.2.6 naming its version' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'opencode.models.line',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.models.line.title', defaultMessage: 'A model in opencode models', description: "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of one line of the CLI's model list. opencode models is a command: keep it." }),
+    desc: msg({ id: 'settings.advanced.opencode.models.line.desc', defaultMessage: "One line of opencode models' list: the model's id, its provider and model as provider/model (its first group). Wrong, no OpenCode models are offered.", description: 'What the advanced setting "A model in opencode models" is (Settings → Advanced, under OpenCode). opencode models is a command: keep it.' }),
+    kind: 'pattern',
+    default: String.raw`^\s*([A-Za-z0-9][A-Za-z0-9._-]*/\S+)\s*$`,
+    flags: '',
+    applies: 'now',
+    samples: [
+      { from: `${FIX}/advanced/models-opencode-2.2.6.txt`, version: '2.2.6', text: 'ollama/qwen3:8b', shows: 'A local model OpenCode found' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/models-opencode-2.2.6.txt`, version: '2.2.6', text: 'opencode/big-pickle', shows: "One of OpenCode's own built-in models" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: 'opencode.env.credentials',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.env.credentials.title', defaultMessage: 'Credentials left out of OpenCode', description: "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the environment variables' names Combwork leaves out." }),
+    desc: msg({ id: 'settings.advanced.opencode.env.credentials.desc', defaultMessage: "The names of the environment variables Combwork leaves out of OpenCode while Keep other credentials from OpenCode is on: every variable OpenCode's providers read as a key or token, and the clouds' own (AWS, Azure, Google). Combwork's own variables are always kept. Wrong, a key set on this PC could reach an OpenCode agent unasked.", description: 'What the advanced setting "Credentials left out of OpenCode" is (Settings → Advanced, under OpenCode). Keep other credentials from OpenCode is the name of another setting; AWS, Azure and Google are names.' }),
+    kind: 'pattern',
+    default: String.raw`^(AWS_|AZURE_|AZD_|GOOGLE_|GCLOUD|CLOUDSDK_|VERTEX|OPENCODE_|XDG_)|_(API_?KEY|TOKEN|PAT|KEY|SECRET)$|^(CLOUDFLARE_ACCOUNT_ID|CLOUDFLARE_GATEWAY_ID|INFOMANIAK_PRODUCT_ID|WATSONX_AI_PROJECT_ID)$`,
+    flags: 'i',
+    applies: 'sessions',
+    samples: [
+      { from: `${FIX}/advanced/integrations-opencode-2.2.6.json`, version: '2.2.6', text: 'ANTHROPIC_API_KEY', shows: 'A key OpenCode reads from the environment' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/integrations-opencode-2.2.6.json`, version: '2.2.6', text: 'AWS_BEARER_TOKEN_BEDROCK', shows: 'A token OpenCode reads from the environment' }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/integrations-opencode-2.2.6.json`, version: '2.2.6', text: 'GITHUB_TOKEN', shows: 'A token OpenCode reads for GitHub Copilot' } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: 'opencode.ambient.integrations',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.ambient.integrations.title', defaultMessage: "Providers using this PC's sign-ins", description: "An advanced setting's title (Settings → Advanced, under OpenCode): OpenCode's providers that can use a sign-in the PC already has." }),
+    desc: msg({ id: 'settings.advanced.opencode.ambient.integrations.desc', defaultMessage: "OpenCode's providers that can use a sign-in this PC already has (an AWS profile, a gcloud login, the Azure CLI's), by their ids: Combwork denies each unless the account saved a credential for it. Wrong, an agent could use one of those sign-ins unasked.", description: 'What the advanced setting "Providers using this PC\'s sign-ins" is (Settings → Advanced, under OpenCode). AWS, gcloud and Azure CLI are names.' }),
+    kind: 'list',
+    default: ['amazon-bedrock', 'google-vertex', 'azure'],
+    applies: 'sessions',
+    samples: [
+      { from: `${FIX}/advanced/integrations-opencode-2.2.6.json`, version: '2.2.6', text: '"id": "aws-profile"', shows: "Amazon Bedrock's AWS profile sign-in" }, // i18n-ignore: a CLI's recorded text (#367)
+      { from: `${FIX}/advanced/integrations-opencode-2.2.6.json`, version: '2.2.6', text: '"id": "google-adc"', shows: "Google Vertex's gcloud sign-in" } // i18n-ignore: a CLI's recorded text (#367)
+    ]
+  },
+  {
+    id: 'opencode.server.readySeconds',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.server.readySeconds.title', defaultMessage: 'Server: time to start', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.opencode.server.readySeconds.desc', defaultMessage: "How long an OpenCode agent's private server gets to answer before the launch gives up and ends it. Too short, an agent on a slow PC doesn't start.", description: 'What the advanced setting "Server: time to start" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    default: 30,
+    min: 5,
+    max: 300,
+    unit: 's',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/help-opencode-2.2.6.txt`, version: '2.2.6', text: 'serve              Start the v2 API and web server', shows: 'The server each OpenCode agent runs privately' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: overrideId('copilot', 'allMcpInstructions'),
     group: 'copilot',

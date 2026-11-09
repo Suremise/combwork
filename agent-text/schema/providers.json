@@ -129,6 +129,34 @@
   "providers.copilot.updateModified": {
     "placeholders": {}
   },
+  "providers.opencode.claudeAgentModel": {
+    "placeholders": {
+      "provider": "plain",
+      "model": "plain"
+    }
+  },
+  "providers.opencode.noOwner": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "providers.opencode.otherAccount": {
+    "placeholders": {
+      "provider": "plain",
+      "session": "plain"
+    }
+  },
+  "providers.opencode.protectedArg": {
+    "placeholders": {
+      "provider": "plain",
+      "arg": "plain"
+    }
+  },
+  "providers.opencode.v1Found": {
+    "placeholders": {
+      "count": "plural"
+    }
+  },
   "providers.readiness.notInstalled": {
     "placeholders": {
       "provider": "plain"

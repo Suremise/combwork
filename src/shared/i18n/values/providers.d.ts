@@ -109,6 +109,12 @@ interface CombworkMessageValues {
   'providers.localLimits.switched': { model: string | number }
   'providers.memory.connection': { file: string | number; name: string | number }
   'providers.memory.user': { file: string | number }
+  'providers.opencode.claudeAgentModel': { provider: string | number; model: string | number }
+  'providers.opencode.connections.setUp': undefined
+  'providers.opencode.noOwner': { provider: string | number }
+  'providers.opencode.otherAccount': { provider: string | number; session: string | number }
+  'providers.opencode.protectedArg': { provider: string | number; arg: string | number }
+  'providers.opencode.v1Found': { count: number }
   'providers.readiness.notInstalled': { provider: string | number }
   'providers.readiness.signedOut': { provider: string | number }
   'providers.readiness.update': { provider: string | number; version: string | number }

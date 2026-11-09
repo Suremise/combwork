@@ -396,5 +396,15 @@
   "agents.workflowTools.restartTitle": "Reiniciar {agents} para o novo fluxo de trabalho?",
   "agents.workflowTools.restartMessage": "{count, plural, one {{agents} está trabalhando. As ferramentas que o fluxo de trabalho do projeto agora permite são carregadas quando ele reiniciar; ele continua na mesma conversa.} other {{agents} estão trabalhando. As ferramentas que o fluxo de trabalho do projeto agora permite são carregadas quando reiniciarem; cada um continua na mesma conversa.}}",
   "agents.workflowTools.restartWhenDone": "{count, plural, one {Reiniciar quando o turno terminar} other {Reiniciar quando os turnos terminarem}}",
-  "agents.workflowTools.later": "Depois"
+  "agents.workflowTools.later": "Depois",
+  "agents.opencode.auto": "Aprovar tudo",
+  "agents.opencode.autoDescription": "Aprova sem perguntar toda permissão que as regras do OpenCode não negam explicitamente. Use só onde mudanças sem supervisão forem aceitáveis.",
+  "agents.opencode.build": "Build",
+  "agents.opencode.buildDescription": "O agente Build do OpenCode com as próprias regras de permissão: ele pergunta antes do que elas não permitem.",
+  "agents.opencode.extensionNote": "Você tem uma cópia do OpenCode dentro de um editor. O Combwork não usa a cópia do editor. Instale o OpenCode 2 independente; seu editor continua funcionando como antes.",
+  "agents.opencode.installNote": "Instale o OpenCode 2 pelo download oficial independente para Windows: Instalar busca a versão 2.x mais recente no GitHub, confere com o SHA256SUMS da versão e coloca o `opencode.exe` em %LOCALAPPDATA%\\Programs\\OpenCode. O OpenCode 1 (`opencode-ai`) e o projeto opencode arquivado não são compatíveis. Se o OpenCode 2 estiver instalado em outro lugar, defina o caminho em Configurações → OpenCode.",
+  "agents.opencode.modelPlaceholder": "ID do modelo, p. ex. ollama/qwen3:8b",
+  "agents.opencode.plan": "Plan",
+  "agents.opencode.planDescription": "O agente Plan do OpenCode: ele planeja e lê, e pergunta antes de mudar qualquer coisa.",
+  "agents.opencode.signInHelp": "Conecte a conta a um provedor de modelos de novo: Configurações → Contas e conexões → a conta do OpenCode → Entrar (executa opencode auth login)."
 }
