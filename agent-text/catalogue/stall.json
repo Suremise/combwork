@@ -70,5 +70,9 @@
   "stall.review.wait": {
     "text": "{agent} is watching {card} but hasn't started reviewing it{state, select, silent { (it shows working, but has been silent for {silentMinutes} min: state unknown)} busy { (it is working on something else)} other {}}: in Review for {waited}.",
     "note": "A card waiting in Review: its reviewer watches it but hasn't started. state: silent (it shows working, but has said nothing for silentMinutes), busy (working on something else) or none. waited: a duration (stall.duration.*)."
+  },
+  "stall.safeguard.stopped": {
+    "text": "{agent}'s latest turn was stopped by {provider}'s safety filter at {time} ({stops, plural, one {# stop} other {# stops}} this session). Look at its pane before nudging it, and tell the user.",
+    "note": "HI-2754: said after a stall's reason when the agent it is about is idle and its latest turn was stopped by its CLI's safety filter. agent: its name; provider: the coding agent's name (Codex); time: \"18:54\"; stops: how many this launch."
   }
 }

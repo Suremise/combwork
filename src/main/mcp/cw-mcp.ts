@@ -129,7 +129,7 @@ const T = {
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
   'queue.arg.target': agentMsg({ id: 'tool.queue.arg.target', text: 'The target branch.' }),
-  'queue.arg.items': agentMsg({ id: 'tool.queue.arg.items', text: 'retarget: the card keys and slot names to move, from the preview named.' }),
+  'queue.arg.items': agentMsg({ id: 'tool.queue.arg.items', text: 'retarget: the card keys, lane names and slot names to move, from the preview named.' }),
   'queue.arg.preview': agentMsg({ id: 'tool.queue.arg.preview', text: "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing." }),
   'queue.reply.retargetPreview': agentMsg({ id: 'tool.queue.reply.retargetPreview', text: 'Preview {preview}: can follow {to}: {move}. Stay: {stay}. To move them, ask the user, then retarget with preview and items.', note: 'HI-2680: cw_queue retarget\'s reply without a preview. {move} and {stay} are lists ("-" for none).' }),
   'queue.reply.retarget': agentMsg({ id: 'tool.queue.reply.retarget', text: 'Moved to {to}: {moved}. Left where they were: {skipped}.', note: 'HI-2680: cw_queue retarget\'s reply. {moved} and {skipped} are lists ("-" for none).' }),
@@ -1007,8 +1007,8 @@ const tools: Tool[] = [
           const v = (await api('POST', '/v1/workflow/retarget', { project, from: a.from, to: a.target })) as { preview: string; to: string; move: string[]; stay: { key?: string; slot?: string; lane?: string; why: string }[] }
           return say(T['queue.reply.retargetPreview'], { preview: v.preview, to: v.to, move: v.move.join(', ') || '-', stay: v.stay.map((s) => `${s.key ?? s.slot ?? s.lane} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
         }
-        const r = (await api('POST', '/v1/workflow/retarget', { project, preview: a.preview, items: a.items })) as { moved: { cards: { key: string }[]; slots: string[] }; skipped: { key?: string; slot?: string; why: string }[]; to: string }
-        return say(T['queue.reply.retarget'], { moved: [...r.moved.cards.map((c) => c.key), ...r.moved.slots].join(', ') || '-', to: r.to, skipped: r.skipped.map((s) => `${s.key ?? s.slot} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
+        const r = (await api('POST', '/v1/workflow/retarget', { project, preview: a.preview, items: a.items })) as { moved: { cards: { key: string }[]; slots: string[]; lanes?: string[] }; skipped: { key?: string; slot?: string; lane?: string; why: string }[]; to: string }
+        return say(T['queue.reply.retarget'], { moved: [...(r.moved.lanes ?? []), ...r.moved.cards.map((c) => c.key), ...r.moved.slots].join(', ') || '-', to: r.to, skipped: r.skipped.map((s) => `${s.key ?? s.slot ?? s.lane} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
       }
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error(say(T['queue.error.action.assistant']))
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)

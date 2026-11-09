@@ -469,6 +469,8 @@ Then, for that launch (`LiveSessionState.hooksMissing`: since, after start, prom
 - **The agent's note** (`LiveSessionState.safeguard`, `noteSafeguard()`): the last stop's time, model and tool names, the stops this launch, the switch (from, to, since) until the model changes back, and whether it waits on the CLI's prompt about it or is idle after one. Each stop a detector or the screen check gives it counts. Its pane shows a shield beside the status (amber while it waits, is idle after one, or runs on another model, with that model's name), its tooltip saying what happened and the provider's pointers (Claude Code: `/feedback` for a false positive, `/model` to switch back, `/config` for the switch setting); the agent's tab tooltip says it too.
 - **A switch** is told: Combwork's notice ("HB3 now runs on Opus 4.8"), a comment by Combwork on the agent's Doing cards (`commentOnDoingCards()`), and the attention inbox (**After a safeguard stop**) until the agent's pane has been on screen (`safeguard.unseen`, cleared by `markSeen`).
 - **The prompt about a stop.** Claude Code asks whether to switch models (a question it puts through its permission check, header "Model switch": "…'s safeguards flagged this message. … Switch to Opus 4.8 and keep going whenever this happens?", choices **Switch automatically** and **Stay on** its model) with a `Notification` (`permission_prompt`) naming no tool ("Claude needs your permission"), after its turn's `Stop` (so the turn ledger finds it stale), and the stop that asked HB3 left no record in its transcript. So a blocking ask naming no tool, from a CLI whose adapter tells a safeguard prompt by its screen (`safeguardAsk()`: the `claudePrompt` pattern, the open dialog's two numbered choices, in the last 24 lines it wrote; never the words "safeguards" or "safety classifier" in task text or an earlier stop's note, nor an answered prompt, which shows only its answer), is checked against the screen when it arrives and as the screen draws, for 10 seconds; once it is one, the agent **waits** (even after its turn's Stop) and the status and notification say why, with the last tool calls ("A safety classifier stopped a response: Claude Code asks what to do (its last tool calls: Bash, Edit)"). The prompt is a stop (once, however often it is told while it waits), kept on the session's record (`SessionRecord.screenStops`) for Performance with its **turn** (`SafeguardEvent.turn`: the uuid of the prompt that started it, in the transcript's order; a prompt is any user entry with text, markup and all, or images alone, that isn't Claude Code's own: meta entries, a compaction's summary, tool results). Claude Code's record of a stop it asked about (`model_refusal_fallback` after **Switch automatically**: `SafeguardEvent.asked`) carries its turn the same way, so in a turn one prompt and one record are the same stop, whichever Combwork reads first, however late (after the next prompt) and across a restart: the agent's note counts it once (`seenInTurn()`), and so does Performance, which matches them from what is kept (`SessionUsage.safeguardsAsked` per turn, `withScreenStops()`). A second prompt in a turn, a record in a turn with no prompt, and a prompt with no turn known are each a stop of their own. The CLI sends no hook for the answer, so HB3 showed "Claude needs your permission" for half an hour: the wait ends (`safeguardAnswered()` in `hookStatus.ts`) when its `idle_prompt` comes, or the prompt is gone from its screen, once the user has typed in its terminal since it asked (or the prompt is no longer on screen at all). It is then **ready** with "Idle after a safeguard stop: give it a nudge" (or **background** on its tasks) until it is given something to do.
+- **The latest turn's stop** (HI-2754): the note's `latest` (`latestStop()`, `placeEvent()`), set by a stop no older than the agent's latest prompt (the session's `promptAt`: the user's or one Combwork typed) and cleared by the next prompt (`newTurn()`). A stop read late (a transcript read after a newer prompt) is counted and kept as the last stop, never `latest`; the CLIs' native turn ids and the turn ledger's aren't one namespace, so the prompt's time is the boundary. A new launch's note starts empty; a switch neither sets nor clears it. It says the latest turn was stopped, never that the agent is still blocked.
+- **A stall's agent after a stop** (HI-2754: on 8 Nov OpenAI's filter stopped CB2's turn on CL-133 and the lane's stall said only "CB2 only watches CL-133", which the Assistant took for the usual wait). A stall's reason keeps its cause (`cardStallCause()`: each reason names the agent it is about: the builder for its own idleness, the reviewer for a review or design check it owes, none for a start, an agent not running, a deadlock or a review copy). When that agent is live in the card's project, idle (ready, finished or watching) and its note has `latest`, one sentence follows the reason (`safeguardContext()`, agent text): "CB2's latest turn was stopped by Codex's safety filter at 18:54 (3 stops this session). Look at its pane before nudging it, and tell the user." Never in its place, and never for another agent's stall. The lane watch carries the cause's stop with the stall (`stalledSafeguard`, `cardStallWith()`) to the user's lane notice, whose line says the same (`service.workflowNotice.stalledSafeguard`) followed by the provider's own help (its descriptor's `safeguardHelp`) or "Check {provider}'s guidance on its safety filter". The stall clocks are unchanged: a stop alone stalls nothing.
 - **The Assistant** sees it in `cw_agent_activity`: `safeguard` with when, the stops, the model, the tool names before it, the model switched to and from and since when, and whether it waits on the prompt or is idle after one; `"not detected"` for a CLI Combwork can't tell. **Performance** counts the stops (below).
 
 **A CLI's question by itself while idle** (HI-1959). Claude Code 2.1.312 offers, after a turn in auto mode, to teach auto mode about the environment ("Teach auto mode about your environment?": Yes / Not now / Don't show again, then a wizard whose Continue reads the project, recent sessions and optionally shell history and other repositories). It sends no hook. Its own code shows it once per home after 5 starts and 5 auto mode denials, again a week after Not now, never after Don't show again, unless the settings turn the `auto-mode-setup` skill off (`skillOverrides`). HB4's wake was typed into it and Combwork's Enter again answered it (Yes); the line it took left the agent held behind an empty input.
@@ -2349,8 +2351,8 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   and through approvals and quorum.
 - **Every card keeps the ruleset it started with** (`Started.ruleset`) until it's Done; a card in Todo uses the current
   one. A lane started under the old options keeps its ruleset until it ends ("old rules") [#1112 UI, #1122 c].
-- **A card's target is its start's** (`Started.target`, HI-2674): its queue entry takes that one, and neither a change of
-  G7 nor applying the options to the card (an Override) moves it; a running lane's cards still to start take what a
+- **A card's target is its start's** (`Started.target`, HI-2674), until a move in flight (HI-2753, below): its queue
+  entry takes that one, and neither a change of G7 nor applying the options to the card (an Override) moves it; a running lane's cards still to start take what a
   start under its ruleset, for its builder, would (`startTarget`: an empty G7 can give a builder worktree's base).
   So a change of the target says which cards in flight and running lanes keep another one, with it: Workflow's Save…
   dialog (`WorkflowCheck.targets`) and the settings tool's reply (`keptTargets` in `optionsForm.ts`). Moving them onto the
@@ -2371,6 +2373,52 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
   new target. Both name only
+- **A card in flight moved to another target (HI-2753, designs s8 → s11 → s15 → s18, HR1 and HR2).** An integration
+  branch ends (RELEASING.md: merged into `main`, then deleted), so the cards and lanes started on it need a way on. A card
+  in Doing, Review, Passed or Merging, on a line of its own (a slot), moves from `from` (its `Started.target`) to `to`
+  with its line, base, submissions and verdicts kept: a `Retargeted` fact (`from`, `to`, the `line`, its `head` and
+  `to`'s `toHead` as proved, `by`, and for a submitted card the latest submission's `base` with `to`), which the fold
+  applies to `started.target` (every reader of it, the queue's included, then follows) and to that submission and its
+  approval, and whose ruleset is the card's merging into `to` (`targetedOf`, `ownRuleset` taking it as an Override's).
+  Its `cards.target` changes in the same write, with a history line. **Only when its work is provably its own**
+  (`retargetCard.ts`, fail closed: anything unreadable refuses): with H its line's head and T `to`'s, the commits S =
+  `H ^T` (a) lie on H's first-parent chain (no merge brought in history `to` lacks), (b) are reachable from no ref but
+  the card's own (its lines and remote copies of them, its `refs/cw/cards/<key>/` pins and `refs/cw/queue/<key>` refs, a
+  stash) nor from another worktree's detached HEAD, (c) the line's reflog, from its creation (an old id of zeros; one cut
+  short refuses), holds only commits, cherry-picks, reverts and real merges, any other entry (a fast-forward, a reset, a
+  move of Combwork's) only to a commit `to` has or back to one the line had, and no rebase, and (d) every point it was
+  created or (re)started from (that first reflog entry, each `Started`'s base on the line) is in `to`. A card with an
+  open or started queue entry waits for it (`queued`). **A reviewed card** (Review, Passed, Merging) moves only if its
+  reviewed revision R passes (a), (b) and (d) and brings into `to` exactly the commits it was reviewed with (`R ^T` =
+  `R ^base`): its verdicts and its runs at R (runs on R's own tree) stay; its base becomes `merge-base(R, T)`; the
+  fingerprints and the merge preview (keyed by the target) are read again; and the queue, its entry made after the move
+  with `to`, checks the merge result on `to` (conflicts, its focused-test pick, the merge checks, an OK before merging)
+  as for any card: an approval is never evidence for anything decided on the merge result. Otherwise `reviewed`: back
+  through Doing. **The move** is a compare and swap that holds git's own locks: the check outside every lock; then the
+  lanes' lock, the board's, and a prepared `git update-ref --stdin` transaction verifying the line at H and `to` at T
+  (`refHold.ts`: git's `.lock` files on both, so an agent's commit, reset or update-ref meanwhile fails on git's lock,
+  or one before it makes the prepare fail: `changed`); under them the card and its lane checked again as seen (its last fact's seq as checked: any fact since, a submission,
+  a verdict, an enqueue, options applied, refuses it as `changed`; a retarget's lane its id, ruleset, list and queued list
+  as its preview saw them); then one
+  board write; last, in the tick the write commits in, the hold still held (its git not ended, its input not broken),
+  else the write is undone. The transaction is closed after the write settles (`abort`, stdin closed, its exit waited for
+  a bound, then ended). Only the wait for the prepare is bounded (`REF_HOLD`); once prepared, nothing but that close (or
+  git dying, whose locks then stay) releases the locks. Git aborts a transaction whose input ends before `commit` and
+  removes its locks, Combwork quitting included; **Combwork never removes a lock file**: someone else's, or one a git
+  killed hard left, refuses the move naming the file (`locked`), for the user to remove once no git runs there. **Who**:
+  the user, the Assistant or a script, never an agent: `tasks.setTarget` on a card in flight (the card dialog's Merges
+  into, open for a card in flight and showing the branch it merges into now: `WorkBadge.startedOn`,
+  `cw_update_task` `target`, run in a change of its own before any other part of the update, the Agent API), refused while
+  the card's running lane is on another branch (`lane`); and the retarget below, whose preview lists such cards
+  (`cards.move` with `started`: the head checked and its own target, which the apply expects with `expectFrom` and
+  `expectHead`) and **running lanes** on `from` (`laneMoves`): a lane moves with its card in flight (at most one) in that
+  card's write (the lane's ruleset `targetedOf` `to` in `lane_runs`), or alone (no card in flight: under the lanes' and
+  board's locks, as it was seen), before the other cards; one whose card can't move stays, with why. Refusals
+  (`tasks.error.targetMoveRefused`): `queued`, `notInTarget` (its rule), `reviewed`, `noLine` (a card in the project
+  folder), `targetMissing`, `lane`, `locked`, `changed`, `cantCheck`. **A submit whose target is gone** is refused as
+  `platform.targetGone` (naming the branch and the way on), not `platform.unknown`. **A restart keeps its line**: a card
+  started again works on the newest line of its own (`cw/<project>/<its key>…`) still there, not one named after a new
+  title (`GitPlatform.lineFor`).
 - **Retargeting when Work merges into moves on (HI-2680, design s14 after s8/s11).** A change of G7 from `A` (a release
   shipped) to `B` previews what still points at `A` (`retargetPreview`, read-only): Todo cards whose own target is `A`
   with no own work move; free slots recording `A` (or none, `A` being the target they fell back to) that are clean with

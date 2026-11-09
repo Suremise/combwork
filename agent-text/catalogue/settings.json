@@ -3310,7 +3310,7 @@
     "note": "When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it."
   },
   "settings.agent.tool.retarget": {
-    "text": "These still on {from} can follow {to} (Todo cards with no work, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.",
+    "text": "These still on {from} can follow {to} (Todo cards with no work, cards started with only their own work, running lanes with their card, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.",
     "note": "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names."
   },
   "settings.agent.tool.switchRefused": {

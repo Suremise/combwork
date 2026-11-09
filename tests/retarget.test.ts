@@ -65,7 +65,7 @@ const ownOf = async (w: WS, repo: string, number: number) => (await workflowFor(
 const moveTarget = (w: WS, repo: string, to: string, others = ['main', '1.1.0', '1.2.0'].filter((b) => b !== to)) => inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, target: to, otherTargets: others } }))
 
 describe('the retarget preview (HI-2680)', () => {
-  it('moves Todo cards on 1.1.0 with no work; keeps one with work, one started on it, and a running lane, each with why', async () => {
+  it('moves Todo cards on 1.1.0 with no work; keeps one with work, one started on it in the project folder (HI-2753: no line of its own), and moves a running lane on it (HI-2753: 1.1.0 ended), each with why', async () => {
     const { w, repo } = await project()
     const free = await card(w, 'Free')
     await own(w, repo, free.number, '1.1.0')
@@ -83,8 +83,10 @@ describe('the retarget preview (HI-2680)', () => {
     await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [lc.number], by: 'You' })
     const p = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.1.0', '1.2.0'))
     expect(p.cards.move.map((c) => c.number)).toEqual([free.number])
-    expect(p.cards.keep).toEqual(expect.arrayContaining([expect.objectContaining({ number: busy.number, why: 'work' }), expect.objectContaining({ number: started.number, why: 'started' })]))
-    expect(p.lanes).toEqual([expect.objectContaining({ builder: 'B1' })])
+    expect(p.cards.keep).toEqual(expect.arrayContaining([expect.objectContaining({ number: busy.number, why: 'work' }), expect.objectContaining({ number: started.number, why: 'noLine' })]))
+    // 1.1.0 is all in 1.2.0 (the same commit): it has ended, so the running lane can follow (HI-2753); its card isn't started.
+    expect(p.lanes).toEqual([])
+    expect(p.laneMoves).toEqual([expect.objectContaining({ builder: 'B1', card: null })])
     // The tab's check shows it while the target changes.
     const check = await inWorkspace(w, () => form.checkWorkflowChange(w, repo, { preset: 'pair', options: { ...pair, target: '1.2.0', otherTargets: ['main', '1.1.0'] } }))
     expect(check.retarget?.cards.move.map((c) => c.number)).toEqual([free.number])
