@@ -2036,6 +2036,18 @@ act on a folder, and never decide a folder's safety themselves.
 - `relocate(ctx, from, to)` (a capability of its own): the repair after a workspace or project moved
   (`workspaceMove.ts`, `combworkMove.ts`, `nameUpgradeProjects.ts`'s worktree repair).
 
+R4 (HI-2786) built it as `src/main/platform/workspacePort.ts` (the contract, types only), Git's
+`gitWorkspacePort.ts` (worktrees: each member the git command the pool ran itself before, or `worktrees.ts`' and
+`platform/git.ts`' function it called) and `workspacePorts.ts` (found by platform; the pool's by the **isolation**
+capability, `slotWorkspaces()`, never an id). Refined there: its members take the repository's folder and the
+workspace's folder rather than a `RepoContext` (building a context could add a git call where a trace has none);
+`inspect` is its reads one by one (`head`, `line`, `heads`, `dirty`, `checkout` read from files, `lineHead`,
+`defaultLine`), so each caller keeps its own order of reads; `prepare` and `detach` are the switches; `dropLine` and
+`restoreLine` delete and put back a Done card's merged line (§16.10.1), each a compare and swap. Unaccounted work (a
+head contained in its target) stays the containment reads (R6's history port). `slots.ts`, `slotCards.ts` and
+`agentWorktree.ts` use only the port for these (the import rule in `tests/repoPortsImports.test.ts`), and
+`tests/slotTraces.test.ts` holds the pool's git commands (folder, argv, order) to those recorded before it.
+
 **Invariants:**
 - **R2.1** **Unknown means keep it.** A workspace whose state can't be read is never removed, reset, re-lent or
   reported clean.
