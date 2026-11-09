@@ -47,6 +47,8 @@ class FakeRepo {
   files = ['a.txt']
   track = 'all()'
   snapshotFails: string | null = null
+  /** The snapshot is cancelled (its signal aborted: the runner's result says so, code -1). */
+  snapshotCancelled = false
   calls: string[][] = []
   /** Runs inside a command, before it answers (a race put exactly there). */
   during: ((args: readonly string[]) => void) | null = null
@@ -85,6 +87,7 @@ class FakeRepo {
         this.during?.(args)
         const a = [...args]
         if (a[0] === 'util' && a[1] === 'snapshot') {
+          if (this.snapshotCancelled) return { out: '', ok: false, buf: Buffer.alloc(0), err: 'cancelled', code: -1, notRun: 'cancelled', cancelled: true }
           if (this.snapshotFails) return answer(this.snapshotFails, 1)
           if (this.dirty) {
             this.dirty = false
@@ -304,6 +307,9 @@ describe('jj boundary', () => {
     f.snapshotFails = 'The working copy is stale'
     expect(await jjBoundary(w, owns(), { lock: noLock }, f.runner())).toMatchObject({ refused: 'stale' })
     f.snapshotFails = null
+    f.snapshotCancelled = true
+    expect(await jjBoundary(w, owns(), { lock: noLock }, f.runner())).toEqual({ refused: 'cancelled' })
+    f.snapshotCancelled = false
     const runs = f.calls.length
     expect(await jjBoundary(w, owns(), { lock: noLock }, f.runner({ state: 'untested', version: '0.48.0' }))).toMatchObject({ refused: 'unknown' })
     expect(f.calls.length).toBe(runs) // an untested jj never writes
@@ -372,6 +378,11 @@ describe('jj check credit: the bracket with races at each barrier', () => {
     const f = new FakeRepo()
     const o = owns()
     expect(await bracket(f, { owner: o, seams: { boundary: { endHooks: { beforeSnapshot: () => o.lose() } } } })).toMatchObject({ whyNot: 'changed', why: 'end:owner' })
+  })
+
+  it('a cancelled end boundary earns nothing', async () => {
+    const f = new FakeRepo()
+    expect(await bracket(f, { run: () => void (f.snapshotCancelled = true) })).toMatchObject({ whyNot: 'changed', why: 'end:cancelled' })
   })
 
   it('a raw write the watcher missed is recorded by the end boundary', async () => {
