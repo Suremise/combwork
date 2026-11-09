@@ -1,0 +1,107 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "msg_1be1355ac001O1rGT256KhVHo3",
+    "time": {
+     "created": 1794190300588
+    },
+    "type": "idle",
+    "outcome": "succeeded"
+   },
+   {
+    "type": "compaction",
+    "id": "msg_1be134526001R6SS4GC6oHqqc5",
+    "time": {
+     "created": 1794190296361
+    },
+    "status": "completed",
+    "reason": "manual",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "summary": "<template>\n## Objective\n- Reply with the single word OK.\n\n## Requirements\n- Summarize the conversation into a structured summary for another agent.\n- Exclude setup details like repository conventions and environment info.\n\n## Work State\n### Completed\n- User requested a summary and the assistant acknowledged with \"OK\".\n\n## Next Move\n1. Generate the structured summary as specified.\n</template>",
+    "cost": 0,
+    "tokens": {
+     "input": 575,
+     "output": 467,
+     "reasoning": 0,
+     "cache": {
+      "read": 4763,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1be13450a00126KuymSKdFpReX",
+    "time": {
+     "created": 1794190296330
+    },
+    "type": "idle",
+    "outcome": "succeeded"
+   },
+   {
+    "id": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "time": {
+     "created": 1794190289470,
+     "streamed": 1794190296276,
+     "completed": 1794190296326
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "Okay, the user just asked me to reply with the single word \"OK\". Let me make sure I understand the request correctly. They want a simple, straightforward response without any additional text or explanation. \n\nFirst, I'll check if there are any specific instructions or context that might affect this. The user mentioned using the tools provided, but in this case, the request is very direct. Since the user is asking for a single word reply, I don't need to use any of the functions or tools listed. \n\nI should also consider if there's a possibility of misunderstanding. The user might be testing if I follow instructions correctly or ensuring that I don't add extra information. My response should strictly be \"OK\" without any punctuation or additional words.\n\nI'll confirm that there are no hidden requirements or hidden steps. The user's message is clear and concise. Therefore, the appropriate response is to type \"OK\" as requested.\n",
+      "native": {
+       "reasoningField": "reasoning"
+      },
+      "time": {
+       "created": 1794190294669,
+       "completed": 1794190296273
+      }
+     },
+     {
+      "type": "text",
+      "text": "OK"
+     }
+    ],
+    "snapshot": {
+     "start": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "end": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+     "files": []
+    },
+    "finish": "stop",
+    "rawFinish": "stop",
+    "cost": 0,
+    "tokens": {
+     "input": 4766,
+     "output": 193,
+     "reasoning": 0,
+     "cache": {
+      "read": 4,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1be132a14001UDXOGkoZoKS0Xl",
+    "time": {
+     "created": 1794190289443
+    },
+    "text": "Reply with the single word OK.",
+    "type": "user"
+   }
+  ],
+  "cursor": {
+   "previous": "eyJpZCI6Im1zZ18xYmUxMzU1YWMwMDFPMXJHVDI1NktoVkhvMyIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+   "next": "eyJpZCI6Im1zZ18xYmUxMzJhMTQwMDFVRFhPR2tvWm9LUzBYbCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+ }
+}
