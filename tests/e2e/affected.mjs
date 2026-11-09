@@ -891,6 +891,9 @@ export const UNIT_SCANS = [
   { test: 'tests/networkDecoding.test.ts', paths: ['src/main/', 'src/preload/', 'src/shared/'], lines: ['fetch', 'undici', 'brotli', 'DecompressionStream', 'zlib'] },
   { test: 'tests/searchBoxes.test.ts', paths: ['src/renderer/src/'], lines: ['<input', 'placeholder', 'aria-label'] },
   { test: 'tests/trash.test.ts', paths: ['src/'], lines: ['trashItem'] },
+  // HI-2784: the callers moved to the repository context port, its contract, and who imports Git's implementation of it.
+  { test: 'tests/repoPortsImports.test.ts', paths: ['src/main/settingsTools.ts', 'src/main/workflow/levels.ts', 'src/main/workflow/optionsForm.ts', 'src/main/workflow/platformSwitch.ts', 'src/main/platform/repoContext.ts', 'src/main/platform/repoPorts.ts'] },
+  { test: 'tests/repoPortsImports.test.ts', paths: ['src/'], lines: ['gitRepoPorts'] },
   { test: 'tests/exitLog.test.ts', paths: ['src/main/'], lines: ['app\\.quit', 'app\\.exit', 'process\\.exit', 'app\\.relaunch', 'quitAndInstall', 'exitBy'] },
   // Each function in main taking the board's lock or a database lease is listed by file and name (HI-1368): a new
   // one, or a change to a listed file (a rename of its function), can break it.

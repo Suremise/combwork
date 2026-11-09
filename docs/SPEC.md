@@ -1986,12 +1986,15 @@ Owns what a repository **is** and how Combwork talks to it. Every other port tak
   git dir; the project folder's for the main checkout), the root, `subfolder` (§16.3.5, OP-29) and the folder asked
   about. Two contexts are the same repository exactly when their store ids are equal: a colocated pair (jj over Git)
   is **one** store, so it gets one lock, never two.
-- **Execution.** A bounded runner per platform: `run(ctx, args, { timeout, maxOutput, route, signal })` → output or
-  `Unknown`. Git's is `git()` (`git.ts`) with its worker (`gitWorker.ts`), its tool resolution and readiness
+- **Execution.** A bounded runner per platform: `run(ctx, args, { timeout, maxOutput, input, env })` → the tool's
+  result, where a command that didn't run to an exit of its own (missing, not run, timed out) is never an answer (the
+  caller's read of it is `Unknown`). Git's is `git()` (`git.ts`) with its worker (`gitWorker.ts`), its tool resolution and readiness
   (`gitTool.ts`, `checkGit`), its route into the queue's host (`withGitRoute`, `gitHost.ts`), its environment
   allowlist, non-interactive credentials (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential manager non-interactive)
-  and its job objects. `readiness()` says whether the tool is there and which (Provider Setup's row). A later
-  platform adds its own runner; it never changes Git's.
+  and its job objects. `readiness()` says whether the tool is there and which (Provider Setup's row). A route is the
+  platform's own (Git's carries its request to the queue's host): the runner says whether one runs this scope's
+  commands (`routed`) and runs work outside it (`withoutRoute`); cancellation stays the route's job and the timeout. A
+  later platform adds its own runner; it never changes Git's.
 - **Locks.** `withRepoLock(ctx, fn)` (`repoLock.ts`, `repoLockCore.ts`: the row in the store's `cw-merge.lock`),
   named locks (`withNamedLock`), the folder fence (`changingFolder`, `folderFence.ts`) and ref holds (`holdRefs`,
   `refHold.ts`: git's own ref locks held while Combwork records what it proved about them). The port keys each by store
@@ -2265,7 +2268,9 @@ becomes the port's Git implementation.
 | Shared | `shared/platform/descriptors.ts` | `PlatformId` stays `'none' \| 'git'` in 1.4.0; `operations` and gate ids added | R3 (operations), J0 (gates) |
 | Audit | Every remaining Git import outside `src/main/platform` and the Git implementations | Classified (implementation, historic migration, or defect) and held by an import rule | R9 |
 
-The shapes, for R1 to start from:
+The shapes, for R1 to start from (R1 built port 1 as `src/main/platform/repoContext.ts`, refined there: `run` answers
+`RunResult`, Git's `GitResult`; `RepoLocks` adds `withRepoLocks` and `changingFolder`; contexts come from
+`repoPorts.ts`):
 
 ```ts
 interface RepoContext { platform: PlatformId; store: string; workspace: string; root: string; folder: string; subfolder?: boolean }

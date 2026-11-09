@@ -14,7 +14,7 @@ import { setSlotDefault } from './slotSettings'
 import { setGithubHosts } from './githubHosts'
 import { resolveGithubHosts } from '../shared/githubHost'
 import { workflowWrite } from './workflow/writes'
-import { withRepoLocks } from './repoLock'
+import { withFolderRepoLocks } from './platform/repoPorts'
 import { keptTargets, problemEnglish, WorkflowRefused } from './workflow/optionsForm'
 import { offerRetarget, refuseRemovedTargets, retargetPreview, slotTargets } from './workflow/retarget'
 import { boardWrite } from './boardStore'
@@ -315,7 +315,7 @@ export async function applySetting(
       }
       return write()
     })) : e.workflow === 'target' ? () => boardWrite(workspace, write) : write // HI-2680: serial with a retarget's moves (`tasks.setTarget`'s `expectDefault`)
-    const next = e.workflow ? await withRepoLocks([projectPath], () => workflowWrite(guarded), { quiet: true, project: projectPath }) : await write()
+    const next = e.workflow ? await withFolderRepoLocks([projectPath], () => workflowWrite(guarded), { quiet: true, project: projectPath }) : await write()
     if (e.workflow) workflowChanged(workspace, projectPath)
     const now = settingValue(e, config.settings, next)
     const changed = e.workflow === 'target' && JSON.stringify(old) !== JSON.stringify(now)
