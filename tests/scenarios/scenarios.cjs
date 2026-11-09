@@ -4298,19 +4298,21 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'assistant-next-version-ask',
-    title: "The Assistant asked what starting the next version would do (HI-2811): answers and puts the decision to the user, changing nothing (no cw_branch, no retarget)",
+    title: "The Assistant told the user is about ready for the next version (HI-2811): puts starting it to the user first, changing nothing (no cw_branch, no retarget)",
     role: 'assistant',
     control: 'agents',
     changeSettings: true,
     setup: nextVersionSetup,
     after: nextVersionAfter,
-    prompt: "I'm thinking about starting 1.4.0 for alpha, after 1.3.0. What would that do to its cards and its running lane?",
+    // An intent the user hasn't confirmed (HI-2811's design, HR1): a question about what it would do alone was answered,
+    // rightly, with nothing to decide (Codex, 0 of 3), so the prompt leaves the step to be agreed.
+    prompt: "I think alpha's 1.3.0 is feature-complete, so we're about ready for 1.4.0.",
     // A fake has nothing to decide: it reads the board, as a model may, and its run checks only that nothing changed.
     fake: 'cw cw_list_tasks {"project":"alpha"}',
     expect: (o, c) => {
       const s = nextVersionState(o, c)
       return [
-        ['put the decision to the user (a reply naming 1.4.0 that asks)', s.asks('1.4.0'), s.said.slice(-600)],
+        ['put the decision to the user (a reply naming 1.4.0 that asks)', s.asks('1.4.0'), (o.replies ?? []).filter((r) => String(r).includes('1.4.0')).map((r) => String(r).slice(-250)).join(' | ') || s.said.slice(-300)],
         ['started no version and moved nothing (no cw_branch, no cw_queue retarget, no card target)', !called(o, 'cw_branch').length && !s.retargets.length && !s.byCard.length, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['no 1.4.0 branch, and alpha still merges into 1.3.0', !s.branches.includes('1.4.0') && s.targets?.target === '1.3.0' && !(s.targets?.otherTargets ?? []).length, JSON.stringify({ branches: s.branches, targets: s.targets })],
         ["the Todo card still has its own 1.3.0, and the lane's card is still in Doing on it", s.todoTarget === '1.3.0' && s.laneOn13 && s.laneCardDoing, JSON.stringify({ todo: s.todoTarget, lane: s.lane })]
