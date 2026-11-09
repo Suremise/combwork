@@ -297,7 +297,9 @@ Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the con
 `platform/historyPorts.ts` finds one (`historyOf(platform)`, null for None; `observePort`, the watcher for every
 platform). Reconciliation, the recorder, targets, retarget, check brackets (`runChecks`, `queueChecks`) and the focused
 pick's diff read through it (`tests/historyPortsImports.test.ts`, check:repo); Git's adapter passes its port to
-`reconcileHistory` and `attributeFolder`.
+`reconcileHistory` and `attributeFolder`. A card's move to another target (`workflow/retargetCard.ts`, HI-2821) asks its
+platform's optional `ownWork` proof (Git's in `platform/gitOwnWork.ts`; absent, the move isn't offered) and holds the refs
+through port 1's `holdRefs`; `tests/retargetTraces.test.ts` holds its git commands.
 Port 4's candidate half (HI-2790's R7): `platform/integration.ts` holds the contract (`IntegrationPort`'s `update`,
 `candidate` and `mergeBase`, the queue's `CandidateHost`, the outcomes), `platform/gitIntegration.ts` is Git's (the queue's
 worktree made or reused, strict's update, the test merge in each style and its cleanup, moved from `mergeQueue.ts`), with
