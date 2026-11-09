@@ -3266,7 +3266,8 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 120,
     unit: 's',
-    applies: 'sessions'
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/opencode/real-2.2.6/wire/session-after-turn.json`, version: '2.2.6', text: '"updated": 1794179626037', shows: "The session's time.updated, which each check compares with the one Combwork read last" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'opencode.history.repairMinutes',
@@ -3278,7 +3279,8 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 1,
     max: 1440,
     unit: 'min',
-    applies: 'restart'
+    applies: 'restart',
+    samples: [{ from: `${FIX}/opencode/real-2.2.6/cli/session-export-absent.txt`, version: '2.2.6', text: 'Session not found:', shows: 'An export of a session that failed, which the history says and tries again' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: 'opencode.history.retryMinutes',
@@ -3290,7 +3292,8 @@ const SOURCES: readonly AdvancedSource[] = [
     min: 10,
     max: 43200,
     unit: 'min',
-    applies: 'restart'
+    applies: 'restart',
+    samples: [{ from: `${FIX}/opencode/real-2.2.6/cli/session-export-absent.txt`, version: '2.2.6', text: 'Session not found:', shows: 'An export of a session that failed, which the history says and tries again' }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
     id: overrideId('copilot', 'allMcpInstructions'),
