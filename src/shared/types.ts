@@ -4396,8 +4396,8 @@ export interface LaneStatus {
   agent?: string
   /** offSide (HI-2664): the lane part `agent`'s role doesn't do. */
   part?: 'builder' | 'reviewer'
-  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
-  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
+  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation; `stopped` (HI-2815): someone stopped its builder. */
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies' | 'stopped'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
   waitsFor?: string
   /** startWait `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in its `blockedBy` order. */

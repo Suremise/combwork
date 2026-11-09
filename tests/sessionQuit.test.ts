@@ -256,4 +256,22 @@ describe("a stop's cause is its caller's (HI-1881, HR5's round 1)", () => {
     await sessions.stopWhereAndWait((s) => (s as { agentId?: string }).agentId === b.agentId, 50, 'closed')
     expect(b.l.stopCause).toBe('closed')
   })
+
+  it("someone's Stop (the user's, the Assistant's, an agent's) is remembered with its time, so what was owed before it doesn't start the agent again (HI-2815); a stop with no one's cause isn't", () => {
+    const before = Date.now()
+    for (const cause of ['you', 'assistant', 'agent'] as const) {
+      const a = live()
+      expect(sessions.stoppedOnPurposeAt(P, a.agentId)).toBe(0)
+      sessions.stop(P, a.agentId, cause)
+      expect(kills).toContain(a.key)
+      expect(sessions.stoppedOnPurposeAt(P, a.agentId)).toBeGreaterThanOrEqual(before)
+    }
+    const b = live()
+    sessions.stop(P, b.agentId)
+    const c = live()
+    sessions.stop(P, c.agentId, 'lane')
+    expect(kills).toEqual(expect.arrayContaining([b.key, c.key]))
+    expect(sessions.stoppedOnPurposeAt(P, b.agentId)).toBe(0)
+    expect(sessions.stoppedOnPurposeAt(P, c.agentId)).toBe(0)
+  })
 })

@@ -572,6 +572,12 @@
       "idle": "select"
     }
   },
+  "lane.status.start.stopped": {
+    "placeholders": {
+      "card": "plain",
+      "agent": "plain"
+    }
+  },
   "lane.status.start.watching": {
     "placeholders": {
       "card": "plain",

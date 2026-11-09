@@ -184,6 +184,8 @@ const MOVED_FRESH = {
 
 /** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
 const EXIT_IN_TURN: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
+/** A stop's causes that are someone's Stop (HI-2815): the user's, the Assistant's, an agent's; not a lane's end, a closed window or one unsaid. */
+const STOPPED_ON_PURPOSE: ReadonlySet<StopCause> = new Set<StopCause>(['you', 'assistant', 'agent'])
 /** The statuses of an agent in a turn (or starting one): reached from any other, its next turn has begun (HI-2312). */
 const BUSY: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
 
@@ -2000,6 +2002,8 @@ class SessionManager {
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw combworkError(msg({ id: 'session.start.cleaning', defaultMessage: "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Combwork is moving or removing its files." }), undefined, { kind: 'conflict' })
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
+    // Started again (the user, a lane update, a Retry, a switch's resume): someone's earlier Stop no longer holds it (HI-2815).
+    this.stoppedOnPurpose.delete(id)
     // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
     // CLI may exit meanwhile, and that failure (onExit's) must stand (HR6's round 1).
     startBegins(projectPath, agentId)
@@ -2532,6 +2536,8 @@ class SessionManager {
 
   /** Switches of connection waiting for their agent's safe point (HI-1755), by liveId: at most one per agent. */
   private switches = new Map<string, SwitchOp>()
+  /** When each agent was last stopped at someone's request and not started since (HI-2815, stoppedOnPurposeAt), by liveId. */
+  private stoppedOnPurpose = new Map<string, number>()
   /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
   private switchResuming = new Set<string>()
   /**
@@ -2734,6 +2740,15 @@ class SessionManager {
    * `restarting` once its exit was typed (its run ending, or ended and about to resume), null for none. Either way not free
    * for a new conversation (HI-2739: a lane started meanwhile owes it one instead).
    */
+  /**
+   * When an agent was last stopped at someone's request (HI-2815: the user, the Assistant or an agent, through stop()),
+   * in ms since the epoch; 0 if never, or once it has been started again since (start()). While it is set, nothing of
+   * Combwork's own starts it: neither a lane's new conversation owed before it (HI-2034) nor its lane's next card.
+   */
+  stoppedOnPurposeAt(projectPath: string, agentId: string): number {
+    return this.stoppedOnPurpose.get(liveId(projectPath, agentId)) ?? 0
+  }
+
   switchUnderWay(projectPath: string, agentId: string): 'waiting' | 'restarting' | null {
     const op = this.switches.get(liveId(projectPath, agentId))
     return !op ? null : op.typed ? 'restarting' : 'waiting'
@@ -3316,6 +3331,8 @@ class SessionManager {
   stop(projectPath: string, agentId?: string, cause?: StopCause): void {
     const agents = agentId ? [agentId] : this.projectStates(projectPath).map((s) => s.agentId)
     for (const a of agents) {
+      // Someone's Stop (HI-2815): what Combwork owed it since (a lane's new conversation) doesn't start it again.
+      if (cause && STOPPED_ON_PURPOSE.has(cause)) this.stoppedOnPurpose.set(liveId(projectPath, a), Date.now())
       // A switch of connection waiting for it ends with it (HI-1755): a stop is the user's.
       this.switches.get(liveId(projectPath, a))?.cancel('stopped')
       const l = this.live.get(liveId(projectPath, a))
