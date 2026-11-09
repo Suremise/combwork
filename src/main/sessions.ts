@@ -2002,6 +2002,8 @@ class SessionManager {
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw combworkError(msg({ id: 'session.start.cleaning', defaultMessage: "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Combwork is moving or removing its files." }), undefined, { kind: 'conflict' })
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
+    // Started again (the user, a lane update, a Retry, a switch's resume): someone's earlier Stop no longer holds it (HI-2815).
+    this.stoppedOnPurpose.delete(id)
     // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
     // CLI may exit meanwhile, and that failure (onExit's) must stand (HR6's round 1).
     startBegins(projectPath, agentId)
@@ -2534,7 +2536,7 @@ class SessionManager {
 
   /** Switches of connection waiting for their agent's safe point (HI-1755), by liveId: at most one per agent. */
   private switches = new Map<string, SwitchOp>()
-  /** When each agent was last stopped at someone's request (HI-2815, stoppedOnPurposeAt), by liveId. */
+  /** When each agent was last stopped at someone's request and not started since (HI-2815, stoppedOnPurposeAt), by liveId. */
   private stoppedOnPurpose = new Map<string, number>()
   /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
   private switchResuming = new Set<string>()
@@ -2740,7 +2742,8 @@ class SessionManager {
    */
   /**
    * When an agent was last stopped at someone's request (HI-2815: the user, the Assistant or an agent, through stop()),
-   * in ms since the epoch, or 0. What was owed it before then (a lane's new conversation, HI-2034) never starts it again.
+   * in ms since the epoch; 0 if never, or once it has been started again since (start()). While it is set, nothing of
+   * Combwork's own starts it: neither a lane's new conversation owed before it (HI-2034) nor its lane's next card.
    */
   stoppedOnPurposeAt(projectPath: string, agentId: string): number {
     return this.stoppedOnPurpose.get(liveId(projectPath, agentId)) ?? 0
