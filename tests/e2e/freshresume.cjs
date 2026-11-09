@@ -92,7 +92,11 @@ function backup(id, at) {
   await shot(page, '2-question')
   await dialog.locator('.dialog-footer button', { hasText: /^Cancel$/ }).click()
   check('Cancel closes it', !!(await lib.until(async () => (await dialog.count()) === 0, HUNG_MS)))
-  check('…and starts nothing', !(await live()) && !(await page.evaluate(() => document.querySelector('.transcript-toolbar button.act-resume')?.getAttribute('aria-busy'))))
+  // Its Resume stops showing busy once the start it began is over: the store clears that with the agents' states, at the
+  // end of their batch if some came lately (setWithLive, HI-1862), so waited for, never read at the dialog's close (HI-2819).
+  const busy = () => page.evaluate(() => document.querySelector('.transcript-toolbar button.act-resume')?.getAttribute('aria-busy') ?? null)
+  const settled = await lib.until(async () => !(await busy()), HUNG_MS)
+  check('…and starts nothing', !!settled && !(await live()), JSON.stringify({ busy: await busy(), live: (await live())?.status ?? null }))
 
   // 4. Start New Conversation: a new conversation for the agent; the old one stays.
   await resumeBtn.click()
