@@ -23,7 +23,7 @@ import { workflowFor } from './service'
 import { queueChanged } from './queueHost'
 import { workflowChanged } from './rulesets'
 import { workflowWrite } from './writes'
-import { withRepoLocks } from '../repoLock'
+import { withFolderRepoLocks } from '../platform/repoPorts'
 import { cardRef } from '../../shared/projectKeys'
 
 const log = createLogger('workflow')
@@ -83,7 +83,7 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
 export function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
   // In its turn among workflow writes (#1422): an options save or a level's check never interleaves with it.
   // Its repository's lock first (#1642 round 5): a switch moves what the project's branches are measured against.
-  return withRepoLocks([projectPath], () => workflowWrite(() => switchPlatform(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
+  return withFolderRepoLocks([projectPath], () => workflowWrite(() => switchPlatform(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
 async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void }): Promise<{ from: PlatformId; to: PlatformId }> {

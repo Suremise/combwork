@@ -19,7 +19,7 @@ import { checkOptions, resolveOptions, workflowChanged, type OptionLevels } from
 import { workflowEnforced } from './service'
 import { cardsInFlight, keptNames, problemEnglish, WorkflowRefused, WorkflowStale } from './optionsForm'
 import { workflowWrite } from './writes'
-import { withRepoLocks } from '../repoLock'
+import { hasRepository, withFolderRepoLocks } from '../platform/repoPorts'
 
 const log = createLogger('workflow')
 
@@ -133,12 +133,12 @@ export function setLevelOptions(ws: WorkspaceService, rawLevel: unknown, rawPlat
   // The level and every project it reaches checked as they are now, and written in the same turn of workflow writes:
   // no project or level changes between the check and the write (HR5's round 1).
   // Every repository the level reaches locked first (#1642 round 5): a level's target is each inheriting Git project's.
-  return withRepoLocks(levelRepos(ws, rawLevel), () => workflowWrite(() => saveLevelOptions(ws, rawLevel, rawPlatform, raw)), { quiet: true })
+  return withFolderRepoLocks(levelRepos(ws, rawLevel), () => workflowWrite(() => saveLevelOptions(ws, rawLevel, rawPlatform, raw)), { quiet: true })
 }
 
-/** The Git projects a level's options reach: the workspace's for its own level, every open workspace's for Combwork's. */
+/** The repository projects (Git's) a level's options reach: the workspace's for its own level, every open workspace's for Combwork's. */
 function levelRepos(ws: WorkspaceService, rawLevel: unknown): string[] {
-  const of = (w: WorkspaceService): string[] => (w.info()?.projects ?? []).filter((p) => p.platform?.id === 'git').map((p) => p.path)
+  const of = (w: WorkspaceService): string[] => (w.info()?.projects ?? []).filter((p) => !!p.platform && hasRepository(p.platform.id)).map((p) => p.path)
   return rawLevel === 'workspace' ? of(ws) : openWorkspaces().flatMap(of)
 }
 

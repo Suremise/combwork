@@ -40,7 +40,7 @@ import { isUnknown } from '../platform/types'
 import { refuseRemovedTargets, retargetPreview, slotTargets } from './retarget'
 import { projectTargets } from './targets'
 import { workflowWrite } from './writes'
-import { withRepoLocks } from '../repoLock'
+import { withFolderRepoLocks } from '../platform/repoPorts'
 import { exitBy } from '../exitLog'
 import { LEGACY_CONSUMED, legacyPreferences } from '../../shared/workflow/preferences'
 
@@ -337,7 +337,7 @@ export function setWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   // Checked against the levels as they are now and written in the same turn of workflow writes (#1422), holding the
   // project's repository lock first (#1642 round 5): its target can't move while a clean-up checks a branch against it,
   // from this Combwork or another.
-  return withRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
+  return withFolderRepoLocks([projectPath], () => workflowWrite(() => saveWorkflowOptions(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
 }
 
 /** HI-1697: the user's answer to the merge queue's question before an upgraded project's first merge. */
@@ -357,7 +357,7 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
   const a = raw as { card?: unknown; request?: unknown; style?: unknown; commitMessage?: unknown } | null
   if (!a || !Number.isInteger(a.card) || typeof a.request !== 'string' || !takesOption('style', a.style) || !takesOption('commitMessage', a.commitMessage)) throw new CombworkError({ lines: ['A merge choice is { card, request, style, commitMessage }'] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   const answer: MergeAnswer = { card: a.card as number, request: a.request, style: a.style as WorkflowOptions['style'], commitMessage: a.commitMessage as CommitMessage }
-  await withRepoLocks([project.path], () => workflowWrite(() => saveWorkflowOptions(ws, project.path, null, { answer })), { quiet: true, project: project.path })
+  await withFolderRepoLocks([project.path], () => workflowWrite(() => saveWorkflowOptions(ws, project.path, null, { answer })), { quiet: true, project: project.path })
 }
 
 /**
@@ -475,7 +475,7 @@ export function mergeChoiceOf(ws: WorkspaceService, projectName: string): MergeC
 export async function settleMergeChoice(ws: WorkspaceService, projectPath: string): Promise<void> {
   const project = projectOf(ws, projectPath)
   if (!mergeChoiceOf(ws, project.name)?.pending) return
-  await withRepoLocks([project.path], () => workflowWrite(() => settleLocked(ws, project)), { quiet: true, project: project.path })
+  await withFolderRepoLocks([project.path], () => workflowWrite(() => settleLocked(ws, project)), { quiet: true, project: project.path })
 }
 
 /** Every project of the workspace settled (its open), each on its own: one that fails is logged and tried again later. */

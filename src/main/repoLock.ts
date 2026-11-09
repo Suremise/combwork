@@ -14,6 +14,7 @@ import { commonDirSync } from './platform/git'
 import { createLogger, userText } from './logger'
 import { bundledScriptExists, workerHere, workerStarted } from './workerThreads'
 import { REPO_LOCK_FILE } from './repoLockCore'
+import type { RepoLockOptions } from './platform/repoContext'
 
 const log = createLogger('repoLock')
 
@@ -138,12 +139,8 @@ export async function commonGitDir(folder: string): Promise<string> {
   throw combworkError(msg({ id: 'git.repoLock.noGitDir', defaultMessage: "Combwork couldn't find the git folder of {folder}, so nothing was changed: {why}", description: "An error: a merge or another change to a repository didn't start, because git couldn't name the repository's git folder (where Combwork's merge lock lives). {why} is git's message." }), { folder, why: r?.err || r?.out || '' }, { kind: 'conflict' })
 }
 
-export interface RepoLockOptions {
-  /** A background change (the line updater): no notice while it waits. */
-  quiet?: boolean
-  /** The project the notice is about. */
-  project?: string
-}
+/** `quiet`: a background change (the line updater), no notice while it waits; `project`: the project the notice is about. */
+export type { RepoLockOptions } from './platform/repoContext'
 
 /**
  * Runs fn holding the repository lock of `folder`'s repository. A wait longer than a moment shows who holds it ("Another
@@ -206,12 +203,26 @@ export async function withNamedLock<T>(dir: string, file: string, fn: () => Prom
  * no repository takes none. Taken before the turn of workflow writes, as everything that takes both does.
  */
 export async function withRepoLocks<T>(folders: readonly string[], fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
-  const byDir = new Map<string, string>()
+  const found: { store: string; folder: string }[] = []
   for (const f of folders) {
     const dir = await commonGitDir(f).catch(() => null)
-    if (dir && !byDir.has(dir.toLowerCase())) byDir.set(dir.toLowerCase(), f)
+    if (dir) found.push({ store: dir, folder: f })
   }
-  const order = [...byDir].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, f]) => f)
+  return withLocksInOrder(inStoreOrder(found), fn, opts)
+}
+
+/**
+ * The folders to lock for these stores (HI-2784: withRepoLocks's, and the repository context port's): each store once,
+ * by the first folder naming it, sorted by the store's path compared case-insensitively, the order every taker uses.
+ */
+export function inStoreOrder(found: readonly { store: string; folder: string }[]): string[] {
+  const byDir = new Map<string, string>()
+  for (const { store, folder } of found) if (!byDir.has(store.toLowerCase())) byDir.set(store.toLowerCase(), folder)
+  return [...byDir].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([, f]) => f)
+}
+
+/** Runs fn holding each folder's repository lock, taken in the order given (inStoreOrder's). */
+export function withLocksInOrder<T>(order: readonly string[], fn: () => Promise<T>, opts: RepoLockOptions = {}): Promise<T> {
   const from = (i: number): Promise<T> => (i === order.length ? fn() : withRepoLock(order[i], () => from(i + 1), opts))
   return from(0)
 }
