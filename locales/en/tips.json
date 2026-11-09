@@ -883,6 +883,14 @@
     "defaultMessage": "Ctrl+click a path in the terminal",
     "description": "A tip's title."
   },
+  "tips.filesGit.text": {
+    "defaultMessage": "Right-click a file or folder in the Files tab: Exclude from Git adds it to .gitignore (or only to this PC's .git/info/exclude), Stop Tracking takes a committed file out of git but leaves it on disk, and Why Is This Ignored? opens a dimmed file's rule.",
+    "description": "A tip (HI-2743). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep .gitignore and .git/info/exclude."
+  },
+  "tips.filesGit.title": {
+    "defaultMessage": "Keep a file out of git from the Files tab",
+    "description": "A tip's title (HI-2743)."
+  },
   "tips.filesTab.text": {
     "defaultMessage": "The Files tab browses and edits the project, previews Markdown, CSV, HTML and images, and keeps unsaved edits as you switch.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

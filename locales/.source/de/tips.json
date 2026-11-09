@@ -220,6 +220,8 @@
   "tips.editTemplates.title": "Edit a template in place",
   "tips.fileLinks.text": "File paths an agent prints, like src/app.ts:42, are links: Ctrl+click one to open the file in the Files tab at that line.",
   "tips.fileLinks.title": "Ctrl+click a path in the terminal",
+  "tips.filesGit.text": "Right-click a file or folder in the Files tab: Exclude from Git adds it to .gitignore (or only to this PC's .git/info/exclude), Stop Tracking takes a committed file out of git but leaves it on disk, and Why Is This Ignored? opens a dimmed file's rule.",
+  "tips.filesGit.title": "Keep a file out of git from the Files tab",
   "tips.filesTab.text": "The Files tab browses and edits the project, previews Markdown, CSV, HTML and images, and keeps unsaved edits as you switch.",
   "tips.filesTab.title": "Edit files without leaving Combwork",
   "tips.flightRecorder.text": "Turn on a flight recorder trigger in Settings → Advanced (safeguard stops, something unknown from a CLI, a CLI version change, an agent gone silent), and Combwork saves the agent's recent developer console events, redacted, when it happens, with a notice.",

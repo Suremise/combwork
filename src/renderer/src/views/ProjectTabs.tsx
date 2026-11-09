@@ -1100,6 +1100,13 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
     setFile(null)
   }, [root, base])
   useEffect(load, [load, usageVersion])
+  // The Files tab's Show changes (HI-2743): the project folder's file, once its status is in.
+  const jump = useStore((s) => (s.changesJump?.project === owner.path ? s.changesJump : null))
+  useEffect(() => {
+    if (!jump || root !== owner.path || base || !status || statusFor.current !== key) return
+    if (status.files.some((f) => f.path === jump.file)) setFile(jump.file)
+    set({ changesJump: null })
+  }, [jump, root, owner.path, base, status, key])
 
   // A refresh of the same file keeps showing its diff until the new one arrives; another file's never shows.
   const wanted = `${key}\n${file ?? ''}`

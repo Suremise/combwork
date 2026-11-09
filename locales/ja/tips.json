@@ -214,6 +214,8 @@
   "tips.editTemplates.title": "テンプレートをその場で編集",
   "tips.fileLinks.text": "エージェントが出力するsrc/app.ts:42のようなファイルパスはリンクです。Ctrl+クリックすると、「ファイル」タブでその行を開きます。",
   "tips.fileLinks.title": "ターミナルのパスをCtrl+クリック",
+  "tips.filesGit.text": "「ファイル」タブでファイルやフォルダーを右クリック：「Gitから除外」で.gitignoreに追加（このPCの.git/info/excludeだけにも可）、「追跡をやめてファイルは残す」でコミット済みのファイルをGitから外しつつディスクに残し、「なぜ無視されている？」で淡色表示のファイルのルールを開きます。",
+  "tips.filesGit.title": "「ファイル」タブからファイルをGitの対象外にする",
   "tips.filesTab.text": "「ファイル」タブでは、プロジェクトの閲覧と編集、Markdown、CSV、HTML、画像のプレビューができ、切り替えても未保存の編集は残ります。",
   "tips.filesTab.title": "Combworkから離れずにファイルを編集",
   "tips.flightRecorder.text": "「設定」→「詳細」でフライトレコーダーのトリガー（セーフガードによる停止、CLIからの不明な内容、CLIのバージョン変更、応答しなくなったエージェント）をオンにすると、それが起きた瞬間に、Combworkがエージェントの最近の開発者コンソールのイベントを機密情報を伏せて保存し、通知を表示します。",

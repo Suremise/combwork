@@ -271,6 +271,8 @@ interface State {
   activityFilters: Record<string, ActivityView>
   /** A file to show in a project's Files tab (a terminal's file link): whose folder (`root`, a worktree agent's id or ''), the file and the line. */
   filesJump: { project: string; root: string; rel: string; line?: number; col?: number; nonce: number } | null
+  /** A file whose diff to show in a project's Changes (the Files tab's Show changes, HI-2743): the project folder's. */
+  changesJump: { project: string; file: string; nonce: number } | null
   /** Resizable pane sizes, saved with the window layout. */
   panes: Record<string, number>
   /** The provider each project's Skills tab last showed, by project path in lower case (#118; saved in ui). */
@@ -592,6 +594,7 @@ export const useStore = create<State>(() => ({
   attachmentsJump: null,
   activityFilters: {},
   filesJump: null,
+  changesJump: null,
   panes: {},
   skillsProvider: {},
   skillsFold: {},

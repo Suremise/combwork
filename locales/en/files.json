@@ -371,13 +371,121 @@
     "defaultMessage": "Searching…",
     "description": "The Files tab's list while a search runs."
   },
+  "files.git.allExt": {
+    "defaultMessage": "All *.{ext} files",
+    "description": "A choice in the Exclude from Git menu: ignore every file with this extension ({ext}, such as log), anywhere in the project. Keep *.{ext}."
+  },
+  "files.git.exclude": {
+    "defaultMessage": "Exclude from Git",
+    "description": "Files tab's right-click menu (HI-2743): opens a menu of ways to make git ignore the file or folder (a line in .gitignore)."
+  },
+  "files.git.excludeFailed": {
+    "defaultMessage": "Could not exclude from Git",
+    "description": "Title of an error notification in the Files tab."
+  },
+  "files.git.excluded": {
+    "defaultMessage": "{added, plural, =0 {Already in {file}: nothing added.} one {Added {line} to {file}{branch, select, none {.} other { on {branch}.}}} other {Added # lines to {file}{branch, select, none {.} other { on {branch}.}}}}",
+    "description": "Notification after Exclude from Git. {added} is how many lines were added to {file} (.gitignore or .git/info/exclude); {line} the one line; {branch} the branch of the project folder changed, or none."
+  },
+  "files.git.excludedDetail": {
+    "defaultMessage": "{file, select, gitignore {The change to .gitignore shows in the Version Control tab, to commit.} other {Only this PC: nothing to commit.}}",
+    "description": "Under the notification after Exclude from Git. {file} is gitignore for .gitignore, else .git/info/exclude."
+  },
+  "files.git.ignoredBy": {
+    "defaultMessage": "Ignored by {file}:{line} `{pattern}`",
+    "description": "A dimmed file's tooltip in the Files tab (HI-2743): the rule git ignores it by, in its ignore file ({file}) at line {line}; {pattern} is the rule as written. Keep the backquotes."
+  },
   "files.git.inFolder": {
     "defaultMessage": "{status} (contains changes)",
     "description": "A folder's git status in the Files tab's details: {status} is the first change inside it, such as Modified."
   },
+  "files.git.inGitignore": {
+    "defaultMessage": "Shared with everyone",
+    "description": "A heading in the Exclude from Git menu (shown in capitals): the choices under it write the project's .gitignore, which is committed, so collaborators and agents get it. Each choice's second line names the file."
+  },
+  "files.git.include": {
+    "defaultMessage": "Include Again",
+    "description": "Files tab's right-click menu (HI-2743), for an ignored file: removes the .gitignore line that ignores exactly it, so git sees it again."
+  },
+  "files.git.includeFailed": {
+    "defaultMessage": "Could not include it again",
+    "description": "Title of an error notification in the Files tab."
+  },
+  "files.git.included": {
+    "defaultMessage": "Removed {line} from {file}{branch, select, none {.} other { on {branch}.}}",
+    "description": "Notification after Include Again: the line removed from the ignore file. {branch} is the branch of the project folder changed, or none."
+  },
+  "files.git.initialise": {
+    "defaultMessage": "Initialise Repository…",
+    "description": "Files tab's right-click menu in a project that isn't a git repository (HI-2743): opens the Initialise repository dialog in the Version Control tab."
+  },
+  "files.git.onThisPc": {
+    "defaultMessage": "Only on this PC",
+    "description": "A heading in the Exclude from Git menu (shown in capitals): the choices under it write .git/info/exclude, which git never commits. Each choice's second line names the file."
+  },
+  "files.git.ruleAt": {
+    "defaultMessage": "Line {line} of {file}: `{pattern}`",
+    "description": "Above the rule file in Why Is This Ignored?'s viewer: the line ({line}) of the file ({file}, such as .git/info/exclude) whose rule ({pattern}) ignores it, highlighted below. Keep the backquotes."
+  },
+  "files.git.ruleClose": {
+    "defaultMessage": "Close",
+    "description": "Button: closes Why Is This Ignored?'s viewer."
+  },
+  "files.git.ruleTitle": {
+    "defaultMessage": "Why {name} is ignored",
+    "description": "Title of the viewer Why Is This Ignored? opens (HI-2743) for a rule file the Files tab doesn't show (.git/info/exclude, the global excludes file). {name} is the ignored file's or folder's name."
+  },
+  "files.git.section": {
+    "defaultMessage": "Git",
+    "description": "Heading of the Git section of the Files tab's right-click menu (HI-2743). Usually kept as Git."
+  },
+  "files.git.showChanges": {
+    "defaultMessage": "Show Changes",
+    "description": "Files tab's right-click menu (HI-2743), for a changed or new file: opens its diff in the Version Control tab."
+  },
   "files.git.status": {
     "defaultMessage": "{status, select, M {Modified} A {Added} D {Deleted} R {Renamed} U {Untracked} C {Copied} other {{status}}}",
     "description": "A file's git status in the Files tab's details, after its letter. Translate the words, not the letters that pick them."
+  },
+  "files.git.thisItem": {
+    "defaultMessage": "{count, plural, =1 {{folder, select, yes {This folder} other {This file}}} other {These # items}}",
+    "description": "A choice in the Exclude from Git menu: ignore exactly the selected file, folder or items. {folder} is yes for one folder; {count} how many are selected."
+  },
+  "files.git.untrack": {
+    "defaultMessage": "Stop Tracking, Keep the File…",
+    "description": "Files tab's right-click menu (HI-2743), for files git tracks: removes them from git (git rm --cached) and leaves them on disk, after asking."
+  },
+  "files.git.untrackButton": {
+    "defaultMessage": "Stop Tracking",
+    "description": "Button of the confirmation before Stop Tracking: git stops tracking the files."
+  },
+  "files.git.untrackDetail": {
+    "defaultMessage": "The Version Control tab shows the removal as a deletion, to commit. Exclude it from Git too, or git offers it as new again.",
+    "description": "Under the confirmation before Stop Tracking."
+  },
+  "files.git.untrackFailed": {
+    "defaultMessage": "Could not stop tracking",
+    "description": "Title of an error notification in the Files tab."
+  },
+  "files.git.untrackMessage": {
+    "defaultMessage": "{branch, select, none {Git stops tracking it in the project folder.} other {Git stops tracking it on {branch}, in the project folder.}} {count, plural, =1 {The file stays on disk.} other {The files stay on disk.}}",
+    "description": "The confirmation before Stop Tracking. {branch} is the branch of the project folder, or none; {count} how many items."
+  },
+  "files.git.untrackTitle": {
+    "defaultMessage": "Stop tracking {count, plural, =1 {\"{name}\"} other {# items}}?",
+    "description": "Title of the confirmation before Stop Tracking in the Files tab. {name} is the one file or folder; {count} how many."
+  },
+  "files.git.untracked": {
+    "defaultMessage": "{count, plural, one {Git stopped tracking # item} other {Git stopped tracking # items}}{branch, select, none {.} other { on {branch}.}}",
+    "description": "Notification after Stop Tracking. {branch} is the branch of the project folder changed, or none."
+  },
+  "files.git.why": {
+    "defaultMessage": "Why Is This Ignored?",
+    "description": "Files tab's right-click menu (HI-2743), for an ignored file: opens the ignore file at the rule that ignores it."
+  },
+  "files.git.whyFailed": {
+    "defaultMessage": "Could not open the rule",
+    "description": "Title of an error notification in the Files tab: Why Is This Ignored? could not open the ignore file."
   },
   "files.header": {
     "defaultMessage": "Files",

@@ -214,6 +214,8 @@
   "tips.editTemplates.title": "Edytuj szablon na miejscu",
   "tips.fileLinks.text": "Ścieżki plików wypisywane przez agenta, np. src/app.ts:42, są linkami: kliknij z Ctrl, żeby otworzyć plik w tym wierszu w zakładce Pliki.",
   "tips.fileLinks.title": "Ctrl+klik na ścieżce w terminalu",
+  "tips.filesGit.text": "Kliknij prawym przyciskiem plik lub folder w zakładce Pliki: Wyklucz z Gita dodaje go do .gitignore (albo tylko do .git/info/exclude tego komputera), Przestań śledzić usuwa zatwierdzony plik z Gita, ale zostawia go na dysku, a Dlaczego jest ignorowany? otwiera regułę wyszarzonego pliku.",
+  "tips.filesGit.title": "Wyklucz plik z Gita w zakładce Pliki",
   "tips.filesTab.text": "Zakładka Pliki pozwala przeglądać i edytować projekt, pokazuje podgląd Markdown, CSV, HTML i obrazów, a niezapisane zmiany zachowuje przy przełączaniu.",
   "tips.filesTab.title": "Edytuj pliki bez wychodzenia z Combwork",
   "tips.flightRecorder.text": "Włącz wyzwalacz rejestratora lotu (Ustawienia → Zaawansowane: zatrzymanie przez zabezpieczenia, coś nieznanego z CLI, zmiana wersji CLI, agent, który milczy), a gdy to nastąpi, Combwork od razu zapisze ostatnie zdarzenia konsoli deweloperskiej agenta, z ukrytymi danymi, i pokaże komunikat.",

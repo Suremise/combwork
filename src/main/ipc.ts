@@ -63,6 +63,7 @@ import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgr
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
+import * as filesGit from './filesGit'
 import * as mcp from './mcp'
 import * as mcpCatalog from './mcpCatalog'
 import * as notes from './notes'
@@ -1343,6 +1344,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:watch': (p) => files.watchProject(p),
     'files:setUnsaved': (paths) => quitControl.setUnsaved(win(), Array.isArray(paths) ? paths.filter((p) => typeof p === 'string') : []),
     'files:unwatch': (p) => files.unwatchProject(p),
+    'files:gitInfo': (p, items) => filesGit.gitInfo(p, items),
+    'files:gitExclude': (p, items, target, ext) => filesGit.gitExclude(p, items, target, ext === true),
+    'files:gitUntrack': (p, items) => filesGit.gitUntrack(p, items),
+    'files:gitInclude': (p, items) => filesGit.gitInclude(p, items),
+    'files:gitRuleText': (p, items) => filesGit.ignoreRuleText(p, items),
 
     'attachments:list': (p) => files.listAttachments(p),
     'attachments:read': (p, path) => files.readAttachment(p, path),

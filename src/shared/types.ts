@@ -6,6 +6,7 @@ import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
+import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { FreshReason } from './sessionFresh'
@@ -3770,6 +3771,42 @@ export interface FileEntry {
   modified: string
   /** Ignored by git, or Combwork's own .combwork folder — shown dimmed. */
   ignored: boolean
+  /** The rule git ignores it by (HI-2743), for its tooltip: absent when git didn't name one. */
+  ignoredBy?: IgnoreRule
+}
+
+/** One item of the Files tab's Git menu (HI-2743), as git sees it. */
+export interface FileGitItem {
+  rel: string
+  isDir: boolean
+  /** Git tracks it (a folder: a file in it). */
+  tracked: boolean
+  /** The rule that ignores it: `file` is that rule's file as a Files tab path when the tab shows it, `removable` where Include again takes the line out. */
+  rule: (IgnoreRule & { file: string | null; removable: IgnoreTarget | null }) | null
+}
+
+/** What the Files tab's Git menu shows: none of it outside a repository. */
+export interface FileGitInfo {
+  repo: boolean
+  branch: string | null
+  items: FileGitItem[]
+}
+
+/** The file of a rule outside the Files tab's tree, for Why is this ignored?'s viewer: as git names it, its full path, its text, and the rule's line and pattern. */
+export interface FileGitRuleText {
+  file: string
+  path: string
+  text: string
+  line: number
+  pattern: string
+}
+
+/** A Git menu action done: the ignore file written (none for Stop tracking), the lines added or removed, how many items, and the branch it changed. */
+export interface FileGitDone {
+  file: string | null
+  lines: string[]
+  count: number
+  branch: string | null
 }
 
 /** A file opened in the Files tab editor. */

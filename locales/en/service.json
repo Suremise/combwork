@@ -283,6 +283,42 @@
     "defaultMessage": "Path leads outside the project (through a link)",
     "description": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project."
   },
+  "service.filesGit.busy": {
+    "defaultMessage": "Another git command is using the repository. Try again in a moment.",
+    "description": "An error from the Files tab's Git menu: git's index is locked by another git command (an agent's commit, say)."
+  },
+  "service.filesGit.failed": {
+    "defaultMessage": "Git could not do it: {why}",
+    "description": "An error from the Files tab's Git menu. {why} is git's own message (English)."
+  },
+  "service.filesGit.linked": {
+    "defaultMessage": "{file} is a link, or leads outside the repository, so Combwork leaves it alone. Change it by hand.",
+    "description": "An error from the Files tab's Git menu (HI-2743): the ignore file ({file}: .gitignore or .git/info/exclude) is a symbolic link or junction, or its folder leads outside the repository, so Combwork won't write through it."
+  },
+  "service.filesGit.notIgnored": {
+    "defaultMessage": "Git no longer ignores it.",
+    "description": "An error from the Files tab's Git menu: the file isn't ignored any more."
+  },
+  "service.filesGit.notRepo": {
+    "defaultMessage": "This project is not a git repository.",
+    "description": "An error from the Files tab's Git menu (HI-2743): the project folder isn't in a git repository."
+  },
+  "service.filesGit.notUtf8": {
+    "defaultMessage": "{file} is not UTF-8 text, so Combwork leaves it alone.",
+    "description": "An error from the Files tab's Git menu: the ignore file ({file}) isn't UTF-8, so Combwork won't rewrite it."
+  },
+  "service.filesGit.nothing": {
+    "defaultMessage": "Choose a file or folder in the project.",
+    "description": "An error from the Files tab's Git menu: it was given nothing to act on."
+  },
+  "service.filesGit.ruleChanged": {
+    "defaultMessage": "The rule that ignores it has changed. Look again with Why is this ignored?.",
+    "description": "An error from Include again in the Files tab's Git menu: the line it would remove isn't there any more, or it isn't one Combwork can remove. Why is this ignored? is the menu item (files.git.why)."
+  },
+  "service.filesGit.tooLarge": {
+    "defaultMessage": "{file} is too large to show here.",
+    "description": "An error from Why Is This Ignored? in the Files tab's Git menu: the rule's file ({file}) is too large to show in Combwork's viewer."
+  },
   "service.forward.byAssistant": {
     "defaultMessage": "the Assistant",
     "description": "HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant."
