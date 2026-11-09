@@ -31,6 +31,7 @@
 
 ### Changed
 
+- **The Assistant's list of coding agents is shorter** (HI-2814). Its `cw_list_providers` tool now gives a line per coding agent (on or off, installed and tested version, default model, efforts, modes and connections), and one in full, with its models and what each mode does, when the Assistant names it. With OpenCode as the fifth, the full list of all of them had grown past the size Combwork keeps a tool's reply to. The Agent API's `GET /v1/providers` is unchanged.
 - **GitHub Copilot 1.0.107 tested** (HI-2780), beside 1.0.106: Provider Setup ticks either. 1.0.107's release notes are 1.0.106's, and no differences were found in what was checked (its help, its terminal output, its model listing, Combwork's Copilot suites); WinGet offered only 1.0.106 when this was tested.
 
 ### Fixed

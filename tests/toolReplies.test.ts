@@ -3,6 +3,8 @@
 import { describe, expect, it } from 'vitest'
 import { addRetryWaited, retryWaitEnd } from '../src/shared/runtime'
 import {
+  type ProviderPublic,
+  providerListText,
   CLI_DEFAULT,
   MAX_ROWS,
   cardRequests,
@@ -312,5 +314,26 @@ describe('a card read narrowed to its newest comments', () => {
     expect(newestComments(card, 0)).toEqual({ comments: [], commentsOmitted: 3 })
     expect(newestComments(card, 2)).toEqual({ comments: ['b', 'c'], commentsOmitted: 1 })
     expect(newestComments(card, 5)).toEqual({ comments: ['a', 'b', 'c'], commentsOmitted: 0 })
+  })
+})
+
+describe('cw_list_providers: a line per provider, one in full on request (HI-2814)', () => {
+  const mode = (value: string) => ({ value, label: value, description: `What ${value} does, at some length, as the descriptor says it.` })
+  const claude: ProviderPublic = { id: 'claude-code', name: 'Claude Code', enabled: true, installed: true, version: '2.1.999', tested: { version: '2.1.319', installed: 'newer' }, problem: null, defaultModel: 'claude-opus-5-5', models: Array.from({ length: 30 }, (_, i) => ({ value: `model-${i}`, label: `A long model label ${i}` })), efforts: [{ value: 'low', label: 'Low' }, { value: 'high', label: 'High' }], context200k: true, modes: ['manual', 'plan', 'cli-own'].map(mode), connections: [{ id: 'c-1', name: 'Max' }] }
+  const opencode: ProviderPublic = { id: 'opencode', name: 'OpenCode', enabled: false, installed: false, version: null, tested: { version: '2.0.0', installed: 'unknown' }, problem: 'OpenCode is not installed.', defaultModel: null, models: [], efforts: [], context200k: false, modes: ['build', 'plan'].map(mode) }
+
+  it('says each in a line: on, installed and tested, default model, how many models, efforts, modes and connections', () => {
+    const [c, o, more] = providerListText([claude, opencode]).split('\n')
+    expect(c).toBe('Claude Code (claude-code): on, installed 2.1.999 (tested with 2.1.319: newer); default model claude-opus-5-5; 30 models; efforts low, high; modes manual, plan, cli-own; connections Max (id c-1)')
+    expect(o).toBe("OpenCode (opencode): off, not installed; default model its CLI's own; 0 models; modes build, plan. Problem: OpenCode is not installed.")
+    expect(more).toMatch(/^cw_list_providers with provider \(its id\) gives one in full/)
+  })
+
+  it("leaves out what the listing doesn't need: models' labels and modes' descriptions, however many", () => {
+    const text = providerListText([claude, opencode])
+    expect(text).not.toContain('A long model label')
+    expect(text).not.toContain('What manual does')
+    // Five CLIs with long model lists still fit well inside the reply's budget (tests/e2e/replysize.cjs).
+    expect(providerListText(Array.from({ length: 5 }, () => claude)).length).toBeLessThan(2000)
   })
 })
