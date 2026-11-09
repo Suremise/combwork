@@ -453,10 +453,12 @@ const projectJson = (p) => JSON.parse(fs.readFileSync(path.join(p, '.combwork', 
     const keptSave = await openSave()
     const keptList = keptSave.locator('[data-kept-targets]')
     check("HI-2674: with the target changed, the save's warning names the running lane and Two, each merging into main still", !!(await waitHung(async () => { const x = await text(keptList); return /even if you tick/.test(x) && /Lane .*into main/.test(x) && /Two: into main/.test(x) })), await text(keptSave))
-    // HI-2680: its Retarget says what stays on main and why: Two already started, the running lane, the lane's lent slot;
-    // nothing can move, so no tick box.
+    // HI-2680: its Retarget says what can move and what stays on main, and why. A card in flight moves with its branch and
+    // work kept, and a running lane with its card (HI-2753): the lane with Two, and Needs One (B2's, started); the lanes'
+    // lent slots stay. So there is a tick box.
     const retargetList = keptSave.locator('[data-retarget]')
-    check("HI-2680: the save's Retarget lists what stays on main with why (Two started, the running lane, its lent slot), and offers nothing to move", !!(await waitHung(async () => { const x = await text(retargetList); return /These stay on main/.test(x) && /Two: already started/.test(x) && /a running lane keeps its branch until it ends/.test(x) && /: lent/.test(x) })) && (await retargetList.locator('[data-retarget-on]').count()) === 0, await text(retargetList))
+    const moveText = (what) => retargetList.locator(`[data-retarget-move="${what}"]`).innerText().catch(() => '')
+    check("HI-2680, HI-2753: the save's Retarget offers to move the running lane with Two and Needs One with its work kept, and lists the lent slots staying on main", !!(await waitHung(async () => { const x = await text(retargetList); return /2 cards and 0 free slots/.test(x) && /Builder B1, with its card \S+ Two: to the new branch/.test(await moveText(a?.id)) && /Needs One: to the new branch, its branch and work kept/.test(x) && /These stay on main/.test(x) && /slot-a: lent/.test(x) && /slot-b: lent/.test(x) && !/already started/.test(x) && !/a running lane keeps its branch/.test(x) })) && (await retargetList.locator('[data-retarget-on]').count()) === 1, await text(retargetList))
     await keptSave.screenshot({ path: path.join(fx.shots ?? lib.WORK, 'p6lane-retarget-preview.png') }).catch(() => undefined)
     await cancelSave(keptSave, 'en')
     await targetInput.fill(targetWas)
