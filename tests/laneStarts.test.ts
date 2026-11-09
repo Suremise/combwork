@@ -68,7 +68,7 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     mkdirSync(join(p, '.combwork'), { recursive: true })
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1', 'h2', 'h3'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1', 'h2', 'h3', 'h4', 'h5'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -554,6 +554,8 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
       vi.spyOn(sessions, 'start').mockImplementation(async (_p: string, o: { agentId?: string; allowed?: () => void }) => {
         await midLaunch?.()
         o.allowed?.()
+        // As the real start, once reserved: someone's earlier Stop no longer holds the agent (HI-2815).
+        ;(sessions as unknown as { stoppedOnPurpose: Map<string, number> }).stoppedOnPurpose.delete(`${p.toLowerCase()}#${o.agentId}`)
         launches.push(o.agentId!)
         const st = builder('starting', o.agentId!) as unknown as Record<string, unknown>
         st.sessionId = `new-${o.agentId}-${launches.length}`
@@ -585,11 +587,45 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
       // Another look (the 30 s tick, a status change): still nothing of Combwork's starts it.
       await checkLaneStarts(w)
       expect(await columnOf(first)).toBe('todo')
-      // Started again (by hand, a lane update) and idle: its card follows, in the conversation it runs.
+      // Running again but never started since (a stand-in for its old run still exiting): still held.
       old('ready', 'h2')
       await checkLaneStarts(w)
+      expect(await columnOf(first)).toBe('todo')
+      // Started again (by hand, a lane update: the start clears the Stop) and idle: its card follows, in the conversation it runs.
+      await sessions.start(p, { agentId: 'h2' })
+      ;(sessions.liveFor(p, 'h2') as unknown as { status: string }).status = 'ready'
+      await checkLaneStarts(w)
       expect(await columnOf(first)).toBe('doing')
+      expect(launches).toEqual(['h2'])
+      await lanes.endLane(w, lane.id, { abandoned: true })
+    })
+
+    it("someone's Stop holds the card while its old run is still exiting, its status idle meanwhile (HI-2815, HR2's round 2): nothing launched, nothing offered to the run being stopped", async () => {
+      const first = await card('Fresh graceful stop', 'h4')
+      const lane = await laneOf('h4', [first])
+      old('ready', 'h4')
+      await lanes.oweFreshStart(w, lane.id, 'h4', 'builder', 'old-h4')
+      // The real stop: its exit is asked for, and its run stays live (no process here exits), as a graceful exit does for a while.
+      sessions.stop(p, 'h4', 'you')
+      expect(sessions.liveFor(p, 'h4')).toBeTruthy()
+      await checkLaneStarts(w)
+      expect(owed(lane.id)).toEqual([])
       expect(launches).toEqual([])
+      expect(await columnOf(first)).toBe('todo')
+      expect(pty.typed.join('')).not.toContain('New in your inbox')
+      expect((await lanes.getLane(w, lane.id)).status).toMatchObject({ reason: 'startWait', card: first, why: 'stopped', agent: 'H4' })
+      await lanes.endLane(w, lane.id, { abandoned: true })
+    })
+
+    it("someone's Stop between the look and the start's write (HI-2815, HR2's round 2): the card isn't started", async () => {
+      const first = await card('Stop at the write', 'h5')
+      const lane = await laneOf('h5', [first])
+      old('ready', 'h5')
+      laneStartsTestHooks.beforeStart = async () => void sessions.stop(p, 'h5', 'you')
+      await checkLaneStarts(w)
+      expect(await columnOf(first)).toBe('todo')
+      expect(pty.typed.join('')).not.toContain('New in your inbox')
+      laneStartsTestHooks.beforeStart = null
       await lanes.endLane(w, lane.id, { abandoned: true })
     })
 

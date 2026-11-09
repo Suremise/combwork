@@ -148,8 +148,12 @@ function slotRefused(e: unknown): boolean {
   return false
 }
 
-/** Whether an agent isn't running because someone stopped it, and nothing started it since (HI-2815, sessions.stoppedOnPurposeAt). */
-const stoppedByOne = (projectPath: string, agentId: string): boolean => !sessions.liveFor(projectPath, agentId) && sessions.stoppedOnPurposeAt(projectPath, agentId) > 0
+/**
+ * Whether someone stopped an agent and nothing started it since (HI-2815, sessions.stoppedOnPurposeAt): whether or not its
+ * old run has exited yet (HR2's round 2: a graceful exit takes a while, its status still idle meanwhile). Only a start
+ * clears it, so a run still live is never taken for a restart.
+ */
+const stoppedByOne = (projectPath: string, agentId: string): boolean => sessions.stoppedOnPurposeAt(projectPath, agentId) > 0
 
 /** A start the lane no longer asks for: its lane ended, was changed or isn't the builder's, or the card isn't its next. */
 class LaneChanged extends Error {}
