@@ -91,7 +91,8 @@ Combwork runs **OpenCode 2** (the `opencode` command from opencode.ai). Turn it 
 - **Credentials.** Keys and tokens set on your PC (`OPENAI_API_KEY`, `GITHUB_TOKEN` and the like) don't reach OpenCode agents or the commands they run, and an AWS profile, a gcloud login or an Azure CLI sign-in on this PC isn't used unless the account saved a credential for that provider. **Settings → Advanced → OpenCode → Keep other credentials from OpenCode** turns that off.
 - **Only the connection's provider.** An OpenCode agent uses only the provider in its connection's model (`ollama` for `ollama/qwen3:8b`): titles, compaction and image requests can't go to another provider, even where a project's config sets another provider's model for them, and OpenCode's free cloud models aren't used. So a connection must name its model: with none, the agent doesn't start. This decides which provider OpenCode uses, not where that provider's address points, and isn't a firewall: web search, MCP servers, plugins and commands can still reach the network. **Settings → Advanced → OpenCode → Keep OpenCode to the connection's own provider** turns it off, and OpenCode may then use any provider it can, as outside Combwork.
 - **Status.** An OpenCode agent shows **working** while it works, **needs you** while OpenCode asks your permission (answer in its pane), **compacting** while it summarises its conversation (`/compact`), and **finished** at the end of each turn, as for the other CLIs. Combwork follows the agent's private OpenCode server for this, and catches up by itself if it loses touch with it for a moment.
-- **Modes.** **Build** (the default) uses OpenCode's own permission rules. **Plan** starts OpenCode's plan agent. **Approve all** approves everything OpenCode's rules don't deny, without asking. A mode changes when the agent restarts.
+- **Folders outside its own.** OpenCode's own rules let its agents read and change any folder on your PC without asking. Combwork makes an OpenCode agent ask first, before it reads or changes anything outside its own folder: it shows **needs you** until you answer in its pane, and an agent in an unattended lane waits there too, as a Claude Code agent would. A reviewer's review copies, the agent's skills and its temp folder stay allowed. **Approve all** approves these questions without asking you. A rule in the project's own OpenCode config, if you let it load, comes after Combwork's and wins: an `external_directory` rule there can allow a folder, or every folder. **Settings → Advanced → OpenCode → Ask before reaching outside the agent's folder** turns it off.
+- **Modes.** **Build** (the default) uses OpenCode's own permission rules, and asks before an outside folder. **Plan** starts OpenCode's plan agent. **Approve all** approves everything OpenCode's rules don't deny, without asking, outside folders included. A mode changes when the agent restarts.
 - **Effort.** OpenCode's effort is a variant of the model, and models list their own (often low, medium and high; some none). The connection's **Effort** offers the variants OpenCode lists for its model on your accounts, and none for a model listing none. Combwork sets the connection's model and effort on the session each time the agent starts or resumes, so a change applies at the next start; with no effort chosen, the session uses the model's own default (*OpenCode default*). If the account's OpenCode no longer lists the chosen effort for that model, or its models couldn't be read just then, the agent doesn't start and says why, rather than run on another effort.
 - **History, tokens and cost.** Combwork reads an OpenCode agent's session from its server while it runs, and once more when it stops, so the transcript view, the Sessions tab, the Overview and the pane's footer show its conversation (tool calls, interrupted turns and compactions included), its tokens and its cost as OpenCode reports it. Tokens include requests OpenCode makes for itself, such as naming the session. A model OpenCode has no price for (a subscription's, a free one or one on your PC) shows $0, and the cost's hover says that $0 isn't a measure of your plan's allowance. If Combwork can't read the end of a session, its history says so, and Combwork tries again later. **Settings → Advanced → OpenCode** has how often it checks. A **subagent** OpenCode starts (its `subagent` tool) runs in a session of its own: the Sessions tab lists it under the session that started it, with its own conversation, tokens and cost, which aren't counted again in that session's. Images you attach, and images a tool reads, show in the history (a model that can't read images refuses them, and OpenCode then refuses every later request in that session; the history shows its words). A revert you've marked in OpenCode shows as a notice until you confirm it; confirmed, the undone messages leave the history, though the tokens they used still count. Sessions you make in an OpenCode agent's own window (`/new`, `/fork`) appear in the Sessions tab once the agent stops, a fork under the session it came from, with only its own usage counted; **Adopt** takes a new one over, so it resumes on that account like the agent's own.
 - **Plan limits.** OpenCode reports plan limits only for an OpenCode Go or Console workspace it's signed in to: those show in the status bar and the Overview. Other providers' limits aren't available through OpenCode, so none are shown for them.
@@ -544,6 +545,220 @@ Combwork only ever ends processes the agent's session started: never one you sta
 - **From a card**: a card in **Doing** or **Review**, a project's or the workspace's own, has **Activity** in its dialog and its right-click menu. It opens on the agents working on that card now (its builder, else its reviewer, and any agent whose running session worked on it), with *Card HI-12* above. When nobody works on it any more it says so: the card has its history. The **×** on *Card HI-12* shows every agent again.
 - **From the Progress panel**: a run's details have **Show in Activity**, for the agent that ran it, and a lane's right-click menu has **Show in Activity**, for its builder and reviewer.
 - It reads nothing while it isn't shown or the window is minimised, and only the projects with an agent running.
+
+### Claude Code under an organisation's policy <a id="claude-code-managed-policy"></a>
+
+An organisation can manage Claude Code's settings for its users: in its admin console (Claude Code's *server-managed settings*, fetched when Claude Code signs in), in `C:\Program Files\ClaudeCode\managed-settings.json`, or in the registry (`HKLM\SOFTWARE\Policies\ClaudeCode`). Those settings come before anything Combwork passes. Three of them change what Combwork can do:
+
+- **`allowManagedHooksOnly`**: only hooks the organisation manages run. Combwork's own hooks don't, so Combwork can't tell what its agents are doing, can't hold file locks, and can't give an agent its messages. Its status line goes too (the policy allows only a managed one), and with it the agent's cost, plan limits, model and effort.
+- **`allowManagedPermissionRulesOnly`**: only the organisation's permission rules count. Combwork passes none of its own to agents: the one thing it relies on is pre-approving the Combwork Assistant's Combwork tools (`--allowedTools`). Under this policy the Assistant asks before each of its tool calls, no agent gets **always allow** in a permission prompt, and your own allow rules stop applying: expect more prompts. An agent waiting on a prompt shows as needing you, as always. If the organisation wants the Assistant's tools pre-approved, its admin can add rules such as `mcp__combwork__cw_list_tasks` to the managed `permissions.allow`; they aren't in Combwork's snippet, which never approves more than your **Settings → Assistant → Control** does.
+- **The update channel or version** (`autoUpdatesChannel`, `minimumVersion`, `requiredMaximumVersion`). If an update Combwork ran for Claude Code ends with the version where it was, or a later check finds an older version than the last (a session's updater put it back), Provider Setup says *Claude Code stayed on 2.1.311 after updating to 2.1.319: an organisation's policy may set its version or channel, or the update didn't take*. **Update** stays there; the note goes when the version changes, or after a day.
+
+**When an agent's hooks don't arrive**, the banner over its panes says what Combwork found on this computer: the setting and where it is (*Combwork found allowManagedHooksOnly in Claude Code's managed settings file…*). If it couldn't read one of them, it says so rather than taking it as empty. It can only read what is on the computer: an organisation's server-managed settings, if it has any, decide over it. When nothing on the computer explains hooks missing from a session's start, the banner says an organisation's remote policy may. Where the snippet would help, the banner has **Admin snippet…**.
+
+#### The admin snippet <a id="claude-code-admin-snippet"></a>
+
+**Admin snippet…** (on the banner, or **Claude Code Admin Snippet…** in the command palette) shows a block of Claude Code settings for the organisation's administrator to paste into its managed settings once. It gives Claude Code Combwork's hooks, and Combwork's status line, for every session, every account and every project on the computer, without working around the policy:
+
+- It holds no password or token. Each hook carries the token of the session it comes from, which only Combwork's own sessions have; Combwork takes nothing without it.
+- In a session Combwork didn't start, its hooks send nothing (the SessionStart hook and the status line), or are answered without anything happening (the others).
+- Its hooks post to `http://127.0.0.1:<port>/hook`, Combwork's **Agent API** port (47821 for the installed app; Settings → Agent API). If that port changes, the administrator pastes a new snippet: Combwork says so if a session's other hooks stop while its SessionStart still arrives. A development build of Combwork (47822) needs its own hooks too: tick **Also for a development build** in the dialog.
+- Its status line replaces any status line the organisation's managed settings set, in every Claude Code session on the computer, and shows nothing. Untick it in the dialog to leave it out; Combwork then can't show cost, plan limits, model or effort.
+- If the managed settings set **`allowedHttpHookUrls`**, add `http://127.0.0.1:47821/hook*` to it; if they set **`httpHookAllowedEnvVars`**, add `CW_HOOK_TOKEN`.
+- Combwork's own hooks are the snippet's, handler for handler, so where the policy doesn't allow only managed hooks, Claude Code runs each once. If they differ (a hook timeout changed in Settings → Advanced after the snippet was pasted, or an older snippet), Claude Code may run both (it runs hooks to the same address once, but the SessionStart command twice): Combwork takes a session's start, each tool call and each prompt once, other hooks may count twice, and a banner asks for the snippet to be pasted again.
+
+The dialog fills in your port and your hook timeouts. For port 47821 and the default timeouts it is:
+
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQAiAAoAZQB4AGkAdAAgADAA",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 10,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "http",
+            "url": "http://127.0.0.1:47821/hook",
+            "timeout": 5,
+            "headers": {
+              "Authorization": "Bearer $CW_HOOK_TOKEN"
+            },
+            "allowedEnvVars": [
+              "CW_HOOK_TOKEN"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABQAHIAbwBnAHIAZQBzAHMAUAByAGUAZgBlAHIAZQBuAGMAZQA9ACcAUwBpAGwAZQBuAHQAbAB5AEMAbwBuAHQAaQBuAHUAZQAnAAoAJAB1AD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBVAFIATAA7ACAAJABhAD0AJABlAG4AdgA6AEMAVwBfAEgATwBPAEsAXwBBAFUAVABIAF8ARgBJAEwARQAKAGkAZgAgACgALQBuAG8AdAAgACQAdQAgAC0AbwByACAALQBuAG8AdAAgACQAYQApACAAewAgAGUAeABpAHQAIAAwACAAfQAKAFMAZQB0AC0ATABvAGMAYQB0AGkAbwBuACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAtAEwAaQB0AGUAcgBhAGwAUABhAHQAaAAgACQAYQApAAoAYwB1AHIAbAAuAGUAeABlACAALQBzACAALQBtACAANQAgAC0AWAAgAFAATwBTAFQAIAAtAEgAIAAiAEAAJAAoAFMAcABsAGkAdAAtAFAAYQB0AGgAIAAkAGEAIAAtAEwAZQBhAGYAKQAiACAALQBIACAAIgBDAG8AbgB0AGUAbgB0AC0AVAB5AHAAZQA6ACAAYQBwAHAAbABpAGMAYQB0AGkAbwBuAC8AagBzAG8AbgAiACAALQAtAGQAYQB0AGEALQBiAGkAbgBhAHIAeQAgACIAQAAtACIAIAAiACQAKAAkAHUAKQA/AHMAdABhAHQAdQBzAGwAaQBuAGUAIgAKAGUAeABpAHQAIAAwAA==",
+    "padding": 0
+  }
+}
+```
+
+Its SessionStart hook and status line run one PowerShell command, encoded so Git Bash and PowerShell (the shells Claude Code runs hooks in) pass it alike. Decoded, it is:
+
+```powershell
+$ProgressPreference='SilentlyContinue'
+$u=$env:CW_HOOK_URL; $a=$env:CW_HOOK_AUTH_FILE
+if (-not $u -or -not $a) { exit 0 }
+Set-Location -LiteralPath (Split-Path -LiteralPath $a)
+curl.exe -s -m 5 -X POST -H "@$(Split-Path $a -Leaf)" -H "Content-Type: application/json" --data-binary "@-" "$($u)"
+exit 0
+```
+
+`CW_HOOK_URL` and `CW_HOOK_AUTH_FILE` are set by Combwork for each session it starts. The auth file is in Combwork's own data, not the project, and goes when the session ends.
 
 ### Reading past sessions <a id="reading-past-sessions"></a>
 
@@ -1065,7 +1280,7 @@ Stopping a `cw-progress` command (Ctrl+C where it gets one) gives it 5 seconds t
 
 A reviewer reviews a card's work in a **review copy**: a folder from the same pool as check copies (`<workspace>.worktrees/<project>/copies/copy-2`), at exactly the revision the builder submitted, which nothing else writes. When it starts its review, Combwork leases it a copy and its reply says where: *Review in …\copies\copy-2 at a3f2c1d: read and run commands there. Your session and its shell stay in your own folder, so change into the copy in each command.* So the builder can carry on in its own folder while the review reads and tests what was submitted, and a check the reviewer runs there (`cw-progress --check typecheck`) counts for that submission. Its verdict returns the copy, and so does its review ending otherwise (the card moving on, or the reviewer's session ending); a copy is used again only once nothing is left running in it. When every copy is in use, the card's history says *R1 is waiting for a review copy*, the reviewer is told which copy is likely to come free first and what still holds it, and Combwork tells it once one is free. A copy an isolated check used is free again within seconds of the check ending, even while its builder carries on working. A review that waits more than five minutes for a copy shows as stalled to whoever watches the lane.
 
-The reviewer's session stays in the project folder, so its conversation always resumes there. Its launch is given the project's copies folder, one fixed path, as each coding agent allows on its command line, never in its own settings: **Claude Code** and **GitHub Copilot** `--add-dir` (Copilot's Accept edits approves its edits there as in its own folder), **Codex** `--add-dir`, which adds the folder to the writable roots of your own Codex settings rather than replacing them, and **OpenCode** needs nothing: its own default rules let it reach folders outside its own without asking, the copies included (a rule in the project's OpenCode config, if you let it in, can still make it ask or refuse), and in Plan it edits nothing there. Reviewers and agents that do either get it whenever they start in the project folder; builders, and an agent that does either while it builds in its slot, don't. Builds and tests in the copy run within the agent's own permission mode. **Settings → Advanced → Reviewers review in review copies** turns this off: reviewers then review the builder's folder, as before, and sessions started afterwards aren't given the folder. With **Workflow rules are enforced** off, no review copy is leased either; a copy a reviewer already has is handed back as usual when its review ends.
+The reviewer's session stays in the project folder, so its conversation always resumes there. Its launch is given the project's copies folder, one fixed path, as each coding agent allows on its command line, never in its own settings: **Claude Code** and **GitHub Copilot** `--add-dir` (Copilot's Accept edits approves its edits there as in its own folder), **Codex** `--add-dir`, which adds the folder to the writable roots of your own Codex settings rather than replacing them, and **OpenCode** an allow for the folder in its private config, among the folders it may reach without asking (a rule in the project's OpenCode config, if you let it in, can still make it ask or refuse), and in Plan it edits nothing there. Reviewers and agents that do either get it whenever they start in the project folder; builders, and an agent that does either while it builds in its slot, don't. Builds and tests in the copy run within the agent's own permission mode. **Settings → Advanced → Reviewers review in review copies** turns this off: reviewers then review the builder's folder, as before, and sessions started afterwards aren't given the folder. With **Workflow rules are enforced** off, no review copy is leased either; a copy a reviewer already has is handed back as usual when its review ends.
 
 ## Task board <a id="task-board"></a>
 

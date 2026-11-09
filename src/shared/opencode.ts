@@ -144,9 +144,10 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
     startupSizeRefresh: true,
     bracketedPaste: false,
     enterOnceDrawn: false,
-    // 2.2.6 reaches folders outside the session's own with no grant: every agent's default rules begin `* * allow`, so
-    // its external_directory permission asks only where a rule the user let in says so (HI-2772, the real tier's
-    // opencodereal-dirs). Combwork adds no rule: a reviewer is lent its review copy, and Plan still edits nothing.
+    // 2.2.6's agents reach folders outside the session's own unasked (every agent's default rules begin `* * allow`,
+    // HI-2772), so a launch's private config asks external_directory for every outside folder and allows the review
+    // copies and Combwork's own folders it needs (HI-2775, askOutsideFolder: config.ts outsidePermissions). A reviewer is
+    // lent its review copy that way; Plan still edits nothing.
     extraDirs: true,
     // Each account a private data root (XDG_DATA_HOME, with its config, state and cache roots beside it): its sign-ins
     // and its sessions in its own database. Nothing shared between accounts.

@@ -67,6 +67,7 @@
   "shell.command.help.restoreBoard09": "0.9-Board-Sicherung wiederherstellen…",
   "shell.command.help.shortcuts": "Tastenkombinationen",
   "shell.command.help.tips": "Tipps…",
+  "shell.command.hooks.adminSnippet": "Admin-Snippet für Claude Code…",
   "shell.command.layout": "Layout: {layout}",
   "shell.command.mcp.import": "MCP-Server des Projekts in den Arbeitsbereich kopieren",
   "shell.command.notes.open": "Gemeinsame Notiz öffnen",

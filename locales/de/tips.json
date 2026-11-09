@@ -149,6 +149,8 @@
   "tips.cardWork.title": "Sieh, was die Arbeit einer Karte durchlaufen hat",
   "tips.chooseConnections.text": "Projekteinstellungen → Agenten → Verbindungen wählen… wählt eine Verbindung für jede Rolle der Agenten des Projekts (oder eine für alle, oder pro Agent) und ändert sonst nichts. Beim Laden einer Vorlage gibt es dieselbe Auswahl.",
   "tips.chooseConnections.title": "Hoher Aufwand für alle Bearbeiter, auf einmal",
+  "tips.claudeManagedPolicy.text": "Wenn die Claude-Code-Richtlinie deiner Organisation nur verwaltete Hooks zulässt, kann Combwork nicht erkennen, was seine Agenten tun. „Admin-Snippet für Claude Code…“ gibt deinem Administrator einen Block, den er einmal in die verwalteten Einstellungen einfügt, damit auch die Hooks von Combwork laufen.",
+  "tips.claudeManagedPolicy.title": "Claude Code unter der Richtlinie deiner Organisation",
   "tips.claudeStatusLine.text": "Combworks Statuszeile versorgt die Fußzeile eines Agenten und zeigt im Bereich nichts. Schalte Einstellungen → Erweitert → Combworks Statuszeile statt deiner aus, um wieder die aus deinen Claude-Code-Einstellungen zu sehen: Combwork liest den Status weiterhin.",
   "tips.claudeStatusLine.title": "Behalte deine eigene Claude-Code-Statuszeile",
   "tips.cliOverrides.text": "Combwork ändert in seinen Sitzungen ein wenig, wie sich jede CLI verhält, etwa dass Copilot sich nicht selbst aktualisiert, oder den Terminaltitel von Codex. Jede Änderung lässt sich unter Einstellungen → Erweitert bei ihrer CLI ausschalten; dort steht, was Combwork ohne sie nicht mehr kann.",
@@ -570,6 +572,8 @@
   "tips.opencode.text": "Agenten können OpenCode 2 verwenden. Die Anbieter-Einrichtung installiert es; jedes OpenCode-Konto hat seine eigenen Anmeldungen bei Anbietern und seine eigenen Sitzungen, und jeder Agent führt einen privaten OpenCode-Server aus, der mit ihm endet.",
   "tips.opencodeOwnProvider.title": "OpenCode bleibt beim Anbieter der Verbindung",
   "tips.opencodeOwnProvider.text": "Ein OpenCode-Agent nutzt nur den Anbieter im Modell seiner Verbindung, sodass nichts, was er tut, an einen anderen Anbieter oder an OpenCodes kostenlose Cloud-Modelle geht. Gib das Modell der Verbindung an, etwa ollama/qwen3:8b; unter Einstellungen → Erweitert → OpenCode lässt sich das ausschalten.",
+  "tips.opencodeOutsideFolder.title": "OpenCode-Agenten fragen vor anderen Ordnern",
+  "tips.opencodeOutsideFolder.text": "Ein OpenCode-Agent fragt, bevor er etwas außerhalb seines eigenen Ordners liest oder ändert, und wartet in seinem Bereich auf deine Antwort. Review-Kopien bleiben erlaubt, und „Alles genehmigen“ genehmigt ohne Nachfrage; unter Einstellungen → Erweitert → OpenCode lässt sich das ausschalten.",
   "tips.opencode.title": "Agenten mit OpenCode ausführen",
   "tips.opencodeHistory.text": "Die Unterhaltung eines OpenCode-Agenten erscheint im Tab „Sitzungen“, seine Tokens und Kosten in der Übersicht und der Fußzeile seines Bereichs, wie OpenCode sie meldet. $0 Kosten sind kein Maß für das Kontingent deines Plans; Limits gibt es nur für OpenCode Go oder Console.",
   "tips.opencodeHistory.title": "Verlauf, Tokens und Kosten eines OpenCode-Agenten"

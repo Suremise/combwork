@@ -149,6 +149,8 @@
   "tips.cardWork.title": "查看卡片工作经历了什么",
   "tips.chooseConnections.text": "在“项目设置”→“智能体”→“选择连接…”中，可为项目智能体的每个角色选择连接（也可全部相同或按智能体选择），其他一概不变。加载模板时也提供同样的选择。",
   "tips.chooseConnections.title": "一次性为所有构建者设置高推理强度",
+  "tips.claudeManagedPolicy.text": "如果你所在组织的 Claude Code 策略只允许托管钩子，Combwork 就无法得知其智能体在做什么。“Claude Code 管理员代码片段…”会为你的管理员提供一个代码块，只需将其粘贴到托管设置中一次，Combwork 的钩子就也能运行。",
+  "tips.claudeManagedPolicy.title": "在组织策略下使用 Claude Code",
   "tips.claudeStatusLine.text": "Combwork 的状态行为智能体的页脚提供信息，在窗格中不显示任何内容。关闭“设置”→“高级”→“用 Combwork 的状态行代替你的”，即可再次看到你的 Claude Code 设置中的状态行：Combwork 仍会读取状态。",
   "tips.claudeStatusLine.title": "保留你自己的 Claude Code 状态行",
   "tips.cliOverrides.text": "Combwork 会稍微改变每个 CLI 在其会话中的行为，例如不让 Copilot 自行更新，或设置 Codex 的终端标题。每项更改都可以在“设置”→“高级”中对应 CLI 的下方关闭，那里会说明关闭后 Combwork 无法再做什么。",
@@ -570,6 +572,8 @@
   "tips.opencode.text": "智能体可以使用 OpenCode 2。“配置提供方”会安装它；每个 OpenCode 账号都有自己的提供方登录和会话，每个智能体都运行一个随它一起结束的私有 OpenCode 服务器。",
   "tips.opencodeOwnProvider.title": "OpenCode 只使用连接的提供方",
   "tips.opencodeOwnProvider.text": "OpenCode 智能体只使用其连接模型中的提供方，因此它所做的任何事都不会发送给其他提供方或 OpenCode 的免费云端模型。请指定连接的模型，例如 ollama/qwen3:8b；可在“设置”→“高级”→“OpenCode”中关闭。",
+  "tips.opencodeOutsideFolder.title": "OpenCode 智能体访问其他文件夹前会询问",
+  "tips.opencodeOutsideFolder.text": "OpenCode 智能体在读取或更改其自身文件夹以外的任何内容前会先询问，并在它的窗格中等待你的回答。评审副本仍然允许，“全部批准”会直接批准；可在“设置”→“高级”→“OpenCode”中关闭。",
   "tips.opencode.title": "使用 OpenCode 运行智能体",
   "tips.opencodeHistory.text": "OpenCode 代理的对话显示在“会话”标签页中，其令牌和费用按 OpenCode 的报告显示在概览和其窗格的页脚中。$0 的费用并不能衡量你的套餐额度；只有 OpenCode Go 或 Console 才显示限额。",
   "tips.opencodeHistory.title": "OpenCode 代理的历史记录、令牌和费用"

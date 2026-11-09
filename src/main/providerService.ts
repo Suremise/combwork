@@ -16,6 +16,7 @@ import { noteCliFolder, refreshPath } from './freshPath'
 import { emit, onCombworkEvent, toast } from './events'
 import { createLogger } from './logger'
 import { childEnv, hasPty, killPty, spawnPty, startSize, writePty } from './ptyHost'
+import { judgeStayed, type StayedRecord, type UpdateExpectation } from './updateStayed'
 import { connectionsManaged } from './connectionSeam'
 import { KeyGate } from './taskKeys'
 import { KeysStopped, PickNotFound, typeKeySteps } from './keySteps'
@@ -208,6 +209,10 @@ class ProviderService {
 
   /** Each provider's latest refresh: an older one still running when a newer starts (the path changed) is dropped. */
   private refreshes = new Map<ProviderId, number>()
+  /** An update Combwork ran, until the check after it (HI-2777: updateStayed.ts). */
+  private updateExpect = new Map<ProviderId, UpdateExpectation>()
+  /** A CLI seen staying on its version after an update (HI-2777). */
+  private stayed = new Map<ProviderId, StayedRecord>()
 
   private async refreshOne(id: ProviderId, checkLatest?: boolean): Promise<AgentInstallInfo> {
     const adapter = provider(id)
@@ -258,6 +263,16 @@ class ProviderService {
         observedEfforts: this.observedEfforts(id),
         tested: tested ? compareTested(tested, found.version, (a, b) => adapter.isNewer(a, b)) : null,
         checking: false
+      }
+      // A CLI an organisation can govern remotely, staying on its version after an update (HI-2777): Provider Setup says a
+      // policy may decide it rather than offer the same update as if nothing happened.
+      if (adapter.descriptor.capabilities.remoteHookPolicy) {
+        const expect = this.updateExpect.get(id) ?? null
+        if (expect && !hasPty(`task:${id}:update`)) this.updateExpect.delete(id)
+        const stayed = judgeStayed({ expect: hasPty(`task:${id}:update`) ? null : expect, prev: { path: prev.path, version: prev.version }, next: { path: found.path, version: found.version, latest }, held: this.stayed.get(id) ?? null, now: Date.now(), isNewer: (a, b) => adapter.isNewer(a, b) })
+        if (stayed) this.stayed.set(id, stayed)
+        else this.stayed.delete(id)
+        if (stayed && next.updateAvailable) next.updateStayed = { version: stayed.version, offered: stayed.offered }
       }
     } catch (e) {
       log.error(`Failed to locate ${adapter.descriptor.name}`, e)
@@ -402,7 +417,10 @@ class ProviderService {
       if (retryUpdate && (!pending || pending.path !== info.path || pending.version !== info.version)) throw combworkError(msg({ id: 'service.providers.retryUnavailable', defaultMessage: 'This update retry is no longer available. Check again, then try Update.', description: 'Provider Setup error when a user tries to retry an update whose failure is no longer current. Check again and Update are buttons.' }), undefined, { kind: 'conflict' })
       if (hasPty(`task:${id}:${task}`)) return `task:${id}:${task}`
       const cmd = retryUpdate ? pending!.retry.command : adapter.updateCommand(info.path)
+      // What the check after it compares (HI-2777: a version that stays put).
+      this.updateExpect.set(id, { path: info.path, from: info.version, offered: info.latestVersion })
       const key = this.runTask(id, task, cmd, `${name} update`, undefined, shown, (code) => { // i18n-ignore: the task's name in the log
+        if (code !== 0) this.updateExpect.delete(id)
         // Its installer having nothing newer (WinGet's 0x8A15002B) isn't a failure: the check after it says up to date.
         if (code !== 0 && adapter.updateUpToDate?.(info.path!, code)) return true
         const retry = adapter.updateRetry?.(info.path!, code)

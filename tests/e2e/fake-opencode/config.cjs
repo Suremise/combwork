@@ -86,7 +86,10 @@ function load(projectDir, env = process.env) {
   }
   const globalPolicies = global.policies || []
   const projectPolicies = project.flatMap((p) => p.config.policies || [])
-  return { cfgDir, global, loaded, servers, providers, model, instructions: [...new Set(instructions)], globalPolicies, projectPolicies, serviceDisabled: readJson(path.join(cfgDir, 'service.json'))?.disabled === true }
+  // Permission rules: each document's in turn, the config folder's first, so a project's let in comes last and wins
+  // (2.2.6 pushes them onto each agent's own rules: probes/external-directory-ask.json, HI-2775).
+  const permissions = [...(global.permissions || []), ...project.flatMap((p) => p.config.permissions || [])]
+  return { cfgDir, global, loaded, servers, providers, model, instructions: [...new Set(instructions)], globalPolicies, projectPolicies, permissions, serviceDisabled: readJson(path.join(cfgDir, 'service.json'))?.disabled === true }
 }
 
 const glob = (pattern, value) => new RegExp('^' + String(pattern).replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$').test(value)

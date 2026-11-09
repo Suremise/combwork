@@ -90,7 +90,7 @@ import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agen
 import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
-import { apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
+import { apiInfo, claudeSnippetFacts, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
 import * as templates from './templates'
 import * as branchWatch from './branchWatch'
@@ -1880,6 +1880,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'session:restartForTools': (p, agentId, when) => sessions.restartForTools(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
 
     'api:info': () => apiInfo(),
+    'api:claudeSnippet': () => claudeSnippetFacts(),
     'api:regenerateToken': async () => {
       await regenerateToken()
       return apiInfo()

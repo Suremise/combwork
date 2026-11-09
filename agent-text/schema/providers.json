@@ -201,6 +201,13 @@
       "version": "plain"
     }
   },
+  "providers.readiness.updateStayed": {
+    "placeholders": {
+      "provider": "plain",
+      "version": "plain",
+      "offered": "plain"
+    }
+  },
   "providers.settings.hooksOff": {
     "placeholders": {
       "source": "select",

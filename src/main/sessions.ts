@@ -40,6 +40,8 @@ import type {
   AgentInfo,
   EffortLevel,
   FileLockMode,
+  HookCause,
+  HooksMissing,
   LaunchDialect,
   LiveSessionState,
   ModelSwitch,
@@ -88,7 +90,8 @@ import { emit, emitTo, onCombworkEvent, toast } from './events'
 import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
-import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
+import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/claudeHookHandlers'
+import { COMPACTING_TEXT, HOOKS_DOUBLED_NOTE, hooksMissingNote, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
 import { latestStop, memoModel, memoTools, memoTurn, newTurn, noteSafeguard, placeEvent, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
 import { applyStatus, idleNow, NO_STATUS, type StatusState } from './statusLineState'
@@ -433,6 +436,10 @@ interface LiveSession {
   turnsBegun?: boolean
   /** For the check's why: where its CLI's settings turn hooks off now, and whether it is newer than Combwork was tested with. */
   hooksOffIn?: () => string | null
+  /** What on the PC would keep its hooks away (HI-2777: the adapter's hookCause, read at launch), once read. */
+  hookCause?: HookCause | null
+  /** The hook events heard from this launch (HI-2777: SessionStart alone tells a snippet naming another port). */
+  heard?: Set<string>
   newerThanTested?: boolean
   /** When the cost estimate was last worked out (providers that don't report cost, or the user's prices: #436). */
   costAt?: number
@@ -1341,6 +1348,8 @@ class SessionManager {
     return this.deliveries
   }
   hookUrl = ''
+  /** The fixed hook URL on the Agent API's port while it listens (HI-2777: Claude Code's hooks and the admin snippet's), else null. */
+  fixedHookUrl: () => string | null = () => null
   apiEnv: (projectPath: string, agentId: string) => Record<string, string> = () => ({})
   /** Combwork's bin folder (cw-progress), first on each session's PATH; null until written, or when it couldn't be. */
   binDir: string | null = null
@@ -2939,6 +2948,7 @@ class SessionManager {
     const tempDir = tempSetting ? await prepareAgentTemp({ setting: tempSetting, host: projectPath, agentId: agent.id, assistant: assistantHost, protect: [...(await protectedFolders(openWorkspaces())), projectPath, cwd] }) : null
     times?.mark('tempDir')
     const binPath = (env: Record<string, string>, dir: string | null): Record<string, string> => (policy.tools ? withBinOnPath(env, dir) : env)
+    const fixedHookUrl = this.fixedHookUrl()
     const ctx: LaunchContext = {
       projectPath,
       agentId: agent.id,
@@ -2962,6 +2972,7 @@ class SessionManager {
       othersHere: () => this.othersIn(cwd, id),
       extraDirs,
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
+      fixedHookUrl,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,
       guidance,
@@ -2987,6 +2998,10 @@ class SessionManager {
       // no cw-progress on its PATH.
       env: withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
         CW_HOOK_TOKEN: hookAuth.token,
+        // Claude Code's hook commands (HI-2777: SessionStart, the admin snippet's status line) read where to post and the
+        // auth file's header from these, so no command names a port or holds the token.
+        [HOOK_URL_ENV]: fixedHookUrl ?? this.hookUrl,
+        [HOOK_AUTH_FILE_ENV]: hookAuth.file,
         CW_RUN_ID: state.runId,
         ...(state.sessionId ? { CW_SESSION_ID: state.sessionId } : {}),
         ...(policy.tools ? { CW_PROJECT: basename(projectPath), CW_PROJECT_PATH: projectPath, CW_WORKSPACE: workspaceOf(projectPath).path!, CW_AGENT: agent.name, CW_PROVIDER: adapter.id } : {}),
@@ -3063,6 +3078,13 @@ class SessionManager {
     // Whether its hooks reach Combwork (#1336), and what can say why they don't.
     l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook, adapter.transcriptTurns ? (adapter.turnsJoin ?? 'id') : null)
     l.hooksOffIn = adapter.hooksOffIn ? () => adapter.hooksOffIn!(ctx) : undefined
+    // Read once, in the background: the warning names it if its hooks don't come (HI-2777).
+    if (adapter.hookCause) {
+      void adapter.hookCause(ctx).then(
+        (c) => (l.hookCause = c),
+        () => (l.hookCause = null)
+      )
+    }
     l.newerThanTested = info.tested?.installed === 'newer'
     // What it was given: Combwork's guidance revision and each skill as delivered (the Agent API's project status shows
     // them). A skill not delivered as asked (kept old copy, failed copy) leaves it needing a restart.
@@ -3955,9 +3977,22 @@ class SessionManager {
         return null
       }
     })()
-    const why = hooksRefused(st.runId) ? 'refused' : offIn ? 'off' : l.newerThanTested ? 'newer' : undefined
+    // What on the PC would keep them away (HI-2777), read at launch: a setting and where; else hooksOffIn's answer. An
+    // allowlist without the token's variable sends them with no token, which Combwork refuses: the allowlist is the cause.
+    const cause = l.hookCause ?? (offIn ? { why: 'off' as const, setting: 'disableAllHooks', where: offIn, snippet: false } : null) // i18n-ignore: a select key and a setting's name, never shown
+    const remote = !!l.adapter.descriptor.capabilities.remoteHookPolicy
+    const events = l.heard ?? new Set<string>()
+    const why: HooksMissing['why'] =
+      cause?.why === 'blocked' ? 'blocked'
+      : hooksRefused(st.runId) ? 'refused'
+      : cause ? cause.why
+      : remote && events.has('SessionStart') && [...events].every((e) => e === 'SessionStart') ? 'partial'
+      : l.newerThanTested ? 'newer'
+      : remote && after === 'start' ? 'org'
+      : undefined
+    const snippet = cause ? cause.snippet : why === 'partial' || why === 'org'
     const turn = after === 'transcript' ? l.hooksWatch?.flagged : null
-    st.hooksMissing = { since: new Date().toISOString(), after, ...(turn ? { turn } : {}), ...(why ? { why } : {}), ...(why === 'off' ? { offIn: offIn! } : {}) }
+    st.hooksMissing = { since: new Date().toISOString(), after, ...(turn ? { turn } : {}), ...(why ? { why } : {}), ...(cause && why === cause.why ? { offIn: cause.where, setting: cause.setting, ...(cause.also ? { also: cause.also } : {}) } : {}), ...(snippet ? { snippet } : {}) }
     this.emitState(st)
     noteHooksMissing(st.projectPath, st.agentId, true)
     const label = this.label(st)
@@ -3966,7 +4001,7 @@ class SessionManager {
     // Once a conversation (a restart with the same hooks problem says it again only in its pane).
     if (!this.hooksTold.first(`${st.agentId}\n${st.sessionId || st.runId}`)) return
     // A toast, kept in Notifications.
-    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Combwork isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label)) // i18n-ignore: select keys, never shown
+    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Combwork isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). {agent} is the agent." }), { agent: label }), hooksMissingNote(st, tr) ?? '', undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label))
   }
 
   /** Its hooks came again (#1336): its status is Combwork's to tell again, and its lanes go on. */
@@ -5987,6 +6022,29 @@ class SessionManager {
   }
 
   /** The launch a hook call belongs to: named by its run id, else (older launch folders) by session id. */
+  /** A hook's occurrence identity (HI-2777: hookTwins), as its launch's CLI gives one; null when it gives none. */
+  hookOccurrence(runId: string, body: Record<string, any>): string | null {
+    const l = this.findLaunch(runId, body.session_id)?.[1]
+    return l?.adapter.hookOccurrence?.(body) ?? null
+  }
+
+  /**
+   * A launch's hooks arrive twice (HI-2777): its CLI ran Combwork's handler and a differing one of the admin snippet's
+   * (a timeout changed since it was pasted, an older snippet). Each occurrence with an identity is handled once; the
+   * others twice. Logged, and the user told once a run to copy the snippet again.
+   */
+  hooksDoubled(runId: string): void {
+    const found = this.findLaunch(runId, null)
+    if (!found) return
+    const st = found[1].state
+    const label = this.label(st)
+    log.warn(`${userText(label)}: its hooks arrive twice (Combwork's and a managed snippet's that differs); tool calls and prompts are handled once, other hooks twice`)
+    hookJournal(`run=${st.runId} hooks doubled`)
+    st.hooksDoubled = true
+    this.emitState(st)
+    toast('warning', tr(msg({ id: 'session.notice.hooksDoubledTitle', defaultMessage: "{agent}'s hooks arrive twice", description: "A notification's title: an agent's coding agent sends Combwork each of its hooks twice (the calls that tell Combwork what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_DOUBLED_NOTE, { provider: found[1].adapter.descriptor.name }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label))
+  }
+
   private findLaunch(runId: string | null, sessionId: unknown): [string, LiveSession] | null {
     if (runId) {
       const id = this.runs.get(runId)
@@ -6808,6 +6866,7 @@ class SessionManager {
     const l = this.findLaunch(runId, body.session_id)?.[1]
     if (!l?.hookHistory) return null
     const event = clip(typeof body.hook_event_name === 'string' ? body.hook_event_name : '?', HOOK_SHORT_MAX).text
+    ;(l.heard ??= new Set()).add(event)
     const obs: HookObservation = { l, started: performance.now(), fired: { at: Date.now(), event, receiver: l.hooks?.receivers[event] ?? 'combwork', response: 'none', ledger: 'none', ms: 0 } }
     this.hookObs.set(body, obs)
     return obs

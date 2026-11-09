@@ -149,6 +149,8 @@
   "tips.cardWork.title": "Voir le parcours du travail d’une carte",
   "tips.chooseConnections.text": "Paramètres du projet → Agents → Choisir les connexions… choisit une connexion pour chaque rôle des agents du projet (ou une pour tous, ou par agent), sans rien changer d’autre. Charger un modèle propose le même choix.",
   "tips.chooseConnections.title": "Un effort élevé pour tous les auteurs, d’un coup",
+  "tips.claudeManagedPolicy.text": "Si la stratégie Claude Code de ton organisation n’autorise que les hooks gérés, Combwork ne peut pas savoir ce que font ses agents. Extrait administrateur Claude Code… donne à ton administrateur un bloc à coller une seule fois dans ses paramètres gérés, pour que les hooks de Combwork s’exécutent aussi.",
+  "tips.claudeManagedPolicy.title": "Claude Code sous la stratégie de ton organisation",
   "tips.claudeStatusLine.text": "La ligne d’état de Combwork alimente le pied d’un agent et n’affiche rien dans le volet. Désactive Paramètres → Avancé → La ligne d’état de Combwork à la place de la tienne pour revoir celle de tes paramètres Claude Code : Combwork lit toujours l’état.",
   "tips.claudeStatusLine.title": "Garde ta propre ligne d’état Claude Code",
   "tips.cliOverrides.text": "Combwork modifie un peu le comportement de chaque CLI dans ses sessions, comme Copilot qui ne se met pas à jour lui-même ou le titre du terminal de Codex. Chaque modification peut être désactivée dans Paramètres → Avancé, sous sa CLI, qui indique ce que Combwork ne peut plus faire sans elle.",
@@ -570,6 +572,8 @@
   "tips.opencode.text": "Les agents peuvent utiliser OpenCode 2. Configuration des fournisseurs l’installe ; chaque compte OpenCode a ses propres connexions aux fournisseurs et ses propres sessions, et chaque agent exécute un serveur OpenCode privé qui s’arrête avec lui.",
   "tips.opencodeOwnProvider.title": "OpenCode s’en tient au fournisseur de la connexion",
   "tips.opencodeOwnProvider.text": "Un agent OpenCode n’utilise que le fournisseur du modèle de sa connexion, donc rien de ce qu’il fait ne va à un autre fournisseur ni aux modèles cloud gratuits d’OpenCode. Nomme le modèle de la connexion, comme ollama/qwen3:8b ; Paramètres → Avancé → OpenCode le désactive.",
+  "tips.opencodeOutsideFolder.title": "Les agents OpenCode demandent avant d’autres dossiers",
+  "tips.opencodeOutsideFolder.text": "Un agent OpenCode demande avant de lire ou de modifier quoi que ce soit hors de son propre dossier, et attend ta réponse dans son volet. Les copies de relecture restent autorisées, et Tout approuver approuve sans demander ; Paramètres → Avancé → OpenCode le désactive.",
   "tips.opencode.title": "Exécuter des agents avec OpenCode",
   "tips.opencodeHistory.text": "La conversation d’un agent OpenCode s’affiche dans l’onglet Sessions, et ses tokens et son coût dans la Vue d’ensemble et le pied de son volet, tels qu’OpenCode les indique. Un coût de $0 ne mesure pas le quota de votre forfait ; les limites ne s’affichent que pour OpenCode Go ou Console.",
   "tips.opencodeHistory.title": "L’historique, les tokens et le coût d’un agent OpenCode"

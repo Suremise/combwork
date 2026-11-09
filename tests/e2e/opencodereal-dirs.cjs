@@ -1,12 +1,13 @@
 // The real OpenCode (the pinned 2.2.6) and folders outside its own (HI-2772, #1439), through Combwork's production launch,
 // under Darren's HI-2758 option A as opencodereal.cjs: no account, key, sign-in or cloud call; model turns only to the PC's
-// local Ollama qwen3:8b through a logging proxy here; the project's own OpenCode config kept out (the default). Combwork
-// adds no permission rule for a reviewer's review copies: 2.2.6's default rules (`* * allow` first) let any agent reach
-// them, so what this records is that baseline. Three agents, each in its own fresh session: a reviewer in Build reads a
-// marker file in the copies folder (proved by its session record's read result for that turn) and writes a new file
-// there (its bytes on disk); a reviewer in Plan, asked to write there, doesn't (its own edit deny: the file absent, and
-// what it tried, from its record); a builder in Build, lent no copy, reaches the copies folder too, unasked. Any
-// permission asked is recorded and rejected (Esc, 2.2.6's escapeKey), never approved. A turn is one by its own id (the
+// local Ollama qwen3:8b through a logging proxy here; the project's own OpenCode config kept out (the default). Combwork's
+// launch config asks external_directory for every folder outside the agent's own and allows a reviewer's review copies
+// (HI-2775: 2.2.6's default rules, `* * allow` first, would let any agent reach any folder). Three agents, each in its own
+// fresh session: a reviewer in Build reads a marker file in the copies folder (proved by its session record's read result
+// for that turn) and writes a new file there (its bytes on disk), unasked; a reviewer in Plan, asked to write there,
+// doesn't (its own edit deny: the file absent, and what it tried, from its record); a builder in Build, lent no copy, is
+// asked for the copies folder (shown as waiting for the user, OpenCode's external_directory) and, rejected, writes nothing
+// there. Any permission asked is recorded and rejected (Esc, 2.2.6's escapeKey), never approved. A turn is one by its own id (the
 // turn ledger's) reaching its end; each attempt has its own files and marker, and a tool's result counts once the record
 // has it ended for that turn. A step the model never tries in three prompts makes the run SKIPPED (inconclusive), not a
 // pass (opencodeDirsProbe.cjs). The evidence goes to the suite's log and TRACE (scrubbed into
@@ -196,9 +197,12 @@ function proxy() {
       const written = file ? JSON.parse(fs.readFileSync(file, 'utf8')) : null
       const providerRules = (written?.policies ?? []).filter((p) => p.action === 'provider.use')
       const held = providerRules[0]?.resource === '*' && providerRules[0]?.effect === 'deny' && providerRules.filter((p) => p.effect === 'allow').every((p) => p.resource === seam.id) && written?.model === `${seam.id}/${MODEL}`
-      trace.launches[label] = { defaultAgent: written?.default_agent ?? null, permissions: written?.permissions ?? null, externalDirectoryRules: JSON.stringify(written ?? {}).includes('external_directory'), providerPolicies: providerRules }
+      trace.launches[label] = { defaultAgent: written?.default_agent ?? null, permissions: written?.permissions ?? null, providerPolicies: providerRules }
       check(`${label}: the launch config denies every provider but the local test one`, held, JSON.stringify(trace.launches[label]))
-      check(`${label}: …and adds no permission rule (no permissions, no external_directory)`, !!written && !('permissions' in written) && !trace.launches[label].externalDirectoryRules, JSON.stringify(written?.permissions))
+      // HI-2775: ask for every outside folder first, then the grants; the copies among them for a reviewer only.
+      const rules = written?.permissions ?? []
+      const copiesRule = rules.some((r) => r.action === 'external_directory' && r.effect === 'allow' && r.resource.toLowerCase() === `${fwd(copies)}/*`.toLowerCase())
+      check(`${label}: …asks before an outside folder${agent === agents.builder ? ', the copies not allowed (no review copy)' : ', the review copies allowed'}`, rules[0]?.action === 'external_directory' && rules[0]?.resource === '*' && rules[0]?.effect === 'ask' && copiesRule === (agent !== agents.builder), JSON.stringify(rules))
       const sessionId = (await until(async () => sessionsMade().find((f) => !knownSes.has(f)) ?? null, HUNG_MS))?.replace(/\.json$/, '') ?? null
       const drawn = !!(await until(async () => (/ctrl\+p commands/.test(await screen(agent)) ? true : null), HUNG_MS))
       check(`${label}: its TUI is drawn in its pane`, drawn, (await screen(agent)).slice(-300))
@@ -307,20 +311,26 @@ function proxy() {
       console.log(`INCONCLUSIVE reviewer (Plan): never called a write tool in ${TRIES} prompts (2.2.6's Plan may offer none): ${JSON.stringify(trace.results.plan)}`)
     }
 
-    // --- 3. A builder in Build, lent no copy: reaches the copies folder too, unasked (2.2.6's baseline).
+    // --- 3. A builder in Build, lent no copy: asked for the copies folder (HI-2775), shown as waiting for the user, and,
+    // rejected, writes nothing there.
     const bd = await start('builder (Build)', agents.builder)
     if (!bd) return
+    const builderFiles = []
+    const builderAsks = (n) => trace.asks.filter((a) => a.phase === `builder (Build): write ${n}`)
     const reached = await attempts('builder (Build): write', agents.builder, (n) => {
       const marker = `cw-builder-${crypto.randomBytes(4).toString('hex')}`
       const file = path.join(probe, `builder-${n}.txt`)
-      return { nonce: marker, marker, file, prompt: `Use your write tool to create the file ${fwd(file)} containing exactly this one line: ${marker}` }
-    }, async (a) => fs.existsSync(a.file) && fs.readFileSync(a.file, 'utf8').includes(a.marker))
+      builderFiles.push(file)
+      return { n, nonce: marker, marker, file, prompt: `Use your write tool to create the file ${fwd(file)} containing exactly this one line: ${marker}` }
+    }, async (a) => builderAsks(a.n).length > 0 || fs.existsSync(a.file))
     await stop('builder (Build)', agents.builder)
-    trace.results.baseline = reached ? { file: path.basename(reached.file), bytes: fs.readFileSync(reached.file, 'utf8'), asks: trace.asks.filter((a) => a.phase.startsWith('builder')) } : null
-    if (reached) console.log(`BASELINE builder (Build), lent no copy and given no rule, wrote ${path.basename(reached.file)} in the copies folder ${trace.results.baseline.asks.length ? 'after an ask' : 'unasked'} (2.2.6's default rules)`)
-    else {
-      inconclusive.push("the builder's write (the baseline)")
-      console.log(`INCONCLUSIVE builder (Build): no file written in ${TRIES} prompts`)
+    trace.results.builder = { asks: reached ? builderAsks(reached.n) : [], filesWritten: builderFiles.filter((f) => fs.existsSync(f)).map((f) => path.basename(f)) }
+    if (reached) {
+      check('builder (Build): asked for the copies folder, waiting for the user (external_directory)', trace.results.builder.asks.some((a) => a.message.startsWith('external_directory') && a.message.toLowerCase().includes(fwd(probe).toLowerCase())), JSON.stringify(trace.results.builder))
+      check('builder (Build): rejected, no file it was asked to write exists', trace.results.builder.filesWritten.length === 0, JSON.stringify(trace.results.builder))
+    } else {
+      inconclusive.push("the builder's write")
+      console.log(`INCONCLUSIVE builder (Build): never tried to write in ${TRIES} prompts`)
     }
     check('every model request went to the local proxy for ' + MODEL, trace.requests.length > 0 && trace.requests.every((r) => r.path.startsWith('/v1/') && (r.model === null || r.model === MODEL)), JSON.stringify(trace.requests.slice(0, 5)))
     check("none of this test's opencode is left running", !!(await until(async () => (opencodeLeft().length ? null : true), HUNG_MS)), JSON.stringify(opencodeLeft().map((p) => p.pid)))

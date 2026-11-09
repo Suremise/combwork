@@ -39,6 +39,10 @@
     "defaultMessage": "{live, select, yes {Changes apply to new sessions — restart the running session to apply them.} other {Changes apply to new sessions.}}",
     "description": "Under the Skills and MCP tabs."
   },
+  "project.banner.adminSnippet": {
+    "defaultMessage": "Admin snippet…",
+    "description": "Button in the banner saying an agent's hooks don't reach Combwork (or arrive twice): opens the admin snippet, a block of Claude Code settings an organisation's administrator pastes into its managed settings. The … says it opens a dialog: keep it."
+  },
   "project.banner.change": {
     "defaultMessage": "Change",
     "description": "Button in that banner: opens Project Settings."

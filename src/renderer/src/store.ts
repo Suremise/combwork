@@ -416,6 +416,8 @@ interface State {
   compactFor: AgentRef | null
   /** The agent whose Hooks dialog is open (HI-982). */
   hooksFor: AgentRef | null
+  /** Whether the Claude Code admin snippet dialog is open (HI-2777). */
+  adminSnippetOpen: boolean
   /** Project whose Add Agent dialog is open. */
   addAgentFor: string | null
   /** Agent whose settings dialog (name, model, effort, permission mode) is open. */
@@ -674,6 +676,7 @@ export const useStore = create<State>(() => ({
   sessionBulk: {},
   compactFor: null,
   hooksFor: null,
+  adminSnippetOpen: false,
   addAgentFor: null,
   agentSettingsFor: null,
   templateAgentFor: null,

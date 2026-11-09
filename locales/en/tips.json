@@ -599,6 +599,14 @@
     "defaultMessage": "High effort for every builder, in one go",
     "description": "A tip's title (HI-2109). Glossary: builder, effort."
   },
+  "tips.claudeManagedPolicy.text": {
+    "defaultMessage": "If your organisation's Claude Code policy allows only managed hooks, Combwork can't tell what its agents are doing. Claude Code Admin Snippet… gives your administrator a block to paste into its managed settings once, so Combwork's hooks run too.",
+    "description": "A tip. Claude Code Admin Snippet… is a command: keep it as Combwork shows it. \"Managed hooks\" are hooks an administrator sets for everyone."
+  },
+  "tips.claudeManagedPolicy.title": {
+    "defaultMessage": "Claude Code under your organisation's policy",
+    "description": "A tip's title (HI-2777): Combwork with Claude Code where an organisation manages Claude Code's settings."
+  },
   "tips.claudeStatusLine.text": {
     "defaultMessage": "Combwork's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Combwork's status line in place of yours to see the one in your Claude Code settings again: Combwork still reads the status.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -1498,6 +1506,14 @@
   "tips.opencodeHistory.title": {
     "defaultMessage": "An OpenCode agent's history, tokens and cost",
     "description": "A tip's title (HI-2762). OpenCode is a product name."
+  },
+  "tips.opencodeOutsideFolder.text": {
+    "defaultMessage": "An OpenCode agent asks before it reads or changes anything outside its own folder, and waits for your answer in its pane. Review copies stay allowed, and Approve all approves without asking; Settings → Advanced → OpenCode turns this off.",
+    "description": "A tip. Names of Combwork's menus, settings and modes (Approve all): keep them as Combwork shows them. OpenCode is a product name."
+  },
+  "tips.opencodeOutsideFolder.title": {
+    "defaultMessage": "OpenCode agents ask before other folders",
+    "description": "A tip's title. OpenCode is a product name."
   },
   "tips.opencodeOwnProvider.text": {
     "defaultMessage": "An OpenCode agent uses only the provider in its connection's model, so nothing it does goes to another provider or to OpenCode's free cloud models. Name the connection's model, such as ollama/qwen3:8b; Settings → Advanced → OpenCode turns this off.",

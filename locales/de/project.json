@@ -9,6 +9,7 @@
   "project.agents.settings": "Agent-Einstellungen…",
   "project.agents.turnedOff": "{provider} ist unter Einstellungen → Anbieter ausgeschaltet",
   "project.apply.new": "{live, select, yes {Änderungen gelten für neue Sitzungen – starte die laufende Sitzung neu, um sie zu übernehmen.} other {Änderungen gelten für neue Sitzungen.}}",
+  "project.banner.adminSnippet": "Admin-Snippet…",
   "project.banner.change": "Ändern",
   "project.banner.chooseInSettings": "In den Einstellungen wählen",
   "project.banner.connectionSetup": "In diesem Arbeitsbereich ist kein Konto für {cli} eingeschaltet, daher können die Agenten dieses Projekts nicht starten. Füge eines hinzu und melde es an.",

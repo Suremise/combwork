@@ -151,6 +151,8 @@ interface CombworkMessageValues {
   'tips.cardWork.title': undefined
   'tips.chooseConnections.text': undefined
   'tips.chooseConnections.title': undefined
+  'tips.claudeManagedPolicy.text': undefined
+  'tips.claudeManagedPolicy.title': undefined
   'tips.claudeStatusLine.text': undefined
   'tips.claudeStatusLine.title': undefined
   'tips.cliOverrides.text': undefined
@@ -376,6 +378,8 @@ interface CombworkMessageValues {
   'tips.opencode.title': undefined
   'tips.opencodeHistory.text': undefined
   'tips.opencodeHistory.title': undefined
+  'tips.opencodeOutsideFolder.text': undefined
+  'tips.opencodeOutsideFolder.title': undefined
   'tips.opencodeOwnProvider.text': undefined
   'tips.opencodeOwnProvider.title': undefined
   'tips.outageResume.text': undefined

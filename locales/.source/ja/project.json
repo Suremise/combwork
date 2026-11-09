@@ -9,6 +9,7 @@
   "project.agents.settings": "Agent settings…",
   "project.agents.turnedOff": "{provider} is turned off in Settings → Providers",
   "project.apply.new": "{live, select, yes {Changes apply to new sessions — restart the running session to apply them.} other {Changes apply to new sessions.}}",
+  "project.banner.adminSnippet": "Admin snippet…",
   "project.banner.change": "Change",
   "project.banner.chooseInSettings": "Choose in Settings",
   "project.banner.connectionSetup": "No {cli} account is on in this workspace, so its agents can't start. Add one and sign it in.",

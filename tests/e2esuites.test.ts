@@ -2349,9 +2349,9 @@ describe('the run context: what a test starts gets only the allowlist and its ow
     for (const s of claudeSuites) {
       expect(['own', 'test'], s.name).toContain(s.claudeHome)
       const src = readFileSync(join(root, 'tests', 'e2e', `${s.name}.cjs`), 'utf8')
-      // Its Combwork (every combworkEnv or lib.launch call) gets the home: lib's helper for it, CLAUDE_CONFIG_DIR given directly,
-      // or the suite's `homes`.
-      const launches = [...src.matchAll(/(?:combworkEnv|lib\.launch)\(\{[^\n]*\}\)/g)].map((m) => m[0])
+      // Its Combwork (every combworkEnv or lib.launch call), or the CLI it starts itself (lib.childEnv: HI-2777's
+      // claudemanagedreal), gets the home: lib's helper for it, CLAUDE_CONFIG_DIR given directly, or the suite's `homes`.
+      const launches = [...src.matchAll(/(?:combworkEnv|lib\.launch|lib\.childEnv)\(\{[^\n]*\}\)/g)].map((m) => m[0])
       expect(launches.length, s.name).toBeGreaterThan(0)
       for (const l of launches) expect(/CLAUDE_CONFIG_DIR|ownClaudeHome|claudeHome\.env|env: homes/.test(l), `${s.name}: ${l}`).toBe(true)
       if (s.claudeHome === 'test') expect(src, s.name).toMatch(/CLAUDE_CONFIG_DIR: CLAUDE_TEST_HOME/)

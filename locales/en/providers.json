@@ -199,6 +199,18 @@
     "defaultMessage": "{agent} wasn’t started: its context size ({context, number} tokens, {contextFrom}) is too small for any output budget. Set a larger context size.",
     "description": "An error starting an agent on a local model (HI-2682): its context is so small that no output budget fits. {agent} is the agent's name; {context} is a number of tokens; {contextFrom} says where it was set."
   },
+  "providers.claude.policy.file": {
+    "defaultMessage": "Claude Code's managed settings file",
+    "description": "Where a Claude Code setting that blocks Combwork's hooks was found: the managed-settings.json an administrator gives Claude Code (C:\\Program Files\\ClaudeCode). Used after \"in\" or as a subject in the hooks warning."
+  },
+  "providers.claude.policy.hkcu": {
+    "defaultMessage": "your Claude Code policy in the registry (HKCU)",
+    "description": "Where a Claude Code setting that blocks Combwork's hooks was found: a policy in the Windows registry for the current user. Used after \"in\" or as a subject in the hooks warning. Keep HKCU."
+  },
+  "providers.claude.policy.hklm": {
+    "defaultMessage": "the computer's Claude Code policy in the registry (HKLM)",
+    "description": "Where a Claude Code setting that blocks Combwork's hooks was found: a policy in the Windows registry for the whole computer. Used after \"in\" or as a subject in the hooks warning. Keep HKLM."
+  },
   "providers.cmdTooLong": {
     "defaultMessage": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
     "description": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are."
@@ -486,6 +498,10 @@
   "providers.readiness.update": {
     "defaultMessage": "{provider} {version} is available.",
     "description": "Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version."
+  },
+  "providers.readiness.updateStayed": {
+    "defaultMessage": "{provider} stayed on {version} after updating to {offered}: an organisation's policy may set its version or channel, or the update didn't take. Check again later, or update again.",
+    "description": "Provider Setup and Settings → Providers: the coding agent was updated but is still on its old version (HI-2777). {provider} is its name, {version} the version it stayed on, {offered} the one offered. \"Check again\" and \"update\" name the buttons beside it."
   },
   "providers.settings.hooksOff": {
     "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Combwork's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Combwork doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
