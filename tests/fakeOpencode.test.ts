@@ -219,6 +219,50 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
     await s.stop()
   })
 
+  it("an edit outside the session's folder: allowed by 2.2.6's defaults; a config's rules that ask or allow decide, the last that matches (HI-2772)", async () => {
+    const copies = join(tempDir('fakeopencode-copies-'), 'My Copies')
+    const other = `${copies}-other`
+    for (const d of [join(copies, 'copy-1'), other]) mkdirSync(d, { recursive: true })
+    const allowed = join(copies, 'copy-1', 'probe.txt')
+    const sibling = join(other, 'probe.txt')
+    for (const f of [allowed, sibling]) writeFileSync(f, 'before\n')
+    // No rule: 2.2.6's defaults (`* * allow`) let it, unasked.
+    const plain = root()
+    const p = await serve(plain.env, plain.project)
+    p.subscribe()
+    await until(() => p.events[0]?.type === 'server.connected', 'server.connected')
+    const psid = (await p.api('POST', '/api/session', { location: { directory: plain.project } })).body.data.id
+    await p.api('POST', `/api/session/${psid}/prompt`, { text: `patch "${sibling}"` })
+    await until(() => ended(p.events, psid), "the default turn's end")
+    expect(p.events.some((e) => e.type === 'permission.asked')).toBe(false)
+    expect(readFileSync(sibling, 'utf8')).toMatch(/^before\nedited by /)
+    await p.stop()
+    writeFileSync(sibling, 'before\n')
+    // A config's rules (a project's, when let in): ask for every folder, then allow one (in another case, forward slashes).
+    const allowOne = { action: 'external_directory', resource: `${copies.replace(/\\/g, '/').toUpperCase()}/*`, effect: 'allow' }
+    const r = root({}, { ...ourConfig(), permissions: [{ action: 'external_directory', resource: '*', effect: 'ask' }, allowOne] })
+    const s = await serve(r.env, r.project)
+    s.subscribe()
+    await until(() => s.events[0]?.type === 'server.connected', 'server.connected')
+    const turn = async (prompt: string, reply?: string) => {
+      const sid = (await s.api('POST', '/api/session', { location: { directory: r.project } })).body.data.id
+      expect((await s.api('POST', `/api/session/${sid}/prompt`, { text: prompt })).status).toBe(200)
+      const asked = reply ? await until(() => s.events.find((e) => e.type === 'permission.asked' && e.data.sessionID === sid), 'permission.asked') : null
+      if (asked) await s.api('POST', `/api/session/${sid}/permission/${asked.data.id}/reply`, { decision: reply })
+      await until(() => ended(s.events, sid), `the turn's end (${prompt})`)
+      return { sid, asked }
+    }
+    // The folder allowed by the later rule: edited without asking.
+    const yes = await turn(`patch "${allowed}"`)
+    expect(s.events.some((e) => e.type === 'permission.asked' && e.data.sessionID === yes.sid)).toBe(false)
+    expect(readFileSync(allowed, 'utf8')).toMatch(/^before\nedited by /)
+    // A sibling whose name starts the same isn't allowed: asked for its folder, and rejected, it stays as it was.
+    const no = await turn(`patch "${sibling}"`, 'reject')
+    expect(no.asked!.data).toMatchObject({ action: 'external_directory', resources: [`${other.replace(/\\/g, '/')}/*`] })
+    expect(readFileSync(sibling, 'utf8')).toBe('before\n')
+    await s.stop()
+  })
+
   it("calls an MCP tool through Code Mode's execute, as 2.2.6 did, on the selected server with its own token", async () => {
     const r = root()
     const stub = join(r.root, 'stub-mcp.cjs')

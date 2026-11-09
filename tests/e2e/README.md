@@ -48,7 +48,9 @@ proxy the suite starts. The test seam `CW_TEST_OPENCODE_PROVIDER` (dev builds on
 every provider but that one, and the suite types nothing unless the written config holds that. It is skipped when the
 pinned build or Ollama's `qwen3:8b` isn't there, and fails if your OpenCode folders (`~\.config`, `.local\share`,
 `.local\state`, `.cache` and `%APPDATA%`/`%LOCALAPPDATA%`/`%ProgramData%\opencode`) or the machine-wide service's port
-(28894) changed. The fake OpenCode (`fake-opencode/`) is modelled on recordings of the real one only
+(28894) changed. `opencodereal-dirs` (HI-2772) runs under the same conditions: a reviewer in Build reads and writes in the
+review copies folder, one in Plan is asked to write there and doesn't, and a builder lent no copy reaches it too (2.2.6's
+default rules); any ask is rejected, and a step the model never tries in three prompts makes the run `SKIPPED inconclusive`, never a pass. The fake OpenCode (`fake-opencode/`) is modelled on recordings of the real one only
 (`tests/fixtures/opencode/real-2.2.6`, its README says which); `opencode`, `opencode-isolation` and `opencode-launch`
 run it, and stop before any session unless Combwork selected it.
 

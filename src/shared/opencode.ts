@@ -144,7 +144,10 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
     startupSizeRefresh: true,
     bracketedPaste: false,
     enterOnceDrawn: false,
-    extraDirs: false,
+    // 2.2.6 reaches folders outside the session's own with no grant: every agent's default rules begin `* * allow`, so
+    // its external_directory permission asks only where a rule the user let in says so (HI-2772, the real tier's
+    // opencodereal-dirs). Combwork adds no rule: a reviewer is lent its review copy, and Plan still edits nothing.
+    extraDirs: true,
     // Each account a private data root (XDG_DATA_HOME, with its config, state and cache roots beside it): its sign-ins
     // and its sessions in its own database. Nothing shared between accounts.
     connections: {

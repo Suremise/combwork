@@ -329,6 +329,22 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     expect(providerRules(terminal)).toEqual(['claude-agent:deny'])
   }, 60000)
 
+  it("a reviewer's granted folder adds no rule to the private config, new or resumed (HI-2772: 2.2.6 reaches it by default; a rule the user let in still decides)", async () => {
+    const { sessionMark } = await import('../src/main/providers/opencode/launcher')
+    const copies = join(base, 'ws space.worktrees', 'proj', 'copies')
+    const written = (c: { privateDir: string }) => JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8'))
+    const fresh = ctx({ extraDirs: [copies], permissionMode: 'build' }) as { privateDir: string }
+    await opencode.prepareLaunch(fresh as never)
+    const resumed = ctx({ extraDirs: [copies], resume: true }) as { privateDir: string; connectionHome: string; sessionId: string }
+    mkdirSync(join(resumed.connectionHome, 'combwork-sessions'), { recursive: true })
+    writeFileSync(sessionMark(resumed.connectionHome, resumed.sessionId), '{}')
+    await opencode.prepareLaunch(resumed as never)
+    for (const c of [fresh, resumed]) {
+      expect(written(c)).not.toHaveProperty('permissions')
+      expect(JSON.stringify(written(c))).not.toContain('external_directory')
+    }
+  }, 60000)
+
   it("gives the launch's first task to the TUI as --prompt (a Combwork start, the Assistant's), none without one", async () => {
     const c = ctx({ initialPrompt: '[CW] Work on "AL-1"\u001fnow', permissionMode: 'build' }) as never
     await opencode.prepareLaunch(c)

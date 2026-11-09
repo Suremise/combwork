@@ -273,12 +273,32 @@ async function startServer(opts) {
       return lastCall
     }
     const read = (file) => toolStep('read', { filePath: file }, async () => (fs.existsSync(file) ? { text: fs.readFileSync(file, 'utf8'), metadata: { truncated: false } } : { text: `File not found: ${file}`, isError: true }))
-    const edit = (file) =>
-      toolStep('edit', { filePath: file, oldString: '', newString: 'edited' }, async () => {
+    /**
+     * 2.2.6's external_directory, for an edit outside the session's folder (HI-2772, from the pinned opencode.exe:
+     * FileAccess.resolve and authorizeExternal): its resource the file's folder, slashed, and /*; the last matching rule
+     * decides (Kw: slashes either way, any case), of the agent's defaults (Agent.Info's: `* * allow` first, so nothing
+     * asks by default, as the real tier's opencodereal-dirs saw), then the config's `permissions`, then the session's.
+     * Only the edit checks it here: what else 2.2.6 checks it for, the fake doesn't model.
+     */
+    const external = (file) => {
+      const rel = path.relative(l.directory, file)
+      if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return null
+      const resource = `${path.dirname(file).replace(/\\/g, '/')}/*`
+      const kw = (value, pattern) => new RegExp('^' + String(pattern).replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'si').test(value.replace(/\\/g, '/'))
+      const rules = [{ action: '*', resource: '*', effect: 'allow' }, ...(cfg.global.permissions || []), ...(session(sid).info.permissions || [])]
+      const effect = rules.findLast((p) => kw('external_directory', p.action) && kw(resource, p.resource ?? '*'))?.effect ?? 'ask'
+      return { effect, resource }
+    }
+    const edit = (file) => {
+      const ext = external(file)
+      if (ext) log({ kind: 'external-directory', file, ...ext })
+      if (ext?.effect === 'deny') return toolStep('edit', { filePath: file, oldString: '', newString: 'edited' }, async () => ({ text: `Permission denied: external_directory ${ext.resource}`, isError: true }))
+      return toolStep('edit', { filePath: file, oldString: '', newString: 'edited' }, async () => {
         fs.appendFileSync(file, `edited by ${env.CW_AGENT || 'agent'}\n`)
         log({ kind: 'edit', agent: env.CW_AGENT || 'agent', file: path.basename(file), allowed: true })
         return { text: 'Edit applied successfully.', metadata: { truncated: false } }
-      })
+      }, ext?.effect === 'ask' ? { action: 'external_directory', resources: [ext.resource], save: [ext.resource] } : null)
+    }
     // A skill as 2.2.6 offers one: only those it loaded (config.cjs: the config folder's skills, and the project's or the
     // home's as the switches let them), by its folder's name, its id (skills/config-dir.json, HI-2761's R0b).
     const loadedSkills = () => cfg.loaded.filter((x) => x.kind === 'skill').map((x) => x.path)
@@ -319,8 +339,9 @@ async function startServer(opts) {
       })
       const sh = /\bshell:\s*(.+)$/i.exec(s)
       if (sh) await shell(sh[1].trim())
-      const patch = /\bpatch\s+([\w.-]+)/i.exec(s)
-      if (patch) await edit(path.resolve(l.directory, patch[1]))
+      // A file in the session's folder, or "a path" anywhere (an absolute one outside: external_directory, HI-2772).
+      const patch = /\bpatch\s+(?:"([^"]+)"|([\w.-]+))/i.exec(s)
+      if (patch) await edit(path.resolve(l.directory, patch[1] ?? patch[2]))
     }
 
     let failure = null
