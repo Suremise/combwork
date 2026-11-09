@@ -795,6 +795,14 @@
     "defaultMessage": "Run agents on GitHub Copilot",
     "description": "A tip's title."
   },
+  "tips.copilotGithubHost.text": {
+    "defaultMessage": "Repositories on yourcompany.ghe.com or your own GitHub Enterprise Server? Set the GitHub host in Version Control → GitHub, for the workspace or a project: Copilot then signs in and checks its sign-in on that host, and Provider Setup shows each host apart.",
+    "description": "A tip (HI-2779). Names of Combwork's menus, views, settings and commands (Version Control → GitHub, GitHub host, Provider Setup): keep them as Combwork shows them. Keep the example host name."
+  },
+  "tips.copilotGithubHost.title": {
+    "defaultMessage": "Copilot on your company’s GitHub",
+    "description": "A tip's title (HI-2779): GitHub Copilot with GitHub Enterprise (a GHE.com host or GitHub Enterprise Server)."
+  },
   "tips.copilotModes.text": {
     "defaultMessage": "Copilot agents start in Accept edits: they edit files in their own folder and use the Combwork tools without asking, and ask before other commands, other MCP tools and web access. Choose Ask to approve each edit too, or Allow all to approve everything.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

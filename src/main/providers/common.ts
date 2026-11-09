@@ -23,7 +23,7 @@ export function readFirstLine(path: string, max = 1 << 20): Promise<string> {
 /** Helpers shared by provider adapters. */
 
 /** `ended`: it didn't exit by itself (its timeout ended it, or it couldn't start): its code says nothing then. */
-export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number; ended?: true }> {
+export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number; ended?: true; timedOut?: true }> {
   const shell = /\.(cmd|bat)$/i.test(file)
   // Through cmd, Node joins the command and its arguments as they are: a path with spaces ("C:\My Tools\agy.cmd") would be
   // read as "C:\My" (HI-2548), so it and any argument with a space are quoted.
@@ -33,7 +33,9 @@ export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJ
       const raw = err ? (err as NodeJS.ErrnoException & { code?: number | string }).code : 0
       const code = err ? (raw as unknown as number) || 1 : 0
       const ended = !!err && (!!(err as { killed?: boolean }).killed || typeof raw !== 'number')
-      resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: typeof code === 'number' ? code : 1, ...(ended ? { ended: true as const } : {}) })
+      // timedOut (HI-2779): killed at its timeout, told from a program that couldn't start (ENOENT), which ends too.
+      const timedOut = !!err && !!(err as { killed?: boolean }).killed
+      resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: typeof code === 'number' ? code : 1, ...(ended ? { ended: true as const } : {}), ...(timedOut ? { timedOut: true as const } : {}) })
     })
   })
 }

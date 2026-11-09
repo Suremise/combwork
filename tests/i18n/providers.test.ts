@@ -133,12 +133,12 @@ describe("a provider's install info: English for agents and Combwork's own code,
     setLanguage(PSEUDO_LANGUAGE, {})
     const english = copilotReadiness(info({ provider: 'copilot', loggedIn: false }), { GH_TOKEN: 'x' })
     expect(english[0]).toMatchObject({ message: 'GitHub Copilot is not signed in.', action: { label: 'Sign in' } })
-    expect(english[0].detail?.at(-1)).toBe('Copilot agents don’t get `GH_TOKEN` from Combwork’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.')
+    expect(english[0].detail?.at(-2)).toBe('Copilot agents don’t get `GH_TOKEN` from Combwork’s environment, so it doesn’t sign them in. For a token of Copilot’s own, set `COPILOT_GITHUB_TOKEN`.')
     const shown = shownInstallInfo(info({ provider: 'copilot', readiness: english, notes: [installText(COPILOT_PLAN_NOTE)] }))
     const issue = shown.readiness![0]
     expect([issue.message, issue.action!.label, ...issue.detail!, ...shown.notes!].every((t) => PSEUDO.test(t))).toBe(true)
     // The variable and the command stay as they are, inside the translated paragraph.
-    expect(issue.detail!.at(-1)).toContain('`GH_TOKEN`')
+    expect(issue.detail!.at(-2)).toContain('`GH_TOKEN`')
     expect(problems).toEqual([])
   })
 

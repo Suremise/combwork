@@ -1,4 +1,5 @@
-import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, HookCause, CatalogModel, EffortLevel, LaunchedLimits, LaunchedPicker, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, ServerModel, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { ResolvedGithubHosts } from '../../shared/githubHost'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, HookCause, CatalogModel, EffortLevel, LaunchedLimits, LaunchedPicker, LaunchedSignInHost, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, ServerModel, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
@@ -123,6 +124,10 @@ export interface LaunchContext {
   localLimits?: LaunchedLimits | null
   /** The /model lineup the adapter asked for on a server connection (HI-2684), set by prepareLaunch: kept on the session. */
   picker?: LaunchedPicker
+  /** The GitHub hosts the launch signs in on (HI-2779), set by prepareLaunch where the CLI has them: kept on the session. */
+  signInHost?: LaunchedSignInHost
+  /** Its project's GitHub hosts as resolved for this launch (HI-2779), for a CLI with capabilities.githubHost. */
+  githubHosts?: ResolvedGithubHosts
   /** The user lets sessions move into the CLI's own background service (see capabilities.backgroundSessions). */
   allowBackgroundSessions: boolean
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
@@ -486,7 +491,8 @@ export interface ProviderAdapter {
   agentRemoved?(agentId: string, workspacePath: string): Promise<void>
   /** An update's exit code that means its installer had nothing newer (HI-2729: WinGet's 0x8A15002B): it ended well. */
   updateUpToDate?(executable: string, exitCode: number): boolean
-  loginCommand(executable: string): CommandSpec
+  /** The CLI's sign-in; `host`: the GitHub host it signs in on (HI-2779, capabilities.githubHost), else its default. */
+  loginCommand(executable: string, host?: string): CommandSpec
   /**
    * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's
    * `capabilities.connections.homeEnv`), from the CLI's own status: never a token. `ok: false` when it couldn't be told

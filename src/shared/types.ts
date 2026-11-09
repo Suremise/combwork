@@ -10,6 +10,7 @@ import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { FreshReason } from './sessionFresh'
 import type { TipsState } from './tips'
+import type { GithubHostSettings } from './githubHost'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
 import type { ConnectionOption } from './templateConnections'
 import type { KeepAwakeSetting } from './keepAwake'
@@ -1049,6 +1050,8 @@ export interface WorkspaceConfig {
   stepsDone?: string[]
   /** The workspace's default slot options (HI-1765), between Combwork's and each project's own. */
   slotDefaults?: SlotDefaults
+  /** The workspace's GitHub host and Copilot sign-in host (HI-2779, shared/githubHost.ts), each project's default. */
+  github?: GithubHostSettings
   /** HI-1368's When this workspace closes, run, as saved before HI-1954: read once into `commands`, then dropped. */
   onClose?: CloseCommandSetting
   /** The workspace's own commands (HI-1954, Settings → Commands at its level) and its open and close points. */
@@ -1841,6 +1844,8 @@ export interface ProjectConfig {
    * Each left out reads today's `worktreeSetup`, none, and `worktreeCopy` (which stay as they are, for 0.9.3).
    */
   slots?: SlotOptions
+  /** The project's own GitHub host and Copilot sign-in host (HI-2779), over its workspace's. */
+  github?: GithubHostSettings
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
   /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
@@ -2303,9 +2308,21 @@ export interface MergeResult {
   moveError?: string
 }
 
+/**
+ * The GitHub hosts a launch used (HI-2779): where its CLI signed in (`host`) and the repositories' host (`repoHost`), and
+ * where the sign-in host came from. Never a token or an account's secret.
+ */
+export interface LaunchedSignInHost {
+  host: string
+  repoHost: string
+  origin: 'project' | 'workspace' | 'environment' | 'default'
+}
+
 export interface SessionRecord {
   /** The connection its latest run launched on (HI-1755), id and name as then; absent: none (a provider without connections). */
   connection?: { id: string; name: string }
+  /** The GitHub hosts its latest run signed in on (HI-2779), as resolved at that launch; absent: github.com, or not a GitHub CLI. */
+  signInHost?: LaunchedSignInHost
   /**
    * A run of it was on a server connection (HI-1772), kept once set: its CLI's own cost reports price the server's model
    * as a Claude model, so they are never counted (`withoutCostReports`): Combwork's estimate by the real model id only.
@@ -2658,6 +2675,8 @@ export interface LiveSessionState {
   localLimits?: LaunchedLimits
   /** The /model picker rows this launch asked Claude Code for (HI-2684), on a server connection, or why none. */
   picker?: LaunchedPicker
+  /** The GitHub hosts this launch signed in on (HI-2779, LaunchContext.signInHost), as resolved then: never relabelled. */
+  signInHost?: LaunchedSignInHost
   launchedConnection?: {
     id: string
     name: string
@@ -3732,6 +3751,42 @@ export interface AgentInstallInfo {
   observedEfforts?: Record<string, EffortLevel>
   /** The version this Combwork release was tested with and how the installed one compares (#365); null when the release names none. */
   tested?: TestedCli | null
+  /**
+   * Its sign-in per GitHub host in use (HI-2779, capabilities.githubHost): one row per host the open workspaces and their
+   * projects resolve to, each with its own evidence. Absent: a CLI without GitHub hosts. `loggedIn` above is the first row's.
+   */
+  hostChecks?: HostCheck[]
+}
+
+/**
+ * How far a sign-in on one GitHub host is known (HI-2779), each from its own evidence, never inferred from a remembered
+ * entry: `installed` (no credentials for this host), `configured` (a token variable set, or a stored login for this host,
+ * never checked), `verified` (the GitHub CLI checked its login on exactly this host: its identity, not a Copilot seat),
+ * `denied` (every model listed is marked unavailable to the account), `noSignIn` (a local model, BYOK or offline: no
+ * GitHub sign-in needed), `unverified` (a check answered with an error it can't classify: see `diagnostic`), `unknown`
+ * (a check timed out or answered nothing readable), `chooseHost` (a GitHub Enterprise Server repository host and no Copilot
+ * host chosen), `proxyUnsupported` (GHES's Copilot proxy chosen: not supported yet).
+ */
+export type HostCheckState = 'installed' | 'configured' | 'verified' | 'denied' | 'noSignIn' | 'unverified' | 'unknown' | 'chooseHost' | 'proxyUnsupported'
+
+/** One GitHub host's sign-in check (HI-2779), as Provider Setup shows it. No token, nor anything derived from one. */
+export interface HostCheck {
+  /** Its route: the sign-in host, the repositories' host and the CLI's home (no secret). */
+  key: string
+  /** Where the CLI signs in; null while there is none to (chooseHost, proxyUnsupported). */
+  host: string | null
+  repoHost: string
+  origin: 'project' | 'workspace' | 'environment' | 'default'
+  state: HostCheckState
+  /** The sign-in's source, by name: a variable's name, `Copilot login`, `GitHub CLI`, `local model`. */
+  source: string | null
+  account: string | null
+  /** What a check answered when it couldn't be classified (an error's message, at most 300 characters). */
+  diagnostic?: string
+  /** What the model listing for this host found: models offered, and those marked unavailable to the account. */
+  models?: { available: number; unavailable: number; metadata: 'all' | 'some' | 'none' }
+  /** Who resolves to it: each workspace's name and the projects there (none named: the workspace's own default). */
+  usedBy: { workspace: string; projects: string[] }[]
 }
 
 export interface ProviderUpdateRetry {
@@ -3754,7 +3809,8 @@ export interface ReadinessIssue {
   level: 'error' | 'warning' | 'info'
   message: string
   /** Button: a provider task Combwork runs in a terminal. */
-  action?: { label: string; task: ProviderTask }
+  /** `host`: the GitHub host a sign-in is for (HI-2779), where the CLI signs in per host. */
+  action?: { label: string; task: ProviderTask; host?: string }
   /** Shown in Provider Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
   detail?: string[]
 }

@@ -231,6 +231,7 @@
   "service.providers.task": "{task, select, install {Installation von {cli}} update {Update von {cli}} login {Anmeldung bei {cli}} other {Einrichtung von {cli}}}",
   "service.providers.taskDone": "{task} abgeschlossen",
   "service.providers.taskFailed": "{task} mit Code {code} beendet",
+  "service.providers.unknownHost": "Kein Projekt nutzt diesen GitHub-Host jetzt für {cli}. Klicke auf „Erneut prüfen“ und melde dich dann an.",
   "service.slots.notPrepared": "Combwork konnte {slot} nicht für {card} vorbereiten: {why}",
   "service.slots.resumeFailed": "Combwork konnte die Unterhaltung von {agent} in {slot} für {card} nicht fortsetzen (drei Versuche): {why}. Setze {agent} unter Sitzungen fort oder starte neu, dann gibt Combwork {agent} die Karte {card}.",
   "service.slots.resumeHeld": "Combwork kann {agent} die Karte {card} noch nicht geben: Die Unterhaltung von {agent} in {slot} lässt sich gerade nicht fortsetzen ({why}). Combwork gibt {agent} die Karte {card}, sobald es geht.",

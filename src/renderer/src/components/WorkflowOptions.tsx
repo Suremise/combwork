@@ -16,6 +16,7 @@ import { call, errorMessage } from '../api'
 import { agentProviderOf, cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { cx } from '../util'
 import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
+import { GithubHosts } from './GithubHosts'
 import { ORIGIN_TEXT } from '../workflowOrigins'
 import { OriginText } from './OriginText'
 import { providerDescriptor } from '@shared/providers'
@@ -707,6 +708,9 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
             {/* A Git project's slots and copies, after where cards are built (a level has none: they're a project's). */}
             {g.id === 'where' && project && <SlotsAndCopies project={project} slots={effective.folder === 'slots'} />}
             {g.id === 'where' && !project && source.level && platform === 'git' && <SlotCopyLevel level={source.level} />}
+            {/* The GitHub hosts (HI-2779): a Git project's own, and the workspace's default (Combwork's level has none). */}
+            {g.id === 'where' && project && <GithubHosts projectPath={project.path} />}
+            {g.id === 'where' && !project && source.level === 'workspace' && platform === 'git' && <GithubHosts projectPath={null} />}
           </Fragment>
         )
       })}

@@ -231,6 +231,7 @@
   "service.providers.task": "{task, select, install {{cli} 安装} update {{cli} 更新} login {{cli} 登录} other {{cli} 配置}}",
   "service.providers.taskDone": "{task}已完成",
   "service.providers.taskFailed": "{task}已退出，退出码 {code}",
+  "service.providers.unknownHost": "现在没有项目为 {cli} 使用该 GitHub 主机。请先点击“重新检查”，再登录。",
   "service.slots.notPrepared": "Combwork 无法为 {card} 准备 {slot}：{why}",
   "service.slots.resumeFailed": "Combwork 无法为 {card} 恢复 {agent} 在 {slot} 中的对话（已尝试三次）：{why}。请在“会话历史”中恢复 {agent}，或重新开始，Combwork 随后会把 {card} 交给它。",
   "service.slots.resumeHeld": "Combwork 暂时无法把 {card} 交给 {agent}：{agent} 在 {slot} 中的对话现在无法恢复（{why}）。一旦可以，Combwork 就会把 {card} 交给它。",

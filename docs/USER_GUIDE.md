@@ -50,7 +50,7 @@ Combwork calls the coding agents it can run **providers**. Each agent in a proje
 Combwork runs the **GitHub Copilot CLI** (the `copilot` command), not Copilot in VS Code. Any Copilot plan includes it, Copilot Free too. Turn it on in **Settings → Providers**, then choose **GitHub Copilot** when you add an agent. Its agents get what the others get: statuses, file locks, the `cw_` tools, the workspace's skills, sessions you can resume, usage and cost.
 
 - **Installing.** **Help → Provider Setup… → GitHub Copilot → Install** runs `winget install GitHub.Copilot` in a terminal. Installed with npm (`npm install -g @github/copilot`) works too. Provider Setup shows the version it found and how (WinGet, npm, PATH, or the path in **Settings → GitHub Copilot**). **Update** goes through the same installer to keep its package record consistent, and is offered only when that installer has a newer version: WinGet publishes Copilot's releases a few days after npm, so a WinGet install is offered one once WinGet has it. Copilot's own updater can change a WinGet-installed executable without updating WinGet's record. If WinGet then refuses to remove the old portable package, Provider Setup explains the possible cause with the failed update's terminal and offers **Update anyway**. Clicking it retries with `--force`, allowing WinGet to replace changed files; Combwork never does this automatically. Stop all Copilot agents first, as for any update. **Check again** shows the installed version afterwards.
-- **Signing in.** Signed out, **Sign in** opens `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. With `copilot login --device-code`, you enter a code on GitHub instead. Combwork never signs in for you.
+- **Signing in.** Signed out, **Sign in** opens `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. With `copilot login --device-code`, you enter a code on GitHub instead. Combwork never signs in for you. On a company's GitHub (a GHE.com host or GitHub Enterprise Server), set its host first: see [GitHub Copilot with GitHub Enterprise](#copilot-github-enterprise).
 - **Which sign-in Combwork uses.** Provider Setup says who Copilot is signed in as, and how, in the order Copilot itself checks:
   - **`COPILOT_GITHUB_TOKEN`**: a token you set in your environment for Copilot (a fine-grained token with the "Copilot Requests" permission) comes first. Provider Setup can't tell whose it is.
   - **Copilot login**: your own `copilot login` (the account comes from Copilot's settings; the token stays in Windows Credential Manager).
@@ -758,6 +758,30 @@ exit 0
 ```
 
 `CW_HOOK_URL` and `CW_HOOK_AUTH_FILE` are set by Combwork for each session it starts. The auth file is in Combwork's own data, not the project, and goes when the session ends.
+
+### GitHub Copilot with GitHub Enterprise <a id="copilot-github-enterprise"></a>
+
+Copilot signs in on a GitHub host: github.com unless you say otherwise. A company on **GitHub Enterprise Cloud with data residency** has its own host (`yourcompany.ghe.com`), and one on **GitHub Enterprise Server** runs its own (`git.yourcompany.example`). Combwork's **GitHub** settings say which, and Copilot's sign-in, its sign-in check, its models and its agents all follow them.
+
+- **Where to set it.** **Settings → Version Control → Workspace defaults → GitHub** for the whole workspace, and a project's **Version Control** tab → **GitHub** for one project, over the workspace's. Each shows the value it uses and where it comes from: set here, from the workspace, from `GH_HOST` or `COPILOT_GH_HOST` in Combwork's environment, or the default. **Inherit** stops setting it at that level.
+- **GitHub host** is the repositories' host: `github.com`, `yourcompany.ghe.com` or your server's name. Only the name: Combwork refuses an address with a user name, password or token in it, a path, a port or anything after `?` or `#`. Nothing secret is stored there.
+- **Copilot signs in on** is usually the same as the GitHub host. With repositories on **GitHub Enterprise Server**, Copilot can't sign in on the server itself: choose where your Copilot licence is, **github.com** or your **GHE.com host**. Until you choose, Copilot agents for those projects don't start, and Provider Setup says so. **Same as the GitHub host** sets it explicitly, which also undoes a workspace's choice for one project. GitHub Enterprise Server's own Copilot proxy is a preview Combwork doesn't support yet.
+- **What Combwork passes.** Once either level sets something, every Copilot run (its sign-in, its checks, its model list and its sessions) gets `GH_HOST` as the repositories' host and `COPILOT_GH_HOST` as Copilot's, whatever Combwork's own environment had. With nothing set, Combwork's environment decides, as before.
+- **Signing in.** Provider Setup → **GitHub Copilot** lists each host the open workspaces and their projects use, with who uses it. **Sign in** on a host runs `copilot login --host <host>` in a terminal (just `copilot login` for github.com); Combwork never signs in for you and never opens a browser by itself.
+- **What Provider Setup can tell.** Each host shows how far its sign-in is known, never more:
+  - **Not signed in**: no token and no login for that host.
+  - **Credentials set, identity not checked**: a token variable is set, or Copilot has a login stored for that host. Combwork never reads a token. With **models available**, Copilot listed its models there, which still doesn't prove whose account it is.
+  - **GitHub CLI signed in as … on …**: the GitHub CLI (`gh auth status`) checked its login on exactly that host. That is gh's account; it doesn't prove a Copilot seat.
+  - **Every model is unavailable to this account**: Copilot listed models there and marked each one unavailable, as an organisation's policy or a plan can. A model marked unavailable on its own is listed apart, never offered.
+  - **Couldn't confirm the sign-in**: a check answered with an error, shown as it said it. It may be a token that no longer works or the network; Combwork doesn't guess which.
+  - **Couldn't reach the host to check**: a check timed out.
+  - **No GitHub sign-in needed**: Copilot runs a model of its own (`COPILOT_PROVIDER_BASE_URL`, or `COPILOT_OFFLINE`).
+
+  A login on one host never counts for another: a GitHub CLI login on github.com doesn't sign Copilot in on `yourcompany.ghe.com`.
+- **Tokens.** Copilot takes `COPILOT_GITHUB_TOKEN` first. Combwork keeps `GH_TOKEN` and `GITHUB_TOKEN` from Copilot agents, since other tools set them: **Settings → Advanced → GitHub Copilot → Keep GH_TOKEN and GITHUB_TOKEN from Copilot** turns that off, for every workspace. Provider Setup names the variable a sign-in comes from, never its value.
+- **Changing a host** checks Copilot again on the new one. Running Copilot agents keep the host they started on (their sessions say which, so their usage stays with it) until they restart: a notification says how many.
+- **The model list** in the pickers is the first host's: Combwork's environment's when a project uses it, else the first open workspace's.
+- **What doesn't change.** Combwork's own updates and the public catalogues it reads stay on github.com, whatever the GitHub host.
 
 ### Reading past sessions <a id="reading-past-sessions"></a>
 

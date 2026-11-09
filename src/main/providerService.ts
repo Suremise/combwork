@@ -285,8 +285,9 @@ class ProviderService {
     return next
   }
 
-  private runTask(id: ProviderId, task: ProviderTask, cmd: { file: string; args: string[]; line?: string }, label: string, typed?: { keys: KeySteps; ready?: RegExp; busyTitle?: RegExp; busyScreen?: (screen: string) => boolean; done?: () => boolean }, shown: () => string = () => label, onExit?: (code: number) => boolean | void, place?: { env?: Record<string, string>; cwd?: string }): string {
-    const key = `task:${id}:${task}`
+  private runTask(id: ProviderId, task: ProviderTask, cmd: { file: string; args: string[]; line?: string }, label: string, typed?: { keys: KeySteps; ready?: RegExp; busyTitle?: RegExp; busyScreen?: (screen: string) => boolean; done?: () => boolean }, shown: () => string = () => label, onExit?: (code: number) => boolean | void, place?: { env?: Record<string, string>; cwd?: string; keySuffix?: string }): string {
+    // A sign-in per GitHub host (HI-2779) has a terminal of its own per host.
+    const key = `task:${id}:${task}${place?.keySuffix ? `:${place.keySuffix}` : ''}`
     if (hasPty(key)) return key
     // A command toSpawnable already gave its command line (an adapter's) is started as it is.
     const s = cmd.line !== undefined ? cmd : toSpawnable(cmd.file, cmd.args)
@@ -400,7 +401,7 @@ class ProviderService {
   }
 
   /** Starts a provider task in a terminal and returns its terminal key. */
-  runProviderTask(id: ProviderId, task: ProviderTask, retryUpdate = false): string {
+  runProviderTask(id: ProviderId, task: ProviderTask, retryUpdate = false, host?: string): string {
     const adapter = provider(id)
     const name = adapter.descriptor.name
     const info = this.info(id)
@@ -434,8 +435,10 @@ class ProviderService {
     if (task === 'login') {
       // Signed in per connection (HI-1755): its sign-in is Settings → Accounts & Connections', never ~/.claude's.
       if (connectionsManaged(id)) throw combworkError(msg({ id: 'service.providers.signInConnections', defaultMessage: '{cli} signs in per account: sign in from Settings → Accounts & Connections.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "Claude Code") in, but its logins are accounts (Settings → Accounts & Connections names a section).' }), { cli: name }, { kind: 'conflict' })
-      const cmd = adapter.loginCommand(info.path)
-      return this.runTask(id, task, cmd, `${name} sign-in`, undefined, shown) // i18n-ignore: the task's name in the log
+      // On a GitHub host (HI-2779): only one its checks found in use, and its own sign-in there, in its environment.
+      if (host !== undefined && (!adapter.descriptor.capabilities.githubHost || !info.hostChecks?.some((c) => c.host === host))) throw combworkError(msg({ id: 'service.providers.unknownHost', defaultMessage: 'No project uses that GitHub host for {cli} now. Check again, then sign in.', description: 'An error: Provider Setup was asked to sign a coding agent CLI ({cli}: "GitHub Copilot") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button.' }), { cli: name }, { kind: 'conflict' })
+      const cmd = adapter.loginCommand(info.path, host)
+      return this.runTask(id, task, cmd, `${name} sign-in`, undefined, shown, undefined, cmd.env || host ? { ...(cmd.env ? { env: cmd.env } : {}), ...(host ? { keySuffix: host } : {}) } : undefined) // i18n-ignore: the task's name in the log
     }
     if (!adapter.setupCommand) throw combworkError(msg({ id: 'service.providers.noSetup', defaultMessage: '{cli} has no setup task.', description: 'An error: the coding agent CLI {cli} ("Codex") has no setup task for Combwork to run.' }), { cli: name }, { kind: 'invalid' })
     const cmd = adapter.setupCommand(info.path)

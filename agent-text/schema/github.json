@@ -1,0 +1,26 @@
+{
+  "github.host.rejected.credentials": {
+    "placeholders": {}
+  },
+  "github.host.rejected.empty": {
+    "placeholders": {}
+  },
+  "github.host.rejected.invalid": {
+    "placeholders": {}
+  },
+  "github.host.rejected.notCloud": {
+    "placeholders": {}
+  },
+  "github.host.rejected.path": {
+    "placeholders": {}
+  },
+  "github.host.rejected.port": {
+    "placeholders": {}
+  },
+  "github.host.rejected.query": {
+    "placeholders": {}
+  },
+  "github.host.rejected.scheme": {
+    "placeholders": {}
+  }
+}

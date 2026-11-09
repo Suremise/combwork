@@ -146,6 +146,7 @@ import { headerOf } from './revisions'
 import { utf8Bytes } from '../shared/metrics'
 import { cardNamesOf, scopeOfHost } from './projectKeys'
 import { inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService, type SessionsFile } from './workspace'
+import { githubHostsFor } from './githubHosts'
 import { agentTempSetting, prepareAgentTemp, protectedFolders, withAgentTemp } from './agentTemp'
 import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
@@ -3015,12 +3016,16 @@ class SessionManager {
         ...(workspace.isAssistantHome(projectPath) || !policy.tools ? {} : this.apiEnv(projectPath, agent.id))
       }))), this.binDir), tempDir)
     }
+    // The GitHub hosts a CLI signing in on one launches with (HI-2779): its project's, its workspace's, else the environment's.
+    if (adapter.descriptor.capabilities.githubHost) ctx.githubHosts = await githubHostsFor(workspaceOf(projectPath), projectPath, ctx.env)
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
     // A local model's limits as applied (HI-2682), for its context meter: this launch's, never read again.
     state.localLimits = ctx.localLimits ?? undefined
     // The /model lineup it asked Claude Code for (HI-2684), or why none.
     state.picker = ctx.picker
+    // The GitHub hosts it signs in on (HI-2779), as resolved for this launch: its usage stays attributed to them.
+    state.signInHost = ctx.signInHost
     l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
@@ -3252,6 +3257,8 @@ class SessionManager {
       ...(l.handedOverFrom ? { handedOverFrom: l.handedOverFrom } : {}),
       // The connection its latest run launched on (HI-1755), id and name as then: what it actually ran on.
       ...(state.launchedConnection ? { connection: { id: state.launchedConnection.id, name: state.launchedConnection.name } } : {}),
+      // The GitHub hosts its latest run signed in on (HI-2779), as resolved at its launch.
+      ...(state.signInHost ? { signInHost: state.signInHost } : {}),
       // On a server connection (HI-1772), kept once set: its CLI's cost reports are never counted for it.
       ...(state.launchedConnection?.server ? { serverRan: true as const } : {}),
       // Free (HI-1772, Darren 27 Oct) only while every run of it was on a server on this PC: kept once set, each.

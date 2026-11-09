@@ -192,6 +192,8 @@
   "tips.consoleText.title": "在开发者控制台中查看文本",
   "tips.copilot.text": "智能体可以使用 GitHub Copilot CLI，包括 Copilot Free。“配置提供方”会安装它，并显示它以谁的身份登录：它自己的登录，或 GitHub CLI 的登录。",
   "tips.copilot.title": "用 GitHub Copilot 运行智能体",
+  "tips.copilotGithubHost.text": "仓库在 yourcompany.ghe.com 或你自己的 GitHub Enterprise Server 上？请在“版本控制”→“GitHub”中为工作区或项目设置 GitHub 主机：Copilot 随后会在该主机上登录并检查登录状态，“配置提供方”也会分别显示每个主机。",
+  "tips.copilotGithubHost.title": "在你公司的 GitHub 上使用 Copilot",
   "tips.copilotModes.text": "Copilot 智能体以“接受编辑”模式启动：它们在自己的文件夹中编辑文件、使用 Combwork 工具时无需询问，运行其他命令、使用其他 MCP 工具和访问网络前会先询问。选择“询问”则每次编辑也需批准，选择“全部允许”则批准一切。",
   "tips.copilotModes.title": "Copilot 智能体会在什么之前询问",
   "tips.copyDiagnostics.text": "“帮助”→“复制诊断信息…”会收集 Combwork 的版本、你的编程智能体、关键设置和日志末尾，用于错误报告，其中的名称、文件夹和令牌都会去掉。",

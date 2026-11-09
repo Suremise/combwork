@@ -20,8 +20,10 @@ import { launchOverrides } from '../../advancedValues'
 import { overrideId } from '../../../shared/advanced'
 import { copilotTranscriptTurns } from './turns'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
-import { readCopilotModels } from './models'
-import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, copilotUpdateUpToDate, locateCopilot } from './install'
+import { COPILOT_HOST_TEXT, copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, copilotUpdateUpToDate, launchRoute, locateCopilot, primaryModels } from './install'
+import { launchedHostOf } from './hosts'
+import { resolveGithubHosts } from '../../../shared/githubHost'
+import { combworkError } from '../../combworkError'
 import { advanced } from '../../advanced'
 import { agentMsg, say } from '../../../shared/agentText'
 
@@ -190,9 +192,12 @@ export class CopilotAdapter implements ProviderAdapter {
     return copilotUpdateUpToDate(executable, exitCode)
   }
 
-  /** Copilot's own sign-in, run in a terminal for the user to complete (never typed into by Combwork). */
-  loginCommand(executable: string): CommandSpec {
-    return copilotLoginCommand(executable)
+  /**
+   * Copilot's own sign-in, run in a terminal for the user to complete (never typed into by Combwork): on `host`
+   * (HI-2779), `copilot login --host`, in that host's environment.
+   */
+  loginCommand(executable: string, host?: string): CommandSpec {
+    return copilotLoginCommand(executable, host)
   }
 
   isNewer(latest: string, current: string): boolean {
@@ -208,7 +213,8 @@ export class CopilotAdapter implements ProviderAdapter {
    * is turned on in Settings: the ACP session it opens leaves a folder in Copilot's session store for a moment.
    */
   listModels(executable: string, env: Record<string, string>): Promise<CatalogRead | null> {
-    return isProviderEnabled(config.settings, this.id) ? readCopilotModels(executable, env) : Promise.resolve(null)
+    // The first GitHub host's (HI-2779): the listing its sign-in check just got, never another host's.
+    return isProviderEnabled(config.settings, this.id) ? primaryModels(executable, env) : Promise.resolve(null)
   }
 
   /** The model in Copilot's own settings.json (or COPILOT_MODEL), which it runs unless Combwork passes one. */
@@ -252,6 +258,13 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
+    // The GitHub hosts it signs in on (HI-2779): its project's, else its workspace's, else the environment's, written into
+    // its environment as its checks and Sign in get them. A host Copilot can't sign in on yet doesn't start.
+    const hosts = ctx.githubHosts ?? resolveGithubHosts(null, null, ctx.env)
+    if (hosts.copilot.problem === 'chooseCopilotHost') throw combworkError(COPILOT_HOST_TEXT.chooseHost, { repoHost: hosts.repo.host }, { kind: 'conflict' })
+    if (hosts.copilot.problem === 'ghesProxyUnsupported') throw combworkError(COPILOT_HOST_TEXT.proxy, undefined, { kind: 'conflict' })
+    ctx.env = launchRoute(hosts, ctx.env).env
+    ctx.signInHost = launchedHostOf(hosts) ?? undefined
     const delivered = await syncAgentsSkills(ctx, this.descriptor.name)
     const plugin = this.pluginDir(ctx)
     await mkdir(plugin, { recursive: true })

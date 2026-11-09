@@ -27,6 +27,7 @@ import { appendFile, readFile, stat } from 'original-fs/promises'
 import { Readable } from 'stream'
 import type { AppInfo, CloseReason, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
 import { providerService } from './providerService'
+import { watchGithubHostChanges } from './githubHostChanges'
 import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
@@ -1242,6 +1243,8 @@ app.whenReady().then(async () => {
   // An agent no longer waiting for you: its entries say so, in whichever window owns them.
   startNoticeResolver()
   providerService.setLiveSessionCounter((p) => sessions.liveCount(p))
+  // A GitHub host change (HI-2779): its CLIs checked again, and the running agents a restart would move named.
+  watchGithubHostChanges(() => sessions.liveStates())
   // Agents stopped by a refused sign-in can carry on once the CLI is signed in again (#309).
   providerService.onSignedIn((p) => sessions.signedInAgain(p, true))
   // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins. Waited for: their order's

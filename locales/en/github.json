@@ -1,0 +1,118 @@
+{
+  "github.host.rejected.credentials": {
+    "defaultMessage": "A GitHub host can’t hold a user name, password or token.",
+    "description": "An error saving a GitHub host setting (HI-2779): it has an @ (user name, password or token before the host). Combwork never stores credentials there."
+  },
+  "github.host.rejected.empty": {
+    "defaultMessage": "Enter a host name, such as github.com or yourcompany.ghe.com.",
+    "description": "An error saving a GitHub host setting (HI-2779): the host is empty. Keep the example host names."
+  },
+  "github.host.rejected.invalid": {
+    "defaultMessage": "That isn’t a host name, such as github.com or yourcompany.ghe.com.",
+    "description": "An error saving a GitHub host setting (HI-2779): the text isn’t a valid host name. Keep the example host names."
+  },
+  "github.host.rejected.notCloud": {
+    "defaultMessage": "Copilot signs in on github.com or a GHE.com host (yourcompany.ghe.com). For your own GitHub Enterprise Server, choose its Copilot proxy instead.",
+    "description": "An error saving where Copilot signs in (HI-2779): the host given is a GitHub Enterprise Server host, where cloud Copilot can’t sign in. GHE.com is GitHub’s product name; Copilot proxy: GitHub Enterprise Server’s preview. Keep the host names."
+  },
+  "github.host.rejected.path": {
+    "defaultMessage": "A GitHub host is only its name, without a path after it.",
+    "description": "An error saving a GitHub host setting (HI-2779): it has a path after the host name (/org/repo)."
+  },
+  "github.host.rejected.port": {
+    "defaultMessage": "A GitHub host is only its name, without a port.",
+    "description": "An error saving a GitHub host setting (HI-2779): it has :port after the host name."
+  },
+  "github.host.rejected.query": {
+    "defaultMessage": "A GitHub host is only its name, without ? or # after it.",
+    "description": "An error saving a GitHub host setting (HI-2779): it has a query string or fragment. Keep ? and #."
+  },
+  "github.host.rejected.scheme": {
+    "defaultMessage": "A GitHub host is a name such as github.com, or an https:// address: no other scheme.",
+    "description": "An error saving a GitHub host setting (HI-2779): it starts with a scheme other than https:// (http://, ssh://…). Keep github.com and https:// as they are."
+  },
+  "github.host.restart": {
+    "defaultMessage": "{n, plural, one {# running agent signed in on another GitHub host than its project uses now. Restart it to apply the change.} other {# running agents signed in on another GitHub host than their projects use now. Restart them to apply the change.}}",
+    "description": "A notification (HI-2779) after a GitHub host setting changed: how many running agents ({n}) launched signed in on another GitHub host than the setting now gives; the change applies when each restarts."
+  },
+  "github.host.restartTitle": {
+    "defaultMessage": "GitHub host changed",
+    "description": "A notification’s title (HI-2779): a workspace’s or project’s GitHub host setting changed."
+  },
+  "github.hosts.choose": {
+    "defaultMessage": "{host} is a GitHub Enterprise Server: choose where Copilot signs in. Copilot agents don’t start until you do.",
+    "description": "Under “Copilot signs in on” (HI-2779): the repositories are on a GitHub Enterprise Server host ({host}), where cloud Copilot can’t sign in, and nothing is chosen."
+  },
+  "github.hosts.copilot": {
+    "defaultMessage": "Copilot signs in on",
+    "description": "A setting (HI-2779): the GitHub host GitHub Copilot signs in on, which can differ from the repositories’ host."
+  },
+  "github.hosts.copilotDesc": {
+    "defaultMessage": "Usually the same as the GitHub host. With repositories on GitHub Enterprise Server, choose where your Copilot licence is: github.com or your GHE.com host.",
+    "description": "What the setting “Copilot signs in on” is for (HI-2779). GHE.com is GitHub’s product name."
+  },
+  "github.hosts.desc": {
+    "defaultMessage": "Where the repositories are, and where Copilot signs in. Saved as you change them; running Copilot agents use a change when they restart.",
+    "description": "Under the heading “GitHub” (HI-2779): what its two settings are, and that they save at once and apply at an agent’s restart."
+  },
+  "github.hosts.fromEnvironment": {
+    "defaultMessage": "From Combwork’s environment (GH_HOST, COPILOT_GH_HOST)",
+    "description": "Where a GitHub host comes from (HI-2779): environment variables Combwork was started with. Keep the variable names."
+  },
+  "github.hosts.heading": {
+    "defaultMessage": "GitHub",
+    "description": "A heading in the Version Control tab and in Settings → Version Control → Workspace defaults (HI-2779): the GitHub host settings. GitHub is a product name."
+  },
+  "github.hosts.host": {
+    "defaultMessage": "GitHub host",
+    "description": "A setting (HI-2779): the host of the repositories: github.com, a GHE.com host (yourcompany.ghe.com) or a GitHub Enterprise Server."
+  },
+  "github.hosts.hostDesc": {
+    "defaultMessage": "github.com, your GHE.com host (yourcompany.ghe.com) or your GitHub Enterprise Server’s name. Only the name: no path, port or token.",
+    "description": "What the setting “GitHub host” takes (HI-2779). GHE.com is GitHub’s product name; keep the host names."
+  },
+  "github.hosts.inherit": {
+    "defaultMessage": "Inherit",
+    "description": "A button beside a GitHub setting set at this level (HI-2779): stop setting it here and use the inherited value."
+  },
+  "github.hosts.inheritOption": {
+    "defaultMessage": "Inherit ({value})",
+    "description": "An option of “Copilot signs in on” (HI-2779): use the inherited choice. {value} is what that gives (a host, or a note)."
+  },
+  "github.hosts.kind.gheCloud": {
+    "defaultMessage": "GitHub Enterprise Cloud with data residency",
+    "description": "The kind of a GitHub host (HI-2779): a GHE.com host (GitHub product name)."
+  },
+  "github.hosts.kind.ghes": {
+    "defaultMessage": "GitHub Enterprise Server",
+    "description": "The kind of a GitHub host (HI-2779): a company’s own GitHub Enterprise Server (GitHub product name)."
+  },
+  "github.hosts.kind.github": {
+    "defaultMessage": "github.com",
+    "description": "The kind of a GitHub host (HI-2779): github.com itself."
+  },
+  "github.hosts.noneChosen": {
+    "defaultMessage": "none chosen",
+    "description": "In the option “Inherit (…)” of “Copilot signs in on” (HI-2779): what inheriting gives when the repositories are on GitHub Enterprise Server and nothing is chosen above (lower case, inside brackets)."
+  },
+  "github.hosts.otherOption": {
+    "defaultMessage": "A GHE.com host…",
+    "description": "An option of “Copilot signs in on” (HI-2779): a host of GitHub Enterprise Cloud with data residency (yourcompany.ghe.com), typed in. GHE.com is GitHub’s product name."
+  },
+  "github.hosts.proxy": {
+    "defaultMessage": "Not supported yet: Copilot agents don’t start. Choose github.com or your GHE.com host.",
+    "description": "Under “Copilot signs in on” (HI-2779) when GitHub Enterprise Server’s Copilot proxy is chosen. GHE.com is GitHub’s product name."
+  },
+  "github.hosts.proxyOption": {
+    "defaultMessage": "GitHub Enterprise Server’s Copilot proxy (not supported yet)",
+    "description": "An option of “Copilot signs in on” (HI-2779): GitHub Enterprise Server’s Copilot proxy, a GitHub preview Combwork doesn’t support yet."
+  },
+  "github.hosts.sameOption": {
+    "defaultMessage": "Same as the GitHub host",
+    "description": "An option of “Copilot signs in on” (HI-2779): Copilot signs in on the repositories’ host."
+  },
+  "github.hosts.saveFailed": {
+    "defaultMessage": "Couldn’t save the GitHub host",
+    "description": "An error’s title (HI-2779): a GitHub host setting couldn’t be saved (its message says why)."
+  }
+}

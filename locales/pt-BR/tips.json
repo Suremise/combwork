@@ -192,6 +192,8 @@
   "tips.consoleText.title": "Veja o texto no console do desenvolvedor",
   "tips.copilot.text": "Os agentes podem usar a GitHub Copilot CLI, inclusive com o Copilot Free. A Configuração de provedores a instala e diz com qual conta ela está conectada: o login próprio dela ou o da GitHub CLI.",
   "tips.copilot.title": "Rode agentes no GitHub Copilot",
+  "tips.copilotGithubHost.text": "Repositórios em yourcompany.ghe.com ou no seu próprio GitHub Enterprise Server? Defina o host do GitHub em Controle de versão → GitHub, para o espaço de trabalho ou um projeto: o Copilot então entra e verifica o login nesse host, e a Configuração de provedores mostra cada host separadamente.",
+  "tips.copilotGithubHost.title": "Copilot no GitHub da sua empresa",
   "tips.copilotModes.text": "Agentes do Copilot começam em Aceitar edições: editam arquivos na própria pasta e usam as ferramentas do Combwork sem perguntar, e perguntam antes de outros comandos, outras ferramentas MCP e acesso à web. Escolha Perguntar para aprovar também cada edição, ou Permitir tudo para aprovar tudo.",
   "tips.copilotModes.title": "O que os agentes do Copilot perguntam antes",
   "tips.copyDiagnostics.text": "Ajuda → Copiar diagnóstico… reúne a versão do Combwork, seus agentes de código, as principais configurações e o fim do log para um relatório de bug, sem nomes, pastas e tokens.",
