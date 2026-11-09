@@ -2852,12 +2852,13 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   with the rules enforced. **A lane is one target**: a card whose own target isn't its lane's is refused into it (on a
   start, an edit or a placement), and a lane's card can't be set to another. A **card's** own target is the user's or the
   Assistant's (`tasks.setTarget`, the card dialog, `cw_create_task`/`cw_update_task`, the Agent API's `target`), only
-  while its branch has no work (never started, or each line it had is gone or already in its target, and the folder it
+  in On Hold or Todo (HI-2825: On Hold too) while its branch has no work (never started, or each line it had is gone or already in its target, and the folder it
   worked in holds nothing uncommitted, tracked or not: its slot while still on its line, the project folder whatever is
   there: `ownWork`): no rebase of started work. Its old lines, empty, are deleted with the change (`dropEmptyLines`,
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
-  new target. Both name only
+  new target. Refused otherwise, the refusal names the branch its work was made from, else the one it merges into now,
+  never an empty name (HI-2825). Both name only
 - **A card in flight moved to another target (HI-2753, designs s8 → s11 → s15 → s18, HR1 and HR2).** An integration
   branch ends (RELEASING.md: merged into `main`, then deleted), so the cards and lanes started on it need a way on. A card
   in Doing, Review, Passed or Merging, on a line of its own (a slot), moves from `from` (its `Started.target`) to `to`

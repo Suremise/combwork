@@ -198,6 +198,25 @@ describe("a card's Merges into", () => {
     expect(cardTarget(w, idle.number)).toBe('1.2.0')
   })
 
+  it('changes on a card never started, in On Hold as in Todo; a refusal never names an empty branch (HI-2825)', async () => {
+    const { w } = await project()
+    const held = await card(w, 'Never started, held', { column: 'hold', blocked: 'later' })
+    const waiting = await card(w, 'Never started, in Todo')
+    for (const c of [held, waiting]) {
+      await inWorkspace(w, () => tasks.setTarget(c.number, '1.2.0', assistant))
+      expect(cardTarget(w, c.number)).toBe('1.2.0')
+      await inWorkspace(w, () => tasks.setTarget(c.number, null, user))
+      expect(cardTarget(w, c.number)).toBeNull()
+    }
+    expect((await inWorkspace(w, () => tasks.readTask(held.number, user))).column).toBe('hold')
+    // Past them without ever starting (Done): refused, naming the branch it merges into, never an empty one.
+    const done = await card(w, 'Never started, Done', { target: '1.2.0' })
+    await inWorkspace(w, () => tasks.moveTask(done.number, 'done', { confirm: true, paths: null, reason: 'nothing to do' }))
+    expect((await inWorkspace(w, () => tasks.readTask(done.number, user))).column).toBe('done')
+    const refused = await inWorkspace(w, () => tasks.setTarget(done.number, null, user)).then(() => null, (e: Error) => e.message)
+    expect(refused).toMatch(/has work on its branch made from 1\.2\.0,/)
+  })
+
   it("knows a card's own work: none never started, none when its line is gone or in its target already; some when its line is ahead", async () => {
     const { repo } = await project()
     const { hasOwnWork } = await import('../src/main/workflow/targets')
