@@ -111,7 +111,7 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     check("nothing of the project's own OpenCode config, plugins, agents or the parent folder's config loads: only Combwork's private config", !!loaded && loaded.every((l) => (l.kind === 'config' && under(l.path, userData)) || (l.kind === 'instructions' && (under(l.path, userData) || path.resolve(l.path).toLowerCase() === projectFile))), JSON.stringify(loaded))
     check("…the project's AGENTS.md given as an instruction, Combwork's guidance from its private folder", !!loaded && loaded.some((l) => l.kind === 'instructions' && path.resolve(l.path).toLowerCase() === path.join(fs.realpathSync.native(alpha), 'AGENTS.md').toLowerCase()), JSON.stringify(loaded))
     const mcp = entries('mcp').at(-1)
-    check("a project's same-name server never replaces Combwork's (no project token), and none of its own starts", !!mcp && !mcp.started.some((n) => /^evil/.test(n)) && !Object.values(mcp.tokens ?? {}).includes('T-EVIL'), JSON.stringify(mcp))
+    check("a project's same-name server never replaces Combwork's (no project token), and none of its own starts", !!mcp && !mcp.started.some((n) => n.startsWith('evil')) && !Object.values(mcp.tokens ?? {}).includes('T-EVIL'), JSON.stringify(mcp))
 
     // --- Stopped: its server ends with it.
     const servePid = serve?.pid
