@@ -13,12 +13,12 @@ import { launchOverrides } from '../../advancedValues'
 import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { POWERSHELL } from '../../launchGate'
-import { compareVersions, exportSubtitleText } from '../common'
+import { compareVersions, exportSubtitleText, toSpawnable } from '../common'
 import type { CatalogRead, CommandSpec, ConnectionStatus, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { localDataRoot } from '../antigravity/home'
 import { AMBIENT_DIRS, AMBIENT_FILES, DATA_ENV, ambientIntegrations, opencodeEnv, opencodeHome } from './home'
-import { chosenAmbient, launchConfig, writeConfigDir, type SavedCredentials } from './config'
-import { accountModels, checkHome, latestOpencode, locateOpencode, opencodeInstallCommand, opencodeLoginCommand, opencodeReadiness, opencodeUpdateCommand, savedCredentials } from './install'
+import { chosenAmbient, launchConfig, withTestProvider, writeConfigDir, type SavedCredentials } from './config'
+import { accountModels, checkHome, testProvider, latestOpencode, locateOpencode, opencodeInstallCommand, opencodeLoginCommand, opencodeReadiness, opencodeUpdateCommand, savedCredentials } from './install'
 import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerToken, sessionMark, sessionMarks } from './launcher'
 
 // OpenCode 2 as a Combwork provider (HI-2759, against 2.2.6; the runtime facts are HI-2758's). Each launch runs its own
@@ -114,6 +114,14 @@ export class OpencodeAdapter implements ProviderAdapter {
   /** An account's sign-in: `opencode auth login` on its own roots. */
   accountLoginCommand(executable: string, home?: string): CommandSpec {
     return opencodeLoginCommand(executable, home || opencodeHome(null))
+  }
+
+  /**
+   * An account's Set Up is its sign-in, with the same protected preparation (HR1 on HI-2759): never the raw CLI with only
+   * its data root, which would read the user's own config and start the machine-wide service.
+   */
+  accountSetUpCommand(executable: string, home: string): CommandSpec {
+    return opencodeLoginCommand(executable, home)
   }
 
   /**
@@ -226,7 +234,7 @@ export class OpencodeAdapter implements ProviderAdapter {
       strip,
       noUpdate
     })
-    await writeConfigDir(configDir, cfg, launchGuidance(ctx))
+    await writeConfigDir(configDir, withTestProvider(cfg, testProvider(), true), launchGuidance(ctx))
     await mkdir(ambientDir, { recursive: true })
     for (const f of AMBIENT_FILES) await writeFile(join(ambientDir, f), '')
     for (const d of AMBIENT_DIRS) await mkdir(join(ambientDir, d), { recursive: true })
@@ -251,8 +259,11 @@ export class OpencodeAdapter implements ProviderAdapter {
       noUpdate: launchOverrides(ctx.overrides, OPENCODE, 'noAutoUpdate'),
       keepOut: launchOverrides(ctx.overrides, OPENCODE, 'keepProjectConfigOut')
     })
+    // A Node CLI's launcher runs as its node and script; any other .cmd/.bat through cmd.exe, escaped for it (launcher.ts).
+    const run = toSpawnable(ctx.executable, [])
     const launcher = launcherEnv({
-      executable: ctx.executable,
+      executable: run.line === undefined ? run.file : ctx.executable,
+      prefix: run.line === undefined ? run.args : [],
       cwd: ctx.cwd,
       sessionId: ctx.sessionId,
       intent: ctx.resume ? 'resume' : 'new',

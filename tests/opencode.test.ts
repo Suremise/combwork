@@ -3,7 +3,7 @@
 // never offered), the environment (credentials stripped, ambient chains blocked, Combwork's roots and switches set last),
 // the provider and MCP policies, the private config, saved credentials, session ids and the launch arguments.
 import { readFileSync } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
 import { describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
@@ -257,6 +257,8 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     const [ownerPid, created] = cmd.env!.CW_OC_OWNER.split(':')
     expect([ownerPid, /^[0-9]{15,19}$/.test(created)]).toEqual([String(process.pid), true])
     expect(cmd.env!.OPENAI_API_KEY).toBeUndefined()
+    // A bare Node launcher (the fake's opencode.cmd) runs as its node and script; anything else .cmd goes through cmd.exe.
+    expect([basename(cmd.env!.CW_OC_EXE).toLowerCase(), basename(cmd.env!.CW_OC_PREFIX)]).toEqual(['node.exe', 'fake-opencode.cjs'])
     // Built once: a second build of the same launch is a bug.
     expect(() => opencode.buildCommand(FAKE, c as never)).toThrow()
   }, 60000)
@@ -276,4 +278,44 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     expect(opencode.buildCommand(FAKE, c as never).env).toMatchObject({ CW_OC_INTENT: 'resume' })
     expect(existsSync(sessionMark(c.connectionHome, c.sessionId))).toBe(true)
   }, 60000)
+})
+
+describe("the real tier's test provider (CW_TEST_OPENCODE_PROVIDER, HI-2763): a test seam, never the production recipe", async () => {
+  const { testProviderOf, withTestProvider } = await import('../src/main/providers/opencode/config')
+  const raw = JSON.stringify({ id: 'cwtest', baseURL: 'http://127.0.0.1:47123/v1', model: 'qwen3:8b' })
+
+  it('read only by an unpackaged build, only well formed, only on loopback', () => {
+    expect(testProviderOf(raw, false)).toEqual({ id: 'cwtest', baseURL: 'http://127.0.0.1:47123/v1', model: 'qwen3:8b' })
+    expect(testProviderOf(raw, true)).toBeNull()
+    expect(testProviderOf(undefined, false)).toBeNull()
+    for (const bad of ['not json', JSON.stringify({ id: 'cwtest', baseURL: 'https://api.example.com/v1', model: 'm' }), JSON.stringify({ id: 'Bad Id', baseURL: 'http://127.0.0.1:1/v1', model: 'm' }), JSON.stringify({ id: 'x', baseURL: 'http://127.0.0.1:1/v1', model: '' })]) expect(testProviderOf(bad, false), bad).toBeNull()
+  })
+
+  it('unset, every config is exactly as written; set, its provider, a deny-all but it in place of the provider policies (the MCP ones kept), and on a launch its model', () => {
+    const launch = launchConfig({ model: 'ollama/qwen3:8b', agent: 'build', mcpServers: { combwork: { command: 'node' } }, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: true })
+    expect(withTestProvider(launch, null, true)).toBe(launch)
+    const tp = testProviderOf(raw, false)!
+    const t = withTestProvider(launch, tp, true)
+    expect(t).toMatchObject({ update: 'disable', model: 'cwtest/qwen3:8b', providers: { cwtest: { package: '@opencode/ai/providers/openai-compatible', settings: { baseURL: 'http://127.0.0.1:47123/v1' }, models: { 'qwen3:8b': { name: 'qwen3:8b' } } } } })
+    expect((t.policies as { action: string; resource: string; effect: string }[]).map((p) => `${p.action}:${p.resource}:${p.effect}`)).toEqual(['provider.use:*:deny', 'provider.use:cwtest:allow', 'mcp.use:*:deny', 'mcp.use:combwork:allow'])
+    const check = withTestProvider(checkConfig(AMBIENT, null, true, true), tp, false)
+    expect(check.model).toBeUndefined()
+    expect((check.policies as { resource: string }[])[0]).toEqual({ action: 'provider.use', resource: '*', effect: 'deny' })
+    expect((withTestProvider(loginConfig(true), tp, false).policies as { resource: string }[]).map((p) => p.resource)).toEqual(['*', 'cwtest', '*'])
+  })
+})
+
+describe.runIf(process.platform === 'win32')("an account's Set Up (HR1 on HI-2759: never the raw CLI)", async () => {
+  const { opencode } = await import('../src/main/providers/opencode/adapter')
+  const FAKE = join(__dirname, 'e2e', 'fake-opencode', 'opencode.cmd')
+
+  it("is its sign-in, prepared as one: auth login, standalone, on the account's roots and its own login config, the switches set", () => {
+    const home = join(base, 'accounts', 'oc-setup')
+    const cmd = opencode.accountSetUpCommand(FAKE, home)
+    expect(cmd.args.slice(-3)).toEqual(['auth', 'login', '--standalone'])
+    expect(cmd.env).toMatchObject({ XDG_DATA_HOME: home, OPENCODE_CONFIG_DIR: join(home, 'combwork-login'), OPENCODE_DISABLE_PROJECT_CONFIG: '1', OPENCODE_DISABLE_CLAUDE_CODE: '1', OPENCODE_DISABLE_AUTOUPDATE: '1' })
+    const cfg = JSON.parse(readFileSync(join(home, 'combwork-login', 'opencode.json'), 'utf8'))
+    expect(cfg.policies).toContainEqual({ action: 'provider.use', resource: 'claude-agent', effect: 'deny' })
+    expect(JSON.parse(readFileSync(join(home, 'combwork-login', 'service.json'), 'utf8'))).toEqual({ disabled: true })
+  })
 })

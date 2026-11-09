@@ -493,6 +493,11 @@ export interface ProviderAdapter {
    */
   accountLoginCommand?(executable: string, home?: string): CommandSpec
   /**
+   * A connection's Set Up, when the CLI's own run on the folder (with connectionSetUpArgs) isn't safe for it (HI-2759:
+   * OpenCode's needs its private config and roots, so its Set Up is its sign-in); its `env` is put over the run's.
+   */
+  accountSetUpCommand?(executable: string, home: string): CommandSpec
+  /**
    * Environment variables the CLI reads as a login (HI-1757: Codex's CODEX_ACCESS_TOKEN), left out wherever it runs on a
    * connection (its sign-in, its checks, its sessions: withoutAccountEnv), so they can't stand in for the connection's own.
    */

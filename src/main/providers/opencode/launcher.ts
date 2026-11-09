@@ -47,6 +47,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using Microsoft.Win32.SafeHandles;
 
@@ -63,7 +64,13 @@ public static class CwOpencode {
 
   static IntPtr job = IntPtr.Zero;
   static string E(string n) { return Environment.GetEnvironmentVariable(n) ?? ""; }
-  static void Say(string s) { try { Console.Error.WriteLine("Combwork: " + s); } catch (Exception) { } }
+  /** The server's log, where what the launcher says goes too (its terminal may be gone by then). */
+  static string sayLog;
+  static void Say(string s) {
+    try { Console.Error.WriteLine("Combwork: " + s); } catch (Exception) { }
+    // Shared as the server's log is (it is open for its output meanwhile).
+    try { if (sayLog != null) using (var f = new FileStream(sayLog, FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { byte[] b = Encoding.UTF8.GetBytes("[Combwork launcher] " + s + "\r\n"); f.Write(b, 0, b.Length); } } catch (Exception) { }
+  }
 
   /** The owner: its handle, once its creation time is exactly the one Combwork gave. Null: not that process. */
   static WaitHandle HoldOwner(string token, out string why) {
@@ -105,17 +112,49 @@ public static class CwOpencode {
   }
   static string Line(List<string> args) { var parts = new List<string>(); foreach (var a in args) parts.Add(Q(a)); return string.Join(" ", parts.ToArray()); }
 
-  /** The executable started with these arguments: a .cmd or .bat through cmd.exe, as Combwork starts one (toSpawnable). */
-  static ProcessStartInfo Start(string exe, List<string> args) {
-    string ext = Path.GetExtension(exe).ToLowerInvariant();
+  /**
+   * One argument of the line cmd.exe runs, as Combwork's own cmdArg (common.ts, HI-2722) quotes it: quoted when it is empty
+   * or has a space, a quote or a character cmd.exe acts on, so &|<>^ stay inside cmd.exe's quotes; a quote doubled; a %
+   * followed by %cd:~,% (expanded to nothing), so no %NAME% in it expands; backslashes before a quote doubled.
+   */
+  static string CmdArg(string arg) {
+    if (arg.Length > 0 && !Regex.IsMatch(arg, "[\\s\"&|<>^(),;=%!]")) return arg;
+    var b = new StringBuilder("\"");
+    int slashes = 0;
+    foreach (char ch in arg) {
+      if (ch == '\\') { slashes++; continue; }
+      if (ch == '"') { b.Append('\\', slashes * 2).Append("\"\""); slashes = 0; continue; }
+      if (ch == '%') { b.Append('\\', slashes).Append("%%cd:~,%"); slashes = 0; continue; }
+      b.Append('\\', slashes).Append(ch); slashes = 0;
+    }
+    return b.Append('\\', slashes * 2).Append('"').ToString();
+  }
+
+  /** What to run for opencode: the executable and the arguments before its own (a Node launcher's script, toSpawnable). */
+  static string exe0; static List<string> prefix = new List<string>();
+
+  /**
+   * opencode started with these arguments: an .exe (or a Node launcher's node and script) by Windows' argv rules; a .cmd
+   * or .bat through cmd.exe, /d /s /c "<each CmdArg>", as Combwork starts one (toSpawnable).
+   */
+  static ProcessStartInfo Start(List<string> args) {
+    var all = new List<string>(prefix); all.AddRange(args);
+    string ext = Path.GetExtension(exe0).ToLowerInvariant();
     ProcessStartInfo s;
     if (ext == ".cmd" || ext == ".bat") {
-      var all = new List<string>(); all.Add(exe); all.AddRange(args);
-      s = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"), "/d /s /c \"" + Line(all) + "\"");
-    } else s = new ProcessStartInfo(exe, Line(args));
+      var parts = new List<string>(); parts.Add(CmdArg(exe0)); foreach (var a in all) parts.Add(CmdArg(a));
+      s = new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe"), "/d /s /c \"" + string.Join(" ", parts.ToArray()) + "\"");
+    } else s = new ProcessStartInfo(exe0, Line(all));
     s.UseShellExecute = false;
     return s;
   }
+
+  /** The owner's handle (null: none, a test); gone: the launch stops wherever it is, before anything more is done. */
+  static WaitHandle ownerWait;
+  static bool OwnerGone() { return ownerWait != null && ownerWait.WaitOne(0); }
+
+  /** A wait handle that is set when the process ends (its own handle, not owned). */
+  static WaitHandle Exits(Process p) { return new ManualResetEvent(false) { SafeWaitHandle = new SafeWaitHandle(p.Handle, false) }; }
 
   static int FreePort() { var l = new TcpListener(IPAddress.Loopback, 0); l.Start(); int p = ((IPEndPoint)l.LocalEndpoint).Port; l.Stop(); return p; }
 
@@ -184,13 +223,14 @@ public static class CwOpencode {
     string pw = E("OPENCODE_PASSWORD");
     int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 30000;
     long logMax; if (!long.TryParse(E("CW_OC_LOG_MAX"), out logMax) || logMax < 4096) logMax = 1048576;
+    exe0 = exe; sayLog = log == "" ? null : log;
+    foreach (string a in E("CW_OC_PREFIX").Split('\u001f')) if (a.Length > 0) prefix.Add(a);
     var tuiArgs = new List<string>(); foreach (string a in E("CW_OC_TUI_ARGS").Split('\u001f')) if (a.Length > 0) tuiArgs.Add(a);
     var dirs = new List<string>(); foreach (string d in E("CW_OC_DIRS").Split('\u001f')) if (d.Length > 0) dirs.Add(Norm(d));
-    foreach (string n in new string[] { "CW_OC_MARKS", "CW_OC_EXE", "CW_OC_CWD", "CW_OC_SESSION", "CW_OC_INTENT", "CW_OC_INFO", "CW_OC_LOG", "CW_OC_OWNER", "CW_OC_READY_MS", "CW_OC_LOG_MAX", "CW_OC_TUI_ARGS", "CW_OC_DIRS", "CW_OC_CS" }) Environment.SetEnvironmentVariable(n, null);
+    foreach (string n in new string[] { "CW_OC_PREFIX", "CW_OC_MARKS", "CW_OC_EXE", "CW_OC_CWD", "CW_OC_SESSION", "CW_OC_INTENT", "CW_OC_INFO", "CW_OC_LOG", "CW_OC_OWNER", "CW_OC_READY_MS", "CW_OC_LOG_MAX", "CW_OC_TUI_ARGS", "CW_OC_DIRS", "CW_OC_CS" }) Environment.SetEnvironmentVariable(n, null);
     if (exe == "" || cwd == "" || pw == "" || info == "" || log == "" || marks == "" || !session.StartsWith("ses") || (intent != "new" && intent != "resume")) { Say("the launch was given incomplete settings."); return ${LAUNCHER_EXIT.input}; }
 
     string why;
-    WaitHandle ownerWait = null;
     if (owner != "") { ownerWait = HoldOwner(owner, out why); if (ownerWait == null) { Say("OpenCode didn't start: " + why + "."); return ${LAUNCHER_EXIT.owner}; } }
     why = OwnJob();
     if (why != null) { Say("OpenCode didn't start: its server couldn't be given a lifetime of its own (" + why + ")."); return ${LAUNCHER_EXIT.job}; }
@@ -202,7 +242,8 @@ public static class CwOpencode {
     try { logFile = new FileStream(log, FileMode.Append, FileAccess.Write, FileShare.ReadWrite); } catch (Exception e) { Say("OpenCode didn't start: its server's log couldn't be opened (" + e.Message + ")."); return ${LAUNCHER_EXIT.serverStart}; }
     for (int attempt = 0; attempt < 3 && url == null; attempt++) {
       port = FreePort();
-      var s = Start(exe, new List<string> { "serve", "--hostname", "127.0.0.1", "--port", port.ToString() });
+      if (OwnerGone()) { Say("Combwork ended: OpenCode isn't started."); return ${LAUNCHER_EXIT.ownerEnded}; }
+      var s = Start(new List<string> { "serve", "--hostname", "127.0.0.1", "--port", port.ToString() });
       s.CreateNoWindow = true; s.RedirectStandardOutput = true; s.RedirectStandardError = true; s.RedirectStandardInput = true; s.WorkingDirectory = cwd;
       try { serve = Process.Start(s); } catch (Exception e) { Say("OpenCode didn't start: its server couldn't be run (" + e.Message + ")."); return ${LAUNCHER_EXIT.serverStart}; }
       var p = serve;
@@ -214,17 +255,23 @@ public static class CwOpencode {
         int st = Http("GET", "http://127.0.0.1:" + port + "/api/info", auth, null, out body);
         if (st == 200) { url = "http://127.0.0.1:" + port; break; }
         if (st == 401) { Say("OpenCode's server refused Combwork's password."); return ${LAUNCHER_EXIT.auth}; }
-        if (serve.WaitForExit(200)) break;
+        // The server ending, or the owner: whichever comes first in the next 200 ms.
+        var w = ownerWait == null ? new WaitHandle[] { Exits(serve) } : new WaitHandle[] { Exits(serve), ownerWait };
+        int hit = WaitHandle.WaitAny(w, 200);
+        if (hit == 1) { Say("Combwork ended while OpenCode's server was starting."); return ${LAUNCHER_EXIT.ownerEnded}; }
+        if (hit == 0) break;
       }
       if (url == null && !serve.HasExited) { Say("OpenCode's server didn't answer within " + (readyMs / 1000) + " s."); return ${LAUNCHER_EXIT.serverStart}; }
     }
     if (url == null) { Say("OpenCode's server ended as it started (see " + log + ")."); return ${LAUNCHER_EXIT.serverStart}; }
 
     string reply;
+    if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
     int got = Http("GET", url + "/api/session/" + Uri.EscapeDataString(session), auth, null, out reply);
     if (intent == "new") {
       if (got == 200) { Say("a session " + session + " already exists: Combwork doesn't take another's session."); return ${LAUNCHER_EXIT.sessionClash}; }
       if (got != 404) { Say("OpenCode's server couldn't be asked for the session (HTTP " + got + ")."); return ${LAUNCHER_EXIT.sessionCreate}; }
+      if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
       int made = Http("POST", url + "/api/session", auth, "{\"id\":" + J(session) + ",\"location\":{\"directory\":" + J(cwd) + "}}", out reply);
       if (made != 200 || Field(reply, "id") != session) { Say("OpenCode didn't create the session (HTTP " + made + ")."); return ${LAUNCHER_EXIT.sessionCreate}; }
       // Combwork's record that this account's data holds the session (its resume looks for it here: sessionMark).
@@ -235,6 +282,7 @@ public static class CwOpencode {
       string dir = Field(reply, "directory");
       if (Field(reply, "id") != session || dir == null || !dirs.Contains(Norm(dir))) { Say("session " + session + " belongs to another folder: not resumed."); return ${LAUNCHER_EXIT.sessionMismatch}; }
     }
+    if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
     try {
       string tmp = info + ".tmp";
       File.WriteAllText(tmp, "{\"url\":" + J(url) + ",\"port\":" + port + ",\"serverPid\":" + serve.Id + ",\"sessionId\":" + J(session) + ",\"pid\":" + Process.GetCurrentProcess().Id + "}");
@@ -245,17 +293,19 @@ public static class CwOpencode {
     var t = new List<string> { "--server", url, "--session", session };
     t.AddRange(tuiArgs);
     t.Add(cwd);
-    var ts = Start(exe, t);
+    if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
+    var ts = Start(t);
     ts.WorkingDirectory = cwd;
     Process tui;
     try { tui = Process.Start(ts); } catch (Exception e) { Say("OpenCode's interface couldn't be run (" + e.Message + ")."); return ${LAUNCHER_EXIT.tuiStart}; }
     var waits = new List<WaitHandle>();
-    waits.Add(new ManualResetEvent(false) { SafeWaitHandle = new SafeWaitHandle(tui.Handle, false) });
-    waits.Add(new ManualResetEvent(false) { SafeWaitHandle = new SafeWaitHandle(serve.Handle, false) });
+    waits.Add(Exits(tui));
+    waits.Add(Exits(serve));
     if (ownerWait != null) waits.Add(ownerWait);
     int which = WaitHandle.WaitAny(waits.ToArray());
     if (which == 0) { tui.WaitForExit(); return tui.ExitCode; }
     if (which == 1) { Say("OpenCode's server ended (see " + log + ")."); return ${LAUNCHER_EXIT.serverEnded}; }
+    Say("Combwork ended: OpenCode and its server end with it.");
     return ${LAUNCHER_EXIT.ownerEnded};
   }
 }
@@ -274,7 +324,10 @@ export const LAUNCHER_ARGS = ['-NoProfile', '-NonInteractive', '-NoLogo', '-Exec
 
 /** What the launcher is told (its environment: nothing on its command line is quoted twice). */
 export interface LauncherInput {
+  /** What runs opencode: its .exe, a .cmd/.bat (run through cmd.exe), or a Node launcher's node (with `prefix`). */
   executable: string
+  /** Arguments before opencode's own: a Node launcher's script (toSpawnable's shim), else none. */
+  prefix?: string[]
   cwd: string
   sessionId: string
   intent: 'new' | 'resume'
@@ -304,6 +357,7 @@ export const launcherSourcePath = (privateDir: string): string => join(privateDi
 export function launcherEnv(i: LauncherInput): Record<string, string> {
   return {
     CW_OC_EXE: i.executable,
+    CW_OC_PREFIX: (i.prefix ?? []).join('\u001f'),
     CW_OC_CWD: i.cwd,
     CW_OC_SESSION: i.sessionId,
     CW_OC_INTENT: i.intent,
