@@ -372,6 +372,13 @@
   "api.change.commentTask": {
     "text": "comment on {card}"
   },
+  "api.change.createBranch": {
+    "text": "create the branch {name} from {from} in {project}",
+    "note": "HI-2807: cw_branch create. {from}: a branch, tag or commit as named."
+  },
+  "api.change.createBranchAny": {
+    "text": "create a branch"
+  },
   "api.change.createProject": {
     "text": "create the project \"{name}\""
   },
@@ -418,6 +425,10 @@
   },
   "api.change.messageAgent": {
     "text": "leave {agent} in {project} a message"
+  },
+  "api.change.nextVersion": {
+    "text": "start the next version of {project}",
+    "note": "HI-2807: cw_branch nextVersion."
   },
   "api.change.onlyAssistant": {
     "text": "Only the Assistant can {what} through the Agent API.",
@@ -658,6 +669,10 @@
   "api.done.alreadyStopped": {
     "text": "{agent} in {project} had already stopped"
   },
+  "api.done.branchCreated": {
+    "text": "Created {name} from {from} ({commit}) in {project}",
+    "note": "HI-2807: {commit} is a short hash."
+  },
   "api.done.cancelledMessages": {
     "text": "{n, plural, =0 {No message was waiting for {agent} in {project}} one {Cancelled the message waiting for {agent} in {project}} other {Cancelled {total} messages waiting for {agent} in {project}}}"
   },
@@ -710,6 +725,10 @@
   },
   "api.done.messaged": {
     "text": "{typed, select, yes {Gave} other {Left}} {agent} in {project} a message ({id}){tied, select, yes { for {card} round {round}} other {}}{typed, select, yes {} other { (queued)}}"
+  },
+  "api.done.nextVersionStarted": {
+    "text": "Started {name} from {from} ({commit}) in {project}: {added, select, yes {{from} added to the other branches work can merge into, } other {}}work merges into {name} now",
+    "note": "HI-2807: Start the next version. {commit} is a short hash."
   },
   "api.done.notRunning": {
     "text": "{agent} in {project} wasn't running"
@@ -1070,6 +1089,10 @@
   },
   "api.provider.notInstalled": {
     "text": "not installed"
+  },
+  "api.queue.branchArgs": {
+    "text": "name and from are required: the new branch and where it starts (a branch, a tag or a commit)",
+    "note": "HI-2807: cw_branch create without them."
   },
   "api.queue.forwardArgs": {
     "text": "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets"

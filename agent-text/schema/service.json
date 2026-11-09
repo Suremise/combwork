@@ -353,6 +353,11 @@
       "name": "plain"
     }
   },
+  "service.gitRepo.branchTaken": {
+    "placeholders": {
+      "name": "plain"
+    }
+  },
   "service.gitRepo.chooseRemote": {
     "placeholders": {}
   },
@@ -426,6 +431,11 @@
   },
   "service.gitRepo.noRemotesFetch": {
     "placeholders": {}
+  },
+  "service.gitRepo.noStart": {
+    "placeholders": {
+      "ref": "plain"
+    }
   },
   "service.gitRepo.noTarget": {
     "placeholders": {
@@ -523,6 +533,12 @@
       "why": "plain"
     }
   },
+  "service.gitRepo.startMoved": {
+    "placeholders": {
+      "ref": "plain",
+      "now": "plain"
+    }
+  },
   "service.gitRepo.switchFailed": {
     "placeholders": {
       "branch": "plain",
@@ -535,6 +551,11 @@
       "name": "plain",
       "remote": "plain",
       "why": "plain"
+    }
+  },
+  "service.gitRepo.tagTaken": {
+    "placeholders": {
+      "name": "plain"
     }
   },
   "service.gitRepo.update.agentBusy": {
@@ -781,6 +802,33 @@
       "error": "plain"
     }
   },
+  "service.nextVersion.movedOn": {
+    "placeholders": {
+      "now": "plain",
+      "from": "plain"
+    }
+  },
+  "service.nextVersion.noName": {
+    "placeholders": {
+      "from": "plain"
+    }
+  },
+  "service.nextVersion.notGit": {
+    "placeholders": {}
+  },
+  "service.nextVersion.partial": {
+    "placeholders": {
+      "name": "plain",
+      "commit": "plain",
+      "why": "plain",
+      "kept": "select"
+    }
+  },
+  "service.nextVersion.sameName": {
+    "placeholders": {
+      "from": "plain"
+    }
+  },
   "service.providers.noSetup": {
     "placeholders": {
       "cli": "plain"
@@ -870,6 +918,12 @@
     "placeholders": {
       "branch": "plain",
       "uses": "plain"
+    }
+  },
+  "service.workflow.targetMissing": {
+    "placeholders": {
+      "n": "plural",
+      "branches": "plain"
     }
   },
   "service.workspace.advancedNotHere": {

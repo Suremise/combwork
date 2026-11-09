@@ -58,6 +58,14 @@ const recording = new AsyncLocalStorage<Recording | null>()
  * Runs one of the Assistant's changes (`act`: its action's kind; `what`: its line, "change #12 on the board"), recording
  * what it changes for undo.
  */
+/**
+ * HI-2807: a branch the Assistant made, recorded as a `setting` change whose target is `branch:<name>` (its field `branch`,
+ * the commit it was made at): the board's change kinds are fixed by its schema, which older Combworks on the same
+ * workspace read too. Undo takes it back as a branch (assistantUndo.ts `undoBranch`), never as a setting.
+ */
+export const BRANCH_TARGET = 'branch:'
+export const branchChange = (project: string, name: string, commit: string): { kind: 'setting'; project: string; target: string; fields: { field: string; old: null; new: string }[] } => ({ kind: 'setting', project, target: `${BRANCH_TARGET}${name}`, fields: [{ field: 'branch', old: null, new: commit }] })
+
 export function recordingChanges<T>(workspacePath: string, act: ActivityKind, what: string, fn: () => Promise<T>): Promise<T> {
   return recording.run({ workspace: workspacePath, turn: currentTurn(workspacePath), act, what, cards: new Map(), finals: new Map(), recorded: 0 }, fn)
 }

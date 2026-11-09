@@ -104,6 +104,34 @@
   "tool.askUser.description": {
     "placeholders": {}
   },
+  "tool.branch.arg.commit": {
+    "placeholders": {}
+  },
+  "tool.branch.arg.from": {
+    "placeholders": {}
+  },
+  "tool.branch.description": {
+    "placeholders": {}
+  },
+  "tool.branch.reply.created": {
+    "placeholders": {
+      "name": "plain",
+      "from": "plain",
+      "commit": "plain"
+    }
+  },
+  "tool.branch.reply.nextVersion": {
+    "placeholders": {
+      "name": "plain",
+      "from": "plain",
+      "commit": "plain",
+      "added": "select",
+      "retarget": "select",
+      "move": "plain",
+      "stay": "plain",
+      "preview": "plain"
+    }
+  },
   "tool.call.error": {
     "placeholders": {
       "message": "plain"

@@ -36,6 +36,7 @@ import { BusyButton, Icon, IconButton, Tooltip, useBusy } from '../components/ui
 import { INIT_TEXT, InitRepoButton } from '../components/InitRepo'
 import { at, GIT_TEXT, GitForm, gitAction, Loading, rich, useFolderBusy, useGitRead, type FormSpec, type OpenForm } from './GitTab'
 import { awayFromProject } from '../agentPlace'
+import { NewBranchForm, type NewBranchDraft } from '../components/NewBranchForm'
 
 /**
  * Version Control → Branches & remotes (#607, #1385; its own file since #1416): the project folder's branch or detached
@@ -63,7 +64,7 @@ const M = {
   create: msg({ id: 'git.newBranch.create', defaultMessage: 'Create', description: "The New branch form's button." }),
   branchNoSpaces: msg({ id: 'git.newBranch.noSpaces', defaultMessage: 'Branch names have no spaces', description: "Under the New branch form's box." }),
   switchNow: msg({ id: 'git.newBranch.switchNow', defaultMessage: 'Switch to it now', description: 'Check box in the New branch form.' }),
-  createFailed: msg({ id: 'git.newBranch.failed', defaultMessage: "Couldn't create {branch}", description: 'Title of an error notification.' }),
+  noStartAt: msg({ id: 'git.newBranch.noStartAt', defaultMessage: 'There’s no branch, tag or commit {ref}.', description: 'HI-2807: an error in the New branch form: nothing in the repository is called {ref} (as typed in Starts at).' }),
   pushFailed: msg({ id: 'git.push.failed', defaultMessage: "Couldn't push {branch}", description: 'Title of an error notification.' }),
   pushTitle: msg({ id: 'git.push.title', defaultMessage: 'Push {branch}', description: 'Title of the dialog that pushes a branch that tracks no remote branch yet.' }),
   pushMessage: msg({ id: 'git.push.message', defaultMessage: '{branch} tracks no remote branch yet. Push it, and track it from now on:', description: 'The Push dialog, above the drop-down of remotes.' }),
@@ -253,18 +254,29 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
     if (ok) act(`switch:${target}`, tr(M.switchFailed, { branch: target }), () => call('git:switch', project.path, target))
   }
 
+  /**
+   * HI-2807: New branch… with where it starts (the folder's commit by default, or any branch, tag or commit), created
+   * from the commit the form showed; switched to only when asked and the folder may move. A failure stays in the dialog.
+   */
   const newBranch = async (s: GitRepoSummary): Promise<void> => {
     const blocked = busyFor('create')
-    let switchNow = !blocked
-    const name = await prompt({
+    let draft: NewBranchDraft = { name: '', start: '', resolved: null, switchNow: false }
+    let done = ''
+    await confirm({
       title: tr(M.newBranchTitle),
       message: [tr(M.newBranchAt, { commit: s.head ?? '', onBranch: s.branch ? 'yes' : 'no', current: s.branch ?? '' }), blocked ? tr(M.newBranchBlocked, { why: blocked }) : ''].filter(Boolean).join(' '),
-      placeholder: tr(M.branchPlaceholder),
+      content: <NewBranchForm projectPath={project.path} onChange={(d) => (draft = d)} initialStart={s.branch ?? s.head ?? ''} blocked={blocked} switchLabel={tr(M.switchNow)} placeholder={tr(M.branchPlaceholder)} />,
       confirmLabel: tr(M.create),
-      validate: (v) => (!v.trim() ? tr(M.enterName) : /\s/.test(v.trim()) ? tr(M.branchNoSpaces) : null),
-      check: blocked ? undefined : { label: tr(M.switchNow), initial: true, set: (v) => (switchNow = v) }
+      run: async () => {
+        if (!draft.name) throw new Error(tr(M.enterName))
+        if (/\s/.test(draft.name)) throw new Error(tr(M.branchNoSpaces))
+        const start = draft.resolved ?? (await call('git:resolveStart', project.path, draft.start))
+        if (!start) throw new Error(tr(M.noStartAt, { ref: draft.start }))
+        done = await call('git:createBranch', project.path, draft.name, !draft.switchNow, { ref: draft.start, commit: start.commit })
+      }
     })
-    if (name) act('create', tr(M.createFailed, { branch: name.trim() }), () => call('git:createBranch', project.path, name.trim(), !switchNow))
+    bumpGit(project.path)
+    if (done) notify('success', done)
   }
 
   const pushNow = async (s: GitRepoSummary): Promise<void> => {

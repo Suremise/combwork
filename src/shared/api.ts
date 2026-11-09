@@ -1,5 +1,6 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
+import type { BranchStart, ResolvedStart, StartPoints } from './nextVersion'
 import type { IgnoreTarget } from './gitIgnoreRules'
 import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
 import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
@@ -143,6 +144,8 @@ import type {
   WorkflowChange,
   RetargetPreview,
   RetargetResult,
+  NextVersionPlan,
+  NextVersionResult,
   WorkflowCheck,
   WorkflowForm,
   PlatformSwitchCheck,
@@ -387,6 +390,12 @@ export interface CombworkRequests {
   'workflow:setOptions': (projectPath: string, change: WorkflowChange, opts?: { applyTo?: number[] }) => WorkflowForm
   /** HI-2680: moves what a confirmed Retarget preview listed, as the user: each item rechecked; what happened to each. */
   'workflow:retarget': (projectPath: string, preview: RetargetPreview) => RetargetResult
+  /** HI-2807: what Start the next version's dialog shows: the release, its head, the proposed name, what can follow. */
+  'workflow:nextVersionPlan': (projectPath: string) => NextVersionPlan
+  /** HI-2807: what can follow `to` from the release with both going on (the dialog's name edited). */
+  'workflow:nextVersionPreview': (projectPath: string, from: string, to: string) => RetargetPreview | null
+  /** HI-2807: Start the next version: the branch made at the release's head as shown, the release added to Other branches, Work merges into moved to it. */
+  'workflow:startNextVersion': (projectPath: string, args: { name: string; from: BranchStart; base: NextVersionPlan['base'] }) => NextVersionResult
   /** The user's answer to the merge queue's question before an upgraded project's first merge (HI-1697, For you): its merge style and commit message saved, the request answered. */
   'workflow:chooseMerge': (projectPath: string, choice: { card: number; request: string; style: WorkflowOptions['style']; commitMessage: CommitMessage }) => void
   /**
@@ -1081,7 +1090,16 @@ export interface CombworkRequests {
   /** Update from <target> (HI-1180): what it would do to a branch (its dialog), and the update, merge or rebase, saying what it did. */
   'git:updatePlan': (projectPath: string, branch: string) => BranchUpdatePlan
   'git:updateBranch': (projectPath: string, branch: string, how: BranchUpdateHow) => string
-  'git:createBranch': (projectPath: string, name: string, stay?: boolean) => string
+  /** Creates a branch, switching to it unless `stay`: at the folder's commit, or (HI-2807) at `from` as the user was shown it. */
+  'git:createBranch': (projectPath: string, name: string, stay?: boolean, from?: BranchStart | null) => string
+  /** HI-2807: why `name` can't be a new branch (a name git refuses, a branch or tag of that name), or null. */
+  'git:checkBranchName': (projectPath: string, name: string) => string | null
+  /** HI-2807: a start point (branch, tag, remote branch or commit) resolved, or null when there's no such thing. */
+  'git:resolveStart': (projectPath: string, ref: string) => ResolvedStart | null
+  /** HI-2807: the names New branch…'s Starts at offers. */
+  'git:startPoints': (projectPath: string) => StartPoints
+  /** HI-2807: which of these names aren't local branches now. */
+  'git:missingBranches': (projectPath: string, names: string[]) => string[]
   'git:addRemote': (projectPath: string, name: string, url: string) => string
   'git:setRemoteUrl': (projectPath: string, name: string, url: string) => string
   'git:fetch': (projectPath: string) => string

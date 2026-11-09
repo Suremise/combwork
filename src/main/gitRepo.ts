@@ -40,6 +40,7 @@ import {
   type BranchUpdatePlan
 } from '../shared/gitRepo'
 import { localUse, remoteKept } from '../shared/branchCleanup'
+import type { BranchStart, ResolvedStart, StartPoints } from '../shared/nextVersion'
 import { samePath } from '../shared/movePaths'
 import * as G from './platform/git'
 import { plainRepo } from './platform/repoRefs'
@@ -55,7 +56,7 @@ import { gitProblem, gitTool } from './gitTool'
 import { gitProblemData } from '../shared/gitTool'
 import { linesOf, listOf, shownText, withValues, type Text, type TextPart, type TextValues } from '../shared/advanced'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
-import { errorText, CombworkError } from './combworkError'
+import { errorText, shownError, CombworkError } from './combworkError'
 import { changingFolder } from './folderFence'
 import { createLogger, userText } from './logger'
 import { mergeSlots } from './mergeSlotHost'
@@ -69,7 +70,8 @@ const log = createLogger('gitRepo')
 
 /**
  * The Git view (#607): a project folder's branch, remotes, upstream, history, tags and identity, and the user's actions
- * on them. Everything here is the user's, from the window: no agent tool or Agent API route reaches it. Actions take
+ * on them. Everything here is the user's, from the window: no agent tool or Agent API route reaches it, but for the
+ * Assistant's branch creation (HI-2807: `makeBranchAt`, `removeMadeBranch`, through its change boundary). Actions take
  * only a project folder (`assertProject`), never a worktree: agents' worktrees change through the merge flow. Nothing
  * fetches by itself: ahead/behind is as of the user's last fetch.
  */
@@ -108,6 +110,10 @@ const M = {
   pushOutcome: msg({ id: 'service.gitRepo.pushOutcome', defaultMessage: '{result, select, pushed {Pushed: {refs}.} upToDate {Already up to date: {refs}.} refused {Refused: {refs}.} other {Tags pushed: {refs}.}}', description: "A line after Push to… with all branches and tags in the Git view: the branches pushed, already up to date, refused (branches or tags), or the tags pushed. {refs} lists them all by name." }),
   remoteTrackingChanged: msg({ id: 'service.gitRepo.remoteTrackingChanged', defaultMessage: "The branches tracking {remote} changed since you were asked, so nothing was removed: look at them again.", description: 'An error removing a remote in the Git view: the local branches tracking it are not the ones the confirmation listed (one started or stopped tracking it meanwhile).' }),
   notOnRemote: msg({ id: 'service.gitRepo.notOnRemote', defaultMessage: '{remote} has no {branch} (as of the last fetch): push it there first, or fetch.', description: 'An error choosing what a branch tracks in the Git view: the remote {remote} has no branch {branch} that Combwork knows of.' }),
+  branchTaken: msg({ id: 'service.gitRepo.branchTaken', defaultMessage: 'There’s already a branch {name}.', description: 'HI-2807: an error creating a branch: the repository has a branch called {name} already.' }),
+  tagTaken: msg({ id: 'service.gitRepo.tagTaken', defaultMessage: 'There’s a tag {name}: a branch of the same name would make the name mean two things to git.', description: 'HI-2807: an error creating a branch: the repository has a tag called {name}, so a branch can’t take that name.' }),
+  noStart: msg({ id: 'service.gitRepo.noStart', defaultMessage: 'There’s no branch, tag or commit {ref}.', description: 'HI-2807: an error creating a branch from a start point: nothing in the repository is called {ref} (as typed in Starts at).' }),
+  startMoved: msg({ id: 'service.gitRepo.startMoved', defaultMessage: '{ref} has moved since you were shown it (it’s at {now} now), so nothing was created: look at it again.', description: 'HI-2807: an error creating a branch from a branch: {ref} points at another commit ({now}, a short hash) than the one the dialog showed.' }),
   badName: msg({ id: 'service.gitRepo.badName', defaultMessage: "{kind, select, tag {{hasName, select, yes {{name} isn't a valid tag name.} other {That isn't a valid tag name.}}} other {{hasName, select, yes {{name} isn't a valid branch name.} other {That isn't a valid branch name.}}}}", description: "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That)." })
 }
 
@@ -724,14 +730,162 @@ export async function switchBranch(projectPath: string, target: string): Promise
   })
 }
 
-/** Creates a branch at the folder's commit, switching to it unless `stay`. */
-export async function createBranch(projectPath: string, name: string, stay = false): Promise<string> {
+/**
+ * HI-2807: what stops `name` being a new branch now, or null: a name git refuses, a branch of that name already, or a tag
+ * of that name (a branch beside a tag of its name makes the name ambiguous to git).
+ */
+async function branchNameProblem(projectPath: string, name: string): Promise<CombworkError | null> {
+  if (!(await branchNameOk(projectPath, name))) return refusal(M.badName, { kind: 'branch', hasName: name ? 'yes' : 'no', name })
+  if ((await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${name}`])).ok) return refusal(M.branchTaken, { name })
+  if ((await git(projectPath, ['show-ref', '--verify', '-q', `refs/tags/${name}`])).ok) return refusal(M.tagTaken, { name })
+  return null
+}
+
+/** HI-2807: New branch…'s name checked as it is typed: why it can't be a new branch (the window's words), or null. */
+export async function checkBranchName(projectPath: string, name: string): Promise<string | null> {
+  projectPath = workspace.assertProject(projectPath)
+  const p = await branchNameProblem(projectPath, String(name ?? '').trim())
+  return p ? shownError(p) : null
+}
+
+/**
+ * HI-2807: a start point (a branch, a tag, a remote branch or a commit) resolved to its commit, short hash and subject;
+ * null when the repository has nothing of that name.
+ */
+export async function resolveStart(projectPath: string, ref: string): Promise<ResolvedStart | null> {
+  projectPath = workspace.assertProject(projectPath)
+  return resolvedStart(projectPath, String(ref ?? '').trim())
+}
+
+async function resolvedStart(projectPath: string, ref: string): Promise<ResolvedStart | null> {
+  if (!ref || ref.startsWith('-')) return null
+  const r = await git(projectPath, ['rev-parse', '--verify', '-q', `${ref}^{commit}`])
+  if (!r.ok) return null
+  const commit = r.out.trim()
+  const has = async (full: string): Promise<boolean> => (await git(projectPath, ['show-ref', '--verify', '-q', full])).ok
+  const kind: ResolvedStart['kind'] = (await has(`refs/heads/${ref}`)) ? 'branch' : (await has(`refs/tags/${ref}`)) ? 'tag' : (await has(`refs/remotes/${ref}`)) ? 'remote' : 'commit'
+  // Never a signature check (a repository's log.showSignature would run gpg and print its lines).
+  const l = await git(projectPath, ['show', '-s', '--no-show-signature', '--format=%h%x00%s', commit, '--'])
+  const [short, subject] = l.ok ? l.out.replace(/\r?\n$/, '').split('\0') : [commit.slice(0, 7), '']
+  return { commit, short: short || commit.slice(0, 7), subject: subject ?? '', kind }
+}
+
+/** HI-2807: the names New branch…'s Starts at offers: local branches, tags (newest first) and remote branches. */
+export async function startPoints(projectPath: string): Promise<StartPoints> {
+  projectPath = workspace.assertProject(projectPath)
+  const refs = async (args: string[]): Promise<string[]> => {
+    const r = await git(projectPath, ['for-each-ref', '--format=%(refname:short)', ...args])
+    return r.ok ? r.out.split(/\r?\n/).filter((x) => x && !x.endsWith('/HEAD')).slice(0, BRANCHES_SHOWN) : []
+  }
+  const [branches, tags, remote] = await Promise.all([refs(['--sort=-committerdate', 'refs/heads']), refs(['--sort=-creatordate', 'refs/tags']), refs(['--sort=-committerdate', 'refs/remotes'])])
+  return { branches, tags, remote }
+}
+
+/** HI-2807: which of `names` aren't local branches now (the Workflow section's offer to create each), at most 50 asked. */
+export async function missingBranches(projectPath: string, names: string[]): Promise<string[]> {
+  projectPath = workspace.assertProject(projectPath)
+  const out: string[] = []
+  for (const n of (Array.isArray(names) ? names : []).filter((x): x is string => typeof x === 'string').slice(0, 50)) {
+    const b = n.trim()
+    if (b && !(await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${b}`])).ok) out.push(b)
+  }
+  return out
+}
+
+/**
+ * HI-2807: the start as the user confirmed it, pinned: `ref` resolved now must still be the commit they were shown, else
+ * refused (it moved meanwhile); a hash names itself.
+ */
+async function pinnedStart(projectPath: string, from: BranchStart): Promise<ResolvedStart> {
+  const ref = String(from?.ref ?? '').trim()
+  const shown = String(from?.commit ?? '').trim()
+  const now = await resolvedStart(projectPath, ref)
+  if (!now) throw refusal(M.noStart, { ref })
+  if (shown && now.commit !== shown && !(shown.length >= 7 && now.commit.startsWith(shown))) throw refusal(M.startMoved, { ref, now: now.short })
+  return now
+}
+
+/**
+ * HI-2807: makes branch `name` at the start confirmed (pinned, `pinnedStart`), switching nothing: created only where no
+ * branch of that name is (`update-ref <ref> <commit> ""`, atomic: one made meanwhile makes git refuse). The caller holds
+ * whatever its change needs (Start the next version: the repository's lock and the turn of workflow writes). Returns the
+ * start as it was used.
+ */
+export async function makeBranchAt(projectPath: string, name: string, from: BranchStart): Promise<ResolvedStart> {
+  const problem = await branchNameProblem(projectPath, name)
+  if (problem) throw problem
+  const start = await pinnedStart(projectPath, from)
+  // i18n-ignore: the reflog's line, as git writes its own
+  const r = await git(projectPath, ['update-ref', '-m', `branch: Created from ${from.ref}`, `refs/heads/${name}`, start.commit, ''])
+  if (!r.ok) {
+    if ((await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${name}`])).ok) throw refusal(M.branchTaken, { name })
+    throw failed(M.createFailed, { name }, r)
+  }
+  log.info(`Created branch ${userText(name)} from ${userText(from.ref)} (${start.short}) in ${userText(projectPath)}`)
+  void checkProject(projectPath)
+  return start
+}
+
+/** Why a branch Combwork made wasn't removed (HI-2807): moved since, checked out somewhere, in use, gone, or git's failure. */
+export type MadeBranchKept = { why: 'moved' | 'worktree' | 'gone' } | { why: 'inUse'; use: string } | { why: 'failed'; error: string }
+
+/**
+ * HI-2807: removes a branch Combwork made (Start the next version's own rollback, the Assistant's undo), only while it is
+ * still at the commit it was made at and nothing uses it: not checked out anywhere, not the project's target, default
+ * branch or an open card's line (`branchUseNow`), nor what `inUse` says (the caller's own: Other branches, a lane, a
+ * slot). The ref goes only at that commit (`update-ref -d <ref> <commit>`: a git that moved it meanwhile makes git
+ * refuse), and is put back if a worktree has it checked out after all. The caller holds the repository's lock.
+ */
+export async function removeMadeBranch(projectPath: string, name: string, commit: string, inUse?: () => Promise<string | null>): Promise<{ removed: true } | ({ removed: false } & MadeBranchKept)> {
+  const at = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${name}^{commit}`])
+  if (!at.ok) return { removed: false, why: 'gone' } // i18n-ignore: a reason's code, worded by whoever shows it
+  if (at.out.trim() !== commit) return { removed: false, why: 'moved' } // i18n-ignore: a reason's code, worded by whoever shows it
+  const now = await branchUseNow(projectPath, name)
+  if (now.why === 'current' || now.why === 'worktree') return { removed: false, why: 'worktree' } // i18n-ignore: a reason's code, worded by whoever shows it
+  if (now.why) return { removed: false, why: 'inUse', use: now.why } // i18n-ignore: a reason's code, worded by whoever shows it
+  const other = inUse ? await inUse() : null
+  if (other) return { removed: false, why: 'inUse', use: other } // i18n-ignore: a reason's code, worded by whoever shows it
+  const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${name}`, commit])
+  if (!r.ok) {
+    const moved = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${name}^{commit}`])
+    return moved.ok && moved.out.trim() !== commit ? { removed: false, why: 'moved' } : { removed: false, why: 'failed', error: gitSays(r) } // i18n-ignore: a reason's code, worded by whoever shows it
+  }
+  const after = await git(projectPath, ['worktree', 'list', '--porcelain'])
+  if (!after.ok || parseWorktrees(after.out).some((w) => w.branch === name)) {
+    const back = await git(projectPath, ['update-ref', `refs/heads/${name}`, commit, ''])
+    return back.ok ? { removed: false, why: 'worktree' } : { removed: false, why: 'failed', error: gitSays(back) } // i18n-ignore: a reason's code, worded by whoever shows it
+  }
+  await git(projectPath, ['config', '--remove-section', `branch.${name}`])
+  log.info(`Removed branch ${userText(name)} Combwork made, in ${userText(projectPath)}`)
+  void checkProject(projectPath)
+  return { removed: true }
+}
+
+/**
+ * Creates a branch, switching to it unless `stay`: at the folder's commit, or (HI-2807) at `from`, the start the user
+ * confirmed (pinned: refused if that ref moved since they were shown it). Without switching, nothing in the folder
+ * moves; switching follows the folder's rules (`changeFolder`).
+ */
+export async function createBranch(projectPath: string, name: string, stay = false, from?: BranchStart | null): Promise<string> {
   projectPath = workspace.assertProject(projectPath)
   name = name.trim()
   return oneAtATime(projectPath, async () => {
     const s = await summaryOf(projectPath)
-    if (!name || name.startsWith('-') || !(await refFormatOk(projectPath, ['--branch', name]))) throw refusal(M.badName, { kind: 'branch', hasName: name ? 'yes' : 'no', name })
     if (!s.head) throw refusal(M.noCommits)
+    const problem = await branchNameProblem(projectPath, name)
+    if (problem) throw problem
+    if (from) {
+      if (stay) {
+        const start = await makeBranchAt(projectPath, name, from)
+        return tr(msg({ id: 'service.gitRepo.createdFrom', defaultMessage: 'Created {name} from {from} ({commit}).', description: 'HI-2807: after creating a branch in Version Control without switching to it: {name} starts at {from} (a branch, a tag or a commit as the user named it), at the commit {commit} (a short hash).' }), { name, from: from.ref, commit: start.short })
+      }
+      const start = await pinnedStart(projectPath, from)
+      const r = await changeFolder(projectPath, 'create', s.branch, () => git(projectPath, ['checkout', '-q', '--no-track', '-b', name, start.commit, '--']))
+      if (!r.ok) throw failed(M.createFailed, { name }, r)
+      log.info(`Created ${userText(name)} from ${userText(from.ref)} and switched to it in ${userText(projectPath)}`)
+      await changed(projectPath)
+      return tr(msg({ id: 'service.gitRepo.createdFromSwitched', defaultMessage: 'Created {name} from {from} and switched to it.', description: 'HI-2807: after creating a branch in Version Control: the project folder is on the new branch {name}, made from {from} (a branch, a tag or a commit as the user named it).' }), { name, from: from.ref })
+    }
     if (stay) {
       const r = await git(projectPath, ['branch', '--no-track', name])
       if (!r.ok) throw failed(M.createFailed, { name }, r)

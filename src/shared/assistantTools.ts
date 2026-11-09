@@ -69,6 +69,12 @@ export const ASSISTANT_SLOT_TOOLS = ['cw_release_slot']
 export const ASSISTANT_TEAM_TOOLS = ['cw_team']
 
 /**
+ * Branches (HI-2807): creating one from a ref, and Start the next version, both changes (Control agents, which the Agent
+ * API checks: assistantChange) and undoable: offered with the agent tools. Project agents don't get it.
+ */
+export const ASSISTANT_BRANCH_TOOLS = ['cw_branch']
+
+/**
  * Templates (HI-1502): every Assistant lists them and plans a load (reads); loading one needs Control agents, which the
  * Agent API checks (assistantChange). Project agents don't get it: loading a template is the user's in the window.
  */
@@ -201,7 +207,7 @@ export function workflowAllows(launchedHidden: readonly string[], hiddenNow: rea
 }
 
 /** Tools only the Assistant has (project agents don't get them). cw_wait_for_agents isn't one: an agent waits on its project's agents too (#416). */
-export const ASSISTANT_ONLY_TOOLS = ['cw_agent_activity', 'cw_list_providers', 'cw_list_settings', 'cw_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]
+export const ASSISTANT_ONLY_TOOLS = ['cw_agent_activity', 'cw_list_providers', 'cw_list_settings', 'cw_read_setting', ...ASSISTANT_AGENT_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_BRANCH_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_PROJECT_TOOLS, ...ASSISTANT_SETTINGS_TOOLS, ...JOURNAL_TOOLS]
 
 const RANK: Record<AssistantControlLevel, number> = { look: 0, agents: 1, projects: 2 }
 
@@ -212,7 +218,7 @@ export function controlAllows(level: AssistantControlLevel | string | undefined,
 
 /** The tools an Assistant with this control level (and Change settings, its journal, on or off) may use without asking. */
 export function assistantTools(level: AssistantControlLevel | string | undefined, changeSettings = false, journal = false): string[] {
-  return [...(journal ? JOURNAL_TOOLS : []), ...ASSISTANT_READ_TOOLS, ...ASSISTANT_LANE_TOOLS, ...ASSISTANT_QUEUE_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...(controlAllows(level, 'agents') ? [...ASSISTANT_AGENT_TOOLS, ...TASK_TOOLS, ...INTENT_TOOLS.filter((t) => !WORKER_ONLY_TOOLS.includes(t)), ...ASSISTANT_UNDO_TOOLS] : []), ...(controlAllows(level, 'projects') ? ASSISTANT_PROJECT_TOOLS : []), ...(changeSettings ? ASSISTANT_SETTINGS_TOOLS : [])]
+  return [...(journal ? JOURNAL_TOOLS : []), ...ASSISTANT_READ_TOOLS, ...ASSISTANT_LANE_TOOLS, ...ASSISTANT_QUEUE_TOOLS, ...ASSISTANT_SLOT_TOOLS, ...ASSISTANT_TEAM_TOOLS, ...ASSISTANT_TEMPLATE_TOOLS, ...ASSISTANT_CONNECTION_TOOLS, ...(controlAllows(level, 'agents') ? [...ASSISTANT_AGENT_TOOLS, ...TASK_TOOLS, ...INTENT_TOOLS.filter((t) => !WORKER_ONLY_TOOLS.includes(t)), ...ASSISTANT_UNDO_TOOLS, ...ASSISTANT_BRANCH_TOOLS] : []), ...(controlAllows(level, 'projects') ? ASSISTANT_PROJECT_TOOLS : []), ...(changeSettings ? ASSISTANT_SETTINGS_TOOLS : [])]
 }
 
 /**
@@ -230,7 +236,7 @@ export const CW_TOOLS: readonly string[] = [
   'cw_read_latest_handover', 'cw_create_handover', 'cw_notify', 'cw_list_providers', 'cw_agent_activity', 'cw_wait_for_agents',
   'cw_create_project', 'cw_activate_project', 'cw_add_agent', 'cw_update_agent', 'cw_start_agent', 'cw_stop_agent', 'cw_prompt_agent',
   'cw_message_agent', 'cw_hand_over', 'cw_list_tasks', 'cw_read_task', 'cw_read_attachment', 'cw_create_task', 'cw_update_task', 'cw_update_tasks', 'cw_reorder_tasks', 'cw_start_task', 'cw_list_skills', 'cw_wait_for_tasks',
-  'cw_list_settings', 'cw_read_setting', 'cw_update_setting', 'cw_merge_slot', 'cw_lane', 'cw_queue', 'cw_release_slot', 'cw_team', 'cw_template', 'cw_connection', 'cw_inbox', 'cw_console',
+  'cw_list_settings', 'cw_read_setting', 'cw_update_setting', 'cw_merge_slot', 'cw_lane', 'cw_queue', 'cw_release_slot', 'cw_team', 'cw_branch', 'cw_template', 'cw_connection', 'cw_inbox', 'cw_console',
   'cw_journal_write', 'cw_journal_recall', 'cw_journal_entry', 'cw_journal_update',
   'cw_start_card', ...INTENT_TOOLS, 'cw_focused_skip', 'cw_ask_assistant', 'cw_undo'
 ]

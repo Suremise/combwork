@@ -14,6 +14,8 @@ import type { WorkspaceService } from '../workspace'
 import type { CardState } from '../../shared/workflow/facts'
 import { projectPlatform } from '../platform/registry'
 import { resolvedOf } from './rulesets'
+import { combworkError } from '../combworkError'
+import { fmt, msg } from '../../shared/i18n'
 
 /** A project's targets: its default (G7 resolved) and the others it lists (G7b); null when it has no Git workflow. */
 export interface ProjectTargets {
@@ -48,6 +50,32 @@ export function pickTarget(t: ProjectTargets | null, raw: unknown): { target: st
 export async function branchExists(projectPath: string, branch: string): Promise<boolean | 'unknown'> {
   const h = await G.lineHead(projectPath, branch)
   return isUnknown(h) ? 'unknown' : !!h
+}
+
+/** The branches a project's options name as targets: Work merges into (when set) and Other branches work can merge into. */
+const namedTargets = (o: { target?: string; otherTargets?: string[] }): string[] => [...new Set([o.target ?? '', ...(o.otherTargets ?? [])].map((b) => b.trim()).filter(Boolean))]
+
+/**
+ * HI-2807: the branches a change newly names as targets (in `will`, not in `was`) that aren't local branches now: a
+ * target nothing can start from. One git can't answer for isn't counted; branches already named stay as they are.
+ */
+export async function newlyMissing(projectPath: string, was: { target?: string; otherTargets?: string[] }, will: { target?: string; otherTargets?: string[] }): Promise<string[]> {
+  const before = new Set(namedTargets(was))
+  const out: string[] = []
+  for (const b of namedTargets(will).filter((x) => !before.has(x))) if ((await branchExists(projectPath, b)) === false) out.push(b)
+  return out
+}
+
+const MISSING = msg({ id: 'service.workflow.targetMissing', defaultMessage: '{n, plural, one {{branches} doesn’t exist} other {{branches} don’t exist}}, so nothing was saved: create {n, plural, one {it} other {them}} first (Version Control → New branch…).', description: 'HI-2807: a save of workflow options refused: Work merges into or Other branches work can merge into names branches ({branches}, {n} of them) the repository hasn’t got. New branch… is a button: as translated there.' })
+
+/**
+ * HI-2807: refuses a save naming new targets that don't exist (`newlyMissing`), in every save's write (the Workflow
+ * section's, the Assistant's settings tool, Start the next version), so a branch gone after the window's check is still
+ * caught.
+ */
+export async function refuseMissingTargets(projectPath: string, was: { target?: string; otherTargets?: string[] }, will: { target?: string; otherTargets?: string[] }): Promise<void> {
+  const missing = await newlyMissing(projectPath, was, will)
+  if (missing.length) throw combworkError(MISSING, { n: missing.length, branches: fmt.list(missing) }, { kind: 'invalid' })
 }
 
 /**
