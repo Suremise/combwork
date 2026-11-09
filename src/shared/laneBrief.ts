@@ -7,7 +7,7 @@ import { targetOfRulesetId } from './workflow/compile'
  * the target its recorded ruleset marks) where it has one, so its brief names the branch its work goes to and its slot
  * is lent for that branch, never the project's Work merges into. Null while the rules are off.
  */
-export function laneOptions(options: WorkflowOptions | null, lane: { ruleset?: string; target?: string }): WorkflowOptions | null {
+export function laneOptions<O extends Pick<WorkflowOptions, 'target'>>(options: O | null, lane: { ruleset?: string; target?: string }): O | null {
   const target = lane.target || (lane.ruleset ? targetOfRulesetId(lane.ruleset) : null)
   return options && target ? { ...options, target } : options
 }
