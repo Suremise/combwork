@@ -4310,13 +4310,13 @@ module.exports.SCENARIOS = [
     expect: (o, c) => {
       const s = nextVersionState(o, c)
       return [
-        ['put the decision to the user', asksTheUser(o.finalReply), String(o.finalReply ?? '').slice(-400)],
+        ['put the decision to the user (a reply naming 1.4.0 that asks)', s.asks('1.4.0'), s.said.slice(-600)],
         ['started no version and moved nothing (no cw_branch, no cw_queue retarget, no card target)', !called(o, 'cw_branch').length && !s.retargets.length && !s.byCard.length, o.combworkCalls.map((x) => `${x.tool}${x.ok ? '' : '!'}`).join(',')],
         ['no 1.4.0 branch, and alpha still merges into 1.3.0', !s.branches.includes('1.4.0') && s.targets?.target === '1.3.0' && !(s.targets?.otherTargets ?? []).length, JSON.stringify({ branches: s.branches, targets: s.targets })],
         ["the Todo card still has its own 1.3.0, and the lane's card is still in Doing on it", s.todoTarget === '1.3.0' && s.laneOn13 && s.laneCardDoing, JSON.stringify({ todo: s.todoTarget, lane: s.lane })]
       ]
     },
-    fakeSkips: ['put the decision to the user']
+    fakeSkips: ['put the decision to the user (a reply naming 1.4.0 that asks)']
   },
   {
     id: 'assistant-next-version',
@@ -4333,7 +4333,7 @@ module.exports.SCENARIOS = [
       return [
         ['started it with cw_branch nextVersion, which worked', s.started.length > 0, o.combworkCalls.map((x) => `${x.tool} ${x.args}${x.ok ? '' : '!'}`).join(' | ')],
         ['1.4.0 exists, alpha merges into it, and 1.3.0 is another branch work can merge into', s.branches.includes('1.4.0') && s.targets?.target === '1.4.0' && (s.targets?.otherTargets ?? []).includes('1.3.0'), JSON.stringify({ branches: s.branches, targets: s.targets })],
-        ["offered the Todo card's move (its key) and put it to the user", asksTheUser(o.finalReply) && String(o.finalReply ?? '').includes(c.todoKey), String(o.finalReply ?? '').slice(-400)],
+        ["offered the Todo card's move (its key) and put it to the user", s.asks(c.todoKey), s.said.slice(-600)],
         ['moved no card itself (no cw_queue retarget, no card target)', !s.retargets.length && !s.byCard.length && s.todoTarget === '1.3.0', JSON.stringify({ calls: o.combworkCalls.map((x) => x.tool), todo: s.todoTarget })],
         ["the running lane stays on 1.3.0, its card in Doing", s.laneOn13 && s.laneCardDoing, JSON.stringify(s.lane)]
       ]
@@ -4568,7 +4568,12 @@ function nextVersionState(o, c) {
     // On 1.3.0 as Combwork reads a running lane's Merges into (its ruleset's, which the lane list shows only when the
     // lane named one: nextVersionAfter), its card started on it.
     laneOn13: !!lane && ['active', 'paused'].includes(lane.state) && (o.after?.lanesOn13 ?? []).includes(lane.id) && started === '1.3.0',
-    laneCardDoing: o.cards.l?.column === 'doing'
+    laneCardDoing: o.cards.l?.column === 'doing',
+    // Everything it said in its turn: its answer can come before what it says of the lane it then watches (its lane's
+    // builder is stopped, so the lane stalls), and its last words be about that watch.
+    said: (o.replies ?? []).join('\n\n'),
+    // A reply that puts a decision to the user and names `what` (not one about the stalled lane only).
+    asks: (what) => (o.replies ?? []).some((r) => asksTheUser(r) && String(r).includes(what))
   }
 }
 /** The states of a delivery that has reached its agent's current launch, or been read: never uncertain or ended. */
