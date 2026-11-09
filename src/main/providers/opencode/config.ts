@@ -105,7 +105,20 @@ export interface LaunchConfigInput {
   saved: SavedCredentials | null
   strip: boolean
   noUpdate: boolean
+  /**
+   * The project's own config decides its MCP servers, as in a terminal (HI-2761): only for the whole "as from a terminal"
+   * preset with no server given and the project's config let in (projectDecidesMcp). Otherwise every server is denied but
+   * those given.
+   */
+  projectDecidesMcp?: boolean
 }
+
+/**
+ * Whether a launch leaves its MCP servers to the project's own config (HI-2761, HR1's design check): the Independent
+ * role's terminal preset (read from the launch policy, never from a launch's servers), no server given at all, and the
+ * project's config let in. A managed launch with no servers still denies every one.
+ */
+export const projectDecidesMcp = (i: { asFromTerminal: boolean; servers: number; keepOut: boolean }): boolean => i.asFromTerminal && i.servers === 0 && !i.keepOut
 
 /** A launch's opencode.json. Own keys only: a server named __proto__ is an entry like any other. */
 export function launchConfig(i: LaunchConfigInput): Record<string, unknown> {
@@ -120,7 +133,8 @@ export function launchConfig(i: LaunchConfigInput): Record<string, unknown> {
     ...(i.model ? { model: i.model } : {}),
     ...(i.agent ? { default_agent: i.agent } : {}),
     mcp: { servers },
-    policies: [...providerPolicies(i.ambient, i.saved, i.strip), ...mcpPolicies(Object.keys(servers))],
+    // Claude Agent stays denied in every case; the MCP servers left to the project only as projectDecidesMcp says.
+    policies: [...providerPolicies(i.ambient, i.saved, i.strip), ...(i.projectDecidesMcp ? [] : mcpPolicies(Object.keys(servers)))],
     ...(i.instructions.length ? { instructions: i.instructions } : {})
   }
 }

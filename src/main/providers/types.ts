@@ -93,6 +93,12 @@ export interface LaunchContext {
    * buildCommand agree when one changes meanwhile; read with launchOverrides. Missing: each read as it is now.
    */
   overrides?: Readonly<Record<string, boolean>>
+  /**
+   * Whether this launch is the whole "as from a terminal" preset (HI-2731's Independent role, or a connection with every
+   * switch off, HI-2670): no guidance, tools or typing, and each override off. Read from the launch policy, never from
+   * what servers it happens to have (HI-2761).
+   */
+  asFromTerminal?: boolean
   /** Tools of the combwork MCP server this launch may use without asking, for providers that can pre-approve tools. */
   trustedCombworkTools?: string[]
   /** The first task, given on the command line so the CLI starts on it (e.g. from the Combwork Assistant). */

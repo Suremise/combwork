@@ -2968,6 +2968,8 @@ class SessionManager {
       promptAddedBefore,
       // Its connection's overrides of its CLI (HI-2670), as this launch read them.
       overrides: policy.overrides,
+      // The whole "as from a terminal" preset (HI-2731's Independent role or a connection with every switch off): HI-2761.
+      asFromTerminal: !policy.guidance && !policy.tools && !policy.typing && Object.values(policy.overrides).every((v) => !v),
       trustedCombworkTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
       // Not typed in without its connection's typing (HI-2670), nor given on the command line.
       initialPrompt: policy.typing ? l.initialPrompt : undefined,

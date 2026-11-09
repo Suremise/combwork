@@ -16,6 +16,7 @@ What the real OpenCode v2.2.6 did, recorded for the fake opencode (`tests/e2e/fa
 | `events/` | One session's `/api/event` stream per case: a shell tool with a permission answered once and rejected, no tool, interrupted, an MCP tool through Code Mode's `execute`, a provider failing at once (400) and after retries (refused connection). |
 | `messages/` | `GET /api/session/{id}/message` after each case, and after an import. |
 | `switches/` | What loaded from a hostile project with each discovery switch alone, both and none: config files, the model's instructions (codewords), which MCP server started with whose token, and plugin markers. |
+| `skills/` | HI-2761's R0b (HB2, 9 Nov 2026, the same conditions, one prompt): with both switches on, the skills in `<OPENCODE_CONFIG_DIR>\skills` and its AGENTS.md reach the model, the skills listed by id, name and description beside the built-in two, loaded with the `skill` tool `{id}` (a call's result not recorded). |
 | `tui/` | The TUI given an absent `--session`: a new-session screen, with no session created. |
 
 **Not recorded, so not faked:**

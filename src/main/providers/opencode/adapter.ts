@@ -17,7 +17,8 @@ import { compareVersions, exportSubtitleText, toSpawnable } from '../common'
 import type { CatalogRead, CommandSpec, ConnectionStatus, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { localDataRoot } from '../antigravity/home'
 import { AMBIENT_DIRS, AMBIENT_FILES, DATA_ENV, ambientIntegrations, opencodeEnv, opencodeHome } from './home'
-import { chosenAmbient, launchConfig, withTestProvider, writeConfigDir, type SavedCredentials } from './config'
+import { chosenAmbient, launchConfig, projectDecidesMcp, withTestProvider, writeConfigDir, type SavedCredentials } from './config'
+import { copyOpencodeSkills, opencodeSkillsDir } from './skills'
 import { accountModels, checkHome, testProvider, latestOpencode, locateOpencode, opencodeInstallCommand, opencodeLoginCommand, opencodeReadiness, opencodeUpdateCommand, savedCredentials } from './install'
 import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerToken, sessionMark, sessionMarks } from './launcher'
 
@@ -200,7 +201,7 @@ export class OpencodeAdapter implements ProviderAdapter {
   }
 
   skillCopyPath(ctx: LaunchContext, skill: string): string {
-    return join(ctx.privateDir, 'opencode-config', 'skills', skill)
+    return join(opencodeSkillsDir(join(ctx.privateDir, 'opencode-config')), skill)
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
@@ -224,6 +225,7 @@ export class OpencodeAdapter implements ProviderAdapter {
     const ambientDir = join(ctx.privateDir, 'opencode-ambient')
     const mode = ctx.permissionMode || OPENCODE_DESCRIPTOR.defaultPermissionMode
     const agentsMd = join(ctx.cwd, 'AGENTS.md')
+    const keepOut = launchOverrides(ctx.overrides, OPENCODE, 'keepProjectConfigOut')
     const cfg = launchConfig({
       model: ctx.model,
       agent: opencodeAgentOf(mode),
@@ -232,15 +234,18 @@ export class OpencodeAdapter implements ProviderAdapter {
       ambient: ambientIntegrations(),
       saved,
       strip,
-      noUpdate
+      noUpdate,
+      projectDecidesMcp: projectDecidesMcp({ asFromTerminal: ctx.asFromTerminal === true, servers: Object.keys(ctx.mcpServers).length, keepOut })
     })
     await writeConfigDir(configDir, withTestProvider(cfg, testProvider(), true), launchGuidance(ctx))
+    // Combwork's skills in the config folder's own skills folder, the one 2.2.6 reads with the switches on (R0b, HI-2761).
+    const delivered = await copyOpencodeSkills(opencodeSkillsDir(configDir), ctx.skills)
     await mkdir(ambientDir, { recursive: true })
     for (const f of AMBIENT_FILES) await writeFile(join(ambientDir, f), '')
     for (const d of AMBIENT_DIRS) await mkdir(join(ambientDir, d), { recursive: true })
     await writeFile(launcherSourcePath(ctx.privateDir), LAUNCHER_SOURCE)
     this.prepared.set(ctx.runId, { home, marks: sessionMarks(home), configDir, ambientDir, password: randomBytes(24).toString('hex'), owner, chosen: strip ? chosenAmbient(saved) : new Set() })
-    return {}
+    return delivered
   }
 
   buildCommand(_executable: string, ctx: LaunchContext): CommandSpec {

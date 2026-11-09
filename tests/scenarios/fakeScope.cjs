@@ -1,4 +1,4 @@
-// Which fake providers run each scenario (HI-2663). A fake run (fake, fake-codex, fake-copilot, fake-antigravity) tests Combwork's
+// Which fake providers run each scenario (HI-2663). A fake run (fake, fake-codex, fake-copilot, fake-antigravity, fake-opencode) tests Combwork's
 // machinery: each fake sends `cw TOOL {json}` to the same Combwork MCP server (tests/e2e/fake-bridge.cjs; Copilot's own
 // MCP client, tests/e2e/fake-copilot-api.cjs), so what a call does after the server is the same for every provider.
 // Running a scenario on all three proves something only where its fake script exercises what differs per CLI: skill
@@ -48,7 +48,15 @@ const MODEL_TRIALS_ONLY = [
 
 const NOT_A_TRIAL = ['tool-sweep']
 
-const FAKES = ['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity']
+const FAKES = ['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity', 'fake-opencode']
+
+/**
+ * A fake provider whose runs wait for a card, every scenario left out with why (HI-2761): the harness knows a prompt was
+ * taken from the agent's status (working) or its transcript, and an OpenCode agent has neither before HI-2760 (its turn
+ * status from the server's events) and HI-2762 (its history). HI-2761's first try, run 2026-11-09T01-29-58-fake-opencode:
+ * every prompt "never taken", the fake's turns run all the same. The card that gives OpenCode its status lifts this.
+ */
+const PROVIDER_WAITS = { 'fake-opencode': "waits for HI-2760: an OpenCode agent has no turn status before it, so the harness can't see a prompt taken (tests/scenarios/fakeScope.cjs)" }
 
 /** The fakes a scenario runs on: every fake, ['fake'], or [] (model trials only). */
 function fakesFor(id) {
@@ -68,7 +76,7 @@ function scopeProblems(ids) {
 }
 
 /**
- * The scenarios a run takes, for a provider (its key: fake, fake-codex, fake-copilot, fake-antigravity, claude-code, codex): { run, excluded }.
+ * The scenarios a run takes, for a provider (its key: fake, fake-codex, fake-copilot, fake-antigravity, fake-opencode, claude-code, codex): { run, excluded }.
  * listed: the scenarios asked for (all, or --only's). excluded: [{ id, why }], those a run of this provider leaves out,
  * each to be said (never silently dropped), with where it does run.
  */
@@ -77,7 +85,8 @@ function selectFor(listed, providerKey) {
   const run = []
   const excluded = []
   for (const s of listed) {
-    if (fake) {
+    if (PROVIDER_WAITS[providerKey]) excluded.push({ id: s.id, why: PROVIDER_WAITS[providerKey] })
+    else if (fake) {
       const on = fakesFor(s.id)
       if (on.includes(providerKey)) run.push(s)
       else excluded.push({ id: s.id, why: on.length ? `runs on ${on.join(', ')} only (tests/scenarios/fakeScope.cjs): --provider ${on[0]}` : 'model trials only: no fake runs it (tests/scenarios/fakeScope.cjs)' })
@@ -87,4 +96,4 @@ function selectFor(listed, providerKey) {
   return { run, excluded }
 }
 
-module.exports = { FAKES, FAKE_CLAUDE_ONLY, MODEL_TRIALS_ONLY, NOT_A_TRIAL, fakesFor, scopeProblems, selectFor }
+module.exports = { FAKES, PROVIDER_WAITS, FAKE_CLAUDE_ONLY, MODEL_TRIALS_ONLY, NOT_A_TRIAL, fakesFor, scopeProblems, selectFor }

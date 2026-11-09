@@ -81,7 +81,10 @@ const PROVIDERS = {
   'fake-copilot': { provider: 'copilot', fake: true, executable: '', mode: 'allow-all', standIn: true },
   // The fake Antigravity CLI (HI-2548), in each agent's private profile under the run's own Combwork data; its check
   // profile already past agy's first-run screens (as after Provider Setup's Set up).
-  'fake-antigravity': { provider: 'antigravity', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-agy', 'agy.cmd'), mode: 'accept-edits' }
+  'fake-antigravity': { provider: 'antigravity', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-agy', 'agy.cmd'), mode: 'accept-edits' },
+  // The fake OpenCode (HI-2763, scenarios HI-2761): its private server and TUI per agent, on the run's own OpenCode test
+  // home (XDG_DATA_HOME, the CLI-home seam's), Combwork's skills in each launch's private config folder.
+  'fake-opencode': { provider: 'opencode', fake: true, executable: path.join(lib.ROOT, 'tests', 'e2e', 'fake-opencode', 'opencode.cmd'), mode: 'build' }
 }
 
 const sleep = lib.sleep
@@ -484,6 +487,10 @@ async function runScenario(sc, providerKey, opts = {}) {
   const agyLog = path.join(root, 'fake-agy.jsonl')
   // Where the fake Antigravity CLI reads its wake scripts (FAKE_AGY_WAKES: fake-wakes-<agent>.txt, HI-2745).
   const agyWakes = path.join(root, 'agy-wakes')
+  // What the fake OpenCode did (FAKE_OPENCODE_LOG), where it reads its wake scripts (FAKE_OPENCODE_WAKES), and its test home.
+  const opencodeLog = path.join(root, 'fake-opencode.jsonl')
+  const opencodeWakes = path.join(root, 'opencode-wakes')
+  const opencodeHome = path.join(root, 'opencode-home')
   // Emptied first (with no evidence store: a caller of its own, like an e2e suite). Still in use (something an earlier
   // run left running holds it, #542): this scenario fails, saying so, and the run goes on.
   if (!opts.evidence) {
@@ -519,7 +526,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     lib.trustForCodex(ws)
   }
 
-  lib.enableProviders(userData, ['claude-code', 'codex', ...(p.provider === 'copilot' || p.provider === 'antigravity' ? [p.provider] : [])])
+  lib.enableProviders(userData, ['claude-code', 'codex', ...(p.provider === 'copilot' || p.provider === 'antigravity' || p.provider === 'opencode' ? [p.provider] : [])])
   // agy's first-run screens done in Combwork's check profile (its data folder's antigravity/check), as Set up leaves it: each
   // agent's profile starts past them (HI-2547).
   if (p.provider === 'antigravity') {
@@ -572,7 +579,9 @@ async function runScenario(sc, providerKey, opts = {}) {
       // Copilot in the run's own home, its profile folder faked and the GitHub CLI's login hidden (fake-copilot-api.cjs).
       ...(standIn ? copilotTestEnv(standIn, root, { above: root }) : {}),
       // The fake agy follows Combwork's notices as a model does (#650), and logs what it did.
-      ...(p.provider === 'antigravity' ? { FAKE_AGY_LOG: agyLog, FAKE_AGY_WAKES: agyWakes, FAKE_AGY_FOLLOW_NOTICES: '1', FAKE_AGY_MODEL_MS: '700' } : {})
+      ...(p.provider === 'antigravity' ? { FAKE_AGY_LOG: agyLog, FAKE_AGY_WAKES: agyWakes, FAKE_AGY_FOLLOW_NOTICES: '1', FAKE_AGY_MODEL_MS: '700' } : {}),
+      // The fake OpenCode the same, on the run's own test home (the CLI-home seam: no OpenCode account needed).
+      ...(p.provider === 'opencode' ? { FAKE_OPENCODE_LOG: opencodeLog, FAKE_OPENCODE_WAKES: opencodeWakes, FAKE_OPENCODE_FOLLOW_NOTICES: '1', FAKE_OPENCODE_MODEL_MS: '700', XDG_DATA_HOME: opencodeHome } : {})
     }
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
@@ -758,7 +767,7 @@ async function runScenario(sc, providerKey, opts = {}) {
     // The fake Codex and the fake Antigravity CLI answer a wake they read from the same file (fake-codex.cjs and
     // fake-agy.cjs, nextScripted): only where a scenario asks (scriptedWakes, HI-2716, HI-2745), since the others'
     // fakeSkips take fakes that don't act on their wakes.
-    const wakesDir = { 'fake-codex': fakeCodexHome, 'fake-antigravity': agyWakes }[providerKey]
+    const wakesDir = { 'fake-codex': fakeCodexHome, 'fake-antigravity': agyWakes, 'fake-opencode': opencodeWakes }[providerKey]
     if (wakesDir && sc.fakeWakes && sc.scriptedWakes) {
       fs.mkdirSync(wakesDir, { recursive: true })
       fs.writeFileSync(path.join(wakesDir, `fake-wakes-${String(wakesOf).replace(/[^\w-]/g, '_')}.txt`), sc.fakeWakes(ctx).join('\n') + '\n')
