@@ -3,7 +3,7 @@ import { endTree } from '../../progressReporters/wrapper'
 import { request as httpRequest } from 'http'
 import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
-import { buildMirror, mirrorState, newestMessage, parseExport, withStatus, type MirrorHeader, type MirrorProblem, type LimitsReading, opencodePlanUsage } from './mirror'
+import { buildMirror, mirrorState, newestMessage, parseExport, sessionSettled, subagentSessions, withStatus, type MirrorHeader, type MirrorProblem, type LimitsReading, opencodePlanUsage } from './mirror'
 
 // The OpenCode history's worker core (HI-2762, design s7/s10/s13): every read of a session from its agent's private server,
 // every `opencode session export`, and every write of a session's mirror (mirror.ts) happens here, in a thread of its own
@@ -21,6 +21,15 @@ import { buildMirror, mirrorState, newestMessage, parseExport, withStatus, type 
 // counted as it is read; each request `requestMs`; an export `exportMs` and `maxExportBytes`, its process tree killed on a
 // timeout or cancel. Full with no repair to drop: a live refresh is left to its run's next poll, a run-end export is kept
 // for the repair pass (its state file says so): neither is lost, neither grows the queue.
+//
+// Subagents (HI-2773): OpenCode runs each in a session of its own, its `parentID` the session that started it, named in the
+// starting tool part's metadata. A published session's parts name its children; each is a session here too, mirrored
+// beside its parent and owned with it: a run's start and end move its descendants' epochs with its own, so while the run
+// lives they are read from its server (a poll's check of `time.updated` first, as for the parent; one still running is
+// checked at each of the parent's polls), and after it each is exported once, when its mirror is older than its newest
+// start (main is told which: `children`, as it builds the commands). A child's read publishes only when its info names
+// that parent. Each session's tokens are its own (2.2.6: a parent's info doesn't count its subagents'), so nothing is
+// counted twice.
 
 export interface Bounds {
   maxPending: number
@@ -68,6 +77,8 @@ export type CoreRequest = { id: number } & (
 export type CoreEvent =
   | { event: 'published'; home: string; sessionId: string; source: 'api' | 'export'; updated: number; cost: number | null }
   | { event: 'limits'; runId: string; epoch: number; reading: LimitsReading }
+  /** An exported session's subagents whose mirrors need an export of their own (HI-2773): main queues them. */
+  | { event: 'children'; home: string; sessionId: string; children: string[]; reason: 'runEnd' | 'repair' }
   | { event: 'log'; level: 'info' | 'warn'; text: string }
 
 export type CoreReply = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string } | CoreEvent
@@ -93,7 +104,14 @@ interface Session {
   runId: string | null
   /** The session's `time.updated` the last published read had (a poll that sees it unchanged reads nothing more). */
   updated: number
+  /** A subagent's session: the session that started it, once a published read of that one named it. */
+  parent: string | null
+  /** Whether its last published info said nothing runs in it (a child still running is checked at each parent poll). */
+  settled: boolean
 }
+
+/** At most this many subagents are followed per session (its newest starts first). */
+const MAX_CHILDREN = 200
 
 interface Run {
   runId: string
@@ -186,6 +204,8 @@ const defaultDeps: CoreDeps = {
 
 export class HistoryCore {
   private sessions = new Map<string, Session>()
+  /** Each session's subagents' sessions (by its key: their ids), from its last published read. */
+  private kids = new Map<string, Set<string>>()
   private runs = new Map<string, Run>()
   private removed = new Set<string>()
   /** Queued jobs, oldest first: at most one per session and kind. */
@@ -219,6 +239,12 @@ export class HistoryCore {
         for (const run of this.runs.values()) if (run.key === key(r.home, r.sessionId) && run.runId !== r.runId) this.dropRun(run)
         this.runs.set(r.runId, { runId: r.runId, key: key(r.home, r.sessionId), epoch: s.epoch, url: null, password: null, abort: new AbortController() })
         this.cancelQueued(key(r.home, r.sessionId))
+        // Its subagents' sessions are the run's too.
+        for (const c of this.descendants(s)) {
+          c.epoch++
+          c.runId = r.runId
+          this.cancelQueued(key(c.home, c.sessionId))
+        }
         return s.epoch
       }
       case 'server': {
@@ -235,6 +261,11 @@ export class HistoryCore {
           s.epoch++
           s.runId = null
         }
+        for (const c of s ? this.descendants(s) : [])
+          if (c.runId === r.runId) {
+            c.epoch++
+            c.runId = null
+          }
         return s?.epoch ?? null
       }
       case 'removeRoot': {
@@ -304,8 +335,65 @@ export class HistoryCore {
   private session(home: string, sessionId: string): Session {
     const k = key(home, sessionId)
     let s = this.sessions.get(k)
-    if (!s) this.sessions.set(k, (s = { home, sessionId, epoch: this.epochBase, runId: null, updated: 0 }))
+    if (!s) this.sessions.set(k, (s = { home, sessionId, epoch: this.epochBase, runId: null, updated: 0, parent: null, settled: false }))
     return s
+  }
+
+  /** A session's subagents' sessions, theirs, and so on, each once. */
+  private descendants(s: Session): Session[] {
+    const out: Session[] = []
+    const seen = new Set([key(s.home, s.sessionId)])
+    const todo = [s]
+    while (todo.length) {
+      const p = todo.pop()!
+      for (const id of this.kids.get(key(p.home, p.sessionId)) ?? []) {
+        const k = key(p.home, id)
+        const c = this.sessions.get(k)
+        if (!c || seen.has(k)) continue
+        seen.add(k)
+        out.push(c)
+        todo.push(c)
+      }
+    }
+    return out
+  }
+
+  /**
+   * After a session's read published: the subagents its parts name. While its run lives, each is the run's and is read
+   * from its server (a poll: nothing more when unchanged); after it, those whose mirror is older than their newest start
+   * are given to main to export (`reason`: the parent's).
+   */
+  private followChildren(s: Session, source: 'api' | 'export', messages: Record<string, any>[], reason: 'runEnd' | 'repair' = 'repair'): void {
+    const found = [...subagentSessions(s.sessionId, messages)].sort((a, b) => b[1] - a[1]).slice(0, MAX_CHILDREN)
+    const pk = key(s.home, s.sessionId)
+    if (!found.length) return void this.kids.delete(pk)
+    this.kids.set(pk, new Set(found.map(([id]) => id)))
+    const run = source === 'api' && s.runId ? this.runs.get(s.runId) : undefined
+    const exports: string[] = []
+    for (const [id, ran] of found) {
+      const c = this.session(s.home, id)
+      c.parent = s.sessionId
+      if (run) {
+        if (c.runId !== run.runId) {
+          c.epoch++
+          c.runId = run.runId
+        }
+        this.enqueue({ kind: 'refresh', key: key(s.home, id), epoch: c.epoch, runId: run.runId })
+      } else if (source === 'export' && !c.runId && this.needsExport(c, ran)) exports.push(id)
+    }
+    if (exports.length) this.emit({ event: 'children', home: s.home, sessionId: s.sessionId, children: exports, reason })
+  }
+
+  /** A child's mirror needs an export: none complete, one ending in a notice, or one older than its newest start. */
+  private needsExport(c: Session, ran: number): boolean {
+    const h = this.header(c)
+    if (!h || h.state !== 'complete' || this.needsRepair(c.home, c.sessionId)) return true
+    return !(typeof h.updated === 'number' && h.updated >= ran)
+  }
+
+  /** At a run's poll: its session's subagents still running are checked too (a poll each: nothing more when unchanged). */
+  private pollChildren(s: Session, run: Run): void {
+    for (const c of this.descendants(s)) if (c.runId === run.runId && !c.settled) this.enqueue({ kind: 'refresh', key: key(c.home, c.sessionId), epoch: c.epoch, runId: run.runId })
   }
 
   private dropRun(run: Run): void {
@@ -448,16 +536,18 @@ export class HistoryCore {
     const deadline = this.deps.now() + this.bounds.refreshMs
     try {
       if (!j.force) {
+        if (run.key === j.key) this.pollChildren(s, run)
         // A poll: nothing more is read while the session's time.updated is the one published.
         const info = ((await this.get(run, `/api/session/${encodeURIComponent(s.sessionId)}`, deadline)) as { data?: Record<string, any> })?.data
         const updated = typeof info?.time?.updated === 'number' ? info.time.updated : 0
-        if (updated && updated === s.updated && this.complete(s)) return
+        // 2.2.6 sets a session's `time.idle` at its end without moving `time.updated` (HI-2773's R0): that is a change too.
+        if (updated && updated === s.updated && sessionSettled(info ?? {}) === s.settled && this.complete(s)) return
       }
       const read = await this.settledRead(run, s, deadline)
       // Unsettled every try (a turn under way): the next poll or nudge reads again; nothing is published, no notice.
       if (!read) return
       const updated = typeof read.info.time?.updated === 'number' ? read.info.time.updated : 0
-      this.publish(s, j.epoch, 'api', read.w, updated, read.info, read.messages)
+      if (this.publish(s, j.epoch, 'api', read.w, updated, read.info, read.messages)) this.followChildren(s, 'api', read.messages)
     } catch (e) {
       // A run's server going away (it ends with its run) or slow is no notice: its run-end export reads it again. What a
       // retry can't change (too large, unreadable) is one.
@@ -494,8 +584,9 @@ export class HistoryCore {
       const parsed = parseExport(readFileSync(tmp, 'utf8'))
       if (!parsed || parsed.info.id !== s.sessionId) throw new Failed('parse', "the export wasn't a session's") // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       const updated = typeof parsed.info.time?.updated === 'number' ? parsed.info.time.updated : newestMessage(parsed.messages)
-      this.publish(s, j.epoch, 'export', -1, updated, parsed.info, parsed.messages)
+      const published = this.publish(s, j.epoch, 'export', -1, updated, parsed.info, parsed.messages)
       this.clearState(s)
+      if (published) this.followChildren(s, 'export', parsed.messages, j.reason)
     } catch (e) {
       const f = e instanceof Failed ? e : new Failed('exit', e instanceof Error ? e.message : String(e)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       if (s.epoch !== j.epoch) return
@@ -593,6 +684,11 @@ export class HistoryCore {
    */
   publish(s: Session, epoch: number, source: 'api' | 'export', w: number, updated: number, info: Record<string, any>, messages: Record<string, any>[]): boolean {
     if (s.epoch !== epoch || this.removed.has(s.home.toLowerCase()) || this.closed) return false
+    // A subagent's session is published only as the one its parent named (its info says that parent).
+    if (s.parent && info.parentID !== s.parent) {
+      this.emit({ event: 'log', level: 'warn', text: "an OpenCode subagent's session didn't name the session that started it: not published" }) // i18n-ignore: a log line
+      return false
+    }
     const h = this.header(s)
     if (h?.state === 'complete') {
       if (source === 'api' && h.source === 'api' && h.epoch === epoch && typeof h.w === 'number' && h.w > w) return false
@@ -601,6 +697,7 @@ export class HistoryCore {
     const text = buildMirror({ w, epoch, source, at: new Date(this.deps.now()).toISOString(), updated }, info, messages)
     this.write(s, text)
     s.updated = updated
+    s.settled = sessionSettled(info)
     this.emit({ event: 'published', home: s.home, sessionId: s.sessionId, source, updated, cost: typeof info.cost === 'number' && Number.isFinite(info.cost) ? info.cost : null })
     return true
   }

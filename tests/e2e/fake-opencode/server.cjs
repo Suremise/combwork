@@ -210,7 +210,9 @@ async function startServer(opts) {
         emit('session.tool.called', { sessionID: sid, assistantMessageID: msgId, id: callId, input, executed: false }, d)
         emit('session.step.streamed', { sessionID: sid, assistantMessageID: msgId }, d)
         const created = Date.now()
-        const part = (state) => setMessage(sid, msgId, (m) => (m.content = [{ type: 'tool', id: callId, name, executed: false, state, time: { created, ran: Date.now(), completed: Date.now() } }]))
+        // `ran` is when it started running (HI-2773's R0: before the subagent it started), `completed` when it ended.
+        let ran = created
+        const part = (state) => setMessage(sid, msgId, (m) => (m.content = [{ type: 'tool', id: callId, name, executed: false, state, time: { created, ran, completed: Date.now() } }]))
         if (permission) {
           const reply = await ask(sid, l, { action: permission.action, resources: permission.resources, save: permission.save, source: { type: 'tool', messageID: msgId, id: callId } }, ctl)
           if (reply !== 'once' && reply !== 'always') {
@@ -227,6 +229,7 @@ async function startServer(opts) {
           }
         }
         if (ctl.aborted) return false
+        ran = Date.now()
         const r = await run(callId, msgId)
         if (r.isError) {
           const error = { type: 'tool', message: r.text }
@@ -321,6 +324,50 @@ async function startServer(opts) {
       return t.includes(`](${file})`) || t.includes(`](./${file})`) ? path.resolve(dir, file) : path.join(dir, `no-link-to-${file}`)
     }
     const own = (tool, args) => mcp('combwork', tool, args)
+    /**
+     * 2.2.6's `subagent` tool (HI-2773's R0, events/subagent.json, messages/subagent-*.json): a session of its own, its
+     * `parentID` this one and its agent `general`, created with session.created; the tool's progress and result name it
+     * (`metadata.sessionID`); it runs its own turn (the prompt OpenCode gives it, one step and a reply, its idle marker),
+     * its tokens its own, never added to the parent's.
+     */
+    const subagent = (prompt) =>
+      toolStep('subagent', { description: prompt.slice(0, 40), agent: 'general', prompt }, async (callId, msgId) => {
+        const cid = store.newId('ses')
+        const now = Date.now()
+        const info = { id: cid, parentID: sid, projectID: store.projectId(l.directory), agent: 'general', cost: 0, tokens: zeroTokens(), time: { created: now, updated: now, busy: now }, title: prompt.slice(0, 40), location: { directory: l.directory } }
+        store.change((db) => {
+          db.sessions[cid] = { info, messages: [], seq: -1 }
+        }, env)
+        const cd = { sid: cid, durable: true, location: l }
+        emit('session.created', { sessionID: cid, slug: SLUGS[0], version: VERSION, projectID: info.projectID, parentID: sid, location: info.location, subpath: '' }, cd)
+        emit('session.tool.progress', { sessionID: sid, assistantMessageID: msgId, id: callId, metadata: { sessionID: cid, status: 'running' } }, { location: l })
+        const inbox = store.newId('msg')
+        const given = `You are a subagent spawned by another session.\n${prompt}`
+        pushMessage(cid, { id: inbox, time: { created: Date.now() }, text: given, type: 'user' })
+        emit('session.inbox.enqueued', { inboxID: inbox, sessionID: cid, item: { type: 'user', payload: { text: given }, delivery: 'steer' } }, cd)
+        emit('session.execution.started', { sessionID: cid }, cd)
+        emit('session.inbox.delivered', { sessionID: cid, inboxID: inbox }, cd)
+        const cm = store.newId('msg')
+        pushMessage(cid, { id: cm, time: { created: Date.now() }, type: 'assistant', agent: 'general', model, content: [] })
+        emit('session.step.started', { sessionID: cid, agent: 'general', model, assistantMessageID: cm, started: Date.now() }, cd)
+        if (MODEL_MS) await waitOrAbort(ctl, MODEL_MS)
+        const reply = `Done: ${prompt}`
+        const tokens = { input: 1196, output: 96, reasoning: 0, cache: { read: 2762, write: 0 } }
+        setMessage(cid, cm, (m) => Object.assign(m, { content: [{ type: 'text', text: reply }], time: { ...m.time, streamed: Date.now(), completed: Date.now() }, finish: 'stop', rawFinish: 'stop', cost: 0, tokens }))
+        emit('session.text.ended', { sessionID: cid, assistantMessageID: cm, ordinal: 0, text: reply }, cd)
+        emit('session.step.ended', { sessionID: cid, assistantMessageID: cm, finish: 'stop', rawFinish: 'stop', tokens, cost: 0 }, cd)
+        emit('session.usage.updated', { sessionID: cid, cost: 0, tokens })
+        pushMessage(cid, { id: store.newId('msg'), time: { created: Date.now() }, type: 'idle', outcome: 'succeeded' })
+        updateInfo(cid, (i) => {
+          i.tokens = tokens
+          i.outcome = 'succeeded'
+          i.time.updated = Date.now()
+          i.time.idle = Date.now()
+        })
+        emit('session.execution.succeeded', { sessionID: cid }, cd)
+        log({ kind: 'subagent', session: sid, child: cid })
+        return { text: `<subagent sessionID="${cid}" state="completed">\n${reply}\n</subagent>`, metadata: { sessionID: cid, status: 'completed', truncated: false } }
+      })
 
     // The scenarios' steps (tests/scenarios), as the other fakes take them.
     async function scripted(s) {
@@ -341,6 +388,8 @@ async function startServer(opts) {
       })
       const sh = /\bshell:\s*(.+)$/i.exec(s)
       if (sh) await shell(sh[1].trim())
+      const sub = /\bsubagent:\s*(.+)$/i.exec(s)
+      if (sub) await subagent(sub[1].trim())
       // A file in the session's folder, or "a path" anywhere (an absolute one outside: external_directory, HI-2772).
       const patch = /\bpatch\s+(?:"([^"]+)"|([\w.-]+))/i.exec(s)
       if (patch) await edit(path.resolve(l.directory, patch[1] ?? patch[2]))

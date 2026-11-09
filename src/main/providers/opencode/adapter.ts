@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto'
 import { join } from 'path'
 import { existsSync } from 'original-fs'
-import { mkdir, writeFile } from 'original-fs/promises'
+import { mkdir, readdir, stat, writeFile } from 'original-fs/promises'
 import type { AgentInstallInfo, McpServerDef, MemorySource, PermissionMode, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
 import { OPENCODE, OPENCODE_DESCRIPTOR, isClaudeAgentModel, isOpencodeModelId, opencodeAgentOf, opencodeModeFlags } from '../../../shared/opencode'
 import { TOOLS_SERVER } from '../../../shared/assistantTools'
@@ -13,7 +13,8 @@ import { launchOverrides } from '../../advancedValues'
 import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { POWERSHELL } from '../../launchGate'
-import { compareVersions, exportSubtitleText, toSpawnable } from '../common'
+import { compareVersions, exportSubtitleText, readFirstLine, toSpawnable } from '../common'
+import { placeMatcher } from '../../places'
 import type { CatalogRead, CommandSpec, ConnectionStatus, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { localDataRoot } from '../antigravity/home'
 import { AMBIENT_DIRS, AMBIENT_FILES, DATA_ENV, ambientIntegrations, opencodeEnv, opencodeHome } from './home'
@@ -22,7 +23,8 @@ import { copyOpencodeSkills, opencodeSkillsDir } from './skills'
 import { accountModels, checkHome, testProvider, latestOpencode, locateOpencode, opencodeInstallCommand, opencodeLoginCommand, opencodeReadiness, opencodeUpdateCommand, savedCredentials } from './install'
 import { expandOpencodeHook, normalizeOpencodeHook } from './events'
 import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerToken, sessionMark, sessionMarks } from './launcher'
-import { OpencodeConversationParser, OpencodeUsageParser, parseMirrorUsage } from './mirror'
+import { OpencodeConversationParser, OpencodeUsageParser, mirrorState, parseMirrorUsage, type MirrorHeader } from './mirror'
+import { mirrorDir, mirrorPath } from './historyCore'
 import { opencodeHistory } from './history'
 
 // OpenCode 2 as a Combwork provider (HI-2759, against 2.2.6; the runtime facts are HI-2758's). Each launch runs its own
@@ -361,7 +363,26 @@ export class OpencodeAdapter implements ProviderAdapter {
   async transcriptPath(_folder: string, sessionId: string): Promise<string | null> {
     if (!isSessionId(sessionId)) return null
     for (const home of this.allHomes()) if (existsSync(sessionMark(home, sessionId))) return opencodeHistory.mirrorFor(home, sessionId)
+    // A subagent's session (HI-2773): no mark (Combwork didn't make it), its mirror once a read of it completed.
+    for (const home of this.allHomes()) {
+      const p = mirrorPath(home, sessionId)
+      if ((await this.header(p))?.parent) return p
+    }
     return null
+  }
+
+  /** Each mirror's first line, by path and mtime (a subagent's names its parent and folder); the oldest go past 2000. */
+  private headers = new Map<string, { mtime: number; header: MirrorHeader | null }>()
+  private async header(path: string, mtimeMs?: number): Promise<MirrorHeader | null> {
+    const mtime = mtimeMs ?? (await stat(path).catch(() => null))?.mtimeMs
+    if (mtime === undefined) return null
+    const c = this.headers.get(path)
+    if (c && c.mtime === mtime) return c.header
+    const header = mirrorState(await readFirstLine(path, 64 * 1024).catch(() => '')).header
+    this.headers.delete(path)
+    this.headers.set(path, { mtime, header })
+    if (this.headers.size > 2000) this.headers.delete(this.headers.keys().next().value!)
+    return header
   }
 
   /** Every root sessions may have been made on: each OpenCode account's, a test copy's seam home, Combwork's own. */
@@ -376,12 +397,51 @@ export class OpencodeAdapter implements ProviderAdapter {
     return null
   }
 
-  async listSessions(): Promise<ExternalSession[]> {
-    return []
+  /**
+   * The subagents' sessions that ran in a folder (HI-2773): the mirrors without a mark whose first line names a parent and
+   * that folder, each a sub-session of its parent. Ids the caller has (Combwork's own sessions) aren't looked at, and a
+   * mirror folder's subagents are found again only when the folder changed (HI-1681's rule: a listing stats only those).
+   */
+  async listSessions(folder: string, skip?: (id: string) => boolean): Promise<ExternalSession[]> {
+    const here = placeMatcher(folder)
+    const out: ExternalSession[] = []
+    for (const home of this.allHomes()) {
+      const dir = mirrorDir(home)
+      for (const id of await this.childIds(dir)) {
+        if (skip?.(id)) continue
+        const p = mirrorPath(home, id)
+        const st = await stat(p).catch(() => null)
+        if (!st) continue
+        const h = await this.header(p, st.mtimeMs)
+        if (!h?.parent || typeof h.directory !== 'string' || !here(h.directory)) continue
+        out.push({ id, transcriptPath: p, modified: st.mtime.toISOString(), bytes: st.size, mtimeMs: st.mtimeMs, sub: subagentOf(h.parent) })
+      }
+    }
+    return out
   }
 
-  async subSessionOf(): Promise<SubSession | null> {
-    return null
+  /** The subagents' mirrors in a mirror folder, by the folder's mtime (a mirror's rename into place changes it). */
+  private childDirs = new Map<string, { mtime: number; ids: string[] }>()
+  private async childIds(dir: string): Promise<string[]> {
+    const st = await stat(dir).catch(() => null)
+    if (!st) {
+      this.childDirs.delete(dir)
+      return []
+    }
+    const c = this.childDirs.get(dir)
+    if (c && c.mtime === st.mtimeMs) return c.ids
+    const ids: string[] = []
+    for (const n of await readdir(dir).catch(() => [] as string[])) {
+      const id = n.endsWith('.jsonl') ? n.slice(0, -'.jsonl'.length) : ''
+      if (isSessionId(id) && (await this.header(join(dir, n)))?.parent) ids.push(id)
+    }
+    this.childDirs.set(dir, { mtime: st.mtimeMs, ids })
+    return ids
+  }
+
+  async subSessionOf(path: string, _sessionId: string, mtimeMs?: number): Promise<SubSession | null> {
+    const parent = (await this.header(path, mtimeMs))?.parent
+    return parent ? subagentOf(parent) : null
   }
 
   parseUsage(text: string, sessionId: string): SessionUsage {
@@ -426,6 +486,9 @@ export class OpencodeAdapter implements ProviderAdapter {
     return {}
   }
 }
+
+/** A subagent's session as a sub-session: its kind is OpenCode's own name for the tool that starts one (2.2.6: `subagent`). */
+const subagentOf = (parentId: string): SubSession => ({ parentId, kind: 'subagent' }) // i18n-ignore: OpenCode's own name
 
 /** What a launch puts in its private config's AGENTS.md: Combwork's guidance (with its tools), the launch's instructions, the notes. */
 export function launchGuidance(ctx: Pick<LaunchContext, 'guidance' | 'instructions' | 'notes' | 'mcpServers'>): string {

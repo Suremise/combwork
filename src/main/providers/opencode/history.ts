@@ -326,6 +326,13 @@ export class OpencodeHistory {
 
   private onEvent(e: CoreEvent): void {
     if (e.event === 'log') return void (e.level === 'warn' ? log.warn(e.text) : log.info(e.text))
+    if (e.event === 'children') {
+      // An exported session's subagents (HI-2773): each exported in turn, as its parent was.
+      void (async () => {
+        for (const id of e.children) await this.exportSession(e.home, id, e.reason)
+      })()
+      return
+    }
     if (e.event === 'published') {
       // A newer reading of the session's cost than any live one shown takes over.
       const t = [...this.runs.values()].find((r) => r.sessionId === e.sessionId && r.home.toLowerCase() === e.home.toLowerCase())

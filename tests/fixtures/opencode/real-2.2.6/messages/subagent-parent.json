@@ -1,0 +1,139 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "msg_1bf9c9d64001VcsMuZoR9XLKD1",
+    "time": {
+     "created": 1794216074596
+    },
+    "type": "idle",
+    "outcome": "succeeded"
+   },
+   {
+    "id": "msg_1bf9c972d001ao7gonf2Pqnm5F",
+    "time": {
+     "created": 1794216073007,
+     "streamed": 1794216074593,
+     "completed": 1794216074594
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "Okay, the user asked me to start a subagent of type \"general\" with the prompt \"Reply with exactly the word PONG and nothing else.\" I called the subagent function with the correct parameters. The response came back with the subagent's output as \"PONG\". Now, I need to tell the user in one line what the subagent said. Since the subagent's response is exactly \"PONG\", I should just output that. The user probably expected a simple confirmation that the subagent responded correctly. I'll make sure to keep the response concise and direct, matching the exact requirement.\n",
+      "native": {
+       "reasoningField": "reasoning"
+      },
+      "time": {
+       "created": 1794216073456,
+       "completed": 1794216074591
+      }
+     },
+     {
+      "type": "text",
+      "text": "The subagent said: PONG"
+     }
+    ],
+    "finish": "stop",
+    "rawFinish": "stop",
+    "cost": 0,
+    "tokens": {
+     "input": 2399,
+     "output": 135,
+     "reasoning": 0,
+     "cache": {
+      "read": 2762,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1bf9c5a58001dA7HyTRXkvUXAm",
+    "time": {
+     "created": 1794216057440,
+     "streamed": 1794216071949,
+     "completed": 1794216073000
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "Okay, the user wants me to start a subagent of type \"general\" with the prompt \"Reply with exactly the word PONG and nothing else.\" Then, after it returns, I need to tell them in one line what the subagent said.\n\nFirst, I should check the available tools. The subagent function is available, so I can use that. The parameters required are agent, prompt, and optionally background, model, sessionID, etc. The user specified the agent type as \"general\" and the prompt. Since the task is straightforward, I can run it in the foreground by default. The model isn't specified, so I don't need to set that. The description should be something like \"Test subagent response\". \n\nWait, the user said to use the task tool exactly once. So I need to structure the subagent call correctly. The function requires the agent type, prompt, and other optional parameters. Since the user wants the subagent to reply with exactly \"PONG\", the prompt should be that exact string. \n\nI'll construct the tool call with the agent set to \"general\", the prompt as given, and make sure to not include any other parameters unless necessary. Then, after the subagent completes, I'll retrieve its response and output just the result in one line.\n",
+      "native": {
+       "reasoningField": "reasoning"
+      },
+      "time": {
+       "created": 1794216069335,
+       "completed": 1794216071945
+      }
+     },
+     {
+      "type": "tool",
+      "id": "call_omh0f0k8",
+      "name": "subagent",
+      "executed": false,
+      "state": {
+       "status": "completed",
+       "input": {
+        "description": "Test subagent response",
+        "agent": "general",
+        "prompt": "Reply with exactly the word PONG and nothing else."
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "<subagent sessionID=\"ses_e40636cefffe4iaKCYy8miDkrx\" state=\"completed\">\nPONG\n</subagent>"
+        }
+       ],
+       "metadata": {
+        "sessionID": "ses_e40636cefffe4iaKCYy8miDkrx",
+        "status": "completed",
+        "truncated": false
+       }
+      },
+      "time": {
+       "created": 1794216071928,
+       "ran": 1794216071948,
+       "completed": 1794216072999
+      }
+     }
+    ],
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "cost": 0,
+    "tokens": {
+     "input": 4799,
+     "output": 313,
+     "reasoning": 0,
+     "cache": {
+      "read": 4,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1bf9c593c001YzDItWGxHKQvr2",
+    "time": {
+     "created": 1794216057424
+    },
+    "text": "Use the task tool exactly once: start a subagent of type \"general\" whose prompt is \"Reply with exactly the word PONG and nothing else.\" When it returns, tell me in one line what the subagent said.",
+    "type": "user"
+   }
+  ],
+  "cursor": {
+   "previous": "eyJpZCI6Im1zZ18xYmY5YzlkNjQwMDFWY3NNdVpvUjlYTEtEMSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+   "next": "eyJpZCI6Im1zZ18xYmY5YzU5M2MwMDFZekRJdFdHeEhLUXZyMiIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+ }
+}
