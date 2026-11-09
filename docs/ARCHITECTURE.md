@@ -298,6 +298,13 @@ Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the con
 platform). Reconciliation, the recorder, targets, retarget, check brackets (`runChecks`, `queueChecks`) and the focused
 pick's diff read through it (`tests/historyPortsImports.test.ts`, check:repo); Git's adapter passes its port to
 `reconcileHistory` and `attributeFolder`.
+Port 4's candidate half (HI-2790's R7): `platform/integration.ts` holds the contract (`IntegrationPort`'s `update`,
+`candidate` and `mergeBase`, the queue's `CandidateHost`, the outcomes), `platform/gitIntegration.ts` is Git's (the queue's
+worktree made or reused, strict's update, the test merge in each style and its cleanup, moved from `mergeQueue.ts`), with
+`platform/gitCommits.ts` reading a commit's stream (hook, signer or git), and `platform/integrationPorts.ts` finds it by
+the card's platform. `mergeQueue.ts` keeps the state machine, the facts and the messages, and calls the port for each
+candidate (`tests/integrationPortsImports.test.ts`, check:repo; `tests/workflow/queueTraces.test.ts` holds the commands to
+their recorded traces).
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

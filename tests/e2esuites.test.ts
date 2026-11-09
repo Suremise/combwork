@@ -209,6 +209,12 @@ describe('the suites a change needs (affected.mjs)', () => {
     for (const f of src) expect(under(f, EVERYTHING) || unitTest(f) || areas.some((a) => under(f, a.paths)), `${f} is in no area`).toBe(true)
   })
 
+  it("HR1's R7 round 1: the queue's candidate moved behind the integration port keeps the queue's suites", () => {
+    for (const f of ['src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/again.ts']) {
+      expect(affectedSuites([f], names).suites, f).toEqual(expect.arrayContaining(['mergequeue', 'mergequeuefolder']))
+    }
+  })
+
   it('picks an area’s suites, a suite’s own file, and about for docs the app bundles', () => {
     expect(affectedSuites(['src/renderer/src/components/Progress.tsx'], names).suites).toEqual(['i18nshots', 'lanesslots', 'progress', 'progressgates', 'progresslanes', 'progressqueue', 'progressreport', 'progressstates', 'progresstabs', 'replysize'])
     expect(affectedSuites(['tests/e2e/carddialog.cjs', 'docs/SPEC.md', 'CHANGELOG.md'], names).suites).toEqual(['about', 'carddialog'])
