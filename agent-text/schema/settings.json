@@ -1711,6 +1711,18 @@
   "settings.advanced.opencode.models.line.title": {
     "placeholders": {}
   },
+  "settings.advanced.opencode.models.variantId.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.variantId.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.variants.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.variants.title": {
+    "placeholders": {}
+  },
   "settings.advanced.opencode.override.keepProjectConfigOut.desc": {
     "placeholders": {}
   },

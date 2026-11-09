@@ -1,0 +1,57 @@
+{
+ "location": {
+  "directory": "<root>"
+ },
+ "data": [
+  {
+   "id": "qwen3:8b",
+   "modelID": "qwen3:8b",
+   "providerID": "cwtest",
+   "name": "qwen3:8b",
+   "package": "@opencode/ai/providers/openai-compatible",
+   "settings": {
+    "baseURL": "http://127.0.0.1:11434/v1"
+   },
+   "capabilities": {
+    "tools": true,
+    "input": [
+     "text",
+     "image"
+    ],
+    "output": [
+     "text"
+    ]
+   },
+   "variants": [
+    {
+     "id": "low",
+     "settings": {
+      "reasoningEffort": "low"
+     }
+    },
+    {
+     "id": "medium",
+     "settings": {
+      "reasoningEffort": "medium"
+     }
+    },
+    {
+     "id": "high",
+     "settings": {
+      "reasoningEffort": "high"
+     }
+    }
+   ],
+   "time": {
+    "released": 0
+   },
+   "cost": [],
+   "status": "active",
+   "enabled": true,
+   "limit": {
+    "context": 200000,
+    "output": 32000
+   }
+  }
+ ]
+}

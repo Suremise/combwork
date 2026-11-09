@@ -58,7 +58,8 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
   fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2))
 
   // Keys in Combwork's own environment, as ones set on the PC would be: an OpenCode agent must never get them.
-  const env = { FAKE_OPENCODE_LOG: fakeLog, OPENAI_API_KEY: 'sk-not-for-opencode', AWS_PROFILE: 'not-for-opencode', CW_TEST_CLI_HOME_CONNECTION: '0' }
+  // Two models of its own (HI-2767): one with variants (its efforts), one with none.
+  const env = { FAKE_OPENCODE_MODELS: 'ollama/qwen3:8b#low|medium|high,ollama/plain', FAKE_OPENCODE_LOG: fakeLog, OPENAI_API_KEY: 'sk-not-for-opencode', AWS_PROFILE: 'not-for-opencode', CW_TEST_CLI_HOME_CONNECTION: '0' }
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } })
   try {
     page.on('pageerror', (e) => check('no page errors', false, e.message))
@@ -142,15 +143,51 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
     const rows = await lib.until(async () => {
       const n = await page.locator('.advanced-row[data-advanced^="opencode."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)
-      return n === 8 ? n : null
+      return n === 10 ? n : null
     }, HUNG_MS)
-    check('Settings → Advanced has an OpenCode tab with its eight values (HI-2762 added three for history)', rows === 8)
+    check('Settings → Advanced has an OpenCode tab with its ten values (HI-2762 added three for history, HI-2767 two for variants)', rows === 10)
     await shots('advanced')
     await page.keyboard.press('Escape')
     await page.getByText('alpha', { exact: true }).first().click()
     const conn = (await inv('connections:list')).connectionRows.find((c) => c.account === account.id) ?? (await inv('connection:add', account.id, { name: 'Test · OpenCode' }))
     await inv('agents:update', alpha, agent.id, { connection: conn.id })
-    await lib.setLaunch(inv, alpha, agent.id, { model: 'opencode/big-pickle' }) // a connection kept to its own provider names its model (HI-2769)
+
+    // --- Effort (HI-2767): the picker offers the chosen model's own variants, none for a model listing none; the base
+    // option is OpenCode's default. In the connection's dialog, nothing saved.
+    const catalog = await lib.until(async () => {
+      const c = (await inv('provider:refresh', 'opencode'))?.opencode?.catalog
+      return c?.models?.some((m) => m.value === 'ollama/qwen3:8b' && m.efforts?.length) ? c : null
+    }, HUNG_MS)
+    check("the catalogue has each model's variants as its efforts, none for one listing none", JSON.stringify(catalog?.models.find((m) => m.value === 'ollama/qwen3:8b')?.efforts) === '["low","medium","high"]' && JSON.stringify(catalog?.models.find((m) => m.value === 'ollama/plain')?.efforts) === '[]', JSON.stringify(catalog?.models))
+    await page.keyboard.press('Control+,')
+    await page.locator('.settings-nav .row[data-section="accounts"]').click()
+    const form = page.locator('[data-connection-form]')
+    const connRow = page.locator(`[data-connections-of="${account.id}"] [data-connection]`).first()
+    await connRow.locator('[data-action="connection-menu"]').click({ timeout: HUNG_MS })
+    await page.locator('.menu .menu-item', { hasText: 'Edit…' }).first().click({ timeout: HUNG_MS })
+    await form.waitFor({ timeout: HUNG_MS })
+    const options = async (sel) => sel.locator('option').evaluateAll((os) => os.map((o) => ({ value: o.value, label: o.textContent })))
+    const modelSelect = form.locator('.model-picker select').first()
+    const effortSelect = form.locator('select.effort-picker').first()
+    await modelSelect.selectOption('ollama/qwen3:8b')
+    const withVariants = await lib.until(async () => {
+      const o = await options(effortSelect)
+      return o.filter((x) => x.value).map((x) => x.value).join() === 'low,medium,high' ? o : null
+    }, HUNG_MS)
+    check("with ollama/qwen3:8b, the effort picker offers its variants by the shared names, the base OpenCode default", !!withVariants && withVariants.filter((x) => x.value).map((x) => x.label).join() === 'Low,Medium,High' && /^OpenCode default$/.test(withVariants.find((x) => !x.value)?.label ?? ''), JSON.stringify(await options(effortSelect)))
+    await shots('effort-variants', form)
+    await modelSelect.selectOption('ollama/plain')
+    check('with ollama/plain (no variants), none is offered', !!(await lib.until(async () => ((await options(effortSelect)).filter((x) => x.value).length === 0 ? true : null), HUNG_MS)), JSON.stringify(await options(effortSelect)))
+    await shots('effort-none', form)
+    await page.locator('.dialog').last().getByRole('button', { name: 'Cancel' }).click()
+    await form.waitFor({ state: 'detached', timeout: HUNG_MS })
+    await page.keyboard.press('Escape')
+
+    // An effort the model doesn't list can't be saved on its connection (the catalogue's levels; a listing that changes
+    // later is refused at the start: tests/opencode.test.ts).
+    const unlisted = await failure(lib.setLaunch(inv, alpha, agent.id, { model: 'ollama/qwen3:8b', effort: 'max' }))
+    check("an effort ollama/qwen3:8b doesn't list (max) can't be saved, saying so", /ollama\/qwen3:8b doesn't take max effort/.test(unlisted ?? ''), unlisted ?? 'saved')
+    await lib.setLaunch(inv, alpha, agent.id, { model: 'ollama/qwen3:8b', effort: 'low' }) // a connection kept to its own provider names its model (HI-2769)
     const started = await failure(inv('session:start', alpha, { agentId: agent.id }))
     check('it starts on the OpenCode account', started === null, started ?? '')
 
@@ -164,6 +201,7 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     const sessionArg = tui ? tui.args[tui.args.indexOf('--session') + 1] : null
     check('the TUI is given the server and a session Combwork picked, in the project folder', !!tui && /^ses_[A-Za-z0-9]{26}$/.test(sessionArg ?? '') && tui.args.at(-1).toLowerCase() === fs.realpathSync.native(alpha).toLowerCase(), JSON.stringify(tui?.args))
     check('…the session created once (GET 404, then POST), recorded in the account', entries('http').filter((e) => e.method === 'POST' && e.path === '/api/session').length === 1 && fs.existsSync(path.join(home, 'combwork-sessions', `${sessionArg}.json`)))
+    check("…with the connection's model and its effort as the variant (HI-2767)", JSON.stringify(entries('session').find((e) => e.created === sessionArg)?.model) === JSON.stringify({ id: 'qwen3:8b', providerID: 'ollama', variant: 'low' }), JSON.stringify(entries('session')))
 
     // --- The hostile project loads nothing; only the config Combwork wrote and the project's AGENTS.md, as given.
     // What the fake loaded (each a line of its kind: config, plugin, agent, skill, instructions).
@@ -184,16 +222,27 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     await lib.until(async () => !(await live(agent.id)), HUNG_MS)
     check('stopped, its private server ends', !!(await lib.until(async () => (servePid && !alive(servePid) ? true : null), HUNG_MS)))
 
-    // --- Started again: the same session, resumed, never created again.
+    // --- Started again: the same session, resumed, never created again; its effort changed to high meanwhile.
+    await lib.setLaunch(inv, alpha, agent.id, { model: 'ollama/qwen3:8b', effort: 'high' })
     const before = entries('launch').filter((e) => e.args.includes('--server')).length
     await inv('session:start', alpha, { agentId: agent.id, resumeId: sessionArg })
     const again = await lib.until(async () => entries('launch').filter((e) => e.args.includes('--server'))[before] ?? null, HUNG_MS)
     check('started again, the same session is resumed', !!again && again.args[again.args.indexOf('--session') + 1] === sessionArg, JSON.stringify(again?.args))
-    check('…by GET alone: still one POST', entries('http').filter((e) => e.method === 'POST' && e.path === '/api/session').length === 1)
+    check('…never created again: still one POST of a session', entries('http').filter((e) => e.method === 'POST' && e.path === '/api/session').length === 1)
+    check('…its model and effort set on it as the connection now has them: high (HI-2767)', JSON.stringify(entries('model-set').at(-1)?.model) === JSON.stringify({ providerID: 'ollama', id: 'qwen3:8b', variant: 'high' }), JSON.stringify(entries('model-set')))
     const serve2 = entries('launch').filter((e) => e.args[0] === 'serve' && under(e.env.XDG_DATA_HOME, accountsRoot)).at(-1)
     await inv('session:stop', alpha, agent.id)
     await lib.until(async () => !(await live(agent.id)), HUNG_MS)
     check('…and its server ends when stopped again', !!(await lib.until(async () => (serve2?.pid && !alive(serve2.pid) ? true : null), HUNG_MS)))
+    // Resumed once more with no effort chosen: no variant sent, so the session goes back to the model's default.
+    await lib.setLaunch(inv, alpha, agent.id, { model: 'ollama/qwen3:8b', effort: '' })
+    const sets = entries('model-set').length
+    await inv('session:start', alpha, { agentId: agent.id, resumeId: sessionArg })
+    const cleared = await lib.until(async () => entries('model-set')[sets] ?? null, HUNG_MS)
+    check('resumed with no effort chosen: the model set with no variant (the default)', JSON.stringify(cleared?.model) === JSON.stringify({ providerID: 'ollama', id: 'qwen3:8b' }), JSON.stringify(cleared))
+    await lib.until(async () => entries('launch').filter((e) => e.args.includes('--server')).length > before + 1, HUNG_MS)
+    await inv('session:stop', alpha, agent.id)
+    await lib.until(async () => !(await live(agent.id)), HUNG_MS)
     check('the fake logged no errors', entries('error').length === 0, JSON.stringify(entries('error')))
   } finally {
     await app.close().catch(() => undefined)

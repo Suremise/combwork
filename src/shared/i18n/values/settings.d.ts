@@ -664,6 +664,10 @@ interface CombworkMessageValues {
   'settings.advanced.opencode.history.retryMinutes.title': undefined
   'settings.advanced.opencode.models.line.desc': undefined
   'settings.advanced.opencode.models.line.title': undefined
+  'settings.advanced.opencode.models.variantId.desc': undefined
+  'settings.advanced.opencode.models.variantId.title': undefined
+  'settings.advanced.opencode.models.variants.desc': undefined
+  'settings.advanced.opencode.models.variants.title': undefined
   'settings.advanced.opencode.override.keepProjectConfigOut.desc': undefined
   'settings.advanced.opencode.override.keepProjectConfigOut.title': undefined
   'settings.advanced.opencode.override.noAutoUpdate.desc': undefined

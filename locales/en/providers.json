@@ -439,6 +439,14 @@
     "defaultMessage": "Set Up runs `opencode auth login` on this account, so you can connect it to the model providers you use. Answer in the terminal; Combwork types nothing into it.",
     "description": "Settings → Accounts & Connections, above an OpenCode account's Set Up terminal: what Set Up is for. opencode auth login is a command: keep it. Set Up names a button."
   },
+  "providers.opencode.effortNeedsModel": {
+    "defaultMessage": "{provider} didn't start: the connection's effort is {effort}, which OpenCode sets as a variant of the model, and the connection names no model. Choose its model (a provider and model, such as ollama/qwen3:8b) or the default effort in Agent Settings.",
+    "description": "Why an OpenCode agent didn't start (its pane): an effort level is chosen, but OpenCode sets effort as a variant of a model and no model is chosen. {provider} is OpenCode, {effort} the effort as chosen (e.g. high). ollama/qwen3:8b is a model id: keep it. Agent Settings is a place in Combwork."
+  },
+  "providers.opencode.effortNotListed": {
+    "defaultMessage": "{provider} didn't start: the connection's effort is {effort}, and OpenCode doesn't list {effort} as a variant of {model} on this account, so Combwork can't set it. Choose one of the model's efforts, or the default, in Agent Settings. If OpenCode's models couldn't be read just now, start the agent again.",
+    "description": "Why an OpenCode agent didn't start (its pane): the chosen effort level isn't one of the variants OpenCode lists for the chosen model on this account (or the list couldn't be read). {provider} is OpenCode, {effort} the effort as chosen (e.g. high), {model} the model's id. Agent Settings is a place in Combwork."
+  },
   "providers.opencode.historyBusy": {
     "defaultMessage": "{provider} didn't start: Combwork's reader of OpenCode sessions didn't answer in time, so it couldn't take this session over from an earlier run. Start the agent again.",
     "description": "Why an OpenCode agent didn't start (its pane): Combwork's background reader of OpenCode session histories didn't confirm in time that it let go of the session's earlier run. {provider} is OpenCode."

@@ -1,0 +1,49 @@
+{
+ "note": "HI-2767 (HB2, 9 Nov 2026, 07:50-08:10 UTC, the pinned build in a throwaway root, local Ollama only): a session's model and variant set and read back with `opencode api --standalone`, no model call. A status of 204 is shown as the API printed nothing (exit 0).",
+ "create": {
+  "request": { "method": "POST", "path": "/api/session", "body": { "location": { "directory": "<root>/project" }, "model": { "providerID": "cwtest", "id": "qwen3:8b", "variant": "low" } } },
+  "status": 200,
+  "body": { "data": { "id": "ses_e40ab2d56ffeEnx8SfF7hcvsYp", "projectID": "ea9b1b206808c8ca62191786b43fdeb655d249eb", "model": { "id": "qwen3:8b", "providerID": "cwtest", "variant": "low" }, "cost": 0, "tokens": { "input": 0, "output": 0, "reasoning": 0, "cache": { "read": 0, "write": 0 } }, "time": { "created": 1794211369645, "updated": 1794211369645 }, "location": { "directory": "<root>\\project" } } }
+ },
+ "createWithoutModel": {
+  "request": { "method": "POST", "path": "/api/session", "body": { "location": { "directory": "<root>/project" } } },
+  "status": 200,
+  "body": { "data": { "id": "ses_e40ab2ffbffeeUlClvE6gCiEXD", "projectID": "ea9b1b206808c8ca62191786b43fdeb655d249eb", "cost": 0, "tokens": { "input": 0, "output": 0, "reasoning": 0, "cache": { "read": 0, "write": 0 } }, "time": { "created": 1794211368968, "updated": 1794211368968 }, "location": { "directory": "<root>\\project" } } }
+ },
+ "set": {
+  "request": { "method": "POST", "path": "/api/session/ses_e40ab2d56ffeEnx8SfF7hcvsYp/model", "body": { "model": { "providerID": "cwtest", "id": "qwen3:8b", "variant": "high" } } },
+  "status": 204,
+  "after": { "model": { "id": "qwen3:8b", "providerID": "cwtest", "variant": "high" } }
+ },
+ "setWithoutVariant": {
+  "request": { "method": "POST", "path": "/api/session/ses_e40ab2d56ffeEnx8SfF7hcvsYp/model", "body": { "model": { "providerID": "cwtest", "id": "qwen3:8b" } } },
+  "status": 204,
+  "after": { "model": { "id": "qwen3:8b", "providerID": "cwtest", "variant": "default" } }
+ },
+ "flatBody": {
+  "request": { "method": "POST", "path": "/api/session/ses_e40ab2d56ffeEnx8SfF7hcvsYp/model", "body": { "providerID": "cwtest", "id": "qwen3:8b", "variant": "high" } },
+  "status": 400,
+  "body": { "_tag": "InvalidRequestError", "message": "Missing key\n  at [\"model\"]", "kind": "Payload" }
+ },
+ "nullVariant": {
+  "request": { "method": "POST", "path": "/api/session/ses_e40ab2d56ffeEnx8SfF7hcvsYp/model", "body": { "model": { "providerID": "cwtest", "id": "qwen3:8b", "variant": null } } },
+  "status": 400,
+  "body": { "_tag": "InvalidRequestError", "message": "Expected string\n  at [\"model\"][\"variant\"]", "kind": "Payload" }
+ },
+ "noProvider": {
+  "request": { "method": "POST", "path": "/api/session/ses_e40ab2d56ffeEnx8SfF7hcvsYp/model", "body": { "model": { "id": "qwen3:8b" } } },
+  "status": 400,
+  "body": { "_tag": "InvalidRequestError", "message": "Missing key\n  at [\"model\"][\"providerID\"]", "kind": "Payload" }
+ },
+ "missingSession": {
+  "request": { "method": "POST", "path": "/api/session/ses_doesnotexist0000000000000/model", "body": { "model": { "providerID": "cwtest", "id": "qwen3:8b", "variant": "low" } } },
+  "status": 404,
+  "body": { "_tag": "SessionNotFoundError", "sessionID": "ses_doesnotexist0000000000000", "message": "Session not found: ses_doesnotexist0000000000000" }
+ },
+ "unknownVariant": {
+  "request": { "method": "POST", "path": "/api/session", "body": { "location": { "directory": "<root>/project" }, "model": { "providerID": "cwtest", "id": "qwen3:8b", "variant": "bogus" } } },
+  "status": 200,
+  "after": { "model": { "id": "qwen3:8b", "providerID": "cwtest", "variant": "bogus" } }
+ },
+ "inference": "Prompted through the private server (a logging proxy to local Ollama qwen3:8b): a session created with variant low sent reasoning_effort \"low\" in both of its requests; a session created with no model under a config model \"cwtest/qwen3:8b#high\" sent none (the config's #variant isn't applied)."
+}

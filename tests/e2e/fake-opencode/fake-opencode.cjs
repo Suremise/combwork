@@ -77,7 +77,7 @@ if (has('--help', '-h')) {
 
 const ANSI = { grey: (s) => `\x1b[90m${s}\x1b[39m`, red: (s) => `\x1b[31m${s}\x1b[39m` }
 const sub = positional[0]
-const NEEDS_SERVER = ['models', 'auth', 'stats', 'session', 'debug', 'mcp']
+const NEEDS_SERVER = ['models', 'api', 'auth', 'stats', 'session', 'debug', 'mcp']
 if (NEEDS_SERVER.includes(sub) && !has('--standalone', '--server') && !serviceDisabled()) {
   log({ kind: 'shared-service', args: argv })
   process.stderr.write(`fake opencode: "${argv.join(' ')}" would start OpenCode's shared background service (127.0.0.1:28894, outliving this command). Pass --standalone or --server <url>, or write {"disabled":true} to ${path.join(cfgDir(), 'service.json')}.\n`)
@@ -89,6 +89,17 @@ if (NEEDS_SERVER.includes(sub) && !has('--standalone', '--server') && !serviceDi
   if (sub === 'models') {
     const cfg = config.load(process.cwd())
     process.stdout.write(modelsOf(cfg).map((m) => `${m.providerID}/${m.id}\n`).join(''))
+    return process.exit(0)
+  }
+  // `opencode api GET /api/model`: the listing with each model's variants, as 2.2.6 answered (cli/api-model.json, HI-2767).
+  if (sub === 'api' && positional[1] === 'GET' && positional[2] === '/api/model') {
+    if (process.env.FAKE_OPENCODE_API_FAIL) {
+      process.stderr.write('fake opencode: api refused (FAKE_OPENCODE_API_FAIL)\n')
+      return process.exit(1)
+    }
+    const cfg = config.load(process.cwd())
+    const data = modelsOf(cfg).map((m) => ({ id: m.id, modelID: m.id, providerID: m.providerID, name: m.name, variants: m.variants }))
+    process.stdout.write(JSON.stringify({ location: { directory: process.cwd() }, data }) + '\n')
     return process.exit(0)
   }
   if (sub === 'auth' && positional[1] === 'list') {

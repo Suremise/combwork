@@ -16,7 +16,7 @@ import { localDataRoot } from '../antigravity/home'
 import { ambientIntegrations, noAutoUpdate, opencodeEnv, stripCredentials } from './home'
 import { app } from 'electron'
 import { checkConfig, loginConfig, parseAuthList, testProviderOf, withTestProvider, writeConfigDir, type SavedCredentials, type TestProvider } from './config'
-import { parseOpencodeModels } from './models'
+import { parseOpencodeModels, parseOpencodeModelsApi } from './models'
 import type { CatalogModel } from '../../../shared/types'
 
 // OpenCode's installation, readiness and checks, for Provider Setup and accounts (HI-2759, against 2.2.6). Combwork never
@@ -110,9 +110,17 @@ export async function savedCredentials(executable: string, home: string, base?: 
   return parseAuthList(r.stdout)
 }
 
-/** An account's models, standalone on its roots (with its saved credentials' policies): null when they couldn't be listed. */
+/**
+ * An account's models, standalone on its roots (with its saved credentials' policies): with their variants as efforts
+ * from `opencode api GET /api/model` (HI-2767), else from `opencode models` with no efforts (none invented); null when
+ * neither could list them.
+ */
 export async function accountModels(executable: string, home: string, base?: Record<string, string>): Promise<CatalogModel[] | null> {
   const saved = await savedCredentials(executable, home, base)
+  const api = await runOpencode(executable, ['api', 'GET', '/api/model'], home, 30000, saved?.saved ?? null, base)
+  const withVariants = api.code === 0 && !api.ended ? parseOpencodeModelsApi(api.stdout) : null
+  if (withVariants) return withVariants
+  log.warn(`${NAME}'s models couldn't be listed with their variants (${userText(`${api.stderr}`.slice(0, 200))}): no effort is offered`)
   const r = await runOpencode(executable, ['models'], home, 30000, saved?.saved ?? null, base)
   if (r.code !== 0 || r.ended) return null
   return parseOpencodeModels(r.stdout)

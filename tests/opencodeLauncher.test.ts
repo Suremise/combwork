@@ -99,7 +99,7 @@ interface Run {
 }
 
 /** A launch's folders and environment, with the stand-in (or the fake) as its opencode. */
-function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; sessionId?: string; owner?: string; delay?: number; sessions?: string[]; home?: string; project?: string; binDir?: string; tuiArgs?: string[] } = {}): Run {
+function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; sessionId?: string; owner?: string; delay?: number; sessions?: string[]; home?: string; project?: string; binDir?: string; tuiArgs?: string[]; model?: string | null; variant?: string | null } = {}): Run {
   const dir = tempDir('cw-oclauncher-')
   const home = o.home ?? join(dir, 'acct')
   const project = o.project ?? join(dir, 'project')
@@ -128,7 +128,7 @@ function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; session
     CW_STANDIN_DELAY: String(o.delay ?? 0),
     CW_STANDIN_DIR: project,
     CW_STANDIN_SESSIONS: (o.sessions ?? []).join(','),
-    ...launcherEnv({ executable: o.exe === 'fake' ? FAKE : join(bin, 'opencode.cmd'), cwd: project, sessionId, intent: o.intent ?? 'new', tuiArgs: o.tuiArgs ?? [], dirs: [project], privateDir: priv, owner: o.owner ?? '', marks: join(home, 'combwork-sessions'), readyMs: 30000 })
+    ...launcherEnv({ executable: o.exe === 'fake' ? FAKE : join(bin, 'opencode.cmd'), cwd: project, sessionId, intent: o.intent ?? 'new', tuiArgs: o.tuiArgs ?? [], dirs: [project], privateDir: priv, owner: o.owner ?? '', marks: join(home, 'combwork-sessions'), readyMs: 30000, model: o.model, variant: o.variant })
   })
   return { dir, home, project, priv, rec, env }
 }
@@ -318,4 +318,74 @@ describe.runIf(windows)('the session protocol (design s10)', () => {
     await b.exit
     await until(() => !alive(again.serverPid), 'the resumed server to end')
   }, 90000)
+})
+
+describe.runIf(windows)("the session's model and effort, set at each start and resume (HI-2767), with the fake opencode 2.2.6", () => {
+  /** The session as the server now has it, through the running launch's server (its record and password). */
+  const sessionOf = async (r: Run, id: string): Promise<{ model?: { id: string; providerID: string; variant?: string } }> => {
+    const info = await until(() => infoOf(r), 'the server record')
+    const res = await fetch(`${info.url}/api/session/${id}`, { headers: { authorization: 'Basic ' + Buffer.from(`opencode:${r.env.OPENCODE_PASSWORD}`).toString('base64') } })
+    return ((await res.json()) as { data: { model?: { id: string; providerID: string; variant?: string } } }).data
+  }
+  const stop = async (l: ReturnType<typeof launch>, r: Run): Promise<void> => {
+    const info = infoOf(r)
+    l.child.kill()
+    await l.exit
+    if (info) await until(() => !alive(info.serverPid), 'the server to end')
+  }
+  /** The fake's TUI runs (opencode with --session), as its log has them. */
+  const tuis = (r: Run): number => fakeLog(r).filter((e) => e.kind === 'launch' && JSON.stringify((e as { args?: unknown }).args ?? []).includes('--session')).length
+  const fakeLog = (r: Run): { kind: string; method?: string; path?: string; url?: string; model?: unknown }[] => (existsSync(r.env.FAKE_OPENCODE_LOG) ? readFileSync(r.env.FAKE_OPENCODE_LOG, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
+
+  it('a new session is created with the model and its variant; each resume sets them again: low, high, none (the default), another model', async () => {
+    const first = setUp({ exe: 'fake', model: 'cwtest/qwen3:8b', variant: 'low' })
+    const a = launch(first)
+    const id = (await until(() => infoOf(first), 'the server record')).sessionId
+    expect((await sessionOf(first, id)).model).toEqual({ id: 'qwen3:8b', providerID: 'cwtest', variant: 'low' })
+    await until(() => tuis(first) > 0, 'the TUI')
+    await stop(a, first)
+    const resume = async (model: string, variant: string | null, want: { id: string; providerID: string; variant: string }) => {
+      const r = setUp({ exe: 'fake', intent: 'resume', sessionId: id, home: first.home, project: first.project, model, variant })
+      r.env.FAKE_OPENCODE_LOG = first.env.FAKE_OPENCODE_LOG
+      const l = launch(r)
+      expect((await sessionOf(r, id)).model, `${model} ${variant}`).toEqual(want)
+      await stop(l, r)
+    }
+    await resume('cwtest/qwen3:8b', 'high', { id: 'qwen3:8b', providerID: 'cwtest', variant: 'high' })
+    await resume('cwtest/qwen3:8b', null, { id: 'qwen3:8b', providerID: 'cwtest', variant: 'default' })
+    await resume('cwtest/qwen3:14b', 'medium', { id: 'qwen3:14b', providerID: 'cwtest', variant: 'medium' })
+    // Each update in the body 2.2.6 takes, {model: {providerID, id, variant?}}: no variant when none is chosen.
+    const sets = fakeLog(first).filter((e) => e.kind === 'model-set').map((e) => e.model)
+    expect(sets).toEqual([{ providerID: 'cwtest', id: 'qwen3:8b', variant: 'high' }, { providerID: 'cwtest', id: 'qwen3:8b' }, { providerID: 'cwtest', id: 'qwen3:14b', variant: 'medium' }])
+  }, 180000)
+
+  it("an update refused, taken but not kept (an old model with the same variant), or never answered: the launch fails before the TUI, its server ends, and no session is created", async () => {
+    const first = setUp({ exe: 'fake', model: 'cwtest/qwen3:8b', variant: 'low' })
+    const a = launch(first)
+    const id = (await until(() => infoOf(first), 'the server record')).sessionId
+    await stop(a, first)
+    for (const fail of ['refuse', 'stale', 'hang']) {
+      const r = setUp({ exe: 'fake', intent: 'resume', sessionId: id, home: first.home, project: first.project, model: 'cwtest/qwen3:14b', variant: 'low' })
+      r.env.FAKE_OPENCODE_LOG = first.env.FAKE_OPENCODE_LOG
+      r.env.FAKE_OPENCODE_MODEL_SET = fail
+      const before = tuis(first)
+      const l = launch(r)
+      expect(await l.exit, fail).toBe(LAUNCHER_EXIT.modelSet)
+      expect(l.output(), fail).toMatch(/OpenCode didn't (set|keep) the (session's model and effort|connection's model and effort)/)
+      // Its server ended with it (the job), and the TUI never ran.
+      expect(infoOf(r), fail).toBeNull()
+      expect(tuis(first), fail).toBe(before)
+    }
+    // Only the first launch created a session: a failed update never becomes a new one.
+    expect(fakeLog(first).filter((e) => e.kind === 'session').length).toBe(1)
+  }, 180000)
+
+  it('a new session created without the model asked for (its reply says another): the launch fails before the TUI', async () => {
+    const r = setUp({ exe: 'fake', model: 'cwtest/qwen3:8b', variant: 'low' })
+    r.env.FAKE_OPENCODE_MODEL_SET = 'drop-on-create'
+    const l = launch(r)
+    expect(await l.exit).toBe(LAUNCHER_EXIT.modelSet)
+    expect(l.output()).toMatch(/OpenCode created the session without the connection's model and effort \(cwtest\/qwen3:8b, low\)/)
+    expect(infoOf(r)).toBeNull()
+  }, 60000)
 })

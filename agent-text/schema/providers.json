@@ -135,6 +135,19 @@
       "model": "plain"
     }
   },
+  "providers.opencode.effortNeedsModel": {
+    "placeholders": {
+      "provider": "plain",
+      "effort": "plain"
+    }
+  },
+  "providers.opencode.effortNotListed": {
+    "placeholders": {
+      "provider": "plain",
+      "effort": "plain",
+      "model": "plain"
+    }
+  },
   "providers.opencode.historyBusy": {
     "placeholders": {
       "provider": "plain"

@@ -2739,6 +2739,26 @@
     "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of one line of the CLI's model list. opencode models is a command: keep it.",
     "audience": "both"
   },
+  "settings.advanced.opencode.models.variantId.desc": {
+    "text": "The field of a model's variant with its id, the effort level Combwork passes when an OpenCode session starts. Wrong, no effort is offered for OpenCode models.",
+    "note": "What the advanced setting \"Model list: a variant's id field\" is for, and what goes wrong when it is wrong (Settings → Advanced, under OpenCode).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.variantId.title": {
+    "text": "Model list: a variant's id field",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the field of one of a model's variants that holds its id.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.variants.desc": {
+    "text": "The field of a model in OpenCode's model list with its variants, which Combwork offers as its effort levels. Wrong, no effort is offered for OpenCode models.",
+    "note": "What the advanced setting \"Model list: a model's variants field\" is for, and what goes wrong when it is wrong (Settings → Advanced, under OpenCode).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.variants.title": {
+    "text": "Model list: a model's variants field",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the field of OpenCode's model list that holds a model's variants.",
+    "audience": "both"
+  },
   "settings.advanced.opencode.override.keepProjectConfigOut.desc": {
     "text": "Combwork runs OpenCode with OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1, so nothing of the project's own OpenCode setup loads, and Combwork gives OpenCode the project's AGENTS.md itself. Turned off, OpenCode loads what it would outside Combwork: the project's opencode.json and any opencode.json in a folder above it, its .opencode folder (MCP servers, agents, and plugins, whose code runs), the skills in its .agents and .claude folders and in your home folder's .claude, and the instructions its config names. A project's MCP server with the same name as one Combwork gave the agent then replaces it, Combwork's own tools included.",
     "note": "What the advanced setting \"Keep the project's OpenCode config out\" does (Settings → Advanced, under OpenCode), as OpenCode 2.2.6 was recorded loading each (HI-2763, HI-2761). OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1 are environment variables; opencode.json, .opencode, .agents, .claude and AGENTS.md are file and folder names: keep them.",
