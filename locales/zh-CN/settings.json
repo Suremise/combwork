@@ -1592,5 +1592,21 @@
   "settings.connections.server.outputDefault": "默认：{n, number}",
   "settings.connections.server.tight": "空间不足：Claude Code 带 Combwork 工具的首个请求可能有 14,000–28,000 个 Token，因此会话可能无法启动，或会立即压缩。",
   "settings.connections.server.tokens": "个 Token",
-  "settings.connections.server.unsupported": "{why, select, alias {此模型不支持：Claude Code 将此 ID 读作它的别名之一。} other {此模型不支持：此处不支持含 claude、[1m] 或日期后缀的 ID。}}"
+  "settings.connections.server.unsupported": "{why, select, alias {此模型不支持：Claude Code 将此 ID 读作它的别名之一。} other {此模型不支持：此处不支持含 claude、[1m] 或日期后缀的 ID。}}",
+  "settings.advanced.opencode.ambient.integrations.desc": "可以使用这台电脑已有登录（AWS 配置文件、gcloud 登录、Azure CLI 的登录）的 OpenCode 提供方，按 ID 列出：除非账号为其保存了凭据，否则 Combwork 会拒绝每一个。设置错误时，智能体可能会在未经要求的情况下使用其中某个登录。",
+  "settings.advanced.opencode.ambient.integrations.title": "使用这台电脑登录的提供方",
+  "settings.advanced.opencode.env.credentials.desc": "在“不向 OpenCode 传递其他凭据”开启时，Combwork 不传给 OpenCode 的环境变量名称：OpenCode 的提供方作为密钥或令牌读取的每个变量，以及各云平台自己的变量（AWS、Azure、Google）。Combwork 自己的变量始终保留。设置错误时，这台电脑上设置的密钥可能会在未经要求的情况下到达 OpenCode 智能体。",
+  "settings.advanced.opencode.env.credentials.title": "不传给 OpenCode 的凭据",
+  "settings.advanced.opencode.models.line.desc": "opencode models 列表中的一行：模型的 ID，即以 provider/model 形式表示的提供方和模型（其第一个分组）。设置错误时，不会提供任何 OpenCode 模型。",
+  "settings.advanced.opencode.models.line.title": "opencode models 中的模型",
+  "settings.advanced.opencode.override.keepProjectConfigOut.desc": "Combwork 以 OPENCODE_DISABLE_PROJECT_CONFIG=1 和 OPENCODE_DISABLE_CLAUDE_CODE=1 运行 OpenCode，因此项目自己的 opencode.json 和 .opencode 文件夹（其 MCP 服务器、插件和智能体）、上级文件夹中的配置以及 Claude Code 的文件夹都不会加载；项目的 AGENTS.md 由 Combwork 交给 OpenCode。关闭后，这些都会像在 Combwork 之外一样加载，包括插件的代码，而且项目的 MCP 服务器可能会取代 Combwork 交给智能体的服务器。",
+  "settings.advanced.opencode.override.keepProjectConfigOut.title": "不加载项目的 OpenCode 配置",
+  "settings.advanced.opencode.override.noAutoUpdate.desc": "Combwork 在 OpenCode 的私有配置中使用 update: \"disable\" 并设置 OPENCODE_DISABLE_AUTOUPDATE=1 来运行它（它的智能体，以及检查其账号和模型），因此它运行已安装的版本，在智能体重启之间绝不会更改；“配置提供方”中的“更新”会在你选择时更新它。关闭后，OpenCode 可能会像在 Combwork 之外一样自行更新。",
+  "settings.advanced.opencode.override.noAutoUpdate.title": "不让 OpenCode 自行更新",
+  "settings.advanced.opencode.override.stripCredentials.desc": "Combwork 会从 OpenCode 的环境中去掉它作为提供方密钥或令牌读取的变量（也包括其智能体运行命令所用的 shell：其中有 GITHUB_TOKEN 和 HF_TOKEN），并且除非账号为其保存了凭据，否则拒绝 Amazon Bedrock、Google Vertex 和 Azure，因此这台电脑上的 AWS 配置文件、gcloud 登录或 Azure CLI 登录绝不会在未经要求的情况下被使用。OpenCode 的 Claude Agent 提供方无论如何都会被拒绝。关闭后，OpenCode 会获得这些变量，并可能像在 Combwork 之外一样使用这些登录。",
+  "settings.advanced.opencode.override.stripCredentials.title": "不向 OpenCode 传递其他凭据",
+  "settings.advanced.opencode.server.readySeconds.desc": "OpenCode 智能体的私有服务器有多长时间作出响应，超时后启动会放弃并结束它。太短时，慢速电脑上的智能体无法启动。",
+  "settings.advanced.opencode.server.readySeconds.title": "服务器：启动时间",
+  "settings.advanced.opencode.version.desc": "opencode --version 的输出：版本是其第一个分组。Combwork 只使用 OpenCode 2 或更高版本。设置错误时，将找不到 OpenCode。",
+  "settings.advanced.opencode.version.title": "opencode --version 中的版本"
 }

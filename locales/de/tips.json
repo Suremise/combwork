@@ -564,5 +564,7 @@
   "tips.localModelLimits.text": "Lege bei den Modellen eines Server-Kontos (Einstellungen → Konten & Verbindungen, Server bearbeiten…) Kontextgröße und Ausgabebudget fest: Agenten, die mit diesem Modell starten, komprimieren dann bei seinem echten Kontext statt bei angenommenen 200.000.",
   "tips.localModelPicker.title": "Lokale Modelle in Claude Codes /model wechseln",
   "tips.localModelPicker.text": "Ein Agent auf einem Server-Konto findet die Modelle des Kontos in Claude Codes /model, mit ihren genauen IDs. Gib jedem unter Server bearbeiten… eine Bezeichnung, um es dort zu benennen.",
-  "tips.localModelLimits.title": "Sag Claude Code den echten Kontext deines lokalen Modells"
+  "tips.localModelLimits.title": "Sag Claude Code den echten Kontext deines lokalen Modells",
+  "tips.opencode.text": "Agenten können OpenCode 2 verwenden. Die Anbieter-Einrichtung installiert es; jedes OpenCode-Konto hat seine eigenen Anmeldungen bei Anbietern und seine eigenen Sitzungen, und jeder Agent führt einen privaten OpenCode-Server aus, der mit ihm endet.",
+  "tips.opencode.title": "Agenten mit OpenCode ausführen"
 }

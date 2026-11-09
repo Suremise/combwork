@@ -1,0 +1,25 @@
+$ opencode stats --full
+code 0
+--- stdout
+2026 so far · all projects
+
+COST & TOKENS
+  cost                $0.00
+  input               5.1k
+  output              504
+  reasoning           0
+  cache read          9.6k
+  cache write         0
+  cached input        65.5%
+
+MODELS
+model                                 tokens       steps        cost
+probe/qwen3:8b                         15.2k           4       $0.00
+
+TOOL RELIABILITY
+tool                                   calls       error         p50
+shell                                      1       0.00%       419ms
+
+1 finished calls · 0 unfinished
+
+--- stderr

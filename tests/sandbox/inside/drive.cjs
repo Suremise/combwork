@@ -71,7 +71,7 @@ const TRUST_FOLDERS = Object.keys(TRUST_JSON.projects)
 const connectionFiles = (home) => Object.fromEntries(['fake-account.json', '.claude.json'].map((n) => [n, (() => { try { return fs.readFileSync(path.join(home, n), 'utf8') } catch { return null } })()]))
 const MARK = { userName: 'Sandbox Check', theme: 'light' }
 // The providers Combwork knows, by their descriptors' ids (src/shared/providers.ts PROVIDERS; a unit test holds them equal).
-const PROVIDER_IDS = ['claude-code', 'codex', 'copilot', 'antigravity']
+const PROVIDER_IDS = ['claude-code', 'codex', 'copilot', 'antigravity', 'opencode']
 // Scenario 4's workspace, made before the upgrade and opened after it (HI-2506), and its card.
 const KEPT_WS = path.join(process.env.USERPROFILE, 'Workspaces', 'Kept')
 const KEPT_CARD = 'Made before the upgrade'

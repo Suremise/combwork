@@ -178,5 +178,29 @@
   "mode.copilot.plan.label": {
     "text": "Plan",
     "note": "GitHub Copilot's permission mode plan: its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.opencode.auto.desc": {
+    "text": "Approves every permission OpenCode’s rules don’t explicitly deny, without asking. Use only where unattended changes are acceptable.",
+    "note": "What OpenCode's no-guardrails mode does, as agents and the Agent API read it."
+  },
+  "mode.opencode.auto.label": {
+    "text": "Approve all",
+    "note": "OpenCode's no-guardrails mode (--auto): its name, as agents and the Agent API read it."
+  },
+  "mode.opencode.build.desc": {
+    "text": "OpenCode’s Build agent with its own permission rules: it asks before what they don’t allow.",
+    "note": "What OpenCode's Build mode does, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.opencode.build.label": {
+    "text": "Build",
+    "note": "OpenCode's default agent and permission rules (its Build agent): its name, as agents and the Agent API read it (the window has its own message)."
+  },
+  "mode.opencode.plan.desc": {
+    "text": "OpenCode’s Plan agent: it plans and reads, and asks before changing anything.",
+    "note": "What OpenCode's Plan mode does, as agents and the Agent API read it."
+  },
+  "mode.opencode.plan.label": {
+    "text": "Plan",
+    "note": "OpenCode's Plan agent: its name, as agents and the Agent API read it."
   }
 }

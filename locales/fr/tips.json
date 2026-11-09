@@ -564,5 +564,7 @@
   "tips.localModelLimits.text": "Sur les modèles d’un compte de serveur (Paramètres → Comptes et connexions, Modifier le serveur…), définis la taille du contexte et le budget de sortie : les agents démarrés sur ce modèle compactent alors à son contexte réel plutôt qu’à 200 000 supposés.",
   "tips.localModelPicker.title": "Change de modèle local dans le /model de Claude Code",
   "tips.localModelPicker.text": "Un agent sur un compte serveur trouve les modèles du compte dans le /model de Claude Code, par leurs ID exacts. Donne à chacun un Libellé dans Modifier le serveur… pour l’y nommer.",
-  "tips.localModelLimits.title": "Indique à Claude Code le vrai contexte de ton modèle local"
+  "tips.localModelLimits.title": "Indique à Claude Code le vrai contexte de ton modèle local",
+  "tips.opencode.text": "Les agents peuvent utiliser OpenCode 2. Configuration des fournisseurs l’installe ; chaque compte OpenCode a ses propres connexions aux fournisseurs et ses propres sessions, et chaque agent exécute un serveur OpenCode privé qui s’arrête avec lui.",
+  "tips.opencode.title": "Exécuter des agents avec OpenCode"
 }

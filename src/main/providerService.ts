@@ -5,7 +5,7 @@ import { observedEffortKey } from '../shared/models'
 import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
 import { ptyArgs, shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
 import { allProviders, provider } from './providers'
-import type { KeySteps, UpdateRetry } from './providers/types'
+import type { CommandSpec, KeySteps, UpdateRetry } from './providers/types'
 import { msg, onLanguageChange, tr } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { config } from './config'
@@ -377,10 +377,10 @@ class ProviderService {
     // server connection's Set Up (HI-1772) runs the CLI itself instead, with its server's variables, for its first-run
     // screens: the user answers them in the CLI's own way.
     const home = env[adapter.descriptor.capabilities.connections?.homeEnv ?? '']
-    const cmd = setUp ? { file: info.path, args: (home && adapter.connectionSetUpArgs?.(home)) || [] } : (adapter.accountLoginCommand?.(info.path) ?? adapter.loginCommand(info.path))
+    const cmd: CommandSpec = setUp ? ((home && adapter.accountSetUpCommand?.(info.path, home)) || { file: info.path, args: (home && adapter.connectionSetUpArgs?.(home)) || [] }) : (adapter.accountLoginCommand?.(info.path, home) ?? adapter.loginCommand(info.path))
     const s = cmd.line !== undefined ? cmd : toSpawnable(cmd.file, cmd.args)
     log.info(`${adapter.descriptor.name} ${setUp ? 'set-up' : 'sign-in'} for account ${accountId}`)
-    spawnPty(key, { file: s.file, args: ptyArgs(s), cwd: setUp?.cwd ?? homedir(), env: withServerEnv(setUp?.env, withoutAccountEnv(adapter, childEnv(env))), onExit })
+    spawnPty(key, { file: s.file, args: ptyArgs(s), cwd: setUp?.cwd ?? homedir(), env: { ...withServerEnv(setUp?.env, withoutAccountEnv(adapter, childEnv(env))), ...cmd.env }, onExit })
     return key
   }
 

@@ -3,12 +3,13 @@ import { claudeCode } from './claude/adapter'
 import { codex } from './codex/adapter'
 import { copilot } from './copilot/adapter'
 import { antigravity } from './antigravity/adapter'
+import { opencode } from './opencode/adapter'
 import type { ProviderAdapter } from './types'
 import { msg } from '../../shared/i18n/msg'
 import { combworkError } from '../combworkError'
 
 /** Every provider adapter, in display order. Adding a provider: its descriptor in shared/providers.ts and its adapter here. */
-const ADAPTERS: ProviderAdapter[] = [claudeCode, codex, copilot, antigravity]
+const ADAPTERS: ProviderAdapter[] = [claudeCode, codex, copilot, antigravity, opencode]
 
 export function allProviders(): ProviderAdapter[] {
   return ADAPTERS

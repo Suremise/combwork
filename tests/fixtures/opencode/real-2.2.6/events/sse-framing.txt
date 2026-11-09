@@ -1,0 +1,11 @@
+HTTP 200 {"cache-control":"no-cache, no-transform","connection":"keep-alive","content-type":"text/event-stream","date":"Sun, 08 Nov 2026 23:13:31 GMT","keep-alive":"timeout=5","transfer-encoding":"chunked","vary":"Origin","x-accel-buffering":"no","x-content-type-options":"nosniff"}
+
+data: {"id":"evt_1bd703ca4001LyA9MAN5PT80K7","type":"server.connected","data":{}}
+
+: heartbeat
+
+data: {"id":"evt_1bd703d90001Pp2yCdcP5Jvjz9","created":1794179612048,"type":"worktree.resolved","data":{"projectID":"49b7441588fa9d640766ecb1ceb74e76d7a346b2","directory":"<root>\\project","previous":"global"},"durable":{"aggregateID":"49b7441588fa9d640766ecb1ceb74e76d7a346b2","seq":0,"version":1}}
+
+data: {"id":"evt_1bd703d910012EEqrISxtjFgLv","created":1794179612049,"type":"session.created","location":{"directory":"<root>\\project"},"data":{"sessionID":"ses_e428fc2ecffex263I9wXsnv2XZ","slug":"crisp-star","version":"2.2.6","projectID":"49b7441588fa9d640766ecb1ceb74e76d7a346b2","location":{"directory":"<root>\\project"},"subpath":"","permissions":[{"action":"shell","resource":"*","effect":"ask"}]},"durable":{"aggregateID":"ses_e428fc2ecffex263I9wXsnv2XZ","seq":0,"version":1}}
+
+data: {"id":"evt_1bd703d9b001oWouQbIFII6rBH","created":1794179612059,"type":"project.updated","location":{"directory":"<root>\\project"},"data":{"id":"49b7441588fa9d640766ecb1ceb74e76d7a346b2","canonical":"<root>\\project","vcs":"git","time":{"created":1794179612046,"updated":1794179612046,"active":1794179612058},"sandboxes":[]}}

@@ -1,0 +1,10 @@
+$ opencode auth login --standalone  (stdin closed)
+code 1
+--- stdout
+[90m|[39m
+[31mx[39m  Pass an integration ID or name when running without an interactive terminal
+[90m|[39m
+[90m—[39m  Failed
+
+
+--- stderr

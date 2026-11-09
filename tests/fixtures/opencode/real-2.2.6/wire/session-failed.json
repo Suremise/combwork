@@ -1,0 +1,34 @@
+{
+ "status": 200,
+ "body": {
+  "data": {
+   "id": "ses_e428cd051ffeb4MEzo4je7B9QD",
+   "projectID": "5bf1afff089b051664f74078e3842757b4a36040",
+   "model": {
+    "id": "m",
+    "providerID": "bad",
+    "variant": "default"
+   },
+   "cost": 0,
+   "tokens": {
+    "input": 0,
+    "output": 0,
+    "reasoning": 0,
+    "cache": {
+     "read": 0,
+     "write": 0
+    }
+   },
+   "outcome": "failed",
+   "time": {
+    "created": 1794179805104,
+    "updated": 1794179805223,
+    "busy": 1794179805110,
+    "idle": 1794179805226
+   },
+   "location": {
+    "directory": "<root>\\project"
+   }
+  }
+ }
+}

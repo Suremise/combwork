@@ -1,0 +1,30 @@
+{
+ "status": 200,
+ "body": {
+  "data": {
+   "id": "ses_e428cefc2ffeSDNwiHFcRk8o1D",
+   "projectID": "37017098b713d4ce9f43e4ceb987a8b81875ddb2",
+   "cost": 0,
+   "tokens": {
+    "input": 3293,
+    "output": 803,
+    "reasoning": 0,
+    "cache": {
+     "read": 7203,
+     "write": 0
+    }
+   },
+   "outcome": "succeeded",
+   "time": {
+    "created": 1794179797178,
+    "updated": 1794179805815,
+    "busy": 1794179797646,
+    "idle": 1794179805066
+   },
+   "title": "Execute combwork ping r0",
+   "location": {
+    "directory": "<root>\\project"
+   }
+  }
+ }
+}

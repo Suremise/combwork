@@ -396,5 +396,15 @@
   "agents.workflowTools.restartTitle": "为新的工作流重启 {agents}？",
   "agents.workflowTools.restartMessage": "{count, plural, other {{agents} 正在工作。项目工作流现在允许的工具会在重启时加载；会在同一对话中继续。}}",
   "agents.workflowTools.restartWhenDone": "{count, plural, other {回合结束后重启}}",
-  "agents.workflowTools.later": "稍后"
+  "agents.workflowTools.later": "稍后",
+  "agents.opencode.auto": "全部批准",
+  "agents.opencode.autoDescription": "不经询问就批准 OpenCode 规则未明确拒绝的每一项权限。仅在可以接受无人值守更改的地方使用。",
+  "agents.opencode.build": "Build",
+  "agents.opencode.buildDescription": "OpenCode 的 Build 智能体，使用它自己的权限规则：在规则不允许的操作之前询问。",
+  "agents.opencode.extensionNote": "你在编辑器中有一份 OpenCode 副本。Combwork 不使用编辑器的副本。请安装独立的 OpenCode 2；你的编辑器会照常工作。",
+  "agents.opencode.installNote": "从官方独立 Windows 下载安装 OpenCode 2：“安装”会从 GitHub 获取最新的 2.x 版本，用该版本的 SHA256SUMS 校验，并将 `opencode.exe` 放到 %LOCALAPPDATA%\\Programs\\OpenCode。不支持 OpenCode 1（`opencode-ai`）和已归档的 opencode 项目。如果 OpenCode 2 安装在其他位置，请在“设置”→“OpenCode”中设置其路径。",
+  "agents.opencode.modelPlaceholder": "模型 ID，例如 ollama/qwen3:8b",
+  "agents.opencode.plan": "Plan",
+  "agents.opencode.planDescription": "OpenCode 的 Plan 智能体：它进行规划和读取，在更改任何内容之前询问。",
+  "agents.opencode.signInHelp": "将账号重新连接到模型提供方：“设置”→“账号与连接”→ OpenCode 账号 →“登录”（它会运行 opencode auth login）。"
 }

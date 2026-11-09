@@ -280,6 +280,16 @@ interface CombworkMessageValues {
   'agents.name.empty': undefined
   'agents.name.taken': { agent: string | number; project: string | number; suggestion: string | number }
   'agents.name.tooLong': { max: string | number }
+  'agents.opencode.auto': undefined
+  'agents.opencode.autoDescription': undefined
+  'agents.opencode.build': undefined
+  'agents.opencode.buildDescription': undefined
+  'agents.opencode.extensionNote': undefined
+  'agents.opencode.installNote': undefined
+  'agents.opencode.modelPlaceholder': undefined
+  'agents.opencode.plan': undefined
+  'agents.opencode.planDescription': undefined
+  'agents.opencode.signInHelp': undefined
   'agents.overrides.off': undefined
   'agents.overrides.on': undefined
   'agents.permission.answerFirst': undefined

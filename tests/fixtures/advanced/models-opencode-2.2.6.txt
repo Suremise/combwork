@@ -1,0 +1,4 @@
+ollama/qwen3:8b
+opencode/big-pickle
+opencode/crouton-alpha-free
+opencode/glm-5.3-flash-free

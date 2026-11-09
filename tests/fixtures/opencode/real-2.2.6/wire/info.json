@@ -1,0 +1,17 @@
+{
+ "status": 200,
+ "body": {
+  "version": "2.2.6",
+  "pid": 6544,
+  "hostname": "<host>",
+  "urls": [
+   "http://127.0.0.1:50111"
+  ],
+  "paths": {
+   "tmp": "<root>\\tmp\\opencode"
+  },
+  "capabilities": {
+   "persistentPty": true
+  }
+ }
+}
