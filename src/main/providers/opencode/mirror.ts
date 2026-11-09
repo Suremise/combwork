@@ -19,7 +19,7 @@ import type { ConversationParserLike, ImageLocation } from '../types'
 //    `{"type":"combwork.mirror","state":"complete","w":…,"epoch":…,"source":"api"|"export","at":…,"updated":…}`: a
 //    settled read's (or an export's), published whole. Only this line says a read completed; the file existing doesn't.
 //    A subagent's session's (HI-2773) also has `"parent"` (the session that started it) and `"directory"` (its folder),
-//    so the Sessions tab finds it under its parent from this line alone.
+//    so the Sessions tab finds it under its parent from this line alone, and `"settled"` (whether it had ended when read).
 // 2. `{"type":"combwork.session","info":{…}}`: the session as `GET /api/session/{id}` gives it (title, tokens, cost, times).
 // 3. `{"type":"combwork.message","message":{…}}` per message, oldest first, as `GET /api/session/{id}/message` gives them.
 // 4. At most one `{"type":"combwork.status","problem":…,"detail":…,"at":…}` last: the newest read failed (the content
@@ -51,6 +51,8 @@ export interface MirrorHeader {
   /** A subagent's session (HI-2773): the session that started it (its info's `parentID`), and the folder it ran in. */
   parent?: string
   directory?: string
+  /** A subagent's: whether its info said nothing ran in it then (an unsettled one needs a final read after its run). */
+  settled?: boolean
 }
 
 /** A session id as OpenCode gives one (`ses_` and letters and digits). */
@@ -76,15 +78,18 @@ export function subagentSessions(sessionId: string, messages: readonly Obj[]): M
   return out
 }
 
-/** What a published session's header says of it as a subagent's (its info's `parentID` and folder), or nothing. */
-export function subagentHeader(info: Obj): Pick<MirrorHeader, 'parent' | 'directory'> {
-  if (typeof info.parentID !== 'string' || !SESSION_ID.test(info.parentID)) return {}
-  const dir = isObj(info.location) && typeof info.location.directory === 'string' ? info.location.directory : typeof info.directory === 'string' ? info.directory : null
-  return { parent: info.parentID, ...(dir ? { directory: dir } : {}) }
-}
-
 /** Whether a session's info says it has nothing running (its `time.idle` at or after its `time.busy`). */
 export const sessionSettled = (info: Obj): boolean => typeof info?.time?.idle === 'number' && (typeof info.time.busy !== 'number' || info.time.idle >= info.time.busy)
+
+/**
+ * What a published session's header says of it as a subagent's (its info's `parentID`, folder, and whether it had ended:
+ * kept in the file, so a later worker knows an unfinished mirror needs a final read), or nothing.
+ */
+export function subagentHeader(info: Obj): Pick<MirrorHeader, 'parent' | 'directory' | 'settled'> {
+  if (typeof info.parentID !== 'string' || !SESSION_ID.test(info.parentID)) return {}
+  const dir = isObj(info.location) && typeof info.location.directory === 'string' ? info.location.directory : typeof info.directory === 'string' ? info.directory : null
+  return { parent: info.parentID, ...(dir ? { directory: dir } : {}), settled: sessionSettled(info) }
+}
 
 export interface MirrorStatus {
   type: typeof STATUS_LINE
@@ -102,7 +107,7 @@ const iso = (ms: unknown): string | null => (typeof ms === 'number' && Number.is
 export const placeholderMirror = (): string => JSON.stringify({ type: MIRROR, state: 'placeholder' }) + '\n'
 
 /** A complete mirror: its header, the session, its messages oldest first. */
-export function buildMirror(header: Omit<MirrorHeader, 'type' | 'state' | 'parent' | 'directory'>, info: Obj, messages: readonly Obj[]): string {
+export function buildMirror(header: Omit<MirrorHeader, 'type' | 'state' | 'parent' | 'directory' | 'settled'>, info: Obj, messages: readonly Obj[]): string {
   const lines = [JSON.stringify({ type: MIRROR, state: 'complete', ...header, ...subagentHeader(info) }), JSON.stringify({ type: SESSION_LINE, info })]
   for (const m of messages) lines.push(JSON.stringify({ type: MESSAGE_LINE, message: m }))
   return lines.join('\n') + '\n'

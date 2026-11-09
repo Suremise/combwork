@@ -817,6 +817,59 @@ describe("OpenCode's subagent sessions (HI-2773)", () => {
     expect(await ask(core, { type: 'export', home, sessionId: CHILD.info.id, reason: 'repair', command: childExport })).toBe(false)
   })
 
+  it("reads a subagent's end after its parent's run when its last read caught it running, though newer than its start (HR1, round 1)", async () => {
+    const home = tempDir('cw-oc-sub-')
+    const events: CoreEvent[] = []
+    // Running at the live read: no time.idle yet, its time.updated (072994) after the tool's time.ran (071948).
+    const running = { ...CHILD.info, outcome: undefined, time: { created: CHILD.info.time.created, updated: CHILD.info.time.updated, busy: CHILD.info.time.busy } }
+    const sessions = { [PARENT.info.id]: { ...PARENT, w: 20 }, [CHILD.info.id]: { info: running, messages: CHILD.messages.slice(0, 2), w: 11 } }
+    const core = subCore(sessions, [], events)
+    await ask(core, { type: 'begin', home, sessionId: PARENT.info.id, runId: 'r1' })
+    await ask(core, { type: 'server', runId: 'r1', url: 'http://127.0.0.1:1', password: 'pw' })
+    await ask(core, { type: 'refresh', runId: 'r1', force: true })
+    await ask(core, { type: 'idle' })
+    expect(mirrorState(readFileSync(mirrorPath(home, CHILD.info.id), 'utf8')).header).toMatchObject({ state: 'complete', parent: PARENT.info.id, settled: false })
+    // The run ends before the child's end was read: the parent's export names it, for its reason.
+    await ask(core, { type: 'end', runId: 'r1' })
+    const parentExport = printing(home, 'parent.json', cliStdout('cli/session-export-subagent-parent.txt'))
+    await ask(core, { type: 'export', home, sessionId: PARENT.info.id, reason: 'runEnd', command: parentExport })
+    await ask(core, { type: 'idle' })
+    expect(events.filter((e) => e.event === 'children').map((e) => (e as any).children)).toEqual([[CHILD.info.id]])
+    // A new worker knows it from the mirror alone: the parent's export names it, and the repair pass lists it.
+    const fresh: CoreEvent[] = []
+    const again = subCore({}, [], fresh)
+    expect(again.repairCandidates([home])).toContainEqual({ home, sessionId: CHILD.info.id })
+    await ask(again, { type: 'export', home, sessionId: PARENT.info.id, reason: 'repair', command: parentExport })
+    await ask(again, { type: 'idle' })
+    expect(fresh.filter((e) => e.event === 'children').map((e) => (e as any).children)).toEqual([[CHILD.info.id]])
+    // Its final export: its end (the reply and the idle marker), settled; nothing more to read.
+    await ask(again, { type: 'export', home, sessionId: CHILD.info.id, reason: 'repair', command: printing(home, 'child.json', cliStdout('cli/session-export-subagent.txt')) })
+    await ask(again, { type: 'idle' })
+    const text = readFileSync(mirrorPath(home, CHILD.info.id), 'utf8')
+    expect(mirrorState(text).header).toMatchObject({ source: 'export', settled: true })
+    expect(conversation(text).find((i) => i.kind === 'assistant')).toMatchObject({ text: 'PONG' })
+    expect(again.repairCandidates([home]).some((c) => c.sessionId === CHILD.info.id)).toBe(false)
+    expect(existsSync(statePath(home, CHILD.info.id))).toBe(false)
+  })
+
+  it("tries a subagent whose export still says it runs again only once the account changed, never in a loop", async () => {
+    const home = tempDir('cw-oc-sub-')
+    const core = subCore({})
+    const stillRunning = JSON.parse(cliStdout('cli/session-export-subagent.txt'))
+    stillRunning.info.time = { created: stillRunning.info.time.created, updated: stillRunning.info.time.updated, busy: stillRunning.info.time.busy }
+    await ask(core, { type: 'export', home, sessionId: CHILD.info.id, reason: 'repair', command: printing(home, 'child.json', JSON.stringify(stillRunning)) })
+    await ask(core, { type: 'idle' })
+    expect(mirrorState(readFileSync(mirrorPath(home, CHILD.info.id), 'utf8')).header).toMatchObject({ state: 'complete', settled: false })
+    expect(core.repairCandidates([home])).toEqual([])
+    // The account's database changed since: eligible again.
+    const [db] = dbFiles(home)
+    mkdirSync(join(home, 'opencode'), { recursive: true })
+    writeFileSync(db, 'x')
+    const later = new Date(Date.now() + 60_000)
+    utimesSync(db, later, later)
+    expect(core.repairCandidates([home])).toEqual([{ home, sessionId: CHILD.info.id }])
+  })
+
   it("exports an exported session's subagents through main, each in turn", async () => {
     const asked: string[][] = []
     const h = await historyWorkerForTests('in-process')

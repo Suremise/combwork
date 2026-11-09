@@ -384,7 +384,10 @@ export class HistoryCore {
     if (exports.length) this.emit({ event: 'children', home: s.home, sessionId: s.sessionId, children: exports, reason })
   }
 
-  /** A child's mirror needs an export: none complete, one ending in a notice, or one older than its newest start. */
+  /**
+   * A child's mirror needs an export: none complete, one ending in a notice, one read while the child still ran (its first
+   * line says so: needsRepair), or one older than its newest start.
+   */
   private needsExport(c: Session, ran: number): boolean {
     const h = this.header(c)
     if (!h || h.state !== 'complete' || this.needsRepair(c.home, c.sessionId)) return true
@@ -585,7 +588,10 @@ export class HistoryCore {
       if (!parsed || parsed.info.id !== s.sessionId) throw new Failed('parse', "the export wasn't a session's") // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       const updated = typeof parsed.info.time?.updated === 'number' ? parsed.info.time.updated : newestMessage(parsed.messages)
       const published = this.publish(s, j.epoch, 'export', -1, updated, parsed.info, parsed.messages)
-      this.clearState(s)
+      // A subagent's export that still says it runs (its parent's run ended under it) is read again by the repair pass, as
+      // a failure is: once the account's database changed, or after the retry time, never in a loop.
+      if (published && typeof parsed.info.parentID === 'string' && !sessionSettled(parsed.info)) this.writeState(s, { failedAt: this.deps.now(), dbMtime: this.dbMtime(s.home), attempts: (this.readState(s).attempts ?? 0) + 1 })
+      else this.clearState(s)
       if (published) this.followChildren(s, 'export', parsed.messages, j.reason)
     } catch (e) {
       const f = e instanceof Failed ? e : new Failed('exit', e instanceof Error ? e.message : String(e)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
@@ -758,7 +764,8 @@ export class HistoryCore {
 
   /**
    * Sessions whose mirror needs an export, at most `repairBatch` (design s13 §1): a placeholder, one ending in a status
-   * line, or one a run-end export was kept for; not one with a live run (its poll reads it); and only once the account's
+   * line, a subagent's read while it still ran (HI-2773), or one a run-end export was kept for; not one with a live run
+   * (its poll reads it); and only once the account's
    * database changed since the last failure, or `repairHours` passed.
    */
   repairCandidates(homes: string[]): { home: string; sessionId: string }[] {
@@ -799,6 +806,8 @@ export class HistoryCore {
       readSync(fd, head, 0, head.length, 0)
       const first = mirrorState(head.toString('utf8').split('\n')[0]).header
       if (!first || first.state === 'placeholder') return true
+      // A subagent's read while it still ran (HR1 on HI-2773): its end is still to be read.
+      if (first.parent && first.settled !== true) return true
       const tailLen = Math.min(4096, size)
       const tail = Buffer.alloc(tailLen)
       readSync(fd, tail, 0, tailLen, size - tailLen)
