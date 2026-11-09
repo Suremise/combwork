@@ -286,7 +286,8 @@ async function tui() {
         if (e.type === 'session.text.ended') out(`${e.data.text}\n`)
         else if (e.type === 'session.tool.called') out(`· ${JSON.stringify(e.data.input)}\n`)
         else if (e.type === 'permission.asked' && has('--auto')) {
-          // --help: "Auto-approve permissions that are not explicitly denied". The reply 2.2.6 sends then wasn't recorded: once.
+          // --help: "Auto-approve permissions that are not explicitly denied": 2.2.6's TUI replies once to each ask
+          // (probes/external-directory-ask.json's auto, HI-2775).
           log({ kind: 'auto-approved', session: sid, action: e.data.action })
           void api('POST', `/api/session/${sid}/permission/${e.data.id}/reply`, { decision: 'once' })
         } else if (e.type === 'permission.asked') {

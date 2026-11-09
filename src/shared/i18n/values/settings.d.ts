@@ -668,6 +668,8 @@ interface CombworkMessageValues {
   'settings.advanced.opencode.models.variantId.title': undefined
   'settings.advanced.opencode.models.variants.desc': undefined
   'settings.advanced.opencode.models.variants.title': undefined
+  'settings.advanced.opencode.override.askOutsideFolder.desc': undefined
+  'settings.advanced.opencode.override.askOutsideFolder.title': undefined
   'settings.advanced.opencode.override.keepProjectConfigOut.desc': undefined
   'settings.advanced.opencode.override.keepProjectConfigOut.title': undefined
   'settings.advanced.opencode.override.noAutoUpdate.desc': undefined

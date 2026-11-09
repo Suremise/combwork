@@ -235,6 +235,29 @@ describe('the policies and the private config (design s7 to s16)', () => {
     expect(launchConfig({ model: null, agent: null, mcpServers: {}, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: false })).not.toHaveProperty('update')
   })
 
+  it("the outside-folder rules (HI-2775) decide as 2.2.6 was recorded deciding: ask outside, the grants allowed, a project's rule let in wins, kept out it doesn't, none without them", () => {
+    type Rule = { action: string; resource: string; effect: string }
+    type Case = { config: { permissions: Rule[] | null; projectConfig: { permissions: Rule[] } | null; projectLetIn: boolean }; effects: Record<string, Record<string, string>> }
+    const rec = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', 'probes', 'external-directory-ask.json'), 'utf8')) as { cases: Record<string, Case>; model: Record<string, { asks: { resources: string[] }[]; written: string | null }>; auto: Record<string, { asks: unknown[]; replies: { reply: string }[]; written: string | null }> }
+    // Combwork's rules for the probe's folders are exactly the ones 2.2.6 ran with.
+    const ours = launchConfig({ model: null, agent: 'build', mcpServers: {}, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: true, outsideAllowed: ['<root>\\copies', '<root>/private/opencode-config/skills/', '<root>/agent-temp', '<root>\\COPIES'] }).permissions
+    expect(ours).toEqual(rec.cases.combwork.config.permissions)
+    // 2.2.6's decision (Permission.evaluate): the agent's own rules (`* * allow` first), then each config document's in
+    // order, the last that matches wins; `*` across slashes, slashes either way, any case.
+    const kw = (value: string, pattern: string) => new RegExp('^' + pattern.replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$', 'si').test(value.replace(/\\/g, '/'))
+    const decide = (c: Case, resource: string) => [{ action: '*', resource: '*', effect: 'allow' }, ...(c.config.permissions ?? []), ...(c.config.projectLetIn ? (c.config.projectConfig?.permissions ?? []) : [])].findLast((r) => kw('external_directory', r.action) && kw(resource, r.resource))!.effect
+    const RESOURCES: Record<string, string> = { outside: '<root>/outside/*', outsideBackslashed: '<root>\\outside\\*', outsideAllowed: '<root>/outside/allowed/*', reviewCopy: '<root>/copies/rev1/*', skills: '<root>/private/opencode-config/skills/probe-skill/*', temp: '<root>/agent-temp/*', privateDir: '<root>/private/*' }
+    for (const [name, c] of Object.entries(rec.cases))
+      for (const agent of ['build#1', 'plan#2', 'build#2']) for (const [k, resource] of Object.entries(RESOURCES)) expect(decide(c, resource), `${name} ${agent} ${k}`).toBe(c.effects[agent][k])
+    expect(rec.cases.combwork.effects['build#2']).toMatchObject({ outside: 'ask', reviewCopy: 'allow', skills: 'allow', temp: 'allow', privateDir: 'ask' })
+    expect(rec.cases.switchOff.effects['build#2'].outside).toBe('allow')
+    // The ask's resource as 2.2.6 raised it for a write: the file's folder, slashed, and /*: the form the grants take.
+    expect(rec.model['outside#1'].asks.map((a) => a.resources)).toEqual([['<root>/outside/*']])
+    expect([rec.model['outside#1'].written, rec.model['reviewCopy#1'].written]).toEqual([null, 'cw-reviewCopy'])
+    // Approve all: the TUI with --auto answered the ask once, and the write went through.
+    expect(rec.auto['outside#1']).toMatchObject({ asks: [{}], replies: [{ reply: 'once' }], written: 'cw-auto' })
+  })
+
   it("saved credentials from `opencode auth list --format json` (HI-2758's shape): methods by integration, env connections apart", () => {
     const r = parseAuthList(JSON.stringify([{ id: 'probe', name: 'Probe Ollama', connections: [{ type: 'credential', id: 'cred_1', label: 'a-saved', method: 'key' }, { type: 'env', name: 'PROBE_API_KEY' }] }, { id: 'anthropic', name: 'Anthropic', connections: [{ type: 'env', name: 'ANTHROPIC_API_KEY' }] }]))!
     expect([...r.saved]).toEqual([['probe', ['key']]])
@@ -369,17 +392,37 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     expect(providerRules(terminal)).toEqual(['claude-agent:deny'])
   }, 60000)
 
-  it("a reviewer's granted folder adds no rule to the private config, new or resumed (HI-2772: 2.2.6 reaches it by default; a rule the user let in still decides)", async () => {
+  it("asks before an outside folder (HI-2775): every launch, new or resumed, in any mode; the review copies, its skills and its temp folder allowed; the switch off (or the terminal preset) adds no rule", async () => {
     const { sessionMark } = await import('../src/main/providers/opencode/launcher')
+    const ASK = 'opencode.override.askOutsideFolder'
     const copies = join(base, 'ws space.worktrees', 'proj', 'copies')
+    const temp = join(base, 'agent temp', 'a-1')
     const written = (c: { privateDir: string }) => JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8'))
-    const fresh = ctx({ extraDirs: [copies], permissionMode: 'build' }) as { privateDir: string }
-    await opencode.prepareLaunch(fresh as never)
+    const slashed = (p: string) => `${p.replace(/\\/g, '/')}/*`
+    const reviewer = ctx({ extraDirs: [copies], tempDir: temp, permissionMode: 'build' }) as { privateDir: string }
     const resumed = ctx({ extraDirs: [copies], resume: true }) as { privateDir: string; connectionHome: string; sessionId: string }
     mkdirSync(join(resumed.connectionHome, 'combwork-sessions'), { recursive: true })
     writeFileSync(sessionMark(resumed.connectionHome, resumed.sessionId), '{}')
-    await opencode.prepareLaunch(resumed as never)
-    for (const c of [fresh, resumed]) {
+    const auto = ctx({ permissionMode: 'auto' }) as { privateDir: string }
+    for (const c of [reviewer, resumed, auto]) await opencode.prepareLaunch(c as never)
+    const skills = (c: { privateDir: string }) => slashed(join(c.privateDir, 'opencode-config', 'skills'))
+    expect(written(reviewer).permissions).toEqual([
+      { action: 'external_directory', resource: '*', effect: 'ask' },
+      { action: 'external_directory', resource: slashed(copies), effect: 'allow' },
+      { action: 'external_directory', resource: skills(reviewer), effect: 'allow' },
+      { action: 'external_directory', resource: slashed(temp), effect: 'allow' }
+    ])
+    expect(written(resumed).permissions.map((r: { resource: string }) => r.resource)).toEqual(['*', slashed(copies), skills(resumed)])
+    // Approve all asks the same: its --auto approves each ask (the TUI replies once), as 2.2.6 was recorded doing.
+    expect(written(auto).permissions.map((r: { resource: string }) => r.resource)).toEqual(['*', skills(auto)])
+    // The rest of the private folder isn't allowed: the hook token and the config with the servers' tokens are there.
+    expect(JSON.stringify(written(reviewer).permissions)).not.toContain(`${reviewer.privateDir.replace(/\\/g, '/')}/*`)
+    // Off, and the Independent role's terminal preset (every override off): 2.2.6's own rules, no permissions.
+    const on = { 'opencode.override.noAutoUpdate': true, 'opencode.override.keepProjectConfigOut': true, 'opencode.override.stripCredentials': true }
+    const off = ctx({ extraDirs: [copies], overrides: { ...on, [ASK]: false } }) as { privateDir: string }
+    const terminal = ctx({ model: null, overrides: { 'opencode.override.noAutoUpdate': false, 'opencode.override.keepProjectConfigOut': false, 'opencode.override.stripCredentials': false, 'opencode.override.ownProviderOnly': false, [ASK]: false } }) as { privateDir: string }
+    for (const c of [off, terminal]) {
+      await opencode.prepareLaunch(c as never)
       expect(written(c)).not.toHaveProperty('permissions')
       expect(JSON.stringify(written(c))).not.toContain('external_directory')
     }

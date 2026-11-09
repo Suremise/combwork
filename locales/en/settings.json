@@ -2667,6 +2667,14 @@
     "defaultMessage": "Model list: a model's variants field",
     "description": "An advanced setting's title (Settings → Advanced, under OpenCode): the field of OpenCode's model list that holds a model's variants."
   },
+  "settings.advanced.opencode.override.askOutsideFolder.desc": {
+    "defaultMessage": "Combwork's private OpenCode config makes an OpenCode agent ask before it reads or changes anything outside its own folder (OpenCode's external_directory permission). A reviewer's review copies, the agent's skills and its temp folder stay allowed. Approve all approves these questions without asking you, and a rule in the project's own OpenCode config, when you let it load, comes after Combwork's and wins. An agent nobody is watching waits at such a question until you answer it in its pane. Turned off, OpenCode agents reach any folder on this PC without asking, as OpenCode's own rules allow outside Combwork.",
+    "description": "What the advanced setting \"Ask before reaching outside the agent's folder\" does (Settings → Advanced, under OpenCode). external_directory is the name of an OpenCode permission: keep it. Approve all is the name of a permission mode: use its translated name."
+  },
+  "settings.advanced.opencode.override.askOutsideFolder.title": {
+    "defaultMessage": "Ask before reaching outside the agent's folder",
+    "description": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default."
+  },
   "settings.advanced.opencode.override.keepProjectConfigOut.desc": {
     "defaultMessage": "Combwork runs OpenCode with OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1, so nothing of the project's own OpenCode setup loads, and Combwork gives OpenCode the project's AGENTS.md itself. Turned off, OpenCode loads what it would outside Combwork: the project's opencode.json and any opencode.json in a folder above it, its .opencode folder (MCP servers, agents, and plugins, whose code runs), the skills in its .agents and .claude folders and in your home folder's .claude, and the instructions its config names. A project's MCP server with the same name as one Combwork gave the agent then replaces it, Combwork's own tools included.",
     "description": "What the advanced setting \"Keep the project's OpenCode config out\" does (Settings → Advanced, under OpenCode), as OpenCode 2.2.6 was recorded loading each (HI-2763, HI-2761). OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1 are environment variables; opencode.json, .opencode, .agents, .claude and AGENTS.md are file and folder names: keep them."

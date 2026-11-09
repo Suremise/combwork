@@ -1491,6 +1491,14 @@
     "defaultMessage": "An OpenCode agent's history, tokens and cost",
     "description": "A tip's title (HI-2762). OpenCode is a product name."
   },
+  "tips.opencodeOutsideFolder.text": {
+    "defaultMessage": "An OpenCode agent asks before it reads or changes anything outside its own folder, and waits for your answer in its pane. Review copies stay allowed, and Approve all approves without asking; Settings → Advanced → OpenCode turns this off.",
+    "description": "A tip. Names of Combwork's menus, settings and modes (Approve all): keep them as Combwork shows them. OpenCode is a product name."
+  },
+  "tips.opencodeOutsideFolder.title": {
+    "defaultMessage": "OpenCode agents ask before other folders",
+    "description": "A tip's title. OpenCode is a product name."
+  },
   "tips.opencodeOwnProvider.text": {
     "defaultMessage": "An OpenCode agent uses only the provider in its connection's model, so nothing it does goes to another provider or to OpenCode's free cloud models. Name the connection's model, such as ollama/qwen3:8b; Settings → Advanced → OpenCode turns this off.",
     "description": "A tip. Names of Combwork's menus, views and settings: keep them as Combwork shows them. OpenCode is a product name; ollama/qwen3:8b is a model id: keep it."

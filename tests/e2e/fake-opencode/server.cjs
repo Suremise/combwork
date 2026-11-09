@@ -293,7 +293,7 @@ async function startServer(opts) {
     // The tools a fake model calls.
     const shellRule = (command) => {
       if (/\bneeds approval\b/i.test(text)) return 'ask'
-      const rules = [...(cfg.global.permissions || []), ...(session(sid).info.permissions || [])]
+      const rules = [...cfg.permissions, ...(session(sid).info.permissions || [])]
       let effect = 'allow'
       for (const p of rules) if (p.action === 'shell' && new RegExp('^' + String(p.resource ?? '*').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$').test(command)) effect = p.effect
       return effect
@@ -329,7 +329,8 @@ async function startServer(opts) {
      * 2.2.6's external_directory, for an edit outside the session's folder (HI-2772, from the pinned opencode.exe:
      * FileAccess.resolve and authorizeExternal): its resource the file's folder, slashed, and /*; the last matching rule
      * decides (Kw: slashes either way, any case), of the agent's defaults (Agent.Info's: `* * allow` first, so nothing
-     * asks by default, as the real tier's opencodereal-dirs saw), then the config's `permissions`, then the session's.
+     * asks without a rule, as the real tier's opencodereal-dirs saw), then each config document's `permissions` (the
+     * config folder's, then a project's let in: HI-2775's probes/external-directory-ask.json), then the session's.
      * Only the edit checks it here: what else 2.2.6 checks it for, the fake doesn't model.
      */
     const external = (file) => {
@@ -337,7 +338,7 @@ async function startServer(opts) {
       if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return null
       const resource = `${path.dirname(file).replace(/\\/g, '/')}/*`
       const kw = (value, pattern) => new RegExp('^' + String(pattern).replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'si').test(value.replace(/\\/g, '/'))
-      const rules = [{ action: '*', resource: '*', effect: 'allow' }, ...(cfg.global.permissions || []), ...(session(sid).info.permissions || [])]
+      const rules = [{ action: '*', resource: '*', effect: 'allow' }, ...cfg.permissions, ...(session(sid).info.permissions || [])]
       const effect = rules.findLast((p) => kw('external_directory', p.action) && kw(resource, p.resource ?? '*'))?.effect ?? 'ask'
       return { effect, resource }
     }

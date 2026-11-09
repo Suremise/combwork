@@ -568,6 +568,8 @@
   "tips.opencode.text": "Agenten können OpenCode 2 verwenden. Die Anbieter-Einrichtung installiert es; jedes OpenCode-Konto hat seine eigenen Anmeldungen bei Anbietern und seine eigenen Sitzungen, und jeder Agent führt einen privaten OpenCode-Server aus, der mit ihm endet.",
   "tips.opencodeOwnProvider.title": "OpenCode bleibt beim Anbieter der Verbindung",
   "tips.opencodeOwnProvider.text": "Ein OpenCode-Agent nutzt nur den Anbieter im Modell seiner Verbindung, sodass nichts, was er tut, an einen anderen Anbieter oder an OpenCodes kostenlose Cloud-Modelle geht. Gib das Modell der Verbindung an, etwa ollama/qwen3:8b; unter Einstellungen → Erweitert → OpenCode lässt sich das ausschalten.",
+  "tips.opencodeOutsideFolder.title": "OpenCode-Agenten fragen vor anderen Ordnern",
+  "tips.opencodeOutsideFolder.text": "Ein OpenCode-Agent fragt, bevor er etwas außerhalb seines eigenen Ordners liest oder ändert, und wartet in seinem Bereich auf deine Antwort. Review-Kopien bleiben erlaubt, und „Alles genehmigen“ genehmigt ohne Nachfrage; unter Einstellungen → Erweitert → OpenCode lässt sich das ausschalten.",
   "tips.opencode.title": "Agenten mit OpenCode ausführen",
   "tips.opencodeHistory.text": "Die Unterhaltung eines OpenCode-Agenten erscheint im Tab „Sitzungen“, seine Tokens und Kosten in der Übersicht und der Fußzeile seines Bereichs, wie OpenCode sie meldet. $0 Kosten sind kein Maß für das Kontingent deines Plans; Limits gibt es nur für OpenCode Go oder Console.",
   "tips.opencodeHistory.title": "Verlauf, Tokens und Kosten eines OpenCode-Agenten"

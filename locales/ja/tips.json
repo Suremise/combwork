@@ -568,6 +568,8 @@
   "tips.opencode.text": "エージェントはOpenCode 2を使えます。「プロバイダーのセットアップ」でインストールします。OpenCodeの各アカウントは独自のプロバイダーへのサインインとセッションを持ち、各エージェントは自分と一緒に終了するプライベートなOpenCodeサーバーを実行します。",
   "tips.opencodeOwnProvider.title": "OpenCodeは接続のプロバイダーだけを使う",
   "tips.opencodeOwnProvider.text": "OpenCodeのエージェントは接続のモデルにあるプロバイダーだけを使うため、その作業がほかのプロバイダーやOpenCodeの無料クラウドモデルに送られることはありません。接続のモデル（ollama/qwen3:8bなど）を指定してください。「設定」→「詳細」→「OpenCode」でオフにできます。",
+  "tips.opencodeOutsideFolder.title": "OpenCodeのエージェントはほかのフォルダーの前に確認する",
+  "tips.opencodeOutsideFolder.text": "OpenCodeのエージェントは、自分のフォルダーの外にあるものを読んだり変更したりする前に確認を求め、そのペインであなたの答えを待ちます。レビュー用コピーは引き続き許可され、「すべて承認」では確認なしで承認されます。「設定」→「詳細」→「OpenCode」でオフにできます。",
   "tips.opencode.title": "OpenCodeでエージェントを実行する",
   "tips.opencodeHistory.text": "OpenCode エージェントの会話は [セッション] タブに、トークンとコストは概要とペインのフッターに、OpenCode が報告するとおりに表示されます。$0 のコストはプランの利用枠の目安ではありません。上限が表示されるのは OpenCode Go または Console だけです。",
   "tips.opencodeHistory.title": "OpenCode エージェントの履歴、トークン、コスト"
