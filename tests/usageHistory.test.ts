@@ -248,6 +248,72 @@ describe('the usage history of a workspace', () => {
     }
   })
 
+  describe("a resume's read of a stopped session's /rename (HI-2839)", () => {
+    type Resume = { resumeUsage: (projectPath: string, sessionId: string) => Promise<SessionUsage | null>; resumeReadWaitMs: number }
+    const resume = sessions as unknown as Resume
+    /** A stopped session the history has, then a /rename in its CLI just before Stop: the import queued as it ended not run yet. */
+    const renamedAfterImport = async (): Promise<string> => {
+      const id = newId()
+      write(cliFile(id), transcript(id, [100]))
+      await run(() => workspace.upsertSession(p, { id, agent: 'claude-code', agentId: 'c1', name: 'Docs pass', titleAtRename: null, lastActiveAt: new Date(T0).toISOString() }))
+      await run(() => usageHistory.ingest(p, id, { priority: 1, keepState: 'no' }))
+      appendFileSync(cliFile(id), JSON.stringify({ type: 'custom-title', customTitle: 'Guide only', sessionId: id }) + '\n')
+      return id
+    }
+    const named = async (id: string): Promise<string | null> => {
+      const { cliRename } = await import('../src/shared/defaults')
+      const rec = (await run(() => workspace.sessionsFile(p))).sessions.find((s) => s.id === id)!
+      return cliRename({ ...rec, usage: await run(() => resume.resumeUsage(p, id)) }, 'proj')
+    }
+
+    it('history behind the transcript: the transcript is read, and the /rename adopted', async () => {
+      const id = await renamedAfterImport()
+      // What a resume read before: the history, without the /rename (so --name gave the older name back).
+      expect((await run(() => sessions.usage(p, id, undefined, { noWait: true })))?.customTitle).toBeFalsy()
+      expect(await named(id)).toBe('Guide only')
+    })
+
+    it("the worker busy with its transcript: the resume waits for its turn, bounded, and adopts the /rename", async () => {
+      const id = await renamedAfterImport()
+      const real = usageHistory.read.bind(usageHistory)
+      // The file's turn taken (the import ingesting it): a read that doesn't wait gets nothing, one that does gets it later.
+      const reads = vi.spyOn(usageHistory, 'read').mockImplementation(async (...a) => (a[4]?.noWait ? null : real(...a)))
+      try {
+        expect(await named(id)).toBe('Guide only')
+        expect(reads.mock.calls.map((c) => !!c[4]?.noWait)).toEqual([true, false])
+      } finally {
+        reads.mockRestore()
+      }
+    })
+
+    it("a turn that doesn't come within the bound: the history's usage, the start not held", async () => {
+      const id = await renamedAfterImport()
+      const reads = vi.spyOn(usageHistory, 'read').mockImplementation(async (...a) => (a[4]?.noWait ? null : new Promise<never>(() => undefined)))
+      const was = resume.resumeReadWaitMs
+      resume.resumeReadWaitMs = 50
+      try {
+        const usage = await run(() => resume.resumeUsage(p, id))
+        expect(usage?.outputTokens).toBe(100)
+        expect(usage?.customTitle).toBeFalsy()
+      } finally {
+        resume.resumeReadWaitMs = was
+        reads.mockRestore()
+      }
+    })
+
+    it('history up to date with the transcript: taken as it is, the worker not asked', async () => {
+      const id = await renamedAfterImport()
+      await run(() => usageHistory.ingest(p, id, { priority: 1, keepState: 'no' }))
+      const reads = vi.spyOn(usageHistory, 'read')
+      try {
+        expect(await named(id)).toBe('Guide only')
+        expect(reads).not.toHaveBeenCalled()
+      } finally {
+        reads.mockRestore()
+      }
+    })
+  })
+
   it("a cost read's freshen reads a host's records once for all its running sessions, and records each (HI-1790)", async () => {
     const ids = [newId(), newId(), newId()]
     const live = (sessions as unknown as { live: Map<string, unknown> }).live

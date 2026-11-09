@@ -2368,8 +2368,9 @@ class SessionManager {
     // it back with --name rather than its own.
     let adopted: string | null = null
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
-      // Never waiting for the usage import's turn on its transcript (#1177): then the name is adopted at a later resume.
-      const usage = await this.usage(projectPath, opts.resumeId, undefined, { noWait: true }).catch(() => null)
+      // As its transcript has it now (HI-2839): a /rename just before Stop is in no history yet, and missing it here passes
+      // the older name with --name, which Claude Code keeps as the title over the user's.
+      const usage = await this.resumeUsage(projectPath, opts.resumeId).catch(() => null)
       times.mark('usage')
       adopted = cliRename({ ...existing, usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
       if (adopted) {
@@ -8271,6 +8272,38 @@ class SessionManager {
       if (window) return { ...usage, contextWindow: window }
     }
     return usage
+  }
+
+  /** How long a resume waits for the worker's turn on its transcript (HI-2839): past it, the history's usage, or none. */
+  resumeReadWaitMs = 3000
+
+  /**
+   * A stopped session's usage as its resume adopts a CLI /rename from it (HI-2839): the history's only while it has the
+   * whole transcript (its size and time as read); behind it (the import queued as the launch ended hasn't run yet), the
+   * transcript's, read by the worker from where it stopped. When the worker has the file's turn (that import under way),
+   * waited for up to `resumeReadWaitMs` rather than never (#1177: a start never waits long on it).
+   */
+  private async resumeUsage(projectPath: string, sessionId: string): Promise<SessionUsage | null> {
+    const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+    const stored = (await usageHistory.storedUsage(projectPath).catch(() => null))?.get(sessionId)
+    const p = await this.anyTranscript(projectPath, sessionId)
+    if (!p) return this.usage(projectPath, sessionId, undefined, { noWait: true })
+    const st = await stat(p).catch(() => null)
+    if (stored && (!st || (stored.read.path?.toLowerCase() === p.toLowerCase() && stored.read.size === st.size && stored.read.mtime === st.mtimeMs))) return withScreenStopsIn(this.titled(stored.usage), rec?.screenStops)
+    const provider = await this.sessionProvider(projectPath, sessionId)
+    const o = { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }
+    let usage = await this.usageFor(projectPath, p, sessionId, provider, { ...o, noWait: true })
+    if (!usage) {
+      let timer: NodeJS.Timeout | undefined
+      const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), this.resumeReadWaitMs)))
+      try {
+        usage = await Promise.race([this.usageFor(projectPath, p, sessionId, provider, o), late])
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    if (usage) return withScreenStopsIn(usage, rec?.screenStops)
+    return stored ? withScreenStopsIn(this.titled(stored.usage), rec?.screenStops) : (rec?.keptUsage ?? null)
   }
 
   /** A usage from the history with the title its CLI gives the session now (Codex's and Copilot's own index), when it has none. */
