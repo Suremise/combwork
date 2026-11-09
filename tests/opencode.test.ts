@@ -457,3 +457,35 @@ describe.runIf(process.platform === 'win32')("an account's Set Up (HR1 on HI-275
     expect(JSON.parse(readFileSync(join(home, 'combwork-login', 'service.json'), 'utf8'))).toEqual({ disabled: true })
   })
 })
+
+describe("subagents' sessions in the Sessions tab (HI-2773)", () => {
+  it('lists a subagent\'s mirror under its parent, in the folder it ran in, and finds its transcript; never a session Combwork made', async () => {
+    const { OpencodeAdapter } = await import('../src/main/providers/opencode/adapter')
+    const { buildMirror, placeholderMirror } = await import('../src/main/providers/opencode/mirror')
+    const { mirrorDir, mirrorPath } = await import('../src/main/providers/opencode/historyCore')
+    const { mkdirSync, writeFileSync } = await import('fs')
+    const rec = (rel: string) => JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', rel), 'utf8'))
+    const list: any[] = rec('wire/session-list-subagent.json').body.data
+    const home = tempDir('cw-oc-subs-')
+    const project = tempDir('cw-oc-subs-project-')
+    const parent = { ...list.find((s) => !s.parentID), location: { directory: project } }
+    const child = { ...list.find((s) => s.parentID), location: { directory: project } }
+    mkdirSync(mirrorDir(home), { recursive: true })
+    writeFileSync(mirrorPath(home, parent.id), buildMirror({ w: 1 }, parent, []))
+    writeFileSync(mirrorPath(home, child.id), buildMirror({ w: 1 }, child, [...rec('messages/subagent-child.json').body.data].reverse()))
+    writeFileSync(mirrorPath(home, 'ses_placeholderPLACEHOLDER0'), placeholderMirror())
+    const a = new OpencodeAdapter()
+    a.allHomes = () => [home]
+    const found = await a.listSessions(project, (id) => id === parent.id)
+    expect(found.map((s) => [s.id, s.sub])).toEqual([[child.id, { parentId: parent.id, kind: 'subagent' }]])
+    expect(found[0].transcriptPath).toBe(mirrorPath(home, child.id))
+    // Another folder has none of it; one the caller has already is left out.
+    expect(await a.listSessions(tempDir('cw-oc-subs-other-'))).toEqual([])
+    expect(await a.listSessions(project, (id) => id === child.id || id === parent.id)).toEqual([])
+    expect(await a.subSessionOf(mirrorPath(home, child.id), child.id)).toEqual({ parentId: parent.id, kind: 'subagent' })
+    expect(await a.subSessionOf(mirrorPath(home, parent.id), parent.id)).toBeNull()
+    // Its transcript by id (it has no mark); the parent without its mark has none (never made by Combwork).
+    expect(await a.transcriptPath(project, child.id)).toBe(mirrorPath(home, child.id))
+    expect(await a.transcriptPath(project, parent.id)).toBeNull()
+  })
+})

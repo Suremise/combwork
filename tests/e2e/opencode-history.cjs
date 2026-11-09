@@ -3,8 +3,9 @@
 // tool call) once Combwork has read the session from the agent's server, off main's thread; its usage is the session's
 // own (the title's request included, which no message shows), its cost OpenCode's $0, said in the footer's hover to be no
 // measure of a plan's allowance; usage/limits answers no Console sign-in, so the Overview says OpenCode's plan limits
-// aren't available, with no meter; stopped, the session is exported once and its history stays, read again after a
-// restart. Dev build, throwaway profile and workspace.
+// aren't available, with no meter; a subagent's session (HI-2773) is listed under the agent's with its own conversation and
+// usage, counted once; stopped, the session is exported once and its history stays, read again after a restart, its
+// subagent's too. Dev build, throwaway profile and workspace.
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
@@ -112,11 +113,36 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
     const none = page.locator('.plan-connection-limits', { hasText: 'OpenCode reports plan limits only for an OpenCode Go or Console workspace' })
     check('the Overview says OpenCode reports limits only for OpenCode Go or Console, with no meter', !!(await lib.until(async () => (await none.count()) >= 1, HUNG_MS)) && (await none.first().locator('.meter').count()) === 0)
 
+    // --- A subagent (HI-2773, 2.2.6's `subagent` tool as recorded): its own session, listed under the agent's with its own
+    // conversation and usage, its tokens counted once (the parent's are its own steps' and its title's only).
+    ends = turnEnds().length
+    await type('subagent: say pong')
+    await lib.until(async () => turnEnds().length > ends, HUNG_MS)
+    const childId = (await lib.until(async () => lines().find((e) => e.kind === 'subagent')?.child ?? null, HUNG_MS)) ?? ''
+    const childRow = await lib.until(async () => {
+      const r = (await inv('session:list', alpha)).find((s) => s.id === childId)
+      return r?.usage?.requests ? r : null
+    }, HUNG_MS)
+    check("the subagent's session is listed under the agent's, as a subagent", !!childRow && childRow.sub?.parentId === sid && childRow.sub?.kind === 'subagent' && childRow.provider === 'opencode', JSON.stringify(childRow && { sub: childRow.sub, provider: childRow.provider }))
+    const childItems = await lib.until(async () => {
+      const t = (await inv('transcript:read', alpha, childId).catch(() => null))?.items ?? []
+      return t.some((x) => x.kind === 'assistant') ? t : null
+    }, HUNG_MS)
+    check('…with its own conversation: the prompt OpenCode gave it and its reply', !!childItems && childItems.some((x) => x.kind === 'user' && /subagent spawned by another session/.test(x.text)) && childItems.some((x) => x.kind === 'assistant' && /say pong/.test(x.text)), JSON.stringify((childItems ?? []).map((x) => x.kind)))
+    check('…and its own usage: its one request, 1196 input tokens', !!childRow && childRow.usage.requests === 1 && childRow.usage.inputTokens === 1196, JSON.stringify(childRow?.usage && { requests: childRow.usage.requests, in: childRow.usage.inputTokens }))
+    // The parent's: its title's 457 and its five steps' (200; 200, 300; 200, 300), never the subagent's 1196 as well.
+    const parentUsage = await lib.until(async () => {
+      const u = await inv('session:usage', alpha, sid)
+      return u && u.requests >= 5 ? u : null
+    }, HUNG_MS)
+    check("…counted once: the agent's session's tokens are its own, without the subagent's", !!parentUsage && parentUsage.inputTokens === 457 + 200 + 500 + 500, JSON.stringify(parentUsage && { requests: parentUsage.requests, in: parentUsage.inputTokens }))
+
     // --- Stopped: one export of the session, standalone; its history stays.
     const exports = () => lines().filter((e) => e.kind === 'launch' && /session export/.test((e.args ?? []).join(' ')))
     await inv('session:stop', alpha, agent.id)
     await lib.until(async () => !(await live()), HUNG_MS)
-    const exported = await lib.until(async () => (exports().length ? exports() : null), HUNG_MS)
+    const exportsOf = (id) => exports().filter((e) => (e.args ?? []).includes(id))
+    const exported = await lib.until(async () => (exportsOf(sid).length ? exportsOf(sid) : null), HUNG_MS)
     check('stopped, the session is exported once, standalone', !!exported && exported.length === 1 && (exported[0].args ?? []).includes('--standalone'), JSON.stringify(lines().filter((e) => e.kind === 'launch').map((e) => e.args)))
     check('…and its history stays', (await items()).filter((x) => x.kind === 'user').length >= 2)
 
@@ -130,6 +156,10 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
       return t.filter((x) => x.kind === 'user').length >= 2 ? t : null
     }, HUNG_MS)
     check('after a restart, the session’s history shows again', !!again)
+    const childAgain = await lib.until(async () => (await inv('session:list', alpha)).find((s) => s.id === childId && s.sub?.parentId === sid) ?? null, HUNG_MS)
+    check("…its subagent's still under it, its conversation read from its mirror", !!childAgain && ((await inv('transcript:read', alpha, childId).catch(() => null))?.items ?? []).some((x) => x.kind === 'assistant'))
+    // Its parent's export (long done by now) found its mirror as new as its start: no export of its own.
+    check("the subagent's session wasn't exported again after the run: read while it ran, it was as new as its start", exportsOf(childId).length === 0, JSON.stringify(exports().map((e) => e.args)))
     check('the fake logged no errors', !lines().some((e) => e.kind === 'error'), JSON.stringify(lines().filter((e) => e.kind === 'error')))
   } finally {
     await app.close().catch(() => undefined)

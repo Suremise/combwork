@@ -18,6 +18,8 @@ import type { ConversationParserLike, ImageLocation } from '../types'
 // 1. `{"type":"combwork.mirror","state":"placeholder"}`: made when Combwork first gives the path, before any read; or
 //    `{"type":"combwork.mirror","state":"complete","w":…,"epoch":…,"source":"api"|"export","at":…,"updated":…}`: a
 //    settled read's (or an export's), published whole. Only this line says a read completed; the file existing doesn't.
+//    A subagent's session's (HI-2773) also has `"parent"` (the session that started it) and `"directory"` (its folder),
+//    so the Sessions tab finds it under its parent from this line alone, and `"settled"` (whether it had ended when read).
 // 2. `{"type":"combwork.session","info":{…}}`: the session as `GET /api/session/{id}` gives it (title, tokens, cost, times).
 // 3. `{"type":"combwork.message","message":{…}}` per message, oldest first, as `GET /api/session/{id}/message` gives them.
 // 4. At most one `{"type":"combwork.status","problem":…,"detail":…,"at":…}` last: the newest read failed (the content
@@ -46,6 +48,47 @@ export interface MirrorHeader {
   at?: string
   /** The session's `time.updated` as read (ms). */
   updated?: number
+  /** A subagent's session (HI-2773): the session that started it (its info's `parentID`), and the folder it ran in. */
+  parent?: string
+  directory?: string
+  /** A subagent's: whether its info said nothing ran in it then (an unsettled one needs a final read after its run). */
+  settled?: boolean
+}
+
+/** A session id as OpenCode gives one (`ses_` and letters and digits). */
+const SESSION_ID = /^ses_[A-Za-z0-9]{1,64}$/
+
+/**
+ * The sessions a session's subagents ran in (HI-2773; 2.2.6's `subagent` tool, messages/subagent-parent.json): each tool
+ * part whose `state.metadata.sessionID` names another session, with when it last started there (its `time.ran`, else its
+ * creation's): a subagent resumed later starts there again. Read from the parts, never from the tool's name.
+ */
+export function subagentSessions(sessionId: string, messages: readonly Obj[]): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const m of messages) {
+    if (m?.type !== 'assistant' || !Array.isArray(m.content)) continue
+    for (const p of m.content) {
+      if (!isObj(p) || p.type !== 'tool' || !isObj(p.state) || !isObj(p.state.metadata)) continue
+      const id = p.state.metadata.sessionID
+      if (typeof id !== 'string' || id === sessionId || !SESSION_ID.test(id)) continue
+      const at = num(p.time?.ran) || num(p.time?.created) || num(m.time?.created)
+      out.set(id, Math.max(out.get(id) ?? 0, at))
+    }
+  }
+  return out
+}
+
+/** Whether a session's info says it has nothing running (its `time.idle` at or after its `time.busy`). */
+export const sessionSettled = (info: Obj): boolean => typeof info?.time?.idle === 'number' && (typeof info.time.busy !== 'number' || info.time.idle >= info.time.busy)
+
+/**
+ * What a published session's header says of it as a subagent's (its info's `parentID`, folder, and whether it had ended:
+ * kept in the file, so a later worker knows an unfinished mirror needs a final read), or nothing.
+ */
+export function subagentHeader(info: Obj): Pick<MirrorHeader, 'parent' | 'directory' | 'settled'> {
+  if (typeof info.parentID !== 'string' || !SESSION_ID.test(info.parentID)) return {}
+  const dir = isObj(info.location) && typeof info.location.directory === 'string' ? info.location.directory : typeof info.directory === 'string' ? info.directory : null
+  return { parent: info.parentID, ...(dir ? { directory: dir } : {}), settled: sessionSettled(info) }
 }
 
 export interface MirrorStatus {
@@ -64,8 +107,8 @@ const iso = (ms: unknown): string | null => (typeof ms === 'number' && Number.is
 export const placeholderMirror = (): string => JSON.stringify({ type: MIRROR, state: 'placeholder' }) + '\n'
 
 /** A complete mirror: its header, the session, its messages oldest first. */
-export function buildMirror(header: Omit<MirrorHeader, 'type' | 'state'>, info: Obj, messages: readonly Obj[]): string {
-  const lines = [JSON.stringify({ type: MIRROR, state: 'complete', ...header }), JSON.stringify({ type: SESSION_LINE, info })]
+export function buildMirror(header: Omit<MirrorHeader, 'type' | 'state' | 'parent' | 'directory' | 'settled'>, info: Obj, messages: readonly Obj[]): string {
+  const lines = [JSON.stringify({ type: MIRROR, state: 'complete', ...header, ...subagentHeader(info) }), JSON.stringify({ type: SESSION_LINE, info })]
   for (const m of messages) lines.push(JSON.stringify({ type: MESSAGE_LINE, message: m }))
   return lines.join('\n') + '\n'
 }

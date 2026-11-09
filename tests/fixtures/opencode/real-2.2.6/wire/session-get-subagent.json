@@ -1,0 +1,32 @@
+{
+ "status": 200,
+ "body": {
+  "data": {
+   "id": "ses_e40636cefffe4iaKCYy8miDkrx",
+   "parentID": "ses_e4063a6e4ffeyrnGITrRGOIyc0",
+   "projectID": "1ae5e58725ac5a2887f33939ab4d028a6fd843d8",
+   "agent": "general",
+   "cost": 0,
+   "tokens": {
+    "input": 1196,
+    "output": 96,
+    "reasoning": 0,
+    "cache": {
+     "read": 2762,
+     "write": 0
+    }
+   },
+   "outcome": "succeeded",
+   "time": {
+    "created": 1794216071955,
+    "updated": 1794216072994,
+    "busy": 1794216071958,
+    "idle": 1794216072996
+   },
+   "title": "Test subagent response",
+   "location": {
+    "directory": "<root>\\project"
+   }
+  }
+ }
+}
