@@ -25,7 +25,7 @@ import { jjBoundary, isRefused, type Boundary, type BoundaryOptions, type Bounda
 import { jjRunner, type JjRunner } from './jjRunner'
 import { isJjUnknown, JjReads, type JjCommit } from './jjReads'
 import { snapshotLine } from './snapshotLine'
-import { viewNow, type ViewNow, type ViewOf } from './jjView'
+import { isAbsent, viewNow, type ViewNow, type ViewOf } from './jjView'
 import { isUnknown, type Maybe } from './types'
 
 /** What a jj check run is for. */
@@ -94,7 +94,8 @@ export const jjCounts = (paths: string[]): string[] => paths.filter((p) => !inte
 
 /**
  * The stat snapshot of a revision's files under the workspace's root, and of their folders (a file made beside them
- * shows), off main's thread; each line `snapshotLine`'s. Null when the list is null.
+ * shows), off main's thread; each line `snapshotLine`'s. A path that isn't there (deleted) is a "gone" line; one that
+ * couldn't be stat'ed (access, I/O) makes the whole snapshot null, so it never equals another. Null when the list is.
  */
 export async function jjStats(root: string, files: string[] | null): Promise<string | null> {
   if (!files) return null
@@ -106,17 +107,20 @@ export async function jjStats(root: string, files: string[] | null): Promise<str
   const all = [...files, ...[...dirs].sort()]
   const out: string[] = Array.from({ length: all.length }, () => '')
   let next = 0
+  let unreadable = false
   const worker = async (): Promise<void> => {
-    while (next < all.length) {
+    while (next < all.length && !unreadable) {
       const i = next++
-      out[i] = await stat(join(root, all[i])).then(
+      const line = await stat(join(root, all[i])).then(
         (s) => snapshotLine(all[i], s),
-        () => snapshotLine(all[i], null)
+        (e: unknown) => (isAbsent(e) ? snapshotLine(all[i], null) : null)
       )
+      if (line === null) unreadable = true
+      else out[i] = line
     }
   }
   await Promise.all(Array.from({ length: Math.min(STATS_AT_ONCE, all.length) }, worker))
-  return out.join('\n')
+  return unreadable ? null : out.join('\n')
 }
 
 /** The run's start (steps 1–4). */
@@ -206,7 +210,9 @@ export function jjCredit(rec: JjCheckRecord): JjCredit {
  * or conflicted revision on either side never carries.
  */
 export async function jjSameRevision(a: { base: string; commit: JjCommit }, b: { base: string; commit: JjCommit }, sameChange: (a: { base: string; revision: string }, b: { base: string; revision: string }) => Promise<boolean>): Promise<boolean> {
-  if (a.commit.commit === b.commit.commit) return true
+  // The flags first: a reviewed commit can become one variant of a divergent change keeping its exact id (or be read now
+  // storing conflicts), and then even the same id carries nothing.
   if (a.commit.divergent || b.commit.divergent || a.commit.conflict || b.commit.conflict) return false
+  if (a.commit.commit === b.commit.commit) return true
   return sameChange({ base: a.base, revision: a.commit.commit }, { base: b.base, revision: b.commit.commit })
 }

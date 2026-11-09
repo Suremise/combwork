@@ -430,6 +430,15 @@ describe('jj check credit: the bracket with races at each barrier', () => {
     expect(await jjSameRevision({ base: commit(9), commit: c(1) }, { base: commit(9), commit: c(2, { divergent: true }) }, async () => true)).toBe(false)
     expect(await jjSameRevision({ base: commit(9), commit: c(1) }, { base: commit(9), commit: c(2) }, async () => true)).toBe(true)
   })
+
+  it('the same commit id carries nothing once either side is divergent or stores conflicts', async () => {
+    const c = (o: Partial<JjCommit> = {}): JjCommit => ({ commit: commit(1), change: change('k'), parents: [], empty: false, divergent: false, conflict: false, ...o })
+    const always = async (): Promise<boolean> => true
+    for (const flag of [{ divergent: true }, { conflict: true }]) {
+      expect(await jjSameRevision({ base: commit(9), commit: c(flag) }, { base: commit(9), commit: c() }, always)).toBe(false)
+      expect(await jjSameRevision({ base: commit(9), commit: c() }, { base: commit(9), commit: c(flag) }, always)).toBe(false)
+    }
+  })
 })
 
 describe('jj observer', () => {

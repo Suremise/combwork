@@ -2384,7 +2384,9 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
   a missing field is malformed) and, colocated, Git's state beside it (HEAD's content, the index, the workspace's and
   the store's HEAD reflogs, packed refs, every ref and ref log under `refs/heads`, at most 1,024 entries, and an
   operation under way). Its parts are read as one moment: the heads are read again after the rest, and a moved head
-  is unknown. Unreadable or malformed is null, never an empty token. An intent's fingerprint (`jjFingerprint`) is
+  is unknown. Unreadable or malformed is null, never an empty token: only "not there" (a fresh repository's missing
+  packed refs or reflogs) is an absence; any other failure to stat or list (access, I/O) is unknown, never "gone".
+  An intent's fingerprint (`jjFingerprint`) is
   exactly these parts: it never walks the working tree (rule 5); the tree's content is the boundary's.
 - **The snapshot boundary** (`platform/jjBoundary.ts`): the only place Combwork records a jj working copy, a separate
   operation its caller authorises (a check's start and end; a submission, once J6 wires it), never something an
@@ -2404,7 +2406,8 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
   2. tested: B1's @ is the revision, or an empty @ whose one parent is (jj's state after `jj commit`), else
      `notContained`, as is a divergent or conflicted revision or @. Equal change ids count for nothing;
   3. the start evidence E1 at H1: the revision's files (jj's list at H1), their and their folders' stat snapshot (off
-     main, `snapshotLine`'s), and the moment still B1's;
+     main, `snapshotLine`'s: a deleted file is a "gone" line, one it can't stat makes the snapshot unknown), and the
+     moment still B1's;
   4. t0 once the write record has settled; the command; t1 once it has settled again;
   5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
      complete, the stat snapshot again (unequal or unreadable: `changed`);
@@ -2416,7 +2419,8 @@ so credit is only ever on the exact commit id and its content (R3.1, R3.2), and 
   8. the final moment after B2, still B2's and E1's, read with nothing awaited before the decision.
   Unknown at any step fails closed.
 - **A pass carrying over** (`jjSameRevision`): the same commit id, or the same change by content (Git's own replay on
-  the Git-backed store, §16.3.2's), never equal change ids; a divergent or conflicted side never carries.
+  the Git-backed store, §16.3.2's), never equal change ids; a divergent or conflicted side never carries, the same
+  commit id included (a reviewed commit can become one variant of a divergent change keeping its exact id).
 - **Attribution** (`platform/jjAttribution.ts`): a commit is a card's only on positive provenance: its commit id, or one
   in its **complete** evolution (`jj evolog`, pinned, at most 100 entries: a 101st means capped; each line validated;
   the first the commit itself; the heads unchanged after), recorded for that card and no other. A squash's evolution

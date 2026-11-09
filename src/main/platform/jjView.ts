@@ -9,7 +9,7 @@
 // a merge operation to reconcile them. `--at-op <id>` never does. So a read first takes the heads from here, and with
 // more than one it reads nothing through jj.
 
-import { closeSync, existsSync, opendirSync, openSync, readSync, statSync } from 'original-fs'
+import { closeSync, opendirSync, openSync, readSync, statSync } from 'original-fs'
 import { isAbsolute, join, resolve } from 'path'
 import { snapshotLine } from './snapshotLine'
 
@@ -159,19 +159,39 @@ export function workspaceGitDir(root: string): string | null {
   return isAbsolute(m[1]) ? resolve(m[1]) : resolve(root, m[1])
 }
 
-/** A path's size and time as a stat line ("gone" when it isn't there). */
-function statOf(path: string): string {
+/**
+ * Whether an error says the path isn't there (absence is an answer: a file that may legitimately be missing), as against
+ * one it couldn't read (access, I/O, anything else): unknown, never taken for absence.
+ */
+export const isAbsent = (e: unknown): boolean => {
+  const code = (e as NodeJS.ErrnoException | null)?.code
+  return code === 'ENOENT' || code === 'ENOTDIR'
+}
+
+/** A path's size and time as a stat line ("gone" when it isn't there), or null when it couldn't be read. */
+function statOf(path: string): string | null {
   try {
-    const s = statSync(path)
-    return snapshotLine(path, s)
-  } catch {
-    return snapshotLine(path, null)
+    return snapshotLine(path, statSync(path))
+  } catch (e) {
+    return isAbsent(e) ? snapshotLine(path, null) : null
   }
 }
 
-/** Every entry under a refs folder with its size and time, at most REFS_MAX; null past that or unreadable. */
+/** Whether a path is there: true, false (absent), or null when that couldn't be told. */
+function presence(path: string): boolean | null {
+  try {
+    statSync(path)
+    return true
+  } catch (e) {
+    return isAbsent(e) ? false : null
+  }
+}
+
+/** Every entry under a refs folder with its size and time, at most REFS_MAX; false past that or unreadable. */
 function refsTree(dir: string, out: string[]): boolean {
-  if (!existsSync(dir)) return true
+  const there = presence(dir)
+  if (there === null) return false
+  if (!there) return true
   const walk = (d: string): boolean => {
     let h
     try {
@@ -183,7 +203,9 @@ function refsTree(dir: string, out: string[]): boolean {
       for (let e = h.readSync(); e; e = h.readSync()) {
         if (out.length >= REFS_MAX) return false
         const p = join(d, e.name)
-        out.push(statOf(p))
+        const line = statOf(p)
+        if (line === null) return false
+        out.push(line)
         if (e.isDirectory() && !walk(p)) return false
       }
       return true
@@ -209,8 +231,15 @@ function refsTree(dir: string, out: string[]): boolean {
 export function gitState(gitDir: string, store: string): string | null {
   const head = firstLine(join(gitDir, 'HEAD'))
   if (head === null) return null
-  const parts = [`HEAD:${head}`, statOf(join(gitDir, 'index')), statOf(join(gitDir, 'logs', 'HEAD')), statOf(join(store, 'logs', 'HEAD')), statOf(join(store, 'packed-refs'))]
-  for (const m of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']) parts.push(existsSync(join(gitDir, m)) ? m : '')
+  // Each may legitimately be absent (a fresh repository has no packed refs or reflogs yet); unreadable is unknown.
+  const stats = [statOf(join(gitDir, 'index')), statOf(join(gitDir, 'logs', 'HEAD')), statOf(join(store, 'logs', 'HEAD')), statOf(join(store, 'packed-refs'))]
+  if (stats.some((s) => s === null)) return null
+  const parts = [`HEAD:${head}`, ...(stats as string[])]
+  for (const m of ['MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply']) {
+    const there = presence(join(gitDir, m))
+    if (there === null) return null
+    parts.push(there ? m : '')
+  }
   const refs: string[] = []
   if (!refsTree(join(store, 'refs', 'heads'), refs) || !refsTree(join(store, 'logs', 'refs', 'heads'), refs)) return null
   return [...parts, ...refs].join('\n')

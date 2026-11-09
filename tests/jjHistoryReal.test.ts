@@ -236,6 +236,24 @@ describe.skipIf(!exe)(`jj history, attribution and evidence on the real jj (${TE
     expect(await r.reads.pinned((o) => r.reads.commitAt(o, change))).toMatchObject({ jjUnknown: 'ambiguous' })
   })
 
+  it('a reviewed commit that becomes one variant of a divergent change, keeping its exact id, carries no pass', async () => {
+    const r = await repo('divergent-same-id')
+    const op = readOpHeads(r.view.jjRepo)![0]
+    // The card's revision is a rewrite of R (R1), reviewed while it was the change's only commit.
+    jj(r.root, '--ignore-working-copy', 'describe', '-r', r.R, '-m', 'K, reviewed')
+    const R1 = r.id('description(substring:"K, reviewed")')
+    const reviewed = await commitOf(r, R1)
+    expect(reviewed.divergent).toBe(false)
+    // Another rewrite of R, made from the operation before (another agent, an external jj): R1 itself is unchanged.
+    jj(r.root, '--at-op', op, 'describe', '-r', r.R, '-m', 'K, another variant')
+    jj(r.root, 'status') // the user's own jj reconciles the two heads
+    const now = await commitOf(r, R1)
+    expect(now.commit).toBe(reviewed.commit)
+    expect(now.divergent).toBe(true)
+    expect(await jjSameRevision({ base: r.base, commit: reviewed }, { base: r.base, commit: now }, sameChange(r))).toBe(false)
+    expect(await credit(r, R1)).toMatchObject({ whyNot: 'notContained' })
+  })
+
   it("a split: the part keeping the change id has other content (no credit, no pass) and stays the card's", async () => {
     const r = await repo('split')
     writeFileSync(join(r.root, 'k2.txt'), 'more of K\n')
