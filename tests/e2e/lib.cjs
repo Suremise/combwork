@@ -1780,7 +1780,8 @@ const launchDir = (userData, runId) => path.join(userData, 'launches', runId)
  */
 function launchHook(userData, runId) {
   const text = fs.readFileSync(path.join(launchDir(userData, runId), 'settings.json'), 'utf8')
-  const url = /"(http:\/\/127\.0\.0\.1:\d+\/hook\?run=[0-9a-f]+)"/.exec(text)?.[1]
+  // The run-named URL, from its status line's command (HI-2777: its HTTP hooks post to the fixed URL, which names no run).
+  const url = /(http:\/\/127\.0\.0\.1:\d+\/hook\?run=[0-9a-f]+)/.exec(text)?.[1]
   const token = hookAuthToken(text)
   return url && token ? { url, token } : null
 }

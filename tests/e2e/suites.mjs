@@ -89,6 +89,8 @@ export const SUITES = [
   { name: 'chooseconnections' },
   { name: 'claude-real', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudehome', needs: ['claude'], claudeHome: 'own' },
+  { name: 'claudemanaged' },
+  { name: 'claudemanagedreal', needs: ['claude'], claudeHome: 'test' },
   { name: 'claudesettings', needs: ['claude'], claudeHome: 'own' },
   { name: 'claudestatusline', needs: ['claude'], claudeHome: 'own' },
   { name: 'cliownmode' },

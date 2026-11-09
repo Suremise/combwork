@@ -149,6 +149,8 @@
   "tips.cardWork.title": "Zobacz, przez co przeszła praca karty",
   "tips.chooseConnections.text": "Ustawienia projektu → Agenci → Wybierz połączenia… wybiera połączenie dla każdej roli agentów projektu (albo jedno dla wszystkich, albo dla każdego agenta), nie zmieniając nic więcej. Wczytanie szablonu daje ten sam wybór.",
   "tips.chooseConnections.title": "Wysoki wysiłek dla wszystkich wykonawców naraz",
+  "tips.claudeManagedPolicy.text": "Jeśli zasady Claude Code w Twojej organizacji dopuszczają tylko zarządzane hooki, Combwork nie wie, co robią jego agenty. Fragment dla administratora Claude Code… daje Twojemu administratorowi blok do jednorazowego wklejenia w zarządzanych ustawieniach, dzięki czemu hooki Combwork też się uruchamiają.",
+  "tips.claudeManagedPolicy.title": "Claude Code pod zasadami Twojej organizacji",
   "tips.claudeStatusLine.text": "Pasek stanu Combwork zasila stopkę agenta i niczego nie pokazuje w panelu. Wyłącz Ustawienia → Zaawansowane → Pasek stanu Combwork zamiast Twojego, by znów zobaczyć ten z Twoich ustawień Claude Code: Combwork nadal odczytuje stan.",
   "tips.claudeStatusLine.title": "Zachowaj własny pasek stanu Claude Code",
   "tips.cliOverrides.text": "Combwork trochę zmienia zachowanie każdego CLI w swoich sesjach, na przykład to, że Copilot nie aktualizuje się sam, albo tytuł terminala Codex. Każdą zmianę można wyłączyć w Ustawienia → Zaawansowane, pod jej CLI, gdzie opisano, czego Combwork bez niej już nie zrobi.",

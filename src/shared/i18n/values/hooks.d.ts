@@ -33,6 +33,18 @@ interface CombworkMessageValues {
   'hooks.receiver': { form: string | number }
   'hooks.refresh': undefined
   'hooks.response': { response: string }
+  'hooks.snippet.allowlists': { url: string | number }
+  'hooks.snippet.close': undefined
+  'hooks.snippet.copied': undefined
+  'hooks.snippet.copy': undefined
+  'hooks.snippet.guide': undefined
+  'hooks.snippet.loadWhat': undefined
+  'hooks.snippet.notListening': { port: string | number }
+  'hooks.snippet.otherPort': { build: string; port: string | number }
+  'hooks.snippet.port': { port: string | number }
+  'hooks.snippet.statusLine': undefined
+  'hooks.snippet.title': undefined
+  'hooks.snippet.what': undefined
   'hooks.source': { source: string }
   'hooks.stale': undefined
   'hooks.status': { status: string }

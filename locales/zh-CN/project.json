@@ -9,6 +9,7 @@
   "project.agents.settings": "智能体设置…",
   "project.agents.turnedOff": "{provider} 已在“设置”→“提供方”中关闭",
   "project.apply.new": "{live, select, yes {更改将应用于新会话——重启正在运行的会话即可应用。} other {更改将应用于新会话。}}",
+  "project.banner.adminSnippet": "管理员代码片段…",
   "project.banner.change": "更改",
   "project.banner.chooseInSettings": "在设置中选择",
   "project.banner.connectionSetup": "此工作区中没有已启用的 {cli} 账号，因此它的智能体无法启动。请添加一个并登录。",

@@ -599,6 +599,14 @@
     "defaultMessage": "High effort for every builder, in one go",
     "description": "A tip's title (HI-2109). Glossary: builder, effort."
   },
+  "tips.claudeManagedPolicy.text": {
+    "defaultMessage": "If your organisation's Claude Code policy allows only managed hooks, Combwork can't tell what its agents are doing. Claude Code Admin Snippet… gives your administrator a block to paste into its managed settings once, so Combwork's hooks run too.",
+    "description": "A tip. Claude Code Admin Snippet… is a command: keep it as Combwork shows it. \"Managed hooks\" are hooks an administrator sets for everyone."
+  },
+  "tips.claudeManagedPolicy.title": {
+    "defaultMessage": "Claude Code under your organisation's policy",
+    "description": "A tip's title (HI-2777): Combwork with Claude Code where an organisation manages Claude Code's settings."
+  },
   "tips.claudeStatusLine.text": {
     "defaultMessage": "Combwork's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Combwork's status line in place of yours to see the one in your Claude Code settings again: Combwork still reads the status.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

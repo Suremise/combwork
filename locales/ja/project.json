@@ -9,6 +9,7 @@
   "project.agents.settings": "エージェント設定…",
   "project.agents.turnedOff": "{provider}は「設定」→「プロバイダー」でオフになっています",
   "project.apply.new": "{live, select, yes {変更は新しいセッションから適用されます。実行中のセッションに適用するには再起動してください。} other {変更は新しいセッションから適用されます。}}",
+  "project.banner.adminSnippet": "管理者用スニペット…",
   "project.banner.change": "変更",
   "project.banner.chooseInSettings": "設定で選択",
   "project.banner.connectionSetup": "このワークスペースで有効な{cli}のアカウントがないため、エージェントを起動できません。アカウントを追加してサインインしてください。",

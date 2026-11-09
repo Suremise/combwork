@@ -149,6 +149,8 @@
   "tips.cardWork.title": "Voir le parcours du travail d’une carte",
   "tips.chooseConnections.text": "Paramètres du projet → Agents → Choisir les connexions… choisit une connexion pour chaque rôle des agents du projet (ou une pour tous, ou par agent), sans rien changer d’autre. Charger un modèle propose le même choix.",
   "tips.chooseConnections.title": "Un effort élevé pour tous les auteurs, d’un coup",
+  "tips.claudeManagedPolicy.text": "Si la stratégie Claude Code de ton organisation n’autorise que les hooks gérés, Combwork ne peut pas savoir ce que font ses agents. Extrait administrateur Claude Code… donne à ton administrateur un bloc à coller une seule fois dans ses paramètres gérés, pour que les hooks de Combwork s’exécutent aussi.",
+  "tips.claudeManagedPolicy.title": "Claude Code sous la stratégie de ton organisation",
   "tips.claudeStatusLine.text": "La ligne d’état de Combwork alimente le pied d’un agent et n’affiche rien dans le volet. Désactive Paramètres → Avancé → La ligne d’état de Combwork à la place de la tienne pour revoir celle de tes paramètres Claude Code : Combwork lit toujours l’état.",
   "tips.claudeStatusLine.title": "Garde ta propre ligne d’état Claude Code",
   "tips.cliOverrides.text": "Combwork modifie un peu le comportement de chaque CLI dans ses sessions, comme Copilot qui ne se met pas à jour lui-même ou le titre du terminal de Codex. Chaque modification peut être désactivée dans Paramètres → Avancé, sous sa CLI, qui indique ce que Combwork ne peut plus faire sans elle.",

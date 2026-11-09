@@ -13,7 +13,7 @@ const HUNG_MS = 10000
 const userData = await vi.hoisted(async () => (await import('./tempDir')).tempDir('cw-hook-tokens-'))
 vi.mock('electron', () => ({ app: { getPath: () => userData, getVersion: () => '0.0.0-test', isPackaged: false } }))
 
-const { clearHookAuth, endHookToken, hookAuthFile, hookTokenMatches, newHookToken, refusedHookNote } = await import('../src/main/hookTokens')
+const { clearHookAuth, endHookToken, hookAuthFile, hookTokenMatches, newHookToken, refusedHookNote, runForHookToken } = await import('../src/main/hookTokens')
 
 const base = tempDir('cw-hook-launch-')
 afterAll(() => {
@@ -53,6 +53,25 @@ describe('hook tokens per launch (#345)', () => {
     await vi.waitFor(() => expect(existsSync(a.file)).toBe(false), { timeout: HUNG_MS })
     expect(hookTokenMatches('runb', `Bearer ${b.token}`)).toBe(true)
     endHookToken('runb')
+  })
+
+  it("tells the run from its token alone at the fixed hook URL (HI-2777): only a running launch's, never another kind of token", async () => {
+    const a = await newHookToken('runfixeda')
+    const b = await newHookToken('runfixedb')
+    expect(runForHookToken(`Bearer ${a.token}`)).toBe('runfixeda')
+    expect(runForHookToken(`Bearer ${b.token}`)).toBe('runfixedb')
+    // No header, an empty bearer, a token this Combwork didn't issue (an Agent API or viewer token, another build's).
+    expect(runForHookToken(undefined)).toBeNull()
+    expect(runForHookToken('Bearer ')).toBeNull()
+    expect(runForHookToken('Bearer 0123456789abcdef0123456789abcdef0123456789abcdef')).toBeNull()
+    // Ended: none.
+    endHookToken('runfixeda')
+    expect(runForHookToken(`Bearer ${a.token}`)).toBeNull()
+    // A launch given a new token: the old one is no longer its.
+    const b2 = await newHookToken('runfixedb')
+    expect(runForHookToken(`Bearer ${b.token}`)).toBeNull()
+    expect(runForHookToken(`Bearer ${b2.token}`)).toBe('runfixedb')
+    endHookToken('runfixedb')
   })
 
   it("writes the header curl reads to a file in Combwork's user data, and clears what an earlier run left", async () => {
@@ -112,7 +131,10 @@ describe('hook tokens per launch (#345)', () => {
         expect(settings.env).toEqual({ MY_API_KEY: SECRETS[2] })
         // Its hook commands read the header from the auth file.
         expect(settings.statusLine.command).toContain(`-H "@${slashed(auth.file)}"`)
-        expect(settings.hooks.SessionStart[0].hooks[0].command).toContain(`-H "@${slashed(auth.file)}"`)
+        // SessionStart's reads it too, named by the launch's CW_HOOK_AUTH_FILE (HI-2777: the admin snippet's command), its
+        // text holding no path and no token.
+        const start = settings.hooks.SessionStart[0].hooks[0].command as string
+        expect(Buffer.from(start.split(' ').pop()!, 'base64').toString('utf16le')).toContain('$a=$env:CW_HOOK_AUTH_FILE')
       } else {
         expect(args).toContain(`@${slashed(auth.file)}`)
       }

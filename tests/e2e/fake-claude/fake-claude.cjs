@@ -395,6 +395,23 @@ function recordSizes(dir, id) {
 recordSizes(home, sessionId)
 const settings = opts['--settings'] ? JSON.parse(fs.readFileSync(opts['--settings'], 'utf8')) : {}
 const hookUrl = settings.hooks?.Stop?.[0]?.hooks?.[0]?.url
+// Its status line posts where Combwork's statusLine command does (its first quoted URL: the launch's, with &statusline).
+const statusUrl = /"(http[^"]+)"/.exec(settings.statusLine?.command ?? '')?.[1] ?? null
+// Managed settings (HI-2777): managed-settings.json in fake-managed in its home (Claude Code's own is in Program Files,
+// which tests never touch; the suite gives Combwork the same folder as CW_TEST_CLAUDE_MANAGED_DIR). With one, hooks run as Claude Code runs them: each event's handlers from the
+// managed settings and (unless allowManagedHooksOnly) the --settings, a handler defined in both once, HTTP ones posted
+// with their allowedEnvVars headers, command ones (and the status line) run with the hook's JSON on stdin; the status
+// line the managed one when it sets one (or allows only managed hooks), else the --settings one.
+const managed = (() => {
+  const dir = home ? path.join(home, 'fake-managed') : null
+  if (!dir) return null
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, 'managed-settings.json'), 'utf8'))
+  } catch {
+    return null
+  }
+})()
+const managedOnly = managed?.allowManagedHooksOnly === true
 // HTTP hooks send the launch's token from the environment; command hooks (SessionStart) and the status line run
 // Combwork's curl command, which reads the header from the launch's auth file (#345).
 const token = process.env.CW_HOOK_TOKEN || ''
@@ -496,7 +513,78 @@ const hookFailed = (event, entry) => {
  */
 const hooksOff = () => fs.existsSync(path.join(home, `fake-nohooks-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
 
+/**
+ * An event's handlers under managed settings: managed first, then the --settings' unless only managed run; each once, as
+ * Claude Code 2.1.319 matches them (HI-2777's claudemanagedreal): an HTTP handler by its URL (a different timeout is the
+ * same handler), a command one by its command.
+ */
+function handlersFor(event) {
+  const groups = [...(managed?.hooks?.[event] ?? []), ...(managedOnly ? [] : (settings.hooks?.[event] ?? []))]
+  const seen = new Set()
+  const handlers = []
+  for (const g of groups) {
+    for (const h of g?.hooks ?? []) {
+      const k = h.type === 'http' ? `http ${h.url}` : `${h.type} ${h.command ?? JSON.stringify(h)}`
+      if (!seen.has(k)) {
+        seen.add(k)
+        handlers.push(h)
+      }
+    }
+  }
+  return handlers
+}
+
+/** Runs a command handler as Claude Code does: through a shell, the JSON on stdin, its stdout read (as JSON where it is). */
+function runCommand(command, input, seconds) {
+  return new Promise((resolve) => {
+    const child = spawn(command, { shell: true, windowsHide: true, env: process.env })
+    let printed = ''
+    child.stdout.on('data', (c) => (printed += c))
+    child.stderr.resume()
+    const t = setTimeout(() => child.kill(), (seconds || 10) * 1000)
+    child.on('close', (code) => {
+      clearTimeout(t)
+      resolve({ code, out: printed })
+    })
+    child.on('error', () => resolve({ code: -1, out: '' }))
+    child.stdin.end(input)
+  })
+}
+
+/** A handler's headers with $VAR / ${VAR} from the environment, only for its allowedEnvVars (others empty). */
+const headersOf = (h) => Object.fromEntries(Object.entries(h.headers ?? {}).map(([k, v]) => [k, String(v).replace(/\$\{?(\w+)\}?/g, (_, n) => ((h.allowedEnvVars ?? []).includes(n) ? (process.env[n] ?? '') : ''))]))
+
+async function runHandler(event, h, body) {
+  try {
+    if (h.type === 'http') {
+      const res = await fetch(h.url, { method: 'POST', headers: { ...headersOf(h), 'Content-Type': 'application/json' }, body })
+      if (!res.ok) hookFailed(event, { status: res.status, url: h.url })
+      return await res.json().catch(() => null)
+    }
+    if (h.type === 'command') {
+      const r = await runCommand(h.command, body, h.timeout)
+      if (r.code !== 0) hookFailed(event, { exit: r.code })
+      try {
+        return r.out.trim() ? JSON.parse(r.out) : null
+      } catch {
+        return null
+      }
+    }
+  } catch (e) {
+    hookFailed(event, { error: String(e?.cause?.code ?? e?.cause?.message ?? e?.message ?? e) })
+  }
+  return null
+}
+
+/** Each handler run at once, as Claude Code runs them; a deny wins, then the first reply with something in it. */
+async function managedHook(event, body) {
+  const replies = (await Promise.all(handlersFor(event).map((h) => runHandler(event, h, body)))).filter((r) => r && typeof r === 'object')
+  if (home) fs.appendFileSync(path.join(home, 'fake-managed-hooks.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent'), event, handlers: handlersFor(event).length, replies: replies.length }) + '\n')
+  return replies.find((r) => r.hookSpecificOutput?.permissionDecision === 'deny') ?? replies.find((r) => Object.keys(r).length) ?? null
+}
+
 async function hook(event, extra = {}) {
+  if (managed && !hooksOff()) return managedHook(event, JSON.stringify({ hook_event_name: event, session_id: sessionId, transcript_path: transcript, cwd, permission_mode: runMode(), ...(promptId && event !== 'SessionStart' ? { prompt_id: promptId } : {}), ...extra }))
   if (!hookUrl || hooksOff()) return null
   try {
     const res = await fetch(hookUrl, {
@@ -767,8 +855,14 @@ async function runPrompt(text, enter = null) {
 
 /** Posts a status line, as Claude Code's statusLine command does (Combwork's curl command, with the launch's auth file). */
 async function statusLine(body) {
-  if (!hookUrl || hooksOff()) return
-  await fetch(`${hookUrl}&statusline`, {
+  if (hooksOff()) return
+  const managedLine = managed && (managedOnly || managed.statusLine) ? managed.statusLine : null
+  if (managed && (managedOnly || managed.statusLine)) {
+    if (managedLine?.type === 'command') await runCommand(managedLine.command, JSON.stringify({ session_id: sessionId, ...body }), 10)
+    return
+  }
+  if (!statusUrl) return
+  await fetch(statusUrl, {
     method: 'POST',
     headers: { Authorization: commandAuth(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, ...body })

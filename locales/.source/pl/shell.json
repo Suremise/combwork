@@ -67,6 +67,7 @@
   "shell.command.help.restoreBoard09": "Restore the 0.9 Board Backup…",
   "shell.command.help.shortcuts": "Keyboard Shortcuts",
   "shell.command.help.tips": "Tips…",
+  "shell.command.hooks.adminSnippet": "Claude Code Admin Snippet…",
   "shell.command.layout": "Layout: {layout}",
   "shell.command.mcp.import": "Copy Project MCP Servers to Workspace",
   "shell.command.notes.open": "Open Shared Note",

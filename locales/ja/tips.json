@@ -149,6 +149,8 @@
   "tips.cardWork.title": "カードの作業の経過を確認する",
   "tips.chooseConnections.text": "「プロジェクト設定」→「エージェント」→「接続を選択…」で、プロジェクトのエージェントの役割ごと（またはすべて同じ、エージェントごと）に接続を選べます。ほかは何も変わりません。テンプレートを読み込むときも同じ選択ができます。",
   "tips.chooseConnections.title": "すべてのビルダーを一度に高エフォートに",
+  "tips.claudeManagedPolicy.text": "組織のClaude Codeポリシーが管理されたフックのみを許可している場合、Combworkはエージェントが何をしているかを把握できません。「Claude Code 管理者用スニペット…」を使うと、管理者が組織の管理された設定に一度貼り付けるブロックが得られ、Combworkのフックも実行されるようになります。",
+  "tips.claudeManagedPolicy.title": "組織のポリシー下でのClaude Code",
   "tips.claudeStatusLine.text": "Combworkのステータスラインはエージェントのフッターに情報を送り、ペインには何も表示しません。「設定」→「詳細」→「自分のステータスラインの代わりにCombworkのものを使う」をオフにすると、Claude Codeの設定にあるステータスラインが再び表示されます。Combworkは引き続きステータスを読み取ります。",
   "tips.claudeStatusLine.title": "Claude Codeの自分のステータスラインを残す",
   "tips.cliOverrides.text": "Combworkは、セッション内での各CLIの動作を少しだけ変えています。たとえば、Copilotが自動で更新しないことや、Codexのターミナルのタイトルです。それぞれの変更は「設定」→「詳細」の各CLIの下でオフにでき、オフにするとCombworkにできなくなることもそこで説明されています。",

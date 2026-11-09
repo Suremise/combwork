@@ -149,6 +149,8 @@
   "tips.cardWork.title": "See what a card’s work went through",
   "tips.chooseConnections.text": "Project Settings → Agents → Choose Connections… picks a connection for each role of the project's agents (or one for all, or per agent), changing nothing else. Loading a template offers the same choice.",
   "tips.chooseConnections.title": "High effort for every builder, in one go",
+  "tips.claudeManagedPolicy.text": "If your organisation's Claude Code policy allows only managed hooks, Combwork can't tell what its agents are doing. Claude Code Admin Snippet… gives your administrator a block to paste into its managed settings once, so Combwork's hooks run too.",
+  "tips.claudeManagedPolicy.title": "Claude Code under your organisation's policy",
   "tips.claudeStatusLine.text": "Combwork's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Combwork's status line in place of yours to see the one in your Claude Code settings again: Combwork still reads the status.",
   "tips.claudeStatusLine.title": "Keep your own Claude Code status line",
   "tips.cliOverrides.text": "Combwork changes a little of how each CLI behaves in its sessions, such as Copilot not updating itself or Codex's terminal title. Each change can be turned off in Settings → Advanced, under its CLI, which says what Combwork can no longer do without it.",

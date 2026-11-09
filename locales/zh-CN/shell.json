@@ -67,6 +67,7 @@
   "shell.command.help.restoreBoard09": "恢复 0.9 看板备份…",
   "shell.command.help.shortcuts": "键盘快捷键",
   "shell.command.help.tips": "提示…",
+  "shell.command.hooks.adminSnippet": "Claude Code 管理员代码片段…",
   "shell.command.layout": "布局：{layout}",
   "shell.command.mcp.import": "将项目的 MCP 服务器复制到工作区",
   "shell.command.notes.open": "打开共享笔记",

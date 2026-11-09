@@ -425,6 +425,12 @@ const COMMAND_DEFS: CommandDef[] = [
     }
   },
   {
+    id: 'hooks.adminSnippet',
+    name: msg({ id: 'shell.command.hooks.adminSnippet', defaultMessage: 'Claude Code Admin Snippet…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the admin snippet, a block of Claude Code settings an organisation's administrator pastes into its managed settings so Combwork's hooks run where policy allows only managed hooks (HI-2777). The … says it opens a dialog first: keep it." }),
+    category: 'session',
+    run: () => set({ adminSnippetOpen: true })
+  },
+  {
     id: 'agent.menu',
     name: msg({ id: 'shell.command.agent.menu', defaultMessage: 'Agent Menu…', description: "A command (the menus, the command palette, Settings → Keyboard Shortcuts), in the Session category: opens the focused agent's ⋯ menu on its pane (everything its pane header doesn't show). The … says it opens a menu first: keep it." }),
     category: 'session',

@@ -149,6 +149,8 @@
   "tips.cardWork.title": "Sieh, was die Arbeit einer Karte durchlaufen hat",
   "tips.chooseConnections.text": "Projekteinstellungen → Agenten → Verbindungen wählen… wählt eine Verbindung für jede Rolle der Agenten des Projekts (oder eine für alle, oder pro Agent) und ändert sonst nichts. Beim Laden einer Vorlage gibt es dieselbe Auswahl.",
   "tips.chooseConnections.title": "Hoher Aufwand für alle Bearbeiter, auf einmal",
+  "tips.claudeManagedPolicy.text": "Wenn die Claude-Code-Richtlinie deiner Organisation nur verwaltete Hooks zulässt, kann Combwork nicht erkennen, was seine Agenten tun. „Admin-Snippet für Claude Code…“ gibt deinem Administrator einen Block, den er einmal in die verwalteten Einstellungen einfügt, damit auch die Hooks von Combwork laufen.",
+  "tips.claudeManagedPolicy.title": "Claude Code unter der Richtlinie deiner Organisation",
   "tips.claudeStatusLine.text": "Combworks Statuszeile versorgt die Fußzeile eines Agenten und zeigt im Bereich nichts. Schalte Einstellungen → Erweitert → Combworks Statuszeile statt deiner aus, um wieder die aus deinen Claude-Code-Einstellungen zu sehen: Combwork liest den Status weiterhin.",
   "tips.claudeStatusLine.title": "Behalte deine eigene Claude-Code-Statuszeile",
   "tips.cliOverrides.text": "Combwork ändert in seinen Sitzungen ein wenig, wie sich jede CLI verhält, etwa dass Copilot sich nicht selbst aktualisiert, oder den Terminaltitel von Codex. Jede Änderung lässt sich unter Einstellungen → Erweitert bei ihrer CLI ausschalten; dort steht, was Combwork ohne sie nicht mehr kann.",

@@ -4475,6 +4475,14 @@ p.hint {
   user-select: text;
 }
 /* An agent's Hooks dialog (HI-982): its two tables in the dialog's own scroll, a long command cut to two lines. */
+/* Claude Code's admin snippet (HI-2777): the block an administrator copies. */
+.admin-snippet {
+  width: 100%;
+  resize: vertical;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
 .hooks-head {
   align-items: flex-start;
   gap: 8px;

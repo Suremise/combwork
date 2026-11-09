@@ -80,6 +80,12 @@ export interface ModelGroup {
 }
 
 export interface ProviderCapabilities {
+  /**
+   * An organisation can govern the CLI with remote settings Combwork can't read (HI-2777: Claude Code's server-managed
+   * settings), which may allow only their own hooks: the hooks warning says so when nothing local explains them, and
+   * offers the admin snippet.
+   */
+  remoteHookPolicy?: boolean
   /** Combwork chooses the session id at launch (Claude Code); otherwise the provider reports it once started. */
   fixedSessionId: boolean
   /** How a running session changes permission mode: cycling a key (Claude's Shift+Tab), a menu, or not at all. */

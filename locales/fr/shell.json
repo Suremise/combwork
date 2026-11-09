@@ -67,6 +67,7 @@
   "shell.command.help.restoreBoard09": "Restaurer la sauvegarde du tableau 0.9…",
   "shell.command.help.shortcuts": "Raccourcis clavier",
   "shell.command.help.tips": "Astuces…",
+  "shell.command.hooks.adminSnippet": "Extrait administrateur Claude Code…",
   "shell.command.layout": "Disposition : {layout}",
   "shell.command.mcp.import": "Copier les serveurs MCP du projet dans l’espace de travail",
   "shell.command.notes.open": "Ouvrir une note partagée",

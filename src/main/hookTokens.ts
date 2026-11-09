@@ -1,8 +1,9 @@
-import { randomBytes, timingSafeEqual } from 'crypto'
+import { createHash, randomBytes, timingSafeEqual } from 'crypto'
 import { app } from 'electron'
 import { mkdir, rm, writeFile } from 'original-fs/promises'
 import { join } from 'path'
 import { recordTestToken } from './testQuiet'
+import { endTwins } from './hookTwins'
 
 /**
  * Each launch's own hook token and private folder (#345). The hook server takes a hook call only with the token of the
@@ -17,6 +18,12 @@ import { recordTestToken } from './testQuiet'
  */
 
 const tokens = new Map<string, string>()
+/**
+ * Each live token's run, by the token's SHA-256 (HI-2777): the fixed hook URL names no run, so its token tells it. A
+ * lookup by hash, then the token compared in constant time, never the token itself as a key.
+ */
+const runsByToken = new Map<string, string>()
+const tokenKey = (token: string): string => createHash('sha256').update(token).digest('hex')
 /** Every run id this Combwork has made a token for (#711): only these are ever named in the log, never what a caller sent. */
 const issued = new Set<string>()
 
@@ -41,7 +48,10 @@ export async function newHookToken(runId: string): Promise<{ token: string; file
   recordTestToken('hook', token)
   const dir = launchPrivateDir(runId)
   const file = hookAuthFile(runId)
+  const before = tokens.get(runId)
+  if (before) runsByToken.delete(tokenKey(before))
   tokens.set(runId, token)
+  runsByToken.set(tokenKey(token), runId)
   issued.add(runId)
   // A bounded record: the oldest go first (a run that old has long ended).
   if (issued.size > 5000) issued.delete(issued.values().next().value!)
@@ -57,6 +67,18 @@ export function hookTokenMatches(runId: string | null, header: string | undefine
   const got = Buffer.from((header ?? '').replace(/^Bearer\s+/i, ''))
   const want = Buffer.from(token)
   return got.length === want.length && timingSafeEqual(got, want)
+}
+
+/**
+ * The running launch whose token an Authorization header carries (HI-2777: the fixed hook URL, which names no run), or
+ * null: no header, a token this Combwork didn't issue, or one whose launch has ended. Only hook tokens: an Agent API or
+ * viewer token is never one.
+ */
+export function runForHookToken(header: string | undefined): string | null {
+  const got = (header ?? '').replace(/^Bearer\s+/i, '').trim()
+  if (!got) return null
+  const run = runsByToken.get(tokenKey(got)) ?? null
+  return run && hookTokenMatches(run, `Bearer ${got}`) ? run : null // agent-protocol: an Authorization header's scheme, compared
 }
 
 /** Run ids whose refused hook calls the log has told of (refusedHookNote): once each, a bounded few. */
@@ -86,7 +108,11 @@ export const hooksRefused = (runId: string): boolean => tokens.has(runId) && ref
 
 /** The launch `runId` ended: its token stops working and its private folder goes. */
 export function endHookToken(runId: string): void {
+  const token = tokens.get(runId)
+  if (token) runsByToken.delete(tokenKey(token))
   tokens.delete(runId)
+  // Its duplicate deliveries' records go, and any still waiting on one goes on (HI-2777).
+  endTwins(runId)
   void rm(launchPrivateDir(runId), { recursive: true, force: true }).catch(() => undefined)
 }
 

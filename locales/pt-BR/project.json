@@ -9,6 +9,7 @@
   "project.agents.settings": "Configurações do agente…",
   "project.agents.turnedOff": "{provider} está desativado em Configurações → Provedores",
   "project.apply.new": "{live, select, yes {As alterações valem para novas sessões — reinicie a sessão em execução para aplicá-las.} other {As alterações valem para novas sessões.}}",
+  "project.banner.adminSnippet": "Trecho para administrador…",
   "project.banner.change": "Alterar",
   "project.banner.chooseInSettings": "Escolher em Configurações",
   "project.banner.connectionSetup": "Nenhuma conta do {cli} está ativada neste espaço de trabalho, então os agentes deste projeto não podem ser iniciados. Adicione uma e faça login nela.",
