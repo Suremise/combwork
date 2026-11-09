@@ -64,6 +64,16 @@ export const isSessionId = (id: string): boolean => /^ses_?[A-Za-z0-9]{8,64}$/.t
 /** An agent's extra argument Combwork sets itself, if any. */
 export const protectedArg = (args: readonly string[]): string | null => args.flatMap((a) => a.split(/\s+/)).find((a) => PROTECTED_ARGS.test(a)) ?? null
 
+/**
+ * The folders outside its own an OpenCode agent may still reach with askOutsideFolder on (HI-2775): a reviewer's review
+ * copies (extraDirs), the skills folder of its private config (a skill's reference files are read from there), and its
+ * temp folder (HI-2496) when it has one. Not the rest of its private launch folder: that holds the hook token and the
+ * config with its MCP servers' tokens, which OpenCode reads itself. OpenCode has no launch plugin folder.
+ */
+export function outsideFolders(ctx: Pick<LaunchContext, 'privateDir' | 'extraDirs' | 'tempDir'>): string[] {
+  return [...(ctx.extraDirs ?? []), opencodeSkillsDir(join(ctx.privateDir, 'opencode-config')), ...(ctx.tempDir ? [ctx.tempDir] : [])]
+}
+
 /** What prepareLaunch decided, for buildCommand (which can't wait): by run id, taken once. */
 interface Prepared {
   home: string
@@ -266,7 +276,8 @@ export class OpencodeAdapter implements ProviderAdapter {
       strip,
       noUpdate,
       ownProvider,
-      projectDecidesMcp: projectDecidesMcp({ asFromTerminal: ctx.asFromTerminal === true, servers: Object.keys(ctx.mcpServers).length, keepOut })
+      projectDecidesMcp: projectDecidesMcp({ asFromTerminal: ctx.asFromTerminal === true, servers: Object.keys(ctx.mcpServers).length, keepOut }),
+      outsideAllowed: launchOverrides(ctx.overrides, OPENCODE, 'askOutsideFolder') ? outsideFolders(ctx) : null
     })
     await writeConfigDir(configDir, withTestProvider(cfg, testProvider(), true), launchGuidance(ctx))
     // Combwork's skills in the config folder's own skills folder, the one 2.2.6 reads with the switches on (R0b, HI-2761).
@@ -313,6 +324,8 @@ export class OpencodeAdapter implements ProviderAdapter {
       dirs: [ctx.cwd, ctx.projectPath],
       model: p.model,
       variant: p.variant,
+      // Combwork's folder rule on the session's agent before the TUI starts (HI-2775: 2.2.6 loads it a moment late).
+      rules: launchOverrides(ctx.overrides, OPENCODE, 'askOutsideFolder') ? { pattern: advanced.pattern('opencode.rules.loaded').source, agent: opencodeAgentOf(mode) ?? 'build' } : null,
       privateDir: ctx.privateDir,
       owner: p.owner,
       marks: p.marks,

@@ -99,14 +99,14 @@ interface Run {
 }
 
 /** A launch's folders and environment, with the stand-in (or the fake) as its opencode. */
-function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; sessionId?: string; owner?: string; delay?: number; sessions?: string[]; home?: string; project?: string; binDir?: string; tuiArgs?: string[]; model?: string | null; variant?: string | null } = {}): Run {
+function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; sessionId?: string; owner?: string; delay?: number; sessions?: string[]; home?: string; project?: string; binDir?: string; tuiArgs?: string[]; model?: string | null; variant?: string | null; rules?: { pattern: string; agent: string } | null; permissions?: object[]; readyMs?: number } = {}): Run {
   const dir = tempDir('cw-oclauncher-')
   const home = o.home ?? join(dir, 'acct')
   const project = o.project ?? join(dir, 'project')
   const priv = join(dir, 'private')
   for (const d of [home, project, priv, join(dir, 'cfg')]) mkdirSync(d, { recursive: true })
   writeFileSync(join(dir, 'cfg', 'service.json'), '{"disabled":true}')
-  writeFileSync(join(dir, 'cfg', 'opencode.json'), JSON.stringify({ update: 'disable', policies: [{ action: 'mcp.use', resource: '*', effect: 'deny' }] }))
+  writeFileSync(join(dir, 'cfg', 'opencode.json'), JSON.stringify({ update: 'disable', policies: [{ action: 'mcp.use', resource: '*', effect: 'deny' }], ...(o.permissions ? { permissions: o.permissions } : {}) }))
   // The stand-in's .cmd (not a bare Node launcher: it names node by its path, so it goes through cmd.exe), in a folder
   // of the test's choosing (one with a space and an ampersand, say).
   const bin = o.binDir ? join(dir, o.binDir) : dir
@@ -128,7 +128,7 @@ function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; session
     CW_STANDIN_DELAY: String(o.delay ?? 0),
     CW_STANDIN_DIR: project,
     CW_STANDIN_SESSIONS: (o.sessions ?? []).join(','),
-    ...launcherEnv({ executable: o.exe === 'fake' ? FAKE : join(bin, 'opencode.cmd'), cwd: project, sessionId, intent: o.intent ?? 'new', tuiArgs: o.tuiArgs ?? [], dirs: [project], privateDir: priv, owner: o.owner ?? '', marks: join(home, 'combwork-sessions'), readyMs: 30000, model: o.model, variant: o.variant })
+    ...launcherEnv({ executable: o.exe === 'fake' ? FAKE : join(bin, 'opencode.cmd'), cwd: project, sessionId, intent: o.intent ?? 'new', tuiArgs: o.tuiArgs ?? [], dirs: [project], privateDir: priv, owner: o.owner ?? '', marks: join(home, 'combwork-sessions'), readyMs: o.readyMs ?? 30000, model: o.model, variant: o.variant, rules: o.rules })
   })
   return { dir, home, project, priv, rec, env }
 }
@@ -387,5 +387,88 @@ describe.runIf(windows)("the session's model and effort, set at each start and r
     expect(await l.exit).toBe(LAUNCHER_EXIT.modelSet)
     expect(l.output()).toMatch(/OpenCode created the session without the connection's model and effort \(cwtest\/qwen3:8b, low\)/)
     expect(infoOf(r)).toBeNull()
+  }, 60000)
+})
+
+describe.runIf(windows)("Combwork's folder rule on the session's agent before the TUI (HI-2775), with the fake opencode 2.2.6", async () => {
+  const { advancedDef } = await import('../src/shared/advanced')
+  const rules = { pattern: String(advancedDef('opencode.rules.loaded')!.default), agent: 'build' }
+  const ask = [{ action: 'external_directory', resource: '*', effect: 'ask' }]
+  const fakeLog = (r: Run): { kind: string; live?: boolean; args?: unknown }[] => (existsSync(r.env.FAKE_OPENCODE_LOG) ? readFileSync(r.env.FAKE_OPENCODE_LOG, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [])
+  const isTui = (e: { kind: string; args?: unknown }) => e.kind === 'launch' && JSON.stringify(e.args ?? []).includes('--session')
+
+  it("waits until the agent shows the rule (2.2.6 loads it a moment after the folder's first session), then starts the TUI", async () => {
+    const r = setUp({ exe: 'fake', rules, permissions: ask })
+    r.env.FAKE_OPENCODE_RULES_LOAD_MS = '1500'
+    const l = launch(r)
+    await until(() => fakeLog(r).some(isTui), 'the TUI')
+    const log = fakeLog(r)
+    const reads = log.filter((e) => e.kind === 'agent-read')
+    // Read while the rule wasn't on the agent yet, then once it was; the TUI only after that.
+    expect(reads.some((e) => e.live === false)).toBe(true)
+    const firstLive = log.findIndex((e) => e.kind === 'agent-read' && e.live === true)
+    expect(firstLive).toBeGreaterThan(-1)
+    expect(log.findIndex(isTui)).toBeGreaterThan(firstLive)
+    expect(log.slice(firstLive + 1).some((e) => e.kind === 'agent-read')).toBe(false)
+    const info = infoOf(r)
+    l.child.kill()
+    await l.exit
+    if (info) await until(() => !alive(info.serverPid), 'the server to end')
+  }, 60000)
+
+  it("never shown, refused or unreadable within the server's wait: the launch fails before the TUI, saying what turns the rule off, and its server ends", async () => {
+    for (const [knob, value] of [['FAKE_OPENCODE_RULES_NEVER', '1'], ['FAKE_OPENCODE_AGENT_READ', 'refuse'], ['FAKE_OPENCODE_AGENT_READ', 'garbage']]) {
+      const r = setUp({ exe: 'fake', rules, permissions: ask, readyMs: 2000 })
+      r.env[knob] = value
+      const l = launch(r)
+      expect(await l.exit, value).toBe(LAUNCHER_EXIT.rules)
+      expect(l.output(), value).toMatch(/didn't load Combwork's rule to ask before folders outside the agent's own within 2 s .*Ask before reaching outside the agent's folder turns that rule off/)
+      expect(infoOf(r), value).toBeNull()
+      const log = fakeLog(r) as { kind: string; args?: unknown; pid?: number }[]
+      expect(log.some(isTui), value).toBe(false)
+      expect(log.some((e) => e.kind === 'agent-read'), value).toBe(true)
+      const serve = log.find((e) => e.kind === 'launch' && JSON.stringify(e.args ?? []).includes('"serve"'))!.pid!
+      await until(() => !alive(serve), `the server to end (${value})`)
+    }
+  }, 120000)
+
+  it("a resume in Plan, the project's config let in with a later allow for every folder: waits on the plan agent until Combwork's rule shows (the project's after it), then starts", async () => {
+    const first = setUp({ exe: 'fake', rules, permissions: ask })
+    const a = launch(first)
+    const id = (await until(() => infoOf(first), 'the server record')).sessionId
+    const firstInfo = infoOf(first)!
+    a.child.kill()
+    await a.exit
+    await until(() => !alive(firstInfo.serverPid), 'the first server to end')
+    const r = setUp({ exe: 'fake', intent: 'resume', sessionId: id, home: first.home, project: first.project, rules: { ...rules, agent: 'plan' }, permissions: ask })
+    r.env.OPENCODE_DISABLE_PROJECT_CONFIG = ''
+    r.env.FAKE_OPENCODE_RULES_LOAD_MS = '1000'
+    writeFileSync(join(r.project, 'opencode.json'), JSON.stringify({ permissions: [{ action: 'external_directory', resource: '*', effect: 'allow' }] }))
+    const l = launch(r)
+    await until(() => fakeLog(r).some(isTui), 'the TUI')
+    const log = fakeLog(r) as { kind: string; agent?: string; live?: boolean; args?: unknown }[]
+    const reads = log.filter((e) => e.kind === 'agent-read')
+    expect(reads.every((e) => e.agent === 'plan')).toBe(true)
+    expect(reads.some((e) => e.live === false)).toBe(true)
+    expect(log.findIndex(isTui)).toBeGreaterThan(log.findIndex((e) => e.kind === 'agent-read' && e.live === true))
+    // The agent as the launcher saw it: Combwork's ask, then the project's allow after it (which wins in 2.2.6).
+    const info = await until(() => infoOf(r), 'the server record')
+    const agent = (await (await fetch(`${info.url}/api/agent/plan`, { headers: { authorization: 'Basic ' + Buffer.from(`opencode:${r.env.OPENCODE_PASSWORD}`).toString('base64'), 'x-opencode-directory': encodeURIComponent(r.project) } })).json()) as { data: { permissions: { action: string; resource: string; effect: string }[] } }
+    expect(agent.data.permissions.filter((p) => p.action === 'external_directory').map((p) => p.effect)).toEqual(['ask', 'allow'])
+    l.child.kill()
+    await l.exit
+    await until(() => !alive(info.serverPid), 'the server to end')
+  }, 120000)
+
+  it('with no rule asked for (the switch off, the terminal preset): the agent is never read and the TUI starts', async () => {
+    const off = setUp({ exe: 'fake', permissions: ask })
+    off.env.FAKE_OPENCODE_RULES_NEVER = '1'
+    const o = launch(off)
+    await until(() => fakeLog(off).some(isTui), 'the TUI without the wait')
+    expect(fakeLog(off).some((e) => e.kind === 'agent-read')).toBe(false)
+    const info = infoOf(off)
+    o.child.kill()
+    await o.exit
+    if (info) await until(() => !alive(info.serverPid), 'the server to end')
   }, 60000)
 })

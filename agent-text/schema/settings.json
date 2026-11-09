@@ -1723,6 +1723,12 @@
   "settings.advanced.opencode.models.variants.title": {
     "placeholders": {}
   },
+  "settings.advanced.opencode.override.askOutsideFolder.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.askOutsideFolder.title": {
+    "placeholders": {}
+  },
   "settings.advanced.opencode.override.keepProjectConfigOut.desc": {
     "placeholders": {}
   },
@@ -1745,6 +1751,12 @@
     "placeholders": {}
   },
   "settings.advanced.opencode.override.stripCredentials.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.rules.loaded.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.rules.loaded.title": {
     "placeholders": {}
   },
   "settings.advanced.opencode.server.readySeconds.desc": {

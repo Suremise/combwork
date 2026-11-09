@@ -374,6 +374,8 @@
   "tips.opencode.title": "Run agents on OpenCode",
   "tips.opencodeHistory.text": "An OpenCode agent's conversation shows in the Sessions tab, and its tokens and cost in the Overview and its pane's footer, as OpenCode reports them. A $0 cost isn't a measure of your plan's allowance; limits show only for OpenCode Go or Console.",
   "tips.opencodeHistory.title": "An OpenCode agent's history, tokens and cost",
+  "tips.opencodeOutsideFolder.text": "An OpenCode agent asks before it reads or changes anything outside its own folder, and waits for your answer in its pane. Review copies stay allowed, and Approve all approves without asking; Settings → Advanced → OpenCode turns this off.",
+  "tips.opencodeOutsideFolder.title": "OpenCode agents ask before other folders",
   "tips.opencodeOwnProvider.text": "An OpenCode agent uses only the provider in its connection's model, so nothing it does goes to another provider or to OpenCode's free cloud models. Name the connection's model, such as ollama/qwen3:8b; Settings → Advanced → OpenCode turns this off.",
   "tips.opencodeOwnProvider.title": "OpenCode keeps to the connection's provider",
   "tips.outageResume.text": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",

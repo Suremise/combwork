@@ -116,6 +116,40 @@ export interface LaunchConfigInput {
    * those given.
    */
   projectDecidesMcp?: boolean
+  /**
+   * Ask before reaching outside the session's folder (HI-2775, askOutsideFolder): the folders still allowed outside it (a
+   * reviewer's review copies, Combwork's own the agent needs), or null: no rule, 2.2.6's defaults (every folder allowed).
+   */
+  outsideAllowed?: readonly string[] | null
+}
+
+/** A permission rule (2.2.6's `permissions`: each config document's, in order, after the agent's own; last match wins). */
+export interface PermissionRule {
+  action: 'external_directory'
+  resource: string
+  effect: 'allow' | 'ask'
+}
+
+/**
+ * A folder's `external_directory` grant (HI-2772, HI-2775): 2.2.6 asks that permission for a path outside the session's
+ * folder, its resource the path's folder with forward slashes and `/*` (probes/external-directory-ask.json); the rule's
+ * `*` matches across slashes, so a folder's grant covers what is inside it. Whether an edit there is allowed stays the
+ * mode's (Plan's edit deny holds).
+ */
+export function externalDirRule(dir: string): PermissionRule {
+  return { action: 'external_directory', resource: `${dir.replace(/\\/g, '/').replace(/\/+$/, '')}/*`, effect: 'allow' }
+}
+
+/**
+ * The launch's `external_directory` rules (HI-2775): ask for every folder outside the session's, then allow each given.
+ * 2.2.6 puts each config document's `permissions` after the agent's own rules (whose `* * allow` comes first), the
+ * private config folder's before a project's: so these win over the agents' defaults, and a project's config the user
+ * let in comes after them and wins over them (probes/external-directory-ask.json, projectLetIn).
+ */
+export function outsidePermissions(allowed: readonly string[]): PermissionRule[] {
+  const grants: PermissionRule[] = []
+  for (const r of allowed.map(externalDirRule)) if (!grants.some((g) => g.resource.toLowerCase() === r.resource.toLowerCase())) grants.push(r)
+  return [{ action: 'external_directory', resource: '*', effect: 'ask' }, ...grants]
 }
 
 /**
@@ -140,6 +174,7 @@ export function launchConfig(i: LaunchConfigInput): Record<string, unknown> {
     mcp: { servers },
     // Claude Agent stays denied in every case; the MCP servers left to the project only as projectDecidesMcp says.
     policies: [...providerPolicies(i.ambient, i.saved, i.strip, i.ownProvider ?? null), ...(i.projectDecidesMcp ? [] : mcpPolicies(Object.keys(servers)))],
+    ...(i.outsideAllowed ? { permissions: outsidePermissions(i.outsideAllowed) } : {}),
     ...(i.instructions.length ? { instructions: i.instructions } : {})
   }
 }

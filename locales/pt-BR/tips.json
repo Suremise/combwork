@@ -570,6 +570,8 @@
   "tips.opencode.text": "Os agentes podem usar o OpenCode 2. A Configuração de provedores o instala; cada conta do OpenCode tem os próprios logins em provedores e as próprias sessões, e cada agente roda um servidor privado do OpenCode que termina junto com ele.",
   "tips.opencodeOwnProvider.title": "O OpenCode fica no provedor da conexão",
   "tips.opencodeOwnProvider.text": "Um agente do OpenCode usa só o provedor do modelo da sua conexão, então nada do que ele faz vai para outro provedor nem para os modelos gratuitos na nuvem do OpenCode. Indique o modelo da conexão, como ollama/qwen3:8b; Configurações → Avançado → OpenCode desativa isso.",
+  "tips.opencodeOutsideFolder.title": "Agentes do OpenCode perguntam antes de outras pastas",
+  "tips.opencodeOutsideFolder.text": "Um agente do OpenCode pergunta antes de ler ou alterar qualquer coisa fora da própria pasta e espera sua resposta no painel dele. As cópias de revisão continuam permitidas, e Aprovar tudo aprova sem perguntar; Configurações → Avançado → OpenCode desativa isso.",
   "tips.opencode.title": "Rodar agentes no OpenCode",
   "tips.opencodeHistory.text": "A conversa de um agente do OpenCode aparece na aba Sessões, e os tokens e o custo dele na Visão geral e no rodapé do painel, como o OpenCode os informa. Um custo de $0 não mede a cota do seu plano; limites só aparecem para o OpenCode Go ou o Console.",
   "tips.opencodeHistory.title": "O histórico, os tokens e o custo de um agente do OpenCode"

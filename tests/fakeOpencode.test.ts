@@ -263,6 +263,33 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
     await s.stop()
   })
 
+  it("Combwork's ask in the config folder; a project's rule comes after it and wins only when the project's config is let in (HI-2775, as 2.2.6 was recorded)", async () => {
+    const outside = join(tempDir('fakeopencode-outside-'), 'Out')
+    mkdirSync(outside, { recursive: true })
+    const file = join(outside, 'probe.txt')
+    const ask = [{ action: 'external_directory', resource: '*', effect: 'ask' }]
+    const projectAllows = { permissions: [{ action: 'external_directory', resource: `${outside.replace(/\\/g, '/')}/*`, effect: 'allow' }] }
+    const attempt = async (letIn: boolean) => {
+      writeFileSync(file, 'before\n')
+      const r = root(letIn ? { OPENCODE_DISABLE_PROJECT_CONFIG: '' } : {}, { ...ourConfig(), permissions: ask })
+      writeFileSync(join(r.project, 'opencode.json'), JSON.stringify(projectAllows))
+      const s = await serve(r.env, r.project)
+      s.subscribe()
+      await until(() => s.events[0]?.type === 'server.connected', 'server.connected')
+      const sid = (await s.api('POST', '/api/session', { location: { directory: r.project } })).body.data.id
+      await s.api('POST', `/api/session/${sid}/prompt`, { text: `patch "${file}"` })
+      const asked = await until(() => s.events.find((e) => (e.type === 'permission.asked' && e.data.sessionID === sid) || ended([e], sid)), 'an ask or the end')
+      if (asked.type === 'permission.asked') await s.api('POST', `/api/session/${sid}/permission/${asked.data.id}/reply`, { decision: 'reject' })
+      await until(() => ended(s.events, sid), "the turn's end")
+      await s.stop()
+      return { asked: asked.type === 'permission.asked', text: readFileSync(file, 'utf8') }
+    }
+    // Kept out (Combwork's default): asked, rejected, unchanged.
+    expect(await attempt(false)).toEqual({ asked: true, text: 'before\n' })
+    // Let in: the project's allow comes after Combwork's ask, so the edit goes through unasked.
+    expect(await attempt(true)).toMatchObject({ asked: false, text: expect.stringMatching(/^before\nedited by /) })
+  })
+
   it("a session's model and variant: created with them, set again with the nested body, no variant the default; refused as 2.2.6 refused (HI-2767)", async () => {
     const recorded = recJson('wire/session-model-set.json') as Record<string, { request: { body: unknown }; status: number; body?: unknown; after?: { model: unknown } }>
     const r = root()

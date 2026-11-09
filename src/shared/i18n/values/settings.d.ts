@@ -668,6 +668,8 @@ interface CombworkMessageValues {
   'settings.advanced.opencode.models.variantId.title': undefined
   'settings.advanced.opencode.models.variants.desc': undefined
   'settings.advanced.opencode.models.variants.title': undefined
+  'settings.advanced.opencode.override.askOutsideFolder.desc': undefined
+  'settings.advanced.opencode.override.askOutsideFolder.title': undefined
   'settings.advanced.opencode.override.keepProjectConfigOut.desc': undefined
   'settings.advanced.opencode.override.keepProjectConfigOut.title': undefined
   'settings.advanced.opencode.override.noAutoUpdate.desc': undefined
@@ -676,6 +678,8 @@ interface CombworkMessageValues {
   'settings.advanced.opencode.override.ownProviderOnly.title': undefined
   'settings.advanced.opencode.override.stripCredentials.desc': undefined
   'settings.advanced.opencode.override.stripCredentials.title': undefined
+  'settings.advanced.opencode.rules.loaded.desc': undefined
+  'settings.advanced.opencode.rules.loaded.title': undefined
   'settings.advanced.opencode.server.readySeconds.desc': undefined
   'settings.advanced.opencode.server.readySeconds.title': undefined
   'settings.advanced.opencode.version.desc': undefined
