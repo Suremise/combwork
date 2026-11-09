@@ -288,6 +288,12 @@ Git's over worktrees (the same git commands as before; `worktrees.ts` stays its 
 which takes it as `PoolDeps.workspaces`), its card hooks (`slotCards.ts`) and a 0.9 worktree's recreation
 (`agentWorktree.ts`) keep the leases, operations, jobs and refusals and act on folders only through it;
 `tests/slotTraces.test.ts` holds the pool's git commands to their recorded traces.
+Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the contracts (`HistoryPort`, `ObservePort`),
+`platform/gitHistory.ts` is Git's, delegating to `platform/git.ts` and the exact `git()` commands its callers ran, and
+`platform/historyPorts.ts` finds one (`historyOf(platform)`, null for None; `observePort`, the watcher for every
+platform). Reconciliation, the recorder, targets, retarget, check brackets (`runChecks`, `queueChecks`) and the focused
+pick's diff read through it (`tests/historyPortsImports.test.ts`, check:repo); Git's adapter passes its port to
+`reconcileHistory` and `attributeFolder`.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

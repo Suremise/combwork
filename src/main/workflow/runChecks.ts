@@ -16,14 +16,13 @@
 
 import { join, resolve } from 'path'
 import { boardWrite, cardDoc, hasCard, inBoardWrite } from '../boardStore'
-import { git } from '../git'
 import { getTask } from '../tasks'
 import type { WorkspaceService } from '../workspace'
 import { platformIdOf } from '../platform/registry'
-import * as G from '../platform/git'
 import { NoneAdapter } from '../platform/none'
 import { readCheckPoint } from '../noneBaseline'
-import { observer as appObserver, type FolderChanges } from '../platform/observe'
+import type { WriteLog } from '../platform/history'
+import { hasHistory, historyOf, observePort as appObserver } from '../platform/historyPorts'
 import { isUnknown, type Maybe } from '../platform/types'
 import { blocks, snapshot } from './checks'
 import { cardFacts } from './cardWork'
@@ -63,11 +62,8 @@ export interface CheckRunFor {
   isolated?: boolean
 }
 
-/** What the watcher answers (the app's observer; a test's own). */
-export interface WriteLog {
-  changedBetween(folder: string, t0: number, t1: number, counts?: (paths: string[]) => string[]): Promise<Maybe<FolderChanges>>
-  settled(folder: string): Promise<void>
-}
+/** What the watcher answers (the app's observer, port 3's ObservePort; a test's own). */
+export type { WriteLog }
 
 /** What was read when the run started. */
 export interface CheckStart {
@@ -85,13 +81,6 @@ export interface CheckStart {
   containment: 'equal' | 'ancestor'
   /** None: the declared paths the revision was taken of. */
   paths: string[]
-}
-
-/** Git's tracked files and git dir, for a stat snapshot. */
-async function tracked(folder: string): Promise<{ files: string[]; gitDir: string | null }> {
-  const ls = await git(folder, ['ls-files', '-z'])
-  const gd = await git(folder, ['rev-parse', '--absolute-git-dir'])
-  return { files: ls.ok ? ls.out.split('\0').filter(Boolean) : [], gitDir: gd.ok ? gd.out.trim() : null }
 }
 
 /** A list read, or none where it couldn't be. */
@@ -136,14 +125,15 @@ export async function checkStart(r: CheckRunFor, log: WriteLog = appObserver, no
   // start is taken before the rest is read: a write meanwhile counts against the run (the safe side).
   await log.settled(r.folder)
   const t0 = now()
-  if (r.platform === 'none') {
+  const H = historyOf(r.platform)
+  if (!H) {
     // Read before the command starts (its caller awaits this), after t0: a write while it is read counts against it.
     const p = await nonePoint(r, r.paths, true)
     return { t0, dirty: null, snapshot: p.snapshot, revision: p.revision, containment: 'equal', paths: [...r.paths] }
   }
-  const t = await tracked(r.folder)
+  const t = await H.checkFiles(r.folder)
   const snap = await snapshot(r.folder, t.files, t.gitDir)
-  const dirty = await G.dirty(r.folder)
+  const dirty = await H.dirty(r.folder)
   return { t0, dirty, snapshot: snap, ...(await cardRevisionNow(r)), paths: [] }
 }
 
@@ -169,7 +159,8 @@ export async function checkEnd(r: CheckRunFor, start: CheckStart, end: { at: num
   const check = whichCheck(r)
   const base = { name: check.name ?? end.title, command: r.command?.trim() ?? '', run: end.run, durationMs: Math.max(0, end.at - start.t0), by: end.by, result: end.result, ...(r.isolated ? { isolated: true } : {}) }
   let whyNot: CheckRanData['whyNot']
-  if (r.platform === 'none') {
+  const H = historyOf(r.platform)
+  if (!H) {
     const none = noneOf(r)
     const paths = end.endPaths ?? start.paths
     // The watcher's record first; then the point, off main's thread (HI-2358), its snapshot only where that record isn't
@@ -189,12 +180,12 @@ export async function checkEnd(r: CheckRunFor, start: CheckStart, end: { at: num
   const seen = await log.changedBetween(r.folder, start.t0, end.at)
   let snapB: string | null = null
   if (isUnknown(seen)) {
-    const t = await tracked(r.folder)
+    const t = await H.checkFiles(r.folder)
     snapB = await snapshot(r.folder, t.files, t.gitDir)
   }
-  const dirtyB = await G.dirty(r.folder)
+  const dirtyB = await H.dirty(r.folder)
   const headB = await folderHead(r.folder)
-  const contained = !!tested && !!revision && (revision === tested || (start.containment === 'ancestor' && (await G.isAncestor(r.project, revision, tested)) === true))
+  const contained = !!tested && !!revision && (revision === tested || (start.containment === 'ancestor' && (await H.isAncestor(r.project, revision, tested)) === true))
   const isDirty = (d: Maybe<string[]> | null): boolean => d === null || isUnknown(d) || d.length > 0
   if (!check.ran) whyNot = 'notCheck'
   else if (!contained) whyNot = 'notContained'
@@ -236,12 +227,13 @@ export async function bracketFor(ws: WorkspaceService, link: RunLink): Promise<B
   const project = join(workspacePath, c.project)
   const cfg = (await ws.projectConfig(project).catch(() => null)) as (ProjectConfig & { workflow?: { options?: { commands?: Record<string, unknown>; excluded?: unknown } } }) | null
   const platform = platformIdOf(project, cfg?.platform)
-  if (platform === 'git' && (!link.folder || !link.testedCheckout)) return null
+  const history = hasHistory(platform)
+  if (history && (!link.folder || !link.testedCheckout)) return null
   const options = cfg?.workflow?.options
   const commands = Object.fromEntries(Object.entries(options?.commands ?? {}).filter((e): e is [string, string] => typeof e[1] === 'string' && !!e[1].trim()).map(([k, v]) => [k, v.trim()]))
   // The options' exclusions, else the defaults (node_modules, .venv), until #1218 resolves the options with defaults.
   const excluded = Array.isArray(options?.excluded) && options.excluded.every((x) => typeof x === 'string') ? (options.excluded as string[]) : allOff('none').excluded
-  const f: CheckRunFor = { card: link.card, folder: platform === 'none' ? project : link.folder!, project, platform, tested: link.testedCheckout, check: link.check?.name ?? null, checkCommand: link.check?.command ?? null, command: null, commands, facts: got.facts, paths: platform === 'none' ? declaredPaths(ws, c.project, link.card) : [], excluded, ...(link.isolated ? { isolated: true } : {}) }
+  const f: CheckRunFor = { card: link.card, folder: history ? link.folder! : project, project, platform, tested: link.testedCheckout, check: link.check?.name ?? null, checkCommand: link.check?.command ?? null, command: null, commands, facts: got.facts, paths: history ? [] : declaredPaths(ws, c.project, link.card), excluded, ...(link.isolated ? { isolated: true } : {}) }
   return { ws, workspacePath, project: c.project, for: f, start: await checkStart(f) }
 }
 
@@ -325,7 +317,7 @@ async function record(run: ProgressRun, b: Bracket): Promise<Recorded | null> {
   if (b.ws.path !== b.workspacePath || !cardOf(b)) return null
   // Its command as its reporter said (cw-progress: the check's command, or its command line); None's declared paths
   // as they are now: a list changed during the run is a new revision.
-  const endPaths = b.for.platform === 'none' ? declaredPaths(b.ws, b.project, b.for.card) : undefined
+  const endPaths = hasHistory(b.for.platform) ? undefined : declaredPaths(b.ws, b.project, b.for.card)
   const ended = await checkEnd({ ...b.for, command: run.command }, b.start, { at: run.finishedAt, result: run.state, run: run.id, by: run.agentName, title: run.title, endPaths })
   // Who ran it, by id (HI-1367): the merge queue takes a focused test's proof only from its card's reviewer.
   const data = run.source === 'agent' && run.agentId ? { ...ended, agent: run.agentId } : ended

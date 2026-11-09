@@ -899,6 +899,8 @@ export const UNIT_SCANS = [
   // HI-2786: the callers moved to the workspace lifecycle port, its contract and registry, and who imports Git's.
   { test: 'tests/repoPortsImports.test.ts', paths: ['src/main/slots.ts', 'src/main/slotCards.ts', 'src/main/agentWorktree.ts', 'src/main/platform/workspacePort.ts', 'src/main/platform/workspacePorts.ts'] },
   { test: 'tests/repoPortsImports.test.ts', paths: ['src/'], lines: ['gitWorkspacePort'] },
+  { test: 'tests/historyPortsImports.test.ts', paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/targets.ts', 'src/main/workflow/retarget.ts', 'src/main/workflow/runChecks.ts', 'src/main/workflow/focusedRun.ts', 'src/main/workflow/queueChecks.ts', 'src/main/platform/history.ts', 'src/main/platform/historyPorts.ts'] },
+  { test: 'tests/historyPortsImports.test.ts', paths: ['src/'], lines: ['gitHistory'] },
   { test: 'tests/exitLog.test.ts', paths: ['src/main/'], lines: ['app\\.quit', 'app\\.exit', 'process\\.exit', 'app\\.relaunch', 'quitAndInstall', 'exitBy'] },
   // Each function in main taking the board's lock or a database lease is listed by file and name (HI-1368): a new
   // one, or a change to a listed file (a rename of its function), can break it.
