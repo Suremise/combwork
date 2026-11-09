@@ -89,6 +89,17 @@ export async function runOpencode(executable: string, args: string[], home: stri
   return run(s.file, s.args, timeoutMs, checkEnvFor(home, base))
 }
 
+/**
+ * The command for opencode outside an agent's launch, as runOpencode runs it (standalone, its check config written, the
+ * account's roots), for a caller that runs it itself: the OpenCode history's worker exports a session with it (HI-2762).
+ */
+export async function opencodeCommand(executable: string, args: string[], home: string): Promise<{ file: string; args: string[]; line?: string; env: Record<string, string> }> {
+  await mkdir(home, { recursive: true })
+  await writeConfigDir(checkConfigDir(home), withTestProvider(checkConfig(ambientIntegrations(), null, stripCredentials(), noAutoUpdate()), testProvider(), false))
+  const s = toSpawnable(executable, [...args, '--standalone'])
+  return { file: s.file, args: s.args, ...(s.line !== undefined ? { line: s.line } : {}), env: checkEnvFor(home) }
+}
+
 /** An account's saved credentials (`opencode auth list --format json`), null when the listing failed. */
 export async function savedCredentials(executable: string, home: string, base?: Record<string, string>): Promise<{ saved: SavedCredentials; integrations: { id: string; name: string; saved: number; env: string[] }[] } | null> {
   const r = await runOpencode(executable, ['auth', 'list', '--format', 'json'], home, 20000, null, base)

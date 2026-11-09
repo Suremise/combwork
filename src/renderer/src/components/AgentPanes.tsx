@@ -42,7 +42,7 @@ import { ModeBadge } from './PermissionMode'
 import { contextLines, providerDescriptor, providerName } from '@shared/providers'
 import { declaredFor, launchedWindow, localLimitsLines } from '@shared/localModelLimits'
 import { safeguardText } from '@shared/safeguards'
-import { unpricedModel, unpricedText } from '@shared/prices'
+import { unpricedModel, unpricedText, zeroCostNote } from '@shared/prices'
 import { hooksMissingNote, hooksMissingText, retryWaitText, unknownStateText } from '@shared/runtime'
 import { retryWaitsView } from '@shared/toolReplies'
 import { Icon, IconButton, ReviewMark, SafeguardMark, signInNote, statusText, Tooltip, useContextMenu, useFolds, type MenuEntry } from './ui'
@@ -1595,6 +1595,8 @@ export function PaneFooter({
   const estimated = live?.costUsd !== undefined ? !!live.costEstimated : !!usage?.costEstimated
   // Some of its tokens without a price (HI-2675): " + ?", as a total says it.
   const partUnpriced = live?.costUsd !== undefined ? !!live.costUnpriced : !!usage?.costUnpriced
+  // A $0 the provider reported for a session that used tokens (HI-2762): said so, never a price.
+  const zeroNote = zeroCostNote(cost, estimated, usage ? usage.inputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheWriteTokens : 0, providerDescriptor(provider).name)
   const bytes = live?.transcriptBytes
   const sizeLimit = transcriptWarnLimit(project.config, settings?.sessions.transcriptWarnMB ?? 0)
   const long = bytes !== undefined && sizeLimit > 0 && bytes >= sizeLimit * 1024 * 1024
@@ -1710,7 +1712,8 @@ export function PaneFooter({
         </Tooltip>
       )
     })
-  else if (cost !== null && cost > 0)
+  // A reported $0 for a session that used tokens shows too, its hover saying what $0 means (HI-2762).
+  else if (cost !== null && (cost > 0 || zeroNote))
     right.push({
       key: 'cost',
       node: (
@@ -1718,7 +1721,7 @@ export function PaneFooter({
           key="cost"
           content={
             <span style={{ whiteSpace: 'pre-line' }}>
-              {`${estimated ? tr(msg({ id: 'panes.footer.costEstimated', defaultMessage: 'API-equivalent cost of this session, estimated by Combwork from its tokens', description: "Hover of a pane footer's cost (≈): Combwork estimated it from the session's tokens at API prices." })) : tr(msg({ id: 'panes.footer.costReported', defaultMessage: 'API-equivalent cost of this session, as the provider reports it', description: "Hover of a pane footer's cost: the provider reported it, at API prices." }))}${costClick ? `\n\n${tr(COST_CLICK)}` : ''}`}
+              {`${estimated ? tr(msg({ id: 'panes.footer.costEstimated', defaultMessage: 'API-equivalent cost of this session, estimated by Combwork from its tokens', description: "Hover of a pane footer's cost (≈): Combwork estimated it from the session's tokens at API prices." })) : tr(msg({ id: 'panes.footer.costReported', defaultMessage: 'API-equivalent cost of this session, as the provider reports it', description: "Hover of a pane footer's cost: the provider reported it, at API prices." }))}${zeroNote ? `\n\n${zeroNote}` : ''}${costClick ? `\n\n${tr(COST_CLICK)}` : ''}`}
             </span>
           }
         >

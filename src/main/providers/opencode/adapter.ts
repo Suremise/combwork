@@ -22,11 +22,13 @@ import { copyOpencodeSkills, opencodeSkillsDir } from './skills'
 import { accountModels, checkHome, testProvider, latestOpencode, locateOpencode, opencodeInstallCommand, opencodeLoginCommand, opencodeReadiness, opencodeUpdateCommand, savedCredentials } from './install'
 import { expandOpencodeHook, normalizeOpencodeHook } from './events'
 import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerToken, sessionMark, sessionMarks } from './launcher'
+import { OpencodeConversationParser, OpencodeUsageParser, parseMirrorUsage } from './mirror'
+import { opencodeHistory } from './history'
 
 // OpenCode 2 as a Combwork provider (HI-2759, against 2.2.6; the runtime facts are HI-2758's). Each launch runs its own
 // private server, owned by the launcher (launcher.ts), on its account's roots (home.ts) with a private config folder
-// (config.ts). Status from the server's events is HI-2760's; history and usage HI-2762's; Combwork's tools, guidance and
-// skills HI-2761's: until then a launch gets the MCP servers and guidance it was given, as they are.
+// (config.ts). Status from the server's events is HI-2760's; history and usage HI-2762's (history.ts: a mirror of each
+// session read from its server, mirror.ts); Combwork's tools, guidance and skills HI-2761's.
 
 const NAME = OPENCODE_DESCRIPTOR.name
 
@@ -34,6 +36,7 @@ const REFUSED = {
   claudeAgent: msg({ id: 'providers.opencode.claudeAgentModel', defaultMessage: "{provider} didn't start: {model} is a model of OpenCode's Claude Agent provider, which Combwork doesn't run through OpenCode. Run Claude Code as its own provider instead, or choose another model.", description: "Why an OpenCode agent didn't start (its pane): its model belongs to OpenCode's nested Claude Agent provider, which Combwork never allows. {provider} is OpenCode, {model} the model's id. Claude Agent and Claude Code are product names: keep them." }),
   protectedArg: msg({ id: 'providers.opencode.protectedArg', defaultMessage: "{provider} didn't start: the agent's extra arguments include {arg}, which Combwork sets itself for every OpenCode launch. Remove it from the agent's extra arguments (Agent Settings).", description: "Why an OpenCode agent didn't start (its pane): its extra command-line arguments include one Combwork controls (its server, its session, its mode). {provider} is OpenCode, {arg} the argument as typed. Agent Settings is a place in Combwork." }),
   otherAccount: msg({ id: 'providers.opencode.otherAccount', defaultMessage: "{provider} didn't resume {session}: it is in another OpenCode account's data, not the account this agent runs on now. Start a new session, or move the agent back to that account.", description: "Why an OpenCode agent didn't resume a session (its pane): each OpenCode account keeps its own sessions, and this one was made on another account. {provider} is OpenCode, {session} the session's id." }),
+  historyBusy: msg({ id: 'providers.opencode.historyBusy', defaultMessage: "{provider} didn't start: Combwork's reader of OpenCode sessions didn't answer in time, so it couldn't take this session over from an earlier run. Start the agent again.", description: "Why an OpenCode agent didn't start (its pane): Combwork's background reader of OpenCode session histories didn't confirm in time that it let go of the session's earlier run. {provider} is OpenCode." }),
   noOwner: msg({ id: 'providers.opencode.noOwner', defaultMessage: "{provider} didn't start: Combwork couldn't read its own process's identity, which the agent's private OpenCode server is tied to so that it ends with Combwork. Windows PowerShell may be blocked on this PC.", description: "Why an OpenCode agent didn't start (its pane): Combwork couldn't get the identity it ties the agent's server's lifetime to. {provider} is OpenCode. Windows PowerShell is a program's name: keep it." })
 }
 
@@ -68,11 +71,6 @@ interface Prepared {
 
 /** The folder an account's (or the check root's) data is in, as accounts give it (capabilities.connections.homeEnv). */
 const homeOf = (env: NodeJS.ProcessEnv): string | undefined => env[DATA_ENV] || undefined
-
-/** The usage of a session Combwork can't read yet (HI-2762 reads OpenCode's sessions). */
-function noUsage(sessionId: string): SessionUsage {
-  return { provider: OPENCODE, sessionId, title: null, model: null, cliVersion: null, inputTokens: 0, outputTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, requests: 0, reasoningTokens: 0, contextTokens: 0, contextWindow: null, compactions: [], cacheTtlSeconds: 0, firstActivity: null, lastActivity: null, userMessages: 0, lastPrompt: null, costUsd: null, costEstimated: false }
-}
 
 export class OpencodeAdapter implements ProviderAdapter {
   readonly id = OPENCODE
@@ -217,6 +215,10 @@ export class OpencodeAdapter implements ProviderAdapter {
     await mkdir(home, { recursive: true })
     // Each account keeps its own sessions: one made on another account's data isn't there to resume (design s7, s10).
     if (ctx.resume && !existsSync(sessionMark(home, ctx.sessionId))) throw combworkError(REFUSED.otherAccount, { provider: NAME, session: ctx.sessionId })
+    // The session's history is this run's to read from now (design s13 §2): no older run's read publishes after this.
+    await opencodeHistory.begin(home, ctx.sessionId, ctx.runId).catch((e) => {
+      throw combworkError(REFUSED.historyBusy, { provider: NAME }, { cause: e })
+    })
     const strip = launchOverrides(ctx.overrides, OPENCODE, 'stripCredentials')
     const noUpdate = launchOverrides(ctx.overrides, OPENCODE, 'noAutoUpdate')
     // The account's saved credentials decide which ambient chains it chose (null: none could be read, so none).
@@ -253,6 +255,8 @@ export class OpencodeAdapter implements ProviderAdapter {
     const p = this.prepared.get(ctx.runId)
     if (!p) throw new Error('an OpenCode launch was built before it was prepared') // i18n-ignore: an internal check, never shown
     this.prepared.delete(ctx.runId)
+    // Its history is read from its server, with its password, kept only here (history.ts).
+    opencodeHistory.track(ctx.runId, ctx.privateDir, p.password)
     const mode = ctx.permissionMode || OPENCODE_DESCRIPTOR.defaultPermissionMode
     const env = opencodeEnv({
       base: ctx.env,
@@ -288,9 +292,16 @@ export class OpencodeAdapter implements ProviderAdapter {
 
   // ---- Hooks (HI-2760): the launcher posts its server's events and settled snapshots; the tracker (events.ts), in the
   // launch's hook order, turns each into the hooks it stands for.
-  async prepareHook(body: Record<string, any>, launch: { memo: Record<string, unknown> }): Promise<void> {
+  async prepareHook(body: Record<string, any>, launch: { memo: Record<string, unknown>; sessionId?: string | null }): Promise<void> {
     const expanded = expandOpencodeHook(launch.memo, body)
     if (expanded) body.combworkExpanded = expanded
+    // The history (HI-2762): a turn's end or a resync reads the session now; OpenCode's running usage is its live cost.
+    const sid = launch.sessionId
+    if (!sid) return
+    const type = typeof body.event?.type === 'string' ? body.event.type : ''
+    if (body.hook_event_name === 'OpencodeSnapshot') opencodeHistory.nudge(sid, { kind: 'resync' })
+    else if (body.hook_event_name === 'OpencodeEvent' && type.startsWith('session.execution.')) opencodeHistory.nudge(sid, { kind: 'turnEnd' })
+    else if (body.hook_event_name === 'OpencodeEvent' && type === 'session.usage.updated' && typeof body.event.cost === 'number') opencodeHistory.nudge(sid, { kind: 'usage', cost: body.event.cost, at: typeof body.event.created === 'number' ? body.event.created : Date.now() })
   }
 
   normalizeHook(body: Record<string, any>): NormalizedHook {
@@ -313,23 +324,21 @@ export class OpencodeAdapter implements ProviderAdapter {
     return OPENCODE_DESCRIPTOR.canSwitchLive(target, current, launched)
   }
 
-  // ---- Transcripts and usage: HI-2762 reads OpenCode's sessions from its server. Until then none are listed.
+  // ---- Transcripts and usage (HI-2762): each session Combwork made has a mirror of its history (history.ts, mirror.ts),
+  // read from its run's server while it runs and exported after, in the account's data beside the session's mark.
   /**
-   * Combwork's record of the session in the account's data it was made on (the launcher writes it as it creates the
-   * session), in place of a transcript (HI-2762's): a restart resumes the session when there is one, rather than taking
-   * the same id as new. None: the session was never made.
+   * The session's mirror, once Combwork made the session (the launcher's mark, in the account's data it was made on): its
+   * path from the first answer on (a placeholder until a read completes), so the history and usage readers follow it as it
+   * fills. None (null) without a mark: the session was never made, so a restart takes the id as new, never a resume.
    */
   async transcriptPath(_folder: string, sessionId: string): Promise<string | null> {
     if (!isSessionId(sessionId)) return null
-    for (const home of this.allHomes()) {
-      const mark = sessionMark(home, sessionId)
-      if (existsSync(mark)) return mark
-    }
+    for (const home of this.allHomes()) if (existsSync(sessionMark(home, sessionId))) return opencodeHistory.mirrorFor(home, sessionId)
     return null
   }
 
   /** Every root sessions may have been made on: each OpenCode account's, a test copy's seam home, Combwork's own. */
-  private allHomes(): string[] {
+  allHomes(): string[] {
     const ids = (config.get().accounts ?? []).filter((a) => a.provider === OPENCODE && !a.home && a.kind !== 'server').map((a) => a.id)
     const homes = ids.map((id) => join(localDataRoot(), 'accounts', id))
     for (const h of [opencodeHome(null), join(localDataRoot(), 'opencode', 'default')]) if (!homes.includes(h)) homes.push(h)
@@ -348,16 +357,17 @@ export class OpencodeAdapter implements ProviderAdapter {
     return null
   }
 
-  parseUsage(_text: string, sessionId: string): SessionUsage {
-    return noUsage(sessionId)
+  parseUsage(text: string, sessionId: string): SessionUsage {
+    return parseMirrorUsage(text, sessionId)
   }
 
   usageParser(sessionId: string): UsageParser {
-    return { feed: () => undefined, result: () => noUsage(sessionId) }
+    const p = new OpencodeUsageParser(sessionId)
+    return { feed: (t) => p.feed(t), result: () => p.result() }
   }
 
-  conversationParser(): ConversationParserLike {
-    return { items: [], images: [], offset: 0, feed: () => 0 }
+  conversationParser(projectPath: string): ConversationParserLike {
+    return new OpencodeConversationParser(projectPath)
   }
 
   imageData(_line: Record<string, any>, _loc: ImageLocation): string | null {

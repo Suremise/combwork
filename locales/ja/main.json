@@ -5,6 +5,7 @@
   "main.accounts.inUse": "{name}は使用中です。その接続で動いているエージェントを停止し、サインインを閉じてから削除してください。",
   "main.accounts.keyRemoveFailed": "{name}を削除できませんでした：キーを消去できませんでした。何も変更していません。「削除」でもう一度試せます。",
   "main.accounts.leftover": "{name}は削除が途中で止まっています。先にもう一度削除してください。",
+  "main.accounts.letGoFailed": "{name} は削除されませんでした: Combwork はそのフォルダーでの自身の処理を時間内に止められませんでした。何も変更していません。「削除」でもう一度試せます。",
   "main.accounts.makeFailed": "接続のフォルダーを作成できませんでした：{error}",
   "main.accounts.noHome": "{cli}のフォルダー（{folder}）がまだありません。{cli}を一度実行してから、接続を追加してください。",
   "main.accounts.noName": "接続に名前を付けてください。",

@@ -29,6 +29,11 @@
     "note": "An error signing a connection in ({name}): an earlier removal stopped partway, so it can't be used.",
     "audience": "both"
   },
+  "main.accounts.letGoFailed": {
+    "text": "{name} wasn't removed: Combwork couldn't stop its own work in its folder in time. Nothing was changed; Remove tries again.",
+    "note": "An error removing a connection ({name}, its name in Settings → Accounts & Connections): something of Combwork's still writing into its folder (an OpenCode session's history being read) didn't stop in time, so nothing was removed.",
+    "audience": "both"
+  },
   "main.accounts.makeFailed": {
     "text": "Couldn't make the connection's folder: {error}",
     "note": "An error adding a connection: its folder or link couldn't be made. {error} is the reason, in English.",

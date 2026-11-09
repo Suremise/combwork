@@ -5,6 +5,7 @@
   "main.accounts.inUse": "{name} is in use: stop the agents on it and close its sign-in, then remove it.",
   "main.accounts.keyRemoveFailed": "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.",
   "main.accounts.leftover": "{name} is half removed: remove it again first.",
+  "main.accounts.letGoFailed": "{name} wasn't removed: Combwork couldn't stop its own work in its folder in time. Nothing was changed; Remove tries again.",
   "main.accounts.makeFailed": "Couldn't make the connection's folder: {error}",
   "main.accounts.noHome": "{cli}'s folder ({folder}) isn't there yet: run {cli} once, then add the connection.",
   "main.accounts.noName": "Give the connection a name.",

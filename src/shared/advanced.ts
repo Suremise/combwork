@@ -3254,6 +3254,47 @@ const SOURCES: readonly AdvancedSource[] = [
     applies: 'sessions',
     samples: [{ from: `${FIX}/advanced/help-opencode-2.2.6.txt`, version: '2.2.6', text: 'serve              Start the v2 API and web server', shows: 'The server each OpenCode agent runs privately' }] // i18n-ignore: a CLI's recorded text (#367)
   },
+  // OpenCode's history (HI-2762, providers/opencode/history.ts): how often Combwork reads a running session, and repairs
+  // the history of one it couldn't read.
+  {
+    id: 'opencode.history.pollSeconds',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.history.pollSeconds.title', defaultMessage: 'History: check interval', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.opencode.history.pollSeconds.desc', defaultMessage: "How often Combwork checks a running OpenCode agent's session for changes, and reads it again when it changed, for its history, tokens and cost. Longer, they're behind for longer; shorter, more reads.", description: 'What the advanced setting "History: check interval" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    default: 5,
+    min: 1,
+    max: 120,
+    unit: 's',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/opencode/real-2.2.6/wire/session-after-turn.json`, version: '2.2.6', text: '"updated": 1794179626037', shows: "The session's time.updated, which each check compares with the one Combwork read last" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'opencode.history.repairMinutes',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.history.repairMinutes.title', defaultMessage: 'History: repair interval', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.opencode.history.repairMinutes.desc', defaultMessage: "How often Combwork looks for OpenCode sessions whose history it couldn't read, and tries again for those whose OpenCode data changed since. Longer, a history stays incomplete for longer.", description: 'What the advanced setting "History: repair interval" is for, and what goes wrong when it is wrong (Settings → Advanced).' }),
+    kind: 'number',
+    default: 10,
+    min: 1,
+    max: 1440,
+    unit: 'min',
+    applies: 'restart',
+    samples: [{ from: `${FIX}/opencode/real-2.2.6/cli/session-export-absent.txt`, version: '2.2.6', text: 'Session not found:', shows: 'An export of a session that failed, which the history says and tries again' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
+    id: 'opencode.history.retryMinutes',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.history.retryMinutes.title', defaultMessage: 'History: retry after', description: "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork." }),
+    desc: msg({ id: 'settings.advanced.opencode.history.retryMinutes.desc', defaultMessage: "How long Combwork waits before trying again to read an OpenCode session's history it couldn't read, when nothing in that account's OpenCode data changed meanwhile.", description: 'What the advanced setting "History: retry after" is for (Settings → Advanced).' }),
+    kind: 'number',
+    default: 1440,
+    min: 10,
+    max: 43200,
+    unit: 'min',
+    applies: 'restart',
+    samples: [{ from: `${FIX}/opencode/real-2.2.6/cli/session-export-absent.txt`, version: '2.2.6', text: 'Session not found:', shows: 'An export of a session that failed, which the history says and tries again' }] // i18n-ignore: a CLI's recorded text (#367)
+  },
   {
     id: overrideId('copilot', 'allMcpInstructions'),
     group: 'copilot',

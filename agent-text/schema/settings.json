@@ -1687,6 +1687,24 @@
   "settings.advanced.opencode.env.credentials.title": {
     "placeholders": {}
   },
+  "settings.advanced.opencode.history.pollSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.pollSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.repairMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.repairMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.retryMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.retryMinutes.title": {
+    "placeholders": {}
+  },
   "settings.advanced.opencode.models.line.desc": {
     "placeholders": {}
   },

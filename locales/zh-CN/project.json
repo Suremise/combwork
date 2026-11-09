@@ -176,6 +176,7 @@
   "project.cost.unknown": "未知",
   "project.cost.unpriced": "Combwork 没有 {model} 的 API 价格，因此无法估算此会话的费用。请在“设置”→“{provider}”→“API 价格”中添加。",
   "project.cost.withFree": "{cost} + 免费（本地）",
+  "project.cost.zeroReported": "{provider} 报告此会话的费用为 $0。订阅、免费模型或此电脑上的模型仍可能消耗你的套餐额度：$0 并不能衡量它。",
   "project.empty.addAgent": "添加智能体来处理 {project}：“添加智能体”会以默认设置添加一个 {provider} 智能体（点击 ▾ 可选择其他提供方、工作树或设置）。“新建会话”会添加一个智能体并启动它。",
   "project.empty.allSessions": "全部会话",
   "project.empty.markActive": "将此项目标记为正在处理，即可运行会话并查看其状态。也可以直接启动会话。",

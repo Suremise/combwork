@@ -18,6 +18,8 @@ const SNAPSHOT = 'f9f4a137eafda739c874d9f1ff5de0924cc85bea'
 const INSTRUCTIONS_DELTA = { 'core/codemode': '74a1fe4cac15f42fd158773d5d180e363ce6fbfcde6213fc51a7f5d0a79775bc', 'core/skill-guidance': '8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9', 'core/date': 'f5037a79687112a772ccf5ed4b2589caebf713959392bc4d0630977e1a6b4009', 'core/environment': '996bcfb91c5a9c9a37f473eb59aa94c1ffffe5bd30729270f32861e3b164b6fb' }
 const SLUGS = ['crisp-star', 'brave-star', 'tidy-pixel', 'glowing-nebula', 'curious-canyon']
 const zeroTokens = () => ({ input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } })
+/** A session's title request (HI-2762's R0: the first usage.updated, before any step): in the session's tokens, in no message. */
+const TITLE_TOKENS = { input: 457, output: 312, reasoning: 0, cache: { read: 0, write: 0 } }
 const addTokens = (a, b) => ({ input: a.input + b.input, output: a.output + b.output, reasoning: a.reasoning + b.reasoning, cache: { read: a.cache.read + b.cache.read, write: a.cache.write + b.cache.write } })
 
 /**
@@ -157,8 +159,11 @@ async function startServer(opts) {
     const provider = config.allowed(cfg, 'provider.use', model.providerID)
     // A provider that fails at once fails its title call too: no usage or rename (events/failed-provider-400.json).
     const failsAtOnce = !provider || /^fail\b/i.test(text)
-    if (!failsAtOnce) emit('session.usage.updated', { sessionID: sid, cost: 0, tokens: session(sid).info.tokens })
-    if (!failsAtOnce && !session(sid).info.title) {
+    // Its first turn names it: the title's request is counted in the session's tokens, never in a message's (HI-2762's R0).
+    const titled = !failsAtOnce && !session(sid).info.title
+    const titleTokens = titled ? TITLE_TOKENS : zeroTokens()
+    if (!failsAtOnce) emit('session.usage.updated', { sessionID: sid, cost: 0, tokens: addTokens(session(sid).info.tokens, titleTokens) })
+    if (titled) {
       const title = text.slice(0, 40)
       updateInfo(sid, (info) => (info.title = title))
       emit('session.renamed', { sessionID: sid, title }, d)
@@ -172,7 +177,7 @@ async function startServer(opts) {
         c.end()
       }
     let n = 0
-    let total = zeroTokens()
+    let total = titleTokens
 
     const step = async (body) => {
       const msgId = store.newId('msg')
@@ -544,6 +549,9 @@ async function startServer(opts) {
       const r = importSession(body, env)
       return r.conflict ? json(res, 409, { _tag: 'ConflictError', message: `Session already exists: ${body.info.id}`, resource: body.info.id }) : json(res, 200, { data: r.info })
     }
+    // OpenCode Go's and Console's limits: none without a Console sign-in, which the fake never has (HI-2762's R0,
+    // wire/usage-limits-signed-out.json).
+    if (p === '/api/experimental/usage/limits' && req.method === 'GET') return json(res, 200, { location: { directory: url.searchParams.get('location[directory]') || process.cwd() }, data: null })
     if (p === '/api/mcp' && req.method === 'GET') return json(res, 200, listing(null, Object.entries(mcpStatus).map(([name, status]) => ({ name, status }))))
     if (p === '/api/model' && req.method === 'GET') return json(res, 200, listing(null, modelsOf(boot, env).map((x) => ({ id: x.id, modelID: x.id, providerID: x.providerID, name: x.name }))))
     if (p === '/api/integration' && req.method === 'GET') return json(res, 200, listing(null, integrations(boot, env)))

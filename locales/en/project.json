@@ -707,6 +707,10 @@
     "defaultMessage": "{cost} + free (local)",
     "description": "A total cost (\"$1.20\") that also covers sessions run only on a model server on this PC (Ollama, for example), which cost nothing (HI-1772)."
   },
+  "project.cost.zeroReported": {
+    "defaultMessage": "{provider} reported this session’s cost as $0. A subscription, a free model or a model on this PC can still use your plan’s allowance: $0 isn’t a measure of it.",
+    "description": "Added to the hover of a session's cost when the coding agent itself reported $0 for a session that used tokens (HI-2762: OpenCode gives $0 for a model it has no price for). {provider} is the coding agent (OpenCode…). $0 is the amount as shown: keep it."
+  },
   "project.empty.addAgent": {
     "defaultMessage": "Add an agent to work on {project}: Add Agent adds a {provider} agent with its default settings (▾ to choose another provider, a worktree or settings). New Session adds one and starts it.",
     "description": "The Session tab of a project with no agents. Add Agent and New Session are its buttons; ▾ is the arrow beside Add Agent."

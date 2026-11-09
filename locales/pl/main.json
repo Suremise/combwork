@@ -5,6 +5,7 @@
   "main.accounts.inUse": "Połączenie {name} jest w użyciu: zatrzymaj agentów, którzy na nim pracują, i zamknij jego logowanie, a potem je usuń.",
   "main.accounts.keyRemoveFailed": "Nie usunięto połączenia {name}: nie udało się usunąć jego klucza. Niczego nie zmieniono; Usuń spróbuje jeszcze raz.",
   "main.accounts.leftover": "Połączenie {name} jest usunięte tylko częściowo: najpierw usuń je jeszcze raz.",
+  "main.accounts.letGoFailed": "Nie usunięto {name}: Combwork nie zdołał na czas zatrzymać własnej pracy w jego folderze. Nic nie zostało zmienione; Usuń spróbuje jeszcze raz.",
   "main.accounts.makeFailed": "Nie udało się utworzyć folderu połączenia: {error}",
   "main.accounts.noHome": "Folderu {cli} ({folder}) jeszcze nie ma: uruchom raz {cli}, a potem dodaj połączenie.",
   "main.accounts.noName": "Nadaj połączeniu nazwę.",

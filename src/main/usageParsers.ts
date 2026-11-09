@@ -5,10 +5,12 @@ import { CLAUDE_CODE } from '../shared/claude'
 import { CODEX } from '../shared/codex'
 import { COPILOT } from '../shared/copilot'
 import { ANTIGRAVITY } from '../shared/antigravity'
+import { OPENCODE } from '../shared/opencode'
 import { ClaudeUsageParser } from './providers/claude/usage'
 import { CodexUsageParser } from './providers/codex/rollout'
 import { CopilotUsageParser } from './providers/copilot/events'
 import { AntigravityUsageParser } from './providers/antigravity/transcript'
+import { OpencodeUsageParser } from './providers/opencode/mirror'
 
 /**
  * The CLIs' usage parsers without their adapters (#1106), for the usage worker, which can't load Electron: a parser
@@ -29,7 +31,8 @@ const PARSERS: Partial<Record<ProviderId, ParserClass>> = {
   [CLAUDE_CODE]: ClaudeUsageParser,
   [CODEX]: CodexUsageParser,
   [COPILOT]: CopilotUsageParser,
-  [ANTIGRAVITY]: AntigravityUsageParser
+  [ANTIGRAVITY]: AntigravityUsageParser,
+  [OPENCODE]: OpencodeUsageParser
 }
 
 /**
