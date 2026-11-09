@@ -86,6 +86,60 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     const account = await inv('connections:add', 'opencode', 'OpenCode · Local')
     await inv('connections:setOn', account.id, true)
     const home = path.join(accountsRoot, account.id)
+
+    // --- What the user sees, light and dark (kept with --keep-files): Provider Setup's tab, Settings → Accounts with the
+    // OpenCode account, its Settings page and its Advanced tab, all with the fake opencode.
+    const shots = async (name, target = page) => {
+      while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
+      await page.mouse.move(5, 5)
+      for (const theme of ['light', 'dark']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+        await target.screenshot({ path: path.join(lib.WORK, `opencode-${name}-${theme}.png`) })
+      }
+      await page.evaluate(() => document.documentElement.removeAttribute('data-theme'))
+    }
+    await page.keyboard.press('Control+Shift+P')
+    await page.locator('.palette input').waitFor({ timeout: HUNG_MS })
+    await page.keyboard.type('Provider Setup')
+    await page.locator('.palette-item[data-command="help.agentSetup"]').waitFor({ timeout: HUNG_MS })
+    await page.keyboard.press('Enter')
+    const setup = page.locator('.dialog', { hasText: 'Provider Setup' })
+    await setup.locator('.setup-tab', { hasText: 'OpenCode' }).click()
+    const setupText = await lib.until(async () => {
+      const t = await setup.innerText().catch(() => '')
+      return /2\.2\.6/.test(t) ? t : null
+    }, HUNG_MS)
+    check('Provider Setup has an OpenCode tab, the fake found (2.2.6) and nothing to fix', !!setupText && !/not installed/i.test(setupText), setupText ?? '')
+    await shots('setup', setup)
+    console.log(`INFO Provider Setup → OpenCode says: ${(setupText ?? '').replace(/\s+/g, ' ').slice(0, 600)}`)
+    await page.keyboard.press('Escape')
+    await setup.waitFor({ state: 'detached', timeout: HUNG_MS })
+    await page.keyboard.press('Control+,')
+    await page.locator('.settings-nav').waitFor({ timeout: HUNG_MS })
+    await page.locator('.settings-nav .row[data-section="accounts"]').click()
+    const accountsText = await lib.until(async () => {
+      const t = await page.locator('.settings-content, .settings-page, main').first().innerText().catch(() => '')
+      return /OpenCode · Local/.test(t) ? t : null
+    }, HUNG_MS)
+    check('Settings → Accounts lists the OpenCode account', !!accountsText)
+    await shots('accounts')
+    console.log(`INFO Settings → Accounts says of it: ${(accountsText ?? '').replace(/\s+/g, ' ').match(/.{0,200}OpenCode · Local.{0,300}/)?.[0] ?? ''}`)
+    await page.locator('.settings-nav .row', { hasText: 'OpenCode' }).first().click()
+    await lib.until(async () => (await page.locator('.settings-nav .row.selected', { hasText: 'OpenCode' }).count()) > 0, HUNG_MS)
+    await shots('settings')
+    await page.locator('.settings-nav .row', { hasText: 'Advanced' }).click()
+    const ocTab = page.locator('.advanced-tabs [role="tab"][data-tab="opencode"]')
+    await ocTab.waitFor({ timeout: HUNG_MS })
+    await ocTab.click()
+    // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
+    const rows = await lib.until(async () => {
+      const n = await page.locator('.advanced-row[data-advanced^="opencode."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)
+      return n === 5 ? n : null
+    }, HUNG_MS)
+    check('Settings → Advanced has an OpenCode tab with its five values', rows === 5)
+    await shots('advanced')
+    await page.keyboard.press('Escape')
+    await page.getByText('alpha', { exact: true }).first().click()
     const started = await failure(inv('session:start', alpha, { agentId: agent.id }))
     check('it starts on the OpenCode account', started === null, started ?? '')
 
