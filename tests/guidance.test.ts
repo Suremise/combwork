@@ -1007,6 +1007,22 @@ describe("RELEASING.md's release path", () => {
     expect(section('Steps')).toMatch(/^These are the steps for an uploaded release/m)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists each step that needs it/)
   })
+  // HI-2804 (the user, 9 Nov): main's ruleset needs a pull request with CI green, merge commits only, and an admin bypass
+  // for emergencies alone; releases and patches reach main by pull request.
+  it('reaches main only by pull request, merged with a merge commit, the bypass an emergency only', () => {
+    const path = section('The release path')
+    expect(path).toMatch(/### `main` is protected[\s\S]*\*\*Everything reaches `main` through a pull request with CI green\*\*[\s\S]*`git push origin main` is refused/)
+    expect(path).toMatch(/\*\*A pull request into `main` is merged with a merge commit\*\*[\s\S]*never squashed or rebased/)
+    expect(path).toMatch(/\*\*The admin bypass is for an emergency only\*\*[\s\S]*on a pull request only[\s\S]*Using it is the user's decision[\s\S]*recorded on the release card/)
+    expect(path).toMatch(/\*\*A patch\*\* \(`x\.y\.1`\) comes from `main`, on a \*\*patch branch\*\* made from it/)
+    expect(path).not.toMatch(/fix cards merge into `main` \(or/)
+    expect(section("The user's OK")).toMatch(/the admin bypass of `main`'s protection/)
+    for (const copy of ['.claude', '.agents']) {
+      const skill = readFileSync(join(ROOT, copy, 'skills', 'release-combwork', 'SKILL.md'), 'utf8')
+      expect(skill).toMatch(/\*\*`main` is protected\*\*[\s\S]*`git push origin main` is refused[\s\S]*merge commit[\s\S]*never squashed or rebased[\s\S]*The admin bypass is for an emergency only/)
+      expect(skill).toMatch(/A patch \(`x\.y\.1`\) comes from `main` with the fix-round budget, on a patch branch/)
+    }
+  })
 })
 
 describe("Combwork's development skills", () => {
