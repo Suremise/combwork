@@ -637,3 +637,38 @@ describe("the history's ownership across a removal and a new worker (HI-2762, HR
     }
   }, 60_000)
 })
+
+describe("a refused removal gives the root back (HI-2762, HR1 round 2)", () => {
+  it('a removal whose export outlives the answer is refused, and the account, kept, publishes again once the export has ended', async () => {
+    // An export that ends only when the test lets it: the worker marks the root, waits for it past removeRoot's deadline.
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((r) => (release = r))
+    const deps = {
+      get: async () => ({ status: 404, body: '{}' }),
+      spawn: (f: string, a: string[], o: { env: Record<string, string>; cwd?: string }) => require('child_process').spawn(f, a, { env: o.env, cwd: o.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }),
+      endTree: (c: any) => void gate.then(() => c.kill()),
+      now: () => Date.now()
+    }
+    const h = await historyWorkerForTests('in-process', deps)
+    h.removeAckMs = 30
+    const home = tempDir('cw-oc-rmlate-')
+    const sid = 'ses_lateLATElateLATElateLATEla'
+    const begun = join(home, 'started.txt')
+    const good = join(home, 'good.json')
+    writeFileSync(good, JSON.stringify({ info: { ...SHELL.info, id: sid }, messages: SHELL.messages }))
+    await h.ask({ type: 'export', home, sessionId: sid, reason: 'runEnd', command: { file: process.execPath, args: ['-e', `require('fs').writeFileSync(${JSON.stringify(begun)}, 'x'); setTimeout(() => {}, 60000)`], env: childEnv() } })
+    for (let i = 0; i < 2000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, 5))
+    expect(existsSync(begun)).toBe(true)
+    await expect(h.removeRoot(home)).rejects.toThrow(/didn't answer removeRoot/)
+    expect((h as any).removedHomes.size).toBe(0)
+    // The export is ended now; the removal's late answer changes nothing: the root is the kept account's again.
+    release()
+    await h.idle()
+    expect(existsSync(mirrorPath(home, sid))).toBe(false)
+    await h.ask({ type: 'export', home, sessionId: sid, reason: 'repair', command: { file: process.execPath, args: ['-e', `process.stdout.write(require('fs').readFileSync(${JSON.stringify(good)}))`], env: childEnv() } })
+    await h.idle()
+    expect(mirrorState(readFileSync(mirrorPath(home, sid), 'utf8')).header?.state).toBe('complete')
+    await h.stop()
+    await historyWorkerForTests(null)
+  }, 30_000)
+})

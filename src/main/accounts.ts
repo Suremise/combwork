@@ -230,7 +230,7 @@ const generation = (id: string): number => generations.get(id) ?? 0
 // ---------------------------------------------------------------------------
 
 /** For tests: run before each delete of a removal (with the folder it is in), to change the folder meanwhile. */
-export const accountTestHooks: { beforeDelete?: (dir: string) => Promise<void>; beforeOrderRead?: () => Promise<void>; beforeUsersRead?: () => Promise<void> } = {}
+export const accountTestHooks: { beforeDelete?: (dir: string) => Promise<void>; beforeOrderRead?: () => Promise<void>; beforeUsersRead?: () => Promise<void>; removingMs?: number } = {}
 
 /** Why a folder can't be used or removed safely, in English (the log and `leftover`), with the text for the user. */
 class Unsafe extends Error {}
@@ -844,12 +844,25 @@ async function letGo(id: string): Promise<() => void> {
         log.warn('taking back an account removal hook failed', e)
       }
   }
+  const ms = accountTestHooks.removingMs ?? REMOVING_MS
   for (const fn of removingHooks) {
     let timer: ReturnType<typeof setTimeout> | undefined
+    const asked = fn(id)
     try {
-      undos.push(await Promise.race([fn(id), new Promise<never>((_, no) => (timer = setTimeout(() => no(new Error(`no answer in ${REMOVING_MS} ms`)), REMOVING_MS)))])) // i18n-ignore: an internal error, for the log
+      undos.push(await Promise.race([asked, new Promise<never>((_, no) => (timer = setTimeout(() => no(new Error(`no answer in ${ms} ms`)), ms)))])) // i18n-ignore: an internal error, for the log
     } catch (e) {
       undo()
+      // One that answers after the deadline is taken back when it does: the removal it let go for was refused.
+      asked.then(
+        (late) => {
+          try {
+            late()
+          } catch (x) {
+            log.warn('taking back an account removal hook failed', x)
+          }
+        },
+        () => undefined
+      )
       throw e
     } finally {
       clearTimeout(timer)

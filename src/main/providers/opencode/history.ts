@@ -6,7 +6,7 @@ import type { PlanUsage } from '../../../shared/types'
 import { advanced } from '../../advanced'
 import { createLogger, userText } from '../../logger'
 import { bundledScriptExists, workerHere, workerStarted } from '../../workerThreads'
-import type { CoreEvent, CoreReply, CoreRequest, CommandSpec } from './historyCore'
+import type { CoreDeps, CoreEvent, CoreReply, CoreRequest, CommandSpec } from './historyCore'
 import { mirrorDir, mirrorPath } from './historyCore'
 import { placeholderMirror } from './mirror'
 import { serverInfoPath } from './launcher'
@@ -80,7 +80,7 @@ class HistoryThread {
     if (!this.inProcess && (scriptForTests === 'in-process' || !bundledScriptExists(workerScript()))) {
       if (scriptForTests !== 'in-process') workerHere('OpenCode history', "its script isn't there") // i18n-ignore: Copy Diagnostics' report, in English
       const { HistoryCore } = await import('./historyCore')
-      const core = new HistoryCore((e) => this.reply(e))
+      const core = new HistoryCore((e) => this.reply(e), coreDepsForTests ?? undefined)
       this.inProcess = (m) => core.handle(m)
     }
     if (this.inProcess) {
@@ -130,6 +130,8 @@ class HistoryThread {
 }
 
 let scriptForTests: string | null = null
+/** Tests: the in-process core's dependencies (its server reads, its processes). */
+let coreDepsForTests: CoreDeps | null = null
 const workerScript = (): string => (scriptForTests && scriptForTests !== 'in-process' ? scriptForTests : join(__dirname, 'opencode-history-worker.js'))
 
 export class OpencodeHistory {
@@ -141,6 +143,8 @@ export class OpencodeHistory {
   /** Sessions a first-read export was queued for, this process: once each until its state changes. */
   private asked = new Set<string>()
 
+  /** How long removeRoot waits for the worker's answer (tests shorten it). */
+  removeAckMs = 5000
   /** Roots whose removal the worker acknowledged (and not taken back): a restarted worker is told again first. */
   private removedHomes = new Set<string>()
 
@@ -299,7 +303,14 @@ export class OpencodeHistory {
    * it back (a removal refused later).
    */
   async removeRoot(home: string): Promise<() => void> {
-    await this.thread.ask({ type: 'removeRoot', home }, 5000)
+    try {
+      await this.thread.ask({ type: 'removeRoot', home }, this.removeAckMs)
+    } catch (e) {
+      // The worker may have marked the root before it answered (its exports still ending): the removal is refused, so the
+      // root is given back now, in order after the removal, whenever that ends (HR1 on HI-2762, round 2).
+      void this.thread.ask({ type: 'restoreRoot', home }).catch(() => undefined)
+      throw e
+    }
     const h = home.toLowerCase()
     this.removedHomes.add(h)
     for (const t of [...this.runs.values()])
@@ -353,9 +364,10 @@ export class OpencodeHistory {
 export let opencodeHistory = new OpencodeHistory()
 
 /** Tests: the worker from this script (a build of opencodeHistoryWorker.ts), 'in-process', or null for the default; a new history. */
-export async function historyWorkerForTests(script: string | null): Promise<OpencodeHistory> {
+export async function historyWorkerForTests(script: string | null, deps?: CoreDeps): Promise<OpencodeHistory> {
   await opencodeHistory.stop()
   scriptForTests = script
+  coreDepsForTests = deps ?? null
   opencodeHistory = new OpencodeHistory()
   return opencodeHistory
 }
