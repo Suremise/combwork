@@ -18,5 +18,10 @@
     "version": "1.5.0",
     "testedAt": "2026-11-08",
     "record": "1f8dc3f0c1c3"
+  },
+  "opencode": {
+    "version": "2.2.6",
+    "testedAt": "2026-11-09",
+    "record": "b71c09355837"
   }
 }
