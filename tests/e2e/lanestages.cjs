@@ -210,6 +210,14 @@ const beta = path.join(fx.ws, 'beta')
     check('…no old rules set by it: the Review card still has none, the lanes as they were', (await badge(r))?.oldRules === false && JSON.stringify((await inv('lanes:list')).map((l) => [l.id, l.oldRules])) === JSON.stringify(before), JSON.stringify((await inv('lanes:list')).map((l) => [l.id, l.oldRules])))
     check('…the legend lists the rename', !!(await hover(bar, (t) => t.includes('Ready'))), await tipText())
 
+    // From here the workflow changes (Solo, the rules turned off and on) restart the project's agents for it in the
+    // background (HI-2694): one working just then (R1, on a wake) is asked about in a dialog, whenever that comes, and the
+    // dialog takes the window's clicks and hovers (HI-2816: rc.1's loaded run, at the lane header's link and the Merges
+    // tab). Nothing here is about it: answered Later whenever it is in an action's way.
+    await page.addLocatorHandler(page.locator('.overlay', { hasText: 'for the new workflow?' }), async (d) => {
+      console.log(`INFO answered Later: ${(await d.innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 120)}`)
+      await d.getByRole('button', { name: 'Later', exact: true }).click()
+    })
     // A change of the stages themselves (Solo: no review, nothing merging; HR4's round 1): the lanes and cards under old
     // rules keep their own stages, by the names now.
     const solo = (await inv('workflow:form', fx.alpha)).presets.find((p) => p.id === 'solo')?.options
@@ -236,27 +244,16 @@ const beta = path.join(fx.ws, 'beta')
     // --- Links: the lane header's project opens its Version Control tab at Workflow; the queue card at Merge queue.
     const link = row(l2).locator('.progress-lane-project')
     check("the lane header names its project, with its accessible name", (await link.innerText()) === 'alpha' && /open its workflow in Version Control/.test((await link.getAttribute('aria-label')) ?? ''), await row(l2).innerText())
-    // Turning the rules off and on (above) restarts the project's agents for the workflow in the background (HI-2694): one
-    // working just then (R1, on a wake) is asked about in a dialog, whenever it comes, and that dialog takes the clicks
-    // (HI-2816: rc.1's loaded run). Answered Later wherever it is in the way: nothing here is about it.
-    const restartAsked = page.locator('.overlay', { hasText: 'for the new workflow?' })
-    const clickPast = async (target) => !!(await waitHung(async () => {
-      if (await restartAsked.count()) {
-        console.log(`INFO answered Later: ${(await restartAsked.innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 120)}`)
-        await restartAsked.getByRole('button', { name: 'Later', exact: true }).click().catch(() => undefined)
-      }
-      return target.click({ timeout: 2000 }).then(() => true, () => false)
-    }))
-    await clickPast(link)
+    await link.click()
     const section = (id) => page.locator(`[role="tab"][data-section="${id}"][aria-selected="true"]`)
     check("…a click opens alpha's Version Control tab at Workflow", !!(await waitHung(async () => (await section('workflow').count()) === 1)))
-    await clickPast(page.getByRole('button', { name: 'Task Board' }))
+    await page.getByRole('button', { name: 'Task Board' }).click()
     await showTab('merges')
     const queueLink = panel.locator('.progress-queue-link').first()
     await waitHung(async () => (await queueLink.count()) === 1)
-    await clickPast(queueLink)
+    await queueLink.click()
     check('the Merges tab’s queue card opens the Merge queue section', !!(await waitHung(async () => (await section('queue').count()) === 1)))
-    await clickPast(page.getByRole('button', { name: 'Task Board' }))
+    await page.getByRole('button', { name: 'Task Board' }).click()
     await showTab('pulse')
 
     // --- Solo: Pulse shows no lanes of beta (preset Solo) unless one runs; the Lanes tab keeps them.
