@@ -25,6 +25,14 @@ v3 adds checks that an edited skill was delivered as edited and a deleted one wa
   (`results/2026-11-07T18-12-02-fake-antigravity` at 87cad8778, no uncommitted changes; baseline
   `baselines/fake-antigravity.json`; guidance `0757e209cc3f05e7`). The fake agy runs its hooks' commands as agy 1.5.0
   does (`cmd /c`, its quotes escaped), names a conversation only with its first prompt, and its model calls take 700 ms.
+- **Fake OpenCode** (HI-2760, 9 Nov 2026): fixtures v127, all 20 of its set pass (`results/2026-11-09T02-45-36-fake-opencode`
+  at d75e2b45b, no uncommitted changes; baseline `baselines/fake-opencode.json`; guidance `0757e209cc3f05e7`; the fake
+  opencode 2.2.6). 33 more wait for a card, each by id in `fakeScope.cjs`'s SCENARIO_WAITS: 32 for HI-2762 (their checks
+  read the agent's transcript: skills read, Combwork's replies, its last reply, the line Combwork typed; every other check
+  of theirs passed in `2026-11-09T01-59-16-fake-opencode`) and `assistant-journal-recall` for HI-2771 (no state view at an
+  OpenCode Assistant's start). Before HI-2760 none ran ("No scenario to run": HI-2761's hold, an OpenCode agent having no
+  turn status). The first full run found a launch's first task never reaching the TUI (`fresh-start-saves-first`; now
+  `--prompt`) and `launchedIn` not reading OpenCode's guidance (`mode-coordinator-plans`), both fixed on HI-2760.
 
 v4 added **card-detail** and **oversize-skill**; v5 adds two controlled pairs: **list-compact** / **list-detail** (the same
 three cards: 144 characters of compact list against 2,283 of explicit detail with the fake Codex, both correct) and

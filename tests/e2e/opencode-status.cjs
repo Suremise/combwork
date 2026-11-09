@@ -77,7 +77,13 @@ const turnEnds = () => lines().filter((e) => e.kind === 'turn-end')
     const s1 = await statusIs(['working', 'finished'])
     check('a prompt typed in the pane makes the agent working (or already finished)', s1 === 'working' || s1 === 'finished', String(s1))
     await lib.until(async () => turnEnds().length > ends, HUNG_MS)
-    check('…and finished at its end, as the TUI shows the reply', (await statusIs(['finished'])) === 'finished' && /Done: hello/.test(await screen()), (await screen()).slice(-400))
+    // The hook post and the TUI's output are separate streams: both are waited for together, and checked as one look saw them.
+    let seen = null
+    const replied = await lib.until(async () => {
+      seen = { status: (await live())?.status ?? null, screen: await screen() }
+      return seen.status === 'finished' && /Done: hello/.test(seen.screen)
+    }, HUNG_MS)
+    check('…and finished at its end, as the TUI shows the reply', !!replied, JSON.stringify({ status: seen?.status, screen: seen?.screen.slice(-400) }))
 
     // --- A permission: needs you while it asks, working once answered in the pane, finished.
     ends = turnEnds().length
@@ -94,8 +100,13 @@ const turnEnds = () => lines().filter((e) => e.kind === 'turn-end')
     ends = turnEnds().length
     await type('fail')
     await lib.until(async () => turnEnds().length > ends, HUNG_MS)
-    const f = await live()
-    check('a failed turn ends finished, failed', (await statusIs(['finished'])) === 'finished' && !!(f?.failedTurn || /refused|fail/i.test(f?.statusMessage ?? '')), JSON.stringify({ status: f?.status, msg: f?.statusMessage, failed: f?.failedTurn }))
+    // Finished and its failure, from the same look at the session (the hook post may land after the fake's log line).
+    let f = null
+    const failedSeen = await lib.until(async () => {
+      f = await live()
+      return f?.status === 'finished' && !!(f.failedTurn || /refused|fail/i.test(f.statusMessage ?? ''))
+    }, HUNG_MS)
+    check('a failed turn ends finished, failed', !!failedSeen, JSON.stringify({ status: f?.status, msg: f?.statusMessage, failed: f?.failedTurn }))
 
     // --- An interrupt: Esc in the pane while it works; ready again.
     ends = turnEnds().length

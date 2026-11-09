@@ -222,6 +222,9 @@ public static class CwStream {
         string id = G(m, "id") as string, type = G(m, "type") as string;
         if ((type == "user" && id != null && knownNow.Contains(id)) || (baselineIdle != null && id == baselineIdle)) { stop = true; boundary = "known"; break; }
         newestFirst.Add(ProjectMessage(m));
+        // A resumed session's baseline: its newest idle marker is where Combwork's knowledge starts (what closed before it is
+        // history), kept so Baseline records it; only the execution after it, if one runs, matters.
+        if (baseline && Intent == "resume" && type == "idle" && id != null) { stop = true; boundary = "known"; break; }
       }
       if (stop) break;
       cursor = G(G(reply, "cursor"), "next") as string;
@@ -261,21 +264,48 @@ public static class CwStream {
       bool settled; long w;
       var snap = Snapshot(baseline, out settled, out w);
       if (snap != null && settled) {
+        // A baseline establishes where Combwork's knowledge starts (design s22): one whose messages were bounded out (a
+        // message over the size bound, the page limit, the body's bound) isn't one, and the launch fails rather than guess.
+        if (baseline && (snap["boundary"] as string) == "partial") {
+          LastProblem = "the session's history couldn't be read within its bounds" + (LastProblem.Length > 0 ? " (" + LastProblem + ")" : "");
+          return false;
+        }
         lock (gate) {
           gen++;
           string body = Json.Serialize(new Dictionary<string, object> { { "hook_event_name", "OpencodeSnapshot" }, { "session_id", Session }, { "gen", gen }, { "snapshot", snap } });
-          if (postNow) {
-            if (!Post(body)) { LastProblem = "Combwork's hook server didn't take the first snapshot"; return false; }
-            foreach (string u in UsersOf(snap)) known.Add(u);
-          } else { queue.Clear(); queueBytes = 0; Enqueue(body, UsersOf(snap)); }
-          Baseline(snap, baseline);
-          foreach (var kv in held) if (kv.Key < 0 || kv.Key > w) Enqueue(EventBody(kv.Value, gen), UserOf(kv.Value));
-          held = null; heldBytes = 0;
+          // What this snapshot publishes, all or nothing: its body, then what was held beyond its watermark. More than the
+          // queue takes: nothing is published, what was held goes (the next snapshot has its durable part) and it holds anew.
+          var after = new List<KeyValuePair<string, string[]>>();
+          long bytes = body.Length;
+          bool fits = body.Length <= BodyMax;
+          if (held != null) foreach (var kv in held) if (kv.Key < 0 || kv.Key > w) {
+            string b = EventBody(kv.Value, gen);
+            if (b.Length > BodyMax) fits = false;
+            after.Add(new KeyValuePair<string, string[]>(b, UserOf(kv.Value))); bytes += b.Length;
+          }
+          int already = postNow ? queue.Count : 0;
+          long alreadyBytes = postNow ? queueBytes : 0;
+          if (!fits || already + 1 + after.Count > QueueItems || alreadyBytes + bytes > QueueBytes) {
+            held = new List<KeyValuePair<long, Dictionary<string, object>>>(); heldBytes = 0;
+            LastProblem = "more came while the session was read than the queue holds";
+          } else {
+            if (postNow) {
+              if (!Post(body)) { LastProblem = "Combwork's hook server didn't take the first snapshot"; return false; }
+              foreach (string u in UsersOf(snap)) known.Add(u);
+            } else {
+              queue.Clear(); queueBytes = 0;
+              queue.Enqueue(new KeyValuePair<string, string[]>(body, UsersOf(snap))); queueBytes += body.Length;
+            }
+            Baseline(snap, baseline);
+            foreach (var item in after) { queue.Enqueue(item); queueBytes += item.Key.Length; }
+            held = null; heldBytes = 0;
+            Monitor.PulseAll(gate);
+            posted.Set();
+            return true;
+          }
         }
-        posted.Set();
-        return true;
       }
-      if (snap != null) LastProblem = "the session kept changing while it was read";
+      if (snap != null && !settled) LastProblem = "the session kept changing while it was read";
       Thread.Sleep(wait);
       wait = Math.Min(wait * 2, 5000);
     }
@@ -378,7 +408,12 @@ public static class CwStream {
     while (!stopping) {
       kick.WaitOne(1000);
       if (stopping) return;
-      if (resync && connected) { resync = false; if (!Settle(false, DateTime.MaxValue, false)) resync = true; }
+      if (!resync || !connected) continue;
+      resync = false;
+      // Never ends the launcher: a repair that fails, however, is asked for again.
+      bool ok = false;
+      try { ok = Settle(false, DateTime.MaxValue, false); } catch (Exception e) { LastProblem = "a resync failed (" + e.GetType().Name + ")"; }
+      if (!ok) resync = true;
     }
   }
 
