@@ -2352,9 +2352,99 @@ changes. Git's runner and worker are untouched.
     revision, never a skipped run.
 - **Left to the J cards:** registering jj's context port and routing R9's six seams by the project's platform. Each
   seam is routed by the J card implementing its port, **before** that card enables it for jj: `slotWorkspaces()` and
-  `slotRelocation()` J2's, `lineHistory()` J3's, `queueIntegration()` J4's and J5's, `lineRepoReads()` and
-  `lineRepoOps()` J6's, as is jj's descriptor (its capabilities, operations and closed gates, aligned with HI-2822's
-  descriptor contract once that is on 1.5.0).
+  `slotRelocation()` J2's, `queueIntegration()` J4's and J5's, `lineRepoReads()` and `lineRepoOps()` J6's, as is jj's
+  descriptor (its capabilities, operations and closed gates, aligned with HI-2822's descriptor contract once that is on
+  1.5.0). `lineHistory()`: J3 supplies jj's history and evidence (below) unregistered; J6 composes them into jj's
+  adapter and routes `lineHistory()` before it enables jj.
+- **Several operation heads** (found by J3, HI-2831): detection's `jj git root` loads the repository, and with two
+  operation heads any command that does, `--ignore-working-copy` included, writes a merge operation. HI-2831 fixes
+  detection; J3's reads never load the repository unpinned.
+
+##### jj's history, attribution and evidence (1.5.0's J3, HI-2796)
+
+J3 built jj's side of port 3, unregistered as J0's runner is (jj isn't a `PlatformId`; J6 composes it): which commit a
+card's work is, whether a check or a pass earns credit, which card a commit belongs to, and the watcher. The rule it
+holds everywhere: **the change id and the immutable commit id are kept apart.** A change id follows rewrites (an
+association, a hint), but it can be divergent, split, squashed with another card's or made fresh for a commit Git made,
+so credit is only ever on the exact commit id and its content (R3.1, R3.2), and attribution only on recorded provenance
+(R3.5). Everything was established on the pinned 0.47.1 (HI-2796's probes) and is held by its real-jj tests.
+
+- **Reads never write** (R3.4): every read through jj is pinned, `--at-op <H>` (J0's `--ignore-working-copy` with
+  it), where H is the **single** operation head read from `.jj/repo/op_heads/heads` (a file per head). With two heads
+  any read that loads the repository writes a merge operation; `--at-op` never does. So with none or several heads
+  nothing is read through jj (unknown), and a pinned answer (`Pinned`, its op beside its value) is used only after the
+  head files still say exactly H. Answers are a value or a typed unknown (`heads`, `tool`, `failed`, `malformed`,
+  `ambiguous`, `none`, `moved`: protocol codes, as J0's), and only the pinned jj's are trusted (`jjSupported`).
+  `platform/jjReads.ts`: a commit (`commitAt`: its commit id, change id, parents, empty, divergent, conflict; named by
+  its full id or a revset giving exactly one, so a divergent change id is `ambiguous`, never one picked), a change id's
+  commits, a revision's files, a config value, and a commit's evolution (below).
+- **The view** (`platform/jjView.ts`), read synchronously on main with no process and bounded: the heads (at most 64,
+  each a 128-hex name), a workspace's checkout record (`working_copy/checkout`, at most 4 KB: protobuf field 2, the
+  64-byte operation id, and field 3, the workspace's name; any other field or wire type, a duplicate, a truncation or
+  a missing field is malformed) and, colocated, Git's state beside it (HEAD's content, the index, the workspace's and
+  the store's HEAD reflogs, packed refs, every ref and ref log under `refs/heads`, at most 1,024 entries, and an
+  operation under way). Its parts are read as one moment: the heads are read again after the rest, and a moved head
+  is unknown. Unreadable or malformed is null, never an empty token. An intent's fingerprint (`jjFingerprint`) is
+  exactly these parts: it never walks the working tree (rule 5); the tree's content is the boundary's.
+- **The snapshot boundary** (`platform/jjBoundary.ts`): the only place Combwork records a jj working copy, a separate
+  operation its caller authorises (a check's start and end; a submission, once J6 wires it), never something an
+  observer, reader or credit decision does. Under the store's repository lock (its caller's, port 1's `withRepoLock`
+  for the workspace's context once J6 composes jj: J3 imports no lock of Git's) it checks its owner (the lease lending
+  the workspace to the card) before the snapshot and after every await; takes the single head H0 (with `expect`, a
+  check's end, H0 must be exactly that, else `moved`); runs `jj util snapshot` (written, `auto-update-stale=false`:
+  a stale workspace refuses, `stale`; its recovery is J2's explicit operation); reads the moment the snapshot left
+  (head H1, the checkout record, which must be at H1 and name the workspace, and Git's state); reads, pinned at H1,
+  the workspace's @ and `snapshot.auto-track` (anything but `all()` refuses: an untracked file would escape it); then
+  checks the moment is still the same before answering `{ before: H0, op: H1, recorded: H1 ≠ H0, at, view }`. It never
+  retries onto a newer operation. Only the pinned jj writes. Refusals: `owner`, `heads`, `moved`, `stale`,
+  `cancelled`, `autoTrack`, `unknown`.
+- **A check run's credit** (`platform/jjChecks.ts`, the jj side of §16.13's bracket), decided by a pure function
+  (`jjCredit`) from the captures, in order:
+  1. the start boundary B1: anything recorded means disk wasn't @, so `dirty`;
+  2. tested: B1's @ is the revision, or an empty @ whose one parent is (jj's state after `jj commit`), else
+     `notContained`, as is a divergent or conflicted revision or @. Equal change ids count for nothing;
+  3. the start evidence E1 at H1: the revision's files (jj's list at H1), their and their folders' stat snapshot (off
+     main, `snapshotLine`'s), and the moment still B1's;
+  4. t0 once the write record has settled; the command; t1 once it has settled again;
+  5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
+     complete, the stat snapshot again (unequal or unreadable: `changed`);
+  6. the moment before the end boundary: still H1, the same checkout record and Git state, else `moved` (any
+     operation by anyone, a bookmark set elsewhere included; a plain Git commit jj hasn't imported shows in Git's
+     state);
+  7. the end boundary B2, strict at H1: anything since H1 is `moved`; anything it records (a raw write, an add, a
+     delete or a rename the watcher missed) is `changed`, as is another @;
+  8. the final moment after B2, still B2's and E1's, read with nothing awaited before the decision.
+  Unknown at any step fails closed.
+- **A pass carrying over** (`jjSameRevision`): the same commit id, or the same change by content (Git's own replay on
+  the Git-backed store, §16.3.2's), never equal change ids; a divergent or conflicted side never carries.
+- **Attribution** (`platform/jjAttribution.ts`): a commit is a card's only on positive provenance: its commit id, or one
+  in its **complete** evolution (`jj evolog`, pinned, at most 100 entries: a 101st means capped; each line validated;
+  the first the commit itself; the heads unchanged after), recorded for that card and no other. A squash's evolution
+  holds both sides (probed), so a squash across two cards is `several`; a change id in its evolution recorded for
+  another card is `changeId`; a divergent commit is `divergent`; an incomplete evolution is `history`. All ambiguous,
+  refused or left to the user. Nothing recorded (a Git commit imported, another workspace's commit) is none: the lease
+  only scopes which workspace's history is read, and never assigns a commit by itself.
+- **Facts' optional ids** (`platform/jjFacts.ts`, rule 4): `data.platform.jj = { changeId, commitId, operation?,
+  workspace? }`, in the field §16.4.1 keeps for one platform's own data (Started, Adopted and Submitted have it), each
+  field validated or the whole record ignored; old facts are read as written. A submission's ids count only when their
+  commit id is the fact's own revision (an adoption's, its head; never a start's base, the target's). No shared schema
+  changes.
+- **The watcher** (`platform/jjObserve.ts`): the heads' folder watched as a hint and a rescan (the minute's) for missed
+  events. On a new single head it reads the view pinned there (each local bookmark's commit, the workspace's @) and
+  reports `lineMoved` and `folderMoved` only while the heads are still that one. With several heads, or a conflicted
+  bookmark, it reads or reports nothing and its token (`refsNow`) is null. Disposing closes the watch, clears the
+  timer and aborts reads under way. Unsnapshotted edits never reach the operation log: the write record's file watch
+  (the common observer) covers them (R3.3).
+- **Tests:** `tests/jjHistory.test.ts` (hand-made `.jj` files and a simulated jj): the bounded readers and their
+  malformed inputs, the parsers and evolution's completeness (capped, malformed, truncated, not the commit), the facts'
+  readers, attribution's rules, the boundary's refusals, and the bracket with races at each barrier (an owner lost at an
+  await; an operation, a bookmark-only one included, during the run, before and inside the end boundary and before the
+  final read; a colocated Git change at the same points). `tests/jjHistoryReal.test.ts` on the pinned jj, the
+  acceptance (`CW_JJ_REAL=1`), feeding real operations through the production capture and decision functions: a
+  clean run, a raw write, an edit and its undo, a missed event, a plain Git commit and its import, a bookmark set during
+  the run and racing the end boundary, a Git ref racing it, a stable change id rewritten with new content (and a
+  description-only rewrite carrying by content), a divergent change, a split, a squash across two cards, a stale
+  workspace and the observer with two heads, which nothing merged.
 
 ##### Open: jj's target advance (J1's gate)
 
