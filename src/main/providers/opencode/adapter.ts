@@ -14,7 +14,7 @@ import { config } from '../../config'
 import { combworkError } from '../../combworkError'
 import { POWERSHELL } from '../../launchGate'
 import { compareVersions, exportSubtitleText, toSpawnable } from '../common'
-import type { CatalogRead, CommandSpec, ConnectionStatus, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
+import type { CatalogRead, CommandSpec, ConnectionStatus, StartContextDelivery, StartContextTrigger, ConversationParserLike, ExternalSession, ImageLocation, LaunchContext, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, UsageParser } from '../types'
 import { localDataRoot } from '../antigravity/home'
 import { AMBIENT_DIRS, AMBIENT_FILES, DATA_ENV, ambientIntegrations, opencodeEnv, opencodeHome } from './home'
 import { chosenAmbient, launchConfig, projectDecidesMcp, withTestProvider, writeConfigDir, type SavedCredentials } from './config'
@@ -24,6 +24,7 @@ import { expandOpencodeHook, normalizeOpencodeHook } from './events'
 import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerToken, sessionMark, sessionMarks } from './launcher'
 import { OpencodeConversationParser, OpencodeUsageParser, parseMirrorUsage } from './mirror'
 import { opencodeHistory } from './history'
+import { contextTrigger, deliverContext, trackContextRun } from './context'
 
 // OpenCode 2 as a Combwork provider (HI-2759, against 2.2.6; the runtime facts are HI-2758's). Each launch runs its own
 // private server, owned by the launcher (launcher.ts), on its account's roots (home.ts) with a private config folder
@@ -282,6 +283,8 @@ export class OpencodeAdapter implements ProviderAdapter {
     this.prepared.delete(ctx.runId)
     // Its history is read from its server, with its password, kept only here (history.ts).
     opencodeHistory.track(ctx.runId, ctx.privateDir, p.password)
+    // So is Combwork's state view put in its session (HI-2771: context.ts), for this run's session only.
+    trackContextRun(ctx.runId, ctx.privateDir, p.password, ctx.sessionId)
     const mode = ctx.permissionMode || OPENCODE_DESCRIPTOR.defaultPermissionMode
     const env = opencodeEnv({
       base: ctx.env,
@@ -329,6 +332,16 @@ export class OpencodeAdapter implements ProviderAdapter {
     if (body.hook_event_name === 'OpencodeSnapshot') opencodeHistory.nudge(sid, { kind: 'resync' })
     else if (body.hook_event_name === 'OpencodeEvent' && type.startsWith('session.execution.')) opencodeHistory.nudge(sid, { kind: 'turnEnd' })
     else if (body.hook_event_name === 'OpencodeEvent' && type === 'session.usage.updated' && typeof body.event.cost === 'number') opencodeHistory.nudge(sid, { kind: 'usage', cost: body.event.cost, at: typeof body.event.created === 'number' ? body.event.created : Date.now() })
+  }
+
+  // ---- The start context (HI-2771): its hooks take no reply, so the Assistant's state view goes into the session as an
+  // instruction entry, at the launch's first baseline (before its TUI starts) and after a compaction's end.
+  startContextTrigger(body: Record<string, any>): StartContextTrigger | null {
+    return contextTrigger(body)
+  }
+
+  deliverStartContext(runId: string, sessionId: string, text: string | null, signal: AbortSignal): Promise<StartContextDelivery> {
+    return deliverContext(runId, sessionId, text, signal)
   }
 
   normalizeHook(body: Record<string, any>): NormalizedHook {

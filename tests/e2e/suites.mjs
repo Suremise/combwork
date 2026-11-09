@@ -234,6 +234,7 @@ export const SUITES = [
   { name: 'onelinedesc' },
   { name: 'onopen' },
   { name: 'opencode' },
+  { name: 'opencode-assistant' },
   { name: 'opencode-history' },
   { name: 'opencode-isolation' },
   { name: 'opencode-launch' },

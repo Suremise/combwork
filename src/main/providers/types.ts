@@ -437,6 +437,17 @@ export interface SkillRoots {
 }
 
 /**
+ * A hook post that brings a start context into the session (HI-2771): its launch's start. A compaction's end comes as the
+ * normalized compactEnd hooks of its posts, live or recovered by a resync, each compaction once (SessionManager).
+ */
+export type StartContextTrigger = { source: 'start' }
+/**
+ * What putting or removing a start context did (HI-2771): put, removed (or none was there), not sent (no such run or
+ * server, or it was too large to send), refused, or uncertain (sent, then cut off: the server may have taken it).
+ */
+export type StartContextDelivery = 'put' | 'removed' | 'notSent' | 'tooLarge' | 'refused' | 'uncertain'
+
+/**
  * Everything Combwork needs from a coding-agent CLI. One adapter per provider, registered in
  * providers/index.ts; the rest of Combwork never checks which provider it is talking to.
  */
@@ -575,6 +586,16 @@ export interface ProviderAdapter {
    * carries it, as for a start.
    */
   readonly startContextAfterCompaction?: 'prompt'
+  /**
+   * A CLI whose start context goes into its session itself, not a hook's reply (HI-2771: OpenCode, whose hooks take no
+   * reply): which of its hook posts brings one (startContextTrigger) and how it is put or removed (deliverStartContext).
+   */
+  startContextTrigger?(body: Record<string, any>): StartContextTrigger | null
+  /**
+   * Puts the start context (text) in the run's session, or removes Combwork's own (null), within signal; never throws.
+   * What it did, as far as it knows: a request the signal cut off after it was sent is 'uncertain', never a success.
+   */
+  deliverStartContext?(runId: string, sessionId: string, text: string | null, signal: AbortSignal): Promise<StartContextDelivery>
   /**
    * Whether the turn a drain carries on comes back to Combwork as a new prompt hook, with the notice as its prompt (Copilot):
    * the turn ledger then takes it as Combwork's own in the running turn, not a new one.
