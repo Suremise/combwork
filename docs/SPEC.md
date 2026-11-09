@@ -2394,14 +2394,17 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   through Doing. **The move** is a compare and swap that holds git's own locks: the check outside every lock; then the
   lanes' lock, the board's, and a prepared `git update-ref --stdin` transaction verifying the line at H and `to` at T
   (`refHold.ts`: git's `.lock` files on both, so an agent's commit, reset or update-ref meanwhile fails on git's lock,
-  or one before it makes the prepare fail: `changed`); under them the card and its lane checked again as seen; then one
+  or one before it makes the prepare fail: `changed`); under them the card and its lane checked again as seen (its last fact's seq as checked: any fact since, a submission,
+  a verdict, an enqueue, options applied, refuses it as `changed`; a retarget's lane its id, ruleset, list and queued list
+  as its preview saw them); then one
   board write; last, in the tick the write commits in, the hold still held (its git not ended, its input not broken),
   else the write is undone. The transaction is closed after the write settles (`abort`, stdin closed, its exit waited for
   a bound, then ended). Only the wait for the prepare is bounded (`REF_HOLD`); once prepared, nothing but that close (or
   git dying, whose locks then stay) releases the locks. Git aborts a transaction whose input ends before `commit` and
   removes its locks, Combwork quitting included; **Combwork never removes a lock file**: someone else's, or one a git
   killed hard left, refuses the move naming the file (`locked`), for the user to remove once no git runs there. **Who**:
-  the user, the Assistant or a script, never an agent: `tasks.setTarget` on a card in flight (the card dialog,
+  the user, the Assistant or a script, never an agent: `tasks.setTarget` on a card in flight (the card dialog's Merges
+  into, open for a card in flight and showing the branch it merges into now: `WorkBadge.startedOn`,
   `cw_update_task` `target`, run in a change of its own before any other part of the update, the Agent API), refused while
   the card's running lane is on another branch (`lane`); and the retarget below, whose preview lists such cards
   (`cards.move` with `started`: the head checked and its own target, which the apply expects with `expectFrom` and

@@ -74,6 +74,11 @@ export interface CardMoveCheck {
   base?: string
   /** Its running lane as it was seen (its id and ruleset). */
   lane?: { id: string; ruleset: string; target: string | null }
+  /**
+   * The card's last fact when it was checked (HR2's round 1, finding 1): any fact since (a submission, a verdict, an
+   * approval, an enqueue, options applied) changes what the proof was made for, so the move is refused as changed.
+   */
+  seq: number
 }
 
 export type CheckResult = { ok: true; check: CardMoveCheck } | ({ ok: false } & MoveRefusal)
@@ -82,6 +87,21 @@ const ZERO = /^0+$/
 const FULL = /^[0-9a-f]{40}([0-9a-f]{24})?$/
 
 /** The lane a card is in, while it runs, with its target (the one its ruleset marks, else the ruleset's G7). */
+/** A running lane as a preview saw it (HR2's round 1, finding 2): the apply moves it only while it is still so. */
+export interface LaneSeen {
+  id: string
+  ruleset: string
+  cards: number[]
+  pending: number[] | null
+}
+
+/** Whether lane `id` is still as `seen` (its record, ruleset, list and queued list), read where the caller holds the locks. */
+export function laneStill(wf: Workflow, seen: LaneSeen): boolean {
+  const rec = wf.lane(seen.id)
+  const same = (a: readonly number[] | null, b: readonly number[] | null): boolean => (a === null || b === null ? a === b : a.length === b.length && a.every((x, i) => x === b[i]))
+  return !!rec && !rec.ended && rec.ruleset === seen.ruleset && same(rec.cards, seen.cards) && same(rec.pending, seen.pending)
+}
+
 export function laneOf(wf: Workflow, card: CardRecord): CardMoveCheck['lane'] | undefined {
   const rec = card.lane ? wf.lane(card.lane) : null
   if (!rec || rec.ended || !rec.ruleset) return undefined
@@ -137,7 +157,7 @@ export async function checkCardMove(wf: Workflow, projectPath: string, card: Car
     }
   } else if (reviewed) return { ok: false, why: 'reviewed' } // i18n-ignore: a reason's code, said in words where it is shown
   const lane = laneOf(wf, card)
-  return { ok: true, check: { card: card.id, key: card.key, from, to, line, head: H, toHead: T, ...(base ? { base } : {}), ...(lane ? { lane } : {}) } }
+  return { ok: true, check: { card: card.id, key: card.key, from, to, line, head: H, toHead: T, seq: s.lastSeq, ...(base ? { base } : {}), ...(lane ? { lane } : {}) } }
 }
 
 /** Whether `R ^target` and `R ^base` are the same commits (the reviewed change brings the same into the new target). */
@@ -303,7 +323,7 @@ export function stillAsChecked(wf: Workflow, card: CardRecord, c: CardMoveCheck)
   const s = wf.state(card)
   const first = movable(wf, s)
   if (first) return first.why === 'notStarted' ? { why: 'changed' } : first // i18n-ignore: a reason's code, said in words where it is shown
-  if (s.started!.target !== c.from || s.started!.line !== c.line) return { why: 'changed' } // i18n-ignore: a reason's code, said in words where it is shown
+  if (s.started!.target !== c.from || s.started!.line !== c.line || s.lastSeq !== c.seq) return { why: 'changed' } // i18n-ignore: a reason's code, said in words where it is shown
   const lane = laneOf(wf, card)
   if ((lane?.id ?? null) !== (c.lane?.id ?? null) || (lane?.ruleset ?? null) !== (c.lane?.ruleset ?? null)) return { why: 'changed' } // i18n-ignore: a reason's code, said in words where it is shown
   return null

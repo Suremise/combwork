@@ -9,7 +9,7 @@ import { RETURNED_COMMENT, returnedCommentFrom } from './workflow/queueState'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
 import { branchExists, dropEmptyLines, ownWork, pickTarget, projectTargets } from './workflow/targets'
-import { checkCardMove, holdChecked, IN_FLIGHT_STAGES, laneOf, MoveRefused, moveTestHooks, rulesInto, stillAsChecked, stillHeld, type MoveRefusal } from './workflow/retargetCard'
+import { checkCardMove, holdChecked, IN_FLIGHT_STAGES, laneOf, laneStill, MoveRefused, moveTestHooks, rulesInto, stillAsChecked, stillHeld, type LaneSeen, type MoveRefusal } from './workflow/retargetCard'
 import type { RefHold } from './platform/refHold'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
@@ -2097,7 +2097,7 @@ function moveRefusedError(n: number, r: MoveRefusal, v: { from: string; to: stri
  * makes it refuse), the card and its lane checked again, and one board write: its `Retargeted` fact (its rules merging
  * into the new target), its Merges into, and its lane's rules. Git's locks are released after the write settles.
  */
-async function moveInFlight(n: number, target: string | null, def: string, actor: TaskActor, wf: Workflow, projectPath: string, names: ReadonlyMap<string, string>, o: { commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; withLane?: boolean }): Promise<TaskCard> {
+async function moveInFlight(n: number, target: string | null, def: string, actor: TaskActor, wf: Workflow, projectPath: string, names: ReadonlyMap<string, string>, o: { commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; withLane?: LaneSeen | true }): Promise<TaskCard> {
   const ws = workspace
   const to = target ?? def
   if (ws.path && inBoardWrite(ws.path)) throw new Error('A card in flight is moved in a change of its own, never inside another board change') // i18n-ignore: a programming error, never shown
@@ -2126,6 +2126,8 @@ async function moveInFlight(n: number, target: string | null, def: string, actor
           if (o.expect !== undefined && (now.target ?? null) !== o.expect) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))
           const again = stillAsChecked(wf, now, c)
           if (again) throw new MoveRefused(again)
+          // A retarget's lane group: its lane only as its preview saw it (id, rules, list, queued list).
+          if (typeof o.withLane === 'object' && (c.lane?.id !== o.withLane.id || !laneStill(wf, o.withLane))) throw new MoveRefused({ why: 'changed' }) // i18n-ignore: a reason's code, said in words where it is shown
           const targets = await projectTargets(ws, projectPath).catch(() => null)
           if (o.expectDefault !== undefined && targets?.default !== o.expectDefault) throw new TaskConflictError(withValues(TARGET.defaultMoved, { card: cardRef(n) }))
           if (!targets || (targets.default !== to && !targets.others.includes(to))) throw new MoveRefused({ why: 'changed' }) // i18n-ignore: a reason's code, said in words where it is shown
@@ -2190,7 +2192,7 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
  * targets (null or the default: none of its own). Only while its branch has no work (never started, or nothing of its
  * own on a line it had), and as its running lane's, if any.
  */
-export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; expectFrom?: string; withLane?: boolean } = {}): Promise<TaskCard> {
+export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; expectFrom?: string; withLane?: LaneSeen | true } = {}): Promise<TaskCard> {
   if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
   const ws = workspace
   // Its project's runtime, before the board's lock (made the first time, it takes that lock itself).

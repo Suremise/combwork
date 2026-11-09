@@ -559,6 +559,8 @@ export interface WorkBadge {
   kindProposed: CardKind | null
   /** Its own Merges into (HI-2556), the card's now; absent: none (its lane's, shown on the lane, or the project's). */
   target?: string
+  /** HI-2753: in flight (Doing to Merging), the branch it started on and merges into now (`Started.target`, or a move's). */
+  startedOn?: string
   /** It skips review (#1625): who set it and their reason (the Review skipped mark); and an agent's proposal, its reason. */
   reviewSkip: ReviewSkip | null
   reviewSkipProposed: string | null
@@ -641,6 +643,7 @@ export function workBadge(v: WorkView, current?: string | null, stagesOf?: (rule
     kind: v.kind,
     kindProposed: v.kindProposed,
     ...(v.cardTarget ? { target: v.cardTarget } : {}),
+    ...(v.target && (v.stage === 'active' || v.stage === 'review' || v.stage === 'approved' || v.stage === 'merging') ? { startedOn: v.target } : {}),
     reviewSkip: v.reviewSkip,
     reviewSkipProposed: v.reviewSkipProposed,
     decisionSince: !!latest && v.decisions.generation > latest.generation,

@@ -1675,7 +1675,7 @@ export interface RetargetPreview {
   /** Running lanes on `from` that stay, with why (none given: more than one card of it in flight). */
   lanes: { id: string; name: string | null; builder: string; why?: RetargetCardKeep }[]
   /** HI-2753: running lanes on `from` that move to `to`, each with its card in flight (moved with it in one write), if any. */
-  laneMoves?: { id: string; name: string | null; builder: string; ruleset: string; card: { number: number; key: string; title: string; head: string; own: string | null } | null }[]
+  laneMoves?: { id: string; name: string | null; builder: string; ruleset: string; cards: number[]; pending: number[] | null; card: { number: number; key: string; title: string; head: string; own: string | null } | null }[]
 }
 
 /** Why a card stays on the old target in a retarget (HI-2680, HI-2753): its own work, or why its move in flight can't be made. */

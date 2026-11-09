@@ -285,6 +285,41 @@ describe('a card in flight on an integration branch that ended (HI-2753)', () =>
     expect((await wfOf(w, repo)).store.facts(n).find((f) => f.kind === 'Retargeted')?.data).toMatchObject({ head: head(repo, line) })
   })
 
+  it("a submission or a verdict between the check and the write changes what was proved: refused (HR2's round 1, finding 1)", async () => {
+    const { w, repo } = await workspace()
+    const { n, folder } = await started(w, repo)
+    const W1 = git(folder, 'rev-parse', 'HEAD')
+    commitIn(folder, 'second.txt')
+    // main has W1 already: the reviewed change W1+W2 against 1.2.0 isn't the one main would get (W2), so a reviewed card
+    // must be refused, though the card in Doing, as checked, could move.
+    git(repo, 'merge', '-q', '--no-ff', '-m', 'part of it', W1)
+    const other = await started(w, repo, 'Other')
+    await release(w, repo, { keepBranch: true })
+    const wf = await wfOf(w, repo)
+    rc.moveTestHooks.checked = async () => {
+      expect(await store.boardWrite(w, async () => wf.submit(`#${n}`, agentActor('b1'), { summary: 'Done' }))).toMatchObject({ ok: true })
+    }
+    try {
+      await expect(inWorkspace(w, () => tasks.setTarget(n, 'main', user))).rejects.toThrow(/changed while it was being moved/)
+    } finally {
+      rc.moveTestHooks.checked = undefined
+    }
+    expect(await stateOf(w, repo, n)).toMatchObject({ stage: 'review', started: { target: '1.2.0' } })
+    // Checked again now that it is reviewed: refused for what it is.
+    await expect(inWorkspace(w, () => tasks.setTarget(n, 'main', user))).rejects.toThrow(/its reviewed work would bring other commits into main/)
+    // A verdict between the check and the write: refused too.
+    expect(await store.boardWrite(w, async () => wf.submit(`#${other.n}`, agentActor('b1'), { summary: 'Done' }))).toMatchObject({ ok: true })
+    rc.moveTestHooks.checked = async () => {
+      expect(await store.boardWrite(w, async () => wf.verdict(`#${other.n}`, agentActor('r1'), { pass: true, comment: 'ok', startReview: true }))).toMatchObject({ ok: true })
+    }
+    try {
+      await expect(inWorkspace(w, () => tasks.setTarget(other.n, 'main', user))).rejects.toThrow(/changed while it was being moved/)
+    } finally {
+      rc.moveTestHooks.checked = undefined
+    }
+    expect((await stateOf(w, repo, other.n)).started?.target).toBe('1.2.0')
+  })
+
   it('an enqueue or a lane started between the check and the write: refused under the locks, nothing moved', async () => {
     const { w, repo } = await workspace()
     const { n } = await started(w, repo)
@@ -464,6 +499,59 @@ describe('a running lane and its card in flight (HI-2753)', () => {
     const again = await inWorkspace(w, () => retarget.retargetApply(w, repo, p, user))
     expect(again.moved.lanes).toEqual([])
     expect(again.skipped[0]).toMatchObject({ why: 'changed' })
+  })
+})
+
+describe("a lane as its preview saw it (HR2's round 1, finding 2)", () => {
+  it('a card added to the running lane after the preview: the lane and its card stay (changed); a fresh preview moves them', async () => {
+    const { w, repo } = await workspace()
+    const c = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Lane card', project: 'p' }, user)).number)
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [c], by: 'You' })
+    const wf = await wfOf(w, repo)
+    if (wf.state(wf.store.card(c)).stage === 'todo') expect(await store.boardWrite(w, async () => wf.start(`#${c}`, agentActor('b1')))).toMatchObject({ ok: true })
+    const s0 = wf.state(wf.store.card(c))
+    if (!existsSync(s0.started!.folder)) git(repo, 'worktree', 'add', '-q', '-b', s0.started!.line!, s0.started!.folder, s0.started!.base!)
+    commitIn(s0.started!.folder, 'lane.txt')
+    await release(w, repo, { keepBranch: true })
+    const p = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.2.0', 'main'))
+    expect(p.laneMoves).toHaveLength(1)
+    // D joins the running lane after the preview (its list queued while C is in flight: either way not as seen).
+    const d = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Joins later', project: 'p' }, user)).number)
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [c, d], by: 'You' })
+    const r = await inWorkspace(w, () => retarget.retargetApply(w, repo, p, user))
+    expect(r.moved.lanes).toEqual([])
+    expect(r.moved.cards).toEqual([])
+    expect(r.skipped).toEqual([expect.objectContaining({ card: c, why: 'changed' })])
+    expect(wf.state(wf.store.card(c)).started?.target).toBe('1.2.0')
+    expect(targetOfRulesetId(wf.lane(wf.store.card(c).lane!)!.ruleset!)).toBeNull()
+    // Seen again: it moves with its new list.
+    const p2 = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.2.0', 'main'))
+    const r2 = await inWorkspace(w, () => retarget.retargetApply(w, repo, p2, user))
+    expect(r2.moved.lanes).toHaveLength(1)
+    expect(wf.state(wf.store.card(c)).started?.target).toBe('main')
+  })
+
+  it('a lane with no card in flight whose list or rules changed after the preview stays (changed)', async () => {
+    const { w, repo } = await workspace()
+    const c = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Todo in lane', project: 'p' }, user)).number)
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [c], by: 'You' })
+    const wf = await wfOf(w, repo)
+    if (wf.state(wf.store.card(c)).stage !== 'todo') expect(await store.boardWrite(w, async () => wf.putBack(`#${c}`, 'user'))).toMatchObject({ ok: true })
+    await release(w, repo, { keepBranch: true })
+    const p = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.2.0', 'main'))
+    expect(p.laneMoves).toEqual([expect.objectContaining({ card: null })])
+    const d = await inWorkspace(w, async () => (await tasks.createTask({ title: 'Joins later', project: 'p' }, user)).number)
+    await lanes.startLane(w, { project: 'p', builder: 'b1', reviewer: 'r1', cards: [c, d], by: 'You' })
+    const r = await inWorkspace(w, () => retarget.retargetApply(w, repo, p, user))
+    expect(r.moved.lanes).toEqual([])
+    expect(r.skipped).toEqual([expect.objectContaining({ why: 'changed', detail: 'the lane changed meanwhile' })])
+    // Its rules as a stale preview saw them: stays too.
+    const p2 = await inWorkspace(w, () => retarget.retargetPreview(w, repo, '1.2.0', 'main'))
+    const stale = { ...p2, laneMoves: p2.laneMoves!.map((l) => ({ ...l, ruleset: `${l.ruleset}~target:other` })) }
+    const r2 = await inWorkspace(w, () => retarget.retargetApply(w, repo, stale, user))
+    expect(r2.moved.lanes).toEqual([])
+    const r3 = await inWorkspace(w, () => retarget.retargetApply(w, repo, p2, user))
+    expect(r3.moved.lanes).toHaveLength(1)
   })
 })
 

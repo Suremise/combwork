@@ -21,7 +21,7 @@ import { projectAgents } from '../../shared/defaults'
 import { targetedOf, targetOfRulesetId } from '../../shared/workflow/compile'
 import { workflowFor } from './service'
 import { hasOwnWork, projectTargets } from './targets'
-import { checkCardMove, IN_FLIGHT_STAGES, laneOf, type MoveWhy } from './retargetCard'
+import { checkCardMove, IN_FLIGHT_STAGES, laneOf, laneStill, type MoveWhy } from './retargetCard'
 import type { RetargetPreview, RetargetResult } from '../../shared/types'
 import { combworkError } from '../combworkError'
 import { fmt, msg } from '../../shared/i18n'
@@ -80,7 +80,8 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       out.cards.keep.push({ ...row(c), why })
       continue
     }
-    out.laneMoves.push({ ...lane, ruleset: wf.lane(l.id)!.ruleset!, card: c && checked?.ok ? { ...row(c), head: checked.check.head, own: c.target ?? null } : null })
+    const rec = wf.lane(l.id)!
+    out.laneMoves.push({ ...lane, ruleset: rec.ruleset!, cards: [...rec.cards], pending: rec.pending ? [...rec.pending] : null, card: c && checked?.ok ? { ...row(c), head: checked.check.head, own: c.target ?? null } : null })
   }
   for (const c of cards) {
     const s = wf.state(c)
@@ -175,7 +176,7 @@ export async function retargetApply(ws: WorkspaceService, projectPath: string, p
     }
     try {
       if (l.card) {
-        await setTarget(l.card.number, to, actor, { commit: still, expect: l.card.own, expectDefault: to, expectHead: l.card.head, expectFrom: from, withLane: true })
+        await setTarget(l.card.number, to, actor, { commit: still, expect: l.card.own, expectDefault: to, expectHead: l.card.head, expectFrom: from, withLane: { id: l.id, ruleset: l.ruleset, cards: l.cards, pending: l.pending } })
         out.moved.cards.push({ number: l.card.number, key: l.card.key })
       } else await moveLaneAlone(ws, projectPath, l, from, to, still)
       out.moved.lanes!.push(name)
@@ -234,11 +235,11 @@ async function moveLaneAlone(ws: WorkspaceService, projectPath: string, l: NonNu
   await withLanesLock(ws, () =>
     boardWrite(ws, async () => {
       const rec = wf.lane(l.id)
-      if (!rec || rec.ended || rec.ruleset !== l.ruleset) throw new Error('the lane changed meanwhile') // i18n-ignore: a reason's detail (English)
+      if (!rec || !laneStill(wf, { id: l.id, ruleset: l.ruleset, cards: l.cards, pending: l.pending })) throw new Error('the lane changed meanwhile') // i18n-ignore: a reason's detail (English)
       if (wf.store.cards().some((c) => c.lane === l.id && IN_FLIGHT_STAGES.includes(wf.state(c).stage) && wf.state(c).started?.target === from)) throw new Error('a card of the lane started meanwhile') // i18n-ignore: a reason's detail (English)
       if ((await projectTargets(ws, projectPath).catch(() => null))?.default !== to) throw new Error('the target changed meanwhile') // i18n-ignore: a reason's detail (English)
       still()
-      const r = targetedOf(wf.store.ruleset(rec.ruleset), to)
+      const r = targetedOf(wf.store.ruleset(l.ruleset), to)
       wf.store.saveRuleset(r)
       wf.store.saveLane({ ...rec, ruleset: r.id })
       boardChanged(ws)
@@ -297,7 +298,7 @@ export function retargetArg(raw: unknown): RetargetPreview {
     r.cards!.move.every((c) => Number.isInteger(c?.number) && typeof c.key === 'string' && (c.started === undefined || (str(c.started?.head) && (c.started.own === null || str(c.started.own))))) &&
     Array.isArray(r.slots?.move) &&
     r.slots!.move.every((s) => str(s?.name) && str(s.folder) && (s.target === null || str(s.target)) && str(s.head)) &&
-    (r.laneMoves === undefined || (Array.isArray(r.laneMoves) && r.laneMoves.every((l) => str(l?.id) && str(l.ruleset) && typeof l.builder === 'string' && (l.card === null || (Number.isInteger(l.card?.number) && typeof l.card.key === 'string' && str(l.card.head) && (l.card.own === null || str(l.card.own)))))))
+    (r.laneMoves === undefined || (Array.isArray(r.laneMoves) && r.laneMoves.every((l) => str(l?.id) && str(l.ruleset) && typeof l.builder === 'string' && Array.isArray(l.cards) && l.cards.every(Number.isInteger) && (l.pending === null || (Array.isArray(l.pending) && l.pending.every(Number.isInteger))) && (l.card === null || (Number.isInteger(l.card?.number) && typeof l.card.key === 'string' && str(l.card.head) && (l.card.own === null || str(l.card.own)))))))
   if (!ok) throw new Error('A retarget is a preview: from, to, cards.move and slots.move') // i18n-ignore: a mistake in a caller, never the window's
   return { from: r!.from!, to: r!.to!, cards: { move: r!.cards!.move, keep: [] }, slots: { move: r!.slots!.move, keep: [] }, lanes: [], ...(r!.laneMoves ? { laneMoves: r!.laneMoves } : {}) }
 }

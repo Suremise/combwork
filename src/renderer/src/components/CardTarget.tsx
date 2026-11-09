@@ -8,7 +8,8 @@ import { Icon, Tooltip, useBusy } from './ui'
 
 // A card's Merges into in the window (HI-2556, SPEC §16.6.2 G7b): the branch its work is made from and merges into,
 // the project's Work merges into or one of its Other branches work can merge into. Set when the card is made, or later
-// while its branch has no work (main refuses it otherwise, saying why); shown on its tile when it isn't the project's.
+// while its branch has no work, or in flight with work all its own (HI-2753; main refuses it otherwise, saying why);
+// shown on its tile when it isn't the project's.
 
 const M = {
   field: msg({ id: 'board.target.field', defaultMessage: 'Merges into', description: 'HI-2556: a field label in the card dialog: the branch the card’s work is made from and merges into (Darren’s name for it).' }),
@@ -51,15 +52,19 @@ export function TargetMark({ b }: { b: WorkBadge | undefined }) {
 
 /**
  * The card dialog's Merges into, where the project lists other branches: for a new card, the choice it is made with;
- * for a card made, its branch and a choice that saves at once while it is in Todo (main checks it has no work).
+ * for a card made, its branch and a choice that saves at once while it is in Todo (main checks it has no work), or in
+ * flight (HI-2753: main moves it with its work kept, or refuses saying why).
  */
 export function TargetField(props: { card: TaskCard | null; b: WorkBadge | undefined; targets: LaneStartInfo['targets']; value: string; setValue: (v: string) => void; readOnly: boolean }) {
   const { card, b, targets, value, setValue, readOnly } = props
   const action = useBusy()
   useLanguage()
-  const own = card ? (b?.target ?? '') : value
+  // A card in flight shows the branch it merges into now (HI-2753): picking another moves it with its work kept, when main
+  // finds all of that work its own (else it says why); the project's own branch is the empty choice.
+  const flying = !!card && !!b?.startedOn
+  const own = card ? (flying ? (b!.startedOn === targets?.default ? '' : b!.startedOn!) : (b?.target ?? '')) : value
   if (!targets && !own) return null
-  const open = !card || !b || b.stage === 'hold' || b.stage === 'todo'
+  const open = !card || !b || b.stage === 'hold' || b.stage === 'todo' || flying
   const save = async (to: string): Promise<void> => {
     if (!card) return setValue(to)
     let failed: string | null = null

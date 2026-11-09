@@ -9,6 +9,7 @@
 //   preview is refused (409).
 // - HI-2753: a card in flight on 1.2.0 when 1.2.0 is released into integration: Save…'s Retarget offers it, its branch
 //   and work kept; saved, it moves (a Retargeted fact, its line where it was, its history says so) and submits.
+//   Another card in flight there moved from its dialog's Merges into (open for a started card), its line kept.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -166,7 +167,33 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     lib.git(b9.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
     lib.git(b9.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'In flight'])
     const head9 = git(fx.alpha, 'rev-parse', line9)
+    // A second card in flight on 1.2.0, on its own (no lane), to be moved from its dialog's Merges into.
+    const b10 = await q.agent(fx, h, 'B10')
+    const n10 = (await inv('tasks:create', { title: 'Moved from its dialog', project: 'alpha' })).number
+    const st10 = await q.startCard(fx, h, b10, n10)
+    const line10 = st10.body?.data?.line
+    fs.writeFileSync(path.join(b10.folder, 'dialog.txt'), 'from the dialog\n')
+    lib.git(b10.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
+    lib.git(b10.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'Dialog'])
+    const head10 = git(fx.alpha, 'rev-parse', line10)
     q.mergeOn(fx, 'integration', '1.2.0', '1.2.0 released into integration')
+    // The card dialog: its Merges into shows 1.2.0 (the project's) and is open for a card in flight; integration picked.
+    await q.showBoard(page)
+    await waitHung(async () => (await page.locator(`.task-card[data-task="${n10}"]`).count()) > 0)
+    await q.openByTitle(page, n10)
+    const field = page.locator('.dialog select#card-target')
+    await field.waitFor({ timeout: HUNG_MS })
+    await waitHung(async () => !(await field.isDisabled()))
+    check("a started card's dialog offers its Merges into", !(await field.isDisabled()), String(await field.getAttribute('data-card-target-field')))
+    await page.locator('.dialog').first().screenshot({ path: path.join(fx.shots, 'retarget-dialog-in-flight.png') }).catch(() => undefined)
+    await field.selectOption('integration')
+    const moved10 = await waitHung(async () => ((await h.kinds(n10)).includes('Retargeted') ? true : null)).catch(() => null)
+    check('…picked integration there: it moves, its line where it was', !!moved10 && git(fx.alpha, 'rev-parse', line10) === head10, JSON.stringify(await h.kinds(n10)))
+    await waitHung(async () => (await field.getAttribute('data-card-target-field')) === 'integration')
+    check('…the field shows integration now', (await field.getAttribute('data-card-target-field')) === 'integration', String(await field.getAttribute('data-card-target-field')))
+    await page.keyboard.press('Escape')
+    await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
+    await page.locator('.git-sections [data-section="workflow"]').click()
     const key9 = await keyOf(n9)
     await targetInput.waitFor({ timeout: HUNG_MS })
     await targetInput.fill('integration')
