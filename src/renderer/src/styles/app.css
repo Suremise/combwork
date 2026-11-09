@@ -4818,6 +4818,30 @@ h2.section#unused-worktrees {
   margin: 0 0 6px;
   line-height: 1.45;
 }
+/* A CLI's sign-in per GitHub host (HI-2779): a row each, its state beside the host. */
+.setup-hosts {
+  margin: 0 2px 12px;
+}
+.setup-hosts-h {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.setup-host {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+}
+.setup-host .hint {
+  margin: 2px 0 0;
+}
+.setup-host-diagnostic {
+  overflow-wrap: anywhere;
+}
+.setup-hosts > p.hint {
+  margin: 6px 0 0;
+  line-height: 1.45;
+}
 /* Settings → Accounts (HI-980) */
 .accounts-provider {
   display: flex;
