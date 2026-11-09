@@ -2,11 +2,11 @@
 // (mirror.ts), read from what 2.2.6 recorded (tests/fixtures/opencode/real-2.2.6); the worker core that reads, exports and
 // publishes it (historyCore.ts), with its serialized ownership, bounds and repair; and the main side's limits and live
 // cost handling (history.ts). The non-null usage/limits answer is from 2.2.6's openapi.json, never observed: labelled so.
-import { readFileSync, existsSync, writeFileSync, mkdirSync, utimesSync } from 'fs'
+import { readFileSync, existsSync, writeFileSync, mkdirSync, utimesSync, openSync, closeSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { HISTORY_TEXT, OpencodeConversationParser, buildMirror, forkCopies, inconsistentBreakdowns, mirrorState, opencodeImageData, opencodePlanUsage, opencodeUsage, parseExport, parseMirrorUsage, placeholderMirror, subagentSessions, withStatus, withoutStatus } from '../src/main/providers/opencode/mirror'
-import { Failed, HistoryCore, dbFiles, markPath, mirrorPath, plainLocalGet, statePath, type CoreEvent } from '../src/main/providers/opencode/historyCore'
+import { Failed, HistoryCore, dbFiles, markPath, mirrorPath, plainLocalGet, statePath, type CoreDeps, type CoreEvent } from '../src/main/providers/opencode/historyCore'
 import { OpencodeHistory, historyWorkerForTests } from '../src/main/providers/opencode/history'
 import { serverInfoPath } from '../src/main/providers/opencode/launcher'
 import { englishText } from '../src/shared/advanced'
@@ -255,22 +255,22 @@ function fakeGet(srv: FakeServer): (url: string, headers: Record<string, string>
   }
 }
 
-function newCore(srv: FakeServer, events: CoreEvent[] = []): HistoryCore {
+function newCore(srv: FakeServer, events: CoreEvent[] = [], extra: Partial<CoreDeps> = {}): HistoryCore {
   const g = fakeGet(srv)
   const core = new HistoryCore((e) => events.push(e), { get: async (url, headers, _signal, maxBytes) => {
     const r = await g(url, headers)
     if (Buffer.byteLength(r.body) > maxBytes) throw new Failed('size', 'too large')
     return r
-  }, spawn: (f, a, o) => require('child_process').spawn(f, a, { env: o.env, cwd: o.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }), endTree: (c) => c.kill(), now: () => Date.now() })
+  }, spawn: (f, a, o) => require('child_process').spawn(f, a, { env: o.env, cwd: o.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }), endTree: (c) => c.kill(), now: () => Date.now(), ...extra })
   return core
 }
 
 let req = 0
 const ask = (core: HistoryCore, body: any): Promise<unknown> => core.handle({ ...body, id: ++req })
 
-async function started(srv: FakeServer, home: string, runId = 'run1'): Promise<{ core: HistoryCore; events: CoreEvent[] }> {
+async function started(srv: FakeServer, home: string, runId = 'run1', extra: Partial<CoreDeps> = {}): Promise<{ core: HistoryCore; events: CoreEvent[] }> {
   const events: CoreEvent[] = []
-  const core = newCore(srv, events)
+  const core = newCore(srv, events, extra)
   await ask(core, { type: 'begin', home, sessionId: srv.info.id, runId })
   await ask(core, { type: 'server', runId, url: 'http://127.0.0.1:1', password: 'pw' })
   return { core, events }
@@ -1313,5 +1313,85 @@ describe("OpenCode sessions Combwork didn't make: discovery and adoption's mark 
     await ask(again, { type: 'idle' })
     expect(mirrorState(readFileSync(mirrorPath(home, lost), 'utf8')).header).toMatchObject({ state: 'complete', external: true })
     expect(again.repairCandidates([home])).toEqual([])
+  })
+})
+
+describe("a mirror's publication while a reader has it open (HI-2778)", () => {
+  const busy = (): Error => Object.assign(new Error('EPERM: operation not permitted, rename'), { code: 'EPERM' })
+
+  it("lands a live read whose rename a reader's open handle refuses twice, waiting between tries, and says so in the log", async () => {
+    const home = tempDir('cw-oc-hist-')
+    const srv = server()
+    const real = (await import('fs')).renameSync
+    let refused = 0
+    const pauses: number[] = []
+    const { core, events } = await started(srv, home, 'run1', {
+      rename: (a, b) => {
+        if (refused < 2) {
+          refused++
+          throw busy()
+        }
+        real(a, b)
+      },
+      pause: (ms) => void pauses.push(ms)
+    })
+    await ask(core, { type: 'refresh', runId: 'run1', force: true })
+    await ask(core, { type: 'idle' })
+    expect(mirrorState(readFileSync(mirrorPath(home, srv.info.id), 'utf8')).header).toMatchObject({ state: 'complete', source: 'api' })
+    expect(pauses).toEqual([10, 20])
+    expect(events.some((e) => e.event === 'published')).toBe(true)
+    expect(events.some((e) => e.event === 'log' && /published at try 3/.test(e.text))).toBe(true)
+    expect(readdirSync(join(home, 'combwork-sessions')).filter((f) => f.endsWith('.tmp'))).toEqual([])
+  })
+
+  it('publishes over a mirror another handle holds open once it is let go (a real handle: Windows refuses the rename meanwhile)', async () => {
+    const home = tempDir('cw-oc-hist-')
+    const srv = server()
+    mkdirSync(join(home, 'combwork-sessions'), { recursive: true })
+    writeFileSync(mirrorPath(home, srv.info.id), placeholderMirror())
+    let fd: number | null = openSync(mirrorPath(home, srv.info.id), 'r')
+    const { core } = await started(srv, home, 'run1', {
+      // The reader closes its handle at the first wait.
+      pause: () => {
+        if (fd !== null) closeSync(fd)
+        fd = null
+      }
+    })
+    try {
+      await ask(core, { type: 'refresh', runId: 'run1', force: true })
+      await ask(core, { type: 'idle' })
+    } finally {
+      if (fd !== null) closeSync(fd)
+    }
+    // Windows refused the rename while the handle was open: the publish waited, and landed once it was let go.
+    if (process.platform === 'win32') expect(fd).toBeNull()
+    expect(mirrorState(readFileSync(mirrorPath(home, srv.info.id), 'utf8')).header?.state).toBe('complete')
+  })
+
+  it("never throws out of an export's failure path when every rename is refused: the last mirror stays, the retry record is kept", async () => {
+    const home = tempDir('cw-oc-hist-')
+    const sid = 'ses_cccccccccccccccccccccccccc'
+    const events: CoreEvent[] = []
+    let tries = 0
+    const core = newCore(server(), events, {
+      rename: () => {
+        tries++
+        throw busy()
+      },
+      pause: () => undefined
+    })
+    mkdirSync(join(home, 'combwork-sessions'), { recursive: true })
+    writeFileSync(mirrorPath(home, sid), placeholderMirror())
+    const good = join(home, 'good.json')
+    writeFileSync(good, JSON.stringify({ info: { ...SHELL.info, id: sid }, messages: SHELL.messages }))
+    await ask(core, { type: 'export', home, sessionId: sid, reason: 'repair', command: { file: process.execPath, args: ['-e', `process.stdout.write(require('fs').readFileSync(${JSON.stringify(good)}))`], env: childEnv() } })
+    await ask(core, { type: 'idle' })
+    // The publish's five tries, then the notice's five.
+    expect(tries).toBe(10)
+    expect(readFileSync(mirrorPath(home, sid), 'utf8')).toBe(placeholderMirror())
+    expect(JSON.parse(readFileSync(statePath(home, sid), 'utf8'))).toMatchObject({ attempts: 1 })
+    expect(events.some((e) => e.event === 'log' && /notice couldn't be written/.test(e.text))).toBe(true)
+    expect(events.some((e) => e.event === 'log' && /export failed/.test(e.text))).toBe(true)
+    expect(readdirSync(join(home, 'combwork-sessions')).filter((f) => f.endsWith('.tmp'))).toEqual([])
   })
 })
