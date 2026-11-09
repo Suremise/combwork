@@ -333,9 +333,16 @@ processes in its own worker (`platform/jjWorker.ts` over `jjProcess.ts`, never G
 trusted (`jjSupported`; a newer one is `untested`); and `platform/jjDetect.ts` is read-only detection
 (`jjContextOf`: the workspace, its shared repository and Git store, linked, colocated, a nearer Git root, or unknown
 with a code). Neither is in `repoPorts.ts`; only Copy Diagnostics and the tests reach them (`tests/jjReal.test.ts` on
-the pinned jj, `npm run jj:fetch`). `platform/jjAdvanceProbe.ts` (J1, HI-2794) is evidence only, for the closed
-gate:advance (SPEC §16.3.6, "Open: jj's target advance"). It is one advance attempt step by step, plus a classifier
-of what it observed, and only its tests reach it (`tests/jjAdvanceProbeReal.test.ts`; `tests/integrationPortsImports.test.ts`
+the pinned jj, `npm run jj:fetch`). J3 (HI-2796; SPEC §16.3.6, jj's history, attribution and evidence) adds jj's side
+of port 3, unregistered too (J6 composes it): `platform/jjView.ts` (the operation heads, a checkout record and colocated
+Git state, read from files, bounded, no process), `jjReads.ts` (reads pinned `--at-op` the single head, used only while
+it still is), `jjBoundary.ts` (the one snapshot Combwork takes, under the store's lock and its owner's lease),
+`jjChecks.ts` (a check's bracket and its pure credit decision), `jjAttribution.ts` and `jjFacts.ts` (provenance from
+recorded commits and complete evolutions; the ids in `data.platform.jj`) and `jjObserve.ts` (the heads watched, read at
+one head). `tests/jjHistory.test.ts` and, on the pinned jj, `tests/jjHistoryReal.test.ts`. `platform/jjAdvanceProbe.ts`
+(J1, HI-2794) is evidence only, for the closed gate:advance (SPEC §16.3.6, "Open: jj's target advance": Darren decided
+on user-performed integration, no automatic advance). It is one advance attempt step by step, plus a classifier of what
+it observed, and only its tests reach it (`tests/jjAdvanceProbeReal.test.ts`; `tests/integrationPortsImports.test.ts`
 fails on any import of it from `src`).
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
