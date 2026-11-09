@@ -116,6 +116,18 @@ export interface LaunchConfigInput {
    * those given.
    */
   projectDecidesMcp?: boolean
+  /** Folders outside its own the session may read and write (#1439, LaunchContext.extraDirs): a reviewer's review copies. */
+  extraDirs?: readonly string[]
+}
+
+/**
+ * A folder's `external_directory` grant (HI-2772): 2.2.6 asks that permission for any path outside the session's folder,
+ * its resource the folder with forward slashes and `/*`, matched by the last rule that fits (slashes either way, any case).
+ * A config's top-level `permissions` come after each agent's own rules, so this allow wins over Build's ask, and it is
+ * the only action it names: whether an edit there is allowed stays the mode's (Plan's edit deny holds).
+ */
+export function externalDirRule(dir: string): { action: 'external_directory'; resource: string; effect: 'allow' } {
+  return { action: 'external_directory', resource: `${dir.replace(/\\/g, '/').replace(/\/+$/, '')}/*`, effect: 'allow' }
 }
 
 /**
@@ -140,6 +152,7 @@ export function launchConfig(i: LaunchConfigInput): Record<string, unknown> {
     mcp: { servers },
     // Claude Agent stays denied in every case; the MCP servers left to the project only as projectDecidesMcp says.
     policies: [...providerPolicies(i.ambient, i.saved, i.strip, i.ownProvider ?? null), ...(i.projectDecidesMcp ? [] : mcpPolicies(Object.keys(servers)))],
+    ...(i.extraDirs?.length ? { permissions: i.extraDirs.map(externalDirRule) } : {}),
     ...(i.instructions.length ? { instructions: i.instructions } : {})
   }
 }

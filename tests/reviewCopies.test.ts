@@ -91,8 +91,8 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(copiesDirOf('D:\\Work\\ws.worktrees', 'D:\\Work\\ws\\proj')).toBe(join('D:\\Work\\ws.worktrees', 'proj', COPIES_DIR))
   })
 
-  it('every provider Combwork has can be given folders, but OpenCode (HI-2759: not verified for 2.2.6, so its reviewers review read-only)', () => {
-    for (const p of PROVIDERS) expect(p.capabilities.extraDirs, p.id).toBe(p.id !== 'opencode')
+  it('every provider Combwork has can be given folders (OpenCode since HI-2772: its launch config grants external_directory)', () => {
+    for (const p of PROVIDERS) expect(p.capabilities.extraDirs, p.id).toBe(true)
   })
 
   it('Claude Code: --add-dir, always followed by an option (it takes several), never with none granted', () => {

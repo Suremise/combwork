@@ -144,7 +144,8 @@ export const OPENCODE_DESCRIPTOR: ProviderDescriptor = {
     startupSizeRefresh: true,
     bracketedPaste: false,
     enterOnceDrawn: false,
-    extraDirs: false,
+    // A launch's own config allows 2.2.6's external_directory for each folder granted (HI-2772: config.ts externalDirRule).
+    extraDirs: true,
     // Each account a private data root (XDG_DATA_HOME, with its config, state and cache roots beside it): its sign-ins
     // and its sessions in its own database. Nothing shared between accounts.
     connections: {
