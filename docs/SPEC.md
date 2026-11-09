@@ -2275,7 +2275,8 @@ becomes the port's Git implementation.
 | 3 Evidence | `workflow/checks.ts`, `adoption.ts`, `upgrade.ts`, `lineUpdates.ts`, `runLink.ts` (not moved by R6: still import Git) | Common, calling `HistoryPort` / `ObservePort` | R9 |
 | 3 Evidence | `platform/gitPlatform.ts`'s own reads (Git's adapter: its reconciliation, attribution and the watcher go through the ports since R6) | Composed over `HistoryPort` | R9 |
 | 3 Evidence | `shared/workflow/guards.ts` `submit.trailer`, `submit.identity` commands | The remedy from `HistoryPort` | R9 |
-| 4 Integration | `workflow/mergeQueue.ts` candidate steps (prepare, reset, clean, merge, squash, rebase, conflicts, commit, `refs/cw/queue` pins), `queueControls.ts` | `IntegrationPort.prepareCandidate`, `inspectCandidate` | R7 |
+| 4 Integration | `workflow/mergeQueue.ts` candidate steps (prepare, reset, clean, merge, squash, rebase, conflicts, commit, `refs/cw/queue` pins) | `IntegrationPort.update` (strict's) and `candidate` (the test merge, sameness in it), `mergeBase` (moved: HI-2790's R7) | R7 |
+| 4 Integration | `queueControls.ts`' reads (forwarding counts, a paused condition read again), `queueHost.ts`' pin clean-up (`dropQueuePin`, `prunePins`) and the test merge's branch messages (`G.messages`) and identity reads in `mergeQueue.ts` (not moved by R7) | The integration port (with the advance's conditions) and `HistoryPort` | R8 |
 | 4 Integration | `mergeQueue.ts` advance, journal, rollback, recovery, push; `queueRunner.ts`, `queueHost.ts` | `IntegrationPort.advance`, `recover`, `publish`; the state machine stays common | R8 |
 | 5 Operations | `gitRepo.ts` reads, `gitCompare.ts`, `branchWatch.ts` | `RepoReads` (Git: stays) | R2 |
 | 5 Operations | `gitRepo.ts` mutations, `gitInit.ts`, `branchMerge.ts`, `worktrees.ts` `mergeWorktree`, their IPC and renderer dispatch | `RepoOps`, gated by the descriptor's operations | R3 |
@@ -2289,7 +2290,12 @@ The shapes, for R1 to start from (R1 built port 1 as `src/main/platform/repoCont
 ask in, not a `RepoContext` (every caller holds one, and a context per read would add reads to each: rule 1), and keep
 the two check brackets' tracked-file reads apart (`checkFiles`, a run's; `queueCheckFiles`, the queue's, whose
 unreadable list is null); `ObservePort` is the watcher, common to every platform (None's write record too); both come
-from `historyPorts.ts`, `historyOf(platform)` null for None):
+from `historyPorts.ts`, `historyOf(platform)` null for None. R7 built port 4's candidate half as
+`src/main/platform/integration.ts`: `prepareCandidate` is `candidate(host, change & { style, updated, message })`,
+strict's update its own `update`, both given the queue's side as a `CandidateHost` (its runner in the lease's job, the
+queue's worktree, the identity and a round's reads) and answering `Again`, a result, a `CandidateFail` or a
+`CandidatePause`; the message is a callback read once the workspace is ready, as before; `inspectCandidate` is the
+sameness check inside them; Git's commits' stream reading moved with them to `platform/gitCommits.ts`):
 
 ```ts
 interface RepoContext { platform: PlatformId; store: string; workspace: string; root: string; folder: string; subfolder?: boolean }
