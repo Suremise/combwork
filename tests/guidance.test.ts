@@ -840,7 +840,7 @@ describe('coordinator guidance', () => {
       expect(ok).toMatch(/takes the user's OK in its own pane, never one passed on by you/)
       // RELEASING.md (#1533) is the pattern it follows: its stages and its list of the user's OKs.
       const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
-      for (const stage of ['## The 1.0 path', '**The baseline install**', '**An RC**', "## The user's OK"]) expect(releasing, stage).toContain(stage)
+      for (const stage of ['## The release path', '**Develop on the release branch.**', '**Freeze and rc.1.**', '**Soak.**', "## The user's OK"]) expect(releasing, stage).toContain(stage)
     })
     it('Planner and QA triager point at the skills that own their workflows, and scale down to one agent', () => {
       expect(mode('planner')).toMatch(/\(the split-work skill\)\. For a solo user with one agent, the plan is the cards in order\./)
@@ -926,7 +926,7 @@ describe("the repository's AGENTS.md", () => {
 })
 
 // #1533 (P8): RELEASING.md owns the release path and the list of the user's OKs; release-combwork and AGENTS.md point to it.
-describe('RELEASING.md on the 1.0 path', () => {
+describe("RELEASING.md's release path", () => {
   const releasing = readFileSync(join(ROOT, 'RELEASING.md'), 'utf8')
   const section = (heading: string): string => releasing.split(/^## /m).find((s) => s.startsWith(heading)) ?? ''
   it("Step 4's real-tier command selects every suite of a real CLI, Copilot's too, and none of the rest (HI-2658)", async () => {
@@ -945,24 +945,30 @@ describe('RELEASING.md on the 1.0 path', () => {
     const wanted = SUITES.filter((s: { needs?: string[] }) => needsCli(s) && !(s.needs ?? []).includes('packaged')).map((s: { name: string }) => s.name).sort()
     expect(chosen).toEqual(wanted)
   })
-  it('goes from phases on the integration branch to a baseline install, then an RC and the release', () => {
-    const path = section('The 1.0 path')
-    expect(path).toMatch(/\*\*integration branch\*\* \(`1\.0\.0`\)/)
-    expect(path).toMatch(/1\. \*\*Phases\.\*\*[\s\S]*\*\*checks card\*\*, #1449/)
-    expect(path).toMatch(/2\. \*\*The baseline install\*\* \(#1288\)[\s\S]*\*\*The user installs\.\*\* Nothing is pushed, tagged or uploaded\./)
-    expect(path).toMatch(/3\. \*\*The RC, then the release\*\* \(#1541\)[\s\S]*the integration branch is merged into `main` \(asked/)
-    expect(path).toMatch(/`dist\/build-info\.json`/)
-    expect(section('Release notes')).toMatch(/\*\*back up first, there's no going back\*\*/)
+  // HI-2803 (the user, 9 Nov): a release branch with CI on its draft pull request throughout, a freeze, rc.1 with the full
+  // checks once, a soak while the next version starts, then the version card, the pull request into main and the publish card.
+  it('goes from the release branch and its draft pull request to a freeze, rc.1, a soak and the release', () => {
+    const path = section('The release path')
+    expect(path).toMatch(/1\. \*\*Develop on the release branch\.\*\*[\s\S]*\*\*draft pull request into `main`\*\*[\s\S]*\*\*every push of the branch runs CI\*\*[\s\S]*\*\*A red CI is fixed then\*\*/)
+    expect(path).toMatch(/`ci\.yml` is left as it is/)
+    expect(path).toMatch(/2\. \*\*Freeze and rc\.1\.\*\*[\s\S]*only \*\*release blockers\*\* join it: a regression from the last release, data loss or a safety problem, a new feature of this release that's broken, or a red CI\. Each is marked with the `release-blocker` label/)
+    expect(path).toMatch(/the full release checks, \*\*once\*\*, on its commit/)
+    expect(path).toMatch(/3\. \*\*Soak\.\*\*[\s\S]*\*\*one day of normal use\*\*, unless the user says otherwise[\s\S]*\*\*the next version starts on its own branch\*\*/)
+    expect(path).toMatch(/4\. \*\*Release\*\*, once an RC has soaked with no open blockers:[\s\S]*\*\*The version card\*\*[\s\S]*\*\*merges it into `main`\*\* \(asked\)[\s\S]*\*\*Nothing reruns\*\* when `main` hasn't moved[\s\S]*\*\*The publish card\*\* \(no code\)/)
+    expect(path).toMatch(/5\. \*\*After the release\.\*\*[\s\S]*`main` is merged into the next version's branch \(asked\)[\s\S]*\*\*A patch\*\* \(`x\.y\.1`\) comes from `main`/)
+    expect(path).toMatch(/### The release-blocker label/)
+    // The current-version candidate is gone: RCs are -rc.N builds, and the 1.0 path is a history note.
+    expect(releasing).not.toMatch(/Release candidate first/)
+    expect(section('Steps')).not.toMatch(/at the \*\*current\*\* version/)
+    expect(section('Betas and RCs')).toMatch(/there is no candidate at the release's own version/)
+    expect(section('The 1.0 path (history)')).toMatch(/Both are replaced by The release path/)
+    expect(section('A release\'s cards')).toMatch(/\*\*The RC card\*\* \(code\), one per RC[\s\S]*\*\*The version card\*\* \(code\)[\s\S]*\*\*The publish card\*\* \(no code\), blocked by the version card/)
+    expect(section('Builds and the journal')).toMatch(/`dist\/build-info\.json`/)
   })
-  // The user, 24 Oct (m3757, on #1288, #1537, #1539, #1541): the baseline's checks are lighter, and it doesn't wait for Electron.
-  it("gives the baseline its own prerequisites and lighter checks, the full ones before a proper release", () => {
-    const path = section('The 1.0 path')
-    expect(path).toMatch(/It waits for the last phase's checks card \(#1539\), the translation review \(#1126\) and #1582[^\n]*Electron's CVE fix \(#1503\) comes before the RC \(#1541\), not the baseline/)
-    // HI-2655: the model trials are a release's, 3 to 5 scenarios picked at random; the full e2e set and the real tier come later.
-    expect(path).toMatch(/\*\*Its checks are lighter than a release's\*\*[^\n]*with the model trials as a release's: 3 to 5 scenarios picked at random, once each \(What a release checks\)\. The full e2e set and the real tier come before a proper release/)
+  it('keeps the checks of each stage, the coverage ledger and the manifest rules', () => {
     const checks = section('What a release checks')
     expect(checks).toMatch(/\*\*3 to 5 scenarios picked at random\*\* from the trial set, once each, with no repeats \(`npm run scenarios -- --provider <provider> --random 3`/)
-    expect(checks).toMatch(/The release card names the seed or the ids/)
+    expect(checks).toMatch(/The RC card names the seed or the ids/)
     expect(checks).toMatch(/The full set on every provider is not a release step/)
     // HI-2658: each stage's budget, as AGENTS.md's.
     expect(checks).toMatch(/\*\*The first release candidate\*\*, about \*\*2–3 hours\*\*/)
@@ -980,24 +986,24 @@ describe('RELEASING.md on the 1.0 path', () => {
     expect(checks).toMatch(/is either part of a version-only bump or on the test-only allowlist \(`manifestCheck`[^\n]*Anything else means the real tier runs again\./)
     expect(checks).toMatch(/anything outside `tests\/` other than the version-only bump of those three files, more than that bump in them/)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/The full set is for guidance-wide changes only \(HI-2010, HI-2011, HI-2012\); a publishable RC gets 3 to 5 scenarios picked at random/)
-    expect(path).toMatch(/`npm run dist -- --kind baseline` \(asked\)/)
     // #1534: where each build is recorded.
-    expect(path).toMatch(/also goes into the Combwork Assistant's journal as Combwork's entry[^\n]*\*\*Settings → Advanced → Record builds in the journal\*\* turns it off/)
-    expect(section('What a release checks')).toMatch(/unlike the baseline's lighter checks/)
-    for (const copy of ['.claude', '.agents']) expect(readFileSync(join(ROOT, copy, 'skills', 'release-combwork', 'SKILL.md'), 'utf8')).toMatch(/Its checks are lighter than an uploaded release's \(the model trial is a release's, 3 to 5 scenarios picked at random: RELEASING, What a release checks\)/)
+    expect(section('Builds and the journal')).toMatch(/also goes into the Combwork Assistant's journal as Combwork's entry[^\n]*\*\*Settings → Advanced → Record builds in the journal\*\* turns it off/)
+    expect(section('What a release checks')).toMatch(/unlike a beta's/)
+    // HI-2803: the manifest needs a record of the released code, so a later RC with other changes runs the real tier again.
+    expect(section('The release path')).toMatch(/\*\*The manifest is stricter than the ledger\*\*/)
   })
   it("lists every publishing step as the user's OK, which release-combwork and AGENTS.md point to without repeating", () => {
     const ok = section("The user's OK")
-    for (const step of [/`npm run dist`/, /changing the version/, /pushing/, /merging an integration branch into `main`/, /`npm run release`/, /publishing the draft, and creating tags/, /GitHub issue/]) expect(ok).toMatch(step)
+    for (const step of [/`npm run dist`/, /changing the version/, /pushing/, /opening or merging a GitHub pull request \(it's public\), and merging into `main`/, /merging `main` into the next version's branch/, /`npm run release`/, /publishing the draft, and creating tags/, /GitHub issue/]) expect(ok).toMatch(step)
     for (const copy of ['.claude', '.agents']) {
       const skill = readFileSync(join(ROOT, copy, 'skills', 'release-combwork', 'SKILL.md'), 'utf8')
       expect(skill).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists the decisions that are the user's/)
       expect(skill).not.toMatch(/^- creating tags;/m)
-      // HR5's #1533 round 1 finding: the current-version candidate is the uploaded release's; a baseline sets its version first.
-      expect(skill).toMatch(/\*\*A baseline install\*\* .* goes version first: its version is set \(asked: a `-beta\.<n>`; 1\.0's were named `1\.0\.0-rc\.<n>`\) before its one `npm run dist`, with no current-version candidate before it/)
-      expect(skill).toMatch(/^- \*\*For an uploaded release\*\* \(an RC or the release, RELEASING's Steps\), the release candidate comes first/m)
+      // HI-2803: the skill walks RELEASING's stages, with no current-version candidate before the version changes.
+      for (const stage of ['## Stage 1: the release branch', '## Stage 2: freeze and rc.1', '## Stage 3: soak', '## Stage 4: the release', '## Stage 5: after the release']) expect(skill, stage).toContain(stage)
+      expect(skill).toMatch(/There is no installer at the release's own version before the version card: every candidate is an `-rc\.<n>` build\./)
+      expect(skill).not.toMatch(/the release candidate comes first|integration branch|current version/)
     }
-    expect(section('The 1.0 path')).toMatch(/`1\.0\.0-rc\.<n>` \(asked\), set before the build: no current-version candidate comes first \(that's Step 1, for an uploaded release\)/)
     expect(section('Steps')).toMatch(/^These are the steps for an uploaded release/m)
     expect(readFileSync(join(ROOT, 'AGENTS.md'), 'utf8')).toMatch(/RELEASING\.md's \*\*The user's OK\*\* lists each step that needs it/)
   })
