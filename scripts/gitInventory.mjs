@@ -26,7 +26,7 @@ const PATTERNS = {
   refsAndReflog: /refs\/|reflog|packed-refs|update-ref|symbolic-ref/,
   branchesAndHead: /\bbranch(?:es)?\b|\bHEAD\b|merge-base|rev-parse|rev-list/,
   mergeAndRebase: /merge-tree|commit-tree|read-tree|--squash|--no-ff|--rebase-merges|rebase/,
-  trailersAndAttribution: /Hive-Card|Combwork-Card|interpret-trailers|trailer|patch-id/,
+  trailersAndAttribution: /Hive-Card|Combwork-Card|interpret-trailers|trailer|patch-id/, // old-name: HI-2781's pattern as it ran (commits before 1.1 carry Hive-Card trailers)
   platformSwitch: /platform\s*===?\s*['"]git|platform\s*!==?\s*['"]git|PlatformId|gitFound|otherFound/
 }
 
