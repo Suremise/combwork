@@ -21,6 +21,7 @@
 //   It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected);
 //   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
 //   its session doesn't start (no SessionStart: Combwork sees it starting) until fake-start-go-<agent> (HI-1707: never ready).
+//   With fake-start-write-<agent>, it first writes a line of its start to its transcript (HI-2816).
 //   "holduntil NAME": the turn doesn't end until the test makes a file NAME in its home (CLAUDE_CONFIG_DIR).
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
 //   "waitfile NAME" as a step ("waitfile go then cw cw_inbox {}"): the steps after it wait for that file.
@@ -1575,6 +1576,9 @@ async function main() {
       })()
     : null
   void connectOwnServer(server, held)
+  // fake-start-write-<agent>: its start written to its transcript first, before its session starts (HI-2816: as Claude Code
+  // records a resumed session's start before its SessionStart hook), with a start held or not.
+  if (take('fake-start-write')) write({ type: 'system', subtype: 'informational', content: 'Session resumed', level: 'info' })
   if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
   promptLine()
