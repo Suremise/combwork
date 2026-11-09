@@ -18,7 +18,7 @@ const path = require('path')
 const http = require('http')
 const crypto = require('crypto')
 const { processes } = require('./folderProcesses.cjs')
-const { recordOf, ended, turnTools, ending } = require('./opencodeDirsProbe.cjs')
+const { recordOf, readOf, writeOf, turnTools, ending } = require('./opencodeDirsProbe.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 60000
 // A real model turn on a local model: bounded, never how long it should take.
@@ -252,8 +252,7 @@ function proxy() {
      * a tool that ended, never just the turn's start), within the bound; else what the record had.
      */
     const toolsFor = (sessionId, nonce, ready, ms = HUNG_MS) => turnTools(() => recordOf(accountHome, sessionId), nonce, ready, until, ms)
-    const readEnded = (tools) => tools.some((x) => x.name === 'read' && ended(x))
-    const writeEnded = (tools) => tools.some((x) => /^(write|edit|patch)$/.test(x.name) && ended(x))
+    // Each attempt waits for its own file's read or write to end (opencodeDirsProbe.cjs readOf, writeOf): another file's never counts.
 
     // --- 1. A reviewer in Build: reads a marker there (its record's read result), writes a new file (bytes on disk).
     const rb = await start('reviewer (Build)', agents.build)
@@ -264,7 +263,7 @@ function proxy() {
       const file = path.join(probe, `marker-${n}.txt`)
       fs.writeFileSync(file, `${marker}\n`)
       return { nonce: `marker-${n}.txt`, marker, file, prompt: `Use your read tool on the file ${fwd(file)} and reply with only its contents.` }
-    }, async (a) => !!(await toolsFor(rb.sessionId, a.nonce, readEnded))?.some((x) => x.name === 'read' && x.status === 'completed' && x.result.includes(a.marker)))
+    }, async (a) => !!readOf(a.file)((await toolsFor(rb.sessionId, a.nonce, readOf(a.file))) ?? []))
     const write = await attempts('reviewer (Build): write', agents.build, (n) => {
       const marker = `cw-written-${crypto.randomBytes(4).toString('hex')}`
       const file = path.join(probe, `written-${n}.txt`)
@@ -272,14 +271,15 @@ function proxy() {
     }, async (a) => fs.existsSync(a.file) && fs.readFileSync(a.file, 'utf8').includes(a.marker))
     await stop('reviewer (Build)', agents.build)
     // From the record as the stop left it: the read's result in the turn its prompt started.
-    const readTools = read ? await toolsFor(rb.sessionId, read.nonce, readEnded) : null
+    const readTools = read ? await toolsFor(rb.sessionId, read.nonce, readOf(read.file)) : null
+    const markerRead = read ? readOf(read.file)(readTools ?? []) : null
     trace.results.read = read ? { file: path.basename(read.file), tools: readTools } : null
-    if (read) check('reviewer (Build): read the marker in the copies folder, its record has the read with it for that turn, unasked', !!readTools?.some((x) => x.name === 'read' && x.result.includes(read.marker)) && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): read')), JSON.stringify({ readTools, asks: trace.asks }))
+    if (read) check('reviewer (Build): read the marker in the copies folder, its record has the read with it for that turn, unasked', markerRead?.status === 'completed' && markerRead.result.includes(read.marker) && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): read')), JSON.stringify({ readTools, asks: trace.asks }))
     else {
       inconclusive.push("the Build reviewer's read")
       console.log(`INCONCLUSIVE reviewer (Build): no read of the marker in ${TRIES} prompts`)
     }
-    trace.results.write = write ? { file: path.basename(write.file), bytes: fs.readFileSync(write.file, 'utf8'), tools: await toolsFor(rb.sessionId, write.marker, writeEnded) } : null
+    trace.results.write = write ? { file: path.basename(write.file), bytes: fs.readFileSync(write.file, 'utf8'), tools: await toolsFor(rb.sessionId, write.marker, writeOf(write.file)) } : null
     if (write) check('reviewer (Build): wrote a new file in the copies folder, its bytes on disk, unasked', fs.readFileSync(write.file, 'utf8').trim() === write.marker && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): write')), JSON.stringify({ result: trace.results.write, asks: trace.asks }))
     else {
       inconclusive.push("the Build reviewer's write")
@@ -296,12 +296,12 @@ function proxy() {
       const file = path.join(probe, `plan-${n}.txt`)
       planFiles.push(file)
       return { nonce: marker, marker, file, prompt: `Use your write tool to create the file ${fwd(file)} containing exactly this one line: ${marker}` }
-    }, async (a) => writeEnded((await toolsFor(rp.sessionId, a.marker, writeEnded)) ?? []))
+    }, async (a) => !!writeOf(a.file)((await toolsFor(rp.sessionId, a.marker, writeOf(a.file))) ?? []))
     await stop('reviewer (Plan)', agents.plan)
-    const planTools = planned ? await toolsFor(rp.sessionId, planned.marker, writeEnded) : null
+    const planTools = planned ? await toolsFor(rp.sessionId, planned.marker, writeOf(planned.file)) : null
     trace.results.plan = { tried: planned ? planTools : null, filesWritten: planFiles.filter((f) => fs.existsSync(f)).map((f) => path.basename(f)) }
     check('reviewer (Plan): no file it was asked to write exists', planFiles.every((f) => !fs.existsSync(f)), JSON.stringify(trace.results.plan))
-    if (planned) check('…its write was refused (an error result, not completed)', !!planTools?.filter((x) => /^(write|edit|patch)$/.test(x.name)).every((x) => x.status === 'error'), JSON.stringify(planTools))
+    if (planned) check('…its write was refused (an error result, not completed)', writeOf(planned.file)(planTools ?? [])?.status === 'error', JSON.stringify(planTools))
     else {
       inconclusive.push("the Plan reviewer's write")
       console.log(`INCONCLUSIVE reviewer (Plan): never called a write tool in ${TRIES} prompts (2.2.6's Plan may offer none): ${JSON.stringify(trace.results.plan)}`)

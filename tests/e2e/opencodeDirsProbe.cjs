@@ -32,6 +32,15 @@ function toolsOfTurn(messages, nonce) {
 /** A tool call that has ended (completed or failed), not one still running. */
 const ended = (t) => t.status === 'completed' || t.status === 'error'
 
+/** A path as a tool's input or the probe gives it: either slash, any case, no trailing separator. */
+const samePath = (a, b) => typeof a === 'string' && typeof b === 'string' && a.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase() === b.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+/** A tool call on `file` (its input's path, as 2.2.6's read and write give it: `path`, or `filePath`). */
+const on = (t, file) => samePath(t.input?.path ?? t.input?.filePath, file)
+/** The read of the attempt's own file that has ended (another file's read, say AGENTS.md, never counts). */
+const readOf = (file) => (tools) => tools.find((t) => t.name === 'read' && ended(t) && on(t, file)) ?? null
+/** A write (or edit, patch) of the attempt's own file that has ended. */
+const writeOf = (file) => (tools) => tools.find((t) => /^(write|edit|patch)$/.test(t.name) && ended(t) && on(t, file)) ?? null
+
 /**
  * The turn's tools once `ready(tools)` holds of what the record has for it, polled with `until(fn, ms)` (lib.until);
  * at the bound, what it had (null: not even the turn's user message), for the caller to call it not tried.
@@ -55,4 +64,4 @@ function ending({ failed, inconclusive }) {
   return { line: 'all checks passed', code: 0 }
 }
 
-module.exports = { recordOf, toolsOfTurn, ended, turnTools, ending }
+module.exports = { recordOf, toolsOfTurn, ended, samePath, readOf, writeOf, turnTools, ending }
