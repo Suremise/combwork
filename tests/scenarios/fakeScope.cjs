@@ -61,7 +61,7 @@ const PROVIDER_WAITS = {}
  * (2026-11-09T01-59-16-fake-opencode, then 02-32-38 for those not about the transcript). The ones that read the agent's
  * transcript ran once HI-2762 gave OpenCode agents their history (2026-11-09T02-52-58-fake-opencode).
  * - an OpenCode Assistant gets no state view at its start: HI-2771.
- * HI-2772 lifted review-in-copy's (an OpenCode reviewer is lent its review copy: external_directory granted per launch).
+ * HI-2772 lifted review-in-copy's (an OpenCode reviewer is lent its review copy: 2.2.6's default rules reach it, no grant written).
  */
 const SCENARIO_WAITS = {
   'fake-opencode': [

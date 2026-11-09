@@ -7,8 +7,9 @@
 // there (its bytes on disk); a reviewer in Plan, asked to write there, doesn't (its own edit deny: the file absent, and
 // what it tried, from its record); a builder in Build, lent no copy, reaches the copies folder too, unasked. Any
 // permission asked is recorded and rejected (Esc, 2.2.6's escapeKey), never approved. A turn is one by its own id (the
-// turn ledger's) reaching its end; each attempt has its own files and marker. A step the model never tries in three
-// prompts is INCONCLUSIVE, not a pass. The evidence goes to the suite's log and TRACE (scrubbed into
+// turn ledger's) reaching its end; each attempt has its own files and marker, and a tool's result counts once the record
+// has it ended for that turn. A step the model never tries in three prompts makes the run SKIPPED (inconclusive), not a
+// pass (opencodeDirsProbe.cjs). The evidence goes to the suite's log and TRACE (scrubbed into
 // tests/fixtures/opencode/real-2.2.6/probes/external-directory.json).
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -17,6 +18,7 @@ const path = require('path')
 const http = require('http')
 const crypto = require('crypto')
 const { processes } = require('./folderProcesses.cjs')
+const { recordOf, ended, turnTools, ending } = require('./opencodeDirsProbe.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 60000
 // A real model turn on a local model: bounded, never how long it should take.
@@ -31,7 +33,8 @@ const userData = path.join(lib.WORK, 'opencodedirs-profile')
 const ws = path.join(lib.WORK, 'opencodedirs-ws')
 const alpha = path.join(ws, 'alpha')
 let failed = 0
-let inconclusive = 0
+// The steps the model never tried in its prompts: any makes the run SKIPPED, not passed (opencodeDirsProbe.cjs ending).
+const inconclusive = []
 const check = (name, ok, extra = '') => {
   if (!ok) failed++
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
@@ -123,27 +126,6 @@ function proxy() {
   return new Promise((resolve) => srv.listen(0, '127.0.0.1', () => resolve({ port: srv.address().port, close: () => new Promise((c) => (srv.closeAllConnections?.(), srv.close(c))) })))
 }
 
-
-/** A session's record as Combwork keeps it (the account's combwork-sessions/<id>.jsonl): its messages in order. */
-function recordOf(accountHome, sessionId) {
-  const file = path.join(accountHome, 'combwork-sessions', `${sessionId}.jsonl`)
-  if (!sessionId || !fs.existsSync(file)) return []
-  return fs.readFileSync(file, 'utf8').split('\n').flatMap((l) => {
-    try {
-      const x = JSON.parse(l)
-      return x.type === 'combwork.message' ? [x.message] : []
-    } catch {
-      return []
-    }
-  })
-}
-/** The tool calls of the turn a user message holding `nonce` started: its assistant messages up to the next user message. */
-function toolsOfTurn(messages, nonce) {
-  const at = messages.findIndex((m) => m.type === 'user' && String(m.text ?? '').includes(nonce))
-  if (at < 0) return null
-  const next = messages.findIndex((m, i) => i > at && m.type === 'user')
-  return messages.slice(at + 1, next < 0 ? undefined : next).flatMap((m) => (m.content ?? []).filter((c) => c.type === 'tool')).map((c) => ({ name: c.name, status: c.state?.status ?? null, input: c.state?.input ?? null, result: (c.state?.content ?? []).map((x) => x.text ?? '').join('\n').slice(0, 400), error: c.state?.error?.message ?? null }))
-}
 
 ;(async () => {
   if (!fs.existsSync(PINNED) || crypto.createHash('sha256').update(fs.readFileSync(PINNED)).digest('hex') !== PINNED_SHA256) {
@@ -265,8 +247,13 @@ function toolsOfTurn(messages, nonce) {
       await inv('session:stop', alpha, agent.id)
       check(`${label}: it stops`, !!(await until(async () => !(await live(agent.id)), HUNG_MS)))
     }
-    /** The record's tools for a nonce's turn once Combwork has it (live, or written when the session stopped). */
-    const toolsFor = async (sessionId, nonce, ms = HUNG_MS) => (await until(async () => toolsOfTurn(recordOf(accountHome, sessionId), nonce), ms)) ?? null
+    /**
+     * The record's tools for a nonce's turn once `ready` holds of them (the user message comes in before its tool results:
+     * a tool that ended, never just the turn's start), within the bound; else what the record had.
+     */
+    const toolsFor = (sessionId, nonce, ready, ms = HUNG_MS) => turnTools(() => recordOf(accountHome, sessionId), nonce, ready, until, ms)
+    const readEnded = (tools) => tools.some((x) => x.name === 'read' && ended(x))
+    const writeEnded = (tools) => tools.some((x) => /^(write|edit|patch)$/.test(x.name) && ended(x))
 
     // --- 1. A reviewer in Build: reads a marker there (its record's read result), writes a new file (bytes on disk).
     const rb = await start('reviewer (Build)', agents.build)
@@ -277,7 +264,7 @@ function toolsOfTurn(messages, nonce) {
       const file = path.join(probe, `marker-${n}.txt`)
       fs.writeFileSync(file, `${marker}\n`)
       return { nonce: `marker-${n}.txt`, marker, file, prompt: `Use your read tool on the file ${fwd(file)} and reply with only its contents.` }
-    }, async (a) => (await toolsFor(rb.sessionId, a.nonce, 15000))?.some((x) => x.name === 'read' && x.result.includes(a.marker)) ?? (await screen(agents.build)).includes(a.marker))
+    }, async (a) => !!(await toolsFor(rb.sessionId, a.nonce, readEnded))?.some((x) => x.name === 'read' && x.status === 'completed' && x.result.includes(a.marker)))
     const write = await attempts('reviewer (Build): write', agents.build, (n) => {
       const marker = `cw-written-${crypto.randomBytes(4).toString('hex')}`
       const file = path.join(probe, `written-${n}.txt`)
@@ -285,17 +272,17 @@ function toolsOfTurn(messages, nonce) {
     }, async (a) => fs.existsSync(a.file) && fs.readFileSync(a.file, 'utf8').includes(a.marker))
     await stop('reviewer (Build)', agents.build)
     // From the record as the stop left it: the read's result in the turn its prompt started.
-    const readTools = read ? await toolsFor(rb.sessionId, read.nonce) : null
+    const readTools = read ? await toolsFor(rb.sessionId, read.nonce, readEnded) : null
     trace.results.read = read ? { file: path.basename(read.file), tools: readTools } : null
     if (read) check('reviewer (Build): read the marker in the copies folder, its record has the read with it for that turn, unasked', !!readTools?.some((x) => x.name === 'read' && x.result.includes(read.marker)) && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): read')), JSON.stringify({ readTools, asks: trace.asks }))
     else {
-      inconclusive++
+      inconclusive.push("the Build reviewer's read")
       console.log(`INCONCLUSIVE reviewer (Build): no read of the marker in ${TRIES} prompts`)
     }
-    trace.results.write = write ? { file: path.basename(write.file), bytes: fs.readFileSync(write.file, 'utf8'), tools: await toolsFor(rb.sessionId, write.marker) } : null
+    trace.results.write = write ? { file: path.basename(write.file), bytes: fs.readFileSync(write.file, 'utf8'), tools: await toolsFor(rb.sessionId, write.marker, writeEnded) } : null
     if (write) check('reviewer (Build): wrote a new file in the copies folder, its bytes on disk, unasked', fs.readFileSync(write.file, 'utf8').trim() === write.marker && !trace.asks.some((a) => a.phase.startsWith('reviewer (Build): write')), JSON.stringify({ result: trace.results.write, asks: trace.asks }))
     else {
-      inconclusive++
+      inconclusive.push("the Build reviewer's write")
       console.log(`INCONCLUSIVE reviewer (Build): no file written in ${TRIES} prompts`)
     }
 
@@ -309,14 +296,14 @@ function toolsOfTurn(messages, nonce) {
       const file = path.join(probe, `plan-${n}.txt`)
       planFiles.push(file)
       return { nonce: marker, marker, file, prompt: `Use your write tool to create the file ${fwd(file)} containing exactly this one line: ${marker}` }
-    }, async (a) => !!(await toolsFor(rp.sessionId, a.marker, 15000))?.some((x) => /^(write|edit|patch)$/.test(x.name)))
+    }, async (a) => writeEnded((await toolsFor(rp.sessionId, a.marker, writeEnded)) ?? []))
     await stop('reviewer (Plan)', agents.plan)
-    const planTools = planned ? await toolsFor(rp.sessionId, planned.marker) : null
+    const planTools = planned ? await toolsFor(rp.sessionId, planned.marker, writeEnded) : null
     trace.results.plan = { tried: planned ? planTools : null, filesWritten: planFiles.filter((f) => fs.existsSync(f)).map((f) => path.basename(f)) }
     check('reviewer (Plan): no file it was asked to write exists', planFiles.every((f) => !fs.existsSync(f)), JSON.stringify(trace.results.plan))
     if (planned) check('…its write was refused (an error result, not completed)', !!planTools?.filter((x) => /^(write|edit|patch)$/.test(x.name)).every((x) => x.status === 'error'), JSON.stringify(planTools))
     else {
-      inconclusive++
+      inconclusive.push("the Plan reviewer's write")
       console.log(`INCONCLUSIVE reviewer (Plan): never called a write tool in ${TRIES} prompts (2.2.6's Plan may offer none): ${JSON.stringify(trace.results.plan)}`)
     }
 
@@ -332,7 +319,7 @@ function toolsOfTurn(messages, nonce) {
     trace.results.baseline = reached ? { file: path.basename(reached.file), bytes: fs.readFileSync(reached.file, 'utf8'), asks: trace.asks.filter((a) => a.phase.startsWith('builder')) } : null
     if (reached) console.log(`BASELINE builder (Build), lent no copy and given no rule, wrote ${path.basename(reached.file)} in the copies folder ${trace.results.baseline.asks.length ? 'after an ask' : 'unasked'} (2.2.6's default rules)`)
     else {
-      inconclusive++
+      inconclusive.push("the builder's write (the baseline)")
       console.log(`INCONCLUSIVE builder (Build): no file written in ${TRIES} prompts`)
     }
     check('every model request went to the local proxy for ' + MODEL, trace.requests.length > 0 && trace.requests.every((r) => r.path.startsWith('/v1/') && (r.model === null || r.model === MODEL)), JSON.stringify(trace.requests.slice(0, 5)))
@@ -346,8 +333,9 @@ function toolsOfTurn(messages, nonce) {
   }
   const diff = changes(before, snapshot())
   check("the user's own OpenCode folders are as they were, and the machine-wide service's port too", diff.length === 0 && (await portOpen(28894)) === serviceBefore, diff.slice(0, 8).join('; '))
-  console.log(failed ? `${failed} check(s) failed` : inconclusive ? `all checks passed, ${inconclusive} INCONCLUSIVE` : 'all checks passed')
-  process.exit(failed ? 1 : 0)
+  const end = ending({ failed, inconclusive })
+  console.log(end.line)
+  process.exit(end.code)
 })().catch((e) => {
   console.error(e)
   process.exit(1)
