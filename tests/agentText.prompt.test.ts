@@ -9,6 +9,7 @@ import { laneBuilderSkill, laneOrderWaitReason, loopStepWaitReason, notWatchingR
 import { laneBrief, laneRules, type LaneBriefInput } from '../src/shared/laneBrief'
 import type { TaskCard } from '../src/shared/types'
 import { laneNextWaitReason } from '../src/main/cardStall'
+import { safeguardContext } from '../src/shared/stallSafeguard'
 // @ts-expect-error: a plain .mjs module without types
 import { readCatalogue } from '../scripts/agentTextExtract.mjs'
 
@@ -69,6 +70,13 @@ function stalls(): { name: string; text: string | null }[] {
     { name: 'wake untaken', text: notWatchingReason(doing as never, [{ name: 'B1', project: 'alpha', notWatching: [9], untaken: true }]) },
     { name: 'not watching', text: notWatchingReason(doing as never, [{ name: 'B1', project: 'alpha', notWatching: [9] }]) }
   ]
+  // HI-2754: the stall's agent idle after its latest turn was stopped by its provider's safety filter, said beside the
+  // reason as cardStall says it.
+  for (const stops of [1, 3]) {
+    const safeguard = { at: at(30), tools: [], stops, latest: { at: at(30) } }
+    const context = safeguardContext({ name: 'B1', status: 'watching', provider: 'codex', safeguard })
+    out.push({ name: `not watching, safety stop ${stops}`, text: `${notWatchingReason(doing as never, [{ name: 'B1', project: 'alpha', notWatching: [9] }])} ${context}` })
+  }
   for (const [minAgo, label] of [[40, 'minutes'], [120, 'hours'], [125, 'hours and minutes']] as const) {
     const r = { ...review, history: [{ at: at(minAgo), by: 'You', what: 'Moved to Review' }] }
     for (const w of [{}, { status: 'working' }, { silentMinutes: 25 }]) out.push({ name: `review wait ${label} ${JSON.stringify(w)}`, text: reviewWaitReason(r as never, [{ name: 'R1', project: 'alpha', agentId: 'r', cards: [9], ...w }], now) })
