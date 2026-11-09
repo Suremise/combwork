@@ -292,6 +292,12 @@ a Resume's claim (`agentFolders.ts`), a lane's start (`lanes.ts`) and agents' wo
 making) use the workspace port too, and the providers' context reads (Claude Code's memory base, the trust check's roots
 in `accounts.ts`, the skill copies' exclude) are port 1's `mainTree`, `trustRoot` and `excludeFile` (`repoPorts.ts`);
 `tests/contextTraces.test.ts` holds their commands and answers.
+Port 3, evidence and history (HI-2787's R6): `platform/history.ts` holds the contracts (`HistoryPort`, `ObservePort`),
+`platform/gitHistory.ts` is Git's, delegating to `platform/git.ts` and the exact `git()` commands its callers ran, and
+`platform/historyPorts.ts` finds one (`historyOf(platform)`, null for None; `observePort`, the watcher for every
+platform). Reconciliation, the recorder, targets, retarget, check brackets (`runChecks`, `queueChecks`) and the focused
+pick's diff read through it (`tests/historyPortsImports.test.ts`, check:repo); Git's adapter passes its port to
+`reconcileHistory` and `attributeFolder`.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
