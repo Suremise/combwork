@@ -197,6 +197,19 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
     const forkRec = await lib.until(async () => (await listedNow()).find((s) => s.id === forkId && s.source === 'combwork') ?? null, HUNG_MS)
     check('a fork adopted stays a sub-session of its source', !!forkRec && forkRec.sub?.kind === 'fork' && forkRec.sub?.parentId === sid, JSON.stringify(forkRec && forkRec.sub))
 
+    // --- The window: the Sessions tab nests the fork under its source, whose transcript shows the attached image.
+    await page.locator('.tab', { hasText: 'Sessions' }).first().click()
+    const rowOf = (text) => page.locator('.sessions-tree .session-row', { hasText: text })
+    await lib.until(async () => (await rowOf('hello').count()) >= 1, HUNG_MS)
+    await rowOf('hello').first().click()
+    const img = page.locator('img[src^="data:image/png"]')
+    check("the window shows the attached image in the session's transcript", !!(await lib.until(async () => (await img.count()) >= 1, HUNG_MS)))
+    // Its sub-sessions (the subagent's and the fork) under it, unfolded.
+    await page.keyboard.press('ArrowRight')
+    check('…and the fork under it, badged as OpenCode names it', !!(await lib.until(async () => (await page.locator('.sessions-tree .badge.sub-kind', { hasText: 'fork' }).count()) >= 1, HUNG_MS)))
+    await img.first().scrollIntoViewIfNeeded().catch(() => undefined)
+    await page.screenshot({ path: path.join(lib.WORK, 'opencode-history-sessions.png') })
+
     // --- After a restart, the history is read from Combwork's mirror, no server needed.
     await app.close().catch(() => undefined)
     ;({ app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 900 } }))
