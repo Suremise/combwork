@@ -4434,6 +4434,9 @@ async function team(c) {
  * A lane registered as its builder (`key`) registers its own (cw_lane start, with its own token), which starts nobody:
  * a lane a script records starts its stopped agents on its brief (HI-1900, HI-1934), and the scenarios start them
  * themselves. So the builder is started for its token, registers its lane, and is stopped again (HI-1939). Its reply.
+ * Stopped as a script does (the Agent API with the run's own token: a stop with no cause, HI-1881), never as the user's
+ * Stop: since HI-2815 Combwork starts no lane card on a builder the user, the Assistant or an agent stopped, so the lane's
+ * first card (combworkStartedLaneCard) would never start (HI-2819, 1.3.0-rc.2's scenarios).
  */
 async function builderLane(c, key, body) {
   const id = c.agents[key].id
@@ -4442,7 +4445,8 @@ async function builderLane(c, key, body) {
   if (!(await live())) await c.startAgent(key)
   const r = await c.as(key, 'POST', '/v1/lanes', { project: 'alpha', ...body })
   if (r.status !== 200) throw new Error(`lane: ${r.status} ${JSON.stringify(r.body)}`)
-  await c.inv('session:stop', c.alpha, id)
+  const stopped = await c.api('POST', `/v1/projects/alpha/agents/${encodeURIComponent(id)}/stop`, {})
+  if (stopped.status !== 200) throw new Error(`setup: stopping ${key} after registering its lane: ${stopped.status} ${JSON.stringify(stopped.body)}`)
   const lib = require('../e2e/lib.cjs')
   if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
   return r
