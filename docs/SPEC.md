@@ -1624,6 +1624,9 @@ interface PlatformAdapter {
 }
 ```
 
+1.4.0's refactor (§16.3.6) keeps this workflow facade and puts the rest of Combwork's version control calls behind five
+ports under it; §16.3.6's invariants hold for both.
+
 Platform words stay out of the facts: a card works on a **line** (Git branch, jj or hg bookmark), integrates into a
 **target** (a line), and integration produces a **result revision** (a merge commit in Git, a rebased commit in jj).
 
@@ -1839,14 +1842,15 @@ says how the platform would answer, and where it is weaker than Git.
 | readiness | **jj can store unresolved conflicts in a commit** ([conflicts](https://docs.jj-vcs.dev/latest/conflicts/)): `readiness` asks for the revision's `conflict` template keyword and lists the files; a conflicted revision is refused at submit (`submit.ready`) and as a test-merge result. | Always ready (a merge with unresolved files can't be committed). | Always ready (`svn commit` refuses conflicted paths). |
 | isolation | `jj workspace add` (each workspace has its own working-copy commit). | `hg share -B` (bookmarks shared with the source: without `-B` a share keeps its own bookmarks and the target couldn't be read; [share](https://www.mercurial-scm.org/help/commands/share)). | A second checkout. |
 | integration | Rebase onto, or a merge commit with, the target bookmark; the **result revision** is the new commit. | `hg merge` + commit (or `hg rebase`); the result is the new changeset. | `svn merge` + commit (or commit straight to trunk). |
-| advance (atomic) | `jj bookmark set <target> -r <result>`: jj operations are atomic, and two concurrent ones never lose an update; a racing change leaves a **conflicted bookmark**, which `advance` reports as `Moved(actual)`. | **Weaker:** no compare-and-swap for a bookmark on the command line ([bookmarks](https://www.mercurial-scm.org/help/commands/bookmarks)). The adapter checks the bookmark, moves it, reads it back, and reports `Moved(actual)` if another writer moved it; it holds Combwork's repository lock, which excludes Combwork but not other clients. To settle when hg is built (git-support's sibling list). | The commit itself is the advance, and the server refuses an out-of-date working copy (`svn: E155011`), which is a compare-and-swap. |
+| advance (atomic) | **Superseded (HI-2781, §16.3.6):** this row proposed `jj bookmark set <target> -r <result>`, reporting a conflicted bookmark as `Moved(actual)`. The spike showed two racing sets both exit 0, leaving a conflicted bookmark and a Git ref naming one side: not a compare-and-swap. jj's advance is open, J1's gate. | **Weaker:** no compare-and-swap for a bookmark on the command line ([bookmarks](https://www.mercurial-scm.org/help/commands/bookmarks)). The adapter checks the bookmark, moves it, reads it back, and reports `Moved(actual)` if another writer moved it; it holds Combwork's repository lock, which excludes Combwork but not other clients. To settle when hg is built (git-support's sibling list). | The commit itself is the advance, and the server refuses an out-of-date working copy (`svn: E155011`), which is a compare-and-swap. |
 | containment | jj integrates by **rebase**, which rewrites revision ids, so ancestry (`jj log -r 'R & ::T'`) answers only for a merge; the main test is a target commit that replays the change exactly (the change id as a hint), as Git's squash row. | Ancestry for `hg merge`; after `hg rebase`, the obsolescence markers (`hg log -r 'successors(R)'`, with evolve) or an exact replay. | R ≤ the target's head on the same branch path; merges through `svn:mergeinfo`. |
 | sameness | Replay: rebase R1's change onto the new base in a temporary workspace and compare trees (the change id only a hint) [#1112 B]. | Replay with `hg graft` or a merge in a temporary share, comparing manifests. | Exact revision; there is no rebase. |
 | dirty | **jj has no dirty state:** the working copy is a commit that commands snapshot. `submit.clean` means the working-copy commit `@` is empty (its changes were moved into the card's revision), and the watcher debounces `op_heads` so every snapshot isn't a new revision. | `hg status`. | `svn status`. |
 | authorship | Author field + Combwork's records. | Same. | Same. |
 | observe | `.jj/repo/op_heads` (each operation), read with `--ignore-working-copy`. | `.hg/store`, `.hg/dirstate`, `.hg/bookmarks`. | `.svn/wc.db`. |
 
-**Fits:** jj and hg fit every capability, with two contract points the Git adapter doesn't exercise but the
+**Fits** (1.0's paper check; HI-2781's spike on a real jj corrected its advance row, and §16.3.6 holds what jj
+won't support as gates): jj and hg fit every capability, with two contract points the Git adapter doesn't exercise but the
 interface now carries: **readiness** (jj stores conflicts in commits) and **explicit snapshots** (jj records the
 working copy when read). hg's target advance is not atomic from the command line: a known weakness for when hg is
 built, written down here so it isn't discovered then. Subversion has no local commits, so "submit a revision" means
@@ -1923,6 +1927,351 @@ Everything is visible in the Version Control tab itself, not only through the As
   is read, or added by the Assistant or the Agent API, gets a notice in the presets notice's look ("<project> was
   added: how do you work?", **Choose…** to the step, **Not Now** answers `notNow`); after a switch to a platform with no
   answer, the tab shows the step. All of it works with the Assistant off.
+
+#### 16.3.6 The platform contract (1.4.0)
+
+**Status:** the design the 1.4.0 Git refactor builds against (HI-2783, R0 of HI-2781's plan). Darren, 9 Nov
+[HI-1750 9 Nov]: "we refactor git in 1.4.0 … so that the app can support multiple version control systems properly.
+Then we implement jujutsu in 1.5.0 … properly", in both the colocated and the non-colocated Git-backed modes, with the
+target-advance safety gate and explicit compatibility limits part of doing it properly. Evidence: HI-2781's spike
+(jj 0.47.1, Git 2.56.0, its inventory at `0560a6245`). 1.4.0 changes **no behaviour**: Git and None work exactly as
+§16.3.2, §16.3.3, §16.9 and §16.10 say, and jj stays None (§16.3.5) until 1.5.0. This section says what each port
+owns, the invariants it keeps, the modes Combwork supports and what jj won't support. The method names are a type map
+for R1–R9 (the last table), the builders' to refine as §16.3.1's were; the invariants and the outcomes are not.
+
+**Why ports, beside the adapter.** `PlatformAdapter` (`adapter.ts`, §16.3.1) is the **workflow's** facade: start,
+submit, finish, containment, reconcile, check brackets, check copies, evidence. It stays, and keeps its contract. What
+goes past it today is the rest: ~48 main modules import Git directly (the runner, locks, slots, copies, the queue's
+mechanics, the Git view, relocation, providers' trust roots). The ports below are what those callers use instead; the
+Git adapter and `GitPlatform` are composed over them, and a later platform implements the ports, not a second copy of
+the workflow.
+
+##### The contract's rules
+
+These hold for every port, in 1.4.0 and after.
+
+1. **Delegation first, behaviour unchanged** [HI-2781 part 2]. Each port's Git implementation **is** today's code,
+   called through the port: the same argv, environment, timeouts, output bounds, parsers, lock files and lock order, the
+   same fact schema and the same watcher cadence. An R card renames or widens an interface in one change and alters
+   behaviour in none; a behaviour change found needed is its own card. The proof is the existing tests at each boundary
+   (and, for the queue and slots, a command trace before and after: the same git commands in the same order).
+2. **No switch on a platform id** outside its adapter and its descriptor (AGENTS.md's rule for providers). A caller
+   asks a port, or reads a capability; it never writes `if (platform === 'git')`, nor "if not Git, then None".
+3. **Unknown fails closed** (§16.3.1). Every read answers a value or `Unknown`; a timeout, a crash of the tool, an
+   output past its bound and an answer from a host that lost its lease are unknown. A cache keeps only what §16.3.2
+   says it may (a merge's containment; a squash's not-found for 30 s), and never turns unknown into known. **A zero exit
+   proves only what the tool guarantees it proves** (git's `update-ref <ref> <new> <old>` exiting 0 is the swap made);
+   anything else a port reads back (the ref, the tree, conflicts in the result) and types the outcome from that
+   (HI-2781: jj's conflicted rebase and a racing bookmark set both exit 0).
+4. **Facts keep their meaning** (§16.4). No field of an existing fact changes meaning or type; `revision`, `base`,
+   `head`, `result`, `expected` and `commit` stay immutable revision ids (Git: full commit ids). What another platform
+   needs beside them (a change id, an operation id, a workspace id) is a **new optional field** or `data.platform`, added
+   with its migration; old facts are read as written, under the platform that wrote them, and never reinterpreted.
+   1.4.0 adds no fact fields.
+5. **Off main's thread** (AGENTS.md, Main's thread). No port runs a process or a file walk synchronously on main. The
+   one synchronous read is the evidence fingerprint (`evidence()`, below), which reads files and never starts a
+   process, as today.
+6. **A capability absent is an operation not offered** (§16.3.1). A port method a platform lacks is absent from its
+   descriptor's capabilities and operations; the option, the button or the queue step isn't offered and says why. It
+   is never emulated by a weaker operation (a read-then-set for a compare-and-swap, a global undo for a targeted one).
+7. **Platform words** (§16.3.4): revision, line, target, folder, workspace, store, result. Git's words (branch, commit,
+   worktree, ref, merge commit) stay in the Git implementation and in the window's Git text.
+
+##### Port 1: repository context (identity, execution, locks)
+
+Owns what a repository **is** and how Combwork talks to it. Every other port takes a `RepoContext` rather than a path.
+
+- **Identity.** `RepoContext` = platform, **store id** (the backing store all of its workspaces share: Git's common git
+  dir, resolved and compared case-insensitively), **workspace id** (the working folder's own state: Git's per-worktree
+  git dir; the project folder's for the main checkout), the root, `subfolder` (§16.3.5, OP-29) and the folder asked
+  about. Two contexts are the same repository exactly when their store ids are equal: a colocated pair (jj over Git)
+  is **one** store, so it gets one lock, never two.
+- **Execution.** A bounded runner per platform: `run(ctx, args, { timeout, maxOutput, route, signal })` → output or
+  `Unknown`. Git's is `git()` (`git.ts`) with its worker (`gitWorker.ts`), its tool resolution and readiness
+  (`gitTool.ts`, `checkGit`), its route into the queue's host (`withGitRoute`, `gitHost.ts`), its environment
+  allowlist, non-interactive credentials (`GIT_TERMINAL_PROMPT=0`, no askpass, the credential manager non-interactive)
+  and its job objects. `readiness()` says whether the tool is there and which (Provider Setup's row). A later
+  platform adds its own runner; it never changes Git's.
+- **Locks.** `withRepoLock(ctx, fn)` (`repoLock.ts`, `repoLockCore.ts`: the row in the store's `cw-merge.lock`),
+  named locks (`withNamedLock`), the folder fence (`changingFolder`, `folderFence.ts`) and ref holds (`holdRefs`,
+  `refHold.ts`: git's own ref locks held while Combwork records what it proved about them). The port keys each by store
+  or workspace id; their order and their semantics are §16.9.3's.
+- **Metadata.** `metadataDirs(ctx)` names the folders that are the platform's (`.git`; later `.jj`): never file-search
+  content, never a deliverable, never an agent's edit, hidden in the Files tab. Keeping Combwork's own files out of the
+  repository is the same port's (`combworkVcs.ts`'s `.combwork` exclude, and `excludeCopies` for the providers' skill
+  copies, `providers/common.ts`): an exclude in the platform's own terms.
+
+**Invariants:**
+- **R1.1** One store, one lock: the repository lock is keyed by store id, and every Combwork process and every
+  workspace of the store (slots, the queue's folder, a colocated view) takes the same row.
+- **R1.2** A live holder is never taken over; a dead one is replaced only by compare and swap on its token; release
+  deletes by token (§16.9.3).
+- **R1.3** The repository lock is held only for §16.9.3's short writes (an advance, the Git view's folder actions, a
+  worktree's merge, the line updater's move), never across a test merge or checks; the folder fence covers every write Combwork makes into a folder an agent may be typing in.
+- **R1.4** Every process the queue starts is in its lease's job before it runs (§16.9.3); a read of a run that lost its
+  lease starts nothing and is never an answer.
+- **R1.5** The tool Combwork runs is the standalone one Provider Setup found (§11); a missing or broken tool is
+  `Unknown`, with Provider Setup as the fix, never a fallback to another copy.
+
+##### Port 2: workspace lifecycle (slots, copies)
+
+The mechanics of working folders (the **isolation** capability). Leases, op tokens, writer reservations, setup and
+archive jobs and the pool's state machine stay common (`slots.ts`, `copies.ts`, `slotCards.ts`): they call the port to
+act on a folder, and never decide a folder's safety themselves.
+
+- `list(ctx)`: the store's workspaces (Git: `git worktree list`) with each one's line, head and folder.
+- `inspect(ws)` → `WorkspaceState`: its line, its head (read without side effects: no snapshot), **clean**, **dirty**
+  (the files) or **unknown**, an operation under way (Git: a merge, rebase, cherry-pick or bisect), and **unaccounted
+  work** (Git: commits on its line not contained in the target; later, a jj working-copy change, a stale copy or a
+  divergent change).
+- `create(ctx, { name, folder, line, at })`, `prepare(ws, { line, at })` (Git: today's `prepareSlot`: a new line at the
+  target's head, checked out), `remove(ws)`, `recover(ws)` (a folder gone from disk recreated, a broken link repaired:
+  `recreateWorktree`, `unlinkMissingWorktree`).
+- `checkCopy(ctx, revision)` and the review copy: a folder at **exactly** that immutable revision, private to the
+  check or the reviewer, never the builder's own (Git: today's `copies.ts`, detached at the full commit id).
+- `queueWorkspace(ctx, target, lease)`: the queue's own folder per lease (§16.9.3).
+- `relocate(ctx, from, to)` (a capability of its own): the repair after a workspace or project moved
+  (`workspaceMove.ts`, `combworkMove.ts`, `nameUpgradeProjects.ts`'s worktree repair).
+
+**Invariants:**
+- **R2.1** **Unknown means keep it.** A workspace whose state can't be read is never removed, reset, re-lent or
+  reported clean.
+- **R2.2** **Reusable** is proven, not assumed: no open lease, no live process of an earlier lease, clean, nothing
+  under way, and all its work accounted for (contained in the target by the integration port's containment, or
+  recorded as integrated). Git's answer is today's guarded clean-up (§16.10.2); a later platform proves the same
+  predicate its own way, and "its diff is empty" is not that proof on a platform that snapshots.
+- **R2.3** Every refusal before the refactor is the same refusal after it, in the same words: a held lease, a late
+  process, a dirty or unmerged slot, unreadable state, a moved folder, a folder outside the pool.
+- **R2.4** Only the lease's builder writes in a slot; a review or check copy is never the builder's folder, and a copy's
+  revision never moves under a run.
+- **R2.5** The port never removes a folder the user can see except through today's paths (git's own `worktree remove`
+  after the guards, or `trash()`); ignored files are kept or archived as today.
+- **R2.6** A platform's workspaces are made only by that platform's own command for them (Git: `git worktree add`).
+  An existing Git slot is never converted: on a switch it finishes under Git and the new platform gets a fresh pool
+  (HI-2781: `jj git init` inside a Git worktree makes an independent jj repository).
+
+##### Port 3: evidence and history (observation, attribution facts)
+
+What Combwork **knows** about content and history: the reads behind revisions, sameness, containment, attribution and
+check credit (the **revisions**, **sameness**, **containment**, **authorship** and **observe** capabilities).
+
+- **Revisions:** `head(ws)` (no side effect), `snapshot?(ws)` (explicit, under the lease, only at a defined boundary
+  such as submit; absent for Git), `resolve(ctx, name)` (to a full id; an ambiguous prefix refused, HI-2671),
+  `readiness(rev)` → ready, conflicted (files) or unknown, `dirty(ws, paths?)`.
+- **Changes:** `change(base, head)` → files and candidate key; `sameChange(r1, b1, r2, b2)` (Git: §16.3.2's replay);
+  `contains(target, change, at?)` with its method (Git: merge, fast-forward, squash, same-tree, §16.3.2, with its
+  keep rules); `mergeBase`, `isAncestor`, `firstParents`, `commitsBetween`, `messages`, `authors` and `identity`.
+- **Pins:** `pin(ctx, name, rev)` and `unpin` (Git: `refs/cw/cards/<key>/<n>`, `refs/cw/queue/*`, §16.9.3), so what was
+  reviewed, approved or tested is never lost to a deleted line, a force push or garbage collection.
+- **Observation:** `observe(ctx, onChange)` (Git: `observe.ts`'s watch on HEAD, `refs/heads`, `packed-refs` and
+  `logs/HEAD` in the common dir and each worktree's, debounced, plus the minute's and focus's rescans), and per folder
+  the **write record**: each write to a tracked file and each HEAD reflog entry (§16.13), which check brackets use.
+- **Evidence:** `prime` / `evidence` / `content` as today (`adapter.ts`): a fingerprint read synchronously with no
+  process (Git: the target's and line's refs, the folder's HEAD, its index, an operation under way and the tracked
+  files it covers), taken before the slow reads and again inside the transaction, and the content answer that settles
+  a fingerprint that moved without its content.
+- **Attribution:** the commits on a shared folder's line, its first parents (HI-2382), their trailers and authors, for
+  `CommitAttributed` (§16.3.2). The **remedies** a refusal gives (`submit.trailer`'s amend or rebase, `submit.identity`'s
+  reset-author) are the platform's: the port supplies the command, and `shared/workflow/guards.ts` stops writing a git
+  command into a common guard (R6 or R9 moves it, with the same words for Git).
+
+**Invariants:**
+- **R3.1** **Immutable tested revisions.** A check run, a review, a verdict, a carried-over pass and a queue test all
+  name an immutable revision by its full id (never HEAD, a line name or a short id), with what was actually checked out
+  (`tested`) kept apart from the card's revision (§16.13). On a platform with stable change ids, a change id is an
+  association, never proof that the content is the reviewed content.
+- **R3.2** **Sameness is content.** Git's is §16.3.2's replay with patch-id only as a first test; any platform's must
+  give "not the same" for anything it can't settle. Equal keys or equal change ids never carry a pass on their own.
+- **R3.3** **Edits during a run are seen.** A write to a tracked file or a reflog entry while a check ran (an edit and
+  its undo included), a missed watcher event (the stat snapshot fallback), a folder dirty at either end or a checkout
+  that moved: the run doesn't count (§16.13). A platform whose own log misses unsnapshotted edits (jj's operation log)
+  adds the file watch; it never relies on the log alone.
+- **R3.4** **The evidence fence.** An intent's evidence is read before its slow reads and again in its transaction;
+  changed or unreadable, the intent is refused (§16.8, #1206). Reading evidence never changes the repository (no
+  snapshot, no index refresh that writes, no import).
+- **R3.5** **Attribution is recorded once,** when a commit is seen, by §16.3.2's rule, and never recomputed;
+  ambiguity is refused or left to the user, never guessed.
+- **R3.6** **Containment answers from stored endpoints and pins,** so it answers after a line is deleted, and caches
+  only §16.3.2's two answers.
+
+##### Port 4: integration (queue candidates, advance, publish, recovery)
+
+The **integration** capability's mechanics. The queue's state machine, its facts (`IntegrationRequested` …
+`Integrated`), its leases, pauses, retries, focused proofs and For you stay common (`mergeQueue.ts`, `queueRunner.ts`,
+`queueHost.ts`); they call the port for each step and act on its **typed outcome**.
+
+- `prepareCandidate(qws, { revision, base, key, target, targetHead, style, message })` in the queue's workspace →
+  `Candidate { result, tree }` · `Conflicted { files, conflicts }` · `Unknown` (Git: today's merge, squash or rebase
+  in the queue's worktree, `refs/cw/queue/*` pinned, cleanup on failure). The reviewed revision is never rewritten:
+  the candidate is built on private copies.
+- `inspectCandidate(candidate)`: the result's sameness with the reviewed change (for G20's focused pick and carry-over).
+- `advance(ctx, target, expected, result, journal)` → `Advanced` · `Moved { actual }` · `Paused { condition, files }`
+  (`folderBusy`, `wrongBranch`, `staged`, `unstagedChanges`) · `Terminal { state }` (§16.9.2's needs-you record) ·
+  `Unknown`. Git: `update-ref <result> <expected>` for a target checked out nowhere, and the journaled `read-tree` /
+  `update-ref` for one checked out in a folder, with its rollback, exactly as §16.9.2.
+- `recover(ctx, journal)` → the same outcomes, classified from the journal's last phase **and** the state read now
+  (§16.9.2's table); never assumed from the journal alone.
+- `publish(ctx, target, result)` → `Published` · `UpToDate` · `Rejected` · `Failed { why }` · `NoRemote` · `Unknown`
+  (Git: G18's push of `refs/heads/<target>`, §16.9.1 step 7).
+- Further outcomes a later platform reports (the type carries them from R7/R8 so the queue handles them before jj
+  exists, each a pause naming it, never success): `divergentChange`, `conflictedTarget`, `staleWorkspace`,
+  `partialExport`.
+- None's integration is **acceptance** (§16.3.3): no candidate, no advance; the accepted revision must still be the
+  paths' hash when it is accepted.
+
+**Invariants:**
+- **R4.1** **Compare-and-swap advance.** The target moves from the expected revision (the head the candidate was
+  tested on) to the result in one operation the platform applies only if the target is still at the expected
+  revision, or it doesn't move. Never a read followed by a set, and never a `merge --ff-only` (no expected value). A
+  platform without such an operation has no automatic advance (rule 6): the queue doesn't offer Combwork merging.
+- **R4.2** **Write fencing.** Every fact the queue writes checks its lease in the same write; the lease is checked
+  again just before each step that changes the repository; the advance runs under the repository lock (R1.1) and, for
+  a checked-out target, the folder's fence. A runner that lost its lease writes and changes nothing more.
+- **R4.3** **Journal before step.** `IntegrationStarted` and each `IntegrationPhase` are committed before the step they
+  name; the log stays append-only; a restart's run begins a journal of its own.
+- **R4.4** **Recovery reads, never assumes.** From the journal and the state read now, under the lock and the fence:
+  finish, roll back, retest or terminal (needs you). A needs-you pause naming a card freezes its target until the
+  user lifts it. Nothing is rewound to undo the queue's work: no reset of a target, no global undo.
+- **R4.5** **Exactly once.** A card is `Integrated` once, with the result that is on the target; an advance whose
+  outcome is unknown pauses rather than retests into a second merge.
+- **R4.6** **Only the tested result is published.** Publish pushes exactly the result recorded as integrated, only
+  while the target still holds it; never `--force`, never `--set-upstream`, never a prompt; bounded and cancellable;
+  owed durably (`queue.pushOwed:<target>`) and idempotent after a restart.
+- **R4.7** **No dirty user file is overwritten.** A checked-out target's conditions (§16.9.2) hold before anything is
+  touched, and the platform's own refusal to overwrite (git's `read-tree`) is kept, never bypassed.
+- **R4.8** **A conflicted result is never an advance.** A candidate with conflicts (Git: the merge stopped; a later
+  platform: a commit storing them) is `Conflicted`, kept as evidence (HI-1181's record), and the entry returns to the
+  builder.
+
+##### Port 5: repository operations (the window's reads, mutations, capabilities)
+
+What the Version Control tab, the Git view, the branch cards, Compare and the Merge dialog do, through IPC
+(`gitRepo.ts`, `gitCompare.ts`, `gitInit.ts`, `branchWatch.ts`, `branchMerge.ts`, `worktrees.ts`' `mergeWorktree`).
+
+- **Reads:** summary (`repoSummary`, `repoInfo`), history (paged, each page from pinned endpoints), lines and their
+  upstreams, remotes, tags, identity, line status (`branchWatch`), compare (`compareLines`, `compareDiff`: always
+  between two immutable revisions read once, never a line that moves between pages).
+- **Mutations:** switch and create a line, delete lines (local and remote), update a line from its target, merge a
+  line, remotes (add, rename, set URL, remove), fetch, pull, push, upstream, tag, identity, initialise.
+- **Capabilities:** the descriptor gains an **operations** list beside its capabilities; the renderer offers an
+  operation only when listed, and main refuses one that isn't, with the reason. Git lists every operation it has today;
+  None lists none (Initialise repository stays on Git's page, where HI-1905 put it).
+
+**Invariants:**
+- **R5.1** Every guard on a mutation stays the same guard with the same words: a dirty folder, a line checked out
+  elsewhere, a subfolder of a larger repository, a branch named like another but for case, the repository lock and
+  the folder fence where they are taken today.
+- **R5.2** An operation the platform lacks is unavailable, never mapped to a near equivalent (a jj bookmark is not
+  shown as a Git branch, a working-copy change not as uncommitted files).
+- **R5.3** Reads have no side effects on the repository (Git's `--no-optional-locks`; a later platform's
+  non-snapshotting reads).
+
+##### Supported modes
+
+| Mode | 1.4.0 | 1.5.0 (decided [HI-1750 9 Nov]) |
+|---|---|---|
+| **None** (no version control) | Supported, unchanged (§16.3.3). | Unchanged. |
+| **Git**, the project's own repository | Supported, unchanged: slots as worktrees, or the project folder shared (G11). | Unchanged. |
+| **Git**, a subfolder of a larger repository | Supported, unchanged (OP-29: Combwork merges only into a target the project names). | Unchanged. |
+| **jj, colocated** (`.jj` beside `.git`) | **None**, as today (§16.3.5): detected, offered nothing but None. | A platform: jj workspaces as slots (made by jj, colocated as jj makes them), the gates below. |
+| **jj, non-colocated, Git-backed** | None, as today. | A platform, same adapter, once its tool, trust-root and file-list paths pass (J7). |
+| jj with another storage backend | None. | **Not supported** (untested, not proposed). |
+| Mercurial, other systems | None, as today. | None. |
+
+Switching between Git and jj (1.5.0) is stricter than §16.6.5's "from the next card": it drains the repository's lanes,
+queue, leases and review copies first, keeps historic facts under the platform that wrote them, and makes new slots
+(HI-2781 part 2 §7; J6 builds it). No mode is changed by detection alone, and Combwork never initialises jj or
+converts a repository's colocation.
+
+##### Compatibility matrix and gates
+
+Each **gate** is an explicit refusal: while a gate is closed, its capability or operation is absent from jj's
+descriptor (rule 6), the compatibility assessment says so before the user switches, and the window and agents get the
+reason. A gate opens only with the J card's evidence named; until then "Git-backed" never implies the Git feature
+works.
+
+| Area | Git (1.4.0) | None | jj (1.5.0) | Gate |
+|---|---|---|---|---|
+| Revisions, readiness | Commit ids; always ready | Content hash | Commit ids (not change ids); a revision storing conflicts is not ready (`submit.ready`); `head` reads with `--ignore-working-copy`, `snapshot` explicit | J3 |
+| Isolation (slots, copies) | Worktrees | None (OP-16) | `jj workspace add`; review and check copies at the immutable commit; stale copies recovered only by an explicit, inspected operation | J2 |
+| Shared folder (G11, several agents in the project folder) | Supported | Supported | **Not supported** until validated: slots required | **gate: sharedFolder** (J2/J3) |
+| Containment, sameness | Ancestry, then replay (§16.3.2) | Accepted fact; equal hash | Replay, change id as a hint only | J3 |
+| Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
+| Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
+| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private copies rebased, squashed or merged; conflicts typed | J4 |
+| **Integration: target advance** | CAS (§16.9.2) | — | **Open** (below) | **gate: advance** (J1) |
+| Publish | G18's push | — | Exact-result push, tested against a local bare remote | **gate: publish** (J5) |
+| Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
+| **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
+| **Hooks** (pre-commit, commit-msg, pre-push…) | Run by git | — | **Not run** by jj | **gate: hooks**: a repository with hooks it relies on can't switch to jj; Combwork never stands in "jj succeeded" for a required hook |
+| **LFS** | As git does | — | **Not supported** | **gate: lfs** |
+| **Submodules** | As git does | — | **Not supported** | **gate: submodules** |
+| Commit signing | As git is configured | — | Unverified | **gate: signing** (J5/J7) |
+| **Relocation** (moved workspace or project, the name upgrade's repair) | Supported (`workspaceMove.ts`, `combworkMove.ts`) | Supported | **Not supported**: no jj workspace move was validated | **gate: relocation**: a jj project's workspace or slots aren't moved; the move refuses with the reason |
+| Plain `git` run by an agent in a jj workspace | — | — | Add and commit seen through import (HI-2781); reset, rebase, merge and index-conflict states unvalidated | **gate: plainGit** (J7): guidance and detection before it's allowed |
+
+The gates' ids are the descriptor's (J0 adds them); their detection (which file or config makes a repository use
+attributes, hooks, LFS or submodules) is J0's and J7's to specify, failing closed: unreadable is "uses it".
+
+##### Open: jj's target advance (J1's gate)
+
+How jj advances a target with R4.1's guarantee is **not decided here**: J1 decides it, with evidence. What the
+contract fixes:
+- **Not a protocol:** `jj bookmark set` exiting 0, and `--at-op` (it permits concurrent operations by design).
+  HI-2781 reproduced two racing sets from one operation both exiting 0, leaving a **conflicted bookmark** and a Git
+  ref naming only one side. §16.3.4's jj advance row is superseded by this.
+- **What J1 must show:** that external concurrent jj or git movement, divergent operation heads and a partial Git
+  export can never produce a false `Integrated` fact or overwrite a change Combwork doesn't own; and how recovery
+  classifies each crash point HI-2781 lists (an object made with no operation recorded, an operation recorded with the
+  checkout stale, the bookmark moved but its export failed, a publish done before the owed push cleared, a process
+  ended before the lock's recovery, another agent's operation interleaved).
+- **The port's shape already allows it:** `advance` answers `Moved`, `Unknown`, `conflictedTarget` or `partialExport`,
+  never a boolean.
+- **If J1 can't prove it,** jj has no automatic advance (gate: advance stays closed, rule 6), and the trade-off comes
+  back to Darren; Git's guarantees are never weakened to match.
+
+##### Type map
+
+Where today's code goes behind the ports, and which R card moves it. "Stays" means the module keeps its algorithm and
+becomes the port's Git implementation.
+
+| Port | Today | Becomes | Card |
+|---|---|---|---|
+| 1 Context | `git.ts` (`git`, `gitRouted`, `withGitRoute`), `gitWorker.ts`, `gitTool.ts`, `workflow/gitHost.ts` | `RepoRunner` (Git: stays) | R1 |
+| 1 Context | `repoLock.ts`, `repoLockCore.ts`, `folderFence.ts`, `platform/refHold.ts` | `RepoLocks` keyed by `RepoContext` (Git: stays) | R1 |
+| 1 Context | `platform/git.ts` `commonDir*`, `gitDirSync`; `combworkVcs.ts` `gitDirOf`, `vcsOf`; `providers/common.ts` `excludeCopies`; `accounts.ts` trust roots | `RepoContext` (store id, workspace id, root) and `metadataDirs` | R1, R5 |
+| 1 Context | `platform/registry.ts` `detect`, `combworkVcs.ts` `otherVcsOf` | `Detection` unchanged in 1.4.0 (jj stays None) | R9 |
+| 2 Workspaces | `worktrees.ts` (`createWorktree`, `removeWorktree`, `listWorktrees`, `worktreeCheck`, `workLeft`, `copyIgnored`), `agentWorktree.ts`, `platform/git.ts` `isolate`, `worktreeNow` | `WorkspacePort` (Git: stays) | R4 |
+| 2 Workspaces | `slots.ts`, `slotCards.ts`, `unusedWorktrees.ts`, slot release, migration and jobs | Common orchestration, calling `WorkspacePort` | R4 |
+| 2 Workspaces | `copies.ts`, `agentFolders.ts`, `lanes.ts`, `projectAgents.ts` | Common, calling `WorkspacePort.checkCopy` and `RepoContext` | R5 |
+| 2 Workspaces | `workspaceMove.ts`, `combworkMove.ts`, `nameUpgradeProjects.ts` | `WorkspacePort.relocate` (Git); historic migrations stay Git-only by name | R9 |
+| 3 Evidence | `platform/git.ts` (`head`, `resolve`, `dirty`, `change`, `candidateKey`, `replayTree`, `sameChange`, `contains`, `firstParents`, `commits`, `messages`, `identity`, `pin`), `platform/repoRefs.ts`, `snapshotLine.ts` | `HistoryPort` (Git: stays) | R6 |
+| 3 Evidence | `platform/observe.ts`, `watching.ts` | `ObservePort` with the write record (Git: stays) | R6 |
+| 3 Evidence | `workflow/reconcile.ts`, `reconciler.ts`, `recorder.ts`, `targets.ts`, `retarget.ts`, `runChecks.ts`, `focusedRun.ts`, `queueChecks.ts`, `checks.ts`, `adoption.ts`, `upgrade.ts`, `lineUpdates.ts`, `runLink.ts` | Common, calling `HistoryPort` / `ObservePort` | R6 |
+| 3 Evidence | `shared/workflow/guards.ts` `submit.trailer`, `submit.identity` commands | The remedy from `HistoryPort` | R6 or R9 |
+| 4 Integration | `workflow/mergeQueue.ts` candidate steps (prepare, reset, clean, merge, squash, rebase, conflicts, commit, `refs/cw/queue` pins), `queueControls.ts` | `IntegrationPort.prepareCandidate`, `inspectCandidate` | R7 |
+| 4 Integration | `mergeQueue.ts` advance, journal, rollback, recovery, push; `queueRunner.ts`, `queueHost.ts` | `IntegrationPort.advance`, `recover`, `publish`; the state machine stays common | R8 |
+| 5 Operations | `gitRepo.ts` reads, `gitCompare.ts`, `branchWatch.ts` | `RepoReads` (Git: stays) | R2 |
+| 5 Operations | `gitRepo.ts` mutations, `gitInit.ts`, `branchMerge.ts`, `worktrees.ts` `mergeWorktree`, their IPC and renderer dispatch | `RepoOps`, gated by the descriptor's operations | R3 |
+| Workflow facade | `platform/adapter.ts` `PlatformAdapter`, `gitPlatform.ts`, `nonePlatform.ts`, `none.ts` | Unchanged contract, composed over ports 1–4 | R6–R9 |
+| Shared | `shared/platform/descriptors.ts` | `PlatformId` stays `'none' \| 'git'` in 1.4.0; `operations` and gate ids added | R3 (operations), J0 (gates) |
+| Audit | Every remaining Git import outside `src/main/platform` and the Git implementations | Classified (implementation, historic migration, or defect) and held by an import rule | R9 |
+
+The shapes, for R1 to start from:
+
+```ts
+interface RepoContext { platform: PlatformId; store: string; workspace: string; root: string; folder: string; subfolder?: boolean }
+interface RepoRunner { run(ctx: RepoContext, args: readonly string[], o: RunOptions): Promise<Maybe<RunOutput>>; readiness(): Promise<Readiness> }
+interface RepoLocks { withRepoLock<T>(ctx: RepoContext, fn: () => Promise<T>, o?: RepoLockOptions): Promise<T>; holdRefs(ctx: RepoContext, refs: readonly RefAt[], o: HoldOptions): Promise<{ hold: RefHold } | { refused: RefHoldRefused }> }
+interface WorkspaceState { line: string | null; head: Maybe<string>; status: 'clean' | { dirty: string[] } | Unknown; underWay: string | null; unaccounted: Maybe<string[]> }
+interface WorkspacePort { list(ctx): Promise<Maybe<WorkspaceRef[]>>; inspect(ws): Promise<WorkspaceState>; create(...); prepare(...); remove(...); recover(...); checkCopy(ctx, revision): Promise<Maybe<string>>; relocate?(...) }
+type AdvanceOutcome = { advanced: true } | { moved: string } | { paused: PauseCondition; files?: string[] } | { terminal: NeedsYouState } | { refused: 'divergentChange' | 'conflictedTarget' | 'staleWorkspace' | 'partialExport'; detail: string } | Unknown
+interface IntegrationPort { prepareCandidate(...): Promise<CandidateOutcome>; advance(ctx, target, expected, result, journal): Promise<AdvanceOutcome>; recover(ctx, journal): Promise<AdvanceOutcome>; publish(ctx, target, result): Promise<PublishOutcome> }
+```
+
+**What the R cards inherit:** each keeps this section's invariants at its boundary and names, in its summary, the
+existing tests that prove it unchanged (HI-2781 part 2's selection menu); none adds jj code; R9 ends 1.4.0's refactor
+with the audit and the import rule, and J0 starts 1.5.0 from it.
 
 ### 16.4 Facts
 
