@@ -55,7 +55,7 @@ export async function deliverContext(runId: string, sessionId: string, text: str
   try {
     const res = await fetch(`${url}/api/experimental/session/${encodeURIComponent(sessionId)}/instructions/entries/${CONTEXT_KEY}`, {
       method: remove ? 'DELETE' : 'PUT',
-      headers: { authorization: 'Basic ' + Buffer.from(`opencode:${run.password}`).toString('base64'), ...(remove ? {} : { 'content-type': 'application/json' }) },
+      headers: { authorization: 'Basic ' + Buffer.from(`opencode:${run.password}`).toString('base64'), ...(remove ? {} : { 'content-type': 'application/json' }) }, // i18n-ignore: an HTTP authorization header, never shown
       ...(remove ? {} : { body: body! }),
       signal
     })
