@@ -1753,6 +1753,12 @@
   "settings.advanced.opencode.override.stripCredentials.title": {
     "placeholders": {}
   },
+  "settings.advanced.opencode.rules.loaded.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.rules.loaded.title": {
+    "placeholders": {}
+  },
   "settings.advanced.opencode.server.readySeconds.desc": {
     "placeholders": {}
   },

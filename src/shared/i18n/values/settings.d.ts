@@ -678,6 +678,8 @@ interface CombworkMessageValues {
   'settings.advanced.opencode.override.ownProviderOnly.title': undefined
   'settings.advanced.opencode.override.stripCredentials.desc': undefined
   'settings.advanced.opencode.override.stripCredentials.title': undefined
+  'settings.advanced.opencode.rules.loaded.desc': undefined
+  'settings.advanced.opencode.rules.loaded.title': undefined
   'settings.advanced.opencode.server.readySeconds.desc': undefined
   'settings.advanced.opencode.server.readySeconds.title': undefined
   'settings.advanced.opencode.version.desc': undefined

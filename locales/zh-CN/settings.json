@@ -1618,6 +1618,8 @@
   "settings.advanced.opencode.override.ownProviderOnly.desc": "Combwork 的 OpenCode 私有配置会拒绝除连接模型中的提供方（ollama/qwen3:8b 中的 ollama）以外的所有提供方，因此 OpenCode 代表智能体所做的任何事都不会发送给其他提供方：无论是设置为其他提供方模型的标题或压缩、回退到其他提供方模型的图像请求，还是 OpenCode 的免费云端模型。开启此项的连接必须指定其模型。它决定 OpenCode 使用哪个提供方，而不是该提供方的地址指向哪里，也不是防火墙：网页搜索、MCP 服务器、插件和命令仍然可以访问网络。关闭后，OpenCode 可能像在 Combwork 之外一样使用它能使用的任何提供方；Claude Agent 无论如何都会被拒绝。",
   "settings.advanced.opencode.override.askOutsideFolder.title": "访问智能体文件夹以外的内容前先询问",
   "settings.advanced.opencode.override.askOutsideFolder.desc": "Combwork 的 OpenCode 私有配置让 OpenCode 智能体在读取或更改其自身文件夹以外的任何内容前先询问（OpenCode 的 external_directory 权限）。评审者的评审副本、智能体的技能及其临时文件夹仍然允许。“全部批准”会直接批准这些询问而不问你；如果你让项目自己的 OpenCode 配置加载，其中的规则排在 Combwork 的规则之后并优先生效。无人看着的智能体会停在这类询问处，直到你在它的窗格中回答。关闭后，OpenCode 智能体会像在 Combwork 之外 OpenCode 自己的规则所允许的那样，不经询问访问这台电脑上的任何文件夹。",
+  "settings.advanced.opencode.rules.loaded.title": "OpenCode 智能体中的 Combwork 文件夹规则",
+  "settings.advanced.opencode.rules.loaded.desc": "OpenCode 加载 Combwork 在访问智能体文件夹以外的文件夹前先询问的规则后，在智能体上显示的内容（它对 /api/agent 的回复）。开启“访问智能体文件夹以外的内容前先询问”时，Combwork 会在 OpenCode 的窗口打开前等待它出现，这样在规则生效前不会运行任何工具，没有它智能体也不会启动。设置错误时，OpenCode 智能体无法启动。",
   "settings.advanced.opencode.override.stripCredentials.title": "不向 OpenCode 传递其他凭据",
   "settings.advanced.opencode.server.readySeconds.desc": "OpenCode 智能体的私有服务器有多长时间作出响应，超时后启动会放弃并结束它。太短时，慢速电脑上的智能体无法启动。",
   "settings.advanced.opencode.server.readySeconds.title": "服务器：启动时间",

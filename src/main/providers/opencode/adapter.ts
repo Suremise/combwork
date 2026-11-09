@@ -324,6 +324,8 @@ export class OpencodeAdapter implements ProviderAdapter {
       dirs: [ctx.cwd, ctx.projectPath],
       model: p.model,
       variant: p.variant,
+      // Combwork's folder rule on the session's agent before the TUI starts (HI-2775: 2.2.6 loads it a moment late).
+      rules: launchOverrides(ctx.overrides, OPENCODE, 'askOutsideFolder') ? { pattern: advanced.pattern('opencode.rules.loaded').source, agent: opencodeAgentOf(mode) ?? 'build' } : null,
       privateDir: ctx.privateDir,
       owner: p.owner,
       marks: p.marks,

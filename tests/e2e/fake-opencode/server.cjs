@@ -43,6 +43,16 @@ async function startServer(opts) {
   const pending = new Map() // permission id → { request, resolve }
   const turns = new Map() // session id → { abort }
   const queues = new Map()
+  /**
+   * When each folder's config rules are on its agents (HI-2775, agent-opencode-2.2.6.txt): 2.2.6 puts them there a moment
+   * after the folder's first session (about 0.3 s, probes/external-directory-ask.json) and checks a tool against the agent
+   * as it is then. A test's knobs: FAKE_OPENCODE_RULES_LOAD_MS (that moment; none: at once) and FAKE_OPENCODE_RULES_NEVER.
+   */
+  const rulesAt = new Map()
+  const dirKey = (d) => path.resolve(d).toLowerCase()
+  const rulesLive = (dir) => env.FAKE_OPENCODE_RULES_NEVER !== '1' && rulesAt.has(dirKey(dir)) && Date.now() >= rulesAt.get(dirKey(dir))
+  /** An agent's own rules in 2.2.6 (its /api/agent reply before the config's: agent-opencode-2.2.6.txt). */
+  const AGENT_RULES = [{ action: '*', resource: '*', effect: 'allow' }, { action: 'read', resource: '*.env', effect: 'ask' }, { action: 'read', resource: '*.env.*', effect: 'ask' }, { action: 'read', resource: '*.env.example', effect: 'allow' }, { action: 'question', resource: '*', effect: 'allow' }]
 
   // --- MCP servers, started once (stdio, initialize then initialized, as an MCP client does).
   const children = []
@@ -163,6 +173,7 @@ async function startServer(opts) {
     const dir = body.location?.directory || cwd
     const existing = session(id)
     if (existing) return existing.info
+    if (!rulesAt.has(dirKey(dir))) rulesAt.set(dirKey(dir), Date.now() + (Number(env.FAKE_OPENCODE_RULES_LOAD_MS) || 0))
     // Its model as given, its variant too (wire/session-model-set.json, HI-2767); a test's failure creates it without it.
     const model = body.model && env.FAKE_OPENCODE_MODEL_SET !== 'drop-on-create' ? { id: body.model.id, providerID: body.model.providerID, ...(body.model.variant !== undefined ? { variant: body.model.variant } : {}) } : null
     const info = { id, projectID: store.projectId(dir), ...(model ? { model } : {}), cost: 0, tokens: zeroTokens(), time: { created: now, updated: now }, ...(body.permissions ? { permissions: body.permissions } : {}), location: { directory: dir } }
@@ -338,7 +349,7 @@ async function startServer(opts) {
       if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return null
       const resource = `${path.dirname(file).replace(/\\/g, '/')}/*`
       const kw = (value, pattern) => new RegExp('^' + String(pattern).replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'si').test(value.replace(/\\/g, '/'))
-      const rules = [{ action: '*', resource: '*', effect: 'allow' }, ...cfg.permissions, ...(session(sid).info.permissions || [])]
+      const rules = [{ action: '*', resource: '*', effect: 'allow' }, ...(rulesLive(l.directory) ? cfg.permissions : []), ...(session(sid).info.permissions || [])]
       const effect = rules.findLast((p) => kw('external_directory', p.action) && kw(resource, p.resource ?? '*'))?.effect ?? 'ask'
       return { effect, resource }
     }
@@ -644,6 +655,16 @@ async function startServer(opts) {
     if (req.headers.authorization !== auth) return json(res, 401, { _tag: 'UnauthorizedError', message: 'Authentication required' })
     log({ kind: 'http', method: req.method, path: p })
     let m
+    // An agent as 2.2.6 shows it for a folder (x-opencode-directory, URI-escaped): its own rules, then the config's once they
+    // are on it (HI-2775); a folder with no session yet: not found, as recorded.
+    if ((m = /^\/api\/agent\/([^/]+)$/.exec(p)) && req.method === 'GET') {
+      const header = req.headers['x-opencode-directory']
+      const dir = header ? decodeURIComponent(String(header)) : cwd
+      const id = decodeURIComponent(m[1])
+      log({ kind: 'agent-read', agent: id, live: rulesLive(dir) })
+      if (!['build', 'plan'].includes(id) || (header && !rulesAt.has(dirKey(dir)))) return json(res, 404, { _tag: 'AgentNotFoundError', agentID: id, message: `Agent not found: ${id}` })
+      return json(res, 200, { location: { directory: dir }, data: { id, name: id === 'build' ? 'Build' : 'Plan', mode: 'primary', hidden: false, permissions: [...AGENT_RULES, ...(rulesLive(dir) ? cfgFor(dir).permissions : [])] } })
+    }
     if (req.method === 'GET' && p === '/api/info') return json(res, 200, { version: VERSION, pid: process.pid, hostname: os.hostname(), urls: [base], paths: { tmp: path.join(path.dirname(store.dbPath(env)), 'opencode', 'tmp') }, capabilities: { persistentPty: true } })
     if (req.method === 'GET' && p === '/api/event') {
       res.writeHead(200, { 'cache-control': 'no-cache, no-transform', connection: 'keep-alive', 'content-type': 'text/event-stream', vary: 'Origin', 'x-accel-buffering': 'no', 'x-content-type-options': 'nosniff' })

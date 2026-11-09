@@ -2809,6 +2809,16 @@
     "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
     "audience": "both"
   },
+  "settings.advanced.opencode.rules.loaded.desc": {
+    "text": "What OpenCode shows on the agent (its /api/agent reply) once it has loaded Combwork's rule to ask before folders outside the agent's own. With Ask before reaching outside the agent's folder on, Combwork waits for it before OpenCode's window opens, so no tool runs before the rule applies, and the agent doesn't start without it. Wrong, OpenCode agents don't start.",
+    "note": "What the advanced setting \"Combwork's folder rule, in OpenCode's agent\" is (Settings → Advanced, under OpenCode). /api/agent is an address: keep it. The quoted setting title is another advanced setting's: use its translated title.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.rules.loaded.title": {
+    "text": "Combwork's folder rule, in OpenCode's agent",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the rule Combwork waits to see on OpenCode's agent.",
+    "audience": "both"
+  },
   "settings.advanced.opencode.server.readySeconds.desc": {
     "text": "How long an OpenCode agent's private server gets to answer before the launch gives up and ends it. Too short, an agent on a slow PC doesn't start.",
     "note": "What the advanced setting \"Server: time to start\" is for, and what goes wrong when it is wrong (Settings → Advanced).",

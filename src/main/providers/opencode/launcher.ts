@@ -15,6 +15,9 @@ import { POWERSHELL } from '../../launchGate'
 //    a bounded log, and waits for GET /api/info to answer 200 (bounded; a port taken: up to 3 tries);
 // 4. new: GET /api/session/<id>, 404 → POST {id, location}; 200 is an id clash and fails. resume: GET only; 200 must be that
 //    id in one of the allowed folders; 404 fails ("session missing"), never creating one;
+// 4b. with Combwork's folder rule (HI-2775): waits until the session's agent, as GET /api/agent/<agent> shows it for the
+//    folder, has it (2.2.6 puts a config's rules on its agents a moment after a folder's first session, and checks a tool
+//    against the agent as it is then); bounded, and never starting the TUI without it;
 // 5. writes the server's address, port, pid and session id (never the password) for Combwork (opencode-server.json);
 // 6. runs the TUI on the terminal's console: `opencode --server <url> --session <id> [flags] <folder>`;
 // 7. waits for the owner, the TUI and serve: when any ends, it exits, and the job's handle closing ends the rest.
@@ -36,7 +39,8 @@ export const LAUNCHER_EXIT = {
   ownerEnded: 130,
   tuiStart: 131,
   input: 132,
-  modelSet: 134
+  modelSet: 134,
+  rules: 135
 } as const
 
 /** The C# the launcher compiles (Add-Type, .NET Framework 4's csc: C# 5, no newer syntax). */
@@ -544,12 +548,16 @@ public static class CwOpencode {
   static int FreePort() { var l = new TcpListener(IPAddress.Loopback, 0); l.Start(); int p = ((IPEndPoint)l.LocalEndpoint).Port; l.Stop(); return p; }
 
   /** An HTTP request to the server: its status (0: no answer) and body. */
-  static int Http(string method, string url, string auth, string body, out string text) {
+  static int Http(string method, string url, string auth, string body, out string text) { return Http(method, url, auth, body, out text, null); }
+
+  /** A request, with the folder it is about (2.2.6's x-opencode-directory, its value URI-escaped) when given. */
+  static int Http(string method, string url, string auth, string body, out string text, string directory) {
     text = "";
     try {
       var r = (HttpWebRequest)WebRequest.Create(url);
       r.Method = method; r.Timeout = 5000; r.ReadWriteTimeout = 5000; r.Proxy = null;
       r.Headers["Authorization"] = auth;
+      if (directory != null) r.Headers["x-opencode-directory"] = Uri.EscapeDataString(directory);
       if (body != null) {
         byte[] data = Encoding.UTF8.GetBytes(body);
         r.ContentType = "application/json"; r.ContentLength = data.Length;
@@ -629,6 +637,9 @@ public static class CwOpencode {
     string pw = E("OPENCODE_PASSWORD");
     // The session's model and effort (HI-2767): provider/model, and its variant ("" = the model's default); "" = none set.
     string model = E("CW_OC_MODEL"), variant = E("CW_OC_VARIANT");
+    // Combwork's folder rule (HI-2775): a pattern the session's agent must show before the TUI starts ("" = no wait).
+    string rules = E("CW_OC_RULES"), rulesAgent = E("CW_OC_RULES_AGENT");
+    if (rulesAgent == "") rulesAgent = "build";
     int slash = model.IndexOf('/');
     string modelProvider = slash > 0 ? model.Substring(0, slash) : "", modelId = slash > 0 ? model.Substring(slash + 1) : "";
     int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 30000;
@@ -637,7 +648,7 @@ public static class CwOpencode {
     foreach (string a in E("CW_OC_PREFIX").Split('\u001f')) if (a.Length > 0) prefix.Add(a);
     var tuiArgs = new List<string>(); foreach (string a in E("CW_OC_TUI_ARGS").Split('\u001f')) if (a.Length > 0) tuiArgs.Add(a);
     var dirs = new List<string>(); foreach (string d in E("CW_OC_DIRS").Split('\u001f')) if (d.Length > 0) dirs.Add(Norm(d));
-    foreach (string n in new string[] { "CW_OC_STREAM_VIA", "CW_OC_HOOK_URL", "CW_OC_PREFIX", "CW_OC_MARKS", "CW_OC_EXE", "CW_OC_CWD", "CW_OC_SESSION", "CW_OC_INTENT", "CW_OC_INFO", "CW_OC_LOG", "CW_OC_OWNER", "CW_OC_READY_MS", "CW_OC_LOG_MAX", "CW_OC_TUI_ARGS", "CW_OC_DIRS", "CW_OC_CS" }) Environment.SetEnvironmentVariable(n, null);
+    foreach (string n in new string[] { "CW_OC_STREAM_VIA", "CW_OC_HOOK_URL", "CW_OC_PREFIX", "CW_OC_MARKS", "CW_OC_EXE", "CW_OC_CWD", "CW_OC_SESSION", "CW_OC_INTENT", "CW_OC_INFO", "CW_OC_LOG", "CW_OC_OWNER", "CW_OC_READY_MS", "CW_OC_LOG_MAX", "CW_OC_TUI_ARGS", "CW_OC_DIRS", "CW_OC_CS", "CW_OC_RULES", "CW_OC_RULES_AGENT" }) Environment.SetEnvironmentVariable(n, null);
     if (exe == "" || cwd == "" || pw == "" || info == "" || log == "" || marks == "" || !session.StartsWith("ses") || (intent != "new" && intent != "resume")) { Say("the launch was given incomplete settings."); return ${LAUNCHER_EXIT.input}; }
 
     string why;
@@ -703,6 +714,23 @@ public static class CwOpencode {
         if (set < 200 || set > 299) { Say("OpenCode didn't set the session's model and effort (HTTP " + set + "): not resumed."); return ${LAUNCHER_EXIT.modelSet}; }
         int back = Http("GET", url + "/api/session/" + Uri.EscapeDataString(session), auth, null, out reply);
         if (back != 200 || !ModelIs(reply, modelProvider, modelId, variant)) { Say("OpenCode didn't keep the connection's model and effort (" + model + (variant == "" ? "" : ", " + variant) + ") on the session: not resumed."); return ${LAUNCHER_EXIT.modelSet}; }
+      }
+    }
+    // Combwork's folder rule on the session's agent before anything can use a tool (HI-2775): 2.2.6 checks a tool against
+    // the agent as it is at that moment, and puts the config's rules on it only once the folder's config has loaded (about
+    // 0.3 s after its first session, recorded). Bounded; without it the launch fails, never a TUI without the rule.
+    if (rules != "") {
+      Regex want;
+      try { want = new Regex(rules); } catch (Exception) { Say("OpenCode didn't start: Combwork's pattern for its folder rule isn't valid (Settings → Advanced → OpenCode)."); return ${LAUNCHER_EXIT.rules}; }
+      var until = DateTime.UtcNow.AddMilliseconds(readyMs);
+      int st = 0; string agentReply = "";
+      while (true) {
+        if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
+        st = Http("GET", url + "/api/agent/" + Uri.EscapeDataString(rulesAgent), auth, null, out agentReply, cwd);
+        if (st == 200 && want.IsMatch(agentReply)) break;
+        if (DateTime.UtcNow >= until || serve.HasExited) { Say("OpenCode didn't start: it didn't load Combwork's rule to ask before folders outside the agent's own within " + (readyMs / 1000) + " s (HTTP " + st + "). Settings → Advanced → OpenCode → Ask before reaching outside the agent's folder turns that rule off."); return ${LAUNCHER_EXIT.rules}; }
+        var w = ownerWait == null ? new WaitHandle[] { Exits(serve) } : new WaitHandle[] { Exits(serve), ownerWait };
+        WaitHandle.WaitAny(w, 50);
       }
     }
     if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
@@ -781,6 +809,11 @@ export interface LauncherInput {
   /** The session's model (provider/model) to set at its start, and its variant (HI-2767); none: the session's as it is. */
   model?: string | null
   variant?: string | null
+  /**
+   * Combwork's folder rule (HI-2775): a pattern (.NET regex) the session's agent, as GET /api/agent/<agent> shows it for
+   * the folder, must match before the TUI starts, and that agent; none: no wait.
+   */
+  rules?: { pattern: string; agent: string } | null
 }
 
 /** Where Combwork records the sessions it created in an account's data (the launcher writes one as it creates it). */
@@ -810,7 +843,9 @@ export function launcherEnv(i: LauncherInput): Record<string, string> {
     CW_OC_HOOK_URL: i.hookUrl ?? '',
     CW_OC_READY_MS: String(i.readyMs),
     CW_OC_MODEL: i.model ?? '',
-    CW_OC_VARIANT: i.model ? (i.variant ?? '') : ''
+    CW_OC_VARIANT: i.model ? (i.variant ?? '') : '',
+    CW_OC_RULES: i.rules?.pattern ?? '',
+    CW_OC_RULES_AGENT: i.rules?.agent ?? ''
   }
 }
 

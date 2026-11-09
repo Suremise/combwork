@@ -3222,6 +3222,19 @@ const SOURCES: readonly AdvancedSource[] = [
     samples: [{ from: `${FIX}/advanced/help-opencode-2.2.6.txt`, version: '2.2.6', text: 'Auto-approve permissions that are not explicitly denied', shows: "OpenCode's --auto (Combwork's Approve all), which approves these questions" }] // i18n-ignore: a CLI's recorded text (#367)
   },
   {
+    // HI-2775 (HR1's question): 2.2.6 puts the config's rules on its agents a moment after a folder's first session, and
+    // checks a tool against the agent as it is then, so the launcher waits for the rule before the TUI starts.
+    id: 'opencode.rules.loaded',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.rules.loaded.title', defaultMessage: "Combwork's folder rule, in OpenCode's agent", description: "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the rule Combwork waits to see on OpenCode's agent." }),
+    desc: msg({ id: 'settings.advanced.opencode.rules.loaded.desc', defaultMessage: "What OpenCode shows on the agent (its /api/agent reply) once it has loaded Combwork's rule to ask before folders outside the agent's own. With Ask before reaching outside the agent's folder on, Combwork waits for it before OpenCode's window opens, so no tool runs before the rule applies, and the agent doesn't start without it. Wrong, OpenCode agents don't start.", description: 'What the advanced setting "Combwork\'s folder rule, in OpenCode\'s agent" is (Settings → Advanced, under OpenCode). /api/agent is an address: keep it. The quoted setting title is another advanced setting\'s: use its translated title.' }),
+    kind: 'pattern',
+    default: String.raw`\{"action":"external_directory","resource":"\*","effect":"ask"\}`,
+    flags: '',
+    applies: 'sessions',
+    samples: [{ from: `${FIX}/advanced/agent-opencode-2.2.6.txt`, version: '2.2.6', text: '{"action":"external_directory","resource":"*","effect":"ask"}', shows: "Combwork's rule on OpenCode's Build agent once the folder's config has loaded" }] // i18n-ignore: a CLI's recorded text (#367)
+  },
+  {
     id: 'opencode.version',
     group: 'opencode',
     title: msg({ id: 'settings.advanced.opencode.version.title', defaultMessage: 'The version in opencode --version', description: "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the CLI's version line. opencode --version is a command: keep it." }),
