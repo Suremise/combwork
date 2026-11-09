@@ -135,7 +135,10 @@ const until = lib.until
     check('4: the agent starts', (await start()) && !!(await until(async () => (await live())?.status === 'ready', HUNG_MS)))
     check('4: a turn ends finished', await turn('managed-model-4'))
     const f4 = await fired()
-    check('4: the fake ran two handlers for each event whose timeout changed (PostToolUse; PreToolUse has its own)', fakeRows().some((r) => r.event === 'PostToolUse' && r.handlers === 2), JSON.stringify(fakeRows().slice(0, 6)))
+    // As Claude Code 2.1.319 does: HTTP handlers of one URL run once whatever their timeouts; the SessionStart commands
+    // differ (the timeout is in the command), so both run.
+    check('4: the fake ran both SessionStart commands, and one HTTP handler per event (same URL)', fakeRows().some((r) => r.event === 'SessionStart' && r.handlers === 2) && fakeRows().filter((r) => r.event !== 'SessionStart').every((r) => r.handlers === 1), JSON.stringify(fakeRows().slice(0, 6)))
+    check('4: SessionStart (startup) was handled once', count(f4, 'SessionStart') === 1, JSON.stringify(f4))
     check('4: the tool call and the prompt were each handled once', count(f4, 'PreToolUse') === 1 && count(f4, 'PostToolUse') === 1 && count(f4, 'UserPromptSubmit') === 1, JSON.stringify(f4))
     check('4: Combwork says its hooks arrive twice', !!(await until(async () => (await live())?.hooksDoubled, HUNG_MS)))
     check('4: the banner says so and offers the admin snippet', !!(await until(async () => /twice/.test((await page.locator('.banner.hooks-doubled').innerText().catch(() => '')) ?? ''), HUNG_MS)))

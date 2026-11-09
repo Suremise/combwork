@@ -513,14 +513,18 @@ const hookFailed = (event, entry) => {
  */
 const hooksOff = () => fs.existsSync(path.join(home, `fake-nohooks-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
 
-/** An event's handlers under managed settings: managed first, then the --settings' unless only managed run; each once. */
+/**
+ * An event's handlers under managed settings: managed first, then the --settings' unless only managed run; each once, as
+ * Claude Code 2.1.319 matches them (HI-2777's claudemanagedreal): an HTTP handler by its URL (a different timeout is the
+ * same handler), a command one by its command.
+ */
 function handlersFor(event) {
   const groups = [...(managed?.hooks?.[event] ?? []), ...(managedOnly ? [] : (settings.hooks?.[event] ?? []))]
   const seen = new Set()
   const handlers = []
   for (const g of groups) {
     for (const h of g?.hooks ?? []) {
-      const k = JSON.stringify(h)
+      const k = h.type === 'http' ? `http ${h.url}` : `${h.type} ${h.command ?? JSON.stringify(h)}`
       if (!seen.has(k)) {
         seen.add(k)
         handlers.push(h)

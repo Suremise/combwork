@@ -7,7 +7,8 @@
 // 2. the SessionStart command (encoded PowerShell, through the shell Claude Code picks) forwards stdin byte for byte
 //    (non-ASCII prompt and folder) with the header from the auth file, a Unicode path;
 // 3. the HTTP hook carries $CW_HOOK_TOKEN from the environment to the fixed URL;
-// 4. a hook timeout changed in one file: the handlers differ, so both run (two of each, Combwork's fallback's case);
+// 4. a hook timeout changed in one file: the SessionStart commands differ and both run (Combwork's fallback's case),
+//    while HTTP handlers of one URL still run once whatever their timeouts (2.1.319);
 // 5. a session without Combwork's variables: the SessionStart command sends nothing.
 // It proves nothing about how an organisation's remote settings rank. Runs in the Claude Code test home
 // (CLAUDE_TEST_HOME, claudeHome: 'test'); the status line isn't covered (claude -p has none: claudeManagedHooks.test.ts
@@ -102,7 +103,9 @@ const check = (name, ok, extra = '') => {
 
     // ---- 4: a timeout changed in one file: both run.
     const b = await runOnce(handlers, claudeHookHandlers([fixedHookUrl(port)], { hook: 7, preToolUse: 10 }), env)
-    check('4: differing handlers both run (two SessionStarts, two UserPromptSubmits)', count(b.calls, 'SessionStart') === 2 && count(b.calls, 'UserPromptSubmit') === 2, JSON.stringify(b.calls.map((c) => c.event)))
+    // Claude Code 2.1.319 matches an HTTP handler by its URL (a different timeout is the same handler) and a command one by
+    // its command (which holds the timeout): the commands both run, the HTTP hook once.
+    check('4: differing SessionStart commands both run; HTTP handlers of one URL run once whatever their timeouts', count(b.calls, 'SessionStart') === 2 && count(b.calls, 'UserPromptSubmit') === 1, JSON.stringify(b.calls.map((c) => c.event)))
 
     // ---- 5: no Combwork variables: SessionStart's command sends nothing (HTTP hooks still post, with no token).
     const c = await runOnce(handlers, handlers, { CW_HOOK_TOKEN: '', CW_HOOK_URL: '', CW_HOOK_AUTH_FILE: '' })
