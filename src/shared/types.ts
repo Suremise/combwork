@@ -1666,18 +1666,28 @@ export interface WorkflowCheck {
 export interface RetargetPreview {
   from: string
   to: string
-  cards: { move: { number: number; key: string; title: string }[]; keep: { number: number; key: string; title: string; why: 'work' | 'started' | 'cantCheck' }[] }
+  /**
+   * HI-2753: a card in flight started on `from` moves too when its work is provably its own (`started`: its line's head
+   * as checked, and its own target then, which the apply expects); one that can't stays with why.
+   */
+  cards: { move: { number: number; key: string; title: string; started?: { head: string; own: string | null } }[]; keep: { number: number; key: string; title: string; why: RetargetCardKeep }[] }
   slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' }[] }
-  lanes: { id: string; name: string | null; builder: string }[]
+  /** Running lanes on `from` that stay, with why (none given: more than one card of it in flight). */
+  lanes: { id: string; name: string | null; builder: string; why?: RetargetCardKeep }[]
+  /** HI-2753: running lanes on `from` that move to `to`, each with its card in flight (moved with it in one write), if any. */
+  laneMoves?: { id: string; name: string | null; builder: string; ruleset: string; card: { number: number; key: string; title: string; head: string; own: string | null } | null }[]
 }
+
+/** Why a card stays on the old target in a retarget (HI-2680, HI-2753): its own work, or why its move in flight can't be made. */
+export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine'
 
 /** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
 export interface RetargetResult {
   from: string
   to: string
-  moved: { cards: { number: number; key: string }[]; slots: string[] }
+  moved: { cards: { number: number; key: string }[]; slots: string[]; lanes?: string[] }
   /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
-  skipped: { card?: number; key?: string; slot?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
+  skipped: { card?: number; key?: string; slot?: string; lane?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
 }
 
 export interface KeptTargets {

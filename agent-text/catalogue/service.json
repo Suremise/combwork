@@ -720,8 +720,8 @@
     "audience": "both"
   },
   "service.lanes.targetFixed": {
-    "text": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch.",
-    "note": "HI-2556: an error changing a running lane’s Merges into (fixed for its life). {builder} is the lane’s builder agent, {target} its branch.",
+    "text": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch. Once {target} has been merged into another branch, a retarget of Work merges into moves the lane and its card there (Also retarget what can move).",
+    "note": "HI-2556, HI-2753: an error changing a running lane’s Merges into (fixed for its life, except through a retarget once its branch has been merged into another). {builder} is the lane’s builder agent, {target} its branch. Work merges into and Also retarget what can move are names in the window (Version Control → Workflow, Save…): as translated there.",
     "audience": "both"
   },
   "service.lanes.targetMissing": {

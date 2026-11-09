@@ -21,7 +21,8 @@ export const APPLY_OPTIONS = 'applyOptions'
  */
 export function ownRuleset(facts: readonly Fact[], s: Pick<CardState, 'started' | 'stage' | 'cycle'>): string | null {
   if (!s.started || s.stage === 'todo') return null
-  const applied = facts.filter((x) => x.seq > s.cycle && x.kind === 'Override' && !!x.ruleset && (x.data as FactData['Override']).move === APPLY_OPTIONS).at(-1)
+  // The options applied to it since (an Override), or its target moved (HI-2753: its rules then, merging into the new one).
+  const applied = facts.filter((x) => x.seq > s.cycle && !!x.ruleset && ((x.kind === 'Override' && (x.data as FactData['Override']).move === APPLY_OPTIONS) || x.kind === 'Retargeted')).at(-1)
   return (applied ?? facts.find((x) => x.seq === s.cycle))?.ruleset ?? null
 }
 

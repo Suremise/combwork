@@ -97,6 +97,25 @@ export class GitPlatform implements PlatformAdapter {
     return this.wf.cfg.project
   }
 
+  /**
+   * The line a start of the card works on (HI-2753): the one it had, while that branch is still there and is this card's
+   * own (`cw/<project>/<its key>…`), so a restart after a retitle keeps its work; else its name from its title now.
+   */
+  private async lineFor(card: CardRecord): Promise<Maybe<string>> {
+    const named = lineName(this.wf.cfg.projectKey, card)
+    const s = this.wf.state(card)
+    const own = `cw/${this.wf.cfg.projectKey}/${card.key}`
+    // Its newest own line still there: the last started first, then the others it had, newest first.
+    for (const l of new Set([s.started?.line, ...[...s.lines].reverse()])) {
+      if (!l || (l !== own && !l.startsWith(`${own}-`))) continue
+      if (l === named) return named
+      const h = await G.lineHead(this.project, l)
+      if (isUnknown(h)) return h
+      if (h) return l
+    }
+    return named
+  }
+
   async start(card: CardRecord, o: WorkflowOptions, builder?: string, dry = false): Promise<Maybe<StartPlan>> {
     // Before P7 (SPEC §16.19.1): the builder's own worktree stands in for a slot, and is where its work is whatever the
     // folder option says (as P3 recorded it). Its line is the worktree's branch, and the card's base the merge base of its
@@ -134,7 +153,8 @@ export class GitPlatform implements PlatformAdapter {
       const th = await G.lineHead(this.project, target)
       if (isUnknown(th)) return th
       if (!th) return unknown(UNREADABLE.head, { where: target })
-      const line = lineName(this.wf.cfg.projectKey, card)
+      const line = await this.lineFor(card)
+      if (isUnknown(line)) return line
       // A line of its from an earlier start (put back, then started again) carries on: its base is where it left the target.
       const had = await G.lineHead(this.project, line)
       if (isUnknown(had)) return had
@@ -149,7 +169,9 @@ export class GitPlatform implements PlatformAdapter {
       const base = await G.lineHead(this.project, target)
       if (isUnknown(base)) return base
       if (!base) return unknown(UNREADABLE.head, { where: target })
-      return { folder: join(this.wf.cfg.slots ?? join(this.project, CW_DIR, 'slots'), card.key), line: lineName(this.wf.cfg.projectKey, card), base, target }
+      const line = await this.lineFor(card)
+      if (isUnknown(line)) return line
+      return { folder: join(this.wf.cfg.slots ?? join(this.project, CW_DIR, 'slots'), card.key), line, base, target }
     }
     const line = await G.branch(this.project)
     const base = await G.head(this.project)
@@ -340,6 +362,8 @@ export class GitPlatform implements PlatformAdapter {
       dirty = got?.dirty
       // The change's base: the merge base with the target at this moment, fixed with the submission.
       const th = got ? (got.target ?? null) : read!.target
+      // HI-2753: the target it started on is gone (an integration branch merged and deleted): said so, with its way on.
+      if (th === null && target) return { ok: false, refusal: { rule: 'platform.targetGone', values: { card: card.key, target } } }
       const mb = !isUnknown(th) && th ? (th === h ? h : await G.mergeBase(this.project, th, h)) : th
       if (isUnknown(mb) || !mb) return { ok: false, refusal: unknownRefusal(card, unknown(UNREADABLE.branchedOffTarget), 'submit') }
       base = mb

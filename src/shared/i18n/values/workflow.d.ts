@@ -125,9 +125,11 @@ interface CombworkMessageValues {
   'workflow.form.retargetChoice': { from: string | number; to: string | number; cards: number; slots: number }
   'workflow.form.retargetDone': { skipped: number; to: string | number; cards: number; slots: number }
   'workflow.form.retargetFailed': undefined
-  'workflow.form.retargetKeep': { what: string | number; why: string; from: string | number }
+  'workflow.form.retargetKeep': { what: string | number; why: string; to: string | number; from: string | number }
+  'workflow.form.retargetLane': { hasCard: string; lane: string | number; card: string | number; title: string | number }
   'workflow.form.retargetSkipped': { what: string | number; why: string }
   'workflow.form.retargetSlot': { slot: string | number }
+  'workflow.form.retargetStarted': { card: string | number; title: string | number }
   'workflow.form.retargetStays': { from: string | number }
   'workflow.form.save': undefined
   'workflow.form.saveBlocked': undefined
@@ -318,6 +320,8 @@ interface CombworkMessageValues {
   'workflow.refused.move.useIntent.next': { intent: string | number }
   'workflow.refused.paths.excluded.message': { card: string | number; path: string | number; folder: string | number }
   'workflow.refused.paths.excluded.next': { folder: string | number }
+  'workflow.refused.platform.targetGone.message': { card: string | number; target: string | number }
+  'workflow.refused.platform.targetGone.next': undefined
   'workflow.refused.platform.unknown.message': { card: string | number; what: string | number; rule: string | number }
   'workflow.refused.platform.unknown.next': undefined
   'workflow.refused.platform.unknown.nextGone': { reader: string }

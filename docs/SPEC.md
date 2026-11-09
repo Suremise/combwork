@@ -2348,8 +2348,8 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   and through approvals and quorum.
 - **Every card keeps the ruleset it started with** (`Started.ruleset`) until it's Done; a card in Todo uses the current
   one. A lane started under the old options keeps its ruleset until it ends ("old rules") [#1112 UI, #1122 c].
-- **A card's target is its start's** (`Started.target`, HI-2674): its queue entry takes that one, and neither a change of
-  G7 nor applying the options to the card (an Override) moves it; a running lane's cards still to start take what a
+- **A card's target is its start's** (`Started.target`, HI-2674), until a move in flight (HI-2753, below): its queue
+  entry takes that one, and neither a change of G7 nor applying the options to the card (an Override) moves it; a running lane's cards still to start take what a
   start under its ruleset, for its builder, would (`startTarget`: an empty G7 can give a builder worktree's base).
   So a change of the target says which cards in flight and running lanes keep another one, with it: Workflow's Save…
   dialog (`WorkflowCheck.targets`) and the settings tool's reply (`keptTargets` in `optionsForm.ts`). Moving them onto the
@@ -2370,6 +2370,49 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   each only at the head `ownWork` found empty, compare and swap: one moved since is refused and kept; refused while a
   folder has one checked out; only its own slot lines, never a target), so its next start makes a fresh line from the
   new target. Both name only
+- **A card in flight moved to another target (HI-2753, designs s8 → s11 → s15 → s18, HR1 and HR2).** An integration
+  branch ends (RELEASING.md: merged into `main`, then deleted), so the cards and lanes started on it need a way on. A card
+  in Doing, Review, Passed or Merging, on a line of its own (a slot), moves from `from` (its `Started.target`) to `to`
+  with its line, base, submissions and verdicts kept: a `Retargeted` fact (`from`, `to`, the `line`, its `head` and
+  `to`'s `toHead` as proved, `by`, and for a submitted card the latest submission's `base` with `to`), which the fold
+  applies to `started.target` (every reader of it, the queue's included, then follows) and to that submission and its
+  approval, and whose ruleset is the card's merging into `to` (`targetedOf`, `ownRuleset` taking it as an Override's).
+  Its `cards.target` changes in the same write, with a history line. **Only when its work is provably its own**
+  (`retargetCard.ts`, fail closed: anything unreadable refuses): with H its line's head and T `to`'s, the commits S =
+  `H ^T` (a) lie on H's first-parent chain (no merge brought in history `to` lacks), (b) are reachable from no ref but
+  the card's own (its lines and remote copies of them, its `refs/cw/cards/<key>/` pins and `refs/cw/queue/<key>` refs, a
+  stash) nor from another worktree's detached HEAD, (c) the line's reflog, from its creation (an old id of zeros; one cut
+  short refuses), holds only commits, cherry-picks, reverts and real merges, any other entry (a fast-forward, a reset, a
+  move of Combwork's) only to a commit `to` has or back to one the line had, and no rebase, and (d) every point it was
+  created or (re)started from (that first reflog entry, each `Started`'s base on the line) is in `to`. A card with an
+  open or started queue entry waits for it (`queued`). **A reviewed card** (Review, Passed, Merging) moves only if its
+  reviewed revision R passes (a), (b) and (d) and brings into `to` exactly the commits it was reviewed with (`R ^T` =
+  `R ^base`): its verdicts and its runs at R (runs on R's own tree) stay; its base becomes `merge-base(R, T)`; the
+  fingerprints and the merge preview (keyed by the target) are read again; and the queue, its entry made after the move
+  with `to`, checks the merge result on `to` (conflicts, its focused-test pick, the merge checks, an OK before merging)
+  as for any card: an approval is never evidence for anything decided on the merge result. Otherwise `reviewed`: back
+  through Doing. **The move** is a compare and swap that holds git's own locks: the check outside every lock; then the
+  lanes' lock, the board's, and a prepared `git update-ref --stdin` transaction verifying the line at H and `to` at T
+  (`refHold.ts`: git's `.lock` files on both, so an agent's commit, reset or update-ref meanwhile fails on git's lock,
+  or one before it makes the prepare fail: `changed`); under them the card and its lane checked again as seen; then one
+  board write; last, in the tick the write commits in, the hold still held (its git not ended, its input not broken),
+  else the write is undone. The transaction is closed after the write settles (`abort`, stdin closed, its exit waited for
+  a bound, then ended). Only the wait for the prepare is bounded (`REF_HOLD`); once prepared, nothing but that close (or
+  git dying, whose locks then stay) releases the locks. Git aborts a transaction whose input ends before `commit` and
+  removes its locks, Combwork quitting included; **Combwork never removes a lock file**: someone else's, or one a git
+  killed hard left, refuses the move naming the file (`locked`), for the user to remove once no git runs there. **Who**:
+  the user, the Assistant or a script, never an agent: `tasks.setTarget` on a card in flight (the card dialog,
+  `cw_update_task` `target`, run in a change of its own before any other part of the update, the Agent API), refused while
+  the card's running lane is on another branch (`lane`); and the retarget below, whose preview lists such cards
+  (`cards.move` with `started`: the head checked and its own target, which the apply expects with `expectFrom` and
+  `expectHead`) and **running lanes** on `from` (`laneMoves`): a lane moves with its card in flight (at most one) in that
+  card's write (the lane's ruleset `targetedOf` `to` in `lane_runs`), or alone (no card in flight: under the lanes' and
+  board's locks, as it was seen), before the other cards; one whose card can't move stays, with why. Refusals
+  (`tasks.error.targetMoveRefused`): `queued`, `notInTarget` (its rule), `reviewed`, `noLine` (a card in the project
+  folder), `targetMissing`, `lane`, `locked`, `changed`, `cantCheck`. **A submit whose target is gone** is refused as
+  `platform.targetGone` (naming the branch and the way on), not `platform.unknown`. **A restart keeps its line**: a card
+  started again works on the newest line of its own (`cw/<project>/<its key>…`) still there, not one named after a new
+  title (`GitPlatform.lineFor`).
 - **Retargeting when Work merges into moves on (HI-2680, design s14 after s8/s11).** A change of G7 from `A` (a release
   shipped) to `B` previews what still points at `A` (`retargetPreview`, read-only): Todo cards whose own target is `A`
   with no own work move; free slots recording `A` (or none, `A` being the target they fell back to) that are clean with

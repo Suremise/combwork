@@ -7,6 +7,8 @@
 //   preview offered at Control agents; its apply bound to that preview: a card changed since and a slot whose folder moved
 //   off the head seen stay (the slot set aside, never lent), an item the preview didn't list is said so, an unknown
 //   preview is refused (409).
+// - HI-2753: a card in flight on 1.2.0 when 1.2.0 is released into integration: Save…'s Retarget offers it, its branch
+//   and work kept; saved, it moves (a Retargeted fact, its line where it was, its history says so) and submits.
 // Dev build, throwaway profile, workspace and CLAUDE_CONFIG_DIR.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -151,6 +153,41 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     const actions = await inv('assistant:actions')
     check('…listed in its actions', actions.some((x) => x.ok && x.kind === 'retarget' && x.project === 'alpha'), JSON.stringify(actions.map((x) => [x.kind, x.text])))
     await inv('session:stop', home, 'assistant')
+
+    // --- HI-2753: a card in flight on 1.2.0 when 1.2.0 is released into integration. Save…'s Retarget offers it, with its
+    // branch and work kept; saved, it moves (its line where it was), and its history says so.
+    await targets('1.2.0', 'integration')
+    const b9 = await q.agent(fx, h, 'B9')
+    const n9 = (await inv('tasks:create', { title: 'In flight at the release', project: 'alpha' })).number
+    const st9 = await q.startCard(fx, h, b9, n9)
+    const line9 = st9.body?.data?.line
+    check('a card started on 1.2.0 in a slot of its own', st9.status === 200 && !!line9 && b9.folder && b9.folder !== 'project', JSON.stringify(st9.body))
+    fs.writeFileSync(path.join(b9.folder, 'flight.txt'), 'in flight\n')
+    lib.git(b9.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'add', '-A'])
+    lib.git(b9.folder, ['-c', `user.name=${fx.identity.name}`, '-c', `user.email=${fx.identity.email}`, 'commit', '-qm', 'In flight'])
+    const head9 = git(fx.alpha, 'rev-parse', line9)
+    q.mergeOn(fx, 'integration', '1.2.0', '1.2.0 released into integration')
+    const key9 = await keyOf(n9)
+    await targetInput.waitFor({ timeout: HUNG_MS })
+    await targetInput.fill('integration')
+    await targetInput.press('Enter')
+    await form.locator('[data-action="save"]').click()
+    await save.waitFor({ timeout: HUNG_MS })
+    const offered9 = await waitHung(async () => {
+      const row = list.locator(`[data-retarget-move="${key9}"]`)
+      return (await row.count()) ? text(row) : null
+    })
+    check("Save…'s Retarget offers the card in flight, its branch and work kept", !!offered9 && /its branch and work kept/.test(offered9), (await text(list)) || '')
+    check('…Also retarget what can move, ticked', (await tick.isChecked().catch(() => false)) === true)
+    await save.screenshot({ path: path.join(fx.shots, 'retarget-in-flight-preview.png') }).catch(() => undefined)
+    await save.getByRole('button', { name: 'Save', exact: true }).click()
+    await save.waitFor({ state: 'detached', timeout: HUNG_MS })
+    const moved9 = await waitHung(async () => ((await h.kinds(n9)).includes('Retargeted') ? true : null)).catch(() => null)
+    check('…saved, it moved to integration (a Retargeted fact), its line where it was', !!moved9 && git(fx.alpha, 'rev-parse', line9) === head9, JSON.stringify(await h.kinds(n9)))
+    const hist9 = (await card(n9))?.history?.map((x) => x.what) ?? []
+    check('…its history says it moved with its branch and work kept', hist9.some((x) => /Moved from 1\.2\.0 to integration, its branch and work kept/.test(x)), JSON.stringify(hist9.slice(-3)))
+    const sub9 = await q.act(fx, h, b9, n9, 'submit', { summary: 'In flight: ready' })
+    check('…and it submits, merging into integration', sub9.status === 200, JSON.stringify(sub9.body))
   } catch (e) {
     check('no exception', false, e.stack)
   } finally {

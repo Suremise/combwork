@@ -734,6 +734,8 @@ describe('a change of the target says what keeps its own (HI-2674)', () => {
     const { w, repo } = await workspace({ project: { ...pair, target: 'rel1' }, preset: 'pair' })
     git(repo, 'branch', 'rel1')
     git(repo, 'branch', 'rel2')
+    // rel1 goes on beside rel2 (a commit rel2 lacks): it hasn't ended, so nothing started on it is offered a retarget (HI-2753).
+    git(repo, 'update-ref', 'refs/heads/rel1', git(repo, 'commit-tree', 'HEAD^{tree}', '-p', 'HEAD', '-m', 'rel1 only'))
     const card = await inWorkspace(w, () => tasks.createTask({ title: 'Waits to merge', project: 'p' }, user))
     const later = await inWorkspace(w, () => tasks.createTask({ title: 'Lane card still to start', project: 'p' }, user))
     const outside = await inWorkspace(w, () => tasks.createTask({ title: 'Outside the lane', project: 'p' }, user))

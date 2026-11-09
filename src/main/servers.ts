@@ -2570,7 +2570,7 @@ route('POST', '/v1/workflow/retarget', async ({ body }) => {
     const to = typeof body?.to === 'string' ? body.to.trim().slice(0, 250) : ''
     if (!from || !to) throw new HttpError(400, say(API.queue.retargetArgs))
     const preview = await retargetPreview(ws, p, from, to)
-    return { preview: offerRetarget(p, preview), from, to, move: [...preview.cards.move.map((c) => c.key), ...preview.slots.move.map((s) => s.name)], stay: [...preview.cards.keep.map((c) => ({ key: c.key, why: c.why })), ...preview.slots.keep.map((s) => ({ slot: s.name, why: s.why })), ...preview.lanes.map((l) => ({ lane: l.name ?? l.builder, why: 'running' }))] }
+    return { preview: offerRetarget(p, preview), from, to, move: [...(preview.laneMoves ?? []).map((l) => l.name ?? l.builder), ...preview.cards.move.map((c) => c.key), ...preview.slots.move.map((s) => s.name)], stay: [...preview.cards.keep.map((c) => ({ key: c.key, why: c.why })), ...preview.slots.keep.map((s) => ({ slot: s.name, why: s.why })), ...preview.lanes.map((l) => ({ lane: l.name ?? l.builder, why: l.why ?? 'running' }))] }
   }
   if (!items.length) throw new HttpError(400, say(API.queue.retargetArgs))
   const offered = offeredRetarget(id, p)
@@ -3275,7 +3275,7 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
       await tasks.setReviewSkip(n, skipReview !== false, actor, { commit, reason: skipReview || '' })
       changes.push(sayStored([skipReview !== false ? API.card.saidSkipsReview : API.card.saidReviewed]))
     }
-    if (target !== undefined) {
+    if (target !== undefined && !moving) {
       await tasks.setTarget(n, target, actor, { commit })
       changes.push(sayStored([API.card.saidTarget, { own: target ? 'yes' : 'no', target: target ?? '' }]))
     }
@@ -3288,8 +3288,14 @@ route('PATCH', '/v1/tasks/:n', async ({ params, body }) => {
   if (body?.attachments !== undefined && patch.project !== undefined) throw new HttpError(400, apiSaid(API.attachment.moveFirst))
   const paths = attachmentList(body)
   // A change of its kind with anything else is one board change (HR3's #1277 round 1): refused part way, none of it.
-  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined || target !== undefined ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
+  // HI-2753: a card in flight moves to its new target in a change of its own, first: refused, nothing else is changed.
+  const moving = target !== undefined && (await tasks.targetMovesInFlight(n).catch(() => false))
+  const once = (commit?: () => void): Promise<TaskCard> => (kind !== undefined || confirmKind !== undefined || skipReview !== undefined || (target !== undefined && !moving) ? tasks.cardBatch(workspace, () => write(commit)) : write(commit))
   const apply = async (commit?: () => void): Promise<TaskCard> => {
+    if (moving) {
+      await tasks.setTarget(n, target, actor, { commit })
+      changes.push(sayStored([API.card.saidTarget, { own: target ? 'yes' : 'no', target: target ?? '' }]))
+    }
     // Its files copied here, inside the operation (the Assistant's: once admitted), to the card's own project.
     const c = await withAttachments(paths, paths ? ((await tasks.readTask(n, actor)).project ?? null) : null, (files) => tasks.changeWithAttachments(actor, files, comment ? 'comment' : 'description', () => once(commit), commit))
     changes.push(...attachedLines(c))

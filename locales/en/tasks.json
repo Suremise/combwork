@@ -339,6 +339,10 @@
     "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so nothing was changed.} other {There is no branch {target} in this repository: make it first, then pick it.}}",
     "description": "HI-2556: an error setting a card’s Merges into to a branch the project lists under Other branches work can merge into but which doesn’t exist (yet) in the repository. {target} is the branch name. unknown yes: git couldn’t say. Keep the select keys."
   },
+  "tasks.error.targetMoveRefused": {
+    "defaultMessage": "{why, select, queued {{card} is in the merge queue for {from}: it can move once its entry is done or taken out.} notInTarget {{card} stays on {from}: {rule, select, firstParent {its branch merged in history {to} doesn’t have} otherRef {some of its commits are on another branch, tag or worktree too} reflog {its branch was moved onto commits {to} doesn’t have (a fast-forward, a reset or a rebase)} other {it was started from a commit {to} doesn’t have}}. Merge {from} into {to} first, or put it back and start it again on {to}.} reviewed {{card} stays on {from}: its reviewed work would bring other commits into {to} than it was reviewed with. Send it back to Doing, move it, then submit it again.} noLine {{card} works in the project folder, not on a branch of its own, so it stays on {from}.} targetMissing {There is no branch {to} in this repository: make it first, then pick it.} lane {{card} is in {builder}’s lane, which merges into {laneTarget}: a lane and its card move together, with a retarget of Work merges into (Also retarget what can move).} locked {Another git operation holds {ref}, so {card} stays on {from}. Try again once it ends; if no git is running there, remove {lock} and try again.} changed {{card} or its branch changed while it was being moved, so it stays on {from}. Try again.} other {Combwork can’t tell whether everything {card} would bring into {to} is its own work, so it stays on {from}.}}{hasDetail, select, yes { ({detail})} other {}}",
+    "description": "HI-2753: an error moving a card already started (in Doing, Review or Passed) from the branch it started on ({from}) to another ({to}), its work kept: why it stays. {card} is its key (HI-12); {builder} a lane’s builder agent and {laneTarget} that lane’s branch; {ref} a git ref (refs/heads/main) and {lock} a file path; {detail} what git or the check said, in English. Work merges into and Also retarget what can move are names in the window (Version Control → Workflow, Save…): as translated there. Keep the select keys."
+  },
   "tasks.error.targetMoved": {
     "defaultMessage": "{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.",
     "description": "HI-2556: an error changing a card’s Merges into: its old branch, found with no work of its own, moved (a commit arrived) before Combwork could remove it, so nothing was changed. {card} is the card’s key (HI-12)."
@@ -614,6 +618,10 @@
   "tasks.history.restored": {
     "defaultMessage": "Brought back: {project} was restored",
     "description": "A line in a card's history: the card came back onto the board because the user restored its project {project} (its folder name)."
+  },
+  "tasks.history.retargeted": {
+    "defaultMessage": "Moved from {from} to {to}, its branch and work kept",
+    "description": "A line in a card's history (HI-2753): a card already started was moved from the branch it started on ({from}) to another ({to}); its own branch and commits stay as they were. Branch names."
   },
   "tasks.history.returned": {
     "defaultMessage": "Returned for review, round {round}",
