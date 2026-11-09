@@ -10,11 +10,16 @@ import { admit, newLedger } from '../src/main/turnLedger'
 import { applyStep, hookStep, type HookStatusInput } from '../src/main/hookStatus'
 import type { Ask } from '../src/main/providers/types'
 import type { SessionStatus } from '../src/shared/types'
+import { COMPACTING_MESSAGE } from '../src/shared/defaults'
 import { applyEvent, applySnapshot, expandOpencodeHook, newTracker, normalizeOpencodeHook, projectEvent, type Normalized, type OcEvent, type OcSnapshot, type OcTracker } from '../src/main/providers/opencode/events'
 
 const REC = join(__dirname, 'fixtures', 'opencode', 'real-2.2.6')
 type Raw = { type: string; data: Record<string, any>; durable?: { seq: number } }
-const recorded = (name: string): Raw[] => JSON.parse(readFileSync(join(REC, 'events', `${name}.json`), 'utf8'))
+/** A recording's events: a bare list, or HI-2762's { source, events } (compaction). */
+const recorded = (name: string): Raw[] => {
+  const j = JSON.parse(readFileSync(join(REC, 'events', `${name}.json`), 'utf8'))
+  return Array.isArray(j) ? j : j.events
+}
 const sidOf = (ev: Raw[]) => ev.find((e) => e.data?.sessionID)!.data.sessionID as string
 
 /** An agent as the status rules see it, with the turn ledger beside it: hooks go through admit, then hookStep. */
@@ -241,6 +246,83 @@ describe('the tracker: settled snapshots (design s14 to s22)', () => {
     live(t, a, 1, enq('m1', 1), step('a1', 2), asked('per_gone', 'a1', 'call_gone'))
     a.take(applySnapshot(t, 2, snap({ w: 5, boundary: 'known', session: { busy: 9, idle: 1 }, messages: [{ id: 'm1', type: 'user' }, { id: 'a1', type: 'assistant' }, { id: 'a2', type: 'assistant' }], permissions: [{ id: 'per_new', messageID: 'a2', callID: 'call_new', action: 'edit', resources: 'x.ts' }, { id: 'per_other', messageID: 'a_unknown', callID: 'c' }] })))
     expect([a.status, a.waitingOn?.call, a.waitingOn?.message]).toEqual(['waiting', 'call_new', 'edit: x.ts'])
+  })
+})
+
+describe("a compaction (HI-2762's 2.2.6 recording: its own execution, under its inbox item of type compaction)", () => {
+  const compacting = (a: Agent) => a.status === 'working' && a.statusMessage === COMPACTING_MESSAGE
+  /** The recording's messages as the launcher's snapshot has them: oldest first, projected (ProjectMessage). */
+  const messages = () => (JSON.parse(readFileSync(join(REC, 'messages', 'compaction.json'), 'utf8')).body.data as Record<string, any>[]).reverse().map((m) => ({ id: m.id, type: m.type, ...(m.outcome ? { outcome: m.outcome } : {}), ...(m.type === 'compaction' ? { status: m.status, reason: m.reason } : {}) }))
+  const ev = recorded('compaction')
+  const sid = sidOf(ev)
+  const upTo = (type: string, nth = 1) => {
+    let n = 0
+    return ev.findIndex((e) => e.type === type && ++n === nth)
+  }
+
+  it('compacting from its start to its execution’s end, then ready; one prompt counted (the compaction is none), nothing stale', () => {
+    const t = newTracker()
+    const a = new Agent()
+    let during = false
+    for (const raw of ev) {
+      const e = projectEvent(raw, sid)
+      if (!e) continue
+      a.take(applyEvent(t, 0, e))
+      if (raw.type === 'session.compaction.ended') during = compacting(a)
+    }
+    expect([during, a.status, a.statusMessage ?? null, a.prompts, a.running, a.stale, t.compacting]).toEqual([true, 'ready', null, 1, false, [], null])
+  })
+
+  it('its submission alone says nothing; its start makes the agent compacting', () => {
+    const t = newTracker()
+    const a = new Agent()
+    for (const raw of ev.slice(0, upTo('session.compaction.started'))) {
+      const e = projectEvent(raw, sid)
+      if (e) a.take(applyEvent(t, 0, e))
+    }
+    expect([a.status, t.compacting?.shown]).toEqual(['finished', false])
+    a.take(applyEvent(t, 0, projectEvent(ev[upTo('session.compaction.started')], sid)!))
+    expect(compacting(a)).toBe(true)
+  })
+
+  it('the stream dropped after its submission: the settled snapshot after the reconnect starts and ends it, ready', () => {
+    const t = newTracker()
+    const a = new Agent()
+    for (const raw of ev.slice(0, upTo('session.inbox.enqueued', 2) + 1)) {
+      const e = projectEvent(raw, sid)
+      if (e) a.take(applyEvent(t, 0, e))
+    }
+    a.take(applySnapshot(t, 2, snap({ w: 21, boundary: 'start', session: { busy: 1, idle: 2, outcome: 'succeeded' }, messages: messages() })))
+    expect([a.status, a.statusMessage ?? null, a.prompts, a.stale, t.compacting]).toEqual(['ready', null, 1, [], null])
+  })
+
+  it('the stream dropped before it: a snapshot showing it under way makes the agent compacting; its execution’s end, live, ready', () => {
+    const t = newTracker()
+    const a = new Agent()
+    for (const raw of ev.slice(0, upTo('session.execution.succeeded') + 1)) {
+      const e = projectEvent(raw, sid)
+      if (e) a.take(applyEvent(t, 0, e))
+    }
+    const running = messages().slice(0, -1).map((m) => (m.type === 'compaction' ? { ...m, status: 'running' } : m))
+    a.take(applySnapshot(t, 2, snap({ w: 18, boundary: 'start', session: { busy: 3, idle: 2 }, messages: running })))
+    expect(compacting(a)).toBe(true)
+    a.take(applyEvent(t, 2, projectEvent(ev[upTo('session.execution.succeeded', 2)], sid)!))
+    expect([a.status, a.statusMessage ?? null, a.stale]).toEqual(['ready', null, []])
+  })
+
+  it('a resumed session’s closed compaction (at its baseline) counts nothing', () => {
+    const t = newTracker()
+    const a = new Agent()
+    a.take(applySnapshot(t, 1, snap({ w: 21, baseline: true, intent: 'resume', boundary: 'start', session: { busy: 1, idle: 2, outcome: 'succeeded' }, messages: messages() })))
+    expect([a.status, a.prompts, t.open]).toEqual(['ready', 0, null])
+  })
+
+  it('session.usage.updated is projected (cost and tokens, numbers only) and gives no hook', () => {
+    const raw = ev.find((e) => e.type === 'session.usage.updated')!
+    const e = projectEvent(raw, sid)!
+    expect(e).toEqual({ type: 'session.usage.updated', cost: 0, tokens: { input: 457, output: 312, reasoning: 0, cache: { read: 0, write: 0 } } })
+    expect(applyEvent(newTracker(), 0, e)).toEqual([])
+    expect(projectEvent({ type: 'session.usage.updated', data: { sessionID: sid, cost: 'x', tokens: { input: '1' } } }, sid)).toMatchObject({ tokens: { input: undefined } })
   })
 })
 

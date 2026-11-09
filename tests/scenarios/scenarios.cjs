@@ -4378,6 +4378,11 @@ const launchedIn = (c, name) => {
     const f = require('path').join(c.agyProfiles, d, '.gemini', 'GEMINI.md')
     return fs.existsSync(f) && fs.readFileSync(f, 'utf8').includes(`# Your mode: ${name}`)
   })())) return true
+  // OpenCode: the launch's guidance is its private config folder's AGENTS.md, gone with the launch; the fake logs each
+  // instructions file's text as it loads it (instructions-text), as the real one gives it to the model.
+  if (c.opencodeLog && fs.existsSync(c.opencodeLog) && fs.readFileSync(c.opencodeLog, 'utf8').split('\n').some((l) => {
+    try { const e = JSON.parse(l); return e.kind === 'instructions-text' && String(e.text).includes(`# Your mode: ${name}`) } catch { return false }
+  })) return true
   // Codex (and the fake): its instructions come as -c developer_instructions, which the session's own rollout records as
   // its first developer message (#462, #520). Its rollout only: the test home keeps earlier runs' sessions.
   const id = c.session?.id
@@ -5669,4 +5674,4 @@ module.exports.SCENARIOS.push({
     })
 })
 
-module.exports.helpers = { laneStartLanded, readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }
+module.exports.helpers = { launchedIn, laneStartLanded,readOf, called, ran, retargetWays, asksTheUser, questionsToUser, relaysOk, laneRunsOn, leftoversByOwner, askedToCommit, read, moved, history, field, cardIs, namesCard, namesCards, movesOf, openAsks, laneStartsOf, startedWithBrief, movedInto, runs, commandsOf, testRunsIn, verdictOf, LANES_RUNNING_TAIL, checkRunsOf, mergedInto, shotsOpened }

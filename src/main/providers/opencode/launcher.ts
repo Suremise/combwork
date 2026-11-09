@@ -64,7 +64,7 @@ public static class CwStream {
   public static string Url, Auth, Session, HookUrl, HookToken, Intent;
   /** A test's relay for the event stream alone (CW_OC_STREAM_VIA, to force a disconnect); Combwork never sets it. */
   public static string StreamVia = "";
-  static readonly string[] Types = { "session.inbox.enqueued", "session.step.started", "session.tool.called", "session.tool.success", "session.tool.failed", "permission.asked", "permission.replied", "session.retry.scheduled", "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted" };
+  static readonly string[] Types = { "session.inbox.enqueued", "session.step.started", "session.tool.called", "session.tool.success", "session.tool.failed", "permission.asked", "permission.replied", "session.retry.scheduled", "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted", "session.compaction.started", "session.compaction.ended", "session.usage.updated" };
   const int FrameMax = 262144, PageBytes = 1048576, BodyMax = 65536, QueueItems = 512, PageLimit = 50, Pages = 10;
   const long QueueBytes = 1048576;
   static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 4 * 1048576 };
@@ -110,8 +110,17 @@ public static class CwStream {
     object err = G(d, "error");
     if (err != null) { var x = new Dictionary<string, object>(); Put(x, "type", S(G(err, "type"), 200)); Put(x, "message", S(G(err, "message"), 500)); if (G(err, "status") is int) x["status"] = G(err, "status"); e["error"] = x; }
     Put(e, "reason", S(G(d, "reason"), 200));
+    if (type == "session.usage.updated") {
+      Put(e, "cost", Num(G(d, "cost")));
+      object k = G(d, "tokens"), c = G(k, "cache");
+      var cache = new Dictionary<string, object>(); Put(cache, "read", Num(G(c, "read"))); Put(cache, "write", Num(G(c, "write")));
+      var tok = new Dictionary<string, object>(); Put(tok, "input", Num(G(k, "input"))); Put(tok, "output", Num(G(k, "output"))); Put(tok, "reasoning", Num(G(k, "reasoning"))); tok["cache"] = cache;
+      e["tokens"] = tok;
+    }
     return e;
   }
+  /** A number as JSON gives one (int, long, decimal or double), else null. */
+  static object Num(object v) { return v is int || v is long || v is decimal || v is double ? v : null; }
 
   /** A GET of the server's: its status (0: none; -2: over cap bytes, not read further) and text. */
   static int Get(string path, int cap, out string text) {
@@ -166,6 +175,7 @@ public static class CwStream {
     object err = G(m, "error");
     if (err != null) { var x = new Dictionary<string, object>(); Put(x, "type", S(G(err, "type"), 200)); Put(x, "message", S(G(err, "message"), 500)); p["error"] = x; }
     if ((G(m, "type") as string) == "user") Put(p, "text", S(G(m, "text"), 200));
+    if ((G(m, "type") as string) == "compaction") { Put(p, "status", S(G(m, "status"), 50)); Put(p, "reason", S(G(m, "reason"), 200)); }
     return p;
   }
 

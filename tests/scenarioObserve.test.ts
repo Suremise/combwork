@@ -2317,3 +2317,21 @@ describe("review-record-trusted's reuse check (HI-2660)", () => {
     expect(check([shell('npm test')], 'Round 1: PASSED.')).toBe(false)
   })
 })
+
+describe("a launch's mode, as each CLI has its launch's guidance (launchedIn)", () => {
+  const fs = require('fs') as typeof import('fs')
+  const { join } = require('path') as typeof import('path')
+  const { launchedIn } = (require('./scenarios/scenarios.cjs') as { helpers: { launchedIn: (c: unknown, name: string) => boolean } }).helpers
+  it("OpenCode: found in the fake's log of the instructions it loaded (the private config's AGENTS.md is gone with the launch); not without it", () => {
+    const d = tempDir('cw-2760-mode')
+    const log = join(d, 'fake-opencode.jsonl')
+    const line = (e: unknown) => JSON.stringify(e) + '\n'
+    fs.writeFileSync(log, line({ kind: 'loaded', path: 'x' }) + line({ kind: 'instructions-text', path: join(d, 'AGENTS.md'), text: 'Combwork guidance\n\n# Your mode: Coordinator\n' }) + 'not json\n')
+    expect(launchedIn({ ws: d, opencodeLog: log }, 'Coordinator')).toBe(true)
+    expect(launchedIn({ ws: d, opencodeLog: log }, 'Planner')).toBe(false)
+    expect(launchedIn({ ws: d, opencodeLog: null }, 'Coordinator')).toBe(false)
+    // Only an instructions file's text counts, not a mention elsewhere in the log.
+    fs.writeFileSync(log, line({ kind: 'turn', text: '# Your mode: Coordinator' }))
+    expect(launchedIn({ ws: d, opencodeLog: log }, 'Coordinator')).toBe(false)
+  })
+})

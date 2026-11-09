@@ -278,6 +278,15 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     expect(opencode.buildCommand(FAKE, c as never).env).toMatchObject({ CW_OC_INTENT: 'resume' })
     expect(existsSync(sessionMark(c.connectionHome, c.sessionId))).toBe(true)
   }, 60000)
+
+  it("gives the launch's first task to the TUI as --prompt (a Combwork start, the Assistant's), none without one", async () => {
+    const c = ctx({ initialPrompt: '[CW] Work on "AL-1"\u001fnow', permissionMode: 'build' }) as never
+    await opencode.prepareLaunch(c)
+    expect(opencode.buildCommand(FAKE, c).env!.CW_OC_TUI_ARGS.split('\u001f')).toEqual(['--prompt', '[CW] Work on "AL-1" now'])
+    const d = ctx({ permissionMode: 'build' }) as never
+    await opencode.prepareLaunch(d)
+    expect(opencode.buildCommand(FAKE, d).env!.CW_OC_TUI_ARGS).toBe('')
+  }, 60000)
 })
 
 describe("the real tier's test provider (CW_TEST_OPENCODE_PROVIDER, HI-2763): a test seam, never the production recipe", async () => {

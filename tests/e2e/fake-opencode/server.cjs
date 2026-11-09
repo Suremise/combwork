@@ -33,6 +33,11 @@ async function startServer(opts) {
   const cfgFor = (dir) => config.load(dir || cwd, env)
   const boot = cfgFor(cwd)
   for (const l of boot.loaded) log({ kind: 'loaded', ...l })
+  // Each instructions file's text, as the real one puts it in the model's system prompt (a scenario reads a launch's mode
+  // in it, as it reads Copilot's stand-in's log), cut at 256 KB.
+  for (const l of boot.loaded) if (l.kind === 'instructions') {
+    try { log({ kind: 'instructions-text', path: l.path, text: fs.readFileSync(l.path, 'utf8').slice(0, 262144) }) } catch { /* gone: nothing to show */ }
+  }
   const auth = 'Basic ' + Buffer.from(`opencode:${opts.password ?? ''}`).toString('base64')
   const clients = new Set()
   const pending = new Map() // permission id → { request, resolve }

@@ -648,6 +648,8 @@ async function runScenario(sc, providerKey, opts = {}) {
       modelLog: standIn ? modelLog : null,
       /** Antigravity's agents' private profiles (each one's .gemini\GEMINI.md has its launch's guidance); null for the others. */
       agyProfiles: p.provider === 'antigravity' ? path.join(userData, 'antigravity', 'profiles') : null,
+      /** What the fake OpenCode did (its instructions' text among it: a launch's guidance), for fake-opencode; null for the others. */
+      opencodeLog: p.provider === 'opencode' ? opencodeLog : null,
       ws,
       alpha,
       skillsDir: path.join(ws, '.combwork', 'skills'),
