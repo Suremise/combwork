@@ -28,6 +28,10 @@
 
 - **Git options in the Files tab** (HI-2743). Right-click a file or folder in the project folder: **Exclude from Git** adds it, exactly, or all files with its extension, to the project's `.gitignore`, or only to this PC's `.git/info/exclude`; **Stop Tracking, Keep the File…** takes a committed file out of git and leaves it on disk; **Include Again** takes out the line that ignores a dimmed file, when it's a plain line for just that file; **Why Is This Ignored?** opens the rule that ignores it (hover a dimmed file to see the rule); and **Show Changes** opens a changed file's diff in Version Control.
 
+### Changed
+
+- **GitHub Copilot 1.0.107 tested** (HI-2780), beside 1.0.106: Provider Setup ticks either. 1.0.107 is a republish of 1.0.106 with no changes of its own (the same release notes and help); WinGet offered only 1.0.106 when this was tested.
+
 ### Fixed
 
 - **A stall after a safety filter stop says so** (HI-2754). When a lane's card stalls and the agent it waits on is idle because its latest turn was stopped by its provider's safety filter (Codex's cyber checks, Claude Code's safeguards), the stall's reason, the Assistant's lane wake and your lane notification now say so, with when and how many this session, and the provider's own advice. Before, it read as an ordinary wait ("only watches the card").

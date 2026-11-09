@@ -13,7 +13,11 @@ import { CLI_PROVIDERS, MANIFEST, manifestFromRecords } from './testedClis.mjs'
 
 const root = join(import.meta.dirname, '..')
 const runContext = createRequire(import.meta.url)('../tests/e2e/runContext.cjs')
-const files = process.argv.length > 2 ? process.argv.slice(2) : [join(runContext.WORK, 'logs', 'run-record.json')]
+// --also <cli> (HI-2780): that CLI may be tested at more than one version at this commit, each in its own record.
+const args = process.argv.slice(2)
+const also = args.flatMap((a, i) => (args[i - 1] === '--also' ? [a] : []))
+const given = args.filter((a, i) => a !== '--also' && args[i - 1] !== '--also')
+const files = given.length ? given : [join(runContext.WORK, 'logs', 'run-record.json')]
 const absent = files.filter((f) => !existsSync(f))
 if (absent.length) {
   console.error(`No run record at ${absent.join(', ')}. Run the real tier with a record first: npm run e2e -- --all --only-real <Copilot's suites> --build --record (RELEASING.md Step 4)`)
@@ -22,11 +26,11 @@ if (absent.length) {
 const records = files.map((f) => JSON.parse(readFileSync(f, 'utf8')))
 const out = join(root, MANIFEST)
 const current = existsSync(out) ? JSON.parse(readFileSync(out, 'utf8')) : {}
-const { manifest, updated, problems } = manifestFromRecords(records, SUITES, current)
+const { manifest, updated, problems } = manifestFromRecords(records, SUITES, current, { also })
 for (const [i, f] of files.entries()) console.log(`Run record: ${f} (code ${records[i].code ?? '?'}, ${records[i].when ?? '?'})`)
 if (updated.length) {
   writeFileSync(out, `${JSON.stringify(manifest, null, 2)}\n`)
-  for (const id of updated) console.log(`  ${Object.values(CLI_PROVIDERS).find((p) => p.id === id).name}: tested with ${manifest[id].version}`)
+  for (const id of updated) console.log(`  ${Object.values(CLI_PROVIDERS).find((p) => p.id === id).name}: tested with ${manifest[id].version}${manifest[id].also?.length ? ` (also ${manifest[id].also.map((a) => a.version).join(', ')})` : ''}`)
   console.log(`Wrote ${MANIFEST}: commit it.`)
 }
 for (const p of problems) console.log(`  Not updated: ${p}`)

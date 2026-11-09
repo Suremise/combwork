@@ -1,0 +1,167 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "protocolVersion": 1,
+      "agentCapabilities": {
+        "auth": {
+          "logout": {}
+        },
+        "loadSession": true,
+        "mcpCapabilities": {
+          "http": true,
+          "sse": true
+        },
+        "promptCapabilities": {
+          "image": true,
+          "audio": false,
+          "embeddedContext": true
+        },
+        "sessionCapabilities": {
+          "close": {},
+          "list": {}
+        }
+      },
+      "agentInfo": {
+        "name": "Copilot",
+        "title": "Copilot",
+        "version": "1.0.107"
+      },
+      "authMethods": [
+        {
+          "id": "copilot-login",
+          "name": "Log in with Copilot CLI",
+          "description": "Run `copilot login` in the terminal",
+          "_meta": {
+            "terminal-auth": {
+              "command": "<path>",
+              "args": [
+                "login"
+              ],
+              "label": "Copilot Login"
+            }
+          }
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "models": {
+        "availableModels": [
+          {
+            "modelId": "auto",
+            "name": "Auto",
+            "description": "Let Copilot pick the best model"
+          },
+          {
+            "modelId": "gpt-4.1",
+            "name": "gpt-4.1",
+            "description": "gpt-4.1",
+            "_meta": {
+              "copilotUsage": "0x",
+              "copilotEnablement": "enabled"
+            }
+          }
+        ],
+        "currentModelId": "gpt-4.1"
+      },
+      "configOptions": [
+        {
+          "type": "select",
+          "id": "mode",
+          "name": "Mode",
+          "category": "mode",
+          "description": "Controls how Copilot responds: a conversational agent, planning multi-step work, or autonomous autopilot.",
+          "currentValue": "https://agentclientprotocol.com/protocol/session-modes#agent",
+          "options": [
+            {
+              "value": "https://agentclientprotocol.com/protocol/session-modes#agent",
+              "name": "Agent",
+              "description": "Default agent mode for conversational interactions"
+            },
+            {
+              "value": "https://agentclientprotocol.com/protocol/session-modes#plan",
+              "name": "Plan",
+              "description": "Plan mode for creating and executing multi-step plans"
+            },
+            {
+              "value": "https://agentclientprotocol.com/protocol/session-modes#autopilot",
+              "name": "Autopilot",
+              "description": "Autonomous mode that enables allow-all and runs until task completion without user interaction (experimental)"
+            }
+          ]
+        },
+        {
+          "type": "select",
+          "id": "model",
+          "name": "Model",
+          "category": "model",
+          "description": "The AI model Copilot uses to generate responses.",
+          "currentValue": "gpt-4.1",
+          "options": [
+            {
+              "value": "auto",
+              "name": "Auto",
+              "description": "Let Copilot pick the best model",
+              "_meta": null
+            },
+            {
+              "value": "gpt-4.1",
+              "name": "gpt-4.1",
+              "description": "gpt-4.1",
+              "_meta": {
+                "copilotUsage": "0x",
+                "copilotEnablement": "enabled"
+              }
+            }
+          ]
+        },
+        {
+          "type": "select",
+          "id": "allow_all",
+          "name": "Allow All",
+          "category": "permissions",
+          "description": "Controls whether Copilot prompts for approval before using tools, accessing paths, or fetching URLs.",
+          "currentValue": "off",
+          "options": [
+            {
+              "value": "on",
+              "name": "On",
+              "description": "Automatically approve all tool, path, and URL requests"
+            },
+            {
+              "value": "off",
+              "name": "Off",
+              "description": "Require approval for tool, path, and URL requests"
+            }
+          ]
+        }
+      ],
+      "modes": {
+        "availableModes": [
+          {
+            "id": "https://agentclientprotocol.com/protocol/session-modes#agent",
+            "name": "Agent",
+            "description": "Default agent mode for conversational interactions"
+          },
+          {
+            "id": "https://agentclientprotocol.com/protocol/session-modes#plan",
+            "name": "Plan",
+            "description": "Plan mode for creating and executing multi-step plans"
+          },
+          {
+            "id": "https://agentclientprotocol.com/protocol/session-modes#autopilot",
+            "name": "Autopilot",
+            "description": "Autonomous mode that enables allow-all and runs until task completion without user interaction (experimental)"
+          }
+        ],
+        "currentModeId": "https://agentclientprotocol.com/protocol/session-modes#agent"
+      },
+      "sessionId": "dde861ca-3134-4788-bf3c-7fae308e1131"
+    }
+  }
+]

@@ -101,6 +101,28 @@ describe("the run record names each real suite's CLI home, and none may be the u
   })
 })
 
+describe('npm run tested-clis -- --also <cli>: one CLI at two versions of the same commit (HI-2780)', () => {
+  const copilotAt = (version: string, when: string) => {
+    const results = realResults().map((r: Result) => ({ ...r, clis: r.clis.map((c) => (c.provider === 'copilot' ? { ...c, version } : c)) }))
+    return { ...recordJson({ code: '0123456789ab', when, results, clis: realCliVersions(results, suites) }) }
+  }
+  it('the newest is the version, the other its also, each from its own passing record', () => {
+    const { manifest, problems } = manifestFromRecords([copilotAt('1.0.107', '2026-11-09 15:10'), copilotAt('1.0.106', '2026-11-09 15:40')], suites, {}, { also: ['copilot'] })
+    expect(problems).toEqual([])
+    expect(manifest.copilot).toEqual({ version: '1.0.107', testedAt: '2026-11-09', record: '0123456789ab', also: [{ version: '1.0.106', testedAt: '2026-11-09' }] })
+    // By the numbers, not as text: 1.0.107 after 1.0.99.
+    expect(manifestFromRecords([copilotAt('1.0.99', '2026-11-09 15:10'), copilotAt('1.0.107', '2026-11-09 15:40')], suites, {}, { also: ['copilot'] }).manifest.copilot.version).toBe('1.0.107')
+  })
+  it('without --also, two versions are refused as before; with it, a version whose record failed is refused', () => {
+    expect(manifestFromRecords([copilotAt('1.0.107', '2026-11-09 15:10'), copilotAt('1.0.106', '2026-11-09 15:40')], suites).problems).toEqual(['GitHub Copilot: the records ran different versions (1.0.106, 1.0.107)'])
+    const failed = copilotAt('1.0.106', '2026-11-09 15:40')
+    failed.results = failed.results.map((r: Result) => (r.name === alone('copilot')[0] ? { ...r, ok: false } : r))
+    const out = manifestFromRecords([copilotAt('1.0.107', '2026-11-09 15:10'), failed], suites, {}, { also: ['copilot'] })
+    expect(out.problems).toEqual(['GitHub Copilot: 1.0.106 ran in a record where not all its real suites passed at that version'])
+    expect(out.manifest.copilot).toBeUndefined()
+  })
+})
+
 describe('npm run tested-clis: the manifest from a run record (#365)', () => {
   it('takes each CLI whose real suites all ran and passed, with the version their Combwork selected', () => {
     const { manifest, updated, problems } = manifestFromRecord(fullRecord(), suites)
@@ -471,6 +493,15 @@ describe('the installed version against the tested one (#365)', () => {
     expect(compareTested(tested, '2.10.0', isNewer).installed).toBe('newer')
     expect(compareTested(tested, null, isNewer)).toEqual({ ...tested, installed: 'unknown' })
   })
+  it('an installed version that is one also tested (HI-2780) is the tested one, named as such; any other is compared with the newest', () => {
+    const both = { version: '1.0.107', testedAt: '2026-11-09', also: [{ version: '1.0.106', testedAt: '2026-11-09' }] }
+    expect(compareTested(both, '1.0.106', isNewer)).toEqual({ version: '1.0.106', testedAt: '2026-11-09', installed: 'same' })
+    expect(compareTested(both, '1.0.107', isNewer)).toEqual({ version: '1.0.107', testedAt: '2026-11-09', installed: 'same' })
+    expect(compareTested(both, '1.0.108', isNewer)).toEqual({ version: '1.0.107', testedAt: '2026-11-09', installed: 'newer' })
+    expect(compareTested(both, '1.0.105', isNewer)).toEqual({ version: '1.0.107', testedAt: '2026-11-09', installed: 'older' })
+    expect(testedSummary(compareTested(both, '1.0.106', isNewer), '1.0.106')).toBe('Tested with 1.0.106 · installed 1.0.106')
+  })
+
   it('says it calmly: a tick for the same, a note for newer, older or unknown', () => {
     const t = (installed: 'same' | 'newer' | 'older' | 'unknown') => ({ ...tested, installed })
     expect(testedSummary(t('newer'), '2.1.290')).toBe('Tested with 2.1.287 · installed 2.1.290')
