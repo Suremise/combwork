@@ -243,6 +243,9 @@ const R = {
   connectionRow: agentMsg({ id: 'reply.connection.row', text: '{name} (id {id}) on {account}, {cli}: {values}{unusable, select, yes {. Not usable here: its account is off} other {}}', note: 'cw_connection list (HI-2108): a connection, its account and CLI, its values, and whether it is usable here.' }),
   unknownCli: agentMsg({ id: 'reply.connection.unknownCli', text: 'unknown CLI', note: "A connection whose CLI isn't known." }),
   accountBare: agentMsg({ id: 'reply.connection.accountBare', text: 'Account {name} (id {id}), {cli}: no connections{off, select, yes {, off here} other {}}', note: 'cw_connection list: an account with no connections.' }),
+  providerRow: agentMsg({ id: 'reply.provider.row', text: "{name} ({id}): {on, select, yes {on} other {off}}, {installed, select, yes {installed{hasVersion, select, yes { {version}} other {}}{hasTested, select, yes { (tested with {tested}: {compared})} other {}}} other {not installed}}; default model {hasModel, select, yes {{model}} other {its CLI's own}}; {models, plural, one {# model} other {# models}}{hasEfforts, select, yes {; efforts {efforts}} other {}}; modes {modes}{hasConnections, select, yes {; connections {connections}} other {}}{hasProblem, select, yes {. Problem: {problem}} other {}}", note: "cw_list_providers (HI-2814): a provider in a line. The has… flags (yes/no) say whether {version}, {tested}, {model}, {efforts}, {connections} and {problem} have a value. {compared}: same, newer, older or unknown." }),
+  providerConnection: agentMsg({ id: 'reply.provider.connection', text: '{name} (id {id})', note: "cw_list_providers (HI-2814): one of a provider's connections usable here, what cw_add_agent's connection names." }),
+  providersMore: agentMsg({ id: 'reply.provider.more', text: 'cw_list_providers with provider (its id) gives one in full: its models with their labels, its efforts and its modes with what each does.', note: 'cw_list_providers (HI-2814): the listing ends with how to get one provider in full.' }),
   connectionsNone: agentMsg({ id: 'reply.connection.none', text: 'No connections: the user adds an account in Settings → Accounts & Connections.', note: 'cw_connection list with none.' }),
   usageLimit: agentMsg({ id: 'reply.usage.limit', text: '{label} {percent}%{hasReset, select, yes { (resets {at}Z)} other {}}', note: "An account's limit (HI-2195): its share used and when it resets (UTC)." }),
   usageMove: agentMsg({ id: 'reply.usage.move', text: 'moves its agents to {to} at {percent}% of {limit, select, weekly {the weekly limit} fiveHour {the 5-hour limit} other {either limit}}', note: "An account's usage move (HI-2195): where its agents move, at what share of which limit." }),
@@ -1419,6 +1422,58 @@ export function connectionListText(r: { connections: ConnectionPublic[]; account
   const rows = r.connections.map((c) => say(R.connectionRow, { name: c.name, id: c.id, account: c.account, cli: c.cli ?? say(R.unknownCli), values: connectionValuesText(c), unusable: yn(c.usable === false) }))
   const bare = r.accounts.filter((a) => !r.connections.some((c) => c.account === a.name)).map((a) => say(R.accountBare, { name: a.name, id: a.id, cli: a.cli, off: yn(a.on === false) }))
   return [...rows, ...bare, ...(r.usage ?? []).map(accountUsageText)].join('\n') || say(R.connectionsNone)
+}
+
+/** A provider as GET /v1/providers gives it (cw_list_providers, HI-2814). */
+export interface ProviderPublic {
+  id: string
+  name: string
+  enabled: boolean
+  installed: boolean
+  version: string | null
+  tested: { version: string; installed: string } | null
+  problem: string | null
+  defaultModel: string | null
+  models: { value: string; label: string }[]
+  efforts: { value: string; label: string }[]
+  context200k: boolean
+  modes: { value: string; label: string; description: string }[]
+  connections?: { id: string; name: string }[]
+}
+
+/**
+ * cw_list_providers (HI-2814): a short row per provider (on, installed, default model, how many models, efforts, modes,
+ * connections, a problem), then how to get one in full: its models' labels and its modes' descriptions are the bulk, and
+ * the listing outgrew its budget with a fifth CLI (OpenCode).
+ */
+export function providerListText(ps: ProviderPublic[]): string {
+  const rows = ps.map((p) => {
+    const efforts = p.efforts.map((e) => e.value).join(', ')
+    const connections = (p.connections ?? []).map((c) => say(R.providerConnection, { name: c.name, id: c.id })).join(', ')
+    const tested = p.installed && p.tested ? p.tested : null
+    return say(R.providerRow, {
+      name: p.name,
+      id: p.id,
+      on: yn(p.enabled),
+      installed: yn(p.installed),
+      hasVersion: yn(p.version),
+      version: p.version ?? '',
+      hasTested: yn(tested),
+      tested: tested?.version ?? '',
+      compared: tested?.installed ?? '',
+      hasModel: yn(p.defaultModel),
+      model: p.defaultModel ?? '',
+      models: p.models.length,
+      hasEfforts: yn(efforts),
+      efforts,
+      modes: p.modes.map((m) => m.value).join(', '),
+      hasConnections: yn(connections),
+      connections,
+      hasProblem: yn(p.problem),
+      problem: p.problem ?? ''
+    })
+  })
+  return [...rows, say(R.providersMore)].join('\n')
 }
 
 /** An account's plan usage and usage move (HI-2195), as GET /v1/connections gives them. */

@@ -582,7 +582,13 @@ const prose = (seed, n) => {
   await inv('console:subscribe', [])
 
   console.log('\n--- Combwork tools (as the Assistant)')
-  measure('cw_list_providers', tool('cw_list_providers', {}, 'assistant'))
+  // A line a provider (HI-2814: the JSON of all five was about 12,200 characters with OpenCode), one in full on request.
+  const providerRows = measure('cw_list_providers', tool('cw_list_providers', {}, 'assistant'), 2500)
+  check('the providers listed a line each, by id, and how to get one in full', ['claude-code', 'codex', 'copilot'].every((id) => providerRows.includes(`(${id}): `)) && !providerRows.includes('"models"') && /cw_list_providers with provider/.test(providerRows), providerRows)
+  const oneProvider = measure('cw_list_providers (one provider)', tool('cw_list_providers', { provider: 'claude-code' }, 'assistant'), 5000)
+  check('one provider in full: its models and its modes with what each does', (() => { try { const p = JSON.parse(oneProvider); return p.id === 'claude-code' && Array.isArray(p.models) && p.modes?.every((m) => m.description) } catch { return false } })(), oneProvider.slice(0, 300))
+  const noProvider = tool('cw_list_providers', { provider: 'nope' }, 'assistant')
+  check('an unknown provider is refused, naming the ids', noProvider.isError && /No provider nope: one of claude-code, /.test(noProvider.text), noProvider.text)
   // Combwork's settings (#186): a listing (all, narrowed, a project's), one in full, and a change with Change settings on.
   // A line a setting (about 85 characters with its title): 6,200 since #418 added Tell the Assistant when I reply to an agent;
   // 7,000 since #450 added GitHub Copilot, a third provider with its own settings (about 730 characters); 7,200 since #412
@@ -1111,9 +1117,10 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   await inv('connections:setOn', max.id, true)
   const linked = measure('cw_add_agent (connection)', tool('cw_add_agent', { project: 'beta', name: 'Linked', connection: 'Max' }, 'assistant'), 400)
   check('a new agent on a connection: its line names it', /^Added Linked \(id a-\w+\) to beta: claude-code on Max, in the project folder, stopped\.$/.test(linked), linked)
-  // The providers' JSON with a connection on here: about 11,430 characters since Antigravity (HI-2544) made it four CLIs
-  // (three were about 9,200; HI-2696 raised the limit for that, the entry's fields unchanged).
-  measure('cw_list_providers (connections)', tool('cw_list_providers', {}, 'assistant'), 12000)
+  // The providers with a connection on here: a line each since HI-2814 (the JSON was about 12,200 characters with OpenCode,
+  // a fifth CLI, past the 12,000 HI-2696 had raised it to); the connection named on its provider's line, by name and id.
+  const withConnection = measure('cw_list_providers (connections)', tool('cw_list_providers', {}, 'assistant'), 2600)
+  check("the connection on here is on its provider's line", new RegExp(`^Claude Code \\(claude-code\\): .*; connections .*Max \\(id ${max.id}\\)`, 'm').test(withConnection), withConnection)
   // beta's status with Linked's connection and each agent's connection fields (about 3,040 characters).
   measure('cw_project_status (connections)', tool('cw_project_status', { project: 'beta' }, 'assistant'), 3500)
   await inv('connections:setOn', max.id, false)
