@@ -1,5 +1,6 @@
 import { createRequire } from 'module'
 import { describe, expect, it } from 'vitest'
+// @ts-expect-error: plain .mjs modules without types
 import { suiteOutcome } from './e2e/runner.mjs'
 
 // opencodereal-dirs.cjs's record reading and its end (HI-2772, HR1's round 1): the real suite's two ways of saying what a
