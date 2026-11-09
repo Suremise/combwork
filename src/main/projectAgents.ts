@@ -82,18 +82,18 @@ function connectionFor(projectPath: string, cli: ProviderId, named: string | nul
   return account ? baseConnection(account.id, allConnections())?.id : undefined
 }
 
-/**
- * A shared helper's text for the window (`agentLimitText`, `mergeBlocked`, given the `tr` capturedText passes), as a
- * CombworkError: a refusal by the project's state (its agents per project, an agent at work), so the Agent API answers 409,
- * never 500 (HI-1952).
- */
-// agent-text: agentLimitText, mergeBlocked
 /** The workspace lifecycle port agents' worktrees are listed and made with (SPEC §16.3.6 Port 2, HI-2789's R5). */
 const port = slotWorkspaces
 
 /** The project's worktrees, the project folder included, by path and branch: none when they can't be listed (as listWorktrees answered). */
 const worktreesOf = async (projectPath: string): Promise<{ path: string; branch: string | null }[]> => ((await port().list(projectPath)) ?? []).map((w) => ({ path: w.path, branch: w.line }))
 
+/**
+ * A shared helper's text for the window (`agentLimitText`, `mergeBlocked`, given the `tr` capturedText passes), as a
+ * CombworkError: a refusal by the project's state (its agents per project, an agent at work), so the Agent API answers 409,
+ * never 500 (HI-1952).
+ */
+// agent-text: agentLimitText, mergeBlocked
 const helperError = (fn: Parameters<typeof capturedText>[0]): CombworkError => new CombworkError(capturedText(fn)!, { kind: 'conflict' })
 
 /** Branches and worktrees for the Add Agent dialog. */
