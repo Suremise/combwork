@@ -2111,8 +2111,10 @@ The **integration** capability's mechanics. The queue's state machine, its facts
   `update-ref` for one checked out in a folder, with its rollback, exactly as §16.9.2.
 - `recover(ctx, journal)` → the same outcomes, classified from the journal's last phase **and** the state read now
   (§16.9.2's table); never assumed from the journal alone.
-- `publish(ctx, target, result)` → `Published` · `UpToDate` · `Rejected` · `Failed { why }` · `NoRemote` · `Unknown`
-  (Git: G18's push of `refs/heads/<target>`, §16.9.1 step 7).
+- `publish(ctx, target, owed)` → `Published { pushed }` · `UpToDate { pushed }` · `NotHeld` (the target no longer
+  contains the owed result: reset since) · `Rejected` · `Failed { why }` · `NoRemote` · `Unknown` (Git: G18's settle,
+  `MergeQueue.settlePush`, §16.9.1 step 7: the target's head read once, proved to contain the owed result, and that
+  **captured commit id** pushed to the destination ref, never the moving line; `pushed` is that id).
 - Further outcomes a later platform reports (the type carries them from R7/R8 so the queue handles them before jj
   exists, each a pause naming it, never success): `divergentChange`, `conflictedTarget`, `staleWorkspace`,
   `partialExport`.
@@ -2134,9 +2136,15 @@ The **integration** capability's mechanics. The queue's state machine, its facts
   user lifts it. Nothing is rewound to undo the queue's work: no reset of a target, no global undo.
 - **R4.5** **Exactly once.** A card is `Integrated` once, with the result that is on the target; an advance whose
   outcome is unknown pauses rather than retests into a second merge.
-- **R4.6** **Only the tested result is published.** Publish pushes exactly the result recorded as integrated, only
-  while the target still holds it; never `--force`, never `--set-upstream`, never a prompt; bounded and cancellable;
-  owed durably (`queue.pushOwed:<target>`) and idempotent after a restart.
+- **R4.6** **Publish a captured head that contains the integrated result.** Git's, unchanged (HI-1924, #1179): the
+  target's head is read once and must **contain** the owed result (it may be a descendant: after a rejected push the
+  user merges the remote into the target and Resume pushes that, `queuePush.test.ts`); that exact immutable commit is
+  pushed, so a line moving during the push never changes what counts as pushed, and pending merges are settled only
+  against the commit actually pushed. Unreadable is a pause (`pushUnreadable`), still owed; a target that no longer
+  contains the result clears it as reset with nothing pushed; the option turned off (read again just before the push)
+  clears it unpushed; a newer owed result stays owed. Never `--force`, never `--set-upstream`, never a prompt; bounded
+  and cancellable; owed durably (`queue.pushOwed:<target>`) and idempotent after a restart. Whether jj publishes by
+  the same rule or a stricter exact-result one is J5's design question, not a change to Git's.
 - **R4.7** **No dirty user file is overwritten.** A checked-out target's conditions (§16.9.2) hold before anything is
   touched, and the platform's own refusal to overwrite (git's `read-tree`) is kept, never bypassed.
 - **R4.8** **A conflicted result is never an advance.** A candidate with conflicts (Git: the merge stopped; a later
@@ -2200,7 +2208,7 @@ works.
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
 | Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private copies rebased, squashed or merged; conflicts typed | J4 |
 | **Integration: target advance** | CAS (§16.9.2) | — | **Open** (below) | **gate: advance** (J1) |
-| Publish | G18's push | — | Exact-result push, tested against a local bare remote | **gate: publish** (J5) |
+| Publish | G18's push of a captured head containing the owed result (R4.6) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
 | **Hooks** (pre-commit, commit-msg, pre-push…) | Run by git | — | **Not run** by jj | **gate: hooks**: a repository with hooks it relies on can't switch to jj; Combwork never stands in "jj succeeded" for a required hook |
@@ -2266,7 +2274,7 @@ interface RepoLocks { withRepoLock<T>(ctx: RepoContext, fn: () => Promise<T>, o?
 interface WorkspaceState { line: string | null; head: Maybe<string>; status: 'clean' | { dirty: string[] } | Unknown; underWay: string | null; unaccounted: Maybe<string[]> }
 interface WorkspacePort { list(ctx): Promise<Maybe<WorkspaceRef[]>>; inspect(ws): Promise<WorkspaceState>; create(...); prepare(...); remove(...); recover(...); checkCopy(ctx, revision): Promise<Maybe<string>>; relocate?(...) }
 type AdvanceOutcome = { advanced: true } | { moved: string } | { paused: PauseCondition; files?: string[] } | { terminal: NeedsYouState } | { refused: 'divergentChange' | 'conflictedTarget' | 'staleWorkspace' | 'partialExport'; detail: string } | Unknown
-interface IntegrationPort { prepareCandidate(...): Promise<CandidateOutcome>; advance(ctx, target, expected, result, journal): Promise<AdvanceOutcome>; recover(ctx, journal): Promise<AdvanceOutcome>; publish(ctx, target, result): Promise<PublishOutcome> }
+interface IntegrationPort { prepareCandidate(...): Promise<CandidateOutcome>; advance(ctx, target, expected, result, journal): Promise<AdvanceOutcome>; recover(ctx, journal): Promise<AdvanceOutcome>; publish(ctx, target, owed: PushOwed): Promise<PublishOutcome> }
 ```
 
 **What the R cards inherit:** each keeps this section's invariants at its boundary and names, in its summary, the
