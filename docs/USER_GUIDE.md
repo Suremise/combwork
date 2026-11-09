@@ -113,6 +113,7 @@ Claude Code, Codex, Copilot, Antigravity and OpenCode update on their own schedu
 - **The same version**: a tick.
 - **Newer than tested**: "This version came out after this Combwork release was tested. Most updates work; if something behaves oddly, report it (Copy Diagnostics)." Nothing is blocked.
 - **Older than tested**: "Older than tested; consider updating."
+- **Two versions tested**: a release can be tested with two versions of a CLI, as when GitHub publishes a Copilot version before WinGet has it. Either one installed gets the tick, with its own version named.
 - **Version unknown**: Combwork says it couldn't tell which version is installed.
 
 **Help → Copy Diagnostics** lists the tested and installed versions for each CLI, so a bug report says how they compare, and the Assistant can see them too when you ask it about a CLI behaving oddly.
