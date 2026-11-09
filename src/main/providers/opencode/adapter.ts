@@ -290,9 +290,16 @@ export class OpencodeAdapter implements ProviderAdapter {
 
   // ---- Hooks (HI-2760): the launcher posts its server's events and settled snapshots; the tracker (events.ts), in the
   // launch's hook order, turns each into the hooks it stands for.
-  async prepareHook(body: Record<string, any>, launch: { memo: Record<string, unknown> }): Promise<void> {
+  async prepareHook(body: Record<string, any>, launch: { memo: Record<string, unknown>; sessionId?: string | null }): Promise<void> {
     const expanded = expandOpencodeHook(launch.memo, body)
     if (expanded) body.combworkExpanded = expanded
+    // The history (HI-2762): a turn's end or a resync reads the session now; OpenCode's running usage is its live cost.
+    const sid = launch.sessionId
+    if (!sid) return
+    const type = typeof body.event?.type === 'string' ? body.event.type : ''
+    if (body.hook_event_name === 'OpencodeSnapshot') opencodeHistory.nudge(sid, { kind: 'resync' })
+    else if (body.hook_event_name === 'OpencodeEvent' && type.startsWith('session.execution.')) opencodeHistory.nudge(sid, { kind: 'turnEnd' })
+    else if (body.hook_event_name === 'OpencodeEvent' && type === 'session.usage.updated' && typeof body.event.cost === 'number') opencodeHistory.nudge(sid, { kind: 'usage', cost: body.event.cost, at: typeof body.event.created === 'number' ? body.event.created : Date.now() })
   }
 
   normalizeHook(body: Record<string, any>): NormalizedHook {

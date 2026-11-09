@@ -1712,7 +1712,8 @@ export function PaneFooter({
         </Tooltip>
       )
     })
-  else if (cost !== null && cost > 0)
+  // A reported $0 for a session that used tokens shows too, its hover saying what $0 means (HI-2762).
+  else if (cost !== null && (cost > 0 || zeroNote))
     right.push({
       key: 'cost',
       node: (

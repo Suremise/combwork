@@ -237,6 +237,7 @@ export const SUITES = [
   { name: 'opencode-isolation' },
   { name: 'opencode-launch' },
   { name: 'opencode-status' },
+  { name: 'opencode-history' },
   { name: 'opencode-tools' },
   { name: 'opencodereal', needs: ['opencode'] },
   { name: 'openguard' },
