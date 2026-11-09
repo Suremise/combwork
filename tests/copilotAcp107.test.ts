@@ -15,7 +15,7 @@ const sessionNew = replies.find((r) => r.id === 2)!
 describe("Copilot 1.0.107's ACP model listing", () => {
   it('says its version in initialize, and offers the terminal sign-in Combwork never runs from a check', () => {
     expect(init.result?.agentInfo).toEqual({ name: 'Copilot', title: 'Copilot', version: '1.0.107' })
-    expect((init.result?.authMethods as { id: string }[]).map((m) => m.id)).toContain('copilot-login')
+    expect(((init.result?.authMethods ?? []) as { id: string }[]).map((m) => m.id)).toContain('copilot-login')
   })
 
   it('lists its models with the default it runs, read as before', () => {
