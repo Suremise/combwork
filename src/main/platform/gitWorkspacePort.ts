@@ -8,6 +8,7 @@ import { readFile } from 'original-fs/promises'
 import { git, gitErrorLine } from '../git'
 import { copyIgnored, createWorktree, currentBranch, listWorktreesOrNull } from '../worktrees'
 import * as G from './git'
+import { gitRelocation } from './gitRelocation'
 import type { WorkspacePort, WorkspaceStep } from './workspacePort'
 
 /** A git command's answer as a step's: done, or git's own words. */
@@ -66,5 +67,6 @@ export const gitWorkspacePort: WorkspacePort = {
   remove: (repo, folder, o) => step(git(repo, o?.force ? ['worktree', 'remove', '--force', folder] : ['worktree', 'remove', folder])),
   dropLine: (repo, line, at) => step(git(repo, ['update-ref', '-d', `refs/heads/${line}`, at])),
   restoreLine: (repo, line, revision) => step(git(repo, ['update-ref', `refs/heads/${line}`, revision, ''])),
-  errorLine: gitErrorLine
+  errorLine: gitErrorLine,
+  relocate: gitRelocation
 }

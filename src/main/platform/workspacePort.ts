@@ -113,4 +113,33 @@ export interface WorkspacePort {
 
   /** The line of a step's `err` that says what went wrong (Git: its fatal: or error: line, else the first), for a reason shown. */
   errorLine(err: string): string
+
+  /** Repair after a moved workspace or project (the relocation capability, §16.3.6's gate: relocation); absent where it isn't supported. */
+  relocate?: Relocation
+}
+
+/**
+ * Relocation (§16.3.6 port 2, HI-2792): what Repair does to the store's workspaces after their folders moved
+ * (workspaceMove.ts, combworkMove.ts), in the platform's own terms. Git's: worktree move and repair, its links' files,
+ * branch rename (gitRelocation.ts).
+ */
+export interface Relocation {
+  /** Whether a folder is one of the store's linked workspaces (Git: a `.git` file, not a folder), read with no process. */
+  isWorkspaceFolder(folder: string): Promise<boolean>
+  /** Whether the store's links to a workspace are right both ways (by real paths), read with no process. */
+  linked(repo: string, folder: string): Promise<boolean>
+  /** A workspace's identity, kept across a move (Git: its administrative folder), null when the folder isn't one. */
+  identity(folder: string): Promise<string | null>
+  /** The folders the store lists as its workspaces (resolved), null when it can't list them. */
+  listedFolders(repo: string): Promise<string[] | null>
+  /** The store's local lines, as the 0.9 agents' branches are named against (none when unreadable). */
+  localLines(repo: string): Promise<string[]>
+  /** The remote a line tracks, '' for none. */
+  lineRemote(repo: string, line: string): Promise<string>
+  /** A workspace moved from one folder to another by the tool. */
+  move(repo: string, from: string, to: string): Promise<WorkspaceStep>
+  /** The store's links to the workspaces now at `folders` made right again. */
+  repair(repo: string, folders: string[]): Promise<WorkspaceStep & { code: number }>
+  /** A line renamed. */
+  renameLine(repo: string, from: string, to: string): Promise<WorkspaceStep>
 }

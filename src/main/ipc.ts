@@ -34,7 +34,6 @@ import { emit, emitTo, onCombworkEvent } from './events'
 import { setPinned } from './pin'
 import { presentWindow } from './testQuiet'
 import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTextUnlessChanged } from './fsutil'
-import { gitDiff, gitStatus } from './git'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
@@ -146,6 +145,7 @@ import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
+import { checkRepoTools } from './platform/repoPorts'
 import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { branchStartArg } from '../shared/nextVersion'
@@ -1761,8 +1761,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     },
 
     // An unused worktree too (#400): read only, as the Changes tab opens it.
-    'git:status': (root, base) => gitStatus(workspace.assertChangesRoot(root), base),
-    'git:diff': (root, f, base) => gitDiff(workspace.assertChangesRoot(root), f, base),
+    'git:status': (root, base) => lineRepoReads().changes(workspace.assertChangesRoot(root), base),
+    'git:diff': (root, f, base) => lineRepoReads().changeDiff(workspace.assertChangesRoot(root), f, base),
     'git:compareLines': async (p) => {
       p = workspace.assertProject(p)
       // The slots as the board records them: a plain read, never the slot pool or the 0.9 migration (it runs as the project opens).
@@ -1817,7 +1817,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'provider:refresh': async (id) => {
       // Provider Setup's Check again looks at git too (#346), on the PATH a new process would get (#472).
       await refreshPath()
-      await Promise.all([providerService.refresh(id, true), checkGit()])
+      await Promise.all([providerService.refresh(id, true), checkRepoTools()])
       return providerService.shown()
     },
     'provider:task': async (id, task, host) => {

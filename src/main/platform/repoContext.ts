@@ -8,6 +8,7 @@
 // environment, timeouts, output bounds, lock files and lock order.
 
 import type { PlatformId } from '../../shared/platform/descriptors'
+import type { IgnoreRule } from '../../shared/gitIgnoreRules'
 
 /**
  * A repository as Combwork talks to it. `store`: the backing store all of its workspaces share (Git: the common git dir,
@@ -148,6 +149,8 @@ export interface RepoLocks {
 /** A platform's repository context port: its contexts, runner, locks and the folders that are its own. */
 export interface RepoPorts {
   platform: PlatformId
+  /** Its tool's name, as Copy Diagnostics names it (a product's name: Git). */
+  tool: string
   /** The context of the repository holding `folder`, or null when this platform has none there (no repository, unreadable). */
   contextOf(folder: string): Promise<RepoContext | null>
   runner: RepoRunner
@@ -171,4 +174,33 @@ export interface RepoPorts {
   trustRoot(folder: string, o: { timeout: number }): Promise<{ root: string | null } | { none: true } | { unknown: true }>
   /** The store's own exclude file, where Combwork keeps its copies out of the repository (Git: info/exclude in the common git dir); null when it can't be named. */
   excludeFile(folder: string, o: { timeout: number }): Promise<string | null>
+  /** Keeping a project's .combwork out of the repository (HI-2792, #345, #364), in the platform's own terms. */
+  keepOut: KeepOut
+  /** The line the project folder has checked out, read with no process (HI-2792: ProjectInfo's branch); null when none or unreadable. */
+  currentLine(projectPath: string): Promise<string | null>
+  /** The Files tab's reads (HI-2792): what the repository ignores of a folder's entries, and the files a search reads. */
+  files: RepoFiles
+}
+
+/** The Files tab's repository reads (port 1, HI-2792; Git's: check-ignore and ls-files, platform/gitFiles.ts). */
+export interface RepoFiles {
+  /** The ignored entries among `rels` (folders with a trailing `/`) with each one's rule; null when the tool couldn't say; `none` when no repository of this platform holds the folder. */
+  ignored(folder: string, rels: string[]): Promise<Map<string, IgnoreRule> | null | 'none'>
+  /** Every file a search reads (tracked and untracked, not ignored); null when the tool can't list them (none holds the folder, or it failed). */
+  list(folder: string): Promise<string[] | null>
+}
+
+/** What keeping .combwork out of a repository is (port 1's metadata, HI-2792): Git's is info/exclude and `git rm --cached`. */
+export interface KeepOut {
+  /** Whether a repository of this platform holds the project (read from its folders, no process). */
+  holds(projectPath: string): boolean
+  /**
+   * Keeps the project's .combwork out of the repository holding it (`readOnly`: asks only), then asks the tool whether it
+   * is; null when no repository of this platform holds it. `unconfirmed`: the tool couldn't be asked (its runner's problem says why).
+   */
+  ensure(projectPath: string, opts?: { readOnly?: boolean | (() => boolean) }): Promise<{ excluded: boolean; root: string; added: boolean; unconfirmed?: boolean } | null>
+  /** The files under the project's .combwork the repository tracks (`fresh`: asked again now); null when the tool can't say. */
+  tracked(projectPath: string, root: string, opts?: { fresh?: boolean }): Promise<string[] | null>
+  /** Stops tracking exactly the files the user confirmed (none if the tracked list changed since), leaving them on disk: how many. */
+  untrack(projectPath: string, confirmed: string[]): Promise<number>
 }

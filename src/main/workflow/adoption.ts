@@ -22,7 +22,7 @@ import { ADOPTION_UPTO, adoptionCardNow, adoptionCards, boardValue, boardWrite, 
 import { coalesced } from '../coalesce'
 import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
-import * as G from '../platform/git'
+import { historyOf } from '../platform/historyPorts'
 import { projectPlatform } from '../platform/registry'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
@@ -210,6 +210,6 @@ async function whereItWorks(folder: string, cfg: ProjectConfig, c: AdoptionCard,
   const agent = c.agent ? (cfg.agents ?? []).find((a) => a.id === c.agent) : undefined
   const tree = legacyWorktree(agent)
   if (agent && tree) return { agent: agent.id, worktree: tree.path, target: tree.base }
-  const line = platform === 'git' ? await G.branch(folder) : null
+  const line = (await historyOf(platform)?.line(folder)) ?? null
   return { agent: c.agent ?? 'user', target: line && !isUnknown(line) ? line : null }
 }

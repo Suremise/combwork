@@ -48,7 +48,7 @@ import { openDb } from './db'
 import { samePlace } from './fsutil'
 import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
-import * as G from './platform/git'
+import { lineHistory } from './platform/historyPorts'
 import { isUnknown } from './platform/types'
 import type { WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces } from './platform/workspacePorts'
@@ -1780,7 +1780,7 @@ export class SlotPool {
     if (h !== head) return { why: 'moved' }
     const b = await this.port.lineHead(this.deps.project, baseline)
     if (isUnknown(b) || !b) return { why: 'cantCheck', detail: `can't read ${baseline}` } // agent-protocol: a reason's detail for the log and the result, as git's are (English)
-    const inIt = h === b || (await G.isAncestor(this.deps.project, h, b))
+    const inIt = h === b || (await lineHistory().isAncestor(this.deps.project, h, b))
     if (isUnknown(inIt)) return { why: 'cantCheck', detail: inIt.what }
     return inIt ? null : { why: 'unmerged' }
   }
@@ -2339,9 +2339,9 @@ export class SlotPool {
     const t = await this.port.lineHead(this.deps.project, target)
     if (isUnknown(t) || !t) return { why: 'cantCheck', detail: sayStored(T.noBranch, { target }) }
     if (t === head) return null
-    const base = await G.mergeBase(this.deps.project, t, head)
+    const base = await lineHistory().mergeBase(this.deps.project, t, head)
     if (isUnknown(base) || !base) return { why: 'cantCheck', detail: sayStored(T.noBase, { target }) }
-    const c = await G.contains(this.deps.project, target, { base, revision: head }, t)
+    const c = await lineHistory().contains(this.deps.project, target, { base, revision: head }, t)
     if (isUnknown(c)) return { why: 'cantCheck', detail: c.what }
     return c ? null : { why: 'unmerged', target }
   }

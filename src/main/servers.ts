@@ -120,7 +120,7 @@ import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
 import { detect, platformIdOf } from './platform/registry'
-import { revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
+import { hasCapability, revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
 import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskAction, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
 import { actorOf, recordDecisionsReceived } from './workflow/recorder'
@@ -4573,7 +4573,7 @@ async function isolatedFor(ws: WorkspaceService, caller: ProgressCaller, link: R
   if (link.card === null || !link.revision) throw new HttpError(400, apiSaid(API.check.isolatedNeedsCard))
   const cfg = await ws.projectConfig(caller.projectPath).catch(() => null)
   // None has no check copies (OP-16): its remedy is running again once the deliverables are quiet.
-  if (platformIdOf(caller.projectPath, cfg?.platform) !== 'git') throw new HttpError(400, apiSaid(API.check.noVcs))
+  if (!hasCapability(platformIdOf(caller.projectPath, cfg?.platform), 'isolation')) throw new HttpError(400, apiSaid(API.check.noVcs))
   // Leased and set up apart from this request (a first setup takes minutes): `wait` with a ticket to ask again with.
   const got = await isolatedRequest(ws, caller.projectPath, linkOwner(caller), { card: link.card, revision: link.revision, agent: caller.agentId }, ticket)
   if ('wait' in got) throw new HttpError(409, apiSaid(API.check.waiting, { what: got.wait }), { wait: got.wait, ...(got.ticket ? { ticket: got.ticket } : {}) })

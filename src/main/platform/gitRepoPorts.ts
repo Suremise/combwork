@@ -10,7 +10,10 @@ import { changingFolder } from '../folderFence'
 import { git, gitRouted, withoutGitRoute } from '../git'
 import { checkGit, gitProblem, gitTool } from '../gitTool'
 import { commonGitDir, inStoreOrder, withLocksInOrder, withRepoLock } from '../repoLock'
+import { currentLine, ensureCombworkExcluded, trackedCombworkFiles, untrackCombwork } from './gitKeepOut'
+import { fileList, ignoredSet } from './gitFiles'
 import { holdRefs } from './refHold'
+import { vcsOf } from '../vcsDetect'
 import type { RepoContext, RepoPorts } from './repoContext'
 
 /** Whether `path` exists, as stat says (async: no file system call on main's thread blocks). */
@@ -101,6 +104,7 @@ async function excludeFile(folder: string, o: { timeout: number }): Promise<stri
 
 export const gitRepoPorts: RepoPorts = {
   platform: 'git',
+  tool: 'Git', // i18n-ignore: a product's name
   contextOf,
   runner: {
     run: (ctx, args, o = {}) => git(ctx.folder, [...args], o.maxOutput, o.input, { ...(o.env ? { env: o.env } : {}), ...(o.timeout ? { timeout: o.timeout } : {}) }),
@@ -119,5 +123,13 @@ export const gitRepoPorts: RepoPorts = {
   metadataDirs: ['.git'],
   mainTree,
   trustRoot,
-  excludeFile
+  excludeFile,
+  keepOut: {
+    holds: (projectPath) => vcsOf(projectPath)?.kind === 'git',
+    ensure: (projectPath, opts) => ensureCombworkExcluded(projectPath, opts),
+    tracked: (projectPath, root, opts) => trackedCombworkFiles(projectPath, root, opts),
+    untrack: (projectPath, confirmed) => untrackCombwork(projectPath, confirmed)
+  },
+  currentLine,
+  files: { ignored: ignoredSet, list: fileList }
 }

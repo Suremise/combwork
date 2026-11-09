@@ -47,7 +47,7 @@ import { containsPlace, samePlace } from './fsutil'
 import { samePath } from '../shared/movePaths'
 import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLaneSlotHeld, setLaneSlots, setLaneSlotWait } from './lanes'
 import { createLogger, userText } from './logger'
-import * as G from './platform/git'
+import { lineHistory } from './platform/historyPorts'
 import type { WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
 import { slotWorkspaces } from './platform/workspacePorts'
 import { observer } from './platform/observe'
@@ -707,7 +707,7 @@ async function cleanAndContained(projectPath: string, folder: string, target: st
   const th = await port().lineHead(projectPath, t)
   if (isUnknown(th) || !th) return false
   if (head === th) return true
-  const inIt = await G.isAncestor(projectPath, head, th)
+  const inIt = await lineHistory().isAncestor(projectPath, head, th)
   return !isUnknown(inIt) && inIt
 }
 

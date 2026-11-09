@@ -26,7 +26,7 @@ import { actorOf, changeByRuntime, decisionGenerations, gatherReads, isStorageEr
 import { noteCard } from './assistantChanges'
 import { FactStore } from './workflow/factStore'
 import { loopReviewerOf } from './loopReviewer'
-import { gitStep } from './platform/git'
+import { readStep } from './platform/historyPorts'
 import type { CardKind } from '../shared/workflow/facts'
 import { alongside, isRefusal, type Reply, type Workflow, type Write } from './workflow/runtime'
 import { linkToComment, moveCardFolder, publish, removeCardAttachments, trashCardFolder, type CleanupFile, type Staging } from './cardAttachments'
@@ -1757,8 +1757,8 @@ export async function runIntent<R>(
           saved = await recordingByRuntime(() => updateTaskAs(n, p, actor, { ...extra.opts, was: STAGE_CATEGORY[w.was], ...(commit ? { commit } : {}) }), moved)
         }
       },
-      // One git step (#1376): what it asks git about fixed commits is asked once in it.
-      () => gitStep(() => call(wf))
+      // One read step (#1376): what it asks git about fixed commits is asked once in it.
+      () => readStep(() => call(wf))
     )
   )
   return { reply, saved }

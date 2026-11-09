@@ -3,7 +3,7 @@
 // (workspace.ts ensureProject), and each refresh compares what detection finds with it (`projectPlatform`).
 
 import { resolve } from 'path'
-import { otherVcsOf, vcsOf } from '../combworkVcs'
+import { otherVcsOf, vcsOf } from '../vcsDetect'
 import { isPlatformId, PLATFORMS, type Detection, type PlatformId, type PlatformOffer, type ProjectPlatform } from '../../shared/platform/descriptors'
 
 export type { Detection } from '../../shared/platform/descriptors'

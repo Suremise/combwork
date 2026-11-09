@@ -400,7 +400,7 @@ export class GitPlatform implements PlatformAdapter {
       if (commits) {
         const u = await this.untrailered(card, s)
         if (isUnknown(u)) return { ok: false, refusal: unknownRefusal(card, u, 'submit') }
-        if (u) return { ok: false, refusal: trailerRefusal(card.key, u) }
+        if (u) return { ok: false, refusal: trailerRefusal(this.id, card.key, u) }
       }
       const all = dirty ?? (await G.dirty(folder))
       const notMine = this.wf.ownLine(s) || isUnknown(all) ? [] : await this.inRepo(this.notMine(card, s))

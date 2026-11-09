@@ -2,7 +2,7 @@ import { randomBytes } from 'crypto'
 import { carryLegacyAgentFields, legacyWorktree, type LegacyAgentFields, type NamedFolder, type StoredAgent } from '../shared/agentFolders'
 import { basename, dirname, join, resolve, sep } from 'path'
 import { mkdir, readdir, readFile, stat, writeFile } from 'original-fs/promises'
-import { existsSync, statSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
+import { existsSync, watch, type FSWatcher as RootWatcher } from 'original-fs'
 import { boardFile, boardWrite, closeBoard, inBoardWrite, untilBoardOpenable } from './boardStore'
 import { closeJournal, untilJournalOpenable } from './journal'
 import { AsyncLocalStorage } from 'async_hooks'
@@ -33,10 +33,10 @@ import { createLogger, userText } from './logger'
 import { changeSessionRecord, changeSessions, exportSessions, readAgentSessions, readCardSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
-import { ensureCombworkExcluded, gitDirOf, combworkVcs } from './combworkVcs'
+import { ensureCombworkExcluded, combworkVcs } from './combworkVcs'
 import { detect, projectPlatform } from './platform/registry'
+import { currentLine, repoHolding } from './platform/repoPorts'
 import type { ProjectPlatform } from '../shared/platform/descriptors'
-import { gitProblem } from './gitTool'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
 import { NO_PROJECT_IDS, isProjectId, settleProjectIds, type ProjectIdEntry, type ProjectIdIndex } from '../shared/projectIds'
 import { migrateProjectPreferences } from '../shared/workflow/preferences'
@@ -1505,35 +1505,18 @@ export class WorkspaceService {
     if (!this.isAssistantHome(projectPath) && existsSync(join(h, 'project.json'))) this.markSetUp(projectPath, gen, ticket)
   }
 
-  private gitDir(projectPath: string): Promise<string | null> {
-    return gitDirOf(projectPath)
-  }
-
   /** Adds the project's .combwork to the info/exclude of the git repository holding it (its own, or one above), if it isn't (#345). */
   async ensureGitExclude(projectPath: string): Promise<void> {
     const r = await ensureCombworkExcluded(projectPath)
     if (r?.added) log.info(`Excluded .combwork from git in ${userText(r.root)}`)
     // The line is there whatever git can do; git missing only means it couldn't confirm a .gitignore doesn't bring .combwork back (#346).
-    if (r?.unconfirmed) log.info(`Git couldn't confirm .combwork is ignored in ${userText(r.root)}${gitProblem() ? ` (${gitProblem()})` : ''}`)
+    const problem = r?.unconfirmed ? repoHolding(projectPath)?.runner.problem() : null
+    if (r?.unconfirmed) log.info(`Git couldn't confirm .combwork is ignored in ${userText(r.root)}${problem ? ` (${problem})` : ''}`)
   }
 
+  /** The line the project folder has checked out (HI-2792: asked of the repository platforms, read with no process). */
   async branch(projectPath: string): Promise<string | null> {
-    const gd = await this.gitDir(projectPath)
-    if (!gd) return null
-    try {
-      // For worktrees HEAD lives in the worktree gitdir, not the common dir.
-      const gfile = join(projectPath, '.git')
-      let headDir = gd
-      if (statSync(gfile).isFile()) {
-        const m = (await readFile(gfile, 'utf8')).match(/gitdir:\s*(.+)/)
-        if (m) headDir = resolve(projectPath, m[1].trim())
-      }
-      const head = (await readFile(join(headDir, 'HEAD'), 'utf8')).trim()
-      const m = head.match(/^ref: refs\/heads\/(.+)$/)
-      return m ? m[1] : head.slice(0, 8)
-    } catch {
-      return null
-    }
+    return currentLine(projectPath)
   }
 
   /** A project's config; `opts` for a read that is written back (mutateProjectConfig, #1600). */

@@ -309,6 +309,22 @@ swap, a checked-out target's conditions, the files moved forth and back, each fi
 recovery's table, the push's destination and the push of a captured head, the host's pins, the runner's workspace
 removal, Resume's condition reads), called between the journal's phases: the journal, lock, fence, lease checks, crash
 hooks and pauses stay in `mergeQueue.ts` (`tests/workflow/queueAdvanceTraces.test.ts` holds those commands to theirs).
+R9 (HI-2792) finished the routing and audited what's left. The runtime builds its adapters from
+`platform/adapters.ts`, and the Git tool's readiness is each repository platform's runner (`repoTools()`,
+`checkRepoTools()`). Port 1 also owns keeping `.combwork` out (`RepoPorts.keepOut`, Git's in `platform/gitKeepOut.ts`;
+`combworkVcs.ts` routes to it), the Files tab's ignore rules and search list (`RepoPorts.files`, Git's in
+`platform/gitFiles.ts`), the project's current line, and the metadata folders the Files tab hides. Detection's folder
+markers are `vcsDetect.ts`. Port 2 has the relocation capability (`Relocation`, Git's in `platform/gitRelocation.ts`),
+which Repair (`workspaceMove.ts`) and the 1.1 folder move's worktree repair (`combworkMove.ts`) use. Port 3 gained the
+reads its last direct callers made (a step, identity, messages, the queue's step reads, a run's checked-out revision),
+and the queue reads them by the card's platform (`historyFor`). Port 5 gained the Changes tab's status and diff. The
+refusals' git commands are the descriptor's `remedies`. **The audit** is `tests/gitAudit.mjs`: every import of a Git
+module from outside Git's implementation is a classified edge (Git implementation, a port's registry, Git-facing UI,
+historic migration, common, or a defect with its card), with the names it may take. It also counts the remaining
+"platform with lines" seams (`lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`,
+`slotWorkspaces()`, `slotRelocation()`) per caller: in 1.4.0 these resolve to Git alone, and 1.5.0's J0 routes each
+by the project's platform. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one, or a
+changed seam count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

@@ -5,13 +5,29 @@
 
 import { hasCapability, type PlatformId } from '../../shared/platform/descriptors'
 import { gitWorkspacePort } from './gitWorkspacePort'
-import type { WorkspacePort } from './workspacePort'
+import type { Relocation, WorkspacePort } from './workspacePort'
+import { repoHolding } from './repoPorts'
 
 /** Each platform's port; absent for a platform without the isolation capability (None). */
 const PORTS: Partial<Record<PlatformId, WorkspacePort>> = { git: gitWorkspacePort }
 
 /** A platform's workspace lifecycle port, or null for one without isolation (None). */
 export const workspacePortOf = (platform: PlatformId): WorkspacePort | null => PORTS[platform] ?? null
+
+/**
+ * The relocation of the repository platform holding `folder` (HI-2792: Repair after a move), read from its folders; null
+ * when none holds it or its platform has no relocation (§16.3.6's gate: relocation).
+ */
+export function relocationIn(folder: string): Relocation | null {
+  const holder = repoHolding(folder)
+  return (holder && workspacePortOf(holder.platform)?.relocate) ?? null
+}
+
+/**
+ * The relocation of the platform slots are made with (HI-2792): Repair's worktree steps for a project's slots and agents'
+ * worktrees (Git alone in 1.4.0), null when it has none.
+ */
+export const slotRelocation = (): Relocation | null => slotWorkspaces().relocate ?? null
 
 /**
  * The port slots are made with: the platform whose descriptor has the isolation capability. 1.4.0 has one (Git's

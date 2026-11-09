@@ -4,11 +4,11 @@ import { basename, dirname, extname, join, relative, resolve, sep } from 'path'
 import { CW_DIR, assertSessionId } from '../shared/defaults'
 import type { AttachmentContent, FileContent, FileEntry, SessionAttachment, SessionAttachmentGroup } from '../shared/types'
 import { attachmentKind, isSessionFolder } from '../shared/attachments'
-import { parseCheckIgnore, type IgnoreRule } from '../shared/gitIgnoreRules'
+import type { IgnoreRule } from '../shared/gitIgnoreRules'
 import { attachmentsDir, movedAttachment } from './attachmentsFolder'
 import { emit } from './events'
 import { heldOpen, insideReal, isInUse, trashAllOrNothing, withFileLock } from './fsutil'
-import { INDEX_BUSY, git } from './git'
+import { fileListOf, ignoredIn, repoMetadataDirs } from './platform/repoPorts'
 import { msg } from '../shared/i18n'
 import { combworkError } from './combworkError'
 import { createLogger, userText } from './logger'
@@ -19,7 +19,8 @@ import { followMovedLink } from './combworkMove'
 
 const log = createLogger('files')
 
-const HIDDEN = new Set(['.git'])
+/** Each repository platform's own folders (RepoPorts.metadataDirs, HI-2792: Git's `.git`): never listed. */
+const HIDDEN = new Set(repoMetadataDirs())
 /** Files the combwork-img: protocol may serve to the renderer (image and PDF previews). */
 export const SERVABLE_EXT = /\.(png|jpe?g|gif|webp|bmp|ico|pdf)$/i
 const SERVABLE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp', ico: 'image/x-icon', pdf: 'application/pdf' }
@@ -71,48 +72,6 @@ function uniqueName(dir: string, name: string): string {
   }
 }
 
-/** check-ignore's tries when git can't open or read the index (another git command is rewriting it), and the pause. */
-export const IGNORE_TRIES = 4
-const IGNORE_RETRY_MS = 50
-const NOT_A_REPO = /not a git repository/i
-
-/**
- * The entries git ignores, or null when git couldn't say (#222). check-ignore exits 0 (some ignored) or 1 (none); a
- * failure (128) used to read as "none ignored", so a listing made while another git command rewrote the index (a
- * user's `git add`, an agent's commit) showed ignored folders undimmed. A busy index is tried again briefly; outside
- * a repository nothing is ignored. Each with the rule git ignores it by (-v, HI-2743: its tooltip names it).
- */
-async function ignoredSet(projectPath: string, rels: string[]): Promise<Map<string, IgnoreRule> | null> {
-  const out = new Map<string, IgnoreRule>()
-  // Chunked to stay under the Windows command-line limit.
-  for (let i = 0; i < rels.length; i += 200) {
-    // -z needs --stdin, which the helper does not support, so read one path per line.
-    const args = ['check-ignore', '-v', '--', ...rels.slice(i, i + 200)]
-    let r = await git(projectPath, args)
-    for (let t = 1; t < IGNORE_TRIES && r.code !== 0 && r.code !== 1 && INDEX_BUSY.test(r.err); t++) {
-      await new Promise((res) => setTimeout(res, IGNORE_RETRY_MS))
-      r = await git(projectPath, args)
-    }
-    if (r.code !== 0 && r.code !== 1) {
-      if (NOT_A_REPO.test(r.err)) return new Map()
-      ignoreFailed(projectPath, r.err)
-      return null
-    }
-    // A path a negation (`!keep.log`) matched is listed by -v but isn't ignored: parseCheckIgnore leaves it out.
-    for (const [p, rule] of parseCheckIgnore(r.out)) out.set(p, rule)
-  }
-  return out
-}
-
-/** Projects whose check-ignore failure has been logged (once each). */
-const loggedIgnore = new Set<string>()
-function ignoreFailed(projectPath: string, err: string): void {
-  const key = projectPath.toLowerCase()
-  if (loggedIgnore.has(key) || loggedIgnore.size >= 100) return
-  loggedIgnore.add(key)
-  log.warn(`git check-ignore failed in ${userText(projectPath)}; showing the last known ignored state and listing again: ${userText(err.slice(0, 200))}`)
-}
-
 /**
  * The ignored entries of the folders listed last (a bounded memory: the most recently listed 500), kept for a listing
  * whose check-ignore failed: it shows them as they were rather than undimmed, and the folder is listed again shortly
@@ -157,7 +116,7 @@ export async function listDir(projectPath: string, rel: string): Promise<FileEnt
     out.push({ name: e.name, relPath: toRel(projectPath, abs), isDir: s.isDirectory(), size: s.size, modified: s.mtime.toISOString(), ignored: false })
   }
   const key = `${projectPath.toLowerCase()}\0${toRel(projectPath, dir)}`
-  let ignored = await ignoredSet(
+  let ignored = await ignoredIn(
     projectPath,
     out.map((f) => (f.isDir ? `${f.relPath}/` : f.relPath))
   )
@@ -364,8 +323,8 @@ export async function find(projectPath: string, query: string, limit = 500): Pro
   const words = query.toLowerCase().split(/\s+/).filter(Boolean)
   if (!words.length) return []
   let paths: string[] = []
-  const r = await git(projectPath, ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
-  if (r.ok) paths = r.out.split('\0').filter(Boolean)
+  const listed = await fileListOf(projectPath)
+  if (listed) paths = listed
   else {
     const walk = async (dir: string, depth: number): Promise<void> => {
       if (depth > 12 || paths.length > 50000) return

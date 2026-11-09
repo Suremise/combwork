@@ -13,7 +13,7 @@
 
 import type { BranchDrops, BranchUpdatePlan, CompareLines, GitComparison, GitHistory, GitRepoInfo, GitRepoSummary, LeftoverInfo } from '../../shared/gitRepo'
 import type { ResolvedStart, StartPoints } from '../../shared/nextVersion'
-import type { AgentBranchStatus, GitDiff, MergeBranchList, ProjectInfo } from '../../shared/types'
+import type { AgentBranchStatus, GitDiff, GitStatus, MergeBranchList, ProjectInfo } from '../../shared/types'
 
 /** A slot as the board records it, for Compare's list: its folder, and its open lease's card and agent (null: free). */
 export interface ReadSlot {
@@ -38,6 +38,10 @@ export type ComparePins = { base?: unknown; head?: unknown } | null
 
 /** What the window reads of a repository (port 5's reads). */
 export interface RepoReads {
+  /** The Changes tab's changed files in a working folder (HI-2792); with `base`, everything since the line left it. */
+  changes(root: string, base?: string): Promise<GitStatus>
+  /** The Changes tab's diff of one file (HI-2792), as `changes` lists it. */
+  changeDiff(root: string, file: string, base?: string): Promise<GitDiff>
   /** The folder's line, head, upstream, remotes and state (repoSummary): cheap, no working-tree scan. */
   summary(root: string): Promise<GitRepoSummary>
   /** The line the project's work merges into, as its options say (none: the default line). */

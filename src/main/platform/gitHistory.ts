@@ -4,13 +4,28 @@
 // argv, bounds, parsers and Unknown answers, so no git command is added, dropped or reordered. The watcher is
 // observe.ts's observer, unchanged.
 
-import { git } from '../git'
+import { git, gitReading } from '../git'
 import * as G from './git'
 import type { HistoryPort } from './history'
 import { unknown } from './types'
 import { UNREADABLE as U } from '../../shared/workflow/texts'
 
 export const gitHistory: HistoryPort = {
+  step: (fn) => G.gitStep(fn),
+  identity: (repo) => G.identity(repo),
+  messages: (repo, range) => G.messages(repo, range),
+  lineHeadAndTree: (repo, line) => G.lineHeadAndTree(repo, line),
+  // runLink.ts's folderHead and commitIn (moved here unchanged): gitReading, a read off the queue's route.
+  // queueControls.ts's commitsBehind (HI-2679), moved here unchanged.
+  async countFirstParents(repo, base, head) {
+    const r = await git(repo, ['rev-list', '--count', '--first-parent', `${base}..${head}`])
+    const n = r.ok ? Number(r.out.trim()) : NaN
+    return Number.isInteger(n) ? n : null
+  },
+  // mergeQueue.ts's focused tests' bound (moved here unchanged): Combwork's own git, not the queue's runner, as before.
+  treeOf: (folder, revision) => git(folder, ['rev-parse', `${revision}^{tree}`]).then((r) => (r.ok ? r.out.trim() : null)),
+  checkedOut: (folder) => gitReading(folder, ['rev-parse', '--verify', '--quiet', 'HEAD']).then((r) => (r.ok ? r.out.trim() || null : null)),
+  commitIn: (folder, revision) => gitReading(folder, ['rev-parse', '--verify', '--quiet', `${revision}^{commit}`]).then((r) => (r.ok ? r.out.trim() || null : null)),
   head: (folder) => G.head(folder),
   line: (folder) => G.branch(folder),
   lineHead: (repo, line) => G.lineHead(repo, line),

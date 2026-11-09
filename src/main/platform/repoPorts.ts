@@ -5,6 +5,7 @@
 // modules (tests/repoPorts.test.ts holds them to it).
 
 import type { PlatformId } from '../../shared/platform/descriptors'
+import type { IgnoreRule } from '../../shared/gitIgnoreRules'
 import { gitRepoPorts } from './gitRepoPorts'
 import type { RepoContext, RepoLockOptions, RepoPorts } from './repoContext'
 
@@ -17,6 +18,48 @@ export const repoPortsOf = (platform: PlatformId): RepoPorts | null => PORTS[pla
 
 /** Whether a platform's projects are repositories (they have a context, locks and a runner). */
 export const hasRepository = (platform: PlatformId): boolean => repoPortsOf(platform) !== null
+
+/** Each platform with repositories, its tool's name and runner (HI-2792): Copy Diagnostics' rows, the startup check. */
+export const repoTools = (): readonly { tool: string; runner: RepoPorts['runner'] }[] => ORDER
+
+/** Checks every repository platform's tool again (each runner's readiness), as Combwork does at startup and on a refresh. */
+export const checkRepoTools = (): Promise<unknown> => Promise.all(ORDER.map((p) => p.runner.readiness()))
+
+/** The repository platform holding a project, by its keep-out (HI-2792: read from its folders, each platform in turn); null for none. */
+export const repoHolding = (projectPath: string): RepoPorts | null => ORDER.find((p) => p.keepOut.holds(projectPath)) ?? null
+
+/** The line a project folder has checked out (ProjectInfo's branch, HI-2792): the first platform naming one, read with no process. */
+export async function currentLine(projectPath: string): Promise<string | null> {
+  for (const p of ORDER) {
+    const l = await p.currentLine(projectPath)
+    if (l) return l
+  }
+  return null
+}
+
+/** Every repository platform's own folders (Git's `.git`): hidden in the Files tab, never file content (HI-2792). */
+export const repoMetadataDirs = (): string[] => ORDER.flatMap((p) => p.metadataDirs)
+
+/**
+ * What the repository holding `folder` ignores of its entries `rels` (HI-2792, the Files tab): each platform asked in
+ * turn, the first that holds the folder answering (null: it couldn't say); none holding it, nothing is ignored.
+ */
+export async function ignoredIn(folder: string, rels: string[]): Promise<Map<string, IgnoreRule> | null> {
+  for (const p of ORDER) {
+    const a = await p.files.ignored(folder, rels)
+    if (a !== 'none') return a
+  }
+  return new Map()
+}
+
+/** The files a search reads in `folder` (HI-2792): the first platform able to list them; null when none can (the caller walks the folder). */
+export async function fileListOf(folder: string): Promise<string[] | null> {
+  for (const p of ORDER) {
+    const l = await p.files.list(folder)
+    if (l) return l
+  }
+  return null
+}
 
 /** The port a context came from. */
 export function portsOf(ctx: RepoContext): RepoPorts {

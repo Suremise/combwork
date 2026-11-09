@@ -31,7 +31,7 @@ import { watchGithubHostChanges } from './githubHostChanges'
 import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
-import { checkGit } from './gitTool'
+import { checkRepoTools } from './platform/repoPorts'
 import { handoverSession, combworkInstructions, withLatestHandover, wrapsLongCommands } from '../shared/combworkGuidance'
 import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
@@ -1416,7 +1416,7 @@ app.whenReady().then(async () => {
     restart: () => void requestQuit({ intent: 'update' })
   })
   void providerService.refresh()
-  void checkGit()
+  void checkRepoTools()
 })
 
 // A file picked to import in the Dialects view is its window's (HI-2444): gone when the window closes.

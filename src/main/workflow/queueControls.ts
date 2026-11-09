@@ -23,11 +23,10 @@ import { existsSync } from 'original-fs'
 import { boardRevision } from '../boardStore'
 import { runCardIntent } from '../cardIntents'
 import { onCombworkEvent } from '../events'
-import { git } from '../git'
 import type { TaskActor } from '../tasks'
 import type { TaskCard } from '../../shared/types'
 import type { IntentDone } from '../../shared/toolReplies'
-import * as G from '../platform/git'
+import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import { processAlive } from '../progressService'
 import type { WorkspaceService } from '../workspace'
@@ -158,14 +157,13 @@ const BEHIND_KEPT = 64
  * kept by both heads (a git process only when either moved); null when a head can't be read.
  */
 export async function commitsBehind(projectPath: string, from: string, to: string): Promise<number | null> {
-  const [a, b] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+  const [a, b] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]
   if (!a || !b || isUnknown(a) || isUnknown(b)) return null
   const key = [projectPath.toLowerCase(), a, b].join('\n') // i18n-ignore: a key, never shown
   const had = behindKept.get(key)
   if (had !== undefined) return had
-  const r = await git(projectPath, ['rev-list', '--count', '--first-parent', `${b}..${a}`])
-  const n = r.ok ? Number(r.out.trim()) : NaN
-  if (!Number.isInteger(n)) return null
+  const n = await lineHistory().countFirstParents(projectPath, b, a)
+  if (n === null) return null
   behindKept.set(key, n)
   while (behindKept.size > BEHIND_KEPT) behindKept.delete(behindKept.keys().next().value!)
   return n
@@ -190,7 +188,7 @@ async function queueScope(wf: Workflow, projectPath: string): Promise<QueueScope
   const o = wf.currentRuleset(false).options
   let current: string | null = null
   if (o.platform === 'git' && o.finish === 'combworkMerges') {
-    const def = o.target ? o.target : await G.defaultBranch(projectPath).catch(() => null)
+    const def = o.target ? o.target : await lineHistory().defaultTarget(projectPath).catch(() => null)
     current = def && !isUnknown(def) ? def : null
   }
   return { inFlight, current }
@@ -434,7 +432,7 @@ async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ sour
     const rec = wf?.store.cards().find((c) => c.id === n)
     const f = rec ? wf!.state(rec).forward : null
     if (!f) continue
-    const head = await G.lineHead(p.path, f.from)
+    const head = await lineHistory().lineHead(p.path, f.from)
     return head && !isUnknown(head) ? { source: head } : null
   }
   return null
@@ -471,11 +469,11 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   const all = [t.default, ...t.others]
   if (from === to || !all.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, targets: fmt.list(all) }), { kind: 'invalid' })
   // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
-  const [source, dest] = [await G.lineHead(projectPath, from), await G.lineHead(projectPath, to)]
+  const [source, dest] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]
   for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
-  const contained = await G.isAncestor(projectPath, source as string, dest as string)
+  const contained = await lineHistory().isAncestor(projectPath, source as string, dest as string)
   if (contained === true) return { upToDate: true, from, to }
-  const base = await G.mergeBase(projectPath, source as string, dest as string)
+  const base = await lineHistory().mergeBase(projectPath, source as string, dest as string)
   const { cardBatch, readTask, createTask, runIntent } = await import('../tasks')
   const by = actor.kind === 'assistant' ? 'assistant' : 'user'
   // One board change (HR3's round 1): the open card for the pair looked for, the caller's authority checked, the card made

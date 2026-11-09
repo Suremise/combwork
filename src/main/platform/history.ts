@@ -45,6 +45,25 @@ export interface ChangeAt {
  * so any of its workspaces answers it). Revisions are immutable full ids (§16.3.6's rule 4).
  */
 export interface HistoryPort {
+  /**
+   * One workflow step (HI-2792, Git's gitStep, #1376): answers about fixed revisions (an ancestor, a merge base) asked
+   * once in it, nothing that moves kept; a step inside a step is the outer one's.
+   */
+  step<T>(fn: () => Promise<T>): Promise<T>
+  /** The identity new revisions are made with in the repository (HI-2792: the options form's, the queue's), null when none is set. */
+  identity(repo: string): Promise<Maybe<{ name: string; email: string } | null>>
+  /** The messages of the revisions in a range, oldest first, merges left out (HI-2792: the queue's squash message). */
+  messages(repo: string, range: string): Promise<Maybe<string[]>>
+  /** A line's head (lineHead's answer), its tree read in the same command and kept for the step (HI-2792: the queue's step read). */
+  lineHeadAndTree(repo: string, line: string): Promise<Maybe<string | null>>
+  /** What's checked out in a folder, read off the queue's route (HI-2792: runLink's folderHead), null where nothing is or it can't be read. */
+  checkedOut(folder: string): Promise<string | null>
+  /** The revision a name gives in a folder, in full, read off the queue's route (HI-2792: runLink's commitIn), null when it names none. */
+  commitIn(folder: string, revision: string): Promise<string | null>
+  /** How many revisions along `head`'s first-parent history `base` lacks (HI-2792: queueControls' commitsBehind), null when unreadable. */
+  countFirstParents(repo: string, base: string, head: string): Promise<number | null>
+  /** A revision's tree, read in a folder (HI-2792: the queue's skipped-tests bound), null when unreadable. */
+  treeOf(folder: string, revision: string): Promise<string | null>
   /** The revision a folder has checked out, read with no side effect. */
   head(folder: string): Promise<Maybe<string>>
   /** The line a folder has checked out, or null when it has none (detached). */

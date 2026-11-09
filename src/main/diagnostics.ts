@@ -12,7 +12,7 @@ import { config } from './config'
 import { LOG_FILE, logsDir } from './logger'
 import { provider } from './providers'
 import { providerService } from './providerService'
-import { gitTool } from './gitTool'
+import { repoTools } from './platform/repoPorts'
 import { combworkWindows } from './windows'
 import { GUIDANCE_REVISION } from './guidance'
 import { combworkSkills } from './skills'
@@ -125,8 +125,11 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     ]
     return [head, ...extra]
   })
-  const g = gitTool()
-  providerLines.push(`- **Git**: ${g.state === 'missing' ? "not found on Combwork's PATH" : g.version ? `${g.version}${g.path ? ` at \`${g.path}\`` : ''}${g.state === 'old' ? ' (older than Combwork needs)' : ''}` : `unknown${g.error ? ` (${g.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  // Each repository platform's tool (HI-2792: its runner's readiness; Git alone in 1.4.0, the same line as before).
+  for (const { tool, runner } of repoTools()) {
+    const g = runner.readinessNow()
+    providerLines.push(`- **${tool}**: ${g.state === 'missing' ? "not found on Combwork's PATH" : g.version ? `${g.version}${g.path ? ` at \`${g.path}\`` : ''}${g.state === 'old' ? ' (older than Combwork needs)' : ''}` : `unknown${g.error ? ` (${g.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
+  }
 
   // Bundled skills: Combwork's own names, so they are shown; the user's own skills only as a count.
   const skillLines: string[] = []

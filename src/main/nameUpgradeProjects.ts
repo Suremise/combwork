@@ -4,7 +4,8 @@ import { EXCLUDE_COMMENT } from '../shared/combworkFolderMove'
 import { cleanSwaps, contentHash, ContentTooLarge, COPY_MARKER, SwapAbandoned, swapOut, SwapUnreadable, withFileLock, writeTextAtomic } from './fsutil'
 import { git } from './git'
 import { createLogger, userText } from './logger'
-import { gitDirOf, vcsOf } from './combworkVcs'
+import { vcsOf } from './vcsDetect'
+import { gitDirOf } from './platform/gitKeepOut'
 import { ifAbsent, present } from './fsPresence'
 
 /**
