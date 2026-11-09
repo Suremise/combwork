@@ -192,6 +192,14 @@ const git = (cwd, ...args) => lib.git(cwd, args).trim()
     await waitHung(async () => (await field.getAttribute('data-card-target-field')) === 'integration')
     check('…the field shows integration now', (await field.getAttribute('data-card-target-field')) === 'integration', String(await field.getAttribute('data-card-target-field')))
     await page.keyboard.press('Escape')
+    await page.locator('.dialog select#card-target').waitFor({ state: 'detached', timeout: HUNG_MS })
+    // Back to alpha's Version Control tab (the board view hides the project's tabs).
+    await waitHung(async () => {
+      if (await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().isVisible().catch(() => false)) return true
+      await page.getByRole('button', { name: 'Projects' }).click()
+      await page.locator('.sidebar').getByText('alpha', { exact: true }).first().click().catch(() => undefined)
+      return false
+    })
     await page.locator('.tabs .tab', { hasText: 'Version Control' }).first().click()
     await page.locator('.git-sections [data-section="workflow"]').click()
     const key9 = await keyOf(n9)
