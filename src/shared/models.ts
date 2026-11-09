@@ -1,5 +1,5 @@
 import type { AgentInstallInfo, AppSettings, CatalogModel, Account, EffortLevel, EffortOption, FallbackModel, ModelAlias, ModelSwitch, ProviderId } from './types'
-import { OLDER_VERSIONS } from './claude'
+import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
 import { fmt } from './i18n'
 import { msg } from './i18n/msg'
 import { serverDefaultModel } from './serverConnection'
@@ -75,7 +75,11 @@ export function effortName(provider: ProviderId, value: EffortLevel, settings?: 
   const found = fallbackEfforts(provider, settings).find((e) => e.value === value) ?? shippedEfforts(provider).find((e) => e.value === value)
   const shipped = tr ? providerDescriptor(provider).effortLevels.find((e) => e.value === value && e.label === found?.label) : undefined
   if (tr && shipped?.text) return tr(shipped.text)
-  return found?.label ?? value.charAt(0).toUpperCase() + value.slice(1)
+  if (found) return found.label
+  // A level only a model reports (OpenCode's variants, HI-2767): a common one by the shared name, else capitalised.
+  const common = Object.hasOwn(EFFORT_TEXT, value) ? EFFORT_TEXT[value as keyof typeof EFFORT_TEXT] : undefined
+  if (common) return tr ? tr(common) : common.defaultMessage
+  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 /** The descriptor's models as a fallback list (its groups flattened; "older" groups marked). */

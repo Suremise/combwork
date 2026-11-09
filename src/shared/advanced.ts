@@ -3231,6 +3231,26 @@ const SOURCES: readonly AdvancedSource[] = [
     ]
   },
   {
+    id: 'opencode.models.variants',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.models.variants.title', defaultMessage: "Model list: a model's variants field", description: "An advanced setting's title (Settings → Advanced, under OpenCode): the field of OpenCode's model list that holds a model's variants." }),
+    desc: msg({ id: 'settings.advanced.opencode.models.variants.desc', defaultMessage: "The field of a model in OpenCode's model list with its variants, which Combwork offers as its effort levels. Wrong, no effort is offered for OpenCode models.", description: 'What the advanced setting "Model list: a model\'s variants field" is for, and what goes wrong when it is wrong (Settings → Advanced, under OpenCode).' }),
+    kind: 'field',
+    default: 'variants',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/models-api-opencode-2.2.6.json`, version: '2.2.6', fields: ['capabilities', 'cost', 'enabled', 'id', 'limit', 'modelID', 'name', 'package', 'providerID', 'settings', 'status', 'time', 'variants'] }]
+  },
+  {
+    id: 'opencode.models.variantId',
+    group: 'opencode',
+    title: msg({ id: 'settings.advanced.opencode.models.variantId.title', defaultMessage: "Model list: a variant's id field", description: "An advanced setting's title (Settings → Advanced, under OpenCode): the field of one of a model's variants that holds its id." }),
+    desc: msg({ id: 'settings.advanced.opencode.models.variantId.desc', defaultMessage: "The field of a model's variant with its id, the effort level Combwork passes when an OpenCode session starts. Wrong, no effort is offered for OpenCode models.", description: 'What the advanced setting "Model list: a variant\'s id field" is for, and what goes wrong when it is wrong (Settings → Advanced, under OpenCode).' }),
+    kind: 'field',
+    default: 'id',
+    applies: 'now',
+    samples: [{ from: `${FIX}/advanced/models-api-opencode-2.2.6.json`, version: '2.2.6', fields: ['id', 'settings'] }]
+  },
+  {
     id: 'opencode.env.credentials',
     group: 'opencode',
     title: msg({ id: 'settings.advanced.opencode.env.credentials.title', defaultMessage: 'Credentials left out of OpenCode', description: "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the environment variables' names Combwork leaves out." }),

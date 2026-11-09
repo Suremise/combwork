@@ -131,6 +131,8 @@
   "providers.localLimits.output": "输出预算 {value, number} 个 Token（{from}）{fallback, select, none {} other {：{fallback} 不小于上下文，因此使用了默认值}}",
   "providers.localLimits.switched": "以这些值在 {model} 上启动：它们在整个会话中保持不变，Claude Code 报告的是当前运行模型的窗口。",
   "providers.opencode.claudeAgentModel": "{provider} 未启动：{model} 是 OpenCode 的 Claude Agent 提供方的模型，Combwork 不会通过 OpenCode 运行它。请改为将 Claude Code 作为单独的提供方运行，或选择其他模型。",
+  "providers.opencode.effortNeedsModel": "{provider} 未启动：连接的推理强度为 {effort}，OpenCode 将其设置为模型的变体，但此连接没有指定模型。请在智能体设置中选择其模型（提供方和模型，例如 ollama/qwen3:8b）或默认推理强度。",
+  "providers.opencode.effortNotListed": "{provider} 未启动：连接的推理强度为 {effort}，但在此账户上 OpenCode 没有把 {effort} 列为 {model} 的变体，因此 Combwork 无法设置它。请在智能体设置中选择该模型的某个推理强度或默认值。如果刚才无法读取 OpenCode 的模型，请重新启动智能体。",
   "providers.opencode.noModel": "{provider} 未启动：Combwork 让 OpenCode 只使用连接模型中的提供方，而此连接没有指定模型，因此 OpenCode 会自行选择一个，可能是它的某个免费云端模型。请在智能体设置中为连接选择模型（提供方和模型，例如 ollama/qwen3:8b），或在“设置”→“高级”中关闭“让 OpenCode 只使用连接自己的提供方”。",
   "providers.opencode.connections.setUp": "“初始设置”会在此账号上运行 `opencode auth login`，让你把它连接到你使用的模型提供方。请在终端中回答；Combwork 不会在其中输入任何内容。",
   "providers.opencode.historyBusy": "{provider} 未启动：Combwork 的 OpenCode 会话读取程序未及时响应，因此无法从之前的运行接手此会话。请重新启动该代理。",

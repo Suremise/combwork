@@ -263,6 +263,35 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
     await s.stop()
   })
 
+  it("a session's model and variant: created with them, set again with the nested body, no variant the default; refused as 2.2.6 refused (HI-2767)", async () => {
+    const rec = recJson('wire/session-model-set.json') as Record<string, { request: { body: unknown }; status: number; body?: unknown; after?: { model: unknown } }>
+    const r = root()
+    const s = await serve(r.env, r.project)
+    const made = (await s.api('POST', '/api/session', { location: { directory: r.project }, model: { providerID: 'cwtest', id: 'qwen3:8b', variant: 'low' } })).body.data
+    expect(made.model).toEqual((rec.create.body as { data: { model: unknown } }).data.model)
+    const id = made.id as string
+    const model = async () => (await s.api('GET', `/api/session/${id}`)).body.data.model
+    for (const k of ['set', 'setWithoutVariant']) {
+      expect((await s.api('POST', `/api/session/${id}/model`, rec[k].request.body)).status, k).toBe(rec[k].status)
+      expect(await model(), k).toEqual(rec[k].after!.model)
+    }
+    for (const k of ['flatBody', 'nullVariant', 'noProvider']) expect(await s.api('POST', `/api/session/${id}/model`, rec[k].request.body), k).toEqual({ status: rec[k].status, body: rec[k].body })
+    expect(await s.api('POST', '/api/session/ses_doesnotexist0000000000000/model', rec.missingSession.request.body)).toEqual({ status: 404, body: rec.missingSession.body })
+    await s.stop()
+  })
+
+  it('lists models with their variants, as `opencode api GET /api/model` gave them (HI-2767)', () => {
+    const r = root({ FAKE_OPENCODE_MODELS: 'ollama/qwen3:8b#low|high' }, { ...ourConfig(), providers: { probe: { name: 'Probe Ollama', package: '@opencode/ai/providers/openai-compatible', models: { 'qwen3:8b': { name: 'qwen3 8b' } } }, ollama: { name: 'Ollama' } }, policies: [] })
+    const out = run(r.env, ['api', 'GET', '/api/model', '--standalone'], r.project)
+    expect(out.status).toBe(0)
+    const data = JSON.parse(out.stdout).data as { providerID: string; id: string; variants: { id: string; settings: object }[] }[]
+    // An openai-compatible model's, as recorded (cli/../advanced/models-api-opencode-2.2.6.json); a built-in's none.
+    const recorded = (JSON.parse(readFileSync(join(__dirname, 'fixtures', 'advanced', 'models-api-opencode-2.2.6.json'), 'utf8')) as { data: { variants: unknown }[] }).data[0].variants
+    expect(data.find((m) => m.providerID === 'probe')?.variants).toEqual(recorded)
+    expect(data.find((m) => m.providerID === 'ollama')?.variants.map((v) => v.id)).toEqual(['low', 'high'])
+    expect(data.find((m) => m.providerID === 'opencode')?.variants).toEqual([])
+  })
+
   it("calls an MCP tool through Code Mode's execute, as 2.2.6 did, on the selected server with its own token", async () => {
     const r = root()
     const stub = join(r.root, 'stub-mcp.cjs')
@@ -345,7 +374,7 @@ describe('fake opencode: a policy-denied model, as HB1 recorded 2.2.6 (HI-2759)'
     s.subscribe()
     await until(() => s.events[0], 'server.connected')
     const sid = (await s.api('POST', '/api/session', { location: { directory: r.project } })).body.data.id
-    expect((await s.api('POST', `/api/session/${sid}/model`, { providerID: 'claude-agent', id: 'claude-sonnet' })).status).toBe(204)
+    expect((await s.api('POST', `/api/session/${sid}/model`, { model: { providerID: 'claude-agent', id: 'claude-sonnet' } })).status).toBe(204)
     await s.api('POST', `/api/session/${sid}/prompt`, { text: 'Reply OK.' })
     expect((await until(() => ended(s.events, sid), "the turn's end")).type).toBe('session.execution.failed')
     const idle = (await s.api('GET', `/api/session/${sid}/message`)).body.data[0]
@@ -382,7 +411,7 @@ describe('fake opencode: paging, the durable log and the types filter, as HB1 re
       return JSON.parse((await res.text()).trim().replace(/^data: /, ''))
     }
     expect(await log()).toEqual({ type: 'log.synced', aggregateID: sid, seq: 0 })
-    expect((await s.api('POST', `/api/session/${sid}/model`, { providerID: 'denied', id: 'x' })).status).toBe(204)
+    expect((await s.api('POST', `/api/session/${sid}/model`, { model: { providerID: 'denied', id: 'x' } })).status).toBe(204)
     for (let i = 1; i <= 6; i++) {
       await s.api('POST', `/api/session/${sid}/prompt`, { text: `prompt ${i}` })
       await until(() => filtered.filter((e) => e.type === 'session.execution.failed').length === i, `turn ${i}'s end`)
