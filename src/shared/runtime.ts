@@ -119,21 +119,32 @@ export function hooksMissingText(st: Pick<LiveSessionState, 'hooksMissing' | 'pr
 
 /**
  * What the window says of an agent whose hooks aren't reaching Combwork (#1336): that its status may be wrong, why when
- * Combwork can tell, and what to do. Null otherwise.
+ * Combwork can tell (HI-2777: a setting found on the PC, and where), and what to do. Null otherwise.
  */
 export function hooksMissingNote(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr: Tr): string | null {
   const h = st?.hooksMissing
   if (!h) return null
-  return tr(HOOKS_MISSING_NOTE, { provider: providerDescriptor(st!.provider).name, why: h.why ?? 'other', where: h.offIn ?? '', after: h.after }) // i18n-ignore: select keys, never shown
+  // A setting found here, for a CLI an organisation can also govern remotely: what it has there decides over it.
+  const remote = !!providerDescriptor(st!.provider).capabilities.remoteHookPolicy && (h.why === 'off' || h.why === 'managedOnly' || h.why === 'blocked' || h.why === 'unreadable')
+  return tr(HOOKS_MISSING_NOTE, { provider: providerDescriptor(st!.provider).name, why: h.why ?? 'other', where: h.offIn ?? '', setting: h.setting ?? '', also: h.also ? 'yes' : 'no', alsoWhere: h.also ?? '', remote: remote ? 'yes' : 'no', after: h.after }) // i18n-ignore: select keys, never shown
 }
 
 /** hooksMissingNote's message (main's notification says it too). */
 export const HOOKS_MISSING_NOTE = msg({
   id: 'panes.runtime.hooksMissingNote',
   defaultMessage:
-    "Combwork isn't hearing from {provider}'s hooks, so its status may be wrong. {why, select, refused {Combwork refused its hooks: they didn't carry this session's token.} off {{where} turns hooks off (disableAllHooks).} newer {This {provider} is newer than the version Combwork was tested with.} other {{after, select, start {None came after it started.} other {None came after a prompt it went to work on.}}}} Until its hooks arrive, Combwork types nothing into it. Restart the session; if this happens again, update Combwork, or check {provider}'s settings for hooks turned off.",
+    "Combwork isn't hearing from {provider}'s hooks, so its status may be wrong. {why, select, refused {Combwork refused its hooks: they didn't carry this session's token.} off {{where} turns hooks off (disableAllHooks).} managedOnly {Combwork found {setting} in {where}: only managed hooks run, and Combwork's aren't managed. An administrator can add them with Combwork's admin snippet.{also, select, yes { {alsoWhere} turns hooks off too, but not managed ones.} other {}}} blocked {Combwork found {setting} in {where}, and it doesn't let Combwork's hooks through. An administrator can add them (the admin snippet says how).} unreadable {Combwork couldn't read {where}, so it can't tell whether a setting there keeps them away. If an organisation allows only its own hooks there, an administrator can add Combwork's with the admin snippet.} partial {Its SessionStart hook arrives but no other: an admin snippet may name another port than Combwork's, or an allowlist blocks the others. Copy the admin snippet again.} org {Combwork found nothing on this computer that turns them off. If an organisation manages {provider}'s settings remotely, its policy may allow only its own hooks: an administrator can add Combwork's with the admin snippet.} newer {This {provider} is newer than the version Combwork was tested with.} other {{after, select, start {None came after it started.} other {None came after a prompt it went to work on.}}}}{remote, select, yes { An organisation's remote settings, if it has any, decide over what Combwork found here.} other {}} Until its hooks arrive, Combwork types nothing into it. Restart the session; if this happens again, update Combwork, or check {provider}'s settings for hooks turned off.",
   description:
-    "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). why: Combwork refused them (a security token didn't match); the settings file {where} (its name, such as \"managed settings\") turns hooks off (disableAllHooks is the setting's name: keep it); the coding agent is newer than the one Combwork was tested with; else what showed it (after: no hook after its start, or after a prompt). Keep the select keys."
+    "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). why: Combwork refused them (a security token didn't match); the settings file {where} (its name, such as \"Claude Code's managed settings file\") turns hooks off (disableAllHooks is the setting's name: keep it); managedOnly: the setting {setting} (allowManagedHooksOnly: keep it) was found in {where}, so only hooks an administrator manages run, and {alsoWhere} is another settings file; blocked: an allowlist setting {setting} (keep it) in {where} doesn't let Combwork's hooks through; unreadable: Combwork couldn't read the settings source {where}, so it can't tell what it holds; partial: only the SessionStart hook arrives (keep SessionStart), perhaps because an administrator's pasted snippet names another network port; org: nothing on this computer explains it, an organisation's remote policy might; newer: the coding agent is newer than the one Combwork was tested with; else what showed it (after: no hook after its start, or after a prompt). remote: a sentence that an organisation's remote settings decide over what was found locally. \"admin snippet\" is a block of settings Combwork gives an administrator to paste (the same words as the button that copies it). Keep the select keys."
+})
+
+/** A notice on an agent whose hooks arrive twice (HI-2777): its CLI runs Combwork's handlers and a differing admin snippet's. */
+export const HOOKS_DOUBLED_NOTE = msg({
+  id: 'panes.runtime.hooksDoubledNote',
+  defaultMessage:
+    "{provider} is sending Combwork each of its hooks twice: Combwork's own and an admin snippet's that no longer matches them (a hook timeout changed after it was pasted, or an older snippet). Tool calls and prompts are handled once; other hooks may count twice. Ask your administrator to paste Combwork's admin snippet again.",
+  description:
+    "A notice on an agent's pane and in Notifications: its coding agent ({provider}, a product name) sends each hook (the calls that tell Combwork what it is doing) twice, because an administrator's pasted settings (\"admin snippet\", a block of settings Combwork gives administrators) differ from Combwork's own. Keep \"admin snippet\" as the same words as the button that copies it."
 })
 
 /**

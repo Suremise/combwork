@@ -67,6 +67,7 @@
   "shell.command.help.restoreBoard09": "Restaurar o backup do quadro 0.9…",
   "shell.command.help.shortcuts": "Atalhos de teclado",
   "shell.command.help.tips": "Dicas…",
+  "shell.command.hooks.adminSnippet": "Trecho para administrador do Claude Code…",
   "shell.command.layout": "Layout: {layout}",
   "shell.command.mcp.import": "Copiar servidores MCP do projeto para o espaço de trabalho",
   "shell.command.notes.open": "Abrir nota compartilhada",

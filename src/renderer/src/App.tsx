@@ -8,6 +8,7 @@ import { call } from './api'
 import { playChime } from './chime'
 import { matchKeybinding, runCommand, runCommandAsync } from './commands'
 import { HooksDialog } from './components/HooksDialog'
+import { AdminSnippetDialog } from './components/AdminSnippetDialog'
 import { AboutDialog, AgentSetupDialog, DiagnosticsDialog, CommandPalette, CompactDialog, Dialogs, NotificationCenter, ProvidersBanner, QuitDialog, QuitPendingBanner, ShortcutsDialog } from './components/Overlays'
 import { ConnectionsIntroBanner, useProviderWarnings } from './components/ConnectionChoice'
 import { AddAgentDialog, AgentSettingsDialog, askWorkflowToolsRestart, HandOverDialog, MergeDialog, TemplateAgentDialog } from './components/AgentDialogs'
@@ -605,6 +606,7 @@ export function App() {
       <QuitDialog />
       <CompactDialog />
       <HooksDialog />
+      <AdminSnippetDialog />
       <MoveRepairDialog />
       <SetAsideDialog />
       <BoardUpgradeAsk />

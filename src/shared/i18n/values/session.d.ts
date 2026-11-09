@@ -114,6 +114,7 @@ interface CombworkMessageValues {
   'session.newConversation.pending': undefined
   'session.notice.finished': { agent: string | number }
   'session.notice.finishedBody': undefined
+  'session.notice.hooksDoubledTitle': { agent: string | number }
   'session.notice.hooksMissingTitle': { agent: string | number }
   'session.notice.lineLost': { text: string | number }
   'session.notice.lineLostTitle': { agent: string | number }

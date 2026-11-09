@@ -9,6 +9,7 @@
   "project.agents.settings": "Paramètres de l’agent…",
   "project.agents.turnedOff": "Le fournisseur {provider} est désactivé dans Paramètres → Fournisseurs",
   "project.apply.new": "{live, select, yes {Les modifications s’appliquent aux nouvelles sessions : redémarre la session en cours pour les appliquer.} other {Les modifications s’appliquent aux nouvelles sessions.}}",
+  "project.banner.adminSnippet": "Extrait administrateur…",
   "project.banner.change": "Modifier",
   "project.banner.chooseInSettings": "Choisir dans les Paramètres",
   "project.banner.connectionSetup": "Aucun compte {cli} n’est activé dans cet espace de travail : les agents de ce projet ne peuvent donc pas démarrer. Ajoutes-en un et connecte-le.",

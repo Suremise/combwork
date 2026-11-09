@@ -128,7 +128,10 @@ import { agentForToken, agentToken, agentTokenFile, onAgentTokenEnded, type Agen
 import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
-import { hookTokenMatches, refusedHookNote } from './hookTokens'
+import { hookTokenMatches, refusedHookNote, runForHookToken } from './hookTokens'
+import { carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
+import { fixedHookUrl, type ClaudeSnippetFacts } from '../shared/claudeHookHandlers'
+import { launchHookTimeouts } from './providers/claude/adapter'
 import { unusedWorktreeCounts } from './unusedWorktrees'
 import { devConsole, combworkSourceId, sessionSourceId } from './devConsole'
 import { consoleSources } from './devConsoleSources'
@@ -208,17 +211,49 @@ function send(res: ServerResponse, status: number, body: unknown, headers: Recor
 }
 
 // ---------------------------------------------------------------------------
-// Hook server: receives the agents' CLI hooks. Random port; ?run=<runId> names the launch, whose own token it needs.
+// Hook server: receives the agents' CLI hooks. Random port; ?run=<runId> names the launch, whose own token it needs. With
+// no run named, the token tells it (HI-2777). Claude Code's hooks post to the fixed hook URL on the Agent API's port
+// (serveFixedHook), where only the token tells the run.
 // ---------------------------------------------------------------------------
 
 let hookServer: http.Server | null = null
+
+/** How long a duplicate delivery waits for its first one's reply, or for the response carrying its context (HI-2777). */
+const TWIN_WAIT_MS = 15_000
+
+/** Whether the fixed hook URL's ignored calls were logged (once a run of Combwork). */
+let ignoredTold = false
+
+/**
+ * The fixed hook URL (HI-2777): `POST /hook` on the Agent API's port, the run told only by its hook token. A call with no
+ * token of a running launch of this Combwork (another Claude Code session on the PC, the other build's, an ended launch's)
+ * is answered 200 `{}` and nothing else happens: refusing it would show every session that isn't Combwork's a hook error.
+ * Never with a run named in the URL, never for an Agent API or viewer token.
+ */
+async function serveFixedHook(req: IncomingMessage, res: ServerResponse): Promise<void> {
+  // agent-protocol: the hook server answers a CLI hook, not an agent
+  if (req.method !== 'POST') return send(res, 404, { error: 'not found' })
+  const run = runForHookToken(req.headers.authorization)
+  if (!run) {
+    await readBody(req).catch(() => '')
+    if (!ignoredTold) {
+      ignoredTold = true
+      log.info("Ignored a call to the fixed hook URL that carried no hook token of a running launch (another Claude Code session's, or the other build's)")
+    }
+    if (!res.headersSent) send(res, 200, {})
+    return
+  }
+  return serveHook(req, res, run)
+}
 
 export async function startHookServer(): Promise<string> {
   hookServer = http.createServer(async (req, res) => {
     // agent-protocol: the hook server answers a CLI hook, not an agent
     if (req.method !== 'POST' || !req.url?.startsWith('/hook')) return send(res, 404, { error: 'not found' })
     const query = new URL(req.url, 'http://127.0.0.1').searchParams
-    const run = query.get('run')
+    const named = query.get('run')
+    // No run named: its token tells it (HI-2777: Claude Code's hooks when the Agent API isn't listening).
+    const run = named ?? runForHookToken(req.headers.authorization)
     // Only the launch's own token, while it runs (#345).
     if (!hookTokenMatches(run, req.headers.authorization)) {
       // The developer console (#636): a hook refused (an ended launch's, or a wrong token), in every workspace watched.
@@ -230,6 +265,21 @@ export async function startHookServer(): Promise<string> {
       // agent-protocol: the hook server answers a CLI hook, not an agent
       return send(res, 401, { error: 'unauthorized' })
     }
+    return serveHook(req, res, run!)
+  })
+  await new Promise<void>((resolve) => hookServer!.listen(0, '127.0.0.1', resolve))
+  const addr = hookServer.address()
+  const port = typeof addr === 'object' && addr ? addr.port : 0
+  sessions.hookUrl = `http://127.0.0.1:${port}/hook`
+  sessions.fixedHookUrl = () => (apiServer?.listening ? fixedHookUrl(apiPort()) : null)
+  log.info(`Hook server listening on ${sessions.hookUrl}`)
+  return sessions.hookUrl
+}
+
+/** A hook call of the launch `run`, its token checked: handled in the launch's order, answered with its reply. */
+async function serveHook(req: IncomingMessage, res: ServerResponse, run: string): Promise<void> {
+  const query = new URL(req.url ?? '/hook', 'http://127.0.0.1').searchParams
+  {
     // Tests lose every hook while the file CW_TEST_DROP_HOOKS names is there (#1371: a CLI whose hooks Combwork can't
     // stop at its end, Copilot), answered as if Combwork had taken them; unpackaged builds only.
     const drop = !app.isPackaged ? process.env.CW_TEST_DROP_HOOKS : undefined
@@ -242,6 +292,8 @@ export async function startHookServer(): Promise<string> {
     // a body Combwork can't read is recorded too.
     let obs: HookObservation | null = null
     let step = 'read'
+    // Its occurrence's first delivery (HI-2777), whose reply its duplicates are answered from: settled whatever happens.
+    let first: TwinEntry | null = null
     try {
       const raw = await readBody(req)
       let body: Record<string, any>
@@ -274,6 +326,17 @@ export async function startHookServer(): Promise<string> {
       // decides whose turn they are (#650: a notice of what is unread, or the drain carrying the turn on); other hooks
       // are answered at once so they never slow the agent down. Each is handled in the launch's order from when it came,
       // with its reply: the turn ledger learns what the Stop was told (#648).
+      // A delivery of an occurrence already taken (HI-2777: Claude Code ran both Combwork's and a differing admin snippet's
+      // handler): answered from the first one's reply, its decision always and its context only if no response carried it.
+      const claim = claimTwin(run, sessions.hookOccurrence(run, body), () => sessions.hooksDoubled(run))
+      if (claim && !claim.first) {
+        const twin = await claim.entry.twinReply(TWIN_WAIT_MS)
+        if (twin.carries) carrying(res, claim.entry)
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify(twin.reply ?? {}))
+        return
+      }
+      first = claim?.entry ?? null
       obs = sessions.observeHook(run, body)
       step = 'reply'
       const reply = sessions.hookReply(run, body)
@@ -285,6 +348,14 @@ export async function startHookServer(): Promise<string> {
         failed = { step: 'reply', error: e }
         return null
       })
+      if (first) {
+        first.computed(answer)
+        if (hasContext(answer)) {
+          first.sending()
+          carrying(res, first)
+        }
+        first = null
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify(answer ?? {}))
       await handled
@@ -296,15 +367,10 @@ export async function startHookServer(): Promise<string> {
       // agent-protocol: the hook server answers a CLI hook, not an agent
       if (!res.headersSent) send(res, 400, { error: 'bad request' })
     } finally {
+      first?.computed(null)
       done?.()
     }
-  })
-  await new Promise<void>((resolve) => hookServer!.listen(0, '127.0.0.1', resolve))
-  const addr = hookServer.address()
-  const port = typeof addr === 'object' && addr ? addr.port : 0
-  sessions.hookUrl = `http://127.0.0.1:${port}/hook`
-  log.info(`Hook server listening on ${sessions.hookUrl}`)
-  return sessions.hookUrl
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -407,6 +473,17 @@ function apiPort(): number {
   if (env > 0) return env
   const port = config.settings.agentApi.port
   return !app.isPackaged && port === DEFAULT_API_PORT ? port + 1 : port
+}
+
+/**
+ * What the Claude Code admin snippet is made from (HI-2777): this Combwork's Agent API port, the other build's default
+ * one (an installed app's 47821, a development build's 47822) and the hooks' timeouts as Settings → Advanced has them,
+ * so a snippet made now matches the handlers Combwork's launches pass.
+ */
+export function claudeSnippetFacts(): ClaudeSnippetFacts {
+  const port = apiPort()
+  const other = app.isPackaged ? DEFAULT_API_PORT + 1 : DEFAULT_API_PORT
+  return { port, otherPort: other === port ? null : other, packaged: app.isPackaged, listening: !!apiServer?.listening, timeouts: launchHookTimeouts() }
 }
 
 export function apiInfo(): AgentApiInfo {
@@ -4566,6 +4643,13 @@ async function handleApi(req: IncomingMessage, res: ServerResponse): Promise<voi
     if (m.authenticated && !m.skip && !m.route.startsWith('/v1/console')) captureApiCall(req, res, url, m, who, metricsClock.mono() - started)
   })
   const url = new URL(req.url ?? '/', 'http://127.0.0.1')
+  // The fixed hook URL (HI-2777): a CLI's hooks, on their own route, never the API's (no API token counts there, and a hook
+  // token counts nowhere else). Not in the API's metrics.
+  if (url.pathname === '/hook') {
+    m.authenticated = true
+    m.skip = true
+    return serveFixedHook(req, res)
+  }
   // Browsers must not be able to drive the API from a web page.
   if (req.headers.origin) return send(res, 403, { error: say(API.http.crossOrigin) })
   const enabled = config.settings.agentApi.enabled

@@ -160,8 +160,9 @@ interface CombworkMessageValues {
   'panes.resume.tip': { session: string | number; when: string | number }
   'panes.running.cards': { n: number }
   'panes.running.waitingFor': undefined
+  'panes.runtime.hooksDoubledNote': { provider: string | number }
   'panes.runtime.hooksMissing': { provider: string | number }
-  'panes.runtime.hooksMissingNote': { provider: string | number; why: string; where: string | number; after: string }
+  'panes.runtime.hooksMissingNote': { provider: string | number; why: string; where: string | number; setting: string | number; also: string; alsoWhere: string | number; after: string; remote: string }
   'panes.runtime.needsInput': undefined
   'panes.runtime.retrying': { why: string; status: string | number; provider: string | number; when: string; time: string | number; tries: string; attempt: number; max: number }
   'panes.runtime.signin': undefined

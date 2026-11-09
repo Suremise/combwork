@@ -2489,6 +2489,25 @@ export interface InboxSummary {
   overdue: number
 }
 
+/**
+ * What on the PC Combwork found that would keep its hooks from a CLI's sessions (HI-2777), for the warning when they
+ * don't arrive: a setting (its name, as the CLI has it) and where it was found (in the window's language). Only what is
+ * local: an organisation's remote settings, when it has them, decide over it.
+ */
+export interface HookCause {
+  /**
+   * off: hooks turned off (disableAllHooks); managedOnly: managed settings allow only their own; blocked: an HTTP hook
+   * allowlist; unreadable: a source Combwork couldn't read (`where`), so it can't tell.
+   */
+  why: 'off' | 'managedOnly' | 'blocked' | 'unreadable'
+  setting: string
+  where: string
+  /** Whether the admin snippet would help (not when managed settings turn every hook off). */
+  snippet: boolean
+  /** managedOnly: a scope below that turns hooks off too (it doesn't stop managed hooks). */
+  also?: string
+}
+
 /** LiveSessionState.hooksMissing (#1336): since when, what showed it, and why when Combwork can tell. */
 export interface HooksMissing {
   since: string
@@ -2496,9 +2515,21 @@ export interface HooksMissing {
   after: 'start' | 'prompt' | 'transcript'
   /** transcript: the turn that showed it, by the transcript's id for it (Claude Code's promptId, Codex's turn_id, Copilot's interactionId). */
   turn?: string
-  why?: 'refused' | 'off' | 'newer'
-  /** off: the settings that turn them off, as the CLI's adapter names them. */
+  /**
+   * refused: wrong token; off, managedOnly, blocked: a setting found on the PC (HI-2777: setting, offIn); unreadable: a
+   * settings source Combwork couldn't read (offIn), so it can't tell; partial: its
+   * SessionStart came but no other hook (an admin snippet naming another port, or an allowlist); org: nothing local
+   * explains hooks absent from the start (an organisation's remote policy may); newer: an untested CLI.
+   */
+  why?: 'refused' | 'off' | 'newer' | 'managedOnly' | 'blocked' | 'unreadable' | 'partial' | 'org'
+  /** off, managedOnly, blocked: the setting's name (HI-2777). */
+  setting?: string
+  /** Whether the admin snippet would help (HI-2777): the warning offers it. */
+  snippet?: boolean
+  /** off, managedOnly, blocked: where the setting was found, as the CLI's adapter names it. */
   offIn?: string
+  /** managedOnly: a scope below that turns hooks off too, which doesn't stop managed hooks (HI-2777). */
+  also?: string
 }
 
 /**
@@ -2684,6 +2715,11 @@ export interface LiveSessionState {
    * refused its hooks (their token), its settings turn hooks off (`offIn`: where), or it is newer than Combwork was tested with.
    */
   hooksMissing?: HooksMissing
+  /**
+   * Its hooks arrive twice (HI-2777): its CLI runs Combwork's handlers and an admin snippet's that differ. Tool calls and
+   * prompts are handled once; the user is told to copy the snippet again.
+   */
+  hooksDoubled?: boolean
   /**
    * Its deliveries (#647: messages left for it, main/deliveries.ts) not received yet, and how many are overdue; shown in
    * its pane ("✉ 2 unread"), where the user can cancel those waiting. Absent when there are none.
@@ -3662,6 +3698,11 @@ export interface AgentInstallInfo {
   source: string | null
   latestVersion: string | null
   updateAvailable: boolean
+  /**
+   * It stayed on `version` after an update offering `offered` (HI-2777): an organisation's policy may decide its version
+   * or channel. Tentative: the update stays available, and Provider Setup says so in place of its usual offer.
+   */
+  updateStayed?: { version: string; offered: string }
   /** An explicit retry offered after a known update failure; never run automatically. */
   updateRetry?: ProviderUpdateRetry
   loggedIn: boolean | null

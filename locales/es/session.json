@@ -112,6 +112,7 @@
   "session.newConversation.pending": "Acaba de recibir un prompt que su CLI todavía no ha tomado.",
   "session.notice.finished": "{agent} terminó",
   "session.notice.finishedBody": "El agente terminó su tarea.",
+  "session.notice.hooksDoubledTitle": "Los hooks de {agent} llegan dos veces",
   "session.notice.hooksMissingTitle": "Combwork no recibe los hooks de {agent}",
   "session.notice.lineLost": "Una pantalla de su CLI la tomó antes de enviarse. Vuelve a enviarla si aún hace falta: {text}",
   "session.notice.lineLostTitle": "{agent} no recibió una línea que escribió Combwork",

@@ -151,6 +151,8 @@ interface CombworkMessageValues {
   'tips.cardWork.title': undefined
   'tips.chooseConnections.text': undefined
   'tips.chooseConnections.title': undefined
+  'tips.claudeManagedPolicy.text': undefined
+  'tips.claudeManagedPolicy.title': undefined
   'tips.claudeStatusLine.text': undefined
   'tips.claudeStatusLine.title': undefined
   'tips.cliOverrides.text': undefined

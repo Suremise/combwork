@@ -112,6 +112,7 @@
   "session.newConversation.pending": "它的 CLI 尚未接收刚刚给它的提示词。",
   "session.notice.finished": "{agent} 已结束",
   "session.notice.finishedBody": "智能体已结束工作。",
+  "session.notice.hooksDoubledTitle": "{agent} 的钩子到达了两次",
   "session.notice.hooksMissingTitle": "Combwork 没有收到 {agent} 的钩子",
   "session.notice.lineLost": "它的 CLI 的一个界面在发送前接走了这一行。如果仍然需要，请再发送一次：{text}",
   "session.notice.lineLostTitle": "{agent} 没有收到 Combwork 输入的一行内容",

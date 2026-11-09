@@ -67,6 +67,7 @@
   "shell.command.help.restoreBoard09": "0.9のボードのバックアップを復元…",
   "shell.command.help.shortcuts": "キーボードショートカット",
   "shell.command.help.tips": "ヒント…",
+  "shell.command.hooks.adminSnippet": "Claude Code 管理者用スニペット…",
   "shell.command.layout": "レイアウト：{layout}",
   "shell.command.mcp.import": "プロジェクトのMCPサーバーをワークスペースにコピー",
   "shell.command.notes.open": "共有ノートを開く",

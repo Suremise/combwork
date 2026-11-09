@@ -451,6 +451,10 @@
     "defaultMessage": "The agent has finished its task.",
     "description": "The notification that an agent finished, when it left no last message to show."
   },
+  "session.notice.hooksDoubledTitle": {
+    "defaultMessage": "{agent}'s hooks arrive twice",
+    "description": "A notification's title: an agent's coding agent sends Combwork each of its hooks twice (the calls that tell Combwork what it is doing). {agent} is the agent."
+  },
   "session.notice.hooksMissingTitle": {
     "defaultMessage": "Combwork isn't hearing from {agent}'s hooks",
     "description": "A notification's title: an agent's coding agent has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). {agent} is the agent."
