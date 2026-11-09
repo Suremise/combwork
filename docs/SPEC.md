@@ -2187,6 +2187,17 @@ What the Version Control tab, the Git view, the branch cards, Compare and the Me
   operation only when listed, and main refuses one that isn't, with the reason. Git lists every operation it has today;
   None lists none (Initialise repository stays on Git's page, where HI-1905 put it).
 
+R2 (HI-2785) built the reads as `src/main/platform/repoReads.ts` (`RepoReads`, the contract: types only, its members in
+platform words, the view types keeping their Git names for the window's Git text), Git's `gitRepoReads.ts` (each member
+the function its callers called before, in `gitRepo.ts`, `gitCompare.ts`, `branchWatch.ts` and `branchMerge.ts`, called
+through the module) and `repoReadsPorts.ts` (`repoReadsOf(platform)`; `lineRepoReads()` for the window's calls, which
+don't carry the project's platform yet and read the folder whatever it is, as before: R9 routes them by platform).
+`ipc.ts`'s reads (the summary, Branches & remotes, the leftovers, History, Compare and its diff, a line's drops and
+update plan, a remote's tracking lines, New branch…'s start points and name check, the missing targets, the Merge
+dialog's lines and status) and Start the next version's go through it (the import rule in
+`tests/repoReadsImports.test.ts`); `tests/repoReadTraces.test.ts` holds their git commands and answers, errors included,
+to those recorded before. The branch watcher's own refresh stays inside Git's implementation; the mutations are R3's.
+
 **Invariants:**
 - **R5.1** Every guard on a mutation stays the same guard with the same words: a dirty folder, a line checked out
   elsewhere, a subfolder of a larger repository, a branch named like another but for case, the repository lock and

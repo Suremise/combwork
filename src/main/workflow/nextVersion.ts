@@ -10,7 +10,8 @@
 // and while nothing uses it; when it can't be, the error says what was left.
 
 import { CombworkError, combworkError, errorText } from '../combworkError'
-import { makeBranchAt, removeMadeBranch, resolveStart, type MadeBranchKept } from '../gitRepo'
+import { makeBranchAt, removeMadeBranch, type MadeBranchKept } from '../gitRepo'
+import { lineRepoReads } from '../platform/repoReadsPorts'
 import { withFolderRepoLocks } from '../platform/repoPorts'
 import { createLogger, userText } from '../logger'
 import { msg } from '../../shared/i18n/msg'
@@ -52,7 +53,7 @@ export async function nextVersionPlan(ws: WorkspaceService, projectPath: string)
   if (form.platform !== 'git') throw new CombworkError(M.notGit, { kind: 'invalid' })
   const from = (await projectTargets(ws, projectPath))?.default ?? ''
   // The release as its local branch (HR1's round 1, finding 2): a tag of the same name is never its head.
-  const found = from ? await resolveStart(projectPath, from) : null
+  const found = from ? await lineRepoReads().resolveStart(projectPath, from) : null
   const start = found?.kind === 'branch' ? found : null
   const name = nextVersionName(from) ?? ''
   return { from, start, name, base: { preset: form.preset, options: form.own }, listed: (form.options.otherTargets ?? []).includes(from), retarget: name && from ? await previewFor(ws, projectPath, from, name) : null }
@@ -95,7 +96,7 @@ async function startLocked(ws: WorkspaceService, projectPath: string, a: Paramet
   const listed = others.includes(release)
   const otherTargets = [...new Set([...others, release])].filter((b) => b !== name)
   // Work merges into's own branch, never a tag of its name; made with the caller's authority checked right before git.
-  if ((await resolveStart(projectPath, release))?.kind !== 'branch') throw combworkError(M.notBranch, { from: release }, { kind: 'invalid' })
+  if ((await lineRepoReads().resolveStart(projectPath, release))?.kind !== 'branch') throw combworkError(M.notBranch, { from: release }, { kind: 'invalid' })
   const start: ResolvedStart = await makeBranchAt(projectPath, name, from, a.check)
   let saved: WorkflowForm
   try {
