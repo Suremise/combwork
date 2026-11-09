@@ -2283,8 +2283,8 @@ becomes the port's Git implementation.
 | 3 Evidence | `platform/gitPlatform.ts`'s own reads (Git's adapter: its reconciliation, attribution and the watcher go through the ports since R6) | Composed over `HistoryPort` | R9 |
 | 3 Evidence | `shared/workflow/guards.ts` `submit.trailer`, `submit.identity` commands | The remedy from `HistoryPort` | R9 |
 | 4 Integration | `workflow/mergeQueue.ts` candidate steps (prepare, reset, clean, merge, squash, rebase, conflicts, commit, `refs/cw/queue` pins) | `IntegrationPort.update` (strict's) and `candidate` (the test merge, sameness in it), `mergeBase` (moved: HI-2790's R7) | R7 |
-| 4 Integration | `queueControls.ts`' reads (forwarding counts, a paused condition read again), `queueHost.ts`' pin clean-up (`dropQueuePin`, `prunePins`) and the test merge's branch messages (`G.messages`) and identity reads in `mergeQueue.ts` (not moved by R7) | The integration port (with the advance's conditions) and `HistoryPort` | R8 |
-| 4 Integration | `mergeQueue.ts` advance, journal, rollback, recovery, push; `queueRunner.ts`, `queueHost.ts` | `IntegrationPort.advance`, `recover`, `publish`; the state machine stays common | R8 |
+| 4 Integration | `mergeQueue.ts` advance, journal, rollback, recovery, push; `queueRunner.ts`, `queueHost.ts` | The port's granular steps (moved: HI-2791's R8): `checkouts`, `swap`, `conditions`, `moveFiles`, `edited`, `sides`, `stuck`, `folderLine`, `targetHead`, `recoveryState`, `contains`, `pushDest`, `push`; the host's and runner's `dropQueuePins`, `cardPins`, `dropPin`, `removeWorkspace`, `pruneWorkspaces`; Resume's `pausedCondition` (`queueControls.ts`). The journal, the decisions, the lock, the fence, the lease checks, the crash hooks and the pauses stay common | R8 |
+| 4 Integration | Not moved by R7/R8: `queueControls.ts`' forwarding and default-target reads (`G.lineHead`, `G.defaultBranch`, `G.isAncestor`, `G.mergeBase`, `rev-list --count`), and `mergeQueue.ts`' step reads (`G.gitStep`, `G.lineHeadAndTree`, `G.contains`, `G.identity`, `G.messages`); host-level port calls with no card (`queueIntegration()`) | `HistoryPort` and the integration port, routed by the project's platform | R9 |
 | 5 Operations | `gitRepo.ts` reads, `gitCompare.ts`, `branchWatch.ts` | `RepoReads` (Git: stays) | R2 |
 | 5 Operations | `gitRepo.ts` mutations, `gitInit.ts`, `branchMerge.ts`, `worktrees.ts` `mergeWorktree`, their IPC and renderer dispatch | `RepoOps`, gated by the descriptor's operations | R3 |
 | Workflow facade | `platform/adapter.ts` `PlatformAdapter`, `gitPlatform.ts`, `nonePlatform.ts`, `none.ts` | Unchanged contract, composed over ports 1–4 | R6–R9 |
@@ -2302,7 +2302,14 @@ from `historyPorts.ts`, `historyOf(platform)` null for None. R7 built port 4's c
 strict's update its own `update`, both given the queue's side as a `CandidateHost` (its runner in the lease's job, the
 queue's worktree, the identity and a round's reads) and answering `Again`, a result, a `CandidateFail` or a
 `CandidatePause`; the message is a callback read once the workspace is ready, as before; `inspectCandidate` is the
-sameness check inside them; Git's commits' stream reading moved with them to `platform/gitCommits.ts`):
+sameness check inside them; Git's commits' stream reading moved with them to `platform/gitCommits.ts`. R8 built the
+advance, recovery and publish half as granular steps rather than `advance`/`recover`/`publish` whole: each journal phase
+fact is committed between two of the platform's commands, with the lease checked and the crash hooks run in between, so a
+whole-operation port would have to take the protocol as callbacks. The protocol (the journal, the decision tree, the
+repository lock and folder fence, `stillHolds` just before each step that touches the repository, settle-in-lock, the
+owed push's bookkeeping and every pause) stays in `mergeQueue.ts`; the port's steps are typed (`swap` → whether it
+swapped, `conditions` → `Again`, a pause, `retest` or the files, `recoveryState` → §16.9.2's row, `push` → pushed,
+rejected or failed). The further outcomes above (`divergentChange` …) are the J cards'):
 
 ```ts
 interface RepoContext { platform: PlatformId; store: string; workspace: string; root: string; folder: string; subfolder?: boolean }

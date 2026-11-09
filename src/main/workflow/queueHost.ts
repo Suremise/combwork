@@ -19,6 +19,7 @@
 // A host that finds another Combwork running its target watches that runner's process (#1455, S50): once it is gone, with
 // entries still open, the host runs again here and takes the lease over (the runner's own rule: only a gone process).
 
+import { queueIntegration } from '../platform/integrationPorts'
 import { basename, join } from 'path'
 import { app } from 'electron'
 import { detect } from '../platform/registry'
@@ -408,11 +409,8 @@ async function pauseForRulesOff(wf: Workflow, q: MergeQueue, target: string): Pr
 
 /** A card's test merge's ref (`refs/cw/queue/<key>`), once its entry has an outcome. */
 async function dropQueuePin(projectPath: string, cardKey: string): Promise<void> {
-  const key = cardKey.replace(/[^A-Za-z0-9._-]/g, '-')
-  await git(projectPath, ['update-ref', '-d', `refs/cw/queue/${key}`])
-  // Its entries' strict updates (#1352: `refs/cw/queue/<entry>`, `AM-12/e7` as `AM-12-e7`).
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', `refs/cw/queue/${key}-e*`])
-  for (const ref of r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []) await git(projectPath, ['update-ref', '-d', ref])
+  // Its entries' strict updates too (#1352: `refs/cw/queue/<entry>`, `AM-12/e7` as `AM-12-e7`): the port's (HI-2791).
+  await queueIntegration().dropQueuePins(projectPath, cardKey)
 }
 
 /**
@@ -420,14 +418,13 @@ async function dropQueuePin(projectPath: string, cardKey: string): Promise<void>
  * removed. A pin keeps what was reviewed until its card is archived.
  */
 export async function prunePins(wf: Workflow, projectPath: string): Promise<void> {
-  const r = await git(projectPath, ['for-each-ref', '--format=%(refname)', 'refs/cw/cards/'])
-  if (!r.ok) return
-  const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/cw\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
-  for (const key of keys) {
+  const I = queueIntegration()
+  const pins = await I.cardPins(projectPath)
+  if (!pins) return
+  for (const [key, refs] of pins) {
     const card = wf.store.cardByKey(key)
     if (card && !wf.store.isArchived(card.id)) continue
-    const refs = r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(`refs/cw/cards/${key}/`))
-    for (const ref of refs) await git(projectPath, ['update-ref', '-d', ref])
+    for (const ref of refs) await I.dropPin(projectPath, ref)
   }
 }
 

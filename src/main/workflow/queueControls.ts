@@ -10,6 +10,7 @@
 // whose cause Combwork can see (§16.9.2's conditions, the rules off, a process or folder of an earlier runner) is checked
 // first, and paused again, saying so, when it still holds.
 
+import { queueIntegration } from '../platform/integrationPorts'
 import { app } from 'electron'
 import { CombworkError } from '../combworkError'
 import { fmt, msg, tr } from '../../shared/i18n'
@@ -529,18 +530,9 @@ async function stillPaused(ws: WorkspaceService, wf: Workflow, projectPath: stri
       return (await ws.projectConfig(projectPath).catch(() => null))?.workflow?.mergeAsk && !wf.store.meta(MERGE_CHOICE_KEY) ? {} : null
     case 'wrongBranch':
     case 'staged':
-    case 'unstagedChanges': {
-      const where = await G.checkouts(projectPath)
-      if (isUnknown(where)) return {}
-      const folder = where[target]
-      if (!folder) return null
-      if (p.reason === 'wrongBranch') return (await G.branch(folder)) === target ? null : {}
-      if (p.reason === 'staged') return (await git(folder, ['diff', '--cached', '--quiet'])).code === 0 ? null : {}
-      if (!p.files?.length) return null
-      const st = await git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...p.files])
-      const busy = st.out.split('\0').filter(Boolean).map((l) => l.slice(3))
-      return !st.ok || busy.length ? { files: busy.length ? busy : p.files } : null
-    }
+    case 'unstagedChanges':
+      // The checked-out target's condition read again (HI-2791: the port's).
+      return queueIntegration().pausedCondition(projectPath, target, p.reason, p.files)
     case 'needsYou': {
       // An earlier runner's process or folder (#1360): the next runner settles it again, and pauses again if it can't.
       if (!p.card) return (p.pid && processAlive(p.pid)) || (p.files?.[0] && existsSync(p.files[0])) ? {} : null

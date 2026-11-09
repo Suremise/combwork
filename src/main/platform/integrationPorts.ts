@@ -18,3 +18,13 @@ export function integrationFor(platform: PlatformId): IntegrationPort {
   if (!p) throw new Error(`No integration port for ${platform}`) // i18n-ignore: an internal error, for the log
   return p
 }
+
+/**
+ * The integration port of the platform whose projects have a merge queue, for the queue's work that no card names: the
+ * owed push of a target, the host's pin clean-up, the runner's workspace removal, Resume's condition reads (1.4.0 has one
+ * such platform; SPEC §16.3.6's type map lists these against R9, which routes them by the project's platform). A None
+ * project's leftover Git entries (#1419) are Git's, as before; None never becomes a platform with integration.
+ */
+export function queueIntegration(): IntegrationPort {
+  return gitIntegration
+}
