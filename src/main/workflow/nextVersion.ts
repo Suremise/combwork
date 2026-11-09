@@ -29,6 +29,7 @@ const log = createLogger('nextVersion')
 const M = {
   notGit: msg({ id: 'service.nextVersion.notGit', defaultMessage: 'Start the next version needs a project using Git.', description: 'HI-2807: Start the next version refused: the project’s version control isn’t Git. Start the next version is an action’s name: as translated there.' }),
   noName: msg({ id: 'service.nextVersion.noName', defaultMessage: 'Name the next version’s branch: {from} doesn’t read as a version to propose one from.', description: 'HI-2807: Start the next version refused: no name was given, and the release branch {from} isn’t a version number (1.3.0), so none could be proposed.' }),
+  notBranch: msg({ id: 'service.nextVersion.notBranch', defaultMessage: '{from} isn’t a branch in this repository, so nothing can start from it.', description: 'HI-2807: Start the next version refused: the project’s Work merges into, {from}, isn’t a local branch (a tag of that name doesn’t count).' }),
   sameName: msg({ id: 'service.nextVersion.sameName', defaultMessage: 'The next version needs a branch of its own, not {from}.', description: 'HI-2807: Start the next version refused: the name given is the release branch’s own, {from}.' }),
   movedOn: msg({ id: 'service.nextVersion.movedOn', defaultMessage: 'Work merges into is {now} now, not {from}, so nothing was changed: look again.', description: 'HI-2807: Start the next version refused: the project’s Work merges into (an option’s name: as translated there) changed from {from} to {now} since the dialog opened.' }),
   partial: msg({ id: 'service.nextVersion.partial', defaultMessage: 'Created {name} at {commit}, but the workflow options weren’t saved: {why} {name} was kept ({kept, select, moved {it has moved since} worktree {it is checked out} inUse {it is in use} gone {it is gone} other {it couldn’t be removed}}): delete it in Version Control if it isn’t wanted.', description: 'HI-2807: Start the next version made the branch {name} (at {commit}, a short hash) but saving the options failed ({why}, a sentence), and the branch couldn’t be removed again, for the reason {kept} (keep the select keys).' })
@@ -50,7 +51,9 @@ export async function nextVersionPlan(ws: WorkspaceService, projectPath: string)
   const form = await workflowForm(ws, projectPath)
   if (form.platform !== 'git') throw new CombworkError(M.notGit, { kind: 'invalid' })
   const from = (await projectTargets(ws, projectPath))?.default ?? ''
-  const start = from ? await resolveStart(projectPath, from) : null
+  // The release as its local branch (HR1's round 1, finding 2): a tag of the same name is never its head.
+  const found = from ? await resolveStart(projectPath, from) : null
+  const start = found?.kind === 'branch' ? found : null
   const name = nextVersionName(from) ?? ''
   return { from, start, name, base: { preset: form.preset, options: form.own }, listed: (form.options.otherTargets ?? []).includes(from), retarget: name && from ? await previewFor(ws, projectPath, from, name) : null }
 }
@@ -91,7 +94,9 @@ async function startLocked(ws: WorkspaceService, projectPath: string, a: Paramet
   const others = form.options.otherTargets ?? []
   const listed = others.includes(release)
   const otherTargets = [...new Set([...others, release])].filter((b) => b !== name)
-  const start: ResolvedStart = await makeBranchAt(projectPath, name, from)
+  // Work merges into's own branch, never a tag of its name; made with the caller's authority checked right before git.
+  if ((await resolveStart(projectPath, release))?.kind !== 'branch') throw combworkError(M.notBranch, { from: release }, { kind: 'invalid' })
+  const start: ResolvedStart = await makeBranchAt(projectPath, name, from, a.check)
   let saved: WorkflowForm
   try {
     saved = await saveWorkflowOptions(ws, projectPath, { preset: base.preset, options: { ...base.options, target: name, otherTargets }, base }, { ...(a.check ? { check: a.check } : {}) })

@@ -610,7 +610,7 @@ async function undoBranch(ws: WorkspaceService, c: RecordedChange, guard: Guard)
               const t = await projectTargets(ws, projectPath).catch(() => null)
               if (t?.default === name || t?.others.includes(name)) return 'target'
               return (await referencesTo(ws, projectPath, name, slots)).length ? 'card' : null
-            })
+            }, guard)
             if (r.removed) return { undone: ['branch'], skipped: [] }
             if (r.why === 'gone') return goneAll(['branch'])
             if (r.why === 'failed') return failedAll(['branch'], new Error(r.error))

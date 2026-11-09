@@ -234,6 +234,7 @@
   "service.nameUpgrade.profileFailed": "O Combwork não conseguiu converter {files} dos nomes antigos para os do Combwork: outro programa pode {n, plural, one {estar com ele aberto} other {estar com eles abertos}}. Feche esse programa e inicie o Combwork novamente. Nada foi alterado.",
   "service.nextVersion.movedOn": "O trabalho agora é mesclado em {now}, não em {from}, então nada foi alterado: olhe de novo.",
   "service.nextVersion.noName": "Dê um nome ao branch da próxima versão: {from} não parece uma versão a partir da qual propor um.",
+  "service.nextVersion.notBranch": "{from} não é um branch neste repositório, então nada pode começar a partir dele.",
   "service.nextVersion.notGit": "Iniciar a próxima versão precisa de um projeto que use Git.",
   "service.nextVersion.partial": "Branch {name} criado em {commit}, mas as opções do fluxo de trabalho não foram salvas: {why} {name} foi mantido ({kept, select, moved {ele mudou desde então} worktree {ele está em checkout} inUse {ele está em uso} gone {ele não existe mais} other {não foi possível removê-lo}}): exclua-o em Controle de versão se não quiser.",
   "service.nextVersion.sameName": "A próxima versão precisa de um branch próprio, não {from}.",

@@ -234,6 +234,7 @@
   "service.nameUpgrade.profileFailed": "Combwork n’a pas pu convertir {files} des anciens noms vers ceux de Combwork : un autre programme {n, plural, one {l’a peut-être ouvert} other {les a peut-être ouverts}}. Fermez ce programme et redémarrez Combwork. Rien n’a été modifié.",
   "service.nextVersion.movedOn": "Le travail est maintenant fusionné dans {now}, pas dans {from}, donc rien n’a été changé : regarde à nouveau.",
   "service.nextVersion.noName": "Nomme la branche de la prochaine version : {from} ne ressemble pas à une version d’après laquelle en proposer une.",
+  "service.nextVersion.notBranch": "{from} n’est pas une branche de ce dépôt, donc rien ne peut en partir.",
   "service.nextVersion.notGit": "Démarrer la prochaine version demande un projet sous Git.",
   "service.nextVersion.partial": "Branche {name} créée sur {commit}, mais les options du workflow n’ont pas été enregistrées : {why} {name} a été gardée ({kept, select, moved {elle a bougé depuis} worktree {elle est extraite} inUse {elle est utilisée} gone {elle n’existe plus} other {elle n’a pas pu être retirée}}) : supprime-la dans Gestion de versions si tu n’en veux pas.",
   "service.nextVersion.sameName": "La prochaine version a besoin de sa propre branche, pas de {from}.",

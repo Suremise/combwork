@@ -2501,7 +2501,12 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   two options as setting changes and the branch as a `setting` change whose target is `branch:<name>` (the board's
   change kinds are fixed by its schema, which older Combworks read), undone only while the branch is still at its
   commit and nothing uses it, G7b, a lane, a slot or a card included (`undoBranch`, in the repository lock, the turn of
-  workflow writes, the lanes' lock and the board's write); else kept, as changed.
+  workflow writes, the lanes' lock and the board's write); else kept, as changed. The Assistant's authority is checked
+  again right before each git change, after the reads before it (`makeBranchAt`'s and `removeMadeBranch`'s guard): its
+  refusal creates nothing, and stops an undo, deleting nothing; a rollback of its own change passes none. A start point
+  is resolved by the ref its kind names (a branch first, then a tag, then a remote branch), never git's precedence for a
+  bare name, which prefers a tag; the release is always its local branch. The missing-target check runs before either way
+  a save goes, the merge choice's included.
 - A ruleset can't run arbitrary code: pieces are looked up by id, and an unknown id or parameter refuses to compile
   (a ruleset from a newer Combwork opens read-only, like `combwork.db`, §4) [#1112 D].
 

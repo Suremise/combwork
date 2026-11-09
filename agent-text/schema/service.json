@@ -813,6 +813,11 @@
       "from": "plain"
     }
   },
+  "service.nextVersion.notBranch": {
+    "placeholders": {
+      "from": "plain"
+    }
+  },
   "service.nextVersion.notGit": {
     "placeholders": {}
   },

@@ -31,6 +31,8 @@ const changes = await import('../src/main/assistantChanges')
 const control = await import('../src/main/assistantControl')
 const { userUndo } = await import('../src/main/assistantUndo')
 const { isVersionBranch, nextVersionName, branchStartArg } = await import('../src/shared/nextVersion')
+const { gitTestHooks } = await import('../src/main/git')
+const { undoChanges } = await import('../src/main/assistantUndo')
 
 vi.setConfig({ testTimeout: 60_000 })
 
@@ -203,8 +205,9 @@ describe('Start the next version (HI-2807)', () => {
         from: { ref: plan.from, commit: plan.start!.commit },
         base: plan.base,
         check: () => {
-          // The authority check at the save's write: the first at the start passes; at the write, the branch is moved and it refuses.
-          if (++calls < 2) return
+          // The authority checks at the start and right before git makes the branch pass; at the save's write, the branch
+          // is moved and it refuses.
+          if (++calls < 3) return
           advance(repo, '1.4.0')
           throw new Error('Control turned down')
         }
@@ -277,5 +280,85 @@ describe('the Assistant’s undo of a branch it made (HI-2807)', () => {
     const [moved] = await userUndo(w, { group: g3 })
     expect(moved.skipped).toEqual([{ field: 'branch', why: 'changed' }])
     expect(hasBranch(repo, '1.6.0')).toBe(true)
+  })
+})
+
+describe('HR1’s round 1 (HI-2807)', () => {
+  it('resolves a name both a branch and a tag have as the branch, at the branch’s own head; the release is its branch', async () => {
+    const { w, repo } = await project()
+    sh(repo, 'tag', '1.3.0', 'v1.2.0')
+    const actual = advance(repo, '1.3.0')
+    const r = await inWorkspace(w, () => gitRepoMod.resolveStart(repo, '1.3.0'))
+    expect(r).toMatchObject({ kind: 'branch', commit: actual })
+    expect((await inWorkspace(w, () => gitRepoMod.resolveStart(repo, 'tags/1.3.0')))?.commit).toBe(head(repo, 'v1.2.0^{commit}'))
+    const plan = await inWorkspace(w, () => nv.nextVersionPlan(w, repo))
+    expect(plan.start?.commit).toBe(actual)
+    await inWorkspace(w, () => nv.startNextVersion(w, repo, { from: { ref: plan.from, commit: plan.start!.commit }, base: plan.base }))
+    expect(head(repo, '1.4.0')).toBe(actual)
+  })
+
+  it('refuses a missing target when the save also records the merge choice', async () => {
+    const { w, repo } = await project()
+    await w.mutateProjectConfig(repo, (c) => ({ workflow: { ...c.workflow!, mergeAsk: true } }))
+    const style = pair.style === 'merge' ? 'squash' : 'merge'
+    await expect(inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, style, target: '9.9.9', otherTargets: ['main', '1.3.0'] } }))).rejects.toThrow(/9\.9\.9 doesn’t exist/)
+    expect((await options(w, repo)).target).toBe('1.3.0')
+  })
+
+  it('creates no branch once the authority is withdrawn during the reads before it: Start the next version, and a branch of its own', async () => {
+    const { w, repo } = await project()
+    let revoked = false
+    const made: string[][] = []
+    gitTestHooks.started = (_cwd, args) => {
+      if (args[0] === 'show') revoked = true
+      if (revoked && args[0] === 'update-ref' && args[1] === '-m') made.push([...args])
+    }
+    const guard = (): void => {
+      if (revoked) throw new Error('authority revoked')
+    }
+    try {
+      await expect(inWorkspace(w, () => nv.startNextVersion(w, repo, { check: guard }))).rejects.toThrow(/authority revoked/)
+      expect(revoked).toBe(true)
+      revoked = false
+      await expect(inWorkspace(w, () => gitRepoMod.makeBranchAt(repo, 'own', { ref: '1.3.0', commit: '' }, guard))).rejects.toThrow(/authority revoked/)
+      expect(revoked).toBe(true)
+      expect(made).toEqual([])
+    } finally {
+      gitTestHooks.started = undefined
+    }
+    expect(hasBranch(repo, '1.4.0') || hasBranch(repo, 'own')).toBe(false)
+    expect((await options(w, repo)).target).toBe('1.3.0')
+  })
+
+  it('stops the Assistant’s undo, deleting nothing, once its authority is withdrawn during the reads before the delete', async () => {
+    const { w, repo, ws } = await project()
+    await control.newAssistantToken(ws)
+    control.newTurn(ws)
+    const group = control.currentTurn(ws).id
+    await changes.recordingChanges(ws, 'create-branch', 'create undo-probe', () =>
+      inWorkspace(w, async () => {
+        const s = await gitRepoMod.makeBranchAt(repo, 'undo-probe', { ref: '1.3.0', commit: '' })
+        await changes.noteChange(w, changes.branchChange('p', 'undo-probe', s.commit))
+      })
+    )
+    let revoked = false
+    const deletes: string[][] = []
+    gitTestHooks.started = (_cwd, args) => {
+      if (args[0] === 'worktree' && args[1] === 'list') revoked = true
+      if (revoked && args[0] === 'update-ref' && args[1] === '-d') deletes.push([...args])
+    }
+    try {
+      await expect(inWorkspace(w, () => undoChanges(w, { group }, 'assistant', () => {
+        if (revoked) throw new Error('authority revoked')
+      }))).rejects.toThrow(/authority revoked/)
+      expect(revoked).toBe(true)
+      expect(deletes).toEqual([])
+    } finally {
+      gitTestHooks.started = undefined
+    }
+    expect(hasBranch(repo, 'undo-probe')).toBe(true)
+    // Not marked undone: the user can still undo it.
+    const [r] = await userUndo(w, { group })
+    expect(r).toMatchObject({ undone: ['branch'] })
   })
 })

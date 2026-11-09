@@ -234,6 +234,7 @@
   "service.nameUpgrade.profileFailed": "Combwork 无法将 {files} 从旧名称转换为 Combwork 的名称：可能有其他程序{n, plural, other {正在打开它}}。请关闭该程序，然后重新启动 Combwork。没有任何更改。",
   "service.nextVersion.movedOn": "工作现在合并到 {now}，而不是 {from}，因此未做任何更改：请重新查看。",
   "service.nextVersion.noName": "请为下一个版本的分支命名：{from} 看起来不像版本号，无法据此推荐名称。",
+  "service.nextVersion.notBranch": "{from} 不是此仓库中的分支，因此无法从它开始。",
   "service.nextVersion.notGit": "“开始下一个版本”需要使用 Git 的项目。",
   "service.nextVersion.partial": "已在 {commit} 处创建 {name}，但工作流选项未保存：{why} {name} 已保留（{kept, select, moved {它之后已移动} worktree {它已被检出} inUse {它正在使用} gone {它已不存在} other {无法删除它}}）：如不需要，请在版本控制中删除。",
   "service.nextVersion.sameName": "下一个版本需要自己的分支，而不是 {from}。",

@@ -759,11 +759,14 @@ export async function resolveStart(projectPath: string, ref: string): Promise<Re
 
 async function resolvedStart(projectPath: string, ref: string): Promise<ResolvedStart | null> {
   if (!ref || ref.startsWith('-')) return null
-  const r = await git(projectPath, ['rev-parse', '--verify', '-q', `${ref}^{commit}`])
-  if (!r.ok) return null
-  const commit = r.out.trim()
+  // Resolved by the ref its kind names (HR1's round 1, finding 2): a branch first, then a tag, then a remote branch, never
+  // git's own precedence for a bare name, which takes a tag of the same name over the branch.
   const has = async (full: string): Promise<boolean> => (await git(projectPath, ['show-ref', '--verify', '-q', full])).ok
   const kind: ResolvedStart['kind'] = (await has(`refs/heads/${ref}`)) ? 'branch' : (await has(`refs/tags/${ref}`)) ? 'tag' : (await has(`refs/remotes/${ref}`)) ? 'remote' : 'commit'
+  const full = kind === 'branch' ? `refs/heads/${ref}` : kind === 'tag' ? `refs/tags/${ref}` : kind === 'remote' ? `refs/remotes/${ref}` : ref
+  const r = await git(projectPath, ['rev-parse', '--verify', '-q', `${full}^{commit}`])
+  if (!r.ok) return null
+  const commit = r.out.trim()
   // Never a signature check (a repository's log.showSignature would run gpg and print its lines).
   const l = await git(projectPath, ['show', '-s', '--no-show-signature', '--format=%h%x00%s', commit, '--'])
   const [short, subject] = l.ok ? l.out.replace(/\r?\n$/, '').split('\0') : [commit.slice(0, 7), '']
@@ -811,11 +814,14 @@ async function pinnedStart(projectPath: string, from: BranchStart): Promise<Reso
  * whatever its change needs (Start the next version: the repository's lock and the turn of workflow writes). Returns the
  * start as it was used.
  */
-export async function makeBranchAt(projectPath: string, name: string, from: BranchStart): Promise<ResolvedStart> {
+export async function makeBranchAt(projectPath: string, name: string, from: BranchStart, guard?: () => void): Promise<ResolvedStart> {
   const problem = await branchNameProblem(projectPath, name)
   if (problem) throw problem
   const start = await pinnedStart(projectPath, from)
   // i18n-ignore: the reflog's line, as git writes its own
+  // The caller's authority (the Assistant's) checked right before git changes anything (HR1's round 1, finding 1): after
+  // the reads above, nothing awaited between it and git starting.
+  guard?.()
   const r = await git(projectPath, ['update-ref', '-m', `branch: Created from ${from.ref}`, `refs/heads/${name}`, start.commit, ''])
   if (!r.ok) {
     if ((await git(projectPath, ['show-ref', '--verify', '-q', `refs/heads/${name}`])).ok) throw refusal(M.branchTaken, { name })
@@ -836,7 +842,7 @@ export type MadeBranchKept = { why: 'moved' | 'worktree' | 'gone' } | { why: 'in
  * slot). The ref goes only at that commit (`update-ref -d <ref> <commit>`: a git that moved it meanwhile makes git
  * refuse), and is put back if a worktree has it checked out after all. The caller holds the repository's lock.
  */
-export async function removeMadeBranch(projectPath: string, name: string, commit: string, inUse?: () => Promise<string | null>): Promise<{ removed: true } | ({ removed: false } & MadeBranchKept)> {
+export async function removeMadeBranch(projectPath: string, name: string, commit: string, inUse?: () => Promise<string | null>, guard?: () => void): Promise<{ removed: true } | ({ removed: false } & MadeBranchKept)> {
   const at = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${name}^{commit}`])
   if (!at.ok) return { removed: false, why: 'gone' } // i18n-ignore: a reason's code, worded by whoever shows it
   if (at.out.trim() !== commit) return { removed: false, why: 'moved' } // i18n-ignore: a reason's code, worded by whoever shows it
@@ -845,6 +851,9 @@ export async function removeMadeBranch(projectPath: string, name: string, commit
   if (now.why) return { removed: false, why: 'inUse', use: now.why } // i18n-ignore: a reason's code, worded by whoever shows it
   const other = inUse ? await inUse() : null
   if (other) return { removed: false, why: 'inUse', use: other } // i18n-ignore: a reason's code, worded by whoever shows it
+  // The Assistant's undo: its authority checked right before the ref goes (its refusal thrown, stopping the undo); a
+  // rollback of its own change passes none. Putting it back below is never refused.
+  guard?.()
   const r = await git(projectPath, ['update-ref', '-d', `refs/heads/${name}`, commit])
   if (!r.ok) {
     const moved = await git(projectPath, ['rev-parse', '--verify', '-q', `refs/heads/${name}^{commit}`])

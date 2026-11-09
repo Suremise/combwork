@@ -236,6 +236,7 @@ interface CombworkMessageValues {
   'service.nameUpgrade.profileFailed': { files: string | number; n: number }
   'service.nextVersion.movedOn': { now: string | number; from: string | number }
   'service.nextVersion.noName': { from: string | number }
+  'service.nextVersion.notBranch': { from: string | number }
   'service.nextVersion.notGit': undefined
   'service.nextVersion.partial': { name: string | number; commit: string | number; why: string | number; kept: string }
   'service.nextVersion.sameName': { from: string | number }

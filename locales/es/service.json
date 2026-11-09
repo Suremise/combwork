@@ -234,6 +234,7 @@
   "service.nameUpgrade.profileFailed": "Combwork no pudo convertir {files} de los nombres antiguos a los de Combwork: puede que otro programa {n, plural, one {lo tenga abierto} other {los tenga abiertos}}. Cierra ese programa e inicia Combwork de nuevo. No se ha cambiado nada.",
   "service.nextVersion.movedOn": "El trabajo se fusiona ahora en {now}, no en {from}, así que no se cambió nada: vuelve a mirar.",
   "service.nextVersion.noName": "Pon nombre a la rama de la próxima versión: {from} no parece una versión de la que proponer una.",
+  "service.nextVersion.notBranch": "{from} no es una rama de este repositorio, así que no se puede empezar nada a partir de ella.",
   "service.nextVersion.notGit": "Iniciar la próxima versión necesita un proyecto que use Git.",
   "service.nextVersion.partial": "Se creó {name} en {commit}, pero las opciones del flujo de trabajo no se guardaron: {why} Se conservó {name} ({kept, select, moved {se ha movido desde entonces} worktree {está extraída} inUse {está en uso} gone {ya no existe} other {no se pudo quitar}}): elimínala en Control de versiones si no la quieres.",
   "service.nextVersion.sameName": "La próxima versión necesita una rama propia, no {from}.",

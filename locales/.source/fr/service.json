@@ -234,6 +234,7 @@
   "service.nameUpgrade.profileFailed": "Combwork couldn't convert {files} from the old names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.",
   "service.nextVersion.movedOn": "Work merges into is {now} now, not {from}, so nothing was changed: look again.",
   "service.nextVersion.noName": "Name the next version’s branch: {from} doesn’t read as a version to propose one from.",
+  "service.nextVersion.notBranch": "{from} isn’t a branch in this repository, so nothing can start from it.",
   "service.nextVersion.notGit": "Start the next version needs a project using Git.",
   "service.nextVersion.partial": "Created {name} at {commit}, but the workflow options weren’t saved: {why} {name} was kept ({kept, select, moved {it has moved since} worktree {it is checked out} inUse {it is in use} gone {it is gone} other {it couldn’t be removed}}): delete it in Version Control if it isn’t wanted.",
   "service.nextVersion.sameName": "The next version needs a branch of its own, not {from}.",

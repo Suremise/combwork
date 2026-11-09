@@ -234,6 +234,7 @@
   "service.nameUpgrade.profileFailed": "Combwork nie mógł przekonwertować {files} ze starych nazw na nazwy Combwork: inny program może mieć {n, plural, one {ten plik} few {te pliki} many {te pliki} other {te pliki}} otwarte. Zamknij ten program i uruchom Combwork ponownie. Nic nie zostało zmienione.",
   "service.nextVersion.movedOn": "Praca jest teraz scalana do {now}, nie do {from}, więc niczego nie zmieniono: spójrz jeszcze raz.",
   "service.nextVersion.noName": "Nazwij gałąź następnej wersji: {from} nie wygląda na wersję, z której można by ją zaproponować.",
+  "service.nextVersion.notBranch": "{from} nie jest gałęzią w tym repozytorium, więc nic nie może się od niej zacząć.",
   "service.nextVersion.notGit": "Rozpoczęcie następnej wersji wymaga projektu używającego Gita.",
   "service.nextVersion.partial": "Utworzono gałąź {name} na {commit}, ale opcje przepływu pracy nie zostały zapisane: {why} Gałąź {name} została zachowana ({kept, select, moved {od tego czasu się przesunęła} worktree {jest pobrana} inUse {jest używana} gone {już jej nie ma} other {nie dało się jej usunąć}}): usuń ją w Kontroli wersji, jeśli jej nie chcesz.",
   "service.nextVersion.sameName": "Następna wersja potrzebuje własnej gałęzi, nie {from}.",

@@ -2701,9 +2701,10 @@ route('POST', '/v1/git/branch', async ({ body }) => {
   return assistantChange('agents', [API.change.createBranch, { name, from: from.ref, project: basename(p) }], { kind: 'create-branch', project: basename(p) }, async (guard) => {
     const start = await withRepoLock(
       p,
+      // The guard at once, and again right before git creates it (after its reads).
       async () => {
         guard()
-        return makeBranchAt(p, name, from)
+        return makeBranchAt(p, name, from, guard)
       },
       { project: p }
     ).catch((e: unknown) => {

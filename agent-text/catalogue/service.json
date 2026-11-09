@@ -854,6 +854,11 @@
     "note": "HI-2807: Start the next version refused: no name was given, and the release branch {from} isn’t a version number (1.3.0), so none could be proposed.",
     "audience": "both"
   },
+  "service.nextVersion.notBranch": {
+    "text": "{from} isn’t a branch in this repository, so nothing can start from it.",
+    "note": "HI-2807: Start the next version refused: the project’s Work merges into, {from}, isn’t a local branch (a tag of that name doesn’t count).",
+    "audience": "both"
+  },
   "service.nextVersion.notGit": {
     "text": "Start the next version needs a project using Git.",
     "note": "HI-2807: Start the next version refused: the project’s version control isn’t Git. Start the next version is an action’s name: as translated there.",

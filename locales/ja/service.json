@@ -234,6 +234,7 @@
   "service.nameUpgrade.profileFailed": "Combwork は {files} を古い名前から Combwork の名前に変換できませんでした。別のプログラムが{n, plural, other {開いている}}可能性があります。そのプログラムを閉じてから、Combwork をもう一度起動してください。何も変更されていません。",
   "service.nextVersion.movedOn": "マージ先は現在{from}ではなく{now}です。何も変更していません。もう一度確認してください。",
   "service.nextVersion.noName": "次のバージョンのブランチ名を入力してください。{from}はバージョンとして読めないため、提案できません。",
+  "service.nextVersion.notBranch": "{from}はこのリポジトリのブランチではないため、そこから開始できません。",
   "service.nextVersion.notGit": "「次のバージョンを開始」には Git を使うプロジェクトが必要です。",
   "service.nextVersion.partial": "{commit}に{name}を作成しましたが、ワークフローのオプションは保存されませんでした：{why} {name}は残しました（{kept, select, moved {その後移動しています} worktree {チェックアウトされています} inUse {使用中です} gone {なくなっています} other {削除できませんでした}}）。不要ならバージョン管理で削除してください。",
   "service.nextVersion.sameName": "次のバージョンには{from}ではなく専用のブランチが必要です。",

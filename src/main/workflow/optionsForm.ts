@@ -387,6 +387,11 @@ export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: str
   // the turn of workflow writes, which every other write of a project's options takes too).
   const plan = planOptions(ws, project, cfg, change, asking && !!o.answer)
   let target = change.options.target ?? ''
+  const was = resolvedOf(ws, project.path, project.platform, cfg).options
+  const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
+  // HI-2807: a branch newly named as a target must exist, checked here at the save (one deleted since the window's check
+  // too), for both ways a save goes: the plain write and the one recording the merge choice (HR1's round 1, finding 3).
+  if (project.platform === 'git') await refuseMissingTargets(project.path, was, will)
   if (!plan.chosen) {
     const write = () =>
       ws.mutateProjectConfig(project.path, (c) => {
@@ -396,10 +401,6 @@ export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: str
       })
     // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, checked in
     // the board's write (serial with every writer of those), the file written in it.
-    const was = resolvedOf(ws, project.path, project.platform, cfg).options
-    const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
-    // HI-2807: a branch newly named as a target must exist (checked here, at the save: one deleted since the window's check too).
-    if (project.platform === 'git') await refuseMissingTargets(project.path, was, will)
     if ((was.otherTargets ?? []).some((b) => !(will.otherTargets ?? []).includes(b) && b !== will.target)) {
       const slots = await slotTargets(ws, project.path)
       await withLanesLock(ws, () =>
