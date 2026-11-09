@@ -1,8 +1,8 @@
 // The window's repository reads, traced (HI-2785, R2 of the 1.4.0 Git refactor; SPEC §16.3.6's rule 1, port 5): the
 // summary, the Branches & remotes info, the leftovers, History's pages, what can be compared, a pinned compare with its
 // pages and a file's diff, a pin that moved and a branch that isn't one (their errors), an agent's line status and the
-// Merge dialog's branches, through the repository reads port. The same git commands (folder, argv, order) and the same
-// answers as the code before the port: the expected traces were recorded at a49568305 with
+// Merge dialog's branches, through the repository reads port. The same git commands (folder and argv; sorted, since
+// some run together) and the same answers as the code before the port: the expected traces were recorded at a49568305 with
 // `CW_RECORD_REPO_TRACES=1 npx vitest run tests/repoReadTraces.test.ts`, into tests/fixtures/repoReadTraces.json.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
@@ -29,6 +29,7 @@ type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
 afterEach(() => {
   gitTestHooks.started = undefined
+  gitTestHooks.ended = undefined
   if (RECORD) writeFileSync(FIXTURE, `${JSON.stringify({ ...expected(), ...recorded }, null, 2)}\n`)
 })
 afterAll(async () => {
@@ -55,16 +56,38 @@ async function traced(base: string, fn: () => Promise<unknown>): Promise<string[
       .join('<base>')
       .replace(/\b[0-9a-f]{40}\b/g, '<id>')
       .replace(/\b[0-9a-f]{7,12}\b/g, '<short>')
-  gitTestHooks.started = (cwd, args) => void ran.push(stable(`${resolve(cwd)} :: ${args.join(' ')}`))
+  let running = 0
+  gitTestHooks.started = (cwd, args) => {
+    running++
+    ran.push(stable(`${resolve(cwd)} :: ${args.join(' ')}`))
+  }
+  gitTestHooks.ended = () => void running--
+  let end = ''
   try {
     const v = await fn()
-    ran.push(stable(`=> ${JSON.stringify(v ?? null, (k, x) => (TIMES.has(k) ? '<time>' : x))}`))
+    end = stable(`=> ${JSON.stringify(v ?? null, (k, x) => (TIMES.has(k) ? '<time>' : x))}`)
   } catch (e) {
-    ran.push(stable(`!! ${(e as Error).message}`))
+    end = stable(`!! ${(e as Error).message}`)
   } finally {
+    // A command still running when the call ended (one of two read together, after the other's refusal) is this step's:
+    // waited for, so it never lands in the next step's trace.
+    await until(() => running === 0)
     gitTestHooks.started = undefined
+    gitTestHooks.ended = undefined
   }
-  return ran
+  // The commands sorted: these reads run some of theirs together (Promise.all), so which starts first varies run to run,
+  // in the code before the port too. The port delegates to the same function, so a command added, dropped or changed
+  // shows here; the answer, last, is exact.
+  return [...ran.sort(), end]
+}
+
+/** Waits for `ok` (a bound for a hung run, never how long it should take). */
+async function until(ok: () => boolean, ms = 15_000): Promise<void> {
+  const by = Date.now() + ms
+  while (!ok()) {
+    if (Date.now() > by) throw new Error('git commands still running after the read ended') // i18n-ignore: a test's own failure
+    await new Promise((r) => setTimeout(r, 10))
+  }
 }
 
 function same(step: string, trace: string[]): void {
@@ -79,17 +102,28 @@ describe("the window's repository reads (HI-2785)", { timeout: 120_000 }, () => 
     const repo = join(ws, 'p')
     mkdirSync(ws, { recursive: true })
     gitRepo(repo)
-    commit(repo, { '.gitignore': '.combwork/\n' }, 'ignore')
+    // Each commit a minute after the last: lines sorted by commit date never tie, so the traces' order is the same run to run.
+    let tick = 0
+    const dated = (dir: string, files: Record<string, string>, message: string): string => {
+      process.env.GIT_COMMITTER_DATE = process.env.GIT_AUTHOR_DATE = `@${1767225600 + ++tick * 60} +0000`
+      try {
+        return commit(dir, files, message)
+      } finally {
+        delete process.env.GIT_COMMITTER_DATE
+        delete process.env.GIT_AUTHOR_DATE
+      }
+    }
+    dated(repo, { '.gitignore': '.combwork/\n' }, 'ignore')
     mkdirSync(join(repo, '.combwork'), { recursive: true })
     mkdirSync(join(ws, '.combwork'), { recursive: true })
     sh(repo, 'tag', 'v1.0')
     sh(repo, 'branch', 'release')
-    for (let i = 1; i <= 3; i++) commit(repo, { [`r${i}.txt`]: `${i}\n` }, `release work ${i}`)
+    for (let i = 1; i <= 3; i++) dated(repo, { [`r${i}.txt`]: `${i}\n` }, `release work ${i}`)
     const main = sh(repo, 'symbolic-ref', '--short', 'HEAD')
     sh(repo, 'branch', '-f', 'release', 'HEAD')
     sh(repo, 'reset', '-q', '--hard', 'v1.0')
     sh(repo, 'checkout', '-q', '-b', 'feature')
-    commit(repo, { 'f.txt': 'f\n' }, 'feature work')
+    dated(repo, { 'f.txt': 'f\n' }, 'feature work')
     sh(repo, 'checkout', '-q', main)
     const tree = join(base, 'tree')
     sh(repo, 'worktree', 'add', '-q', tree, 'feature')
@@ -113,7 +147,7 @@ describe("the window's repository reads (HI-2785)", { timeout: 120_000 }, () => 
     same('compare: pinned', await run(() => reads.compare(repo, 'release', 'feature', 1, pinBase, pinHead)))
     same('compare: unpinned', await run(() => reads.compare(repo, 'release', 'feature', 1)))
     same('compare diff: pinned', await run(() => reads.compareDiff(repo, 'release', 'feature', 'f.txt', { base: pinBase, head: pinHead })))
-    commit(tree, { 'g.txt': 'g\n' }, 'more feature work')
+    dated(tree, { 'g.txt': 'g\n' }, 'more feature work')
     same('compare: a pin that moved', await run(() => reads.compare(repo, 'release', 'feature', 1, pinBase, pinHead)))
     same('compare: no such branch', await run(() => reads.compare(repo, 'release', 'nope', 1)))
     same('compare diff: no such file', await run(() => reads.compareDiff(repo, 'release', 'feature', 'nope.txt', { base: pinBase, head: sh(repo, 'rev-parse', 'feature') })))
