@@ -85,9 +85,20 @@ const ollamaModels = () => new Promise((resolve) => {
   req.on('error', () => resolve(null))
   req.on('timeout', () => (req.destroy(), resolve(null)))
 })
-/** A logging proxy to the local Ollama: each request's method, path and model kept (HI-2758's proxy.cjs). */
+// The run's evidence (HR1 on HI-2763 round 1): the lifecycle's phases, the restriction the launch config held, and each
+// request the model got (sanitized: its method, path, model, the upstream it went to and its answer's status, never a
+// prompt or a header). Written to the suite's log at the end, and to TRACE (kept with --keep-files).
+const TRACE = path.join(lib.WORK, 'opencodereal-trace.json')
+const trace = { build: { path: PINNED, sha256: PINNED_SHA256 }, upstream: `${OLLAMA.host}:${OLLAMA.port}`, restriction: null, phases: [], requests: [] }
+let phase = 'launch'
+const enter = (name) => {
+  phase = name
+  trace.phases.push({ at: new Date().toISOString(), phase: name })
+}
+
+/** A logging proxy to the local Ollama: each request's method, path and model kept (HI-2758's proxy.cjs), in `trace`. */
 function proxy() {
-  const seen = []
+  const seen = trace.requests
   const srv = http.createServer((req, res) => {
     const chunks = []
     req.on('data', (c) => chunks.push(c))
@@ -97,14 +108,17 @@ function proxy() {
       try {
         model = JSON.parse(body.toString('utf8')).model ?? null
       } catch {}
-      seen.push({ method: req.method, path: req.url, model })
+      const entry = { at: new Date().toISOString(), phase, method: req.method, path: req.url, model, upstream: trace.upstream, status: null }
+      seen.push(entry)
       const headers = { ...req.headers, host: `${OLLAMA.host}:${OLLAMA.port}` }
       delete headers.authorization
       const up = http.request({ ...OLLAMA, method: req.method, path: req.url, headers }, (ur) => {
+        entry.status = ur.statusCode
         res.writeHead(ur.statusCode, ur.headers)
         ur.pipe(res)
       })
       up.on('error', (e) => {
+        entry.status = 502
         res.writeHead(502)
         res.end(String(e))
       })
@@ -160,6 +174,7 @@ function proxy() {
     const conn = (await inv('connections:list')).connectionRows.find((c) => c.account === account.id) ?? (await inv('connection:add', account.id, { name: 'Test · OpenCode' }))
     await inv('agents:update', alpha, agent.id, { connection: conn.id })
     const accountHome = path.join(userData, 'accounts', account.id)
+    enter('launch')
     await inv('session:start', alpha, { agentId: agent.id })
 
     // --- The written launch config holds the seam's restriction, or nothing is typed (option A: no cloud call).
@@ -170,6 +185,7 @@ function proxy() {
     }, HUNG_MS)
     const policies = launchConfig?.policies ?? []
     const providerRules = policies.filter((p) => p.action === 'provider.use')
+    trace.restriction = launchConfig && { providers: Object.fromEntries(Object.entries(launchConfig.providers ?? {}).map(([id, p]) => [id, { baseURL: p?.settings?.baseURL ?? null, models: Object.keys(p?.models ?? {}) }])), model: launchConfig.model ?? null, providerPolicies: providerRules, discoverySwitchesInConfig: 'env (OPENCODE_DISABLE_PROJECT_CONFIG, OPENCODE_DISABLE_CLAUDE_CODE): unchanged by the seam' }
     const held = providerRules[0]?.resource === '*' && providerRules[0]?.effect === 'deny' && providerRules.filter((p) => p.effect === 'allow').every((p) => p.resource === seam.id) && Object.keys(launchConfig?.providers ?? {}).join() === seam.id && launchConfig?.model === `${seam.id}/${MODEL}`
     check('the launch config denies every provider but the local test one, its model that one', held, JSON.stringify({ providers: Object.keys(launchConfig?.providers ?? {}), model: launchConfig?.model, providerRules }))
     if (!held) {
@@ -185,6 +201,7 @@ function proxy() {
 
     // --- One prompt, answered in the pane; every request to the proxy, for the local model.
     const prompt = 'Reply with just: OK'
+    enter('prompt')
     const taken = await lib.sendPrompt(inv, key, prompt, { submitted: async () => px.seen.length > 0, tries: 1, waitMs: HUNG_MS })
     check('the prompt reaches the model, through the proxy', taken > 0 && px.seen.length > 0, JSON.stringify(px.seen))
     const answered = await until(async () => {
@@ -199,21 +216,28 @@ function proxy() {
     check("…its session recorded in the account (Combwork picked its id)", !!sessionId, JSON.stringify(sessionFiles))
 
     // --- Stopped: nothing of this test left running.
+    enter('stop')
     await inv('session:stop', alpha, agent.id)
     check('it stops', !!(await until(async () => !(await live(agent.id)), HUNG_MS)))
     check('…and no opencode of this test is left running', !!(await until(async () => (opencodeLeft().length ? null : true), HUNG_MS)), JSON.stringify(opencodeLeft().map((p) => p.pid)))
 
     // --- Started again: the same session, its history in the pane.
     const requests = px.seen.length
+    enter('resume')
     await inv('session:start', alpha, { agentId: agent.id, resumeId: sessionId })
     check('started again, the session is resumed with its history', !!(await until(async () => ((await screen()).includes(prompt) ? true : null), HUNG_MS)), (await screen()).slice(-600))
     check('…with no model request of its own', px.seen.length === requests, JSON.stringify(px.seen.slice(requests)))
+    enter('stop again')
     await inv('session:stop', alpha, agent.id)
     await until(async () => !(await live(agent.id)), HUNG_MS)
     check('…and stopped again, none left running', !!(await until(async () => (opencodeLeft().length ? null : true), HUNG_MS)))
   } finally {
+    enter('closed')
     await app.close().catch(() => undefined)
     await px.close()
+    // The evidence, whatever happened: in the log (always kept with the run) and in TRACE.
+    fs.writeFileSync(TRACE, JSON.stringify(trace, null, 2))
+    console.log(`TRACE (also ${TRACE}):\n${JSON.stringify(trace, null, 2)}`)
   }
   const diff = changes(before, snapshot())
   check("the user's own OpenCode folders are as they were, and the machine-wide service's port too", diff.length === 0 && (await portOpen(28894)) === serviceBefore, diff.slice(0, 8).join('; '))
