@@ -3,7 +3,9 @@
 // clone's push shows nothing until Fetch); Pull fast-forwards; New branch… switches to it and Push sets its upstream;
 // a branch's Switch is disabled, with why, while an agent works in the project folder; History lists the commits and
 // Create tag… tags the commit; Add remote… adds one, and a GitHub remote with a personal email warns; a project without
-// git (None, #1416) says so under the header, Initialise repository… shown once Git is chosen (HI-1905). Remotes are local bare repositories in the suite's folder (never a real remote), git's
+// git (None, #1416) says so under the header, Initialise repository… shown once Git is chosen (HI-1905). HI-2807: New
+// branch… from another branch without moving the folder (a tag's name refused), a missing Work merges into offering to create
+// itself, and Start the next version from 1.3.0 (screenshots in both themes). Remotes are local bare repositories in the suite's folder (never a real remote), git's
 // global config is the suite's own (GIT_CONFIG_GLOBAL), and the agent is the fake Claude Code. Dev build, throwaway
 // profile and workspace.
 const lib = require('./lib.cjs')
@@ -79,7 +81,11 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   // --- New branch… (switching to it), and Push setting its upstream.
   await branches.getByRole('button', { name: 'New branch…', exact: true }).click()
   const dialog = page.locator('.dialog', { hasText: 'New branch' })
-  await dialog.locator('input.input').fill('feature/demo')
+  await dialog.locator('[data-field="name"]').fill('feature/demo')
+  // Starts at the folder's branch: Switch to it now ticked once that resolves (HI-2807).
+  const switchTicked = await lib.until(async () => await dialog.locator('[data-field="switch"]').isChecked({ timeout: 1000 }).catch(() => false), HUNG_MS)
+  if (!switchTicked) await shot(page, 'new-branch-switch')
+  check('Switch to it now is ticked, starting at the folder’s branch', !!switchTicked, await text(dialog))
   await dialog.getByRole('button', { name: 'Create', exact: true }).click()
   check('New branch… creates it and switches to it', !!(await lib.until(async () => (await text(branches.locator('[data-git-head]'))) === 'feature/demo', HUNG_MS)) && g(alpha, 'symbolic-ref', '--short', 'HEAD') === 'feature/demo')
   check('the status bar says it has no upstream', !!(await lib.until(async () => (await text(item)).includes('feature/demo · no upstream'), HUNG_MS)), await text(item))
@@ -188,6 +194,64 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
 
   // A project without git (None: Workflow only, no Initialise repository…, no status bar item; Git chosen there offers
   // Initialise repository…) is versioncontrol's and gitinit's: here too until HI-2663.
+
+  // --- HI-2807: New branch… from another branch, the project folder staying where it is; a target that doesn't exist offers to
+  // create itself; Start the next version from 1.3.0. Screenshots in both themes.
+  const themed = async (name, target) => {
+    await page.mouse.move(5, 5)
+    for (const t of ['dark', 'light']) {
+      await inv('settings:update', { appearance: { theme: t } })
+      await lib.until(() => page.evaluate((x) => document.documentElement.dataset.theme === x, t), HUNG_MS)
+      await target.screenshot({ path: path.join(lib.WORK, `gitview-${name}-${t}.png`) })
+    }
+    await inv('settings:update', { appearance: { theme: 'dark' } })
+  }
+  for (const close of await page.locator('.toast .toast-close, .toast button[aria-label="Close"]').all()) await close.click().catch(() => undefined)
+  await page.locator('.git-sections button', { hasText: 'Branches & remotes' }).click()
+  await branches.getByRole('button', { name: 'New branch…', exact: true }).click()
+  const fromTag = page.locator('.dialog', { hasText: 'New branch' })
+  await fromTag.locator('[data-field="name"]').fill('hotfix/0.1')
+  // The tag v0.1 is on main's commit, the folder's: Switch to it now ticks itself; release (25 commits on) doesn't.
+  await fromTag.locator('[data-field="start"]').fill('v0.1')
+  check('Starts at says what v0.1 is', !!(await lib.until(async () => /^Tag at [0-9a-f]{7,}: their commit/.test(await text(fromTag.locator('[data-resolved]'))), HUNG_MS)), await text(fromTag.locator('[data-resolved]')))
+  check('…at the folder’s commit, Switch to it now ticks itself', !!(await lib.until(async () => await fromTag.locator('[data-field="switch"]').isChecked(), HUNG_MS)))
+  await fromTag.locator('[data-field="start"]').fill('release')
+  check('Starts at says what release is', !!(await lib.until(async () => /^Branch at [0-9a-f]{7,}: release work 25/.test(await text(fromTag.locator('[data-resolved]'))), HUNG_MS)), await text(fromTag.locator('[data-resolved]')))
+  check('Switch to it now is off, starting elsewhere than the folder', !(await fromTag.locator('[data-field="switch"]').isChecked()))
+  await fromTag.locator('[data-field="name"]').fill('v0.1')
+  check('a name a tag has is said under the box', !!(await lib.until(async () => /There’s a tag v0\.1/.test(await text(fromTag.locator('[data-problem="name"]'))), HUNG_MS)), await text(fromTag))
+  await fromTag.locator('[data-field="name"]').fill('hotfix/0.1')
+  await lib.until(async () => (await fromTag.locator('[data-problem="name"]').count()) === 0, HUNG_MS)
+  await themed('7-new-branch-from', fromTag)
+  await fromTag.getByRole('button', { name: 'Create', exact: true }).click()
+  check('it is made at release, the folder still on main', !!(await lib.until(() => { try { return g(alpha, 'rev-parse', 'hotfix/0.1') === g(alpha, 'rev-parse', 'release') } catch { return false } }, HUNG_MS)) && g(alpha, 'symbolic-ref', '--short', 'HEAD') === 'main', g(alpha, 'symbolic-ref', '--short', 'HEAD'))
+
+  g(alpha, 'branch', '1.3.0', 'release')
+  await inv('workflow:setOptions', alpha, { preset: null, options: { target: '1.3.0' } })
+  await page.locator('.git-sections button', { hasText: 'Workflow' }).click()
+  const target = page.locator('.workflow-option[data-option="target"]')
+  await target.locator('input.input').fill('2.0.0')
+  await target.locator('input.input').press('Enter')
+  const missing = page.locator('[data-missing="2.0.0"]')
+  check('a missing target offers to create itself, Save held', !!(await lib.until(async () => (await missing.count()) === 1 && (await page.locator('[data-action="save"]').isDisabled()), HUNG_MS)) && /2\.0\.0 doesn’t exist: create it from/.test(await text(missing)), await text(target))
+  await themed('8-missing-target', target)
+  await missing.getByRole('button', { name: 'Create', exact: true }).click()
+  check('Create makes it from the project’s branch, and the offer goes', !!(await lib.until(async () => (await missing.count()) === 0, HUNG_MS)) && g(alpha, 'rev-parse', '2.0.0') === g(alpha, 'rev-parse', '1.3.0') && g(alpha, 'symbolic-ref', '--short', 'HEAD') === 'main')
+  await page.getByRole('button', { name: 'Discard Changes', exact: true }).click()
+  const next = page.locator('[data-action="next-version"]')
+  check('Start the next version… shows under a version branch', !!(await lib.until(async () => (await next.count()) === 1 && !(await next.isDisabled()), HUNG_MS)))
+  await next.click()
+  const nv = page.locator('.dialog', { hasText: 'Start the next version' })
+  check('it proposes 1.4.0 and lists what it does', !!(await lib.until(async () => (await nv.locator('[data-field="name"]').inputValue().catch(() => '')) === '1.4.0', HUNG_MS)) && /Create 1\.4\.0 from 1\.3\.0/.test(await text(nv.locator('[data-step="create"]'))) && /Add 1\.3\.0 to Other branches/.test(await text(nv.locator('[data-step="other"]'))) && /1\.3\.0 → 1\.4\.0/.test(await text(nv.locator('[data-step="target"]'))), await text(nv))
+  await themed('9-next-version', nv)
+  await nv.getByRole('button', { name: 'Start', exact: true }).click()
+  const after = await lib.until(async () => {
+    const f = await inv('workflow:form', alpha)
+    return f.options.target === '1.4.0' ? f : null
+  }, HUNG_MS)
+  check('Start: 1.4.0 at 1.3.0’s head, 1.3.0 in Other branches, work merges into 1.4.0', !!after && (after.options.otherTargets ?? []).includes('1.3.0') && g(alpha, 'rev-parse', '1.4.0') === g(alpha, 'rev-parse', '1.3.0') && g(alpha, 'symbolic-ref', '--short', 'HEAD') === 'main', JSON.stringify(after?.options.otherTargets))
+  check('a notification says what it did', !!(await lib.until(async () => /Started 1\.4\.0 from 1\.3\.0/.test(await text(page.locator('.toast').last())), HUNG_MS)))
+  await themed('10-next-version-done', page)
 
   await app.close()
   console.log(failed ? `${failed} check(s) failed` : 'all checks passed')

@@ -571,6 +571,8 @@
   "tips.localModelPicker.title": "Lokale Modelle in Claude Codes /model wechseln",
   "tips.localModelPicker.text": "Ein Agent auf einem Server-Konto findet die Modelle des Kontos in Claude Codes /model, mit ihren genauen IDs. Gib jedem unter Server bearbeiten… eine Bezeichnung, um es dort zu benennen.",
   "tips.localModelLimits.title": "Sag Claude Code den echten Kontext deines lokalen Modells",
+  "tips.nextVersion.text": "Wird Arbeit in 1.3.0 gemergt, erstellt „Nächste Version beginnen…“ daraus 1.4.0, behält 1.3.0 in den weiteren Branches und stellt „Arbeit wird gemergt in“ auf 1.4.0. Begonnene Karten und laufende Lanes bleiben auf 1.3.0.",
+  "tips.nextVersion.title": "Die nächste Version in einem Schritt beginnen",
   "tips.opencode.text": "Agenten können OpenCode 2 verwenden. Die Anbieter-Einrichtung installiert es; jedes OpenCode-Konto hat seine eigenen Anmeldungen bei Anbietern und seine eigenen Sitzungen, und jeder Agent führt einen privaten OpenCode-Server aus, der mit ihm endet.",
   "tips.opencodeOwnProvider.title": "OpenCode bleibt beim Anbieter der Verbindung",
   "tips.opencodeOwnProvider.text": "Ein OpenCode-Agent nutzt nur den Anbieter im Modell seiner Verbindung, sodass nichts, was er tut, an einen anderen Anbieter oder an OpenCodes kostenlose Cloud-Modelle geht. Gib das Modell der Verbindung an, etwa ollama/qwen3:8b; unter Einstellungen → Erweitert → OpenCode lässt sich das ausschalten.",

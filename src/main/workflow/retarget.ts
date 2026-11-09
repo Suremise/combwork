@@ -40,8 +40,8 @@ const keepOf = (why: MoveWhy): KeepWhy => (why === 'queued' || why === 'notInTar
  * What a change of Work merges into from `from` to `to` would move, and what stays with why (HI-2680), read-only. Slots
  * recording none count as `from`'s when it is the project's target they fell back to (the preview is made while it is).
  */
-export async function retargetPreview(ws: WorkspaceService, projectPath: string, from: string, to: string): Promise<RetargetPreview> {
-  const out: RetargetPreview = { from, to, cards: { move: [], keep: [] }, slots: { move: [], keep: [] }, lanes: [] }
+export async function retargetPreview(ws: WorkspaceService, projectPath: string, from: string, to: string, o: { ongoing?: boolean } = {}): Promise<RetargetPreview> {
+  const out: RetargetPreview = { from, to, cards: { move: [], keep: [] }, slots: { move: [], keep: [] }, lanes: [], ...(o.ongoing ? { ongoing: true } : {}) }
   const wf = await workflowFor(ws, projectPath)
   if (!wf || from === to) return out
   const store = wf.store
@@ -57,10 +57,12 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   const onFrom = new Set(running.filter((l) => (laneTarget(l.id) || null) === from && !wf.lane(l.id)?.ended).map((l) => l.id))
   // Only once `from` has ended (HI-2753): gone, or all of it in `to` (merged, as an integration branch is at its release).
   // A change between branches that both go on leaves started cards and running lanes on their own (HI-2674).
+  // HI-2807: `ongoing` (Start the next version): both go on by the user's word, whatever their heads say (a new branch is
+  // at the release's head), so started cards and running lanes stay, and `to` need not exist yet: nothing reads it.
   const H = lineHistory()
-  const fromNow = await H.lineHead(projectPath, from)
-  const toNow = await H.lineHead(projectPath, to)
-  const ended = !isUnknown(fromNow) && !isUnknown(toNow) && !!toNow && (!fromNow || fromNow === toNow || (await H.isAncestor(projectPath, fromNow, toNow)) === true)
+  const fromNow = o.ongoing ? null : await H.lineHead(projectPath, from)
+  const toNow = o.ongoing ? null : await H.lineHead(projectPath, to)
+  const ended = !o.ongoing && !isUnknown(fromNow) && !isUnknown(toNow) && !!toNow && (!fromNow || fromNow === toNow || (await H.isAncestor(projectPath, fromNow, toNow)) === true)
   const inFlight = (c: (typeof cards)[number], s: ReturnType<typeof wf.state>): boolean => IN_FLIGHT_STAGES.includes(s.stage) && s.started?.target === from
   const grouped = new Set<number>()
   out.laneMoves = []

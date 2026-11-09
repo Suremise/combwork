@@ -3327,6 +3327,10 @@
     "text": "These workflow defaults can't be saved: {problems} Change the other options first, or tell the user.",
     "note": "A workflow default at Combwork's or the workspace's level that contradicts the others (#1422). {problems} are the reasons, each a sentence."
   },
+  "settings.agent.tool.missingTarget": {
+    "text": "{n, plural, one {{branches} doesn't exist} other {{branches} don't exist}}, so nothing was saved: create {n, plural, one {it} other {them}} first with cw_branch (create), the user agreeing.",
+    "note": "HI-2807: a change of Work merges into or Other branches naming branches the repository hasn't got. {branches}: their names; {n}: how many. cw_branch is a tool's name."
+  },
   "settings.agent.tool.more.advancedDesc": {
     "text": "Advanced settings.",
     "note": "cw_list_settings: what the advanced settings left out are (#367)."

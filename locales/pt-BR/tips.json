@@ -571,6 +571,8 @@
   "tips.localModelPicker.title": "Troque de modelo local no /model do Claude Code",
   "tips.localModelPicker.text": "Um agente numa conta de servidor encontra os modelos da conta no /model do Claude Code, pelos IDs exatos. Dê a cada um um Rótulo em Editar servidor… para nomeá-lo lá.",
   "tips.localModelLimits.title": "Informe ao Claude Code o contexto real do seu modelo local",
+  "tips.nextVersion.text": "Com o trabalho mesclado em 1.3.0, Iniciar a próxima versão… cria 1.4.0 a partir dele, mantém 1.3.0 nos outros branches e passa “O trabalho é mesclado em” para 1.4.0. Cartões iniciados e raias em andamento ficam em 1.3.0.",
+  "tips.nextVersion.title": "Inicie a próxima versão de uma vez",
   "tips.opencode.text": "Os agentes podem usar o OpenCode 2. A Configuração de provedores o instala; cada conta do OpenCode tem os próprios logins em provedores e as próprias sessões, e cada agente roda um servidor privado do OpenCode que termina junto com ele.",
   "tips.opencodeOwnProvider.title": "O OpenCode fica no provedor da conexão",
   "tips.opencodeOwnProvider.text": "Um agente do OpenCode usa só o provedor do modelo da sua conexão, então nada do que ele faz vai para outro provedor nem para os modelos gratuitos na nuvem do OpenCode. Indique o modelo da conexão, como ollama/qwen3:8b; Configurações → Avançado → OpenCode desativa isso.",

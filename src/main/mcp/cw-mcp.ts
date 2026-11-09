@@ -251,6 +251,11 @@ const T = {
   'queue.description.assistant': agentMsg({ id: 'tool.queue.description.assistant', text: "A project's merge queues, one per target branch, where Combwork merges approved cards one at a time: list, pause, resume, remove (back to Approved) and retry (a returned card). remove and retry take the user's reason. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
   'queue.description': agentMsg({ id: 'tool.queue.description', text: "Your project's merge queues, one per target branch, merging approved cards in turn: list shows what tests now, what waits, recent outcomes and whether it is paused." }),
   'team.description': agentMsg({ id: 'tool.team.description', text: 'Pause the team before an update: Combwork starts no card, wakes no agent with card events and gives no reviews out in your workspace until it resumes, and tells each agent once to park. status says whether it is parked (safe to install) and names what still runs. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only status works.} other {}}' }),
+  'branch.description': agentMsg({ id: 'tool.branch.description', text: "Branches, each once the user agrees. create: name at from (a branch, tag or commit), never switching. nextVersion: makes name (default 1.3.0 → 1.4.0) at Work merges into's head, adds that to Other branches and moves Work merges into to it; started cards and lanes stay. Undoable.", note: 'HI-2807. Work merges into and Other branches (work can merge into) are option names.' }),
+  'branch.arg.from': agentMsg({ id: 'tool.branch.arg.from', text: 'create: where it starts: a branch, tag or commit.' }),
+  'branch.arg.commit': agentMsg({ id: 'tool.branch.arg.commit', text: 'The commit you showed the user for from (or the release): refused if it moved since.' }),
+  'branch.reply.created': agentMsg({ id: 'tool.branch.reply.created', text: 'Created {name} from {from} ({commit}).', note: 'HI-2807: cw_branch create. {commit} is a short hash.' }),
+  'branch.reply.nextVersion': agentMsg({ id: 'tool.branch.reply.nextVersion', text: 'Started {name} from {from} ({commit}); {added, select, yes {{from} added to other branches; } other {}}target {name}.{retarget, select, yes { Can follow {name}: {move}. Stay: {stay}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to.} other {}}', note: 'HI-2807: cw_branch nextVersion. {move} and {stay} are lists ("-" for none); {preview} an id.' }),
   'releaseSlot.description': agentMsg({ id: 'tool.releaseSlot.description', text: "Release Slot: slots kept for an agent or held by an ended run. list, then release. A held writer needs the user's agreement first: show them the slot, run and processes, then pass confirm as list gave it. Not undoable. (detail: use-cw-api, tools.md){agentsAllowed, select, no { At Look and advise only list works.} other {}}" }),
   'createTask.description': agentMsg({ id: 'tool.createTask.description', text: "Add a card, in todo unless column says otherwise (never done{role, select, assistant {} other { or hold}}). {role, select, assistant {Give it a project: without one it can't be started on an agent.} other {Your project's only.}} Replies with its key and place." }),
   'createTask.arg.kind.assistant': agentMsg({ id: 'tool.createTask.arg.kind.assistant', text: 'no-code: work with no commits (a decision, a write-up), finished by its summary. Default code.' }),
@@ -1012,6 +1017,31 @@ const tools: Tool[] = [
       }
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error(say(T['queue.error.action.assistant']))
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)
+    }
+  },
+  {
+    name: 'cw_branch',
+    description: say(T['branch.description']),
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['create', 'nextVersion'] },
+        project: projectArg,
+        name: { type: 'string' },
+        from: { type: 'string', description: say(T['branch.arg.from']) },
+        commit: { type: 'string', description: say(T['branch.arg.commit']) }
+      },
+      required: ['action', 'project']
+    },
+    run: async (a) => {
+      const pick = Object.fromEntries((['project', 'name', 'from', 'commit'] as const).filter((k) => a[k] !== undefined).map((k) => [k, a[k]]))
+      if (a.action === 'create') {
+        const r = (await api('POST', '/v1/git/branch', pick)) as { name: string; from: string; commit: string }
+        return say(T['branch.reply.created'], r)
+      }
+      const r = (await api('POST', '/v1/workflow/next-version', pick)) as { name: string; from: string; commit: string; added: boolean; retarget?: { preview: string; move: string[]; stay: { key?: string; slot?: string; lane?: string; why: string }[] } }
+      const rt = r.retarget
+      return say(T['branch.reply.nextVersion'], { name: r.name, from: r.from, commit: r.commit, added: r.added ? 'yes' : 'no', retarget: rt ? 'yes' : 'no', move: rt?.move.join(', ') || '-', stay: rt?.stay.map((s) => `${s.key ?? s.slot ?? s.lane} (${s.why})`).join(', ') || '-', preview: rt?.preview ?? '' }) // agent-protocol: a list of keys and codes
     }
   },
   {

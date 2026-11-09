@@ -499,6 +499,16 @@
       "card": "plain"
     }
   },
+  "api.change.createBranch": {
+    "placeholders": {
+      "name": "plain",
+      "from": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.createBranchAny": {
+    "placeholders": {}
+  },
   "api.change.createProject": {
     "placeholders": {
       "name": "plain"
@@ -570,6 +580,11 @@
   "api.change.messageAgent": {
     "placeholders": {
       "agent": "plain",
+      "project": "plain"
+    }
+  },
+  "api.change.nextVersion": {
+    "placeholders": {
       "project": "plain"
     }
   },
@@ -920,6 +935,14 @@
       "project": "plain"
     }
   },
+  "api.done.branchCreated": {
+    "placeholders": {
+      "name": "plain",
+      "from": "plain",
+      "commit": "plain",
+      "project": "plain"
+    }
+  },
   "api.done.cancelledMessages": {
     "placeholders": {
       "n": "plural",
@@ -1053,6 +1076,15 @@
       "tied": "select",
       "card": "plain",
       "round": "plain"
+    }
+  },
+  "api.done.nextVersionStarted": {
+    "placeholders": {
+      "name": "plain",
+      "from": "plain",
+      "commit": "plain",
+      "project": "plain",
+      "added": "select"
     }
   },
   "api.done.notRunning": {
@@ -1532,6 +1564,9 @@
     }
   },
   "api.provider.notInstalled": {
+    "placeholders": {}
+  },
+  "api.queue.branchArgs": {
     "placeholders": {}
   },
   "api.queue.forwardArgs": {

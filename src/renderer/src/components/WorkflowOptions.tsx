@@ -24,6 +24,8 @@ import { agentWorkflowRole, reviewsWork } from '@shared/workflow/roles'
 import { Icon, Switch, Tooltip } from './ui'
 import { overlayTemplateWorkflow } from '@shared/workflow/templateOptions'
 import { PLATFORM_NAME } from '@shared/platform/switching'
+import { isVersionBranch } from '@shared/nextVersion'
+import { MissingBranches, missingSaveText, newlyNamed, NextVersionButton, startNextVersion } from './NextVersion'
 
 /**
  * The Version Control tab's Workflow section (#1418, SPEC §16.6; P4's plain form before it, #1278): the presets, each
@@ -353,6 +355,28 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   }, [prefill, loaded, source, show, project])
 
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
+  // HI-2807: a Git project's branches newly named as targets that don't exist yet (each offered to be created), and the
+  // branches one can be created from, read again once one is.
+  const gitProject = project && form?.platform === 'git' ? project.path : null
+  const named = useMemo(() => (gitProject && form && effective ? newlyNamed(effective, form.options) : []), [gitProject, form, effective])
+  const namedKey = named.join(' ')
+  const [branchesRead, setBranchesRead] = useState(0)
+  const [missing, setMissing] = useState<{ for: string; names: string[]; branches: string[] } | null>(null)
+  useEffect(() => {
+    if (!gitProject || !namedKey) return setMissing(null)
+    let live = true
+    const t = setTimeout(() => {
+      void Promise.all([call('git:missingBranches', gitProject, namedKey.split(' ')), call('git:startPoints', gitProject)]).then(
+        ([names, points]) => live && setMissing({ for: `${gitProject} ${namedKey}`, names, branches: points.branches }),
+        () => live && setMissing(null)
+      )
+    }, 250)
+    return () => {
+      live = false
+      clearTimeout(t)
+    }
+  }, [gitProject, namedKey, branchesRead])
+  const missingNow = missing && missing.for === `${gitProject} ${namedKey}` ? missing : null
   const dirty = !!form && !!draft && (draft.preset !== form.preset || !same(draft.options, form.own))
   dirtyRef.current = dirty
   useEffect(() => onDirty?.(dirty), [onDirty, dirty])
@@ -519,6 +543,17 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   )
   const controlNote = (key: OptionKey): React.ReactNode => {
     if (key === 'identity') return <div className="s-desc">{form.identity ? tr(T.identity, { name: form.identity.name, email: form.identity.email }) : tr(T.noIdentity)}</div>
+    // HI-2807: a named branch that doesn't exist offers to create itself; a version branch, to start the next version.
+    if ((key === 'target' || key === 'otherTargets') && gitProject) {
+      const here = (missingNow?.names ?? []).filter((b) => (key === 'target' ? b === effective.target : b !== effective.target))
+      const release = form.options.target
+      return (
+        <>
+          <MissingBranches projectPath={gitProject} missing={here} branches={missingNow?.branches ?? []} from={release || ''} created={() => setBranchesRead((n) => n + 1)} />
+          {key === 'target' && isVersionBranch(release) && !source.level && <NextVersionButton from={release} disabled={dirty} onStart={() => void startNextVersion(gitProject, (f) => show(source.key, f))} />}
+        </>
+      )
+    }
     // Agents still on their worktrees from before 1.0 (#1441) finish their current work there first.
     const carried = project?.agents.filter((a) => a.carriedSlot) ?? []
     if (key === 'folder' && effective.folder === 'slots' && carried.length) return <div className="s-desc" data-note="carried">{tr(T.carried, { agents: fmt.list(carried.map((a) => a.name)) })}</div>
@@ -724,8 +759,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       {/* Discard Changes reads the form again too: a change elsewhere it skipped while the draft was unsaved (another level
           saved meanwhile, HI-1768) shows at once. */}
       <div className="workflow-actions">
-        <Tooltip content={blocked ? tr(T.saveBlocked) : null}>
-          <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
+        <Tooltip content={blocked ? tr(T.saveBlocked) : missingNow?.names.length ? missingSaveText(missingNow.names) : null}>
+          <button className="btn primary" data-action="save" disabled={!dirty || !settings || blocked || !!missingNow?.names.length} onClick={() => void save().catch((e) => notify('error', errorMessage(e)))}>
             {tr(T.save)}
           </button>
         </Tooltip>
@@ -912,7 +947,7 @@ function ChecksEditor({ names, commands, onChange }: { names: string[]; commands
  * which keep their rules until their next card.
  */
 /** HI-2680: what a retarget left where it was, a line each (the toast's text). */
-function retargetSkippedText(r: RetargetResult): string {
+export function retargetSkippedText(r: RetargetResult): string {
   return r.skipped.map((s) => tr(T.retargetSkipped, { what: s.key ?? s.slot ?? s.lane ?? '', why: s.why })).join('\n')
 }
 
@@ -1022,7 +1057,7 @@ function SaveDetails({ changes, check, picked, retarget, title }: { changes: str
 const LANE_KEEPS = 'lane' // i18n-ignore: a select key
 
 /** HI-2680: the Save… dialog's Retarget: what can follow the new target, what stays and why, and its tick box. */
-function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPreview; choice: Set<'on'>; onChange: () => void }) {
+export function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPreview; choice: Set<'on'>; onChange: () => void }) {
   const lanes = p.laneMoves ?? []
   const movable = p.cards.move.length + p.slots.move.length + lanes.length
   const laneName = (l: { name: string | null; builder: string }): string => (l.name ? tr(T.lane, { builder: l.builder, name: l.name }) : tr(T.laneUnnamed, { builder: l.builder }))

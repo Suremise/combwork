@@ -18,6 +18,7 @@ import type { KeepAwakeSetting } from './keepAwake'
 import type { DateFormat, TimeFormat } from './dates'
 import type { ProjectPref } from './uiPrefs'
 import type { GitTool } from './gitTool'
+import type { ResolvedStart } from './nextVersion'
 import type { ConsoleEvent, ConsoleRecordingInfo } from './devConsole'
 import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
@@ -1659,6 +1660,8 @@ export interface WorkflowCheck {
   targets?: KeptTargets
   /** A change of the target (HI-2680): what can follow the new one from the old (Retarget), and what stays. */
   retarget?: RetargetPreview
+  /** HI-2807: branches newly named in Work merges into or Other branches that don't exist (a save refuses them). */
+  missing?: string[]
 }
 
 /**
@@ -1672,9 +1675,43 @@ export interface WorkflowCheck {
  * on `from` are never rewritten. A slot is listed as it was seen (its folder, recorded target, head): the apply moves it
  * only so.
  */
+/** HI-2807: what Start the next version's dialog shows, read when it opens. */
+export interface NextVersionPlan {
+  /** The release: the project's Work merges into now. */
+  from: string
+  /** Its head as shown (pinned: the start refuses if it moved), or null when it isn't a branch here. */
+  start: ResolvedStart | null
+  /** The name proposed (1.3.0 → 1.4.0), "" when the release isn't a version. */
+  name: string
+  /** The options the dialog was read with (the start refuses if they changed). */
+  base: { preset: PresetId | null; options: Partial<WorkflowOptions> }
+  /** Whether the release is in Other branches work can merge into already. */
+  listed: boolean
+  /** What can follow the proposed branch, both going on (started cards and running lanes stay); null: nothing on the release. */
+  retarget: RetargetPreview | null
+}
+
+/** HI-2807: what Start the next version did. */
+export interface NextVersionResult {
+  name: string
+  from: string
+  commit: string
+  short: string
+  /** The release was added to Other branches work can merge into (false: it was there already). */
+  added: boolean
+  form: WorkflowForm
+  /** The Assistant's: what can follow, made before the branch existed. */
+  preview?: RetargetPreview
+  /** The project's own target and other branches before and after (undefined: inherited). */
+  was: { target?: string; otherTargets?: string[] }
+  now: { target: string; otherTargets: string[] }
+}
+
 export interface RetargetPreview {
   from: string
   to: string
+  /** HI-2807: made for Start the next version, where `from` goes on: started cards and running lanes always stay. */
+  ongoing?: boolean
   /**
    * HI-2753: a card in flight started on `from` moves too when its work is provably its own (`started`: its line's head
    * as checked, and its own target then, which the apply expects); one that can't stays with why.

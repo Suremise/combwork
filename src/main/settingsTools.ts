@@ -19,7 +19,7 @@ import { keptTargets, problemEnglish, WorkflowRefused } from './workflow/options
 import { offerRetarget, refuseRemovedTargets, retargetPreview, slotTargets } from './workflow/retarget'
 import { boardWrite } from './boardStore'
 import { withLanesLock } from './lanes'
-import { projectTargets } from './workflow/targets'
+import { newlyMissing, projectTargets } from './workflow/targets'
 import type { SettingDetail, SettingRow } from '../shared/toolReplies'
 import { language } from '../shared/i18n'
 import { docOutline } from '../shared/docSections'
@@ -53,6 +53,7 @@ const T = {
   keptLane: agentMsg({ id: 'settings.agent.tool.keptLane', text: 'lane {named, select, yes {"{name}" } other {}}({builder}) and its cards still to start, into {target}', note: 'HI-2674: a running lane keeping its target. {builder} is its builder agent\'s name; {target} a branch.' }),
   retarget: agentMsg({ id: 'settings.agent.tool.retarget', text: 'These still on {from} can follow {to} (Todo cards with no work, cards started with only their own work, running lanes with their card, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.', note: "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names." }),
   keptCard: agentMsg({ id: 'settings.agent.tool.keptCard', text: '{card} into {target}', note: 'HI-2674: a card in flight keeping its target. {card} is its key (HI-12); {target} a branch.' }),
+  missingTarget: agentMsg({ id: 'settings.agent.tool.missingTarget', text: "{n, plural, one {{branches} doesn't exist} other {{branches} don't exist}}, so nothing was saved: create {n, plural, one {it} other {them}} first with cw_branch (create), the user agreeing.", note: "HI-2807: a change of Work merges into or Other branches naming branches the repository hasn't got. {branches}: their names; {n}: how many. cw_branch is a tool's name." }),
   noPlatform: agentMsg({ id: 'settings.agent.tool.noPlatform', text: '{project} has no version control recorded yet: its workflow options can be set once Combwork has detected it (reopen the project).', note: "A workflow option set on a project whose version control Combwork hasn't detected yet. {project} is the project's folder name." }),
   // What a setting takes (cw_read_setting).
   advanced: agentMsg({ id: 'settings.agent.tool.takes.advanced', text: "{takes} null: {scope, select, workspace {Settings → Advanced's value} other {Combwork's default}}.", note: "What an advanced setting takes (#367): {takes} is what its value takes; null puts back Settings → Advanced's value (a workspace's own) or Combwork's default." }),
@@ -301,9 +302,20 @@ export async function applySetting(
     // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, in the board's
     // write (serial with every writer of those), the file written in it.
     const slots = e.workflow === 'otherTargets' ? await slotTargets(workspace, projectPath) : []
+    // HI-2807: a branch newly named as a target must exist, checked in the write (one deleted since is caught too).
+    const missingFirst = async (): Promise<void> => {
+      const cfg = await workspace.projectConfig(projectPath)
+      const wf = cfg.workflow
+      if (wf?.platform !== 'git' || (e.workflow !== 'target' && e.workflow !== 'otherTargets')) return
+      const was = resolvedOf(workspace, projectPath, 'git', cfg).options
+      const will = resolvedOf(workspace, projectPath, 'git', { ...cfg, workflow: { ...wf, options: { ...wf.options, [e.workflow]: value === null ? undefined : value } } }).options
+      const missing = await newlyMissing(projectPath, was, will)
+      if (missing.length) throw new SettingRefused(409, say(T.missingTarget, { branches: missing.join(', '), n: String(missing.length) }))
+    }
     const guarded = e.workflow === 'otherTargets' ? () => withLanesLock(workspace, () => boardWrite(workspace, async () => {
       const cfg = await workspace.projectConfig(projectPath)
       const platform = cfg.workflow?.platform
+      await missingFirst()
       if (platform === 'git') {
         const was = resolvedOf(workspace, projectPath, 'git', cfg).options
         const will = resolvedOf(workspace, projectPath, 'git', { ...cfg, workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, otherTargets: value as string[] | undefined } } }).options
@@ -314,7 +326,10 @@ export async function applySetting(
         }
       }
       return write()
-    })) : e.workflow === 'target' ? () => boardWrite(workspace, write) : write // HI-2680: serial with a retarget's moves (`tasks.setTarget`'s `expectDefault`)
+    })) : e.workflow === 'target' ? () => boardWrite(workspace, async () => {
+      await missingFirst()
+      return write()
+    }) : write // HI-2680: serial with a retarget's moves (`tasks.setTarget`'s `expectDefault`)
     const next = e.workflow ? await withFolderRepoLocks([projectPath], () => workflowWrite(guarded), { quiet: true, project: projectPath }) : await write()
     if (e.workflow) workflowChanged(workspace, projectPath)
     const now = settingValue(e, config.settings, next)

@@ -38,7 +38,7 @@ import { APPLY_OPTIONS } from './runtime'
 import { kickQueue, queueChanged } from './queueHost'
 import { isUnknown } from '../platform/types'
 import { refuseRemovedTargets, retargetPreview, slotTargets } from './retarget'
-import { projectTargets } from './targets'
+import { newlyMissing, projectTargets, refuseMissingTargets } from './targets'
 import { workflowWrite } from './writes'
 import { withFolderRepoLocks } from '../platform/repoPorts'
 import { exitBy } from '../exitLog'
@@ -258,7 +258,9 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   const targets = c.changed.includes('target') ? await keptTargets(ws, project, c.options.target ?? '') : null
   // HI-2680: what can follow the new target (Retarget), read while the old one is the project's.
   const retarget = targets ? await retargetOf(ws, project, targets.to) : null
-  return { problems: c.problems, changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
+  // HI-2807: branches newly named as targets that don't exist (the save refuses them; the section offers to create each).
+  const missing = project.platform === 'git' && (c.changed.includes('target') || c.changed.includes('otherTargets')) ? await newlyMissing(project.path, resolvedOf(ws, project.path, 'git', cfg).options, c.options) : []
+  return { problems: c.problems, ...(missing.length ? { missing } : {}), changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
 }
 
 /**
@@ -371,9 +373,10 @@ export async function chooseMerge(ws: WorkspaceService, projectPath: string, raw
  * request answered as the user, or the question closed. project.json follows once that has committed, and the record
  * is marked written. A save stopped between the two leaves the board's record pending: `settleMergeChoice` writes the
  * file from it (at the workspace's open, before the queue goes on, before the next save). The board decides; the file
- * follows.
+ * follows. The caller holds the repository's lock and this Combwork's turn of workflow writes (`setWorkflowOptions`;
+ * HI-2807: Start the next version, in its own hold of both): never called inside another turn, which would wait on itself.
  */
-async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer; check?: () => void }): Promise<WorkflowForm> {
+export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, raw: unknown, o: { applyTo?: number[]; answer?: MergeAnswer; check?: () => void }): Promise<WorkflowForm> {
   const project = projectOf(ws, projectPath)
   await settleLocked(ws, project)
   const cfg = await ws.projectConfig(project.path)
@@ -384,6 +387,11 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
   // the turn of workflow writes, which every other write of a project's options takes too).
   const plan = planOptions(ws, project, cfg, change, asking && !!o.answer)
   let target = change.options.target ?? ''
+  const was = resolvedOf(ws, project.path, project.platform, cfg).options
+  const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
+  // HI-2807: a branch newly named as a target must exist, checked here at the save (one deleted since the window's check
+  // too), for both ways a save goes: the plain write and the one recording the merge choice (HR1's round 1, finding 3).
+  if (project.platform === 'git') await refuseMissingTargets(project.path, was, will)
   if (!plan.chosen) {
     const write = () =>
       ws.mutateProjectConfig(project.path, (c) => {
@@ -393,8 +401,6 @@ async function saveWorkflowOptions(ws: WorkspaceService, projectPath: string, ra
       })
     // HI-2680: a branch taken out of Other branches work can merge into: refused while anything records it, checked in
     // the board's write (serial with every writer of those), the file written in it.
-    const was = resolvedOf(ws, project.path, project.platform, cfg).options
-    const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
     if ((was.otherTargets ?? []).some((b) => !(will.otherTargets ?? []).includes(b) && b !== will.target)) {
       const slots = await slotTargets(ws, project.path)
       await withLanesLock(ws, () =>

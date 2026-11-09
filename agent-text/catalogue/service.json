@@ -409,6 +409,11 @@
     "note": "An error creating a branch or a tag ({kind}): its name {name} is one git refuses. {hasName} is no when no name was given (then it says That).",
     "audience": "both"
   },
+  "service.gitRepo.branchTaken": {
+    "text": "There’s already a branch {name}.",
+    "note": "HI-2807: an error creating a branch: the repository has a branch called {name} already.",
+    "audience": "both"
+  },
   "service.gitRepo.chooseRemote": {
     "text": "Choose the remote to push to.",
     "note": "An error pushing in the Git view: the repository has several remotes and none was chosen.",
@@ -487,6 +492,11 @@
   "service.gitRepo.noRemotesFetch": {
     "text": "This repository has no remotes to fetch from: add one first.",
     "note": "An error fetching in the Git view: the repository has no remote.",
+    "audience": "both"
+  },
+  "service.gitRepo.noStart": {
+    "text": "There’s no branch, tag or commit {ref}.",
+    "note": "HI-2807: an error creating a branch from a start point: nothing in the repository is called {ref} (as typed in Starts at).",
     "audience": "both"
   },
   "service.gitRepo.noTarget": {
@@ -579,6 +589,11 @@
     "note": "An error setting the repository's commit identity in the Git view: the git setting {key} (user.name or user.email: keep it) couldn't be set; {why} is git's own words.",
     "audience": "both"
   },
+  "service.gitRepo.startMoved": {
+    "text": "{ref} has moved since you were shown it (it’s at {now} now), so nothing was created: look at it again.",
+    "note": "HI-2807: an error creating a branch from a branch: {ref} points at another commit ({now}, a short hash) than the one the dialog showed.",
+    "audience": "both"
+  },
   "service.gitRepo.switchFailed": {
     "text": "Couldn't switch to {branch}: {why}",
     "note": "An error switching the project folder to the branch {branch}; {why} is git's own words.",
@@ -587,6 +602,11 @@
   "service.gitRepo.tagPushFailed": {
     "text": "Tagged {commit} {name}, but couldn't push it to {remote}: {why}",
     "note": "An error in the Git view: the commit {commit} was tagged {name}, but pushing the tag to the remote {remote} failed; {why} is git's own words.",
+    "audience": "both"
+  },
+  "service.gitRepo.tagTaken": {
+    "text": "There’s a tag {name}: a branch of the same name would make the name mean two things to git.",
+    "note": "HI-2807: an error creating a branch: the repository has a tag called {name}, so a branch can’t take that name.",
     "audience": "both"
   },
   "service.gitRepo.update.agentBusy": {
@@ -824,6 +844,36 @@
     "note": "An error opening a workspace (HI-2587): a step of the one-time upgrade of the names the app stored before 1.1 (files, settings) to Combwork's failed; the next open tries again. {what} is what it was renaming (main.nameUpgrade.what.*); {error} says why, a sentence.",
     "audience": "both"
   },
+  "service.nextVersion.movedOn": {
+    "text": "Work merges into is {now} now, not {from}, so nothing was changed: look again.",
+    "note": "HI-2807: Start the next version refused: the project’s Work merges into (an option’s name: as translated there) changed from {from} to {now} since the dialog opened.",
+    "audience": "both"
+  },
+  "service.nextVersion.noName": {
+    "text": "Name the next version’s branch: {from} doesn’t read as a version to propose one from.",
+    "note": "HI-2807: Start the next version refused: no name was given, and the release branch {from} isn’t a version number (1.3.0), so none could be proposed.",
+    "audience": "both"
+  },
+  "service.nextVersion.notBranch": {
+    "text": "{from} isn’t a branch in this repository, so nothing can start from it.",
+    "note": "HI-2807: Start the next version refused: the project’s Work merges into, {from}, isn’t a local branch (a tag of that name doesn’t count).",
+    "audience": "both"
+  },
+  "service.nextVersion.notGit": {
+    "text": "Start the next version needs a project using Git.",
+    "note": "HI-2807: Start the next version refused: the project’s version control isn’t Git. Start the next version is an action’s name: as translated there.",
+    "audience": "both"
+  },
+  "service.nextVersion.partial": {
+    "text": "Created {name} at {commit}, but the workflow options weren’t saved: {why} {name} was kept ({kept, select, moved {it has moved since} worktree {it is checked out} inUse {it is in use} gone {it is gone} other {it couldn’t be removed}}): delete it in Version Control if it isn’t wanted.",
+    "note": "HI-2807: Start the next version made the branch {name} (at {commit}, a short hash) but saving the options failed ({why}, a sentence), and the branch couldn’t be removed again, for the reason {kept} (keep the select keys).",
+    "audience": "both"
+  },
+  "service.nextVersion.sameName": {
+    "text": "The next version needs a branch of its own, not {from}.",
+    "note": "HI-2807: Start the next version refused: the name given is the release branch’s own, {from}.",
+    "audience": "both"
+  },
   "service.providers.noSetup": {
     "text": "{cli} has no setup task.",
     "note": "An error: the coding agent CLI {cli} (\"Codex\") has no setup task for Combwork to run.",
@@ -922,6 +972,11 @@
   "service.workflow.targetInUse": {
     "text": "{branch} can’t be taken out of Other branches work can merge into while these use it: {uses}. Retarget or finish them first.",
     "note": "HI-2680: a save of workflow options refused: it takes a branch out of Other branches work can merge into while cards, lanes, queue entries or slots still use it ({uses}: their keys and names). Other branches work can merge into is the option’s name: as translated there.",
+    "audience": "both"
+  },
+  "service.workflow.targetMissing": {
+    "text": "{n, plural, one {{branches} doesn’t exist} other {{branches} don’t exist}}, so nothing was saved: create {n, plural, one {it} other {them}} first (Version Control → New branch…).",
+    "note": "HI-2807: a save of workflow options refused: Work merges into or Other branches work can merge into names branches ({branches}, {n} of them) the repository hasn’t got. New branch… is a button: as translated there.",
     "audience": "both"
   },
   "service.workspace.advancedNotHere": {

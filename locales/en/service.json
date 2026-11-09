@@ -407,6 +407,10 @@
     "defaultMessage": "{why, select, target {{branch} is the branch work merges into: kept.} default {{branch} is the default branch: kept.} current {{branch} is checked out in the project folder: kept.} worktree {{branch} is checked out in a worktree or slot: kept.} card {An open card works on {branch}: kept.} remoteHead {{branch} is the remote's default branch: kept.} moved {{branch} has moved since you were shown it: kept. Look at it again.} unmerged {{branch} has commits that aren't in {target}: kept.} gone {There's no branch {branch}.} other {{branch} isn't a valid branch name.}}",
     "description": "Why a branch wasn't deleted (Clean Up Merged Branches, Delete branch…, in Version Control → Branches & remotes). {branch} is its name, {target} the branch the project's work merges into. Keep the select keys."
   },
+  "service.gitRepo.branchTaken": {
+    "defaultMessage": "There’s already a branch {name}.",
+    "description": "HI-2807: an error creating a branch: the repository has a branch called {name} already."
+  },
   "service.gitRepo.branchesDeleted": {
     "defaultMessage": "{n, plural, one {Deleted {branches}.} other {Deleted # branches: {branches}.}}",
     "description": "After deleting branches in Version Control → Branches & remotes: {branches} lists them ({n})."
@@ -426,6 +430,14 @@
   "service.gitRepo.createdAt": {
     "defaultMessage": "Created {name} at {commit}.",
     "description": "After creating a branch in the Git view without switching to it: {name} starts at the commit {commit} (a short hash)."
+  },
+  "service.gitRepo.createdFrom": {
+    "defaultMessage": "Created {name} from {from} ({commit}).",
+    "description": "HI-2807: after creating a branch in Version Control without switching to it: {name} starts at {from} (a branch, a tag or a commit as the user named it), at the commit {commit} (a short hash)."
+  },
+  "service.gitRepo.createdFromSwitched": {
+    "defaultMessage": "Created {name} from {from} and switched to it.",
+    "description": "HI-2807: after creating a branch in Version Control: the project folder is on the new branch {name}, made from {from} (a branch, a tag or a commit as the user named it)."
   },
   "service.gitRepo.createdSwitched": {
     "defaultMessage": "Created {name} and switched to it.",
@@ -498,6 +510,10 @@
   "service.gitRepo.noRemotesFetch": {
     "defaultMessage": "This repository has no remotes to fetch from: add one first.",
     "description": "An error fetching in the Git view: the repository has no remote."
+  },
+  "service.gitRepo.noStart": {
+    "defaultMessage": "There’s no branch, tag or commit {ref}.",
+    "description": "HI-2807: an error creating a branch from a start point: nothing in the repository is called {ref} (as typed in Starts at)."
   },
   "service.gitRepo.noTarget": {
     "defaultMessage": "There's no branch {target} here to check the branches against.",
@@ -599,6 +615,10 @@
     "defaultMessage": "Couldn't set {key}: {why}",
     "description": "An error setting the repository's commit identity in the Git view: the git setting {key} (user.name or user.email: keep it) couldn't be set; {why} is git's own words."
   },
+  "service.gitRepo.startMoved": {
+    "defaultMessage": "{ref} has moved since you were shown it (it’s at {now} now), so nothing was created: look at it again.",
+    "description": "HI-2807: an error creating a branch from a branch: {ref} points at another commit ({now}, a short hash) than the one the dialog showed."
+  },
   "service.gitRepo.switchFailed": {
     "defaultMessage": "Couldn't switch to {branch}: {why}",
     "description": "An error switching the project folder to the branch {branch}; {why} is git's own words."
@@ -614,6 +634,10 @@
   "service.gitRepo.tagPushFailed": {
     "defaultMessage": "Tagged {commit} {name}, but couldn't push it to {remote}: {why}",
     "description": "An error in the Git view: the commit {commit} was tagged {name}, but pushing the tag to the remote {remote} failed; {why} is git's own words."
+  },
+  "service.gitRepo.tagTaken": {
+    "defaultMessage": "There’s a tag {name}: a branch of the same name would make the name mean two things to git.",
+    "description": "HI-2807: an error creating a branch: the repository has a tag called {name}, so a branch can’t take that name."
   },
   "service.gitRepo.tagged": {
     "defaultMessage": "Tagged {commit} {name}.",
@@ -907,6 +931,30 @@
     "defaultMessage": "Combwork couldn't convert {files} from the old names to Combwork's: another program may have {n, plural, one {it} other {them}} open. Close that program and start Combwork again. Nothing was changed.",
     "description": "An error box as Combwork starts, after an update from 1.0: a settings file couldn't be rewritten with Combwork's names (HI-2598), so Combwork doesn't start rather than lose the settings. {files} lists the files' paths; {n} is how many."
   },
+  "service.nextVersion.movedOn": {
+    "defaultMessage": "Work merges into is {now} now, not {from}, so nothing was changed: look again.",
+    "description": "HI-2807: Start the next version refused: the project’s Work merges into (an option’s name: as translated there) changed from {from} to {now} since the dialog opened."
+  },
+  "service.nextVersion.noName": {
+    "defaultMessage": "Name the next version’s branch: {from} doesn’t read as a version to propose one from.",
+    "description": "HI-2807: Start the next version refused: no name was given, and the release branch {from} isn’t a version number (1.3.0), so none could be proposed."
+  },
+  "service.nextVersion.notBranch": {
+    "defaultMessage": "{from} isn’t a branch in this repository, so nothing can start from it.",
+    "description": "HI-2807: Start the next version refused: the project’s Work merges into, {from}, isn’t a local branch (a tag of that name doesn’t count)."
+  },
+  "service.nextVersion.notGit": {
+    "defaultMessage": "Start the next version needs a project using Git.",
+    "description": "HI-2807: Start the next version refused: the project’s version control isn’t Git. Start the next version is an action’s name: as translated there."
+  },
+  "service.nextVersion.partial": {
+    "defaultMessage": "Created {name} at {commit}, but the workflow options weren’t saved: {why} {name} was kept ({kept, select, moved {it has moved since} worktree {it is checked out} inUse {it is in use} gone {it is gone} other {it couldn’t be removed}}): delete it in Version Control if it isn’t wanted.",
+    "description": "HI-2807: Start the next version made the branch {name} (at {commit}, a short hash) but saving the options failed ({why}, a sentence), and the branch couldn’t be removed again, for the reason {kept} (keep the select keys)."
+  },
+  "service.nextVersion.sameName": {
+    "defaultMessage": "The next version needs a branch of its own, not {from}.",
+    "description": "HI-2807: Start the next version refused: the name given is the release branch’s own, {from}."
+  },
   "service.providers.keysStopped": {
     "defaultMessage": "{task}: Combwork stopped typing into it, as {why}. Finish it in the terminal.",
     "description": "A notification: Combwork stopped typing the keys of a coding agent CLI's task ({task}: \"Codex setup\") into its terminal; {why} says why (a clause: \"its terminal closed\")."
@@ -1026,6 +1074,10 @@
   "service.workflow.targetInUse": {
     "defaultMessage": "{branch} can’t be taken out of Other branches work can merge into while these use it: {uses}. Retarget or finish them first.",
     "description": "HI-2680: a save of workflow options refused: it takes a branch out of Other branches work can merge into while cards, lanes, queue entries or slots still use it ({uses}: their keys and names). Other branches work can merge into is the option’s name: as translated there."
+  },
+  "service.workflow.targetMissing": {
+    "defaultMessage": "{n, plural, one {{branches} doesn’t exist} other {{branches} don’t exist}}, so nothing was saved: create {n, plural, one {it} other {them}} first (Version Control → New branch…).",
+    "description": "HI-2807: a save of workflow options refused: Work merges into or Other branches work can merge into names branches ({branches}, {n} of them) the repository hasn’t got. New branch… is a button: as translated there."
   },
   "service.workflowNotice.blocked": {
     "defaultMessage": "{card} is blocked: {reason}",

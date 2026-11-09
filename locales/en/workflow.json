@@ -599,6 +599,26 @@
     "defaultMessage": "{styleTitle}: {style}. {messageTitle}: {message}.",
     "description": "The user's answer to the merge queue's question before an upgraded project's first merge, kept on the card as the user's own comment: the two workflow options they chose, each its name ({styleTitle}: Merge style; {messageTitle}: Commit message) and the value chosen ({style}: Squash, say; {message}: a value of Commit message). The names and values are the workflow options' own texts, already translated: arrange them as your language writes such a list."
   },
+  "workflow.missing.create": {
+    "defaultMessage": "Create",
+    "description": "HI-2807: the button beside a missing branch: creates it from the branch picked, without switching to it."
+  },
+  "workflow.missing.failed": {
+    "defaultMessage": "Couldn’t create {branch}",
+    "description": "HI-2807: an error notification’s title."
+  },
+  "workflow.missing.from": {
+    "defaultMessage": "Where {branch} starts",
+    "description": "HI-2807: the accessible name of the drop-down of branches a missing branch {branch} can be created from."
+  },
+  "workflow.missing.line": {
+    "defaultMessage": "{branch} doesn’t exist: create it from",
+    "description": "HI-2807: under Work merges into or Other branches work can merge into, for a branch named there that the repository hasn’t got; a drop-down of branches and a Create button follow."
+  },
+  "workflow.missing.save": {
+    "defaultMessage": "Create {branches} first: {n, plural, one {it doesn’t} other {they don’t}} exist yet.",
+    "description": "HI-2807: why Save is disabled in the Workflow section: branches named as targets ({branches}, {n} of them) don’t exist."
+  },
   "workflow.move.answer": {
     "defaultMessage": "Answer",
     "description": "A move on a card, named in a refused move: the user's answer to a For you request (Approve, Decline, a reply)."
@@ -646,6 +666,74 @@
   "workflow.move.verdict": {
     "defaultMessage": "Verdict",
     "description": "A move on a card, named in a refused move: a reviewer passing or failing it (glossary 2.3: verdict)."
+  },
+  "workflow.nextVersion.button": {
+    "defaultMessage": "Start the next version…",
+    "description": "HI-2807: a button under Work merges into, while it is a version branch (1.3.0): opens the Start the next version dialog."
+  },
+  "workflow.nextVersion.done": {
+    "defaultMessage": "Started {name} from {from}: work merges into {name} now{added, select, yes {, and {from} is one of the other branches work can merge into} other {}}.",
+    "description": "HI-2807: a notification after Start the next version. {name} the new branch, {from} the release."
+  },
+  "workflow.nextVersion.doneMoved": {
+    "defaultMessage": "Started {name} from {from}: work merges into {name} now. Moved {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}} to it{skipped, plural, =0 {} other {; # left where they were}}.",
+    "description": "HI-2807: a notification after Start the next version with Also retarget ticked."
+  },
+  "workflow.nextVersion.enterName": {
+    "defaultMessage": "Name the next version’s branch",
+    "description": "HI-2807: an error in the Start the next version dialog: the name box is empty."
+  },
+  "workflow.nextVersion.message": {
+    "defaultMessage": "Work merges into {from} now. The next version gets a branch of its own, made from {from} as it is:",
+    "description": "HI-2807: the Start the next version dialog’s first line. {from} is the release branch."
+  },
+  "workflow.nextVersion.name": {
+    "defaultMessage": "Next version’s branch",
+    "description": "HI-2807: the label of the box with the new branch’s name in the Start the next version dialog."
+  },
+  "workflow.nextVersion.noStart": {
+    "defaultMessage": "{from} isn’t a branch in this repository, so nothing can start from it.",
+    "description": "HI-2807: the Start the next version dialog when the release branch doesn’t exist."
+  },
+  "workflow.nextVersion.planFailed": {
+    "defaultMessage": "Couldn’t read what Start the next version would do",
+    "description": "HI-2807: an error notification’s title."
+  },
+  "workflow.nextVersion.start": {
+    "defaultMessage": "Start",
+    "description": "HI-2807: the Start the next version dialog’s button."
+  },
+  "workflow.nextVersion.starting": {
+    "defaultMessage": "Starting…",
+    "description": "HI-2807: the Start the next version dialog’s button while it runs."
+  },
+  "workflow.nextVersion.stays": {
+    "defaultMessage": "Running lanes and started cards stay on {from}.",
+    "description": "HI-2807: under the steps in the Start the next version dialog: what doesn’t move."
+  },
+  "workflow.nextVersion.stepAdd": {
+    "defaultMessage": "Add {from} to Other branches work can merge into",
+    "description": "HI-2807: a step the Start the next version dialog lists. Other branches work can merge into is an option’s name: as translated there."
+  },
+  "workflow.nextVersion.stepCreate": {
+    "defaultMessage": "Create {name} from {from} ({commit})",
+    "description": "HI-2807: a step the Start the next version dialog lists: make the branch {name} at {from}’s head, the commit {commit} (short hash)."
+  },
+  "workflow.nextVersion.stepListed": {
+    "defaultMessage": "{from} stays in Other branches work can merge into",
+    "description": "HI-2807: a step the Start the next version dialog lists, when the release branch is listed there already."
+  },
+  "workflow.nextVersion.stepTarget": {
+    "defaultMessage": "Work merges into: {from} → {name}",
+    "description": "HI-2807: a step the Start the next version dialog lists: the option Work merges into (as translated there) moves from {from} to {name}."
+  },
+  "workflow.nextVersion.tip": {
+    "defaultMessage": "A new branch from {from} for the next version: work merges into it from then on, and {from} stays a branch work can merge into.",
+    "description": "HI-2807: tooltip of Start the next version…. {from} is the release branch (Work merges into now)."
+  },
+  "workflow.nextVersion.title": {
+    "defaultMessage": "Start the next version",
+    "description": "HI-2807: the title of the Start the next version dialog."
   },
   "workflow.option.commands.desc": {
     "defaultMessage": "The command each named check runs. A run counts as the check only when it runs that command.",

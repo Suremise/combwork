@@ -37,7 +37,7 @@ import { insideArchive, insideReal, isFile, samePlace, writeTextAtomic, writeTex
 import { gitDiff, gitStatus } from './git'
 import { compareBranches, compareDiff, compareLines } from './gitCompare'
 import { initCheck, initRepo } from './gitInit'
-import { addRemote, branchDrops, branchUpdatePlan, createBranch, createTag, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, leftoverInfo, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
+import { addRemote, branchDrops, branchUpdatePlan, checkBranchName, createBranch, createTag, missingBranches, resolveStart, startPoints, deleteBranches, deleteRemoteBranches, fetchAll, pull, push, pushToRemote, remoteTracking, removeRemote, renameRemote, leftoverInfo, repoHistory, repoInfo, repoSummary, setIdentity, setRemoteUrl, setUpstream, switchBranch, updateBranch, workTargetOf } from './gitRepo'
 import { checkGit, gitTool } from './gitTool'
 import { refreshPath, refreshPathBeforeStart } from './freshPath'
 import { openExternalTerminal } from './externalTerminal'
@@ -148,6 +148,8 @@ import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from '
 import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
+import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
+import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
 import { reconcileCard, reconcileWorkspace } from './workflow/reconciler'
 import { cardFacts } from './workflow/recorder'
@@ -1026,6 +1028,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'workflow:form': (p) => workflowForm(workspace, workspace.assertProject(p)),
     'workflow:check': (p, change) => checkWorkflowChange(workspace, workspace.assertProject(p), change),
     'workflow:retarget': (p, preview) => retargetApply(currentWorkspace(), workspace.assertProject(p), retargetArg(preview), { kind: 'user' }),
+    'workflow:nextVersionPlan': (p) => nextVersionPlan(workspace, workspace.assertProject(p)),
+    'workflow:nextVersionPreview': (p, from, to) => previewFor(workspace, workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
+    'workflow:startNextVersion': (p, a) => startNextVersion(workspace, workspace.assertProject(p), { name: String(a?.name ?? ''), ...(branchStartArg(a?.from) ? { from: branchStartArg(a?.from)! } : {}), ...(a?.base ? { base: a.base } : {}) }),
     'workflow:setOptions': (p, change, opts) => setWorkflowOptions(workspace, workspace.assertProject(p), change, { applyTo: Array.isArray(opts?.applyTo) ? opts.applyTo.filter((n) => Number.isInteger(n)) : [] }),
     'workflow:stages': (p) => projectStages(workspace, workspace.assertProject(p)),
     'workflow:chooseMerge': (p, choice) => chooseMerge(workspace, workspace.assertProject(p), choice),
@@ -1800,7 +1805,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // Update from <target> (HI-1180): what it would do, for its dialog, and the update itself.
     'git:updatePlan': (p, branch) => branchUpdatePlan(p, String(branch ?? '')),
     'git:updateBranch': (p, branch, how) => updateBranch(p, String(branch ?? ''), how === 'rebase' ? 'rebase' : 'merge'),
-    'git:createBranch': (p, name, stay) => createBranch(p, String(name ?? ''), !!stay),
+    'git:createBranch': (p, name, stay, from) => createBranch(p, String(name ?? ''), !!stay, branchStartArg(from)),
+    'git:checkBranchName': (p, name) => checkBranchName(p, String(name ?? '')),
+    'git:resolveStart': (p, ref) => resolveStart(p, String(ref ?? '')),
+    'git:startPoints': (p) => startPoints(p),
+    'git:missingBranches': (p, names) => missingBranches(p, names),
     'git:addRemote': (p, name, url) => addRemote(p, String(name ?? ''), String(url ?? '')),
     'git:setRemoteUrl': (p, name, url) => setRemoteUrl(p, String(name ?? ''), String(url ?? '')),
     'git:fetch': (p) => fetchAll(p),

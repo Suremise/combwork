@@ -571,21 +571,45 @@
     "defaultMessage": "Create",
     "description": "The New branch form's button."
   },
-  "git.newBranch.failed": {
-    "defaultMessage": "Couldn't create {branch}",
-    "description": "Title of an error notification."
-  },
   "git.newBranch.message": {
     "defaultMessage": "{onBranch, select, yes {A branch at {commit}, where {current} is now.} other {A branch at {commit}.}}",
     "description": "The New branch form. {commit} is the short hash of the commit checked out; {current} the branch there now ({onBranch} is no when HEAD is detached)."
+  },
+  "git.newBranch.name": {
+    "defaultMessage": "Name",
+    "description": "HI-2807: the label of the New branch form’s name box."
   },
   "git.newBranch.noSpaces": {
     "defaultMessage": "Branch names have no spaces",
     "description": "Under the New branch form's box."
   },
+  "git.newBranch.noStart": {
+    "defaultMessage": "No branch, tag or commit called {ref}",
+    "description": "HI-2807: under Starts at, when the repository has nothing of the name typed ({ref})."
+  },
+  "git.newBranch.noStartAt": {
+    "defaultMessage": "There’s no branch, tag or commit {ref}.",
+    "description": "HI-2807: an error in the New branch form: nothing in the repository is called {ref} (as typed in Starts at)."
+  },
   "git.newBranch.placeholder": {
     "defaultMessage": "feature/name",
     "description": "Placeholder in the New branch form's box: an example branch name."
+  },
+  "git.newBranch.resolved": {
+    "defaultMessage": "{kind, select, branch {Branch} tag {Tag} remote {Remote branch} other {Commit}} at {commit}: {subject}",
+    "description": "HI-2807: under Starts at, what it names: its kind, the commit {commit} (short hash) and that commit’s subject {subject}. Keep the select keys."
+  },
+  "git.newBranch.startsAt": {
+    "defaultMessage": "Starts at",
+    "description": "HI-2807: the label of the New branch form’s box for where the branch starts: a branch, a tag or a commit."
+  },
+  "git.newBranch.startsAtHint": {
+    "defaultMessage": "A branch, a tag or a commit",
+    "description": "HI-2807: the placeholder of the New branch form’s Starts at box."
+  },
+  "git.newBranch.switchElsewhere": {
+    "defaultMessage": "It starts somewhere other than the folder’s commit: switching moves the project folder there.",
+    "description": "HI-2807: under Switch to it now, ticked while the branch starts at another commit than the project folder’s."
   },
   "git.newBranch.switchNow": {
     "defaultMessage": "Switch to it now",

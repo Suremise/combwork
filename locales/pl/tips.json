@@ -571,6 +571,8 @@
   "tips.localModelPicker.title": "Przełączaj modele lokalne w /model Claude Code",
   "tips.localModelPicker.text": "Agent na koncie serwera znajdzie modele konta w /model Claude Code, pod ich dokładnymi identyfikatorami. Nadaj każdemu Etykietę w Edytuj serwer…, by tak się tam nazywał.",
   "tips.localModelLimits.title": "Podaj Claude Code rzeczywisty kontekst lokalnego modelu",
+  "tips.nextVersion.text": "Gdy praca jest scalana do 1.3.0, Rozpocznij następną wersję… tworzy z niej 1.4.0, zostawia 1.3.0 w innych gałęziach i przestawia „Praca jest scalana do” na 1.4.0. Rozpoczęte karty i działające tory zostają na 1.3.0.",
+  "tips.nextVersion.title": "Rozpocznij następną wersję za jednym razem",
   "tips.opencode.text": "Agenci mogą używać OpenCode 2. Konfiguracja dostawców je instaluje; każde konto OpenCode ma własne logowania do dostawców i własne sesje, a każdy agent uruchamia prywatny serwer OpenCode, który kończy się razem z nim.",
   "tips.opencodeOwnProvider.title": "OpenCode trzyma się dostawcy połączenia",
   "tips.opencodeOwnProvider.text": "Agent OpenCode używa tylko dostawcy z modelu swojego połączenia, więc nic, co robi, nie trafia do innego dostawcy ani do darmowych modeli chmurowych OpenCode. Podaj model połączenia, np. ollama/qwen3:8b; wyłączysz to w Ustawienia → Zaawansowane → OpenCode.",

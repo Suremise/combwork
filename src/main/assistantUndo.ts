@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import type { AgentDef, AgentPatch, AssistantUndoResult, LaneInfo, PageLayout, ProjectConfig, TaskCard, TaskPatch, TaskWaiting, WorkflowForm } from '../shared/types'
-import { AGENT_FIELDS, CARD_FIELDS, CONNECTION_ID, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
+import { AGENT_FIELDS, BRANCH_TARGET, CARD_FIELDS, CONNECTION_ID, cardValue, markUndone, notRecording, PROVIDER_DEPENDENTS, recordedChanges, REVIEW, reviewOf, sameValue, type CardField, type FieldChange, type RecordedChange, type Value } from './assistantChanges'
 import * as assistant from './assistantControl'
 import { boardWrite } from './boardStore'
 import { config } from './config'
@@ -14,6 +14,11 @@ import { isWorkflowRole } from '../shared/workflow/roles'
 import { restoreProjectAgents } from './templates'
 import { setWorkflowOptions, workflowForm, WorkflowStale } from './workflow/optionsForm'
 import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
+import { removeMadeBranch } from './gitRepo'
+import { withFolderRepoLocks } from './platform/repoPorts'
+import { workflowWrite } from './workflow/writes'
+import { referencesTo, slotTargets } from './workflow/retarget'
+import { projectTargets } from './workflow/targets'
 
 /**
  * Undo for the Combwork Assistant's changes (#1282, SPEC §16.14), from what assistantChanges.ts recorded: one change, or every
@@ -140,7 +145,7 @@ function undoOne(ws: WorkspaceService, c: RecordedChange, by: UndoBy, guard: Gua
     case 'agent':
       return undoAgent(ws, c, guard)
     case 'setting':
-      return undoSetting(ws, c, by, guard)
+      return c.target?.startsWith(BRANCH_TARGET) ? undoBranch(ws, c, guard) : undoSetting(ws, c, by, guard)
     case 'started':
       return undoStarted(ws, c, guard)
     default:
@@ -578,6 +583,44 @@ async function undoSetting(ws: WorkspaceService, c: RecordedChange, by: UndoBy, 
       if (again instanceof ChangedSince) return { undone: [], skipped: changed(c.fields) }
       return failedOr(c.fields, again)
     }
+  }
+}
+
+/**
+ * HI-2807: a branch the Assistant made (`cw_branch`, Start the next version), removed only while, at the moment of the
+ * undo, it is still at the commit it was made at and nothing uses it: not checked out anywhere, not the project's target,
+ * its default branch or an open card's line (`removeMadeBranch`), not in Other branches work can merge into, and nothing
+ * on the board (a card's target or start, a lane, a queue entry, a slot) records it. In the hold every change of those
+ * takes, in their order: the repository's lock, the turn of workflow writes, the lanes' lock, the board's write; the
+ * guard checked inside. Else it stays, said as changed (or gone).
+ */
+async function undoBranch(ws: WorkspaceService, c: RecordedChange, guard: Guard): Promise<Outcome> {
+  const commit = c.values.find((v) => v.field === 'branch')?.new
+  if (!ws.path || !c.project || !c.target || typeof commit !== 'string') return goneAll(['branch'])
+  const projectPath = join(ws.path, c.project)
+  const name = c.target.slice(BRANCH_TARGET.length)
+  try {
+    return await withFolderRepoLocks([projectPath], () =>
+      workflowWrite(async () => {
+        const slots = await slotTargets(ws, projectPath)
+        return lanes.withLanesLock(ws, () =>
+          boardWrite(ws, async () => {
+            guard?.()
+            const r = await removeMadeBranch(projectPath, name, commit, async () => {
+              const t = await projectTargets(ws, projectPath).catch(() => null)
+              if (t?.default === name || t?.others.includes(name)) return 'target'
+              return (await referencesTo(ws, projectPath, name, slots)).length ? 'card' : null
+            }, guard)
+            if (r.removed) return { undone: ['branch'], skipped: [] }
+            if (r.why === 'gone') return goneAll(['branch'])
+            if (r.why === 'failed') return failedAll(['branch'], new Error(r.error))
+            return { undone: [], skipped: changed(['branch']) }
+          })
+        )
+      }), { quiet: true, project: projectPath }
+    )
+  } catch (e) {
+    return failedOr(['branch'], e)
   }
 }
 
