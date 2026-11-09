@@ -38,8 +38,8 @@ describe("the scenarios' fake providers", () => {
       ['fake-codex', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       ['fake-copilot', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       ['fake-antigravity', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
-      // Since HI-2760 gave OpenCode agents their turn status, as every fake but what waits for its transcript (SCENARIO_WAITS).
-      ['fake-opencode', ['tool-sweep'], ['work-on-card', 'review-passed', 'hold-skipped']],
+      // Since HI-2760 gave OpenCode agents their turn status and HI-2762 their transcript, as every fake.
+      ['fake-opencode', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       // Model trials run every scenario but the fakes' plumbing check, whatever the fakes' lists say.
       ['claude-code', ['work-on-card', 'review-passed', 'hold-skipped'], ['tool-sweep']],
       ['codex', ['work-on-card', 'review-passed', 'hold-skipped'], ['tool-sweep']]
@@ -63,14 +63,13 @@ describe("the scenarios' fake providers", () => {
 
     it("leaves out each scenario that waits for a card on that provider, saying which card; the others' runs keep it", () => {
       const sel = pick('fake-opencode', ['work-on-card', 'assistant-journal-recall', 'tool-sweep', 'slot-start'])
-      expect(runIds(sel).sort()).toEqual(['slot-start', 'tool-sweep'])
+      expect(runIds(sel).sort()).toEqual(['slot-start', 'tool-sweep', 'work-on-card'])
       const why = Object.fromEntries(sel.excluded.map((x) => [x.id, x.why]))
-      expect(why['work-on-card']).toMatch(/^waits for HI-2762: .*transcript/)
       expect(why['assistant-journal-recall']).toMatch(/^waits for HI-2771: /)
       expect(runIds(pick('fake-codex', ['work-on-card', 'assistant-journal-recall']))).toEqual(['work-on-card', 'assistant-journal-recall'])
       // Each wait names a scenario that provider would otherwise run, once.
       expect(Object.values(SCENARIO_WAITS).flat().every((w) => /^waits for HI-\d+: /.test((w as { why: string }).why))).toBe(true)
-      expect(scopeProblems([...ids.filter((i) => i !== 'wrap-up')])).toContain("wrap-up: no such scenario (fake-opencode's waits)")
+      expect(scopeProblems([...ids.filter((i) => i !== 'assistant-journal-recall')])).toContain("assistant-journal-recall: no such scenario (fake-opencode's waits)")
     })
 
     it('says where each scenario it leaves out does run', () => {

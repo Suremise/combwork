@@ -58,17 +58,12 @@ const PROVIDER_WAITS = {}
 
 /**
  * Scenarios a fake provider leaves out until a card lands, each group with why (HI-2760). fake-opencode's own run
- * (2026-11-09T01-59-16-fake-opencode, then 02-32-38 for those not about the transcript):
- * - the harness reads what an agent did (its skill reads, Combwork's replies, its last reply, the line Combwork typed) from
- *   its transcript, and an OpenCode agent has none before HI-2762 (its history); every other check of these passed;
+ * (2026-11-09T01-59-16-fake-opencode, then 02-32-38 for those not about the transcript). The ones that read the agent's
+ * transcript ran once HI-2762 gave OpenCode agents their history.
  * - an OpenCode Assistant gets no state view at its start: HI-2771.
  */
 const SCENARIO_WAITS = {
   'fake-opencode': [
-    {
-      why: "waits for HI-2762: the harness reads its checks from the agent's transcript, which an OpenCode agent has none of before it (tests/scenarios/fakeScope.cjs)",
-      ids: ['work-on-card', 'review-card', 'review-interrupted', 'decision-while-waiting', 'inbox-rebrief', 'merge-main-moved', 'merge-slot-queued', 'merge-checks-fail', 'pick-up-latest', 'wrap-up', 'lasting-decision', 'plan-only', 'raw-api', 'watcher-stopped', 'edited-skill', 'skill-reference-read', 'skill-changed', 'card-loop-merge-refused', 'card-loop-merge-decision', 'card-loop-lane', 'card-loop-submit-watch', 'intent-submit-refused', 'review-in-copy', 'card-loop-design-check', 'card-loop-progress-comment', 'assistant-lane-brief', 'assistant-new-lane', 'coordinator-team-lanes', 'assistant-settings-suggest', 'qa-triage-report', 'licence-audit', 'board-hygiene']
-    },
     { why: "waits for HI-2771: an OpenCode Assistant gets no state view at its start (tests/scenarios/fakeScope.cjs)", ids: ['assistant-journal-recall'] }
   ]
 }
