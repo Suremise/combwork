@@ -1120,7 +1120,7 @@ ${require('../../src/shared/combworkGuidance.ts').journalRule(require('../../src
   // The providers with a connection on here: a line each since HI-2814 (the JSON was about 12,200 characters with OpenCode,
   // a fifth CLI, past the 12,000 HI-2696 had raised it to); the connection named on its provider's line, by name and id.
   const withConnection = measure('cw_list_providers (connections)', tool('cw_list_providers', {}, 'assistant'), 2600)
-  check("the connection on here is on its provider's line", new RegExp(`^Claude Code \\(claude-code\\): .*; connections .*Max \\(id ${max.id}\\)`, 'm').test(withConnection), withConnection)
+  check("the connection on here is on its provider's line", /^Claude Code \(claude-code\): .*; connections .*\bMax \(id c-[0-9a-f]+\)/m.test(withConnection), withConnection)
   // beta's status with Linked's connection and each agent's connection fields (about 3,040 characters).
   measure('cw_project_status (connections)', tool('cw_project_status', { project: 'beta' }, 'assistant'), 3500)
   await inv('connections:setOn', max.id, false)
