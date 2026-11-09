@@ -116,11 +116,11 @@ export type JjObservation = { unreadable: string } | { heads: HeadObservation[];
  * - `checkoutDetached`: a worktree's HEAD changed (jj's export detaches Git checkouts of what it moves).
  * - `foreignRefs`: Git refs other than T changed during the attempt (jj's export writes every pending ref).
  * - `leaseLost`: the injected lease was gone before a mutation; nothing more ran.
- * - `unknown`: anything not proved either way, with why.
+ * - `unknown`: anything not proved either way, with a code saying why.
  */
 export type JjProbeVerdict =
   | { kind: 'advancedObserved' }
-  | { kind: 'notApplied'; why: 'noMutation' | 'notInHistory' }
+  | { kind: 'notApplied'; code: 'noMutation' | 'notInHistory' }
   | { kind: 'moved'; actual: string; where: 'jj' | 'git' }
   | { kind: 'conflicted'; added: string[]; removed: string[] }
   | { kind: 'partialExport'; local: string; tracked: string; gitRef: string }
@@ -130,7 +130,7 @@ export type JjProbeVerdict =
   | { kind: 'checkoutDetached'; worktrees: string[] }
   | { kind: 'foreignRefs'; refs: string[] }
   | { kind: 'leaseLost'; before: JjProbePhase }
-  | { kind: 'unknown'; why: string; detail?: string }
+  | { kind: 'unknown'; code: string; detail?: string }
 
 /** Where a fixture's racer runs: between the probe's steps, and between the observation's individual reads. */
 export type JjProbePoint = 'based' | 'prepared' | 'beforeIntegrate' | 'integrated' | 'beforeExport' | 'exported' | `observe:${string}`
@@ -166,7 +166,7 @@ const ids = (s: string): string[] => (s ? s.split(',') : [])
 export function parseBookmarks(out: string): BookmarkRow[] {
   return lines(out).map((l) => {
     const f = l.split(SEP)
-    if (f.length !== 6) throw new Unreadable(`bookmark row: ${l}`)
+    if (f.length !== 6) throw new Unreadable(`bookmark row: ${l}`) // i18n-ignore: a protocol detail for logs and tests, never shown
     return { name: f[0], remote: f[1], conflict: f[2] === 'true', target: f[3], added: ids(f[4]), removed: ids(f[5]) }
   })
 }
@@ -175,7 +175,7 @@ export function parseBookmarks(out: string): BookmarkRow[] {
 export function parseOps(out: string): OpEntry[] {
   return lines(out).map((l) => {
     const f = l.split(SEP)
-    if (f.length !== 3 || !HEX.test(f[0])) throw new Unreadable(`op row: ${l}`)
+    if (f.length !== 3 || !HEX.test(f[0])) throw new Unreadable(`op row: ${l}`) // i18n-ignore: a protocol detail for logs and tests, never shown
     return { id: f[0], parents: ids(f[1]), args: f[2] }
   })
 }
@@ -189,7 +189,7 @@ export function parseWorktrees(out: string): GitSnapshot['worktrees'] {
     const path = ls.find((l) => l.startsWith('worktree '))?.slice(9)
     const head = ls.find((l) => l.startsWith('HEAD '))?.slice(5)
     if (ls.includes('bare')) continue
-    if (!path || !head) throw new Unreadable(`worktree block: ${block}`)
+    if (!path || !head) throw new Unreadable(`worktree block: ${block}`) // i18n-ignore: a protocol detail for logs and tests, never shown
     found.push({ path, head, branch: ls.find((l) => l.startsWith('branch '))?.slice(7) ?? null })
   }
   return found
@@ -241,7 +241,7 @@ export function validPrepared(intent: JjAdvanceIntent, baseOp: string, o: OpEntr
 export function baseVerdict(intent: JjAdvanceIntent, heads: number, view: OpView, git: GitSnapshot): JjProbeVerdict | null {
   if (heads !== 1) return { kind: 'divergentStart', heads }
   const t = local(view, intent.target)
-  if (!t) return { kind: 'unknown', why: 'noTarget' }
+  if (!t) return { kind: 'unknown', code: 'noTarget' }
   if (t.conflict) return { kind: 'conflicted', added: t.added, removed: t.removed }
   if (t.target !== intent.expected) return { kind: 'moved', actual: t.target, where: 'jj' }
   const tg = tracked(view, intent.target)?.target ?? ''
@@ -262,14 +262,14 @@ export function baseVerdict(intent: JjAdvanceIntent, heads: number, view: OpView
  */
 export function classify(r: JjProbeRecord, obs: JjObservation): JjProbeVerdict {
   const { intent, base } = r
-  if (at(r.phase) <= at('based')) return { kind: 'notApplied', why: 'noMutation' }
-  if ('unreadable' in obs) return { kind: 'unknown', why: 'unreadable', detail: obs.unreadable }
-  if (!obs.headsStable || !obs.gitStable) return { kind: 'unknown', why: 'torn' }
-  if (!r.baseOp || !base) return { kind: 'unknown', why: 'noBase' }
-  if (!obs.heads.length) return { kind: 'unknown', why: 'noHeads' }
+  if (at(r.phase) <= at('based')) return { kind: 'notApplied', code: 'noMutation' }
+  if ('unreadable' in obs) return { kind: 'unknown', code: 'unreadable', detail: obs.unreadable }
+  if (!obs.headsStable || !obs.gitStable) return { kind: 'unknown', code: 'torn' }
+  if (!r.baseOp || !base) return { kind: 'unknown', code: 'noBase' }
+  if (!obs.heads.length) return { kind: 'unknown', code: 'noHeads' }
   for (const h of obs.heads) {
-    if (!h.complete) return { kind: 'unknown', why: 'ancestry', detail: h.op }
-    if (!h.ancestry.some((e) => e.id === r.baseOp)) return { kind: 'unknown', why: 'baseNotInHistory', detail: h.op }
+    if (!h.complete) return { kind: 'unknown', code: 'ancestry', detail: h.op }
+    if (!h.ancestry.some((e) => e.id === r.baseOp)) return { kind: 'unknown', code: 'baseNotInHistory', detail: h.op }
   }
   // The Git side apart from T: a worktree whose HEAD changed, or another ref that moved, fails it whatever jj says.
   const moved = base.worktrees.filter((w) => {
@@ -280,7 +280,7 @@ export function classify(r: JjProbeRecord, obs: JjObservation): JjProbeVerdict {
   // A worktree added or removed during the attempt: what it had checked out before the end's reads isn't known (jj's
   // export may have detached it). A checkout made and undone between the base and the end can't be seen at all.
   const changed = obs.git.worktrees.filter((w) => !base.worktrees.some((x) => x.path === w.path)).map((w) => w.path)
-  if (changed.length) return { kind: 'unknown', why: 'worktreesChanged', detail: changed.join(',') }
+  if (changed.length) return { kind: 'unknown', code: 'worktreesChanged', detail: changed.join(',') }
   const tRef = `refs/heads/${intent.target}`
   const refs = new Set([...Object.keys(base.refs), ...Object.keys(obs.git.refs)])
   const foreign = [...refs].filter((k) => k !== tRef && base.refs[k] !== obs.git.refs[k]).sort()
@@ -294,22 +294,22 @@ export function classify(r: JjProbeRecord, obs: JjObservation): JjProbeVerdict {
   const anyOurs = obs.heads.some((h) => ours(h).length > 0)
   const gitRef = obs.git.refs[tRef] ?? ''
   if (!anyOurs && !withO.length) {
-    if (at(r.phase) >= at('integrating')) return { kind: 'unknown', why: 'integrateUncertain' }
-    return { kind: 'notApplied', why: 'notInHistory' }
+    if (at(r.phase) >= at('integrating')) return { kind: 'unknown', code: 'integrateUncertain' }
+    return { kind: 'notApplied', code: 'notInHistory' }
   }
-  if (!r.op || withO.length !== obs.heads.length) return { kind: 'unknown', why: 'concurrent' }
+  if (!r.op || withO.length !== obs.heads.length) return { kind: 'unknown', code: 'concurrent' }
   const views = obs.heads.map((h) => h.view)
   const ts = views.map((v) => local(v, intent.target))
   const conflicted = ts.find((t) => t?.conflict)
   if (conflicted) return { kind: 'conflicted', added: conflicted.added, removed: conflicted.removed }
   const agreed = new Set(ts.map((t) => t?.target ?? ''))
-  if (agreed.size !== 1) return { kind: 'unknown', why: 'headsDisagree' }
+  if (agreed.size !== 1) return { kind: 'unknown', code: 'headsDisagree' }
   const lt = [...agreed][0]
-  if (lt !== intent.result) return { kind: 'unknown', why: 'movedAfter', detail: lt }
+  if (lt !== intent.result) return { kind: 'unknown', code: 'movedAfter', detail: lt }
   const tg = new Set(views.map((v) => tracked(v, intent.target)?.target ?? ''))
   if (tg.size !== 1 || !tg.has(intent.result)) return { kind: 'partialExport', local: lt, tracked: [...tg].join(','), gitRef }
   // Exported (jj recorded Git at R), and Git elsewhere since: a later Git move or a torn read, not proved either way.
-  if (gitRef !== intent.result) return { kind: 'unknown', why: 'gitMovedAfter', detail: gitRef }
+  if (gitRef !== intent.result) return { kind: 'unknown', code: 'gitMovedAfter', detail: gitRef }
   return { kind: 'advancedObserved' }
 }
 
@@ -318,13 +318,13 @@ function steps(intent: JjAdvanceIntent, deps: JjProbeDeps) {
   const limit = deps.ancestryLimit ?? 2000
   const read = async (args: readonly string[]): Promise<string> => {
     const r = await deps.runner.run(intent.root, args)
-    if (!r.ok || r.code !== 0) throw new Unreadable(`jj ${args.join(' ')}: ${r.code} ${r.err.trim()}`)
+    if (!r.ok || r.code !== 0) throw new Unreadable(`jj ${args.join(' ')}: ${r.code} ${r.err.trim()}`) // i18n-ignore: a protocol detail for logs and tests, never shown
     return r.out
   }
   const write = (args: readonly string[]): Promise<RunResult> => deps.runner.run(intent.root, [...JJ_READ, marker(intent.txn), ...args], { write: true })
   const gitRead = async (args: readonly string[]): Promise<string> => {
     const r = await deps.git(args)
-    if (!r.ok || r.code !== 0) throw new Unreadable(`git ${args.join(' ')}: ${r.code} ${r.err.trim()}`)
+    if (!r.ok || r.code !== 0) throw new Unreadable(`git ${args.join(' ')}: ${r.code} ${r.err.trim()}`) // i18n-ignore: a protocol detail for logs and tests, never shown
     return r.out
   }
   const view = async (op: string): Promise<OpView> => ({
@@ -337,7 +337,7 @@ function steps(intent: JjAdvanceIntent, deps: JjProbeDeps) {
   })
   const opEntry = async (op: string): Promise<OpEntry> => {
     const [e] = parseOps(await read(['--at-op', op, 'op', 'log', '--no-graph', '--limit', '1', '-T', OP_T]))
-    if (!e) throw new Unreadable(`no op ${op}`)
+    if (!e) throw new Unreadable(`no op ${op}`) // i18n-ignore: a protocol detail for logs and tests, never shown
     return e
   }
   /** The head files (this version's layout), each confirmed by jj as a full operation id. */
@@ -352,7 +352,7 @@ function steps(intent: JjAdvanceIntent, deps: JjProbeDeps) {
     const out: string[] = []
     for (const n of names.sort()) {
       const e = await opEntry(n)
-      if (e.id !== n) throw new Unreadable(`op head ${n} is ${e.id}`)
+      if (e.id !== n) throw new Unreadable(`op head ${n} is ${e.id}`) // i18n-ignore: a protocol detail for logs and tests, never shown
       out.push(n)
     }
     return out
@@ -435,10 +435,10 @@ export async function runProbe(intent: JjAdvanceIntent, deps: JjProbeDeps): Prom
     if (!(await mutate('preparing'))) return done({ kind: 'leaseLost', before: 'preparing' })
     const prep = await s.write(['--at-op', p0, '--no-integrate-operation', 'bookmark', 'move', intent.target, '--from', intent.expected, '--to', intent.result])
     const short = /--no-integrate-operation was requested: ([0-9a-f]{8,})\s*$/m.exec(`${prep.err}\n${prep.out}`)?.[1]
-    if (prep.code !== 0 || !short) return done({ kind: 'unknown', why: 'prepare', detail: `${prep.code} ${prep.err.trim()}` })
+    if (prep.code !== 0 || !short) return done({ kind: 'unknown', code: 'prepare', detail: `${prep.code} ${prep.err.trim()}` })
     const o = await s.opEntry(short)
     const bad = validPrepared(intent, p0, o, p0View, await s.view(o.id))
-    if (bad) return done({ kind: 'unknown', why: 'prepareInvalid', detail: bad })
+    if (bad) return done({ kind: 'unknown', code: 'prepareInvalid', detail: bad })
     await journal({ phase: 'prepared', op: o.id })
     await deps.hook?.('prepared', record)
     // integrate
@@ -456,13 +456,13 @@ export async function runProbe(intent: JjAdvanceIntent, deps: JjProbeDeps): Prom
     await deps.hook?.('exported', record)
     return done(classify(record, await observe(intent, record, deps)))
   } catch (e) {
-    if (e instanceof Unreadable) return done({ kind: 'unknown', why: 'unreadable', detail: e.message })
+    if (e instanceof Unreadable) return done({ kind: 'unknown', code: 'unreadable', detail: e.message })
     throw e
   }
 }
 
 /** Recovery's reading of a journaled attempt (a crash at any phase): the same classifier on the state read now. */
 export async function recoverProbe(record: JjProbeRecord, deps: JjProbeDeps): Promise<JjProbeVerdict> {
-  if (at(record.phase) <= at('based')) return { kind: 'notApplied', why: 'noMutation' }
+  if (at(record.phase) <= at('based')) return { kind: 'notApplied', code: 'noMutation' }
   return classify(record, await observe(record.intent, record, deps))
 }

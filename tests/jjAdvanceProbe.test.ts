@@ -81,25 +81,25 @@ describe("the prepared operation's validation", () => {
 describe('the classifier: positive evidence only', () => {
   const after = [ours(O, P0), op(P0, [])]
   const cases: [string, JjProbeRecord, JjObservation, Record<string, unknown>][] = [
-    ['no mutation started', { intent, phase: 'based' }, { unreadable: 'x' }, { kind: 'notApplied', why: 'noMutation' }],
+    ['no mutation started', { intent, phase: 'based' }, { unreadable: 'x' }, { kind: 'notApplied', code: 'noMutation' }],
     ['advanced: O in the one head, T = T@git = ref = R', rec('exported', O), obs([head(O, after, view(R, R))], git(R)), { kind: 'advancedObserved' }],
-    ['unreadable', rec('exported', O), { unreadable: 'op_heads' }, { kind: 'unknown', why: 'unreadable' }],
-    ['heads torn between reads', rec('exported', O), obs([head(O, after, view(R, R))], git(R), { heads: false, git: true }), { kind: 'unknown', why: 'torn' }],
-    ['Git torn between reads', rec('exported', O), obs([head(O, after, view(R, R))], git(R), { heads: true, git: false }), { kind: 'unknown', why: 'torn' }],
-    ['ancestry past the bound', rec('exported', O), obs([head(O, after, view(R, R), false)], git(R)), { kind: 'unknown', why: 'ancestry' }],
-    ['P0 not in the history (rewritten)', rec('exported', O), obs([head(O, [ours(O, H2), op(H2, [])], view(R, R))], git(R)), { kind: 'unknown', why: 'baseNotInHistory' }],
-    ['no base journaled', { intent, phase: 'exported', op: O }, obs([head(O, after, view(R, R))], git(R)), { kind: 'unknown', why: 'noBase' }],
+    ['unreadable', rec('exported', O), { unreadable: 'op_heads' }, { kind: 'unknown', code: 'unreadable' }],
+    ['heads torn between reads', rec('exported', O), obs([head(O, after, view(R, R))], git(R), { heads: false, git: true }), { kind: 'unknown', code: 'torn' }],
+    ['Git torn between reads', rec('exported', O), obs([head(O, after, view(R, R))], git(R), { heads: true, git: false }), { kind: 'unknown', code: 'torn' }],
+    ['ancestry past the bound', rec('exported', O), obs([head(O, after, view(R, R), false)], git(R)), { kind: 'unknown', code: 'ancestry' }],
+    ['P0 not in the history (rewritten)', rec('exported', O), obs([head(O, [ours(O, H2), op(H2, [])], view(R, R))], git(R)), { kind: 'unknown', code: 'baseNotInHistory' }],
+    ['no base journaled', { intent, phase: 'exported', op: O }, obs([head(O, after, view(R, R))], git(R)), { kind: 'unknown', code: 'noBase' }],
     ['a worktree HEAD changed', { ...rec('exported', O), base: git(E, [{ path: 'C:/wt', head: E, branch: 'refs/heads/main' }]) }, obs([head(O, after, view(R, R))], git(R, [{ path: 'C:/wt', head: E, branch: null }])), { kind: 'checkoutDetached' }],
-    ['a worktree appeared', rec('exported', O), obs([head(O, after, view(R, R))], git(R, [{ path: 'C:/wt', head: E, branch: null }])), { kind: 'unknown', why: 'worktreesChanged' }],
+    ['a worktree appeared', rec('exported', O), obs([head(O, after, view(R, R))], git(R, [{ path: 'C:/wt', head: E, branch: null }])), { kind: 'unknown', code: 'worktreesChanged' }],
     ['another ref moved', rec('exported', O), obs([head(O, after, view(R, R))], git(R, [], { 'refs/heads/other': X })), { kind: 'foreignRefs', refs: ['refs/heads/other'] }],
-    ['prepared, O nowhere: not applied', rec('prepared', O), obs([head(P0, [op(P0, [])], view(E, E))], git(E)), { kind: 'notApplied', why: 'notInHistory' }],
-    ['integrating, O nowhere: uncertain', rec('integrating', O), obs([head(P0, [op(P0, [])], view(E, E))], git(E)), { kind: 'unknown', why: 'integrateUncertain' }],
-    ['preparing, a marked op in history but no O journaled', rec('preparing'), obs([head(O, after, view(R, E))], git(E)), { kind: 'unknown', why: 'concurrent' }],
-    ['O in one head of two', rec('exported', O), obs([head(O, after, view(R, R)), head(H2, [op(H2, [P0]), op(P0, [])], view(E, E))], git(R)), { kind: 'unknown', why: 'concurrent' }],
+    ['prepared, O nowhere: not applied', rec('prepared', O), obs([head(P0, [op(P0, [])], view(E, E))], git(E)), { kind: 'notApplied', code: 'notInHistory' }],
+    ['integrating, O nowhere: uncertain', rec('integrating', O), obs([head(P0, [op(P0, [])], view(E, E))], git(E)), { kind: 'unknown', code: 'integrateUncertain' }],
+    ['preparing, a marked op in history but no O journaled', rec('preparing'), obs([head(O, after, view(R, E))], git(E)), { kind: 'unknown', code: 'concurrent' }],
+    ['O in one head of two', rec('exported', O), obs([head(O, after, view(R, R)), head(H2, [op(H2, [P0]), op(P0, [])], view(E, E))], git(R)), { kind: 'unknown', code: 'concurrent' }],
     ['T conflicted', rec('exported', O), obs([head(O, after, { ...view(R, R), bookmarks: [row('main', '', R, true), row('main', 'git', R)] })], git(R)), { kind: 'conflicted' }],
-    ['T moved on after O', rec('exported', O), obs([head(O, after, view(X, X))], git(X)), { kind: 'unknown', why: 'movedAfter' }],
+    ['T moved on after O', rec('exported', O), obs([head(O, after, view(X, X))], git(X)), { kind: 'unknown', code: 'movedAfter' }],
     ['export failed (T@git still E)', rec('exported', O), obs([head(O, after, view(R, E))], git(E)), { kind: 'partialExport' }],
-    ['Git moved after the export', rec('exported', O), obs([head(O, after, view(R, R))], git(X)), { kind: 'unknown', why: 'gitMovedAfter' }]
+    ['Git moved after the export', rec('exported', O), obs([head(O, after, view(R, R))], git(X)), { kind: 'unknown', code: 'gitMovedAfter' }]
   ]
   for (const [what, r, o, want] of cases) it(what, () => expect(classify(r, o)).toMatchObject(want))
 })
@@ -179,7 +179,7 @@ describe("the probe's steps over a fake runner", () => {
       return a.join(' ').includes(`--at-op ${O} bookmark list`) ? { ...r, out: r.out.replace(`main\u001fgit\u001ffalse\u001f${E}\u001f${E}`, `main\u001fgit\u001ffalse\u001f${R}\u001f${R}`) } : r
     } } as JjRunner
     const out = await runProbe({ ...intent, jjRepo: jjRepo() }, { runner: bad, git: gitOk, journal: () => {}, leaseHeld: () => true })
-    expect(out.verdict).toMatchObject({ kind: 'unknown', why: 'prepareInvalid', detail: 'otherBookmarks' })
+    expect(out.verdict).toMatchObject({ kind: 'unknown', code: 'prepareInvalid', detail: 'otherBookmarks' })
     expect(mutations(calls)).toEqual(['prepare'])
   })
 
@@ -188,7 +188,7 @@ describe("the probe's steps over a fake runner", () => {
     const d = jjRepo()
     writeFileSync(join(d, 'op_heads', 'heads', 'lock'), '')
     const out = await runProbe({ ...intent, jjRepo: d }, { runner, git: gitOk, journal: () => {}, leaseHeld: () => true })
-    expect(out.verdict).toMatchObject({ kind: 'unknown', why: 'unreadable' })
+    expect(out.verdict).toMatchObject({ kind: 'unknown', code: 'unreadable' })
     expect(mutations(calls)).toEqual([])
   })
 })

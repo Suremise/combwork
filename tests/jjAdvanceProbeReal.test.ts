@@ -159,7 +159,7 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
         const r = await repo(mode)
         const { verdict } = await attempt(r, { hook: (p, rec) => p === 'beforeIntegrate' && void r.jj('--at-op', rec.baseOp!, 'bookmark', 'move', 'main', '--from', r.E, '--to', r.D) })
         expect(r.bookmark()).toBe(r.D)
-        expect(verdict).toMatchObject({ kind: 'unknown', why: 'movedAfter', detail: r.D })
+        expect(verdict).toMatchObject({ kind: 'unknown', code: 'movedAfter', detail: r.D })
       })
 
       it("limitation (b'): our result a descendant of a concurrent move (E → R raced by our E → D): jj takes ours over theirs without a conflict", async () => {
@@ -230,7 +230,7 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
       it('an external Git move after the export: not observed as advanced (Unknown: gitMovedAfter)', async () => {
         const r = await repo(mode)
         const { verdict } = await attempt(r, { hook: (p) => p === 'exported' && void r.git('update-ref', 'refs/heads/main', r.X, r.R) })
-        expect(verdict).toMatchObject({ kind: 'unknown', why: 'gitMovedAfter' })
+        expect(verdict).toMatchObject({ kind: 'unknown', code: 'gitMovedAfter' })
       })
 
       it("a stale refs/heads/main.lock: jj's export fails, exit 0; partialExport", async () => {
@@ -287,7 +287,7 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
         })
         expect(rec.phase).toBe('prepared')
         expect(rec.op).toBeTruthy()
-        expect(verdict).toEqual({ kind: 'notApplied', why: 'notInHistory' })
+        expect(verdict).toEqual({ kind: 'notApplied', code: 'notInHistory' })
         expect(r.bookmark()).toBe(r.E)
       })
 
@@ -300,7 +300,7 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
         const base = parseWorktrees(r.git('worktree', 'list', '--porcelain'))
         const refs = Object.fromEntries(r.git('for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads', 'refs/tags').trim().split(/\r?\n/).filter(Boolean).map((l) => l.split(' ') as [string, string]))
         const rec: JjProbeRecord = { intent: r.intent(), phase: 'preparing', baseOp: p0, base: { refs, worktrees: base } }
-        expect(await recoverProbe(rec, k.d)).toEqual({ kind: 'notApplied', why: 'notInHistory' })
+        expect(await recoverProbe(rec, k.d)).toEqual({ kind: 'notApplied', code: 'notInHistory' })
       })
 
       it('crash (simulated) after integrate, before export: recovery says partialExport; after another jj command exports, advancedObserved', async () => {
@@ -344,7 +344,7 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
             r.jj('--ignore-working-copy', 'new', r.X, '-m', 'late', '--no-edit')
           }
         })
-        expect(a.verdict).toMatchObject({ kind: 'unknown', why: 'torn' })
+        expect(a.verdict).toMatchObject({ kind: 'unknown', code: 'torn' })
         const r2 = await repo(mode)
         let twice = false
         const b = await attempt(r2, {
@@ -354,7 +354,7 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
             r2.git('update-ref', 'refs/heads/main', r2.X, r2.R)
           }
         })
-        expect(b.verdict).toMatchObject({ kind: 'unknown', why: 'torn' })
+        expect(b.verdict).toMatchObject({ kind: 'unknown', code: 'torn' })
       })
     })
   }
@@ -379,7 +379,7 @@ describe.skipIf(!exe)(`jj's advance probe on the real jj (${TESTED_JJ.version})`
             if (dirty) writeFileSync(join(wt, 'base.txt'), 'edited\n')
           }
         })
-        expect(verdict).toMatchObject({ kind: 'unknown', why: 'worktreesChanged' })
+        expect(verdict).toMatchObject({ kind: 'unknown', code: 'worktreesChanged' })
         expect(() => run('git', wt, ['symbolic-ref', '-q', 'HEAD'])).toThrow()
         if (dirty) expect(run('git', wt, ['status', '--porcelain']).trim()).toBe('M base.txt')
       })
