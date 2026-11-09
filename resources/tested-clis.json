@@ -10,9 +10,15 @@
     "record": "1f8dc3f0c1c3"
   },
   "copilot": {
-    "version": "1.0.106",
-    "testedAt": "2026-11-08",
-    "record": "1f8dc3f0c1c3"
+    "version": "1.0.107",
+    "testedAt": "2026-11-09",
+    "record": "4124a332367d",
+    "also": [
+      {
+        "version": "1.0.106",
+        "testedAt": "2026-11-09"
+      }
+    ]
   },
   "antigravity": {
     "version": "1.5.0",
