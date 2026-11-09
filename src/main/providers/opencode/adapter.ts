@@ -478,13 +478,15 @@ export class OpencodeAdapter implements ProviderAdapter {
     const r = await opencodeHistory.adoptMark(home, sessionId, h.directory)
     if (!r.ok) throw combworkError(ADOPT_REFUSED, { why: r.why }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
     const { lease, created } = r
+    let committed = false
     return {
-      // Just before the record: still an account set up now, and not one being removed (the worker says, in order with it).
+      // Just before the record: still an account set up now, and not one being removed (main's barrier, then the worker's).
       commit: async () => {
         const configured = this.allHomes().some((root) => resolve(root).toLowerCase() === resolve(home).toLowerCase())
         if (!configured || !(await opencodeHistory.adoptCommit(home, sessionId, lease))) throw combworkError(ADOPT_REFUSED, { why: 'other' }) // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+        committed = true
       },
-      done: (ok) => opencodeHistory.adoptDone(home, sessionId, lease, ok, created)
+      done: (ok) => opencodeHistory.adoptDone(home, sessionId, lease, ok, created, committed)
     }
   }
 

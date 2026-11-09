@@ -9,6 +9,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 
+// The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
+const HUNG_MS = 10000
 const base = tempDir('cw-oc-adopt-')
 ;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
 
@@ -147,21 +149,52 @@ describe("adopting an OpenCode session Combwork didn't make (HI-2774)", () => {
     expect(await record(id)).toBeUndefined()
   })
 
-  it("holds its account's removal while its record is written, and lets it go once the record is (HR2, round 1)", async () => {
-    const id = external()
-    let removed = false
+  /** The removal of `home` has reached main's barrier: it is marked as removing and waits on this adoption's record. */
+  const removalHeld = (): boolean => (history.opencodeHistory as unknown as { removing: Set<string>; committing: Map<string, number> }).removing.has(home.toLowerCase()) && !!(history.opencodeHistory as unknown as { committing: Map<string, number> }).committing.get(home.toLowerCase())
+  async function untilHeld(): Promise<void> {
+    const end = Date.now() + HUNG_MS
+    while (!removalHeld()) {
+      if (Date.now() > end) throw new Error('the removal never reached the adoption barrier')
+      await new Promise((r) => setImmediate(r))
+    }
+  }
+
+  /** An adoption whose record write waits for `go`; `during` runs once the write has begun. */
+  async function adoptHeld(id: string, during: () => Promise<void>): Promise<{ removing: Promise<unknown>; state: { removed: boolean } }> {
+    const state = { removed: false }
     let removing: Promise<unknown> = Promise.resolve()
     sessions.writeAdopted = async (...a) => {
-      removing = history.opencodeHistory.removeRoot(home).then(() => (removed = true))
-      // The removal waits on this adoption's record (polled a few times while it is being written).
-      for (let i = 0; i < 20; i++) await new Promise((r) => setImmediate(r))
-      expect(removed).toBe(false)
+      removing = history.opencodeHistory.removeRoot(home).then(() => (state.removed = true))
+      await during()
+      // The removal is held at the barrier: marked as removing, with this adoption committing.
+      await untilHeld()
+      expect(state.removed).toBe(false)
       return realWrite(...a)
     }
+    await run(() => sessions.adopt(p, id))
+    return { removing, state }
+  }
+
+  it("holds its account's removal while its record is written, and lets it go once the record is (HR2, round 1; HR1, round 2)", async () => {
+    const id = external()
     try {
-      await run(() => sessions.adopt(p, id))
+      const { removing, state } = await adoptHeld(id, async () => undefined)
       await removing
-      expect(removed).toBe(true)
+      expect(state.removed).toBe(true)
+      expect(await record(id)).toMatchObject({ id })
+      expect(existsSync(markPath(home, id))).toBe(true)
+    } finally {
+      await history.historyWorkerForTests('in-process')
+    }
+  })
+
+  it("holds it though the history's worker ends while the record is written (HR1, round 2)", async () => {
+    const id = external()
+    try {
+      // The worker ends mid-write: a new one, which knows no lease, serves the removal; main's barrier still holds it.
+      const { removing, state } = await adoptHeld(id, () => (history.opencodeHistory as unknown as { thread: { stop: () => Promise<void> } }).thread.stop())
+      await removing
+      expect(state.removed).toBe(true)
       expect(await record(id)).toMatchObject({ id })
     } finally {
       await history.historyWorkerForTests('in-process')
