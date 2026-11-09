@@ -97,7 +97,7 @@ Combwork runs **OpenCode 2** (the `opencode` command from opencode.ai). Turn it 
 - **Plan limits.** OpenCode reports plan limits only for an OpenCode Go or Console workspace it's signed in to: those show in the status bar and the Overview. Other providers' limits aren't available through OpenCode, so none are shown for them.
 - **Sessions.** Combwork picks each session's id and resumes it on the same account. A session made on another account isn't resumed: start a new one.
 - **Instructions.** Combwork's guidance and the agent's instructions (Agent Settings) are in the agent's private config folder, in an `AGENTS.md` OpenCode loads as it starts; an **Independent** agent gets none of Combwork's guidance. The project's own `AGENTS.md` is given to OpenCode by name, so the agent reads it even while the project's OpenCode config is kept out.
-- **What Combwork doesn't run.** OpenCode's **Claude Agent** provider: an agent whose model is one of its models doesn't start, as Combwork runs Claude Code itself instead. **Effort levels**: OpenCode 2.2.6 sets a model's variant per session, with no setting Combwork can pass as an agent starts, so OpenCode connections have no effort level yet. OpenCode's **machine-wide background service**: it's off for everything Combwork runs, so each agent has only its own private server.
+- **What Combwork doesn't run.** OpenCode's **Claude Agent** provider: an agent whose model is one of its models doesn't start, as Combwork runs Claude Code itself instead. OpenCode's **machine-wide background service**: it's off for everything Combwork runs, so each agent has only its own private server.
 
 ### Git <a id="git"></a>
 
