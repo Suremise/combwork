@@ -33,7 +33,7 @@ const pass = (name: string, clis: Cli[] = []) => ({ name, ok: true, seconds: 3, 
 const COPILOT: Cli = { provider: 'copilot', version: '1.0.93', path: 'C:\\Users\\t\\AppData\\Local\\Microsoft\\WinGet\\Links\\copilot.exe' }
 /** Each real suite once (#1521: reviewcopiesreal needs all three), its Combwork having selected every CLI it needs. */
 const AGY: Cli = { provider: 'antigravity', version: '1.5.0', path: 'C:\\Users\\t\\AppData\\Local\\agy\\bin\\agy.exe' }
-const OPENCODE: Cli = { provider: 'opencode', version: '2.2.6', path: 'C:\Users\t\AppData\Local\combwork-test\opencode-2.2.6\opencode.exe' }
+const OPENCODE: Cli = { provider: 'opencode', version: '2.2.6', path: 'C:\\Users\\t\\AppData\\Local\\combwork-test\\opencode-2.2.6\\opencode.exe' }
 const realResults = () => [pass('about'), ...suites.filter((s) => s.needs?.length).map((s) => pass(s.name, [CLAUDE, CODEX, ...(s.needs!.includes('copilot') ? [COPILOT] : []), ...(s.needs!.includes('agy') ? [AGY] : []), ...(s.needs!.includes('opencode') ? [OPENCODE] : [])]))]
 /** A run record of the whole real tier (and one fake suite), every suite passed, as run.mjs writes it. */
 const fullRecord = (over: Record<string, unknown> = {}) => {
