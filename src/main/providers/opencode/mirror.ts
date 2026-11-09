@@ -1,4 +1,4 @@
-import type { CompactionEvent, DayUsage, PlanLimit, PlanUsage, SessionUsage, TranscriptItem, TranscriptTool, UsageTokens } from '../../../shared/types'
+import type { CompactionEvent, DayUsage, PlanLimit, PlanUsage, SessionUsage, TranscriptImageRef, TranscriptItem, TranscriptTool, UsageTokens } from '../../../shared/types'
 import { OPENCODE } from '../../../shared/opencode'
 import { isoTime } from '../../../shared/planLimits'
 import { emptyDay, localDay } from '../../../shared/usageDays'
@@ -20,6 +20,8 @@ import type { ConversationParserLike, ImageLocation } from '../types'
 //    settled read's (or an export's), published whole. Only this line says a read completed; the file existing doesn't.
 //    A subagent's session's (HI-2773) also has `"parent"` (the session that started it) and `"directory"` (its folder),
 //    so the Sessions tab finds it under its parent from this line alone, and `"settled"` (whether it had ended when read).
+//    One Combwork didn't make (HI-2774) has `"external":true`, its `"directory"` and, for a fork, `"fork"` (its source); a
+//    fork's has `"forkCopies"` (how many of its first messages were copied from its source, or null: unknown).
 // 2. `{"type":"combwork.session","info":{…}}`: the session as `GET /api/session/{id}` gives it (title, tokens, cost, times).
 // 3. `{"type":"combwork.message","message":{…}}` per message, oldest first, as `GET /api/session/{id}/message` gives them.
 // 4. At most one `{"type":"combwork.status","problem":…,"detail":…,"at":…}` last: the newest read failed (the content
@@ -53,6 +55,15 @@ export interface MirrorHeader {
   directory?: string
   /** A subagent's: whether its info said nothing ran in it then (an unsettled one needs a final read after its run). */
   settled?: boolean
+  /** A session Combwork didn't make (HI-2774: no mark in its account; a TUI's `/new` or `/fork`), found by discovery. */
+  external?: true
+  /** An external fork's source session (its info's `fork.sessionID`): it is listed under that one. */
+  fork?: string
+  /**
+   * A fork's copied messages (HI-2774): how many of its first messages were copied from its source (each made strictly
+   * before the fork), or null when that can't be established (forkCopies). Absent: not a fork.
+   */
+  forkCopies?: number | null
 }
 
 /** A session id as OpenCode gives one (`ses_` and letters and digits). */
@@ -81,14 +92,53 @@ export function subagentSessions(sessionId: string, messages: readonly Obj[]): M
 /** Whether a session's info says it has nothing running (its `time.idle` at or after its `time.busy`). */
 export const sessionSettled = (info: Obj): boolean => typeof info?.time?.idle === 'number' && (typeof info.time.busy !== 'number' || info.time.idle >= info.time.busy)
 
+/** A session's folder, as its info gives it. */
+export const sessionDirectory = (info: Obj): string | null => (isObj(info.location) && typeof info.location.directory === 'string' ? info.location.directory : typeof info.directory === 'string' ? info.directory : null)
+
 /**
- * What a published session's header says of it as a subagent's (its info's `parentID`, folder, and whether it had ended:
- * kept in the file, so a later worker knows an unfinished mirror needs a final read), or nothing.
+ * What a published session's header says of where it came from: a subagent's (its info's `parentID`, folder, and whether
+ * it had ended: kept in the file, so a later worker knows an unfinished mirror needs a final read); one Combwork didn't
+ * make (`external`: its folder and any fork source); a fork's copied messages (forkCopies); or nothing.
  */
-export function subagentHeader(info: Obj): Pick<MirrorHeader, 'parent' | 'directory' | 'settled'> {
-  if (typeof info.parentID !== 'string' || !SESSION_ID.test(info.parentID)) return {}
-  const dir = isObj(info.location) && typeof info.location.directory === 'string' ? info.location.directory : typeof info.directory === 'string' ? info.directory : null
-  return { parent: info.parentID, ...(dir ? { directory: dir } : {}), settled: sessionSettled(info) }
+export function sessionHeader(info: Obj, messages: readonly Obj[], external: boolean): Pick<MirrorHeader, 'parent' | 'directory' | 'settled' | 'external' | 'fork' | 'forkCopies'> {
+  const dir = sessionDirectory(info)
+  const forked = isObj(info.fork) ? { forkCopies: forkCopies(info, messages) } : {}
+  if (typeof info.parentID === 'string' && SESSION_ID.test(info.parentID)) return { parent: info.parentID, ...(dir ? { directory: dir } : {}), settled: sessionSettled(info), ...forked }
+  if (!external) return forked
+  const source = isObj(info.fork) && typeof info.fork.sessionID === 'string' && SESSION_ID.test(info.fork.sessionID) ? info.fork.sessionID : null
+  return { external: true, ...(dir ? { directory: dir } : {}), ...(source ? { fork: source } : {}), ...forked }
+}
+
+/** Which a fork's message is: copied from its source (made strictly before the fork), its own (strictly after), or unknown. */
+type Provenance = 'copy' | 'own' | 'unknown'
+function provenanceOf(info: Obj, m: Obj): Provenance {
+  const at = info?.time?.created
+  const c = m?.time?.created
+  if (typeof at !== 'number' || !Number.isFinite(at) || at <= 0 || typeof c !== 'number' || !Number.isFinite(c)) return 'unknown'
+  return c < at ? 'copy' : c > at ? 'own' : 'unknown'
+}
+
+/**
+ * A fork's copied messages (HI-2774's R0: `POST /fork` copies the messages before its boundary under new ids, keeping
+ * their `time.created`, earlier than the fork's own; its info's tokens count only its own requests): how many of its
+ * first messages are copies, or null when that can't be established: a message or the fork with no valid time, one made
+ * at the very time of the fork (equal times prove nothing), or a copy after one of its own. 0 for a session that isn't a
+ * fork.
+ */
+/** A session's own messages: all of them, or for a fork only those it made after it was forked (never a copy, nor one that can't be told). */
+export const ownMessages = (info: Obj | null, messages: readonly Obj[]): Obj[] => (info && isObj(info.fork) ? messages.filter((m) => provenanceOf(info, m) === 'own') : [...messages])
+
+export function forkCopies(info: Obj | null, messages: readonly Obj[]): number | null {
+  if (!info || !isObj(info.fork)) return 0
+  let copies = 0
+  let own = false
+  for (const m of messages) {
+    const p = provenanceOf(info, m)
+    if (p === 'unknown' || (p === 'copy' && own)) return null
+    if (p === 'copy') copies++
+    else own = true
+  }
+  return copies
 }
 
 export interface MirrorStatus {
@@ -107,8 +157,9 @@ const iso = (ms: unknown): string | null => (typeof ms === 'number' && Number.is
 export const placeholderMirror = (): string => JSON.stringify({ type: MIRROR, state: 'placeholder' }) + '\n'
 
 /** A complete mirror: its header, the session, its messages oldest first. */
-export function buildMirror(header: Omit<MirrorHeader, 'type' | 'state' | 'parent' | 'directory' | 'settled'>, info: Obj, messages: readonly Obj[]): string {
-  const lines = [JSON.stringify({ type: MIRROR, state: 'complete', ...header, ...subagentHeader(info) }), JSON.stringify({ type: SESSION_LINE, info })]
+export function buildMirror(header: Omit<MirrorHeader, 'type' | 'state' | 'parent' | 'directory' | 'settled' | 'external' | 'fork' | 'forkCopies'> & { external?: boolean }, info: Obj, messages: readonly Obj[]): string {
+  const { external, ...rest } = header
+  const lines = [JSON.stringify({ type: MIRROR, state: 'complete', ...rest, ...sessionHeader(info, messages, !!external) }), JSON.stringify({ type: SESSION_LINE, info })]
   for (const m of messages) lines.push(JSON.stringify({ type: MESSAGE_LINE, message: m }))
   return lines.join('\n') + '\n'
 }
@@ -282,7 +333,13 @@ export function opencodeUsage(sessionId: string, info: Obj | null, messages: rea
     timeline.add(ts, t, 1, reports.length - 1, 0, model)
     return t
   }
+  // A fork (HI-2774): its copied messages are its source's requests, never counted here, nor one that can't be told apart
+  // (equal or missing times); only those made after the fork are. With its copies not established, its totals are info's
+  // and nothing more is broken down (as an inconsistent breakdown's).
+  const forked = !!info && isObj(info.fork)
+  const provenKnown = !forked || forkCopies(info, messages) !== null
   for (const m of messages) {
+    if (forked && provenanceOf(info!, m) !== 'own') continue
     const ts = iso(m?.time?.created)
     if (ts) {
       if (!usage.firstActivity || ts < usage.firstActivity) usage.firstActivity = ts
@@ -320,7 +377,7 @@ export function opencodeUsage(sessionId: string, info: Obj | null, messages: rea
   const infoCost = info && typeof info.cost === 'number' && Number.isFinite(info.cost) && info.cost >= 0 ? info.cost : null
   const rem = infoTokens ? { inputTokens: infoTokens.inputTokens - sums.inputTokens, outputTokens: infoTokens.outputTokens - sums.outputTokens, cacheReadTokens: infoTokens.cacheReadTokens - sums.cacheReadTokens, cacheWriteTokens: infoTokens.cacheWriteTokens - sums.cacheWriteTokens } : null
   const costRem = infoCost !== null ? infoCost - cost : 0
-  const bad = [...(rem ? KINDS.filter((k) => rem[k] < 0) : []), ...(costRem < -1e-9 ? ['cost'] : [])]
+  const bad = [...(rem ? KINDS.filter((k) => rem[k] < 0) : []), ...(costRem < -1e-9 ? ['cost'] : []), ...(provenKnown ? [] : ['fork'])]
   for (const k of KINDS) usage[k] = infoTokens ? infoTokens[k] : sums[k]
   usage.reasoningTokens = infoTokens ? infoTokens.reasoning : sums.reasoning
   usage.costUsd = infoCost ?? (costSeen ? cost : null)
@@ -369,7 +426,10 @@ export const HISTORY_TEXT = {
     exit: msg({ id: 'providers.transcript.opencodeProblem.exit', defaultMessage: 'OpenCode ended with an error', description: "Why Combwork couldn't read an OpenCode session's end ({problem} in providers.transcript.opencodeIncomplete): the opencode command exited with an error. OpenCode is a product's name." }),
     size: msg({ id: 'providers.transcript.opencodeProblem.size', defaultMessage: 'the session is larger than Combwork reads', description: "Why Combwork couldn't read an OpenCode session's end ({problem} in providers.transcript.opencodeIncomplete): it is over Combwork's size limit." }),
     parse: msg({ id: 'providers.transcript.opencodeProblem.parse', defaultMessage: "what OpenCode gave couldn't be read", description: "Why Combwork couldn't read an OpenCode session's end ({problem} in providers.transcript.opencodeIncomplete): OpenCode's answer wasn't in a shape Combwork knows. OpenCode is a product's name." })
-  } satisfies Record<MirrorProblem, ReturnType<typeof msg>>
+  } satisfies Record<MirrorProblem, ReturnType<typeof msg>>,
+  revertStaged: msg({ id: 'providers.transcript.opencodeRevertStaged', defaultMessage: 'OpenCode has this message and everything after it marked to be undone.', description: "A notice in an OpenCode session's history (the Sessions tab's transcript viewer), placed before a message: the user chose to undo (revert) the conversation from here in OpenCode, and hasn't confirmed it yet, so what follows is still shown. OpenCode is a product's name." }),
+  forked: msg({ id: 'providers.transcript.opencodeForked', defaultMessage: 'Forked from another session: everything above was copied from it.', description: "A notice in an OpenCode session's history (the Sessions tab's transcript viewer): this session is a fork (a copy made to continue separately) of another session; the messages above the notice came from that session, those below are this one's own." }),
+  forkedSomewhere: msg({ id: 'providers.transcript.opencodeForkedSomewhere', defaultMessage: 'This session was forked from another one: some of it was copied from that session.', description: "A notice at the start of an OpenCode session's history (the Sessions tab's transcript viewer): this session is a fork (a copy made to continue separately) of another session, and Combwork can't tell where the copied part ends." })
 }
 
 /** The notice for a status line: Combwork's words, translated where shown, with OpenCode's own after them where it gave some. */
@@ -377,11 +437,36 @@ export function statusNotice(s: Pick<MirrorStatus, 'problem'>): Text {
   return withValues(HISTORY_TEXT.incomplete, { provider: 'OpenCode', problem: HISTORY_TEXT.problem[s.problem] }) // i18n-ignore: a product name
 }
 
-/** The text of a tool's content parts (Tool.Content: `{type: 'text', text}`; others named by their type). */
+/** A data URL of an image embedded in the mirror, never a reference to anything else (a `file://` URI, a web address). */
+const EMBEDDED_IMAGE = /^data:image\/[\w.+-]+;base64,[A-Za-z0-9+/=\s]+$/
+
+/** A tool's content part that is an image embedded as a data URL (HI-2774's R0: `read` on a PNG). */
+const embeddedImagePart = (p: unknown): boolean => isObj(p) && p.type === 'file' && typeof p.uri === 'string' && EMBEDDED_IMAGE.test(p.uri)
+
+/** A user message's attachment that is an image with its data (HI-2774's R0: `files[]`, `data` base64 and `mime`). */
+const embeddedImageFile = (f: unknown): boolean => isObj(f) && typeof f.data === 'string' && !!f.data && typeof f.mime === 'string' && /^image\/[\w.+-]+$/.test(f.mime)
+
+/**
+ * The image at `loc` in a mirror's line (its `combwork.message` wrapper), as a data URL: an attachment's `data` and
+ * `mime`, or a tool part's `data:image/…;base64,` URI. Nothing else is resolved: a URI that names a file or a server is
+ * never read or fetched. Null when there is no embedded image there.
+ */
+export function opencodeImageData(line: Record<string, any>, loc: ImageLocation): string | null {
+  let at: unknown = line
+  for (const k of loc.path) at = isObj(at) || Array.isArray(at) ? (at as any)[k] : undefined
+  if (embeddedImageFile(at)) return `data:${(at as Obj).mime};base64,${String((at as Obj).data).replace(/\s+/g, '')}`
+  if (embeddedImagePart(at)) return String((at as Obj).uri)
+  return null
+}
+
+/** Where a message's image is, relative to its line's wrapper: the parser makes a reference for it (or none, in tests). */
+export type ImageAt = (path: (string | number)[]) => TranscriptImageRef | null
+
+/** The text of a tool's content parts (Tool.Content: `{type: 'text', text}`; an embedded image is shown as one; others named by their type). */
 function contentText(c: unknown): string {
   if (!Array.isArray(c)) return ''
   return c
-    .map((p) => (isObj(p) ? (typeof p.text === 'string' ? p.text : typeof p.type === 'string' ? `[${p.type}]` : '') : ''))
+    .map((p) => (isObj(p) ? (typeof p.text === 'string' ? p.text : embeddedImagePart(p) ? '' : typeof p.type === 'string' ? `[${p.type}]` : '') : ''))
     .filter(Boolean)
     .join('\n')
 }
@@ -393,7 +478,7 @@ const errorText = (e: unknown): string => (isObj(e) && typeof e.message === 'str
 const SHELL_AS = 'Bash' // i18n-ignore: a tool's name
 
 /** A tool part as the viewer shows it: its input, its result once it has one, and its exit where it ran a command. */
-export function opencodeTool(part: Obj, root: string | null): TranscriptTool {
+export function opencodeTool(part: Obj, root: string | null, imageAt?: (j: number) => TranscriptImageRef | null): TranscriptTool {
   const name = typeof part.name === 'string' && part.name ? part.name : 'tool'
   const state = isObj(part.state) ? part.state : {}
   const input = isObj(state.input) ? state.input : {}
@@ -404,7 +489,13 @@ export function opencodeTool(part: Obj, root: string | null): TranscriptTool {
   const exit = isObj(state.metadata) && typeof state.metadata.exit === 'number' ? state.metadata.exit : undefined
   const id = typeof part.id === 'string' ? part.id : ''
   const calls = codeModeCalls(id, state, result)
-  return { toolUseId: id, name, summary, input: formatToolInput(name === 'shell' ? SHELL_AS : name, input), result, isError, images: [], ...(exit !== undefined ? { exitCode: exit } : {}), ...(calls ? { calls, script: true as const } : {}) }
+  const images: TranscriptImageRef[] = []
+  if (done && imageAt && Array.isArray(state.content))
+    state.content.forEach((p: unknown, j: number) => {
+      const ref = embeddedImagePart(p) ? imageAt(j) : null
+      if (ref) images.push(ref)
+    })
+  return { toolUseId: id, name, summary, input: formatToolInput(name === 'shell' ? SHELL_AS : name, input), result, isError, images, ...(exit !== undefined ? { exitCode: exit } : {}), ...(calls ? { calls, script: true as const } : {}) }
 }
 
 /**
@@ -424,18 +515,29 @@ function codeModeCalls(id: string, state: Obj, result: string | null): Transcrip
   })
 }
 
-/** A message's items, in order. */
-export function messageItems(m: Obj, root: string | null): NewItem[] {
+/**
+ * A message's items, in order. `imageAt`: where its embedded images are, relative to its line's wrapper (`['message',
+ * 'files', i]` for an attachment, `['message', 'content', p, 'state', 'content', j]` for a tool's: HI-2774's R0).
+ */
+export function messageItems(m: Obj, root: string | null, imageAt?: ImageAt): NewItem[] {
   const ts = iso(m?.time?.created)
   const out: NewItem[] = []
-  if (m.type === 'user' && typeof m.text === 'string') out.push({ kind: 'user', timestamp: ts, text: m.text, images: [] })
-  else if (m.type === 'assistant') {
-    for (const p of Array.isArray(m.content) ? m.content : []) {
-      if (!isObj(p)) continue
+  if (m.type === 'user' && typeof m.text === 'string') {
+    const images: TranscriptImageRef[] = []
+    if (imageAt && Array.isArray(m.files))
+      m.files.forEach((f: unknown, i: number) => {
+        const ref = embeddedImageFile(f) ? imageAt(['message', 'files', i]) : null
+        if (ref) images.push(ref)
+      })
+    out.push({ kind: 'user', timestamp: ts, text: m.text, images })
+  } else if (m.type === 'assistant') {
+    const content: unknown[] = Array.isArray(m.content) ? m.content : []
+    content.forEach((p, i) => {
+      if (!isObj(p)) return
       if (p.type === 'reasoning' && typeof p.text === 'string' && p.text.trim()) out.push({ kind: 'thinking', timestamp: ts, text: p.text })
       else if (p.type === 'text' && typeof p.text === 'string' && p.text.trim()) out.push({ kind: 'assistant', timestamp: ts, text: p.text })
-      else if (p.type === 'tool') out.push({ kind: 'tool', timestamp: ts, tool: opencodeTool(p, root) })
-    }
+      else if (p.type === 'tool') out.push({ kind: 'tool', timestamp: ts, tool: opencodeTool(p, root, imageAt ? (j) => imageAt(['message', 'content', i, 'state', 'content', j]) : undefined) })
+    })
     // A request that failed says why (its error, OpenCode's words); an interrupt is the idle marker's to say.
     const why = errorText(m.error)
     if (m.finish === 'error' && why && m.error?.type !== 'aborted') out.push({ kind: 'notice', timestamp: ts, text: why, level: 'error' })
@@ -459,24 +561,37 @@ export class OpencodeConversationParser implements ConversationParserLike {
   readonly rewritten = true
   offset = 0
   private context = 0
+  /** The header's count of a fork's copied messages (undefined: not said; null: unknown). */
+  private forkCopies: number | null | undefined = undefined
+  /** The message a staged revert starts at (its info's `revert.messageID`), if any. */
+  private revertAt: string | null = null
+  private messages = 0
 
   constructor(private readonly root: string | null) {}
 
   feed(buf: Buffer): number {
     let start = 0
     for (let nl = buf.indexOf(10); nl !== -1; nl = buf.indexOf(10, start)) {
-      this.line(buf.toString('utf8', start, nl))
+      // Each line's place in the file, in bytes (an image is read back from it: opencodeImageData).
+      this.line(buf.toString('utf8', start, nl), this.offset + start, nl - start)
       start = nl + 1
     }
     this.offset += start
     return start
   }
 
+  private imageAt(offset: number, length: number): ImageAt {
+    return (path) => {
+      this.images.push({ offset, length, path })
+      return { id: this.images.length - 1, path: null }
+    }
+  }
+
   private push(item: NewItem): void {
     this.items.push({ ...item, id: this.items.length } as TranscriptItem)
   }
 
-  private line(text: string): void {
+  private line(text: string, offset: number, length: number): void {
     if (!text.trim()) return
     let o: unknown
     try {
@@ -485,6 +600,17 @@ export class OpencodeConversationParser implements ConversationParserLike {
       return
     }
     if (!isObj(o)) return
+    if (o.type === MIRROR) {
+      this.forkCopies = 'forkCopies' in o ? (typeof o.forkCopies === 'number' ? o.forkCopies : null) : undefined
+      return
+    }
+    if (o.type === SESSION_LINE && isObj(o.info)) {
+      const info = o.info
+      this.revertAt = isObj(info.revert) && typeof info.revert.messageID === 'string' ? info.revert.messageID : null
+      // A fork whose copied part can't be told: said at the start, never at a guessed place (HI-2774).
+      if (isObj(info.fork) && typeof this.forkCopies !== 'number') this.push({ ...noticeOf(HISTORY_TEXT.forkedSomewhere, 'info'), timestamp: iso(info.time?.created) })
+      return
+    }
     if (o.type === STATUS_LINE && MIRROR_PROBLEMS.includes(o.problem)) {
       const detail = typeof o.detail === 'string' && o.detail.trim() ? o.detail.trim() : ''
       this.push({ ...noticeOf(statusNotice(o as MirrorStatus), 'error'), timestamp: typeof o.at === 'string' ? o.at : null })
@@ -493,7 +619,10 @@ export class OpencodeConversationParser implements ConversationParserLike {
     }
     if (o.type !== MESSAGE_LINE || !isObj(o.message)) return
     const m = o.message
-    for (const item of messageItems(m, this.root)) {
+    // A staged revert (HI-2774's R0: the messages stay until it is committed): said before the message it starts at; a
+    // message it names that isn't here gets no notice anywhere else.
+    if (this.revertAt && m.id === this.revertAt) this.push({ ...noticeOf(HISTORY_TEXT.revertStaged, 'info'), timestamp: iso(m?.time?.created) })
+    for (const item of messageItems(m, this.root, this.imageAt(offset, length))) {
       if (item.kind === 'compaction') item.preTokens = this.context
       this.push(item)
     }
@@ -501,6 +630,8 @@ export class OpencodeConversationParser implements ConversationParserLike {
       const t = tokensOf(m.tokens)
       this.context = t.inputTokens + t.cacheReadTokens + t.cacheWriteTokens + t.outputTokens || this.context
     }
+    // A fork's copied part ends here (its header counted them, each made before the fork): said after its last copy.
+    if (++this.messages === this.forkCopies) this.push({ ...noticeOf(HISTORY_TEXT.forked, 'info'), timestamp: iso(m?.time?.created) })
   }
 }
 

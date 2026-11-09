@@ -80,7 +80,7 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
-import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
@@ -8312,8 +8312,9 @@ class SessionManager {
         const same = !!st && !!kept?.read.path && samePlace(kept.read.path, ext.transcriptPath) && kept.read.size === st.size && kept.read.mtime === st.mtimeMs
         const usage = kept ? this.titled(kept.usage) : null
         if (!same) void usageHistory.ingestExternal(projectPath, { id: ext.id, provider: adapter.id, transcriptPath: ext.transcriptPath }).catch(() => undefined)
-        // Known to be empty: not listed. Not known yet: listed without figures until the worker has it.
-        if (usage && usage.requests === 0) continue
+        // Known to be empty: not listed. Not known yet: listed without figures until the worker has it. A sub-session is
+        // listed under its session though it made no request of its own (an OpenCode fork holding only what it copied, HI-2774).
+        if (usage && usage.requests === 0 && !ext.sub) continue
         items.push({
           id: ext.id,
           provider: adapter.id,
@@ -8966,13 +8967,51 @@ class SessionManager {
   async adopt(projectPath: string, sessionId: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     assertSessionId(sessionId)
+    // One adoption of a session at a time (HR2 on HI-2774): its provider's record and Combwork's are made, or taken back,
+    // as one, never interleaved with another's.
+    const k = `${projectPath.toLowerCase()}|${sessionId}`
+    const before = this.adoptions.get(k) ?? Promise.resolve()
+    const mine = before.catch(() => undefined).then(() => this.adoptNow(projectPath, sessionId))
+    const kept = mine.catch(() => undefined)
+    this.adoptions.set(k, kept)
+    void kept.then(() => {
+      if (this.adoptions.get(k) === kept) this.adoptions.delete(k)
+    })
+    return mine
+  }
+  private adoptions = new Map<string, Promise<unknown>>()
+
+  private async adoptNow(projectPath: string, sessionId: string): Promise<void> {
     const src = await this.providerTranscript(projectPath, sessionId)
     const provider = src?.provider ?? 'claude-code'
     // As its record says, if it has one (HI-1829): a conversation that ran on a server is never read Claude-priced.
     const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
     const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider, { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }) : null
     // A sub-session (a Codex guardian review, say) stays one: never an agent's session to resume.
-    const sub = src ? (await providerAdapter(provider).listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub : undefined
+    const adapter = providerAdapter(provider)
+    // Found in another of the host's folders, it is still one: its transcript's first line says so too (HI-2774).
+    const sub = src ? ((await adapter.listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub ?? (await adapter.subSessionOf(src.path, sessionId).catch(() => null)) ?? undefined) : undefined
+    // A conversation the CLI keeps by a record of Combwork's (OpenCode's mark, HI-2774) is taken over in the CLI's data
+    // first, or refused with why; what that made is taken back if the record can't be written, so nothing half-adopted stays.
+    let handle: AdoptionHandle | null = null
+    if (src && !sub && adapter.adopting) {
+      const file = await workspace.sessionsFile(projectPath)
+      const cfg = await workspace.projectConfig(projectPath)
+      handle = await adapter.adopting(projectPath, sessionId, src.path, this.sessionFolders(projectPath, file.sessions, cfg))
+    }
+    try {
+      await handle?.commit()
+      await this.writeAdopted(projectPath, sessionId, provider, src, sub, usage)
+    } catch (e) {
+      if (handle) await handle.done(false).catch((u) => log.warn(`Taking back an adoption's record in ${userText(projectPath)}`, u))
+      throw e
+    }
+    if (handle) await handle.done(true).catch((u) => log.warn(`Ending an adoption in ${userText(projectPath)}`, u))
+    if (src && config.settings.sessions.backupTranscripts) await syncCopy(src.path, this.backupPath(projectPath, sessionId)).catch(() => undefined)
+  }
+
+  /** An adopted session's record (a seam for tests: its write failing must take back what the adoption made). */
+  writeAdopted = async (projectPath: string, sessionId: string, provider: ProviderId, src: { path: string } | null, sub: SubSession | undefined, usage: SessionUsage | null): Promise<void> => {
     await workspace.upsertSession(projectPath, {
       ...(sub ? { sub } : {}),
       id: sessionId,
@@ -8984,7 +9023,6 @@ class SessionManager {
       lastActiveAt: usage?.lastActivity ?? new Date().toISOString(),
       ...(src && !providerDescriptor(provider).capabilities.fixedSessionId ? { transcriptPath: src.path } : {})
     })
-    if (src && config.settings.sessions.backupTranscripts) await syncCopy(src.path, this.backupPath(projectPath, sessionId)).catch(() => undefined)
   }
 }
 

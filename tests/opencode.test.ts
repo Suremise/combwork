@@ -488,4 +488,26 @@ describe("subagents' sessions in the Sessions tab (HI-2773)", () => {
     expect(await a.transcriptPath(project, child.id)).toBe(mirrorPath(home, child.id))
     expect(await a.transcriptPath(project, parent.id)).toBeNull()
   })
+
+  it("lists sessions its TUI made (HI-2774: found by discovery): a fork under its source, a new one as a session of its own, each in its folder", async () => {
+    const { OpencodeAdapter } = await import('../src/main/providers/opencode/adapter')
+    const { buildMirror } = await import('../src/main/providers/opencode/mirror')
+    const { mirrorDir, mirrorPath } = await import('../src/main/providers/opencode/historyCore')
+    const { mkdirSync, writeFileSync } = await import('fs')
+    const fork = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', 'wire', 'fork.json'), 'utf8'))
+    const home = tempDir('cw-oc-ext-')
+    const project = tempDir('cw-oc-ext-project-')
+    const forked = { ...fork.fork.info, location: { directory: project } }
+    const fresh = { id: 'ses_e403f932affeEEwzcBWI8UJ5m6', cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 2 }, location: { directory: project } }
+    mkdirSync(mirrorDir(home), { recursive: true })
+    writeFileSync(mirrorPath(home, forked.id), buildMirror({ w: -1, source: 'export', updated: 2, external: true }, forked, [...fork.fork.messages].reverse()))
+    writeFileSync(mirrorPath(home, fresh.id), buildMirror({ w: -1, source: 'export', updated: 2, external: true }, fresh, []))
+    const a = new OpencodeAdapter()
+    a.allHomes = () => [home]
+    const found = await a.listSessions(project)
+    expect(found.map((s) => [s.id, s.sub ?? null]).sort()).toEqual([[forked.id, { parentId: fork.source.info.id, kind: 'fork' }], [fresh.id, null]].sort())
+    expect(await a.listSessions(tempDir('cw-oc-ext-other-'))).toEqual([])
+    expect(await a.transcriptPath(project, fresh.id)).toBe(mirrorPath(home, fresh.id))
+    expect(await a.subSessionOf(mirrorPath(home, forked.id), forked.id)).toEqual({ parentId: fork.source.info.id, kind: 'fork' })
+  })
 })

@@ -1,0 +1,62 @@
+$ opencode stats --json --standalone
+code 0
+--- stdout
+{
+  "range": {
+    "from": 1767225600000,
+    "to": 1794218423119
+  },
+  "sessions": 2,
+  "subagents": 0,
+  "prompts": 6,
+  "steps": 6,
+  "tokens": {
+    "input": 4789,
+    "output": 421,
+    "reasoning": 0,
+    "cache": {
+      "read": 4762,
+      "write": 0
+    }
+  },
+  "cost": 0,
+  "tools": {
+    "mode": "detail",
+    "totals": {
+      "calls": 0,
+      "succeeded": 0,
+      "failed": 0,
+      "unfinished": 0
+    },
+    "usage": []
+  },
+  "activeDays": 1,
+  "streak": 1,
+  "activity": [
+    {
+      "date": "2026-11-09",
+      "steps": 6
+    }
+  ],
+  "models": [
+    {
+      "model": {
+        "id": "qwen3:8b",
+        "providerID": "probe"
+      },
+      "steps": 6,
+      "tokens": {
+        "input": 4789,
+        "output": 421,
+        "reasoning": 0,
+        "cache": {
+          "read": 4762,
+          "write": 0
+        }
+      },
+      "cost": 0
+    }
+  ]
+}
+
+--- stderr

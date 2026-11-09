@@ -3,7 +3,7 @@ import { endTree } from '../../progressReporters/wrapper'
 import { request as httpRequest } from 'http'
 import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'original-fs'
 import { join } from 'path'
-import { buildMirror, mirrorState, newestMessage, parseExport, sessionSettled, subagentSessions, withStatus, type MirrorHeader, type MirrorProblem, type LimitsReading, opencodePlanUsage } from './mirror'
+import { buildMirror, mirrorState, newestMessage, ownMessages, parseExport, placeholderMirror, sessionSettled, subagentSessions, withStatus, type MirrorHeader, type MirrorProblem, type LimitsReading, opencodePlanUsage } from './mirror'
 
 // The OpenCode history's worker core (HI-2762, design s7/s10/s13): every read of a session from its agent's private server,
 // every `opencode session export`, and every write of a session's mirror (mirror.ts) happens here, in a thread of its own
@@ -44,9 +44,11 @@ export interface Bounds {
   maxExportBytes: number
   repairBatch: number
   repairHours: number
+  /** `opencode session list`'s output, at most (discovery, HI-2774). */
+  maxListBytes: number
 }
 
-export const DEFAULT_BOUNDS: Bounds = { maxPending: 64, refreshes: 2, pageSize: 200, maxPages: 100, maxBytes: 8 * 1024 * 1024, requestMs: 10_000, refreshMs: 60_000, settleTries: 3, exportMs: 60_000, maxExportBytes: 64 * 1024 * 1024, repairBatch: 8, repairHours: 24 }
+export const DEFAULT_BOUNDS: Bounds = { maxPending: 64, refreshes: 2, pageSize: 200, maxPages: 100, maxBytes: 8 * 1024 * 1024, requestMs: 10_000, refreshMs: 60_000, settleTries: 3, exportMs: 60_000, maxExportBytes: 64 * 1024 * 1024, repairBatch: 8, repairHours: 24, maxListBytes: 1024 * 1024 }
 
 /** A command main built (its protected environment: install.ts opencodeCommand). */
 export interface CommandSpec {
@@ -69,6 +71,11 @@ export type CoreRequest = { id: number } & (
   | { type: 'limits'; runId: string }
   | { type: 'repairScan'; homes: string[] }
   | { type: 'bounds'; bounds: Partial<Bounds> }
+  | { type: 'discover'; home: string; folder: string; command: CommandSpec; reason: 'runEnd' | 'repair' }
+  | { type: 'discoveryFolders'; homes: string[] }
+  | { type: 'adoptMark'; home: string; sessionId: string; directory: string }
+  | { type: 'adoptCommit'; home: string; sessionId: string; lease: string }
+  | { type: 'adoptDone'; home: string; sessionId: string; lease: string; ok: boolean; created: boolean }
   | { type: 'idle' }
   | { type: 'shutdown' }
 )
@@ -79,6 +86,8 @@ export type CoreEvent =
   | { event: 'limits'; runId: string; epoch: number; reading: LimitsReading }
   /** An exported session's subagents whose mirrors need an export of their own (HI-2773): main queues them. */
   | { event: 'children'; home: string; sessionId: string; children: string[]; reason: 'runEnd' | 'repair' }
+  /** Sessions Combwork didn't make, found in an account's data (HI-2774): main queues their exports. */
+  | { event: 'discovered'; home: string; sessions: string[] }
   | { event: 'log'; level: 'info' | 'warn'; text: string }
 
 export type CoreReply = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string } | CoreEvent
@@ -86,6 +95,11 @@ export type CoreReply = { id: number; ok: true; value: unknown } | { id: number;
 export const mirrorDir = (home: string): string => join(home, 'combwork-sessions')
 export const mirrorPath = (home: string, sessionId: string): string => join(mirrorDir(home), `${sessionId}.jsonl`)
 export const statePath = (home: string, sessionId: string): string => join(mirrorDir(home), `${sessionId}.state.json`)
+/** Combwork's mark that it made (or took over) a session in this account (the launcher's sessionMark: the same folder). */
+export const markPath = (home: string, sessionId: string): string => join(mirrorDir(home), `${sessionId}.json`)
+/** An account's discovery record (HI-2774): per folder scanned, the database's time at its last scan and whether that scan handed out everything. */
+export const discoveryPath = (home: string): string => join(mirrorDir(home), 'combwork-discovery.json')
+const SESSION_ID = /^ses_[A-Za-z0-9]{1,64}$/
 /** The account's database (OpenCode's default under its data root), and its WAL: a change to either is a change. */
 export const dbFiles = (home: string): string[] => [join(home, 'opencode', 'opencode.db'), join(home, 'opencode', 'opencode.db-wal')]
 
@@ -108,7 +122,21 @@ interface Session {
   parent: string | null
   /** Whether its last published info said nothing runs in it (a child still running is checked at each parent poll). */
   settled: boolean
+  /** The message its last published info's staged revert starts at (HI-2774): a stage or unstage is a change too. */
+  revert: string | null
 }
+
+/** A folder's entry in an account's discovery record (discoveryPath). */
+interface Discovery {
+  folder: string
+  dbMtime?: number
+  complete?: boolean
+  /** When it was last scanned (ms): the oldest folder goes past MAX_FOLDERS. */
+  at?: number
+}
+
+/** At most this many folders are kept per account for discovery's later passes. */
+const MAX_FOLDERS = 50
 
 /** At most this many subagents are followed per session (its newest starts first). */
 const MAX_CHILDREN = 200
@@ -122,7 +150,7 @@ interface Run {
   abort: AbortController
 }
 
-type JobKind = 'refresh' | 'export' | 'limits'
+type JobKind = 'refresh' | 'export' | 'limits' | 'discover'
 interface Job {
   kind: JobKind
   key: string
@@ -131,6 +159,9 @@ interface Job {
   force?: boolean
   command?: CommandSpec
   reason?: 'runEnd' | 'repair'
+  /** A discovery's account and folder. */
+  home?: string
+  folder?: string
 }
 
 /**
@@ -204,13 +235,20 @@ const defaultDeps: CoreDeps = {
 
 export class HistoryCore {
   private sessions = new Map<string, Session>()
+  /**
+   * Adoptions under way, by session key (HI-2774, HR2 on round 1): each adoption's lease, pending (its mark checked or
+   * made) or committing (its record being written); whether one of them made the mark, and whether one committed. The
+   * mark is taken back only once none is left and none committed, and only if one of them made it.
+   */
+  private adoptions = new Map<string, { created: boolean; committed: boolean; leases: Map<string, 'pending' | 'committing'> }>()
+  private leaseCount = 0
   /** Each session's subagents' sessions (by its key: their ids), from its last published read. */
   private kids = new Map<string, Set<string>>()
   private runs = new Map<string, Run>()
   private removed = new Set<string>()
   /** Queued jobs, oldest first: at most one per session and kind. */
   private queue: Job[] = []
-  private running = { refresh: 0, export: 0, limits: 0 }
+  private running = { refresh: 0, export: 0, limits: 0, discover: 0 }
   private children = new Set<ChildProcess>()
   /** Each session's export under way, by session key: removeRoot waits for its root's. */
   private exporting = new Map<string, Promise<void>>()
@@ -279,7 +317,12 @@ export class HistoryCore {
           this.cancelQueued(k)
         }
         for (const run of [...this.runs.values()]) if (run.key.startsWith(`${h}|`)) this.dropRun(run)
+        // Its discovery too (HI-2774): a queued one goes, a running one is waited for below.
+        this.queue = this.queue.filter((j) => !j.key.startsWith(`${h}|`))
         await Promise.all([...this.exporting].filter(([k]) => k.startsWith(`${h}|`)).map(([, p]) => p))
+        // An adoption writing its record in the root is waited for (its rollback, if any, done too); one not committing yet
+        // is refused at its commit, the root being removed now (HR2 on HI-2774, round 1).
+        while ([...this.adoptions].some(([k, a]) => k.startsWith(`${h}|`) && [...a.leases.values()].includes('committing'))) await new Promise((res) => setTimeout(res, 5))
         return true
       }
       case 'restoreRoot':
@@ -305,6 +348,49 @@ export class HistoryCore {
       }
       case 'repairScan':
         return this.repairCandidates(r.homes)
+      case 'discover': {
+        // One per account and folder at a time, and only when due: its database changed since that folder's last scan, or
+        // that scan left some.
+        if (this.removed.has(r.home.toLowerCase()) || !this.discoveryDue(r.home, r.folder)) return false
+        return this.enqueue({ kind: 'discover', key: key(r.home, `#discover|${r.folder.toLowerCase()}`), epoch: 0, command: r.command, reason: r.reason, home: r.home, folder: r.folder })
+      }
+      case 'discoveryFolders':
+        // The repair pass: each account's folders scanned before whose scan is due again.
+        return r.homes.filter((h) => !this.removed.has(h.toLowerCase())).flatMap((home) => Object.values(this.readDiscovery(home)).filter((d) => this.discoveryDue(home, d.folder)).map((d) => ({ home, folder: d.folder })))
+      case 'adoptMark': {
+        const m = this.adoptMark(r.home, r.sessionId, r.directory)
+        if (!m.ok) return m
+        const k = key(r.home, r.sessionId)
+        const a = this.adoptions.get(k) ?? { created: false, committed: false, leases: new Map() }
+        const lease = `${this.epochBase}-${++this.leaseCount}`
+        a.created ||= m.created
+        a.leases.set(lease, 'pending')
+        this.adoptions.set(k, a)
+        return { ...m, lease }
+      }
+      case 'adoptCommit': {
+        // The adoption's record is about to be written: refused when its root is going (or went) away meanwhile, or its
+        // lease isn't known (a worker since restarted); else the root's removal waits for it to be done.
+        const a = this.adoptions.get(key(r.home, r.sessionId))
+        if (this.removed.has(r.home.toLowerCase()) || this.closed || !a?.leases.has(r.lease) || !existsSync(markPath(r.home, r.sessionId))) return false
+        a.leases.set(r.lease, 'committing')
+        return true
+      }
+      case 'adoptDone': {
+        const k = key(r.home, r.sessionId)
+        const a = this.adoptions.get(k)
+        if (!a) {
+          // A lease a restarted worker never knew: its own mark taken back if its record wasn't written.
+          if (!r.ok && r.created) rmSync(markPath(r.home, r.sessionId), { force: true })
+          return true
+        }
+        a.leases.delete(r.lease)
+        if (r.ok) a.committed = true
+        if (a.leases.size) return true
+        this.adoptions.delete(k)
+        if (!a.committed && a.created) rmSync(markPath(r.home, r.sessionId), { force: true })
+        return true
+      }
       case 'bounds':
         this.bounds = { ...this.bounds, ...r.bounds }
         return this.bounds
@@ -335,7 +421,7 @@ export class HistoryCore {
   private session(home: string, sessionId: string): Session {
     const k = key(home, sessionId)
     let s = this.sessions.get(k)
-    if (!s) this.sessions.set(k, (s = { home, sessionId, epoch: this.epochBase, runId: null, updated: 0, parent: null, settled: false }))
+    if (!s) this.sessions.set(k, (s = { home, sessionId, epoch: this.epochBase, runId: null, updated: 0, parent: null, settled: false, revert: null }))
     return s
   }
 
@@ -363,8 +449,9 @@ export class HistoryCore {
    * from its server (a poll: nothing more when unchanged); after it, those whose mirror is older than their newest start
    * are given to main to export (`reason`: the parent's).
    */
-  private followChildren(s: Session, source: 'api' | 'export', messages: Record<string, any>[], reason: 'runEnd' | 'repair' = 'repair'): void {
-    const found = [...subagentSessions(s.sessionId, messages)].sort((a, b) => b[1] - a[1]).slice(0, MAX_CHILDREN)
+  private followChildren(s: Session, source: 'api' | 'export', info: Record<string, any>, messages: Record<string, any>[], reason: 'runEnd' | 'repair' = 'repair'): void {
+    // A fork's copied messages name its source's subagents (HI-2774): only what it ran itself is its own to follow.
+    const found = [...subagentSessions(s.sessionId, ownMessages(info, messages))].sort((a, b) => b[1] - a[1]).slice(0, MAX_CHILDREN)
     const pk = key(s.home, s.sessionId)
     if (!found.length) return void this.kids.delete(pk)
     this.kids.set(pk, new Set(found.map(([id]) => id)))
@@ -372,6 +459,8 @@ export class HistoryCore {
     const exports: string[] = []
     for (const [id, ran] of found) {
       const c = this.session(s.home, id)
+      // The session that started it, once known, stays its parent.
+      if (c.parent && c.parent !== s.sessionId) continue
       c.parent = s.sessionId
       if (run) {
         if (c.runId !== run.runId) {
@@ -472,7 +561,8 @@ export class HistoryCore {
   private async run(j: Job): Promise<void> {
     if (j.kind === 'refresh') return this.refresh(j)
     if (j.kind === 'limits') return this.limits(j)
-    const p = this.exportJob(j)
+    // An export or a discovery runs a command in the account's folder: removeRoot waits for it (exporting, by its key).
+    const p = j.kind === 'discover' ? this.discoverJob(j) : this.exportJob(j)
     this.exporting.set(j.key, p.catch(() => undefined))
     try {
       await p
@@ -544,13 +634,15 @@ export class HistoryCore {
         const info = ((await this.get(run, `/api/session/${encodeURIComponent(s.sessionId)}`, deadline)) as { data?: Record<string, any> })?.data
         const updated = typeof info?.time?.updated === 'number' ? info.time.updated : 0
         // 2.2.6 sets a session's `time.idle` at its end without moving `time.updated` (HI-2773's R0): that is a change too.
-        if (updated && updated === s.updated && sessionSettled(info ?? {}) === s.settled && this.complete(s)) return
+        // A staged revert or its undoing changes the info too (HI-2774): compared as well, whatever time.updated says.
+        const revert = typeof info?.revert?.messageID === 'string' ? info.revert.messageID : null
+        if (updated && updated === s.updated && sessionSettled(info ?? {}) === s.settled && revert === s.revert && this.complete(s)) return
       }
       const read = await this.settledRead(run, s, deadline)
       // Unsettled every try (a turn under way): the next poll or nudge reads again; nothing is published, no notice.
       if (!read) return
       const updated = typeof read.info.time?.updated === 'number' ? read.info.time.updated : 0
-      if (this.publish(s, j.epoch, 'api', read.w, updated, read.info, read.messages)) this.followChildren(s, 'api', read.messages)
+      if (this.publish(s, j.epoch, 'api', read.w, updated, read.info, read.messages)) this.followChildren(s, 'api', read.info, read.messages)
     } catch (e) {
       // A run's server going away (it ends with its run) or slow is no notice: its run-end export reads it again. What a
       // retry can't change (too large, unreadable) is one.
@@ -581,7 +673,7 @@ export class HistoryCore {
     mkdirSync(dir, { recursive: true })
     const tmp = join(dir, `.${s.sessionId}.export-${process.pid}-${this.deps.now()}.json`)
     try {
-      const code = await this.runExport(j.command, tmp, s, j.epoch)
+      const code = await this.runExport(j.command, tmp, () => s.epoch === j.epoch, this.bounds.maxExportBytes)
       if (s.epoch !== j.epoch) return
       if (code !== 0) throw new Failed('exit', `opencode exited with code ${code}`, this.tail(tmp)) // i18n-ignore: a log line; the CLI's own output is what the history shows
       const parsed = parseExport(readFileSync(tmp, 'utf8'))
@@ -592,7 +684,7 @@ export class HistoryCore {
       // a failure is: once the account's database changed, or after the retry time, never in a loop.
       if (published && typeof parsed.info.parentID === 'string' && !sessionSettled(parsed.info)) this.writeState(s, { failedAt: this.deps.now(), dbMtime: this.dbMtime(s.home), attempts: (this.readState(s).attempts ?? 0) + 1 })
       else this.clearState(s)
-      if (published) this.followChildren(s, 'export', parsed.messages, j.reason)
+      if (published) this.followChildren(s, 'export', parsed.info, parsed.messages, j.reason)
     } catch (e) {
       const f = e instanceof Failed ? e : new Failed('exit', e instanceof Error ? e.message : String(e)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       if (s.epoch !== j.epoch) return
@@ -606,7 +698,7 @@ export class HistoryCore {
   }
 
   /** Runs an export, its stdout to `tmp` up to the bound; the exit code, or a Failed. Killed when the session's epoch moves on. */
-  private runExport(cmd: CommandSpec, tmp: string, s: Session, epoch: number): Promise<number> {
+  private runExport(cmd: CommandSpec, tmp: string, wanted: () => boolean, maxBytes: number): Promise<number> {
     return new Promise((resolve, reject) => {
       const out = createWriteStream(tmp)
       let child: ChildProcess
@@ -627,11 +719,11 @@ export class HistoryCore {
       }
       const timer = setTimeout(() => kill(new Failed('timeout', `the export took over ${Math.round(this.bounds.exportMs / 1000)} s`)), this.bounds.exportMs) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       const watch = setInterval(() => {
-        if (s.epoch !== epoch || this.closed) kill(new Failed('exit', 'stopped: the session moved on')) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
+        if (!wanted() || this.closed) kill(new Failed('exit', 'stopped: the session moved on')) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
       }, 200)
       child.stdout?.on('data', (b: Buffer) => {
         bytes += b.length
-        if (bytes > this.bounds.maxExportBytes) return kill(new Failed('size', `the export was over ${this.bounds.maxExportBytes} bytes`)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
+        if (bytes > maxBytes) return kill(new Failed('size', `the output was over ${maxBytes} bytes`)) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
         out.write(b)
       })
       child.stderr?.on('data', (b: Buffer) => {
@@ -653,6 +745,131 @@ export class HistoryCore {
     })
   }
 
+  // ---- Discovery (HI-2774): sessions in an account's data that Combwork didn't make (its TUI's `/new` or `/fork`)
+
+  /** An account's discovery record: its folders' entries, by folder in lower case. */
+  private readDiscovery(home: string): Record<string, Discovery> {
+    try {
+      const o = JSON.parse(readFileSync(discoveryPath(home), 'utf8'))
+      if (!o || typeof o !== 'object' || !o.folders || typeof o.folders !== 'object') return {}
+      return Object.fromEntries(Object.entries(o.folders as Record<string, Discovery>).filter(([, d]) => d && typeof d.folder === 'string'))
+    } catch {
+      return {}
+    }
+  }
+
+  private writeDiscovery(home: string, d: Discovery): void {
+    const all = this.readDiscovery(home)
+    all[d.folder.toLowerCase()] = d
+    const kept = Object.entries(all).sort((a, b) => (b[1].at ?? 0) - (a[1].at ?? 0)).slice(0, MAX_FOLDERS)
+    mkdirSync(mirrorDir(home), { recursive: true })
+    writeFileSync(discoveryPath(home), JSON.stringify({ folders: Object.fromEntries(kept) }))
+  }
+
+  /** Due: that folder never scanned, its last scan left candidates it didn't hand out, or the database changed since. */
+  private discoveryDue(home: string, folder: string): boolean {
+    const d = this.readDiscovery(home)[folder.toLowerCase()]
+    return !d || !d.complete || (d.dbMtime ?? 0) < this.dbMtime(home)
+  }
+
+  /**
+   * One scan of an account (`opencode session list --format json`, standalone: main's protected command, an export's
+   * bounds, its output at most `maxListBytes`): the sessions with no mark, no live run and no parent whose mirror is
+   * missing, a placeholder, ends in a notice or is older than listed, and whose retry record lets them be tried now; at
+   * most `repairBatch` of them, the least recently tried first, go to main to export. The scan is complete only when it
+   * handed out every one, so a backlog is scanned for again at the next pass though the database didn't change.
+   */
+  private async discoverJob(j: Job): Promise<void> {
+    const home = j.home
+    const folder = j.folder
+    if (!home || !folder || !j.command || this.removed.has(home.toLowerCase()) || this.closed) return
+    const db = this.dbMtime(home)
+    const dir = mirrorDir(home)
+    mkdirSync(dir, { recursive: true })
+    const tmp = join(dir, `.discover-${process.pid}-${this.deps.now()}.json`)
+    let listed: unknown
+    try {
+      const code = await this.runExport(j.command, tmp, () => !this.removed.has(home.toLowerCase()), this.bounds.maxListBytes)
+      if (code !== 0) throw new Failed('exit', `opencode exited with code ${code}`) // i18n-ignore: a log line
+      listed = JSON.parse(readFileSync(tmp, 'utf8'))
+    } catch (e) {
+      this.emit({ event: 'log', level: 'info', text: `an OpenCode account's sessions couldn't be listed (${e instanceof Error ? e.message : String(e)}); the next pass tries again` }) // i18n-ignore: a log line
+      return
+    } finally {
+      rmSync(tmp, { force: true })
+    }
+    if (this.removed.has(home.toLowerCase()) || this.closed || !Array.isArray(listed)) return
+    const now = this.deps.now()
+    const found: { id: string; tried: number }[] = []
+    for (const row of listed) {
+      const id = row && typeof row === 'object' ? (row as Record<string, unknown>).id : null
+      const updated = row && typeof row === 'object' ? (row as Record<string, unknown>).updated : null
+      if (typeof id !== 'string' || !SESSION_ID.test(id) || existsSync(markPath(home, id))) continue
+      if (this.sessions.get(key(home, id))?.runId) continue
+      const h = this.header({ home, sessionId: id })
+      // A subagent's is its parent's to follow (followChildren).
+      if (h?.parent) continue
+      if (h?.state === 'complete' && !this.needsRepair(home, id) && typeof h.updated === 'number' && typeof updated === 'number' && h.updated >= updated) continue
+      const st = this.readState({ home, sessionId: id })
+      if (st.failedAt && (st.dbMtime ?? 0) >= db && now - st.failedAt < this.bounds.repairHours * 3600_000) continue
+      found.push({ id, tried: st.failedAt ?? 0 })
+    }
+    found.sort((a, b) => a.tried - b.tried)
+    const batch = found.slice(0, this.bounds.repairBatch).map((f) => f.id)
+    // Each handed out is kept for the repair pass before the scan counts as done (HR2 on HI-2774, round 1): a placeholder
+    // mirror and a pending retry record, so an export main never queued (a restart, a full queue, no command) is still
+    // made by the repair pass, which reads the mirror folder.
+    for (const id of batch) {
+      if (!existsSync(mirrorPath(home, id))) writeFileSync(mirrorPath(home, id), placeholderMirror(), { flag: 'wx' })
+      this.writeState({ home, sessionId: id }, { ...this.readState({ home, sessionId: id }), pending: true })
+    }
+    this.writeDiscovery(home, { folder, dbMtime: db, complete: found.length <= batch.length, at: now })
+    if (batch.length) this.emit({ event: 'discovered', home, sessions: batch })
+  }
+
+  /**
+   * An adoption's mark (HI-2774): Combwork takes over a session it didn't make, in the account whose data holds it, as the
+   * launcher's own mark says it made one (`{id, directory}`). In order with removals: none in a root being removed. Only
+   * for a complete mirror of that session, one Combwork didn't make, in that folder; never over another mark (one already
+   * there for the same session and folder is taken as it is: `created: false`, so a rollback leaves it).
+   */
+  private adoptMark(home: string, sessionId: string, directory: string): { ok: true; created: boolean } | { ok: false; why: 'notRead' | 'otherFolder' | 'otherMark' | 'other' } {
+    if (this.removed.has(home.toLowerCase()) || this.closed || !SESSION_ID.test(sessionId)) return { ok: false, why: 'other' } // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    const same = (a: unknown): boolean => typeof a === 'string' && a.replace(/[\\/]+$/, '').toLowerCase() === directory.replace(/[\\/]+$/, '').toLowerCase()
+    const mark = markPath(home, sessionId)
+    if (existsSync(mark)) {
+      try {
+        const o = JSON.parse(readFileSync(mark, 'utf8'))
+        return o && o.id === sessionId && same(o.directory) ? { ok: true, created: false } : { ok: false, why: 'otherMark' } // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+      } catch {
+        return { ok: false, why: 'otherMark' } // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+      }
+    }
+    let lines: string[]
+    try {
+      lines = readFileSync(mirrorPath(home, sessionId), 'utf8').split('\n', 2)
+    } catch {
+      return { ok: false, why: 'notRead' } // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    }
+    const h = mirrorState(lines[0] ?? '').header
+    if (!h || h.state !== 'complete' || !h.external) return { ok: false, why: h?.parent || h?.fork ? 'other' : 'notRead' } // i18n-ignore: ICU select keys (providers.opencode.adoptRefused), not text
+    let info: Record<string, any> | null = null
+    try {
+      const o = JSON.parse(lines[1] ?? '')
+      info = o && o.type === 'combwork.session' ? o.info : null
+    } catch {
+      info = null
+    }
+    if (!info || info.id !== sessionId) return { ok: false, why: 'notRead' } // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    if (!same(h.directory) || !same(info.location?.directory)) return { ok: false, why: 'otherFolder' } // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    try {
+      writeFileSync(mark, JSON.stringify({ id: sessionId, directory: info.location.directory }), { flag: 'wx' })
+    } catch {
+      return { ok: false, why: 'otherMark' } // i18n-ignore: an ICU select key (providers.opencode.adoptRefused), not text
+    }
+    return { ok: true, created: true }
+  }
+
   private tail(file: string): string {
     try {
       return readFileSync(file, 'utf8').trim().slice(-300)
@@ -668,7 +885,7 @@ export class HistoryCore {
   }
 
   /** The published mirror's header (its first line, read alone), or null. */
-  private header(s: Session): MirrorHeader | null {
+  private header(s: Pick<Session, 'home' | 'sessionId'>): MirrorHeader | null {
     const p = mirrorPath(s.home, s.sessionId)
     let fd: number | null = null
     try {
@@ -700,10 +917,13 @@ export class HistoryCore {
       if (source === 'api' && h.source === 'api' && h.epoch === epoch && typeof h.w === 'number' && h.w > w) return false
       if (typeof h.updated === 'number' && h.updated > updated) return false
     }
-    const text = buildMirror({ w, epoch, source, at: new Date(this.deps.now()).toISOString(), updated }, info, messages)
+    // A session with no mark of Combwork's and no parent is one Combwork didn't make (HI-2774): its header says so.
+    const external = typeof info.parentID !== 'string' && !existsSync(markPath(s.home, s.sessionId))
+    const text = buildMirror({ w, epoch, source, at: new Date(this.deps.now()).toISOString(), updated, external }, info, messages)
     this.write(s, text)
     s.updated = updated
     s.settled = sessionSettled(info)
+    s.revert = typeof info.revert?.messageID === 'string' ? info.revert.messageID : null
     this.emit({ event: 'published', home: s.home, sessionId: s.sessionId, source, updated, cost: typeof info.cost === 'number' && Number.isFinite(info.cost) ? info.cost : null })
     return true
   }

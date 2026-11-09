@@ -42,6 +42,8 @@ interface Tracked {
   sessionId: string
   privateDir: string
   password: string
+  /** The folder it runs in: the sessions its TUI makes are that folder's (discovery lists a folder's: HI-2774). */
+  cwd: string
   server: boolean
   /** The server's address, once known (given again to a restarted worker). */
   url: string | null
@@ -192,15 +194,16 @@ export class OpencodeHistory {
    */
   async begin(home: string, sessionId: string, runId: string): Promise<void> {
     const epoch = (await this.thread.ask({ type: 'begin', home, sessionId, runId }, 5000)) as number
-    this.runs.set(runId, { runId, home, sessionId, privateDir: '', password: '', server: false, url: null, poll: null, limitsAt: 0, costAt: 0, epoch })
+    this.runs.set(runId, { runId, home, sessionId, privateDir: '', password: '', cwd: '', server: false, url: null, poll: null, limitsAt: 0, costAt: 0, epoch })
   }
 
   /** The run's server password and private folder (buildCommand): its poll starts, reading the server once it is up. */
-  track(runId: string, privateDir: string, password: string): void {
+  track(runId: string, privateDir: string, password: string, cwd = ''): void {
     const t = this.runs.get(runId)
     if (!t) return
     t.privateDir = privateDir
     t.password = password
+    t.cwd = cwd
     const every = Math.max(1, advanced.number('opencode.history.pollSeconds')) * 1000
     t.poll = setInterval(() => void this.poll(t), every)
     t.poll.unref?.()
@@ -254,7 +257,89 @@ export class OpencodeHistory {
     if (t.poll) clearInterval(t.poll)
     await this.thread.ask({ type: 'end', runId }).catch(() => undefined)
     await this.exportSession(t.home, t.sessionId, 'runEnd')
+    // What its TUI made meanwhile (`/new`, `/fork`: HI-2774) is found now that its server has gone: its folder's sessions.
+    if (t.cwd) await this.discover(t.home, t.cwd, 'runEnd')
     void this.repair([t.home])
+  }
+
+  /**
+   * Asks for a scan of an account's sessions in a folder for ones Combwork didn't make (the worker runs it when due:
+   * HI-2774). 2.2.6's `session list` lists the current folder's project only (cli/session-list-elsewhere.txt), so it runs
+   * in that folder.
+   */
+  private async discover(home: string, folder: string, reason: 'runEnd' | 'repair'): Promise<void> {
+    const exe = this.sink?.executable()
+    if (!exe || !this.sink) return
+    const command = await this.sink.command(exe, ['session', 'list', '--format', 'json'], home).catch(() => null)
+    if (!command) return
+    await this.thread.ask({ type: 'discover', home, folder, command: { ...command, cwd: folder }, reason }).catch((e) => log.warn(`an OpenCode account's discovery couldn't be queued: ${userText(String(e))}`))
+  }
+
+  /**
+   * An adoption's mark in the account holding the session (HI-2774), written by the worker in order with removals and
+   * publication: `created` says whether this call made it (only then is it taken back if the adoption fails), `why` why not.
+   */
+  async adoptMark(home: string, sessionId: string, directory: string): Promise<{ ok: true; created: boolean; lease: string } | { ok: false; why: 'notRead' | 'otherFolder' | 'otherMark' | 'other' }> {
+    return (await this.thread.ask({ type: 'adoptMark', home, sessionId, directory }, 5000)) as { ok: true; created: boolean; lease: string } | { ok: false; why: 'notRead' | 'otherFolder' | 'otherMark' | 'other' }
+  }
+
+  /**
+   * The adoption's record is about to be written (HR2 on HI-2774): false when its account is being removed (or the worker
+   * no longer knows the lease); true, and the account's removal then waits until adoptDone says the record was written or not.
+   */
+  async adoptCommit(home: string, sessionId: string, lease: string): Promise<boolean> {
+    // Main's own barrier first (HR1 on HI-2774, round 2): it holds whatever happens to the worker meanwhile.
+    const h = home.toLowerCase()
+    if (this.removing.has(h) || this.removedHomes.has(h)) return false
+    this.committing.set(h, (this.committing.get(h) ?? 0) + 1)
+    let ok = false
+    try {
+      ok = (await this.thread.ask({ type: 'adoptCommit', home, sessionId, lease }, 5000)) === true
+      // A removal that began while the worker answered refuses it too.
+      if (ok && this.removing.has(h)) ok = false
+    } finally {
+      if (!ok) this.released(h)
+    }
+    return ok
+  }
+
+  /**
+   * The adoption ended (`ok`: its record written): its mark is taken back only when no adoption of the session committed.
+   * `committed`: it had passed adoptCommit, so main's barrier lets its account's removal go now.
+   */
+  async adoptDone(home: string, sessionId: string, lease: string, ok: boolean, created: boolean, committed: boolean): Promise<void> {
+    try {
+      await this.thread.ask({ type: 'adoptDone', home, sessionId, lease, ok, created }, 5000)
+    } finally {
+      if (committed) this.released(home.toLowerCase())
+    }
+  }
+
+  /**
+   * Main's adoption barrier (HR1 on HI-2774, round 2), kept here, not in the worker, so a worker that ends while a record
+   * is written can't drop it: each account's adoptions past their commit and not done yet, and the accounts being removed
+   * (no adoption commits in one). A removal waits for the count to reach 0 before asking the worker.
+   */
+  private committing = new Map<string, number>()
+  private removing = new Set<string>()
+  private barrierWaiters: (() => void)[] = []
+  private released(h: string): void {
+    const n = (this.committing.get(h) ?? 1) - 1
+    if (n > 0) this.committing.set(h, n)
+    else this.committing.delete(h)
+    for (const w of this.barrierWaiters.splice(0)) w()
+  }
+  /** Resolves once no adoption of the account is committing; throws past `ms`. */
+  private async noCommitting(h: string, ms: number): Promise<void> {
+    const deadline = Date.now() + ms
+    while (this.committing.get(h)) {
+      const left = deadline - Date.now()
+      if (left <= 0) throw new Error(`an adoption in the account didn't finish writing its record in ${ms} ms`) // i18n-ignore: an internal error, for the log
+      await new Promise<void>((res) => {
+        const t = setTimeout(res, left)
+        this.barrierWaiters.push(() => (clearTimeout(t), res()))
+      })
+    }
   }
 
   private async exportSession(home: string, sessionId: string, reason: 'runEnd' | 'repair'): Promise<void> {
@@ -295,6 +380,10 @@ export class OpencodeHistory {
     if (!roots.length) return
     const found = (await this.thread.ask({ type: 'repairScan', homes: roots }).catch(() => [])) as { home: string; sessionId: string }[]
     for (const c of found) await this.exportSession(c.home, c.sessionId, 'repair')
+    // And each account's discovery in the folders it was scanned in before, when due (its database changed, or that
+    // folder's last scan left a backlog: HI-2774).
+    const due = (await this.thread.ask({ type: 'discoveryFolders', homes: roots }).catch(() => [])) as { home: string; folder: string }[]
+    for (const d of due) await this.discover(d.home, d.folder, 'repair')
   }
 
   /**
@@ -303,15 +392,21 @@ export class OpencodeHistory {
    * it back (a removal refused later).
    */
   async removeRoot(home: string): Promise<() => void> {
+    const h = home.toLowerCase()
+    const started = Date.now()
+    // No adoption commits in the account from now; one writing its record is waited for first (main's barrier).
+    this.removing.add(h)
     try {
-      await this.thread.ask({ type: 'removeRoot', home }, this.removeAckMs)
+      await this.noCommitting(h, this.removeAckMs)
+      await this.thread.ask({ type: 'removeRoot', home }, Math.max(1, this.removeAckMs - (Date.now() - started)))
     } catch (e) {
+      this.removing.delete(h)
       // The worker may have marked the root before it answered (its exports still ending): the removal is refused, so the
       // root is given back now, in order after the removal, whenever that ends (HR1 on HI-2762, round 2).
       void this.thread.ask({ type: 'restoreRoot', home }).catch(() => undefined)
       throw e
     }
-    const h = home.toLowerCase()
+    this.removing.delete(h)
     this.removedHomes.add(h)
     for (const t of [...this.runs.values()])
       if (t.home.toLowerCase() === h) {
@@ -330,6 +425,13 @@ export class OpencodeHistory {
       // An exported session's subagents (HI-2773): each exported in turn, as its parent was.
       void (async () => {
         for (const id of e.children) await this.exportSession(e.home, id, e.reason)
+      })()
+      return
+    }
+    if (e.event === 'discovered') {
+      // Sessions Combwork didn't make, found in an account's data (HI-2774): each exported in turn, as a repair.
+      void (async () => {
+        for (const id of e.sessions) await this.exportSession(e.home, id, 'repair')
       })()
       return
     }

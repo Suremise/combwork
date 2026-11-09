@@ -1,0 +1,57 @@
+{
+ "uri": {
+  "status": 200,
+  "body": {
+   "data": {
+    "id": "msg_1bfc03761001XFihvp89M3iJ5u",
+    "sessionID": "ses_e403ffb46ffeRo33fkB8wbcBeQ",
+    "time": {
+     "created": 1794218407794
+    },
+    "type": "user",
+    "payload": {
+     "text": "What colour is this image? Answer in one word.",
+     "files": [
+      {
+       "data": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8DwnwGMgRQAH+4D/dJQfRoAAAAASUVORK5CYII=",
+       "mime": "image/png",
+       "source": {
+        "type": "uri",
+        "uri": "file:///<root>/project/img.png"
+       },
+       "name": "img.png"
+      }
+     ]
+    },
+    "delivery": "steer"
+   }
+  }
+ },
+ "inline": {
+  "status": 200,
+  "body": {
+   "data": {
+    "id": "msg_1bfc03f50001c0QExm7UEX3swV",
+    "sessionID": "ses_e403ffb46ffeRo33fkB8wbcBeQ",
+    "time": {
+     "created": 1794218409811
+    },
+    "type": "user",
+    "payload": {
+     "text": "And this one? One word.",
+     "files": [
+      {
+       "data": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8DwnwGMgRQAH+4D/dJQfRoAAAAASUVORK5CYII=",
+       "mime": "image/png",
+       "source": {
+        "type": "inline"
+       },
+       "name": "inline.png"
+      }
+     ]
+    },
+    "delivery": "steer"
+   }
+  }
+ }
+}

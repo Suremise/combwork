@@ -1,0 +1,6 @@
+$ opencode session list --format json --standalone   (cwd: <elsewhere>)
+code 0
+--- stdout
+[]
+
+--- stderr

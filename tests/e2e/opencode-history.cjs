@@ -137,6 +137,27 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
     }, HUNG_MS)
     check("…counted once: the agent's session's tokens are its own, without the subagent's", !!parentUsage && parentUsage.inputTokens === 457 + 200 + 500 + 500, JSON.stringify(parentUsage && { requests: parentUsage.requests, in: parentUsage.inputTokens }))
 
+    // --- HI-2774: the TUI's /fork and /new (the fake's stand-ins), found after the run; then an attached image, which a
+    // text-only model refuses, as 2.2.6 did with qwen3 (the last turn here: every later one would be refused too).
+    ends = turnEnds().length
+    await type('fork then newsession: hello from the tui')
+    await lib.until(async () => turnEnds().length >= ends + 2, HUNG_MS)
+    const forkId = lines().find((e) => e.kind === 'fork')?.fork ?? ''
+    const newId = lines().filter((e) => e.kind === 'session' && e.created !== sid).map((e) => e.created).pop() ?? ''
+    check('the TUI made a fork and a new session (fake stand-ins)', forkId.startsWith('ses_') && newId.startsWith('ses_') && newId !== forkId, JSON.stringify({ forkId, newId }))
+    fs.writeFileSync(path.join(alpha, 'img.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8DwnwGMgRQAH+4D/dJQfRoAAAAASUVORK5CYII=', 'base64'))
+    ends = turnEnds().length
+    await type('attach:img.png what colour is this?')
+    await lib.until(async () => turnEnds().length > ends, HUNG_MS)
+    const withImage = await lib.until(async () => {
+      const t = await items()
+      const u = t.find((x) => x.kind === 'user' && x.text === 'what colour is this?')
+      return u && u.images?.length ? { t, u } : null
+    }, HUNG_MS)
+    const url = withImage ? await inv('transcript:image', alpha, sid, withImage.u.images[0].id).catch((e) => String(e)) : null
+    check('the attached image shows in the history, from the session\'s own data', typeof url === 'string' && url.startsWith('data:image/png;base64,iVBOR'), String(url).slice(0, 80))
+    check("…and OpenCode's refusal from a text-only model, in its words", !!withImage && withImage.t.some((x) => x.kind === 'notice' && /Multimodal data provided/.test(x.text)), JSON.stringify((withImage?.t ?? []).filter((x) => x.kind === 'notice').map((x) => x.text)))
+
     // --- Stopped: one export of the session, standalone; its history stays.
     const exports = () => lines().filter((e) => e.kind === 'launch' && /session export/.test((e.args ?? []).join(' ')))
     await inv('session:stop', alpha, agent.id)
@@ -145,6 +166,49 @@ const http = (pred) => lines().filter((e) => e.kind === 'http' && pred(e))
     const exported = await lib.until(async () => (exportsOf(sid).length ? exportsOf(sid) : null), HUNG_MS)
     check('stopped, the session is exported once, standalone', !!exported && exported.length === 1 && (exported[0].args ?? []).includes('--standalone'), JSON.stringify(lines().filter((e) => e.kind === 'launch').map((e) => e.args)))
     check('…and its history stays', (await items()).filter((x) => x.kind === 'user').length >= 2)
+
+    // --- HI-2774: after the run, discovery finds what its TUI made: the fork under its source, the new session on its own.
+    const listedNow = async () => inv('session:list', alpha)
+    const found = await lib.until(async () => {
+      const l = await listedNow()
+      const f = l.find((s) => s.id === forkId)
+      const n2 = l.find((s) => s.id === newId)
+      return f && n2 && n2.usage?.requests ? { f, n2 } : null
+    }, HUNG_MS)
+    check('discovery lists the fork under the session it came from', !!found && found.f.sub?.parentId === sid && found.f.sub?.kind === 'fork', JSON.stringify(found?.f && { sub: found.f.sub, source: found.f.source }))
+    check('…and the new session as an external one, with its own usage', !!found && !found.n2.sub && found.n2.source === 'external' && found.n2.usage.requests === 1, JSON.stringify(found?.n2 && { sub: found.n2.sub, source: found.n2.source, usage: found.n2.usage && { requests: found.n2.usage.requests } }))
+    check('…through session list in its folder, standalone', lines().some((e) => e.kind === 'launch' && /session list/.test((e.args ?? []).join(' ')) && path.resolve(e.cwd).toLowerCase() === path.resolve(alpha).toLowerCase()), JSON.stringify(lines().filter((e) => e.kind === 'launch' && /session list/.test((e.args ?? []).join(' '))).map((e) => e.cwd)))
+    const forkItems = ((await inv('transcript:read', alpha, forkId).catch(() => null))?.items ?? [])
+    check("…the fork's history: its copies, then a notice where they end", forkItems.some((x) => x.kind === 'notice' && x.message?.id === 'providers.transcript.opencodeForked'), JSON.stringify(forkItems.map((x) => x.kind)))
+
+    // --- Adopting the new session: Combwork's mark goes into its account, and it resumes as one of Combwork's.
+    await inv('session:adopt', alpha, newId)
+    const adopted = await lib.until(async () => (await listedNow()).find((s) => s.id === newId && s.source === 'combwork') ?? null, HUNG_MS)
+    check('adopting it makes it one of Combwork\'s sessions', !!adopted, JSON.stringify((await listedNow()).find((s) => s.id === newId)))
+    const tuis = () => lines().filter((e) => e.kind === 'tui')
+    const before = tuis().length
+    await inv('session:start', alpha, { agentId: agent.id, resumeId: newId })
+    const resumed = await lib.until(async () => tuis().slice(before).find((e) => e.session === newId) ?? null, HUNG_MS)
+    check('…and it resumes on its account', !!resumed && resumed.absent === false, JSON.stringify(tuis().slice(before)))
+    await inv('session:stop', alpha, agent.id)
+    await lib.until(async () => !(await live()), HUNG_MS)
+    // A fork stays a sub-session: adopted as one, never resumed.
+    await inv('session:adopt', alpha, forkId)
+    const forkRec = await lib.until(async () => (await listedNow()).find((s) => s.id === forkId && s.source === 'combwork') ?? null, HUNG_MS)
+    check('a fork adopted stays a sub-session of its source', !!forkRec && forkRec.sub?.kind === 'fork' && forkRec.sub?.parentId === sid, JSON.stringify(forkRec && forkRec.sub))
+
+    // --- The window: the Sessions tab nests the fork under its source, whose transcript shows the attached image.
+    await page.locator('.tab', { hasText: 'Sessions' }).first().click()
+    const rowOf = (text) => page.locator('.sessions-tree .session-row', { hasText: text })
+    await lib.until(async () => (await rowOf('hello').count()) >= 1, HUNG_MS)
+    await rowOf('hello').first().click()
+    const img = page.locator('img[src^="data:image/png"]')
+    check("the window shows the attached image in the session's transcript", !!(await lib.until(async () => (await img.count()) >= 1, HUNG_MS)))
+    // Its sub-sessions (the subagent's and the fork) under it, unfolded.
+    await page.keyboard.press('ArrowRight')
+    check('…and the fork under it, badged as OpenCode names it', !!(await lib.until(async () => (await page.locator('.sessions-tree .badge.sub-kind', { hasText: 'fork' }).count()) >= 1, HUNG_MS)))
+    await img.first().scrollIntoViewIfNeeded().catch(() => undefined)
+    await page.screenshot({ path: path.join(lib.WORK, 'opencode-history-sessions.png') })
 
     // --- After a restart, the history is read from Combwork's mirror, no server needed.
     await app.close().catch(() => undefined)
