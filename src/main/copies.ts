@@ -576,7 +576,16 @@ export class CopyPool {
       }
       const opts = await this.deps.options()
       let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder))
-      if (!made && !(await this.listed(copy.folder))) {
+      const listed = made ? true : await this.listed(copy.folder)
+      // Git can't list the worktrees (HI-2810): passed over as it was, its lease dropped, looked at again next time.
+      if (listed === null) {
+        await this.store.fenced(name, token, (db) => {
+          this.store.dropIn(db, lease.id, 'cantList')
+          this.store.setIn(db, name, copy.state, {}, { op: null })
+        })
+        return 'skip'
+      }
+      if (!listed) {
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'gone')
           this.store.setIn(db, name, 'creating', { warmError: sayStored(T.notListed) }, { op: null })
@@ -630,10 +639,10 @@ export class CopyPool {
     }
   }
 
-  private async listed(folder: string): Promise<boolean> {
-    // A listing that fails is an empty one here, as listWorktrees answered (R5 keeps the pool's reading; HI-2810).
-    const l = await port().list(this.deps.project).then((x) => x ?? [], () => null)
-    return !l || l.some((w) => samePlace(w.path, folder))
+  /** Whether git lists a worktree at `folder`; null when its listing fails (HI-2810, #734: unknown, never an empty one). */
+  private async listed(folder: string): Promise<boolean | null> {
+    const l = await port().list(this.deps.project).catch(() => null)
+    return l ? l.some((w) => samePlace(w.path, folder)) : null
   }
 
   /** A command of an operation's, in a job recorded on the copy first and cleared once settled (as slots' runs). */
