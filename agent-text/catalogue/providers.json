@@ -129,6 +129,21 @@
     "note": "Provider Setup and Settings → Providers (#585): a warning that Codex's commands fail (Windows) while the Microsoft Store's PowerShell 7, the one found first, is running anywhere, e.g. in a terminal. Codex is the coding agent's name.",
     "audience": "both"
   },
+  "providers.copilot.host.choose": {
+    "text": "{repoHost} is a GitHub Enterprise Server host: choose where Copilot signs in (github.com or your GHE.com host) in Version Control → GitHub. Its Copilot agents don’t start until you do.",
+    "note": "Provider Setup, GitHub Copilot (HI-2779): a project’s repositories are on a GitHub Enterprise Server host ({repoHost}), where cloud Copilot can’t sign in, and no Copilot host was chosen. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name.",
+    "audience": "both"
+  },
+  "providers.copilot.host.proxy": {
+    "text": "GitHub Enterprise Server’s Copilot proxy is a preview Combwork doesn’t support yet: choose github.com or your GHE.com host in Version Control → GitHub. Its Copilot agents don’t start until you do.",
+    "note": "Provider Setup, GitHub Copilot (HI-2779): the Copilot sign-in setting chose GitHub Enterprise Server’s Copilot proxy (a GitHub preview), not supported yet. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name.",
+    "audience": "both"
+  },
+  "providers.copilot.host.signedOut": {
+    "text": "Copilot isn’t signed in on {host}.",
+    "note": "Provider Setup, GitHub Copilot (HI-2779): no sign-in found for a GitHub host Combwork’s projects use. {host} is the host (github.com, yourcompany.ghe.com).",
+    "audience": "both"
+  },
   "providers.copilot.planNote": {
     "text": "Copilot Free uses Auto only; choosing a model needs a paid plan.",
     "note": "A note in Provider Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names.",

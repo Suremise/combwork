@@ -335,6 +335,30 @@
     "defaultMessage": "Copilot isn't signed in: sign in as Provider Setup shows, then start it again.",
     "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
+  "providers.copilot.host.choose": {
+    "defaultMessage": "{repoHost} is a GitHub Enterprise Server host: choose where Copilot signs in (github.com or your GHE.com host) in Version Control → GitHub. Its Copilot agents don’t start until you do.",
+    "description": "Provider Setup, GitHub Copilot (HI-2779): a project’s repositories are on a GitHub Enterprise Server host ({repoHost}), where cloud Copilot can’t sign in, and no Copilot host was chosen. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name."
+  },
+  "providers.copilot.host.deviceCode": {
+    "defaultMessage": "For a code to enter instead, run `copilot login --host {host} --device-code` in a terminal.",
+    "description": "Provider Setup, under GitHub Copilot’s Sign in for a GitHub host (HI-2779): another way to sign in. {host} is the host. `…` marks a command: keep it."
+  },
+  "providers.copilot.host.gh": {
+    "defaultMessage": "With no login of its own there, Copilot uses the GitHub CLI’s login on {host} (`gh auth login --hostname {host}`), never one on another host.",
+    "description": "Provider Setup, under GitHub Copilot’s Sign in for a GitHub host (HI-2779): Copilot falls back to the GitHub CLI’s sign-in on the same host only. {host} is the host. `…` marks a command: keep it."
+  },
+  "providers.copilot.host.proxy": {
+    "defaultMessage": "GitHub Enterprise Server’s Copilot proxy is a preview Combwork doesn’t support yet: choose github.com or your GHE.com host in Version Control → GitHub. Its Copilot agents don’t start until you do.",
+    "description": "Provider Setup, GitHub Copilot (HI-2779): the Copilot sign-in setting chose GitHub Enterprise Server’s Copilot proxy (a GitHub preview), not supported yet. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name."
+  },
+  "providers.copilot.host.signInRuns": {
+    "defaultMessage": "**Sign in** runs `copilot login --host {host}` in a terminal: it opens {host} in your browser to authorise Copilot. Combwork never signs in for you.",
+    "description": "Provider Setup, under GitHub Copilot's Sign in for a GitHub host other than github.com (HI-2779): what it does. {host} is the host. **…** marks bold text and `…` a command: keep the marks and the command."
+  },
+  "providers.copilot.host.signedOut": {
+    "defaultMessage": "Copilot isn’t signed in on {host}.",
+    "description": "Provider Setup, GitHub Copilot (HI-2779): no sign-in found for a GitHub host Combwork’s projects use. {host} is the host (github.com, yourcompany.ghe.com)."
+  },
   "providers.copilot.parens.message": {
     "defaultMessage": "Copilot can't approve edits in a folder whose path has parentheses, so this agent asks before each edit, as in Ask. Rename the folder to give it Accept edits.",
     "description": "The notice that a GitHub Copilot agent asks before each edit. Ask and Accept edits are permission modes as Combwork names them: use their names as shown."
@@ -362,6 +386,10 @@
   "providers.copilot.signIn.runs": {
     "defaultMessage": "**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Combwork never signs in for you.",
     "description": "Provider Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
+  },
+  "providers.copilot.signIn.switch": {
+    "defaultMessage": "Settings → Advanced → GitHub Copilot → **Keep GH_TOKEN and GITHUB_TOKEN from Copilot** decides this, for every workspace.",
+    "description": "Provider Setup, under GitHub Copilot’s Sign in, after the tokens Combwork keeps from Copilot (HI-2779): where that switch is. The path and the switch’s name are as Settings shows them (keep them as translated there); **…** marks bold text: keep the marks."
   },
   "providers.copilot.updateAnyway": {
     "defaultMessage": "Update anyway",

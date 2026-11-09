@@ -11,6 +11,8 @@ import { checkPlatformSwitch, oldRulesLine, setPlatform } from './workflow/platf
 import { agentError, CombworkError } from './combworkError'
 import { levelOwn, setLevelOptions } from './workflow/levels'
 import { setSlotDefault } from './slotSettings'
+import { setGithubHosts } from './githubHosts'
+import { resolveGithubHosts } from '../shared/githubHost'
 import { workflowWrite } from './workflow/writes'
 import { withRepoLocks } from './repoLock'
 import { keptTargets, problemEnglish, WorkflowRefused } from './workflow/optionsForm'
@@ -54,6 +56,10 @@ const T = {
   noPlatform: agentMsg({ id: 'settings.agent.tool.noPlatform', text: '{project} has no version control recorded yet: its workflow options can be set once Combwork has detected it (reopen the project).', note: "A workflow option set on a project whose version control Combwork hasn't detected yet. {project} is the project's folder name." }),
   // What a setting takes (cw_read_setting).
   advanced: agentMsg({ id: 'settings.agent.tool.takes.advanced', text: "{takes} null: {scope, select, workspace {Settings → Advanced's value} other {Combwork's default}}.", note: "What an advanced setting takes (#367): {takes} is what its value takes; null puts back Settings → Advanced's value (a workspace's own) or Combwork's default." }),
+  githubHost: agentMsg({ id: 'settings.agent.tool.takes.githubHost', text: 'a host name only, such as github.com or yourcompany.ghe.com{copilot, select, yes {: github.com or a GHE.com host, or repo (the same as the GitHub host) or ghes-proxy (not supported yet)} other {}}; or null to inherit', note: 'What a GitHub host setting takes (HI-2779). {copilot} is yes for where Copilot signs in. repo, ghes-proxy and null are values as written: keep them.' }),
+  githubEffective: agentMsg({ id: 'settings.agent.tool.githubEffective', text: '{value}, {origin, select, project {set for the project} workspace {from the workspace} environment {from Combwork\'s environment (GH_HOST, COPILOT_GH_HOST)} other {the default}}', note: 'What a GitHub host setting resolves to now (HI-2779). {value} is a host, or settings.agent.tool.githubChoose. {origin} is a key, never shown.' }),
+  githubChoose: agentMsg({ id: 'settings.agent.tool.githubChoose', text: 'none: the repositories are on GitHub Enterprise Server, so where Copilot signs in must be chosen (Copilot agents don\'t start until then)', note: 'What "Copilot signs in on" resolves to when the repositories are on a GHES host and nothing is chosen (HI-2779).' }),
+  githubProxy: agentMsg({ id: 'settings.agent.tool.githubProxy', text: "GitHub Enterprise Server's Copilot proxy, not supported yet (Copilot agents don't start)", note: 'What "Copilot signs in on" resolves to when the GHES Copilot proxy is chosen (HI-2779).' }),
   slotCopy: agentMsg({ id: 'settings.agent.tool.takes.slotCopy', text: 'glob patterns, comma separated or one per line ("" for none), or null to inherit', note: 'What a slot default takes (HI-1765): the files copied into new slots. "" is the value as written.' }),
   trueFalse: agentMsg({ id: 'settings.agent.tool.takes.trueFalse', text: 'true or false', note: 'What a boolean setting takes: the values as written (keep them).' }),
   number: agentMsg({ id: 'settings.agent.tool.takes.number', text: '{min} to {max}{hasOff, select, yes {, or 0 for {off}} other {}}{inherit, select, yes {, or null to inherit} other {}}', note: "What a number setting takes. {min} and {max} are numbers as written (-∞ and ∞ where there is none); {off} is the label 0 stands for (Never); inherit is yes where null inherits Combwork's value." }),
@@ -121,6 +127,7 @@ function takesText(e: SettingEntry, project: ProjectConfig | null): string {
   if (e.workflow) return workflowTakes(e, kind)
   // A slot default (HI-1765): patterns, "" for none, null to inherit.
   if (e.slotLevel) return say(T.slotCopy)
+  if (e.githubLevel) return say(T.githubHost, { copilot: e.githubLevel.field === 'copilotHost' ? 'yes' : 'no' })
   const inherit = e.scope === 'project' && e.inherits && kind === 'number' ? 'yes' : 'no'
   switch (kind) {
     case 'boolean':
@@ -230,8 +237,17 @@ export function settingDetail(e: SettingEntry, project: { name: string; config: 
     ...(helps ? { helps } : {}),
     ...(e.restart ? { restart: say(RESTART_TEXT[e.restart]) } : {}),
     ...(readOnly ? { readOnly } : {}),
-    docs: guideHeading(e.docs)
+    docs: guideHeading(e.docs),
+    ...(e.githubLevel ? { effective: githubEffective(e.githubLevel.field, e.githubLevel.level === 'project' ? (project?.config.github ?? null) : null) } : {})
   }
+}
+
+/** What a GitHub host setting resolves to now and from where (HI-2779), as the window's GitHub group says it. */
+function githubEffective(field: 'host' | 'copilotHost', project: ProjectConfig['github'] | null): string {
+  const r = resolveGithubHosts(project, workspace.config.github, process.env)
+  if (field === 'host') return say(T.githubEffective, { value: r.repo.host, origin: r.repo.origin })
+  const value = r.copilot.host ?? say(r.copilot.problem === 'ghesProxyUnsupported' ? T.githubProxy : T.githubChoose)
+  return say(T.githubEffective, { value, origin: r.copilot.origin })
 }
 
 /** When a change applies, in words (undefined: at once). */
@@ -346,6 +362,24 @@ export async function applySetting(
       throw err
     }
     return { old, new: settingValue(e, config.settings, null, workspace.config) }
+  }
+  if ('github' in change) {
+    // A GitHub host (HI-2779): through the setter the window uses, which parses it again; the guard in the change's turn,
+    // against the level's value it replaces. A refused host is the caller's error.
+    const { level, field, value: v } = change.github
+    if (level === 'project' && !projectPath) throw new SettingRefused(400, say(T.projectSetting, { id: e.id }))
+    const valueOf = (own: ProjectConfig['github'] | undefined): unknown => own?.[field] ?? 'inherit'
+    let old: unknown
+    try {
+      const saved = await setGithubHosts(workspace, level === 'project' ? projectPath : null, { [field]: v }, (now) => {
+        old = valueOf(now)
+        guard?.(old)
+      })
+      return { old, new: valueOf(saved) }
+    } catch (err) {
+      if (err instanceof CombworkError) throw new SettingRefused(400, agentError(err))
+      throw err
+    }
   }
   if ('slotLevel' in change) {
     // A level's slot default (HI-1765), saved as Settings saves it: Combwork's at once, the workspace's in its save queue,

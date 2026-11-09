@@ -424,6 +424,11 @@ export class WorkspaceService {
     return worktreesRoot(this.path)
   }
 
+  /** The workspace as its last refresh read it (HI-2779: the projects whose Copilot checks run), null before the first. */
+  get lastInfo(): WorkspaceInfo | null {
+    return this.cached
+  }
+
   get config(): WorkspaceConfig {
     return this.wsConfig
   }

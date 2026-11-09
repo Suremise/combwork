@@ -240,6 +240,7 @@
   "service.providers.task": "{task, select, install {instalação do {cli}} update {atualização do {cli}} login {login do {cli}} other {configuração do {cli}}}",
   "service.providers.taskDone": "{task} terminou",
   "service.providers.taskFailed": "{task} terminou com o código {code}",
+  "service.providers.unknownHost": "Nenhum projeto usa mais esse host do GitHub para {cli}. Clique em Verificar de novo e depois faça login.",
   "service.slots.notPrepared": "O Combwork não conseguiu preparar {slot} para {card}: {why}",
   "service.slots.resumeFailed": "O Combwork não conseguiu retomar a conversa de {agent} em {slot} para {card} (três tentativas): {why}. Retome {agent} em Sessões, ou comece do zero, e o Combwork entrega {card} a ele.",
   "service.slots.resumeHeld": "O Combwork ainda não pode entregar {card} a {agent}: a conversa de {agent} em {slot} não pode ser retomada agora ({why}). O Combwork entrega {card} assim que puder.",

@@ -160,6 +160,7 @@ export const SUITES = [
   { name: 'gitbranchcards' },
   { name: 'gitcleanup' },
   { name: 'gitdirect' },
+  { name: 'githubhosts' },
   { name: 'gitinit' },
   { name: 'gitmissing' },
   { name: 'gitremotes' },

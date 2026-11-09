@@ -145,6 +145,7 @@ import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
+import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
@@ -1041,6 +1042,13 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
+    // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
+    'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
+    'github:set': async (p, change) => {
+      const at = p ? workspace.assertProject(p) : null
+      await setGithubHosts(workspace, at, change)
+      return githubHostsForm(workspace, at, process.env)
+    },
     'slots:levelForm': (level) => slotLevelForm(workspace, level),
     'slots:setLevelDefault': async (level, key, value) => {
       await setSlotDefault(workspace, level, key, value)
@@ -1815,9 +1823,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       await Promise.all([providerService.refresh(id, true), checkGit()])
       return providerService.shown()
     },
-    'provider:task': async (id, task) => {
+    'provider:task': async (id, task, host) => {
       await refreshPathBeforeStart()
-      return providerService.runProviderTask(id, task)
+      return providerService.runProviderTask(id, task, false, typeof host === 'string' && host ? host : undefined)
     },
     'provider:retryUpdate': async (id) => {
       await refreshPathBeforeStart()

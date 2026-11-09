@@ -1166,6 +1166,10 @@ interface CombworkMessageValues {
   'settings.general.userName.placeholder': undefined
   'settings.general.userName.tip': undefined
   'settings.general.userName.title': undefined
+  'settings.github.copilotHost.desc': undefined
+  'settings.github.copilotHost.title': undefined
+  'settings.github.host.desc': undefined
+  'settings.github.host.title': undefined
   'settings.journal.cap': undefined
   'settings.journal.days': undefined
   'settings.journal.delete': undefined

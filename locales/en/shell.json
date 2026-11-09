@@ -1319,6 +1319,70 @@
     "defaultMessage": "{error}. Combwork needs Git {min} or later for worktrees, merging and the Version Control tab.",
     "description": "Provider Setup when git couldn't be checked. {error} is the error, as given."
   },
+  "shell.setup.host.chooseHost": {
+    "defaultMessage": "Choose where Copilot signs in",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): the repositories are on GitHub Enterprise Server and no Copilot host was chosen."
+  },
+  "shell.setup.host.configured": {
+    "defaultMessage": "Credentials set, identity not checked",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): a token is set or a login is stored for this host, but nothing has checked it."
+  },
+  "shell.setup.host.configuredModels": {
+    "defaultMessage": "Credentials set, models available; identity not checked",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): credentials are set and Copilot listed models, but that doesn’t prove whose they are."
+  },
+  "shell.setup.host.denied": {
+    "defaultMessage": "Every model is unavailable to this account: an organisation’s policy or the plan may not allow Copilot here",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): Copilot listed models, each marked unavailable to the account."
+  },
+  "shell.setup.host.heading": {
+    "defaultMessage": "Sign-in per GitHub host",
+    "description": "A heading in Provider Setup → GitHub Copilot (HI-2779): one row per GitHub host the open projects use."
+  },
+  "shell.setup.host.installed": {
+    "defaultMessage": "Not signed in",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): no credentials found for this host."
+  },
+  "shell.setup.host.models": {
+    "defaultMessage": "{available, plural, one {# model offered} other {# models offered}}{unavailable, plural, =0 {} other {, # unavailable to this account}}",
+    "description": "Provider Setup (HI-2779): what Copilot listed for this host: models offered, and those marked unavailable."
+  },
+  "shell.setup.host.noSignIn": {
+    "defaultMessage": "Runs a model of its own (BYOK or offline): no GitHub sign-in needed",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): Copilot is set up with its own model provider (BYOK) or offline, so it doesn’t sign in to GitHub. BYOK: bring your own key."
+  },
+  "shell.setup.host.proxy": {
+    "defaultMessage": "GitHub Enterprise Server’s Copilot proxy: not supported yet",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): GHES’s Copilot proxy (a preview) was chosen."
+  },
+  "shell.setup.host.repo": {
+    "defaultMessage": "Repositories on {host}",
+    "description": "Provider Setup (HI-2779): the repositories’ host, when it differs from where Copilot signs in. {host} is the host."
+  },
+  "shell.setup.host.tokens": {
+    "defaultMessage": "Copilot takes a token from COPILOT_GITHUB_TOKEN first. GH_TOKEN and GITHUB_TOKEN are kept from Copilot agents unless Settings → Advanced → GitHub Copilot → Keep GH_TOKEN and GITHUB_TOKEN from Copilot is off. Combwork never reads a token.",
+    "description": "Provider Setup → GitHub Copilot (HI-2779): which token variables Copilot uses, and where the switch keeping two of them out is (its name as Settings shows it). Keep the variable names."
+  },
+  "shell.setup.host.unknown": {
+    "defaultMessage": "Couldn’t reach the host to check",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): a check timed out or answered nothing readable."
+  },
+  "shell.setup.host.unverified": {
+    "defaultMessage": "Couldn’t confirm the sign-in",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): a check answered with an error Combwork can’t classify; its message follows."
+  },
+  "shell.setup.host.usedBy": {
+    "defaultMessage": "{projects, select, none {{workspace}} other {{workspace}: {projects}}}",
+    "description": "Provider Setup (HI-2779): who uses a GitHub host: a workspace’s name, and its projects named (none: the workspace’s own default)."
+  },
+  "shell.setup.host.verified": {
+    "defaultMessage": "GitHub CLI signed in as {account} on {host}",
+    "description": "Provider Setup, a GitHub host’s sign-in state (HI-2779): the GitHub CLI checked its login on this host. {account} is the login, {host} the host. It says nothing of a Copilot seat."
+  },
+  "shell.setup.host.via": {
+    "defaultMessage": "Through {source}{account, select, none {} other {, as {account}}}",
+    "description": "Provider Setup (HI-2779): the sign-in’s source by name ({source}: a variable such as COPILOT_GITHUB_TOKEN, Copilot login, GitHub CLI), and its account (none: unknown)."
+  },
   "shell.setup.install": {
     "defaultMessage": "Install {provider}",
     "description": "Provider Setup's button: installs the CLI. {provider} is its name."

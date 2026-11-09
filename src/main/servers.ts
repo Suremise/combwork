@@ -19,7 +19,7 @@ import { changeGroups, noteAgent, noteChange, recordedHere, recordingChanges } f
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { routePattern } from './routePattern'
-import { fallbackEfforts, modelGroups } from '../shared/models'
+import { fallbackEfforts, infoAt, modelGroups } from '../shared/models'
 import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { timeLeft } from '../shared/progress'
@@ -1107,9 +1107,10 @@ route('GET', '/v1/providers', async () => {
       // The version this Combwork release was tested with, and how the installed one compares (#365).
       tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : say(API.provider.notInstalled) } : null,
       problem: agentInstallInfo(info).readiness?.find((r) => r.level === 'error')?.message ?? null,
-      defaultModel: info.defaultModel ?? null,
+      defaultModel: infoAt(info, { workspacePath: here?.path ?? null })?.defaultModel ?? null,
       // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
-      models: modelGroups(p.id, info, s).filter((g) => !g.unavailable).flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label }))),
+      // The models of the GitHub host the caller's workspace resolves to (HI-2779), for a CLI signing in on one.
+      models: modelGroups(p.id, infoAt(info, { workspacePath: here?.path ?? null }), s).filter((g) => !g.unavailable).flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label }))),
       efforts: fallbackEfforts(p.id, s),
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,

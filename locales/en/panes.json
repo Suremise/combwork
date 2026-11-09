@@ -255,6 +255,10 @@
     "defaultMessage": "Agent Settings or Project Settings",
     "description": "Where an agent's model and effort are changed, ending the footer model's hover (\"Change them in …\"): the two dialogs' names."
   },
+  "panes.footer.signInHost": {
+    "defaultMessage": "Signed in on {host}{repo, select, same {} other {, repositories on {repoHost}}}{account, select, none {} other { as {account}}}.",
+    "description": "Where a session signed in (HI-2779), in the hover of a pane footer's model and over a session in the Sessions tab: the GitHub host ({host}: yourcompany.ghe.com), the repositories' host when it differs ({repo}: same or other; {repoHost}), and the account when known ({account}; none: leave that branch empty)."
+  },
   "panes.footer.stale": {
     "defaultMessage": "Couldn’t read it again just now: this may be behind.",
     "description": "A line of the hover of a pane footer's context: Combwork couldn't read the usage again, so the numbers may be old."

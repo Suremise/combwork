@@ -200,6 +200,8 @@ interface CombworkMessageValues {
   'tips.consoleText.title': undefined
   'tips.copilot.text': undefined
   'tips.copilot.title': undefined
+  'tips.copilotGithubHost.text': undefined
+  'tips.copilotGithubHost.title': undefined
   'tips.copilotModes.text': undefined
   'tips.copilotModes.title': undefined
   'tips.copyDiagnostics.text': undefined

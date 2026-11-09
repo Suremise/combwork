@@ -1,0 +1,42 @@
+{
+  "github.host.rejected.credentials": {
+    "text": "A GitHub host can’t hold a user name, password or token.",
+    "note": "An error saving a GitHub host setting (HI-2779): it has an @ (user name, password or token before the host). Combwork never stores credentials there.",
+    "audience": "both"
+  },
+  "github.host.rejected.empty": {
+    "text": "Enter a host name, such as github.com or yourcompany.ghe.com.",
+    "note": "An error saving a GitHub host setting (HI-2779): the host is empty. Keep the example host names.",
+    "audience": "both"
+  },
+  "github.host.rejected.invalid": {
+    "text": "That isn’t a host name, such as github.com or yourcompany.ghe.com.",
+    "note": "An error saving a GitHub host setting (HI-2779): the text isn’t a valid host name. Keep the example host names.",
+    "audience": "both"
+  },
+  "github.host.rejected.notCloud": {
+    "text": "Copilot signs in on github.com or a GHE.com host (yourcompany.ghe.com). For your own GitHub Enterprise Server, choose its Copilot proxy instead.",
+    "note": "An error saving where Copilot signs in (HI-2779): the host given is a GitHub Enterprise Server host, where cloud Copilot can’t sign in. GHE.com is GitHub’s product name; Copilot proxy: GitHub Enterprise Server’s preview. Keep the host names.",
+    "audience": "both"
+  },
+  "github.host.rejected.path": {
+    "text": "A GitHub host is only its name, without a path after it.",
+    "note": "An error saving a GitHub host setting (HI-2779): it has a path after the host name (/org/repo).",
+    "audience": "both"
+  },
+  "github.host.rejected.port": {
+    "text": "A GitHub host is only its name, without a port.",
+    "note": "An error saving a GitHub host setting (HI-2779): it has :port after the host name.",
+    "audience": "both"
+  },
+  "github.host.rejected.query": {
+    "text": "A GitHub host is only its name, without ? or # after it.",
+    "note": "An error saving a GitHub host setting (HI-2779): it has a query string or fragment. Keep ? and #.",
+    "audience": "both"
+  },
+  "github.host.rejected.scheme": {
+    "text": "A GitHub host is a name such as github.com, or an https:// address: no other scheme.",
+    "note": "An error saving a GitHub host setting (HI-2779): it starts with a scheme other than https:// (http://, ssh://…). Keep github.com and https:// as they are.",
+    "audience": "both"
+  }
+}

@@ -85,6 +85,12 @@ interface CombworkMessageValues {
   'providers.copilot.hint.mcp': undefined
   'providers.copilot.hint.model': undefined
   'providers.copilot.hint.signIn': undefined
+  'providers.copilot.host.choose': { repoHost: string | number }
+  'providers.copilot.host.deviceCode': { host: string | number }
+  'providers.copilot.host.gh': { host: string | number }
+  'providers.copilot.host.proxy': undefined
+  'providers.copilot.host.signInRuns': { host: string | number }
+  'providers.copilot.host.signedOut': { host: string | number }
   'providers.copilot.parens.message': undefined
   'providers.copilot.parens.title': undefined
   'providers.copilot.planNote': undefined
@@ -92,6 +98,7 @@ interface CombworkMessageValues {
   'providers.copilot.signIn.gh': undefined
   'providers.copilot.signIn.ignored': { n: number; variables: string | number }
   'providers.copilot.signIn.runs': undefined
+  'providers.copilot.signIn.switch': undefined
   'providers.copilot.updateAnyway': undefined
   'providers.copilot.updateManual': { provider: string | number }
   'providers.copilot.updateModified': undefined

@@ -150,6 +150,7 @@ function replies(): { name: string; text: string }[] {
   const detail: R.SettingDetail = { id: 'sessions.compactAbove', title: 'Suggest compacting above', path: 'Settings → Sessions → Suggest compacting above', shownAs: 'Einstellungen', scope: 'workspace', project: 'alpha', value: 'on', default: 'off', takes: 'on or off', desc: 'Suggests compacting.', tip: 'A tip.', helps: 'when long', restart: 'at the next launch', readOnly: 'the user decides', docs: 'User guide section' }
   add('setting', R.settingText(detail))
   add('setting default', R.settingText({ ...detail, value: 'off', project: undefined }))
+  add('setting effective', R.settingText({ ...detail, value: 'inherit', effective: 'tenant.ghe.com, from the workspace' }))
   add('setting changed', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', project: 'alpha', old: 'on', new: 'off', restart: 'at the next launch' }))
   add('setting changed now', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', old: 'on', new: 'off' }))
   add('setting changed with a note', R.settingChangedText({ title: 'x', id: 'project.workflow.target', path: 'Version Control → Workflow → Work merges into', project: 'alpha', old: '1.1.0', new: '1.2.0', note: 'It applies to cards started from now on outside running lanes.' }))

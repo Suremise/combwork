@@ -198,6 +198,8 @@
   "tips.consoleText.title": "See the text in the developer console",
   "tips.copilot.text": "Agents can use the GitHub Copilot CLI, Copilot Free included. Provider Setup installs it and says who it is signed in as: its own login or the GitHub CLI’s.",
   "tips.copilot.title": "Run agents on GitHub Copilot",
+  "tips.copilotGithubHost.text": "Repositories on yourcompany.ghe.com or your own GitHub Enterprise Server? Set the GitHub host in Version Control → GitHub, for the workspace or a project: Copilot then signs in and checks its sign-in on that host, and Provider Setup shows each host apart.",
+  "tips.copilotGithubHost.title": "Copilot on your company’s GitHub",
   "tips.copilotModes.text": "Copilot agents start in Accept edits: they edit files in their own folder and use the Combwork tools without asking, and ask before other commands, other MCP tools and web access. Choose Ask to approve each edit too, or Allow all to approve everything.",
   "tips.copilotModes.title": "What Copilot agents ask before",
   "tips.copyDiagnostics.text": "Help → Copy Diagnostics… gathers Combwork's version, your coding agents, key settings and the end of the log for a bug report, with names, folders and tokens taken out.",

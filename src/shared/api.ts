@@ -155,6 +155,7 @@ import type {
 } from './types'
 import type { PlatformId } from './platform/descriptors'
 import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
+import type { GithubHostChange, GithubHostsForm } from './githubHost'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
@@ -432,6 +433,9 @@ export interface CombworkRequests {
   'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
   /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Combwork's, the default), and where they come from. */
   'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
+  /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
+  'github:form': (projectPath: string | null) => GithubHostsForm
+  'github:set': (projectPath: string | null, change: GithubHostChange) => GithubHostsForm
   /** Combwork's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
   'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
   /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */
@@ -1105,7 +1109,7 @@ export interface CombworkRequests {
   /** Looks again (one provider, or all), including the latest version. */
   'provider:refresh': (provider?: ProviderId) => Record<ProviderId, AgentInstallInfo>
   /** Runs install, update, sign-in or setup in a terminal; returns the terminal's key. */
-  'provider:task': (provider: ProviderId, task: ProviderTask) => string
+  'provider:task': (provider: ProviderId, task: ProviderTask, host?: string) => string
   /** Runs the retry offered for the last failed update, only at the user's request. */
   'provider:retryUpdate': (provider: ProviderId) => string
   /** Stops every running agent of a provider (turning it off). */

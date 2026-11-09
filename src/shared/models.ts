@@ -1,4 +1,4 @@
-import type { AgentInstallInfo, AppSettings, CatalogModel, Account, EffortLevel, EffortOption, FallbackModel, ModelAlias, ModelSwitch, ProviderId } from './types'
+import type { AgentInstallInfo, AppSettings, CatalogModel, Account, EffortLevel, EffortOption, FallbackModel, ModelAlias, ModelCatalog, ModelSwitch, ProviderId } from './types'
 import { EFFORT_TEXT, OLDER_VERSIONS } from './claude'
 import { fmt } from './i18n'
 import { msg } from './i18n/msg'
@@ -19,6 +19,38 @@ export type ModelInfo = Pick<AgentInstallInfo, 'catalog' | 'configuredEffort' | 
 type Info = ModelInfo
 
 const text = (v: unknown): v is string => typeof v === 'string' && v.trim() !== ''
+
+/**
+ * A saved catalogue as a cache for a refresh (the last good reply, shown while the CLI is asked again): only one of the
+ * same version (`version` undefined: any), and for a CLI whose catalogue depends on a context (HI-2779: its GitHub host and
+ * sign-in; `context` not undefined), only one read in that same context; none known now (null), none.
+ */
+export function cachedCatalogFor(c: ModelCatalog | null | undefined, version: string | null | undefined, context: string | null | undefined): ModelCatalog | null {
+  if (!c || !Array.isArray(c.models) || !c.models.length) return null
+  if (context !== undefined && (!context || c.context !== context)) return null
+  return version === undefined || c.version === version ? { ...c, source: 'cache' } : null
+}
+
+/** Where models are offered (HI-2779): a project's folder, else its workspace's; neither: the CLI's catalogue as it is. */
+export interface ModelPlace {
+  projectPath?: string | null
+  workspacePath?: string | null
+}
+
+/**
+ * A provider's install info as a place sees it (HI-2779): for a CLI signing in on a GitHub host, the catalogue of the host
+ * the project (else its workspace) resolves to, and its default; a host with no listing has none (the fallback list,
+ * which says so), never another host's. A place no check knows (not open, or a CLI without hosts): the info as it is.
+ */
+export function infoAt<T extends Pick<AgentInstallInfo, 'catalog' | 'defaultModel' | 'hostCatalogs' | 'hostRouteOf'>>(info: T | null | undefined, at: ModelPlace): T | null | undefined {
+  if (!info?.hostRouteOf || !info.hostCatalogs) return info
+  const route = (at.projectPath && info.hostRouteOf[at.projectPath.toLowerCase()]) || (at.workspacePath && info.hostRouteOf[at.workspacePath.toLowerCase()]) || null
+  if (!route) return info
+  const catalog = info.hostCatalogs[route] ?? null
+  // The info's own default where the info's catalogue is this host's (the same read); else this host's catalogue's.
+  const same = !!catalog && !!info.catalog && info.catalog.context === catalog.context
+  return { ...info, catalog, defaultModel: same ? info.defaultModel : (catalog?.defaultModel ?? null) }
+}
 
 /**
  * What Combwork knows of a connection's models (HI-1770), by its kind, never its CLI: a sign-in connection's are its CLI's

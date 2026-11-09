@@ -5,7 +5,8 @@ import { AGENT_STATE_LABEL, AGENT_STATES, agentState, allStopped, mostUrgent as 
 import { agentDoingCards } from '@shared/tasks'
 import { cardsText } from '@shared/agentTable'
 import { cardLabel } from '@shared/projectKeys'
-import { modelCaps, modelIdName, serverModelLabel } from '@shared/models'
+import { infoAt, modelCaps, modelIdName, serverModelLabel } from '@shared/models'
+import { signInHostLine } from '../signInHost'
 import { serverDefaultModel, serverModelOf } from '@shared/serverConnection'
 import { launchedName } from '@shared/connectionLabel'
 import { agentChoosesMcp, agentMcpText } from '@shared/agentMcp'
@@ -1572,7 +1573,10 @@ export function PaneFooter({
   // resolves to; the choice itself in the tooltip when it reads differently (an alias).
   // A running session's from its own launch (HI-1996), never the settings as they are now; a new session's from them.
   const chose = footerChoices(a, live)
-  const shown = agentModelShown(provider, chose.model, chose.modelGlobal, providers[provider], live ? live.modelId || usage?.model || null : null)
+  // The models of the GitHub host its project resolves to (HI-2779), for a CLI signing in on one; else the CLI's catalogue.
+  const workspacePath = useStore((s) => s.workspace?.path ?? null)
+  const pinfo = infoAt(providers[provider], { projectPath: project.path, workspacePath })
+  const shown = agentModelShown(provider, chose.model, chose.modelGlobal, pinfo, live ? live.modelId || usage?.model || null : null)
   // On a server connection (HI-1772): the server's real model, with the Claude names it stands in for, and no effort.
   const onServer = live?.launchedConnection?.server
   const serverModel = onServer ? serverModelOf(onServer.models, live?.modelId || usage?.model || (live?.launchedWith ? live.launchedWith.model : a.model) || serverDefaultModel(onServer.models) || '') : null
@@ -1580,10 +1584,10 @@ export function PaneFooter({
   // Another model than it was launched with (HI-2609): marked, and said first in its hover.
   const switched = live?.modelSwitch ?? null
   // With no effort set or reported, the model's own default when the CLI said what it is ("Medium (default)", #125).
-  const runModel = (chose.model && chose.model !== 'inherit' ? chose.model : chose.modelGlobal) || providers[provider]?.defaultModel || null
+  const runModel = (chose.model && chose.model !== 'inherit' ? chose.model : chose.modelGlobal) || pinfo?.defaultModel || null
   // This launch's time waiting for its CLI to retry a request (HI-1996), told apart from a slow model in the hover.
   const waited = live ? retryWaitsView(live) : undefined
-  const effort = onServer ? null : effortLabel(provider, live?.effort, chose.effort, chose.effortGlobal, modelCaps(provider, runModel, providers[provider], settings).defaultEffort, settings)
+  const effort = onServer ? null : effortLabel(provider, live?.effort, chose.effort, chose.effortGlobal, modelCaps(provider, runModel, pinfo, settings).defaultEffort, settings)
   const threshold = compactThreshold(project.config, settings?.sessions.compactSuggestTokens ?? 0)
   const ctx = usage?.contextTokens ?? 0
   // A local model's context as its launch applied it (HI-2682), until Claude Code reports its window: launch-global.
@@ -1763,14 +1767,14 @@ export function PaneFooter({
   return (
     <div ref={footerRef} className="pane-footer-bar" data-fit={fit} onMouseDown={() => focusAgent(project.path, a.id)}>
       <Tooltip
-        content={<span style={{ whiteSpace: 'pre-line' }}>{`${switched ? `${tr(MODEL_SWITCHED, { launched: modelIdName(provider, switched.launched, providers[provider]), running: modelIdName(provider, switched.running, providers[provider]), provider: providerName(provider) })}\n\n` : ''}${tr(
+        content={<span style={{ whiteSpace: 'pre-line' }}>{`${switched ? `${tr(MODEL_SWITCHED, { launched: modelIdName(provider, switched.launched, pinfo), running: modelIdName(provider, switched.running, pinfo), provider: providerName(provider) })}\n\n` : ''}${tr(
           msg({
             id: 'panes.footer.modelTip',
             defaultMessage: '{chosenAs, select, none {} other {{model} · chosen as {chosenAs}. }}{provider} {effort, select, yes {model and effort} other {model}} {live, select, yes {of this session} other {for new sessions}}{reported, select, yes { (effort as the session reports it)} other {}}. Change them in {where}.',
             description: "Hover of the model in a pane's footer: the model shown and the name it was chosen by ({chosenAs}; none: leave that branch empty), the provider (\"Claude Code\"), whether effort is shown too, whether it is the running session's or new sessions', and where to change them ({where}: \"Agent Settings or Project Settings\")."
           }),
           { chosenAs: shown.chosenAs || 'none', model, provider: providerName(provider), effort: effort ? 'yes' : 'no', live: live ? 'yes' : 'no', reported: live?.effort ? 'yes' : 'no', where: settingsName ?? tr(msg({ id: 'panes.footer.settingsName', defaultMessage: 'Agent Settings or Project Settings', description: "Where an agent's model and effort are changed, ending the footer model's hover (\"Change them in …\"): the two dialogs' names." })) }
-        )}${waited ? `\n\n${tr(RETRY_WAITED, { minutes: Math.floor(waited.seconds / 60), waits: waited.waits, provider: providerName(provider), time: formatTime(waited.latest.since), ongoing: waited.latest.ongoing ? 'yes' : 'no' })}` : ''}`}</span>}
+        )}${waited ? `\n\n${tr(RETRY_WAITED, { minutes: Math.floor(waited.seconds / 60), waits: waited.waits, provider: providerName(provider), time: formatTime(waited.latest.since), ongoing: waited.latest.ongoing ? 'yes' : 'no' })}` : ''}${signInHostLine(live?.signInHost) ? `\n\n${signInHostLine(live?.signInHost)}` : ''}`}</span>}
       >
         <span className={cx('pane-foot-item', 'foot-model', 'fit-clip', switched && 'warn')} data-switched={switched ? 'yes' : undefined} onClick={() => (onSettings ? onSettings() : set({ agentSettingsFor: { project: project.path, agentId: a.id } }))}>
           {switched && <Icon name="warning" />}

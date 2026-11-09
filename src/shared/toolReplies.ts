@@ -164,6 +164,7 @@ const R = {
   settingShownAs: agentMsg({ id: 'reply.setting.shownAs', text: 'The user sees it as: {shownAs}.', note: "cw_read_setting (#767): where the user sees it, in the language Combwork shows them." }),
   settingHelps: agentMsg({ id: 'reply.setting.helps', text: 'When it helps: {helps}', note: 'cw_read_setting: when the setting helps.' }),
   settingRestart: agentMsg({ id: 'reply.setting.restart', text: 'A change applies {restart}.', note: 'cw_read_setting: when a change applies.' }),
+  settingEffective: agentMsg({ id: 'reply.setting.effective', text: 'In effect: {effective}.', note: 'cw_read_setting (HI-2779): what an inheriting setting resolves to now and where it comes from ({effective}, e.g. "tenant.ghe.com, from the workspace").' }),
   settingReadOnly: agentMsg({ id: 'reply.setting.readOnly', text: 'Read-only to you: {why}', note: "cw_read_setting: the Assistant can't change it, and why." }),
   settingDocs: agentMsg({ id: 'reply.setting.docs', text: 'User guide: "{docs}".', note: "cw_read_setting: the user guide's section on it." }),
   settingSame: agentMsg({ id: 'reply.setting.same', text: '{path}{hasProject, select, yes { ({project})} other {}} was already {value}: nothing changed.', note: 'cw_update_setting when the value was already so.' }),
@@ -1108,6 +1109,8 @@ export interface SettingDetail {
   restart?: string
   readOnly?: string
   docs: string
+  /** What an inheriting setting resolves to now, and where that comes from (HI-2779: a GitHub host). */
+  effective?: string
 }
 
 export function settingText(d: SettingDetail): string {
@@ -1120,6 +1123,7 @@ export function settingText(d: SettingDetail): string {
     d.helps ? say(R.settingHelps, { helps: d.helps }) : '',
     d.restart ? say(R.settingRestart, { restart: d.restart }) : '',
     d.readOnly ? say(R.settingReadOnly, { why: d.readOnly }) : '',
+    d.effective ? say(R.settingEffective, { effective: d.effective }) : '',
     say(R.settingDocs, { docs: d.docs })
   ]
     .filter(Boolean)

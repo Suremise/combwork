@@ -563,6 +563,10 @@
     "text": "User guide: \"{docs}\".",
     "note": "cw_read_setting: the user guide's section on it."
   },
+  "reply.setting.effective": {
+    "text": "In effect: {effective}.",
+    "note": "cw_read_setting (HI-2779): what an inheriting setting resolves to now and where it comes from ({effective}, e.g. \"tenant.ghe.com, from the workspace\")."
+  },
   "reply.setting.head": {
     "text": "{title} ({id}){hasProject, select, yes { in {project}} other {}}: {value}{isDefault, select, yes { (the default)} other { (default {def})}}",
     "note": "cw_read_setting's first line: the setting, its project, its value and its default."

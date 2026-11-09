@@ -192,6 +192,8 @@
   "tips.consoleText.title": "開発者コンソールでテキストを見る",
   "tips.copilot.text": "エージェントはGitHub Copilot CLIを使えます（Copilot Freeも含みます）。「プロバイダーのセットアップ」でインストールでき、誰としてサインインしているか（独自のログインか、GitHub CLIのログインか）が表示されます。",
   "tips.copilot.title": "GitHub Copilotでエージェントを実行",
+  "tips.copilotGithubHost.text": "リポジトリがyourcompany.ghe.comや自社のGitHub Enterprise Serverにありますか？ワークスペースまたはプロジェクトごとに「バージョン管理」→「GitHub」でGitHubホストを設定すると、Copilotはそのホストでサインインとサインインの確認を行い、「プロバイダーのセットアップ」ではホストごとに分けて表示されます。",
+  "tips.copilotGithubHost.title": "自社のGitHubでCopilotを使う",
   "tips.copilotModes.text": "Copilotのエージェントは「編集を承認」で始まります。自分のフォルダー内のファイル編集とCombworkツールの使用は確認なしで行い、それ以外のコマンド、他のMCPツール、Webへのアクセスの前には確認します。編集も1つずつ承認するなら「確認」、すべて承認するなら「すべて許可」を選びます。",
   "tips.copilotModes.title": "Copilotのエージェントが確認すること",
   "tips.copyDiagnostics.text": "「ヘルプ」→「診断情報をコピー…」は、Combworkのバージョン、コーディングエージェント、主な設定、ログの末尾をバグ報告用にまとめます。名前、フォルダー、トークンは取り除かれます。",

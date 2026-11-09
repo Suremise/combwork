@@ -382,6 +382,8 @@ export const AREAS = [
   // Combwork's one way to the Recycle Bin (a test copy's trash folder, #414): the suites that delete something.
   { paths: ['src/main/trash.ts'], suites: ['board', 'files', 'storage', 'sessiontree', 'templateshare', 'unusedwt', 'skills', 'transcript', 'unsaved', 'assistantimages'] },
   { paths: ['src/main/providerService.ts', 'src/main/taskKeys.ts', 'src/main/updateStayed.ts'], suites: ['providers', 'codex-setup', 'startfail', 'models', 'testedclis', 'freshpath', 'providerdetect'] },
+  // GitHub hosts and Copilot's sign-in per host (HI-2779).
+  { paths: ['tests/e2e/githubhosts.cjs', 'src/shared/githubHost.ts', 'src/main/githubHosts.ts', 'src/main/githubHostChanges.ts', 'src/main/providers/copilot/hosts.ts', 'src/main/providers/copilot/install.ts', 'src/main/providers/copilot/models.ts', 'src/renderer/src/components/GithubHosts.tsx', 'src/shared/githubHostText.ts', 'src/renderer/src/signInHost.ts'], suites: ['githubhosts', 'providers'] },
   { paths: ['src/main/keySteps.ts'], suites: ['codex', 'codex-setup'] },
   { paths: ['src/main/rendererWatch.ts'], suites: ['rendercrash', 'windowhealth'] },
   { paths: ['src/shared/windowHealth.ts', 'src/renderer/src/windowHealth.ts', 'src/renderer/src/pageMarks.ts'], suites: ['windowhealth'] },

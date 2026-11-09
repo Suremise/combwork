@@ -115,6 +115,19 @@
   "providers.codex.storePwsh.warning": {
     "placeholders": {}
   },
+  "providers.copilot.host.choose": {
+    "placeholders": {
+      "repoHost": "plain"
+    }
+  },
+  "providers.copilot.host.proxy": {
+    "placeholders": {}
+  },
+  "providers.copilot.host.signedOut": {
+    "placeholders": {
+      "host": "plain"
+    }
+  },
   "providers.copilot.planNote": {
     "placeholders": {}
   },

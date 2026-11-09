@@ -812,6 +812,11 @@
       "cli": "plain"
     }
   },
+  "service.providers.unknownHost": {
+    "placeholders": {
+      "cli": "plain"
+    }
+  },
   "service.slots.notPrepared": {
     "placeholders": {
       "slot": "plain",

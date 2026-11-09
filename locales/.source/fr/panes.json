@@ -63,6 +63,7 @@
   "panes.footer.reading": "Reading this conversation's usage…",
   "panes.footer.retryWaited": "This session has waited {minutes, plural, =0 {under a minute} one {# minute} other {# minutes}} in all for {provider} to retry rate-limited or failed requests ({waits, plural, one {# wait} other {# waits}}, the latest from {time}{ongoing, select, yes {, still waiting} other {}}): time not spent on its work.",
   "panes.footer.settingsName": "Agent Settings or Project Settings",
+  "panes.footer.signInHost": "Signed in on {host}{repo, select, same {} other {, repositories on {repoHost}}}{account, select, none {} other { as {account}}}.",
   "panes.footer.stale": "Couldn’t read it again just now: this may be behind.",
   "panes.footer.tasks": "{n, plural, one {# background task} other {# background tasks}}",
   "panes.footer.tasksTip": "{n, plural, one {A background task it started is still running.} other {# background tasks it started are still running.}} Its status says whether its turn waits for them.",

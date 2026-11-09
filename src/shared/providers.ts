@@ -86,6 +86,11 @@ export interface ProviderCapabilities {
    * offers the admin snippet.
    */
   remoteHookPolicy?: boolean
+  /**
+   * The CLI signs in on a GitHub host (HI-2779: Copilot): it follows the workspace's and project's GitHub host settings,
+   * and Provider Setup checks its sign-in per host in use (AgentInstallInfo.hostChecks), with Sign in per host.
+   */
+  githubHost?: boolean
   /** Combwork chooses the session id at launch (Claude Code); otherwise the provider reports it once started. */
   fixedSessionId: boolean
   /** How a running session changes permission mode: cycling a key (Claude's Shift+Tab), a menu, or not at all. */
