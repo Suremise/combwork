@@ -1058,7 +1058,7 @@ The design across every surface is HI-1755's design note and addendum. The decis
   - **With `provider`:** they must agree (409). **Alone:** its CLI is the agent's, and on another CLI it is that change of CLI (refused while running; model, effort, mode, context, last session and the old connection cleared). Whether the CLI changes is decided again against the agent as saved under the lock (changed meanwhile: refused whole).
   - **Left out:** kept. **`null` or `""`:** cleared (the CLI's default). **`provider` alone:** no connection of its own (the CLI's default; starts refused while none is on).
 - **Status:** each agent row has `connection` (the one chosen, `{ id, name, problem? }`, or null), `launchedConnection` (the account its run is on, with `connection`, the connection on it the run launched with: HI-2406) and `switchPending`. A project agent isn't told the name of one not on in its workspace.
-- **`GET /v1/connections`, `GET /v1/connections/{ref}`** (`connectionsFor`, `connectionShown`): a project agent sees only those on in its workspace (`id`, `name`, `cli`, `kind`, `signedIn`; another one is 404 by id or name); the workspace token and the Assistant see every one, with `on`, `default`, `email` and `plan`. Nobody sees a token, a key, where a login is kept, its settings or defaults; `details=true` widens nothing. cw_list_providers lists each CLI's connections on here.
+- **`GET /v1/connections`, `GET /v1/connections/{ref}`** (`connectionsFor`, `connectionShown`): a project agent sees only those on in its workspace (`id`, `name`, `cli`, `kind`, `signedIn`; another one is 404 by id or name); the workspace token and the Assistant see every one, with `on`, `default`, `email` and `plan`. Nobody sees a token, a key, where a login is kept, its settings or defaults; `details=true` widens nothing. cw_list_providers lists each CLI's connections on here. It is a line a CLI since HI-2814 (`providerListText`: on, installed and tested, default model, how many models, efforts, modes, connections, a problem), the entry of `GET /v1/providers` in full only for the one its `provider` names: every CLI's JSON outgrew the reply's budget (12,000 characters) with OpenCode, the fifth, and models' labels and modes' descriptions were most of it. The API route is unchanged.
 
 **The rows and templates name connections** (S2, HI-1769):
 - **One rule for every row** (`connectionOf`, `src/shared/connectionLabel.ts`), the launch's own (`resolveConnection`), so the window and a start never disagree:
@@ -6073,7 +6073,16 @@ builder outside slots it renews (HI-2232, below): another running agent is left 
 status changes and the 30 s tick, builders and reviewers alike, whether or not a card is due, and with the workflow
 rules off too: only Combwork's own card starts need them) launches each owed agent
 once free (`launchFresh`: as Start Lane would, the lane's brief, a new conversation, or started if it stopped
-meanwhile). The launch is claimed under the lock (`launching`), and its ownership (the lane running, the agent in that
+meanwhile by itself). **Someone's Stop stops it** (HI-2815): an agent stopped by the user, the Assistant or an agent
+(`sessions.stop` with that cause, `stoppedOnPurposeAt`) after its entry's `since` is owed nothing more: the entry is
+removed, before the launch or at its checks (`still`), and nothing is launched; the lane stays, and updating it starts a
+stopped builder on it (`resumeLaneBuilder`, HI-1900). Nor does the card pass start a card on a builder so stopped
+(`lookAt`, and `stillDue` at the start's write): its card waits, `startWait` `stopped` (*AL-3 waits to start: B1 was
+stopped; it goes on once B1 is started again…*), from the Stop on, whether or not its old run has exited yet (a graceful
+exit takes a while, its status idle meanwhile: HR2's round 2), until anything starts the agent (by hand, a lane update,
+a Retry: `start()` clears the mark; a run still live is never taken for a restart), so the pass that drops its owed conversation never gives it its due card instead [HR2's
+round 1]. A stop no one asked for (a lane's end, `lane`; a closed window; Combwork's own) holds nothing. Before, the pass took the stopped agent for free and started it
+again within a second of the user's Stop (assistant-control's *Builder stopped*). The launch is claimed under the lock (`launching`), and its ownership (the lane running, the agent in that
 role, the same entry, unblocked) is checked again at every boundary the session layer gives: just before the old run
 stops and again before the new launch spawns (`newConversation`'s `allowed`, each call; a stopped agent's start's
 `allowed`) [HR1's round 1]; the entry is removed by its id only after the launch. **Bounded**: within Settings → Advanced → *Lanes: longest Combwork waits

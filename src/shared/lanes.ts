@@ -211,7 +211,7 @@ export function laneStartDue(lane: Pick<LaneInfo, 'state' | 'cards'>): LaneCard 
  * its last start failed (`failed`), Combwork's start refused for now and tried again (`refused`), or a card it depends on
  * not Done yet where its rules wait for that (`dependencies`, HI-2129: `waitsFor` names it).
  */
-export type LaneStartWhy = 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
+export type LaneStartWhy = 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies' | 'stopped'
 /** A lane's card waiting to be started, why, and its builder's name (LaneStatus `startWait`). */
 export interface LaneStartWait {
   card: number
@@ -480,6 +480,7 @@ const L = {
   startFailed: agentMsg({ id: 'lane.status.start.failed', text: "{card} waits to start: {agent}'s last start failed", note: "A lane's next card isn't started yet (HI-2029): Combwork's last start of it on the builder failed." }),
   startRefusedHeld: agentMsg({ id: 'lane.status.start.refusedHeld', text: "{card} waits to start: its start was refused for now, {slot} still in use ({held, select, session {{heldBy}'s session is still in it} left {{heldBy}'s last run left {program}{more, plural, =0 {} other { and # more}} running in it} lastRun {{heldBy}'s last run there isn't known to have ended} broker {a process still has a file or folder in it open: Windows Sandbox's broker ({broker}) is working in it{idle, select, yes {, with no Sandbox running} no {, with a Sandbox running} other {}}} other {a process still has a file or folder in it open}}); Combwork tries again", note: "A lane's next card isn't started yet (HI-2468): Combwork's start of it was refused because its slot {slot} is still in use: a session of the agent {heldBy} still runs in it; left, the agent {heldBy}'s last run left programs running in it ({program}: the first one's name, such as node; {more}: how many more); lastRun, that run isn't known to have ended; or (broker) a process holds it, and Windows Sandbox's broker ({broker}: its process name) has the slot as its current folder, idle: yes, no Sandbox runs; no, one does; other, not known; or (other) a process holds it. Combwork tries the start again." }),
   startRefused: agentMsg({ id: 'lane.status.start.refused', text: '{card} waits to start: its start was refused for now; Combwork tries again', note: "A lane's next card isn't started yet (HI-2029): Combwork's start of it was refused for now, and is tried again." }),
+  startStopped: agentMsg({ id: 'lane.status.start.stopped', text: '{card} waits to start: {agent} was stopped; it goes on once {agent} is started again (by hand, or by updating the lane)', note: "A lane's next card isn't started yet (HI-2815): someone (the user, the Assistant, an agent) stopped its builder, and Combwork doesn't start it again by itself." }),
   startBusy: agentMsg({ id: 'lane.status.start.busy', text: '{card} waits to start: {agent} is in a turn', note: "A lane's next card isn't started yet (HI-2029): its builder is in a turn, or starting." }),
   column: {
     hold: agentMsg({ id: 'lane.column.hold', text: 'On Hold', note: "A card's column in a lane's line (a column name)." }),
@@ -583,7 +584,7 @@ export function laneStatusText(s: LaneStatus): string {
       if (s.why === 'refused' && s.slot && s.held) return say(L.startRefusedHeld, { card, slot: s.slot, held: s.held, heldBy: s.heldBy ?? say(L.anAgent), broker: s.broker ?? '', idle: idleKey(s.idle), program: s.program ?? '', more: s.more ?? 0 })
       if (s.why === 'refused') return say(L.startRefused, { card })
       const agent = s.agent ?? say(L.itsBuilder)
-      return say(s.why === 'watching' ? L.startWatching : s.why === 'queued' ? L.startQueued : s.why === 'failed' ? L.startFailed : L.startBusy, { card, agent })
+      return say(s.why === 'watching' ? L.startWatching : s.why === 'queued' ? L.startQueued : s.why === 'failed' ? L.startFailed : s.why === 'stopped' ? L.startStopped : L.startBusy, { card, agent })
     }
   }
 }

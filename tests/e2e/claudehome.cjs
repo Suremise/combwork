@@ -74,7 +74,14 @@ function filesHolding(dir, text) {
   const authFile = path.join(dir, 'hook-auth.txt')
   const token = fs.existsSync(authFile) ? /Bearer ([0-9a-f]+)/.exec(fs.readFileSync(authFile, 'utf8'))?.[1] : null
   check("its settings, MCP config and auth file are in the launch's private folder in Combwork's user data", !!settings && !!token && fs.existsSync(path.join(dir, 'mcp.json')), dir)
-  check('SessionStart and the status line read the header from that file', [settings?.hooks?.SessionStart?.[0]?.hooks?.[0]?.command, settings?.statusLine?.command].every((c) => typeof c === 'string' && c.includes(`-H "@${authFile.split('\\').join('/')}"`) && !c.includes('Bearer')), JSON.stringify(settings?.statusLine))
+  // SessionStart is the shared handler (HI-2777): a PowerShell script reading the URL and the auth file from the launch's
+  // environment (CW_HOOK_URL, CW_HOOK_AUTH_FILE), so its command names neither; reaching Combwork above proves they were set.
+  // The status line still passes the file itself.
+  const sessionStart = settings?.hooks?.SessionStart?.[0]?.hooks?.[0]?.command
+  const encoded = typeof sessionStart === 'string' ? /-EncodedCommand (\S+)$/.exec(sessionStart)?.[1] : null
+  const script = encoded ? Buffer.from(encoded, 'base64').toString('utf16le') : ''
+  const statusLine = settings?.statusLine?.command
+  check('SessionStart reads the URL and the auth file from its environment, and the status line reads the header from that file; neither holds the token', /^powershell\.exe .*-EncodedCommand \S+$/.test(sessionStart ?? '') && script.includes('$env:CW_HOOK_URL') && script.includes('$env:CW_HOOK_AUTH_FILE') && ![sessionStart, script].some((c) => c.includes('Bearer') || (!!token && c.includes(token))) && typeof statusLine === 'string' && statusLine.includes(`-H "@${authFile.split('\\').join('/')}"`) && !statusLine.includes('Bearer'), JSON.stringify({ sessionStart, script, statusLine }))
   check("no file in the project holds the session's token", !!token && filesHolding(proj, token).length === 0, token ? filesHolding(proj, token).join(', ') : 'no token')
 
   await lib.cliStep('the status line reaches Combwork', { session: key }, async () => {
