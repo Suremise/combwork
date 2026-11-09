@@ -9,6 +9,9 @@ import type { WorkspaceService } from '../src/main/workspace'
 import { githubHostsForm, onGithubHostsChanged, setGithubHosts } from '../src/main/githubHosts'
 import { routesInUse } from '../src/main/providers/copilot/hosts'
 import { movedAgents } from '../src/main/githubHostChanges'
+import { writeFileSync } from 'fs'
+import { join } from 'path'
+import { tempDir } from './tempDir'
 
 /** A workspace with just what the GitHub settings use: its config, its projects' configs, their saves. */
 function stubWorkspace(path: string, projects: Record<string, Partial<ProjectConfig>> = {}, wsConfig: Partial<WorkspaceConfig> = {}): WorkspaceService {
@@ -111,14 +114,28 @@ describe('the routes in use', () => {
 })
 
 describe('a host change: the agents a restart would move', () => {
-  const live = (projectPath: string, host: string, repoHost = host, provider = 'copilot'): LiveSessionState => ({ provider, projectPath, agentId: 'a', signInHost: { host, repoHost, origin: 'project' } }) as unknown as LiveSessionState
+  // A Copilot home of the test's own (never the user's ~/.copilot), and a token set for Copilot: named, never read.
+  const home = tempDir('cw-moved-home-')
+  const env = { COPILOT_HOME: home, COPILOT_GITHUB_TOKEN: 'x' }
+  const live = (projectPath: string, host: string, repoHost = host, provider = 'copilot', source: string | null = 'COPILOT_GITHUB_TOKEN'): LiveSessionState => ({ provider, projectPath, agentId: 'a', signInHost: { host, repoHost, origin: 'project', source, account: null, home } }) as unknown as LiveSessionState
 
-  it('names those launched on another host than their project resolves to now, in the changed scope only', async () => {
+  it('names those launched otherwise than a launch now would (host, source), in the changed scope only', async () => {
     const ws = stubWorkspace('D:\\ws', { 'D:\\ws\\app': { github: { host: 'tenant.ghe.com' } }, 'D:\\ws\\other': {} })
-    const states = [live('D:\\ws\\app', 'github.com'), live('D:\\ws\\app', 'tenant.ghe.com'), live('D:\\ws\\other', 'github.com'), live('D:\\ws\\app', 'github.com', 'github.com', 'claude-code')]
-    const moved = await movedAgents(ws, states, {}, (p) => p === 'D:\\ws\\app')
-    expect(moved.map((m) => [m.state.signInHost!.host, m.host])).toEqual([['github.com', 'tenant.ghe.com']])
+    const states = [live('D:\\ws\\app', 'github.com'), live('D:\\ws\\app', 'tenant.ghe.com'), live('D:\\ws\\other', 'github.com'), live('D:\\ws\\app', 'github.com', 'github.com', 'claude-code'), live('D:\\ws\\app', 'tenant.ghe.com', 'tenant.ghe.com', 'copilot', 'Copilot login')]
+    const moved = await movedAgents(ws, states, env, (p) => p === 'D:\\ws\\app')
+    expect(moved.map((m) => [m.state.signInHost!.host, m.state.signInHost!.source, m.host])).toEqual([
+      ['github.com', 'COPILOT_GITHUB_TOKEN', 'tenant.ghe.com'],
+      ['tenant.ghe.com', 'Copilot login', 'tenant.ghe.com']
+    ])
     // Launched before HI-2779 (no snapshot): never relabelled from the settings.
-    expect(await movedAgents(ws, [{ provider: 'copilot', projectPath: 'D:\\ws\\app' } as unknown as LiveSessionState], {}, () => true)).toEqual([])
+    expect(await movedAgents(ws, [{ provider: 'copilot', projectPath: 'D:\\ws\\app' } as unknown as LiveSessionState], env, () => true)).toEqual([])
+  })
+
+  it('legacy (nothing set): an agent on its stored login’s host is where a launch would be now, not moved', async () => {
+    const stored = tempDir('cw-moved-stored-')
+    writeFileSync(join(stored, 'config.json'), `// User settings belong in settings.json.\n${JSON.stringify({ loggedInUsers: [{ host: 'https://tenant.ghe.com', login: 'mona' }] })}\n`)
+    const ws = stubWorkspace('D:\\ws', { 'D:\\ws\\app': {} })
+    const state = { provider: 'copilot', projectPath: 'D:\\ws\\app', agentId: 'a', signInHost: { host: 'tenant.ghe.com', repoHost: 'github.com', origin: 'default', source: 'Copilot login', account: 'mona', home: stored } } as unknown as LiveSessionState
+    expect(await movedAgents(ws, [state], { COPILOT_HOME: stored }, () => true)).toEqual([])
   })
 })

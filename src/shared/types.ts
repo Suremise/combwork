@@ -563,6 +563,11 @@ export interface ModelCatalog {
   defaultModel?: string
   /** When it was read (ISO). */
   at: string
+  /**
+   * The context it was read in (HI-2779: a CLI signing in on a GitHub host: its host, home and sign-in by name, never a
+   * token): a cached catalogue is only used again in the same context.
+   */
+  context?: string
 }
 
 export interface WindowState {
@@ -2316,6 +2321,12 @@ export interface LaunchedSignInHost {
   host: string
   repoHost: string
   origin: 'project' | 'workspace' | 'environment' | 'default'
+  /** The sign-in's source by name (a variable's name, `Copilot login`, `local model`); null: none known at launch (gh's, or none). */
+  source?: string | null
+  /** The account where the CLI's own files say it (a stored login's); null when not known (a token's never is). */
+  account?: string | null
+  /** The CLI's home the launch ran on. */
+  home?: string
 }
 
 export interface SessionRecord {
@@ -3756,6 +3767,10 @@ export interface AgentInstallInfo {
    * projects resolve to, each with its own evidence. Absent: a CLI without GitHub hosts. `loggedIn` above is the first row's.
    */
   hostChecks?: HostCheck[]
+  /** Each host check's catalogue (HI-2779), by its key; a host with no listing has none (the fallback list, labelled so). */
+  hostCatalogs?: Record<string, ModelCatalog>
+  /** Which host check each folder resolves to (HI-2779): workspaces (their default) and projects with settings of their own, lower-cased. */
+  hostRouteOf?: Record<string, string>
 }
 
 /**

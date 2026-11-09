@@ -1,7 +1,7 @@
 import { homedir } from 'os'
 import { app } from 'electron'
 import type { AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
-import { observedEffortKey } from '../shared/models'
+import { cachedCatalogFor, observedEffortKey } from '../shared/models'
 import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
 import { ptyArgs, shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
 import { allProviders, provider } from './providers'
@@ -111,9 +111,20 @@ class ProviderService {
 
   /** The last good catalog this provider's CLI gave, as a cache (for its version only). */
   private cachedCatalog(id: ProviderId, version?: string | null): ModelCatalog | null {
-    const c = config.get().modelCatalogs?.[id]
-    if (!c || !Array.isArray(c.models) || !c.models.length) return null
-    return version === undefined || c.version === version ? { ...c, source: 'cache' } : null
+    // A CLI whose catalogue depends on a context (HI-2779: its GitHub host and sign-in): only the one read in the context
+    // it has now, never another host's or account's; none known now (a check after a change), none.
+    const adapter = provider(id)
+    return cachedCatalogFor(config.get().modelCatalogs?.[id], version, adapter.catalogContext ? adapter.catalogContext() : undefined)
+  }
+
+  /**
+   * Drops what a provider's catalogue was read in before a change of its context (HI-2779: a GitHub host changed): its
+   * catalogue and its hosts' catalogues go, so nothing shows another host's list while it is checked again.
+   */
+  forgetCatalog(id: ProviderId): void {
+    const cur = this.info(id)
+    if (!cur.catalog && !cur.hostCatalogs) return
+    this.set(id, { ...cur, catalog: null, hostCatalogs: {}, defaultModel: this.resolveDefaultModel(id, null) })
   }
 
   /** Records the model seen answering in a session started without a model choice. */
@@ -241,7 +252,9 @@ class ProviderService {
       const read = found.path && adapter.listModels ? await adapter.listModels(found.path, childEnv()).catch(() => null) : null
       let catalog: ModelCatalog | null = null
       if (read) {
-        catalog = { source: 'cli', version: found.version, models: read.models, ...(read.defaultModel ? { defaultModel: read.defaultModel } : {}), at: new Date().toISOString() }
+        // Read in its context (HI-2779), kept with it: a cached catalogue is used again only there.
+        const context = adapter.catalogContext?.() ?? null
+        catalog = { source: 'cli', version: found.version, models: read.models, ...(read.defaultModel ? { defaultModel: read.defaultModel } : {}), at: new Date().toISOString(), ...(context ? { context } : {}) }
         const keep = catalog
         // Only the latest refresh's answer is kept (an older one still running mustn't replace a newer one's).
         if (this.refreshes.get(id) === run)

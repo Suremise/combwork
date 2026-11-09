@@ -6,7 +6,10 @@ import { dirname, join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { resolveGithubHosts, type GithubHostSettings } from '../src/shared/githubHost'
 import { checkRoutes, contextKey, hostEvidence, newGeneration, routeOf, withModels, type CopilotRoute, type HostCheckDeps, readCliConfig } from '../src/main/providers/copilot/hosts'
-import { copilotLoginCommand, ghHostStatus } from '../src/main/providers/copilot/install'
+import { copilotLoginCommand, ghHostStatus, hostCatalogsOf, primaryContext, primaryModels } from '../src/main/providers/copilot/install'
+import { signInSnapshot } from '../src/main/providers/copilot/hosts'
+import { cachedCatalogFor, infoAt, modelGroups } from '../src/shared/models'
+import type { AgentInstallInfo, ModelCatalog } from '../src/shared/types'
 import { askCopilotModels, modelEnablement } from '../src/main/providers/copilot/models'
 import { run } from '../src/main/providers/common'
 import { tempDir } from './tempDir'
@@ -55,7 +58,9 @@ const lists = {
   denied: [model('gpt-5', 'disabled'), model('claude-sonnet-5.5', 'unconfigured')],
   mixed: [model('gpt-5', 'disabled'), model('claude-sonnet-5.5')],
   none: [model('gpt-5'), model('claude-sonnet-5.5')],
-  partial: [model('gpt-5', 'enabled'), model('claude-opus-5.5', 'disabled')]
+  partial: [model('gpt-5', 'enabled'), model('claude-opus-5.5', 'disabled')],
+  // byhost: each host's own models, default and availability (HR2's round 1: two contexts that differ).
+  byhost: process.env.COPILOT_GH_HOST === 'tenant.ghe.com' ? [model('tenant-only-model', 'enabled'), model('gpt-5', 'disabled')] : [model('gpt-5', 'enabled'), model('public-only-model', 'enabled')]
 }
 let buf = ''
 process.stdin.on('data', (d) => {
@@ -116,8 +121,8 @@ function deps(): HostCheckDeps {
 }
 
 /** A route for a project's and its workspace's settings. */
-function route(project: GithubHostSettings | null, workspace: GithubHostSettings | null, env: Record<string, string>): CopilotRoute {
-  return { ...routeOf(resolveGithubHosts(project, workspace, env), env), usedBy: [{ workspace: 'ws', projects: project ? ['app'] : [] }] }
+function route(project: GithubHostSettings | null, workspace: GithubHostSettings | null, env: Record<string, string>, paths: string[] = []): CopilotRoute {
+  return { ...routeOf(resolveGithubHosts(project, workspace, env), env), usedBy: [{ workspace: 'ws', projects: project ? ['app'] : [] }], paths }
 }
 
 async function check(r: CopilotRoute) {
@@ -270,6 +275,99 @@ describe.runIf(windows)('Copilot on each GitHub host, on fake gh and Copilot', {
     release()
     expect(await old).toBeNull()
     expect(now![0]).toMatchObject({ host: 'tenant.ghe.com' })
+  })
+})
+
+describe.runIf(windows)('catalogues per GitHub host (HR2’s round 1 on HI-2779)', { timeout: 60000 }, () => {
+  const token = { COPILOT_GITHUB_TOKEN: 'x', FAKE_COPILOT_MODE: 'byhost' }
+
+  it('two contexts, different models, defaults and availability: each project’s pickers get its own host’s', async () => {
+    freshLog()
+    const env = baseEnv(copilotHome(), token)
+    const pub = route(null, null, env, ['D:\\ws'])
+    const tenant = route({ host: 'tenant.ghe.com' }, null, env, ['D:\\ws\\Tenant-App'])
+    expect(await checkRoutes([pub, tenant], deps())).not.toBeNull()
+    const info = { catalog: null, defaultModel: null, ...hostCatalogsOf([pub, tenant], '1.0.106', 'now') } as Pick<AgentInstallInfo, 'catalog' | 'defaultModel' | 'hostCatalogs' | 'hostRouteOf'>
+    // The tenant project (by its own path, any case) and a project of the workspace without settings of its own.
+    const atTenant = infoAt(info, { projectPath: 'd:\\ws\\tenant-app', workspacePath: 'D:\\ws' })
+    const atOther = infoAt(info, { projectPath: 'D:\\ws\\other', workspacePath: 'D:\\ws' })
+    expect(atTenant?.catalog?.models.map((m) => [m.value, !!m.unavailable])).toEqual([['tenant-only-model', false], ['gpt-5', true]])
+    expect(atTenant?.defaultModel).toBe('tenant-only-model')
+    expect(atOther?.catalog?.models.map((m) => [m.value, !!m.unavailable])).toEqual([['gpt-5', false], ['public-only-model', false]])
+    expect(atOther?.defaultModel).toBe('gpt-5')
+    // The pickers' groups: the tenant's offers only its own; gpt-5 is listed apart, as unavailable to that account.
+    const groups = modelGroups('copilot', atTenant, null)
+    expect(groups[0].models.map((m) => m.value)).toEqual(['tenant-only-model'])
+    expect(groups.find((g) => g.unavailable)?.models.map((m) => m.value)).toEqual(['gpt-5'])
+    // The order the routes come in doesn't change any project's list.
+    const swapped = infoAt({ catalog: null, defaultModel: null, ...hostCatalogsOf([tenant, pub], '1.0.106', 'now') } as typeof info, { projectPath: 'D:\\ws\\Tenant-App', workspacePath: 'D:\\ws' })
+    expect(swapped?.catalog?.models.map((m) => m.value)).toEqual(['tenant-only-model', 'gpt-5'])
+  })
+
+  it('a host with no listing (no sign-in there) has no catalogue: never another host’s', async () => {
+    freshLog()
+    const env = baseEnv(copilotHome(), { FAKE_COPILOT_MODE: 'byhost' })
+    const pub = route(null, null, { ...env, COPILOT_GITHUB_TOKEN: 'x' }, ['D:\\ws'])
+    const tenant = route({ host: 'tenant.ghe.com' }, null, env, ['D:\\ws\\app'])
+    expect(await checkRoutes([pub, tenant], deps())).not.toBeNull()
+    const info = { catalog: null, defaultModel: null, ...hostCatalogsOf([pub, tenant], '1.0.106', 'now') } as Pick<AgentInstallInfo, 'catalog' | 'defaultModel' | 'hostCatalogs' | 'hostRouteOf'>
+    expect(infoAt(info, { projectPath: 'D:\\ws\\app', workspacePath: 'D:\\ws' })?.catalog).toBeNull()
+  })
+
+  it('the primary catalogue is only this generation’s listing: none after a host change, and a delayed old answer is dropped', async () => {
+    freshLog()
+    const env = baseEnv(copilotHome(), token)
+    const pub = route(null, null, env)
+    expect(await checkRoutes([pub], deps())).not.toBeNull()
+    expect(primaryModels([pub])?.models.map((m) => m.value)).toEqual(['gpt-5', 'public-only-model'])
+    expect(primaryContext([pub])).toMatch(/^github\.com\|github\.com\|env\|/)
+    // A host change: the old listing isn't this generation's any more, so nothing is offered for it.
+    newGeneration()
+    expect(primaryModels([pub])).toBeNull()
+    expect(primaryContext([pub])).toBeNull()
+    // An old check still asking when the host changes: its late answer is never kept, so the new route never shows it.
+    const tenant = route(null, { host: 'tenant.ghe.com' }, env)
+    let release: () => void = () => {}
+    const slow: HostCheckDeps = { ...deps(), models: (e) => new Promise((r) => (release = () => void askCopilotModels(COPILOT, e, 8000).then(r))) }
+    const old = checkRoutes([pub], slow)
+    newGeneration()
+    expect(await checkRoutes([tenant], deps())).not.toBeNull()
+    release()
+    expect(await old).toBeNull()
+    expect(primaryModels([pub])).toBeNull()
+    expect(primaryModels([tenant])?.models.map((m) => m.value)).toEqual(['tenant-only-model', 'gpt-5'])
+  })
+})
+
+describe('the saved catalogue as a cache (HR2’s round 1 on HI-2779)', () => {
+  const saved: ModelCatalog = { source: 'cli', version: '1.0.106', models: [{ value: 'public-only-model', label: 'P' }], at: 'then', context: 'github.com|github.com|env|c:\\h|stored:octo|strip:1|update:0|c:\\copilot.exe@1.0.106' }
+  it('is used only in the context it was read in', () => {
+    expect(cachedCatalogFor(saved, '1.0.106', saved.context)?.source).toBe('cache')
+    // The same version on another host or account: not used.
+    expect(cachedCatalogFor(saved, '1.0.106', 'tenant.ghe.com|tenant.ghe.com|set|c:\\h|stored:mona|strip:1|update:0|c:\\copilot.exe@1.0.106')).toBeNull()
+    // An enterprise check that failed after the public one was cached: no context now, so no cache.
+    expect(cachedCatalogFor(saved, '1.0.106', null)).toBeNull()
+    // A CLI without contexts (undefined): as before.
+    expect(cachedCatalogFor({ ...saved, context: undefined }, '1.0.106', undefined)?.source).toBe('cache')
+  })
+})
+
+describe('what a launch records it signs in as (HR2’s round 1 on HI-2779)', () => {
+  const home = (users: { host: string; login: string }[]): string => copilotHome(users)
+  it('legacy (nothing set, no host variable): the stored login’s own host, source and account', async () => {
+    const h = home([{ host: 'https://tenant.ghe.com', login: 'mona' }])
+    const snap = await signInSnapshot(resolveGithubHosts(null, null, {}), { COPILOT_HOME: h })
+    expect(snap).toEqual({ host: 'tenant.ghe.com', repoHost: 'github.com', origin: 'default', source: 'Copilot login', account: 'mona', home: h })
+  })
+  it('an explicit host: a token by its name (never its value), else the stored login on that host only', async () => {
+    const h = home([{ host: 'https://github.com', login: 'octo' }])
+    const resolved = resolveGithubHosts({ host: 'git.acme.example', copilotHost: 'tenant.ghe.com' }, null, {})
+    expect(await signInSnapshot(resolved, { COPILOT_HOME: h, COPILOT_GITHUB_TOKEN: 'secret-value' })).toEqual({ host: 'tenant.ghe.com', repoHost: 'git.acme.example', origin: 'project', source: 'COPILOT_GITHUB_TOKEN', account: null, home: h })
+    expect(await signInSnapshot(resolved, { COPILOT_HOME: h })).toEqual({ host: 'tenant.ghe.com', repoHost: 'git.acme.example', origin: 'project', source: null, account: null, home: h })
+    expect(JSON.stringify(await signInSnapshot(resolved, { COPILOT_HOME: h, COPILOT_GITHUB_TOKEN: 'secret-value' }))).not.toContain('secret-value')
+  })
+  it('none where Copilot can’t sign in (a GHES host with nothing chosen)', async () => {
+    expect(await signInSnapshot(resolveGithubHosts({ host: 'git.acme.example' }, null, {}), {})).toBeNull()
   })
 })
 

@@ -62,6 +62,7 @@
   "panes.footer.reading": "Lecture de l’utilisation de cette conversation…",
   "panes.footer.retryWaited": "Cette session a attendu {minutes, plural, =0 {moins d’une minute} one {# minute} many {# minutes} other {# minutes}} au total que {provider} relance des requêtes limitées ou en échec ({waits, plural, one {# attente} many {# attentes} other {# attentes}}, la dernière depuis {time}{ongoing, select, yes {, toujours en attente} other {}}) : du temps non consacré à son travail.",
   "panes.footer.settingsName": "Paramètres de l’agent ou paramètres du projet",
+  "panes.footer.signInHost": "Connecté sur {host}{repo, select, same {} other {, dépôts sur {repoHost}}}{account, select, none {} other { en tant que {account}}}.",
   "panes.footer.stale": "Impossible de la relire à l’instant : ces chiffres sont peut-être en retard.",
   "panes.footer.tasks": "{n, plural, one {# tâche en arrière-plan} many {# tâches en arrière-plan} other {# tâches en arrière-plan}}",
   "panes.footer.tasksTip": "{n, plural, one {Une tâche en arrière-plan qu’il a lancée tourne encore.} many {# tâches en arrière-plan qu’il a lancées tournent encore.} other {# tâches en arrière-plan qu’il a lancées tournent encore.}} Son statut dit si son tour les attend.",

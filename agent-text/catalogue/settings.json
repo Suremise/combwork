@@ -2961,6 +2961,10 @@
     "text": "{title} takes a list of {shape}, or null for Combwork's list.",
     "note": "A provider's fallback list given something other than a list. {shape} is an entry's JSON fields: code, as written."
   },
+  "settings.agent.error.githubHost": {
+    "text": "{title} takes a host name only, such as github.com or yourcompany.ghe.com (no scheme but https://, no user name, token, path, query or port){copilot, select, yes {: github.com or a GHE.com host, never a GitHub Enterprise Server, or repo (the same as the GitHub host) or ghes-proxy} other {}}, or null to inherit. Refused: {why}.",
+    "note": "A GitHub host setting given a value it refuses (HI-2779). {copilot} is yes for where Copilot signs in. {why} is the reason code as written (credentials, path, query, port, scheme, invalid, empty, notCloud): keep it. repo and ghes-proxy are values as written."
+  },
   "settings.agent.error.isAction": {
     "text": "it is a button, a status or a list",
     "note": "Why a setting has no value to set: it is a button, a status or a list (inside settings.agent.error.notSettable's brackets)."
@@ -3265,6 +3269,18 @@
     "text": "a whole number from {min} to {max}",
     "note": "What a number workflow option takes. {min} and {max} are numbers as written."
   },
+  "settings.agent.tool.githubChoose": {
+    "text": "none: the repositories are on GitHub Enterprise Server, so where Copilot signs in must be chosen (Copilot agents don't start until then)",
+    "note": "What \"Copilot signs in on\" resolves to when the repositories are on a GHES host and nothing is chosen (HI-2779)."
+  },
+  "settings.agent.tool.githubEffective": {
+    "text": "{value}, {origin, select, project {set for the project} workspace {from the workspace} environment {from Combwork's environment (GH_HOST, COPILOT_GH_HOST)} other {the default}}",
+    "note": "What a GitHub host setting resolves to now (HI-2779). {value} is a host, or settings.agent.tool.githubChoose. {origin} is a key, never shown."
+  },
+  "settings.agent.tool.githubProxy": {
+    "text": "GitHub Enterprise Server's Copilot proxy, not supported yet (Copilot agents don't start)",
+    "note": "What \"Copilot signs in on\" resolves to when the GHES Copilot proxy is chosen (HI-2779)."
+  },
   "settings.agent.tool.keptCard": {
     "text": "{card} into {target}",
     "note": "HI-2674: a card in flight keeping its target. {card} is its key (HI-12); {target} a branch."
@@ -3352,6 +3368,10 @@
   "settings.agent.tool.takes.fallback": {
     "text": "the whole list: [{shape}], or null for Combwork's list",
     "note": "What a provider's fallback list takes. {shape} is an entry's JSON fields: code, as written."
+  },
+  "settings.agent.tool.takes.githubHost": {
+    "text": "a host name only, such as github.com or yourcompany.ghe.com{copilot, select, yes {: github.com or a GHE.com host, or repo (the same as the GitHub host) or ghes-proxy (not supported yet)} other {}}; or null to inherit",
+    "note": "What a GitHub host setting takes (HI-2779). {copilot} is yes for where Copilot signs in. repo, ghes-proxy and null are values as written: keep them."
   },
   "settings.agent.tool.takes.nothing": {
     "text": "nothing through the tools",

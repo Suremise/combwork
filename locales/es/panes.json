@@ -62,6 +62,7 @@
   "panes.footer.reading": "Leyendo el uso de esta conversación…",
   "panes.footer.retryWaited": "Esta sesión ha esperado {minutes, plural, =0 {menos de un minuto} one {# minuto} many {# minutos} other {# minutos}} en total a que {provider} reintentara solicitudes limitadas o fallidas ({waits, plural, one {# espera} many {# esperas} other {# esperas}}, la última desde las {time}{ongoing, select, yes {, aún esperando} other {}}): tiempo que no dedicó a su trabajo.",
   "panes.footer.settingsName": "Configuración del agente o configuración del proyecto",
+  "panes.footer.signInHost": "Sesión iniciada en {host}{repo, select, same {} other {, repositorios en {repoHost}}}{account, select, none {} other { como {account}}}.",
   "panes.footer.stale": "No se pudo volver a leer ahora mismo: puede estar desactualizado.",
   "panes.footer.tasks": "{n, plural, one {# tarea en segundo plano} many {# tareas en segundo plano} other {# tareas en segundo plano}}",
   "panes.footer.tasksTip": "{n, plural, one {Una tarea en segundo plano que inició sigue en ejecución.} many {# tareas en segundo plano que inició siguen en ejecución.} other {# tareas en segundo plano que inició siguen en ejecución.}} Su estado dice si su turno las espera.",

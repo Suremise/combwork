@@ -26,6 +26,7 @@ import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import type { CleanupPlan, CleanupSkip } from '@shared/sessionCleanup'
 import { BulkProgressNote, SessionCleanup } from './SessionCleanup'
 import { PurgeDialog } from '../components/Purge'
+import { signInHostLine } from '../signInHost'
 
 /**
  * Sessions tab: the project's sessions as a tree on the left (provider → agent → session → the sub-sessions it
@@ -579,6 +580,12 @@ export function SessionsTab({ project, assistant = false }: { project: ProjectIn
             marker={<SessionMarker s={selected} block={whyNot(selected)} live={isLive(selected.id)} orphan={!!selected.sub && !byId.has(selected.sub.parentId ?? '')} />}
             toolbar={
               <>
+                {/* The GitHub host its latest run signed in on (HI-2779), as its launch recorded it: off github.com only. */}
+                {!!signInHostLine(selected.signInHost) && (
+                  <span className="muted small sessions-sign-in-host" data-sign-in-host={selected.signInHost!.host}>
+                    {signInHostLine(selected.signInHost)}
+                  </span>
+                )}
                 {selected.source === 'external' && !selected.sub && (
                   <button className="btn small subtle" onClick={() => void actions.attempt(tr(ADOPT_FAILED), () => call('session:adopt', project.path, selected.id)).then(reload)}>
                     {tr(ADOPT)}

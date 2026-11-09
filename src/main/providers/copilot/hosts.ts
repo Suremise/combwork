@@ -27,6 +27,8 @@ export interface CopilotRoute {
   env: Record<string, string>
   home: string
   usedBy: { workspace: string; projects: string[] }[]
+  /** The folders that resolve to it: workspaces (their own default) and projects (their own settings), as given. */
+  paths: string[]
 }
 
 /** A route's key: its hosts, whether settings chose them, and the CLI's home. No secret. */
@@ -36,7 +38,7 @@ export function routeKey(resolved: ResolvedGithubHosts, home: string): string {
 }
 
 /** The route for a resolution: its environment (the hosts written, or the environment left as it is), home and key. */
-export function routeOf(resolved: ResolvedGithubHosts, baseEnv: Record<string, string>): Omit<CopilotRoute, 'usedBy'> {
+export function routeOf(resolved: ResolvedGithubHosts, baseEnv: Record<string, string>): Omit<CopilotRoute, 'usedBy' | 'paths'> {
   const env = githubHostEnv(baseEnv, resolved)
   const home = copilotHome(env)
   return { key: routeKey(resolved, home), resolved, env, home }
@@ -50,10 +52,11 @@ export async function routesInUse(baseEnv: Record<string, string>, given?: reado
   // Loaded when asked, not with this module: the adapters load before the workspace service, which needs them.
   const workspaces = given ?? (await import('../../workspace')).openWorkspaces()
   const routes = new Map<string, CopilotRoute>()
-  const add = (resolved: ResolvedGithubHosts, workspace: string | null, project: string | null): void => {
+  const add = (resolved: ResolvedGithubHosts, workspace: string | null, project: string | null, path: string | null): void => {
     const r = routeOf(resolved, baseEnv)
-    const got = routes.get(r.key) ?? { ...r, usedBy: [] }
+    const got = routes.get(r.key) ?? { ...r, usedBy: [], paths: [] }
     routes.set(r.key, got)
+    if (path && !got.paths.includes(path)) got.paths.push(path)
     if (workspace === null) return
     let entry = got.usedBy.find((u) => u.workspace === workspace)
     if (!entry) got.usedBy.push((entry = { workspace, projects: [] }))
@@ -64,13 +67,13 @@ export async function routesInUse(baseEnv: Record<string, string>, given?: reado
     if (!ws.path || ws.closing) continue
     const name = basename(ws.path)
     const wsOwn = cleanGithubSettings(ws.config.github)
-    add(resolveGithubHosts(null, wsOwn, baseEnv), name, null)
+    add(resolveGithubHosts(null, wsOwn, baseEnv), name, null, ws.path)
     for (const p of ws.lastInfo?.projects ?? []) {
       const own = cleanGithubSettings(p.config.github)
-      if (own) add(resolveGithubHosts(own, wsOwn, baseEnv), name, p.name)
+      if (own) add(resolveGithubHosts(own, wsOwn, baseEnv), name, p.name, p.path)
     }
   }
-  if (!routes.size) add(resolveGithubHosts(null, null, baseEnv), null, null)
+  if (!routes.size) add(resolveGithubHosts(null, null, baseEnv), null, null, null)
   return [...routes.values()]
 }
 
@@ -220,12 +223,18 @@ export function keepListing(key: string, gen: number, outcome: CopilotModelsOutc
 }
 
 /** Each route's listing from its latest check (the catalogue Provider Setup keeps takes the first route's from here). */
-const routeListings = new Map<string, { gen: number; outcome: CopilotModelsOutcome }>()
+const routeListings = new Map<string, { gen: number; outcome: CopilotModelsOutcome; context: string }>()
 
 /** A route's listing from this generation's check, if it got one. */
 export function routeListing(key: string): CopilotModelsOutcome | null {
   const l = routeListings.get(key)
   return l && l.gen === generation ? l.outcome : null
+}
+
+/** The full context (contextKey) a route's listing of this generation was asked in, if it got one: what its catalogue is cached by. */
+export function routeContext(key: string): string | null {
+  const l = routeListings.get(key)
+  return l && l.gen === generation ? l.context : null
 }
 
 /** The listing this generation got for a context, if any. */
@@ -280,10 +289,10 @@ export async function checkRoute(route: CopilotRoute, deps: HostCheckDeps, gen: 
     const key = contextKey(route.key, evidence, deps.executable, deps.version)
     const outcome = listingOf(key) ?? (await deps.models(route.env))
     if (gen !== generation) return null
-    if (outcome && keepListing(key, gen, outcome)) routeListings.set(route.key, { gen, outcome })
+    if (outcome && keepListing(key, gen, outcome)) routeListings.set(route.key, { gen, outcome, context: key })
     checked = withModels(evidence, outcome)
   }
-  const source = checked.source === 'token' ? checked.variable : checked.source === 'stored' ? 'Copilot login' : checked.source === 'gh' ? 'GitHub CLI' : checked.source === 'local' ? 'local model' : null // i18n-ignore: sign-in sources as the CLIs name them, matched by tests (data-source)
+  const source = sourceName(checked)
   return { ...base, state: checked.state, source, account: checked.account, ...(checked.diagnostic ? { diagnostic: checked.diagnostic } : {}), ...(checked.models ? { models: checked.models } : {}) }
 }
 
@@ -295,7 +304,24 @@ export async function checkRoutes(routes: CopilotRoute[], deps: HostCheckDeps, g
   return out as HostCheck[]
 }
 
-/** What a launch on a resolution records (LaunchContext.signInHost), or why it can't sign in. */
-export function launchedHostOf(resolved: ResolvedGithubHosts): LaunchedSignInHost | null {
-  return resolved.copilot.host ? { host: resolved.copilot.host, repoHost: resolved.repo.host, origin: resolved.copilot.origin } : null
+/** A sign-in's source by name, as Provider Setup and a launch's record say it (never a token). */
+export function sourceName(e: Pick<HostEvidence, 'source' | 'variable'>): string | null {
+  return e.source === 'token' ? e.variable : e.source === 'stored' ? 'Copilot login' : e.source === 'gh' ? 'GitHub CLI' : e.source === 'local' ? 'local model' : null // i18n-ignore: sign-in sources as the CLIs name them, matched by tests (data-source)
+}
+
+/**
+ * What a launch on a resolution signs in as (LaunchContext.signInHost), from the environment it gets (`env`: its route's,
+ * its token switch applied): the host (the legacy case's stored login's own host, as Copilot takes it), the repositories'
+ * host, the sign-in's source by name and its account where Copilot's files say it, and the CLI's home. No gh call: a gh
+ * fallback is named only by Provider Setup's check. Null when it can't sign in (a host to choose, the proxy). The restart
+ * comparison works it out the same way, so a launch and a change agree.
+ */
+export async function signInSnapshot(resolved: ResolvedGithubHosts, env: Record<string, string | undefined>, readConfig: (home: string) => Promise<unknown> = readCliConfig): Promise<LaunchedSignInHost | null> {
+  const host = resolved.copilot.host
+  if (!host) return null
+  const anyHost = !resolved.levelsSet && resolved.copilot.origin === 'default'
+  const home = copilotHome(env as NodeJS.ProcessEnv)
+  let e = hostEvidence(env, null, null, host, anyHost)
+  if (e.state === 'installed') e = hostEvidence(env, await readConfig(home), null, host, anyHost)
+  return { host: e.storedHost ?? host, repoHost: resolved.repo.host, origin: resolved.copilot.origin, source: sourceName(e), account: e.account, home }
 }

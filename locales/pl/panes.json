@@ -62,6 +62,7 @@
   "panes.footer.reading": "Odczytuję użycie tej rozmowy…",
   "panes.footer.retryWaited": "Ta sesja czekała łącznie {minutes, plural, =0 {mniej niż minutę} one {# minutę} few {# minuty} many {# minut} other {# minuty}}, aż {provider} ponowi ograniczone lub nieudane żądania ({waits, plural, one {# oczekiwanie} few {# oczekiwania} many {# oczekiwań} other {# oczekiwania}}, ostatnie od {time}{ongoing, select, yes {, nadal czeka} other {}}): czas niespędzony na pracy.",
   "panes.footer.settingsName": "ustawieniach agenta lub ustawieniach projektu",
+  "panes.footer.signInHost": "Zalogowano na {host}{repo, select, same {} other {, repozytoria na {repoHost}}}{account, select, none {} other { jako {account}}}.",
   "panes.footer.stale": "Nie udało się teraz odczytać tego ponownie: dane mogą być nieaktualne.",
   "panes.footer.tasks": "{n, plural, one {# zadanie w tle} few {# zadania w tle} many {# zadań w tle} other {# zadania w tle}}",
   "panes.footer.tasksTip": "{n, plural, one {Zadanie w tle, które uruchomił, nadal działa.} few {# zadania w tle, które uruchomił, nadal działają.} many {# zadań w tle, które uruchomił, nadal działa.} other {# zadania w tle, które uruchomił, nadal działa.}} Jego stan mówi, czy tura na nie czeka.",

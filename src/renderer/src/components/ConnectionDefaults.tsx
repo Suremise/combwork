@@ -3,7 +3,7 @@ import type { Account, AppSettings, Connection, EffortLevel, PermissionMode, Pro
 import { TAG_MAX, type ConnectionPatch, type ConnectionRow, type ConnectionsView } from '@shared/accounts'
 import type { MovedNotice } from '@shared/connectionDefaults'
 import { modeCaveat, modeOption, offeredModes, permissionLabel, providerDescriptor } from '@shared/providers'
-import { effortName, modelCaps } from '@shared/models'
+import { effortName, infoAt, modelCaps } from '@shared/models'
 import { serverDefaultModel } from '@shared/serverConnection'
 import { modelLabel } from '@shared/defaults'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -126,7 +126,9 @@ export function ConnectionDialog({ account: accountId, connection: id, onClose }
 
 /** Under a mode choice: the provider's warning when it may not run that mode with that model (as the CLI says, #125). */
 function ModeCaveat({ provider, mode, model }: { provider: ProviderId; mode: string | null | undefined; model: string | null | undefined }) {
-  const info = useStore((s) => s.providers[provider])
+  // The open workspace's GitHub host's models (HI-2779), for a CLI signing in on one.
+  const workspacePath = useStore((s) => s.workspace?.path ?? null)
+  const info = infoAt(useStore((s) => s.providers[provider]), { workspacePath })
   const settings = useStore((s) => s.settings)
   useLanguage()
   const caps = modelCaps(provider, model, info, settings)
@@ -143,7 +145,8 @@ function ConnectionForm({ account: a, row, settings, onClose }: { account: Accou
   const cli = a.provider
   const p = providerDescriptor(cli)
   const server = isServer(a)
-  const info = useStore((s) => s.providers[cli])
+  const workspacePath = useStore((s) => s.workspace?.path ?? null)
+  const info = infoAt(useStore((s) => s.providers[cli]), { workspacePath })
   const [name, setName] = useState(row?.name ?? '')
   const [model, setModel] = useState(row?.model ?? '')
   const [effort, setEffort] = useState<string>(row?.effort ?? '')

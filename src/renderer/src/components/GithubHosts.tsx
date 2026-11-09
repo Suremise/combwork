@@ -3,6 +3,7 @@ import { msg, tr } from '@shared/i18n'
 import { COPILOT_GHES_PROXY, COPILOT_SAME_AS_REPO, GITHUB_COM, type GithubHostChange, type GithubHostKind, type GithubHostOrigin, type GithubHostsForm } from '@shared/githubHost'
 import * as actions from '../actions'
 import { call } from '../api'
+import { GITHUB_HOST_TEXT } from '@shared/githubHostText'
 import { useStore } from '../store'
 import { ORIGIN_TEXT } from '../workflowOrigins'
 import { OriginText } from './OriginText'
@@ -14,12 +15,9 @@ import { OriginText } from './OriginText'
  */
 
 const T = {
+  ...GITHUB_HOST_TEXT,
   heading: msg({ id: 'github.hosts.heading', defaultMessage: 'GitHub', description: 'A heading in the Version Control tab and in Settings → Version Control → Workspace defaults (HI-2779): the GitHub host settings. GitHub is a product name.' }),
   desc: msg({ id: 'github.hosts.desc', defaultMessage: 'Where the repositories are, and where Copilot signs in. Saved as you change them; running Copilot agents use a change when they restart.', description: 'Under the heading “GitHub” (HI-2779): what its two settings are, and that they save at once and apply at an agent’s restart.' }),
-  host: msg({ id: 'github.hosts.host', defaultMessage: 'GitHub host', description: 'A setting (HI-2779): the host of the repositories: github.com, a GHE.com host (yourcompany.ghe.com) or a GitHub Enterprise Server.' }),
-  hostDesc: msg({ id: 'github.hosts.hostDesc', defaultMessage: 'github.com, your GHE.com host (yourcompany.ghe.com) or your GitHub Enterprise Server’s name. Only the name: no path, port or token.', description: 'What the setting “GitHub host” takes (HI-2779). GHE.com is GitHub’s product name; keep the host names.' }),
-  copilot: msg({ id: 'github.hosts.copilot', defaultMessage: 'Copilot signs in on', description: 'A setting (HI-2779): the GitHub host GitHub Copilot signs in on, which can differ from the repositories’ host.' }),
-  copilotDesc: msg({ id: 'github.hosts.copilotDesc', defaultMessage: 'Usually the same as the GitHub host. With repositories on GitHub Enterprise Server, choose where your Copilot licence is: github.com or your GHE.com host.', description: 'What the setting “Copilot signs in on” is for (HI-2779). GHE.com is GitHub’s product name.' }),
   inherit: msg({ id: 'github.hosts.inherit', defaultMessage: 'Inherit', description: 'A button beside a GitHub setting set at this level (HI-2779): stop setting it here and use the inherited value.' }),
   inheritOption: msg({ id: 'github.hosts.inheritOption', defaultMessage: 'Inherit ({value})', description: 'An option of “Copilot signs in on” (HI-2779): use the inherited choice. {value} is what that gives (a host, or a note).' }),
   sameOption: msg({ id: 'github.hosts.sameOption', defaultMessage: 'Same as the GitHub host', description: 'An option of “Copilot signs in on” (HI-2779): Copilot signs in on the repositories’ host.' }),

@@ -9,6 +9,7 @@ import type { LaunchContext } from '../src/main/providers/types'
 import { COPILOT_DESCRIPTOR, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags, copilotModelLabel, copilotPathGlob } from '../src/shared/copilot'
 import { isKnownProvider, providerDescriptor } from '../src/shared/providers'
 import { tempDir } from './tempDir'
+import { resolveGithubHosts } from '../src/shared/githubHost'
 
 // Payloads and screens as Copilot CLI 1.0.93 sent and drew them (the #403 spike), with paths shortened.
 
@@ -187,6 +188,30 @@ describe('Copilot launch', () => {
     const off = args.flatMap((a, i) => (a === '--disable-mcp-server' ? [args[i + 1]] : []))
     // Every server of the project's own, whatever its name, is off with the others.
     expect(off.sort()).toEqual(['acme', 'gh-only', 'theirs'])
+  })
+
+  it('records what it signs in as (HI-2779): the legacy stored login’s own host, an explicit host’s token by name, the hosts written', async () => {
+    const home = join(base, 'sign-in-home')
+    mkdirSync(home, { recursive: true })
+    writeFileSync(join(home, 'config.json'), `// User settings belong in settings.json.\n${JSON.stringify({ loggedInUsers: [{ host: 'https://tenant.ghe.com', login: 'mona' }], lastLoggedInUser: { host: 'https://tenant.ghe.com', login: 'mona' } })}\n`)
+    // Nothing set, no host variable, no token: Copilot takes its last stored login, on tenant.ghe.com.
+    const legacyEnv = { PATH: 'C:\\Windows', COPILOT_HOME: home, CW_HOOK_TOKEN: 'tok123' }
+    const legacy = context({ privateDir: join(base, 'private-legacy'), env: legacyEnv, githubHosts: resolveGithubHosts(null, null, legacyEnv) })
+    await copilot.prepareLaunch(legacy)
+    expect(legacy.signInHost).toEqual({ host: 'tenant.ghe.com', repoHost: 'github.com', origin: 'default', source: 'Copilot login', account: 'mona', home })
+    expect(legacy.env.GH_HOST).toBeUndefined()
+    // A GHES repository with Copilot on tenant.ghe.com, a token set for Copilot: named, never read; both hosts written over
+    // an inherited one.
+    const explicitEnv = { PATH: 'C:\\Windows', COPILOT_HOME: home, COPILOT_GITHUB_TOKEN: 'github_pat_x', gh_host: 'stale.example', CW_HOOK_TOKEN: 'tok123' }
+    const explicit = context({ privateDir: join(base, 'private-explicit'), env: explicitEnv, githubHosts: resolveGithubHosts({ host: 'git.acme.example', copilotHost: 'tenant.ghe.com' }, null, explicitEnv) })
+    await copilot.prepareLaunch(explicit)
+    expect(explicit.signInHost).toEqual({ host: 'tenant.ghe.com', repoHost: 'git.acme.example', origin: 'project', source: 'COPILOT_GITHUB_TOKEN', account: null, home })
+    expect(explicit.env).toMatchObject({ GH_HOST: 'git.acme.example', COPILOT_GH_HOST: 'tenant.ghe.com' })
+    expect(Object.keys(explicit.env).filter((k) => k.toUpperCase() === 'GH_HOST')).toEqual(['GH_HOST'])
+    // The restart comparison works it out the same way: no change, no move.
+    expect(await copilot.signInHostFor(resolveGithubHosts(null, null, legacyEnv), legacyEnv)).toEqual(legacy.signInHost)
+    // A GHES repository with nothing chosen: refused before anything starts.
+    await expect(copilot.prepareLaunch(context({ privateDir: join(base, 'private-choose'), githubHosts: resolveGithubHosts({ host: 'git.acme.example' }, null, {}) }))).rejects.toThrow(/GitHub Enterprise Server/)
   })
 
   it('writes the plugin (hooks with the token), the MCP config and the instructions in the launch’s private folder', async () => {

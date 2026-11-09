@@ -3,11 +3,11 @@
 // resolves to now are named in one notice: a change applies when they restart, never by itself.
 
 import { msg, tr } from '../shared/i18n'
-import { providerDescriptor } from '../shared/providers'
 import type { LiveSessionState } from '../shared/types'
 import { toast } from './events'
 import { githubHostsFor, onGithubHostsChanged } from './githubHosts'
-import { allProviders } from './providers'
+import { allProviders, provider } from './providers'
+import { childEnv } from './ptyHost'
 import { newGeneration } from './providers/copilot/hosts'
 import { providerService } from './providerService'
 import { createLogger } from './logger'
@@ -20,19 +20,25 @@ const RESTART = {
   message: msg({ id: 'github.host.restart', defaultMessage: '{n, plural, one {# running agent signed in on another GitHub host than its project uses now. Restart it to apply the change.} other {# running agents signed in on another GitHub host than their projects use now. Restart them to apply the change.}}', description: 'A notification (HI-2779) after a GitHub host setting changed: how many running agents ({n}) launched signed in on another GitHub host than the setting now gives; the change applies when each restarts.' })
 }
 
-/** The running agents whose launch signed in elsewhere than their project resolves to now (null: it can't sign in at all). */
-export async function movedAgents(ws: WorkspaceService, live: readonly LiveSessionState[], env: Record<string, string | undefined>, inScope: (projectPath: string) => boolean): Promise<{ state: LiveSessionState; host: string | null }[]> {
+/**
+ * The running agents whose launch signed in otherwise than a launch now would (HI-2779): another host, repositories' host,
+ * source or account, worked out as the launch recorded it (the adapter's signInHostFor). `host` null: it couldn't sign in
+ * at all now (a host to choose, the proxy).
+ */
+export async function movedAgents(ws: WorkspaceService, live: readonly LiveSessionState[], env: Record<string, string>, inScope: (projectPath: string) => boolean): Promise<{ state: LiveSessionState; host: string | null }[]> {
   const out: { state: LiveSessionState; host: string | null }[] = []
   for (const s of live) {
-    if (!s.signInHost || !providerDescriptor(s.provider).capabilities.githubHost || !inScope(s.projectPath)) continue
-    const now = await githubHostsFor(ws, s.projectPath, env)
-    if (now.copilot.host !== s.signInHost.host || now.repo.host !== s.signInHost.repoHost) out.push({ state: s, host: now.copilot.host })
+    const adapter = provider(s.provider)
+    if (!s.signInHost || !adapter.descriptor.capabilities.githubHost || !adapter.signInHostFor || !inScope(s.projectPath)) continue
+    const now = await adapter.signInHostFor(await githubHostsFor(ws, s.projectPath, env), env)
+    const was = s.signInHost
+    if (!now || now.host !== was.host || now.repoHost !== was.repoHost || (now.source ?? null) !== (was.source ?? null) || (now.account ?? null) !== (was.account ?? null)) out.push({ state: s, host: now?.host ?? null })
   }
   return out
 }
 
 /** Watches the settings: checks again, and names the agents a restart would move. */
-export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env: () => Record<string, string | undefined> = () => process.env): void {
+export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env: () => Record<string, string> = () => childEnv()): void {
   // A workspace closing (HI-2779): checks still running for its hosts are dropped, and the hosts in use checked again.
   WorkspaceService.closingListeners.add(() => {
     newGeneration()
@@ -40,6 +46,8 @@ export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env
   })
   onGithubHostsChanged((ws, projectPath) => {
     newGeneration()
+    // Nothing of the old hosts' catalogues shows while they are checked again.
+    for (const p of allProviders()) if (p.descriptor.capabilities.githubHost) providerService.forgetCatalog(p.id)
     // Checked on the projects as they are now (the change is in project.json: the workspace reads it again first).
     void ws
       .refresh()

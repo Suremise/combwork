@@ -62,6 +62,7 @@
   "panes.footer.reading": "正在读取此对话的用量…",
   "panes.footer.retryWaited": "此会话总共等待了 {minutes, plural, =0 {不到 1 分钟} other {# 分钟}}，等 {provider} 重试被限速或失败的请求（{waits, plural, other {# 次等待}}，最近一次从 {time} 开始{ongoing, select, yes {，仍在等待} other {}}）：这段时间没有用于工作。",
   "panes.footer.settingsName": "“智能体设置”或“项目设置”",
+  "panes.footer.signInHost": "已登录到 {host}{repo, select, same {} other {，仓库位于 {repoHost}}}{account, select, none {} other {，账户为 {account}}}。",
   "panes.footer.stale": "刚才无法重新读取：数据可能不是最新的。",
   "panes.footer.tasks": "{n, plural, other {# 个后台任务}}",
   "panes.footer.tasksTip": "{n, plural, other {它启动的 # 个后台任务仍在运行。}}它的状态会说明其回合是否在等待这些任务。",

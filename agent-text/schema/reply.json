@@ -777,6 +777,11 @@
       "docs": "plain"
     }
   },
+  "reply.setting.effective": {
+    "placeholders": {
+      "effective": "plain"
+    }
+  },
   "reply.setting.head": {
     "placeholders": {
       "title": "plain",

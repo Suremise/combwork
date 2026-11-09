@@ -1895,6 +1895,13 @@
       "shape": "plain"
     }
   },
+  "settings.agent.error.githubHost": {
+    "placeholders": {
+      "title": "plain",
+      "copilot": "select",
+      "why": "plain"
+    }
+  },
   "settings.agent.error.isAction": {
     "placeholders": {}
   },
@@ -2203,6 +2210,18 @@
       "max": "plain"
     }
   },
+  "settings.agent.tool.githubChoose": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.githubEffective": {
+    "placeholders": {
+      "value": "plain",
+      "origin": "select"
+    }
+  },
+  "settings.agent.tool.githubProxy": {
+    "placeholders": {}
+  },
   "settings.agent.tool.keptCard": {
     "placeholders": {
       "card": "plain",
@@ -2302,6 +2321,11 @@
   "settings.agent.tool.takes.fallback": {
     "placeholders": {
       "shape": "plain"
+    }
+  },
+  "settings.agent.tool.takes.githubHost": {
+    "placeholders": {
+      "copilot": "select"
     }
   },
   "settings.agent.tool.takes.nothing": {

@@ -38,5 +38,25 @@
     "text": "A GitHub host is a name such as github.com, or an https:// address: no other scheme.",
     "note": "An error saving a GitHub host setting (HI-2779): it starts with a scheme other than https:// (http://, ssh://…). Keep github.com and https:// as they are.",
     "audience": "both"
+  },
+  "github.hosts.copilot": {
+    "text": "Copilot signs in on",
+    "note": "A setting (HI-2779): the GitHub host GitHub Copilot signs in on, which can differ from the repositories’ host.",
+    "audience": "both"
+  },
+  "github.hosts.copilotDesc": {
+    "text": "Usually the same as the GitHub host. With repositories on GitHub Enterprise Server, choose where your Copilot licence is: github.com or your GHE.com host.",
+    "note": "What the setting “Copilot signs in on” is for (HI-2779). GHE.com is GitHub’s product name.",
+    "audience": "both"
+  },
+  "github.hosts.host": {
+    "text": "GitHub host",
+    "note": "A setting (HI-2779): the host of the repositories: github.com, a GHE.com host (yourcompany.ghe.com) or a GitHub Enterprise Server.",
+    "audience": "both"
+  },
+  "github.hosts.hostDesc": {
+    "text": "github.com, your GHE.com host (yourcompany.ghe.com) or your GitHub Enterprise Server’s name. Only the name: no path, port or token.",
+    "note": "What the setting “GitHub host” takes (HI-2779). GHE.com is GitHub’s product name; keep the host names.",
+    "audience": "both"
   }
 }

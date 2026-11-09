@@ -491,6 +491,17 @@ export interface ProviderAdapter {
   agentRemoved?(agentId: string, workspacePath: string): Promise<void>
   /** An update's exit code that means its installer had nothing newer (HI-2729: WinGet's 0x8A15002B): it ended well. */
   updateUpToDate?(executable: string, exitCode: number): boolean
+  /**
+   * The context its catalogue was read in (HI-2779: a CLI signing in on a GitHub host), a key with no secret in it; null
+   * when it has none now. Absent: a CLI whose catalogue doesn't depend on one. A cached catalogue is used only in its own.
+   */
+  catalogContext?(): string | null
+  /**
+   * What a launch on these GitHub hosts would sign in as (HI-2779, capabilities.githubHost), worked out as prepareLaunch
+   * records it: `env` is Combwork's environment, before the hosts are written into it. A change compares it with running
+   * agents' records.
+   */
+  signInHostFor?(hosts: ResolvedGithubHosts, env: Record<string, string>): Promise<LaunchedSignInHost | null>
   /** The CLI's sign-in; `host`: the GitHub host it signs in on (HI-2779, capabilities.githubHost), else its default. */
   loginCommand(executable: string, host?: string): CommandSpec
   /**

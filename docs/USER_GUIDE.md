@@ -779,8 +779,9 @@ Copilot signs in on a GitHub host: github.com unless you say otherwise. A compan
 
   A login on one host never counts for another: a GitHub CLI login on github.com doesn't sign Copilot in on `yourcompany.ghe.com`.
 - **Tokens.** Copilot takes `COPILOT_GITHUB_TOKEN` first. Combwork keeps `GH_TOKEN` and `GITHUB_TOKEN` from Copilot agents, since other tools set them: **Settings → Advanced → GitHub Copilot → Keep GH_TOKEN and GITHUB_TOKEN from Copilot** turns that off, for every workspace. Provider Setup names the variable a sign-in comes from, never its value.
-- **Changing a host** checks Copilot again on the new one. Running Copilot agents keep the host they started on (their sessions say which, so their usage stays with it) until they restart: a notification says how many.
-- **The model list** in the pickers is the first host's: Combwork's environment's when a project uses it, else the first open workspace's.
+- **Changing a host** checks Copilot again on the new one. Running Copilot agents keep the host they started on until they restart: a notification says how many. Off github.com, the hover of an agent's model in its pane, and a session in the **Sessions** tab, say where it signed in (*Signed in on yourcompany.ghe.com as mona.*), so its usage stays with that host.
+- **The model list** is each host's own: an agent's pane shows its project's host's models, and a connection's model picker the open workspace's host's. A host Copilot couldn't list models for (no sign-in there yet) offers the fallback list, which says so, never another host's.
+- **The Assistant** can read and change these settings too, with Settings → Assistant → Control's **Change settings** on: it sees what each resolves to and where that comes from, and its changes are listed for undo like its others.
 - **What doesn't change.** Combwork's own updates and the public catalogues it reads stay on github.com, whatever the GitHub host.
 
 ### Reading past sessions <a id="reading-past-sessions"></a>

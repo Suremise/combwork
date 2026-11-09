@@ -278,6 +278,22 @@ describe("the Assistant's changes, recorded and undone (#1282)", () => {
     expect(left.skipped).toEqual([{ field: 'value', why: 'changed' }])
   })
 
+  it("a GitHub host (HI-2779): the workspace's and a project's own, set back to inherit while still as it set them", async () => {
+    for (const [id, at] of [['workspace.github.host', null], ['project.githubHost', alpha]] as const) {
+      const e = entryOf(id)
+      const group = newMessage()
+      await asAssistant('set the GitHub host', async () => {
+        const r = await inWorkspace(w, () => applySetting(e, 'tenant.ghe.com', at))
+        expect(r).toEqual({ old: 'inherit', new: 'tenant.ghe.com' })
+        await changes.noteChange(w, { kind: 'setting', project: at ? 'alpha' : null, target: e.id, fields: [{ field: 'value', old: r.old, new: r.new }] })
+      }, 'setting')
+      const [back] = await userUndo(w, { group })
+      expect(back.undone, id).toEqual(['value'])
+      const now = at ? (await w.projectConfig(alpha)).github : w.config.github
+      expect(now?.host, id).toBeUndefined()
+    }
+  })
+
   it("only the Assistant's own changes are recorded: the user's and an agent's aren't, inside its change either; an id that isn't one of its own is refused", async () => {
     const c = await make('Not its')
     const group = newMessage()

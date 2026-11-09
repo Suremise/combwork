@@ -146,6 +146,13 @@ const logged = () => (fs.existsSync(fakeLog) ? fs.readFileSync(fakeLog, 'utf8').
     const tenantRun = acp.find((l) => l.env.COPILOT_GH_HOST === 'tenant.ghe.com')
     check('the tenant listing ran with GH_HOST and COPILOT_GH_HOST = tenant.ghe.com', !!tenantRun && tenantRun.env.GH_HOST === 'tenant.ghe.com' && tenantRun.env.COPILOT_HOME === copilotHome, JSON.stringify(acp))
     check('no listing for the github.com host without a sign-in there', !acp.some((l) => l.env.COPILOT_GH_HOST === 'github.com'), JSON.stringify(acp))
+    // Each folder's own host's catalogue, as the window gets it (HR2's round 1): the workspace's (tenant) has the fake's
+    // models; the enterprise project's host (github.com, no sign-in there) has none, never the tenant's.
+    const info = (await inv('provider:info')).copilot
+    const routeOf = (p) => info.hostRouteOf?.[p.toLowerCase()]
+    const tenantCatalog = info.hostCatalogs?.[routeOf(ws)]
+    check('the workspace’s host has its own catalogue, with its context', !!tenantCatalog && tenantCatalog.models.map((m) => m.value).join() === 'gpt-5,claude-sonnet-5.5' && /^tenant\.ghe\.com\|/.test(tenantCatalog.context ?? ''), JSON.stringify({ route: routeOf(ws), tenantCatalog }))
+    check('the enterprise project’s host (no sign-in there) has no catalogue, not the tenant’s', !!routeOf(enterprise) && routeOf(enterprise) !== routeOf(ws) && !info.hostCatalogs?.[routeOf(enterprise)], JSON.stringify(info.hostRouteOf))
     await setup.locator('button', { hasText: 'Close' }).last().click()
 
     // --- Settings → Version Control → Workspace defaults → GitHub.

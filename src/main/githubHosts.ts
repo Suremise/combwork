@@ -62,7 +62,7 @@ export async function githubHostsForm(ws: WorkspaceService, projectPath: string 
  * Changes a level's GitHub settings: the project's (project.json, under its lock) or, with `projectPath` null, the
  * workspace's (workspace.json). Each value is parsed here; a refused one changes nothing.
  */
-export async function setGithubHosts(ws: WorkspaceService, projectPath: string | null, change: GithubHostChange): Promise<GithubHostSettings> {
+export async function setGithubHosts(ws: WorkspaceService, projectPath: string | null, change: GithubHostChange, check?: (now: GithubHostSettings | undefined) => void): Promise<GithubHostSettings> {
   const clean: GithubHostChange = {}
   if (change && typeof change === 'object') {
     if ('host' in change) clean.host = change.host === null ? null : (change.host as string)
@@ -76,14 +76,23 @@ export async function setGithubHosts(ws: WorkspaceService, projectPath: string |
   // Checked before anything is written, so a refusal is the caller's error and not a failed save.
   apply(projectPath ? await projectGithubSettings(ws, projectPath) : ws.config.github)
   let saved: GithubHostSettings = {}
+  // `check` sees the level's settings as the change replaces them, in the change's own turn (the settings tool's guard):
+  // throwing refuses it, nothing written. Once: the workspace's save works its change out again after writing.
+  let checked = false
+  const seen = (now: unknown): void => {
+    if (!checked) check?.(cleanGithubSettings(now))
+    checked = true
+  }
   if (projectPath) {
     const cfg = await ws.mutateProjectConfig(projectPath, (c) => {
+      seen(c.github)
       const next = apply(c.github)
       return { github: Object.keys(next).length ? next : undefined }
     })
     saved = cfg.github ?? {}
   } else {
     await ws.saveWorkspaceConfigWith((c) => {
+      seen(c.github)
       saved = apply(c.github)
       return { github: Object.keys(saved).length ? saved : undefined }
     })

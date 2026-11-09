@@ -62,6 +62,7 @@
   "panes.footer.reading": "Nutzung dieser Unterhaltung wird gelesen…",
   "panes.footer.retryWaited": "Diese Sitzung hat insgesamt {minutes, plural, =0 {weniger als eine Minute} one {# Minute} other {# Minuten}} darauf gewartet, dass {provider} abgelehnte oder fehlgeschlagene Anfragen erneut versucht ({waits, plural, one {# Wartezeit} other {# Wartezeiten}}, die letzte ab {time}{ongoing, select, yes {, wartet noch} other {}}): Zeit, die nicht in ihre Arbeit ging.",
   "panes.footer.settingsName": "den Agent-Einstellungen oder den Projekteinstellungen",
+  "panes.footer.signInHost": "Angemeldet bei {host}{repo, select, same {} other {, Repositorys auf {repoHost}}}{account, select, none {} other { als {account}}}.",
   "panes.footer.stale": "Konnte gerade nicht erneut gelesen werden: Die Werte sind eventuell veraltet.",
   "panes.footer.tasks": "{n, plural, one {# Hintergrundaufgabe} other {# Hintergrundaufgaben}}",
   "panes.footer.tasksTip": "{n, plural, one {Eine Hintergrundaufgabe, die er gestartet hat, läuft noch.} other {# Hintergrundaufgaben, die er gestartet hat, laufen noch.}} Sein Status sagt, ob sein Durchgang darauf wartet.",

@@ -2,7 +2,7 @@ import { homedir } from 'os'
 import { msg } from '../../../shared/i18n'
 import { join } from 'path'
 import { existsSync } from 'original-fs'
-import type { AgentInstallInfo, HostCheck, ReadinessIssue } from '../../../shared/types'
+import type { AgentInstallInfo, HostCheck, ModelCatalog, ReadinessIssue } from '../../../shared/types'
 import { COPILOT, COPILOT_DESCRIPTOR } from '../../../shared/copilot'
 import { isProviderEnabled, providerSettings } from '../../../shared/providers'
 import { config } from '../../config'
@@ -14,7 +14,7 @@ import type { CommandSpec, UpdateRetry } from '../types'
 import { COPILOT_ENV_STRIP, copilotEnv, stripsTokens } from './home'
 import { GITHUB_COM } from '../../../shared/githubHost'
 import { askCopilotModels } from './models'
-import { checkRoutes, hostEvidence, loggedInOf, parseGhStatus as parseHostGh, readCliConfig, routeListing, routeOf, routesInUse, type CopilotRoute, type GhHostStatus, type HostCheckDeps } from './hosts'
+import { checkRoutes, hostEvidence, loggedInOf, parseGhStatus as parseHostGh, readCliConfig, routeContext, routeListing, routeOf, routesInUse, type CopilotRoute, type GhHostStatus, type HostCheckDeps } from './hosts'
 import type { ResolvedGithubHosts } from '../../../shared/githubHost'
 import type { CatalogRead } from '../types'
 import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
@@ -142,6 +142,9 @@ export async function locateCopilot(): Promise<AgentInstallInfo> {
   if (!checks) return { ...info, checking: true }
   lastRoutes = routes
   info.hostChecks = checks
+  // Each host's own catalogue, from its listing of this generation (HI-2779), and which host each folder resolves to: a
+  // project's pickers take its host's, never another host's.
+  Object.assign(info, hostCatalogsOf(routes, info.version))
   // Existing callers (diagnostics, Automatic) read the first host's sign-in: the environment's, else the first workspace's.
   const first = checks[0]
   info.loggedIn = loggedInOf(first.state)
@@ -150,19 +153,41 @@ export async function locateCopilot(): Promise<AgentInstallInfo> {
   return info
 }
 
+/**
+ * Each route's catalogue from its listing of this generation (none for a route without one), and which route each folder
+ * resolves to, lower-cased (HI-2779): what infoAt gives a project's or a workspace's pickers.
+ */
+export function hostCatalogsOf(routes: readonly CopilotRoute[], version: string | null, at = new Date().toISOString()): Pick<AgentInstallInfo, 'hostCatalogs' | 'hostRouteOf'> {
+  const hostCatalogs: Record<string, ModelCatalog> = {}
+  const hostRouteOf: Record<string, string> = {}
+  for (const r of routes) {
+    const o = routeListing(r.key)
+    const context = routeContext(r.key)
+    if (o?.kind === 'ok' && context) hostCatalogs[r.key] = { source: 'cli', version, models: o.read.models, ...(o.read.defaultModel ? { defaultModel: o.read.defaultModel } : {}), at, context }
+    for (const path of r.paths) hostRouteOf[path.toLowerCase()] = r.key
+  }
+  return { hostCatalogs, hostRouteOf }
+}
+
 /** The routes the latest check found (Sign in on a host takes its environment from here). */
 let lastRoutes: CopilotRoute[] = []
 
 /**
- * The catalogue Provider Setup keeps and the pickers offer: the first route's (the environment's, else the first open
- * workspace's), from this check's listing when it got one, else asked now in that route's environment. Another route's
- * listing never stands in for it.
+ * The catalogue Provider Setup keeps (where no folder says its host: the first route's, the environment's else the first
+ * open workspace's): only this generation's listing of that route, taken by its check. Nothing is asked here, so nothing
+ * can come back from an older generation; none (no sign-in there, or a check after a change) is no catalogue, never another
+ * host's or account's.
  */
-export async function primaryModels(executable: string, env: Record<string, string>, ask: typeof askCopilotModels = askCopilotModels): Promise<CatalogRead | null> {
-  const route = lastRoutes[0]
-  const got = route ? routeListing(route.key) : null
-  const o = got ?? (await ask(executable, route?.env ?? env))
-  return o.kind === 'ok' ? o.read : null
+export function primaryModels(routes: readonly CopilotRoute[] = lastRoutes): CatalogRead | null {
+  const route = routes[0]
+  const o = route ? routeListing(route.key) : null
+  return o?.kind === 'ok' ? o.read : null
+}
+
+/** The context the primary catalogue was read in (its cache key: no secret), null when this generation has none. */
+export function primaryContext(routes: readonly CopilotRoute[] = lastRoutes): string | null {
+  const route = routes[0]
+  return route ? routeContext(route.key) : null
 }
 
 /** The resolved hosts' route for a launch (prepareLaunch): its environment written the same as its checks'. */

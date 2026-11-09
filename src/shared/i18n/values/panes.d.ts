@@ -65,6 +65,7 @@ interface CombworkMessageValues {
   'panes.footer.reading': undefined
   'panes.footer.retryWaited': { minutes: number; provider: string | number; waits: number; time: string | number; ongoing: string }
   'panes.footer.settingsName': undefined
+  'panes.footer.signInHost': { host: string | number; repo: string; repoHost: string | number; account: string }
   'panes.footer.stale': undefined
   'panes.footer.tasks': { n: number }
   'panes.footer.tasksTip': { n: number }

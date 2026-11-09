@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { fmt, msg, tr } from '@shared/i18n'
 import { providerDescriptor, shownText, type ModelOption } from '@shared/providers'
 import { modelLabel } from '@shared/defaults'
-import { connectionModels, effortName, modelCaps, modelGroups } from '@shared/models'
+import { connectionModels, effortName, infoAt, modelCaps, modelGroups } from '@shared/models'
 import type { Account, ProviderId } from '@shared/types'
 import { useLanguage, useStore } from '../store'
 import { Icon } from './ui'
@@ -16,7 +16,9 @@ export function ModelPicker({ provider, value, base, onChange, connection }: { p
   useLanguage()
   const p = providerDescriptor(provider)
   // A connection's own models (HI-1770: by its kind), else the CLI's.
-  const cliInfo = useStore((s) => s.providers[provider])
+  // The models of the host the open workspace resolves to (HI-2779), for a CLI signing in on one; else its catalogue.
+  const workspacePath = useStore((s) => s.workspace?.path ?? null)
+  const cliInfo = infoAt(useStore((s) => s.providers[provider]), { workspacePath })
   const info = connection ? connectionModels(connection, cliInfo, tr) : cliInfo
   const settings = useStore((s) => s.settings)
   const groups = modelGroups(provider, info, settings, tr)
@@ -97,7 +99,8 @@ export function ModelPicker({ provider, value, base, onChange, connection }: { p
  */
 export function EffortPicker({ provider, model, value, base, onChange, connection }: { provider: ProviderId; model: string | null | undefined; value: string; base: ModelOption; onChange: (value: string) => void; connection?: Pick<Account, 'kind' | 'server'> }) {
   useLanguage()
-  const cliInfo = useStore((s) => s.providers[provider])
+  const workspacePath = useStore((s) => s.workspace?.path ?? null)
+  const cliInfo = infoAt(useStore((s) => s.providers[provider]), { workspacePath })
   const info = connection ? connectionModels(connection, cliInfo, tr) : cliInfo
   const settings = useStore((s) => s.settings)
   const caps = modelCaps(provider, model, info, settings)
