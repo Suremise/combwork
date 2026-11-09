@@ -262,7 +262,8 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     r2.env.FAKE_OPENCODE_LOG = r1.env.FAKE_OPENCODE_LOG
     const b = launch(r2)
     const base = await until(() => hook2.bodies[0], 'the resumed baseline')
-    expect([base.snapshot.baseline, base.snapshot.intent, base.snapshot.messages.filter((m: { type: string }) => m.type === 'user').length]).toEqual([true, 'resume', 1])
+    // Its newest idle marker, where Combwork's knowledge starts: the closed history before it isn't read (HR2's round 1).
+    expect([base.snapshot.baseline, base.snapshot.intent, base.snapshot.boundary, base.snapshot.messages.map((m: { type: string }) => m.type)]).toEqual([true, 'resume', 'known', ['idle']])
     expect(tracked(hook2.bodies).prompts).toBe(0)
     await until(() => infoOf(r2), 'the resumed server record')
     await prompt(r2, 'two')
