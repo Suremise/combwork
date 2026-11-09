@@ -96,6 +96,14 @@ describe('the routes in use', () => {
     expect(routes.find((r) => r.resolved.copilot.host === 'tenant.ghe.com')!.env).toMatchObject({ GH_HOST: 'tenant.ghe.com', COPILOT_GH_HOST: 'tenant.ghe.com' })
   })
 
+  it('a workspace closing is left out at once', async () => {
+    const tenant = stubWorkspace('D:\\tenant', {}, { github: { host: 'tenant.ghe.com' } })
+    const plain = stubWorkspace('D:\\plain')
+    ;(tenant as unknown as { closing: boolean }).closing = true
+    const routes = await routesInUse({}, [tenant, plain])
+    expect(routes.map((r) => r.resolved.copilot.host)).toEqual(['github.com'])
+  })
+
   it('no workspace open: the environment’s alone', async () => {
     const routes = await routesInUse({ COPILOT_GH_HOST: 'acme.ghe.com' }, [])
     expect(routes.map((r) => [r.resolved.copilot.host, r.resolved.levelsSet])).toEqual([['acme.ghe.com', false]])

@@ -60,7 +60,8 @@ export async function routesInUse(baseEnv: Record<string, string>, given?: reado
     if (project && !entry.projects.includes(project)) entry.projects.push(project)
   }
   for (const ws of workspaces) {
-    if (!ws.path) continue
+    // A workspace closing is gone from the routes already (its close starts a new generation: githubHostChanges.ts).
+    if (!ws.path || ws.closing) continue
     const name = basename(ws.path)
     const wsOwn = cleanGithubSettings(ws.config.github)
     add(resolveGithubHosts(null, wsOwn, baseEnv), name, null)

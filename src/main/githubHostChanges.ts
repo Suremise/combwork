@@ -11,7 +11,7 @@ import { allProviders } from './providers'
 import { newGeneration } from './providers/copilot/hosts'
 import { providerService } from './providerService'
 import { createLogger } from './logger'
-import type { WorkspaceService } from './workspace'
+import { WorkspaceService } from './workspace'
 
 const log = createLogger('github')
 
@@ -33,6 +33,11 @@ export async function movedAgents(ws: WorkspaceService, live: readonly LiveSessi
 
 /** Watches the settings: checks again, and names the agents a restart would move. */
 export function watchGithubHostChanges(liveStates: () => LiveSessionState[], env: () => Record<string, string | undefined> = () => process.env): void {
+  // A workspace closing (HI-2779): checks still running for its hosts are dropped, and the hosts in use checked again.
+  WorkspaceService.closingListeners.add(() => {
+    newGeneration()
+    for (const p of allProviders()) if (p.descriptor.capabilities.githubHost && providerService.info(p.id).found) void providerService.refresh(p.id)
+  })
   onGithubHostsChanged((ws, projectPath) => {
     newGeneration()
     // Checked on the projects as they are now (the change is in project.json: the workspace reads it again first).
