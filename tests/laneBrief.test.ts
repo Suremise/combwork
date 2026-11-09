@@ -4,7 +4,8 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
-import { laneBrief, laneRules, type LaneBriefInput } from '../src/shared/laneBrief'
+import { laneBrief, laneOptions, laneRules, type LaneBriefInput } from '../src/shared/laneBrief'
+import { TARGETED } from '../src/shared/workflow/compile'
 
 const input = (over: Partial<LaneBriefInput> = {}): LaneBriefInput => ({
   project: 'alpha',
@@ -25,6 +26,31 @@ describe("a lane's brief on slots (#1438)", () => {
     const b = laneBrief(input({ builder: { name: 'B1', folder: null, branch: null, slot: 'slot-b' } }), 'builder')
     expect(b).toContain("B1 works in slot-b, a new branch per card (Combwork makes each card's branch there from the target and gives the card to B1 there); work goes to main.")
     expect(laneBrief(input({ builder: { name: 'B1', folder: null, branch: null, slot: 'slot-b' } }), 'reviewer')).toContain('B1 works in slot-b, a new branch per card')
+  })
+})
+
+describe("a lane's brief names the lane's own Merges into (HI-2832)", () => {
+  const options = input().options!
+  const slot = { name: 'B1', folder: null, branch: null, slot: 'slot-c' }
+
+  it("a lane started on another target says its work goes there, not to the project's", () => {
+    // HB1's 1.3.0: rc.2 lane, the project's Work merges into 1.4.0: its recorded ruleset marks 1.3.0.
+    const project = { ...options, target: '1.4.0' }
+    const recorded = laneOptions(project, { ruleset: `wf-abc${TARGETED}1.3.0` })
+    expect(recorded?.target).toBe('1.3.0')
+    const b = laneBrief(input({ builder: slot, options: recorded }), 'builder')
+    expect(b).toContain('; work goes to 1.3.0.')
+    expect(b).not.toContain('1.4.0')
+    // As the lane's info gives it (Start Lane…'s recorded lane), and the rest of the options as they were.
+    expect(laneOptions(project, { target: '1.3.0' })).toEqual({ ...project, target: '1.3.0' })
+  })
+
+  it("a lane on the project's own target, or the rules off, keeps the options as they are", () => {
+    const project = { ...options, target: '1.4.0' }
+    expect(laneOptions(project, { ruleset: 'wf-abc' })).toBe(project)
+    expect(laneOptions(project, {})).toBe(project)
+    expect(laneOptions(null, { target: '1.3.0' })).toBeNull()
+    expect(laneBrief(input({ builder: slot, options: laneOptions(project, {}) }), 'builder')).toContain('; work goes to 1.4.0.')
   })
 })
 
