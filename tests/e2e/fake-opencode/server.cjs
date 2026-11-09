@@ -46,10 +46,13 @@ async function startServer(opts) {
   /**
    * When each folder's config rules are on its agents (HI-2775, agent-opencode-2.2.6.txt): 2.2.6 puts them there a moment
    * after the folder's first session (about 0.3 s, probes/external-directory-ask.json) and checks a tool against the agent
-   * as it is then. A test's knobs: FAKE_OPENCODE_RULES_LOAD_MS (that moment; none: at once) and FAKE_OPENCODE_RULES_NEVER.
+   * as it is then; serve's own folder loads by itself as it starts (a resume's, recorded). A test's knobs:
+   * FAKE_OPENCODE_RULES_LOAD_MS (that moment; none: at once), FAKE_OPENCODE_RULES_NEVER, and FAKE_OPENCODE_AGENT_READ
+   * (refuse: a 500; garbage: a 200 that isn't JSON), never 2.2.6's.
    */
   const rulesAt = new Map()
   const dirKey = (d) => path.resolve(d).toLowerCase()
+  rulesAt.set(dirKey(cwd), Date.now() + (Number(env.FAKE_OPENCODE_RULES_LOAD_MS) || 0))
   const rulesLive = (dir) => env.FAKE_OPENCODE_RULES_NEVER !== '1' && rulesAt.has(dirKey(dir)) && Date.now() >= rulesAt.get(dirKey(dir))
   /** An agent's own rules in 2.2.6 (its /api/agent reply before the config's: agent-opencode-2.2.6.txt). */
   const AGENT_RULES = [{ action: '*', resource: '*', effect: 'allow' }, { action: 'read', resource: '*.env', effect: 'ask' }, { action: 'read', resource: '*.env.*', effect: 'ask' }, { action: 'read', resource: '*.env.example', effect: 'allow' }, { action: 'question', resource: '*', effect: 'allow' }]
@@ -662,6 +665,11 @@ async function startServer(opts) {
       const dir = header ? decodeURIComponent(String(header)) : cwd
       const id = decodeURIComponent(m[1])
       log({ kind: 'agent-read', agent: id, live: rulesLive(dir) })
+      if (env.FAKE_OPENCODE_AGENT_READ === 'refuse') return json(res, 500, { _tag: 'UnknownError', message: 'refused (a test)' })
+      if (env.FAKE_OPENCODE_AGENT_READ === 'garbage') {
+        res.writeHead(200, { 'content-type': 'text/plain' })
+        return res.end('not an agent')
+      }
       if (!['build', 'plan'].includes(id) || (header && !rulesAt.has(dirKey(dir)))) return json(res, 404, { _tag: 'AgentNotFoundError', agentID: id, message: `Agent not found: ${id}` })
       return json(res, 200, { location: { directory: dir }, data: { id, name: id === 'build' ? 'Build' : 'Plan', mode: 'primary', hidden: false, permissions: [...AGENT_RULES, ...(rulesLive(dir) ? cfgFor(dir).permissions : [])] } })
     }

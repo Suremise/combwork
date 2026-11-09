@@ -423,6 +423,13 @@ describe.runIf(process.platform === 'win32')('a launch prepared and built (again
     const terminal = ctx({ model: null, overrides: { 'opencode.override.noAutoUpdate': false, 'opencode.override.keepProjectConfigOut': false, 'opencode.override.stripCredentials': false, 'opencode.override.ownProviderOnly': false, [ASK]: false } }) as { privateDir: string }
     // The launcher waits for the rule on the mode's agent before the TUI (2.2.6 loads it a moment late): its pattern given.
     expect(opencode.buildCommand(FAKE, reviewer as never).env).toMatchObject({ CW_OC_RULES: String.raw`\{"action":"external_directory","resource":"\*","effect":"ask"\}`, CW_OC_RULES_AGENT: 'build' })
+    // The agent the session starts as: Plan's own; the CLI's own mode (no default_agent written) is OpenCode's Build.
+    const { CLI_OWN_MODE } = await import('../src/shared/cliOwnMode')
+    for (const [mode, agent] of [['plan', 'plan'], ['auto', 'build'], [CLI_OWN_MODE, 'build']]) {
+      const c = ctx({ permissionMode: mode }) as { privateDir: string }
+      await opencode.prepareLaunch(c as never)
+      expect(opencode.buildCommand(FAKE, c as never).env!.CW_OC_RULES_AGENT, mode).toBe(agent)
+    }
     for (const c of [off, terminal]) {
       await opencode.prepareLaunch(c as never)
       expect(written(c)).not.toHaveProperty('permissions')

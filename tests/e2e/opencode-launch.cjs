@@ -143,9 +143,9 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     // Its switches (Combwork's overrides) are on its connections, as every CLI's are; Advanced lists its CLI-facing values.
     const rows = await lib.until(async () => {
       const n = await page.locator('.advanced-row[data-advanced^="opencode."]').evaluateAll((rs) => rs.filter((r) => r.checkVisibility()).length)
-      return n === 10 ? n : null
+      return n === 11 ? n : null
     }, HUNG_MS)
-    check('Settings → Advanced has an OpenCode tab with its ten values (HI-2762 added three for history, HI-2767 two for variants)', rows === 10)
+    check('Settings → Advanced has an OpenCode tab with its eleven values (HI-2762 added three for history, HI-2767 two for variants, HI-2775 its folder rule)', rows === 11)
     await shots('advanced')
     await page.keyboard.press('Escape')
     await page.getByText('alpha', { exact: true }).first().click()
