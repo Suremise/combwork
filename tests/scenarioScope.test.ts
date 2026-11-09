@@ -20,7 +20,7 @@ describe("the scenarios' fake providers", () => {
 
   it('a scenario not named runs on every fake (a new one keeps every provider)', () => {
     expect(fakesFor('work-on-card')).toEqual(FAKES)
-    expect(fakesFor('a-new-scenario')).toEqual(['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity'])
+    expect(fakesFor('a-new-scenario')).toEqual(['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity', 'fake-opencode'])
     expect(fakesFor(FAKE_CLAUDE_ONLY[0])).toEqual(['fake'])
     expect(fakesFor(MODEL_TRIALS_ONLY[0])).toEqual([])
   })
@@ -38,6 +38,8 @@ describe("the scenarios' fake providers", () => {
       ['fake-codex', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       ['fake-copilot', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
       ['fake-antigravity', ['work-on-card', 'tool-sweep'], ['review-passed', 'hold-skipped']],
+      // Every one left out until HI-2760 gives OpenCode agents their turn status (PROVIDER_WAITS, HI-2761).
+      ['fake-opencode', [], ['work-on-card', 'review-passed', 'hold-skipped', 'tool-sweep']],
       // Model trials run every scenario but the fakes' plumbing check, whatever the fakes' lists say.
       ['claude-code', ['work-on-card', 'review-passed', 'hold-skipped'], ['tool-sweep']],
       ['codex', ['work-on-card', 'review-passed', 'hold-skipped'], ['tool-sweep']]
@@ -45,6 +47,10 @@ describe("the scenarios' fake providers", () => {
       const sel = pick(provider, sample)
       expect(runIds(sel)).toEqual(runs)
       expect(sel.excluded.map((x) => x.id)).toEqual(left)
+    })
+
+    it('says why a provider whose runs wait for a card leaves every scenario out', () => {
+      expect(new Set(pick('fake-opencode', ['work-on-card', 'tool-sweep']).excluded.map((x) => x.why))).toEqual(new Set([expect.stringMatching(/waits for HI-2760/)]))
     })
 
     it('says where each scenario it leaves out does run', () => {

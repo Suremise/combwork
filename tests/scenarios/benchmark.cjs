@@ -328,7 +328,7 @@ function benchmarkOf(meta, results, appVersion) {
     run: {
       fixturesVersion: meta.fixturesVersion,
       provider: meta.provider,
-      providerId: meta.provider === 'fake-codex' || meta.provider === 'codex' ? 'codex' : meta.provider === 'fake-antigravity' ? 'antigravity' : 'claude-code',
+      providerId: meta.provider === 'fake-codex' || meta.provider === 'codex' ? 'codex' : meta.provider === 'fake-antigravity' ? 'antigravity' : meta.provider === 'fake-opencode' ? 'opencode' : 'claude-code',
       real,
       model: meta.model ?? '(default)',
       effort: meta.effort ?? '(default)',
@@ -376,7 +376,7 @@ function resultsHeld(folder, alive = processAlive) {
 
 /**
  * Which kind of run a results folder (`<time>-<provider>[-n]`) holds: 'fake' for the fake providers (fake, fake-codex,
- * fake-copilot, fake-antigravity: free, run every few minutes), else 'model' (a model trial, which costs money).
+ * fake-copilot, fake-antigravity, fake-opencode: free, run every few minutes), else 'model' (a model trial, which costs money).
  */
 function resultsKind(name) {
   return /^\d{4}-\d\d-\d\dT\d\d-\d\d-\d\d-fake(?:-|$)/.test(name) ? 'fake' : 'model'
