@@ -105,7 +105,7 @@ describe('the catalog (opencode models)', () => {
 
   it('an effort only a model reports is named with the shared names in the language shown, else capitalised', () => {
     expect([effortName('opencode', 'low'), effortName('opencode', 'high'), effortName('opencode', 'turbo')]).toEqual(['Low', 'High', 'Turbo'])
-    expect(effortName('opencode', 'medium', undefined, (m) => `[${m.defaultMessage}]`)).toBe('[Medium]')
+    expect(effortName('opencode', 'medium', undefined, ((m: { defaultMessage: string }) => `[${m.defaultMessage}]`) as never)).toBe('[Medium]')
   })
 })
 
@@ -284,10 +284,10 @@ describe('sessions, modes and the launch', () => {
     expect(resumeSteps).toContain('Http("POST", url + "/api/session/" + Uri.EscapeDataString(session) + "/model", auth, "{\\"model\\":" + ModelRef(modelProvider, modelId, variant) + "}"')
     expect(resumeSteps).toContain('!ModelIs(reply, modelProvider, modelId, variant)')
     // The model and effort reach it in its environment: a variant only with a model.
-    const base = { executable: 'x', cwd: 'C:\\p', sessionId: 'ses_x', intent: 'new' as const, tuiArgs: [], dirs: [], privateDir: 'C:\\priv', owner: '', marks: 'm', readyMs: 1 }
-    expect(launcherEnv({ ...base, model: 'ollama/qwen3:8b', variant: 'high' })).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: 'high' })
-    expect(launcherEnv({ ...base, model: 'ollama/qwen3:8b', variant: null })).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: '' })
-    expect(launcherEnv({ ...base, model: null, variant: 'high' })).toMatchObject({ CW_OC_MODEL: '', CW_OC_VARIANT: '' })
+    const launchBase = { executable: 'x', cwd: 'C:\\p', sessionId: 'ses_x', intent: 'new' as const, tuiArgs: [], dirs: [], privateDir: 'C:\\priv', owner: '', marks: 'm', readyMs: 1 }
+    expect(launcherEnv({ ...launchBase, model: 'ollama/qwen3:8b', variant: 'high' })).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: 'high' })
+    expect(launcherEnv({ ...launchBase, model: 'ollama/qwen3:8b', variant: null })).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: '' })
+    expect(launcherEnv({ ...launchBase, model: null, variant: 'high' })).toMatchObject({ CW_OC_MODEL: '', CW_OC_VARIANT: '' })
   })
 })
 

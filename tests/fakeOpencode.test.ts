@@ -264,19 +264,19 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
   })
 
   it("a session's model and variant: created with them, set again with the nested body, no variant the default; refused as 2.2.6 refused (HI-2767)", async () => {
-    const rec = recJson('wire/session-model-set.json') as Record<string, { request: { body: unknown }; status: number; body?: unknown; after?: { model: unknown } }>
+    const recorded = recJson('wire/session-model-set.json') as Record<string, { request: { body: unknown }; status: number; body?: unknown; after?: { model: unknown } }>
     const r = root()
     const s = await serve(r.env, r.project)
     const made = (await s.api('POST', '/api/session', { location: { directory: r.project }, model: { providerID: 'cwtest', id: 'qwen3:8b', variant: 'low' } })).body.data
-    expect(made.model).toEqual((rec.create.body as { data: { model: unknown } }).data.model)
+    expect(made.model).toEqual((recorded.create.body as { data: { model: unknown } }).data.model)
     const id = made.id as string
     const model = async () => (await s.api('GET', `/api/session/${id}`)).body.data.model
     for (const k of ['set', 'setWithoutVariant']) {
-      expect((await s.api('POST', `/api/session/${id}/model`, rec[k].request.body)).status, k).toBe(rec[k].status)
-      expect(await model(), k).toEqual(rec[k].after!.model)
+      expect((await s.api('POST', `/api/session/${id}/model`, recorded[k].request.body)).status, k).toBe(recorded[k].status)
+      expect(await model(), k).toEqual(recorded[k].after!.model)
     }
-    for (const k of ['flatBody', 'nullVariant', 'noProvider']) expect(await s.api('POST', `/api/session/${id}/model`, rec[k].request.body), k).toEqual({ status: rec[k].status, body: rec[k].body })
-    expect(await s.api('POST', '/api/session/ses_doesnotexist0000000000000/model', rec.missingSession.request.body)).toEqual({ status: 404, body: rec.missingSession.body })
+    for (const k of ['flatBody', 'nullVariant', 'noProvider']) expect(await s.api('POST', `/api/session/${id}/model`, recorded[k].request.body), k).toEqual({ status: recorded[k].status, body: recorded[k].body })
+    expect(await s.api('POST', '/api/session/ses_doesnotexist0000000000000/model', recorded.missingSession.request.body)).toEqual({ status: 404, body: recorded.missingSession.body })
     await s.stop()
   })
 
