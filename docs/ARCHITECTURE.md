@@ -273,6 +273,10 @@ wired the rest into the app.
 moved head and sameness, containment, reconcile, a check's bracket, check copies, platform actions), looked up by the
 ruleset's platform, and never switch on a platform id (AGENTS.md's rule for providers). `gitPlatform.ts` and
 `nonePlatform.ts` implement it on `git.ts` and `none.ts`. The merge queue is Git's integration (Combwork merges needs Git).
+Many modules still call Git directly past it (the runner, locks, slots, copies, the queue's mechanics, the Git view):
+1.4.0's refactor (HI-2783's R0 to R9) puts them behind five ports, repository context, workspace lifecycle, evidence
+and history, integration and repository operations, with the invariants each keeps and a type map from today's modules
+in SPEC §16.3.6. Until a module has moved, the code above is how it works.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
