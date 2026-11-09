@@ -37,5 +37,13 @@ export function lineHistory(): HistoryPort {
   return ORDER[0]
 }
 
+/**
+ * One workflow step over every platform's history (HI-2792): `fn` inside each port's step, so whichever platform its
+ * reads ask answers fixed revisions once in it (Git alone in 1.4.0: exactly gitStep).
+ */
+export function readStep<T>(fn: () => Promise<T>): Promise<T> {
+  return ORDER.reduceRight<() => Promise<T>>((inner, h) => () => h.step(inner), fn)()
+}
+
 /** The watcher: every project's events and every working folder's write record, whatever its platform. */
 export const observePort: ObservePort = observer

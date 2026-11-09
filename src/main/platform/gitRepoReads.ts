@@ -3,6 +3,7 @@
 // branchMerge.ts), through the module at call time, so a test's mock or spy of it still applies: the same git commands
 // in the same order, the same answers, caches and errors (tests/repoReadTraces.test.ts). Nothing here runs git itself.
 
+import * as G from '../git'
 import * as repo from '../gitRepo'
 import * as compare from '../gitCompare'
 import * as watch from '../branchWatch'
@@ -10,6 +11,8 @@ import * as merge from '../branchMerge'
 import type { RepoReads } from './repoReads'
 
 export const gitRepoReads: RepoReads = {
+  changes: (root, base) => G.gitStatus(root, base),
+  changeDiff: (root, file, base) => G.gitDiff(root, file, base),
   summary: (root) => repo.repoSummary(root),
   workTarget: (projectPath) => repo.workTargetOf(projectPath),
   info: (root, workTarget) => repo.repoInfo(root, workTarget),

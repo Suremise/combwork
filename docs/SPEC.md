@@ -2348,6 +2348,28 @@ type AdvanceOutcome = { advanced: true } | { moved: string } | { paused: PauseCo
 interface IntegrationPort { prepareCandidate(...): Promise<CandidateOutcome>; advance(ctx, target, expected, result, journal): Promise<AdvanceOutcome>; recover(ctx, journal): Promise<AdvanceOutcome>; publish(ctx, target, owed: PushOwed): Promise<PublishOutcome> }
 ```
 
+R9 (HI-2792) finished the routing and closed 1.4.0's refactor with the audit:
+- **Moved behind ports:**
+  - The runtime's adapters (`platform/adapters.ts`, a factory map).
+  - The Git tool's readiness: Copy Diagnostics, the startup check and Provider Setup's Check again, through each runner.
+  - Keeping `.combwork` out: port 1's `keepOut`, Git's in `platform/gitKeepOut.ts`. `combworkVcs.ts` routes to it, and detection's markers moved to `vcsDetect.ts`.
+  - The Files tab's ignore rules and search list (port 1's `files`), its hidden metadata folders, and ProjectInfo's current line.
+  - Relocation, port 2's capability (`Relocation`, Git's in `platform/gitRelocation.ts`): Repair's worktree move, repair and branch rename, and the 1.1 folder move's worktree repair.
+  - Every remaining direct history read (port 3). These include a workflow step's cache (`readStep`), identity, messages, the queue's step reads by the card's platform, and runLink's reads.
+  - The Changes tab's status and diff (port 5's reads).
+  - The refusals' git commands, now the descriptor's `remedies`.
+- **Platform-id switches removed** where an existing capability or port says the same: adoption's line read, upgrade's reads and its slots default, the options form's presets, and the check-copy refusal.
+- **The audit** classifies every remaining import of a Git module from outside Git's implementation as an edge in `tests/gitAudit.mjs`, with the names it may take:
+  - Git implementation, kept in a common file (the 0.9 agent worktrees, the queue's Git runner and route, the watcher's Git reads);
+  - a port's registry;
+  - Git-facing UI (the Git view, Provider Setup's Git row, the view types that keep their Git names);
+  - common (the folder fence);
+  - historic migration (1.1's refs and exclude-line upgrade, the 1.1 folder move, 1.0's slot migration);
+  - defect with its card: HI-2753's move proof still runs git in `retargetCard.ts` (HI-2821).
+- **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0, and J0 routes each by the project's platform.
+- **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, or a changed seam count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+- **The text audit:** shared, UI and agent text that names Git is Git-facing and stays. The platform-id switches older than 1.4.0 over the workflow options' schema, the window and a few main modules are carded as HI-2822, before J0.
+
 **What the R cards inherit:** each keeps this section's invariants at its boundary and names, in its summary, the
 existing tests that prove it unchanged (HI-2781 part 2's selection menu); none adds jj code; R9 ends 1.4.0's refactor
 with the audit and the import rule, and J0 starts 1.5.0 from it.

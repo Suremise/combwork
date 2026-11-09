@@ -1,23 +1,23 @@
 import { existsSync } from 'original-fs'
-import { mkdir, readFile, stat } from 'original-fs/promises'
+import { mkdir } from 'original-fs/promises'
 import { basename, dirname, join, resolve } from 'path'
 import type { MoveBranch, MoveCards, MoveHostPlan, MoveOptions, MoveOwner, MovePlan, MoveReport, MoveReportRow, MoveWorktree, PathDataCopy, ProfileMove, ProjectConfig, WorkspaceMoved } from '../shared/types'
 import { CW_DIR, projectAgents } from '../shared/defaults'
 import { fmt, msg, tr } from '../shared/i18n'
-import { moveHasWork, rebase, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
+import { moveHasWork, rebaseAny, samePath, worktreeCandidates, type PathMove } from '../shared/movePaths'
 import { moveCardFolders, PruneBlocked, recreateWorktree } from './agentWorktree'
 import { legacyWorktree, slotsMigrated } from './agentFolders'
 import { projectFolders as foldersOf, recreateSlot, relocateFolder, releaseSlotLease, type ProjectFolder } from './projectFolders'
 import { folderWhat } from '../shared/projectFolders'
 import { config } from './config'
-import { placeKey, realPath, samePlace } from './fsutil'
-import { git } from './git'
+import { placeKey, samePlace } from './fsutil'
 import { createLogger, userText } from './logger'
 import { allProviders } from './providers'
 import { recentChanged } from './recentWorkspaces'
 import { sessions } from './sessions'
 import { workspaceFor, type WorkspaceService } from './workspace'
-import { listWorktrees, listWorktreesOrNull, localBranches } from './worktrees'
+import { slotRelocation, slotWorkspaces } from './platform/workspacePorts'
+import type { Relocation } from './platform/workspacePort'
 import type { SlotRenamer } from './slots'
 import { workflowFor } from './workflow/service'
 import { reconcilersIdle } from './workflow/reconciler'
@@ -50,7 +50,6 @@ const assistantName = (): string => tr(msg({ id: 'main.move.assistant', defaultM
 const PROJECT_FILE = join(CW_DIR, 'project.json')
 
 /** Whether p is inside root (or is it). */
-const under = (p: string, root: string): boolean => rebase(p, root, root) !== null
 
 /**
  * A moved project folder (or the Assistant's home), where its sessions ran then (from) and now (folder): its own folder,
@@ -67,22 +66,21 @@ interface Host {
   pendingOnly?: boolean
 }
 
-/** Whether a folder is a git worktree's (it has a .git file, not a folder). */
-async function isWorktreeFolder(p: string): Promise<boolean> {
-  return (await stat(join(p, '.git')).catch(() => null))?.isFile() ?? false
+/**
+ * Repair's steps on the store's workspaces (HI-2792: the relocation capability of the platform slots are made with, Git's
+ * worktrees in 1.4.0; §16.3.6's gate: relocation). Each its git command or file read as before (platform/gitRelocation.ts).
+ */
+function relocation(): Relocation {
+  const r = slotRelocation()
+  if (!r) throw new Error('No relocation for this platform') // i18n-ignore: an internal error, for the log (no platform without it has workspaces in 1.4.0)
+  return r
 }
 
-/** Whether git's links between a repository and one of its worktrees are right both ways (by real paths: git writes the long names, #389). */
-async function linked(repo: string, wt: string): Promise<boolean> {
-  try {
-    const gitdir = /^gitdir:\s*(.+)$/m.exec(await readFile(join(wt, '.git'), 'utf8'))?.[1]?.trim()
-    if (!gitdir || !under(realPath(resolve(wt, gitdir)), realPath(join(repo, '.git', 'worktrees')))) return false
-    const back = (await readFile(join(resolve(wt, gitdir), 'gitdir'), 'utf8')).trim()
-    return samePlace(resolve(back), join(wt, '.git'))
-  } catch {
-    return false
-  }
-}
+/** Whether a folder is one of the store's linked workspaces (Git: a worktree's .git file, not a folder). */
+const isWorktreeFolder = (p: string): Promise<boolean> => relocation().isWorkspaceFolder(p)
+
+/** Whether the store's links between a repository and one of its worktrees are right both ways (by real paths: git writes the long names, #389). */
+const linked = (repo: string, wt: string): Promise<boolean> => relocation().linked(repo, wt)
 
 /** Records where the workspace and its projects are, for those that have no record yet (opened before #146). */
 async function recordNew(ws: WorkspaceService, projects: string[]): Promise<void> {
@@ -151,7 +149,7 @@ async function worktreesOf(ws: WorkspaceService, host: Host, wsMove: PathMove, o
     }
     if (!found) {
       // Its branch lives in the repository: Recreate makes the worktree again on it (where it would have moved to).
-      const branch = { branch: legacy.branch, branchExists: (await git(host.path, ['rev-parse', '--verify', '--quiet', `refs/heads/${legacy.branch}`])).ok }
+      const branch = { branch: legacy.branch, branchExists: await slotWorkspaces().lineExists(host.path, legacy.branch) }
       out.push(opts.recreate?.includes(key) ? { ...base, ...branch, to: candidates[0], how: 'recreate' } : { ...base, ...branch, to: null, how: 'missing' })
     }
     // Still at its old place while the project is at its old folder too: a copy, and the original keeps its worktree.
@@ -189,7 +187,7 @@ async function folderOf(host: Host, f: ProjectFolder, wsMove: PathMove, projectM
     return [{ ...base, to: found, how: samePath(found, f.folder) ? 'stayed' : 'moved' }]
   }
   if (f.of.kind === 'slot' && f.lease) {
-    const branch = { branch: f.line ?? '', branchExists: !!f.line && (await git(host.path, ['rev-parse', '--verify', '--quiet', `refs/heads/${f.line}`])).ok }
+    const branch = { branch: f.line ?? '', branchExists: !!f.line && (await slotWorkspaces().lineExists(host.path, f.line)) }
     return [opts.recreate?.includes(key) && branch.branchExists ? { ...base, ...branch, to: candidates[0], how: 'recreate' } : { ...base, ...branch, to: null, how: 'missing' }]
   }
   if (f.of.kind === 'home') return [{ ...base, to: null, how: 'missing' }]
@@ -211,11 +209,11 @@ async function branchesOf(ws: WorkspaceService, project: string, worktrees: read
   const recreated = (id: string): boolean => worktrees.some((w) => w.agentId === id && w.how === 'recreate' && w.branchExists)
   const todo = agents.filter((a) => legacyWorktree(a)?.branch && !later(a.id) && !pending.some((r) => r.agentId === a.id))
   if (!todo.length && !pending.length) return []
-  const branches = await localBranches(project)
+  const branches = await relocation().localLines(project)
   const has = (b: string): boolean => branches.some((x) => x.toLowerCase() === b.toLowerCase())
   const place: BranchHome = { workspace: basename(ws.path ?? ''), project: basename(project), spaces: Array.isArray(cfg.branchSpaces) ? cfg.branchSpaces : [] }
   const home = { ...place, space: chooseSpace(place, branches).space }
-  const remoteOf = async (b: string): Promise<string> => (await git(project, ['config', '--get', `branch.${b}.remote`])).out.trim()
+  const remoteOf = (b: string): Promise<string> => relocation().lineRemote(project, b)
   const out: MoveBranch[] = []
   for (const r of pending) {
     const a = agents.find((x) => x.id === r.agentId)!
@@ -463,10 +461,8 @@ async function pathData(moves: Move[], apply: boolean): Promise<PathDataCopy[]> 
  * A worktree's identity (#1441): its git administrative folder, as its `.git` file names it. Git's `worktree move` keeps
  * it, so it tells one worktree from another that comes to the same path. Null when the folder isn't a linked worktree.
  */
-export async function worktreeIdentity(folder: string): Promise<string | null> {
-  const text = await readFile(join(folder, '.git'), 'utf8').catch(() => null)
-  const m = text ? /^gitdir:\s*(.+?)\s*$/m.exec(text) : null
-  return m ? resolve(folder, m[1]).toLowerCase() : null
+export function worktreeIdentity(folder: string): Promise<string | null> {
+  return relocation().identity(folder)
 }
 
 /**
@@ -479,7 +475,7 @@ export async function worktreeIdentity(folder: string): Promise<string | null> {
 export function worktreeRenamer(ws: WorkspaceService, projectPath: string, hooks: { beforeGitMove?: (from: string, to: string) => Promise<void> } = {}): SlotRenamer {
   /** Where git lists the worktree with this identity (any path), or null when git can't say or doesn't list it. */
   const locate = async (tree: string): Promise<string | null> => {
-    const listed = await listWorktreesOrNull(projectPath).catch(() => null)
+    const listed = await slotWorkspaces().list(projectPath).catch(() => null)
     for (const w of listed ?? []) if ((await worktreeIdentity(w.path)) === tree) return w.path
     return null
   }
@@ -515,13 +511,13 @@ export function worktreeRenamer(ws: WorkspaceService, projectPath: string, hooks
       if (existsSync(to)) return log.info(`${userText(from)} not renamed: ${userText(to)} is already there`), false
       await mkdir(dirname(to), { recursive: true })
       await hooks.beforeGitMove?.(from, to)
-      const moved = await git(projectPath, ['worktree', 'move', from, to])
+      const moved = await relocation().move(projectPath, from, to)
       if (!moved.ok) return log.info(`${userText(from)} not renamed: ${userText((moved.err || '').trim())}`), false
       const at = await locate(tree)
       if (at && samePlace(at, to)) return true
       log.warn(`${userText(from)} moved, but not to ${userText(to)} (${userText(at ?? 'not listed')}): moving it back`)
       if (at && !samePlace(at, from)) {
-        const back = await git(projectPath, ['worktree', 'move', at, from])
+        const back = await relocation().move(projectPath, at, from)
         if (!back.ok) log.warn(`${userText(at)} couldn't be moved back to ${userText(from)}: ${userText(back.err)}`)
       }
       return false
@@ -535,14 +531,14 @@ export function worktreeRenamer(ws: WorkspaceService, projectPath: string, hooks
       const at = await where(from, to, tree)
       if (at === 'to') {
         await unfollow(from, to, tree)
-        const back = await git(projectPath, ['worktree', 'move', to, from])
+        const back = await relocation().move(projectPath, to, from)
         if (!back.ok) log.warn(`${userText(to)} couldn't be moved back to ${userText(from)}: ${userText(back.err)}`)
       } else if (at === 'from') await unfollow(from, to, tree)
       else if (at === 'elsewhere' && !existsSync(from)) {
         // Inside another worktree that came to `to` (a move cut short before its own check): this one moved back from
         // there; the other, and its records, left as they are (follow never ran for this one).
         const there = (await locate(tree))!
-        const back = await git(projectPath, ['worktree', 'move', there, from])
+        const back = await relocation().move(projectPath, there, from)
         if (!back.ok) log.warn(`${userText(there)} couldn't be moved back to ${userText(from)}: ${userText(back.err)}`)
       }
       return (await where(from, to, tree)) === 'from'
@@ -873,8 +869,8 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
     const folderOfRow = (w: MoveWorktree): ProjectFolder | undefined => (w.of ? folders.find((f) => f.key === w.agentId) : undefined)
     const whatOf = (w: MoveWorktree): MoveReportRow['what'] => (w.of ? { kind: 'folder', of: w.of } : { kind: 'worktree', agent: w.agentName })
     if (fix.length) {
-      const r = await git(h.path, ['worktree', 'repair', ...fix.map((w) => w.to!)])
-      const listed = await listWorktrees(h.path)
+      const r = await relocation().repair(h.path, fix.map((w) => w.to!))
+      const listed = (await slotWorkspaces().list(h.path)) ?? []
       for (const w of fix) {
         const ok = listed.some((l) => samePlace(l.path, w.to!)) && (await linked(h.path, w.to!))
         if (!ok) {
@@ -1054,7 +1050,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
         failed(whyOf(e))
         continue
       }
-      const branches = await localBranches(h.path)
+      const branches = await relocation().localLines(h.path)
       const has = (x: string): boolean => branches.some((y) => y.toLowerCase() === x.toLowerCase())
       if (has(b.from)) {
         if (has(b.to)) {
@@ -1066,7 +1062,7 @@ async function repairNow(ws: WorkspaceService, opts: MoveOptions): Promise<MoveR
           failed(tr(msg({ id: 'main.move.branchQueued', defaultMessage: 'a queued step still uses it; Repair renames it next time', description: "Why Repair couldn't rename an agent's branch yet (in main.move.branchFailed's {why}): one of the board's queued steps (preparing a card's folder) names the branch." })))
           continue
         }
-        const r = await git(h.path, ['branch', '-m', b.from, b.to])
+        const r = await relocation().renameLine(h.path, b.from, b.to)
         if (!r.ok) {
           failed((r.err || 'git branch -m').trim()) // i18n-ignore: a git command's name
           continue

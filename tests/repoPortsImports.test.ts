@@ -29,8 +29,11 @@ describe('callers moved to the repository context port', () => {
 
   it("the port's contract imports no platform's code, only types", () => {
     const text = readFileSync(join(root, 'src/main/platform/repoContext.ts'), 'utf8')
-    expect(importsOf('src/main/platform/repoContext.ts')).toEqual(['src/shared/platform/descriptors'])
+    // The descriptors' ids, and the Files tab's ignore rule (HI-2792's RepoFiles: a shared type, the rule the window shows).
+    expect(importsOf('src/main/platform/repoContext.ts')).toEqual(['src/shared/platform/descriptors', 'src/shared/gitIgnoreRules'])
     expect(text).toMatch(/import type \{[^}]+\} from '\.\.\/\.\.\/shared\/platform\/descriptors'/)
+    expect(text).toMatch(/import type \{ IgnoreRule \} from '\.\.\/\.\.\/shared\/gitIgnoreRules'/)
+    expect([...text.matchAll(/^import (?!type ).*$/gm)].map((m) => m[0])).toEqual([])
   })
 
   it("only the port's registry imports Git's implementation of it", () => {

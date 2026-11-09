@@ -9,9 +9,10 @@ import { msg, tr, type Msg } from '../shared/i18n'
 import { toast } from './events'
 import { readKeptJson, realPath, writeKeptJson, writeTextAtomic } from './fsutil'
 import { ifAbsent, lstatOrNullAsync, present } from './fsPresence'
-import { git } from './git'
+import { relocationIn } from './platform/workspacePorts'
 import { CombworkError, errorText, combworkError } from './combworkError'
-import { excludeLine, gitDirOf, vcsOf } from './combworkVcs'
+import { vcsOf } from './vcsDetect'
+import { excludeLine, gitDirOf } from './platform/gitKeepOut'
 import { createLogger, userText } from './logger'
 import { othersPresentByProcess } from './presence'
 import { ours, type HostKind } from './combworkFolder'
@@ -527,20 +528,18 @@ export async function moveExcludeLine(host: string): Promise<boolean> {
 
 /** git's links to the worktrees that were inside a moved folder (its slots), made right again at their new place. */
 export async function repairWorktrees(host: string, moves: FolderMove[]): Promise<number> {
-  if (vcsOf(host)?.kind !== 'git') return 0
-  const r = await git(host, ['worktree', 'list', '--porcelain'])
-  if (!r.ok) return 0
-  const paths = r.out
-    .split(/\r?\n/)
-    .filter((l) => l.startsWith('worktree '))
-    .map((l) => resolve(l.slice('worktree '.length).trim()))
+  // The relocation of the repository platform holding the host (HI-2792): none, nothing to repair.
+  const relocate = relocationIn(host)
+  if (!relocate) return 0
+  const paths = await relocate.listedFolders(host)
+  if (!paths) return 0
   const fixed: string[] = []
   for (const p of paths) {
     const to = movedPathOf(p, moves)
     if (to && present(to)) fixed.push(to)
   }
   if (!fixed.length) return 0
-  const rep = await git(host, ['worktree', 'repair', ...fixed])
+  const rep = await relocate.repair(host, fixed)
   if (!rep.ok) throw new Error(rep.err.split(/\r?\n/)[0] || `git worktree repair exited with ${rep.code}`) // i18n-ignore: git's own words, for the error's detail
   return fixed.length
 }

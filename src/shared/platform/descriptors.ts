@@ -43,13 +43,35 @@ export interface PlatformDescriptor {
   operations: readonly Operation[]
   /** A revision as shown: Git's 7 characters; None's content hash shortened the same way. */
   revisionShort: (id: string) => string
+  /**
+   * The commands a refusal gives as its remedy, in the platform's own terms (SPEC §16.3.6 port 3's attribution remedies,
+   * HI-2792): a common guard never writes a tool's command itself. Absent on a platform with no commits to fix (None).
+   */
+  remedies?: Remedies
+}
+
+/** A refusal's remedies (HI-2792): each a command as the agent types it. */
+export interface Remedies {
+  /** Adds the card's trailer to the folder's head commit (submit.trailer). */
+  trailer: (key: string) => string
+  /** Sets the project's identity, when it has none (submit.identity). */
+  setIdentity: string
+  /** Makes the head commit again with the project's identity (submit.identity). */
+  resetAuthor: string
+}
+
+/** Git's remedies: the commands submit.trailer and submit.identity have always given. */
+const GIT_REMEDIES: Remedies = {
+  trailer: (key) => `git commit --amend --no-edit --trailer "Combwork-Card: ${key}"`, // i18n-ignore: a git command, as typed
+  setIdentity: 'git config user.email', // i18n-ignore: a git command, as typed
+  resetAuthor: 'git commit --amend --no-edit --reset-author' // i18n-ignore: a git command, as typed
 }
 
 const short = (id: string): string => id.slice(0, 7)
 
 export const PLATFORMS: Record<PlatformId, PlatformDescriptor> = {
   // Git answers everything: worktrees for isolation, merges for integration, replay for sameness.
-  git: { id: 'git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], operations: OPERATIONS, revisionShort: short },
+  git: { id: 'git', capabilities: ['revisions', 'isolation', 'integration', 'containment', 'sameness', 'authorship', 'observe'], operations: OPERATIONS, revisionShort: short, remedies: GIT_REMEDIES },
   // None: content hashes as revisions, acceptance as integration, no isolation in 1.0 (OP-16). No repository to change:
   // Initialise repository is on Git's page (HI-1905), gated by Git's operations.
   none: { id: 'none', capabilities: ['revisions', 'integration', 'containment', 'sameness', 'authorship', 'observe'], operations: [], revisionShort: short }

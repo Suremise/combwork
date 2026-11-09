@@ -19,7 +19,7 @@ import { projectPlatform } from '../platform/registry'
 import { PLATFORM_NAME, SWITCH_REFUSED } from '../../shared/platform/switching'
 import { listLanes, withLanesLock } from '../lanes'
 import { createLogger, userText } from '../logger'
-import * as G from '../platform/git'
+import { historyOf, lineHistory } from '../platform/historyPorts'
 import { agentText, linesOf, withValues, type Text } from '../../shared/advanced'
 import { msg } from '../../shared/i18n/msg'
 import { tr } from '../../shared/i18n'
@@ -96,11 +96,13 @@ export async function presetInputs(projectPath: string, platform: PlatformId): P
   const quick = ['typecheck', 'lint'].filter(has)
   const tests = has('test') ? ['test'] : []
   const commands = Object.fromEntries([...quick.map((n) => [n, `npm run ${n}`]), ...tests.map((n) => [n, 'npm test'])]) // i18n-ignore: commands, run as written
-  if (platform !== 'git') return { quick, tests, commands, identity: null }
-  const target = await G.defaultBranch(projectPath).catch(() => null)
+  // A platform with no history (None) has no target or identity to read (HI-2792: asked of the port, never by its id).
+  const hist = historyOf(platform)
+  if (!hist) return { quick, tests, commands, identity: null }
+  const target = await hist.defaultTarget(projectPath).catch(() => null)
   // HI-2019: a read git couldn't make is asked once more; still unread, the form shows no identity (it has no state for
   // "couldn't read", and the queue reads it again itself before a merge).
-  const read = () => G.identity(projectPath).catch(() => null)
+  const read = () => hist.identity(projectPath).catch(() => null)
   const first = await read()
   const id = isUnknown(first) ? await read() : first
   return { quick, tests, commands, identity: isUnknown(id) ? null : id, ...(typeof target === 'string' ? { target } : {}) }
@@ -274,7 +276,7 @@ export async function keptTargets(ws: WorkspaceService, project: { path: string;
   // The new target, empty: the default branch, as a start in a slot resolves it.
   let fallback: Promise<string> | null = null
   const resolved = (t: string | null | undefined): Promise<string> =>
-    t ? Promise.resolve(t) : (fallback ??= G.defaultBranch(project.path).then((d) => (d && !isUnknown(d) ? d : ''), () => ''))
+    t ? Promise.resolve(t) : (fallback ??= lineHistory().defaultTarget(project.path).then((d) => (d && !isUnknown(d) ? d : ''), () => ''))
   const now = await resolved(to)
   const out: KeptTargets = { to: now, cards: [], lanes: [] }
   const wf = await workflowFor(ws, project.path)
@@ -445,7 +447,7 @@ export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: str
   // Whether Combwork merges, and into what, may have changed: the windows read the project's queues again (#1356: which
   // show follows the options too), whoever changed them (the window, the Assistant). A queue waiting for the merge
   // question (paused `mergeChoice`) carries on.
-  const t = target || (await G.defaultBranch(project.path).catch(() => null))
+  const t = target || (await lineHistory().defaultTarget(project.path).catch(() => null))
   if (t && !isUnknown(t)) {
     queueChanged(ws, project.path, t)
     if (plan.chosen) void kickQueue(ws, project.path, t)

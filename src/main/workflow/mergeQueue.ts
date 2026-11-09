@@ -27,7 +27,8 @@ import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
 import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
-import * as G from '../platform/git'
+import { historyFor, lineHistory, readStep } from '../platform/historyPorts'
+import type { HistoryPort } from '../platform/history'
 import { isUnknown, type Maybe, type Unknown } from '../platform/types'
 import { withWriteFence, type CardRecord } from './factStore'
 import { endedBy, LeaseLost } from './queueRunner'
@@ -726,7 +727,7 @@ export class MergeQueue {
    */
   private async process(card: CardRecord, entry: QueueEntry, ready?: { expected: string; result: string }): Promise<QueueOutcome> {
     try {
-      return await G.gitStep(() => this.steps(card, entry, ready))
+      return await readStep(() => this.steps(card, entry, ready))
     } finally {
       this.cfg.onStep?.(null)
     }
@@ -778,7 +779,7 @@ export class MergeQueue {
       } else {
         step('testMerge', null)
         const base = s.approved?.base ?? s.latest?.base ?? s.started?.base ?? ''
-        const head = await G.lineHeadAndTree(this.project, target)
+        const head = await this.history(card, s).lineHeadAndTree(this.project, target)
         if (isUnknown(head)) {
           const o = await readFailed(again(gitSaid(head)))
           if (o) return o
@@ -786,7 +787,7 @@ export class MergeQueue {
         }
         if (!head) return this.pause(target, card, entry, 'needsYou')
         // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read.
-        const found = await G.contains(this.project, target, { base, revision, key: s.latest?.key }, head)
+        const found = await this.history(card, s).contains(this.project, target, { base, revision, key: s.latest?.key }, head)
         if (!isUnknown(found) && found) {
           // A forward merge (HI-2679) has no line to reconcile: its attempt's own frozen commit, proven in the target just
           // now, is what is recorded (never a newer source head's).
@@ -962,7 +963,12 @@ export class MergeQueue {
    * copy that goes stale): null when git says it isn't set, unknown when git couldn't read it (HI-2019).
    */
   private async identity(reads: EntryReads): Promise<Maybe<{ name: string; email: string } | null>> {
-    return reads.identity ??= G.identity(this.project)
+    return reads.identity ??= lineHistory().identity(this.project)
+  }
+
+  /** The history port of the card's platform (port 3, HI-2792): the queue's step reads ask it. */
+  private history(card: CardRecord, s?: CardState): HistoryPort {
+    return historyFor(this.wf.rulesetOf(card, s).options.platform)
   }
 
   /** The integration port of the card's platform (port 4's candidate half, HI-2790): the queue's steps call it. */
@@ -1006,7 +1012,7 @@ export class MergeQueue {
     const message = async (): Promise<string | Again> => {
       const reviewers = [...new Set(s.verdicts.filter((v) => v.pass && v.submission === s.latest?.id && v.generation === s.generation).map((v) => v.reviewer))].join(', ')
       const how = this.commitMessage()
-      const own = how === 'branch' ? await G.messages(this.project, `${base || (await port.mergeBase(h, revision, expected))}..${revision}`) : []
+      const own = how === 'branch' ? await this.history(card, s).messages(this.project, `${base || (await port.mergeBase(h, revision, expected))}..${revision}`) : []
       if (isUnknown(own)) return again(`Combwork couldn't read the messages of ${revision.slice(0, 7)}'s commits.`) // i18n-ignore: git's side of a pause, in English as git's messages are
       return mergeMessage(how, { card, revision, updated, reviewers, messages: own })
     }
@@ -1156,8 +1162,8 @@ export class MergeQueue {
       }
       if (!b.counted) return { kind: 'uncounted' }
       if (!('bad' in read) && read.skipped.length) {
-        const tree = await git(f, ['rev-parse', `${result}^{tree}`])
-        const bound = { expected, tree: tree.ok ? tree.out.trim() : `unread:${result}` }
+        const tree = await this.history(card).treeOf(f, result)
+        const bound = { expected, tree: tree ?? `unread:${result}` }
         const decided = this.skipDecided(card, entry, read.skipped, bound)
         if (decided === 'declined') return { kind: 'red', transient: false, output: `Skipped and not accepted: ${read.skipped.map((x) => `${x.test}${x.why ? ` (${x.why})` : ''}`).join(', ')}.`, check: FOCUSED_CHECK } // i18n-ignore: a check's output, agent-facing
         if (decided !== 'approved') return { kind: 'skip', skipped: read.skipped, ...bound }

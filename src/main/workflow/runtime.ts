@@ -26,10 +26,9 @@ import { parseCardRef } from '../../shared/workflow/cardRefs'
 import { changeList, nextCard, type LaneList } from '../../shared/workflow/laneList'
 import { LANE_MAX_ROUNDS } from '../../shared/lanes'
 import type { FinishInputs, LineNow, PlatformAdapter, Unsubmitted } from '../platform/adapter'
-import { GitPlatform } from '../platform/gitPlatform'
+import { adaptersFor } from '../platform/adapters'
 import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
-import { NonePlatform } from '../platform/nonePlatform'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
@@ -492,7 +491,7 @@ export class Workflow {
   constructor(readonly cfg: WorkflowConfig) {
     this.store = cfg.store
     this.none = new NoneAdapter(cfg.project, cfg.options().excluded)
-    this.platforms = { git: new GitPlatform(this), none: new NonePlatform(this, this.none) }
+    this.platforms = adaptersFor(this, this.none)
   }
 
   /** The adapter of a ruleset's platform (a card keeps its ruleset's, so a switch applies from the next card). */

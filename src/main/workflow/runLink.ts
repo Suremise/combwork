@@ -9,7 +9,7 @@
 
 import { randomUUID } from 'crypto'
 import { isAbsolute } from 'path'
-import { gitReading } from '../git'
+import { lineHistory } from '../platform/historyPorts'
 import { ProgressError, admitReport, type ProgressCaller, type ProgressGate } from '../progress'
 import type { RunRevision } from '../platform/adapter'
 import type { TaskColumn } from '../../shared/types'
@@ -309,7 +309,7 @@ export class IssuedLinks {
 }
 
 /** What's checked out in a folder (git: a run for no card, or for one with no start yet), or null where nothing is. */
-export const folderHead = (folder: string): Promise<string | null> => gitReading(folder, ['rev-parse', '--verify', '--quiet', 'HEAD']).then((r) => (r.ok ? r.out.trim() || null : null))
+export const folderHead = (folder: string): Promise<string | null> => lineHistory().checkedOut(folder)
 
 /** The commit a revision names in a folder, in full, or null when it names none there. */
-export const commitIn = (folder: string, revision: string): Promise<string | null> => gitReading(folder, ['rev-parse', '--verify', '--quiet', `${revision}^{commit}`]).then((r) => (r.ok ? r.out.trim() || null : null))
+export const commitIn = (folder: string, revision: string): Promise<string | null> => lineHistory().commitIn(folder, revision)

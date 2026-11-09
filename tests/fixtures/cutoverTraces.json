@@ -1,0 +1,72 @@
+{
+  "keepOut.ensure": [
+    "<base>/project :: check-ignore -q --no-index -- .combwork/",
+    "=> {\"excluded\":true,\"root\":\"<base>/project\",\"added\":true}"
+  ],
+  "keepOut.readOnly": [
+    "=> {\"excluded\":true,\"root\":\"<base>/project\",\"added\":false}"
+  ],
+  "keepOut.tracked": [
+    "<base>/project :: ls-files -z -- .combwork",
+    "=> [\".combwork/sessions.json\"]"
+  ],
+  "keepOut.untrack": [
+    "<base>/project :: ls-files -z -- .combwork",
+    "<base>/project :: --literal-pathspecs rm --cached --quiet -- .combwork/sessions.json",
+    "=> 1"
+  ],
+  "keepOut.combworkVcs": [
+    "<base>/project :: ls-files -z -- .combwork",
+    "=> {\"state\":\"excluded\"}"
+  ],
+  "keepOut.noRepository": [
+    "=> null"
+  ],
+  "relocate.repairWorktrees": [
+    "<base>/project :: worktree list --porcelain",
+    "<base>/project :: worktree repair <base>/new/wt",
+    "=> 1"
+  ],
+  "relocate.noRepository": [
+    "=> 0"
+  ],
+  "runLink.folderHead": [
+    "<base>/project :: rev-parse --verify --quiet head",
+    "=> \"<id>\""
+  ],
+  "runLink.commitIn": [
+    "<base>/project :: rev-parse --verify --quiet target^{commit}",
+    "=> \"<id>\""
+  ],
+  "runLink.commitInNone": [
+    "<base>/project :: rev-parse --verify --quiet no-such-line^{commit}",
+    "=> null"
+  ],
+  "queue.commitsBehind": [
+    "<base>/project :: rev-list --count --first-parent <id>..<id>",
+    "=> 1"
+  ],
+  "queue.commitsBehindGone": [
+    "<base>/project :: rev-parse --verify -q refs/heads/gone",
+    "=> null"
+  ],
+  "adoption.git": [
+    "<base>/project :: symbolic-ref -q head",
+    "<base>/project :: rev-parse --verify -q head",
+    "<base>/project :: merge-base <id> <id>",
+    "<base>/project :: diff --name-status --no-renames -z <id> <id>",
+    "<base>/project :: diff --full-index --no-renames -u0 <id> <id>",
+    "<base>/project :: patch-id --stable",
+    "=> {\"line\":\"main\",\"head\":\"<id>\",\"base\":\"<id>\",\"files\":[{\"status\":\"a\",\"path\":\"b.txt\"}],\"key\":\"<id>\"}"
+  ],
+  "adoption.none": [
+    "=> {\"line\":null,\"head\":null,\"base\":null,\"files\":[],\"key\":null}"
+  ],
+  "presets.git": [
+    "<base>/project :: config --null --get-regexp ^user/.(name|email)$",
+    "=> {\"quick\":[],\"tests\":[],\"commands\":{},\"identity\":{\"name\":\"combwork test\",\"email\":\"test@example.invalid\"},\"target\":\"main\"}"
+  ],
+  "presets.none": [
+    "=> {\"quick\":[],\"tests\":[],\"commands\":{},\"identity\":null}"
+  ]
+}

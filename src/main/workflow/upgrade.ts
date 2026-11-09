@@ -10,8 +10,8 @@ import { join } from 'path'
 import type { FactData, StageId } from '../../shared/workflow/facts'
 import type { Ruleset } from '../../shared/workflow/compile'
 import { allOff, type WorkflowOptions } from '../../shared/workflow/options'
-import type { PlatformId } from '../../shared/platform/descriptors'
-import * as G from '../platform/git'
+import { hasCapability, type PlatformId } from '../../shared/platform/descriptors'
+import { historyOf } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import type { CardRecord, Tx } from './factStore'
 import type { Workflow } from './runtime'
@@ -22,7 +22,7 @@ import type { Workflow } from './runtime'
  */
 export function upgradeOptions(platform: PlatformId, has: { reviewers: boolean; worktrees: boolean }): WorkflowOptions {
   const o = allOff(platform)
-  return { ...o, review: has.reviewers ? 'agent' : 'none', noSelfReview: has.reviewers, folder: platform === 'git' && has.worktrees ? 'slots' : 'project' }
+  return { ...o, review: has.reviewers ? 'agent' : 'none', noSelfReview: has.reviewers, folder: hasCapability(platform, 'isolation') && has.worktrees ? 'slots' : 'project' }
 }
 
 /** The column a card in flight was in at the upgrade. */
@@ -52,18 +52,20 @@ const NONE_READ: AdoptionInputs = { line: null, head: null, base: null, files: [
  * folder git can't read: unknown (null), never a failure.
  */
 export async function adoptionInputs(project: string, platform: PlatformId, column: InFlight, at: AdoptionAt): Promise<AdoptionInputs> {
-  if (platform !== 'git') return NONE_READ
+  // A platform with no history (None) has nothing to read (HI-2792: asked of the port, never by its id).
+  const hist = historyOf(platform)
+  if (!hist) return NONE_READ
   const folder = at.worktree ?? project
-  const line = await G.branch(folder)
-  const h = await G.head(folder)
-  const th = at.target ? await G.lineHead(project, at.target) : null
-  const mb = !isUnknown(h) && th && !isUnknown(th) ? await G.mergeBase(project, th, h) : null
+  const line = await hist.line(folder)
+  const h = await hist.head(folder)
+  const th = at.target ? await hist.lineHead(project, at.target) : null
+  const mb = !isUnknown(h) && th && !isUnknown(th) ? await hist.mergeBase(project, th, h) : null
   const head = isUnknown(h) ? null : h
   const base = mb && !isUnknown(mb) ? mb : null
   let files: AdoptionInputs['files'] = []
   let key: string | null = null
   if (column === 'review' && head && base) {
-    const c = await G.change(project, base, head)
+    const c = await hist.change(project, base, head)
     if (!isUnknown(c)) ({ files, key } = c)
   }
   return { line: isUnknown(line) ? null : line, head, base, files, key }
