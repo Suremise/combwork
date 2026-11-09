@@ -76,7 +76,7 @@ export function withTestProvider(cfg: Record<string, unknown>, tp: TestProvider 
   const mcp = ((cfg.policies as Policy[] | undefined) ?? []).filter((p) => p.action === 'mcp.use')
   return {
     ...cfg,
-    providers: { [tp.id]: { name: 'Combwork test', package: '@opencode/ai/providers/openai-compatible', settings: { baseURL: tp.baseURL }, models: { [tp.model]: { name: tp.model } } } },
+    providers: { [tp.id]: { name: 'Combwork test', package: '@opencode/ai/providers/openai-compatible', settings: { baseURL: tp.baseURL }, models: { [tp.model]: { name: tp.model } } } }, // i18n-ignore: a test provider's name in a CLI's config, never shown
     policies: [{ action: 'provider.use', resource: '*', effect: 'deny' }, { action: 'provider.use', resource: tp.id, effect: 'allow' }, ...mcp],
     ...(launch ? { model: `${tp.id}/${tp.model}` } : {})
   }
