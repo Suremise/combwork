@@ -9,6 +9,8 @@ import { B1, commit, moved, R1, setup, sh, type Env } from './harness'
 import { preset } from '../../src/shared/workflow/options'
 import { reconcile } from '../../src/main/workflow/reconcile'
 import type { FactData } from '../../src/shared/workflow/facts'
+import { gitTree } from '../../src/main/workflow/mergeQueue'
+import { git } from '../../src/main/git'
 
 let env: Env | null = null
 afterEach(() => {
@@ -163,5 +165,24 @@ describe('strict (G8): the queue brings the reviewed revision up to date', () =>
     expect(out.at(-1)).toMatchObject({ outcome: 'integrated' })
     expect(e.wf.state(card).stage).toBe('done')
     expect(sh(e.project, 'show', 'main:src/a.txt')).toBe('the card')
+  })
+
+  it("HR1's R7 round 1: strict's merge message is read just before the merge, as the options are then (G19)", async () => {
+    const e = strict()
+    await approved(e, 'Late message change', { 'src/late.txt': 'late\n' })
+    advanceMain(e, { 'other.txt': 'meanwhile\n' }, 'meanwhile')
+    // Commit message changed while the update is prepared (its signing read is the last before the merge).
+    const merges: string[][] = []
+    const q = e.queue({
+      git: (cwd, args, opts) => {
+        if (args.includes('commit.gpgsign')) e.options.commitMessage = 'branch'
+        if (args.includes('merge') && args.includes('--no-ff')) merges.push(args)
+        return opts ? gitTree(cwd, args, opts) : git(cwd, args)
+      }
+    })
+    expect((await q.drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    // The first merge is the update's (the target merged into the card's revision), then the test merge's.
+    const update = merges[0]
+    expect(update[update.indexOf('-m') + 1]).toBe("Merge branch 'main'")
   })
 })

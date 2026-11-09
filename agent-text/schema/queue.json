@@ -1,4 +1,33 @@
 {
+  "queue.candidate.mergeCommit": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "expected": "plain"
+    }
+  },
+  "queue.candidate.notOnTop": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "expected": "plain"
+    }
+  },
+  "queue.candidate.notSame": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "target": "plain",
+      "expected": "plain"
+    }
+  },
+  "queue.candidate.rebasedNotSame": {
+    "placeholders": {
+      "card": "plain",
+      "revision": "plain",
+      "expected": "plain"
+    }
+  },
   "queue.failure.check.environment": {
     "placeholders": {
       "what": "plain",
