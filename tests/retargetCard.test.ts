@@ -6,7 +6,8 @@
 // changes before and while git holds the refs, someone else's lock left alone, a git that ends before the write, a
 // prepare that never answers, two moves at once, a reviewed card's evidence, a lane moved with its card, and a restart
 // keeping its line.
-import { execFileSync, spawn, spawnSync } from 'child_process'
+import { execFileSync, spawn, type ChildProcess } from 'child_process'
+import { createRequire } from 'module'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,6 +17,7 @@ import { tempDir } from './tempDir'
 vi.setConfig({ testTimeout: 60_000 })
 /** A bound for a hung run only, never a timing (tests/README.md). */
 const HUNG_MS = 10_000
+const { endChildTree } = createRequire(import.meta.url)('./e2e/folderProcesses.cjs') as { endChildTree: (child: ChildProcess) => number }
 
 const base = tempDir('cw-retargetcard-')
 mkdirSync(join(base, 'profile'), { recursive: true })
@@ -403,9 +405,9 @@ describe('a card in flight on an integration branch that ended (HI-2753)', () =>
       hold.refHoldTestHooks.prepared = async (child) => {
         // Killed hard, its whole tree (HI-2809): where PATH's git is Git for Windows' launcher (`cmd\git.exe`, as on
         // GitHub's runner), the real git is its child, and killing the launcher alone leaves that git to see its input
-        // close and abort, removing its locks itself. Its status unread: the launcher can end by itself once its git is
-        // killed, before taskkill reaches it; the lock left (below) is what proves the kill.
-        if (how === 'kill') spawnSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], { stdio: 'ignore', windowsHide: true })
+        // close and abort, removing its locks itself. Ended by identity through the handle held (#603); the lock left
+        // (below) is what proves the kill.
+        if (how === 'kill') endChildTree(child)
         else child.stdin?.destroy()
         await new Promise((r) => (child.exitCode !== null ? r(null) : child.once('exit', r)))
       }
