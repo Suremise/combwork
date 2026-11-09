@@ -1607,7 +1607,8 @@ fix (Provider Setup, Retry).
 The adapter's interface (P2 proves it, P3 builds it; names are the builders'):
 
 ```ts
-interface PlatformDescriptor { id: 'none' | 'git'; capabilities: Capability[]; revisionShort(id: string): string }
+interface PlatformDescriptor { id: 'none' | 'git'; capabilities: Capability[]; revisionShort(id: string): string
+  integration: 'merge' | 'accept'; deliverables: 'commits' | 'paths'; repository: boolean }  // HI-2822's workflow facts
 interface PlatformAdapter {
   detect(folder): Detection                               // §16.3.5
   head(where: Folder): Revision | Unknown                 // revisions: reads without side effects (no snapshot)
@@ -1956,7 +1957,8 @@ These hold for every port, in 1.4.0 and after.
    behaviour in none; a behaviour change found needed is its own card. The proof is the existing tests at each boundary
    (and, for the queue and slots, a command trace before and after: the same git commands in the same order).
 2. **No switch on a platform id** outside its adapter and its descriptor (AGENTS.md's rule for providers). A caller
-   asks a port, or reads a capability; it never writes `if (platform === 'git')`, nor "if not Git, then None".
+   asks a port, or reads a capability or the descriptor's facts (its integration, deliverables, repository and
+   operations: HI-2822); it never writes `if (platform === 'git')`, nor "if not Git, then None".
 3. **Unknown fails closed** (§16.3.1). Every read answers a value or `Unknown`; a timeout, a crash of the tool, an
    output past its bound and an answer from a host that lost its lease are unknown. A cache keeps only what §16.3.2
    says it may (a merge's containment; a squash's not-found for 30 s), and never turns unknown into known. **A zero exit
@@ -2367,8 +2369,10 @@ R9 (HI-2792) finished the routing and closed 1.4.0's refactor with the audit:
   - historic migration (1.1's refs and exclude-line upgrade, the 1.1 folder move, 1.0's slot migration);
   - defect with its card: HI-2753's move proof still runs git in `retargetCard.ts` (HI-2821).
 - **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0, and J0 routes each by the project's platform.
-- **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, or a changed seam count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+- **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, a changed seam count, or a changed count of platform-id switches (HI-2822). `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 - **The text audit:** shared, UI and agent text that names Git is Git-facing and stays. The platform-id switches older than 1.4.0 over the workflow options' schema, the window and a few main modules are carded as HI-2822, before J0.
+- **The descriptor's workflow facts** (HI-2822): beside its capabilities and operations, each descriptor says how its integration combines work (`integration`: Git `merge`, None `accept`), what a code card delivers (`deliverables`: Git `commits`, None declared `paths`), and whether it needs its repository found in the folder (`repository`: Git only). The workflow options (their presets, All off, contradictions, stages and the form's rows), the runtime's declared paths, the queue's controls, the watcher's two halves, the switch's refusal and the Version Control tab read these (`merges()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()`), the isolation capability, or an operation (Start the next version: `createLine`), never the id. Behaviour is unchanged for Git and None.
+- **The switch guard:** `tests/gitAudit.mjs`'s `SWITCHES` lists, per file, the switches on a platform's id left outside the descriptors, the adapters and the registry, each justified: Git-facing text that names Git (the project status's `git at`, the tab's fact line), git's own status read on Git's page, and HI-1997's one-time step over stored Git options. `tests/gitAudit.test.ts` fails on a new one, or one gone.
 
 **What the R cards inherit:** each keeps this section's invariants at its boundary and names, in its summary, the
 existing tests that prove it unchanged (HI-2781 part 2's selection menu); none adds jj code; R9 ends 1.4.0's refactor

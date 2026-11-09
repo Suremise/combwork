@@ -5,7 +5,7 @@
 // In the app (#1263): the runtime compiles a project's resolved options (main/workflow/rulesets.ts) and stores each
 // ruleset a card starts under.
 
-import { hasCapability } from '../platform/descriptors'
+import { deliversCommits, hasCapability, merges } from '../platform/descriptors'
 import type { Category, StageId } from './facts'
 import { STAGE_CATEGORY } from './facts'
 import { contradictions, reviewerAgent, type Contradiction, type WorkflowOptions } from './options'
@@ -65,7 +65,7 @@ export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
 }
 
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
-export const needsChange = (o: WorkflowOptions): boolean => o.platform === 'git' && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges')
+export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges')
 
 /**
  * The stages the options produce (§16.5.2), in board order: Review with any review; Approved when something follows a
@@ -74,16 +74,16 @@ export const needsChange = (o: WorkflowOptions): boolean => o.platform === 'git'
  */
 export function producedStages(o: WorkflowOptions): StageId[] {
   const review = o.review !== 'none'
-  const git = o.platform === 'git'
+  const merging = merges(o.platform)
   // Approved when a review or your OK before merging (G10) approves the work and something follows it (§16.5.2, decided
-  // on #1417): in Git a merge (Combwork's, the agent's, or one Combwork doesn't check); in None your OK after the reviewer
-  // agent's pass (N1).
+  // on #1417): where work merges (Git) a merge (Combwork's, the agent's, or one Combwork doesn't check); where it is
+  // accepted (None) your OK after the reviewer agent's pass (N1).
   const approves = review || o.okBefore.mode !== 'never'
-  const approved = git ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : o.review === 'agentThenYou'
+  const approved = merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : o.review === 'agentThenYou'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')
-  if (git && o.finish === 'combworkMerges') out.push('merging')
+  if (merging && o.finish === 'combworkMerges') out.push('merging')
   out.push('done')
   return out
 }

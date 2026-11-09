@@ -323,8 +323,11 @@ module from outside Git's implementation is a classified edge (Git implementatio
 historic migration, common, or a defect with its card), with the names it may take. It also counts the remaining
 "platform with lines" seams (`lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`,
 `slotWorkspaces()`, `slotRelocation()`) per caller: in 1.4.0 these resolve to Git alone, and 1.5.0's J0 routes each
-by the project's platform. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one, or a
-changed seam count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+by the project's platform. Its `SWITCHES` justify, per file, the switches on a platform's id (`platform === 'git'`)
+left outside the descriptors, adapters and registry (HI-2822): everything else reads the descriptor's workflow facts
+(`merges()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()` in `shared/platform/descriptors.ts`), a
+capability or an operation. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one, a
+changed seam count or a changed switch count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

@@ -289,6 +289,38 @@ export const SEAMS = {
   'src/main/workspaceMove': { calls: { slotWorkspaces: 4, slotRelocation: 1 }, why: "Repair's worktree steps: the pool's platform's relocation (HI-2792; §16.3.6's gate: relocation)" }
 }
 
+/**
+ * A switch on a platform's id (`platform === 'git'`, `d.platform !== 'none'`), HI-2822's grep: SPEC §16.3.6's rule 2 says a
+ * caller asks a port or reads the descriptor (a capability, its integration, deliverables, repository or operations).
+ */
+const SWITCH = /platform\)?\s*[!=]==?\s*'(git|none)'/g
+
+/** Where a switch belongs: the descriptors, the platforms' adapters and the registry that picks between them. */
+const SWITCH_HOME = /^src\/(shared\/platform\/descriptors|main\/platform\/(registry|adapters|adapter|git[A-Z]?\w*|none[A-Z]?\w*))$/
+
+/**
+ * The switches left outside their home, per file, each justified (HI-2822): Git-facing text that names Git, and Git's own
+ * data read by a one-time step. Counted like the seams: a new switch, or one gone, fails tests/gitAudit.test.ts.
+ */
+export const SWITCHES = {
+  'src/main/servers': { n: 1, why: "the project's status names what was found in Git's words for agents (`git at {root}`, api.project.vcsGit): Git-facing text" },
+  'src/main/workflow/commitMessageStep': { n: 2, why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): historic, Git's data alone" },
+  'src/renderer/src/views/VersionControl': { n: 1, why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },
+  'src/renderer/src/views/VersionControlHeader': { n: 1, why: "the tab's fact line says the folder is a Git repository at its root (git.vc.fact.repo, .subfolder): Git-facing text" }
+}
+
+/** Each file's count of switches on a platform's id, outside their home. */
+export function switchCounts(root, over = {}) {
+  const out = {}
+  for (const { file, text } of filesOf(root, over)) {
+    const f = file.replace(/\.tsx?$/, '')
+    if (SWITCH_HOME.test(f)) continue
+    const n = [...text.matchAll(SWITCH)].length
+    if (n) out[f] = n
+  }
+  return out
+}
+
 /** The audit against the source: what isn't listed, what is listed but gone, and names beyond an edge's list. */
 export function audit(root, over = {}) {
   const found = gitEdges(root, over)
@@ -308,5 +340,7 @@ export function audit(root, over = {}) {
     const want = SEAMS[file]?.calls ?? {}
     return [...new Set([...Object.keys(have), ...Object.keys(want)])].filter((s) => (have[s] ?? 0) !== (want[s] ?? 0)).map((s) => `${file}: ${s}() ×${have[s] ?? 0}, listed ×${want[s] ?? 0}`)
   })
-  return { found, unlisted, stale, extraNames, seams }
+  const switched = switchCounts(root, over)
+  const switches = [...new Set([...Object.keys(switched), ...Object.keys(SWITCHES)])].sort().filter((f) => (switched[f] ?? 0) !== (SWITCHES[f]?.n ?? 0)).map((f) => `${f}: ${switched[f] ?? 0} switches on a platform's id, listed ${SWITCHES[f]?.n ?? 0}`)
+  return { found, unlisted, stale, extraNames, seams, switches }
 }

@@ -2,6 +2,7 @@ import { basename } from 'path'
 import type { SettingsPatch } from '../shared/api'
 import type { EffortOption, FallbackModel, ModelPrice, ProjectConfig, ProviderId, SlotDefaults, WorkspaceConfig } from '../shared/types'
 import { modelCaps } from '../shared/models'
+import { merges } from '../shared/platform/descriptors'
 import { advancedDef, advancedTakes } from '../shared/advanced'
 import { agentMsg, say } from '../shared/agentText'
 import { projectProviderConfig, providerSettings } from '../shared/providers'
@@ -306,9 +307,9 @@ export async function applySetting(
     const missingFirst = async (): Promise<void> => {
       const cfg = await workspace.projectConfig(projectPath)
       const wf = cfg.workflow
-      if (wf?.platform !== 'git' || (e.workflow !== 'target' && e.workflow !== 'otherTargets')) return
-      const was = resolvedOf(workspace, projectPath, 'git', cfg).options
-      const will = resolvedOf(workspace, projectPath, 'git', { ...cfg, workflow: { ...wf, options: { ...wf.options, [e.workflow]: value === null ? undefined : value } } }).options
+      if (!wf || !merges(wf.platform) || (e.workflow !== 'target' && e.workflow !== 'otherTargets')) return
+      const was = resolvedOf(workspace, projectPath, wf.platform, cfg).options
+      const will = resolvedOf(workspace, projectPath, wf.platform, { ...cfg, workflow: { ...wf, options: { ...wf.options, [e.workflow]: value === null ? undefined : value } } }).options
       const missing = await newlyMissing(projectPath, was, will)
       if (missing.length) throw new SettingRefused(409, say(T.missingTarget, { branches: missing.join(', '), n: String(missing.length) }))
     }
@@ -316,9 +317,9 @@ export async function applySetting(
       const cfg = await workspace.projectConfig(projectPath)
       const platform = cfg.workflow?.platform
       await missingFirst()
-      if (platform === 'git') {
-        const was = resolvedOf(workspace, projectPath, 'git', cfg).options
-        const will = resolvedOf(workspace, projectPath, 'git', { ...cfg, workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, otherTargets: value as string[] | undefined } } }).options
+      if (platform && merges(platform)) {
+        const was = resolvedOf(workspace, projectPath, platform, cfg).options
+        const will = resolvedOf(workspace, projectPath, platform, { ...cfg, workflow: { ...cfg.workflow!, options: { ...cfg.workflow!.options, otherTargets: value as string[] | undefined } } }).options
         try {
           await refuseRemovedTargets(workspace, projectPath, was.otherTargets ?? [], value === null ? (will.otherTargets ?? []) : (value as string[]), will.target || null, slots)
         } catch (err) {
@@ -464,8 +465,9 @@ async function retargetNote(projectPath: string, from: string): Promise<string |
 }
 
 async function keptTargetsNote(projectPath: string, cfg: ProjectConfig): Promise<string | null> {
-  if (cfg.workflow?.platform !== 'git') return null
-  const kept = await keptTargets(workspace, { path: projectPath, name: basename(projectPath) }, resolvedOf(workspace, projectPath, 'git', cfg).options.target ?? '')
+  const platform = cfg.workflow?.platform
+  if (!platform || !merges(platform)) return null
+  const kept = await keptTargets(workspace, { path: projectPath, name: basename(projectPath) }, resolvedOf(workspace, projectPath, platform, cfg).options.target ?? '')
   const list = [...kept.lanes.map((l) => say(T.keptLane, { named: l.name ? 'yes' : 'no', name: l.name ?? '', builder: l.builder, target: l.target })), ...kept.cards.map((c) => say(T.keptCard, { card: c.key, target: c.target }))]
   return list.length ? say(T.keptTargets, { list: list.join('; ') }) : null
 }

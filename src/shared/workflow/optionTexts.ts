@@ -3,7 +3,7 @@
 // settings catalog's rows the Assistant sets them by. Kept as messages, shown with tr() where they are rendered.
 
 import { msg, type Msg } from '../i18n/msg'
-import type { PlatformId } from '../platform/descriptors'
+import { merges, type PlatformId } from '../platform/descriptors'
 import type { FormGroupId, OptionKey, PresetId } from './options'
 
 interface OptionText {
@@ -218,7 +218,8 @@ export const PRESET_NOTE_TEXT: Partial<Record<PresetId, Msg>> = {
 export const optionTitle = (key: OptionKey, platform: PlatformId, folder?: 'slots' | 'project'): Msg | null => {
   const t = OPTION_TEXT[key]
   if (!t) return null
-  if (platform === 'none') return t.none ?? t.title
+  // `none`: the label where work is accepted, not merged (None's N options; HI-2822: by the descriptor).
+  if (!merges(platform)) return t.none ?? t.title
   return folder === 'project' && t.shared ? t.shared : t.title
 }
 
