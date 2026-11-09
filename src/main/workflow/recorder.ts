@@ -22,7 +22,7 @@ import { FOR_YOU, UNREAD_NOTES, workflowEnglish, workflowText } from '../../shar
 import { advanced } from '../advanced'
 import { boardRead, boardReadOnly, boardWrite } from '../boardStore'
 import { createLogger } from '../logger'
-import * as G from '../platform/git'
+import { historyOf } from '../platform/historyPorts'
 import { projectPlatform } from '../platform/registry'
 import { isUnknown, type Maybe } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
@@ -174,7 +174,8 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
     }
   }
   // None (no version control): no line, head or base yet (P5 adds its manifests).
-  if (projectPlatform(projectPath, cfg.platform).id !== 'git') return r
+  const H = historyOf(projectPlatform(projectPath, cfg.platform).id)
+  if (!H) return r
   const take = <T>(field: string, v: Maybe<T>): T | null => {
     if (isUnknown(v)) {
       r.unknown[field] = v.what
@@ -183,14 +184,14 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
     }
     return v
   }
-  r.line = take('line', await G.branch(folder))
-  r.head = take('head', await G.head(folder))
-  r.target = tree?.base ?? take('target', await G.defaultBranch(folder))
+  r.line = take('line', await H.line(folder))
+  r.head = take('head', await H.head(folder))
+  r.target = tree?.base ?? take('target', await H.defaultTarget(folder))
   if (p.why === 'start') {
     // No head, no base: the target isn't read, so the base's reason is the head's (HI-2044: a folder that can't be read
     // fails the target's read too, which would name the target instead).
-    const targetHead = r.target && r.head ? take('base', await G.lineHead(folder, r.target)) : null
-    r.base = r.head && targetHead ? take('base', await G.mergeBase(folder, r.head, targetHead)) : null
+    const targetHead = r.target && r.head ? take('base', await H.lineHead(folder, r.target)) : null
+    r.base = r.head && targetHead ? take('base', await H.mergeBase(folder, r.head, targetHead)) : null
     // Not read: why (its head or target couldn't be read, or there is no target to start from).
     if (!r.base && !r.unknown.base) {
       const from = r.unknown.head ? 'head' : r.unknown.target ? 'target' : null
@@ -203,12 +204,12 @@ async function readsFor(ws: WorkspaceService, p: Planned): Promise<Reads> {
   const started = FactStore.forBoard(ws, { project: p.project, key: '' }).facts(p.number)
   r.base = foldCard(started).started?.base ?? null
   if (!r.base && r.head && r.target) {
-    const targetHead = take('base', await G.lineHead(folder, r.target))
-    r.base = targetHead ? take('base', await G.mergeBase(folder, r.head, targetHead)) : null
+    const targetHead = take('base', await H.lineHead(folder, r.target))
+    r.base = targetHead ? take('base', await H.mergeBase(folder, r.head, targetHead)) : null
   }
   if (r.base && r.head) {
-    r.files = take('files', await G.filesChanged(folder, r.base, r.head)) ?? []
-    r.key = take('key', await G.candidateKey(folder, r.base, r.head))
+    r.files = take('files', await H.filesChanged(folder, r.base, r.head)) ?? []
+    r.key = take('key', await H.candidateKey(folder, r.base, r.head))
   } else {
     r.unknown.files ??= UNREAD_NOTES.noBaseOrHead
   }

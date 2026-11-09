@@ -10,7 +10,7 @@
 import { existsSync } from 'original-fs'
 import { randomBytes } from 'crypto'
 import { samePlace } from '../places'
-import * as G from '../platform/git'
+import { lineHistory } from '../platform/historyPorts'
 import { isUnknown } from '../platform/types'
 import type { WorkspaceService } from '../workspace'
 import type { TaskActor } from '../tasks'
@@ -59,9 +59,10 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   // A change between branches that both go on leaves started cards and running lanes on their own (HI-2674).
   // HI-2807: `ongoing` (Start the next version): both go on by the user's word, whatever their heads say (a new branch is
   // at the release's head), so started cards and running lanes stay, and `to` need not exist yet: nothing reads it.
-  const fromNow = o.ongoing ? null : await G.lineHead(projectPath, from)
-  const toNow = o.ongoing ? null : await G.lineHead(projectPath, to)
-  const ended = !o.ongoing && !isUnknown(fromNow) && !isUnknown(toNow) && !!toNow && (!fromNow || fromNow === toNow || (await G.isAncestor(projectPath, fromNow, toNow)) === true)
+  const H = lineHistory()
+  const fromNow = o.ongoing ? null : await H.lineHead(projectPath, from)
+  const toNow = o.ongoing ? null : await H.lineHead(projectPath, to)
+  const ended = !o.ongoing && !isUnknown(fromNow) && !isUnknown(toNow) && !!toNow && (!fromNow || fromNow === toNow || (await H.isAncestor(projectPath, fromNow, toNow)) === true)
   const inFlight = (c: (typeof cards)[number], s: ReturnType<typeof wf.state>): boolean => IN_FLIGHT_STAGES.includes(s.stage) && s.started?.target === from
   const grouped = new Set<number>()
   out.laneMoves = []
@@ -108,7 +109,7 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
   }
   const { poolFor } = await import('../slotsApp')
   const pool = await poolFor(ws, projectPath).catch(() => null)
-  const fromHead = await G.lineHead(projectPath, from)
+  const fromHead = await H.lineHead(projectPath, from)
   for (const s of pool ? pool.deps.store.slots() : []) {
     if ((s.target ?? from) !== from) continue
     const keep = (why: RetargetPreview['slots']['keep'][number]['why']) => out.slots.keep.push({ name: s.name, why })
@@ -124,8 +125,8 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       keep('cantCheck')
       continue
     }
-    const d = await G.dirty(s.folder)
-    const h = await G.head(s.folder)
+    const d = await H.dirty(s.folder)
+    const h = await H.head(s.folder)
     if (isUnknown(d) || isUnknown(h) || !h) {
       keep('cantCheck')
       continue
@@ -134,7 +135,7 @@ export async function retargetPreview(ws: WorkspaceService, projectPath: string,
       keep('dirty')
       continue
     }
-    const inIt = h === fromHead || (await G.isAncestor(projectPath, h, fromHead))
+    const inIt = h === fromHead || (await H.isAncestor(projectPath, h, fromHead))
     if (inIt !== true) {
       keep(isUnknown(inIt) ? 'cantCheck' : 'unmerged')
       continue

@@ -11,7 +11,7 @@
 
 import { CombworkError, combworkError, errorText } from '../combworkError'
 import { makeBranchAt, removeMadeBranch, resolveStart, type MadeBranchKept } from '../gitRepo'
-import { withRepoLocks } from '../repoLock'
+import { withFolderRepoLocks } from '../platform/repoPorts'
 import { createLogger, userText } from '../logger'
 import { msg } from '../../shared/i18n/msg'
 import { withValues } from '../../shared/advanced'
@@ -75,7 +75,7 @@ export async function startNextVersion(
   projectPath: string,
   a: { name?: string; from?: BranchStart; base?: { preset: PresetId | null; options: Partial<WorkflowOptions> }; check?: () => void; preview?: boolean }
 ): Promise<NextVersionResult> {
-  return withRepoLocks([projectPath], () => workflowWrite(() => startLocked(ws, projectPath, a)), { quiet: true, project: projectPath })
+  return withFolderRepoLocks([projectPath], () => workflowWrite(() => startLocked(ws, projectPath, a)), { quiet: true, project: projectPath })
 }
 
 async function startLocked(ws: WorkspaceService, projectPath: string, a: Parameters<typeof startNextVersion>[2]): Promise<NextVersionResult> {

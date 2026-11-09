@@ -11,20 +11,9 @@ import { GIT_PREFIX } from '../git'
 import { gitExe } from '../gitTool'
 import { withLauncherEnv } from '../gitWorker'
 
-/** A ref and the commit it must be at (a full id). */
-export interface RefAt {
-  ref: string
-  oid: string
-}
-
-/** A prepared hold: the refs locked until `close()`; `lost()` once its git ended or its input broke (its proof can't stand). */
-export interface RefHold {
-  lost(): boolean
-  close(): Promise<void>
-}
-
-/** Why a hold couldn't be prepared: a ref not where it was checked, a lock someone else holds, git's answer late, or git failing. */
-export type RefHoldRefused = { why: 'moved' | 'locked' | 'timeout' | 'failed'; ref?: string; lock?: string; detail: string }
+// A ref and the commit it must be at, a hold and its refusal: the repository context port's (SPEC §16.3.6).
+import type { HoldOptions, RefAt, RefHold, RefHoldRefused } from './repoContext'
+export type { RefAt, RefHold, RefHoldRefused } from './repoContext'
 
 /** Tests: told once the hold is prepared, before `holdRefs` answers (a seam between the prepare and the caller's write). */
 export const refHoldTestHooks: { prepared?: (child: ChildProcess) => void | Promise<void> } = {}
@@ -35,7 +24,7 @@ export const refHoldTestHooks: { prepared?: (child: ChildProcess) => void | Prom
  * for the prepare: once prepared, nothing but `close()` (or git dying) ends the hold, so no timer releases the locks
  * while the caller writes.
  */
-export async function holdRefs(repo: string, refs: readonly RefAt[], o: { prepareMs: number; closeMs: number }): Promise<{ hold: RefHold } | { refused: RefHoldRefused }> {
+export async function holdRefs(repo: string, refs: readonly RefAt[], o: HoldOptions): Promise<{ hold: RefHold } | { refused: RefHoldRefused }> {
   let child: ChildProcess
   try {
     const use = gitExe()

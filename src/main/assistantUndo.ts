@@ -15,7 +15,7 @@ import { restoreProjectAgents } from './templates'
 import { setWorkflowOptions, workflowForm, WorkflowStale } from './workflow/optionsForm'
 import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
 import { removeMadeBranch } from './gitRepo'
-import { withRepoLocks } from './repoLock'
+import { withFolderRepoLocks } from './platform/repoPorts'
 import { workflowWrite } from './workflow/writes'
 import { referencesTo, slotTargets } from './workflow/retarget'
 import { projectTargets } from './workflow/targets'
@@ -600,7 +600,7 @@ async function undoBranch(ws: WorkspaceService, c: RecordedChange, guard: Guard)
   const projectPath = join(ws.path, c.project)
   const name = c.target.slice(BRANCH_TARGET.length)
   try {
-    return await withRepoLocks([projectPath], () =>
+    return await withFolderRepoLocks([projectPath], () =>
       workflowWrite(async () => {
         const slots = await slotTargets(ws, projectPath)
         return lanes.withLanesLock(ws, () =>

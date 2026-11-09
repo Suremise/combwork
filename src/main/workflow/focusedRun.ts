@@ -9,7 +9,7 @@
 
 import { spawn as nodeSpawn, type ChildProcess } from 'child_process'
 import { open } from 'original-fs/promises'
-import { git } from '../git'
+import { lineHistory } from '../platform/historyPorts'
 import { endTree, shellSpec } from '../progressReporters/wrapper'
 import { bracketEnd, bracketStart, checkEnv, programFound, type Spawn } from './queueChecks'
 import { FOCUSED_MAX_DIAGNOSTICS, FOCUSED_MAX_OUTPUT, changePaths, parsePick, type FocusedPickState, type FocusedPickWhy, type FocusedTest, type PathChange } from '../../shared/workflow/focused'
@@ -36,9 +36,8 @@ const CLOSE_AFTER_KILL_MS = 10_000
  * a rename's endpoints (git's own rename detection, the same on both sides). Null when it couldn't be read.
  */
 export async function pathChanges(folder: string, from: string, to: string): Promise<PathChange[] | null> {
-  const r = await git(folder, ['diff', '--raw', '-z', '--no-abbrev', '--find-renames', '--no-ext-diff', '--no-textconv', from, to, '--'])
-  if (!r.ok) return null
-  return parseRaw(r.out)
+  const out = await lineHistory().rawDiff(folder, from, to)
+  return out === null ? null : parseRaw(out)
 }
 
 /** `git diff --raw -z` output as changes; null when it isn't that. */

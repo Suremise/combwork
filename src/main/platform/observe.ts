@@ -24,6 +24,7 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import { isMainGitDir, plainRepo, readRepoRefs, type Heads, type RepoRefs } from './repoRefs'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { unknown, type Maybe } from './types'
+import type { Disposable, FolderChanges, ObserveEvent, ObservePort } from './history'
 
 const log = createLogger('observe')
 
@@ -51,15 +52,8 @@ const ARM_MS = 250
 /** At most this many working folders per repository are watched (its worktrees): beyond, the rest are unknown. */
 const MAX_FOLDERS = 64
 
-/** What the watcher tells its subscribers (platform-neutral: a line is a Git branch). */
-export type ObserveEvent =
-  | { kind: 'lineMoved'; project: string; line: string; from: string | null; to: string | null }
-  | { kind: 'folderMoved'; project: string; folder: string; from: string | null; to: string | null }
-  | { kind: 'written'; project: string; folder: string; paths: string[] }
-
-export interface Disposable {
-  dispose(): void
-}
+// What the watcher tells its subscribers, and how a subscription ends: port 3's types (history.ts, HI-2787).
+export type { Disposable, FolderChanges, ObserveEvent } from './history'
 
 /** A watch that survives its folder going and coming back (#964), and an error: it ends, and is tried again. */
 class DirWatch {
@@ -454,18 +448,11 @@ export interface ObservedProject {
   root?: string
 }
 
-/** The question checks ask of the write log, answered: the folder's writes that count, or unknown. */
-export interface FolderChanges {
-  changed: boolean
-  /** What counted: folder-relative paths, ':reflog', ':edit'. */
-  paths: string[]
-}
-
 /**
  * The watcher for a set of projects: `follow` says which (the workspaces' projects); each repository and folder is
  * watched once, however many projects share it, and closed when none needs it.
  */
-export class Observer {
+export class Observer implements ObservePort {
   /** Common git dir (lower-cased) → its watch. */
   private repos = new Map<string, RepoWatch>()
   /** None project folders (lower-cased) → their write logs. */
