@@ -31,6 +31,7 @@ export const LAUNCHER_EXIT = {
   sessionMismatch: 126,
   sessionMissing: 127,
   infoWrite: 128,
+  baseline: 133,
   serverEnded: 129,
   ownerEnded: 130,
   tuiStart: 131,
@@ -49,7 +50,345 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Web.Script.Serialization;
 using Microsoft.Win32.SafeHandles;
+
+/**
+ * OpenCode's event stream, carried to Combwork's hook server (HI-2760, design s7 to s22). It decides nothing: it projects
+ * the events Combwork follows (the types it subscribes to, its session's only, text cut), takes settled snapshots (one
+ * durable watermark before and after their reads), and posts them in order, each with its generation. On a reconnect, an
+ * overflow, a failed post, an over-long frame or a failed read it holds what comes, takes a settled snapshot again, and
+ * posts it, then what it held beyond its watermark. Every read and post is bounded in time and bytes.
+ */
+public static class CwStream {
+  public static string Url, Auth, Session, HookUrl, HookToken, Intent;
+  /** A test's relay for the event stream alone (CW_OC_STREAM_VIA, to force a disconnect); Combwork never sets it. */
+  public static string StreamVia = "";
+  static readonly string[] Types = { "session.inbox.enqueued", "session.step.started", "session.tool.called", "session.tool.success", "session.tool.failed", "permission.asked", "permission.replied", "session.retry.scheduled", "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted" };
+  const int FrameMax = 262144, PageBytes = 1048576, BodyMax = 65536, QueueItems = 512, PageLimit = 50, Pages = 10;
+  const long QueueBytes = 1048576;
+  static readonly JavaScriptSerializer Json = new JavaScriptSerializer { MaxJsonLength = 4 * 1048576 };
+  static readonly object gate = new object();
+  /** Bodies to post, in order, each with the user messages Combwork knows once it takes it. */
+  static readonly Queue<KeyValuePair<string, string[]>> queue = new Queue<KeyValuePair<string, string[]>>();
+  static long queueBytes;
+  /** Held while a snapshot is taken (null: not holding): each projected event with its durable seq (-1: none). */
+  static List<KeyValuePair<long, Dictionary<string, object>>> held = new List<KeyValuePair<long, Dictionary<string, object>>>();
+  static long heldBytes;
+  static int gen;
+  static volatile bool connected, resync = true, stopping;
+  static readonly AutoResetEvent kick = new AutoResetEvent(false), posted = new AutoResetEvent(false);
+  static readonly HashSet<string> known = new HashSet<string>();
+  static string baselineIdle;
+  public static volatile string LastProblem = "";
+  /** The launch is over (its owner gone): startup stops waiting. */
+  public static Func<bool> Abandoned = () => false;
+
+  static object G(object o, string k) { var d = o as Dictionary<string, object>; object v; return d != null && d.TryGetValue(k, out v) ? v : null; }
+  static string S(object o, int max) { var s = o as string; return s == null ? null : (s.Length > max ? s.Substring(0, max) : s); }
+  static void Put(Dictionary<string, object> d, string k, object v) { if (v != null) d[k] = v; }
+
+  /** An event projected as Combwork's projectEvent does (events.ts): null when it isn't one Combwork follows. */
+  public static Dictionary<string, object> Project(object raw, out long seq) {
+    seq = -1;
+    string type = G(raw, "type") as string;
+    object d = G(raw, "data");
+    if (type == null || Array.IndexOf(Types, type) < 0 || (G(d, "sessionID") as string) != Session) return null;
+    var e = new Dictionary<string, object>();
+    e["type"] = type;
+    object dur = G(raw, "durable");
+    if (dur != null && G(dur, "seq") != null) { seq = Convert.ToInt64(G(dur, "seq")); e["seq"] = seq; }
+    if (type == "session.inbox.enqueued") { Put(e, "inboxID", G(d, "inboxID") as string); Put(e, "itemType", G(G(d, "item"), "type") as string); Put(e, "text", S(G(G(G(d, "item"), "payload"), "text"), 2000)); }
+    if (type == "session.step.started" || type == "session.retry.scheduled") Put(e, "assistantMessageID", G(d, "assistantMessageID") as string);
+    if (type.StartsWith("session.tool.")) { Put(e, "callID", G(d, "id") as string); Put(e, "toolName", S(G(d, "name"), 200)); }
+    if (type == "permission.asked") {
+      Put(e, "requestID", G(d, "id") as string); Put(e, "messageID", G(G(d, "source"), "messageID") as string); Put(e, "callID", G(G(d, "source"), "id") as string); Put(e, "action", S(G(d, "action"), 200));
+      var res = G(d, "resources") as object[];
+      if (res != null) { var parts = new List<string>(); foreach (object r in res) if (r is string) parts.Add((string)r); Put(e, "resources", S(string.Join(" ", parts.ToArray()), 500)); }
+    }
+    if (type == "permission.replied") { Put(e, "requestID", G(d, "requestID") as string); Put(e, "reply", G(d, "reply") as string); }
+    object err = G(d, "error");
+    if (err != null) { var x = new Dictionary<string, object>(); Put(x, "type", S(G(err, "type"), 200)); Put(x, "message", S(G(err, "message"), 500)); if (G(err, "status") is int) x["status"] = G(err, "status"); e["error"] = x; }
+    Put(e, "reason", S(G(d, "reason"), 200));
+    return e;
+  }
+
+  /** A GET of the server's: its status (0: none; -2: over cap bytes, not read further) and text. */
+  static int Get(string path, int cap, out string text) {
+    text = "";
+    try {
+      var r = (HttpWebRequest)WebRequest.Create(Url + path);
+      r.Method = "GET"; r.Timeout = 5000; r.ReadWriteTimeout = 5000; r.Proxy = null; r.Headers["Authorization"] = Auth;
+      using (var resp = (HttpWebResponse)r.GetResponse()) return ReadCapped(resp, cap, out text);
+    } catch (WebException e) {
+      var resp = e.Response as HttpWebResponse;
+      if (resp == null) return 0;
+      try { ReadCapped(resp, cap, out text); } catch (Exception) { }
+      return (int)resp.StatusCode;
+    } catch (Exception) { return 0; }
+  }
+  static int ReadCapped(HttpWebResponse resp, int cap, out string text) {
+    using (var s = resp.GetResponseStream()) using (var m = new MemoryStream()) {
+      var buf = new byte[16384]; int n;
+      while ((n = s.Read(buf, 0, buf.Length)) > 0) { m.Write(buf, 0, n); if (m.Length > cap) { text = ""; return -2; } }
+      text = Encoding.UTF8.GetString(m.ToArray());
+      return (int)resp.StatusCode;
+    }
+  }
+
+  /** Posts one body to Combwork's hook server; whether it took it. */
+  static bool Post(string body) {
+    try {
+      var r = (HttpWebRequest)WebRequest.Create(HookUrl);
+      r.Method = "POST"; r.Timeout = 5000; r.ReadWriteTimeout = 5000; r.Proxy = null; r.ContentType = "application/json";
+      r.Headers["Authorization"] = "Bearer " + HookToken;
+      byte[] data = Encoding.UTF8.GetBytes(body);
+      r.ContentLength = data.Length;
+      using (var s = r.GetRequestStream()) s.Write(data, 0, data.Length);
+      using (var resp = (HttpWebResponse)r.GetResponse()) return (int)resp.StatusCode >= 200 && (int)resp.StatusCode < 300;
+    } catch (Exception) { return false; }
+  }
+
+  static string EventBody(Dictionary<string, object> e, int g) { return Json.Serialize(new Dictionary<string, object> { { "hook_event_name", "OpencodeEvent" }, { "session_id", Session }, { "gen", g }, { "event", e } }); }
+
+  /** The session's durable watermark (the log's log.synced seq), or -1. */
+  static long Watermark() {
+    string t;
+    if (Get("/api/experimental/session/" + Uri.EscapeDataString(Session) + "/log?after=0", 65536, out t) != 200) return -1;
+    var m = Regex.Match(t, "\"type\"\\s*:\\s*\"log\\.synced\"[^}]*\"seq\"\\s*:\\s*(\\d+)");
+    return m.Success ? long.Parse(m.Groups[1].Value) : -1;
+  }
+
+  /** One message projected (oldest first is the caller's): its id, type, outcome, error, a user message's text cut. */
+  static Dictionary<string, object> ProjectMessage(object m) {
+    var p = new Dictionary<string, object>();
+    Put(p, "id", G(m, "id") as string); Put(p, "type", G(m, "type") as string); Put(p, "outcome", G(m, "outcome") as string);
+    object err = G(m, "error");
+    if (err != null) { var x = new Dictionary<string, object>(); Put(x, "type", S(G(err, "type"), 200)); Put(x, "message", S(G(err, "message"), 500)); p["error"] = x; }
+    if ((G(m, "type") as string) == "user") Put(p, "text", S(G(m, "text"), 200));
+    return p;
+  }
+
+  /**
+   * A snapshot, settled or not: the watermark, the session, its pending permissions, its messages back to a boundary,
+   * the watermark again. Null when a read failed. settled when nothing durable happened during the reads.
+   */
+  static Dictionary<string, object> Snapshot(bool baseline, out bool settled, out long w) {
+    settled = false; w = -1;
+    long w1 = Watermark();
+    if (w1 < 0) { LastProblem = "the log's watermark couldn't be read"; return null; }
+    string t;
+    if (Get("/api/session/" + Uri.EscapeDataString(Session), PageBytes, out t) != 200) { LastProblem = "the session couldn't be read"; return null; }
+    object info = G(Json.DeserializeObject(t), "data");
+    var session = new Dictionary<string, object>();
+    object time = G(info, "time");
+    Put(session, "busy", G(time, "busy")); Put(session, "idle", G(time, "idle")); Put(session, "outcome", G(info, "outcome") as string);
+    if (Get("/api/session/" + Uri.EscapeDataString(Session) + "/permission", PageBytes, out t) != 200) { LastProblem = "the permissions couldn't be read"; return null; }
+    var permissions = new List<object>();
+    var plist = G(Json.DeserializeObject(t), "data") as object[];
+    if (plist != null) foreach (object p in plist) {
+      if (permissions.Count >= 20) break;
+      var q = new Dictionary<string, object>();
+      Put(q, "id", G(p, "id") as string); Put(q, "action", S(G(p, "action"), 200)); Put(q, "messageID", G(G(p, "source"), "messageID") as string); Put(q, "callID", G(G(p, "source"), "id") as string);
+      var res = G(p, "resources") as object[];
+      if (res != null) { var parts = new List<string>(); foreach (object r in res) if (r is string) parts.Add((string)r); Put(q, "resources", S(string.Join(" ", parts.ToArray()), 500)); }
+      permissions.Add(q);
+    }
+    // The messages, newest first, back to a user message already known, the baseline's idle marker, or the start.
+    var newestFirst = new List<Dictionary<string, object>>();
+    HashSet<string> knownNow;
+    lock (gate) knownNow = new HashSet<string>(known);
+    string boundary = "partial", cursor = null;
+    int limit = PageLimit;
+    for (int page = 0; page < Pages; ) {
+      string q = "/api/session/" + Uri.EscapeDataString(Session) + "/message?limit=" + limit + (cursor == null ? "&order=desc" : "&cursor=" + Uri.EscapeDataString(cursor));
+      int st = Get(q, PageBytes, out t);
+      if (st == -2) { if (limit == 1) { LastProblem = "a message over the size bound"; break; } limit = Math.Max(1, limit / 2); continue; }
+      if (st != 200) { LastProblem = "the messages couldn't be read (HTTP " + st + ")"; return null; }
+      object reply = Json.DeserializeObject(t);
+      var data = G(reply, "data") as object[] ?? new object[0];
+      bool stop = false;
+      foreach (object m in data) {
+        string id = G(m, "id") as string, type = G(m, "type") as string;
+        if ((type == "user" && id != null && knownNow.Contains(id)) || (baselineIdle != null && id == baselineIdle)) { stop = true; boundary = "known"; break; }
+        newestFirst.Add(ProjectMessage(m));
+      }
+      if (stop) break;
+      cursor = G(G(reply, "cursor"), "next") as string;
+      if (data.Length == 0 || cursor == null) { boundary = "start"; break; }
+      page++;
+      limit = PageLimit;
+    }
+    long w2 = Watermark();
+    if (w2 < 0) { LastProblem = "the log's watermark couldn't be read"; return null; }
+    settled = w1 == w2;
+    w = w2;
+    newestFirst.Reverse();
+    var snap = new Dictionary<string, object> { { "w", w2 }, { "session", session }, { "permissions", permissions }, { "messages", newestFirst }, { "boundary", boundary } };
+    if (baseline) { snap["baseline"] = true; snap["intent"] = Intent; }
+    // Within the body's bound: the oldest messages go first (and the boundary is then partial).
+    while (newestFirst.Count > 0 && Json.Serialize(snap).Length > BodyMax - 512) { newestFirst.RemoveAt(0); snap["boundary"] = "partial"; }
+    return snap;
+  }
+
+  /** A snapshot's user messages: Combwork knows them once it has taken the snapshot (never before: a refused post). */
+  static string[] UsersOf(Dictionary<string, object> snap) {
+    var users = new List<string>();
+    foreach (var m in snap["messages"] as List<Dictionary<string, object>>) if ((m.ContainsKey("type") ? m["type"] as string : null) == "user" && m.ContainsKey("id")) users.Add((string)m["id"]);
+    return users.ToArray();
+  }
+
+  /** A resumed session's baseline marker: its newest idle message, which paging stops at from then on. */
+  static void Baseline(Dictionary<string, object> snap, bool baseline) {
+    var msgs = snap["messages"] as List<Dictionary<string, object>>;
+    if (baseline && Intent == "resume") for (int i = msgs.Count - 1; i >= 0; i--) if ((msgs[i].ContainsKey("type") ? msgs[i]["type"] as string : null) == "idle") { baselineIdle = msgs[i]["id"] as string; break; }
+  }
+
+  /** Takes snapshots until one is settled or until passes: its body, posted with what was held beyond its watermark. */
+  static bool Settle(bool baseline, DateTime until, bool postNow) {
+    int wait = 200;
+    while (!stopping && DateTime.UtcNow < until && !Abandoned()) {
+      bool settled; long w;
+      var snap = Snapshot(baseline, out settled, out w);
+      if (snap != null && settled) {
+        lock (gate) {
+          gen++;
+          string body = Json.Serialize(new Dictionary<string, object> { { "hook_event_name", "OpencodeSnapshot" }, { "session_id", Session }, { "gen", gen }, { "snapshot", snap } });
+          if (postNow) {
+            if (!Post(body)) { LastProblem = "Combwork's hook server didn't take the first snapshot"; return false; }
+            foreach (string u in UsersOf(snap)) known.Add(u);
+          } else { queue.Clear(); queueBytes = 0; Enqueue(body, UsersOf(snap)); }
+          Baseline(snap, baseline);
+          foreach (var kv in held) if (kv.Key < 0 || kv.Key > w) Enqueue(EventBody(kv.Value, gen), UserOf(kv.Value));
+          held = null; heldBytes = 0;
+        }
+        posted.Set();
+        return true;
+      }
+      if (snap != null) LastProblem = "the session kept changing while it was read";
+      Thread.Sleep(wait);
+      wait = Math.Min(wait * 2, 5000);
+    }
+    return false;
+  }
+
+  /** The submission an event is, if it is one: Combwork knows it once it has taken the event. */
+  static string[] UserOf(Dictionary<string, object> e) {
+    return (e["type"] as string) == "session.inbox.enqueued" && e.ContainsKey("inboxID") ? new[] { (string)e["inboxID"] } : new string[0];
+  }
+
+  /** Into the post queue (under gate); over its bounds, everything queued goes and a resync follows. */
+  static void Enqueue(string body, string[] users) {
+    if (body.Length > BodyMax) { Resync(); return; }
+    if (queue.Count >= QueueItems || queueBytes + body.Length > QueueBytes) { Resync(); return; }
+    queue.Enqueue(new KeyValuePair<string, string[]>(body, users)); queueBytes += body.Length;
+    Monitor.PulseAll(gate);
+  }
+
+  /** Drops what is queued and held, and holds from now until a settled snapshot is posted (under gate or not). */
+  public static void Resync() {
+    lock (gate) {
+      queue.Clear(); queueBytes = 0;
+      held = new List<KeyValuePair<long, Dictionary<string, object>>>(); heldBytes = 0;
+      resync = true;
+    }
+    kick.Set();
+  }
+
+  static void Take(string data) {
+    object raw;
+    try { raw = Json.DeserializeObject(data); } catch (Exception) { return; }
+    if ((G(raw, "type") as string) == "server.connected") { connected = true; kick.Set(); return; }
+    long seq;
+    var e = Project(raw, out seq);
+    if (e == null) return;
+    lock (gate) {
+      if (held != null) {
+        long size = Json.Serialize(e).Length;
+        if (held.Count >= QueueItems || heldBytes + size > QueueBytes) { held.Clear(); heldBytes = 0; resync = true; kick.Set(); return; }
+        held.Add(new KeyValuePair<long, Dictionary<string, object>>(seq, e)); heldBytes += size;
+        return;
+      }
+      Enqueue(EventBody(e, gen), UserOf(e));
+    }
+  }
+
+  /** The stream: reconnected with backoff; each connect holds what comes until a settled snapshot is posted. */
+  static void Reader() {
+    int wait = 200;
+    var q = new StringBuilder("/api/event?");
+    for (int i = 0; i < Types.Length; i++) q.Append(i > 0 ? "&" : "").Append("types=").Append(Uri.EscapeDataString(Types[i]));
+    while (!stopping) {
+      try {
+        lock (gate) { if (held == null) { held = new List<KeyValuePair<long, Dictionary<string, object>>>(); heldBytes = 0; } resync = true; }
+        var r = (HttpWebRequest)WebRequest.Create((StreamVia != "" ? StreamVia : Url) + q.ToString());
+        r.Method = "GET"; r.Timeout = 10000; r.ReadWriteTimeout = 30000; r.Proxy = null; r.Headers["Authorization"] = Auth; r.KeepAlive = true;
+        using (var resp = (HttpWebResponse)r.GetResponse()) using (var s = resp.GetResponseStream()) {
+          var line = new StringBuilder();
+          bool over = false;
+          var buf = new byte[8192]; int n;
+          var dec = Encoding.UTF8.GetDecoder();
+          var chars = new char[8192];
+          while (!stopping && (n = s.Read(buf, 0, buf.Length)) > 0) {
+            wait = 200;
+            int c = dec.GetChars(buf, 0, n, chars, 0);
+            for (int i = 0; i < c; i++) {
+              char ch = chars[i];
+              if (ch == '\n') {
+                if (over) Resync(); else if (line.Length > 6 && line.ToString(0, 6) == "data: ") Take(line.ToString(6, line.Length - 6));
+                line.Length = 0; over = false;
+              } else if (ch != '\r') { if (line.Length < FrameMax) line.Append(ch); else over = true; }
+            }
+          }
+        }
+      } catch (Exception) { }
+      connected = false;
+      if (stopping) return;
+      Thread.Sleep(wait);
+      wait = Math.Min(wait * 2, 2000);
+    }
+  }
+
+  /** Posts the queue in order; a failed post drops it and resyncs. */
+  static void Poster() {
+    while (!stopping) {
+      KeyValuePair<string, string[]> item;
+      lock (gate) {
+        while (queue.Count == 0 && !stopping) Monitor.Wait(gate, 1000);
+        if (stopping) return;
+        item = queue.Dequeue(); queueBytes -= item.Key.Length;
+      }
+      if (!Post(item.Key)) { LastProblem = "Combwork's hook server didn't take an event"; Resync(); continue; }
+      lock (gate) foreach (string u in item.Value) known.Add(u);
+    }
+  }
+
+  /** Resyncs whenever asked: a reconnect, an overflow, a failed post, a failed read. */
+  static void Repairer() {
+    while (!stopping) {
+      kick.WaitOne(1000);
+      if (stopping) return;
+      if (resync && connected) { resync = false; if (!Settle(false, DateTime.MaxValue, false)) resync = true; }
+    }
+  }
+
+  /**
+   * Before the TUI starts (design s22): subscribed, then a settled baseline posted, within until; whether it was. Then
+   * the poster and the repairer run until the launcher ends.
+   */
+  public static bool Start(DateTime until) {
+    var reader = new Thread(Reader) { IsBackground = true }; reader.Start();
+    while (!connected && DateTime.UtcNow < until && !Abandoned()) Thread.Sleep(50);
+    if (!connected) { LastProblem = "the server's event stream didn't connect"; return false; }
+    resync = false;
+    if (!Settle(true, until, true)) return false;
+    new Thread(Poster) { IsBackground = true }.Start();
+    new Thread(Repairer) { IsBackground = true }.Start();
+    return true;
+  }
+
+  public static void Stop() { stopping = true; kick.Set(); lock (gate) Monitor.PulseAll(gate); }
+}
 
 public static class CwOpencode {
   [DllImport("kernel32.dll", SetLastError=true)] static extern IntPtr CreateJobObject(IntPtr a, IntPtr name);
@@ -219,7 +558,7 @@ public static class CwOpencode {
   }
 
   public static int Run() {
-    string exe = E("CW_OC_EXE"), cwd = E("CW_OC_CWD"), session = E("CW_OC_SESSION"), intent = E("CW_OC_INTENT"), info = E("CW_OC_INFO"), log = E("CW_OC_LOG"), owner = E("CW_OC_OWNER"), marks = E("CW_OC_MARKS");
+    string exe = E("CW_OC_EXE"), cwd = E("CW_OC_CWD"), session = E("CW_OC_SESSION"), intent = E("CW_OC_INTENT"), info = E("CW_OC_INFO"), log = E("CW_OC_LOG"), owner = E("CW_OC_OWNER"), marks = E("CW_OC_MARKS"), hookUrl = E("CW_OC_HOOK_URL"), streamVia = E("CW_OC_STREAM_VIA");
     string pw = E("OPENCODE_PASSWORD");
     int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 30000;
     long logMax; if (!long.TryParse(E("CW_OC_LOG_MAX"), out logMax) || logMax < 4096) logMax = 1048576;
@@ -227,7 +566,7 @@ public static class CwOpencode {
     foreach (string a in E("CW_OC_PREFIX").Split('\u001f')) if (a.Length > 0) prefix.Add(a);
     var tuiArgs = new List<string>(); foreach (string a in E("CW_OC_TUI_ARGS").Split('\u001f')) if (a.Length > 0) tuiArgs.Add(a);
     var dirs = new List<string>(); foreach (string d in E("CW_OC_DIRS").Split('\u001f')) if (d.Length > 0) dirs.Add(Norm(d));
-    foreach (string n in new string[] { "CW_OC_PREFIX", "CW_OC_MARKS", "CW_OC_EXE", "CW_OC_CWD", "CW_OC_SESSION", "CW_OC_INTENT", "CW_OC_INFO", "CW_OC_LOG", "CW_OC_OWNER", "CW_OC_READY_MS", "CW_OC_LOG_MAX", "CW_OC_TUI_ARGS", "CW_OC_DIRS", "CW_OC_CS" }) Environment.SetEnvironmentVariable(n, null);
+    foreach (string n in new string[] { "CW_OC_STREAM_VIA", "CW_OC_HOOK_URL", "CW_OC_PREFIX", "CW_OC_MARKS", "CW_OC_EXE", "CW_OC_CWD", "CW_OC_SESSION", "CW_OC_INTENT", "CW_OC_INFO", "CW_OC_LOG", "CW_OC_OWNER", "CW_OC_READY_MS", "CW_OC_LOG_MAX", "CW_OC_TUI_ARGS", "CW_OC_DIRS", "CW_OC_CS" }) Environment.SetEnvironmentVariable(n, null);
     if (exe == "" || cwd == "" || pw == "" || info == "" || log == "" || marks == "" || !session.StartsWith("ses") || (intent != "new" && intent != "resume")) { Say("the launch was given incomplete settings."); return ${LAUNCHER_EXIT.input}; }
 
     string why;
@@ -293,6 +632,17 @@ public static class CwOpencode {
     var t = new List<string> { "--server", url, "--session", session };
     t.AddRange(tuiArgs);
     t.Add(cwd);
+    // The event stream (HI-2760): subscribed, and a settled baseline posted to Combwork, before the TUI can take input;
+    // failing that, the launch fails and its job ends the server, so a retry starts clean (design s22).
+    if (hookUrl != "") {
+      CwStream.Url = url; CwStream.Auth = auth; CwStream.Session = session; CwStream.HookUrl = hookUrl; CwStream.HookToken = E("CW_HOOK_TOKEN"); CwStream.Intent = intent; CwStream.StreamVia = streamVia;
+      CwStream.Abandoned = OwnerGone;
+      if (!CwStream.Start(DateTime.UtcNow.AddMilliseconds(readyMs))) {
+        if (OwnerGone()) { Say("Combwork ended while OpenCode was starting."); return ${LAUNCHER_EXIT.ownerEnded}; }
+        Say("OpenCode didn't start: Combwork couldn't follow its session (" + CwStream.LastProblem + ").");
+        return ${LAUNCHER_EXIT.baseline};
+      }
+    }
     if (OwnerGone()) return ${LAUNCHER_EXIT.ownerEnded};
     var ts = Start(t);
     ts.WorkingDirectory = cwd;
@@ -316,7 +666,7 @@ public static class CwOpencode {
  * it. No cmdlet but Add-Type. A failure to compile ends it with a message (the terminal's, English).
  */
 const BOOTSTRAP = `
-try { Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:CW_OC_CS)) -ErrorAction Stop } catch { [Console]::Error.WriteLine("Combwork: OpenCode didn't start: its launcher couldn't be compiled ($($_.Exception.Message))."); exit ${LAUNCHER_EXIT.job} }
+try { Add-Type -TypeDefinition ([System.IO.File]::ReadAllText($env:CW_OC_CS)) -ReferencedAssemblies System.Web.Extensions -ErrorAction Stop } catch { [Console]::Error.WriteLine("Combwork: OpenCode didn't start: its launcher couldn't be compiled ($($_.Exception.Message))."); exit ${LAUNCHER_EXIT.job} }
 exit [CwOpencode]::Run()
 `
 
@@ -341,6 +691,8 @@ export interface LauncherInput {
   owner: string
   /** The account's folder of Combwork's session records (sessionMarks). */
   marks: string
+  /** Combwork's hook endpoint for this launch, where the event stream and snapshots go (HI-2760); none: not followed. */
+  hookUrl?: string
   readyMs: number
 }
 
@@ -368,6 +720,7 @@ export function launcherEnv(i: LauncherInput): Record<string, string> {
     CW_OC_CS: launcherSourcePath(i.privateDir),
     CW_OC_OWNER: i.owner,
     CW_OC_MARKS: i.marks,
+    CW_OC_HOOK_URL: i.hookUrl ?? '',
     CW_OC_READY_MS: String(i.readyMs)
   }
 }

@@ -20,6 +20,7 @@ import { AMBIENT_DIRS, AMBIENT_FILES, DATA_ENV, ambientIntegrations, opencodeEnv
 import { chosenAmbient, launchConfig, projectDecidesMcp, withTestProvider, writeConfigDir, type SavedCredentials } from './config'
 import { copyOpencodeSkills, opencodeSkillsDir } from './skills'
 import { accountModels, checkHome, testProvider, latestOpencode, locateOpencode, opencodeInstallCommand, opencodeLoginCommand, opencodeReadiness, opencodeUpdateCommand, savedCredentials } from './install'
+import { expandOpencodeHook, normalizeOpencodeHook } from './events'
 import { LAUNCHER_ARGS, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, ownerToken, sessionMark, sessionMarks } from './launcher'
 import { OpencodeConversationParser, OpencodeUsageParser, parseMirrorUsage } from './mirror'
 import { opencodeHistory } from './history'
@@ -281,14 +282,21 @@ export class OpencodeAdapter implements ProviderAdapter {
       privateDir: ctx.privateDir,
       owner: p.owner,
       marks: p.marks,
+      hookUrl: ctx.hookUrl,
       readyMs: advanced.number('opencode.server.readySeconds') * 1000
     })
     return { file: POWERSHELL, args: LAUNCHER_ARGS, env: { ...env, ...launcher } }
   }
 
-  // ---- Hooks: OpenCode sends none (its server's events are HI-2760's).
-  normalizeHook(): NormalizedHook {
-    return { event: { kind: 'ignore' }, sessionId: null, transcriptPath: null, mode: null, editedPaths: [], ids: { turn: null, call: null, sub: null, continued: false } }
+  // ---- Hooks (HI-2760): the launcher posts its server's events and settled snapshots; the tracker (events.ts), in the
+  // launch's hook order, turns each into the hooks it stands for.
+  async prepareHook(body: Record<string, any>, launch: { memo: Record<string, unknown> }): Promise<void> {
+    const expanded = expandOpencodeHook(launch.memo, body)
+    if (expanded) body.combworkExpanded = expanded
+  }
+
+  normalizeHook(body: Record<string, any>): NormalizedHook {
+    return normalizeOpencodeHook(body)
   }
 
   lockReply(_d: LockDecision): Record<string, unknown> {

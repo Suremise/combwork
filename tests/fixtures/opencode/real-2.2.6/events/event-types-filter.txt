@@ -1,0 +1,4 @@
+GET /api/event?types=session.inbox.enqueued&types=session.execution.started&types=session.execution.failed&types=session.execution.succeeded, during 6 failed prompts: 19 events
+types: ["server.connected","session.inbox.enqueued","session.execution.started","session.execution.failed"]
+durable seqs: ["inbox.enqueued@1","execution.started@2","execution.failed@5","inbox.enqueued@6","execution.started@7","execution.failed@9","inbox.enqueued@10","execution.started@11","execution.failed@13","inbox.enqueued@14","execution.started@15","execution.failed@17","inbox.enqueued@18","execution.started@19","execution.failed@21","inbox.enqueued@22","execution.started@23","execution.failed@25"]
+the last durable seq (25) is the log's watermark after them (wire/log-synced.txt)
