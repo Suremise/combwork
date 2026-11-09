@@ -62,6 +62,8 @@ using Microsoft.Win32.SafeHandles;
  */
 public static class CwStream {
   public static string Url, Auth, Session, HookUrl, HookToken, Intent;
+  /** A test's relay for the event stream alone (CW_OC_STREAM_VIA, to force a disconnect); Combwork never sets it. */
+  public static string StreamVia = "";
   static readonly string[] Types = { "session.inbox.enqueued", "session.step.started", "session.tool.called", "session.tool.success", "session.tool.failed", "permission.asked", "permission.replied", "session.retry.scheduled", "session.execution.succeeded", "session.execution.failed", "session.execution.interrupted" };
   const int FrameMax = 262144, PageBytes = 1048576, BodyMax = 65536, QueueItems = 512, PageLimit = 50, Pages = 10;
   const long QueueBytes = 1048576;
@@ -319,7 +321,7 @@ public static class CwStream {
     while (!stopping) {
       try {
         lock (gate) { if (held == null) { held = new List<KeyValuePair<long, Dictionary<string, object>>>(); heldBytes = 0; } resync = true; }
-        var r = (HttpWebRequest)WebRequest.Create(Url + q.ToString());
+        var r = (HttpWebRequest)WebRequest.Create((StreamVia != "" ? StreamVia : Url) + q.ToString());
         r.Method = "GET"; r.Timeout = 10000; r.ReadWriteTimeout = 30000; r.Proxy = null; r.Headers["Authorization"] = Auth; r.KeepAlive = true;
         using (var resp = (HttpWebResponse)r.GetResponse()) using (var s = resp.GetResponseStream()) {
           var line = new StringBuilder();
@@ -556,7 +558,7 @@ public static class CwOpencode {
   }
 
   public static int Run() {
-    string exe = E("CW_OC_EXE"), cwd = E("CW_OC_CWD"), session = E("CW_OC_SESSION"), intent = E("CW_OC_INTENT"), info = E("CW_OC_INFO"), log = E("CW_OC_LOG"), owner = E("CW_OC_OWNER"), marks = E("CW_OC_MARKS"), hookUrl = E("CW_OC_HOOK_URL");
+    string exe = E("CW_OC_EXE"), cwd = E("CW_OC_CWD"), session = E("CW_OC_SESSION"), intent = E("CW_OC_INTENT"), info = E("CW_OC_INFO"), log = E("CW_OC_LOG"), owner = E("CW_OC_OWNER"), marks = E("CW_OC_MARKS"), hookUrl = E("CW_OC_HOOK_URL"), streamVia = E("CW_OC_STREAM_VIA");
     string pw = E("OPENCODE_PASSWORD");
     int readyMs; if (!int.TryParse(E("CW_OC_READY_MS"), out readyMs) || readyMs < 1000) readyMs = 30000;
     long logMax; if (!long.TryParse(E("CW_OC_LOG_MAX"), out logMax) || logMax < 4096) logMax = 1048576;
@@ -564,7 +566,7 @@ public static class CwOpencode {
     foreach (string a in E("CW_OC_PREFIX").Split('\u001f')) if (a.Length > 0) prefix.Add(a);
     var tuiArgs = new List<string>(); foreach (string a in E("CW_OC_TUI_ARGS").Split('\u001f')) if (a.Length > 0) tuiArgs.Add(a);
     var dirs = new List<string>(); foreach (string d in E("CW_OC_DIRS").Split('\u001f')) if (d.Length > 0) dirs.Add(Norm(d));
-    foreach (string n in new string[] { "CW_OC_HOOK_URL", "CW_OC_PREFIX", "CW_OC_MARKS", "CW_OC_EXE", "CW_OC_CWD", "CW_OC_SESSION", "CW_OC_INTENT", "CW_OC_INFO", "CW_OC_LOG", "CW_OC_OWNER", "CW_OC_READY_MS", "CW_OC_LOG_MAX", "CW_OC_TUI_ARGS", "CW_OC_DIRS", "CW_OC_CS" }) Environment.SetEnvironmentVariable(n, null);
+    foreach (string n in new string[] { "CW_OC_STREAM_VIA", "CW_OC_HOOK_URL", "CW_OC_PREFIX", "CW_OC_MARKS", "CW_OC_EXE", "CW_OC_CWD", "CW_OC_SESSION", "CW_OC_INTENT", "CW_OC_INFO", "CW_OC_LOG", "CW_OC_OWNER", "CW_OC_READY_MS", "CW_OC_LOG_MAX", "CW_OC_TUI_ARGS", "CW_OC_DIRS", "CW_OC_CS" }) Environment.SetEnvironmentVariable(n, null);
     if (exe == "" || cwd == "" || pw == "" || info == "" || log == "" || marks == "" || !session.StartsWith("ses") || (intent != "new" && intent != "resume")) { Say("the launch was given incomplete settings."); return ${LAUNCHER_EXIT.input}; }
 
     string why;
@@ -633,7 +635,7 @@ public static class CwOpencode {
     // The event stream (HI-2760): subscribed, and a settled baseline posted to Combwork, before the TUI can take input;
     // failing that, the launch fails and its job ends the server, so a retry starts clean (design s22).
     if (hookUrl != "") {
-      CwStream.Url = url; CwStream.Auth = auth; CwStream.Session = session; CwStream.HookUrl = hookUrl; CwStream.HookToken = E("CW_HOOK_TOKEN"); CwStream.Intent = intent;
+      CwStream.Url = url; CwStream.Auth = auth; CwStream.Session = session; CwStream.HookUrl = hookUrl; CwStream.HookToken = E("CW_HOOK_TOKEN"); CwStream.Intent = intent; CwStream.StreamVia = streamVia;
       CwStream.Abandoned = OwnerGone;
       if (!CwStream.Start(DateTime.UtcNow.AddMilliseconds(readyMs))) {
         if (OwnerGone()) { Say("Combwork ended while OpenCode was starting."); return ${LAUNCHER_EXIT.ownerEnded}; }
