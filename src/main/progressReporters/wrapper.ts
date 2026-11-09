@@ -8,6 +8,7 @@ import { delimiter, extname, isAbsolute, join } from 'node:path'
 import { assignIsolated, estimateFor, ProgressRun, progressTarget, recordTiming, resolveRun, type Fetch, type FinishOutcome, type IsolatedAssign, type ProgressStart, type RunLink, type Unreachable } from './report.mts'
 import { startLauncher } from '../workflow/launcher'
 import { agentMsg, inDefaultDialect, say, type AgentMsg } from '../../shared/agentText'
+import { hasCapability, isPlatformId } from '../../shared/platform/descriptors'
 
 /**
  * What cw-progress says (agent text, HI-2065): its usage, refusals and run lines. It runs as the session's own process,
@@ -582,7 +583,7 @@ export function uncountedLine(answer: unknown, isolated: boolean): string | null
   const { name, counted, whyNot, changes, platform } = c as Record<string, unknown>
   if (counted !== false || typeof name !== 'string' || typeof whyNot !== 'string' || !Object.hasOwn(UNCOUNTED, whyNot)) return null
   const listed = Array.isArray(changes) ? changes.filter((x): x is string => typeof x === 'string').map((x) => (Object.hasOwn(MARKS, x) ? say(MARKS[x]) : x)) : []
-  return say(UNCOUNTED[whyNot], { check: name, listed: listed.length ? 'yes' : 'no', changes: listed.join(', '), isolate: !isolated && platform === 'git' ? 'yes' : 'no' })
+  return say(UNCOUNTED[whyNot], { check: name, listed: listed.length ? 'yes' : 'no', changes: listed.join(', '), isolate: !isolated && isPlatformId(platform) && hasCapability(platform, 'isolation') ? 'yes' : 'no' })
 }
 
 /**

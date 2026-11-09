@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PlatformSwitchCheck, ProjectInfo, WorkflowForm } from '@shared/types'
-import type { PlatformId, PlatformOffer, ProjectPlatform } from '@shared/platform/descriptors'
+import { needsRepository, type PlatformId, type PlatformOffer, type ProjectPlatform } from '@shared/platform/descriptors'
 import { PLATFORM_NAME, switchRefused, switchRefusalText } from '@shared/platform/switching'
 import { FORM_OPTIONS } from '@shared/workflow/options'
 import { PRESET_TEXT } from '@shared/workflow/optionTexts'
@@ -209,7 +209,8 @@ function factText(p: ProjectPlatform): string {
   const d = p.detected
   // Git still in force: what was found, not yet what it uses (the offer under the header says that).
   if (d.other) return tr(p.id === 'git' ? M.otherGit : M.other, { vcs: d.other })
-  if (p.id === 'git' && d.platform !== 'git') return tr(M.gone)
+  // The repository its platform needs (Git's) gone from the folder.
+  if (needsRepository(p.id) && d.platform !== p.id) return tr(M.gone)
   if (d.platform === 'git' && d.root) return tr(d.subfolder ? M.subfolder : M.repo, { root: d.root })
   return tr(M.noRepo)
 }
@@ -264,9 +265,9 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
                 </button>
               )
             // Back to None from Git's page, or to Git's page from None: a view, nothing switched or saved.
-            if (onPreview && platform === 'none') {
+            if (onPreview && !needsRepository(platform)) {
               const button = (
-                <button key={id} type="button" role="radio" aria-checked={false} aria-disabled={false} data-platform={id} onClick={() => onPreview(id === 'git')}>
+                <button key={id} type="button" role="radio" aria-checked={false} aria-disabled={false} data-platform={id} onClick={() => onPreview(needsRepository(id))}>
                   {tr(PLATFORM_NAME[id])}
                 </button>
               )
@@ -291,7 +292,7 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
           })}
         </div>
         {project.platform && !offer && (
-          <span className={cx('vc-fact', 'faint', project.platform.detected.other || (platform === 'git' && project.platform.detected.platform !== 'git') ? 'caution' : null)} data-vc-fact="">
+          <span className={cx('vc-fact', 'faint', project.platform.detected.other || (needsRepository(platform) && project.platform.detected.platform !== platform) ? 'caution' : null)} data-vc-fact="">
             {factText(project.platform)}
           </span>
         )}

@@ -12,7 +12,7 @@ import { detect } from '../platform/registry'
 import { stageNameProblems, stageNameProblemText, type StageNameProblem } from '../../shared/workflow/stages'
 import { agentText, type Text } from '../../shared/advanced'
 import { tr } from '../../shared/i18n'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import type { ProjectConfig, WorkflowDefaults } from '../../shared/types'
 import { config } from '../config'
 import type { WorkspaceService } from '../workspace'
@@ -124,7 +124,7 @@ export function checkOptions(platform: PlatformId, levels: OptionLevels): { reso
   delete options.targetOwn
   if (ownsTarget(options, origins.target)) options.targetOwn = true
   // A project inside a larger repository (OP-29, #1419): Combwork's or the agent's merges only into a branch it names itself.
-  const subfolder = !!levels.folder && options.platform === 'git' && !!detect(levels.folder).subfolder
+  const subfolder = !!levels.folder && needsRepository(options.platform) && !!detect(levels.folder).subfolder
   const problems: OptionsProblem[] = [
     ...contradictions(options, { subfolder }).map((id) => ({ kind: 'contradiction' as const, id })),
     // Each stage's name (N5) against every other's, in English and in the language Combwork shows.

@@ -25,6 +25,7 @@ import { pushesSettled, pushLogKey, pushLogOf, pushPendingKey, pushPendingOf, ty
 import type { TransientFailure } from '../../shared/types'
 import { notApproved } from '../../shared/workflow/guards'
 import { hasStage } from '../../shared/workflow/compile'
+import { merges } from '../../shared/platform/descriptors'
 import type { CommitMessage } from '../../shared/workflow/options'
 import { FOR_YOU, workflowText } from '../../shared/workflow/texts'
 import { historyFor, lineHistory, readStep } from '../platform/historyPorts'
@@ -524,7 +525,7 @@ export class MergeQueue {
   /** Whether the project's options push the target after merging, as they are now (G18 isn't a rule: never a ruleset's). */
   private pushes(): boolean {
     const o = this.wf.cfg.options()
-    return o.platform === 'git' && o.finish === 'combworkMerges' && o.pushTarget === true
+    return merges(o.platform) && o.finish === 'combworkMerges' && o.pushTarget === true
   }
 
   /** The message of Combwork's merge commits (G19, HI-1697), as the project's options are now: like G18, never a ruleset's. */

@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
-import type { PlatformId } from '@shared/platform/descriptors'
+import { hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
 import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
@@ -149,6 +149,9 @@ const T = {
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
 
+/** What each platform's defaults are for, beside the level's None · Git choice: a platform's own words (HI-2822). */
+const LEVEL_FOR: Record<PlatformId, ReturnType<typeof msg>> = { none: T.levelForNone, git: T.levelForGit }
+
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
 const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
 
@@ -243,7 +246,7 @@ export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; on
             </button>
           ))}
         </div>
-        <span className="s-desc">{tr(platform === 'git' ? T.levelForGit : T.levelForNone)}</span>
+        <span className="s-desc">{tr(LEVEL_FOR[platform])}</span>
       </div>
       <WorkflowEditor source={source} project={null} onDirty={onDirty} />
     </div>
@@ -357,7 +360,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   const effective = useMemo((): WorkflowOptions | null => (form && draft ? ({ ...form.inherited, ...draft.options, platform: form.platform } as WorkflowOptions) : null), [form, draft])
   // HI-2807: a Git project's branches newly named as targets that don't exist yet (each offered to be created), and the
   // branches one can be created from, read again once one is.
-  const gitProject = project && form?.platform === 'git' ? project.path : null
+  const gitProject = project && form && merges(form.platform) ? project.path : null
   const named = useMemo(() => (gitProject && form && effective ? newlyNamed(effective, form.options) : []), [gitProject, form, effective])
   const namedKey = named.join(' ')
   const [branchesRead, setBranchesRead] = useState(0)
@@ -582,7 +585,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     switch (key) {
       case 'review':
         return select('review', [
-          ['none', tr(platform === 'none' ? V.review.noneNone : V.review.none)],
+          ['none', tr(merges(platform) ? V.review.none : V.review.noneNone)],
           ['agent', tr(V.review.agent)],
           ['agentThenYou', tr(V.review.agentThenYou)],
           ['you', tr(V.review.you)]
@@ -680,7 +683,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
   // A template's options filled in (HI-1910), while unsaved: its name, and the checks this project can't run yet, from the
   // draft as it is (never the dialog's list: a command added here clears it).
   const filled = fromTemplate?.for === source.key && dirty ? fromTemplate : null
-  const noCommand = filled ? [...new Set([...effective.preChecks, ...(platform === 'git' ? effective.mergeChecks : [])])].filter((n) => !effective.commands[n]?.trim()) : []
+  const noCommand = filled ? [...new Set([...effective.preChecks, ...(merges(platform) ? effective.mergeChecks : [])])].filter((n) => !effective.commands[n]?.trim()) : []
   const choices: Choice[] = [...form.presets.map((p) => p.id), 'allOff']
   const choiceName = (c: Choice): string => tr(c === 'allOff' ? T.allOff : PRESET_TEXT[c])
   const presetNow = draft.preset ? (custom ? tr(T.startedFrom, { preset: tr(PRESET_TEXT[draft.preset]) }) : tr(PRESET_TEXT[draft.preset])) : tr(T.noPreset)
@@ -727,8 +730,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
             </button>
           ))}
         </div>
-        {/* Git's presets only: None has no merged result. */}
-        {platform === 'git' && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
+        {/* Only where work merges (Git): None has no merged result. */}
+        {merges(platform) && draft.preset && PRESET_NOTE_TEXT[draft.preset] && <div className="s-desc workflow-preset-note">{tr(PRESET_NOTE_TEXT[draft.preset]!)}</div>}
         {preview && shownChoice && <ChoicePreview choice={preview} name={choiceName(preview)} options={shownChoice} effective={effective} valueText={valueText} onUse={() => choose(preview)} onClose={() => setPreview(null)} />}
       </section>
       {FORM_GROUPS[platform].map((g) => {
@@ -742,10 +745,10 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
             </section>
             {/* A Git project's slots and copies, after where cards are built (a level has none: they're a project's). */}
             {g.id === 'where' && project && <SlotsAndCopies project={project} slots={effective.folder === 'slots'} />}
-            {g.id === 'where' && !project && source.level && platform === 'git' && <SlotCopyLevel level={source.level} />}
+            {g.id === 'where' && !project && source.level && hasCapability(platform, 'isolation') && <SlotCopyLevel level={source.level} />}
             {/* The GitHub hosts (HI-2779): a Git project's own, and the workspace's default (Combwork's level has none). */}
             {g.id === 'where' && project && <GithubHosts projectPath={project.path} />}
-            {g.id === 'where' && !project && source.level === 'workspace' && platform === 'git' && <GithubHosts projectPath={null} />}
+            {g.id === 'where' && !project && source.level === 'workspace' && hasOperation(platform, 'push') && <GithubHosts projectPath={null} />}
           </Fragment>
         )
       })}
@@ -824,7 +827,7 @@ export function ChoicePreview({ choice, name, options, effective, valueText, onU
 /** An option's value in words (the rows' Inherit tips, a preview), as its platform names it. */
 export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId): string {
   if (typeof v === 'boolean') return tr(v ? T.on : T.off)
-  if (key === 'review') return tr(platform === 'none' && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
+  if (key === 'review') return tr(!merges(platform) && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
   const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
   if (values && typeof v === 'string' && values[v]) return tr(values[v])
   // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.

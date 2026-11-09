@@ -27,7 +27,7 @@ import { MERGE_ANSWER, OPTION_TEXT, VALUE_TEXT } from '../../shared/workflow/opt
 import { allOff, BRANCH_OPTIONS, FOCUSED_PICK, FOCUSED_RUN, NAME_OPTIONS, PRESETS, preset, sameOptionValue, takesOption, type CommitMessage, type PresetId, type PresetInputs, type WorkflowOptions } from '../../shared/workflow/options'
 import { setPresetAsked, writeWorkflow } from '../../shared/workflow/projectWorkflow'
 import { keptStageName, stagesOf } from '../../shared/workflow/stages'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { merges, type PlatformId } from '../../shared/platform/descriptors'
 import type { KeptTargets, RetargetPreview, ProjectConfig, ProjectStages, ProjectWorkflow, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowProblem } from '../../shared/types'
 import { compile, mustCompile, type Ruleset } from '../../shared/workflow/compile'
 import type { WorkspaceService } from '../workspace'
@@ -261,7 +261,7 @@ export async function checkWorkflowChange(ws: WorkspaceService, projectPath: str
   // HI-2680: what can follow the new target (Retarget), read while the old one is the project's.
   const retarget = targets ? await retargetOf(ws, project, targets.to) : null
   // HI-2807: branches newly named as targets that don't exist (the save refuses them; the section offers to create each).
-  const missing = project.platform === 'git' && (c.changed.includes('target') || c.changed.includes('otherTargets')) ? await newlyMissing(project.path, resolvedOf(ws, project.path, 'git', cfg).options, c.options) : []
+  const missing = merges(project.platform) && (c.changed.includes('target') || c.changed.includes('otherTargets')) ? await newlyMissing(project.path, resolvedOf(ws, project.path, project.platform, cfg).options, c.options) : []
   return { problems: c.problems, ...(missing.length ? { missing } : {}), changed: c.changed, appliesNow, lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })), inFlight: c.changed.length && !appliesNow ? await cardsInFlight(ws, project) : [], ...(targets ? { targets } : {}), ...(retarget ? { retarget } : {}) }
 }
 
@@ -393,7 +393,7 @@ export async function saveWorkflowOptions(ws: WorkspaceService, projectPath: str
   const will = resolvedOf(ws, project.path, project.platform, { ...cfg, workflow: plan.workflow }).options
   // HI-2807: a branch newly named as a target must exist, checked here at the save (one deleted since the window's check
   // too), for both ways a save goes: the plain write and the one recording the merge choice (HR1's round 1, finding 3).
-  if (project.platform === 'git') await refuseMissingTargets(project.path, was, will)
+  if (merges(project.platform)) await refuseMissingTargets(project.path, was, will)
   if (!plan.chosen) {
     const write = () =>
       ws.mutateProjectConfig(project.path, (c) => {

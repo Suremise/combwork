@@ -4,7 +4,7 @@
 // pick the version control): Git only where a Git repository is found and no other version control is.
 
 import { msg, type Msg } from '../i18n/msg'
-import type { Detection, PlatformId } from './descriptors'
+import { needsRepository, type Detection, type PlatformId } from './descriptors'
 
 /** A platform's name as Combwork shows it (glossary 2.1). */
 export const PLATFORM_NAME: Record<PlatformId, Msg> = {
@@ -23,9 +23,10 @@ export const SWITCH_REFUSED = {
 
 /** Whether a project can switch to `to` from what is detected now: null when it can. */
 export function switchRefused(to: PlatformId, found: Detection): SwitchRefusal | null {
-  if (to !== 'git') return null
+  // A platform that needs no repository (None) is never refused; one that does, only where detection finds its own.
+  if (!needsRepository(to)) return null
   if (found.other) return { why: 'otherFound', vcs: found.other } // i18n-ignore: a reason's key, not text
-  return found.platform === 'git' ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
+  return found.platform === to ? null : { why: 'noGit' } // i18n-ignore: a reason's key, not text
 }
 
 /** A refusal's message and values. */
