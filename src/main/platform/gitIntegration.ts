@@ -6,10 +6,12 @@
 
 import { existsSync, readdirSync } from 'original-fs'
 import { resolve } from 'path'
+import { git } from '../git'
 import { again, isAgain } from './again'
 import { commitEnv, commitFailed, configRead, joined, readCommitStream } from './gitCommits'
 import * as G from './git'
-import type { Again, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions } from './integration'
+import type { Again, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions, RecoveryFound } from './integration'
+import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 import { isUnknown, type Unknown } from './types'
 import { readConflicts } from '../workflow/conflictRead'
 import { agentMsg, say } from '../../shared/agentText'
@@ -82,7 +84,260 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
 /** Its commits' options: Combwork's environment, and the signing bound when the repository signs. */
 const commitOpts = (h: CandidateHost, signed: boolean): QueueGitOptions => ({ env: commitEnv(), ...(signed ? { timeoutMs: h.signTimeoutMs } : {}) })
 
+// ---- The advance, recovery and publish half (HI-2791's R8): moved from mergeQueue.ts, queueHost.ts, queueRunner.ts and
+// queueControls.ts unchanged. Commands the queue ran with its own git (`this.git`) run with `h.run`; the platform's reads
+// (G.*) and the host's and runner's own git() calls stay as they were, so each runs on the same runner and route as before.
+
+/** A push reaches the remote and can wait on a sign-in window: as the Git view's, long but never forever. */
+const PUSH_MS = 5 * 60_000
+
+/** A push never waits on a prompt nobody sees: no terminal prompt, no askpass, a credential manager kept non-interactive. */
+function pushEnv(): NodeJS.ProcessEnv {
+  return { ...process.env, GIT_TERMINAL_PROMPT: '0', SSH_ASKPASS_REQUIRE: 'never', GCM_INTERACTIVE: 'never' }
+}
+
+/** git's words when a remote refuses a push that isn't a fast-forward (the Git view's test). */
+const PUSH_REJECTED = /\[rejected\]|non-fast-forward|fetch first/i
+
+/** git's status in porcelain v1 with -z: the paths with a change in the working copy or index, both sides of a rename. */
+function statusPaths(out: string): string[] {
+  const t = out.split('\0')
+  const paths: string[] = []
+  for (let i = 0; i < t.length; i++) {
+    if (t[i].length < 4) continue
+    paths.push(t[i].slice(3))
+    // A rename or copy: its source follows as a token of its own.
+    if (t[i][0] === 'R' || t[i][0] === 'C') paths.push(t[++i] ?? '')
+  }
+  return paths.filter(Boolean)
+}
+
+const nulList = (out: string): string[] => out.split('\0').filter(Boolean)
+
+/**
+ * Of the files a merge changes, those with a change in the folder (unstaged, staged or untracked), both sides of a
+ * rename; git's words when it couldn't say (HI-2019). The whole folder's status, then the listed files: a long list never
+ * makes a command line too long.
+ */
+async function edited(h: CandidateHost, folder: string, files: string[]): Promise<string[] | { err: string }> {
+  if (!files.length) return []
+  const st = await h.run(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--no-renames'])
+  if (!st.ok) return { err: st.err }
+  const listed = new Set(files)
+  return [...new Set(statusPaths(st.out).filter((p) => listed.has(p)))]
+}
+
+/**
+ * Where each listed file stands in the folder: its index entry and working copy both at the expected revision, both at
+ * the result, or neither (`other`, with the side its index entry is at, when one). Null when git can't say.
+ */
+async function sides(h: CandidateHost, folder: string, files: string[], expected: string, result: string): Promise<{ path: string; side: QueueFileSide; staged: QueueFileSide }[] | null> {
+  const [ix, rx, st] = await Promise.all([
+    h.run(folder, ['diff', '--cached', '--name-only', '-z', '--no-renames', expected]),
+    h.run(folder, ['diff', '--cached', '--name-only', '-z', '--no-renames', result]),
+    h.run(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--no-renames'])
+  ])
+  if (!ix.ok || !rx.ok || !st.ok) return null
+  const notExpected = new Set(nulList(ix.out))
+  const notResult = new Set(nulList(rx.out))
+  // A working copy that differs from its index entry (unstaged or untracked: the status's second column, or `??`).
+  const dirty = new Set(
+    st.out
+      .split('\0')
+      .filter((t) => t.length > 3 && (t[1] !== ' ' || t.startsWith('??')))
+      .map((t) => t.slice(3))
+  )
+  return files.map((path) => {
+    const staged: QueueFileSide = !notExpected.has(path) ? 'expected' : !notResult.has(path) ? 'result' : 'other'
+    return { path, side: dirty.has(path) ? 'other' : staged, staged }
+  })
+}
+
+/**
+ * §16.9.2's terminal state as Combwork finds it: the branch, the ref, each listed file's side, and the commands that finish
+ * or undo it, as far as the state allows (none when a file is at neither side: git would refuse them).
+ */
+async function stuck(h: CandidateHost, target: string, folder: string, expected: string, result: string, files: string[], phase: QueueStuck['phase']): Promise<QueueStuck> {
+  const b = await G.branch(folder)
+  const r = await G.lineHead(h.project, target)
+  const branch = isUnknown(b) ? null : b
+  const ref = isUnknown(r) ? null : r
+  const all3 = (await sides(h, folder, files, expected, result)) ?? files.map((path) => ({ path, side: 'other' as const, staged: 'other' as const }))
+  const all = (side: QueueFileSide): boolean => all3.every((f) => f.side === side)
+  // Each command as its arguments, the ref as it is (a ref may hold `$` or `&`): shown for PowerShell by shellLine.
+  const cmd = (purpose: QueueCommand['purpose'], place: QueueCommand['place'], args: string[]): QueueCommand => ({ purpose, place, args, command: shellLine(args) })
+  const swap = ['git', 'update-ref', `refs/heads/${target}`, result, expected]
+  const back = ['git', 'read-tree', '-m', '-u', result, expected]
+  const forth = ['git', 'read-tree', '-m', '-u', expected, result]
+  const commands: QueueCommand[] = []
+  // A ref with `"` in it (git allows one) can't be handed to git by Windows PowerShell as written (it splits native
+  // arguments at quotes): no command names it then; the state says where things are.
+  if (branch === target && ref === expected && all('result')) commands.push(...(target.includes('"') ? [] : [cmd('finish', 'project', swap)]), cmd('undo', 'folder', back))
+  else if (branch === target && ref === result && all('expected')) commands.push(cmd('finish', 'folder', forth))
+  else if (branch === target && ref !== expected && ref !== result && all('result')) commands.push(cmd('undo', 'folder', back))
+  // The merged files in another branch's working copy: put back as that branch had them.
+  else if (phase === 'done' && all('result')) commands.push(cmd('undo', 'folder', back))
+  return { folder, branch, ref, expected, result, phase, files: all3.map(({ path, side }) => ({ path, side })), commands }
+}
+
+/** The advance, recovery and publish methods of Git's integration port (spread into gitIntegration). */
+const advanceAndPublish: Omit<IntegrationPort, 'mergeBase' | 'update' | 'candidate'> = {
+  checkouts: (h) => G.checkouts(h.project),
+
+  // The target checked out nowhere: one compare-and-swap (`update-ref <target> <result> <expected>`).
+  async swap(h, target, expected, result) {
+    return (await h.run(h.project, ['update-ref', `refs/heads/${target}`, result, expected])).ok
+  },
+
+  // Conditions, before anything is touched: HEAD names the target, at the expected revision; nothing staged; no unstaged
+  // or untracked change in a file the merge changes (the user's other edits are left as they are).
+  async conditions(h, folder, target, expected, result) {
+    // The folder's branch and the target's head, in one git (#1386). A branch git couldn't read is a read that failed
+    // (HI-2019), never taken for the wrong branch; one it read, and isn't the target, is.
+    const hd = await G.heads(folder, target)
+    if (isUnknown(hd.line)) return again(gitSaid(hd.line))
+    if (hd.line !== target) return { pause: 'wrongBranch', files: [folder] }
+    if (hd.target !== expected) return 'retest'
+    // HI-2019: until IntegrationStarted, a read git couldn't make is `again` (nothing touched, nothing written).
+    const staged = await h.run(folder, ['diff', '--cached', '--name-only', '-z', expected])
+    if (!staged.ok) return again(staged.err)
+    if (nulList(staged.out).length) return { pause: 'staged', files: nulList(staged.out) }
+    const changed = await h.run(h.project, ['diff', '--name-only', '-z', '--no-renames', expected, result])
+    if (!changed.ok) return again(changed.err)
+    const files = nulList(changed.out)
+    const ed = await edited(h, folder, files)
+    if (!Array.isArray(ed)) return again(ed.err || `Combwork couldn't read the status of ${folder}.`) // i18n-ignore: git's side of a pause, in English as git's messages are
+    if (ed.length) return { pause: 'unstagedChanges', files: ed }
+    return { files }
+  },
+
+  // The files: index and the listed files moved (git refuses, writing nothing, rather than overwrite a changed file).
+  async moveFiles(h, folder, from, to) {
+    const r = await h.run(folder, ['read-tree', '-m', '-u', from, to])
+    return { ok: r.ok, err: r.err }
+  },
+
+  edited,
+  sides,
+  stuck,
+  folderLine: (folder) => G.branch(folder),
+  targetHead: (project, target) => G.lineHead(project, target),
+
+  /**
+   * §16.9.2's recovery table for an advance begun into a checked-out target, from its journal (the last phase), the
+   * folder's branch, the ref and each listed file's side: run it again from the test merge (`rerun`; `requeue` when the
+   * ref moved before anything was touched, or after a rollback finished: failed and queued again), finish its swap
+   * (`swap`), roll the files back (`rollback`: the ref moved meanwhile), merged (`integrated`; `residue` when the folder
+   * is on another branch with the merged files in its working copy), or the terminal state (`stuck`). Reads only.
+   */
+  async recoveryState(h, e) {
+    const { expected, result, files, folder, phase } = e
+    const b = await G.branch(folder)
+    const r = await G.lineHead(h.project, e.target)
+    const branch = isUnknown(b) ? null : b
+    const ref = isUnknown(r) ? null : r
+    const sd = await sides(h, folder, files, expected, result)
+    const all = (side: QueueFileSide): boolean => !!sd && sd.every((f) => f.side === side)
+    const stuckNow = async (p: QueueStuck['phase'] = phase): Promise<{ found: RecoveryFound; stuck: QueueStuck }> => ({ found: 'stuck', stuck: await stuck(h, e.target, folder, expected, result, files, p) })
+    if (ref === result) {
+      if (branch === e.target || !sd) return { found: 'integrated' }
+      // Merged, and the folder is on another branch now: the merged files left in its working copy (changed from its
+      // HEAD, at the result), if any, are listed to restore.
+      const vsHead = await h.run(folder, ['diff', '--name-only', '-z', '--no-renames', 'HEAD'])
+      const changed = new Set(vsHead.ok ? nulList(vsHead.out) : files)
+      return sd.some((f) => (f.side === 'result' || f.staged === 'result') && changed.has(f.path)) ? { found: 'residue', stuck: await stuck(h, e.target, folder, expected, result, files, 'done') } : { found: 'integrated' }
+    }
+    if (branch !== e.target || !sd) return stuckNow()
+    if (ref === expected) {
+      if ((phase === 'started' || phase === 'files' || phase === 'rollback') && all('expected')) return { found: 'rerun' }
+      if ((phase === 'files' || phase === 'ref') && all('result')) return { found: 'swap' }
+      return stuckNow()
+    }
+    // The ref moved meanwhile (another client), not to the result.
+    if (ref !== null && phase !== 'started' && all('result')) return { found: 'rollback' }
+    if (ref !== null && phase !== 'ref' && all('expected')) return { found: 'requeue' }
+    return stuckNow()
+  },
+
+  contains: (project, a, b) => G.isAncestor(project, a, b),
+
+  /**
+   * Where a target is pushed: its upstream (`branch.<target>.remote` and `.merge`), else the only remote or origin.
+   * HI-2054: a read git couldn't make is 'unreadable', never "nowhere to push" (nor a guessed ref).
+   */
+  async pushDest(h, target) {
+    const get = async (key: string) => configRead(await h.run(h.project, ['config', '--get', key]))
+    const remote = await get(`branch.${target}.remote`)
+    if (typeof remote !== 'string') return 'unreadable'
+    if (remote && remote !== '.') {
+      const merge = await get(`branch.${target}.merge`)
+      if (typeof merge !== 'string') return 'unreadable'
+      return { remote, ref: merge.startsWith('refs/heads/') ? merge : `refs/heads/${target}` }
+    }
+    const list = await h.run(h.project, ['remote'])
+    if (!list.ok) return 'unreadable'
+    const remotes = list.out.split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
+    const only = remotes.length === 1 ? remotes[0] : remotes.includes('origin') ? 'origin' : null
+    return only ? { remote: only, ref: `refs/heads/${target}` } : null
+  },
+
+  // The captured head, by its commit (HI-1924), to the destination ref: never forced, never --set-upstream, no prompt, within PUSH_MS.
+  async push(h, dest, commit) {
+    const r = await h.run(h.project, ['push', '--', dest.remote, `${commit}:${dest.ref}`], { env: pushEnv(), timeoutMs: PUSH_MS })
+    if (r.ok) return 'pushed'
+    const said = `${r.err}\n${r.out}`.trim()
+    return !r.timedOut && PUSH_REJECTED.test(said) ? { rejected: said } : { failed: said }
+  },
+
+  // A card's test merge's ref (`refs/cw/queue/<key>`), once its entry has an outcome (queueHost.ts's, moved).
+  async dropQueuePins(project, card) {
+    const key = card.replace(/[^A-Za-z0-9._-]/g, '-')
+    await git(project, ['update-ref', '-d', `refs/cw/queue/${key}`])
+    // Its entries' strict updates (#1352: `refs/cw/queue/<entry>`, `AM-12/e7` as `AM-12-e7`).
+    const r = await git(project, ['for-each-ref', '--format=%(refname)', `refs/cw/queue/${key}-e*`])
+    for (const ref of r.ok ? r.out.split(/\r?\n/).filter(Boolean) : []) await git(project, ['update-ref', '-d', ref])
+  },
+
+  // The submissions' pins (`refs/cw/cards/<key>/<n>`, §16.9.3), by card, as queueHost.ts's prunePins listed them.
+  async cardPins(project) {
+    const r = await git(project, ['for-each-ref', '--format=%(refname)', 'refs/cw/cards/'])
+    if (!r.ok) return null
+    const keys = new Set(r.out.split(/\r?\n/).map((l) => /^refs\/cw\/cards\/([^/]+)\//.exec(l.trim())?.[1]).filter((k): k is string => !!k))
+    const out = new Map<string, string[]>()
+    for (const key of keys) out.set(key, r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.startsWith(`refs/cw/cards/${key}/`)))
+    return out
+  },
+
+  async dropPin(project, ref) {
+    await git(project, ['update-ref', '-d', ref])
+  },
+
+  // queueRunner.ts's removeFolder: git's worktree removal (its guard and fallback stay the runner's).
+  async removeWorkspace(project, folder) {
+    return (await git(project, ['worktree', 'remove', '--force', folder])).ok
+  },
+
+  async pruneWorkspaces(project) {
+    await git(project, ['worktree', 'prune'])
+  },
+
+  // queueControls.ts's stillPaused, its checked-out conditions read again.
+  async pausedCondition(project, target, reason, files) {
+    const where = await G.checkouts(project)
+    if (isUnknown(where)) return {}
+    const folder = where[target]
+    if (!folder) return null
+    if (reason === 'wrongBranch') return (await G.branch(folder)) === target ? null : {}
+    if (reason === 'staged') return (await git(folder, ['diff', '--cached', '--quiet'])).code === 0 ? null : {}
+    if (!files?.length) return null
+    const st = await git(folder, ['status', '--porcelain', '-z', '--untracked-files=all', '--', ...files])
+    const busy = st.out.split('\0').filter(Boolean).map((l) => l.slice(3))
+    return !st.ok || busy.length ? { files: busy.length ? busy : files } : null
+  }
+}
+
 export const gitIntegration: IntegrationPort = {
+  ...advanceAndPublish,
   mergeBase,
 
   /**

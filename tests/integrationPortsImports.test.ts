@@ -36,9 +36,26 @@ describe("the merge queue's candidate through the integration port", () => {
     expect(importsOf('src/main/workflow/mergeQueue.ts')).not.toContain('src/main/workflow/conflictRead')
   })
 
+  it("HI-2791: the advance, recovery, push and clean-up run none of Git's commands in the queue's own modules", () => {
+    const found: string[] = []
+    const rules: [string, string, RegExp][] = [
+      ['src/main/workflow/mergeQueue.ts', 'the swap', /'update-ref',\s*`refs\/heads\//],
+      ['src/main/workflow/mergeQueue.ts', 'read-tree', /'read-tree'/],
+      ['src/main/workflow/mergeQueue.ts', "the folder's status or index", /'status',\s*'--porcelain'|'diff',\s*'--cached'|'--name-only'/],
+      ['src/main/workflow/mergeQueue.ts', 'the push or its destination', /'push',\s*'--'|'config',\s*'--get'|\['remote'\]/],
+      ['src/main/workflow/mergeQueue.ts', "the platform's reads of the advance", /G\.(?:checkouts|heads|branch|lineHead|isAncestor)\(/],
+      ['src/main/workflow/queueHost.ts', 'the pins', /'for-each-ref'|'update-ref',\s*'-d'/],
+      ['src/main/workflow/queueRunner.ts', "the workspace's removal", /'worktree',\s*'(?:remove|prune)'/],
+      ['src/main/workflow/queueControls.ts', "a paused condition's reads", /'diff',\s*'--cached',\s*'--quiet'|'--untracked-files=all'|G\.checkouts\(/]
+    ]
+    for (const [file, what, re] of rules) if (re.test(read(file))) found.push(`${file}: ${what}`)
+    expect(found).toEqual([])
+    for (const file of ['src/main/workflow/queueHost.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueControls.ts']) expect(importsOf(file), file).not.toContain('src/main/platform/gitIntegration')
+  })
+
   it("the port's contract imports no platform's code, only types", () => {
     const text = read('src/main/platform/integration.ts')
-    expect(importsOf('src/main/platform/integration.ts').sort()).toEqual(['src/main/platform/types', 'src/shared/workflow/conflicts'])
+    expect(importsOf('src/main/platform/integration.ts').sort()).toEqual(['src/main/platform/types', 'src/shared/workflow/conflicts', 'src/shared/workflow/queue'])
     expect([...text.matchAll(/^import .*$/gm)].every((m) => m[0].startsWith('import type '))).toBe(true)
   })
 

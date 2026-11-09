@@ -304,7 +304,11 @@ worktree made or reused, strict's update, the test merge in each style and its c
 `platform/gitCommits.ts` reading a commit's stream (hook, signer or git), and `platform/integrationPorts.ts` finds it by
 the card's platform. `mergeQueue.ts` keeps the state machine, the facts and the messages, and calls the port for each
 candidate (`tests/integrationPortsImports.test.ts`, check:repo; `tests/workflow/queueTraces.test.ts` holds the commands to
-their recorded traces).
+their recorded traces). Its advance, recovery and publish half (HI-2791's R8) is granular steps of the same port (the
+swap, a checked-out target's conditions, the files moved forth and back, each file's side and the terminal state,
+recovery's table, the push's destination and the push of a captured head, the host's pins, the runner's workspace
+removal, Resume's condition reads), called between the journal's phases: the journal, lock, fence, lease checks, crash
+hooks and pauses stay in `mergeQueue.ts` (`tests/workflow/queueAdvanceTraces.test.ts` holds those commands to theirs).
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
