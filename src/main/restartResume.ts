@@ -587,8 +587,8 @@ async function resumeOne(e: RestartEntry, gen: number): Promise<'done' | 'cancel
   if (again) return skip(again)
   const ms = readyMs(ws)
   // Ready once it has taken its note (its first prompt): seen working, or past a turn, in any status change of this
-  // launch. Not `ready` (a resumed conversation's transcript is there before its CLI is, and Combwork's fallback reads that
-  // as ready), nor `watching` (a watch the conversation had shows as it starts). Everything after the start is about
+  // launch. Not `ready` (that says nothing of the note; and before HI-2816 Combwork's fallback read a resumed
+  // conversation's transcript, there before its CLI is, as ready), nor `watching` (a watch the conversation had shows as it starts). Everything after the start is about
   // this launch only (its runId): a session the user started meanwhile is never counted, waited for or stopped as it.
   let runId: string | null = null
   let took = false

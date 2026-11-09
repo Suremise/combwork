@@ -962,7 +962,7 @@ The Assistant's `combwork` server always runs (even with this setting or the Age
 
 | Tool | Endpoint | Control |
 |---|---|---|
-| `cw_list_providers` | `GET /v1/providers` | any |
+| `cw_list_providers` | `GET /v1/providers` (a line a provider; `provider`: that one's entry in full, HI-2814) | any |
 | `cw_agent_activity` | `GET /v1/projects/{name}/agents/{agent}/activity` (`detail: true`: `?detail=true`) | any |
 | `cw_activate_project` | `POST /v1/projects/{name}/activate` | Control agents |
 | `cw_add_agent` | `POST /v1/projects/{name}/agents` | Control agents |

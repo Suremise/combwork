@@ -399,8 +399,17 @@
   "tool.listProjects.description": {
     "placeholders": {}
   },
+  "tool.listProviders.arg.provider": {
+    "placeholders": {}
+  },
   "tool.listProviders.description": {
     "placeholders": {}
+  },
+  "tool.listProviders.error.unknown": {
+    "placeholders": {
+      "provider": "plain",
+      "ids": "plain"
+    }
   },
   "tool.listSettings.arg.offset": {
     "placeholders": {}

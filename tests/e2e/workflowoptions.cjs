@@ -189,6 +189,7 @@ async function theForm(page, app, inv) {
     await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
+    // GitHub's host setting has its group between slots and loops (HI-2779).
     check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'github', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
