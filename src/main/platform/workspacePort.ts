@@ -92,9 +92,18 @@ export interface WorkspacePort {
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean }): Promise<WorkspaceStep>
 
-  // Removal (R2.5: the platform's own, never forced; the callers' guards first).
-  /** The workspace at `folder` removed by the tool, which refuses one with changes. */
-  remove(repo: string, folder: string): Promise<WorkspaceStep>
+  /**
+   * A check or review copy put at exactly `revision` (HI-2789: copies.ts's reuse of a copy): tracked changes dropped and
+   * what isn't ignored removed (dependencies stay); `failed` names the step the tool refused.
+   */
+  resetTo(folder: string, revision: string): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
+
+  // Removal (R2.5: the platform's own, never forced on a folder holding anyone's work; the callers' guards first).
+  /**
+   * The workspace at `folder` removed by the tool, which refuses one with changes; `force` only for a check or review
+   * copy, which holds nobody's work (its build outputs go with it).
+   */
+  remove(repo: string, folder: string, o?: { force?: boolean }): Promise<WorkspaceStep>
 
   // A card's line, once merged (§16.10.1).
   /** The line deleted only from `at` (compare and swap). */

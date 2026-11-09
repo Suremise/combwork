@@ -25,7 +25,7 @@ import { childEnv, hasPty, killPty, ptyGone } from './ptyHost'
 import { connectionsManaged, testHomeSeam } from './connectionSeam'
 import { provider } from './providers'
 import type { TrustReading, TrustTarget } from './providers/types'
-import { git } from './git'
+import { trustRoot } from './platform/repoPorts'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
 import { modelCaps } from '../shared/models'
@@ -1034,28 +1034,15 @@ async function resolveTarget(p: { name: string; path: string }): Promise<Project
   const real = await realpath(p.path).catch(() => null)
   // An 8.3 path (a `~N` part its long form doesn't have): Claude Code doesn't expand it.
   const short = /~\d/.test(p.path) && !!real && real.toLowerCase() !== resolve(p.path).toLowerCase()
-  const run = (cwd: string, args: string[]) => git(cwd, args, undefined, undefined, { timeout: GIT_TRUST_MS }).catch(() => null)
-  const r = await run(p.path, ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir', '--show-toplevel'])
-  if (!r?.ok) {
-    // Not a repository (git says so): the folder itself. Anything else (a bare repository, a timeout, git missing)
+  // The repository's main working tree, from the context port (HI-2789: Git's, as this read it before).
+  const t = await trustRoot(p.path, { timeout: GIT_TRUST_MS })
+  if (!('root' in t)) {
+    // Not a repository (the tool says so): the folder itself. Anything else (a bare repository, a timeout, git missing)
     // can't be told, and Set Up never opens in a git folder.
-    const notRepo = !!r && /not a git repository/i.test(r.err)
+    const notRepo = 'none' in t
     return { project: p.name, root: notRepo ? real : null, git: !notRepo && !!real, short, folder: real }
   }
-  const [gitDir, common, top] = r.out.trim().split(/\r?\n/)
-  const same = (a?: string, b?: string): boolean => !!a && !!b && resolve(a).toLowerCase() === resolve(b).toLowerCase()
-  // In the main working tree (its git folder the common one, wherever that is kept): its top level.
-  let tree: string | undefined = same(gitDir, common) ? top : undefined
-  if (!tree) {
-    // A linked worktree: the main working tree, as git lists it first, checked to be one (not a git folder).
-    const worktrees = await run(p.path, ['worktree', 'list', '--porcelain'])
-    const first = worktrees?.ok ? worktrees.out.split(/\r?\n\r?\n/)[0].split(/\r?\n/) : []
-    const listed = first.includes('bare') ? undefined : first.find((l) => l.startsWith('worktree '))?.slice('worktree '.length)
-    const check = listed ? await run(listed, ['rev-parse', '--path-format=absolute', '--git-common-dir', '--show-toplevel']) : null
-    const [itsCommon, itsTop] = check?.ok ? check.out.trim().split(/\r?\n/) : []
-    if (same(itsCommon, common) && same(itsTop, listed)) tree = itsTop
-  }
-  return { project: p.name, root: tree ? await realpath(tree).catch(() => null) : null, git: true, short, folder: real }
+  return { project: p.name, root: t.root ? await realpath(t.root).catch(() => null) : null, git: true, short, folder: real }
 }
 
 const trustKey = (id: string, ws: string): string => `${id}|${ws.toLowerCase()}`

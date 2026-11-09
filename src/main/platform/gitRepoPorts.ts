@@ -4,7 +4,7 @@
 // lock order: a context is resolved by the same commonGitDir a lock takes, and file reads with no git process for the
 // rest, so no git command is added or dropped.
 
-import { dirname, join, resolve } from 'path'
+import { basename, dirname, isAbsolute, join, resolve } from 'path'
 import { readFile, realpath, stat } from 'original-fs/promises'
 import { changingFolder } from '../folderFence'
 import { git, gitRouted, withoutGitRoute } from '../git'
@@ -58,6 +58,47 @@ async function contextOf(folder: string): Promise<RepoContext | null> {
   return { platform: 'git', store, workspace, root, folder, ...(resolve(root) !== resolve(folder) ? { subfolder: true } : {}) }
 }
 
+/** Claude Code's memory folder's base (memoryDir.ts's memoryBase before HI-2789): one rev-parse; its common git folder's parent when that is a `.git`, else the top level. */
+async function mainTree(folder: string, o: { timeout: number }): Promise<{ main: string | null } | { none: true } | null> {
+  const r = await git(folder, ['rev-parse', '--path-format=absolute', '--git-common-dir', '--show-toplevel'], undefined, undefined, { timeout: o.timeout }).catch(() => null)
+  if (!r) return null
+  if (!r.ok) return /not a git repository/i.test(r.err) ? { none: true } : null
+  const [common, top] = r.out.trim().split(/\r?\n/)
+  // The common git folder's parent is the main working tree when it is a `.git` folder; else the top level.
+  const main = common && basename(common).toLowerCase() === '.git' ? dirname(common) : top
+  return { main: main && isAbsolute(main) ? resolve(main) : null }
+}
+
+/** The trust check's root (accounts.ts's resolveTarget before HI-2789): the main working tree, a linked worktree's checked against git's own listing. */
+async function trustRoot(folder: string, o: { timeout: number }): Promise<{ root: string | null } | { none: true } | { unknown: true }> {
+  const run = (cwd: string, args: string[]) => git(cwd, args, undefined, undefined, { timeout: o.timeout }).catch(() => null)
+  const r = await run(folder, ['rev-parse', '--path-format=absolute', '--git-dir', '--git-common-dir', '--show-toplevel'])
+  // Not a repository (git says so); anything else (a bare repository, a timeout, git missing) can't be told.
+  if (!r?.ok) return r && /not a git repository/i.test(r.err) ? { none: true } : { unknown: true }
+  const [gitDir, common, top] = r.out.trim().split(/\r?\n/)
+  const same = (a?: string, b?: string): boolean => !!a && !!b && resolve(a).toLowerCase() === resolve(b).toLowerCase()
+  // In the main working tree (its git folder the common one, wherever that is kept): its top level.
+  let tree: string | undefined = same(gitDir, common) ? top : undefined
+  if (!tree) {
+    // A linked worktree: the main working tree, as git lists it first, checked to be one (not a git folder).
+    const worktrees = await run(folder, ['worktree', 'list', '--porcelain'])
+    const first = worktrees?.ok ? worktrees.out.split(/\r?\n\r?\n/)[0].split(/\r?\n/) : []
+    const listed = first.includes('bare') ? undefined : first.find((l) => l.startsWith('worktree '))?.slice('worktree '.length)
+    const check = listed ? await run(listed, ['rev-parse', '--path-format=absolute', '--git-common-dir', '--show-toplevel']) : null
+    const [itsCommon, itsTop] = check?.ok ? check.out.trim().split(/\r?\n/) : []
+    if (same(itsCommon, common) && same(itsTop, listed)) tree = itsTop
+  }
+  return { root: tree ?? null }
+}
+
+/** The repository's info/exclude (providers/common.ts's excludeCopies before HI-2789): in the common git dir git names. */
+async function excludeFile(folder: string, o: { timeout: number }): Promise<string | null> {
+  const common = await git(folder, ['rev-parse', '--git-common-dir'], undefined, undefined, { timeout: o.timeout })
+  const gitDir = common.ok ? common.out.trim() : ''
+  if (!gitDir) return null
+  return join(isAbsolute(gitDir) ? gitDir : resolve(folder, gitDir), 'info', 'exclude')
+}
+
 export const gitRepoPorts: RepoPorts = {
   platform: 'git',
   contextOf,
@@ -75,5 +116,8 @@ export const gitRepoPorts: RepoPorts = {
     changingFolder: (ctx, what, fn) => changingFolder(ctx.folder, what, fn),
     holdRefs: (ctx, refs, o) => holdRefs(ctx.folder, refs, o)
   },
-  metadataDirs: ['.git']
+  metadataDirs: ['.git'],
+  mainTree,
+  trustRoot,
+  excludeFile
 }
