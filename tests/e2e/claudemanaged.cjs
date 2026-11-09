@@ -99,6 +99,8 @@ const until = lib.until
     const urls = JSON.stringify(snippet).match(/http:\/\/127\.0\.0\.1:\d+\/hook/g) ?? []
     check("1: the snippet's HTTP hooks post to this Combwork's fixed URL; it has a SessionStart command and a status line", urls.length > 0 && urls.every((u) => u === `http://127.0.0.1:${PORT}/hook`) && /EncodedCommand/.test(snippet.hooks?.SessionStart?.[0]?.hooks?.[0]?.command ?? '') && snippet.statusLine?.type === 'command', JSON.stringify(snippet).slice(0, 400))
     check('1: the snippet holds no token', !/[0-9a-f]{48}/.test(JSON.stringify(snippet)))
+    // The warning's toast would cover the dialog: dismissed first (its own close button).
+    while ((await page.locator('.toast').count()) > 0) await page.locator('.toast').first().locator('button').last().click()
     for (const theme of ['light', 'dark']) {
       await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
       await dialog.screenshot({ path: path.join(lib.WORK, `claudemanaged-snippet-${theme}.png`) })
