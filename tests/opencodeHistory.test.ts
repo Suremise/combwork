@@ -12,12 +12,17 @@ import { serverInfoPath } from '../src/main/providers/opencode/launcher'
 import { englishText } from '../src/shared/advanced'
 import type { TranscriptItem } from '../src/shared/types'
 import { tempDir } from './tempDir'
+import { createRequire } from 'module'
+
+/** A child's environment from the run context's allowlist, never the shell's (tests/README.md, Isolation). */
+const childEnv = (): Record<string, string> => (createRequire(import.meta.url)('./e2e/runContext.cjs') as { childEnv: () => Record<string, string> }).childEnv()
 
 const FIX = join(__dirname, 'fixtures', 'opencode', 'real-2.2.6')
 const fixture = (rel: string): any => JSON.parse(readFileSync(join(FIX, rel), 'utf8'))
 /** A recorded `GET /api/session/{id}/message` body's messages, oldest first (the API gives them newest first). */
 const recorded = (rel: string): any[] => [...fixture(rel).body.data].reverse()
-const cliStdout = (rel: string): string => readFileSync(join(FIX, rel), 'utf8').split('--- stdout\n')[1].split('\n--- stderr')[0]
+// The fixtures are CRLF in a Windows checkout (.gitattributes): read as LF.
+const cliStdout = (rel: string): string => readFileSync(join(FIX, rel), 'utf8').replace(/\r\n/g, '\n').split('--- stdout\n')[1].split('\n--- stderr')[0]
 
 const SHELL = { info: fixture('wire/session-after-turn.json').body.data, messages: recorded('messages/shell-permission-once.json') }
 const COMPACTION = { info: fixture('wire/session-after-compaction.json').body.data, messages: recorded('messages/compaction.json') }
@@ -334,7 +339,7 @@ describe("the OpenCode history's worker core (HI-2762)", () => {
     await ask(core, { type: 'end', runId: 'run1' })
     const older = join(home, 'older.json')
     writeFileSync(older, JSON.stringify({ info: { ...srv.info, title: 'older', time: { ...srv.info.time, updated: srv.info.time.updated - 1000 } }, messages: srv.messages.slice(0, 1) }))
-    await ask(core, { type: 'export', home, sessionId: srv.info.id, reason: 'runEnd', command: { file: process.execPath, args: ['-e', `process.stdout.write(require('fs').readFileSync(${JSON.stringify(older)}))`], env: { ...process.env } as Record<string, string> } })
+    await ask(core, { type: 'export', home, sessionId: srv.info.id, reason: 'runEnd', command: { file: process.execPath, args: ['-e', `process.stdout.write(require('fs').readFileSync(${JSON.stringify(older)}))`], env: childEnv() } })
     await ask(core, { type: 'idle' })
     expect(parseMirrorUsage(readFileSync(mirrorPath(home, srv.info.id), 'utf8'), srv.info.id).title).toBe('r0-shell-marker output')
   })
@@ -349,7 +354,7 @@ describe("the OpenCode history's worker core (HI-2762)", () => {
     mkdirSync(join(home, 'opencode'), { recursive: true })
     writeFileSync(dbFiles(home)[0], 'db')
     utimesSync(dbFiles(home)[0], new Date(Date.now() - 60_000), new Date(Date.now() - 60_000))
-    const fail = { file: process.execPath, args: ['-e', "process.stderr.write('Session not found: x'); process.exit(1)"], env: { ...process.env } as Record<string, string> }
+    const fail = { file: process.execPath, args: ['-e', "process.stderr.write('Session not found: x'); process.exit(1)"], env: childEnv() }
     expect(await ask(core, { type: 'repairScan', homes: [home] })).toEqual([{ home, sessionId: sid }])
     await ask(core, { type: 'export', home, sessionId: sid, reason: 'repair', command: fail })
     await ask(core, { type: 'idle' })
@@ -363,7 +368,7 @@ describe("the OpenCode history's worker core (HI-2762)", () => {
     expect(await ask(core, { type: 'repairScan', homes: [home] })).toEqual([{ home, sessionId: sid }])
     const good = join(home, 'good.json')
     writeFileSync(good, JSON.stringify({ info: { ...SHELL.info, id: sid }, messages: SHELL.messages }))
-    await ask(core, { type: 'export', home, sessionId: sid, reason: 'repair', command: { file: process.execPath, args: ['-e', `process.stdout.write(require('fs').readFileSync(${JSON.stringify(good)}))`], env: { ...process.env } as Record<string, string> } })
+    await ask(core, { type: 'export', home, sessionId: sid, reason: 'repair', command: { file: process.execPath, args: ['-e', `process.stdout.write(require('fs').readFileSync(${JSON.stringify(good)}))`], env: childEnv() } })
     await ask(core, { type: 'idle' })
     const fixed = readFileSync(mirrorPath(home, sid), 'utf8')
     expect(mirrorState(fixed)).toMatchObject({ header: { state: 'complete', source: 'export' }, status: null })
@@ -536,4 +541,99 @@ describe("the history's reads of an agent's server (HI-2762, #1582)", () => {
       await new Promise((r) => srv.close(r))
     }
   })
+})
+
+describe("the history's ownership across a removal and a new worker (HI-2762, HR1 round 1)", () => {
+  it("answers an account's removal only once its export there has ended, and publishes nothing into it after", async () => {
+    const home = tempDir('cw-oc-rm-')
+    const sid = 'ses_rmrmrmrmrmrmrmrmrmrmrmrmrm'
+    const events: CoreEvent[] = []
+    const killed: number[] = []
+    const core = new HistoryCore((e) => events.push(e), { get: async () => ({ status: 404, body: '{}' }), spawn: (f, a, o) => require('child_process').spawn(f, a, { env: o.env, cwd: o.cwd, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }), endTree: (c) => (killed.push(c.pid ?? 0), c.kill()), now: () => Date.now() })
+    const begun = join(home, 'started.txt')
+    const good = join(home, 'good.json')
+    writeFileSync(good, JSON.stringify({ info: { ...SHELL.info, id: sid }, messages: SHELL.messages }))
+    // An export that writes its output only after a while: removed meanwhile, it is ended, and nothing is published.
+    const script = `require('fs').writeFileSync(${JSON.stringify(begun)}, 'x'); setTimeout(() => process.stdout.write(require('fs').readFileSync(${JSON.stringify(good)})), 20000)`
+    await ask(core, { type: 'export', home, sessionId: sid, reason: 'runEnd', command: { file: process.execPath, args: ['-e', script], env: childEnv() } })
+    for (let i = 0; i < 2000 && !existsSync(begun); i++) await new Promise((r) => setTimeout(r, 5))
+    expect(existsSync(begun)).toBe(true)
+    let acked = false
+    const removal = ask(core, { type: 'removeRoot', home }).then(() => (acked = true))
+    await removal
+    expect(acked).toBe(true)
+    expect(killed.length).toBe(1)
+    await ask(core, { type: 'idle' })
+    expect(existsSync(mirrorPath(home, sid))).toBe(false)
+    // No temp file of the export's left in the folder.
+    const dir = join(home, 'combwork-sessions')
+    expect(existsSync(dir) ? require('fs').readdirSync(dir).filter((n: string) => n.includes('.export-')) : []).toEqual([])
+    // Taken back (a removal refused later), the root's sessions are read again.
+    await ask(core, { type: 'restoreRoot', home })
+    await ask(core, { type: 'export', home, sessionId: sid, reason: 'repair', command: { file: process.execPath, args: ['-e', `process.stdout.write(require('fs').readFileSync(${JSON.stringify(good)}))`], env: childEnv() } })
+    await ask(core, { type: 'idle' })
+    expect(mirrorState(readFileSync(mirrorPath(home, sid), 'utf8')).header?.state).toBe('complete')
+  })
+
+  it('refuses a removal the worker never answers (main side): no undo is given, so the account stays', async () => {
+    const h = await historyWorkerForTests('in-process')
+    ;(h as any).thread.ask = () => new Promise((_, no) => setTimeout(() => no(new Error("the OpenCode history's worker didn't answer removeRoot in 5000 ms")), 10))
+    await expect(h.removeRoot(tempDir('cw-oc-rm-'))).rejects.toThrow(/didn't answer removeRoot/)
+    expect((h as any).removedHomes.size).toBe(0)
+  })
+
+  it('gives a new worker its live runs again after the last one ended: it publishes again, and the old epoch counts for nothing', async () => {
+    const { build } = await import('esbuild')
+    const out = join(tempDir('cw-oc-worker-'), 'opencode-history-worker.cjs')
+    await build({ entryPoints: [join(__dirname, '..', 'src', 'main', 'opencodeHistoryWorker.ts')], outfile: out, bundle: true, platform: 'node', format: 'cjs', alias: { 'original-fs': 'fs' }, logLevel: 'silent' })
+    // An agent's server, as the fake's recordings answer: its session, its pages, its log's watermark.
+    const srv = server({ info: { ...SHELL.info, id: 'ses_wkwkwkwkwkwkwkwkwkwkwkwkwk' } })
+    const g = fakeGet(srv)
+    const http = await import('http')
+    const s = http.createServer(async (q, res) => {
+      const r = await g(`http://127.0.0.1${q.url}`, { authorization: String(q.headers.authorization ?? '') })
+      res.writeHead(r.status, { 'content-type': 'application/json' })
+      res.end(r.body)
+    })
+    await new Promise<void>((r) => s.listen(0, '127.0.0.1', () => r()))
+    const url = `http://127.0.0.1:${(s.address() as { port: number }).port}`
+    const h = await historyWorkerForTests(out)
+    const limits: [string, unknown][] = []
+    h.start({ limits: (runId, u) => limits.push([runId, u]), cost: () => undefined, executable: () => null, homes: () => [], command: async () => ({ file: '', args: [], env: {} }) })
+    try {
+      const home = tempDir('cw-oc-wk-')
+      const dir = tempDir('cw-oc-wkrun-')
+      const sid = srv.info.id
+      await h.begin(home, sid, 'runW')
+      h.track('runW', dir, 'pw')
+      writeFileSync(serverInfoPath(dir), JSON.stringify({ url, sessionId: sid }))
+      const t = (h as any).runs.get('runW')
+      await (h as any).poll(t)
+      const mirror = mirrorPath(home, sid)
+      const titleOf = () => (existsSync(mirror) ? parseMirrorUsage(readFileSync(mirror, 'utf8'), sid).title : null)
+      for (let i = 0; i < 400 && titleOf() !== 'r0-shell-marker output'; i++) await new Promise((r) => setTimeout(r, 10))
+      expect(titleOf()).toBe('r0-shell-marker output')
+      const oldEpoch = t.epoch
+      // The worker ends (a crash): the next one gets the run again, with a new epoch, before any poll.
+      const w = (h as any).thread.worker
+      await w.terminate()
+      for (let i = 0; i < 400 && (t.epoch === oldEpoch || !(h as any).thread.worker); i++) await new Promise((r) => setTimeout(r, 10))
+      expect(t.epoch).not.toBe(oldEpoch)
+      expect((h as any).thread.worker).not.toBe(w)
+      // The session changes: a turn's end reads it, and the new worker publishes it.
+      srv.info = { ...srv.info, title: 'after the restart', time: { ...srv.info.time, updated: srv.info.time.updated + 1000 } }
+      srv.w++
+      h.nudge(sid, { kind: 'turnEnd' })
+      for (let i = 0; i < 400 && titleOf() !== 'after the restart'; i++) await new Promise((r) => setTimeout(r, 10))
+      expect(titleOf()).toBe('after the restart')
+      // A limits answer of the old epoch counts for nothing.
+      const before = limits.length
+      ;(h as any).onEvent({ event: 'limits', runId: 'runW', epoch: oldEpoch, reading: { kind: 'none' } })
+      expect(limits.length).toBe(before)
+    } finally {
+      await h.stop()
+      await historyWorkerForTests(null)
+      await new Promise((r) => s.close(r))
+    }
+  }, 60_000)
 })

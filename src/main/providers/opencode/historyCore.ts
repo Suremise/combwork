@@ -54,6 +54,7 @@ export type CoreRequest = { id: number } & (
   | { type: 'server'; runId: string; url: string; password: string }
   | { type: 'end'; runId: string }
   | { type: 'removeRoot'; home: string }
+  | { type: 'restoreRoot'; home: string }
   | { type: 'refresh'; runId: string; force?: boolean }
   | { type: 'export'; home: string; sessionId: string; command: CommandSpec; reason: 'runEnd' | 'repair' }
   | { type: 'limits'; runId: string }
@@ -191,9 +192,16 @@ export class HistoryCore {
   private queue: Job[] = []
   private running = { refresh: 0, export: 0, limits: 0 }
   private children = new Set<ChildProcess>()
+  /** Each session's export under way, by session key: removeRoot waits for its root's. */
+  private exporting = new Map<string, Promise<void>>()
   private inflight = new Set<Promise<unknown>>()
   private closed = false
   bounds: Bounds = { ...DEFAULT_BOUNDS }
+  /**
+   * Where this core's epochs start (its start time, in thousandths): a worker started after another ended never gives an
+   * epoch the old one gave, so nothing of the old one's can pass for the new one's.
+   */
+  private readonly epochBase = Date.now() * 1000
 
   constructor(
     private readonly emit: (e: CoreEvent) => void,
@@ -230,6 +238,8 @@ export class HistoryCore {
         return s?.epoch ?? null
       }
       case 'removeRoot': {
+        // Nothing publishes into the root from now (publish and fail check `removed` in the same step as the rename);
+        // answered once its exports have ended, their temp files gone, so nothing of the worker's is in the folder.
         const h = r.home.toLowerCase()
         this.removed.add(h)
         for (const [k, s] of this.sessions) {
@@ -238,8 +248,13 @@ export class HistoryCore {
           this.cancelQueued(k)
         }
         for (const run of [...this.runs.values()]) if (run.key.startsWith(`${h}|`)) this.dropRun(run)
+        await Promise.all([...this.exporting].filter(([k]) => k.startsWith(`${h}|`)).map(([, p]) => p))
         return true
       }
+      case 'restoreRoot':
+        // The removal was taken back (accounts.ts letGo): the root's sessions may be read again.
+        this.removed.delete(r.home.toLowerCase())
+        return true
       case 'refresh': {
         const run = this.runs.get(r.runId)
         if (!run) return false
@@ -289,7 +304,7 @@ export class HistoryCore {
   private session(home: string, sessionId: string): Session {
     const k = key(home, sessionId)
     let s = this.sessions.get(k)
-    if (!s) this.sessions.set(k, (s = { home, sessionId, epoch: 0, runId: null, updated: 0 }))
+    if (!s) this.sessions.set(k, (s = { home, sessionId, epoch: this.epochBase, runId: null, updated: 0 }))
     return s
   }
 
@@ -366,7 +381,13 @@ export class HistoryCore {
   private async run(j: Job): Promise<void> {
     if (j.kind === 'refresh') return this.refresh(j)
     if (j.kind === 'limits') return this.limits(j)
-    return this.exportJob(j)
+    const p = this.exportJob(j)
+    this.exporting.set(j.key, p.catch(() => undefined))
+    try {
+      await p
+    } finally {
+      this.exporting.delete(j.key)
+    }
   }
 
   // ---- Reading from a run's server

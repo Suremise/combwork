@@ -43,6 +43,8 @@ interface Tracked {
   privateDir: string
   password: string
   server: boolean
+  /** The server's address, once known (given again to a restarted worker). */
+  url: string | null
   poll: ReturnType<typeof setInterval> | null
   /** When its limits were last read (ms): at most once a minute. */
   limitsAt: number
@@ -57,6 +59,8 @@ class HistoryThread {
   private calls = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>()
   private next = 0
   onEvent: (e: CoreEvent) => void = () => undefined
+  /** Told when a worker ended: its next requests go to a new one, which knows nothing of the old one's runs. */
+  onGone: () => void = () => undefined
 
   async ask(body: Body, timeoutMs = 0): Promise<unknown> {
     const send = await this.transport()
@@ -97,6 +101,7 @@ class HistoryThread {
       log.warn(`the OpenCode history's worker ended (${why}); it starts again with the next request`)
       for (const c of this.calls.values()) c.reject(new Error(`The OpenCode history's worker ended (${why})`)) // i18n-ignore: an internal error, for the log
       this.calls.clear()
+      this.onGone()
     }
     w.on('error', (e: Error) => gone(e.message))
     w.on('exit', (code) => gone(`exit code ${code}`)) // i18n-ignore: for the log
@@ -136,8 +141,33 @@ export class OpencodeHistory {
   /** Sessions a first-read export was queued for, this process: once each until its state changes. */
   private asked = new Set<string>()
 
+  /** Roots whose removal the worker acknowledged (and not taken back): a restarted worker is told again first. */
+  private removedHomes = new Set<string>()
+
   constructor() {
     this.thread.onEvent = (e) => this.onEvent(e)
+    this.thread.onGone = () => void this.restore()
+  }
+
+  /**
+   * A new worker after the last one ended (HR1 on HI-2762): told the removed roots first, then each live run again (a new
+   * epoch, so nothing of the old one counts) and its server, before any poll's request; its limits read again. A run it
+   * can't take is left to its own end (its polls then do nothing), and said in the log.
+   */
+  private async restore(): Promise<void> {
+    for (const h of this.removedHomes) await this.thread.ask({ type: 'removeRoot', home: h }, 5000).catch(() => undefined)
+    for (const t of [...this.runs.values()]) {
+      try {
+        t.epoch = (await this.thread.ask({ type: 'begin', home: t.home, sessionId: t.sessionId, runId: t.runId }, 5000)) as number
+        if (t.server && t.url) await this.thread.ask({ type: 'server', runId: t.runId, url: t.url, password: t.password }, 5000)
+        if (t.server) {
+          void this.thread.ask({ type: 'refresh', runId: t.runId, force: true }).catch(() => undefined)
+          this.readLimits(t, true)
+        }
+      } catch (e) {
+        log.warn(`an OpenCode session's history couldn't be taken up again by a new worker: ${userText(String(e))}`)
+      }
+    }
   }
 
   /** Connects the sink and starts the repair pass (once, at startup). */
@@ -158,7 +188,7 @@ export class OpencodeHistory {
    */
   async begin(home: string, sessionId: string, runId: string): Promise<void> {
     const epoch = (await this.thread.ask({ type: 'begin', home, sessionId, runId }, 5000)) as number
-    this.runs.set(runId, { runId, home, sessionId, privateDir: '', password: '', server: false, poll: null, limitsAt: 0, costAt: 0, epoch })
+    this.runs.set(runId, { runId, home, sessionId, privateDir: '', password: '', server: false, url: null, poll: null, limitsAt: 0, costAt: 0, epoch })
   }
 
   /** The run's server password and private folder (buildCommand): its poll starts, reading the server once it is up. */
@@ -180,6 +210,7 @@ export class OpencodeHistory {
       if (typeof info.sessionId === 'string' && info.sessionId !== t.sessionId) return
       await this.thread.ask({ type: 'server', runId: t.runId, url: info.url, password: t.password }).catch(() => undefined)
       t.server = true
+      t.url = info.url
       void this.thread.ask({ type: 'refresh', runId: t.runId, force: true }).catch(() => undefined)
       this.readLimits(t, true)
       return
@@ -262,13 +293,24 @@ export class OpencodeHistory {
     for (const c of found) await this.exportSession(c.home, c.sessionId, 'repair')
   }
 
-  /** An account's folder is going (accounts.onAccountRemoved): nothing publishes into it from now. */
-  async removeRoot(home: string): Promise<void> {
-    for (const t of [...this.runs.values()]) if (t.home.toLowerCase() === home.toLowerCase()) {
-      if (t.poll) clearInterval(t.poll)
-      this.runs.delete(t.runId)
+  /**
+   * An account's folder is going (accounts.onAccountRemoving): the worker answers once nothing of its own writes into the
+   * folder (its exports there ended), within 5 s, else this throws and the removal is refused. Resolves with how to take
+   * it back (a removal refused later).
+   */
+  async removeRoot(home: string): Promise<() => void> {
+    await this.thread.ask({ type: 'removeRoot', home }, 5000)
+    const h = home.toLowerCase()
+    this.removedHomes.add(h)
+    for (const t of [...this.runs.values()])
+      if (t.home.toLowerCase() === h) {
+        if (t.poll) clearInterval(t.poll)
+        this.runs.delete(t.runId)
+      }
+    return () => {
+      this.removedHomes.delete(h)
+      void this.thread.ask({ type: 'restoreRoot', home }).catch(() => undefined)
     }
-    await this.thread.ask({ type: 'removeRoot', home }, 5000).catch((e) => log.warn(`the OpenCode history didn't let go of a removed account in time: ${userText(String(e))}`))
   }
 
   private onEvent(e: CoreEvent): void {

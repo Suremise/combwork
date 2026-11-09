@@ -164,7 +164,42 @@ describe('an account’s folder and its junction', () => {
   })
 })
 
+// What must let go of an account's folder first (HI-2762, HR1 round 1): a test's two hooks, each failing on demand.
+const letGoLog: string[] = []
+const letGoFails = { first: false, second: false }
+accounts.onAccountRemoving(async (id) => {
+  if (letGoFails.first) throw new Error('first refused')
+  letGoLog.push(`first ${id}`)
+  return () => void letGoLog.push(`first undone ${id}`)
+})
+accounts.onAccountRemoving(async (id) => {
+  if (letGoFails.second) throw new Error('second refused')
+  letGoLog.push(`second ${id}`)
+  return () => void letGoLog.push(`second undone ${id}`)
+})
+
 describe('removing an account', () => {
+  afterEach(() => {
+    letGoFails.first = letGoFails.second = false
+    letGoLog.length = 0
+  })
+
+  it('is refused, with nothing removed, while what writes into its folder hasn\'t let go; those that had are taken back (HI-2762)', async () => {
+    const a = await accounts.addAccount('claude-code', 'Held')
+    const mine = (): string[] => letGoLog.filter((l) => l.endsWith(a.id))
+    letGoFails.second = true
+    expect(await outcome(accounts.removeAccount(a.id))).toMatch(/wasn't removed: Combwork couldn't stop its own work in its folder in time\. Nothing was changed/)
+    expect(accounts.getAccount(a.id)).toBeDefined()
+    expect(existsSync(folderOf(a))).toBe(true)
+    expect(mine()).toEqual([`first ${a.id}`, `first undone ${a.id}`])
+    // Let go, Remove goes ahead.
+    letGoFails.second = false
+    letGoLog.length = 0
+    await accounts.removeAccount(a.id)
+    expect(accounts.getAccount(a.id)).toBeUndefined()
+    expect(mine()).toEqual([`first ${a.id}`, `second ${a.id}`])
+  })
+
   it('removes its junction first, then its folder for good: the conversations it linked to stay', async () => {
     const a = await accounts.addAccount('claude-code', 'Gone')
     writeFileSync(join(folderOf(a), '.credentials.json'), '{}')

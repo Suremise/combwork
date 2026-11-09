@@ -814,14 +814,49 @@ const TERMINAL_GONE_MS = 15_000
 /**
  * What else follows an account (HI-2683: a server connection's diagnostics, which register here rather than this module
  * importing them): told once an account being removed has lost its key, so what was asked for it stops at once and what
- * was read of it is dropped, never left running to its deadline. A hook that returns a promise (HI-2762: the OpenCode
- * history letting go of the folder) is waited for, at most REMOVED_HOOK_MS, before the folder is removed.
+ * was read of it is dropped, never left running to its deadline.
  */
-const removedHooks: ((id: string) => void | Promise<void>)[] = []
-export function onAccountRemoved(fn: (id: string) => void | Promise<void>): void {
+const removedHooks: ((id: string) => void)[] = []
+export function onAccountRemoved(fn: (id: string) => void): void {
   removedHooks.push(fn)
 }
-const REMOVED_HOOK_MS = 5000
+
+/**
+ * What must let go of an account's folder before anything of it is removed (HI-2762: the OpenCode history's worker, which
+ * writes its sessions' mirrors there): each is asked once the removal has passed its checks, and answers with how to take
+ * it back. One that fails or doesn't answer in REMOVING_MS refuses the removal, every earlier one taken back, with nothing
+ * else changed; one that answers means nothing of its own writes into the folder from then on.
+ */
+const removingHooks: ((id: string) => Promise<() => void>)[] = []
+export function onAccountRemoving(fn: (id: string) => Promise<() => void>): void {
+  removingHooks.push(fn)
+}
+const REMOVING_MS = 10_000
+
+/** Asks each removing hook in turn; on a failure or a timeout, takes back those that answered, and throws. */
+async function letGo(id: string): Promise<() => void> {
+  const undos: (() => void)[] = []
+  const undo = (): void => {
+    for (const u of undos.reverse())
+      try {
+        u()
+      } catch (e) {
+        log.warn('taking back an account removal hook failed', e)
+      }
+  }
+  for (const fn of removingHooks) {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      undos.push(await Promise.race([fn(id), new Promise<never>((_, no) => (timer = setTimeout(() => no(new Error(`no answer in ${REMOVING_MS} ms`)), REMOVING_MS)))])) // i18n-ignore: an internal error, for the log
+    } catch (e) {
+      undo()
+      throw e
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  return undo
+}
 
 /**
  * Removes an account: refused while anything runs on it (its agents, a launch, its sign-in). With `closeTerminal`
@@ -852,6 +887,14 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
     // Asked again under the lock: a launch or sign-in may have started while it waited.
     refuse()
     assertNotHeld(a)
+    // What writes into its folder lets go first (HI-2762); if one can't, nothing is removed and Remove tries again.
+    let takeBack: () => void
+    try {
+      takeBack = await letGo(id)
+    } catch (e) {
+      log.warn(`account ${id}'s folder wasn't let go of: ${userText(String((e as Error).message ?? e))}`)
+      throw combworkError(msg({ id: 'main.accounts.letGoFailed', defaultMessage: "{name} wasn't removed: Combwork couldn't stop its own work in its folder in time. Nothing was changed; Remove tries again.", description: "An error removing a connection ({name}, its name in Settings → Accounts & Connections): something of Combwork's still writing into its folder (an OpenCode session's history being read) didn't stop in time, so nothing was removed." }), { name: a.name }, { kind: 'conflict' })
+    }
     // A server connection's key goes first (HI-1772): if that fails, nothing else is removed, the row still shows its
     // key, and Remove tries again; a later failure leaves no key behind.
     if (isServer(a)) {
@@ -859,20 +902,18 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
         await removeKey(id)
       } catch (e) {
         log.warn(`connection ${id}'s key couldn't be removed: ${userText(String((e as Error).message ?? e))}`)
+        takeBack()
         throw combworkError(msg({ id: 'main.accounts.keyRemoveFailed', defaultMessage: "{name} wasn't removed: its key couldn't be deleted. Nothing was changed; Remove tries again.", description: "An error removing a server connection ({name}, its name in Settings → Accounts & Connections): its stored API key couldn't be deleted, so the connection was left as it was." }), { name: a.name }, { kind: 'conflict' })
       }
     }
     // Its key is gone: what was asked for it stops now (HI-2683, HR3 round 1), whatever comes of the rest.
-    const waits: Promise<void>[] = []
     for (const fn of removedHooks) {
       try {
-        const p = fn(id)
-        if (p) waits.push(p.catch((e) => log.warn('an account removal hook failed', e)))
+        fn(id)
       } catch (e) {
         log.warn('an account removal hook failed', e)
       }
     }
-    if (waits.length) await Promise.race([Promise.all(waits), new Promise((r) => setTimeout(r, REMOVED_HOOK_MS))])
     // Checks started before are dropped from here (their result would bring it back).
     generations.set(id, generation(id) + 1)
     unwatch(id)

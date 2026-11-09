@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { OPENCODE } from '../shared/opencode'
-import { onAccountRemoved } from './accounts'
+import { onAccountRemoving } from './accounts'
 import { localDataRoot } from './providers/antigravity/home'
 import { opencode } from './providers/opencode/adapter'
 import { opencodeHistory } from './providers/opencode/history'
@@ -13,7 +13,8 @@ let started = false
 /**
  * The OpenCode history (HI-2762, providers/opencode/history.ts) joined to the rest of Combwork, once at startup: a run's
  * end exports its session; its plan limits and live cost reach its launch (sessions.reportDetails, the same way any
- * provider's status reports do); an account's removal waits until nothing publishes into its folder.
+ * provider's status reports do); an account's removal waits until nothing writes into its folder, and is refused when that
+ * can't be known.
  */
 export function startOpencodeHistory(): void {
   if (started) return
@@ -26,7 +27,7 @@ export function startOpencodeHistory(): void {
     command: (executable, args, home) => opencodeCommand(executable, args, home)
   })
   sessions.onLaunchEnded.add((_projectPath, _agentId, runId) => void opencodeHistory.ended(runId))
-  onAccountRemoved((id) => opencodeHistory.removeRoot(join(localDataRoot(), 'accounts', id)))
+  onAccountRemoving((id) => opencodeHistory.removeRoot(join(localDataRoot(), 'accounts', id)))
 }
 
 /** Quitting: the history's worker ends what it started (its exports) and ends. */
