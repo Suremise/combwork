@@ -20,8 +20,9 @@
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
 //   It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected);
 //   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
-//   its session doesn't start (no SessionStart: Combwork sees it starting) until fake-start-go-<agent> (HI-1707: never ready).
-//   With fake-start-write-<agent>, it first writes a line of its start to its transcript (HI-2816).
+//   its session doesn't start (no SessionStart: Combwork sees it starting; nothing written, its title included, and no MCP
+//   server connected) until fake-start-go-<agent> (HI-1707: never ready; HI-2816). With fake-start-write-<agent>, it first
+//   writes a line of its start to its transcript.
 //   "holduntil NAME": the turn doesn't end until the test makes a file NAME in its home (CLAUDE_CONFIG_DIR).
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
 //   "waitfile NAME" as a step ("waitfile go then cw cw_inbox {}"): the steps after it wait for that file.
@@ -1561,6 +1562,10 @@ async function main() {
     process.stdout.write('', () => process.exit(1))
     return
   }
+  // Held (fake-start-hold-<agent>): not started at all until fake-start-go-<agent>, so nothing written to its transcript
+  // meanwhile, its title included (HI-2816). fake-start-write-<agent>: a line of its start written first, held or not.
+  if (take('fake-start-write')) write({ type: 'system', subtype: 'informational', content: 'Session resumed', level: 'info' })
+  if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   // --name: Claude Code keeps it as the session's name (a custom title, as /rename does).
   if (opts['--name']) {
     if (take('fake-title-untimed')) fs.appendFileSync(transcript, JSON.stringify({ type: 'custom-title', customTitle: opts['--name'], sessionId }) + '\n')
@@ -1576,10 +1581,6 @@ async function main() {
       })()
     : null
   void connectOwnServer(server, held)
-  // fake-start-write-<agent>: its start written to its transcript first, before its session starts (HI-2816: as Claude Code
-  // records a resumed session's start before its SessionStart hook), with a start held or not.
-  if (take('fake-start-write')) write({ type: 'system', subtype: 'informational', content: 'Session resumed', level: 'info' })
-  if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
   promptLine()
   setInterval(() => void whileIdle(), 200)
