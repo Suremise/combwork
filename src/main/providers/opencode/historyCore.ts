@@ -224,7 +224,21 @@ export interface CoreDeps {
   /** Ends a process and what it started, by identity (cw-progress's endTree, #603/#655). */
   endTree: (child: ChildProcess) => void
   now: () => number
+  /** Renames a written temp file over a mirror (tests: one that fails as Windows does while a reader holds the mirror). */
+  rename?: (from: string, to: string) => void
+  /** Waits synchronously between a rename's tries (tests: none). */
+  pause?: (ms: number) => void
 }
+
+/**
+ * A mirror's rename over the published file, at most this many tries, the n-th wait `n × RENAME_PAUSE_MS` (HI-2778): on
+ * Windows the rename fails (EPERM, EACCES, EBUSY) while another handle has the mirror open, such as the transcript
+ * viewer or the Sessions list reading it at that moment. The waits are synchronous: the check and the rename stay one step.
+ */
+const RENAME_TRIES = 5
+const RENAME_PAUSE_MS = 10
+const RENAME_BUSY = new Set(['EPERM', 'EACCES', 'EBUSY'])
+const pauseSync = (ms: number): void => void Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
 
 const defaultDeps: CoreDeps = {
   get: (url, headers, signal, maxBytes) => plainLocalGet(url, headers, signal, maxBytes),
@@ -937,17 +951,38 @@ export class HistoryCore {
     } catch {
       current = ''
     }
-    this.write(s, withStatus(current, problem, detail, new Date(this.deps.now()).toISOString()))
     this.emit({ event: 'log', level: 'warn', text: `an OpenCode session's history couldn't be read (${problem})` }) // i18n-ignore: a log line or an internal detail (the history shows only the CLI's own words)
+    // Called from a catch (HI-2778): a notice that can't be written is logged, never thrown; the mirror keeps its content
+    // until the next read or the repair pass.
+    try {
+      this.write(s, withStatus(current, problem, detail, new Date(this.deps.now()).toISOString()))
+    } catch (e) {
+      this.emit({ event: 'log', level: 'warn', text: `an OpenCode session's history notice couldn't be written (${e instanceof Error ? e.message : String(e)})` }) // i18n-ignore: a log line
+    }
   }
 
+  /** Writes a temp file and renames it over the mirror, retrying a rename a reader's open handle refuses (RENAME_TRIES). */
   private write(s: Session, text: string): void {
     const dir = mirrorDir(s.home)
     mkdirSync(dir, { recursive: true })
     const p = mirrorPath(s.home, s.sessionId)
     const tmp = `${p}.${process.pid}.tmp`
     writeFileSync(tmp, text)
-    renameSync(tmp, p)
+    const rename = this.deps.rename ?? renameSync
+    for (let tries = 1; ; tries++) {
+      try {
+        rename(tmp, p)
+        if (tries > 1) this.emit({ event: 'log', level: 'info', text: `an OpenCode session's mirror was published at try ${tries} (another handle had it open)` }) // i18n-ignore: a log line
+        return
+      } catch (e) {
+        const code = (e as NodeJS.ErrnoException | null)?.code ?? ''
+        if (tries >= RENAME_TRIES || !RENAME_BUSY.has(code)) {
+          rmSync(tmp, { force: true })
+          throw e
+        }
+        ;(this.deps.pause ?? pauseSync)(tries * RENAME_PAUSE_MS)
+      }
+    }
   }
 
   // ---- Repair
