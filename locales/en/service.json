@@ -1015,6 +1015,10 @@
     "defaultMessage": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
     "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"GitHub Copilot\") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button."
   },
+  "service.repoOps.notOffered": {
+    "defaultMessage": "Version control ({platform}) doesn’t offer that here.",
+    "description": "HI-2788: an error when the window asks to change a repository in a way its version control ({platform}: a version control’s name, as Combwork names it) doesn’t list. Not reached in 1.4.0: Git lists every operation."
+  },
   "service.slots.notPrepared": {
     "defaultMessage": "Combwork couldn't get {slot} ready for {card}: {why}",
     "description": "A notice: a card was started in a slot (a worktree Combwork lends to a card or a lane), and Combwork couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English."

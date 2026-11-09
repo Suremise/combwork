@@ -3,7 +3,8 @@ import type { AgentBranchStatus, MergeBranch, MergeBranchList, MergeResult } fro
 import type { BranchQueueCard } from '@shared/workflow/queue'
 import { msg, tr, tRich } from '@shared/i18n'
 import * as actions from '../actions'
-import { call, errorMessage } from '../api'
+import { call, errorMessage } from '../api'
+import { repoOp } from '../repoOps'
 import { projectMergeChoice } from '../mergeChoice'
 import { confirm, notify, set, useLanguage, useStore } from '../store'
 import { cx } from '../util'
@@ -204,7 +205,7 @@ export function BranchMergeDialog() {
     } else if (lineCard && !(await confirmLineMerge(lineCard, branch, target))) return
     setBusy(true)
     try {
-      const r = await call('worktrees:mergeBranch', project.path, branch, { target, squash, message, ...(lineCard && !queueCard ? { card: lineCard.number } : {}), ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
+      const r = await repoOp('worktrees:mergeBranch', project.path, branch, { target, squash, message, ...(lineCard && !queueCard ? { card: lineCard.number } : {}), ...(anyway && queueCard ? { outsideQueue: { card: queueCard.card, reason: '' } } : {}) })
       setResult(r)
       if (r.ok) {
         notify('success', tr(M.merged, { branch, into: target }))

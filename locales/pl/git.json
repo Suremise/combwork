@@ -232,6 +232,7 @@
   "git.repoLock.noGitDir": "Combwork nie znalazł folderu git dla {folder}, więc nic nie zostało zmienione: {why}",
   "git.repoLock.waiting": "Inny Combwork scala właśnie do tego repozytorium ({profile})",
   "git.repoLock.waitingFor": "Combwork czeka, aż skończy, najwyżej {seconds, number} s.",
+  "git.repoOp.notOffered": "Kontrola wersji tego projektu tego nie oferuje.",
   "git.retry": "Spróbuj ponownie",
   "git.section.branches": "Gałęzie i zdalne repozytoria",
   "git.section.changes": "Zmiany",

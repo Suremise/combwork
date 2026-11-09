@@ -3,7 +3,8 @@ import type { ProjectInfo } from '@shared/types'
 import { GITIGNORE_CHOICES, initAbout, initProblem, type GitInitCheck, type GitignoreChoice } from '@shared/gitInit'
 import { msg, tr } from '@shared/i18n'
 import { shownText } from '@shared/advanced'
-import { call, errorMessage } from '../api'
+import { errorMessage } from '../api'
+import { offered, repoOp } from '../repoOps'
 import { bumpGit, notify, set, useStore } from '../store'
 import { BusyButton, Icon, Modal, useBusy } from './ui'
 
@@ -43,6 +44,7 @@ const M = {
  * made, then a first commit still to make).
  */
 export function InitRepoButton({ project, label, small }: { project: ProjectInfo; label?: string; small?: boolean }) {
+  if (!offered('git:init')) return null
   return (
     <button className={small ? 'btn small' : 'btn primary'} data-git-init="" onClick={() => set({ gitInitFor: project.path })}>
       <Icon name="repo" /> {label ?? tr(INIT_TEXT.button)}
@@ -79,7 +81,7 @@ function InitRepoDialog({ project, onClose, onInitialised, onFailed }: { project
   }, [error])
   useEffect(() => {
     let live = true
-    call('git:initCheck', project.path).then(
+    repoOp('git:initCheck', project.path).then(
       (c) => live && setCheck(c),
       (e) => live && setLoadError(errorMessage(e))
     )
@@ -91,12 +93,12 @@ function InitRepoDialog({ project, onClose, onInitialised, onFailed }: { project
   const blocked = !check || !!check.refused || !!problem || (!!check.parentRepo && !nested)
   const submit = async (): Promise<void> => {
     if (blocked || !check) return
-    const r = await run('init', () => call('git:init', project.path, { gitignore: check.hasGitignore ? 'none' : gitignore, ...(check.identity.name ? {} : { name: name.trim() }), ...(check.identity.email ? {} : { email: email.trim() }), ...(check.parentRepo ? { nested: true } : {}) }))
+    const r = await run('init', () => repoOp('git:init', project.path, { gitignore: check.hasGitignore ? 'none' : gitignore, ...(check.identity.name ? {} : { name: name.trim() }), ...(check.identity.email ? {} : { email: email.trim() }), ...(check.parentRepo ? { nested: true } : {}) }))
     bumpGit(project.path)
     if (!r) {
       // It may have stopped part way (a repository made, no commit yet): asked again, the dialog goes on from there,
       // with the identity the new repository lacks, its failure still shown.
-      await call('git:initCheck', project.path).then(setCheck, () => undefined)
+      await repoOp('git:initCheck', project.path).then(setCheck, () => undefined)
       return
     }
     notify('success', r.value)

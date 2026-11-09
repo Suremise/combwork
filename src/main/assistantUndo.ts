@@ -14,7 +14,7 @@ import { isWorkflowRole } from '../shared/workflow/roles'
 import { restoreProjectAgents } from './templates'
 import { setWorkflowOptions, workflowForm, WorkflowStale } from './workflow/optionsForm'
 import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
-import { removeMadeBranch } from './gitRepo'
+import { lineRepoOps } from './platform/repoOpsPorts'
 import { withFolderRepoLocks } from './platform/repoPorts'
 import { workflowWrite } from './workflow/writes'
 import { referencesTo, slotTargets } from './workflow/retarget'
@@ -606,7 +606,7 @@ async function undoBranch(ws: WorkspaceService, c: RecordedChange, guard: Guard)
         return lanes.withLanesLock(ws, () =>
           boardWrite(ws, async () => {
             guard?.()
-            const r = await removeMadeBranch(projectPath, name, commit, async () => {
+            const r = await lineRepoOps('deleteLines').removeMadeLine(projectPath, name, commit, async () => {
               const t = await projectTargets(ws, projectPath).catch(() => null)
               if (t?.default === name || t?.others.includes(name)) return 'target'
               return (await referencesTo(ws, projectPath, name, slots)).length ? 'card' : null

@@ -2198,6 +2198,22 @@ dialog's lines and status) and Start the next version's go through it (the impor
 `tests/repoReadsImports.test.ts`); `tests/repoReadTraces.test.ts` holds their git commands and answers, errors included,
 to those recorded before. The branch watcher's own refresh stays inside Git's implementation; the mutations are R3's.
 
+R3 (HI-2788) built the mutations the same way: `RepoOps` (`platform/repoOps.ts`), Git's `gitRepoOps.ts` (each member
+the function its callers called before, in `gitRepo.ts`, `gitInit.ts`, `branchMerge.ts`, `worktrees.ts`' `mergeWorktree`
+and `filesGit.ts`' three writes, called through the module) and `repoOpsPorts.ts`, whose only exports are the gated
+lookups (`repoOpsFor(platform, op)`, `lineRepoOps(op)`): the port is reached only after its operation is checked against
+the descriptor's `operations` (`Operation`, `hasOperation`, `shared/platform/descriptors.ts`: Git lists all nineteen,
+None none), refused otherwise in the window's words. One map, `REPO_OP_CHANNELS` (`shared/repoOpChannels.ts`), names
+each IPC channel's operation; the window offers an action only when it is listed (`renderer/src/repoOps.ts`'s `offered`
+and `repoOp`), and main's handlers (`repoOpsIpc.ts`, registered by `ipc.ts`; its merge, which needs its authorization,
+through `opsAt` too) refuse it otherwise before anything runs. Every entry point (the window's, the Assistant's branch
+route, Start the next version, the branch undo, the 0.9 worktree merge) selects the platform with repository operations,
+whatever the project's recorded workflow platform, as the window acted before: a None project's folder inside Git keeps
+its Files actions and Initialise repository stays on Git's page (HI-1905). R9 routes them by platform. Each delegate
+keeps its guards (R5.1); `tests/repoOpTraces.test.ts` holds their git commands (sorted per step: a multiset, not an
+order) and answers to those recorded before, `tests/repoOpsBoundary.test.ts` calls each kind of entry point with an
+operation withdrawn (refused, nothing run or changed), and `tests/repoOpsImports.test.ts` is the import rule.
+
 **Invariants:**
 - **R5.1** Every guard on a mutation stays the same guard with the same words: a dirty folder, a line checked out
   elsewhere, a subfolder of a larger repository, a branch named like another but for case, the repository lock and

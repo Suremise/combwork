@@ -2,9 +2,10 @@
 // branch (staying, switching, from a ref) and Switch, deleting a merged branch and refusing an unmerged one, Update from
 // the target, the Merge dialog's merge, remotes (add, rename, set URL, remove), fetch, pull, push and Push to against a
 // local bare remote, Track…, Create tag, the commit identity, Initialise repository, and the Files tab's Exclude, Stop
-// tracking and Include again, through the repository operations port. The same git commands (folder and argv; sorted,
-// since some run together) and the same answers and refusals as the code before the port: the expected traces were
-// recorded before the port (tests/repoOpCalls.ts then calling the functions directly) with
+// tracking and Include again, through the repository operations port. The same git commands (folder and argv, compared
+// as a sorted multiset per step, since some run together: not an order proof) and the same answers and refusals as the
+// code before the port: the expected traces were recorded at 196d85906, before the port (its tests/repoOpCalls.ts calls
+// the functions directly), with
 // `CW_RECORD_OP_TRACES=1 npx vitest run tests/repoOpTraces.test.ts`, into tests/fixtures/repoOpTraces.json.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'

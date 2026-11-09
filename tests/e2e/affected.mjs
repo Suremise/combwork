@@ -185,7 +185,7 @@ export const AREAS = [
   // Git missing or too old (#346): Provider Setup's Git row, the status bar and every git-dependent screen.
   { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitdirect', 'gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
-  { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
+  { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts', 'src/main/platform/repoOps.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/shared/repoOpChannels.ts', 'src/renderer/src/repoOps.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
   // HI-2807: New branch… from a ref, a missing target's offer, Start the next version (gitview drives all three).
   { paths: ['src/renderer/src/components/NewBranchForm.tsx', 'src/renderer/src/components/NextVersion.tsx', 'src/main/workflow/nextVersion.ts', 'src/shared/nextVersion.ts'], suites: ['gitview', 'workflowoptions', 'retarget'] },
   // The shared tab strip (HI-1837, HI-1839) and every suite driving one: Version Control's sections, Settings' workflow
@@ -206,7 +206,7 @@ export const AREAS = [
   // Unused worktrees (#353): the Overview's section, the Changes notice, Storage's line and the hints.
   { paths: ['src/main/unusedWorktrees.ts', 'src/shared/unusedWorktrees.ts', 'src/shared/recentCache.ts', 'src/renderer/src/components/UnusedWorktrees.tsx'], suites: ['unusedwt', 'unusedslots', 'changespicker'] },
   { paths: ['tests/e2e/unusedslots.cjs'], suites: ['unusedslots'] },
-  { paths: ['src/main/branchMerge.ts', 'src/renderer/src/components/BranchMerge.tsx', 'tests/e2e/mergedialogslots.cjs', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['mergedialogslots'] },
+  { paths: ['src/main/branchMerge.ts', 'src/renderer/src/components/BranchMerge.tsx', 'tests/e2e/mergedialogslots.cjs', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts'], suites: ['mergedialogslots'] },
   { paths: ['src/renderer/src/mergeChoice.ts'], suites: ['mergedialogslots', 'agents-ui'] },
   { paths: ['src/main/combworkMove.ts', 'src/main/combworkFolder.ts', 'src/main/combworkMoveWorker.ts', 'src/main/boardFileMove.ts', 'src/main/nameUpgrade.ts', 'src/main/nameUpgradeFiles.ts', 'src/main/nameUpgradeProjects.ts', 'src/main/nameUpgradeValues.ts', 'src/main/storedNames.ts', 'src/main/fsPresence.ts', 'src/shared/combworkFolderMove.ts', 'tests/e2e/combworkfolder.cjs'], suites: ['combworkfolder', 'combworkvcs', 'wsmove'] },
   { paths: ['src/main/workspaceMove.ts', 'src/main/viewPrefs.ts', 'src/shared/movePaths.ts', 'src/renderer/src/components/MoveRepair.tsx', 'src/main/agentWorktree.ts', 'src/shared/projectIds.ts', 'src/main/beforeIds.ts', 'src/main/leftovers.ts', 'src/main/projectRename.ts', 'src/main/projectNames.ts'], suites: ['wsmove', 'wtrecreate', 'projectrename', 'repairbranches', 'repairdefender'] },
@@ -256,7 +256,7 @@ export const AREAS = [
   { paths: ['src/main/diagnostics.ts', 'src/shared/redact.ts'], suites: ['about', 'testedclis'] },
   { paths: ['src/main/files.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
   // The Files tab's Git menu (HI-2743): only the Files tab uses it.
-  { paths: ['src/main/filesGit.ts', 'src/shared/gitIgnoreRules.ts', 'src/renderer/src/components/FilesGitMenu.ts'], suites: ['files'] },
+  { paths: ['src/main/filesGit.ts', 'src/shared/gitIgnoreRules.ts', 'src/renderer/src/components/FilesGitMenu.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/renderer/src/repoOps.ts'], suites: ['files'] },
   { paths: ['src/main/attachmentsFolder.ts', 'src/shared/attachments.ts', 'src/renderer/src/attach.ts', 'src/renderer/src/components/AttachmentChips.tsx'], suites: ['image', 'files', 'assistantimages', 'storage', 'storageclose', 'dialogs', 'asarfiles', 'codex-extra'] },
   { paths: ['src/main/heldLine.ts', 'tests/e2e/idlequestion.cjs'], suites: ['idlequestion', 'wakeuntaken'] },
   // Codex's offer of a cheaper model (HI-2609): read on its screen, hidden per launch, and a model switch marked.
@@ -909,6 +909,9 @@ export const UNIT_SCANS = [
   // HI-2785's R2: the window's reads through the repository reads port (its moved callers, the contract, Git's implementation).
   { test: 'tests/repoReadsImports.test.ts', paths: ['src/main/ipc.ts', 'src/main/workflow/nextVersion.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/repoReadsPorts.ts'] },
   { test: 'tests/repoReadsImports.test.ts', paths: ['src/'], lines: ['gitRepoReads'] },
+  // HI-2788's R3: the window's and the Assistant's mutations through the repository operations port.
+  { test: 'tests/repoOpsImports.test.ts', paths: ['src/main/ipc.ts', 'src/main/repoOpsIpc.ts', 'src/main/servers.ts', 'src/main/workflow/nextVersion.ts', 'src/main/assistantUndo.ts', 'src/main/projectAgents.ts', 'src/main/platform/repoOps.ts', 'src/main/platform/repoOpsPorts.ts'] },
+  { test: 'tests/repoOpsImports.test.ts', paths: ['src/'], lines: ['gitRepoOps'] },
   // HI-2789: copies, a Resume's claim, a lane's start, agents' worktrees and the providers' context reads moved to the ports.
   { test: 'tests/repoPortsImports.test.ts', paths: ['src/main/accounts.ts', 'src/main/providers/common.ts', 'src/main/providers/claude/memoryDir.ts', 'src/main/copies.ts', 'src/main/agentFolders.ts', 'src/main/lanes.ts', 'src/main/projectAgents.ts'] },
   { test: 'tests/historyPortsImports.test.ts', paths: ['src/main/workflow/reconcile.ts', 'src/main/workflow/reconciler.ts', 'src/main/workflow/recorder.ts', 'src/main/workflow/targets.ts', 'src/main/workflow/retarget.ts', 'src/main/workflow/runChecks.ts', 'src/main/workflow/focusedRun.ts', 'src/main/workflow/queueChecks.ts', 'src/main/platform/history.ts', 'src/main/platform/historyPorts.ts'] },
