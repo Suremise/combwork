@@ -1,0 +1,49 @@
+{
+ "source": "HI-2761 R0b, 9 Nov 2026 (HB2): the pinned 2.2.6 under HI-2758 option A, both discovery switches on, two skills in <OPENCODE_CONFIG_DIR>skills and an AGENTS.md there; one prompt to local Ollama qwen3:8b through the logging proxy",
+ "configDir": {
+  "skills/cw-probe-skill/SKILL.md": "---\nname: cw-probe-skill\ndescription: CODEWORD-CFG-SKILL use when asked about probes.\n---\nCODEWORD-CFG-SKILL-BODY\n",
+  "skills/plainname/SKILL.md": "---\nname: plainname\ndescription: CODEWORD-CFG-SKILL-2 another.\n---\nbody\n",
+  "AGENTS.md": "CODEWORD-CFG-AGENTS\n"
+ },
+ "codewordsInRequest": [
+  "CODEWORD-CFG-AGENTS",
+  "CODEWORD-CFG-SKILL",
+  "CODEWORD-CFG-SKILL-2"
+ ],
+ "availableSkills": "<available_skills>\n  <skill>\n    <id>cw-probe-skill</id>\n    <name>cw-probe-skill</name>\n    <description>CODEWORD-CFG-SKILL use when asked about probes.</description>\n  </skill>\n  <skill>\n    <id>opencode</id>\n    <name>OpenCode</name>\n    <description>Use this skill for any question about OpenCode itself, including how OpenCode works, using or configuring it, migrating from V1 to V2, troubleshooting it, developing plugins or integrations, using the OpenCode SDK, clients, server, or API, and contributing to the OpenCode codebase. Also use it for OpenCode agents, commands, skills, tools, permissions, MCP servers, providers, models, themes, keybinds, formatters, the CLI, TUI, desktop app, and web app.</description>\n  </skill>\n  <skill>\n    <id>plainname</id>\n    <name>plainname</name>\n    <description>CODEWORD-CFG-SKILL-2 another.</description>\n  </skill>\n  <skill>\n    <id>report</id>\n    <name>Report</name>\n    <description>Use when the user wants to report an opencode issue or bug. Collect standard diagnostics, add user-specific reproduction context, and publish the issue with GitHub CLI.</description>\n  </skill>\n</available_skills>",
+ "skillTool": {
+  "type": "function",
+  "function": {
+   "name": "skill",
+   "description": "Load a specialized skill's instructions and resources into the current conversation when the task at hand matches its description.\n\nThe skill ID must match an available skill or a skill explicitly referenced by the user.",
+   "parameters": {
+    "type": "object",
+    "properties": {
+     "id": {
+      "type": "string",
+      "description": "The ID of an available skill or a skill explicitly referenced by the user"
+     }
+    },
+    "required": [
+     "id"
+    ],
+    "additionalProperties": false
+   },
+   "strict": false
+  }
+ },
+ "tools": [
+  "edit",
+  "glob",
+  "grep",
+  "question",
+  "read",
+  "shell",
+  "skill",
+  "subagent",
+  "webfetch",
+  "websearch",
+  "write",
+  "execute"
+ ]
+}

@@ -1599,7 +1599,7 @@
   "settings.advanced.opencode.env.credentials.title": "不传给 OpenCode 的凭据",
   "settings.advanced.opencode.models.line.desc": "opencode models 列表中的一行：模型的 ID，即以 provider/model 形式表示的提供方和模型（其第一个分组）。设置错误时，不会提供任何 OpenCode 模型。",
   "settings.advanced.opencode.models.line.title": "opencode models 中的模型",
-  "settings.advanced.opencode.override.keepProjectConfigOut.desc": "Combwork 以 OPENCODE_DISABLE_PROJECT_CONFIG=1 和 OPENCODE_DISABLE_CLAUDE_CODE=1 运行 OpenCode，因此项目自己的 opencode.json 和 .opencode 文件夹（其 MCP 服务器、插件和智能体）、上级文件夹中的配置以及 Claude Code 的文件夹都不会加载；项目的 AGENTS.md 由 Combwork 交给 OpenCode。关闭后，这些都会像在 Combwork 之外一样加载，包括插件的代码，而且项目的 MCP 服务器可能会取代 Combwork 交给智能体的服务器。",
+  "settings.advanced.opencode.override.keepProjectConfigOut.desc": "Combwork 以 OPENCODE_DISABLE_PROJECT_CONFIG=1 和 OPENCODE_DISABLE_CLAUDE_CODE=1 运行 OpenCode，因此不会加载项目自己的任何 OpenCode 配置，项目的 AGENTS.md 由 Combwork 交给 OpenCode。关闭后，OpenCode 会加载它在 Combwork 之外会加载的内容：项目的 opencode.json 以及其上层文件夹中的任何 opencode.json、它的 .opencode 文件夹（MCP 服务器、代理以及会运行其代码的插件）、它的 .agents 和 .claude 文件夹以及你主文件夹的 .claude 中的技能，以及其配置指定的说明。届时，与 Combwork 交给该代理的服务器同名的项目 MCP 服务器会取而代之，包括 Combwork 自己的工具。",
   "settings.advanced.opencode.override.keepProjectConfigOut.title": "不加载项目的 OpenCode 配置",
   "settings.advanced.opencode.override.noAutoUpdate.desc": "Combwork 在 OpenCode 的私有配置中使用 update: \"disable\" 并设置 OPENCODE_DISABLE_AUTOUPDATE=1 来运行它（它的智能体，以及检查其账号和模型），因此它运行已安装的版本，在智能体重启之间绝不会更改；“配置提供方”中的“更新”会在你选择时更新它。关闭后，OpenCode 可能会像在 Combwork 之外一样自行更新。",
   "settings.advanced.opencode.override.noAutoUpdate.title": "不让 OpenCode 自行更新",

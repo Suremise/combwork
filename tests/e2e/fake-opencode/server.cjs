@@ -57,7 +57,13 @@ async function startServer(opts) {
       mcpStatus[name] = 'failed'
     }
   }
-  log({ kind: 'mcp', started: Object.keys(started), tokens: Object.fromEntries(Object.entries(started).map(([n, d]) => [n, (d.environment || d.env || {}).CW_MCP_TOKEN ?? (d.environment || d.env || {}).CW_PROBE_TOKEN ?? null])), configured: Object.keys(boot.servers) })
+  // Each server's token, as a test names it (CW_MCP_TOKEN, R0's CW_PROBE_TOKEN), or Combwork's own server's per-agent token
+  // file (CW_API_TOKEN_FILE): whose server it is.
+  const tokenOf = (d) => {
+    const e = d.environment || d.env || {}
+    return e.CW_MCP_TOKEN ?? e.CW_PROBE_TOKEN ?? e.CW_API_TOKEN_FILE ?? null
+  }
+  log({ kind: 'mcp', started: Object.keys(started), tokens: Object.fromEntries(Object.entries(started).map(([n, d]) => [n, tokenOf(d)])), configured: Object.keys(boot.servers) })
 
   // --- Events.
   let evCount = 0
@@ -245,7 +251,20 @@ async function startServer(opts) {
         log({ kind: 'edit', agent: env.CW_AGENT || 'agent', file: path.basename(file), allowed: true })
         return { text: 'Edit applied successfully.', metadata: { truncated: false } }
       })
-    const skillDir = (name) => [path.join(cfg.cfgDir, 'skills'), path.join(l.directory, '.agents', 'skills'), path.join(l.directory, '.opencode', 'skills')].flatMap((root) => [name, `cw-${name}`].map((x) => path.join(root, x))).find((x) => fs.existsSync(path.join(x, 'SKILL.md'))) ?? path.join(cfg.cfgDir, 'skills', name)
+    // A skill as 2.2.6 offers one: only those it loaded (config.cjs: the config folder's skills, and the project's or the
+    // home's as the switches let them), by its folder's name, its id (skills/config-dir.json, HI-2761's R0b).
+    const loadedSkills = () => cfg.loaded.filter((x) => x.kind === 'skill').map((x) => x.path)
+    const skillDir = (name) => loadedSkills().find((x) => path.basename(x) === name && fs.existsSync(path.join(x, 'SKILL.md'))) ?? path.join(cfg.cfgDir, 'skills', name)
+    /**
+     * The `skill` tool `{id}` 2.2.6 loads a skill with: its SKILL.md for one it offers, else an error. (R0b recorded the
+     * tool and the listing, not a call's result: the fake answers with the file's text.)
+     */
+    const skillTool = (name) =>
+      toolStep('skill', { id: name }, async () => {
+        const dir = loadedSkills().find((x) => path.basename(x) === name && fs.existsSync(path.join(x, 'SKILL.md')))
+        log({ kind: 'skill-tool', id: name, found: !!dir })
+        return dir ? { text: fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8'), metadata: { truncated: false } } : { text: `Skill not found: ${name}`, isError: true }
+      })
     const skillRef = (name, file) => {
       const dir = skillDir(name)
       const t = fs.existsSync(path.join(dir, 'SKILL.md')) ? fs.readFileSync(path.join(dir, 'SKILL.md'), 'utf8') : ''
@@ -255,7 +274,7 @@ async function startServer(opts) {
 
     // The scenarios' steps (tests/scenarios), as the other fakes take them.
     async function scripted(s) {
-      for (const m of s.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) await read(path.join(skillDir(m[1]), 'SKILL.md'))
+      for (const m of s.matchAll(/\bskill\s+([a-z0-9][\w-]*)/gi)) await skillTool(m[1])
       for (const m of s.matchAll(/\bskillref\s+([a-z0-9][\w-]*)\s+([\w.-]+\.md)/gi)) await read(skillRef(m[1], m[2]))
       const move = /\bboardmove\s+(\d+)\s+(\w+)/i.exec(s)
       if (move) await own('cw_update_task', { number: Number(move[1]), column: move[2].toLowerCase() })
