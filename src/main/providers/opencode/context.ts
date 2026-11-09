@@ -1,0 +1,84 @@
+// The Assistant's state view in an OpenCode session (HI-2771): 2.2.6's session instruction entries, put through the
+// launch's own server with its password (tests/fixtures/opencode/real-2.2.6/wire/instruction-entries.json). OpenCode
+// renders an entry in the system prompt as <context key="…">value</context>, and a later change to it as a
+// <system-update> superseding the previous value, without starting a turn. Combwork owns one key and touches no other.
+import { request as httpRequest } from 'http'
+import { readFile } from 'original-fs/promises'
+import type { StartContextDelivery, StartContextTrigger } from '../types'
+import { serverInfoPath } from './launcher'
+
+/** Combwork's one instruction entry (2.2.6's key pattern: ^[a-z0-9][a-z0-9._-]*$). */
+export const CONTEXT_KEY = 'combwork.state-view'
+/** 2.2.6's limit on an entry's value (413 above it), its JSON's UTF-8 bytes as 2.2.6 counts them: never trimmed to fit. */
+export const CONTEXT_MAX_BYTES = 262144
+
+/** Each running launch's server credentials, from its build (buildCommand) to its end (sessions.onLaunchEnded). */
+const runs = new Map<string, { privateDir: string; password: string; sessionId: string }>()
+
+export function trackContextRun(runId: string, privateDir: string, password: string, sessionId: string): void {
+  runs.set(runId, { privateDir, password, sessionId })
+}
+export function untrackContextRun(runId: string): void {
+  runs.delete(runId)
+}
+
+/**
+ * The post that brings a start context: the launch's settled baseline (before its TUI starts; Combwork takes only the
+ * first). A compaction's end reaches Combwork as the normalized compactEnd its tracker makes of a post (events.ts), live
+ * or recovered by a resync's snapshot.
+ */
+export function contextTrigger(body: Record<string, any>): StartContextTrigger | null {
+  return body?.hook_event_name === 'OpencodeSnapshot' ? { source: 'start' } : null
+}
+
+/** How the launch's record is read: a test holds it to end the run meanwhile. */
+export const contextIo = { readRecord: (file: string): Promise<string> => readFile(file, 'utf8') }
+
+/** The launch's server, from its own record (the launcher's, for this session only), as a loopback URL; null if not that. */
+async function serverOf(privateDir: string, sessionId: string): Promise<string | null> {
+  try {
+    const info = JSON.parse(await contextIo.readRecord(serverInfoPath(privateDir))) as { url?: unknown; sessionId?: unknown }
+    return info.sessionId === sessionId && typeof info.url === 'string' && /^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(info.url) ? info.url : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Puts the text as Combwork's entry in the run's session, or removes it (null), within signal. A body over the limit
+ * isn't sent: Combwork's entry is removed instead (no stale view stays), and it says so. Never throws.
+ */
+export async function deliverContext(runId: string, sessionId: string, text: string | null, signal: AbortSignal): Promise<StartContextDelivery> {
+  const run = runs.get(runId)
+  if (!run || run.sessionId !== sessionId || signal.aborted) return 'notSent'
+  const url = await serverOf(run.privateDir, sessionId)
+  // Still that run, tracked, after the record was read: a run that ended meanwhile sends nothing to its old server.
+  if (!url || signal.aborted || runs.get(runId) !== run) return 'notSent'
+  const body = text === null ? null : JSON.stringify({ value: text })
+  const tooLarge = text !== null && Buffer.byteLength(JSON.stringify(text), 'utf8') > CONTEXT_MAX_BYTES
+  const remove = body === null || tooLarge
+  try {
+    const status = await send(`${url}/api/experimental/session/${encodeURIComponent(sessionId)}/instructions/entries/${CONTEXT_KEY}`, remove ? 'DELETE' : 'PUT', run.password, remove ? null : body, signal)
+    // A removal 2.2.6 answers 204 whether or not the entry was there (wire/instruction-entries.json deleteAbsent).
+    if (remove) return status === 204 || status === 404 ? (tooLarge ? 'tooLarge' : 'removed') : 'refused'
+    return status === 204 ? 'put' : 'refused'
+  } catch {
+    // Cut off by the signal: it may have reached the server, so its outcome is unknown, never a success.
+    return signal.aborted ? 'uncertain' : 'refused'
+  }
+}
+
+/** One request to the launch's own loopback server (Node's http: no fetch outside Combwork's local API), its status. */
+function send(url: string, method: 'PUT' | 'DELETE', password: string, body: string | null, signal: AbortSignal): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const headers: Record<string, string> = { authorization: 'Basic ' + Buffer.from(`opencode:${password}`).toString('base64'), 'accept-encoding': 'identity' } // i18n-ignore: an HTTP authorization header, never shown
+    if (body !== null) Object.assign(headers, { 'content-type': 'application/json', 'content-length': String(Buffer.byteLength(body, 'utf8')) })
+    const req = httpRequest(url, { method, headers, signal }, (res) => {
+      res.resume()
+      res.on('end', () => resolve(res.statusCode ?? 0))
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.end(body ?? undefined)
+  })
+}

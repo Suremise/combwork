@@ -174,4 +174,191 @@ describe('the start context in the hook replies (#1065)', () => {
     expect(await replay(st, [pre, prompt])).toEqual([null, null])
     sessions.startContext = saved
   })
+
+  describe("into the session itself (HI-2771: a CLI whose hooks take no reply, OpenCode's instruction entries)", () => {
+    type Call = { runId: string; sessionId: string; text: string | null; aborted: boolean }
+    type Ctx = { chain: Promise<void> }
+    const S = sessions as unknown as { live: Map<string, unknown>; sessionContexts: WeakMap<object, Ctx>; constructor: { SESSION_CONTEXT_MS: number } }
+    /** Its launch's baseline; with `compactions`, the compactEnd hooks its tracker would make of it (a resync's recovery). */
+    const snapshot = (compactions: string[] = []) => ({ hook_event_name: 'OpencodeSnapshot', snapshot: {}, compactions })
+    /** A live event whose tracker makes compactEnd hooks (a compaction seen to end). */
+    const compactionEnded = (...ids: string[]) => ({ hook_event_name: 'OpencodeEvent', event: { type: 'session.compaction.ended' }, compactions: ids })
+    /**
+     * A CLI that takes the context into its session, its hooks expanded as OpenCode's tracker expands them (prepareHook:
+     * each `compactions` id a compactEnd of that turn). Each delivery recorded and gated: `delivered(n)` once n were made;
+     * `hold` makes a delivery wait for its signal.
+     */
+    function intoSession(opts: { hold?: boolean } = {}) {
+      const calls: Call[] = []
+      const waiters: { n: number; done: () => void }[] = []
+      const adapter = {
+        ...copilot,
+        prepareHook: async (body: Record<string, any>) => {
+          if (Array.isArray(body.compactions)) body.combworkExpanded = body.compactions.map((turn: string) => ({ hook_event_name: 'Expanded', kind: 'compactEnd', turn }))
+        },
+        normalizeHook: (body: Record<string, any>) => ({ event: { kind: body.kind === 'compactEnd' ? 'compactEnd' : 'other' }, ids: { turn: body.turn ?? null, call: null, sub: null, continued: false } }),
+        noticeReply: () => null,
+        noticeEvents: undefined,
+        startContextReply: undefined,
+        startContextTrigger: (body: Record<string, any>) => (body.hook_event_name === 'OpencodeSnapshot' ? { source: 'start' } : null),
+        deliverStartContext: async (runId: string, sessionId: string, text: string | null, signal: AbortSignal) => {
+          const call = { runId, sessionId, text, aborted: false }
+          calls.push(call)
+          if (opts.hold) await new Promise<void>((done) => signal.addEventListener('abort', () => done(), { once: true }))
+          call.aborted = signal.aborted
+          for (const waiter of waiters.filter((x) => calls.length >= x.n)) waiter.done()
+          return signal.aborted ? 'uncertain' : text === null ? 'removed' : 'put'
+        }
+      }
+      const delivered = (count: number): Promise<void> => (calls.length >= count ? Promise.resolve() : new Promise((done) => waiters.push({ n: count, done })))
+      return { adapter, calls, delivered }
+    }
+    const launchOf = (st: State) => S.live.get(`${p.toLowerCase()}#${st.agentId}`) as object
+    /** Its hook as Combwork takes it: its reply, then its handling (where its expanded hooks are). */
+    const post = (st: State, body: Record<string, unknown>) =>
+      inWorkspace(w, async () => {
+        const b = { ...body, session_id: st.sessionId, cwd: p }
+        const reply = await sessions.hookReply(st.runId, b)
+        await sessions.handleHook(st.runId, b, reply)
+        return reply
+      })
+    /** Every delivery the launch has queued, done (each discarded one included): the queue's own end, never a sleep. */
+    const queued = (st: State) => S.sessionContexts.get(launchOf(st))?.chain ?? Promise.resolve()
+
+    it('at its first baseline (the view, before the reply), never at a resync; resumed, as a resume', async () => {
+      given.length = 0
+      const { adapter, calls } = intoSession()
+      const st = agent(adapter)
+      expect(await post(st, snapshot())).toBeNull()
+      // Delivered before the baseline's reply came back.
+      expect(calls.map((c) => c.text)).toEqual(['[CW] view (startup)'])
+      await post(st, snapshot())
+      await queued(st)
+      expect(calls.length).toBe(1)
+      expect(calls.every((c) => c.runId === st.runId && c.sessionId === st.sessionId)).toBe(true)
+      const resumed = agent(intoSession().adapter)
+      ;(launchOf(resumed) as { resumed?: boolean }).resumed = true
+      await post(resumed, snapshot())
+      expect(given.slice(-1)).toEqual(['resume'])
+    })
+
+    it("after a compaction's end, live or recovered by a resync's snapshot, each compaction once; never the start's own history", async () => {
+      const { adapter, calls, delivered } = intoSession()
+      const st = agent(adapter)
+      // The start's own snapshot names an old compaction: closed history its view covers, no refresh of its own.
+      await post(st, snapshot(['old']))
+      await queued(st)
+      expect(calls.map((c) => c.text)).toEqual(['[CW] view (startup)'])
+      // A compaction seen to end live: one refresh.
+      await post(st, compactionEnded('c1'))
+      await delivered(2)
+      // The stream lost across the next one's end: the repair snapshot recovers it, once; the same repair again, nothing.
+      await post(st, snapshot(['c1', 'c2']))
+      await delivered(3)
+      await post(st, snapshot(['c1', 'c2']))
+      await queued(st)
+      expect(calls.map((c) => c.text)).toEqual(['[CW] view (startup)', '[CW] view (compact)', '[CW] view (compact)'])
+    })
+
+    it("removes Combwork's entry where no view is due (none made: the journal off, not the Assistant), and with guidance off never makes one", async () => {
+      const saved = sessions.startContext
+      try {
+        sessions.startContext = async () => null
+        const off = intoSession()
+        await post(agent(off.adapter), snapshot())
+        expect(off.calls.map((c) => c.text)).toEqual([null])
+        sessions.startContext = saved
+        given.length = 0
+        const plain = intoSession()
+        const st = agent(plain.adapter)
+        ;(launchOf(st) as { policy?: unknown }).policy = { guidance: false }
+        await post(st, snapshot())
+        expect([plain.calls.map((c) => c.text), given]).toEqual([[null], []])
+      } finally {
+        sessions.startContext = saved
+      }
+    })
+
+    it('within its budget: a view that takes too long is never sent, a request still out is cut off (uncertain), and the reply comes in time', async () => {
+      const saved = sessions.startContext
+      const budget = S.constructor.SESSION_CONTEXT_MS
+      S.constructor.SESSION_CONTEXT_MS = 200
+      try {
+        let release!: () => void
+        let building!: () => void
+        const started = new Promise<void>((r) => (building = r))
+        sessions.startContext = () =>
+          new Promise((r) => {
+            building()
+            release = () => r('[CW] late view')
+          })
+        const slow = intoSession()
+        const st = agent(slow.adapter)
+        const t0 = Date.now()
+        expect(await post(st, snapshot())).toBeNull()
+        expect(Date.now() - t0).toBeLessThan(2000)
+        await started
+        // Its view done only after the deadline: the discarded step ends, having sent nothing.
+        release()
+        await queued(st)
+        expect(slow.calls).toEqual([])
+        sessions.startContext = saved
+        const hung = intoSession({ hold: true })
+        const t1 = Date.now()
+        expect(await post(agent(hung.adapter), snapshot())).toBeNull()
+        expect(Date.now() - t1).toBeLessThan(2000)
+        expect(hung.calls.map((c) => [c.text, c.aborted])).toEqual([['[CW] view (startup)', true]])
+      } finally {
+        S.constructor.SESSION_CONTEXT_MS = budget
+        sessions.startContext = saved
+      }
+    })
+
+    it('one at a time: a newer refresh supersedes an older one still being made, and a launch no longer running gets none', async () => {
+      const saved = sessions.startContext
+      try {
+        const { adapter, calls, delivered } = intoSession()
+        const st = agent(adapter)
+        await post(st, snapshot())
+        let release!: () => void
+        let building!: () => void
+        let started = new Promise<void>((r) => (building = r))
+        let made = 0
+        sessions.startContext = async (_s, source) => {
+          if (++made === 1) {
+            building()
+            await new Promise<void>((r) => (release = r))
+          }
+          return `[CW] view ${made} (${source})`
+        }
+        await post(st, compactionEnded('a'))
+        await started
+        await post(st, compactionEnded('b'))
+        release()
+        await delivered(2)
+        await queued(st)
+        // The first refresh, superseded while it was made, sent nothing; the second did.
+        expect(calls.map((c) => c.text)).toEqual(['[CW] view (startup)', '[CW] view 2 (compact)'])
+        // Replaced by another launch of the agent while its view was made: nothing for the old one.
+        made = 0
+        started = new Promise<void>((r) => (building = r))
+        const chain = queued(st)
+        await post(st, compactionEnded('c'))
+        await started
+        const before = S.sessionContexts.get(launchOf(st))!
+        S.live.set(`${p.toLowerCase()}#${st.agentId}`, { ...(launchOf(st) as object) })
+        release()
+        await chain
+        await before.chain
+        expect(calls.length).toBe(2)
+      } finally {
+        sessions.startContext = saved
+      }
+    })
+
+    it("leaves the other CLIs' reply-based start context as it was", async () => {
+      const replies = await replay(agent(codex), [codexHooks.hooks[0]])
+      expect((replies[0]?.hookSpecificOutput as { additionalContext?: string } | undefined)?.additionalContext).toBe('[CW] view (startup)')
+    })
+  })
 })
