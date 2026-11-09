@@ -4,7 +4,7 @@
 // a branch's Switch is disabled, with why, while an agent works in the project folder; History lists the commits and
 // Create tag… tags the commit; Add remote… adds one, and a GitHub remote with a personal email warns; a project without
 // git (None, #1416) says so under the header, Initialise repository… shown once Git is chosen (HI-1905). HI-2807: New
-// branch… from a tag without moving the folder (a tag's name refused), a missing Work merges into offering to create
+// branch… from another branch without moving the folder (a tag's name refused), a missing Work merges into offering to create
 // itself, and Start the next version from 1.3.0 (screenshots in both themes). Remotes are local bare repositories in the suite's folder (never a real remote), git's
 // global config is the suite's own (GIT_CONFIG_GLOBAL), and the agent is the fake Claude Code. Dev build, throwaway
 // profile and workspace.
@@ -195,7 +195,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   // A project without git (None: Workflow only, no Initialise repository…, no status bar item; Git chosen there offers
   // Initialise repository…) is versioncontrol's and gitinit's: here too until HI-2663.
 
-  // --- HI-2807: New branch… from a tag, the project folder staying where it is; a target that doesn't exist offers to
+  // --- HI-2807: New branch… from another branch, the project folder staying where it is; a target that doesn't exist offers to
   // create itself; Start the next version from 1.3.0. Screenshots in both themes.
   const themed = async (name, target) => {
     await page.mouse.move(5, 5)
@@ -211,8 +211,12 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   await branches.getByRole('button', { name: 'New branch…', exact: true }).click()
   const fromTag = page.locator('.dialog', { hasText: 'New branch' })
   await fromTag.locator('[data-field="name"]').fill('hotfix/0.1')
+  // The tag v0.1 is on main's commit, the folder's: Switch to it now ticks itself; release (25 commits on) doesn't.
   await fromTag.locator('[data-field="start"]').fill('v0.1')
   check('Starts at says what v0.1 is', !!(await lib.until(async () => /^Tag at [0-9a-f]{7,}: their commit/.test(await text(fromTag.locator('[data-resolved]'))), HUNG_MS)), await text(fromTag.locator('[data-resolved]')))
+  check('…at the folder’s commit, Switch to it now ticks itself', !!(await lib.until(async () => await fromTag.locator('[data-field="switch"]').isChecked(), HUNG_MS)))
+  await fromTag.locator('[data-field="start"]').fill('release')
+  check('Starts at says what release is', !!(await lib.until(async () => /^Branch at [0-9a-f]{7,}: release work 25/.test(await text(fromTag.locator('[data-resolved]'))), HUNG_MS)), await text(fromTag.locator('[data-resolved]')))
   check('Switch to it now is off, starting elsewhere than the folder', !(await fromTag.locator('[data-field="switch"]').isChecked()))
   await fromTag.locator('[data-field="name"]').fill('v0.1')
   check('a name a tag has is said under the box', !!(await lib.until(async () => /There’s a tag v0\.1/.test(await text(fromTag.locator('[data-problem="name"]'))), HUNG_MS)), await text(fromTag))
@@ -220,7 +224,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(lib.WORK, `gitvie
   await lib.until(async () => (await fromTag.locator('[data-problem="name"]').count()) === 0, HUNG_MS)
   await themed('7-new-branch-from', fromTag)
   await fromTag.getByRole('button', { name: 'Create', exact: true }).click()
-  check('it is made at the tag, the folder still on main', !!(await lib.until(() => { try { return g(alpha, 'rev-parse', 'hotfix/0.1') === g(alpha, 'rev-parse', 'v0.1^{commit}') } catch { return false } }, HUNG_MS)) && g(alpha, 'symbolic-ref', '--short', 'HEAD') === 'main')
+  check('it is made at release, the folder still on main', !!(await lib.until(() => { try { return g(alpha, 'rev-parse', 'hotfix/0.1') === g(alpha, 'rev-parse', 'release') } catch { return false } }, HUNG_MS)) && g(alpha, 'symbolic-ref', '--short', 'HEAD') === 'main', g(alpha, 'symbolic-ref', '--short', 'HEAD'))
 
   g(alpha, 'branch', '1.3.0', 'release')
   await inv('workflow:setOptions', alpha, { preset: null, options: { target: '1.3.0' } })
