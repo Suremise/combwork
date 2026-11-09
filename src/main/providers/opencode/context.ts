@@ -22,19 +22,22 @@ export function untrackContextRun(runId: string): void {
   runs.delete(runId)
 }
 
-/** The posts that bring a start context: the launch's settled baseline (before its TUI starts) and a compaction's end. */
+/**
+ * The post that brings a start context: the launch's settled baseline (before its TUI starts; Combwork takes only the
+ * first). A compaction's end reaches Combwork as the normalized compactEnd its tracker makes of a post (events.ts), live
+ * or recovered by a resync's snapshot.
+ */
 export function contextTrigger(body: Record<string, any>): StartContextTrigger | null {
-  if (body?.hook_event_name === 'OpencodeSnapshot') return { source: 'start' }
-  const e = body?.hook_event_name === 'OpencodeEvent' ? body.event : null
-  if (e?.type !== 'session.compaction.ended') return null
-  const id = typeof e.id === 'string' && e.id ? e.id : typeof e.seq === 'number' ? `seq:${e.seq}` : null
-  return id ? { source: 'compact', id } : null
+  return body?.hook_event_name === 'OpencodeSnapshot' ? { source: 'start' } : null
 }
+
+/** How the launch's record is read: a test holds it to end the run meanwhile. */
+export const contextIo = { readRecord: (file: string): Promise<string> => readFile(file, 'utf8') }
 
 /** The launch's server, from its own record (the launcher's, for this session only), as a loopback URL; null if not that. */
 async function serverOf(privateDir: string, sessionId: string): Promise<string | null> {
   try {
-    const info = JSON.parse(await readFile(serverInfoPath(privateDir), 'utf8')) as { url?: unknown; sessionId?: unknown }
+    const info = JSON.parse(await contextIo.readRecord(serverInfoPath(privateDir))) as { url?: unknown; sessionId?: unknown }
     return info.sessionId === sessionId && typeof info.url === 'string' && /^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(info.url) ? info.url : null
   } catch {
     return null
@@ -49,7 +52,8 @@ export async function deliverContext(runId: string, sessionId: string, text: str
   const run = runs.get(runId)
   if (!run || run.sessionId !== sessionId || signal.aborted) return 'notSent'
   const url = await serverOf(run.privateDir, sessionId)
-  if (!url || signal.aborted) return 'notSent'
+  // Still that run, tracked, after the record was read: a run that ended meanwhile sends nothing to its old server.
+  if (!url || signal.aborted || runs.get(runId) !== run) return 'notSent'
   const body = text === null ? null : JSON.stringify({ value: text })
   const tooLarge = text !== null && Buffer.byteLength(JSON.stringify(text), 'utf8') > CONTEXT_MAX_BYTES
   const remove = body === null || tooLarge

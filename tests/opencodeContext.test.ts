@@ -10,7 +10,7 @@ import { tempDir } from './tempDir'
 
 const require = createRequire(import.meta.url)
 const { childEnv } = require('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => Record<string, string> }
-const { CONTEXT_KEY, CONTEXT_MAX_BYTES, contextTrigger, deliverContext, trackContextRun, untrackContextRun } = await import('../src/main/providers/opencode/context')
+const { CONTEXT_KEY, CONTEXT_MAX_BYTES, contextIo, contextTrigger, deliverContext, trackContextRun, untrackContextRun } = await import('../src/main/providers/opencode/context')
 const { serverInfoPath } = await import('../src/main/providers/opencode/launcher')
 const FAKE = join(__dirname, 'e2e', 'fake-opencode', 'fake-opencode.cjs')
 const REC = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', 'wire', 'instruction-entries.json'), 'utf8'))
@@ -114,12 +114,34 @@ describe('the OpenCode state view in its session (HI-2771)', () => {
     hung.stop()
   }, 90000)
 
-  it('its triggers: the launch\'s baseline snapshot, and a compaction\'s end by its event\'s identity', () => {
+  it("its trigger: the launch's baseline snapshot (a compaction's end comes as its tracker's compactEnd hooks)", () => {
     expect(contextTrigger({ hook_event_name: 'OpencodeSnapshot', snapshot: {} })).toEqual({ source: 'start' })
-    expect(contextTrigger({ hook_event_name: 'OpencodeEvent', event: { type: 'session.compaction.ended', id: 'evt_1' } })).toEqual({ source: 'compact', id: 'evt_1' })
-    expect(contextTrigger({ hook_event_name: 'OpencodeEvent', event: { type: 'session.compaction.ended', seq: 7 } })).toEqual({ source: 'compact', id: 'seq:7' })
-    for (const b of [{ hook_event_name: 'OpencodeEvent', event: { type: 'session.compaction.started', id: 'x' } }, { hook_event_name: 'OpencodeEvent', event: { type: 'session.compaction.ended' } }, { hook_event_name: 'SessionStart' }]) expect(contextTrigger(b)).toBeNull()
+    for (const b of [{ hook_event_name: 'OpencodeEvent', event: { type: 'session.compaction.ended', id: 'x' } }, { hook_event_name: 'OpencodeEvent', event: { type: 'session.execution.succeeded' } }, { hook_event_name: 'SessionStart' }]) expect(contextTrigger(b)).toBeNull()
   })
+
+  it('a run that ends while its record is being read sends nothing, to its old server or any', async () => {
+    const l = await launch()
+    const read = contextIo.readRecord
+    let release!: () => void
+    let reading!: () => void
+    const held = new Promise<void>((r) => (reading = r))
+    contextIo.readRecord = async (file) => {
+      reading()
+      await new Promise<void>((r) => (release = r))
+      return read(file)
+    }
+    try {
+      const out = deliverContext(l.runId, l.sid, '[CW] view', signal())
+      await held
+      untrackContextRun(l.runId)
+      release()
+      expect(await out).toBe('notSent')
+      expect(l.logged()).toEqual([])
+    } finally {
+      contextIo.readRecord = read
+    }
+    l.stop()
+  }, 60000)
 
   it('the fake answers as 2.2.6 did (the recording)', async () => {
     const l = await launch()

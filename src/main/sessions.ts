@@ -80,7 +80,7 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
-import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
@@ -6709,27 +6709,44 @@ class SessionManager {
   static readonly SESSION_CONTEXT_MS = 2500
   /** Each launch's start context in its session (HI-2771): its start step taken, compactions refreshed, its queue, its generation. */
   private sessionContexts = new WeakMap<LiveSession, { started: boolean; compactions: Set<string>; chain: Promise<void>; gen: number }>()
+  /** The post that was its launch's start (its first baseline): its own expanded hooks are history the start's view covers. */
+  private startPosts = new WeakSet<object>()
+
+  private sessionContextOf(l: LiveSession): { started: boolean; compactions: Set<string>; chain: Promise<void>; gen: number } {
+    const s = this.sessionContexts.get(l) ?? { started: false, compactions: new Set<string>(), chain: Promise.resolve(), gen: 0 }
+    this.sessionContexts.set(l, s)
+    return s
+  }
 
   /**
    * On a CLI whose start context goes into its session (startContextTrigger): at its launch's start (its first baseline,
-   * before its TUI takes input) the step that puts or removes it, answered once done or out of time; at a compaction's
-   * end (each compaction once, however often it is seen), a refresh queued behind it, answered at once. Null for any other post.
+   * before its TUI takes input) the step that puts or removes it, answered once done or out of time. Null for any other
+   * post (a compaction's refresh comes from its hooks, compactionIntoSession).
    */
   private sessionContextStep(runId: string | null, body: Record<string, any>): Promise<null> | null {
     const l = this.findLaunch(runId, body.session_id)?.[1]
     const trigger = l?.adapter.deliverStartContext ? l.adapter.startContextTrigger?.(body) : null
-    if (!l || !trigger) return null
-    const s = this.sessionContexts.get(l) ?? { started: false, compactions: new Set<string>(), chain: Promise.resolve(), gen: 0 }
-    this.sessionContexts.set(l, s)
-    if (trigger.source === 'start') {
-      if (s.started) return null
-      s.started = true
-      return this.deliverSessionContext(l, s, l.resumed ? 'resume' : 'startup')
-    }
-    if (s.compactions.has(trigger.id)) return null
-    s.compactions.add(trigger.id)
+    if (!l || trigger?.source !== 'start') return null
+    const s = this.sessionContextOf(l)
+    if (s.started) return null
+    s.started = true
+    this.startPosts.add(body)
+    return this.deliverSessionContext(l, s, l.resumed ? 'resume' : 'startup')
+  }
+
+  /**
+   * A compaction's end, as the CLI's hooks have it (HI-2771: OpenCode's tracker makes compactEnd of a live event, or of a
+   * resync's snapshot that finds one completed while the stream was down): the view refreshed in its session, each
+   * compaction once by its identity (its turn), queued behind the launch's deliveries. Not one the start's own post
+   * brings (closed history the start's view already covers), nor a sub-agent's.
+   */
+  private compactionIntoSession(l: LiveSession, post: Record<string, any>, hook: NormalizedHook): void {
+    if (!l.adapter.deliverStartContext || hook.event.kind !== 'compactEnd' || hook.ids.sub || this.startPosts.has(post)) return
+    const s = this.sessionContextOf(l)
+    const id = hook.ids.turn ?? ''
+    if (s.compactions.has(id)) return
+    s.compactions.add(id)
     void this.deliverSessionContext(l, s, 'compact')
-    return null
   }
 
   /**
@@ -6968,6 +6985,8 @@ class SessionManager {
     if (Array.isArray(body.combworkExpanded)) {
       for (const sub of body.combworkExpanded as Record<string, any>[]) {
         if (this.live.get(id) !== l) return
+        // A compaction's end among them (live, or recovered by a resync): the start context refreshed in the session (HI-2771).
+        if (l.adapter.deliverStartContext) this.compactionIntoSession(l, body, l.adapter.normalizeHook(sub))
         await this.handleHookIn(runId, sub, arrived, hooksBefore, at, null, null)
       }
       return

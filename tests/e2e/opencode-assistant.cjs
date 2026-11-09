@@ -92,6 +92,30 @@ const tuiAt = () => lines().flatMap((e, i) => (e.kind === 'launch' && Array.isAr
     const ended = await lib.until(async () => lines().findIndex((e) => e.kind === 'compaction-end' && e.session === sid) + 1 || null, HUNG_MS)
     const again = await lib.until(async () => entryOps().slice(before).find((e) => e.method === 'PUT' && e.status === 204) ?? null, HUNG_MS)
     check('after the compaction ended, the view put again (once)', !!again && entryAt(again) > ended - 1 && entryOps().slice(before).filter((e) => e.method === 'PUT').length === 1, JSON.stringify({ ended, ops: entryOps().slice(before) }))
+
+    // --- The stream lost across a compaction's end: the launcher's repair snapshot shows it ended, and the view is put
+    // again, once; another resync after it puts nothing more.
+    fs.writeFileSync(modeFile, 'drop-compaction')
+    const lostFrom = entryOps().length
+    const compactions = lines().filter((e) => e.kind === 'compaction-end').length
+    await lib.until(async () => (['ready', 'finished'].includes((await live())?.status) ? true : null), HUNG_MS)
+    await inv('session:compact', home, undefined, 'assistant')
+    await lib.until(async () => (lines().filter((e) => e.kind === 'compaction-end').length > compactions ? true : null), HUNG_MS)
+    fs.writeFileSync(modeFile, '')
+    const recovered = await lib.until(async () => entryOps().slice(lostFrom).find((e) => e.method === 'PUT' && e.status === 204) ?? null, HUNG_MS)
+    check("a compaction whose end the stream missed: the resync's snapshot recovers it and the view is put again", !!recovered && typeof recovered.value === 'string' && /after a compaction/.test(recovered.value), JSON.stringify(entryOps().slice(lostFrom)))
+    // Another resync (a turn that drops the stream at its start): no compaction to recover, so nothing more is put.
+    const resyncFrom = entryOps().length
+    const streams = () => lines().filter((e) => e.kind === 'http' && e.method === 'GET' && e.path === '/api/event').length
+    const streamsBefore = streams()
+    const turns = lines().filter((e) => e.kind === 'turn-end').length
+    await lib.until(async () => (['ready', 'finished'].includes((await live())?.status) ? true : null), HUNG_MS)
+    await lib.sendPrompt(inv, lib.ptyKey(home, 'assistant'), 'drop events then reply', { submitted: async () => lines().some((e) => e.kind === 'turn' && /drop events/.test(e.text ?? '')), tries: 2, waitMs: HUNG_MS })
+    await lib.until(async () => (lines().filter((e) => e.kind === 'turn-end').length > turns ? true : null), HUNG_MS)
+    await lib.until(async () => (['ready', 'finished'].includes((await live())?.status) ? true : null), HUNG_MS)
+    // The launcher reconnected (a new stream) and so resynced: and still nothing more was put.
+    await lib.until(async () => (streams() > streamsBefore ? true : null), HUNG_MS)
+    check('…and a later resync (the stream reconnected) puts nothing more', streams() > streamsBefore && entryOps().slice(resyncFrom).filter((e) => e.method === 'PUT').length === 0, JSON.stringify({ streams: [streamsBefore, streams()], ops: entryOps().slice(resyncFrom) }))
     await stop()
 
     // --- Resumed with its put refused: a refusal, never counted as given, and the session still starts.

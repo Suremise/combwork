@@ -436,8 +436,11 @@ export interface SkillRoots {
   combworkCopyPrefix: string | null
 }
 
-/** A hook post that brings a start context into the session (HI-2771): its launch's start, or a compaction's end (by its identity). */
-export type StartContextTrigger = { source: 'start' } | { source: 'compact'; id: string }
+/**
+ * A hook post that brings a start context into the session (HI-2771): its launch's start. A compaction's end comes as the
+ * normalized compactEnd hooks of its posts, live or recovered by a resync, each compaction once (SessionManager).
+ */
+export type StartContextTrigger = { source: 'start' }
 /**
  * What putting or removing a start context did (HI-2771): put, removed (or none was there), not sent (no such run or
  * server, or it was too large to send), refused, or uncertain (sent, then cut off: the server may have taken it).

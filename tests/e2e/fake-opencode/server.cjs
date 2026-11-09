@@ -426,6 +426,17 @@ async function startServer(opts) {
       emit('session.execution.started', { sessionID: sid }, { sid, durable: true })
       emit('session.inbox.delivered', { sessionID: sid, inboxID: id }, d)
       emit('session.compaction.started', { sessionID: sid, reason: 'manual', inputID: id }, d)
+      // A test's lost stream across its end (the mode file says drop-compaction, HI-2771): what follows reaches no one,
+      // so only a resync's snapshot shows it ended.
+      let dropMode = ''
+      try {
+        dropMode = env.FAKE_OPENCODE_ENTRY_MODE ? fs.readFileSync(env.FAKE_OPENCODE_ENTRY_MODE, 'utf8').trim() : ''
+      } catch {}
+      if (dropMode === 'drop-compaction')
+        for (const c of [...clients]) {
+          clients.delete(c)
+          c.end()
+        }
       emit('session.compaction.delta', { sessionID: sid, text: '<template>\n' })
       const summary = '<template>\n## Objective\n- (the fake compaction)\n</template>'
       const tokens = { input: 575, output: 467, reasoning: 0, cache: { read: 0, write: 0 } }
