@@ -4252,6 +4252,26 @@
     "note": "A setting's title (Settings → General).",
     "audience": "both"
   },
+  "settings.github.copilotHost.desc": {
+    "text": "Usually the same as the GitHub host. With repositories on GitHub Enterprise Server, choose where your Copilot licence is: github.com or your GHE.com host.",
+    "note": "What the setting “Copilot signs in on” is for (HI-2779). GHE.com is GitHub’s product name.",
+    "audience": "both"
+  },
+  "settings.github.copilotHost.title": {
+    "text": "Copilot signs in on",
+    "note": "A setting (HI-2779): the GitHub host GitHub Copilot signs in on, which can differ from the repositories’ host.",
+    "audience": "both"
+  },
+  "settings.github.host.desc": {
+    "text": "github.com, your GHE.com host (yourcompany.ghe.com) or your GitHub Enterprise Server’s name. Only the name: no path, port or token.",
+    "note": "What the setting “GitHub host” takes (HI-2779). GHE.com is GitHub’s product name; keep the host names.",
+    "audience": "both"
+  },
+  "settings.github.host.title": {
+    "text": "GitHub host",
+    "note": "A setting (HI-2779): the host of the repositories: github.com, a GHE.com host (yourcompany.ghe.com) or a GitHub Enterprise Server.",
+    "audience": "both"
+  },
   "settings.keybindings.editor.desc": {
     "text": "Click the pencil (or double-click a shortcut), then press the new keys. Wait a moment after the first combination, or press a second one for a chord such as Ctrl+K Ctrl+S.",
     "note": "What the setting \"Shortcuts\" does, under its title (Settings → Keyboard Shortcuts).",

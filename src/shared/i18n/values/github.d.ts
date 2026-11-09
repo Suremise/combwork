@@ -12,13 +12,9 @@ interface CombworkMessageValues {
   'github.host.restart': { n: number }
   'github.host.restartTitle': undefined
   'github.hosts.choose': { host: string | number }
-  'github.hosts.copilot': undefined
-  'github.hosts.copilotDesc': undefined
   'github.hosts.desc': undefined
   'github.hosts.fromEnvironment': undefined
   'github.hosts.heading': undefined
-  'github.hosts.host': undefined
-  'github.hosts.hostDesc': undefined
   'github.hosts.inherit': undefined
   'github.hosts.inheritOption': { value: string | number }
   'github.hosts.kind.gheCloud': undefined

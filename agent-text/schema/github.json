@@ -22,17 +22,5 @@
   },
   "github.host.rejected.scheme": {
     "placeholders": {}
-  },
-  "github.hosts.copilot": {
-    "placeholders": {}
-  },
-  "github.hosts.copilotDesc": {
-    "placeholders": {}
-  },
-  "github.hosts.host": {
-    "placeholders": {}
-  },
-  "github.hosts.hostDesc": {
-    "placeholders": {}
   }
 }

@@ -43,14 +43,6 @@
     "defaultMessage": "{host} is a GitHub Enterprise Server: choose where Copilot signs in. Copilot agents don’t start until you do.",
     "description": "Under “Copilot signs in on” (HI-2779): the repositories are on a GitHub Enterprise Server host ({host}), where cloud Copilot can’t sign in, and nothing is chosen."
   },
-  "github.hosts.copilot": {
-    "defaultMessage": "Copilot signs in on",
-    "description": "A setting (HI-2779): the GitHub host GitHub Copilot signs in on, which can differ from the repositories’ host."
-  },
-  "github.hosts.copilotDesc": {
-    "defaultMessage": "Usually the same as the GitHub host. With repositories on GitHub Enterprise Server, choose where your Copilot licence is: github.com or your GHE.com host.",
-    "description": "What the setting “Copilot signs in on” is for (HI-2779). GHE.com is GitHub’s product name."
-  },
   "github.hosts.desc": {
     "defaultMessage": "Where the repositories are, and where Copilot signs in. Saved as you change them; running Copilot agents use a change when they restart.",
     "description": "Under the heading “GitHub” (HI-2779): what its two settings are, and that they save at once and apply at an agent’s restart."
@@ -62,14 +54,6 @@
   "github.hosts.heading": {
     "defaultMessage": "GitHub",
     "description": "A heading in the Version Control tab and in Settings → Version Control → Workspace defaults (HI-2779): the GitHub host settings. GitHub is a product name."
-  },
-  "github.hosts.host": {
-    "defaultMessage": "GitHub host",
-    "description": "A setting (HI-2779): the host of the repositories: github.com, a GHE.com host (yourcompany.ghe.com) or a GitHub Enterprise Server."
-  },
-  "github.hosts.hostDesc": {
-    "defaultMessage": "github.com, your GHE.com host (yourcompany.ghe.com) or your GitHub Enterprise Server’s name. Only the name: no path, port or token.",
-    "description": "What the setting “GitHub host” takes (HI-2779). GHE.com is GitHub’s product name; keep the host names."
   },
   "github.hosts.inherit": {
     "defaultMessage": "Inherit",

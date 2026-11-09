@@ -4643,6 +4643,22 @@
     "defaultMessage": "Your name",
     "description": "A setting's title (Settings → General)."
   },
+  "settings.github.copilotHost.desc": {
+    "defaultMessage": "Usually the same as the GitHub host. With repositories on GitHub Enterprise Server, choose where your Copilot licence is: github.com or your GHE.com host.",
+    "description": "What the setting “Copilot signs in on” is for (HI-2779). GHE.com is GitHub’s product name."
+  },
+  "settings.github.copilotHost.title": {
+    "defaultMessage": "Copilot signs in on",
+    "description": "A setting (HI-2779): the GitHub host GitHub Copilot signs in on, which can differ from the repositories’ host."
+  },
+  "settings.github.host.desc": {
+    "defaultMessage": "github.com, your GHE.com host (yourcompany.ghe.com) or your GitHub Enterprise Server’s name. Only the name: no path, port or token.",
+    "description": "What the setting “GitHub host” takes (HI-2779). GHE.com is GitHub’s product name; keep the host names."
+  },
+  "settings.github.host.title": {
+    "defaultMessage": "GitHub host",
+    "description": "A setting (HI-2779): the host of the repositories: github.com, a GHE.com host (yourcompany.ghe.com) or a GitHub Enterprise Server."
+  },
   "settings.journal.cap": {
     "defaultMessage": "Size cap",
     "description": "A label before the journal's size limit in MB (Settings → Assistant → Journal)."

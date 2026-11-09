@@ -2889,6 +2889,18 @@
   "settings.general.userName.title": {
     "placeholders": {}
   },
+  "settings.github.copilotHost.desc": {
+    "placeholders": {}
+  },
+  "settings.github.copilotHost.title": {
+    "placeholders": {}
+  },
+  "settings.github.host.desc": {
+    "placeholders": {}
+  },
+  "settings.github.host.title": {
+    "placeholders": {}
+  },
   "settings.keybindings.editor.desc": {
     "placeholders": {}
   },
