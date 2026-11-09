@@ -5593,7 +5593,11 @@ builder outside slots it renews (HI-2232, below): another running agent is left 
 status changes and the 30 s tick, builders and reviewers alike, whether or not a card is due, and with the workflow
 rules off too: only Combwork's own card starts need them) launches each owed agent
 once free (`launchFresh`: as Start Lane would, the lane's brief, a new conversation, or started if it stopped
-meanwhile). The launch is claimed under the lock (`launching`), and its ownership (the lane running, the agent in that
+meanwhile by itself). **Someone's Stop stops it** (HI-2815): an agent stopped by the user, the Assistant or an agent
+(`sessions.stop` with that cause, `stoppedOnPurposeAt`) after its entry's `since` is owed nothing more: the entry is
+removed, before the launch or at its checks (`still`), and nothing is launched; the lane stays, and updating it starts a
+stopped builder on it (`resumeLaneBuilder`, HI-1900). Before, the pass took the stopped agent for free and started it
+again within a second of the user's Stop (assistant-control's *Builder stopped*). The launch is claimed under the lock (`launching`), and its ownership (the lane running, the agent in that
 role, the same entry, unblocked) is checked again at every boundary the session layer gives: just before the old run
 stops and again before the new launch spawns (`newConversation`'s `allowed`, each call; a stopped agent's start's
 `allowed`) [HR1's round 1]; the entry is removed by its id only after the launch. **Bounded**: within Settings → Advanced → *Lanes: longest Combwork waits

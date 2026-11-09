@@ -678,6 +678,16 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
     log.warn(`Lane ${laneId}: ${userText(agent.name)}'s new conversation may not have started (a launch began and isn't proven): left for the user to retry`)
     return 'blocked'
   }
+  // Stopped by someone since it was owed (HI-2815: the user's Stop stops it): owed no more, and never started by it again.
+  // The lane stays: updating it starts a stopped builder on it (resumeLaneBuilder), and the user can start it themselves.
+  const since = Date.parse(entry.since)
+  const stoppedSince = (): boolean => sessions.stoppedOnPurposeAt(projectPath, agent.id) >= since
+  const dropStopped = async (): Promise<FreshOutcome> => {
+    await changeFreshStart(ws, laneId, entryId, () => null)
+    log.info(`Lane ${laneId}: ${userText(agent.name)} was stopped since its new conversation was owed: no longer owed`)
+    return 'gone'
+  }
+  if (stoppedSince()) return dropStopped()
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
   const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
@@ -700,7 +710,7 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
   // is replaced and as the launch spawns; refused, the claim is given back and the next pass tries again.
   const still = (): void => {
     const f = freshStartsNow(ws, laneId).find((x) => x.id === entryId)
-    if (!f || f.blocked || !f.launching || teamPauseOf(ws)) throw new FreshGone()
+    if (!f || f.blocked || !f.launching || teamPauseOf(ws) || stoppedSince()) throw new FreshGone()
   }
   const [r] = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, undefined, { role: entry.role, still })
   if (r?.how === 'fresh' || r?.how === 'started') {
@@ -712,6 +722,8 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
     await changeFreshStart(ws, laneId, entryId, ({ launching: _l, ...f }) => ({ ...f, blocked: { at: new Date().toISOString(), why: 'failed', message: (r.why ?? '').slice(0, 500) } })) // i18n-ignore: a fresh start's blocked reason, a select key (never shown as it is)
     return 'blocked'
   }
+  // Stopped by someone during the launch (HI-2815): nothing launched, and owed no more.
+  if (stoppedSince()) return dropStopped()
   // Not free after all, or gone meanwhile: the claim given back while the obligation is still this one.
   await changeFreshStart(ws, laneId, entryId, ({ launching: _l, ...f }) => f)
   return r?.how === 'deferred' ? 'notFree' : 'gone'
