@@ -450,6 +450,8 @@ interface CombworkMessageValues {
   'settings.advanced.copilot.signIn.errorType.title': undefined
   'settings.advanced.copilot.signIn.hookMessage.desc': undefined
   'settings.advanced.copilot.signIn.hookMessage.title': undefined
+  'settings.advanced.copilot.terminal.turn.desc': undefined
+  'settings.advanced.copilot.terminal.turn.title': undefined
   'settings.advanced.copilot.trust.prompt.desc': undefined
   'settings.advanced.copilot.trust.prompt.title': undefined
   'settings.advanced.copilot.turnFailed.errorType.desc': undefined

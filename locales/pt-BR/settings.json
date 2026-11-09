@@ -427,6 +427,8 @@
   "settings.advanced.copilot.quota.usedField.desc": "O campo de uma cota com quanto dela foi usado. Se estiver errado, os limites do Copilot não dizem quantos foram usados.",
   "settings.advanced.copilot.quota.usedField.title": "Limites do plano: campo do uso",
   "settings.advanced.copilot.ready.footer.desc": "O Copilot só avisa que começou com o primeiro prompt, então o Combwork entende o rodapé dele na tela como pronto.",
+  "settings.advanced.copilot.terminal.turn.title": "Estado do turno no terminal",
+  "settings.advanced.copilot.terminal.turn.desc": "O que o Copilot escreve no terminal dele (uma sequência OSC, sem o ESC ]) quando um turno começa e termina; o primeiro grupo é o estado (working, done). O Combwork só lê isso enquanto os hooks de um agente não chegam, para mostrá-lo trabalhando ou concluído; se estiver errado, esse agente mostra apenas que o status é desconhecido.",
   "settings.advanced.copilot.ready.footer.title": "Rodapé de pronto",
   "settings.advanced.copilot.retry.context.desc": "Onde o hook de erro do Copilot diz que um erro recuperável foi uma chamada ao modelo que ele tenta de novo (limite de taxa, ou o serviço inacessível). O Combwork mostra o agente esperando uma nova tentativa até o Copilot seguir. Errado, um agente esperando mostra só “Trabalhando”.",
   "settings.advanced.copilot.retry.context.title": "Nova tentativa: contexto do erro",

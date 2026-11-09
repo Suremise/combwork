@@ -2559,6 +2559,11 @@ export interface HooksMissing {
   offIn?: string
   /** managedOnly: a scope below that turns hooks off too, which doesn't stop managed hooks (HI-2777). */
   also?: string
+  /**
+   * What its CLI last wrote to its terminal of its turn (HI-2802, Copilot's OSC 7501; ProviderAdapter.terminalTurn), while
+   * its hooks are missing: working, done (finished) or idle (none begun). It never says a person must act.
+   */
+  terminal?: 'working' | 'done' | 'idle'
 }
 
 /**

@@ -168,6 +168,8 @@
   "panes.runtime.silent": "Silent {known, select, yes {{minutes, number}} other {?}} min · state unknown",
   "panes.runtime.starting": "Starting…",
   "panes.runtime.stopped": "Stopped",
+  "panes.runtime.terminalTurn": "{state, select, working {Working} done {Finished} other {Ready}} (from its terminal: no hooks from {provider})",
+  "panes.runtime.terminalTurnNote": "Meanwhile its status comes from its terminal, which says only whether it is working or finished: it can't show when it asks you something, such as a permission.",
   "panes.runtime.working": "Working…",
   "panes.safeguard.asks": "Its CLI asks what to do about it.",
   "panes.safeguard.idle": "Idle after the stop: give it a nudge.",

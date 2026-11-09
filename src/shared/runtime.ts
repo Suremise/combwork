@@ -1,9 +1,10 @@
 import { shownText } from './advanced'
+import { agentMsg, say } from './agentText'
 import { formatTime } from './dates'
 import { msg, tr as trNow } from './i18n'
 import { providerDescriptor } from './providers'
 import type { Tr } from './tasks'
-import type { LiveSessionState, RetryWait, RetryWaited, RuntimeFacts } from './types'
+import type { HooksMissing, LiveSessionState, RetryWait, RetryWaited, RuntimeFacts } from './types'
 
 /**
  * An agent's runtime as separate facts (#648), rather than one word standing for several. Each is stored where Combwork
@@ -113,6 +114,12 @@ export function retryWaitText(st: (Pick<LiveSessionState, 'retryWait' | 'turn'> 
 export function hooksMissingText(st: Pick<LiveSessionState, 'hooksMissing' | 'provider'> | null | undefined, tr?: Tr): string | null {
   if (!st?.hooksMissing) return null
   const provider = providerDescriptor(st.provider).name
+  // What its terminal says of its turn (HI-2802): working or finished, from there, never that it asks you.
+  const terminal = st.hooksMissing.terminal
+  if (terminal) {
+    if (tr) return tr(TERMINAL_TURN_TEXT, { state: terminal, provider })
+    return say(TERMINAL_TURN_AGENT, { state: terminal, provider })
+  }
   if (tr) return tr(msg({ id: 'panes.runtime.hooksMissing', defaultMessage: 'Status unknown: no hooks from {provider}', description: "An agent's status (its pane, the agents table): its coding agent ({provider}, a product name) has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing), so Combwork can't tell what it is doing. Keep it short." }), { provider })
   return `Status unknown: no hooks from ${provider}` // i18n-ignore: agent-facing (the Agent API's agent state)
 }
@@ -126,7 +133,34 @@ export function hooksMissingNote(st: Pick<LiveSessionState, 'hooksMissing' | 'pr
   if (!h) return null
   // A setting found here, for a CLI an organisation can also govern remotely: what it has there decides over it.
   const remote = !!providerDescriptor(st!.provider).capabilities.remoteHookPolicy && (h.why === 'off' || h.why === 'managedOnly' || h.why === 'blocked' || h.why === 'unreadable')
-  return tr(HOOKS_MISSING_NOTE, { provider: providerDescriptor(st!.provider).name, why: h.why ?? 'other', where: h.offIn ?? '', setting: h.setting ?? '', also: h.also ? 'yes' : 'no', alsoWhere: h.also ?? '', remote: remote ? 'yes' : 'no', after: h.after }) // i18n-ignore: select keys, never shown
+  // Its status from its terminal meanwhile (HI-2802): said, with what it can't show.
+  if (h.terminal) return `${hooksMissingNoteText(h, st!.provider, remote, tr)} ${tr(TERMINAL_TURN_NOTE)}`
+  return hooksMissingNoteText(h, st!.provider, remote, tr)
+}
+
+/** The status shown from its terminal while its hooks are missing (HI-2802). */
+const TERMINAL_TURN_TEXT = msg({
+  id: 'panes.runtime.terminalTurn',
+  defaultMessage: '{state, select, working {Working} done {Finished} other {Ready}} (from its terminal: no hooks from {provider})',
+  description: "An agent's status (its pane, the agents table) while its coding agent ({provider}, a product name) sends Combwork no hooks: what its terminal says instead (state: working, finished, or ready with nothing begun). Keep it short; keep the select keys."
+})
+
+/** TERMINAL_TURN_TEXT as the Agent API says it. */
+const TERMINAL_TURN_AGENT = agentMsg({
+  id: 'api.status.terminalTurn',
+  text: '{state, select, working {Working} done {Finished} other {Ready}} (from its terminal: no hooks from {provider})',
+  note: "An agent's status (the Agent API's statusMessage) while its CLI ({provider}) sends no hooks: what its terminal says of its turn instead (state: working, done, idle). It can't say the agent waits for the user."
+})
+
+/** What hooksMissingNote adds while its status comes from its terminal (HI-2802). */
+const TERMINAL_TURN_NOTE = msg({
+  id: 'panes.runtime.terminalTurnNote',
+  defaultMessage: "Meanwhile its status comes from its terminal, which says only whether it is working or finished: it can't show when it asks you something, such as a permission.",
+  description: "Added to the notice on an agent whose coding agent sends Combwork no hooks, when Combwork reads its status from the coding agent's terminal output instead: that output says working or finished, never that the agent waits for the user (a permission prompt)."
+})
+
+function hooksMissingNoteText(h: HooksMissing, provider: LiveSessionState['provider'], remote: boolean, tr: Tr): string {
+  return tr(HOOKS_MISSING_NOTE, { provider: providerDescriptor(provider).name, why: h.why ?? 'other', where: h.offIn ?? '', setting: h.setting ?? '', also: h.also ? 'yes' : 'no', alsoWhere: h.also ?? '', remote: remote ? 'yes' : 'no', after: h.after }) // i18n-ignore: select keys, never shown
 }
 
 /** hooksMissingNote's message (main's notification says it too). */

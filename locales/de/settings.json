@@ -427,6 +427,8 @@
   "settings.advanced.copilot.quota.usedField.desc": "Das Feld eines Kontingents mit dem, was davon genutzt ist. Ist es falsch, sagen die Limits von Copilot nicht, wie viel genutzt wurde.",
   "settings.advanced.copilot.quota.usedField.title": "Planlimits: Feld für den Verbrauch",
   "settings.advanced.copilot.ready.footer.desc": "Copilot meldet seinen Start erst mit dem ersten Prompt, daher versteht Combwork seine Fußzeile auf dem Bildschirm als bereit.",
+  "settings.advanced.copilot.terminal.turn.title": "Turn-Status im Terminal",
+  "settings.advanced.copilot.terminal.turn.desc": "Was Copilot in sein Terminal schreibt (eine OSC-Sequenz, ohne ihr ESC ]), wenn ein Turn beginnt und endet; die erste Gruppe ist der Status (working, done). Combwork liest es nur, solange die Hooks eines Agenten nicht ankommen, um ihn als arbeitend oder fertig zu zeigen; ist es falsch, zeigt ein solcher Agent nur, dass sein Status unbekannt ist.",
   "settings.advanced.copilot.ready.footer.title": "Fußzeile „bereit“",
   "settings.advanced.copilot.retry.context.desc": "Wo der Fehler-Hook von Copilot sagt, dass ein behebbarer Fehler ein Modellaufruf war, den es erneut versucht (Ratenlimit oder Dienst nicht erreichbar). Combwork zeigt den Agenten als wartend auf einen neuen Versuch, bis Copilot weitermacht. Falsch, zeigt ein wartender Agent nur „Arbeitet“.",
   "settings.advanced.copilot.retry.context.title": "Neuer Versuch: Fehlerkontext",

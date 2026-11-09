@@ -1,0 +1,5 @@
+{
+  "cli": "1.0.106",
+  "note": "OSC payloads (without ESC ] and BEL) Copilot 1.0.106 wrote to its terminal over two quick turns, in order: idle at start, then working and done for each turn. Recorded by tests/e2e/hookscopilot.cjs (its log prints them), offline against the stand-in model in a test home (HI-2802). Windows Terminal's progress (OSC 9;4) isn't sent outside Windows Terminal.",
+  "osc": ["7501;state=idle:app=copilot", "7501;state=working:app=copilot", "7501;state=done:app=copilot", "7501;state=working:app=copilot", "7501;state=done:app=copilot"]
+}

@@ -427,6 +427,8 @@
   "settings.advanced.copilot.quota.usedField.desc": "配额中表示已用量的字段。若设置有误，Copilot 的限额不会显示已用数量。",
   "settings.advanced.copilot.quota.usedField.title": "套餐限额：已用量字段",
   "settings.advanced.copilot.ready.footer.desc": "Copilot 要到第一条提示词时才报告已启动，因此 Combwork 把屏幕上出现其底栏视为它已就绪。",
+  "settings.advanced.copilot.terminal.turn.title": "终端中的轮次状态",
+  "settings.advanced.copilot.terminal.turn.desc": "Copilot 在一轮开始和结束时写入其终端的内容（一个 OSC 序列，不含 ESC ]）；第一个分组是状态（working、done）。Combwork 只在某个智能体的钩子未送达时读取它，以显示其工作中或已完成；如果有误，该智能体只会显示状态未知。",
   "settings.advanced.copilot.ready.footer.title": "就绪底栏",
   "settings.advanced.copilot.retry.context.desc": "Copilot 的错误钩子表明可恢复错误是它会重试的模型调用的位置（被限流，或无法连接到服务）。在 Copilot 继续之前，Combwork 将智能体显示为等待重试。设置错误时，等待中的智能体只会显示“工作中”。",
   "settings.advanced.copilot.retry.context.title": "重试：错误上下文",
