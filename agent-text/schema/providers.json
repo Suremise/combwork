@@ -129,6 +129,11 @@
   "providers.copilot.updateModified": {
     "placeholders": {}
   },
+  "providers.opencode.adoptRefused": {
+    "placeholders": {
+      "why": "select"
+    }
+  },
   "providers.opencode.claudeAgentModel": {
     "placeholders": {
       "provider": "plain",
