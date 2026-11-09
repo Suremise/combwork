@@ -236,22 +236,27 @@ const beta = path.join(fx.ws, 'beta')
     // --- Links: the lane header's project opens its Version Control tab at Workflow; the queue card at Merge queue.
     const link = row(l2).locator('.progress-lane-project')
     check("the lane header names its project, with its accessible name", (await link.innerText()) === 'alpha' && /open its workflow in Version Control/.test((await link.getAttribute('aria-label')) ?? ''), await row(l2).innerText())
-    // Evidence (HI-2816): rc.1's loaded run found a dialog over the window here, its click refused for 30 s; which one?
-    const overlays = await page.locator('.overlay').evaluateAll((els) => els.map((e) => e.innerText.replace(/\s+/g, ' ').slice(0, 300)))
-    if (overlays.length) {
-      console.log(`INFO a dialog was over the window before the lane header's click: ${JSON.stringify(overlays)}`)
-      await page.screenshot({ path: path.join(lib.WORK, 'lanestages-overlay.png') }).catch(() => undefined)
-    }
-    await link.click()
+    // Turning the rules off and on (above) restarts the project's agents for the workflow in the background (HI-2694): one
+    // working just then (R1, on a wake) is asked about in a dialog, whenever it comes, and that dialog takes the clicks
+    // (HI-2816: rc.1's loaded run). Answered Later wherever it is in the way: nothing here is about it.
+    const restartAsked = page.locator('.overlay', { hasText: 'for the new workflow?' })
+    const clickPast = async (target) => !!(await waitHung(async () => {
+      if (await restartAsked.count()) {
+        console.log(`INFO answered Later: ${(await restartAsked.innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 120)}`)
+        await restartAsked.getByRole('button', { name: 'Later', exact: true }).click().catch(() => undefined)
+      }
+      return target.click({ timeout: 2000 }).then(() => true, () => false)
+    }))
+    await clickPast(link)
     const section = (id) => page.locator(`[role="tab"][data-section="${id}"][aria-selected="true"]`)
     check("…a click opens alpha's Version Control tab at Workflow", !!(await waitHung(async () => (await section('workflow').count()) === 1)))
-    await page.getByRole('button', { name: 'Task Board' }).click()
+    await clickPast(page.getByRole('button', { name: 'Task Board' }))
     await showTab('merges')
     const queueLink = panel.locator('.progress-queue-link').first()
     await waitHung(async () => (await queueLink.count()) === 1)
-    await queueLink.click()
+    await clickPast(queueLink)
     check('the Merges tab’s queue card opens the Merge queue section', !!(await waitHung(async () => (await section('queue').count()) === 1)))
-    await page.getByRole('button', { name: 'Task Board' }).click()
+    await clickPast(page.getByRole('button', { name: 'Task Board' }))
     await showTab('pulse')
 
     // --- Solo: Pulse shows no lanes of beta (preset Solo) unless one runs; the Lanes tab keeps them.
