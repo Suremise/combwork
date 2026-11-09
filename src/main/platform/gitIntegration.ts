@@ -12,6 +12,13 @@ import * as G from './git'
 import type { Again, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions } from './integration'
 import { isUnknown, type Unknown } from './types'
 import { readConflicts } from '../workflow/conflictRead'
+import { agentMsg, say } from '../../shared/agentText'
+
+// The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
+const NOT_SAME = agentMsg({ id: 'queue.candidate.notSame', text: "{card}: {revision} brought up to date with {target} ({expected}) isn't the same change as reviewed: bring it up to date yourself and submit it again.", note: "A card's log from the merge queue (strict, G8): the reviewed revision, brought up to date with the target in the queue's worktree, isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids; target: the branch." })
+const NOT_ON_TOP = agentMsg({ id: 'queue.candidate.notOnTop', text: "{card}: {revision} rebased onto {expected} isn't on top of the target: rebase it onto the target yourself and submit it again.", note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision doesn't sit on the target's head, so the card goes back. card: its key; revision and expected: short commit ids." })
+const MERGE_COMMIT = agentMsg({ id: 'queue.candidate.mergeCommit', text: '{card}: {revision} rebased onto {expected} would land a merge commit (Rebase and fast-forward lands a linear history): rebase it onto the target yourself and submit it again.', note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision would add a merge commit to the target, so the card goes back. card: its key; revision and expected: short commit ids." })
+const REBASED_NOT_SAME = agentMsg({ id: 'queue.candidate.rebasedNotSame', text: "{card}: {revision} rebased onto {expected} isn't the same change as reviewed: rebase it onto the target yourself and submit it again.", note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids." })
 
 /**
  * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
@@ -130,7 +137,7 @@ export const gitIntegration: IntegrationPort = {
     if (isUnknown(head)) return again(gitSaid(head))
     // The same change as reviewed, replayed onto the target's head (the candidate key, then the tree)?
     if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: head }))) {
-      return { fail: 'notSame', log: `${c.card}: ${revision.slice(0, 7)} brought up to date with ${c.target} (${expected.slice(0, 7)}) isn't the same change as reviewed: bring it up to date yourself and submit it again.` } // i18n-ignore: the card's log, agent-facing
+      return { fail: 'notSame', log: say(NOT_SAME, { card: c.card, revision: revision.slice(0, 7), target: c.target, expected: expected.slice(0, 7) }) }
     }
     await h.run(h.project, ['update-ref', `refs/cw/queue/${refSafe(c.entry)}`, head])
     return { updated: head }
@@ -248,14 +255,14 @@ async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string;
     if (isUnknown(head)) return again(gitSaid(head))
     result = head
   }
-  const notUp = (why: string): CandidateTestFail => ({ fail: 'notUpToDate', log: `${c.card}: ${revision.slice(0, 7)} rebased onto ${expected.slice(0, 7)} ${why}: rebase it onto the target yourself and submit it again.` }) // i18n-ignore: the card's log, agent-facing
+  const notUp = (m: typeof NOT_ON_TOP | typeof MERGE_COMMIT | typeof REBASED_NOT_SAME): CandidateTestFail => ({ fail: 'notUpToDate', log: say(m, { card: c.card, revision: revision.slice(0, 7), expected: expected.slice(0, 7) }) })
   const anc = await h.run(h.project, ['merge-base', '--is-ancestor', expected, result])
-  if (anc.code === 1) return notUp("isn't on top of the target") // i18n-ignore: the card's log, agent-facing
+  if (anc.code === 1) return notUp(NOT_ON_TOP)
   if (anc.code !== 0) return again(anc.err)
   const twoParents = await h.run(h.project, ['rev-list', '--min-parents=2', `${expected}..${result}`])
   if (!twoParents.ok) return again(twoParents.err)
-  if (twoParents.out.trim()) return notUp('would land a merge commit (Rebase and fast-forward lands a linear history)') // i18n-ignore: the card's log, agent-facing
-  if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: result }))) return notUp("isn't the same change as reviewed") // i18n-ignore: the card's log, agent-facing
+  if (twoParents.out.trim()) return notUp(MERGE_COMMIT)
+  if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: result }))) return notUp(REBASED_NOT_SAME)
   await h.run(h.project, ['update-ref', `refs/cw/queue/${refSafe(c.card)}`, result])
   return { result }
 }
