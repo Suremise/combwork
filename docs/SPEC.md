@@ -2256,7 +2256,7 @@ works.
 | Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
 | Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private copies rebased, squashed or merged; conflicts typed | J4 |
-| **Integration: target advance** | CAS (§16.9.2) | — | **Open** (below) | **gate: advance** (J1) |
+| **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
 | Publish | G18's push of a captured head containing the owed result (R4.6) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
@@ -2374,8 +2374,11 @@ contract fixes:
   back to Darren; Git's guarantees are never weakened to match.
 
 **J1's finding (HI-2794, 9 Nov): the tested jj 0.47.1 CLI protocol does not meet R4.1, and no conforming protocol has
-been proved.** gate:advance stays **closed**; the decision is Darren's (asked on HI-2794), and J4/J5 build no unattended
-advance until he makes it. The evidence is an **unregistered diagnostic probe**, `platform/jjAdvanceProbe.ts`: in no
+been proved.** gate:advance stays **closed**. **Decided** (Darren, 9 Nov [HI-2794]: "Let's do A and not request them to
+change anything right now"): jj has **no automatic advance**. jj work goes on toward **user-performed integration**: the
+user merges, and Combwork's containment checks (J3) record the result. An attended advance (a merge the user starts,
+with a preview) isn't taken, and nothing is asked of the jj project for now: that is carded on hold, for later, if
+Combwork's use grows. J4/J5 build no advance of their own on jj. The evidence is an **unregistered diagnostic probe**, `platform/jjAdvanceProbe.ts`: in no
 port, writing no fact, imported by nothing in `src` (`tests/integrationPortsImports.test.ts`). Its verdicts are
 observations, never a CAS result: `advancedObserved` is not Integrated evidence and `notApplied` is not permission to
 retry. It tries the strongest protocol the CLI offers, one step at a time, each mutation journaled first and the lease
