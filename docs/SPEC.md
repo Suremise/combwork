@@ -2267,8 +2267,94 @@ works.
 | **Relocation** (moved workspace or project, the name upgrade's repair) | Supported (`workspaceMove.ts`, `combworkMove.ts`) | Supported | **Not supported**: no jj workspace move was validated | **gate: relocation**: a jj project's workspace or slots aren't moved; the move refuses with the reason |
 | Plain `git` run by an agent in a jj workspace | — | — | Add and commit seen through import (HI-2781); reset, rebase, merge and index-conflict states unvalidated | **gate: plainGit** (J7): guidance and detection before it's allowed |
 
-The gates' ids are the descriptor's (J0 adds them); their detection (which file or config makes a repository use
-attributes, hooks, LFS or submodules) is J0's and J7's to specify, failing closed: unreadable is "uses it".
+The gates' ids are the descriptor's (J0 added them: `Gate`, `GATES` in `shared/platform/descriptors.ts`; jj's descriptor,
+J6's, lists those closed). J0 specifies their detection; the compatibility assessment that runs it is J6's (shown
+before a switch), completed by J7. It reads what Git and jj would actually apply, never one source of it: the
+**effective** Git config of the store, every level and include Git reads (system, global, `XDG_CONFIG_HOME`, the
+store's, a worktree's, `include` and `includeIf`, as `git config --show-origin --show-scope` lists them, run with
+the store's environment), jj's effective config (`jj config list`: user, repository and workspace levels), and every
+attribute source Git applies. Anything it can't read, list or resolve (an unreadable file, an include it can't follow,
+a configured path outside what it can read, a tool that doesn't answer) is "uses it": the gate stays closed.
+- **attributes:** any of Git's attribute sources (the system `gitattributes`, the file `core.attributesFile` names or
+  its default `XDG_CONFIG_HOME/git/attributes`, every tracked `.gitattributes`, the store's `info/attributes`) setting
+  `text`, `eol`, `filter`, `diff`, `merge`, `working-tree-encoding` or `ident`; or `core.autocrlf`, `core.eol` or a
+  `filter.<name>.clean`, `.smudge` or `.process` set in the effective config.
+- **lfs:** `filter=lfs` in any attribute source, an `lfs.*` or `filter.lfs.*` key in the effective config, or a
+  `.lfsconfig`.
+- **submodules:** a `.gitmodules`, a gitlink in the tree, or a `submodule.*` key in the effective config.
+- **hooks:** `core.hooksPath` at any level (its folder, resolved as Git resolves it, holding any file), or a file in
+  the store's `hooks/` that isn't a `*.sample`.
+- **signing:** `commit.gpgSign` or `tag.gpgSign` at any level, or jj's `signing.behavior` set to `own` or `force`.
+
+##### jj's runner and detection (1.5.0's J0, HI-2793)
+
+J0 built jj's execution and read-only detection, and enables nothing: `PlatformId` stays `'none' | 'git'`, jj isn't in
+`repoPorts.ts`' ports, and a `.jj` is still None (§16.3.5), so no project, folder, lock, file list or trust root
+changes. Git's runner and worker are untouched.
+- **The pinned version:** `resources/tested-vcs.json` (beside `tested-clis.json`, which the real tier's CLI records
+  write) names the jj Combwork is tested with (0.47.1, HI-2781's) and the official Windows build it was tested on (its
+  URL and SHA-256). `shared/jjTool.ts` reads it. Only that version is **supported** (`ok`): jj's command line and files
+  change between 0.x releases, so a newer one is `untested` (the runner starts it, for a report, but nothing trusts
+  what it says: detection is unknown with it, and every J card's reads ask `jjSupported`) and an older one `old` (not
+  run). Supporting another version is a change of the pin, with its real-jj run.
+- **The runner** (`platform/jjRunner.ts`, `jjProcess.ts`, its own worker `jjWorker.ts`, built as `jj-worker`): the
+  standalone `jj.exe` on Combwork's PATH (R1.5), checked lazily (`jj --version`, one check at a time: when something
+  asks, so nothing runs at startup for users without jj).
+  - **Every command** is non-interactive whatever the user's, repository's or workspace's config says: `--no-pager`,
+    `--color=never`, and `--config` overrides (they win over every config level, jj 0.47.1's config.md) giving
+    `ui.editor`, `ui.diff-editor` and `ui.merge-editor` a program that isn't there (an editor fails at once rather than
+    waits) and `fsmonitor.backend="none"`; `JJ_EDITOR` the same program; no credential prompts
+    (`GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`, `SSH_ASKPASS_REQUIRE=never`); its standard input closed after
+    what it is given. Combwork never edits jj's config files.
+  - **A read** (every command unless the caller asks to write; J0 has no writer) adds `--ignore-working-copy` (R5.3:
+    no snapshot, and a stale workspace isn't brought up to date) and `--config=snapshot.auto-update-stale=false`. J0's
+    reads are `jj --version`, `jj root` and `jj git root`; colocation is read from the files (below), not from
+    `jj git colocation status`.
+  - **Bounds:** an output cap (16 MB unless given), a time limit (a minute unless given) and cancellation (an
+    `AbortSignal`). Each ends jj's whole process tree by identity (`processTree.ts`, moved from cw-progress, which ends
+    its command's the same way: listed with start times, children first, each ended only while its pid still names
+    the process listed, so a reused pid is never ended, #655), and the result settles once its output has closed, after
+    that teardown. Such a result, a missing tool or a jj too old is code -1 and never an answer (rule 3).
+  - **Shutdown** (`shutdown(ms)`): ends every command under way, each one's tree, then jj's worker, within its bound;
+    a command asked after it starts nothing. The J card that first runs jj for a project calls it as Combwork quits.
+  - The bounds become Advanced settings with that card too.
+- **Detection** (`platform/jjDetect.ts`, `jjContextOf(folder)`): the nearest `.jj` at or above the folder (at most
+  256 levels); its shared repository (`.jj/repo`, or the file a `jj workspace add` workspace has naming it: `linked`); a
+  Git-backed store only (`store/type` is `git`; another backend is unknown and gets no store identity); and its Git
+  store, named as Git's context and repository lock name a store (`repoLock.ts` `commonGitDir`): the common git dir
+  `store/git_target` leads to (a worktree's administrative folder followed to its `commondir`, never a store of its
+  own), real (links, junctions and drive aliases resolved), compared case-insensitively (`sameStore`), and a Git folder
+  (it has a HEAD). So a colocated pair, its jj-made workspaces and Git's context of the same folders are one store
+  with one lock (R1.1). `colocated`: the workspace's root has a `.git` whose common dir is that store (a jj-made
+  workspace of a colocated repository has a Git worktree). `nestedGit`: a Git root nearer the folder than the
+  workspace's. Marker files are read bounded (one line, at most 4 KB, no NUL): anything else is malformed, unknown,
+  never followed. jj's files are hints (their format is no API), so the supported jj confirms them, reading only:
+  `jj root` and `jj git root` must name the same root and store. The answer is a `JjContext`, `none` (no `.jj`, no
+  process run), or unknown with a code (`noRepo`, `emptyPointer`, `repoGone`, `storeType`, `backend`, `gitStore`,
+  `tool`, `notRun`, `disagrees`) and its data (a path, jj's words, the command and what was expected; never prose),
+  never facts from the files alone. It never runs `jj git init`, changes colocation or snapshots.
+- **Copy Diagnostics** names jj's state (its version and path, the tested version, old or untested), checking it
+  when asked (no process when jj isn't on PATH).
+- **Tests:**
+  - `tests/jjRunner.test.ts` (a fake jj): the version's states, the prefix and environment, the cap, the time limit,
+    cancellation and shutdown, each ending the fake's whole tree and nothing else (a process of the test's own
+    started first survives), in this thread and through the built worker, and a missing tool.
+  - `tests/jjDetect.test.ts` (hand-made layouts, a stub jj): each unknown, an untested jj never asked, malformed
+    markers, a worktree's administrative folder as `git_target` resolving to its common dir.
+  - `tests/jjReal.test.ts` on the real pinned jj, fetched and checked by `npm run jj:fetch` into the test area's
+    `tools` folder (never system-wide), every repository a `tempDir()` with jj's and git's config isolated: the version,
+    a missing tool, colocated and non-colocated repositories, linked workspaces, nested roots, a damaged `.jj`, the cap
+    and cancellation on real jj, store identity against Git's own context (`sameStore`), and that detection writes
+    nothing: `.jj`, the whole `.git` (refs, config, index) and the operation log as they were, in a colocated
+    repository with plain-Git commits and branches jj hasn't imported, and in a stale linked workspace with a local
+    edit (not updated, not snapshotted, the edit still there). Without the fetched jj it is skipped, saying so;
+    `CW_JJ_REAL=1` makes its absence fail: a card's acceptance is its run with `CW_JJ_REAL=1` at the submitted
+    revision, never a skipped run.
+- **Left to the J cards:** registering jj's context port and routing R9's six seams by the project's platform. Each
+  seam is routed by the J card implementing its port, **before** that card enables it for jj: `slotWorkspaces()` and
+  `slotRelocation()` J2's, `lineHistory()` J3's, `queueIntegration()` J4's and J5's, `lineRepoReads()` and
+  `lineRepoOps()` J6's, as is jj's descriptor (its capabilities, operations and closed gates, aligned with HI-2822's
+  descriptor contract once that is on 1.5.0).
 
 ##### Open: jj's target advance (J1's gate)
 
@@ -2366,7 +2452,7 @@ R9 (HI-2792) finished the routing and closed 1.4.0's refactor with the audit:
   - common (the folder fence);
   - historic migration (1.1's refs and exclude-line upgrade, the 1.1 folder move, 1.0's slot migration);
   - defect with its card: HI-2753's move proof still runs git in `retargetCard.ts` (HI-2821).
-- **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0, and J0 routes each by the project's platform.
+- **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0; the J card implementing each one's port routes it by the project's platform (J0's section above).
 - **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, or a changed seam count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 - **The text audit:** shared, UI and agent text that names Git is Git-facing and stays. The platform-id switches older than 1.4.0 over the workflow options' schema, the window and a few main modules are carded as HI-2822, before J0.
 
