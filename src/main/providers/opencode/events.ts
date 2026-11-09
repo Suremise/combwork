@@ -31,10 +31,22 @@ export interface OcEvent {
   assistantMessageID?: string
   error?: { type?: string; message?: string; status?: number }
   reason?: string
+  /** session.usage.updated: the session's cost and tokens so far (no hooks: HI-2762's live usage reads them). */
+  cost?: number
+  tokens?: OcTokens
 }
 
+export interface OcTokens {
+  input?: number
+  output?: number
+  reasoning?: number
+  cache?: { read?: number; write?: number }
+}
+
+const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
+
 /** The event types the launcher subscribes to (`/api/event?types=`): everything else never leaves the server. */
-export const STREAM_TYPES = ['session.inbox.enqueued', 'session.step.started', 'session.tool.called', 'session.tool.success', 'session.tool.failed', 'permission.asked', 'permission.replied', 'session.retry.scheduled', 'session.execution.succeeded', 'session.execution.failed', 'session.execution.interrupted'] as const
+export const STREAM_TYPES = ['session.inbox.enqueued', 'session.step.started', 'session.tool.called', 'session.tool.success', 'session.tool.failed', 'permission.asked', 'permission.replied', 'session.retry.scheduled', 'session.execution.succeeded', 'session.execution.failed', 'session.execution.interrupted', 'session.compaction.started', 'session.compaction.ended', 'session.usage.updated'] as const
 
 /** Text cut to what status needs (a prompt's words, a resource, an error), as the launcher cuts it. */
 export const cut = (s: unknown, max: number): string | undefined => (typeof s === 'string' ? (s.length > max ? s.slice(0, max) : s) : undefined)
@@ -56,6 +68,11 @@ export function projectEvent(raw: Record<string, any>, sessionID: string): OcEve
   if (type === 'permission.replied') Object.assign(e, { requestID: d.requestID, reply: d.reply })
   if (d.error) e.error = { type: cut(d.error.type, 200), message: cut(d.error.message, 500), ...(typeof d.error.status === 'number' ? { status: d.error.status } : {}) }
   if (typeof d.reason === 'string') e.reason = cut(d.reason, 200)
+  if (type === 'session.usage.updated') {
+    e.cost = num(d.cost)
+    const k = d.tokens ?? {}
+    e.tokens = { input: num(k.input), output: num(k.output), reasoning: num(k.reasoning), cache: { read: num(k.cache?.read), write: num(k.cache?.write) } }
+  }
   for (const k of Object.keys(e) as (keyof OcEvent)[]) if (e[k] === undefined) delete e[k]
   return e
 }
@@ -67,6 +84,9 @@ export interface OcMessage {
   outcome?: string
   error?: { type?: string; message?: string }
   text?: string
+  /** A compaction's (its execution's first message, its inbox id): running or completed, and why (manual, auto). */
+  status?: string
+  reason?: string
 }
 
 export interface OcPermission {
@@ -109,10 +129,12 @@ export interface OcTracker {
   askText: Map<string, string>
   answered: Set<string>
   baselined: boolean
+  /** The open execution, when it is a compaction (its inbox id), and whether its start has been said. */
+  compacting: { id: string; shown: boolean } | null
 }
 
 export function newTracker(): OcTracker {
-  return { gen: 0, cut: -1, open: null, submitted: new Set(), ended: new Set(), msgTurn: new Map(), asks: new Map(), askText: new Map(), answered: new Set(), baselined: false }
+  return { gen: 0, cut: -1, open: null, submitted: new Set(), ended: new Set(), msgTurn: new Map(), asks: new Map(), askText: new Map(), answered: new Set(), baselined: false, compacting: null }
 }
 
 /** A launch's tracker, in its hook memo. */
@@ -153,7 +175,36 @@ function close(t: OcTracker, out: Normalized[], outcome: string | undefined, err
     t.asks.delete(req)
     t.askText.delete(req)
   }
+  // A compaction's execution ends the compaction, however it ended: no turn of the user's ran.
+  const k = t.compacting
+  if (k?.id === turn) {
+    t.compacting = null
+    if (k.shown) out.push(hook({ kind: 'compactEnd' }, turn))
+    return
+  }
   out.push(endOf(outcome, error, turn))
+}
+
+/**
+ * A compaction submitted (2.2.6: an inbox item of type compaction, `/compact` or POST /compact): its own execution, under
+ * its inbox id, counting no prompt. While a turn runs it is left to that turn (none recorded runs inside one). `shown`:
+ * its start said at once (a snapshot shows it under way); otherwise its session.compaction.started says it.
+ */
+function compaction(t: OcTracker, out: Normalized[], id: string, shown: boolean, trigger: string | undefined): void {
+  if (t.submitted.has(id)) return
+  remember(t.submitted, id)
+  if (t.open || t.ended.has(id)) return
+  t.open = id
+  t.compacting = { id, shown: false }
+  if (shown) compactionStarted(t, out, trigger)
+}
+
+/** The open compaction's start said (once), the agent compacting until its execution ends. */
+function compactionStarted(t: OcTracker, out: Normalized[], trigger: string | undefined): void {
+  const k = t.compacting
+  if (!k || k.shown || k.id !== t.open) return
+  k.shown = true
+  out.push(hook({ kind: 'compactStart', trigger: trigger ?? 'manual' }, k.id))
 }
 
 /** A submission: it opens an execution, or is a prompt in the one running; never counted twice. */
@@ -207,6 +258,16 @@ export function applyEvent(t: OcTracker, gen: number, e: OcEvent): Normalized[] 
   switch (e.type) {
     case 'session.inbox.enqueued':
       if (e.inboxID && (e.itemType ?? 'user') === 'user') submit(t, out, e.inboxID, e.text)
+      else if (e.inboxID && e.itemType === 'compaction') compaction(t, out, e.inboxID, false, undefined)
+      break
+    case 'session.compaction.started':
+      // The compaction's own execution's; one inside a user's turn (none recorded) is that turn's, the turn going on.
+      if (t.compacting) compactionStarted(t, out, e.reason)
+      else if (turn) out.push(hook({ kind: 'compactStart', trigger: e.reason ?? 'auto' }, turn))
+      break
+    case 'session.compaction.ended':
+      // A compaction's own execution ends with it (close); one inside a user's turn ends here, the turn still working.
+      if (turn && !t.compacting) out.push(hook({ kind: 'compactEnd' }, turn))
       break
     case 'session.step.started':
       if (turn && e.assistantMessageID) rememberIn(t.msgTurn, e.assistantMessageID, turn)
@@ -242,10 +303,11 @@ export function applyEvent(t: OcTracker, gen: number, e: OcEvent): Normalized[] 
   return out
 }
 
-/** One execution as a snapshot's messages show it: its submissions, its assistant messages, its end if it has one. */
+/** One execution as a snapshot's messages show it: its submissions (or its compaction), its assistant messages, its end if it has one. */
 interface Execution {
   turn: string | null
   users: OcMessage[]
+  compaction?: OcMessage
   assistants: string[]
   closed: OcMessage | null
 }
@@ -261,6 +323,10 @@ export function executionsOf(messages: readonly OcMessage[]): Execution[] {
         out.push(cur)
       }
       cur.users.push(m)
+    } else if (m.type === 'compaction' && !cur) {
+      // A compaction's own execution, named by its message (its inbox id). One inside a running execution is that one's.
+      cur = { turn: m.id, users: [], compaction: m, assistants: [], closed: null }
+      out.push(cur)
     } else if (m.type === 'idle') {
       if (!cur) out.push({ turn: null, users: [], assistants: [], closed: m })
       else cur.closed = m
@@ -292,9 +358,15 @@ export function applySnapshot(t: OcTracker, gen: number, s: OcSnapshot): Normali
     if (history && x.closed) {
       if (x.turn) remember(t.ended, x.turn)
       for (const u of x.users) remember(t.submitted, u.id)
+      if (x.compaction) remember(t.submitted, x.compaction.id)
       continue
     }
     if (!turn) continue
+    if (x.compaction) {
+      compaction(t, out, x.compaction.id, true, x.compaction.reason)
+      // Taken live before its start was streamed (the stream dropped between): its start, as the snapshot shows it.
+      compactionStarted(t, out, x.compaction.reason)
+    }
     for (const u of x.users) submit(t, out, u.id, u.text)
     if (t.open !== turn) continue
     for (const a of x.assistants) rememberIn(t.msgTurn, a, turn)

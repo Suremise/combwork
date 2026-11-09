@@ -273,7 +273,9 @@ export class OpencodeAdapter implements ProviderAdapter {
       cwd: ctx.cwd,
       sessionId: ctx.sessionId,
       intent: ctx.resume ? 'resume' : 'new',
-      tuiArgs: [...opencodeModeFlags(mode), ...ctx.extraArgs.flatMap((a) => a.split(/\s+/)).filter(Boolean)],
+      // The launch's first task (a Combwork start, the Assistant's) as 2.2.6's TUI takes one: --prompt, submitted as it opens.
+      // The launcher's argument list is joined with U+001F, so none stays in it.
+      tuiArgs: [...opencodeModeFlags(mode), ...(ctx.initialPrompt ? ['--prompt', ctx.initialPrompt.replace(/\u001f/g, ' ')] : []), ...ctx.extraArgs.flatMap((a) => a.split(/\s+/)).filter(Boolean)],
       dirs: [ctx.cwd, ctx.projectPath],
       privateDir: ctx.privateDir,
       owner: p.owner,

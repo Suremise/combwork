@@ -157,8 +157,10 @@ describe.runIf(windows)("the launcher follows OpenCode's session: baseline first
     await prompt(r, 'hello')
     await until(() => tracked(hook.bodies).ends.length === 1, 'the turn to end')
     const types = hook.bodies.slice(1).map((b) => b.event?.type)
-    expect(types).toEqual(['session.inbox.enqueued', 'session.step.started', 'session.execution.succeeded'])
+    expect(types).toEqual(['session.inbox.enqueued', 'session.usage.updated', 'session.step.started', 'session.usage.updated', 'session.execution.succeeded'])
     expect(hook.bodies[1].event).toMatchObject({ inboxID: expect.stringMatching(/^msg_/), itemType: 'user', text: 'hello', seq: expect.any(Number) })
+    // Usage as events.ts projects it (for HI-2762's live usage): cost and tokens, numbers only, no seq (2.2.6 gives none).
+    expect(hook.bodies[2].event).toEqual({ type: 'session.usage.updated', cost: 0, tokens: { input: expect.any(Number), output: expect.any(Number), reasoning: expect.any(Number), cache: { read: expect.any(Number), write: expect.any(Number) } } })
     expect(tracked(hook.bodies)).toEqual({ prompts: 1, ends: ['stop'], open: null })
     l.child.kill()
     await l.exit
