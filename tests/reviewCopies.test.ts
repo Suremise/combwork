@@ -91,7 +91,7 @@ describe("the grant of the project's copies folder (extraDirs)", () => {
     expect(copiesDirOf('D:\\Work\\ws.worktrees', 'D:\\Work\\ws\\proj')).toBe(join('D:\\Work\\ws.worktrees', 'proj', COPIES_DIR))
   })
 
-  it('every provider Combwork has can be given folders (OpenCode since HI-2772: 2.2.6's default rules reach the copies, no grant needed)', () => {
+  it("every provider Combwork has can be given folders (OpenCode since HI-2772: 2.2.6's default rules reach the copies, no grant needed)", () => {
     for (const p of PROVIDERS) expect(p.capabilities.extraDirs, p.id).toBe(true)
   })
 
