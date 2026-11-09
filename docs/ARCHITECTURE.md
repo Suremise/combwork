@@ -322,9 +322,18 @@ refusals' git commands are the descriptor's `remedies`. **The audit** is `tests/
 module from outside Git's implementation is a classified edge (Git implementation, a port's registry, Git-facing UI,
 historic migration, common, or a defect with its card), with the names it may take. It also counts the remaining
 "platform with lines" seams (`lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`,
-`slotWorkspaces()`, `slotRelocation()`) per caller: in 1.4.0 these resolve to Git alone, and 1.5.0's J0 routes each
-by the project's platform. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one, or a
+`slotWorkspaces()`, `slotRelocation()`) per caller: in 1.4.0 these resolve to Git alone, and the 1.5.0 J card
+implementing each one's port routes it by the project's platform. `tests/gitAudit.test.ts` (check:repo) fails on an unlisted edge or name, a stale one, or a
 changed seam count. `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
+jj (1.5.0's J0, HI-2793; SPEC §16.3.6, jj's runner and detection) is not a platform yet: `platform/jjRunner.ts` is its
+bounded runner (the standalone `jj.exe`, its version against `resources/tested-vcs.json` through `shared/jjTool.ts`,
+reads with `--ignore-working-copy` and config overrides, an output cap, a time limit, cancellation and shutdown, each
+ending jj's process tree by identity through `processTree.ts`, which cw-progress's wrapper uses too), starting its
+processes in its own worker (`platform/jjWorker.ts` over `jjProcess.ts`, never Git's); only the pinned version is
+trusted (`jjSupported`; a newer one is `untested`); and `platform/jjDetect.ts` is read-only detection
+(`jjContextOf`: the workspace, its shared repository and Git store, linked, colocated, a nearer Git root, or unknown
+with a code). Neither is in `repoPorts.ts`; only Copy Diagnostics and the tests reach them (`tests/jjReal.test.ts` on
+the pinned jj, `npm run jj:fetch`).
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

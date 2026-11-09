@@ -33,6 +33,17 @@ export type Operation =
   | 'init'
   | 'ignoreRules'
 
+/**
+ * A compatibility gate (SPEC §16.3.6's matrix, HI-2793's J0): a capability or operation a platform refuses until its J
+ * card's evidence opens it. Closed, it is absent from the platform's descriptor and the switch's assessment says why;
+ * detecting a repository that uses one (attributes, hooks, LFS, submodules) fails closed: unreadable is "uses it". No
+ * platform has gates in 1.5.0's J0: jj's descriptor (J6) lists them.
+ */
+export type Gate = 'attributes' | 'hooks' | 'lfs' | 'submodules' | 'signing' | 'relocation' | 'plainGit' | 'advance' | 'publish' | 'sharedFolder'
+
+/** Every gate, in the matrix's order. */
+export const GATES: readonly Gate[] = ['attributes', 'hooks', 'lfs', 'submodules', 'signing', 'relocation', 'plainGit', 'advance', 'publish', 'sharedFolder']
+
 /** Every operation, in one place: Git lists them all (it has each today). */
 export const OPERATIONS: readonly Operation[] = ['switchLine', 'createLine', 'deleteLines', 'deleteRemoteLines', 'updateLine', 'mergeLine', 'addRemote', 'renameRemote', 'setRemoteUrl', 'removeRemote', 'fetch', 'pull', 'push', 'pushTo', 'setUpstream', 'createTag', 'setIdentity', 'init', 'ignoreRules']
 
