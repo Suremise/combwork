@@ -272,7 +272,10 @@ const toastText = (page, re) => page.evaluate((src) => [...document.querySelecto
     c = null
     fs.writeFileSync(path.join(claudeHome, 'fake-start-hold-Worker'), '')
     c = await start()
-    check('Worker is starting (its CLI held)', !!(await lib.until(async () => (await c.live(agents.Worker.id))?.status === 'starting' && record()?.entries?.find((e) => e.agentName === 'Worker')?.state === 'starting', HUNG_MS, 200)), JSON.stringify(record()))
+    // Still starting once Combwork has looked at its transcript (transcriptBytes set): the conversation's transcript is there
+    // from before, which isn't its CLI being up (HI-2816: it showed ready, so a loaded run read it too late to see starting).
+    const held = await lib.until(async () => { const l = await c.live(agents.Worker.id); return l?.transcriptBytes !== undefined && record()?.entries?.find((e) => e.agentName === 'Worker')?.state === 'starting' ? l : null }, HUNG_MS, 200)
+    check('Worker is starting (its CLI held), its transcript looked at', held?.status === 'starting', JSON.stringify({ live: held && { status: held.status, transcriptBytes: held.transcriptBytes }, record: record() }))
     check('Combwork is ended from outside meanwhile', await endFromOutside(c))
     c = null
     const midway = logLines().length

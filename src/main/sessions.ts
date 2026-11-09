@@ -560,6 +560,8 @@ interface LiveSession {
   turnSeen?: object
   /** This launch resumes a conversation (a failed start's Retry resumes it again). */
   resumed?: boolean
+  /** A resumed launch's transcript size just before its spawn (HI-2816; -1 none found): only growth past it says the CLI is up. */
+  resumedBytes?: number
   /** The Combwork Assistant's mode (its id) its conversation was last given, started in or told: recorded with it. */
   mode?: string
   /** This launch gave its conversation instructions of Combwork's own (SessionRecord.promptAdded): recorded with it. */
@@ -3058,6 +3060,9 @@ class SessionManager {
     // Not while its folder is being changed under it (#646: a Git switch or pull there): it starts once that is done.
     await folderSteady(cwd)
     times?.mark('folderSteady')
+    // A resumed conversation's transcript as it is before its CLI can write (HI-2816): the transcript fallback counts only
+    // what it gains from here, however soon the CLI writes and whenever Combwork first looks. Not found: any counts.
+    if (l.resumed) l.resumedBytes = await this.liveTranscript(l).then((t) => (t ? stat(t).then((s) => s.size) : -1)).catch(() => -1)
     // Its connection, the last await (HI-1755): its choice as saved now (read under the lock saves take), resolved again,
     // must still be the one prepared. From here to the spawn nothing awaits, so no save lands between. Another chosen,
     // or the one prepared removed: this launch ends, and it starts again on the choice saved now (launchOnChosen).
@@ -5277,8 +5282,11 @@ class SessionManager {
   /** What follows from the live transcript growing: status, usage, details, compaction, cost. */
   private async transcriptChanged(l: LiveSession, projectPath: string, agentId: string, src: string, size: number, force: boolean, hooks: number): Promise<void> {
     const sessionId = l.state.sessionId
-    // Fallback if hooks never arrive: a transcript means the session is up.
-    if (l.state.status === 'starting') {
+    // Fallback if hooks never arrive: a transcript means the session is up. Not a resumed conversation's as it was, there
+    // before its CLI started (HI-2816: a held or slow resume showed ready, and deliveries tried to type into it): only
+    // what it gained since its size before the spawn.
+    const before = l.resumed ? (l.resumedBytes ?? -1) : -1
+    if (l.state.status === 'starting' && size > before) {
       this.fact(l.state, { lifecycle: 'running' })
       l.state.status = 'ready'
       this.emitState(l.state)

@@ -191,6 +191,32 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `resume-${n
     // The CLI forgets it again (as Claude Code does after 30 days).
     fs.rmSync(restored, { force: true })
   }
+
+  // A resumed conversation's transcript is there before its CLI starts (HI-2816): with no hook from it, only what the CLI
+  // writes after the spawn says it is up, whenever Combwork first looks. Its session held (no SessionStart) in both.
+  const fakeHome = path.join(scratch, 'resume-claude-home')
+  const fakeFile = (n) => path.join(fakeHome, `${n}-${A1.name.replace(/[^\w-]/g, '_')}`)
+  const liveA1 = async () => (await inv('session:live')).find((l) => l.agentId === A1.id && l.sessionId === OLDER)
+  const stopA1 = async () => {
+    fs.writeFileSync(fakeFile('fake-start-go'), '')
+    await inv('session:stop', proj, A1.id)
+    await lib.until(async () => !(await inv('session:live')).some((l) => l.agentId === A1.id), 15000)
+    fs.rmSync(fakeFile('fake-start-go'), { force: true })
+  }
+  // Held, writing nothing: still starting once Combwork has looked at the transcript (transcriptBytes set).
+  fs.writeFileSync(fakeFile('fake-start-hold'), '')
+  await inv('session:start', proj, { resumeId: OLDER, agentId: A1.id })
+  const looked = await lib.until(async () => { const l = await liveA1(); return !fs.existsSync(fakeFile('fake-start-hold')) && l?.transcriptBytes !== undefined ? l : null }, 30000)
+  check('held, its transcript as it was: still starting after a look', looked?.status === 'starting', JSON.stringify(looked && { status: looked.status, transcriptBytes: looked.transcriptBytes }))
+  await stopA1()
+  // Held after writing its start (as soon as it runs, before Combwork's first look): ready from that write.
+  fs.writeFileSync(fakeFile('fake-start-write'), '')
+  fs.writeFileSync(fakeFile('fake-start-hold'), '')
+  await inv('session:start', proj, { resumeId: OLDER, agentId: A1.id })
+  const wrote = await lib.until(() => !fs.existsSync(fakeFile('fake-start-write')) && !fs.existsSync(fakeFile('fake-start-hold')), 30000)
+  const up = await lib.until(async () => (await liveA1())?.status === 'ready', 30000)
+  check('held after writing its start: ready, from what it wrote', !!wrote && !!up, JSON.stringify((await liveA1())?.status))
+  await stopA1()
   await app.close()
   console.log(`\n${pass} passed, ${fail} failed`)
   process.exit(fail ? 1 : 0)
