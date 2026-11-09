@@ -208,20 +208,38 @@ const thread = new JjThread(jjWorkerScript)
  * A jj runner. `exe`: this jj (the real-jj fixtures' portable one), else the one on the environment's PATH, found again
  * at each check. `env`: the environment it runs in (tests isolate jj's config and home), else Combwork's. `here`: run
  * on this thread rather than jj's worker (tests); `worker`: a test's build of jj's worker. `before`: arguments before jj's own (tests: a fake jj, a script node runs).
+ * `versionTimeout`: the check's time limit (tests).
  */
-export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?: boolean; before?: readonly string[]; worker?: string } = {}): JjRunner {
+export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?: boolean; before?: readonly string[]; worker?: string; versionTimeout?: number } = {}): JjRunner {
   let current: JjTool = { state: 'unknown' }
   let checking: Promise<JjTool> | null = null
   const base = (): NodeJS.ProcessEnv => o.env ?? process.env
-  const own = o.worker ? new JjThread(() => o.worker!) : thread
-  const exec = (m: JjRequest, signal?: AbortSignal): Promise<JjOutcome> => (o.here ? runJj(m, signal) : own.run(m, signal))
+  const ownThread = o.worker ? new JjThread(() => o.worker!) : thread
+  const exec = (m: JjRequest, signal?: AbortSignal): Promise<JjOutcome> => (o.here ? runJj(m, signal) : ownThread.run(m, signal))
+
+  // Everything of this runner's under way, each with its own cancel and its end: every run from its first step
+  // (readiness included) and every check, so shutdown owns all of it and nothing starts after it (HR2, HI-2793 round 1).
+  const running = new Set<{ ac: AbortController; ended: Promise<unknown> }>()
+  let closed = false
+  const own = <T>(ac: AbortController, work: Promise<T>): Promise<T> => {
+    const entry = { ac, ended: work }
+    running.add(entry)
+    return work.finally(() => running.delete(entry))
+  }
+  /** A result for a command that never started because the runner was shut down, or its run was cancelled first. */
+  const stopped = (what: string, why: 'failed' | 'cancelled'): JjRunResult => resultOf({ stdout: new Uint8Array(), stderr: new Uint8Array(), end: why === 'failed' ? { notRun: 'failed', detail: 'shut down' } : { notRun: 'cancelled' } }, what) // i18n-ignore: a protocol detail, for the log
 
   const readiness = (): Promise<JjTool> => {
+    // Shut down: no check starts; the tool as last checked.
+    if (closed) return Promise.resolve(current)
     checking ??= (async (): Promise<JjTool> => {
       const exe = o.exe ?? jjOnPath(base()) ?? undefined
       if (!exe) return { state: 'missing' }
-      const r = resultOf(await exec({ exe, cwd: process.cwd(), args: [...(o.before ?? []), '--version'], env: jjEnv(base()), maxOutput: 64 * 1024, timeout: JJ_DEFAULTS.versionTimeout }), '--version')
-      const version = parseJjVersion(r.out)
+      const ac = new AbortController()
+      const r = resultOf(await own(ac, exec({ exe, cwd: process.cwd(), args: [...(o.before ?? []), '--version'], env: jjEnv(base()), maxOutput: 64 * 1024, timeout: o.versionTimeout ?? JJ_DEFAULTS.versionTimeout }, ac.signal)), '--version')
+      // Only jj's own successful exit is an answer (rule 3): a version printed by a run that failed, timed out, was
+      // capped or cancelled is never taken for the tool's.
+      const version = r.ok ? parseJjVersion(r.out) : null
       if (version) return jjToolOf(version, exe)
       if (r.missing) return { state: 'missing' }
       return { state: 'unknown', path: exe, error: r.timedOut ? 'jj --version took too long' : r.ok ? `jj --version said "${r.out.trim().slice(0, 80)}"` : r.err.split(/\r?\n/)[0] || `exit code ${r.code}` } // i18n-ignore: jj's own answer, for the log and Copy Diagnostics
@@ -241,9 +259,6 @@ export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?
     return checking
   }
 
-  // Each command under way: its own cancel (linked to its caller's) and its end, so shutdown can end them all.
-  const running = new Set<{ ac: AbortController; ended: Promise<unknown> }>()
-  let closed = false
   return {
     readiness,
     readinessNow: () => current,
@@ -254,33 +269,31 @@ export function createJjRunner(o: { exe?: string; env?: NodeJS.ProcessEnv; here?
       let timer: ReturnType<typeof setTimeout> | undefined
       await Promise.race([Promise.allSettled([...running].map((r) => r.ended)), new Promise((res) => (timer = setTimeout(res, ms)))])
       clearTimeout(timer)
-      await own.stop()
+      await ownThread.stop()
     },
-    async run(folder, args, opts = {}) {
+    run(folder, args, opts = {}) {
       const what = args[0] ?? ''
-      if (closed) return resultOf({ stdout: new Uint8Array(), stderr: new Uint8Array(), end: { notRun: 'failed', detail: 'shut down' } }, what) // i18n-ignore: a protocol detail, for the log
-      // Not usable as last checked (never checked, missing, an answer it couldn't read): checked again first, so one
-      // installed since runs. A jj too old stays refused until Check again (no `--version` before every command).
-      const t = jjRunnable(current) || current.state === 'old' ? current : await readiness()
-      if (!jjRunnable(t) || !t.path) return refused(t, what)
-      const full = [...(o.before ?? []), ...JJ_PREFIX, ...(opts.write ? [] : JJ_READ), ...args]
+      if (closed) return Promise.resolve(stopped(what, 'failed'))
+      // The run's own cancel, from its first step: its caller's signal, or shutdown.
       const ac = new AbortController()
       const cancel = (): void => ac.abort()
       opts.signal?.addEventListener('abort', cancel, { once: true })
       if (opts.signal?.aborted) ac.abort()
-      const ended = exec({ exe: t.path, cwd: folder, args: full, env: jjEnv(base(), opts.env), maxOutput: opts.maxOutput ?? JJ_DEFAULTS.maxOutput, timeout: opts.timeout ?? JJ_DEFAULTS.timeout, ...(opts.input !== undefined ? { input: opts.input } : {}) }, ac.signal)
-      const entry = { ac, ended }
-      running.add(entry)
-      const r = resultOf(
-        await ended.finally(() => {
-          running.delete(entry)
-          opts.signal?.removeEventListener('abort', cancel)
-        }),
-        what
-      )
-      // The tool went (uninstalled, moved): checked again, so the next command and Copy Diagnostics say so.
-      if (r.missing) void readiness()
-      return r
+      const work = (async (): Promise<JjRunResult> => {
+        // Not usable as last checked (never checked, missing, an answer it couldn't read): checked again first, so one
+        // installed since runs. A jj too old stays refused until Check again (no `--version` before every command).
+        const t = jjRunnable(current) || current.state === 'old' ? current : await readiness()
+        // Shut down or cancelled while it waited: nothing starts.
+        if (closed) return stopped(what, 'failed')
+        if (ac.signal.aborted) return stopped(what, 'cancelled')
+        if (!jjRunnable(t) || !t.path) return refused(t, what)
+        const full = [...(o.before ?? []), ...JJ_PREFIX, ...(opts.write ? [] : JJ_READ), ...args]
+        const r = resultOf(await exec({ exe: t.path, cwd: folder, args: full, env: jjEnv(base(), opts.env), maxOutput: opts.maxOutput ?? JJ_DEFAULTS.maxOutput, timeout: opts.timeout ?? JJ_DEFAULTS.timeout, ...(opts.input !== undefined ? { input: opts.input } : {}) }, ac.signal), what)
+        // The tool went (uninstalled, moved): checked again, so the next command and Copy Diagnostics say so.
+        if (r.missing) void readiness()
+        return r
+      })()
+      return own(ac, work).finally(() => opts.signal?.removeEventListener('abort', cancel))
     }
   }
 }

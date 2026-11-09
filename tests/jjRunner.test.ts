@@ -19,7 +19,15 @@ writeFileSync(
   fake,
   `const fs = require('fs')
 const args = process.argv.slice(2)
-if (args[0] === '--version') { process.stdout.write(process.env.FAKE_JJ_SAYS ?? 'jj 0.47.1-d16ee1fc88a72c54142241b079a34bbf3b033bc0\\n'); process.exit(0) }
+const say = () => process.stdout.write(process.env.FAKE_JJ_SAYS ?? 'jj 0.47.1-d16ee1fc88a72c54142241b079a34bbf3b033bc0\\n')
+if (args[0] === '--version' && process.env.FAKE_JJ_VERSION_STARTED) {
+  // Held at a barrier: says it started, then waits for the test's release before it answers.
+  fs.writeFileSync(process.env.FAKE_JJ_VERSION_STARTED, String(process.pid))
+  setInterval(() => { if (fs.existsSync(process.env.FAKE_JJ_RELEASE)) { say(); process.exit(0) } }, 20)
+}
+else if (args[0] === '--version' && process.env.FAKE_JJ_VERSION_HANG) { say(); setInterval(() => {}, 1000) }
+else if (args[0] === '--version') { say(); process.exit(Number(process.env.FAKE_JJ_VERSION_EXIT ?? 0)) }
+else {
 if (process.env.FAKE_JJ_PID) fs.writeFileSync(process.env.FAKE_JJ_PID, String(process.pid))
 const mode = process.env.FAKE_JJ_MODE
 if (mode === 'flood') { const chunk = 'x'.repeat(64 * 1024); const go = () => { while (process.stdout.write(chunk)); process.stdout.once('drain', go) }; go() }
@@ -27,6 +35,7 @@ else if (mode === 'hang') setInterval(() => {}, 1000)
 else if (mode === 'tree') { const c = require('child_process').spawn(process.execPath, ['-e', 'require("fs").writeFileSync(process.env.FAKE_JJ_CHILD, String(process.pid)); setInterval(() => {}, 1000)'], { stdio: 'inherit' }); setInterval(() => {}, 1000) }
 else if (mode === 'stdin') { let got = ''; process.stdin.on('data', (d) => (got += d)); process.stdin.on('end', () => { process.stdout.write('read:' + got); process.exit(3) }) }
 else { process.stdout.write(JSON.stringify({ args, editor: process.env.JJ_EDITOR, prompt: process.env.GIT_TERMINAL_PROMPT, cwd: process.cwd() })); process.exit(Number(process.env.FAKE_JJ_EXIT ?? 0)) }
+}
 `
 )
 const env = (extra: Record<string, string> = {}): NodeJS.ProcessEnv => ({ SYSTEMROOT: process.env.SYSTEMROOT, PATH: '', ...extra })
@@ -160,6 +169,43 @@ describe("jj's runner", () => {
     expect(await r.readiness()).toMatchObject({ state: 'unknown', error: expect.stringContaining('something else') })
     expect(r.problem()).toMatch(/Couldn't check Jujutsu/)
   })
+
+  it('never takes a version printed by a check that failed, timed out or was capped for the tool (HR2, round 1)', async () => {
+    // A valid-looking version, then a nonzero exit.
+    expect(await runner({ FAKE_JJ_VERSION_EXIT: '7' }).readiness()).toMatchObject({ state: 'unknown' })
+    // A valid-looking version, then no exit before the check's time limit.
+    const hung = createJjRunner({ exe: process.execPath, before: [fake], env: env({ FAKE_JJ_VERSION_HANG: '1' }), here: true, versionTimeout: 500 })
+    expect(await hung.readiness()).toMatchObject({ state: 'unknown', error: 'jj --version took too long' })
+    // Nor is anything run with it.
+    expect(await hung.run(dir, ['root'], { timeout: 2000 })).toMatchObject({ ok: false, code: -1 })
+  })
+})
+
+/**
+ * HR2's round 1 race: shutdown while a run waits on the tool's check. The fake's `--version` says it started, then
+ * waits at a barrier the test releases only after shutdown has returned; nothing may start after shutdown.
+ */
+async function shutdownWhileChecking(make: (extra: Record<string, string>) => ReturnType<typeof createJjRunner>): Promise<void> {
+  const probe = tempDir('jj-runner-barrier-')
+  const [started, release, pid] = [join(probe, 'started'), join(probe, 'release'), join(probe, 'pid')]
+  const r = make({ FAKE_JJ_VERSION_STARTED: started, FAKE_JJ_RELEASE: release, FAKE_JJ_PID: pid })
+  const running = r.run(dir, ['log'], { timeout: 60_000 })
+  await expect.poll(() => existsSync(started), { timeout: 20_000 }).toBe(true)
+  const checker = Number(readFileSync(started, 'utf8'))
+  await r.shutdown(10_000)
+  // By the time shutdown returns, the check's process is ended (it owned it) and the run has its answer.
+  expect(alive(checker)).toBe(false)
+  writeFileSync(release, '')
+  expect(await running).toMatchObject({ ok: false, code: -1 })
+  // Nothing started after: the command never ran (its marker absent), and neither a check nor a run starts now.
+  expect(existsSync(pid)).toBe(false)
+  expect(await r.readiness()).not.toMatchObject({ state: 'ok' })
+  expect(await r.run(dir, ['log'])).toMatchObject({ ok: false, code: -1, notRun: 'failed' })
+  expect(existsSync(pid)).toBe(false)
+}
+
+describe("jj's shutdown while a run waits on the tool's check", () => {
+  it('in this thread: owns the check, ends it, and starts nothing after', () => shutdownWhileChecking((extra) => runner(extra)))
 })
 
 describe("jj's worker thread", () => {
@@ -187,6 +233,8 @@ describe("jj's worker thread", () => {
     expect(await running).toMatchObject({ code: -1, cancelled: true })
     expect(alive(Number(readFileSync(pid, 'utf8')))).toBe(false)
   })
+
+  it("shuts down while a run waits on the tool's check in the worker: the check ended, nothing started after", () => shutdownWhileChecking((extra) => inWorker(extra)))
 
   it("shuts down: the worker's commands and their trees ended, then the worker", async () => {
     const probe = tempDir('jj-worker-shutdown-')
