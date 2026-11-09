@@ -21,7 +21,7 @@ import {
 import { BRANCH_GROUPS, busyLines, cleanupOffer, localGroup, localUse, remoteGroup, type BranchGroup, type CleanupOffer } from '@shared/branchCleanup'
 import { samePath } from '@shared/movePaths'
 import { call } from '../api'
-import { offered, repoOp } from '../repoOps'
+import { offered, offeredCleanup, repoOp } from '../repoOps'
 import { attempt, releaseHeldSlot } from '../actions'
 import { SLOT_HELD_TEXT } from '../components/SlotsAndCopies'
 import { bumpGit, cardLabelOf, choose, confirm, notify, prompt, set, showVersionControl, UNUSED_ROOT, useStore } from '../store'
@@ -397,7 +397,8 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
         const remoteOnly = remoteRows.filter((r) => !info.branches.some((b) => b.name === r.name.slice(r.name.indexOf('/') + 1)))
         // Grouped by state against the project's target (#1642); with none known, the list as it was.
         const target = info.target ?? null
-        const offer = cleanupOffer(info, busyBranches)
+        // Each part by its own operation (HR3's HI-2788 round 1): local lines by deleting lines, remote ones by deleting remote lines.
+        const offer = offeredCleanup(cleanupOffer(info, busyBranches))
         // Update from <target> (HI-1180): a branch that lacks some of the target's commits (never the target), with work of
         // its own, or in use (HR4's round 1: a card's new line behind its target, fast-forwarded); a merged branch nothing
         // uses is Clean Up's, not to update.
@@ -525,7 +526,7 @@ export function BranchesSection({ project }: { project: ProjectInfo }) {
 
             <h2 className="section git-section-head">
               {tr(M.branches)} <span className="badge">{info.branches.length}</span>
-              {target && offered('git:deleteBranches') && (
+              {target && (offered('git:deleteBranches') || offered('git:deleteRemoteBranches')) && (
                 <span className="git-section-actions">
                   <Tooltip content={ro ?? tr(C.cleanUpTip, { n: offer.local.length + offer.remote.length, target })}>
                     <span>

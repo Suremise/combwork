@@ -25,6 +25,7 @@ import { TaskStrip } from '../components/Board'
 import { ProviderIcon } from '../components/ProviderIcon'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
+import { offered } from '../repoOps'
 import { DocEditor } from '../components/DocEditor'
 import { DiffView } from '../components/Editors'
 import { COMPARE_ROOT, CompareGroup, ComparePage, compareRoot, parseCompareRoot, useCompareLines } from '../components/ChangesCompare'
@@ -1241,9 +1242,9 @@ export function ChangesTab({ project: owner }: { project: ProjectInfo }) {
         <div className="pane-header" style={{ paddingLeft: 14 }}>
           {tr(C.changes)} <span className="badge" style={{ marginLeft: 6 }}>{status.files.length}</span>
           <div className="actions">
-            {agent && !legacy && own?.branch && <IconButton icon="git-merge" action="merge-slot" title={tr(C.mergeBranch, { branch: own.branch })} onClick={() => set({ branchMergeFor: { project: owner.path, branch: own.branch! } })} />}
-            {agent && legacy && <IconButton icon="git-merge" action="merge-agent" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
-            {spare?.branch && !spare.check.removable && <IconButton icon="git-merge" action="merge-unused" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set(spare.slot ? { branchMergeFor: { project: owner.path, branch: spare.branch! } } : { mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
+            {agent && !legacy && own?.branch && offered('worktrees:mergeBranch') && <IconButton icon="git-merge" action="merge-slot" title={tr(C.mergeBranch, { branch: own.branch })} onClick={() => set({ branchMergeFor: { project: owner.path, branch: own.branch! } })} />}
+            {agent && legacy && offered('agents:merge') && <IconButton icon="git-merge" action="merge-agent" title={mergeBlocked(agent.name, agent.live?.status) ?? tr(C.mergeAgent, { agent: agent.name })} disabled={!!mergeBlocked(agent.name, agent.live?.status)} onClick={() => set({ mergeFor: { project: owner.path, agentId: agent.id } })} />}
+            {spare?.branch && !spare.check.removable && offered(spare.slot ? 'worktrees:mergeBranch' : 'worktrees:mergeUnused') && <IconButton icon="git-merge" action="merge-unused" title={tr(C.mergeBranch, { branch: spare.branch! })} onClick={() => set(spare.slot ? { branchMergeFor: { project: owner.path, branch: spare.branch! } } : { mergeFor: { project: owner.path, agentId: '', worktree: { path: spare.path, branch: spare.branch! } } })} />}
             <IconButton icon="refresh" title={tr(M.refresh)} onClick={load} />
           </div>
         </div>
@@ -1822,7 +1823,7 @@ function AgentList({ project }: { project: ProjectInfo }) {
               </div>
             </div>
             <IconButton icon="settings" title={tr(S.agentSettings)} onClick={() => set({ agentSettingsFor: { project: project.path, agentId: a.id } })} />
-            {own && <IconButton icon="git-merge" title={mergeBlocked(a.name, a.live?.status) ?? tr(S.merge)} disabled={!!mergeBlocked(a.name, a.live?.status)} onClick={() => set({ mergeFor: { project: project.path, agentId: a.id } })} />}
+            {own && offered('agents:merge') && <IconButton icon="git-merge" title={mergeBlocked(a.name, a.live?.status) ?? tr(S.merge)} disabled={!!mergeBlocked(a.name, a.live?.status)} onClick={() => set({ mergeFor: { project: project.path, agentId: a.id } })} />}
             <IconButton icon="close" title={tr(S.remove)} className="act-remove" action="remove-agent" onClick={() => void actions.removeAgent(project.path, a.id)} />
           </div>
         )

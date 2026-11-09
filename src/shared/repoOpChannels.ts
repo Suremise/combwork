@@ -12,6 +12,9 @@ export const REPO_OP_CHANNELS = {
   'git:deleteRemoteBranches': 'deleteRemoteLines',
   'git:updateBranch': 'updateLine',
   'worktrees:mergeBranch': 'mergeLine',
+  // The older Merge dialog's: an agent's 0.9 worktree, and an unused worktree (HR3's HI-2788 round 1).
+  'agents:merge': 'mergeLine',
+  'worktrees:mergeUnused': 'mergeLine',
   'git:addRemote': 'addRemote',
   'git:renameRemote': 'renameRemote',
   'git:setRemoteUrl': 'setRemoteUrl',

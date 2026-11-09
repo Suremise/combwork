@@ -4,7 +4,7 @@ import type { BranchQueueCard } from '@shared/workflow/queue'
 import { msg, tr, tRich } from '@shared/i18n'
 import * as actions from '../actions'
 import { call, errorMessage } from '../api'
-import { repoOp } from '../repoOps'
+import { offered, repoOp } from '../repoOps'
 import { projectMergeChoice } from '../mergeChoice'
 import { confirm, notify, set, useLanguage, useStore } from '../store'
 import { cx } from '../util'
@@ -234,12 +234,12 @@ export function BranchMergeDialog() {
           <button className="btn subtle" onClick={close}>
             {tr(result?.conflicts ? M.close : M.cancel)}
           </button>
-          {!result?.conflicts && queueCard && (
+          {!result?.conflicts && queueCard && offered('worktrees:mergeBranch') && (
             <button className="btn subtle" data-action="merge-anyway" disabled={!ready} onClick={() => void merge(true)}>
               {tr(M.anyway)}
             </button>
           )}
-          {!result?.conflicts && (
+          {!result?.conflicts && offered('worktrees:mergeBranch') && (
             <button className={cx('btn', queueCard ? 'merge-held' : 'primary')} data-action="merge" disabled={!ready || !!queueCard} onClick={() => void merge()}>
               <Icon name={busy ? 'loading' : 'git-merge'} spin={busy} /> {tr(M.merge)}
             </button>

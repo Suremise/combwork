@@ -155,10 +155,13 @@ describe('the platform each entry point selects is the window’s as before (HI-
 describe('the one map (HI-2788)', () => {
   it('every mutation channel is a handler of repoOpsIpc.ts, or ipc.ts’ merge through opsAt; ipc.ts calls no mutation itself', () => {
     const channels = Object.keys(REPO_OP_CHANNELS).sort()
-    expect([...Object.keys(repoOpHandlers), 'worktrees:mergeBranch'].sort()).toEqual(channels)
+    expect([...Object.keys(repoOpHandlers), 'worktrees:mergeBranch', 'agents:merge', 'worktrees:mergeUnused'].sort()).toEqual(channels)
     const ipc = readFileSync(join(__dirname, '..', 'src', 'main', 'ipc.ts'), 'utf8')
     expect(ipc).toContain('...repoOpHandlers,')
     expect(ipc).toContain("opsAt('worktrees:mergeBranch').mergeLine(")
+    // The older merges refuse at their handler's start (their port call is further in, in their lock).
+    expect(ipc).toContain("refuseUnoffered('agents:merge')")
+    expect(ipc).toContain("refuseUnoffered('worktrees:mergeUnused')")
     expect(ipc).not.toMatch(/from '\.\/(gitRepo|gitInit)'/)
     expect(ipc).not.toMatch(/filesGit\.(gitExclude|gitUntrack|gitInclude)\b/)
     expect(ipc).not.toMatch(/\bmergeBranch\(path/)

@@ -18,10 +18,16 @@ import type { OpsFor } from './platform/repoOps'
 /** The port for a channel's operation, refused (in the window's words) when its platform doesn't list it. */
 export const opsAt = <C extends RepoOpChannel>(channel: C): OpsFor<(typeof REPO_OP_CHANNELS)[C]> => lineRepoOps(REPO_OP_CHANNELS[channel])
 
+/**
+ * Refuses a channel's operation when its platform doesn't list it, before anything else the handler does: the older
+ * merges (an agent's 0.9 worktree, an unused worktree), whose port call is further in, inside their merge's lock.
+ */
+export const refuseUnoffered = (channel: RepoOpChannel): void => void opsAt(channel)
+
 type Handler<C extends CombworkChannel> = (...args: Parameters<CombworkRequests[C]>) => ReturnType<CombworkRequests[C]> | Promise<ReturnType<CombworkRequests[C]>>
 
 /** The handlers, as ipc.ts had them: the same argument checks, then the port (`worktrees:mergeBranch` stays ipc.ts'). */
-export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBranch'>]: Handler<C> } = {
+export const repoOpHandlers: { [C in Exclude<RepoOpChannel, 'worktrees:mergeBranch' | 'agents:merge' | 'worktrees:mergeUnused'>]: Handler<C> } = {
   'git:switch': (p, branch) => opsAt('git:switch').switchLine(p, String(branch ?? '')),
   'git:createBranch': (p, name, stay, from) => opsAt('git:createBranch').createLine(p, String(name ?? ''), !!stay, branchStartArg(from)),
   'git:deleteBranches': (p, items, unmerged) => opsAt('git:deleteBranches').deleteLines(p, Array.isArray(items) ? items : [], !!unmerged),

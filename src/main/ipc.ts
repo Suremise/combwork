@@ -146,7 +146,7 @@ import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
-import { opsAt, repoOpHandlers } from './repoOpsIpc'
+import { opsAt, refuseUnoffered, repoOpHandlers } from './repoOpsIpc'
 import { nextVersionPlan, previewFor, startNextVersion } from './workflow/nextVersion'
 import { branchStartArg } from '../shared/nextVersion'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
@@ -1308,6 +1308,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'agents:branchStatuses': () => branchWatch.statuses(),
     'agents:merge': async (p, id, opts) => {
       const path = workspace.assertProject(p)
+      refuseUnoffered('agents:merge')
       const branch = legacyWorktree(agentsOf(await workspace.projectConfig(path)).find((a) => a.id === id))?.branch
       return authorizedMerge(path, branch, opts, () => projectAgents.merge(p, id, opts))
     },
@@ -1315,6 +1316,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'worktrees:unusedBranchStatus': (p, path) => unusedBranchStatus(p, path),
     'worktrees:mergeUnused': async (p, path, opts) => {
       const project = workspace.assertProject(p)
+      refuseUnoffered('worktrees:mergeUnused')
       const r = await authorizedMerge(project, await unusedBranchOf(project, path), opts, () => mergeUnused(p, path, opts))
       if (r.cleanedUp) storage.forgetStorage(p)
       return r
