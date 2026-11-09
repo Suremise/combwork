@@ -43,6 +43,45 @@ export function chosenAmbient(saved: SavedCredentials | null): Set<string> {
   return out
 }
 
+/** A test copy's own local provider (CW_TEST_OPENCODE_PROVIDER, HI-2763's real tier): its id, its server and its model. */
+export interface TestProvider {
+  id: string
+  baseURL: string
+  model: string
+}
+
+/**
+ * CW_TEST_OPENCODE_PROVIDER, JSON `{"id","baseURL","model"}`, honoured by unpackaged builds only (a DEV_SEAM): a real-tier
+ * run's local provider, so it makes no cloud call. Anything malformed, a packaged build, or a base URL that isn't
+ * loopback: none.
+ */
+export function testProviderOf(raw: string | undefined, packaged: boolean): TestProvider | null {
+  if (packaged || !raw) return null
+  try {
+    const v = JSON.parse(raw) as Partial<TestProvider>
+    const ok = typeof v.id === 'string' && /^[a-z0-9][a-z0-9-]{0,30}$/.test(v.id) && typeof v.model === 'string' && !!v.model && typeof v.baseURL === 'string' && /^http:\/\/127\.0\.0\.1:\d+\//.test(v.baseURL)
+    return ok ? { id: v.id!, baseURL: v.baseURL!, model: v.model! } : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * A config with the test provider in it (none: the config unchanged, the production recipe): the provider (2.2.6's V2
+ * shape), every provider denied but it in place of the production provider policies (the MCP policies kept), and on a
+ * launch its model.
+ */
+export function withTestProvider(cfg: Record<string, unknown>, tp: TestProvider | null, launch: boolean): Record<string, unknown> {
+  if (!tp) return cfg
+  const mcp = ((cfg.policies as Policy[] | undefined) ?? []).filter((p) => p.action === 'mcp.use')
+  return {
+    ...cfg,
+    providers: { [tp.id]: { name: 'Combwork test', package: '@opencode/ai/providers/openai-compatible', settings: { baseURL: tp.baseURL }, models: { [tp.model]: { name: tp.model } } } },
+    policies: [{ action: 'provider.use', resource: '*', effect: 'deny' }, { action: 'provider.use', resource: tp.id, effect: 'allow' }, ...mcp],
+    ...(launch ? { model: `${tp.id}/${tp.model}` } : {})
+  }
+}
+
 /** MCP servers allowed: every one denied, then each given allowed by name (2.2.6's mcp.use). */
 export function mcpPolicies(servers: readonly string[]): Policy[] {
   return [{ action: 'mcp.use', resource: '*', effect: 'deny' }, ...servers.map((n): Policy => ({ action: 'mcp.use', resource: n, effect: 'allow' }))]

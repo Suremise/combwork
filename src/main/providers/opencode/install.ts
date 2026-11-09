@@ -14,7 +14,8 @@ import { compareVersions, EDITOR_EXTENSION_PATH, installText, notInstalledIssue,
 import type { CommandSpec } from '../types'
 import { localDataRoot } from '../antigravity/home'
 import { ambientIntegrations, noAutoUpdate, opencodeEnv, stripCredentials } from './home'
-import { checkConfig, loginConfig, parseAuthList, writeConfigDir, type SavedCredentials } from './config'
+import { app } from 'electron'
+import { checkConfig, loginConfig, parseAuthList, testProviderOf, withTestProvider, writeConfigDir, type SavedCredentials, type TestProvider } from './config'
 import { parseOpencodeModels } from './models'
 import type { CatalogModel } from '../../../shared/types'
 
@@ -57,6 +58,9 @@ export function parseOpencodeVersion(text: string, pattern: RegExp = advanced.pa
 /** OpenCode 2 or later: V1 and the archived project (0.x) share the executable's name and aren't supported. */
 export const isSupportedVersion = (version: string): boolean => (Number(/^(\d+)\./.exec(version)?.[1]) || 0) >= 2
 
+/** A test copy's local provider (CW_TEST_OPENCODE_PROVIDER: unpackaged builds only, config.ts testProviderOf), or none. */
+export const testProvider = (): TestProvider | null => testProviderOf(process.env.CW_TEST_OPENCODE_PROVIDER, app.isPackaged)
+
 /** Combwork's own roots for checks outside an account (the version, Provider Setup's models): never the user's. */
 export const checkHome = (): string => join(localDataRoot(), 'opencode', 'check')
 
@@ -80,7 +84,7 @@ function inherited(): Record<string, string> {
 /** Runs opencode outside an agent's launch, standalone (never the machine-wide service), on `home`'s roots. */
 export async function runOpencode(executable: string, args: string[], home: string, timeoutMs: number, saved: SavedCredentials | null = null, base?: Record<string, string>): ReturnType<typeof run> {
   await mkdir(home, { recursive: true })
-  await writeConfigDir(checkConfigDir(home), checkConfig(ambientIntegrations(), saved, stripCredentials(), noAutoUpdate()))
+  await writeConfigDir(checkConfigDir(home), withTestProvider(checkConfig(ambientIntegrations(), saved, stripCredentials(), noAutoUpdate()), testProvider(), false))
   const s = toSpawnable(executable, [...args, '--standalone'])
   return run(s.file, s.args, timeoutMs, checkEnvFor(home, base))
 }
@@ -222,7 +226,7 @@ export function opencodeLoginCommand(executable: string, home: string): CommandS
   // Two small files, as the user asks for the sign-in (a click): its config folder, rewritten each time.
   const dir = loginConfigDir(home)
   mkdirSync(dir, { recursive: true })
-  writeFileSync(join(dir, 'opencode.json'), JSON.stringify(loginConfig(noAutoUpdate()), null, 2))
+  writeFileSync(join(dir, 'opencode.json'), JSON.stringify(withTestProvider(loginConfig(noAutoUpdate()), testProvider(), false), null, 2))
   writeFileSync(join(dir, 'service.json'), JSON.stringify({ disabled: true }))
   const s = toSpawnable(executable, ['auth', 'login', '--standalone'])
   // A sign-in is the user's deliberate act: no ambient blockers (an AWS profile chosen there is read from ~\.aws).

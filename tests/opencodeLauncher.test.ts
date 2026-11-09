@@ -14,7 +14,7 @@ import { tempDir } from './tempDir'
 const require = createRequire(import.meta.url)
 const { childEnv } = require('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => Record<string, string> }
 const { endTreeExactly, identify, processes } = require('./e2e/folderProcesses.cjs') as { endTreeExactly: (root: { pid: number; started: number }, list: unknown) => number; identify: (pids: number[]) => { pid: number; started: number }[]; processes: () => unknown }
-const { LAUNCHER_ARGS, LAUNCHER_EXIT, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, processToken, serverInfoPath, sessionMark } = await import('../src/main/providers/opencode/launcher')
+const { LAUNCHER_ARGS, LAUNCHER_EXIT, LAUNCHER_SOURCE, launcherEnv, launcherSourcePath, processToken, serverInfoPath, serverLogPath, sessionMark } = await import('../src/main/providers/opencode/launcher')
 const { newSessionId } = await import('../src/main/providers/opencode/adapter')
 const POWERSHELL = join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 const FAKE = join(__dirname, 'e2e', 'fake-opencode', 'opencode.cmd')
@@ -99,7 +99,7 @@ interface Run {
 }
 
 /** A launch's folders and environment, with the stand-in (or the fake) as its opencode. */
-function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; sessionId?: string; owner?: string; delay?: number; sessions?: string[]; home?: string; project?: string } = {}): Run {
+function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; sessionId?: string; owner?: string; delay?: number; sessions?: string[]; home?: string; project?: string; binDir?: string; tuiArgs?: string[] } = {}): Run {
   const dir = tempDir('cw-oclauncher-')
   const home = o.home ?? join(dir, 'acct')
   const project = o.project ?? join(dir, 'project')
@@ -107,8 +107,12 @@ function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; session
   for (const d of [home, project, priv, join(dir, 'cfg')]) mkdirSync(d, { recursive: true })
   writeFileSync(join(dir, 'cfg', 'service.json'), '{"disabled":true}')
   writeFileSync(join(dir, 'cfg', 'opencode.json'), JSON.stringify({ update: 'disable', policies: [{ action: 'mcp.use', resource: '*', effect: 'deny' }] }))
-  writeFileSync(join(dir, 'standin.cjs'), STANDIN)
-  writeFileSync(join(dir, 'opencode.cmd'), `@"${process.execPath}" "%~dp0standin.cjs" %*\r\n`)
+  // The stand-in's .cmd (not a bare Node launcher: it names node by its path, so it goes through cmd.exe), in a folder
+  // of the test's choosing (one with a space and an ampersand, say).
+  const bin = o.binDir ? join(dir, o.binDir) : dir
+  mkdirSync(bin, { recursive: true })
+  writeFileSync(join(bin, 'standin.cjs'), STANDIN)
+  writeFileSync(join(bin, 'opencode.cmd'), `@"${process.execPath}" "%~dp0standin.cjs" %*\r\n`)
   writeFileSync(launcherSourcePath(priv), LAUNCHER_SOURCE)
   const rec = join(dir, 'standin.json')
   const sessionId = o.sessionId ?? newSessionId()
@@ -124,7 +128,7 @@ function setUp(o: { exe?: 'standin' | 'fake'; intent?: 'new' | 'resume'; session
     CW_STANDIN_DELAY: String(o.delay ?? 0),
     CW_STANDIN_DIR: project,
     CW_STANDIN_SESSIONS: (o.sessions ?? []).join(','),
-    ...launcherEnv({ executable: o.exe === 'fake' ? FAKE : join(dir, 'opencode.cmd'), cwd: project, sessionId, intent: o.intent ?? 'new', tuiArgs: [], dirs: [project], privateDir: priv, owner: o.owner ?? '', marks: join(home, 'combwork-sessions'), readyMs: 30000 })
+    ...launcherEnv({ executable: o.exe === 'fake' ? FAKE : join(bin, 'opencode.cmd'), cwd: project, sessionId, intent: o.intent ?? 'new', tuiArgs: o.tuiArgs ?? [], dirs: [project], privateDir: priv, owner: o.owner ?? '', marks: join(home, 'combwork-sessions'), readyMs: 30000 })
   })
   return { dir, home, project, priv, rec, env }
 }
@@ -146,6 +150,31 @@ const infoOf = (r: Run): { url: string; port: number; serverPid: number; session
   } catch {
     return null
   }
+}
+
+/**
+ * A stand-in for Combwork's main process, which starts the launcher naming itself the owner (its identity read as main
+ * reads its own at start). It is a PowerShell, not Node: Node puts every child in a job of its own that ends them when it
+ * ends (libuv), so a Node stand-in's launcher would be killed with it and its owner watch never tested. Killed alone (its
+ * handle held), the launcher it started lives on.
+ */
+async function ownerStandIn(r: Run): Promise<{ main: ChildProcess; launcherPid: number }> {
+  const go = join(r.dir, 'go')
+  const ps = [
+    `while (-not [IO.File]::Exists('${go}')) { Start-Sleep -Milliseconds 50 }`,
+    `$env:CW_OC_OWNER = [IO.File]::ReadAllText('${go}')`,
+    `$s = [Diagnostics.ProcessStartInfo]::new('${POWERSHELL}', '${LAUNCHER_ARGS.join(' ')}')`,
+    '$s.UseShellExecute = $false; $s.CreateNoWindow = $true',
+    '$p = [Diagnostics.Process]::Start($s)',
+    `[IO.File]::WriteAllText('${go}.pid', [string]$p.Id)`,
+    'while ($true) { Start-Sleep -Seconds 1 }'
+  ].join('\n')
+  const main = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(ps, 'utf16le').toString('base64')], { env: r.env, stdio: 'ignore', windowsHide: true })
+  children.push(main)
+  writeFileSync(go, await until(() => processToken(main.pid!), "the stand-in's identity"))
+  const launcherPid = Number(await until(() => (existsSync(go + '.pid') ? readFileSync(go + '.pid', 'utf8') : ''), 'the launcher'))
+  identities.push(...identify([launcherPid]))
+  return { main, launcherPid }
 }
 
 /** The server, its grandchild and its port, all gone. */
@@ -183,26 +212,46 @@ describe.runIf(windows)('the launcher owns the server (design s13: a kill-on-clo
   }, 60000)
 
   it('the Combwork that launched it dies while the launcher lives: the server and its child still end', async () => {
-    // A stand-in for Combwork's main process: once given its own identity (as main reads it at its start), it starts the
-    // launcher, naming itself the owner. Killed alone (not its tree), its launcher lives on. (Not detached: Windows
-    // PowerShell started without a console exits at once.)
     const r2 = setUp()
-    const ready = join(r2.dir, 'go')
-    const script = `const cp=require('child_process'),fs=require('fs');const wait=()=>{if(!fs.existsSync(${JSON.stringify(ready)}))return setTimeout(wait,50);const env=JSON.parse(process.env.CW_TEST_ENV);env.CW_OC_OWNER=fs.readFileSync(${JSON.stringify(ready)},'utf8');const out=fs.openSync(${JSON.stringify(ready + '.log')},'a');const c=cp.spawn(${JSON.stringify(POWERSHELL)},${JSON.stringify(LAUNCHER_ARGS)},{stdio:['ignore',out,out],windowsHide:true,env});c.unref();fs.writeFileSync(${JSON.stringify(ready + '.pid')},String(c.pid))};wait();setInterval(()=>{},1000)`
-    const main = spawn(process.execPath, ['-e', script], { env: { ...childEnv(), CW_TEST_ENV: JSON.stringify(r2.env) }, stdio: 'ignore', windowsHide: true })
-    children.push(main)
-    writeFileSync(ready, await until(() => processToken(main.pid!), "the stand-in's identity"))
-    const launcherPid = Number(await until(() => (existsSync(ready + '.pid') ? readFileSync(ready + '.pid', 'utf8') : ''), 'the launcher'))
-    identities.push(...identify([launcherPid]))
-    await until(() => infoOf(r2), 'the server record').catch((e) => {
-      throw new Error(`${e.message}: ${existsSync(ready + '.log') ? readFileSync(ready + '.log', 'utf8') : 'no output'}`)
-    })
+    const o = await ownerStandIn(r2)
+    await until(() => infoOf(r2), 'the server record')
     const s = standin(r2)!
-    expect(alive(launcherPid) && alive(s.serve)).toBe(true)
-    main.kill()
+    expect(alive(o.launcherPid) && alive(s.serve)).toBe(true)
+    o.main.kill()
     await allGone(s)
-    await until(() => !alive(launcherPid), 'the launcher to end')
+    await until(() => !alive(o.launcherPid), 'the launcher to end')
+    expect(readFileSync(serverLogPath(r2.priv), 'utf8')).toContain('Combwork ended')
   }, 90000)
+
+  it('the Combwork that launched it dies before its server answers, the launcher alive: it stops at once, the server and its child end, nothing is created', async () => {
+    // As the test above, with a server that would take a minute to answer: the launcher must not wait it out.
+    const r2 = setUp({ delay: 60000 })
+    const o = await ownerStandIn(r2)
+    const s = await until(() => standin(r2), 'the server to start')
+    expect(alive(o.launcherPid) && alive(s.serve) && infoOf(r2) === null).toBe(true)
+    const killed = Date.now()
+    o.main.kill()
+    // Bounded well below the server's 60 s and the launch's 30 s wait: the launcher sees its owner go within a poll.
+    await until(() => !alive(o.launcherPid) && !alive(s.serve) && !alive(s.kid), 'the launcher, server and child to end', 15000)
+    expect(Date.now() - killed).toBeLessThan(15000)
+    await until(() => portFree(s.port), "the server's port to be free")
+    expect(infoOf(r2)).toBeNull()
+    expect(existsSync(r2.rec + '.tui')).toBe(false)
+    expect(readFileSync(serverLogPath(r2.priv), 'utf8')).toContain('Combwork ended while')
+  }, 90000)
+
+  it("a .cmd opencode in a folder with a space and an ampersand, a project folder with them too, and arguments with cmd.exe's characters: each passed whole", async () => {
+    const odd = ['--log-level', 'a & b | c > d < e ^ f', '100%PATH%', 'q"uote', '(x);y=z!']
+    const r = setUp({ binDir: 'R&D tools', project: join(tempDir('cw-oclauncher-'), 'pro&ject (1) 50%'), tuiArgs: odd })
+    const l = launch(r)
+    const info = await until(() => infoOf(r), 'the server record')
+    const tui = await until(() => (existsSync(r.rec + '.tui') ? readFileSync(r.rec + '.tui', 'utf8') : ''), 'the TUI')
+    expect(JSON.parse(tui.trim())).toEqual(['--server', info.url, '--session', info.sessionId, ...odd, r.project])
+    const s = standin(r)!
+    l.child.kill()
+    await l.exit
+    await allGone(s)
+  }, 60000)
 
   it('an owner that is not that exact process is refused, and no server starts: a creation time a tick off, or an old one', async () => {
     const real = await until(() => processToken(process.pid), 'this process\'s identity')

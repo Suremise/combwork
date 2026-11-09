@@ -87,6 +87,14 @@ const under = (p, dir) => !!p && path.resolve(p).toLowerCase().startsWith(path.r
     await inv('connections:setOn', account.id, true)
     const home = path.join(accountsRoot, account.id)
 
+    // --- The account's Set Up (HR1 on HI-2759): its sign-in prepared as one, never the raw CLI on its data root alone.
+    const setUpReply = await inv('connections:setUp', account.id).catch((e) => ({ error: String(e?.message ?? e) }))
+    const setUpRun = await lib.until(async () => entries('launch').find((e) => e.args.includes('auth') && e.args.includes('login') && e.env.XDG_DATA_HOME === home) ?? null, HUNG_MS)
+    check("Set Up runs `opencode auth login --standalone` on the account's roots", !!setUpRun && setUpRun.args.includes('--standalone'), JSON.stringify(setUpReply) + ' ' + JSON.stringify(entries('launch').map((e) => e.args)))
+    check('…with its own login config (the service off, updates held) and the discovery switches, never the raw CLI', !!setUpRun && setUpRun.env.OPENCODE_CONFIG_DIR === path.join(home, 'combwork-login') && setUpRun.serviceDisabled === true && setUpRun.update === 'disable' && setUpRun.env.OPENCODE_DISABLE_PROJECT_CONFIG === '1' && setUpRun.env.OPENCODE_DISABLE_CLAUDE_CODE === '1', JSON.stringify(setUpRun))
+    check('…and no OpenCode run without a private config folder or that would start the machine-wide service', entries('launch').every((e) => !!e.env.OPENCODE_CONFIG_DIR) && entries('shared-service').length === 0, JSON.stringify(entries('launch').filter((e) => !e.env.OPENCODE_CONFIG_DIR).map((e) => e.args)))
+    if (setUpReply?.key) await inv('pty:kill', setUpReply.key).catch(() => undefined)
+
     // --- What the user sees, light and dark (kept with --keep-files): Provider Setup's tab, Settings → Accounts with the
     // OpenCode account, its Settings page and its Advanced tab, all with the fake opencode.
     const shots = async (name, target = page) => {
