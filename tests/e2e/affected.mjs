@@ -310,6 +310,9 @@ export const AREAS = [
   { paths: ['tests/e2e/maxagents.cjs', 'src/shared/agentLimits.ts', 'src/renderer/src/components/ManyAgentsNote.tsx', 'src/main/workflow/preferences.ts', 'src/shared/workflow/preferences.ts'], suites: ['maxagents', 'agents24'] },
   { paths: ['src/main/repoLock.ts', 'src/main/repoLockCore.ts', 'src/main/repoLockWorker.ts', 'tests/e2e/repolock.cjs'], suites: ['repolock', 'repolocktyping', 'gitview', 'mergeslot'] },
   { paths: ['src/main/workflow/queueHost.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/mergeMessage.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/main/repoLock.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeue.cjs'], suites: ['mergequeue', 'queueagents', 'queueupgrade'] },
+  // HI-2790 (R7): the queue's candidate, moved behind the integration port (its contract, lookup and Git's implementation,
+  // Git's commit stream reading, and `again`): a change there is a change to the queue's test merge and strict's update.
+  { paths: ['src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/again.ts'], suites: ['mergequeue', 'mergequeuefolder', 'queueagents', 'queueupgrade'] },
   // Agents under Combwork merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
   // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; this repository's picker and runner.

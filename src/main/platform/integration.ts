@@ -100,9 +100,10 @@ export interface IntegrationPort {
   /**
    * Strict (G8, #1352): the reviewed revision brought up to date with the target in the queue's workspace only (the target
    * merged in, `merge`; or it rebased onto the target, `rebase`), committed as Combwork's commits are, the same change
-   * (§16.3.2) or the card goes back; kept on the entry's queue pin. Up to date already: `updated` null.
+   * (§16.3.2) or the card goes back; kept on the entry's queue pin. Up to date already: `updated` null. `message` (a merge's)
+   * is read just before the command, after the workspace and the signing read, so the options as they are then apply (G19).
    */
-  update(h: CandidateHost, c: CandidateOf & { target: string; entry: string; how: 'merge' | 'rebase'; message: string }): Promise<Again | { updated: string | null } | CandidateFail | CandidatePause>
+  update(h: CandidateHost, c: CandidateOf & { target: string; entry: string; how: 'merge' | 'rebase'; message: () => string }): Promise<Again | { updated: string | null } | CandidateFail | CandidatePause>
   /**
    * The test merge (§16.9.1 step 4) in the queue's workspace at the target's head: a merge commit, a squash, or (`rebase`)
    * the reviewed suffix rebased onto the target, linear, on top and the same change. `message` is read once the workspace

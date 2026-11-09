@@ -1029,7 +1029,8 @@ export class MergeQueue {
    */
   private async upToDate(card: CardRecord, s: CardState, entry: QueueEntry, revision: string, base: string, expected: string, reads: EntryReads): Promise<Again | { updated: string | null } | CandidateFail | CandidatePause> {
     const rebase = this.wf.rulesetOf(card, s).options.style === 'squash'
-    const message = updateMessage(this.commitMessage(), entry.target, card.key, revision)
+    // Read by the port just before its command, as the options are then (G19), never when the step began.
+    const message = (): string => updateMessage(this.commitMessage(), entry.target, card.key, revision)
     const up = await this.integration(card, s).update(this.host(reads), { card: card.key, revision, base, key: s.latest?.key, target: entry.target, expected, entry: entry.id, how: rebase ? 'rebase' : 'merge', message })
     if (isAgain(up) || !('updated' in up) || up.updated === null) return up
     const h = up.updated

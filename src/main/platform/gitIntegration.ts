@@ -112,10 +112,12 @@ export const gitIntegration: IntegrationPort = {
     // HI-2054: whether it signs couldn't be read: again, before anything is merged or committed.
     if (isAgain(signed)) return signed
     const opts = commitOpts(h, signed)
+    // Read now, as the options are just before the update (G19: the project's current Commit message, HR1's R7 round 1).
+    const message = c.message()
     // A rebase here rewrites only the queue's detached HEAD: never other refs at the rebased commits (HR4's #1352 round
     // 1: with the repository's `rebase.updateRefs` on, git would move the builder's branch, or a user's, to the update).
     // Overridden for this command only; the repository's config is left as it is.
-    const u = rebase ? await h.run(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await h.run(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', c.message, expected], opts)
+    const u = rebase ? await h.run(f, [...who, '-c', 'rebase.updateRefs=false', 'rebase', '--no-update-refs', '--no-autostash', '--onto', expected, base], opts) : await h.run(f, [...who, 'merge', '--no-ff', '--no-edit', '-m', message, expected], opts)
     // HI-2020: git never started (nothing ran), or HI-2042 a signal ended it (what it did unknown): the worktree put back as
     // after any failure, and the entry goes round again.
     if (u.notRun || u.signal) {
