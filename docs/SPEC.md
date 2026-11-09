@@ -4481,7 +4481,11 @@ switches to "The agent merges", and one started afterwards reports its merge.
   read "HI-2046 is in Doing; latest comment by HR1: Round 2: PASSED", and HB2 took the card as merged): a card watch's
   line for a card moved back to work by the queue (`queueReturnOf` in `watches.ts`, `WakeAbout.queueReturn`) is the
   return's own words in place of where it is and its latest comment, with others or alone; an inbox item telling
-  several of a card's events leads with its latest return ("… (with 2 more changes: read the card)"). Its **reviewer is
+  several of a card's events leads with its latest return ("… (with 2 more changes: read the card)"). Without a return
+  that holds, such an item leads with a card loop's step waiting for the agent's check, a design or a follow-up (HI-2808:
+  a pool reviewer started for a card got the pool's line and the follow-up's loop wake as "2 changes, read the card",
+  and often reviewed the card or asked what to do rather than answer with `cw_loop_step`; its loop wake's
+  `meta.awaitsCheck`, still due while unread, since a loop wake is the latest per agent and card and is cancelled once not due). Its **reviewer is
   woken when the builder submits it again** (HI-2143: HR2's watch on HI-2122, any move counted, began in Review before its
   pass; the card left and came back, and the watch, comparing only where it was, never fired, while Combwork's loop wake left
   it to that watch): a watch on any move counts a card that left and came back unless every move since was the watcher's

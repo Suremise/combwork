@@ -218,20 +218,24 @@ export function inboxItems(records: readonly DeliveryRecord[]): InboxItem[] {
  * A card's events in one line: one as it is; several counted. HI-2087: led by the merge queue's latest return of the
  * card (its line marked so where it was made: `meta.queueReturn`) while it still says where the work is, that is while
  * nothing but comments on it came after (`meta.commentOnly`: the queue's own comment, say); a later move, verdict, merge
- * or removal is newer than the return, so the count again.
+ * or removal is newer than the return, so the count again. HI-2808: else led by a card loop's step waiting for this agent's
+ * check (a design or a follow-up: `meta.awaitsCheck`, its loop wake's), whatever came with it: the loop wake is the latest
+ * per agent and card and is cancelled once no longer due, so one unread still waits for its answer, and its line says how
+ * to answer it (cw_loop_step), which a count hid behind the pool's review line on the same card.
  */
 function coalesced(events: readonly DeliveryRecord[]): string {
   if (events.length === 1 && events[0].body) return events[0].body
   const i = events.findLastIndex((r) => r.meta?.queueReturn === true)
-  if (i < 0 || !events.slice(i + 1).every((r) => r.meta?.commentOnly === true)) return say(T.counted, { n: events.length, count: String(events.length) })
-  return say(T.withMore, { body: events[i].body, n: events.length - 1, more: String(events.length - 1) })
+  const lead = i >= 0 && events.slice(i + 1).every((r) => r.meta?.commentOnly === true) ? i : events.findLastIndex((r) => r.meta?.awaitsCheck === true && !!r.body)
+  if (lead < 0) return say(T.counted, { n: events.length, count: String(events.length) })
+  return say(T.withMore, { body: events[lead].body, n: events.length - 1, more: String(events.length - 1) })
 }
 
 const idList = (ids: readonly string[]): string => ids.join(', ')
 
 const T = {
   counted: agentMsg({ id: 'inbox.cardEvents.counted', text: '{n, plural, one {{count} change} other {{count} changes}}, read the card', note: "A card's events in one inbox item, counted (several changes to a watched card since the agent last read its inbox). n and count: how many." }),
-  withMore: agentMsg({ id: 'inbox.cardEvents.withMore', text: '{body} (with {more} more {n, plural, one {change} other {changes}}: read the card)', note: "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087). body: the return's own line; n and more: how many events came after it." }),
+  withMore: agentMsg({ id: 'inbox.cardEvents.withMore', text: '{body} (with {more} more {n, plural, one {change} other {changes}}: read the card)', note: "A card's events in one inbox item, led by the merge queue's return of the card while only comments came after it (HI-2087), else by a card loop's step waiting for the agent's check (HI-2808). body: that event's own line; n and more: how many other events came with it." }),
   again: agentMsg({ id: 'inbox.offer.again', text: '({ids} again: {why}, so {n, plural, one {it} other {they}} may repeat.)', note: 'After the doorbell: deliveries offered again, which the agent may have seen before. ids: their ids ("m12, m14"); why: why each is offered again, joined by "; " (inbox.again.*); n: how many.' }),
   watchOn: agentMsg({ id: 'inbox.offer.watchOn', text: '(Your watch is still on, {watch}: do what this asks, then end your turn, and Combwork wakes you when it changes.)', note: "After the doorbell, typed into an agent waiting on a watch: its watch carries on. watch: the watch's label, its first letter in lower case (\"waiting on HI-12\")." }),
   older: agentMsg({ id: 'inbox.read.older', text: 'Received before, not acked yet: {ids}.', note: "In cw_inbox's reply: deliveries the agent read before and has not acked. ids: their ids (\"m12, m14\")." }),

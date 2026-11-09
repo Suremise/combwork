@@ -896,6 +896,9 @@ describe('loop wakes (main/loopWakes.ts, #405)', async () => {
     expect(st.typed[k].agent).toBe('r1')
     expect(st.typed[k].text).toContain(`The builder: "follow-up ${id} ready for your check (answer with its id): Fixes ready: the dark theme."`)
     expect(st.typed[k].text).toContain("check it and answer with cw_loop_step (ok, or gaps saying what's missing, and its id)")
+    // HI-2808: marked as waiting for its check, so it leads the card's events in the inbox (shared/deliveries' coalesced).
+    const deliveries = await import('../src/main/deliveries')
+    expect((await deliveries.deliveriesOf(alpha, 'r1')).filter((r) => r.source === 'loop').at(-1)?.meta).toMatchObject({ kind: 'step', awaitsCheck: true })
     st.status.set('b1', 'ready')
     await intent(r1, { kind: 'loopStep', step: 'ok', text: 'Both themes fine.', design: id })
     await typedUntil(st, k + 2)
