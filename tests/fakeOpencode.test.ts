@@ -294,6 +294,22 @@ describe('fake opencode: its private server, as 2.2.6 served', () => {
   })
 })
 
+describe('fake opencode: a policy-denied model, as HB1 recorded 2.2.6 (HI-2759)', () => {
+  it('takes the model (204) and fails the next turn: provider.no-route in its idle message', async () => {
+    const r = root()
+    const s = await serve(r.env, r.project)
+    s.subscribe()
+    await until(() => s.events[0], 'server.connected')
+    const sid = (await s.api('POST', '/api/session', { location: { directory: r.project } })).body.data.id
+    expect((await s.api('POST', `/api/session/${sid}/model`, { providerID: 'claude-agent', id: 'claude-sonnet' })).status).toBe(204)
+    await s.api('POST', `/api/session/${sid}/prompt`, { text: 'Reply OK.' })
+    expect((await until(() => ended(s.events, sid), "the turn's end")).type).toBe('session.execution.failed')
+    const idle = (await s.api('GET', `/api/session/${sid}/message`)).body.data[0]
+    expect([idle.type, idle.outcome, idle.error]).toEqual(['idle', 'failed', { type: 'provider.no-route', message: 'Model unavailable: claude-agent/claude-sonnet' }])
+    await s.stop()
+  })
+})
+
 // The hostile project R0 recorded (tests/fixtures/opencode/real-2.2.6/switches), rebuilt here: what loads with each switch.
 function hostile(r: ReturnType<typeof root>) {
   const w = (f: string, s: string | object) => {

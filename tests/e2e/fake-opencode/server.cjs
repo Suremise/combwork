@@ -278,7 +278,8 @@ async function startServer(opts) {
 
     let failure = null
     try {
-      if (!provider) failure = { type: 'provider.not-allowed', message: `Provider ${model.providerID} is not allowed by policy` }
+      // A policy-denied provider fails the turn, not the session's creation or model change (HB1's 2.2.6 run, HI-2759).
+      if (!provider) failure = { type: 'provider.no-route', message: `Model unavailable: ${model.providerID}/${model.id}` }
       else if (/^fail\b/i.test(text)) failure = { type: 'provider.invalid-request', message: 'fake provider refused', status: 400 }
       if (!failure) {
         let work = text
@@ -427,12 +428,19 @@ async function startServer(opts) {
       const body = await bodyOf(req)
       if (!body) return json(res, 400, { _tag: 'InvalidRequestError', message: 'Invalid JSON', kind: 'Payload' })
       if (body.id !== undefined && !String(body.id).startsWith('ses')) return json(res, 400, { _tag: 'InvalidRequestError', message: 'Expected a string starting with "ses"\n  at ["id"]', kind: 'Payload' })
-      if (body.model && !config.allowed(cfgFor(body.location?.directory), 'provider.use', body.model.providerID)) return json(res, 400, { _tag: 'InvalidRequestError', message: `Provider not allowed: ${body.model.providerID}`, kind: 'Payload' })
       return json(res, 200, { data: createSession(body) })
     }
     if ((m = /^\/api\/session\/([^/]+)$/.exec(p)) && req.method === 'GET') {
       const s = session(m[1])
       return s ? json(res, 200, { data: s.info }) : notFound(res, m[1])
+    }
+    if ((m = /^\/api\/session\/([^/]+)\/model$/.exec(p)) && req.method === 'POST') {
+      // 204 even for a policy-denied provider: the denial shows at the next prompt (HB1's 2.2.6 run, HI-2759).
+      const body = (await bodyOf(req)) || {}
+      if (!session(m[1])) return notFound(res, m[1])
+      updateInfo(m[1], (info) => (info.model = { id: body.id ?? body.modelID, providerID: body.providerID }))
+      res.writeHead(204)
+      return res.end()
     }
     if ((m = /^\/api\/session\/([^/]+)\/message$/.exec(p)) && req.method === 'GET') {
       const s = session(m[1])
