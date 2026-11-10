@@ -4,7 +4,7 @@
 // outside a group, absent or unreadable refusing while any store switches; malformed rows failing closed; recovery's
 // reconcile from what each member's disk shows.
 import { describe, expect, it } from 'vitest'
-import { admit, beginSwitch, mapStore, readFence, reconcile, settle, storeKey, MEMBER_KEY, FENCE_KEY, SWITCHING_KEY, STORE_KEY, type Meta, type Snap } from '../src/main/platform/platformFence'
+import { admit, beginSwitch, dropMember, mapStore, readFence, reconcile, settle, storeKey, MEMBER_KEY, FENCE_KEY, SWITCHING_KEY, STORE_KEY, type Meta, type Snap } from '../src/main/platform/platformFence'
 
 const metaOf = (m = new Map<string, string>()): Meta & { m: Map<string, string> } => ({
   m,
@@ -121,8 +121,52 @@ describe('admit (s17 to s26)', () => {
   })
 })
 
+describe('a former member outside a later switch (HR2 round 1)', () => {
+  /** P and Q switched to jj together; then Q chose None by itself (its own switch, recorded in the fence). */
+  function afterOptOut() {
+    const meta = metaOf()
+    const f = beginSwitch(meta, S, group, owner)!
+    settle(meta, S, f.generation, { p1: group[0].after, p2: group[1].after })
+    const raw = JSON.parse(meta.get(FENCE_KEY(S))!)
+    raw.members.p2.current = snap('none', { platform: 'none' })
+    meta.set(FENCE_KEY(S), JSON.stringify(raw))
+    return meta
+  }
+  const pBack = [{ id: 'p1', path: 'C:\\ws\\p1', before: group[0].after, after: snap('git', { platform: 'git' }) }]
+
+  it("is no participant of P's switch back: its None start is admitted while it runs, its old attempt dropped", () => {
+    const meta = afterOptOut()
+    const f = beginSwitch(meta, S, pBack, owner)!
+    expect(admit(meta, 'p1', 'jj')).toEqual({ why: 'switching' })
+    expect(admit(meta, 'p2', 'none')).toBeNull()
+    expect(admit(meta, 'p2', 'git')).toEqual({ why: 'changed', now: 'none' })
+    expect(f.members.p2.attempt).toBeUndefined()
+    // Only P is reconciled: Q's None, matching nothing of P's attempt, never makes it stuck.
+    expect(reconcile(f, { p1: pBack[0].before })).toEqual({ back: [], untouched: ['p1'] })
+    expect(reconcile(f, { p1: pBack[0].after })).toEqual({ forward: true })
+    // Settled, Q keeps its own choice.
+    settle(meta, S, f.generation, { p1: pBack[0].before, p2: snap('git') })
+    const now = readFence(meta, S)
+    expect(now && typeof now === 'object' && now.members.p2.current.platform).toBe('none')
+    expect(admit(meta, 'p2', 'none')).toBeNull()
+  })
+
+  it('leaves the fence once it is off the store; never while it takes part in a switch under way', () => {
+    const meta = afterOptOut()
+    expect(dropMember(meta, 'p2')).toBe(true)
+    expect(meta.get(MEMBER_KEY('p2'))).toBeNull()
+    const f = readFence(meta, S)
+    expect(f && typeof f === 'object' && Object.keys(f.members)).toEqual(['p1'])
+    // Now outside any fence, its admissions follow the store map as anyone's.
+    expect(admit(meta, 'p2', 'none')).toBeNull()
+    beginSwitch(meta, S, pBack, owner)
+    expect(dropMember(meta, 'p1')).toBe(false)
+    expect(meta.get(MEMBER_KEY('p1'))).not.toBeNull()
+  })
+})
+
 describe('reconcile (s23 §1): from what each member’s disk shows', () => {
-  const f = { generation: 1, state: 'switching' as const, owner, members: Object.fromEntries(group.map((m) => [m.id, { path: m.path, current: m.before, attempt: { before: m.before, after: m.after } }])) }
+  const f = { generation: 1, state: 'switching' as const, owner, members: Object.fromEntries(group.map((m) => [m.id, { path: m.path, current: m.before, attempt: { generation: 1, before: m.before, after: m.after } }])) }
   it('forward only when every member shows its after', () => {
     expect(reconcile(f, { p1: group[0].after, p2: group[1].after })).toEqual({ forward: true })
   })

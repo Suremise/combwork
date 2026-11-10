@@ -40,13 +40,11 @@ import { boardRead, boardWrite, boardWriteOp } from '../boardStore'
 import { SlotStore } from '../slots'
 import { CopyStore } from '../copies'
 import { boardConn } from '../slotsApp'
-import { jjContextOf } from '../platform/jjDetect'
 import { assessJj, REPO_GATES } from '../platform/jjCompat'
-import { BOOKMARK_TEMPLATE, gitBranches, headsHere, parseBookmarkRows } from '../platform/jjViews'
+import { BOOKMARK_TEMPLATE, gitBranches, parseBookmarkRows, pinnedContextOf } from '../platform/jjViews'
 import { isJjUnknown, JjReads } from '../platform/jjReads'
-import { readOpHeads } from '../platform/jjView'
 import { jjRunner, type JjRunner } from '../platform/jjRunner'
-import { beginSwitch, type BeginMember, FENCE_KEY, fenceOrNull, mapStore, readFence, reconcile, settle, storeKey, type Fence, type Meta, type Snap } from '../platform/platformFence'
+import { beginSwitch, type BeginMember, dropMember, FENCE_KEY, fenceOrNull, participates, mapStore, readFence, reconcile, settle, storeKey, type Fence, type Meta, type Snap } from '../platform/platformFence'
 import { metaOf, projectIdOf } from '../platform/fenceAdmit'
 
 const log = createLogger('workflow')
@@ -151,14 +149,12 @@ async function drainOf(ws: WorkspaceService, members: readonly Member[]): Promis
 
 /** jj itself confirms a colocated repository on exactly this store, with the tested jj (s11 §3c). */
 async function jjReady(path: string, store: string): Promise<SwitchRefusal | null> {
-  // Diverged operation heads: nothing asked of jj (an unpinned command would merge them, a write).
-  const heads = headsHere(path)
-  if (heads && heads.length !== 1) return { why: 'jjUnknown', code: 'heads' } // i18n-ignore: a code, never shown as text
-  const d = await jjContextOf(path)
-  if ('none' in d) return { why: 'noJj' } // i18n-ignore: a code or SQL, never shown as text
-  if ('unknown' in d) return d.unknown === 'tool' ? { why: 'jjTool', state: d.tool?.state ?? 'unknown' } : { why: 'jjUnknown', code: d.unknown } // i18n-ignore: a code or SQL, never shown as text
-  if (!d.jj.colocated) return { why: 'jjSeparate' } // i18n-ignore: a code or SQL, never shown as text
-  if (storeKey(d.jj.store) !== store) return { why: 'jjUnknown', code: 'disagrees' } // i18n-ignore: a code or SQL, never shown as text
+  // Confirmed pinned at the single head (never a merge of diverged ones), the heads read again after.
+  const d = await pinnedContextOf(path)
+  if ('none' in d) return { why: 'noJj' } // i18n-ignore: a code, never shown as text
+  if ('jjUnknown' in d) return d.jjUnknown === 'tool' ? { why: 'jjTool', state: jjRunner.readinessNow().state } : { why: 'jjUnknown', code: d.jjUnknown } // i18n-ignore: a code, never shown as text
+  if (!d.ctx.colocated) return { why: 'jjSeparate' } // i18n-ignore: a code, never shown as text
+  if (storeKey(d.ctx.store) !== store) return { why: 'jjUnknown', code: 'disagrees' } // i18n-ignore: a code, never shown as text
   return null
 }
 
@@ -179,13 +175,11 @@ const UNSUPPORTED = PLATFORMS.jj.gates.filter((g) => !(REPO_GATES as readonly st
  * Git's branch both its commit), no conflicted commit among the bookmarks' history. Read pinned.
  */
 export async function fallbackOf(path: string, runner: JjRunner = jjRunner): Promise<FallbackProblem[]> {
-  const before = headsHere(path)
-  if (before && before.length !== 1) return [{ code: 'heads', n: before.length }]
-  const d = await jjContextOf(path, runner)
-  if (!('jj' in d)) return [{ code: 'unknown', detail: 'unknown' in d ? d.unknown : 'noRepo' }] // i18n-ignore: a code or SQL, never shown as text
-  const c = d.jj
-  const heads = readOpHeads(c.jjRepo)
-  if (!heads || heads.length !== 1) return [{ code: 'heads', n: heads?.length ?? 0 }]
+  // Confirmed pinned at the single head (never a merge of diverged ones), the heads read again after.
+  const d = await pinnedContextOf(path, runner)
+  if ('jjUnknown' in d && d.jjUnknown === 'heads') return [{ code: 'heads', n: Number(d.detail) || 0 }]
+  if (!('ctx' in d)) return [{ code: 'unknown', detail: 'jjUnknown' in d ? d.jjUnknown : 'noRepo' }] // i18n-ignore: a code, never shown as text
+  const c = d.ctx
   const reads = new JjReads({ folder: c.root, jjRepo: c.jjRepo }, runner)
   const r = await reads.pinned(async (op) => {
     const out = await reads.run(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_TEMPLATE])
@@ -333,7 +327,7 @@ async function settleFromDisk(ws: WorkspaceService, store: string, generation: n
   const f = boardRead(ws, (db) => fenceOrNull(metaOf(db), store))
   if (!f || f.state !== 'switching' || f.generation !== generation) return 'none'
   const disk: Record<string, Snap | null> = {}
-  for (const [id, m] of Object.entries(f.members)) if (m.attempt) disk[id] = await diskSnap(m.path)
+  for (const [id, m] of Object.entries(f.members)) if (participates(f, m)) disk[id] = await diskSnap(m.path)
   const r = reconcile(f, disk)
   if ('stuck' in r) {
     log.warn(`The platform switch of ${userText(store)} can't be settled: ${r.stuck.map((id) => userText(id)).join(', ')} changed by hand meanwhile or unreadable; their work stays refused until they show their before or after`)
@@ -351,7 +345,7 @@ async function settleFromDisk(ws: WorkspaceService, store: string, generation: n
       }
     }
   }
-  const currents = Object.fromEntries(Object.entries(f.members).filter(([, m]) => m.attempt).map(([id, m]) => [id, 'forward' in r ? m.attempt!.after : m.attempt!.before]))
+  const currents = Object.fromEntries(Object.entries(f.members).filter(([, m]) => participates(f, m)).map(([id, m]) => [id, 'forward' in r ? m.attempt!.after : m.attempt!.before]))
   await fenceWrite(ws, (meta) => settle(meta, store, generation, currents))
   return 'forward' in r ? 'forward' : 'back'
 }
@@ -418,14 +412,36 @@ onAfterRefresh((ws) => {
   after.set(ws, run)
 })
 
-/** A refresh's store map (s20 §3): each project's repository as detected, written only when it changed. */
+/**
+ * A refresh's store map (s20 §3): each project's repository as detected, written only when it changed; and a fence's
+ * former members taken out of it (HR2's HI-2799 round 1) once they're on another repository, none, or no longer a
+ * project of this workspace, never while they take part in a switch under way.
+ */
 export async function mapStores(ws: WorkspaceService): Promise<void> {
   const rows: [string, string | 'none'][] = []
   for (const p of ws.info()?.projects ?? []) {
     const cfg = await ws.projectConfig(p.path).catch(() => null)
     rows.push([projectIdOf(cfg, p.path), await storeOf(p.path)])
   }
-  const changed = boardRead(ws, (db) => rows.some(([id, s]) => metaOf(db).get(`platform_store:${id}`) !== (s === 'none' ? 'none' : storeKey(s))))
-  if (changed) await fenceWrite(ws, (meta) => rows.forEach(([id, s]) => mapStore(meta, id, s)))
+  const live = new Map(rows.map(([id, s]) => [id, s === 'none' ? 'none' : storeKey(s)]))
+  const { changed, left } = boardRead(ws, (db) => {
+    const meta = metaOf(db)
+    const members = db.prepare("SELECT key, value FROM board_meta WHERE key LIKE 'platform\\_member:%' ESCAPE '\\'").all() as { key: string; value: string }[] // i18n-ignore: SQL
+    const gone = members.filter((r) => {
+      const id = r.key.slice('platform_member:'.length)
+      const store = (() => {
+        try {
+          return (JSON.parse(r.value) as { store?: unknown }).store
+        } catch {
+          return null
+        }
+      })()
+      return live.get(id) !== store
+    }).map((r) => r.key.slice('platform_member:'.length))
+    return { changed: rows.some(([id, s]) => meta.get(`platform_store:${id}`) !== (s === 'none' ? 'none' : storeKey(s))), left: gone }
+  })
+  if (changed || left.length) await fenceWrite(ws, (meta) => {
+    rows.forEach(([id, s]) => mapStore(meta, id, s))
+    for (const id of left) dropMember(meta, id)
+  })
 }
-

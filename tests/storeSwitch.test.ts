@@ -168,6 +168,32 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     expect(await platformIn(w, q)).toBe('git')
   })
 
+  it("a member that left for None takes no part in a later switch: its start admitted while it runs, a failed save never stuck on it (HR2 round 1)", async () => {
+    const { w, p, q } = await workspace({ p: 'git', q: 'git' })
+    await sw.setPlatform(w, p, 'jj', { expected: 'git', token: (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token })
+    // Q chooses None by itself: its own switch, recorded in its fence membership.
+    expect(await sw.setPlatform(w, q, 'none', { expected: 'jj' })).toEqual({ from: 'jj', to: 'none' })
+    const back = (await sw.checkPlatformSwitch(w, p, 'git')).store!
+    expect(back.group.map((g) => g.name)).toEqual(['p'])
+    const pause = pauseAt('afterBegin')
+    // P's save back to Git then fails: rolled back from the disk, P alone.
+    ss.storeSwitchSeams.write = async () => {
+      throw new Error('disk full')
+    }
+    const switching = sw.setPlatform(w, p, 'git', { expected: 'jj', token: back.token })
+    await pause.at
+    try {
+      expect(await startCard(w, q, 'q')).not.toMatchObject({ rule: 'platform.switching' })
+    } finally {
+      pause.go()
+      await expect(switching).rejects.toThrow(/disk full/)
+    }
+    expect(await fenceOf(w, p)).toMatchObject({ state: 'settled', members: { [await idOf(w, p)]: { current: { platform: 'jj' } }, [await idOf(w, q)]: { current: { platform: 'none' } } } })
+    expect(await platformIn(w, p)).toBe('jj')
+    expect(await platformIn(w, q)).toBe('none')
+    expect(await startCard(w, q, 'q')).not.toMatchObject({ refused: true, rule: expect.stringMatching(/^platform\./) })
+  })
+
   it('a group changed after its warning is refused, and a fresh warning gives the new group (1f)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'none' })
     const first = (await sw.checkPlatformSwitch(w, p, 'jj')).store!

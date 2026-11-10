@@ -169,6 +169,61 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     expect(await fallbackOf(r.root, runner)).toEqual([{ code: 'notExported', name: 'main' }])
   })
 
+  it('a head appearing while jj confirms the repository is never merged: every entry point reads nothing (HR2 round 1)', async () => {
+    const { pinnedContextOf } = await import('../src/main/platform/jjViews')
+    const { fallbackOf } = await import('../src/main/workflow/storeSwitch')
+    const entries: [string, (rn: typeof runner) => Promise<unknown>][] = [
+      ['context', (rn) => pinnedContextOf(r0.root, rn)],
+      ['repository', (rn) => jjRepoView(r0.root, rn)],
+      ['history', (rn) => jjHistory(r0.root, rn)],
+      ['bookmarks', (rn) => jjBookmarks(r0.root, rn)],
+      ['conflicts', (rn) => jjConflicts(r0.root, rn)],
+      ['compare', (rn) => jjCompare(r0.root, 'main-', 'main', rn)],
+      ['fallback', (rn) => fallbackOf(r0.root, rn)]
+    ]
+    const r0 = await repo('race')
+    for (const [name, read] of entries) {
+      // Before each read: one head again (the user's own jj reconciles), then the race armed.
+      jj(r0.root, 'status')
+      expect(readOpHeads(r0.ctx.jjRepo)!.length).toBe(1)
+      let raced = false
+      // At jj's own `root` call, another writer makes a second operation from the same base.
+      const racing = {
+        ...runner,
+        run: async (folder: string, args: readonly string[], o?: Parameters<typeof runner.run>[2]) => {
+          if (!raced && args.includes('root')) {
+            raced = true
+            const op = readOpHeads(r0.ctx.jjRepo)![0]
+            jj(r0.root, '--ignore-working-copy', 'bookmark', 'create', `${name}-one`, '-r', 'main')
+            jj(r0.root, '--at-op', op, '--ignore-working-copy', 'bookmark', 'create', `${name}-two`, '-r', 'main')
+          }
+          return runner.run(folder, args, o)
+        },
+        readiness: () => runner.readiness(),
+        readinessNow: () => runner.readinessNow(),
+        problem: () => runner.problem(),
+        shutdown: (ms?: number) => runner.shutdown(ms)
+      }
+      const out = await read(racing)
+      expect(raced, name).toBe(true)
+      // Nothing merged them: both heads are still there, and the read said it couldn't read.
+      expect(readOpHeads(r0.ctx.jjRepo)!.length, name).toBe(2)
+      expect(JSON.stringify(out), name).toMatch(/moved|heads/)
+    }
+  })
+
+  it('an unreadable .jj (an empty pointer) is unknown before anything runs', async () => {
+    const { pinnedContextOf } = await import('../src/main/platform/jjViews')
+    const parent = tempDir('jjv-broken-')
+    mkdirSync(join(parent, '.jj'), { recursive: true })
+    writeFileSync(join(parent, '.jj', 'repo'), '')
+    let ran = 0
+    const counting = { ...runner, run: async (...a: Parameters<typeof runner.run>) => (ran++, runner.run(...a)), readiness: () => runner.readiness(), readinessNow: () => runner.readinessNow(), problem: () => runner.problem(), shutdown: (ms?: number) => runner.shutdown(ms) }
+    expect(await pinnedContextOf(parent, counting)).toEqual({ jjUnknown: 'heads', detail: 'unreadable' })
+    expect(await jjHistory(parent, counting)).toEqual({ jjUnknown: 'heads', detail: 'unreadable' })
+    expect(ran).toBe(0)
+  })
+
   it('compatibility: clear for a plain repository; each gate found where the repository uses it', async () => {
     const r = await repo('compat')
     const clear = await assessJj(r.root, r.ctx.store, gitDeps)

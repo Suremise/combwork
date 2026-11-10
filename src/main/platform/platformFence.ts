@@ -34,8 +34,11 @@ export interface Member {
   path: string
   /** Its choice in force: `after` once a switch settled forward, `before` after a rollback. Admissions compare with it. */
   current: Snap
-  /** The last attempt's before and after: recovery's and history's data, never an admission's. */
-  attempt?: { before: Snap; after: Snap }
+  /**
+   * The last attempt it took part in, its generation's: its before and after. Recovery reconciles, and a switching fence
+   * refuses, only the members of the switch under way (attempt.generation the fence's); an older attempt is history.
+   */
+  attempt?: { generation: number; before: Snap; after: Snap }
 }
 
 export interface FenceOwner {
@@ -89,11 +92,11 @@ function fenceOf(v: unknown): Fence | null {
     if (!current) return null
     let attempt: Member['attempt']
     if (raw.attempt !== undefined) {
-      if (!isObj(raw.attempt)) return null
+      if (!isObj(raw.attempt) || typeof raw.attempt.generation !== 'number') return null
       const before = snapOf(raw.attempt.before)
       const after = snapOf(raw.attempt.after)
       if (!before || !after) return null
-      attempt = { before, after }
+      attempt = { generation: raw.attempt.generation, before, after }
     }
     members[id] = { path: raw.path, current, ...(attempt ? { attempt } : {}) }
   }
@@ -156,9 +159,12 @@ export function admit(meta: Meta, id: string, compiled: PlatformId): AdmitRefusa
   if (store === MALFORMED) return SWITCHING
   if (store !== null) {
     const f = readFence(meta, store)
-    if (f === null || f === MALFORMED || f.state === 'switching') return SWITCHING
+    if (f === null || f === MALFORMED) return SWITCHING
     const m = f.members[id]
     if (!m) return SWITCHING
+    // A participant of the switch under way is refused whatever it compiled; a former member outside it (one that
+    // left the group for None) is held to its own current choice, as a settled fence holds every member.
+    if (f.state === 'switching' && (participates(f, m) || m.current.platform !== 'none')) return SWITCHING
     return m.current.platform === compiled ? null : { why: 'changed', now: m.current.platform } // i18n-ignore: a code, never shown as text
   }
   const mapped = mappedStore(meta, id)
@@ -174,6 +180,33 @@ export function admit(meta: Meta, id: string, compiled: PlatformId): AdmitRefusa
   const used = new Set(Object.values(f.members).map((m) => m.current.platform).filter((p) => p !== 'none'))
   if (used.size && !used.has(compiled)) return { why: 'changed', now: [...used][0] } // i18n-ignore: a code, never shown as text
   return null
+}
+
+/** Whether a member takes part in the fence's switch under way (its attempt is this generation's). */
+export const participates = (f: Fence, m: Member): boolean => m.attempt?.generation === f.generation
+
+/**
+ * Takes a project out of a fence (s20's membership kept accurate: the project left the store, or the workspace): its
+ * member row and its entry, never while it takes part in a switch under way. False when it does, or has no row.
+ */
+export function dropMember(meta: Meta, id: string): boolean {
+  const store = memberStore(meta, id)
+  if (store === null) return false
+  if (store === MALFORMED) {
+    meta.set(MEMBER_KEY(id), null)
+    return true
+  }
+  const f = readFence(meta, store)
+  if (f && f !== MALFORMED) {
+    const m = f.members[id]
+    if (m && f.state === 'switching' && participates(f, m)) return false
+    if (m) {
+      const { [id]: _gone, ...members } = f.members
+      meta.set(FENCE_KEY(store), JSON.stringify({ ...f, members } satisfies Fence))
+    }
+  }
+  meta.set(MEMBER_KEY(id), null)
+  return true
 }
 
 /** Records the store detection found for a project (a refresh's), only when it changed; null clears it. */
@@ -208,12 +241,15 @@ export function beginSwitch(meta: Meta, store: string, members: readonly BeginMe
   const was = fenceOrNull(meta, store)
   if (was?.state === 'switching') return null
   for (const m of members) if (JSON.stringify(m.before).length > SNAP_MAX || JSON.stringify(m.after).length > SNAP_MAX) throw new Error('groupTooLarge') // i18n-ignore: a code the caller words
-  const kept = Object.fromEntries(Object.entries(was?.members ?? {}).filter(([id]) => !members.some((m) => m.id === id)))
+  const generation = (was?.generation ?? 0) + 1
+  // Former members outside this group keep their current choice, their old attempt dropped: only this switch's
+  // participants are fenced and reconciled (HR2's HI-2799 round 1).
+  const kept = Object.fromEntries(Object.entries(was?.members ?? {}).filter(([id]) => !members.some((m) => m.id === id)).map(([id, m]) => [id, { path: m.path, current: m.current }]))
   const fence: Fence = {
-    generation: (was?.generation ?? 0) + 1,
+    generation,
     state: 'switching',
     owner,
-    members: { ...kept, ...Object.fromEntries(members.map((m) => [m.id, { path: m.path, current: m.before, attempt: { before: m.before, after: m.after } }])) }
+    members: { ...kept, ...Object.fromEntries(members.map((m) => [m.id, { path: m.path, current: m.before, attempt: { generation, before: m.before, after: m.after } }])) }
   }
   meta.set(FENCE_KEY(store), JSON.stringify(fence))
   for (const m of members) meta.set(MEMBER_KEY(m.id), JSON.stringify({ store: storeKey(store) }))
@@ -229,7 +265,8 @@ export function beginSwitch(meta: Meta, store: string, members: readonly BeginMe
 export function settle(meta: Meta, store: string, generation: number, currents: Readonly<Record<string, Snap>>): boolean {
   const f = fenceOrNull(meta, store)
   if (!f || f.generation !== generation || f.state !== 'switching') return false
-  const members = Object.fromEntries(Object.entries(f.members).map(([id, m]) => [id, { ...m, current: currents[id] ?? m.current }]))
+  // Only this switch's participants take a new current choice; anyone else keeps theirs.
+  const members = Object.fromEntries(Object.entries(f.members).map(([id, m]) => [id, participates(f, m) && currents[id] ? { ...m, current: currents[id] } : m]))
   meta.set(FENCE_KEY(store), JSON.stringify({ generation: f.generation, state: 'settled', members } satisfies Fence))
   setSwitching(meta, store, false)
   return true
@@ -247,7 +284,7 @@ export type Reconcile = { forward: true } | { back: string[]; untouched: string[
  * neither (edited by hand meanwhile) or unreadable.
  */
 export function reconcile(f: Fence, disk: Readonly<Record<string, Snap | null>>): Reconcile {
-  const attempted = Object.entries(f.members).filter(([, m]) => m.attempt)
+  const attempted = Object.entries(f.members).filter(([, m]) => participates(f, m))
   const stuck = attempted.filter(([id, m]) => {
     const d = disk[id]
     return !d || (!sameSnap(d, m.attempt!.before) && !sameSnap(d, m.attempt!.after))

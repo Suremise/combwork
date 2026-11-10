@@ -2566,10 +2566,12 @@ merges under jj.
   a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
   `bookmarks()`, for the user to pick one by commit id; then `diff --summary` and `--git`, capped), Bookmarks
   (`--all-remotes`; a conflicted one with its sides; a local one whose `@git` or Git branch, read from the store's files,
-  differs marked `gitDiffers`), Conflicts (`conflicts()` among the visible commits, `resolve --list` each). **The heads are read from
-  the files before jj is asked anything** (`headsHere`): J0's detection runs `jj root` unpinned, and on 0.47.1 an unpinned
-  command merges diverged heads (a write, R5.3), so with none or several heads every view, the switch's jj checks and the
-  fallback answer `heads` having run nothing.
+  differs marked `gitDiffers`), Conflicts (`conflicts()` among the visible commits, `resolve --list` each). **jj is confirmed pinned**
+  (`pinnedContextOf`): J0's detection would run `jj root` and `jj git root` unpinned, and on 0.47.1 an unpinned command
+  merges diverged heads (a write, R5.3), even when a second head appears between a check and the command (HR2's round 1).
+  So the single head is read from the files first (none, several or an unreadable `.jj`: `heads`, nothing run), J0's
+  confirming commands run through a runner that pins each at it (`--at-op`, `pinnedRunner`), and the heads are read
+  again after (anything else: `moved`). Every view, the switch's jj check and the fallback go through it.
 - **The switch** (`workflow/storeSwitch.ts`, through `setPlatform` when `storeWide`: to jj, jj → Git, or to Git where jj
   is colocated). Its **group** is every project of this workspace on the repository (its Git store, `commonGitDir`)
   whose choice is Git or jj, plus the project switched (None → jj too); the warning names them, and its `token` (a hash
@@ -2589,14 +2591,17 @@ merges under jj.
   `.jj` stays. jj → None is a project's own switch (no jj card can be in flight), recorded in its fence membership.
 - **The platform fence** (`platform/platformFence.ts`, `platform/fenceAdmit.ts`): rows in the workspace database's
   `board_meta`: `platform_fence:<store>` (generation, `settled` or `switching`, its owner, each member's `current` choice
-  and the last attempt's before and after, each a snapshot of `platform`, `platformFound` and `workflow`, refused past
-  64 KB), `platform_member:<project id>`, `platform_store:<project id>` (each refresh's detection, written when it
+  and the last attempt it took part in, its generation's, with its before and after, each a snapshot of `platform`,
+  `platformFound` and `workflow`, refused past 64 KB; a former member outside a later switch keeps its current choice,
+  its old attempt dropped), `platform_member:<project id>`, `platform_store:<project id>` (each refresh's detection, written when it
   changed) and `platform_switching`. Every admission checks it **in its own write transaction**, so the database
   serializes it with the switch's writes and no new lock is taken: a lane's start (its save's `also`), a card's start
   (the runtime's start write: `platform.switching` or `platform.changed`, refusals with their next step), a slot's lease
   (`SlotStore.take`) and a copy's (`CopyStore.take`). A queue entry needs none: only a card in flight is enqueued, and
-  no member has one once A is written. Membership is looked up first, by the project's id: a member of a switching fence
-  is refused whatever it compiled; of a settled one, held to its `current` (a stale start is re-resolved by the caller's
+  no member has one once A is written. Membership is looked up first, by the project's id: a participant of the switch under
+  way (its attempt the fence's generation) is refused whatever it compiled; a former member outside it, one that left
+  for None, is held to its own `current` as a settled fence holds every member (HR2's round 1); of a settled one, held to
+  its `current` (a stale start is re-resolved by the caller's
   next attempt, a runtime made afresh for the project's new platform). Not a member: the store map; absent or
   unreadable is refused while any store switches; an unchanged None project outside a group is the only exemption; a
   Git or jj one on a switched store must match its members. Malformed rows fail closed.
@@ -2607,6 +2612,9 @@ merges under jj.
   in the switch's own `finally`, still under the lock, from each member's disk (`readKeptJson`): forward when every
   member shows its after, else those showing after written back to their before (read back), the rest untouched, and
   **stuck** (left switching, its admissions refused, said in the log) when a member shows neither or can't be read.
+  Only the participants are reconciled and take a new `current`. A member that is on another repository, none, or no
+  longer a project of the workspace leaves its fence at the next refresh (`dropMember`), never while it takes part in a
+  switch under way.
   **Recovery** (`recoverFences`, after each refresh) settles a switching fence the same way only when its owner is gone
   (its token in no switch this process is making, its pid not alive), under the same locks, the fence read again there.
   The fence is per workspace database: another Combwork process (Dev beside the installed one) on the same repository

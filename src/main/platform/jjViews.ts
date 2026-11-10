@@ -79,18 +79,43 @@ export function headsHere(folder: string): string[] | null {
   return readOpHeads(jjRepo)
 }
 
+/** A runner whose every command reads at operation `op` (`--at-op`): never a merge of diverged heads (R5.3). */
+export function pinnedRunner(runner: JjRunner, op: string): JjRunner {
+  return {
+    run: (folder, args, o) => runner.run(folder, ['--at-op', op, ...args], o),
+    readiness: () => runner.readiness(),
+    readinessNow: () => runner.readinessNow(),
+    problem: () => runner.problem(),
+    shutdown: (ms) => runner.shutdown(ms)
+  }
+}
+
 /**
- * A project folder's jj context, confirmed by jj (J0's detection): or why not. Its heads are read from the files first:
- * with none or several, nothing runs (J0's `jj root` isn't pinned, and on jj 0.47.1 an unpinned command merges diverged
- * heads, a write: R5.3).
+ * A project folder's jj context, confirmed by jj (J0's detection), and the operation it was confirmed at: or why not.
+ * J0's confirmation (`jj root`, `jj git root`) would run unpinned, and on jj 0.47.1 an unpinned command merges diverged
+ * heads, a write (R5.3, HR2's HI-2799 round 1: a head appearing between a check and the command). So the single head is
+ * read from the files first (none, several or unreadable: nothing runs), every confirming command is pinned at it
+ * (`--at-op`), and the heads are read again after: anything but that one head is `moved`.
  */
-async function contextOf(folder: string, runner: JjRunner): Promise<JjContext | JjViewUnknown> {
+export async function pinnedContextOf(folder: string, runner: JjRunner = jjRunner): Promise<{ ctx: JjContext; op: string } | { none: true } | JjViewUnknown> {
+  if (!jjOf(folder)) return { none: true }
   const heads = headsHere(folder)
-  if (heads && heads.length !== 1) return { jjUnknown: 'heads', detail: String(heads.length) }
-  const d = await jjContextOf(folder, runner)
-  if ('jj' in d) return d.jj
-  if ('none' in d) return { jjUnknown: 'noRepo' }
+  if (!heads) return { jjUnknown: 'heads', detail: 'unreadable' } // i18n-ignore: a protocol code
+  if (heads.length !== 1) return { jjUnknown: 'heads', detail: String(heads.length) }
+  const op = heads[0]
+  const d = await jjContextOf(folder, pinnedRunner(runner, op))
+  const after = headsHere(folder)
+  if (!after || after.length !== 1 || after[0] !== op) return { jjUnknown: 'moved' }
+  if ('jj' in d) return { ctx: d.jj, op }
+  if ('none' in d) return { none: true }
   return { jjUnknown: d.unknown, ...(d.detail ? { detail: d.detail.slice(0, 2000) } : {}) }
+}
+
+/** A project folder's jj context for a view (pinnedContextOf's), or why not. */
+async function contextOf(folder: string, runner: JjRunner): Promise<JjContext | JjViewUnknown> {
+  const c = await pinnedContextOf(folder, runner)
+  if ('ctx' in c) return c.ctx
+  return 'none' in c ? { jjUnknown: 'noRepo' } : c
 }
 
 /** Reads for a context, run in its workspace root. */
