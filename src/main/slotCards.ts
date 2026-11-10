@@ -49,7 +49,7 @@ import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLan
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import type { WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
-import { slotWorkspaces } from './platform/workspacePorts'
+import { isJjLineKey, slotWorkspaces } from './platform/workspacePorts'
 import { observer } from './platform/observe'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
@@ -1014,6 +1014,9 @@ export async function finishedSlot(projectPath: string, wf: Workflow, n: number,
   if (!card || !s?.finished || s.started?.lease !== lease || !s.started.line) return false
   const finish = s.finished.seq
   const line = s.started.line
+  // A jj card's slot (HI-2866) is put back on its target by the pool's own settle, an owned write under the slot's
+  // operation (SlotPool.detach); this path holds no such operation, so it never asks Git about a jj slot or acts on one.
+  if (isJjLineKey(line)) return false
   // The finish this was for, still the card's: Done in that finish, on that lease and line.
   const own = (): boolean => {
     if (!alive()) return false
@@ -1268,9 +1271,12 @@ async function prepare(ws: WorkspaceService, projectPath: string, first: Workflo
         line: st.line!,
         base: st.base!,
         install,
+        ...(st.target ? { target: st.target } : {}),
         // At the boundary: the card still this cycle's, the rules on, its builder quiet.
         ready: async () => (gone() ? 'the card moved on, or the rules are off' : quiet(projectPath, builder) ? null : 'its builder is busy'), // i18n-ignore: why a preparation waits, for the log
-        around: (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
+        // A jj card's preparation takes its store's lock itself, rechecking its fence and the folder's quiet inside it
+        // (HI-2866: the lock isn't re-entrant, and a non-colocated project folder has no Git of its own to lock).
+        around: isJjLineKey(st.line) ? (fn) => fn() : (fn) => withRepoLock(projectPath, fn, { quiet: true, project: projectPath })
       })
     )
     if ('ok' in r) {

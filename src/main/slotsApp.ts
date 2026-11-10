@@ -27,14 +27,24 @@ import { childEnv } from './ptyHost'
 import { sessions } from './sessions'
 import { removeCopiesIn } from './skillCopies'
 import { settleSlotJob } from './slotJobs'
-import { builderCountOf, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
+import { builderCountOf, quiet as quietFolder, SlotPool, slotLevelsOf, slotOptionsOf, SlotStore, type OpHolder, type Slot, type SlotConn, type SlotLease, type SlotRenamer, type SlotRunEnd, type SlotRunner, type SlotWriter } from './slots'
 import { onCombworkEvent } from './events'
 import { agentBusy } from './workflow/lineUpdates'
 import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { goneWriterCleared, goneWriterSettles, goneWriterStill, setRetiredHomes, setWriterHost, writerCleared, writerHeld, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
-import type { WorkspaceFilesOutcome } from './platform/workspacePort'
+import type { WorkspaceFilesOutcome, WorkspacePort } from './platform/workspacePort'
+import { registerWorkspacePort, workspacePortForPlatform, workspacePortOf } from './platform/workspacePorts'
+import { createJjWorkspacePort, type JjWorkspacePort } from './platform/jjWorkspacePort'
+import { recoverStale } from './platform/jjRecovery'
+import { git } from './git'
+import { boardPrepStore } from './platform/jjSlotPrep'
+import { historyFor } from './platform/historyPorts'
+import { withRepoLock } from './repoLock'
+import { trash } from './trash'
+import { AsyncLocalStorage } from 'async_hooks'
+import type { PlatformId } from '../shared/platform/descriptors'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
@@ -261,6 +271,79 @@ function renamerFor(ws: WorkspaceService, projectPath: string): SlotRenamer {
   }
 }
 
+/**
+ * The stores whose repository lock this async context holds (HI-2866): jj's port takes its store's lock around each
+ * write, and the lock isn't re-entrant, so a take inside one already held runs straight through.
+ */
+const heldStores = new AsyncLocalStorage<ReadonlySet<string>>()
+function storeLock<T>(store: string, fn: () => Promise<T>): Promise<T> {
+  const key = store.toLowerCase()
+  const held = heldStores.getStore()
+  if (held?.has(key)) return fn()
+  return withRepoLock(store, () => heldStores.run(new Set([...(held ?? []), key]), fn), { quiet: true })
+}
+
+/**
+ * jj's workspace port with the app's dependencies (HI-2866), registered once: its control workspace beside the project's
+ * slots with its record in the workspace database, the project folder's quiet (no session, no process), the store's
+ * lock, the Recycle Bin, the slots' bindings in the workspace database (jjSlotPrep.ts), and §16.3.2's containment on
+ * the store for a slot's reuse.
+ */
+function jjPort(): JjWorkspacePort {
+  const known = workspacePortOf('jj')
+  if (known) return known as JjWorkspacePort
+  const port = createJjWorkspacePort({
+    control: (repo) => {
+      const ws = workspaceFor(repo)
+      const folder = join(ws ? ws.worktreesRoot : join(repo, '..'), basename(repo), '.cw-jj-control')
+      const journal = ws ? new SlotStore(boardConn(ws), basename(repo)).journal(`jj_control:${repo.toLowerCase()}`) : { read: () => ({ unreadable: true }), write: async () => undefined, clear: async () => undefined }
+      return { folder, journal }
+    },
+    projectQuiet: async (repo) => !sessionIn(repo) && (await quietFolder(repo)),
+    lock: storeLock,
+    trash: async (p) => void (await trash(p)),
+    prep: (store) => {
+      const ws = workspaceFor(store)
+      return ws ? boardPrepStore(boardConn(ws)) : null
+    },
+    contains: (store, target, change, at) => historyFor('git').contains(store, target, change, at)
+  })
+  registerWorkspacePort('jj', port)
+  return port
+}
+
+/**
+ * A stale jj slot recovered, the user's explicit action (HI-2866; the window's Recover…, J9c): J2's `recoverStale` under
+ * the pool's operation of the slot, the preserved bytes outside every workspace (the project's worktrees folder's
+ * `.cw-recovery`). A protocol code when refused.
+ */
+export async function recoverStaleSlot(ws: WorkspaceService, projectPath: string, name: string): Promise<{ ok: true } | { ok: false; why: string }> {
+  const pool = await poolFor(ws, projectPath)
+  return pool.recoverStale(name, async (s, fence, journal, quietNow) => {
+    const r = await recoverStale(
+      { port: jjPort(), git: (cwd, args) => git(cwd, args), preserveRoot: join(ws.worktreesRoot, basename(projectPath), '.cw-recovery', s.name), trash: async (p) => void (await trash(p)) },
+      { repo: projectPath, folder: s.folder, identity: s.identity!, journal, fence, quiet: quietNow }
+    )
+    return r.ok ? { ok: true } : { ok: false, why: r.why }
+  })
+}
+
+/** Each project's platform as last read (HI-2866): which port its pools make new slots and copies with. */
+const platforms = new Map<string, PlatformId>()
+const platformKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}
+${projectPath.toLowerCase()}`
+async function readPlatform(ws: WorkspaceService, projectPath: string): Promise<void> {
+  const p = (await ws.projectConfig(projectPath).catch(() => null))?.platform
+  if (p === 'jj') jjPort()
+  platforms.set(platformKey(ws, projectPath), p === 'jj' ? 'jj' : 'git')
+}
+/** The port a project's new slots and copies are made with now (Git's unless the project uses jj). */
+export function projectWorkspaces(ws: WorkspaceService, projectPath: string): WorkspacePort {
+  return workspacePortForPlatform(platforms.get(platformKey(ws, projectPath)) ?? 'git')
+}
+/** Reads a project's platform again (before a lending). */
+export const refreshProjectWorkspaces = (ws: WorkspaceService, projectPath: string): Promise<void> => readPlatform(ws, projectPath)
+
 const pools = new Map<string, { life: AbortSignal; pool: Promise<SlotPool> }>()
 const poolKey = (ws: WorkspaceService, projectPath: string): string => `${(ws.path ?? '').toLowerCase()}\n${projectPath.toLowerCase()}`
 
@@ -271,10 +354,13 @@ export function poolFor(ws: WorkspaceService, projectPath: string): Promise<Slot
   if (known && known.life === ws.lifetime && !known.life.aborted) return known.pool
   const pool = (async () => {
     const cfg = await ws.projectConfig(projectPath)
+    await readPlatform(ws, projectPath)
     const root = join(ws.worktreesRoot, basename(projectPath))
     const store = new SlotStore(boardConn(ws), cfg.id ?? basename(projectPath))
     const made: SlotPool = new SlotPool({
       store,
+      workspacesFor: () => projectWorkspaces(ws, projectPath),
+      refreshPorts: () => readPlatform(ws, projectPath),
       project: projectPath,
       root,
       options: async () => slotOptionsOf(await ws.projectConfig(projectPath), slotLevelsOf(config.settings, ws)),
