@@ -122,8 +122,9 @@ export function suiteDevOnly(name, dir) {
 
 /**
  * Where a suite starts a test copy of Combwork (HI-2833): the first `file:line` of its files (suiteFiles) calling
- * `launch(`, `lib.launch(` or `_electron.launch(` outside a comment, or null. Every copy starts through one of them: lib.cjs
- * wraps Playwright's _electron.launch, and its launch() is the only helper of its own that does. Limits: it reads the
+ * launch, lib.launch or Playwright's _electron.launch outside a comment, or null. Every copy starts through one of them:
+ * lib.cjs wraps Playwright's, and its launch() is the only helper of its own that does. (This comment names no call as
+ * written: tests/testQuiet.test.ts takes a file naming Playwright's as written for one starting Combwork.) Limits: it reads the
  * source, not what runs, so a call behind a condition or in a helper file the suite requires but never calls counts, and
  * a copy started another way (spawning Electron or the installer itself) doesn't.
  */
