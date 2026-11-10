@@ -137,6 +137,30 @@ const TARGET = 'integration'
     await h.inv('settings:update', { appearance: { theme: 'dark' } })
     const noReason = await api(assistant, 'POST', '/v1/queue/retry', { card: `#${three.n}` })
     check("its Retry merge needs a reason (400)", noReason.status === 400, JSON.stringify(noReason.body))
+    // --- HI-2892: a forward merge against the release path's direction (into main, the default branch): refused with its
+    // reason; the user's override only as the JSON boolean true, recorded in the Assistant's action.
+    await h.inv('workflow:setOptions', fx.alpha, { preset: null, options: q.queueOptions(fx, { otherTargets: ['main'] }) })
+    const backward = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: TARGET, to: 'main' })
+    check('HI-2892: a forward into main is refused (400), saying why', backward.status === 400 && /main isn’t brought up to date with integration: main is the repository’s default branch, which a release reaches through its pull request/.test(JSON.stringify(backward.body)), JSON.stringify(backward.body))
+    const loose = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: TARGET, to: 'main', override: 'true' })
+    check('…an override that isn’t the boolean true is refused (400)', loose.status === 400 && /override is true or left out/.test(JSON.stringify(loose.body)), JSON.stringify(loose.body))
+    const overridden = await api(assistant, 'POST', '/v1/queue/forward', { project: 'alpha', from: TARGET, to: 'main', override: true })
+    const fwdCard = overridden.body?.card
+    check('…with override true it is queued, the override on its card', overridden.status === 200 && overridden.body?.queued === true && (await h.facts(fwdCard)).some((f) => f.kind === 'ForwardRequested' && f.data.override?.dir === 'backward' && f.data.override?.why === 'default'), JSON.stringify(overridden.body))
+    const fwdActions = await h.inv('assistant:actions')
+    check('…its action says it overrode the direction', fwdActions.some((x) => x.ok && x.kind === 'queue-forward' && /with the user’s override of the release path’s direction/.test(x.text)), JSON.stringify(fwdActions.map((x) => [x.kind, x.text])))
+    // --- HI-2893: a past branch's queue (1.0.0: not a target, only a pause, nothing in it) is left out of GET /v1/queue
+    // and listed with past=true, marked; named, it is listed as it is.
+    await h.inv('queue:pause', fx.alpha, '1.0.0')
+    const live = await api(reviewer.token, 'GET', '/v1/queue')
+    const withPast = await api(reviewer.token, 'GET', '/v1/queue?past=true')
+    const named = await api(reviewer.token, 'GET', '/v1/queue?target=1.0.0')
+    check('HI-2893: GET /v1/queue leaves out a past branch\'s queue', live.status === 200 && !live.body.some((x) => x.target === '1.0.0') && live.body.some((x) => x.target === TARGET), JSON.stringify(live.body?.map((x) => [x.target, x.past])))
+    check('…past=true lists it, marked past', withPast.status === 200 && withPast.body.some((x) => x.target === '1.0.0' && x.past === true) && !withPast.body.find((x) => x.target === TARGET)?.past, JSON.stringify(withPast.body?.map((x) => [x.target, x.past])))
+    check('…and naming it lists it', named.status === 200 && named.body.length === 1 && named.body[0].target === '1.0.0' && named.body[0].past === true, JSON.stringify(named.body))
+    await h.inv('queue:resume', fx.alpha, '1.0.0')
+    // Taken out again, unless merged already: only the override was checked.
+    if (fwdCard) await h.inv('queue:remove', fwdCard, 'only the override was checked').catch(() => null)
     await h.inv('session:stop', home, 'assistant')
 
     // --- G18 (#1179): Push the target branch after merging, on, in a repository with no remote: the card merges, then

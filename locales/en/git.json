@@ -875,6 +875,14 @@
     "defaultMessage": "Outcome",
     "description": "A column heading of the Git tab's merge queue history: merged (with the result), returned (with why) or taken out."
   },
+  "git.queue.past": {
+    "defaultMessage": "{n, plural, one {Past branches (# branch)} other {Past branches (# branches)}}",
+    "description": "HI-2893: a folded part of the Version Control tab's Merge queue section: the history of the queues of branches that aren't the project's targets any more (Work merges into, Other branches work can merge into), {n} of them. A click unfolds it."
+  },
+  "git.queue.pastTip": {
+    "defaultMessage": "Branches that work no longer merges into, with nothing in their queue: what their queues merged and returned.",
+    "description": "HI-2893: tooltip of Past branches in the Version Control tab's Merge queue section."
+  },
   "git.queue.reading": {
     "defaultMessage": "Reading the merge queues…",
     "description": "The Version Control tab's Merge queue section while the project's queues are read. Glossary 2.5: merge queue."

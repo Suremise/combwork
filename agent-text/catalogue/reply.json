@@ -444,8 +444,8 @@
     "note": "A list cut short (files, processes): those shown, and how many more."
   },
   "reply.queue.head": {
-    "text": "Merge queue for {target} in {project}: {state}.",
-    "note": "cw_queue list's line for a target's queue."
+    "text": "Merge queue for {target} in {project}{past, select, yes { (a past branch: not a target now)} other {}}: {state}.",
+    "note": "cw_queue list's line for a target's queue. HI-2893: past yes for a past branch's queue."
   },
   "reply.queue.how": {
     "text": "to {purpose}, in the {place, select, project {project folder} other {target's folder}}: {command}",

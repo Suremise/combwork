@@ -910,7 +910,10 @@ export async function slotViews(pool: SlotPool): Promise<SlotView[]> {
       const l = pool.openLease(s.name)
       const w = s.writer
       const held = !!w && (await writerHeld(w))
-      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null }
+      // A jj slot (HI-2869): stale only when J2's read says so (never a guess); its Recover… is the user's.
+      const jj = s.platform === 'jj'
+      const stale = jj && s.state !== 'gone' && s.state !== 'removing' ? (await jjPort().stale(s.folder).catch(() => null)) === true : false
+      return { name: s.name, folder: s.folder, state: s.state, warmError: s.warmError, warmLog: s.warmLog, lease: l ? { id: l.id, kind: l.kind, agent: l.agent, card: l.card, lane: l.lane } : null, writer: w ? { agent: w.agent, lease: w.lease, held } : null, ...(jj ? { platform: 'jj' as const } : {}), ...(stale ? { stale: true as const } : {}) }
     })
   )
 }

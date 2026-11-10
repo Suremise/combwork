@@ -31,6 +31,11 @@ if (!jjExe) console.warn(`jjSlotPrepReal.test.ts skipped: jj ${TESTED_JJ.version
 
 const yes: WorkspaceFence = { still: () => true }
 
+// A hung test's bound (HI-2897), not a time budget: each test runs tens of real jj and Git processes (3–11 s alone on
+// jj 0.47.1, up to 16 s for the one HR1 crash test before it was split in four), and several times that under a loaded
+// machine or a 2-worker jj run, which Vitest's 20 s default for unit tests doesn't leave room for.
+const REAL_JJ_MS = 60_000
+
 /** board_meta in memory, behind the app's store (one transaction per write). */
 function memoryStore(): JjPrepStore {
   const db = new DatabaseSync(':memory:')
@@ -51,7 +56,7 @@ function memoryStore(): JjPrepStore {
   })
 }
 
-describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version}), HI-2866`, () => {
+describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version}), HI-2866`, { timeout: REAL_JJ_MS }, () => {
   const h = harness()
 
   async function world(colocated: boolean) {
@@ -79,6 +84,11 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
   }
   type World = Awaited<ReturnType<typeof world>>
   const prepareFor = (w: World, card: number, cycle: number, o: { lease?: string; fence?: WorkspaceFence; identity?: WorkspaceIdentity } = {}) => w.port.prepare(w.slot, w.key(card, cycle), w.main(), { identity: o.identity ?? w.identity, fence: o.fence ?? yes, lease: o.lease ?? 'L1', target: 'main' })
+  /** The next preparation's journal write at `phase` crashes once (`writing`: after it is saved, before jj runs). */
+  const crashAt = (w: World, phase: string): void => {
+    let once = true
+    w.setStore({ ...w.store, writeJournal: async (s, ws, j) => { if (j.phase === phase && once) { once = false; if (phase === 'writing') await w.store.writeJournal(s, ws, j); throw new Error('crash') } return w.store.writeJournal(s, ws, j) } })
+  }
 
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
     it("a card cycle prepared: the slot on its base, its key the slot's line; again, nothing written", async () => {
@@ -253,15 +263,13 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       expect(await w.port.line(w.slot)).toBe(w.key(4, 7))
     })
 
-    it('crashes beside foreign operations (HR1): before the write then a foreign `jj new` on the base, rewritten as its own; after it then another operation, confirmed; then an edit or a foreign write, uncertain', async () => {
+    // HR1's crashes beside foreign operations, a case each (HI-2897: one test of the four took 15–18 s alone, near the
+    // file's bound): each prepares card 1's cycle 5, then crashes the next preparation where it says.
+    it('crash before the write, then a foreign `jj new` on the base in the slot: rewritten as its own (HR1)', async () => {
       const w = await world(colocated)
       await prepareFor(w, 1, 5)
-      const crashAt = (phase: string): void => {
-        let once = true
-        w.setStore({ ...w.store, writeJournal: async (s, ws, j) => { if (j.phase === phase && once) { once = false; if (phase === 'writing') await w.store.writeJournal(s, ws, j); throw new Error('crash') } return w.store.writeJournal(s, ws, j) } })
-      }
       // Crashed after `writing` was journalled, before jj ran; then someone's `jj new` on the same base in the slot.
-      crashAt('writing')
+      crashAt(w, 'writing')
       await expect(prepareFor(w, 3, 6)).rejects.toThrow('crash')
       w.setStore(w.store)
       h.jj(w.slot, 'new', w.main())
@@ -269,37 +277,49 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       expect(await prepareFor(w, 3, 6)).toEqual({ ok: true, err: '' })
       expect(w.wc()).not.toBe(foreign)
       expect(await w.port.line(w.slot)).toBe(w.key(3, 6))
+    })
+
+    it('crash after the write, then another operation elsewhere: its own write, confirmed; retried unchanged, nothing written (HR1)', async () => {
+      const w = await world(colocated)
+      await prepareFor(w, 1, 5)
       // Crashed after jj ran, before `written` was journalled; then another operation elsewhere: its own write, confirmed.
-      crashAt('written')
+      crashAt(w, 'written')
       await expect(prepareFor(w, 4, 7)).rejects.toThrow('crash')
       w.setStore(w.store)
       const mine = w.wc()
       h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'other')
       expect(await prepareFor(w, 4, 7)).toEqual({ ok: true, err: '' })
       expect(w.wc()).toBe(mine)
+      expect(await w.port.line(w.slot)).toBe(w.key(4, 7))
       // Retried unchanged: idempotent, nothing written.
       const heads = w.heads()
       expect(await prepareFor(w, 4, 7)).toEqual({ ok: true, err: '' })
       expect(w.heads()).toEqual(heads)
+    })
+
+    it('crash after the write, then an unrecorded edit in the folder: uncertain, never published, the edit kept (HR1)', async () => {
+      const w = await world(colocated)
+      await prepareFor(w, 1, 5)
       // Crashed after jj ran; then an unrecorded edit in the folder: uncertain, never published, the edit kept; again, still.
-      crashAt('written')
+      crashAt(w, 'written')
       await expect(prepareFor(w, 5, 8)).rejects.toThrow('crash')
       w.setStore(w.store)
       writeFileSync(join(w.slot, 'late.txt'), 'late\n')
       expect((await prepareFor(w, 5, 8)).err).toMatch(/couldn't be read back/)
       expect((await prepareFor(w, 5, 8)).err).toMatch(/couldn't be read back/)
-      expect(await w.port.line(w.slot)).toBe(w.key(4, 7))
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 5))
       expect(readFileSync(join(w.slot, 'late.txt'), 'utf8')).toBe('late\n')
-      // Crashed after jj ran; then someone's `jj new` on the same base replaced the slot's working copy: uncertain.
-      const w2 = await world(colocated)
-      await prepareFor(w2, 1, 5)
-      let once = true
-      w2.setStore({ ...w2.store, writeJournal: async (s, ws, j) => { if (j.phase === 'written' && once) { once = false; throw new Error('crash') } return w2.store.writeJournal(s, ws, j) } })
-      await expect(prepareFor(w2, 3, 6)).rejects.toThrow('crash')
-      w2.setStore(w2.store)
-      h.jj(w2.slot, 'new', w2.main())
-      expect((await prepareFor(w2, 3, 6)).err).toMatch(/couldn't be read back/)
-      expect(await w2.port.line(w2.slot)).toBe(w2.key(1, 5))
+    })
+
+    it("crash after the write, then a foreign `jj new` on the same base replaced the slot's working copy: uncertain (HR1)", async () => {
+      const w = await world(colocated)
+      await prepareFor(w, 1, 5)
+      crashAt(w, 'written')
+      await expect(prepareFor(w, 3, 6)).rejects.toThrow('crash')
+      w.setStore(w.store)
+      h.jj(w.slot, 'new', w.main())
+      expect((await prepareFor(w, 3, 6)).err).toMatch(/couldn't be read back/)
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 5))
     })
   })
 })

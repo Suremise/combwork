@@ -2585,8 +2585,8 @@ merges under jj.
 - **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
   window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
   colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
-  and a `jj rebase -r <commit> -d <target>` to start from, its containment "can't check yet" until J5 records the user's
-  integration, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
+  and a `jj rebase -r <commit> -d <target>` to start from, and its last containment observation for exactly that
+  approval, J9c's: not in the target yet, couldn't check (why) or not checked yet, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
   conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,
   a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
   `bookmarks()`, for the user to pick one by commit id; then `diff --summary` and `--git`, capped), Bookmarks
@@ -3218,6 +3218,56 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
   before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
   pins, re-armed, disposed).
+
+##### The window for jj cards (1.5.0's J9c, HI-2869)
+
+What the window shows of jj cards and the user's acts on them; design HI-2869/s7 to s16 (HR2's). Behind
+`start.platformReady` like the rest until J9e (HI-2874). Decision A holds: nothing here moves a bookmark or pushes; the
+only writes are an acknowledgement, the containment record and the leftovers' prune.
+- **Containment record** (`reconcile.ts`): each J5 proof of an Approved jj card that finds it not in its target yet
+  (`notYet`) or can't say (`unknown`, with J5's reason) writes `jj_contained:<project>:<card>:<cycle>` in `board_meta`:
+  the exact approval observed (submission, revision, base, line key, jj commit, target), what was seen and when. Ordered
+  by a **generation** reserved from the project's `jj_contained_gen:<project>` counter in a board write before the proof
+  starts, never by a clock: it's written only while the card is still that approval (checked in the write) and over no
+  record or a lower generation's, so an older observation finishing later writes nothing. The Integrated transaction
+  deletes it. **Waiting for you to integrate** (`jj:waiting`, `jjWindow.ts`) shows a record only when all six of its
+  identity fields equal the card's now; any other is *not checked yet*.
+- **Publish records to check** (`jj:toCheck`): the project's unresolved `checkThis` rows (§ J9b2's publish pass), 50 a
+  page in (target, flag time, card, cycle, bundle) order, the cursor that whole key (rows flagged at the same moment page
+  once each). Each row says what was recorded (published to which remote, or no longer in its target) and what differs
+  now. **Mark as checked** (`jj:markChecked`, after a confirmation) is an acknowledgement only: one compare-and-set that
+  sets `check.resolvedAt` while the row is exactly the one shown (the project's, its key and target, still `checkThis`,
+  the same flag time, not resolved); `seen` and the differences are kept, and nothing in the repository or remote changes.
+- **Leftovers from setting up jj slots** (`jj:leftovers`): HI-2887's residues of the control workspace (an interrupted or
+  lost set-up, a folder not empty or not proved Combwork's), at most 100 listed with the total, each with **Show in
+  folder**; Combwork never deletes them. Before listing, a bounded prune (`pruneResidues`, under the store's lock) drops
+  a residue only on a **proved absence**: its path's `lstat` says ENOENT or ENOTDIR (any other error keeps it) and its
+  name isn't registered at the pinned operation head. The last step runs inside the journal's own write (the journal's
+  `update`, in the board write's transaction, after any wait for its lock: HR2's round 1), reading nothing
+  asynchronously: the record still exactly the one read, the operation heads unchanged, each `lstat` again; anything
+  else writes nothing. 16 a batch from a rotating cursor kept in the journal, so every residue is reached.
+- **Reading again:** Repository's three panels read again with each of its reads (its Refresh, the window's focus) and,
+  Waiting and the publish records, with each read of the board (a `tasks-changed`: a containment record written, a
+  card moved, the publish pass's worker writing from its own connection), a slower earlier answer dropped.
+- **Stale slots**: Slots and copies marks a jj slot *stale* (J2's `stale`, read with the slot list) with **Recover…**:
+  a confirmation naming the folder its unrecorded edits are copied to (`.cw-recovery/<slot>`), then J9a's
+  `slots:recoverStale`, its refusal said (busy, no longer stale, not the recorded workspace, or jj's failure).
+- **The card dialog's Work section**: a jj card's **Workspace** (its slot's jj workspace) in its line's place, its jj
+  change id beside each revision (with the chain's length when it holds more than one commit), and how the integration
+  was proved (`via`: history, replay, the same tree, a prepared candidate).
+- **Tests:** `tests/jjReconcile.test.ts` (the record for exactly the approval, an older observation dropped, newer ones
+  replacing it at equal and earlier clocks, gone with Integrated; not shown for another approval), `tests/jjWindow.test.ts`
+  (paging more than a page flagged at once across targets, other projects' and resolved rows out; Mark as checked's
+  compare-and-set; a slot journal's `update` deciding on what is stored then), `tests/jjControl.test.ts` (the prune:
+  present, registered, unreadable and changed-meanwhile residues kept, rotating batches; a leftover recreated, or a
+  residue added, while the write waits for its lock), and the e2e suites `jjview` (the publish records and leftovers,
+  seeded, Mark as checked, Refresh) and `jjwindow`: a real jj card in the app, colocated (a non-colocated project can't
+  be switched to before J9f, HI-2896, which checks these views there). An unpackaged build starts jj cards before J9e
+  through HI-2870's switch (`CW_TEST_JJ_CARDS=1`, `jjCardsTestSwitch`; never a packaged one, J9e removes it): a fake
+  builder's card in its slot, submitted through the Agent API and passed by the user; Waiting's observation, shown when
+  written and following a change; the user's integration (Done, the Work section's jj rows); a stale slot recovered
+  through its confirmation once nothing works in it, its unrecorded edit kept (its return to the pool after Done is HI-2906's:
+  the post-Done detach a jj slot refuses); light and dark, and the seven locales.
 
 ##### Non-colocated jj repositories (1.5.0's J9f, HI-2896)
 
@@ -5300,6 +5350,32 @@ brought up to date with the release branch, and only the pull request's merge co
 merge commit with the destination's tree, through the merge checks. A card's submission with nothing of its own is still
 refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card.
 
+**Only in the release path's direction (HI-2892, design s10).** Forward merges go from a release, or `main`, into the
+next version, never back. `forwardDirection` (shared/workflow/forwardOrder.ts) decides from the two names alone, the
+default branch as the project's own platform port names it and only while it exists (none named or readable: nothing
+counts as `main`): two versions (`X.Y.Z[-pre]` or `X.Y`, an optional `v`, read on the whole name or its last `/`
+segment, compared by semver) give `forward` older into newer and `backward` (`older`) newer into older, and `unknown`
+(`sameVersion`) for one version under two names, decided first, whichever is the default (HR1's round 1: with no
+`main` or `master`, git's default is the checked-out branch, which may be a version); then the default branch, unless
+its name is a version, into any other is `forward`, any other into it `backward` (`default`: a release reaches it
+through its pull request); any other pair is `unknown` (`unordered`).
+Ancestry decides nothing: no graph test tells which branch was made from which (one containing the other is equally a
+release behind its next version and a next version built on it), so a pair the names don't order is unknown, never
+permitted. Only `forward` is permitted by default:
+- **The window** offers Bring Up to Date… and counts *behind* only for sources `forward` into the target; a target with
+  none has no `forward` in its view. It has no override.
+- **A request** (`forwardMerge`: the window's IPC, `POST /v1/queue/forward`, `cw_queue forward`) for a `backward` or
+  `unknown` pair is refused, saying which and why (`invalid`, 400), after the membership, actor and Control checks, which
+  an override never bypasses. `override: true` (the Agent API alone, only the JSON boolean: anything else is 400) is the
+  user's explicit choice: the card's `ForwardRequested` records it (`override: { by, dir, why }`), bound to that card and
+  so to its pair, and the Assistant's `queue-forward` action says so. An open card for the pair made without one is
+  never given it: the request is refused (`conflict`), naming the card to remove first.
+- **Retry merge** on a forward card and **the queue, before each forward entry's test merge**, read the direction again:
+  one not `forward` whose request recorded no override is refused (Retry, the card staying Active), or returned
+  (`IntegrationFailed` `direction`, never merged, both branches as they were): a card from before, or one whose default
+  branch changed since, inherits nothing from having been queued. Remove from queue ends it. A recorded override holds
+  through Retry, the source frozen again.
+
 #### 16.9.2 Advancing the target
 
 [P1, answering HR2's round 1 finding 9 and round 2 finding 4] The advance moves the target from the expected
@@ -5651,7 +5727,9 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   revision, the result or why, and when), a `DataTable` as the archived cards' (#1641): a line a row, the title
   ellipsised, the outcome a short label with the result or why as its tooltip, the merge commit its own column
   (left to the tooltip when narrow), the headings and filters sticky over a box of its own that scrolls. A target shows by #1356's rule, or while it has a history. The panel's
-  *Queue in Version Control* opens it.
+  *Queue in Version Control* opens it; the card here has no such link (HI-2893). A past branch's queue (HI-2893:
+  `past`, §16.9.3's Merges tab) shows no card (no Pause queue): only its history, under a folded **Past branches (n)**
+  after the live ones.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Combwork merge it under its own
   ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
   queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
@@ -7765,7 +7843,12 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   queued.*), while the project's current options have Combwork merge into it (`queue:list` gives the window those targets
   too, with `combworkMerges` and `inFlight`; the Agent API's listing is unchanged). So after a switch to "The agent merges",
   or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
-  out of flight, and their outcomes seen. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
+  out of flight, and their outcomes seen. **Past branches** (HI-2893, Darren 10 Nov): a queue whose target is none of
+  the project's targets now (Work merges into, Other branches work can merge into) and that holds no entry (none testing
+  or queued) is a past branch's (`QueueView.past`, set in every listing): it never shows here, whatever else it has (a
+  pause, a return, a card in flight), so the panel and Version Control's Merge queue show the same live queues. Its
+  history stays in Version Control's Merge queue section under **Past branches** (below), and the Agent API lists it
+  only on request. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
   busy (`queueBusy`: an entry testing or queued, a pause, a return not seen, or a merge in the last hour), so an
   inactive project's idle *Nothing queued.* card is left out; chosen in the filter, its queue shows as above. While a

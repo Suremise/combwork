@@ -10,6 +10,10 @@
 //   divergent change id lists both commits, one picked), Bookmarks (a conflicted one with its sides), Conflicts. A card's
 //   start refused (cards don't run in a jj project yet). Back to Git refused (conflicted bookmark and commit), then,
 //   once jj's state is fixed, made: Git's sections again.
+// - J9c (HI-2869), before J9e lets a jj card run: the publish records to check and the set-up's leftovers, seeded as
+//   J9b2's publish pass and HI-2887's control leave them; Mark as checked after its confirmation (only its resolution
+//   written); a leftover proved gone pruned, one still there listed. Waiting's containment and Recover… need a running
+//   jj card: their unit tests (jjReconcile, jjControl) until J9e's suites.
 // - notes: a colocated jj repository whose .gitattributes sets eol: the switch refused, the gate listed.
 // - loose: a jj repository not colocated with Git (HI-2896): jj offered and switched to (the gates read through jj's store,
 //   all clear), its Repository saying so; back to Git greyed out (no Git working copy), its reason in the tooltip; None,
@@ -19,6 +23,7 @@ const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
 const { execFileSync } = require('child_process')
+const { DatabaseSync } = require('node:sqlite')
 const { jjDir, portableJj } = require('../jjPortable.cjs')
 
 const HUNG_MS = 30000
@@ -163,6 +168,62 @@ function jjRepo(dir, o = {}) {
     check('…and Waiting for you to integrate, no merge offered', (await repo.locator('[data-jj-integrate]').count()) === 1 && (await page.locator('[data-action*="merge" i]').count()) === 0)
     await shoot(page.locator('.vc-view'), 'repository')
 
+    // --- J9c (HI-2869): publish records to check and the set-up's leftovers, seeded in the workspace database.
+    const pid = JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).id
+    check('shop has its canonical id', typeof pid === 'string' && pid.length > 0, String(pid))
+    const kept = path.join(work, 'leftover-kept')
+    const gone = path.join(work, 'leftover-gone')
+    fs.mkdirSync(path.join(kept, 'ws'), { recursive: true })
+    fs.writeFileSync(path.join(kept, 'ws', 'notes.txt'), 'a note of the user\'s\n')
+    const C = (c) => c.repeat(40)
+    const db = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { timeout: 5000 })
+    try {
+      const seen = JSON.stringify({ remote: 'origin', url: 'https://example.invalid/shop.git', pushed: C('1'), head: C('1'), op: 'a'.repeat(128), print: 'p', at: Date.now() - 3600e3 })
+      const flag = db.prepare(`INSERT INTO jj_obligations (project, card, cycle, bundle, target, result, since, state, pushed, at, seq, seen, "check") VALUES (?, ?, 1, ?, 'main', ?, 1, 'checkThis', ?, 5, 1, ?, ?)`)
+      flag.run(pid, 'SHOP-1', 'b1shop1', C('1'), C('1'), seen, JSON.stringify({ was: 'published', differs: [{ what: 'pushed', was: C('1'), now: C('2') }], at: 100 }))
+      flag.run(pid, 'SHOP-2', 'b1shop2', C('3'), C('3'), seen, JSON.stringify({ was: 'notHeld', differs: [{ what: 'held', was: 'no', now: 'yes' }], at: 101 }))
+      const control = { phase: 'idle', residues: [{ path: kept, why: 'notEmpty' }, { path: gone, name: 'cw-0000-control-gone', why: 'lost' }] }
+      db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(`jj_control:${shop.toLowerCase()}`, JSON.stringify(control))
+    } finally {
+      db.close()
+    }
+    await section('jjHistory')
+    const repo2 = await section('jjRepo')
+    const toCheck = repo2.locator('[data-jj-to-check]')
+    check('Publish records to check: both, each with what differs', !!(await until(async () => (await toCheck.locator('[data-jj-to-check-row]').count()) === 2 && /now has 2222222/.test(await text(toCheck)) && /back in its target/.test(await text(toCheck)), HUNG_MS)), await text(toCheck))
+    const leftovers = repo2.locator('[data-jj-leftovers]')
+    check('Leftovers: the one still there listed, the one proved gone pruned', !!(await until(async () => JSON.stringify(await leftovers.locator('[data-jj-leftover]').evaluateAll((l) => l.map((x) => x.getAttribute('data-jj-leftover')))) === JSON.stringify([kept]), HUNG_MS)), await text(leftovers))
+    const control = (() => {
+      const r = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true })
+      try {
+        return JSON.parse(r.prepare('SELECT value FROM board_meta WHERE key = ?').get(`jj_control:${shop.toLowerCase()}`).value)
+      } finally {
+        r.close()
+      }
+    })()
+    check('…the journal keeps the kept one only', control.residues.length === 1 && control.residues[0].path === kept && fs.existsSync(kept), JSON.stringify(control))
+    // The switch's notices would cover the panels: hidden for their shots (the window's own, as is).
+    const quiet = await page.addStyleTag({ content: '.toasts { display: none !important; }' })
+    await shoot(toCheck, 'to-check')
+    await shoot(leftovers, 'leftovers')
+    await quiet.evaluate((el) => el.remove())
+    await toCheck.locator('[data-jj-to-check-row="SHOP-1"] [data-jj-mark-checked]').click()
+    const ask = dialog.filter({ hasText: 'Mark SHOP-1 as checked?' })
+    check('Mark as checked asks first, saying nothing changes in the repository', !!(await until(async () => (await ask.count()) === 1 && /changes nothing in the repository/.test(await text(ask)), HUNG_MS)), await text(dialog))
+    await shoot(ask, 'mark-checked')
+    await ask.getByRole('button', { name: 'Mark as checked', exact: true }).click()
+    check('…then SHOP-1 leaves the list, SHOP-2 stays', !!(await until(async () => (await toCheck.locator('[data-jj-to-check-row]').count()) === 1 && (await toCheck.locator('[data-jj-to-check-row="SHOP-2"]').count()) === 1, HUNG_MS)), await text(toCheck))
+    const marked = (() => {
+      const r = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true })
+      try {
+        return r.prepare('SELECT state, seen, "check" AS c FROM jj_obligations WHERE project = ? AND card = ?').get(pid, 'SHOP-1')
+      } finally {
+        r.close()
+      }
+    })()
+    const mc = JSON.parse(marked.c)
+    check('…only its resolution written: still checkThis, seen and the differences kept', marked.state === 'checkThis' && mc.resolvedAt > 0 && mc.differs.length === 1 && JSON.parse(marked.seen).remote === 'origin', JSON.stringify(marked))
+
     // --- History: change id beside commit id, divergent, conflicted, working copy.
     const hist = await section('jjHistory')
     check('History: the feature’s two variants divergent, each with the change id and its own commit id', !!(await until(async () => (await hist.locator(`[data-change="${featureChange}"]`).count()) >= 2 && (await hist.locator('[data-jj-badge="divergent"]').count()) >= 2, HUNG_MS)), await text(hist))
@@ -293,9 +354,11 @@ function jjRepo(dir, o = {}) {
       await speak({ ...english, code: language, locale: language, messages: catalogue(language) })
       const cat = Object.assign({}, ...['jj', 'git'].map((a) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', language, `${a}.json`), 'utf8'))))
       // Repository may be the same word in a language: the unsupported list's heading and Compare's label say it.
-      const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported']]
+      const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported'], cat['jj.toCheck.head'], cat['jj.leftovers.head']]
       check(`${language}: jj's sections in the language`, want.every(Boolean) && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want[0]) && (await text(page.locator('.vc-view'))).includes(want[1]), HUNG_MS)), await text(page.locator('.git-sections')))
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-repository-${language}.png`) })
+      await page.locator('[data-jj-to-check]').screenshot({ path: path.join(shots, `jjview-to-check-${language}.png`) })
+      await page.locator('[data-jj-leftovers]').screenshot({ path: path.join(shots, `jjview-leftovers-${language}.png`) })
       const opsHere = await section('jjOperations')
       check(`${language}: Operations in the language`, !!cat['jj.ops.intro'] && !!(await until(async () => (await text(opsHere)).includes(cat['jj.ops.intro'].slice(0, 20)), HUNG_MS)), await text(opsHere))
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-operations-${language}.png`) })

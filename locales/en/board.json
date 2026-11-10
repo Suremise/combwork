@@ -2960,8 +2960,8 @@
     "description": "An error's title: Resume queue failed (Progress panel)."
   },
   "board.queue.returnWhy": {
-    "defaultMessage": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} other {{why}}}",
-    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
+    "defaultMessage": "{reason, select, conflict {{files, select, none {conflict} other {conflict in {files}}}} checks {{check, select, none {checks failed} other {checks failed: {check}}}} hook {a hook failed} folderBusy {the folder {target} is checked out in was busy} notUpToDate {not up to date with {target}} focused {its focused tests couldn’t be chosen or proved} direction {against the release path’s direction, no override} other {{why}}}",
+    "description": "Why the merge queue returned a card to its builder, in a few words after a colon: a conflict (in {files}: file names), its merge checks failed ({check}: the check, such as unit), a git hook failed, the folder the target ({target}: a branch) is checked out in was busy, or it wasn't up to date with the target, or its focused tests (G20: the tests its change needs) couldn't be chosen or proved by its review, or (direction, HI-2892) it was a forward merge against the release path's direction (into an older version or main) made without the user's override; else {why} as Combwork recorded it. Lower case. Keep the select keys and the word none."
   },
   "board.queue.returned": {
     "defaultMessage": "{card} returned: {why}",
@@ -3887,6 +3887,10 @@
     "defaultMessage": "The pass for {from} carries over to {to}: the same change.",
     "description": "A mark in the card dialog's Work section: a pass for an earlier revision ({from}) still counts for a later one ({to}) with exactly the same changes. Glossary: carries over, same change."
   },
+  "board.work.change": {
+    "defaultMessage": "{commits, plural, one {change {change}} other {change {change}, # commits}}",
+    "description": "Beside a jj card's revision in the card dialog's Work section (HI-2869): its jj change id (short), and how many commits its submitted work holds when more than one. “change” is jj's term."
+  },
   "board.work.check": {
     "defaultMessage": "{name}: {result, select, passed {passed} failed {failed} other {stopped}}{counted, select, no { (not counted)} other {}}",
     "description": "A check under a revision in the card dialog's Work section: its name (typecheck, as the project names it), then a colon and how it ended; (not counted) when it doesn't count for the revision (its hover says why). Keep the select keys. Glossary: check."
@@ -4014,6 +4018,14 @@
   "board.work.verdict": {
     "defaultMessage": "{reviewer}: {pass, select, yes {passed} other {failed}}{current, select, no { (no longer counts)} other {}}",
     "description": "A verdict under a revision in the card dialog's Work section: who reviewed it ({reviewer}, an agent's name, then a colon) and whether it passed or failed; (no longer counts) when a newer revision or decision came since. Keep the select keys. Glossary: verdict, pass/fail."
+  },
+  "board.work.via": {
+    "defaultMessage": "{via, select, ancestry {(found in its history)} replay {(its change found applied again)} sameTree {(the target already had it)} candidate {(from a prepared candidate)} other {}}",
+    "description": "After how a jj card went into its target, in the card dialog's Work section (HI-2869): how jj proved it was there. Keep the select keys; other stays empty."
+  },
+  "board.work.workspace": {
+    "defaultMessage": "Workspace",
+    "description": "A label in the card dialog's Work section (HI-2869): the jj workspace (a slot) a jj card's work is in follows. “workspace” is jj's term."
   },
   "board.workQueue.advance": {
     "defaultMessage": "Tested and ready: update {target} in its folder now?",

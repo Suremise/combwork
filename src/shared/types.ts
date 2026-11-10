@@ -1928,6 +1928,9 @@ export interface SlotView {
    * frees it.
    */
   writer: { agent: string; lease: string; held: boolean } | null
+  /** HI-2869: the platform that made it (jj's, when not Git's), and, for a jj slot, stale (another workspace rewrote it). */
+  platform?: 'jj'
+  stale?: true
 }
 
 /** A slot's writer as Release Slot… shows it (#1506, agentFolders.ts heldWriter). */

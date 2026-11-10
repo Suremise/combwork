@@ -198,3 +198,42 @@ export const JJ_DIFF_MAX = 512 * 1024
 
 /** A revision a user types for Compare: a bookmark, a change id or a commit id (a prefix of either), nothing else. */
 export const jjRevisionInput = (s: string): boolean => /^[A-Za-z0-9._\-/@]{1,200}$/.test(s.trim())
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The window for jj cards (HI-2869, J9c).
+
+/** A passed jj card waiting for the user's integration, with its last containment observation for exactly that approval. */
+export interface JjWaitingCard {
+  card: number
+  submission: number
+  revision: string
+  /** Its change id (jj's), when the submission recorded one. */
+  change: string | null
+  target: string
+  /** The last observation for exactly this approval and target (null: not checked yet), `at` an observation's time. */
+  contained: { state: 'notYet' | 'unknown'; why?: string; at: number } | null
+}
+
+/** A publish record the user is asked to check (J9b2's checkThis), with what differs. */
+export interface JjToCheckRow {
+  card: string
+  cycle: number
+  bundle: string
+  target: string
+  result: string
+  /** What Combwork recorded, and when (the settle's). */
+  was: 'published' | 'notHeld'
+  remote: string | null
+  pushed: string | null
+  at: number
+  /** The flag's own time (Mark as checked's compare-and-set takes it back). */
+  checkAt: number
+  differs: { what: 'remote' | 'url' | 'pushed' | 'inRemote' | 'held'; was: string | null; now: string | null }[]
+}
+
+/** A leftover an interrupted or lost set-up kept (HI-2887's residue): its path, its registration's name if any, and why. */
+export interface JjLeftover {
+  path: string
+  name?: string
+  why: string
+}

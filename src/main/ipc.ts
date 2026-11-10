@@ -146,6 +146,7 @@ import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { lineRepoReads } from './platform/repoReadsPorts'
 import { jjBookmarks, jjCompare, jjConflicts, jjHistory, jjRepoView } from './platform/jjViews'
+import { jjLeftovers, jjMarkChecked, jjToCheck, jjWaiting } from './jjWindow'
 import { jjOperationPreview, jjOperations } from './platform/jjOperations'
 import { checkRepoTools } from './platform/repoPorts'
 import { gitCantRead, slotWorkspaces } from './platform/workspacePorts'
@@ -1810,6 +1811,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     // The Operations section (HI-2800): read only; the preview's command is the user's to run.
     'jj:operations': (p, from) => jjOperations(workspace.assertProject(p), typeof from === 'string' ? from : null),
     'jj:operationPreview': (p, op, moment) => jjOperationPreview(workspace.assertProject(p), String(op ?? ''), typeof moment === 'string' ? moment : null),
+    // The window for jj cards (HI-2869): reads, the user's acknowledgement, and what a set-up left.
+    'jj:waiting': (p) => jjWaiting(workspace, workspace.assertProject(p)),
+    'jj:toCheck': (p, after) => jjToCheck(workspace, workspace.assertProject(p), after ?? null),
+    'jj:markChecked': (p, row) => jjMarkChecked(workspace, workspace.assertProject(p), row),
+    'jj:leftovers': (p) => jjLeftovers(workspace.assertProject(p)),
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

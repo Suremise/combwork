@@ -198,6 +198,8 @@
   "git.queue.none": "Keine Merge-Warteschlange. Wenn der Workflow des Projekts Combwork seine Karten mergen lässt (Versionsverwaltung → Workflow: Wer mergt), erscheint hier die Warteschlange jedes Zielbranchs mit ihrem Verlauf.",
   "git.queue.open": "{card} öffnen",
   "git.queue.outcome": "Ergebnis",
+  "git.queue.past": "{n, plural, one {Frühere Branches (# Branch)} other {Frühere Branches (# Branches)}}",
+  "git.queue.pastTip": "Branches, in die keine Arbeit mehr gemergt wird und deren Warteschlange leer ist: was ihre Warteschlangen gemergt und zurückgegeben haben.",
   "git.queue.reading": "Merge-Warteschlangen werden gelesen…",
   "git.queue.region": "Merge-Warteschlangen",
   "git.queue.result": "Merge-Commit",

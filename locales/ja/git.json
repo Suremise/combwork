@@ -198,6 +198,8 @@
   "git.queue.none": "マージキューはありません。プロジェクトのワークフローでCombworkがカードをマージする設定（「バージョン管理」→「ワークフロー」：「マージする人」）のとき、各マージ先ブランチのキューと履歴がここに表示されます。",
   "git.queue.open": "{card}を開く",
   "git.queue.outcome": "結果",
+  "git.queue.past": "{n, plural, other {過去のブランチ（#件）}}",
+  "git.queue.pastTip": "もう作業のマージ先ではなく、キューが空のブランチです。キューがマージしたものと差し戻したものを表示します。",
   "git.queue.reading": "マージキューを読み込み中…",
   "git.queue.region": "マージキュー",
   "git.queue.result": "マージコミット",

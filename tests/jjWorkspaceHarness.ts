@@ -31,11 +31,21 @@ export const real = (p: string): string => resolve(realpathSync.native(p))
 /** A map of journals by key, as board_meta keeps them. */
 export class Journals {
   readonly rows = new Map<string, unknown>()
+  /** Awaited at the start of each `update`, as the board's write waits for its lock (a test sets it to hold one). */
+  gate: ((key: string) => Promise<void> | void) | null = null
   of(key: string): WorkspaceJournal {
     return {
       read: () => (this.rows.has(key) ? structuredClone(this.rows.get(key)) : null),
       write: async (v) => void this.rows.set(key, structuredClone(v)),
-      clear: async () => void this.rows.delete(key)
+      clear: async () => void this.rows.delete(key),
+      update: async (fn) => {
+        // A test's gate on the write (HR2's round 1: the wait for the board's lock), then the compare-and-set, synchronously.
+        await this.gate?.(key)
+        const next = fn(this.rows.has(key) ? structuredClone(this.rows.get(key)) : null)
+        if (next === undefined) return false
+        this.rows.set(key, structuredClone(next))
+        return true
+      }
     }
   }
 }

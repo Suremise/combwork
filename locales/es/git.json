@@ -198,6 +198,8 @@
   "git.queue.none": "No hay cola de fusión. Cuando el flujo de trabajo del proyecto hace que Combwork fusione sus tarjetas (Control de versiones → Flujo de trabajo: Quién fusiona), aquí aparece la cola de cada rama de destino, con su historial.",
   "git.queue.open": "Abrir {card}",
   "git.queue.outcome": "Resultado",
+  "git.queue.past": "{n, plural, one {Ramas anteriores (# rama)} many {Ramas anteriores (# ramas)} other {Ramas anteriores (# ramas)}}",
+  "git.queue.pastTip": "Ramas en las que ya no se fusiona trabajo y cuya cola está vacía: lo que sus colas fusionaron y devolvieron.",
   "git.queue.reading": "Leyendo las colas de fusión…",
   "git.queue.region": "Colas de fusión",
   "git.queue.result": "Commit de fusión",
