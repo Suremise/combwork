@@ -154,7 +154,7 @@ describe('only a copy is a twin (HI-2850)', () => {
   const turn = '16fb8131-909c-4601-8896-8dcdc5d83e19'
   const prompt = (text: string, pid = turn) => ({ ...base, hook_event_name: 'UserPromptSubmit', prompt_id: pid, prompt: text })
   const tool = (ev: 'PreToolUse' | 'PostToolUse', id: string, extra: Record<string, unknown> = {}) => ({ ...base, hook_event_name: ev, prompt_id: turn, tool_name: 'Bash', tool_input: { command: 'jj log' }, tool_use_id: id, ...extra })
-  const queued = '<cross-session-message from="uds:\\\\.\\pipe\\LOCAL\\cc-msg-e605" from-name="hive · HB2">\nHB2 here: my plan for the shared types, unless you object.\n</cross-session-message>'
+  const queued = '<cross-session-message from="uds:\\\\.\\pipe\\LOCAL\\cc-msg-e605" from-name="alpha · HB2">\nHB2 here: my plan for the shared types, unless you object.\n</cross-session-message>'
 
   it("the recorded case (HB3, 10 Nov 01:49:35): a message queued mid-turn is submitted under the turn's prompt_id; it is handled, nothing doubled", () => {
     const r = run()
