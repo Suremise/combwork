@@ -1525,11 +1525,11 @@ export class SlotPool {
 
   /** What keeps a slot from being quiet for this operation (quietFor's answer, for the log): null when it is. English. */
   private async notQuiet(s: Slot, token: string): Promise<string | null> {
-    const held = await this.store.fenced(s.name, token, (_db, now) => (now.writer ? 'writer' : now.job ? 'job' : null)).catch(() => 'operation lost') // i18n-ignore: a log detail
+    const held = await this.store.fenced(s.name, token, (_db, now) => (now.writer ? 'writer' : now.job ? 'job' : null)).catch(() => 'operation lost') // agent-protocol: a log line's detail, never sent to an agent
     if (held) return held
     const session = this.deps.sessionIn?.(s.folder)
-    if (session) return `session ${session}` // i18n-ignore: a log detail
-    return (await quiet(s.folder)) ? null : 'the folder is in use' // i18n-ignore: a log detail
+    if (session) return `session ${session}` // agent-protocol: a log line's detail, never sent to an agent
+    return (await quiet(s.folder)) ? null : 'the folder is in use' // agent-protocol: a log line's detail, never sent to an agent
   }
 
   /** A slot's removal journal (HI-2795: a jj removal's phases, so an interrupted one resumes), board_meta by key. */
@@ -1798,7 +1798,7 @@ export class SlotPool {
             // fenced by quiet) is asked again soon, as nothing else may say when it has gone (HI-2906).
             busyDetach = latch.lostQuiet
             // For the log only (the latch decided): what is in the way now, read after the refusal.
-            if (busyDetach && !latch.why) latch.why = `the detach's fence; now: ${(await this.notQuiet(s, token)) ?? 'quiet'}` // i18n-ignore: a log detail
+            if (busyDetach && !latch.why) latch.why = `the detach's fence; now: ${(await this.notQuiet(s, token)) ?? 'quiet'}` // agent-protocol: a log line's detail, never sent to an agent
           } else if (now !== null) to = now
         } finally {
           // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
