@@ -19,21 +19,24 @@ const M = {
   failed: msg({ id: 'board.target.failed', defaultMessage: 'Where the card merges wasn’t changed', description: 'HI-2556: an error toast’s title: setting a card’s Merges into failed. Its text says why.' })
 }
 
-/** The branches a project's lanes and cards may merge into (main's `lanes:startInfo`); null while unknown or none to pick. */
-export function useProjectTargets(projectPath: string | null): LaneStartInfo['targets'] {
-  const [targets, setTargets] = useState<LaneStartInfo['targets']>(null)
+/**
+ * The branches a project's lanes and cards may merge into (main's `lanes:startInfo`); null while unknown or none to pick.
+ * Read again whenever `opened` changes (HI-2830: the card dialog stays mounted, so each opening counts), as the project's
+ * Work merges into and Other branches change meanwhile; the last list stays shown while the same project's is re-read.
+ */
+export function useProjectTargets(projectPath: string | null, opened: number): LaneStartInfo['targets'] {
+  const [read, setRead] = useState<{ path: string; targets: LaneStartInfo['targets'] } | null>(null)
   useEffect(() => {
     let live = true
-    setTargets(null)
     if (!projectPath) return
     call('lanes:startInfo', projectPath)
-      .then((i) => live && setTargets(i.targets))
-      .catch(() => live && setTargets(null))
+      .then((i) => live && setRead({ path: projectPath, targets: i.targets }))
+      .catch(() => live && setRead({ path: projectPath, targets: null }))
     return () => {
       live = false
     }
-  }, [projectPath])
-  return targets
+  }, [projectPath, opened])
+  return read && read.path === projectPath ? read.targets : null
 }
 
 /** The Merges into mark on a card's tile: its own branch, when it has one. */
