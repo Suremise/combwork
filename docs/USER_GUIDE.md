@@ -120,7 +120,7 @@ Claude Code, Codex, Copilot, Antigravity and OpenCode update on their own schedu
 
 ### Models, effort levels and prices <a id="models-effort-levels-and-prices"></a>
 
-Combwork asks each CLI which models it has and what each can do, so a new model, or one your plan now includes, shows up without waiting for a Combwork update. Claude Code and Codex answer for your installed version and your account (asking uses no tokens, and never starts a session). **Settings → <provider> → Models (fallback)** says where the models come from now, for example *From Claude Code 2.1.289*.
+Combwork asks each CLI which models it has and what each can do, so a new model, or one your plan now includes, shows up without waiting for a Combwork update. Claude Code and Codex answer for your installed version and your account (asking uses no tokens, and never starts a session). Each account can be offered different models, so each of your accounts is asked in its own folder, and a connection's model list is its own account's: a new model your account has shows there even if another account doesn't have it yet. **Settings → <provider> → Models (fallback)** says where the models come from now, for example *From Claude Code 2.1.289*.
 
 - **Model pickers** list the models the CLI reports; any other model can still be typed as a custom model ID.
 - **Effort pickers** offer the levels the chosen model takes: Haiku 4.5 has no effort setting, Haiku 5.5 takes low, medium, high, xhigh and max (as Claude Code reports them), Opus 4.6 stops at Max, GPT-5.5 at Extra high. An effort you chose that the model doesn't take stays chosen and is marked *(not offered with …)*, with a warning; Combwork doesn't change it for you.

@@ -572,6 +572,16 @@ export interface ModelCatalog {
   context?: string
 }
 
+/**
+ * What a sign-in account's own folder says of its models (HI-2852: a CLI offers each account its own): its catalogue
+ * (null: none read and none kept for this version, so the fallback list, never another account's), and the model it
+ * runs when none is passed (its folder's settings, else its catalogue's default; null: unknown).
+ */
+export interface AccountModels {
+  catalog: ModelCatalog | null
+  defaultModel: string | null
+}
+
 export interface WindowState {
   x?: number
   y?: number
@@ -656,6 +666,8 @@ export interface AppConfig {
   observedDefaultEffort?: Record<ProviderId, Record<string, EffortLevel>>
   /** Per provider: the last good model catalog its CLI gave, keyed by the CLI version, so pickers fill at once on start. */
   modelCatalogs?: Record<ProviderId, ModelCatalog>
+  /** Per sign-in account (its id, HI-2852): the last good catalogue its CLI gave in the account's own folder. */
+  accountModelCatalogs?: Record<string, ModelCatalog>
   /** Per provider: the plan usage it last reported (account-wide), from sessions not on a connection. */
   planUsage: Record<ProviderId, PlanUsage>
   /** Per connection (its id, HI-1756): the plan usage its sessions last reported, that login's own limits. */
@@ -3814,6 +3826,12 @@ export interface AgentInstallInfo {
   hostCatalogs?: Record<string, ModelCatalog>
   /** Which host check each folder resolves to (HI-2779): workspaces (their default) and projects with settings of their own, lower-cased. */
   hostRouteOf?: Record<string, string>
+  /**
+   * Each Combwork sign-in account's own models (HI-2852), by its id: what the CLI offers in that account's folder, read
+   * after the CLI's check and published as each read lands. Absent: a CLI whose accounts aren't read (no listing, no
+   * connection folders). `catalog` above is the CLI's own home's.
+   */
+  accountCatalogs?: Record<string, AccountModels>
 }
 
 /**

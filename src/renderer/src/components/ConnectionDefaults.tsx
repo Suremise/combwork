@@ -3,7 +3,7 @@ import type { Account, AppSettings, Connection, EffortLevel, PermissionMode, Pro
 import { TAG_MAX, type ConnectionPatch, type ConnectionRow, type ConnectionsView } from '@shared/accounts'
 import type { MovedNotice } from '@shared/connectionDefaults'
 import { modeCaveat, modeOption, offeredModes, permissionLabel, providerDescriptor } from '@shared/providers'
-import { effortName, infoAt, modelCaps } from '@shared/models'
+import { accountInfo, effortName, infoAt, modelCaps, type ModelAccount } from '@shared/models'
 import { serverDefaultModel } from '@shared/serverConnection'
 import { modelLabel } from '@shared/defaults'
 import { fmt, msg, tr } from '@shared/i18n'
@@ -125,10 +125,10 @@ export function ConnectionDialog({ account: accountId, connection: id, projectPa
 }
 
 /** Under a mode choice: the provider's warning when it may not run that mode with that model (as the CLI says, #125). */
-function ModeCaveat({ provider, mode, model, projectPath = null }: { provider: ProviderId; mode: string | null | undefined; model: string | null | undefined; projectPath?: string | null }) {
-  // The GitHub host's models (HI-2779): the project's it was opened for, else the open workspace's.
+function ModeCaveat({ provider, account, mode, model, projectPath = null }: { provider: ProviderId; account: ModelAccount; mode: string | null | undefined; model: string | null | undefined; projectPath?: string | null }) {
+  // The GitHub host's models (HI-2779): the project's it was opened for, else the open workspace's; the account's own (HI-2852).
   const workspacePath = useStore((s) => s.workspace?.path ?? null)
-  const info = infoAt(useStore((s) => s.providers[provider]), { projectPath, workspacePath })
+  const info = accountInfo(infoAt(useStore((s) => s.providers[provider]), { projectPath, workspacePath }), account)
   const settings = useStore((s) => s.settings)
   useLanguage()
   const caps = modelCaps(provider, model, info, settings)
@@ -147,8 +147,9 @@ function ConnectionForm({ account: a, row, settings, projectPath, onClose }: { a
   const server = isServer(a)
   // The models of the GitHub host (HI-2779) of the project it was opened for (an agent's dialogs), else the open workspace's
   // (Settings → Accounts & Connections): a connection is the workspace's, but the agent choosing it runs on its project's host.
+  // A sign-in account's own models and default, as its folder says (HI-2852), never the CLI's own home's.
   const workspacePath = useStore((s) => s.workspace?.path ?? null)
-  const info = infoAt(useStore((s) => s.providers[cli]), { projectPath, workspacePath })
+  const info = accountInfo(infoAt(useStore((s) => s.providers[cli]), { projectPath, workspacePath }), a)
   const [name, setName] = useState(row?.name ?? '')
   const [model, setModel] = useState(row?.model ?? '')
   const [effort, setEffort] = useState<string>(row?.effort ?? '')
@@ -243,7 +244,7 @@ function ConnectionForm({ account: a, row, settings, projectPath, onClose }: { a
             ))}
           </select>
           {/* A mode the model that would run may not take (Claude Code's Auto with Haiku, #129): said under it (HI-2145). */}
-          <ModeCaveat provider={cli} mode={mode || p.defaultPermissionMode} model={runModel} projectPath={projectPath} />
+          <ModeCaveat provider={cli} account={a} mode={mode || p.defaultPermissionMode} model={runModel} projectPath={projectPath} />
         </div>
         <label htmlFor="connection-args">{tr(M.args)}</label>
         <div>

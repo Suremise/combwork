@@ -134,6 +134,8 @@
 //   read each time, #234) it acts out a CLI that says Haiku takes Auto, doesn't (as 2.1.289), or says nothing about Auto
 //   (no model has supportsAutoMode): asked for Auto with Haiku, it runs in Auto only when it said Haiku takes it, else
 //   in Manual, and reports the mode it really runs in. Without the file it runs in the mode it was asked for.
+//   Its `reply` (HI-2852) names another recorded reply in tests/fixtures to answer initialize with: a home (a connection's
+//   folder) whose account offers other models, as Claude Code offers each account its own.
 const fs = require('fs')
 const path = require('path')
 const { randomUUID } = require('crypto')
@@ -220,7 +222,7 @@ if (args[0] === 'auth') {
   process.stdout.write('', () => process.exit(out ? 1 : 0))
   return
 }
-/** fake-models.json in the test home ({ haikuAuto }), or null (#234). */
+/** fake-models.json in the test home ({ haikuAuto, reply }), or null (#234, HI-2852). */
 function fakeModels() {
   try {
     return JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_CONFIG_DIR || '', 'fake-models.json'), 'utf8'))
@@ -253,7 +255,8 @@ if (args.includes('-p') && args.includes('stream-json')) {
       const m = JSON.parse(buf.slice(0, i))
       buf = buf.slice(i + 1)
       if (m.type !== 'control_request' || m.request?.subtype !== 'initialize') continue
-      const recorded = withHaikuAuto(JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', 'claude-initialize.json'), 'utf8')))
+      const named = fakeModels()?.reply
+      const recorded = withHaikuAuto(JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'fixtures', typeof named === 'string' && /^[\w.-]+\.json$/.test(named) ? named : 'claude-initialize.json'), 'utf8')))
       const reply = process.env.FAKE_CLAUDE_MODELS === 'fail' ? { type: 'control_response', response: { subtype: 'error', request_id: m.request_id, error: 'not supported' } } : { ...recorded, response: { ...recorded.response, request_id: m.request_id } }
       process.stdout.write(JSON.stringify(reply) + '\n')
     }

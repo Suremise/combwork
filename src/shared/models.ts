@@ -52,15 +52,31 @@ export function infoAt<T extends Pick<AgentInstallInfo, 'catalog' | 'defaultMode
   return { ...info, catalog, defaultModel: same ? info.defaultModel : (catalog?.defaultModel ?? null) }
 }
 
+/** The account fields that say whose models apply (HI-2852): its id, its kind, and whether it is on the CLI's own home. */
+export type ModelAccount = Pick<Account, 'id' | 'kind' | 'home'>
+
+/**
+ * A provider's install info as one sign-in account sees it (HI-2852): the CLI offers each account its own models, so
+ * the catalogue and default are that account's alone (`accountCatalogs`, read in its own folder), never the CLI's own
+ * home's or another account's; an account with nothing read nor kept has none (the fallback list, which says so). An
+ * account on the CLI's own home, a server account, or a CLI whose accounts aren't read: the info as it is.
+ */
+export function accountInfo<T extends Pick<AgentInstallInfo, 'catalog' | 'defaultModel' | 'accountCatalogs'>>(info: T | null | undefined, account: ModelAccount | null | undefined): T | null | undefined {
+  if (!info?.accountCatalogs || !account || account.home || (account.kind ?? 'signIn') !== 'signIn') return info
+  // One not read yet (added since the CLI's check): none, until its read lands.
+  const own = Object.hasOwn(info.accountCatalogs, account.id) ? info.accountCatalogs[account.id] : undefined
+  return { ...info, catalog: own?.catalog ?? null, defaultModel: own?.defaultModel ?? null }
+}
+
 /**
  * What Combwork knows of a connection's models (HI-1770), by its kind, never its CLI: a sign-in connection's are its CLI's
- * (its catalogue, as without connections); a server connection's its own list (HI-1772), each with the aliases it
- * stands in for, none taking an effort, its default the one standing in for Opus (else Sonnet, else its first).
+ * in its account's own folder (HI-2852: accountInfo); a server connection's its own list (HI-1772), each with the aliases
+ * it stands in for, none taking an effort, its default the one standing in for Opus (else Sonnet, else its first).
  */
-export function connectionModels(conn: Pick<Account, 'kind' | 'server'>, info: Info, tr?: Tr): Info {
+export function connectionModels(conn: Pick<Account, 'id' | 'kind' | 'server' | 'home'>, info: (NonNullable<Info> & Pick<AgentInstallInfo, 'accountCatalogs'>) | null | undefined, tr?: Tr): Info {
   switch (conn.kind ?? 'signIn') {
     case 'signIn':
-      return info
+      return accountInfo(info, conn)
     case 'server': {
       const models = conn.server?.models ?? []
       const def = serverDefaultModel(models)
