@@ -310,10 +310,16 @@ describe('one lock owner, whatever platform names the store (s13 §2, s16 §1)',
 
   describe('a callback admitted on an inherited claim keeps its owner’s lock until it settles (s104, HR1’s round 2)', () => {
     const lockFile = (dir: string): string => join(realpathSync(join(dir, '.git')), REPO_LOCK_FILE)
+    // Every gate a test opened is opened again after it, whatever it asserted: no lock is left held for the next test.
+    const gates: { open: () => void }[] = []
+    afterEach(() => {
+      for (const g of gates.splice(0)) g.open()
+    })
     /** A holds X; inside it, a child takes `stores` (X among them), is admitted, and parks on a gate; A doesn't await it. */
     async function parkedChild(x: string, stores: string[], o: { order: string[]; aFails?: boolean; childFails?: boolean }) {
       const park = gate()
       const admitted = gate()
+      gates.push(park, admitted)
       let child: Promise<unknown> | null = null
       const a = withRepoLock(x, async () => {
         child = withFolderRepoLocks(stores, async () => {
@@ -383,6 +389,21 @@ describe('one lock owner, whatever platform names the store (s13 §2, s16 §1)',
       await child()
       await b
       expect(order).toEqual(['child resumed', 'child done', 'B in'])
+    })
+
+    it('the child failing synchronously (its callback throws before returning a promise): unpinned at once, A returns, X released', async () => {
+      const { lo: x } = twoStores()
+      const order: string[] = []
+      const a = withRepoLock(x, async () => {
+        const child = withFolderRepoLocks([x], (() => {
+          throw new Error('sync failure')
+        }) as () => Promise<void>)
+        await child.catch((e: Error) => void order.push(`child: ${e.message}`))
+        return 'A'
+      })
+      expect(await a).toBe('A')
+      expect(await withRepoLock(x, async () => (order.push('B in'), 'B'))).toBe('B')
+      expect(order).toEqual(['child: sync failure', 'B in'])
     })
 
     it('the child failing: A still returns its own value, and X is released after the child', async () => {

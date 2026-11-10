@@ -228,12 +228,22 @@ async function takeOnce<T>(stores: readonly { store: string; folder: string }[],
       if (!o) return RETAKE
       pins.add(o)
     }
-    const p = owners.run(ctx, fn)
+    // Its completion registered before fn is invoked (HR1's s104 answer): a synchronous throw settles and unpins it too.
+    // It always resolves (never rejects), so nothing is left unhandled; the caller keeps fn's own outcome.
+    let finished!: () => void
+    const completion = new Promise<void>((r) => (finished = r))
     for (const o of pins) {
-      o.dependents.add(p)
-      const done = (): void => void o.dependents.delete(p)
-      p.then(done, done)
+      o.dependents.add(completion)
+      void completion.then(() => void o.dependents.delete(completion))
     }
+    let p: Promise<T>
+    try {
+      p = owners.run(ctx, fn)
+    } catch (e) {
+      finished()
+      throw e
+    }
+    p.then(finished, finished)
     return p
   }
   if (!byKey.size) return admit(inherited)
