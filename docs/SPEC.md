@@ -3027,6 +3027,18 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   its settle passes its operation's token as the detach's fence; the removal guard asks §16.3.2's test of a jj slot's
   Git store. A lane-held jj slot isn't settled by the post-Done path (it holds no slot operation): the pool's settle does
   it once the lease is released.
+- **A settle that couldn't run yet is retried** (HI-2906, design HI-2906/s6 and s15): the pool's settle right after a
+  lease ends can find its builder's session or a process still leaving the slot. jj's record and owned detach are fenced
+  by quiet, so the look or the detach is refused, and before this a jj slot then stayed `lent` until the next refresh
+  (up to an hour). Now each attempt carries a latch that the fences it hands out (the look's record, the detach) set
+  when they find the folder no longer quiet, never reconstructed from a later check. A busy look leaves the slot as it was
+  (never `dirty` for that); a busy one or a detach refused with the latch set asks for another settle after a pause
+  (1 s, doubling, at most 30 s; one timer per slot, keyed by generation so a stale callback or attempt never drops or
+  re-arms a newer one), armed only after the attempt's fenced end. The retry is an ordinary settle: it re-reads the slot
+  (an operation, writer or lease taking it meanwhile, set aside, made or removed: it does nothing, and the wait ends).
+  The pool's close drops every wait and awaits a running settle. A refusal with the latch clear (the binding not settled,
+  the target moved) or known dirty files schedule nothing: the next refresh or event looks again. Git's detach takes no
+  fence, so Git is unchanged.
 - **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
   settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
   **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
@@ -3263,8 +3275,8 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   through HI-2870's switch (`CW_TEST_JJ_CARDS=1`, `jjCardsTestSwitch`; never a packaged one, J9e removes it): a fake
   builder's card in its slot, submitted through the Agent API and passed by the user; Waiting's observation, shown when
   written and following a change; the user's integration (Done, the Work section's jj rows); a stale slot recovered
-  through its confirmation once nothing works in it, its unrecorded edit kept (its return to the pool after Done is HI-2906's:
-  the post-Done detach a jj slot refuses); light and dark, and the seven locales.
+  through its confirmation once nothing works in it, its unrecorded edit kept; the slot back in the pool after Done and the
+  next card started in it (HI-2906); light and dark, and the seven locales.
 
 ##### Open: jj's target advance (J1's gate)
 

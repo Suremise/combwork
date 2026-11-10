@@ -1406,6 +1406,36 @@ async function combworkSkillFolders(folder: string): Promise<string[]> {
 }
 const newJob = (): string => `slot-${randomBytes(6).toString('hex')}`
 
+/** The longest pause between a busy slot's settles (HI-2906), as a held lane slot's (HI-2466). */
+const SETTLE_RETRY_MAX_MS = 30_000
+
+/** What one settle attempt's fences saw (HI-2906): whether any of them found the folder no longer quiet. */
+interface QuietLatch {
+  lostQuiet: boolean
+}
+
+/** A fence whose refusals (a false `still`, an unheld `commit`) set the attempt's latch before they are answered. */
+function latched(fence: WorkspaceFence, latch: QuietLatch | undefined): WorkspaceFence {
+  if (!latch) return fence
+  const commit = fence.commit
+  return {
+    still: async () => {
+      const ok = await fence.still()
+      if (!ok) latch.lostQuiet = true
+      return ok
+    },
+    ...(commit
+      ? {
+          commit: async <T>(fn: (db: FenceDb) => T) => {
+            const r = await commit<T>(fn)
+            if (!r.held) latch.lostQuiet = true
+            return r
+          }
+        }
+      : {})
+  }
+}
+
 export class SlotPool {
   private readonly store: SlotStore
   /** The operations this pool runs now, awaited as it closes. */
@@ -1439,14 +1469,20 @@ export class SlotPool {
    * What's in a slot's folder, read by the holder of its operation (`token`): the port's explicit record where it has
    * one (jj: a snapshot, which only the holder may take, HI-2795), else `dirty` (Git, its git command unchanged).
    */
-  private async dirtyOwned(s: Slot, token: string): Promise<Maybe<string[]>> {
+  private async dirtyOwned(s: Slot, token: string, latch?: QuietLatch): Promise<Maybe<string[]>> {
     const port = this.portOf(s)
     if (!port.record) return port.dirty(s.folder)
     // A record is a write in the folder (HR1, HI-2795 round 1): only once nothing else writes there, proved right before
     // it: the operation still holds the slot with no writer or job on it, no session in it, and no process in it.
-    if (!(await this.quietFor(s, token))) return { unknown: true, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
-    const fence: WorkspaceFence = { still: () => this.quietFor(s, token) }
-    return port.record(s.folder, fence, s.identity ?? null)
+    const busy = { unknown: true as const, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
+    if (!(await this.quietFor(s, token))) {
+      if (latch) latch.lostQuiet = true
+      return busy
+    }
+    const fence: WorkspaceFence = latched({ still: () => this.quietFor(s, token) }, latch)
+    const r = await port.record(s.folder, fence, s.identity ?? null)
+    // The record refused because its fence lost quiet during it (HI-2906): busy, not dirty.
+    return isUnknown(r) && latch?.lostQuiet ? busy : r
   }
 
   /**
@@ -1707,16 +1743,22 @@ export class SlotPool {
    * free and as it was read, so another look of it (this pool's or another Combwork's, a finished card's slot question)
    * sees it busy while its files may change, and one settle runs at a time. `looked` is told when its state changed.
    */
-  private async settle(name: string): Promise<void> {
+  private async settle(name: string): Promise<boolean> {
     const seen = this.store.slot(name)
-    if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return
-    if (seen.state === 'creating' || seen.state === 'removing') return
+    if (this.closed || !seen || seen.op || seen.writer || this.store.openLease(name)) return false
+    if (seen.state === 'creating' || seen.state === 'removing') return false
     // Set aside by a retarget (HI-2680): stays as it is, whatever its folder now looks like, until it is removed.
-    if (this.store.asideOf(name)) return
+    if (this.store.asideOf(name)) return false
     const token = newToken()
     let s: Slot = seen
     let to: SlotState = seen.state
     let began = false
+    // HI-2906: its look or its detach couldn't run while something still left the folder: looked at again after a pause.
+    // Known from what this attempt's own fences saw (the latch), never from a later check.
+    let busyDetach = false
+    const latch: QuietLatch = { lostQuiet: false }
+    // The retry this attempt was started under (or none): its clean-up never drops a newer one.
+    const genAtStart = this.settleWaits.get(name)?.gen ?? 0
     try {
       // Tracked (awaited by close, its token live) from before its first wait, so a close never misses it and no look of
       // a pool takes its row, once written, for an abandoned one (HR2's HI-2170 round 1, finding 1).
@@ -1729,13 +1771,19 @@ export class SlotPool {
         began = true
         s = this.store.slot(name) ?? seen
         try {
-          const now = await this.look(s, token)
+          const now = await this.looks(s, token, latch)
           // Clean, it waits for its next card detached at the target's head (HI-2014, HI-1986), before it is ready to lend:
           // its card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
           // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries
           // again (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
           // Git couldn't list the worktrees (HI-2810): the slot as it was, the next look tries again.
-          if (now !== null && !(now === 'ready' && s.state !== 'ready' && !(await this.detach(s, token)))) to = now
+          if (now === 'busy') busyDetach = true
+          else if (now === 'ready' && s.state !== 'ready' && !(await this.detach(s, token, latch))) {
+            // A refusal for good (the work not in the target, the target moved) waits for the next refresh or event; one
+            // while the folder wasn't quiet yet (its builder's session or a process still leaving it: jj's owned move is
+            // fenced by quiet) is asked again soon, as nothing else may say when it has gone (HI-2906).
+            busyDetach = latch.lostQuiet
+          } else if (now !== null) to = now
         } finally {
           // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
           await this.store.fenced(name, token, (db) => this.store.setIn(db, name, to, {}, { op: null })).catch((e) => {
@@ -1749,7 +1797,71 @@ export class SlotPool {
       // After its row's write, only a change: a pass that settles slots asks for itself again, so a slot that stays dirty
       // mustn't loop it.
       if (began && to !== s.state) this.deps.looked?.(name, to)
+      // Armed only after this settle's fenced end (its row written above, its operation over).
+      if (busyDetach) this.settleLater(name)
+      else if (began) this.forgetSettleLater(name, genAtStart)
     }
+    return began
+  }
+
+  /** The slots whose settle waits to try again (HI-2906): each its timer and how many tries it has had. */
+  private readonly settleWaits = new Map<string, { gen: number; tries: number; timer: ReturnType<typeof setTimeout> | null }>()
+  private settleGen = 0
+  private waitsOwned = false
+
+  /**
+   * Another settle of `name` after a pause that grows with each try (1 s, doubling, at most SETTLE_RETRY_MAX_MS), unless one
+   * already waits (HI-2906). An ordinary settle: it does nothing to a slot that has since been taken (an operation, a
+   * writer, a lease) or set aside, and nothing after the pool closes.
+   */
+  private settleLater(name: string): void {
+    if (this.closed) return
+    if (!this.waitsOwned) {
+      // One listener for the pool: its close drops every wait (no listener per slot or retry).
+      this.waitsOwned = true
+      this.life.signal.addEventListener('abort', () => {
+        for (const n of [...this.settleWaits.keys()]) this.forgetSettleLater(n)
+      }, { once: true })
+    }
+    let w = this.settleWaits.get(name)
+    if (!w) {
+      const made = { gen: 0, tries: 0, timer: null as ReturnType<typeof setTimeout> | null }
+      this.settleWaits.set(name, made)
+      w = made
+    }
+    if (w.timer) return
+    w.tries++
+    const gen = ++this.settleGen
+    w.gen = gen
+    const entry = w
+    w.timer = setTimeout(() => {
+      // Only its own generation's (an older callback never clears or re-arms a newer timer).
+      if (this.settleWaits.get(name) !== entry || entry.gen !== gen) return
+      entry.timer = null
+      if (this.closed) return
+      void this.settle(name)
+        .then((ran) => {
+          // Not settleable any more (taken by an operation, a writer or a lease, set aside, being made or removed): the
+          // wait ends, unless a newer one was armed meanwhile.
+          if (!ran) this.forgetSettleLater(name, gen)
+        })
+        .catch((e) => log.warn(`looking at ${userText(name)} again`, e))
+    }, Math.min(SETTLE_RETRY_MAX_MS, 1000 * 2 ** (w.tries - 1)))
+    w.timer.unref?.()
+  }
+
+  /** A slot's wait dropped; with `gen`, only while it is still that generation's (a stale attempt drops nothing newer). */
+  private forgetSettleLater(name: string, gen?: number): void {
+    const w = this.settleWaits.get(name)
+    if (!w || (gen !== undefined && w.gen !== gen)) return
+    if (w.timer) clearTimeout(w.timer)
+    this.settleWaits.delete(name)
+  }
+
+  /** A slot's settle retry as it stands (tests, HI-2906): its tries and whether one waits; null: none. */
+  settleWaitOf(name: string): { tries: number; waiting: boolean } | null {
+    const w = this.settleWaits.get(name)
+    return w ? { tries: w.tries, waiting: !!w.timer } : null
   }
 
   /**
@@ -1787,7 +1899,7 @@ export class SlotPool {
    * worktree (a carried lease, #1441) stays on its agent's own line. False when it should be and isn't (unread, or the
    * switch failed); true when it is, or needn't be.
    */
-  private async detach(s: Slot, token?: string): Promise<boolean> {
+  private async detach(s: Slot, token?: string, latch?: QuietLatch): Promise<boolean> {
     const last = this.store.lastLease(s.name)
     if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return true
     const port = this.portOf(s)
@@ -1797,7 +1909,7 @@ export class SlotPool {
     if (isUnknown(h.target) || !h.target) return false
     // jj's (HI-2866): an owned write settling exactly the card's binding (the line it answered), fenced by this operation
     // with the folder quiet, the target read again right before it. Git ignores the options.
-    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: token ? this.ownedFence(s, token, null) : { still: () => false }, settles: h.line, target: s.target } : {}
+    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: latched(token ? this.ownedFence(s, token, null) : { still: () => false }, latch), settles: h.line, target: s.target } : {}
     const r = await port.detach(s.folder, h.target, owned)
     if (!r.ok) {
       log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
@@ -1812,10 +1924,20 @@ export class SlotPool {
    * worktrees (HI-2810, SPEC §16.3.6 R2.1: unknown is never gone, nor ready), so the caller keeps the slot as it is.
    */
   private async look(s: Slot, token: string): Promise<SlotState | null> {
+    const l = await this.looks(s, token)
+    return l === 'busy' ? 'dirty' : l
+  }
+
+  /**
+   * As `look`, but `busy` when its check couldn't run because something still worked in the folder (HI-2906: jj's record
+   * is fenced by quiet), so the settle leaves the slot as it was and looks again soon, never marking it dirty for that.
+   */
+  private async looks(s: Slot, token: string, latch?: QuietLatch): Promise<SlotState | 'busy' | null> {
     const there = await this.present(s)
     if (there === null) return null
     if (!there) return 'gone'
-    const d = await this.dirtyOwned(s, token)
+    const d = await this.dirtyOwned(s, token, latch)
+    if (isUnknown(d) && d.detail === 'busy') return 'busy'
     return isUnknown(d) || d.length ? 'dirty' : 'ready'
   }
 
