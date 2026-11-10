@@ -11,6 +11,8 @@
 // Unregistered, like J2–J4: jj has no `integration` capability; J6 composes jj's HistoryPort (`contains`, `lineHead`)
 // from these and the reconciler records `Integrated { by: 'outside' }` with this provenance (jjFacts.ts).
 
+import { readFileSync } from 'original-fs'
+import { join } from 'path'
 import type { JjAttemptRecord, JjPin } from './jjCandidates'
 import { parseRefs } from './jjCandidates'
 import type { JjVia } from './jjFacts'
@@ -57,7 +59,7 @@ export interface JjIntegrationDeps {
 }
 
 /** Where a test pauses (a race placed exactly there). */
-export type JjIntegrationPoint = 'afterProof' | 'afterRetain' | `beforePin:${string}` | 'afterRemote' | 'ancestry'
+export type JjIntegrationPoint = 'afterProof' | 'afterRetain' | `beforePin:${string}` | 'afterRemote' | 'ancestry' | 'finalRemote' | 'finalFence'
 
 const BOOKMARK_T = `name ++ "${SEP}" ++ if(remote, remote, "") ++ "${SEP}" ++ conflict ++ "${SEP}" ++ if(normal_target, normal_target.commit_id(), "") ++ "${SEP}" ++ tracked ++ "\\n"`
 
@@ -440,6 +442,65 @@ export function chooseRemote(target: string, rows: readonly BookmarkRow[], confi
   return configured.includes('origin') ? 'origin' : refused('ambiguousRemote', configured.join(','))
 }
 
+/**
+ * A ref's commit read synchronously from the store's files (no process, so nothing can move between it and a synchronous
+ * write after it): the loose ref, else its packed line; null when it is in neither; undefined when it can't be read.
+ */
+export function refFromFiles(store: string, ref: string): string | null | undefined {
+  const read = (f: string): string | null | undefined => {
+    try {
+      return readFileSync(join(store, f), 'utf8')
+    } catch (e) {
+      const code = (e as { code?: string }).code
+      return code === 'ENOENT' || code === 'ENOTDIR' ? null : undefined
+    }
+  }
+  const loose = read(ref)
+  if (loose === undefined) return undefined
+  if (loose !== null) {
+    const v = loose.trim()
+    return /^[0-9a-f]{40}$/.test(v) ? v : undefined
+  }
+  const packed = read('packed-refs')
+  if (packed === undefined) return undefined
+  if (packed === null) return null
+  for (const l of lines(packed)) {
+    const [oid, name] = l.split(' ')
+    if (name === ref) return /^[0-9a-f]{40}$/.test(oid) ? oid : undefined
+  }
+  return null
+}
+
+/**
+ * A remote's URL read synchronously from the store's `config` (where jj's remotes are too): exactly one `url` in exactly
+ * one `[remote "<name>"]` section; anything else (none, several, an include that could change it) undefined.
+ */
+export function remoteUrlFromFiles(store: string, remote: string): string | undefined {
+  let text: string
+  try {
+    text = readFileSync(join(store, 'config'), 'utf8')
+  } catch {
+    return undefined
+  }
+  if (/^\s*\[\s*include/im.test(text)) return undefined
+  let inSection = false
+  let sections = 0
+  const urls: string[] = []
+  for (const raw of text.split(/\r?\n/)) {
+    const l = raw.trim()
+    if (l.startsWith('[')) {
+      const m = /^\[\s*remote\s+"((?:[^"\\]|\\.)*)"\s*\]$/.exec(l)
+      inSection = !!m && m[1].replace(/\\(.)/g, '$1') === remote
+      if (inSection) sections++
+      continue
+    }
+    if (!inSection) continue
+    const kv = /^url\s*=\s*(.*)$/i.exec(l)
+    if (kv) urls.push(kv[1].replace(/^"(.*)"$/, '$1'))
+  }
+  return sections === 1 && urls.length === 1 ? urls[0] : undefined
+}
+
 /** Parses `jj git remote list` (`name url` a line). */
 export function parseRemotes(out: string): Map<string, string> | null {
   const m = new Map<string, string>()
@@ -510,13 +571,20 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   // The observation's whole context read again (the target, its export, the operation, the remote and both URLs): any
   // change, nothing settled. Run across the network read and again after every awaited decision read (HR1's round 1),
   // right before the settles, which are synchronous.
+  // Its last step is synchronous (HR1's round 2): the operation heads, the target's Git ref and the remote's URL read from
+  // the files with no await between them and the settles, so nothing (a plain Git move included) can come in after them.
   const still = async (where: string): Promise<JjRefused | JjReadUnknown | null> => {
-    const moved = await fence(deps, target, th, where)
-    if (moved) return moved
     const r2 = await remoteNow(th.op)
     if (isJjUnknown(r2) || isRefused(r2)) return r2
     if (r2.remote !== r1.remote || r2.url !== r1.url) return jjUnknown('moved', `remote:${where}`)
+    await deps.hook?.('finalRemote')
+    const moved = await fence(deps, target, th, where)
+    if (moved) return moved
+    await deps.hook?.('finalFence')
     if (readOpHeads(deps.view.jjRepo)?.join() !== th.op) return jjUnknown('moved', `heads:${where}`)
+    const refNowSync = refFromFiles(deps.view.store, `refs/heads/${target}`)
+    if (refNowSync === undefined || refNowSync !== th.gitRef) return jjUnknown('moved', `ref:${where}`)
+    if (remoteUrlFromFiles(deps.view.store, r1.remote!) !== r1.url) return jjUnknown('moved', `url:${where}`)
     return null
   }
   const afterRemote = await still('afterRemote')

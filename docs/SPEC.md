@@ -2672,7 +2672,10 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   jj and from the store's config must agree. What the remote has is read from the remote (`ls-remote --refs`, no
   prompt, exactly `refs/heads/T`), then the operation, the target's head and its export, the remote and both URLs are
   read again, across the network read and **again after every awaited decision read, right before the settles** (which
-  are synchronous): any change writes nothing (HR1's round 1). A pushed commit the store lacks is `notFetched`.
+  are synchronous): any change writes nothing (HR1's round 1). That last check ends **synchronously** (HR1's round 2):
+  after the remote's and the target's awaited reads, the operation heads, the target's Git ref and the remote's URL are
+  read from the store's files with no await between them and the settles, so a plain Git move or a config change can't
+  come in after the check. A pushed commit the store lacks is `notFetched`.
 - **Obligations, one per integration** (`(card, cycle, bundle)`, its result): created only where no row of that key
   exists in any state, so a settled one (`published`, with the pushed id, or `notHeld`) is a tombstone that never comes
   back, and a reintegration in the same cycle has its own. An observation snapshots the owed rows and settles each on

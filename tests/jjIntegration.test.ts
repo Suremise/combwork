@@ -2,7 +2,10 @@
 // parsers, the obligations' compare-and-set and idempotent reconstruction, and the Integrated fact's jj provenance. The
 // real jj's behaviour is jjIntegrationReal.test.ts'.
 import { describe, expect, it } from 'vitest'
-import { chooseRemote, exportProblem, memoryObligations, parseBookmarkRows, parseLsRemote, parseRemotes, reconstructObligations } from '../src/main/platform/jjIntegration'
+import { mkdirSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import { chooseRemote, exportProblem, memoryObligations, parseBookmarkRows, parseLsRemote, parseRemotes, reconstructObligations, refFromFiles, remoteUrlFromFiles } from '../src/main/platform/jjIntegration'
+import { tempDir } from './tempDir'
 import { jjIntegratedOf, jjIntegratedPlatform } from '../src/main/platform/jjFacts'
 
 const id = (c: string): string => c.repeat(40)
@@ -82,6 +85,32 @@ describe('obligations: one per integration, compare-and-set, idempotent reconstr
     expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b1-bbbbbb' }, id('b'), 'notHeld', 5)).toBe(true)
     expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b1-bbbbbb' }, id('b'), 'published', 6, id('c'))).toBe(false)
     expect(s.rows[0]).toMatchObject({ state: 'notHeld', at: 5 })
+  })
+})
+
+describe('the synchronous final reads (HR1 round 2): a ref and a remote URL from the store files', () => {
+  it('a loose ref, else its packed line; absent null; malformed undefined', () => {
+    const store = tempDir('jjint-store-')
+    mkdirSync(join(store, 'refs', 'heads'), { recursive: true })
+    expect(refFromFiles(store, 'refs/heads/main')).toBeNull()
+    writeFileSync(join(store, 'packed-refs'), `# pack-refs with: peeled\n${id('a')} refs/heads/main\n${id('b')} refs/heads/other\n`)
+    expect(refFromFiles(store, 'refs/heads/main')).toBe(id('a'))
+    writeFileSync(join(store, 'refs', 'heads', 'main'), `${id('c')}\n`)
+    expect(refFromFiles(store, 'refs/heads/main')).toBe(id('c'))
+    writeFileSync(join(store, 'refs', 'heads', 'main'), 'ref: refs/heads/other\n')
+    expect(refFromFiles(store, 'refs/heads/main')).toBeUndefined()
+  })
+  it("exactly one url in exactly one section; several, none or an include undefined", () => {
+    const store = tempDir('jjint-cfg-')
+    const cfg = (t: string): void => writeFileSync(join(store, 'config'), t)
+    cfg('[core]\n\tbare = true\n[remote "origin"]\n\turl = C:/r/remote.git\n\tfetch = +refs/heads/*:refs/remotes/origin/*\n[remote "up"]\n\turl = https://x\n')
+    expect(remoteUrlFromFiles(store, 'origin')).toBe('C:/r/remote.git')
+    expect(remoteUrlFromFiles(store, 'up')).toBe('https://x')
+    expect(remoteUrlFromFiles(store, 'none')).toBeUndefined()
+    cfg('[remote "origin"]\n\turl = a\n\turl = b\n')
+    expect(remoteUrlFromFiles(store, 'origin')).toBeUndefined()
+    cfg('[remote "origin"]\n\turl = a\n[include]\n\tpath = other\n')
+    expect(remoteUrlFromFiles(store, 'origin')).toBeUndefined()
   })
 })
 

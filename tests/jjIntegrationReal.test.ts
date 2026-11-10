@@ -358,6 +358,32 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     })
   })
 
+  describe('round 2 (HR1): the final context check ends synchronously, right before the settles', () => {
+    const cases = [
+      ['a Git move of the target at the final remote read', 'finalRemote', 'ref'],
+      ['a Git move of the target after the final fence', 'finalFence', 'ref'],
+      ['the remote URL changed in Git config after the final fence', 'finalFence', 'url']
+    ] as const
+    it.each(cases)('%s: refused or unknown, every row still owed', async (_name, point, what) => {
+      const w = await world(true)
+      const store = memoryObligations()
+      w.setMain(w.T)
+      w.jj('git', 'push', '--bookmark', 'main')
+      reconstructObligations(store, [{ card: 'HI-1', cycle: 1, bundle: `b0-${token()}`, target: 'main', result: w.T, at: 1 }])
+      // The first pass through each point is the check after the network read; the second is the one before the settles.
+      let seen = 0
+      const hook = async (p: JjIntegrationPoint): Promise<void> => {
+        if (p !== point || ++seen !== 2) return
+        if (what === 'ref') await w.git(['update-ref', 'refs/heads/main', w.fBase])
+        else await w.git(['config', 'remote.origin.url', join(resolve(w.repo, '..'), 'elsewhere.git')])
+      }
+      const out = await observePublish(w.deps({ hook }), 'main', store)
+      expect(seen).toBe(2)
+      expect(out, JSON.stringify(out)).not.toHaveProperty('settled')
+      expect(store.rows.map((r) => r.state)).toEqual(['owed'])
+    })
+  })
+
   describe('publish: observed, per integration (a local bare remote)', () => {
     const push = (w: World, rev: string): void => {
       w.setMain(rev)
