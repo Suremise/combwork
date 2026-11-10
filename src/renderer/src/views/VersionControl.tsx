@@ -3,7 +3,7 @@ import type { ProjectInfo } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
 import { msg, tr } from '@shared/i18n'
 import { gitStatusText, gitStatusTip, VC_SECTIONS, vcSections, vcSectionShown, type GitRepoSummary } from '@shared/gitRepo'
-import { get, notify, set, showVersionControl, useStore } from '../store'
+import { get, notify, set, showVersionControl, useLanguage, useStore } from '../store'
 import { loadTemplate, refreshWorkspace } from '../actions'
 import { Icon, Tooltip } from '../components/ui'
 import { tabIds, Tabs } from '../components/Tabs'
@@ -106,6 +106,8 @@ function GitPreview({ project, s, error, template }: { project: ProjectInfo; s: 
 }
 
 export function VersionControl({ project }: { project: ProjectInfo }) {
+  // Its sections' names in the window's language, again when it changes.
+  useLanguage()
   const summary = useGitRead('git:summary', project)
   const s = summary.data
   const platform = project.platform?.id ?? (s?.isRepo ? 'git' : 'none')

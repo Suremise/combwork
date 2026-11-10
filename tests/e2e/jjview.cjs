@@ -206,6 +206,7 @@ function jjRepo(dir, o = {}) {
     const looseJj = head.locator('[data-platform="jj"]')
     check('loose: jj not available', (await looseJj.getAttribute('aria-disabled')) === 'true')
     const tip = await lib.hoverTip(page, looseJj, (t) => /colocated/.test(t))
+    if (!tip) await page.screenshot({ path: path.join(shots, 'jjview-loose-tip.png') })
     check('…its tooltip says why', /no colocated Git repository/.test(tip ?? ''), tip)
 
     // --- Back to Git: refused while jj's state can't go back, then made.

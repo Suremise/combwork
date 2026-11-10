@@ -6,7 +6,7 @@ import { revisionShort, PLATFORMS } from '@shared/platform/descriptors'
 import { GATE_TEXT } from '@shared/platform/gateTexts'
 import { msg, tr } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { cardLabelOf, useStore } from '../store'
+import { cardLabelOf, useLanguage, useStore } from '../store'
 import { timeAgo } from '../util'
 import { Icon, Tooltip } from '../components/ui'
 
@@ -124,6 +124,7 @@ function Unknown({ u }: { u: JjViewUnknown }) {
 
 /** A section's frame: its Refresh, and what the read gave (a value, an unknown, an error). */
 function Frame<T>({ name, r, children }: { name: string; r: ReturnType<typeof useJjRead<T>>; children: (v: T) => React.ReactNode }) {
+  useLanguage()
   return (
     <div className="scroll-page">
       <div className="page-narrow jj-section" data-jj-section={name}>
@@ -313,6 +314,7 @@ function Resolved({ side, rev, r, onPick }: { side: 'from' | 'to'; rev: string; 
 }
 
 export function JjCompareSection({ project }: { project: ProjectInfo }) {
+  useLanguage()
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
   const [asked, setAsked] = useState<{ from: string; to: string } | null>(null)

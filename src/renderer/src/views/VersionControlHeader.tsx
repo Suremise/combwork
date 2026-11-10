@@ -286,7 +286,7 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
                 </button>
               )
             // Back to None from Git's page, or to Git's page from None: a view, nothing switched or saved.
-            if (onPreview && platform === 'none') {
+            if (onPreview && platform === 'none' && id !== 'jj') {
               const button = (
                 <button key={id} type="button" role="radio" aria-checked={false} aria-disabled={false} data-platform={id} onClick={() => onPreview(id === 'git')}>
                   {tr(PLATFORM_NAME[id])}
