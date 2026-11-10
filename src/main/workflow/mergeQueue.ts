@@ -925,9 +925,9 @@ export class MergeQueue {
   }
 
   /** In a published merge's `Integrated` write: the local target's catch-up owed, and its push recorded as made (HI-1924's log). */
-  private oweCatchUp(w: Write, entry: string, target: string, from: string, to: string): void {
+  private oweCatchUp(w: Write, entry: string, target: string, from: string, to: string, pushed: boolean): void {
     w.tx.setMeta(catchUpKey(target), JSON.stringify({ from, to, card: w.card.key, entry } satisfies CatchUp))
-    w.tx.setMeta(pushLogKey(target), JSON.stringify(pushesSettled(pushLogOf(w.tx.meta(pushLogKey(target))), [{ entry, state: 'pushed', at: new Date().toISOString() }])))
+    if (pushed) w.tx.setMeta(pushLogKey(target), JSON.stringify(pushesSettled(pushLogOf(w.tx.meta(pushLogKey(target))), [{ entry, state: 'pushed', at: new Date().toISOString() }])))
   }
 
   /** The integration port of a catch-up's merged card (its platform's), or null when the card is gone. */
@@ -1287,6 +1287,9 @@ export class MergeQueue {
           // A forward merge (HI-2679) has no line to reconcile: its attempt's own frozen commit, proven in the target just
           // now, is what is recorded (never a newer source head's).
           if (s.forward) await this.integrated(card, entry, revision, target, onto, 'merge', 'outside') // no advance: the blocker rule applies
+          // G21 (HR2's HI-1183 round 1): found in the remote's head just fetched, which is the target: recorded from that
+          // head (reconcile would read the local target, still behind), the blocker rule applying, and the local catch-up owed.
+          else if (follow) await this.integrated(card, entry, revision, target, onto, 'merge', 'outside', { catchUp: { from: head } })
           else await reconcile(this.wf, card)
           // HI-2709: not closed while a dependency added meanwhile isn't Done (reconcile writes nothing then): it waits.
           const held = this.wf.state(card).stage !== 'done' ? this.wf.queueWaitingOn(card.id) : []
@@ -1953,7 +1956,7 @@ export class MergeQueue {
    * written, while a card it depends on isn't Done. Only the record of the queue's own advance (`afterAdvance`) is
    * written whatever: the target has moved, its blockers decided in IntegrationStarted's write.
    */
-  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'combwork' | 'outside', opts: { afterAdvance?: boolean; published?: { from: string } } = {}): Promise<'written' | 'waiting' | 'already'> {
+  private async integrated(card: CardRecord, entry: QueueEntry, revision: string, target: string, result: string, method: 'merge' | 'squash' | 'fastForward', by: 'combwork' | 'outside', opts: { afterAdvance?: boolean; published?: { from: string }; catchUp?: { from: string } } = {}): Promise<'written' | 'waiting' | 'already'> {
     return this.write(card, (w) => {
       // One Integrated per cycle, whoever writes it (the queue, or another Combwork's recovery or observation).
       const st = w.state()
@@ -1964,8 +1967,10 @@ export class MergeQueue {
       w.written.push(f)
       w.move('done', 'derived')
       // G21 (HI-1183): published to the remote, so pushed already (the push log says so) and the local catch-up owed.
-      if (by === 'combwork' && opts.published) this.oweCatchUp(w, entry.id, target, opts.published.from, result)
+      if (by === 'combwork' && opts.published) this.oweCatchUp(w, entry.id, target, opts.published.from, result, true)
       else if (by === 'combwork') this.owePush(w, entry.id, target, result)
+      // Found published by someone else (follow mode): the local target's catch-up owed, no push of Combwork's logged.
+      else if (opts.catchUp && opts.catchUp.from !== result) this.oweCatchUp(w, entry.id, target, opts.catchUp.from, result, false)
       if (this.wf.store.facts(card.id).some((x) => x.kind === 'Decision' && x.seq > startedAt)) this.wf.askUser(w, 'decide', 'decision', workflowText(FOR_YOU.decidedAfterMerge, { card: card.key }))
       return 'written' as const
     })

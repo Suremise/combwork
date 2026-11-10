@@ -47,11 +47,27 @@ export function displayUrl(url: string): string {
   return url.replace(/[?#].*$/, '')
 }
 
+/**
+ * A push URL as the snapshot keeps it (HR2's round 1): a relative filesystem path made absolute against the project, as
+ * git in the project reads it, so the sealed context (another folder) and recovery reach the same repository. A URL
+ * (`scheme://`), an scp-like `host:path` and an absolute path (`C:\…`, `C:/…`, `/…`, `\\server\…`) are kept as they are.
+ */
+export function projectRelative(project: string, url: string): string {
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) return url
+  const drive = /^[a-z]:[\\/]/i.test(url)
+  // git's rule: a colon before any slash makes it scp-like (a drive letter's isn't).
+  if (!drive && /^[^/\\]*:/.test(url)) return url
+  return isAbsolute(url) ? url : resolve(project, url)
+}
+
 /** The secret values a snapshot holds: its URL's userinfo, and each carried setting's value that could hold one. */
 function secretsOf(snap: TransportSnapshot): string[] {
   const out: string[] = []
   const m = /^[a-z][a-z0-9+.-]*:\/\/([^/@]*)@/i.exec(snap.url)
   if (m) out.push(m[1], ...m[1].split(':').slice(1))
+  // Its query and fragment (HR2's round 1: `?access_token=…`), whole and each value, as git may echo them bare.
+  const q = /[?#](.*)$/.exec(snap.url)
+  if (q) out.push(q[1], ...q[1].split(/[&#;]/).flatMap((p) => [p, p.slice(p.indexOf('=') + 1)]))
   for (const [k, v] of snap.config) {
     if (!/extraheader|proxy|cookie|helper|token|password|secret|key|user/i.test(k)) continue
     out.push(v)
@@ -69,6 +85,8 @@ function secretsOf(snap: TransportSnapshot): string[] {
  */
 export function redactTransport(text: string, snap: TransportSnapshot | null): string {
   let t = text.replace(/([a-z][a-z0-9+.-]*:\/\/)[^/@\s]*@/gi, '$1***@')
+  // Any URL's query and fragment, as a URL shown keeps neither (a token can be in either).
+  t = t.replace(/([a-z][a-z0-9+.-]*:\/\/[^\s'"?#]*)[?#][^\s'"]*/gi, '$1?***')
   t = t.replace(/(authorization:\s*)(\S+\s+)?\S+/gi, '$1***').replace(/(bearer\s+)\S+/gi, '$1***')
   if (snap) for (const s of secretsOf(snap)) t = t.split(s).join('***')
   return t
@@ -160,7 +178,7 @@ export async function destinationOf(h: CandidateHost, target: string): Promise<A
     const at = item.indexOf('\n')
     config.push(at < 0 ? [item, ''] : [item.slice(0, at), item.slice(at + 1)])
   }
-  const url = list[0]
+  const url = projectRelative(h.project, list[0])
   return { snapshot: { remote, url, display: displayUrl(url), ref: merge, config, objects, alternates, format: format.out.trim() || 'sha1' } }
 }
 

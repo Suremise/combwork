@@ -1,6 +1,6 @@
 // HI-1183: follow mode's transport helpers: what a record may show of a URL, and the redaction of git's words.
 import { describe, expect, it } from 'vitest'
-import { displayUrl, redactTransport } from '../src/main/platform/gitTransport'
+import { displayUrl, projectRelative, redactTransport } from '../src/main/platform/gitTransport'
 import { memoryTransportStore, snapshotDigest } from '../src/main/workflow/transportSnapshots'
 import type { TransportSnapshot } from '../src/main/platform/integration'
 
@@ -61,5 +61,22 @@ describe('follow mode’s transport helpers (HI-1183)', () => {
     await store.dropExcept('c:/p', new Set())
     expect(store.raw.has(kept.id)).toBe(false)
     expect(store.raw.has(other.id)).toBe(true)
+  })
+
+  it('query and fragment credentials go too, in a URL and bare (HR2’s round 1)', () => {
+    const s = snap({ url: 'https://example.com/r.git?access_token=QUERY-SECRET-123#frag-secret-456', display: 'https://example.com/r.git' })
+    const out = redactTransport("fatal: unable to access 'https://example.com/r.git?access_token=QUERY-SECRET-123#frag-secret-456/': connection failed\nthe token QUERY-SECRET-123 and frag-secret-456", s)
+    expect(out).not.toContain('QUERY-SECRET-123')
+    expect(out).not.toContain('frag-secret-456')
+    expect(out).toContain('https://example.com/r.git?***')
+    expect(redactTransport('see https://h/x?token=abcdef', null)).toBe('see https://h/x?***')
+  })
+
+  it('a relative filesystem push URL is made absolute against the project; URLs, scp-like and absolute paths are kept', () => {
+    expect(projectRelative('C:/work/proj', '../remote.git').replace(/\\/g, '/')).toBe('C:/work/remote.git')
+    expect(projectRelative('C:/work/proj', 'https://h/r.git')).toBe('https://h/r.git')
+    expect(projectRelative('C:/work/proj', 'git@github.com:team/r.git')).toBe('git@github.com:team/r.git')
+    expect(projectRelative('C:/work/proj', 'C:/other/r.git')).toBe('C:/other/r.git')
+    expect(projectRelative('C:/work/proj', 'D:\\x\\r.git')).toBe('D:\\x\\r.git')
   })
 })

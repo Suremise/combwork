@@ -3,7 +3,7 @@
 // an exact compare-and-swap at the remote, the sealed transport, unknown publications, and the local target's catch-up.
 import { afterEach, describe, expect, it } from 'vitest'
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import { join, relative } from 'path'
 import { execFileSync } from 'child_process'
 import { B1, commit, GIT_HEAVY_MS, moved, setup, sh, type Env } from './harness'
 import { tempDir } from '../tempDir'
@@ -208,6 +208,29 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(head(bare, 'main')).toBe(mainBefore)
     expect(head(e.project, 'main')).toBe(result)
     expect(readFileSync(log, 'utf8').trim().split(/\r?\n/)).toEqual([`args origin ${bare}`, `${result} ${result} refs/heads/trunk ${onto}`])
+  })
+
+  it('a relative remote path keeps the project’s meaning in the sealed context and recovery (HR2’s round 1)', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    sh(e.project, 'remote', 'set-url', 'origin', slash(relative(e.project, bare)))
+    const a = await queued(e, 'A', 'a.txt')
+    expect((await queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    expect(e.wf.state(a).stage).toBe('done')
+    expect(head(bare)).toBe(head(e.project))
+  })
+
+  it('a card someone else published to the remote while the local target is behind: Done from the fetched head, the local one caught up, the queue goes on (HR2’s round 1)', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    const a = await queued(e, 'A', 'a.txt')
+    const b = await queued(e, 'B', 'b.txt')
+    const revA = (e.store.facts(a.id).findLast((f) => f.kind === 'Submitted')!.data as { revision: string }).revision
+    sh(e.project, 'push', '-q', bare, `${revA}:refs/heads/main`)
+    const out = await queue().drain('main')
+    expect(out.map((o) => o.outcome)).toEqual(['integratedOutside', 'integrated'])
+    expect(e.wf.state(a).stage).toBe('done')
+    expect(e.wf.state(b).stage).toBe('done')
+    expect(head(bare)).toBe(head(e.project))
+    expect(catchUpOf(e.store.meta(catchUpKey('main')))).toBeNull()
   })
 
   it('a publication whose reply is lost is verified at the remote: shown there, Done, and never pushed twice', { timeout: GIT_HEAVY_MS }, async () => {
