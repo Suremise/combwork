@@ -1,7 +1,7 @@
 import { msg, tr } from '@shared/i18n'
 import type { LaneEdit, LaneEditResult, LaneEditUndo } from '@shared/types'
 import { call, errorMessage } from './api'
-import { cardLabelOf, get, notify, pushToast } from './store'
+import { cardLabelOf, get, notify, pushToast, setLoaded } from './store'
 
 /**
  * The window's edits of a running lane's list (HI-2898, Progress → Lanes): each asked of main (`lanes:edit`), which
@@ -41,7 +41,16 @@ export async function editLane(e: LaneEdit, names: EditNames): Promise<string | 
     return errorMessage(err)
   }
   said(r, names)
+  await reload()
   return null
+}
+
+/**
+ * The lanes read again at once after a change made here: the next edit names the revision its lane has now, not the
+ * one the settled lanes-changed event (300 ms later) would bring.
+ */
+async function reload(): Promise<void> {
+  await call('lanes:list').then((lanes) => setLoaded({ lanes }), () => undefined)
 }
 
 /** The notification of a change made, with its Undo (kept as the last change made here). */
@@ -79,6 +88,7 @@ export async function undoLaneEdit(id?: string, workspace?: string): Promise<voi
   last = null
   try {
     const r = await call('lanes:edit', { op: 'undo', undo: l.undo })
+    await reload()
     pushToast({ id: `lane-edit-${++seq}`, level: 'success', title: tr(M.done, { op: r.op, card: '', lane: '' }), timestamp: new Date().toISOString() })
   } catch (err) {
     notify('error', tr(M.undoFailed), errorMessage(err))

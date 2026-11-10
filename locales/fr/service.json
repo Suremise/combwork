@@ -205,7 +205,6 @@
   "service.laneEdit.invalid": "Combwork ne peut pas faire cette modification des cartes d’un couloir.",
   "service.laneEdit.keptWork": "La carte {card} garde du travail d’un démarrage précédent (une branche, un emplacement ou une exécution) : elle reste où elle est. Poursuis-la plutôt depuis sa carte.",
   "service.laneEdit.noQueued": "Le couloir {lane} n’a aucune modification en attente à annuler.",
-  "service.laneEdit.notExact": "Une carte du couloir {lane} a démarré depuis : la modification ne peut plus être annulée.",
   "service.laneEdit.notOnLane": "La carte {card} n’est plus dans ce couloir.",
   "service.laneEdit.notQueued": "La carte {card} a démarré, ou n’est plus à faire : seules les cartes qui attendent encore leur tour peuvent être déplacées ou retirées.",
   "service.laneEdit.notTodo": "La carte {card} n’est pas dans À faire : seules les cartes pas encore démarrées entrent dans un couloir.",

@@ -207,7 +207,6 @@ interface CombworkMessageValues {
   'service.laneEdit.invalid': undefined
   'service.laneEdit.keptWork': { card: string | number }
   'service.laneEdit.noQueued': { lane: string | number }
-  'service.laneEdit.notExact': { lane: string | number }
   'service.laneEdit.notOnLane': { card: string | number }
   'service.laneEdit.notQueued': { card: string | number }
   'service.laneEdit.notTodo': { card: string | number }

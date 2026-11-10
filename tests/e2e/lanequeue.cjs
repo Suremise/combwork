@@ -108,6 +108,10 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   check('…its card in flight with a lock, not movable', (await row(la, a1).locator('.progress-lane-queue-lock').count()) === 1 && !/\bmovable\b/.test((await row(la, a1).getAttribute('class')) ?? ''))
   check('…its waiting cards with grips and ×', (await lane(la).locator('.progress-lane-queue-row.movable .progress-lane-queue-grip').count()) === 3 && (await lane(la).locator('.progress-lane-queue-remove').count()) === 3)
   const toast = (re) => page.locator('.toast', { hasText: re }).last()
+  // The pop-ups sit over the panel's bottom right: closed before a click there (each has its ×).
+  const clearToasts = async () => {
+    for (let i = 0; i < 20 && (await page.locator('.toast .popup-close').count()); i++) await page.locator('.toast .popup-close').first().click().catch(() => undefined)
+  }
 
   // --- Alt+Up: queued behind the card in flight, said under the bar with Cancel Change.
   await row(la, a3).focus()
@@ -119,13 +123,17 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   check('…the queued change shows under the bar, with Cancel Change', !!(await until(async () => (await queuedLine.count()) === 1)) && (await queuedLine.locator('[data-action="lane-cancel-change"]').count()) === 1)
   check('…and the focus stays on the card moved', !!(await until(async () => (await page.evaluate(() => document.activeElement?.getAttribute('data-card'))) === String(a3))))
 
-  // --- A move refused in place: A4 before A3, which it depends on. Nothing changes.
+  // --- A move refused in place: A4 up once (still after A3, which it depends on), then again, before A3. Nothing changes.
   await row(la, a4).focus()
+  await page.keyboard.press('Alt+ArrowUp')
+  check('A4 moves up once, still after A3', !!(await until(async () => (await listOf(la)) === [a1, a3, a4, a2].join() && (await rows(la)).join() === [a1, a3, a4, a2].join())), await listOf(la))
   const revBefore = (await laneNow(la)).listRev
+  await row(la, a4).focus()
   await page.keyboard.press('Alt+ArrowUp')
   const refusal = lane(la).locator('.progress-lane-refusal')
   check('a move before a card it depends on is refused in place, saying why', !!(await until(async () => (await refusal.count()) === 1 && /depends on/.test(await refusal.innerText()))), await refusal.innerText().catch(() => ''))
-  check('…and nothing changed', (await listOf(la)) === [a1, a3, a2, a4].join() && (await laneNow(la)).listRev === revBefore)
+  check('…and nothing changed', (await listOf(la)) === [a1, a3, a4, a2].join() && (await laneNow(la)).listRev === revBefore)
+  await clearToasts()
   await refusal.scrollIntoViewIfNeeded()
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
@@ -155,19 +163,22 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   check('…nothing changed', (await listOf(la)) === [a1, a2, a3, a4, x1].join())
 
   // --- Cancel Change drops the queued change (the card from the board), keeping the lane's own list.
+  await clearToasts()
   await queuedLine.locator('[data-action="lane-cancel-change"]').click()
   check('Cancel Change drops the queued change', !!(await until(async () => (await laneNow(la))?.queued === null && (await listOf(la)) === [a1, a2, a3, a4].join())), await listOf(la))
 
   // --- Add Card…: a card given to B3 joins, taken off B3 in the same change.
+  await clearToasts()
   await lane(la).locator('[data-action="lane-add-card"]').click()
   const picker = lane(la).locator('.progress-lane-picker')
   await picker.locator('input').fill(K(x2))
   check('Add Card… finds the card by its key', !!(await until(async () => (await picker.locator(`.progress-lane-picker-card[data-card="${x2}"]`).count()) === 1)))
   await page.keyboard.press('Enter')
-  check('…Enter adds it', !!(await until(async () => (await listOf(la)) === [a1, a2, a3, a4, x2].join())), await listOf(la))
+  check('…Enter adds it', !!(await until(async () => (await listOf(la)) === [a1, a2, a3, a4, x2].join())), `${await listOf(la)} ${await refusal.innerText().catch(() => '')}`)
   check('…taken off B3, so the lane can take it', !!(await until(async () => (await card(x2))?.agent === null)), JSON.stringify((await card(x2))?.agent))
 
   // --- A card on B2's lane: refused, with Move Here; that moves it in one change, and Undo puts everything back.
+  await clearToasts()
   await lane(la).locator('[data-action="lane-add-card"]').click()
   await picker.locator('input').fill(K(c2))
   check("Add Card… says a card is on another lane", !!(await until(async () => /on the lane of B2/.test(await picker.innerText().catch(() => '')))), await picker.innerText().catch(() => ''))
@@ -179,10 +190,11 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   const moved = toast(new RegExp(`Moved ${K(c2)} to B1 / R1`))
   check('…a notification says so, with Undo', !!(await until(async () => (await moved.count()) > 0)))
   await moved.getByRole('button', { name: 'Undo' }).click()
-  check('Undo puts both lanes back, and its agent', !!(await until(async () => (await listOf(lb)) === [c1, c2].join() && !(await listOf(la)).split(',').map(Number).includes(c2) && (await card(c2))?.agent === b2.id)), `${await listOf(la)} / ${await listOf(lb)} / ${(await card(c2))?.agent}`)
+  check('Undo puts both lanes back, and its agent', !!(await until(async () => (await listOf(lb)) === [c1, c2].join() && !(await listOf(la)).split(',').map(Number).includes(c2) && (await card(c2))?.agent === b2.id)), `${await listOf(la)} / ${await listOf(lb)} / ${(await card(c2))?.agent} ${JSON.stringify(await page.locator('.toast').allInnerTexts())}`)
 
   // --- × takes a card off (back to the board), and Ctrl+Z in the tab puts it back.
   const before = await listOf(la)
+  await clearToasts()
   await row(la, a4).hover()
   await row(la, a4).locator('.progress-lane-queue-remove').click()
   check('× takes a card off the lane', !!(await until(async () => !(await listOf(la)).split(',').map(Number).includes(a4))), await listOf(la))
@@ -199,11 +211,13 @@ const until = (fn, ms = HUNG_MS) => lib.until(fn, ms, 150)
   const ended = tab.locator('.progress-lanes-ended')
   check('Ended today shows, collapsed, with one lane', !!(await until(async () => (await ended.count()) === 1 && /Ended today \(1\)/.test(await ended.innerText()))), await ended.innerText().catch(() => ''))
   check('…and the lane is not in the list below', (await lane(lc).count()) === 0)
+  await clearToasts()
   await ended.locator('.progress-lanes-ended-bar').click()
   const endedLane = ended.locator(`.progress-lane[data-lane="${lc}"]`)
   check('…it opens to the lane: builder and reviewer, abandoned', !!(await until(async () => (await endedLane.count()) === 1 && /B3 \/ R1/.test(await endedLane.innerText()) && /abandoned/.test(await endedLane.innerText()))), await endedLane.innerText().catch(() => ''))
   await endedLane.locator('.progress-lane-expand').click()
   check('…which opens to its cards, read only', !!(await until(async () => (await endedLane.locator(`.progress-lane-queue-row[data-card="${e1}"]`).count()) === 1)) && (await endedLane.locator('.progress-lane-queue-row.movable, [data-action="lane-add-card"]').count()) === 0)
+  await clearToasts()
   for (const theme of ['dark', 'light']) {
     await inv('settings:update', { appearance: { theme } })
     await until(async () => (await page.evaluate(() => document.documentElement.dataset.theme)) === theme)

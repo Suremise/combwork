@@ -52,7 +52,6 @@ const M = {
   notOnLane: msg({ id: 'service.laneEdit.notOnLane', defaultMessage: '{card} isn’t on this lane any more.', description: "HI-2898: an error moving or removing a card ({card}, its key) in a lane's cards (Progress → Lanes) that the lane no longer has." }),
   noQueued: msg({ id: 'service.laneEdit.noQueued', defaultMessage: '{lane} has no queued change to cancel.', description: "HI-2898: an error cancelling a lane's queued change (Progress → Lanes: a change of its cards waiting for its card in progress to be Done) when it has none any more. {lane} is its builder / reviewer." }),
   cardChanged: msg({ id: 'service.laneEdit.cardChanged', defaultMessage: '{card} changed since (it was given to an agent, moved or edited): the change wasn’t undone.', description: "HI-2898: an error undoing an edit of lanes (Progress → Lanes) that took a card ({card}, its key) from an agent: the card changed since, so nothing was undone." }),
-  notExact: msg({ id: 'service.laneEdit.notExact', defaultMessage: 'A card of {lane} has started since: the change can’t be undone now.', description: "HI-2898: an error undoing an edit of a lane's cards (Progress → Lanes): a card of it started since, so its list can't go back exactly as it was. {lane} is its builder / reviewer." }),
   invalid: msg({ id: 'service.laneEdit.invalid', defaultMessage: 'That change of a lane’s cards isn’t one Combwork can make.', description: "HI-2898: an error, a change of a lane's cards sent by the window (Progress → Lanes) was malformed (a mistake in Combwork, or a window from another version). Rarely seen." }),
   since: msg({ id: 'service.laneEdit.since', defaultMessage: 'Ended lanes are listed from a time in the last two days.', description: "HI-2898: an error, the window asked for the lanes that ended since a time that isn't a time in the last 48 hours (a mistake in Combwork). Rarely seen." })
 }
@@ -321,6 +320,8 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
         if (p.op === 'transfer' && x.lane === p.brings?.leaving) queuedHere(ws, x.lane, p.card!)
         if (x.cancel) continue
         keepsFixed(ws, x.lane, was, x.next, p.card)
+        // An undo sets the applied list back too: its fixed start kept there as well.
+        if (x.restore) keepsFixed(ws, x.lane, x.lane.cards, x.restore.cards, p.card)
         keepsDependencies(ws, x.lane, was, x.next)
         // An undo bringing a card back (one it took off, or Move here's to its first lane): as any card brought in, but
         // from the lane it leaves in this undo, and without the earlier-work check (it had none as it left).
@@ -354,16 +355,20 @@ export async function editLanes(ws: WorkspaceService, e: LaneEdit): Promise<Lane
           })
         }
       })
-      // The lists, through the one list writer: queued behind the card in flight, or applied between cards.
+      // The lists, through the one list writer: queued behind the card in flight, or applied between cards. An undo puts
+      // back exactly the cards and queued list the edit found (s14's restore): nothing of the lane's list has changed
+      // since (its revision is the one the edit left), its fixed start is kept in both lists (checked above), and
+      // each card it brings back was checked as any card brought in.
       for (const x of p.lanes) {
         const l = x.lane
         if (x.cancel) {
           delete l.pending
+        } else if (x.restore) {
+          l.cards = [...x.restore.cards]
+          if (x.restore.pending) l.pending = [...x.restore.pending]
+          else delete l.pending
         } else {
-          const after = await applyLaneList(ws, l, x.next, on, checks)
-          queued.push({ lane: l.id, queuedAfter: after })
-          // An undo puts the lane back exactly as it was, or not at all (a card started since: queued is not as it was).
-          if (x.restore && (!sameList(l.cards, x.restore.cards) || !sameList(l.pending ?? null, x.restore.pending))) refuse(ws, 409, M.notExact, { lane: pairOf(l) })
+          queued.push({ lane: l.id, queuedAfter: await applyLaneList(ws, l, x.next, on, checks) })
         }
         l.updatedAt = new Date().toISOString()
       }

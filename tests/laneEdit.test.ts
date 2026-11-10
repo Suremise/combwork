@@ -162,6 +162,20 @@ describe('editLanes (HI-2898)', () => {
     await expect(edit({ op: 'undo', undo: r.undo! })).rejects.toThrow(/changed meanwhile/)
   })
 
+  it('undoes a removal from a lane whose card is in flight: the cards put back exactly, not queued', async () => {
+    const [a, b, c] = [await make('A'), await make('B'), await make('C')]
+    const l = await start('b1', [a, b, c])
+    await doing(a, 'b1')
+    // A removal keeping the card in flight applies at once (as cw_lane start's does).
+    const r = await edit({ op: 'remove', lane: l.id, rev: 0, card: b })
+    expect(r.lanes).toEqual([{ lane: l.id, queuedAfter: null }])
+    expect((await raw(l.id)).cards).toEqual([a, c])
+    await edit({ op: 'undo', undo: r.undo! })
+    const rec = await raw(l.id)
+    expect(rec.cards).toEqual([a, b, c])
+    expect(rec.pending).toBeUndefined()
+  })
+
   it('refuses a card from another project, a Done one, one not in To do, one already there, and one on another lane', async () => {
     const [a, b, x] = [await make('A'), await make('B'), await make('X')]
     const other = await make('Other', { project: 'beta' })

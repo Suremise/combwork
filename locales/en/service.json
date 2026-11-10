@@ -823,10 +823,6 @@
     "defaultMessage": "{lane} has no queued change to cancel.",
     "description": "HI-2898: an error cancelling a lane's queued change (Progress → Lanes: a change of its cards waiting for its card in progress to be Done) when it has none any more. {lane} is its builder / reviewer."
   },
-  "service.laneEdit.notExact": {
-    "defaultMessage": "A card of {lane} has started since: the change can’t be undone now.",
-    "description": "HI-2898: an error undoing an edit of a lane's cards (Progress → Lanes): a card of it started since, so its list can't go back exactly as it was. {lane} is its builder / reviewer."
-  },
   "service.laneEdit.notOnLane": {
     "defaultMessage": "{card} isn’t on this lane any more.",
     "description": "HI-2898: an error moving or removing a card ({card}, its key) in a lane's cards (Progress → Lanes) that the lane no longer has."
