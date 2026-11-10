@@ -11443,6 +11443,24 @@ textarea.input.task-blocked-input {
 .git-queue-history-h {
   font-weight: 600;
 }
+/* HI-2893: past branches' queues, folded under the live ones: their histories only. */
+.git-queue-past {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 900px;
+}
+.git-queue-past > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.git-queue-past[open] > summary {
+  margin-bottom: 12px;
+}
+.git-queue-past > .git-queue-target + .git-queue-target {
+  margin-top: 16px;
+}
 /* Its history (#1641): a data table as the archived cards' one, a line a row. The title takes the room left and is
    ellipsised (its tooltip has it whole); the other columns never wrap, and a table narrower than them scrolls sideways
    in its .table-wrap. */

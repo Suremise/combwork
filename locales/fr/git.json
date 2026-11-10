@@ -198,6 +198,8 @@
   "git.queue.none": "Pas de file de fusion. Quand le flux de travail du projet fait fusionner ses cartes par Combwork (Gestion de versions → Flux de travail : Qui fusionne), la file de chaque branche cible s’affiche ici, avec son historique.",
   "git.queue.open": "Ouvrir {card}",
   "git.queue.outcome": "Résultat",
+  "git.queue.past": "{n, plural, one {Anciennes branches (# branche)} many {Anciennes branches (# branches)} other {Anciennes branches (# branches)}}",
+  "git.queue.pastTip": "Branches dans lesquelles le travail n’est plus fusionné et dont la file est vide : ce que leurs files ont fusionné et renvoyé.",
   "git.queue.reading": "Lecture des files de fusion…",
   "git.queue.region": "Files de fusion",
   "git.queue.result": "Commit de fusion",

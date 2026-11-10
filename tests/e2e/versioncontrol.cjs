@@ -183,7 +183,8 @@ function board(sql, ...args) {
       ipcMain.removeHandler('queue:list')
       ipcMain.handle('queue:list', (_e, p) => {
         const s = globalThis.__vc
-        if (p === d.alpha) return [view(p, { paused: { reason: 'user', card: null, files: [], by: 'user', at: new Date().toISOString() } })]
+        // HI-2893: and a past branch's (1.0.0: not a target now, nothing in it), with an outcome in its history.
+        if (p === d.alpha) return [view(p, { paused: { reason: 'user', card: null, files: [], by: 'user', at: new Date().toISOString() } }), view(p, { target: '1.0.0', past: true, recent: [{ card: 3, key: 'AL-3', title: 'Old', entry: 'al/3', outcome: 'merged', at: new Date(Date.now() - 86_400_000).toISOString() }] })]
         if (p !== d.plain) return []
         if (s.hold) {
           s.asked++
@@ -205,6 +206,13 @@ function board(sql, ...args) {
     await pick('alpha')
     await queueTab.click()
     check("alpha's queue shows in its Merge queue section", !!(await lib.until(async () => (await page.locator('.vc-view [data-queue="alpha#main"]').count()) === 1, HUNG_MS)))
+    // HI-2893: no link to the page it's on; a past branch's queue only as its history, under Past branches, folded.
+    check('…with no "Queue in Version Control" link there', (await page.locator('.vc-view [data-queue="alpha#main"] .progress-queue-link').count()) === 0)
+    const pastPart = page.locator('.vc-view .git-queue-past')
+    check("1.0.0, a past branch, isn't a live queue: no card, no Pause queue; it is under Past branches, folded", (await page.locator('.vc-view [data-queue="alpha#1.0.0"]').count()) === 0 && (await pastPart.count()) === 1 && (await pastPart.evaluate((d) => d.open)) === false && /Past branches \(1 branch\)/.test(await pastPart.locator('summary').innerText()), await page.locator('.vc-view .git-queue').innerText())
+    await pastPart.locator('summary').click()
+    check('…unfolded: its history, with no card', !!(await lib.until(async () => (await pastPart.locator('[data-target="1.0.0"] .git-queue-history').count()) === 1 && (await pastPart.locator('.progress-queue-card').count()) === 0, HUNG_MS)))
+    await shots('queue-past', page.locator('.vc-view'))
 
     // Another project's queues never show while its own read is pending: plain shows none of alpha's, and only Workflow.
     await app.evaluate(() => (globalThis.__vc.hold = true))
@@ -224,6 +232,7 @@ function board(sql, ...args) {
     await panel.locator('.progress-tab[data-tab="merges"]').click()
     const card = panel.locator('[data-queue="alpha#main"]')
     check("the Merges tab has alpha's queue", !!(await lib.until(async () => (await card.count()) === 1, HUNG_MS)))
+    check("…and not 1.0.0's, a past branch's (HI-2893)", (await panel.locator('[data-queue="alpha#1.0.0"]').count()) === 0)
     await card.locator('.progress-queue-link').click()
     check("Queue in Version Control selects alpha and opens its Merge queue", !!(await lib.until(async () => (await page.locator('.project-header', { hasText: 'alpha' }).count()) > 0 && (await page.locator('.vc-view').getAttribute('data-platform')) === 'git' && (await selected()) === 'queue', HUNG_MS)))
 

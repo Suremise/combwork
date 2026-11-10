@@ -149,6 +149,16 @@ const TARGET = 'integration'
     check('…with override true it is queued, the override on its card', overridden.status === 200 && overridden.body?.queued === true && (await h.facts(fwdCard)).some((f) => f.kind === 'ForwardRequested' && f.data.override?.dir === 'backward' && f.data.override?.why === 'default'), JSON.stringify(overridden.body))
     const fwdActions = await h.inv('assistant:actions')
     check('…its action says it overrode the direction', fwdActions.some((x) => x.ok && x.kind === 'queue-forward' && /with the user’s override of the release path’s direction/.test(x.text)), JSON.stringify(fwdActions.map((x) => [x.kind, x.text])))
+    // --- HI-2893: a past branch's queue (1.0.0: not a target, only a pause, nothing in it) is left out of GET /v1/queue
+    // and listed with past=true, marked; named, it is listed as it is.
+    await h.inv('queue:pause', fx.alpha, '1.0.0')
+    const live = await api(reviewer.token, 'GET', '/v1/queue')
+    const withPast = await api(reviewer.token, 'GET', '/v1/queue?past=true')
+    const named = await api(reviewer.token, 'GET', '/v1/queue?target=1.0.0')
+    check('HI-2893: GET /v1/queue leaves out a past branch\'s queue', live.status === 200 && !live.body.some((x) => x.target === '1.0.0') && live.body.some((x) => x.target === TARGET), JSON.stringify(live.body?.map((x) => [x.target, x.past])))
+    check('…past=true lists it, marked past', withPast.status === 200 && withPast.body.some((x) => x.target === '1.0.0' && x.past === true) && !withPast.body.find((x) => x.target === TARGET)?.past, JSON.stringify(withPast.body?.map((x) => [x.target, x.past])))
+    check('…and naming it lists it', named.status === 200 && named.body.length === 1 && named.body[0].target === '1.0.0' && named.body[0].past === true, JSON.stringify(named.body))
+    await h.inv('queue:resume', fx.alpha, '1.0.0')
     // Taken out again, unless merged already: only the override was checked.
     if (fwdCard) await h.inv('queue:remove', fwdCard, 'only the override was checked').catch(() => null)
     await h.inv('session:stop', home, 'assistant')

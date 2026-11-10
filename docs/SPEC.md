@@ -5618,7 +5618,9 @@ from queue** on an entry, recorded as an override and as `IntegrationCancelled`.
   revision, the result or why, and when), a `DataTable` as the archived cards' (#1641): a line a row, the title
   ellipsised, the outcome a short label with the result or why as its tooltip, the merge commit its own column
   (left to the tooltip when narrow), the headings and filters sticky over a box of its own that scrolls. A target shows by #1356's rule, or while it has a history. The panel's
-  *Queue in Version Control* opens it.
+  *Queue in Version Control* opens it; the card here has no such link (HI-2893). A past branch's queue (HI-2893:
+  `past`, §16.9.3's Merges tab) shows no card (no Pause queue): only its history, under a folded **Past branches (n)**
+  after the live ones.
 - **The Merge dialog** (OP-13): for an agent's worktree branch whose card in flight has Combwork merge it under its own
   ruleset, with the rules enforced (`worktrees:branchCards`), it says so and where the card stands (not queued yet,
   queued with its place, testing; the queue paused), and Merge is off with why. **Merge anyway…** (a confirmation)
@@ -7732,7 +7734,12 @@ The Progress panel stays; its 1.0 changes per phase are on the phase cards and a
   queued.*), while the project's current options have Combwork merge into it (`queue:list` gives the window those targets
   too, with `combworkMerges` and `inFlight`; the Agent API's listing is unchanged). So after a switch to "The agent merges",
   or Git → None with an old Git ruleset's cards in flight, the old queue stays controllable until its cards are merged,
-  out of flight, and their outcomes seen. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
+  out of flight, and their outcomes seen. **Past branches** (HI-2893, Darren 10 Nov): a queue whose target is none of
+  the project's targets now (Work merges into, Other branches work can merge into) and that holds no entry (none testing
+  or queued) is a past branch's (`QueueView.past`, set in every listing): it never shows here, whatever else it has (a
+  pause, a return, a card in flight), so the panel and Version Control's Merge queue show the same live queues. Its
+  history stays in Version Control's Merge queue section under **Past branches** (below), and the Agent API lists it
+  only on request. Under **All projects** (HI-2165, Darren 30 Oct: "we shouldn't show details
   from inactive projects") a queue shows only for a project being worked on (the sidebar's Working on) or while it is
   busy (`queueBusy`: an entry testing or queued, a pause, a return not seen, or a merge in the last hour), so an
   inactive project's idle *Nothing queued.* card is left out; chosen in the filter, its queue shows as above. While a

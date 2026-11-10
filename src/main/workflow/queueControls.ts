@@ -129,6 +129,10 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const targets = window && scope?.current ? await existingTargets(ws, projectPath) : []
   const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
   const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
+  // HI-2893: a queue whose target is none of the project's targets now, and that holds no entry, is a past branch's.
+  const named = await projectTargets(ws, projectPath).catch(() => null)
+  const current = named ? [named.default, ...named.others] : []
+  for (const v of views) if (!current.includes(v.target) && !v.testing && !v.queued.length) v.past = true
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
   // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
   const sources = targets.length ? await forwardSources(ws, projectPath, targets) : []

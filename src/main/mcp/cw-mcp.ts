@@ -131,6 +131,7 @@ const T = {
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
   'queue.arg.target': agentMsg({ id: 'tool.queue.arg.target', text: 'The target branch.' }),
+  'queue.arg.past': agentMsg({ id: 'tool.queue.arg.past', text: "list: true also lists past branches' queues (not a target now, nothing in them).", note: 'HI-2893.' }),
   'queue.arg.items': agentMsg({ id: 'tool.queue.arg.items', text: 'retarget: the card keys, lane names and slot names to move, from the preview named.' }),
   'queue.arg.preview': agentMsg({ id: 'tool.queue.arg.preview', text: "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing." }),
   'queue.reply.retargetPreview': agentMsg({ id: 'tool.queue.reply.retargetPreview', text: 'Preview {preview}: can follow {to}: {move}. Stay: {stay}. To move them, ask the user, then retarget with preview and items.', note: 'HI-2680: cw_queue retarget\'s reply without a preview. {move} and {stay} are lists ("-" for none).' }),
@@ -998,6 +999,7 @@ const tools: Tool[] = [
         action: { type: 'string', enum: ASSISTANT ? ['list', 'pause', 'resume', 'remove', 'retry', 'forward', 'retarget'] : ['list'] },
         ...(ASSISTANT ? { project: projectArg } : {}),
         target: { type: 'string', description: say(T['queue.arg.target']) },
+        past: { type: 'boolean', description: say(T['queue.arg.past']) },
         ...(ASSISTANT ? { card: cardArg, reason: { type: 'string', description: say(T['queue.arg.reason']) }, from: { type: 'string', description: say(T['queue.arg.from']) }, override: { type: 'boolean', description: say(T['queue.arg.override']) }, items: { type: 'array', items: { type: 'string' }, description: say(T['queue.arg.items']) }, preview: { type: 'string', description: say(T['queue.arg.preview']) } } : {})
       },
       required: ['action']
@@ -1005,7 +1007,7 @@ const tools: Tool[] = [
     run: async (a) => {
       const project = ASSISTANT ? a.project : PROJECT
       if (a.action === 'list') {
-        const q = [project ? `project=${enc(String(project))}` : '', a.target ? `target=${enc(String(a.target))}` : ''].filter(Boolean).join('&')
+        const q = [project ? `project=${enc(String(project))}` : '', a.target ? `target=${enc(String(a.target))}` : '', a.past === true ? 'past=true' : ''].filter(Boolean).join('&')
         return queuesText((await api('GET', `/v1/queue${q ? `?${q}` : ''}`)) as QueuePublic[], String(project ?? ''))
       }
       if (!ASSISTANT) throw new Error(say(T['queue.error.action']))

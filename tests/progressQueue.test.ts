@@ -91,6 +91,13 @@ describe('which merge queues show (#1356 item 0)', () => {
     expect(queueShown(view({ inFlight: [61] }), NOW)).toBe(true)
   })
 
+  it("HI-2893: never a past branch's queue (not a target now, nothing in it), whatever else it has", () => {
+    const r = recent({ outcome: 'returned', reason: 'conflict', files: ['tasks.ts'] })
+    const paused = { reason: 'user' as const, card: null, files: [], by: 'user' as const, at: iso(NOW) }
+    expect(queueShown(view({ past: true, combworkMerges: true, paused, runBy: 'Combwork-Dev', inFlight: [61], returns: [r] }), NOW)).toBe(false)
+    expect(shownQueues([view({ target: '1.0.0', past: true, returns: [r] }), view({ target: '1.5.0', combworkMerges: true })], NOW).map((v) => v.target)).toEqual(['1.5.0'])
+  })
+
   it('an unseen return keeps an old queue shown; once seen, it goes a few seconds later', () => {
     const r = recent({ outcome: 'returned', reason: 'conflict', files: ['tasks.ts'] })
     expect(queueShown(view({ returns: [r] }), NOW)).toBe(true)

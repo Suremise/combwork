@@ -2441,7 +2441,8 @@ async function queueTargetOf(ws: WorkspaceService, p: string, v: unknown): Promi
     if (typeof v !== 'string' || v.length > 255 || /[\s~^:?*[\\]/.test(v)) throw new HttpError(400, apiSaid(API.queue.targetArg))
     return v
   }
-  const views = await queueViews(ws, p)
+  // HI-2893: of the live queues only: a past branch's is named or never picked.
+  const views = (await queueViews(ws, p)).filter((x) => !x.past)
   if (views.length === 1) return views[0].target
   throw new HttpError(400, apiSaid(API.queue.targetRequired, { listed: views.length ? 'yes' : 'no', targets: views.map((x) => x.target).join(', ') }))
 }
@@ -2463,7 +2464,9 @@ route('GET', '/v1/queue', async ({ query }) => {
   const p = queueProject(query.get('project'))
   const target = query.get('target') || undefined
   if (target && (target.length > 255 || /[\s~^:?*[\\]/.test(target))) throw new HttpError(400, apiSaid(API.queue.targetArg))
-  return (await queueViews(ws, p, target)).map(publicQueue)
+  // HI-2893: the project's targets' queues and any holding an entry; past branches' only with past=true, or one named.
+  const past = query.get('past') === 'true'
+  return (await queueViews(ws, p, target)).filter((v) => !v.past || past || !!target).map(publicQueue)
 })
 
 route('POST', '/v1/queue/pause', async ({ body }) => {

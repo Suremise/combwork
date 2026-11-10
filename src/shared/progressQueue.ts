@@ -112,8 +112,11 @@ export const justMerged = (v: QueueView, now: number): QueueRecent[] => v.recent
  * merge of the last few seconds, a Combwork running it (a lease), or a card in flight whose own ruleset has Combwork merge into
  * it; and, empty, while the current options have Combwork merge into it. So after a switch to "The agent merges" (or Git →
  * None with an old Git ruleset's cards in flight) the old queue stays, controllable, until its last outcome is seen.
+ * HI-2893: never a past branch's queue (`past`: its target none of the project's targets now, holding no entry).
  */
 export function queueShown(v: QueueView, now: number): boolean {
+  // HI-2893: never a past branch's (none of the project's targets now, nothing in it): its history is Version Control's.
+  if (v.past) return false
   // HI-2679: a target behind another of its project's (or one whose heads can't be read) shows too, with nothing queued.
   return !!v.testing || v.queued.length > 0 || !!v.paused || !!v.runBy || v.inFlight.length > 0 || v.combworkMerges || shownReturns(v, now).length > 0 || justMerged(v, now).length > 0 || !!v.forward?.behind.some((b) => b.commits !== 0)
 }

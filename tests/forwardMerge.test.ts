@@ -367,6 +367,22 @@ describe('HI-2892: forward merges only in the release path’s direction', () =>
     expect([git(repo, 'rev-parse', '1.4.0'), git(repo, 'rev-parse', '1.5.0')]).toEqual([b14, b15])
   })
 
+  it("HI-2893: a queue whose target isn't one of the project's now, holding no entry, is a past branch's", async () => {
+    const { w, repo } = await versions()
+    // An old target's queue with only a pause (no entry), and another's with an entry still queued.
+    await inWorkspace(w, () => controls.pauseQueue(w, repo, '1.0.0', 'user'))
+    git(repo, 'branch', '1.1.0', '1.4.0')
+    await oldForward(w, repo, 'main', '1.1.0')
+    const views = await inWorkspace(w, () => controls.queueViews(w, repo, undefined, true))
+    const past = (t: string) => views.find((v) => v.target === t)?.past
+    expect(past('1.0.0')).toBe(true)
+    expect(past('1.1.0')).toBeUndefined()
+    for (const t of ['1.5.0', '1.4.0', 'next']) expect(past(t)).toBeUndefined()
+    // The Agent API's listing too (not the window's): the same flag.
+    const api = await inWorkspace(w, () => controls.queueViews(w, repo))
+    expect(api.filter((v) => v.past).map((v) => v.target)).toEqual(['1.0.0'])
+  })
+
   it('a card with its override recorded keeps it through Retry: the source frozen again, queued, merged', async () => {
     const { w, repo } = await versions({ conflict: true })
     const made = await inWorkspace(w, () => controls.forwardMerge(w, repo, '1.5.0', '1.4.0', user, undefined, { override: true }))
