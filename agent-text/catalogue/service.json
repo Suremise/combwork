@@ -724,6 +724,86 @@
     "note": "An error changing a project's key: the project hasn't been given Combwork's id (it hasn't been opened yet).",
     "audience": "both"
   },
+  "service.laneEdit.already": {
+    "text": "{card} is on this lane already.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes) that already has it.",
+    "audience": "both"
+  },
+  "service.laneEdit.cardChanged": {
+    "text": "{card} changed since (it was given to an agent, moved or edited): the change wasn’t undone.",
+    "note": "HI-2898: an error undoing an edit of lanes (Progress → Lanes) that took a card ({card}, its key) from an agent: the card changed since, so nothing was undone.",
+    "audience": "both"
+  },
+  "service.laneEdit.changed": {
+    "text": "The cards of {lane} changed meanwhile: look again, then try again.",
+    "note": "HI-2898: an error editing a lane's cards in Progress → Lanes (a lane: a builder and a reviewer agent working through cards in turn): the lane's list changed since the window showed it (an agent, the Assistant or another window changed it), so nothing was changed. {lane} is its builder / reviewer (B1 / R1).",
+    "audience": "both"
+  },
+  "service.laneEdit.dependency": {
+    "text": "{card} depends on {dep}, which would come after it: put {dep} first.",
+    "note": "HI-2898: an error moving or adding a card in a lane's cards (Progress → Lanes): {card} (a key) depends on {dep} (a key: it's blocked by it), and the change would put {dep} later in the lane.",
+    "audience": "both"
+  },
+  "service.laneEdit.done": {
+    "text": "{card} is Done already.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it's already Done.",
+    "audience": "both"
+  },
+  "service.laneEdit.ended": {
+    "text": "{lane} has ended: its cards can’t be changed any more.",
+    "note": "HI-2898: an error editing a lane's cards in Progress → Lanes: the lane ended (or was abandoned) meanwhile. {lane} is its builder / reviewer, or its id when it's gone.",
+    "audience": "both"
+  },
+  "service.laneEdit.fixedPlace": {
+    "text": "Cards already started or finished keep their places: {card} can only go after them.",
+    "note": "HI-2898: an error moving or adding a card in a lane's cards (Progress → Lanes) to a place before a card that's already in progress, in review, approved or done ({card}: the card moved or added, its key).",
+    "audience": "both"
+  },
+  "service.laneEdit.invalid": {
+    "text": "That change of a lane’s cards isn’t one Combwork can make.",
+    "note": "HI-2898: an error, a change of a lane's cards sent by the window (Progress → Lanes) was malformed (a mistake in Combwork, or a window from another version). Rarely seen.",
+    "audience": "both"
+  },
+  "service.laneEdit.keptWork": {
+    "text": "{card} keeps work from an earlier start (a branch, a slot or a run): it stays where it is. Carry it on from its card instead.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane, or moving it to another lane (Progress → Lanes): it was started before and its work is kept (a branch, a slot lent for it, or a run in progress), so Combwork won't hand it to another builder from here.",
+    "audience": "both"
+  },
+  "service.laneEdit.noQueued": {
+    "text": "{lane} has no queued change to cancel.",
+    "note": "HI-2898: an error cancelling a lane's queued change (Progress → Lanes: a change of its cards waiting for its card in progress to be Done) when it has none any more. {lane} is its builder / reviewer.",
+    "audience": "both"
+  },
+  "service.laneEdit.notOnLane": {
+    "text": "{card} isn’t on this lane any more.",
+    "note": "HI-2898: an error moving or removing a card ({card}, its key) in a lane's cards (Progress → Lanes) that the lane no longer has.",
+    "audience": "both"
+  },
+  "service.laneEdit.notQueued": {
+    "text": "{card} has started, or isn’t to do any more: only cards still waiting their turn can be moved or taken off.",
+    "note": "HI-2898: an error moving or removing a card ({card}, its key) in a lane's cards (Progress → Lanes): only cards still waiting in To do, not another agent's, can be; this one is in progress, in review, approved, done, on hold or another agent's.",
+    "audience": "both"
+  },
+  "service.laneEdit.notTodo": {
+    "text": "{card} isn’t in To do: only cards not started yet join a lane.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it's in progress, in review, approved or on hold. To do is the board's column of cards not started (as the board names it).",
+    "audience": "both"
+  },
+  "service.laneEdit.onLane": {
+    "text": "{card} is on the lane of {builder}: take it off there first, or use Move here.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): another running lane (of the builder agent {builder}) has it. Move here is the button beside this message that moves it: as it's translated there.",
+    "audience": "both"
+  },
+  "service.laneEdit.otherProject": {
+    "text": "{card} isn’t one of {project}’s cards, or it’s archived.",
+    "note": "HI-2898: an error adding a card ({card}, its key) to a lane (Progress → Lanes): it belongs to another project than the lane's ({project}), or it's archived.",
+    "audience": "both"
+  },
+  "service.laneEdit.since": {
+    "text": "Ended lanes are listed from a time in the last two days.",
+    "note": "HI-2898: an error, the window asked for the lanes that ended since a time that isn't a time in the last 48 hours (a mistake in Combwork). Rarely seen.",
+    "audience": "both"
+  },
   "service.laneStart.busy": {
     "text": "{status, select, working {Agent {agent} is working.} starting {Agent {agent} is starting.} waiting {Agent {agent} is waiting for your answer.} background {Agent {agent} is waiting on background tasks it started.} signin {Agent {agent} needs you to sign in again.} other {Agent {agent} is waiting on cards (a card watch).}} Start the lane once it's idle, or choose another agent.",
     "note": "An error starting a lane from the window: the agent {agent} can't start in a new conversation now, because of what it is doing ({status}; keep the select keys). The window offers to wait until it's idle. Each {status} a whole sentence with a noun before the name (HI-1585: glossary §1 rules 3 and 4).",
