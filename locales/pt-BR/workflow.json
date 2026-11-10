@@ -579,5 +579,20 @@
   "workflow.why.stopOwnRuns": "Uma execução deixada rodando continuaria alterando ou testando o trabalho em revisão.",
   "workflow.why.strict": "A fila de merge testa o resultado mesclado de qualquer forma, então isso muda principalmente o formato do histórico.",
   "workflow.why.style": "Um commit de merge mantém os commits de cada cartão, como o Combwork sempre fez o merge.",
-  "workflow.why.target": "O trabalho concluído vai para o branch padrão do repositório; trabalhando sozinho, para o branch em que o projeto está."
+  "workflow.why.target": "O trabalho concluído vai para o branch padrão do repositório; trabalhando sozinho, para o branch em que o projeto está.",
+  "workflow.contradiction.jjNeedsSlots": "Com o jj, cada cartão precisa da própria pasta: agentes compartilhando a pasta do projeto ainda não são suportados.",
+  "workflow.contradiction.jjYouIntegrate": "Com o jj, você mesmo integra o trabalho revisado: o Combwork não faz o merge.",
+  "workflow.form.levelForJj": "Os padrões dos projetos jj.",
+  "workflow.form.levelJj": "jj",
+  "workflow.refused.platform.changed.message": "O cartão {card} não pode começar com estas regras: o projeto agora usa {platform}.",
+  "workflow.refused.platform.changed.next": "Comece de novo: ele será verificado com as regras de {platform}.",
+  "workflow.refused.platform.switching.message": "O cartão {card} não pode começar agora: o controle de versão do repositório está sendo mudado.",
+  "workflow.refused.platform.switching.next": "Tente de novo em instantes, quando a mudança terminar.",
+  "workflow.refused.start.platformReady.message": "O cartão {card} não pode começar: os cartões ainda não rodam em um projeto jj.",
+  "workflow.refused.start.platformReady.next": "Trabalhe nele fora dos cartões do Combwork ou mude o projeto para Git em Controle de versão.",
+  "workflow.rule.start.platformReady": "Os cartões só rodam onde o Combwork oferece suporte ao controle de versão",
+  "workflow.summary.jj.pair": "Um agente revisor aprova cada cartão depois das verificações rápidas, e então você mesmo o integra.",
+  "workflow.summary.jj.solo": "Cada cartão em seu próprio workspace jj, sem revisão: você mesmo integra o trabalho.",
+  "workflow.summary.jj.team": "Um agente revisor e depois você verificam cada cartão depois das verificações rápidas e dos testes, e então você mesmo o integra.",
+  "workflow.value.finish.userIntegrates": "Você mesmo integra"
 }

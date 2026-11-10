@@ -167,7 +167,8 @@ export const VALUE_TEXT = {
     combworkMerges: msg({ id: 'workflow.value.finish.combworkMerges', defaultMessage: 'Combwork merges', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Combwork checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     committed: msg({ id: 'workflow.value.finish.committed', defaultMessage: 'Committed is done', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
-    notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' })
+    notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
+    userIntegrates: msg({ id: 'workflow.value.finish.userIntegrates', defaultMessage: 'You integrate it yourself', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj; you bring the reviewed work into its target with jj.' })
   },
   style: {
     merge: msg({ id: 'workflow.value.style.merge', defaultMessage: 'Merge commit', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' }),
@@ -281,5 +282,11 @@ export const PRESET_SUMMARY: Record<PlatformId, Partial<Record<PresetId, Msg>>> 
     solo: msg({ id: 'workflow.summary.none.solo', defaultMessage: 'No review: a card is done when its builder submits it.', description: 'What the Solo preset sets up, for a project without version control.' }),
     pair: msg({ id: 'workflow.summary.none.pair', defaultMessage: 'A reviewer agent checks each card, after the quick checks pass.', description: 'What the Pair preset sets up, for a project without version control.' }),
     team: msg({ id: 'workflow.summary.none.team', defaultMessage: 'A reviewer agent, then you, check each card, after the quick checks and the tests pass.', description: 'What the Team preset sets up, for a project without version control.' })
+  },
+  // jj (HI-2799, option A): the user integrates what passed; Combwork never merges.
+  jj: {
+    solo: msg({ id: 'workflow.summary.jj.solo', defaultMessage: 'Each card in its own jj workspace, no review: you integrate the work yourself.', description: 'What the Solo preset sets up, for a project using jj (Jujutsu, HI-2799). Keep jj; a jj workspace is a working folder jj makes.' }),
+    pair: msg({ id: 'workflow.summary.jj.pair', defaultMessage: 'A reviewer agent passes each card after the quick checks, then you integrate it yourself.', description: 'What the Pair preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj.' }),
+    team: msg({ id: 'workflow.summary.jj.team', defaultMessage: 'A reviewer agent, then you, check each card after the quick checks and the tests, then you integrate it yourself.', description: 'What the Team preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj.' })
   }
 }

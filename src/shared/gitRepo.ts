@@ -332,6 +332,11 @@ const M = {
   changes: msg({ id: 'git.section.changes', defaultMessage: 'Changes', description: "The Git tab's section with the uncommitted changes." }),
   history: msg({ id: 'git.section.history', defaultMessage: 'History', description: "The Git tab's section with the last commits and the tags." }),
   branches: msg({ id: 'git.section.branches', defaultMessage: 'Branches & remotes', description: "The Git tab's section with the branch, branches, remotes, worktrees and commit identity." }),
+  jjRepo: msg({ id: 'git.section.jjRepo', defaultMessage: 'Repository', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its repository, workspaces, operation and what jj doesn't support in Combwork." }),
+  jjHistory: msg({ id: 'git.section.jjHistory', defaultMessage: 'History', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its commits, each with its change id and commit id." }),
+  jjCompare: msg({ id: 'git.section.jjCompare', defaultMessage: 'Compare', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): what changed between two revisions." }),
+  jjBookmarks: msg({ id: 'git.section.jjBookmarks', defaultMessage: 'Bookmarks', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): its bookmarks (jj's named lines, like Git's branches). Use jj's own word for bookmark in your language's jj documentation, else translate it." }),
+  jjConflicts: msg({ id: 'git.section.jjConflicts', defaultMessage: 'Conflicts', description: "The Version Control tab's section of a project using jj (Jujutsu, HI-2799): the commits jj stores with unresolved conflicts." }),
   queue: msg({ id: 'git.section.queue', defaultMessage: 'Merge queue', description: "The Git tab's section with the project's merge queues (#1357): each target's queue now, its history, Pause and Resume. Glossary 2.5: merge queue." }),
   agentBusy: msg({
     id: 'git.busy.agent',
@@ -372,11 +377,17 @@ const M = {
 }
 
 /** The Version Control tab's sections (#1416, SPEC §16.6): Workflow, then the platform's own. */
-export const VC_SECTIONS: readonly { id: 'workflow' | 'changes' | 'history' | 'branches' | 'queue'; label: Msg; icon: string }[] = [
+export const VC_SECTIONS: readonly { id: 'workflow' | 'changes' | 'history' | 'branches' | 'jjRepo' | 'jjHistory' | 'jjCompare' | 'jjBookmarks' | 'jjConflicts' | 'queue'; label: Msg; icon: string }[] = [
   { id: 'workflow', label: M.workflow, icon: 'git-pull-request' },
   { id: 'changes', label: M.changes, icon: 'git-compare' },
   { id: 'history', label: M.history, icon: 'history' },
   { id: 'branches', label: M.branches, icon: 'git-branch' },
+  // jj's (HI-2799): read-only views, pinned reads; nothing in them changes the repository.
+  { id: 'jjRepo', label: M.jjRepo, icon: 'repo' },
+  { id: 'jjHistory', label: M.jjHistory, icon: 'history' },
+  { id: 'jjCompare', label: M.jjCompare, icon: 'git-compare' },
+  { id: 'jjBookmarks', label: M.jjBookmarks, icon: 'bookmark' },
+  { id: 'jjConflicts', label: M.jjConflicts, icon: 'warning' },
   { id: 'queue', label: M.queue, icon: 'git-merge' }
 ]
 export type VcSection = (typeof VC_SECTIONS)[number]['id']
@@ -384,7 +395,8 @@ export type VcSection = (typeof VC_SECTIONS)[number]['id']
 /** Each platform's own sections, after Workflow: None has none of its own. */
 const PLATFORM_SECTIONS: Record<PlatformId, readonly VcSection[]> = {
   git: ['changes', 'history', 'branches', 'queue'],
-  none: []
+  none: [],
+  jj: ['jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts']
 }
 
 /**
@@ -401,7 +413,7 @@ export function vcSections(platform: PlatformId, queues: readonly QueueView[], n
 /** The section a project opens at when none is kept (or the kept one isn't shown): Changes for Git, else Workflow. */
 export function vcSectionShown(kept: VcSection | undefined, shown: readonly VcSection[]): VcSection {
   if (kept && shown.includes(kept)) return kept
-  return shown.includes('changes') ? 'changes' : 'workflow'
+  return shown.includes('changes') ? 'changes' : shown.includes('jjRepo') ? 'jjRepo' : 'workflow'
 }
 
 /** The actions refused while an agent works in the project folder or holds its merge slot. */

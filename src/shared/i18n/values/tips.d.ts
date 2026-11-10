@@ -563,6 +563,8 @@ interface CombworkMessageValues {
   'tips.updateFromTarget.title': undefined
   'tips.usageMoves.text': undefined
   'tips.usageMoves.title': undefined
+  'tips.versionControlJj.text': undefined
+  'tips.versionControlJj.title': undefined
   'tips.versionControlSwitch.text': undefined
   'tips.versionControlSwitch.title': undefined
   'tips.versionControlTab.text': undefined

@@ -11,7 +11,7 @@ import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
 import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
-import { fmt, msg, tr } from '@shared/i18n'
+import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { agentProviderOf, cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { cx } from '../util'
@@ -145,9 +145,15 @@ const T = {
   levelGit: msg({ id: 'workflow.form.levelGit', defaultMessage: 'Git', description: 'The choice of the defaults for Git projects (glossary 2.1: keep).' }),
   levelForNone: msg({ id: 'workflow.form.levelForNone', defaultMessage: 'The defaults of projects without version control.', description: 'Beside the None · Git choice above workflow defaults, while None is chosen.' }),
   levelForGit: msg({ id: 'workflow.form.levelForGit', defaultMessage: 'The defaults of Git projects.', description: 'Beside the None · Git choice above workflow defaults, while Git is chosen.' }),
+  levelJj: msg({ id: 'workflow.form.levelJj', defaultMessage: 'jj', description: 'The choice of the defaults for projects using jj (Jujutsu, HI-2799). Keep jj: the tool’s name, lower case.' }),
+  levelForJj: msg({ id: 'workflow.form.levelForJj', defaultMessage: 'The defaults of jj projects.', description: 'Beside the None · Git · jj choice above workflow defaults, while jj (Jujutsu, HI-2799) is chosen. Keep jj.' }),
   changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
+
+/** The defaults' platform choice (None · Git · jj) and its line beside it. */
+const LEVEL_NAME: Record<PlatformId, Msg> = { none: T.levelNone, git: T.levelGit, jj: T.levelJj }
+const LEVEL_FOR: Record<PlatformId, Msg> = { none: T.levelForNone, git: T.levelForGit, jj: T.levelForJj }
 
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
 const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
@@ -237,13 +243,13 @@ export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; on
     <div className="workflow-level" data-level={level}>
       <div className="workflow-level-head">
         <div className="segmented workflow-level-platform" role="radiogroup" aria-label={tr(T.levelPlatform)}>
-          {(['none', 'git'] as const).map((p) => (
+          {(['none', 'git', 'jj'] as const).map((p) => (
             <button key={p} type="button" role="radio" aria-checked={platform === p} className={cx(platform === p && 'active')} data-platform={p} onClick={() => setPlatform(p)}>
-              {tr(p === 'git' ? T.levelGit : T.levelNone)}
+              {tr(LEVEL_NAME[p])}
             </button>
           ))}
         </div>
-        <span className="s-desc">{tr(platform === 'git' ? T.levelForGit : T.levelForNone)}</span>
+        <span className="s-desc">{tr(LEVEL_FOR[platform])}</span>
       </div>
       <WorkflowEditor source={source} project={null} onDirty={onDirty} />
     </div>
@@ -593,6 +599,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
       case 'finish':
         // Combwork merges since P5's queue (#1355).
+        // jj (HI-2799, option A): the user integrates, the only finish it has.
+        if (platform === 'jj') return select('finish', [['userIntegrates', tr(V.finish.userIntegrates)]])
         return select('finish', [['combworkMerges', tr(V.finish.combworkMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
@@ -601,6 +609,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'commitMessage':
         return select('commitMessage', [['combwork', tr(V.commitMessage.combwork)], ['branch', tr(V.commitMessage.branch)]])
       case 'folder':
+        // jj (HI-2799): slots only, the shared folder a closed gate (sharedFolder).
+        if (platform === 'jj') return select('folder', [['slots', tr(V.folder.slots)]])
         return select('folder', [['slots', tr(V.folder.slots)], ['project', tr(V.folder.project)]])
       case 'reviewerMode':
         return select('reviewerMode', [['lane', tr(V.reviewerMode.lane)], ['pool', tr(V.reviewerMode.pool)]])

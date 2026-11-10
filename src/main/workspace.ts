@@ -34,7 +34,7 @@ import { changeSessionRecord, changeSessions, exportSessions, readAgentSessions,
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
 import { ensureCombworkExcluded, combworkVcs } from './combworkVcs'
-import { detect, projectPlatform } from './platform/registry'
+import { detect, initialOf, projectPlatform } from './platform/registry'
 import { currentLine, repoHolding } from './platform/repoPorts'
 import type { ProjectPlatform } from '../shared/platform/descriptors'
 import { duplicateAgentNames, suggestAgentName } from '../shared/agentNames'
@@ -79,9 +79,17 @@ const M = {
   platformInvalidTitle: msg({ id: 'service.workspace.platformInvalidTitle', defaultMessage: 'Unknown version control setting in {project}', description: "A notice's title: the project {project}'s settings file names a version control Combwork doesn't have." }),
   platformInvalid: msg({ id: 'service.workspace.platformInvalid', defaultMessage: "{project}'s project.json names a version control Combwork doesn't know (platform: {value}). Until it says \"git\" or \"none\", Combwork uses what it finds in the folder.", description: 'A notice: the platform setting in the project {project}\'s .combwork/project.json is {value}, which is not one Combwork has (only "git" and "none" are: keep them as they are, they are setting values).' }),
   otherFound: msg({ id: 'service.workspace.platformOtherFound', defaultMessage: "{vcs} was found in {project}. Combwork doesn't support it yet, and goes on treating the project as a Git project until you switch it to None in its Version Control tab.", description: 'A notice: another version control system ({vcs}: Mercurial, Jujutsu…) was found in a project Combwork treats as a Git project. Combwork does not switch it by itself: the Version Control tab offers the switch to None (glossary 2.1).' }),
+  jjFound: msg({ id: 'service.workspace.platformJjFound', defaultMessage: '{project} is a jj repository colocated with Git. Combwork goes on with its version control as it is until you switch it to jj in its Version Control tab.', description: 'A notice (HI-2799): a jj (Jujutsu) repository colocated with Git was found in a project. Combwork does not switch it by itself: the Version Control tab offers it. Keep jj and Git.' }),
+  jjGone: msg({ id: 'service.workspace.platformJjGone', defaultMessage: "{project}'s jj repository is gone. Switch it to Git or None in its Version Control tab.", description: 'A notice (HI-2799): the .jj folder of a project using jj was removed or moved. Keep jj, Git and None.' }),
   platformSettled: msg({ id: 'service.workspace.platformSettled', defaultMessage: 'Settled: nothing to change now', description: "What the notice that a project's version control changed says once it no longer applies (HI-2320): the project was switched, or its folder is back as it was. Shown in place of its button." }),
   openVc: msg({ id: 'service.workspace.platformOpen', defaultMessage: 'Open Version Control', description: "A button on the notice that a project's version control changed: shows the project's Version Control tab, where Combwork offers the switch (glossary 2.1)." })
 }
+/** What runs after each refresh reported (HI-2799: the platform fence's store map and recovery), registered by its module. */
+const afterRefresh: ((ws: WorkspaceService) => void)[] = []
+export function onAfterRefresh(fn: (ws: WorkspaceService) => void): void {
+  afterRefresh.push(fn)
+}
+
 // What a closed workspace's refused open throws (#1381: made when refused, not kept per workspace).
 setFenceReason(() => combworkError(M.closed, undefined, { kind: 'conflict' }))
 
@@ -89,7 +97,7 @@ setFenceReason(() => combworkError(M.closed, undefined, { kind: 'conflict' }))
 function platformNotice(project: string, p: ProjectPlatform): { title: string; message: string } {
   if (p.invalid !== undefined) return { title: tr(M.platformInvalidTitle, { project }), message: tr(M.platformInvalid, { project, value: p.invalid }) }
   const why = p.offer?.why
-  const message = why === 'gitFound' ? tr(M.gitFound, { project }) : why === 'otherFound' ? tr(M.otherFound, { project, vcs: p.detected.other ?? '' }) : tr(M.repositoryGone, { project })
+  const message = why === 'gitFound' ? tr(M.gitFound, { project }) : why === 'jjFound' ? tr(M.jjFound, { project }) : why === 'jjGone' ? tr(M.jjGone, { project }) : why === 'otherFound' ? tr(M.otherFound, { project, vcs: p.detected.other ?? 'jj' }) : tr(M.repositoryGone, { project })
   return { title: tr(M.platformTitle, { project }), message }
 }
 
@@ -1479,7 +1487,7 @@ export class WorkspaceService {
         // folder's appearing began reading it) is kept, never replaced by the default.
         if (!existsSync(join(h, 'project.json'))) {
           await configTestHooks.beforeDefaultConfig?.(projectPath)
-          const isNew = await createKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: detect(projectPath).platform }), { existing: true })
+          const isNew = await createKeptJson(join(h, 'project.json'), withoutView({ ...DEFAULT_PROJECT_CONFIG, platform: initialOf(detect(projectPath)) }), { existing: true })
           // Its load, in the log (HI-2563): the default made, or the project's own kept.
           log.info(`${userText(basename(projectPath))}: ${isNew ? 'default project.json made' : 'project.json written meanwhile kept, no default made'}`)
         }
@@ -1942,6 +1950,7 @@ export class WorkspaceService {
     this.cached = { path: this.path, name: basename(this.path), config: this.wsConfig, projects, assistant: assistant && { ...assistant, name: ASSISTANT_NAME, active: true, unmanagedMcp: [] }, moved: this.moved }
     this.emit({ type: 'workspace-changed', workspace: this.cached })
     this.flagDuplicateNames(projects)
+    for (const fn of afterRefresh) fn(this)
     return this.cached
   }
 

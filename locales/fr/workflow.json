@@ -579,5 +579,20 @@
   "workflow.why.stopOwnRuns": "Une exécution laissée en cours continuerait de modifier ou de tester le travail en relecture.",
   "workflow.why.strict": "La file de fusion teste de toute façon le résultat fusionné, donc cela change surtout la forme de l’historique.",
   "workflow.why.style": "Un commit de fusion garde les commits propres à chaque carte, comme Combwork a toujours fusionné.",
-  "workflow.why.target": "Le travail terminé va dans la branche par défaut du dépôt ; en solo, dans la branche sur laquelle est le projet."
+  "workflow.why.target": "Le travail terminé va dans la branche par défaut du dépôt ; en solo, dans la branche sur laquelle est le projet.",
+  "workflow.contradiction.jjNeedsSlots": "Avec jj, chaque carte a besoin de son propre dossier : des agents partageant le dossier du projet ne sont pas encore pris en charge.",
+  "workflow.contradiction.jjYouIntegrate": "Avec jj, tu intègres toi-même le travail relu : Combwork ne le fusionne pas.",
+  "workflow.form.levelForJj": "Les valeurs par défaut des projets jj.",
+  "workflow.form.levelJj": "jj",
+  "workflow.refused.platform.changed.message": "{card} ne peut pas démarrer avec ces règles : son projet utilise maintenant {platform}.",
+  "workflow.refused.platform.changed.next": "Redémarre-la : elle est alors vérifiée selon les règles de {platform}.",
+  "workflow.refused.platform.switching.message": "{card} ne peut pas démarrer maintenant : la gestion de versions de son dépôt est en cours de changement.",
+  "workflow.refused.platform.switching.next": "Réessaie dans un instant, une fois le changement terminé.",
+  "workflow.refused.start.platformReady.message": "{card} ne peut pas démarrer : les cartes ne s’exécutent pas encore dans un projet jj.",
+  "workflow.refused.start.platformReady.next": "Travaille dessus en dehors des cartes de Combwork, ou repasse le projet à Git dans Gestion de versions.",
+  "workflow.rule.start.platformReady": "Les cartes ne s’exécutent que là où Combwork prend en charge la gestion de versions",
+  "workflow.summary.jj.pair": "Un agent relecteur valide chaque carte après les vérifications rapides, puis tu l’intègres toi-même.",
+  "workflow.summary.jj.solo": "Chaque carte dans son propre workspace jj, sans relecture : tu intègres le travail toi-même.",
+  "workflow.summary.jj.team": "Un agent relecteur, puis toi, vérifiez chaque carte après les vérifications rapides et les tests, puis tu l’intègres toi-même.",
+  "workflow.value.finish.userIntegrates": "Tu l’intègres toi-même"
 }

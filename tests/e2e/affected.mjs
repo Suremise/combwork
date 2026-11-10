@@ -193,11 +193,13 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'agentslots', 'gitbranchcards', 'lanesslots', 'lanestages', 'mergedialogslots', 'slotrelease', 'unusedslots', 'p6lane', 'workflowdefaults', 'workflowoptions', 'advanced', 'keys', 'cardattach', 'image', 'i18nshots'] },
   // Where a Version Control or workflow default came from (HI-1837).
   { paths: ['src/renderer/src/components/OriginText.tsx'], suites: ['versioncontrol', 'workflowdefaults', 'workflowoptions'] },
-  { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions'] },
+  { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions', 'jjview'] },
+  // jj in the Version Control tab and the switch (HI-2799).
+  { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts'], suites: ['jjview', 'vcswitch'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
   // Switching the version control (#1419): the switch, detection's offers, the shared rules.
-  { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions'] },
+  { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions', 'jjview'] },
   { paths: ['src/main/gitInit.ts', 'src/shared/gitInit.ts', 'src/renderer/src/components/InitRepo.tsx'], suites: ['gitinit', 'gitview'] },
   { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
   // The providers' version checks' GET (#1582): the test copies turn the checks off, so these drive its callers only.

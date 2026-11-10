@@ -15,6 +15,14 @@
     "defaultMessage": "Each card’s focused tests need the command that runs them.",
     "description": "Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run)."
   },
+  "workflow.contradiction.jjNeedsSlots": {
+    "defaultMessage": "With jj, each card needs its own folder: agents sharing the project folder aren’t supported yet.",
+    "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) was set to have everyone work in the project folder. Keep jj (the tool’s name)."
+  },
+  "workflow.contradiction.jjYouIntegrate": {
+    "defaultMessage": "With jj, you integrate the reviewed work yourself: Combwork doesn’t merge it.",
+    "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) had another finish chosen than “You integrate it”. Keep jj (the tool’s name)."
+  },
   "workflow.contradiction.mergeNeedsSlots": {
     "defaultMessage": "When Combwork or the agent merges, each card needs its own folder.",
     "description": "Why workflow options cannot be saved: a merging option was chosen while everyone works in the project folder."
@@ -327,6 +335,10 @@
     "defaultMessage": "The defaults of Git projects.",
     "description": "Beside the None · Git choice above workflow defaults, while Git is chosen."
   },
+  "workflow.form.levelForJj": {
+    "defaultMessage": "The defaults of jj projects.",
+    "description": "Beside the None · Git · jj choice above workflow defaults, while jj (Jujutsu, HI-2799) is chosen. Keep jj."
+  },
   "workflow.form.levelForNone": {
     "defaultMessage": "The defaults of projects without version control.",
     "description": "Beside the None · Git choice above workflow defaults, while None is chosen."
@@ -334,6 +346,10 @@
   "workflow.form.levelGit": {
     "defaultMessage": "Git",
     "description": "The choice of the defaults for Git projects (glossary 2.1: keep)."
+  },
+  "workflow.form.levelJj": {
+    "defaultMessage": "jj",
+    "description": "The choice of the defaults for projects using jj (Jujutsu, HI-2799). Keep jj: the tool’s name, lower case."
   },
   "workflow.form.levelNone": {
     "defaultMessage": "None",
@@ -1363,6 +1379,22 @@
     "defaultMessage": "Declare only the files of the work, outside {folder}: a card's paths narrow the project's work, never widen it.",
     "description": "The next step after a refused declaration of a card's paths: name files outside the excluded folder {folder} (#1511)."
   },
+  "workflow.refused.platform.changed.message": {
+    "defaultMessage": "{card} can't start under these rules: its project uses {platform} now.",
+    "description": "HI-2799: a refused start: the start was prepared under the project’s previous version control, and the project was switched meanwhile. {card} is a card key; {platform} is None, Git or jj."
+  },
+  "workflow.refused.platform.changed.next": {
+    "defaultMessage": "Start it again: it is then checked under {platform}’s rules.",
+    "description": "HI-2799: the next step after a start refused because the project switched version control meanwhile. {platform} is None, Git or jj."
+  },
+  "workflow.refused.platform.switching.message": {
+    "defaultMessage": "{card} can't start now: its repository's version control is being switched.",
+    "description": "HI-2799: a refused start: the project’s repository is switching between Git and jj, and nothing starts on it meanwhile. {card} is a card key like AM-12."
+  },
+  "workflow.refused.platform.switching.next": {
+    "defaultMessage": "Try again in a moment, once the switch has finished.",
+    "description": "HI-2799: the next step after a start refused while the repository’s version control is switched."
+  },
   "workflow.refused.platform.targetGone.message": {
     "defaultMessage": "{card} was started on {target}, which no longer exists in this repository.",
     "description": "HI-2753: a refused move (a submit): the branch the card was started on and merges into (its target, {target}) was deleted, as an integration branch is once it has been merged. {card} is a card key like AM-12."
@@ -1474,6 +1506,14 @@
   "workflow.refused.start.notBlocked.next": {
     "defaultMessage": "Wait for it to be unblocked, or work on another card.",
     "description": "The next step after a refused start of a blocked card."
+  },
+  "workflow.refused.start.platformReady.message": {
+    "defaultMessage": "{card} can't start: cards don't run in a jj project yet.",
+    "description": "A refused start of a card in a project using jj (Jujutsu, HI-2799): Combwork shows its repository but doesn’t start card work there yet. {card} is a card key. Keep jj (the tool’s name)."
+  },
+  "workflow.refused.start.platformReady.next": {
+    "defaultMessage": "Work on it outside Combwork’s cards, or switch the project to Git in Version Control.",
+    "description": "The next step after a refused start in a jj project (HI-2799). Version Control is the tab’s name (glossary 2.1). Keep Git and jj."
   },
   "workflow.refused.start.slotAvailable.change": {
     "defaultMessage": "This is set in Version Control → Where cards are built.",
@@ -1714,6 +1754,10 @@
   "workflow.rule.start.notBlocked": {
     "defaultMessage": "Blocked cards don't start",
     "description": "A rule of the workflow, named where a move skips or can't check it."
+  },
+  "workflow.rule.start.platformReady": {
+    "defaultMessage": "Cards run only where Combwork supports the version control",
+    "description": "A rule of the workflow, named where a move skips or can’t check it (HI-2799): cards don’t start in a project using jj (Jujutsu) yet."
   },
   "workflow.rule.start.slotAvailable": {
     "defaultMessage": "Each card in its own folder",
@@ -1983,6 +2027,18 @@
     "defaultMessage": "Pair with stricter checks: the unit tests too, a clean install before every merge, and your OK for cards labelled ui or release.",
     "description": "What the Team preset sets up, for a Git project (glossary 2.1: Team, Pair)."
   },
+  "workflow.summary.jj.pair": {
+    "defaultMessage": "A reviewer agent passes each card after the quick checks, then you integrate it yourself.",
+    "description": "What the Pair preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj."
+  },
+  "workflow.summary.jj.solo": {
+    "defaultMessage": "Each card in its own jj workspace, no review: you integrate the work yourself.",
+    "description": "What the Solo preset sets up, for a project using jj (Jujutsu, HI-2799). Keep jj; a jj workspace is a working folder jj makes."
+  },
+  "workflow.summary.jj.team": {
+    "defaultMessage": "A reviewer agent, then you, check each card after the quick checks and the tests, then you integrate it yourself.",
+    "description": "What the Team preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj."
+  },
   "workflow.summary.none.pair": {
     "defaultMessage": "A reviewer agent checks each card, after the quick checks pass.",
     "description": "What the Pair preset sets up, for a project without version control."
@@ -2150,6 +2206,10 @@
   "workflow.value.finish.notChecked": {
     "defaultMessage": "Not checked",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.userIntegrates": {
+    "defaultMessage": "You integrate it yourself",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj; you bring the reviewed work into its target with jj."
   },
   "workflow.value.folder.project": {
     "defaultMessage": "Everyone in the project folder",

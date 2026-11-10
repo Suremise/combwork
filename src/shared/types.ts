@@ -24,7 +24,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
-import type { SwitchRefusal } from './platform/switching'
+import type { StoreSwitch, SwitchRefusal } from './platform/switching'
 import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
@@ -1757,6 +1757,8 @@ export interface PlatformSwitchCheck {
   gitFolder: boolean
   /** A card in flight goes through Combwork's merge queue (its ruleset's): the queue carries on, and stays shown. */
   queue: boolean
+  /** A switch between Git and jj (HI-2799): the repository's projects switch together, after a drain. */
+  store?: StoreSwitch
 }
 
 /** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */

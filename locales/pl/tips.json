@@ -580,5 +580,7 @@
   "tips.opencodeOutsideFolder.text": "Agent OpenCode pyta, zanim odczyta lub zmieni cokolwiek poza swoim folderem, i czeka na Twoją odpowiedź w swoim panelu. Kopie do recenzji pozostają dozwolone, a Zatwierdzaj wszystko zatwierdza bez pytania; wyłączysz to w Ustawienia → Zaawansowane → OpenCode.",
   "tips.opencode.title": "Uruchamiaj agentów w OpenCode",
   "tips.opencodeHistory.text": "Rozmowa agenta OpenCode jest widoczna na karcie Sesje, a jego tokeny i koszt w Przeglądzie i stopce jego panelu, tak jak podaje je OpenCode. Koszt $0 nie mierzy limitu Twojego planu; limity są widoczne tylko dla OpenCode Go lub Console.",
-  "tips.opencodeHistory.title": "Historia, tokeny i koszt agenta OpenCode"
+  "tips.opencodeHistory.title": "Historia, tokeny i koszt agenta OpenCode",
+  "tips.versionControlJj.text": "W repozytorium jj współistniejącym z Gitem wybierz jj u góry zakładki Kontrola wersji: Historia pokazuje każdy identyfikator zmiany obok identyfikatora commita, a Porównanie, Zakładki i Konflikty odczytują repozytorium bez jego zmieniania. Zrecenzowaną pracę włączasz sam.",
+  "tips.versionControlJj.title": "Zobacz repozytorium jj"
 }

@@ -1870,7 +1870,8 @@ revision; Git's words (branch, commit, merge commit) appear only in the Git adap
 | Upgrading to 1.0 | Git projects get Git and None projects None, with options matching how they work today (§16.17); a one-time notice offers the presets. |
 | A None project gets `git init` (by the user or an agent) | Combwork notices (the refresh that ensures `.combwork`'s exclude, §8) and offers to switch to Git, with the switching warning (§16.6.5), from the next card. |
 | The repository disappears (`.git` removed or moved) | Combwork says so and offers None. Until the user switches, Git's rules hold rather than pass: their facts are unknown (§16.3.1). |
-| Mercurial, Jujutsu or another system is found (`combworkVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." A colocated jj+git repository (`.jj` beside `.git`) is Jujutsu too, so None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts; `otherVcsOf` already treats it so for Initialise repository (§8) [P1, answering HB3's round 1 finding 16]. |
+| Mercurial or another system is found (`combworkVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." |
+| A jj repository is found (1.5.0, HI-2799: `vcsDetect.ts` `jjOf`, the nearest `.jj`, before any other marker) | Detection is `jj` (`Detection.jj.colocated`: a `.git` beside it), never what a project takes by itself (`initialOf`: a project with nothing recorded takes None). A None or Git project is offered jj (`jjFound`) where it's colocated; a non-colocated one is shown and refused (J7). A jj project whose `.jj` is gone is offered Git back, or None (`jjGone`). Initialise repository still refuses inside jj (`otherVcsOf`, §8). Before 1.5.0 a colocated pair was None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts, so Git ↔ jj is the repository's switch (§16.3.6, J6). |
 | A subfolder of a larger repository | Git, showing the repository root; the tab says branch and merge actions affect that whole repository. (Today the Git view refuses actions there, §8; 1.0 keeps refusing Combwork's merges into a parent repository unless the project's options name its target explicitly: OP-29.) |
 
 Everything is visible in the Version Control tab itself, not only through the Assistant [#1122 c].
@@ -2230,15 +2231,15 @@ operation withdrawn (refused, nothing run or changed), and `tests/repoOpsImports
 | **None** (no version control) | Supported, unchanged (§16.3.3). | Unchanged. |
 | **Git**, the project's own repository | Supported, unchanged: slots as worktrees, or the project folder shared (G11). | Unchanged. |
 | **Git**, a subfolder of a larger repository | Supported, unchanged (OP-29: Combwork merges only into a target the project names). | Unchanged. |
-| **jj, colocated** (`.jj` beside `.git`) | **None**, as today (§16.3.5): detected, offered nothing but None. | A platform: jj workspaces as slots (made by jj, colocated as jj makes them), the gates below. |
+| **jj, colocated** (`.jj` beside `.git`) | **None**, as today (§16.3.5): detected, offered nothing but None. | A platform (J6, HI-2799: chosen, never taken by itself): read-only views, cards refused until jj's card work is enabled, the gates below. |
 | **jj, non-colocated, Git-backed** | None, as today. | A platform, same adapter, once its tool, trust-root and file-list paths pass (J7). |
 | jj with another storage backend | None. | **Not supported** (untested, not proposed). |
 | Mercurial, other systems | None, as today. | None. |
 
 Switching between Git and jj (1.5.0) is stricter than §16.6.5's "from the next card": it drains the repository's lanes,
 queue, leases and review copies first, keeps historic facts under the platform that wrote them, and makes new slots
-(HI-2781 part 2 §7; J6 builds it). No mode is changed by detection alone, and Combwork never initialises jj or
-converts a repository's colocation.
+(HI-2781 part 2 §7; J6 built it: below, *jj in the window and the switch*). No mode is changed by detection alone,
+and Combwork never initialises jj or converts a repository's colocation.
 
 ##### Compatibility matrix and gates
 
@@ -2547,6 +2548,90 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   `tests/jjRecovery.test.ts` (HI-2781's case, overlaps, a local deletion against an upstream edit, every stop resumed,
   a write at the seam, writes after preservation and after the rescan, an unrelated divergent change, a junction,
   diverged operation heads refused with nothing written).
+
+##### jj in the window and the switch (1.5.0's J6, HI-2799)
+
+J6 made jj a platform: `PlatformId` is `'none' | 'git' | 'jj'` (J2's `JjPlatform` and `WorkspacePlatform` are its own),
+and its design is HI-2799/s11 to s26. Under Darren's option A (HI-2794) the window offers no jj mutation and Combwork never
+merges under jj.
+- **The descriptor** (`PLATFORMS.jj`): capabilities `revisions, isolation, containment, sameness, authorship, observe`;
+  never `integration` (gate advance, J4 and J5 included); `operations: []`; commit and change ids shown at 12
+  (`revisionShort`, `changeShort`); `gates` every gate still closed (all ten in J6), which the window shows as "Not
+  supported with jj" (`shared/platform/gateTexts.ts`). Git's and None's `gates` are empty.
+- **Workflow options for jj**: Git's rows without a merge step or a shared folder (`FORM_GROUPS.jj`); finish
+  `userIntegrates` ("You integrate it yourself", jj's only finish: `jjYouIntegrate` otherwise) in slots only
+  (`jjNeedsSlots`); presets Solo, Pair, Team; workspace and Combwork defaults for jj as for the others. Every jj ruleset
+  carries `start.platformReady`, which the runtime refuses before asking the adapter anything (no override crosses it):
+  **no jj card starts yet** (J2 refuses prepare and attach in a jj slot; a card's line under jj is a later card's). jj's
+  adapter (`platform/jjPlatform.ts`) answers unknown or nothing for everything else.
+- **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
+  window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
+  colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
+  and a `jj rebase -r <commit> -d <target>` to start from, its containment "can't check yet" until J5 records the user's
+  integration, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
+  conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,
+  a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
+  `bookmarks()`, for the user to pick one by commit id; then `diff --summary` and `--git`, capped), Bookmarks
+  (`--all-remotes`; a conflicted one with its sides; a local one whose `@git` or Git branch, read from the store's files,
+  differs marked `gitDiffers`), Conflicts (`conflicts()` among the visible commits, `resolve --list` each). **jj is confirmed pinned**
+  (`pinnedContextOf`): J0's detection would run `jj root` and `jj git root` unpinned, and on 0.47.1 an unpinned command
+  merges diverged heads (a write, R5.3), even when a second head appears between a check and the command (HR2's round 1).
+  So the single head is read from the files first (none, several or an unreadable `.jj`: `heads`, nothing run), J0's
+  confirmation pins its commands at the head it reads (`--at-op`, HI-2831), and the heads are read again after (anything else: `moved`). Every view, the switch's jj check and the fallback go through it.
+- **The switch** (`workflow/storeSwitch.ts`, through `setPlatform` when `storeWide`: to jj, jj → Git, or to Git where jj
+  is colocated). Its **group** is every project of this workspace on the repository (its Git store, `commonGitDir`)
+  whose choice is Git or jj, plus the project switched (None → jj too); the warning names them, and its `token` (a hash
+  of each member, its choice and options, the fence's generation and the store) must still match at the switch, else
+  `groupChanged`. Refused, each with its list and Check Again reading it afresh: `drain` (active or paused lanes, cards
+  in flight, a member's merge queue with work, open slot leases, unfreed copy leases), `otherWorkspace` (the store is a
+  project of another open workspace), `switching`; to jj, jj's confirmation (`jjContextOf`: colocated, the same store,
+  the tested jj: `noJj`, `jjSeparate`, `jjTool`, `jjUnknown`) and the **compatibility assessment**
+  (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
+  -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
+  `.gitattributes`, `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
+  without a Windows extension, in `core.hooksPath` or the store's `hooks/`: a `*.sample` and jj's own `docs.url` aren't
+  hooks), `commit.gpgSign` or `tag.gpgSign` true, and jj's `signing.behavior`; anything unreadable is "uses it". `core.autocrlf` counts by its effective value (the last level's): false converts nothing, as jj does. Git for
+  Windows' own system config and attributes (`core.autocrlf true`, `filter.lfs.*`, `diff=astextplain`) trip attributes
+  and lfs, so a default Windows install is refused until they're off. Back to Git (`fallback`): one head, no conflicted
+  local bookmark, every local bookmark's `@git` and Git branch its commit, no conflicted commit in `::bookmarks()`;
+  `.jj` stays. jj → None is a project's own switch (no jj card can be in flight), recorded in its fence membership.
+- **The platform fence** (`platform/platformFence.ts`, `platform/fenceAdmit.ts`): rows in the workspace database's
+  `board_meta`: `platform_fence:<store>` (generation, `settled` or `switching`, its owner, each member's `current` choice
+  and the last attempt it took part in, its generation's, with its before and after, each a snapshot of `platform`,
+  `platformFound` and `workflow`, refused past 64 KB; a former member outside a later switch keeps its current choice,
+  its old attempt dropped), `platform_member:<project id>`, `platform_store:<project id>` (each refresh's detection, written when it
+  changed) and `platform_switching`. Every admission checks it **in its own write transaction**, so the database
+  serializes it with the switch's writes and no new lock is taken: a lane's start (its save's `also`), a card's start
+  (the runtime's start write: `platform.switching` or `platform.changed`, refusals with their next step), a slot's lease
+  (`SlotStore.take`) and a copy's (`CopyStore.take`). A queue entry needs none: only a card in flight is enqueued, and
+  no member has one once A is written. Membership is looked up first, by the project's id: a participant of the switch under
+  way (its attempt the fence's generation) is refused whatever it compiled; a former member outside it, one that left
+  for None, is held to its own `current` as a settled fence holds every member (HR2's round 1); of a settled one, held to
+  its `current` (a stale start is re-resolved by the caller's
+  next attempt, a runtime made afresh for the project's new platform). Not a member: the store map; absent or
+  unreadable is refused while any store switches; an unchanged None project outside a group is the only exemption; a
+  Git or jj one on a switched store must match its members. Malformed rows fail closed.
+- **The switch's steps**, in lock order (the store's repository lock, the workflow writes, each project.json's lock):
+  A writes the fence `switching` with each member's before and after; **then** the drain is read again (nothing can be
+  admitted after A, so what it reads is final: anything running rolls the fence back and refuses); each member's
+  project.json is written; B settles the fence, each member's `current` its after. A failure between A and B is settled
+  in the switch's own `finally`, still under the lock, from each member's disk (`readKeptJson`): forward when every
+  member shows its after, else those showing after written back to their before (read back), the rest untouched, and
+  **stuck** (left switching, its admissions refused, said in the log) when a member shows neither or can't be read.
+  Only the participants are reconciled and take a new `current`. A member that is on another repository, none, or no
+  longer a project of the workspace leaves its fence at the next refresh (`dropMember`), never while it takes part in a
+  switch under way.
+  **Recovery** (`recoverFences`, after each refresh) settles a switching fence the same way only when its owner is gone
+  (its token in no switch this process is making, its pid not alive), under the same locks, the fence read again there.
+  The fence is per workspace database: another Combwork process (Dev beside the installed one) on the same repository
+  isn't fenced, as the queue isn't beyond the repository lock.
+- **Tests**: `tests/platformFence.test.ts` (the rules on a map), `tests/storeSwitch.test.ts` (two projects on one store,
+  the switch paused after A and after its drain read while the other starts a card, a lane, a slot and a copy lease;
+  the drain; a group changed; a failed save rolled back per member and fresh admissions after it; a save persisted
+  though its call failed; recovery during a live switch; a dead owner's recovered; a member edited by hand left stuck),
+  `tests/platformRegistry.test.ts` (detection, offers), `tests/jjViewsReal.test.ts` on the pinned jj (`CW_JJ_REAL=1`:
+  the views writing nothing, two heads read as such, a divergent change and a conflicted bookmark in Compare, a
+  conflicted commit, the fallback's refusals, the assessment's gates), and the e2e suite `jjview` (the real app).
 
 ##### jj's merge-queue candidates (1.5.0's J4, HI-2797)
 
@@ -3531,6 +3616,10 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   platform the window showed) isn't the one in force is refused ("Changed meanwhile"), and so is an options save read
   before a switch (`setWorkflowOptions` checks the platform under the lock). The window greys Git out with the same
   reason; `project:updateConfig` refuses `platform`.
+- **Git ↔ jj (1.5.0, HI-2799) is the repository's switch**, not this one: every project on the repository using Git
+  or jj switches together, only once nothing runs on it, under the platform fence, and to jj only after the
+  compatibility assessment (§16.3.6, *jj in the window and the switch*). The choice is **None · Git · jj**; jj only
+  where a jj repository colocated with Git is found (`noJj`, `jjSeparate` in its tooltip otherwise).
 - **The warning:** what changes, that it applies from the next card, the running lanes and the cards in flight
   (`cardsInFlight`, as for options) that keep their platform's ruleset; for a Git card in flight, that its merge queue
   carries on and stays in the tab and the panel until clear. **No "Apply to cards in flight"** across platforms.
