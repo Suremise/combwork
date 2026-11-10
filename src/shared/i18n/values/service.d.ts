@@ -302,6 +302,8 @@ interface CombworkMessageValues {
   'service.workspace.platformGitFound': { project: string | number }
   'service.workspace.platformInvalid': { project: string | number; value: string | number }
   'service.workspace.platformInvalidTitle': { project: string | number }
+  'service.workspace.platformJjFound': { project: string | number }
+  'service.workspace.platformJjGone': { project: string | number }
   'service.workspace.platformOpen': undefined
   'service.workspace.platformOtherFound': { vcs: string | number; project: string | number }
   'service.workspace.platformRepositoryGone': { project: string | number }

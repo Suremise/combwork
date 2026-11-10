@@ -179,6 +179,8 @@ export const EDGES = [
   { file: 'src/main/antivirus', module: 'src/main/worktrees', class: 'impl', names: ['worktreesRoot'], why: "the worktrees folder beside the workspace, excluded from scanning (Git's slots and 0.9 worktrees live there)" },
   { file: 'src/main/combworkMove', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['excludeLine', 'gitDirOf'], op: 'excludeMoveLock and moveExcludeLine (HI-2462)', why: "1.1's .hive → .combwork move keeps git's exclude lines right" }, // old-name: the 1.1 folder move's input, named as it was
   { file: 'src/main/combworkMove', module: 'src/main/repoLock', class: 'common', names: ['withNamedLock'], why: "the folder move's named lock (a lock file of Combwork's, not git's)" },
+  { file: 'src/main/platform/jjCompat', module: 'src/main/git', class: 'impl', names: ['git'], why: "jj's compatibility assessment reads Git's effective config, attributes and files of the colocated store (HI-2799, §16.3.6's gates): read-only git calls" },
+  { file: 'src/main/workflow/storeSwitch', module: 'src/main/repoLock', class: 'common', names: ['commonGitDir'], why: "the store a Git ↔ jj switch is about (HI-2799): the Git store both platforms share, the repository lock's own key" },
   { file: 'src/main/deliveries', module: 'src/main/folderFence', class: 'common', names: ['folderChanging', 'folderSteady', 'inFolder', 'onFolderSteady'], why: "the folder fence: keyed by folder, every platform's (§16.3.6 port 1)" },
   { file: 'src/main/files', module: 'src/shared/gitIgnoreRules', class: 'gitUi', why: "the Files tab's ignore rule type (the Git dimming's tooltip)" },
   { file: 'src/main/index', module: 'src/main/branchWatch', class: 'gitUi', why: "starts the branch cards' watcher (the Git view's branch status)" },
@@ -299,6 +301,10 @@ const SWITCH_HOME = /^src\/(shared\/platform\/descriptors|main\/platform\/(regis
  * data read by a one-time step. Counted like the seams: a new switch, or one gone, fails tests/gitAudit.test.ts.
  */
 export const SWITCHES = {
+  'src/main/copies': { n: 1, why: "a copy's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data" },
+  'src/main/slots': { n: 1, why: "a slot's row records its platform only beyond Git's, the column's default for the rows made before jj (HI-2795): Git's data" },
+  'src/main/workflow/platformSwitch': { n: 1, why: "the switch to None warns that the folder is still a Git repository (gitFolder, git.vc.switch.gitFolder): Git-facing text" },
+  'src/main/workflow/storeSwitch': { n: 1, why: "a project's repository store is read as Git's common directory (Git's, or colocated jj's): Git's data (HI-2799)" },
   'src/main/servers': { n: 1, why: "the project's status names what was found in Git's words for agents (`git at {root}`, api.project.vcsGit): Git-facing text" },
   'src/main/workflow/commitMessageStep': { n: 2, why: "HI-1997's one-time step over G19's stored Git options (in force, or kept as `kept.git`): historic, Git's data alone" },
   'src/renderer/src/views/VersionControl': { n: 1, why: "the Version Control tab compares git's own read of the folder (its status summary) with detection finding Git: Git's page" },

@@ -579,5 +579,20 @@
   "workflow.why.stopOwnRuns": "留着继续运行的任务会不断更改或测试正在评审的工作。",
   "workflow.why.strict": "合并队列无论如何都会测试合并结果，因此这主要改变的是历史记录的形态。",
   "workflow.why.style": "合并提交会保留每张卡片自己的提交，这也是 Combwork 一直以来的合并方式。",
-  "workflow.why.target": "完成的工作进入仓库的默认分支；单人工作时，进入项目当前所在的分支。"
+  "workflow.why.target": "完成的工作进入仓库的默认分支；单人工作时，进入项目当前所在的分支。",
+  "workflow.contradiction.jjNeedsSlots": "使用 jj 时，每张卡片都需要自己的文件夹：尚不支持智能体共用项目文件夹。",
+  "workflow.contradiction.jjYouIntegrate": "使用 jj 时，由你自己整合已评审的工作：Combwork 不会合并。",
+  "workflow.form.levelForJj": "jj 项目的默认设置。",
+  "workflow.form.levelJj": "jj",
+  "workflow.refused.platform.changed.message": "{card} 无法按这些规则开始：其项目现在使用 {platform}。",
+  "workflow.refused.platform.changed.next": "请重新开始：届时会按 {platform} 的规则检查。",
+  "workflow.refused.platform.switching.message": "{card} 现在无法开始：其仓库的版本控制正在切换。",
+  "workflow.refused.platform.switching.next": "请在切换完成后稍后再试。",
+  "workflow.refused.start.platformReady.message": "{card} 无法开始：卡片尚不能在 jj 项目中运行。",
+  "workflow.refused.start.platformReady.next": "请在 Combwork 的卡片之外工作，或在“版本控制”中将项目切换到 Git。",
+  "workflow.rule.start.platformReady": "卡片只在 Combwork 支持其版本控制的地方运行",
+  "workflow.summary.jj.pair": "快速检查后，由评审者智能体评审通过每张卡片，然后由你自己整合。",
+  "workflow.summary.jj.solo": "每张卡片在自己的 jj 工作区中，不评审：由你自己整合工作。",
+  "workflow.summary.jj.team": "快速检查和测试后，先由评审者智能体、再由你检查每张卡片，然后由你自己整合。",
+  "workflow.value.finish.userIntegrates": "由你自己整合"
 }

@@ -29,6 +29,7 @@
     "dist:dir": "npm run build && electron-builder --win --dir --publish never",
     "release": "node scripts/release.mjs",
     "tested-clis": "node scripts/tested-clis.mjs",
+    "jj:fetch": "node scripts/fetchJj.mjs",
     "lint": "oxlint --deny-warnings src tests scripts",
     "e2e": "node tests/e2e/run.mjs",
     "e2e:concurrency": "node tests/e2e/concurrency.mjs",

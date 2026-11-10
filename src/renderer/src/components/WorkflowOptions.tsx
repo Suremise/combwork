@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { OwnWorkflowProblem, ProjectInfo, RetargetPreview, RetargetResult, WorkflowChange, WorkflowCheck, WorkflowForm, WorkflowLevel, WorkflowLevelCheck, WorkflowOptionOrigin, WorkflowProblem } from '@shared/types'
-import { hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
+import { accepts, hasCapability, hasOperation, merges, type PlatformId } from '@shared/platform/descriptors'
 import { allOff, CONTRADICTIONS, FOCUSED_PICK, FOCUSED_RUN, contradictions, FORM_GROUPS, FORM_OPTIONS, formShows, identityShown, isAllOff, liveContradictions, previewRows, reviewerAgent, setOption, withUnpreset, type OkBefore, type OptionKey, type PresetId, type WorkflowOptions } from '@shared/workflow/options'
 import { GROUP_TEXT, optionTitle, OPTION_TEXT, OPTION_WHY, PRESET_NOTE_TEXT, PRESET_SUMMARY, PRESET_TEXT, VALUE_TEXT } from '@shared/workflow/optionTexts'
 import { AGENT_LIMIT_DEFAULT, AGENT_LIMIT_MAX, FILE_LOCK_MODES } from '@shared/defaults'
@@ -11,7 +11,7 @@ import { compile, mustCompile } from '@shared/workflow/compile'
 import { STAGE_TEXT, stageNameProblems, stageNameProblemText, type StageNames } from '@shared/workflow/stages'
 import type { StageId } from '@shared/workflow/facts'
 import { shownText } from '@shared/advanced'
-import { fmt, msg, tr } from '@shared/i18n'
+import { fmt, msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
 import { agentProviderOf, cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { cx } from '../util'
@@ -145,12 +145,15 @@ const T = {
   levelGit: msg({ id: 'workflow.form.levelGit', defaultMessage: 'Git', description: 'The choice of the defaults for Git projects (glossary 2.1: keep).' }),
   levelForNone: msg({ id: 'workflow.form.levelForNone', defaultMessage: 'The defaults of projects without version control.', description: 'Beside the None · Git choice above workflow defaults, while None is chosen.' }),
   levelForGit: msg({ id: 'workflow.form.levelForGit', defaultMessage: 'The defaults of Git projects.', description: 'Beside the None · Git choice above workflow defaults, while Git is chosen.' }),
+  levelJj: msg({ id: 'workflow.form.levelJj', defaultMessage: 'jj', description: 'The choice of the defaults for projects using jj (Jujutsu, HI-2799). Keep jj: the tool’s name, lower case.' }),
+  levelForJj: msg({ id: 'workflow.form.levelForJj', defaultMessage: 'The defaults of jj projects.', description: 'Beside the None · Git · jj choice above workflow defaults, while jj (Jujutsu, HI-2799) is chosen. Keep jj.' }),
   changedMeanwhile: msg({ id: 'workflow.form.changedMeanwhile', defaultMessage: 'The workflow options changed meanwhile, so nothing was saved. They’re shown as they are now.', description: 'A notification: saving the Workflow section was refused because the options changed after it was read (in another window, or by the Combwork Assistant); the section reloads them.' }),
   loadFailed: msg({ id: 'workflow.form.loadFailed', defaultMessage: 'Couldn’t read the workflow options: {error}', description: 'An error showing Project Settings → Workflow. {error} says why.' })
 }
 
-/** What each platform's defaults are for, beside the level's None · Git choice: a platform's own words (HI-2822). */
-const LEVEL_FOR: Record<PlatformId, ReturnType<typeof msg>> = { none: T.levelForNone, git: T.levelForGit }
+/** The defaults' platform choice (None · Git · jj) and its line beside it: a platform's own words (HI-2822). */
+const LEVEL_NAME: Record<PlatformId, Msg> = { none: T.levelNone, git: T.levelGit, jj: T.levelJj }
+const LEVEL_FOR: Record<PlatformId, Msg> = { none: T.levelForNone, git: T.levelForGit, jj: T.levelForJj }
 
 /** A problem's sentence, in the window's language (an English reason when it has no message). */
 const ownProblemText = (p: OwnWorkflowProblem): string => (p.kind === 'contradiction' ? tr(CONTRADICTIONS[p.id]) : p.kind === 'stageName' ? shownText(stageNameProblemText(p)) : p.why)
@@ -240,9 +243,9 @@ export function WorkflowLevelForm({ level, onDirty }: { level: WorkflowLevel; on
     <div className="workflow-level" data-level={level}>
       <div className="workflow-level-head">
         <div className="segmented workflow-level-platform" role="radiogroup" aria-label={tr(T.levelPlatform)}>
-          {(['none', 'git'] as const).map((p) => (
+          {(['none', 'git', 'jj'] as const).map((p) => (
             <button key={p} type="button" role="radio" aria-checked={platform === p} className={cx(platform === p && 'active')} data-platform={p} onClick={() => setPlatform(p)}>
-              {tr(p === 'git' ? T.levelGit : T.levelNone)}
+              {tr(LEVEL_NAME[p])}
             </button>
           ))}
         </div>
@@ -585,7 +588,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     switch (key) {
       case 'review':
         return select('review', [
-          ['none', tr(merges(platform) ? V.review.none : V.review.noneNone)],
+          ['none', tr(accepts(platform) ? V.review.noneNone : V.review.none)],
           ['agent', tr(V.review.agent)],
           ['agentThenYou', tr(V.review.agentThenYou)],
           ['you', tr(V.review.you)]
@@ -596,6 +599,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         return select('sameness', [['change', tr(V.sameness.change)], ['exact', tr(V.sameness.exact)]])
       case 'finish':
         // Combwork merges since P5's queue (#1355).
+        // jj (HI-2799, option A): the user integrates, the only finish it has.
+        if (platform === 'jj') return select('finish', [['userIntegrates', tr(V.finish.userIntegrates)]])
         return select('finish', [['combworkMerges', tr(V.finish.combworkMerges)], ['agentMerges', tr(V.finish.agentMerges)], ['committed', tr(V.finish.committed)], ['notChecked', tr(V.finish.notChecked)]])
       case 'mergeInstall':
         return select('mergeInstall', [['onManifestChange', tr(V.mergeInstall.onManifestChange)], ['always', tr(V.mergeInstall.always)]])
@@ -604,6 +609,8 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
       case 'commitMessage':
         return select('commitMessage', [['combwork', tr(V.commitMessage.combwork)], ['branch', tr(V.commitMessage.branch)]])
       case 'folder':
+        // jj (HI-2799): slots only, the shared folder a closed gate (sharedFolder).
+        if (platform === 'jj') return select('folder', [['slots', tr(V.folder.slots)]])
         return select('folder', [['slots', tr(V.folder.slots)], ['project', tr(V.folder.project)]])
       case 'reviewerMode':
         return select('reviewerMode', [['lane', tr(V.reviewerMode.lane)], ['pool', tr(V.reviewerMode.pool)]])
@@ -827,7 +834,7 @@ export function ChoicePreview({ choice, name, options, effective, valueText, onU
 /** An option's value in words (the rows' Inherit tips, a preview), as its platform names it. */
 export function optionValueText(key: OptionKey, v: unknown, platform: PlatformId): string {
   if (typeof v === 'boolean') return tr(v ? T.on : T.off)
-  if (key === 'review') return tr(!merges(platform) && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
+  if (key === 'review') return tr(accepts(platform) && v === 'none' ? VALUE_TEXT.review.noneNone : VALUE_TEXT.review[v as keyof typeof VALUE_TEXT.review])
   const values = (VALUE_TEXT as Record<string, Record<string, ReturnType<typeof msg>>>)[key]
   if (values && typeof v === 'string' && values[v]) return tr(values[v])
   // A structured value with what it holds (HR6's round 3: the labels, the identity), not only its kind.

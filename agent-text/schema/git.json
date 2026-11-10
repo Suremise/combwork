@@ -76,6 +76,9 @@
   "git.vc.git": {
     "placeholders": {}
   },
+  "git.vc.jj": {
+    "placeholders": {}
+  },
   "git.vc.none": {
     "placeholders": {}
   },
@@ -84,12 +87,48 @@
       "platform": "plain"
     }
   },
+  "git.vc.switch.drain": {
+    "placeholders": {}
+  },
+  "git.vc.switch.fallback": {
+    "placeholders": {}
+  },
+  "git.vc.switch.gates": {
+    "placeholders": {}
+  },
+  "git.vc.switch.groupChanged": {
+    "placeholders": {}
+  },
+  "git.vc.switch.jjSeparate": {
+    "placeholders": {}
+  },
+  "git.vc.switch.jjTool": {
+    "placeholders": {
+      "state": "select"
+    }
+  },
+  "git.vc.switch.jjUnknown": {
+    "placeholders": {
+      "code": "plain"
+    }
+  },
   "git.vc.switch.noGit": {
+    "placeholders": {}
+  },
+  "git.vc.switch.noJj": {
     "placeholders": {}
   },
   "git.vc.switch.otherFound": {
     "placeholders": {
       "vcs": "plain"
     }
+  },
+  "git.vc.switch.otherWorkspace": {
+    "placeholders": {
+      "workspace": "plain"
+    }
+  },
+  "git.vc.switch.switching": {
+    "placeholders": {}
   }
 }

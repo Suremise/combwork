@@ -55,6 +55,8 @@ export default defineConfig({
           'none-baseline-worker': resolve(__dirname, 'src/main/noneBaselineWorker.ts'),
           // Git's worker thread, which starts its processes (HI-1783).
           'git-worker': resolve(__dirname, 'src/main/gitWorker.ts'),
+          // jj's worker thread, which starts its processes (HI-2793), never Git's.
+          'jj-worker': resolve(__dirname, 'src/main/platform/jjWorker.ts'),
           // The stall watchdog's thread (HI-1692).
           'stall-watchdog': resolve(__dirname, 'src/main/stallWatchdog.ts'),
           // The log's writer thread (HI-1730).

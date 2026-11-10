@@ -2247,6 +2247,14 @@
     "defaultMessage": "Move agents before a plan runs out",
     "description": "A tip's title (HI-2195): an account's agents move to another account when its plan's usage reaches a share."
   },
+  "tips.versionControlJj.text": {
+    "defaultMessage": "In a jj repository colocated with Git, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
+    "description": "A tip (HI-2799). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and Git."
+  },
+  "tips.versionControlJj.title": {
+    "defaultMessage": "See a jj repository",
+    "description": "A tip's title (HI-2799). Keep jj."
+  },
   "tips.versionControlSwitch.text": {
     "defaultMessage": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Combwork offers the switch there.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (glossary 2.1: None, Git, Version Control, old rules, workflow). Keep git init as it is (a command)."

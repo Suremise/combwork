@@ -39,6 +39,10 @@
     "text": "git couldn't read {what}",
     "note": "A slot's setup or preparation error: git couldn't read a branch or HEAD. {what} is the branch's name, or HEAD."
   },
+  "slot.error.identityUnread": {
+    "text": "its workspace's identity couldn't be read",
+    "note": "A slot's setup error (HI-2795): a jj workspace was made but its store, name or folder ids couldn't be read, so Combwork won't use or remove it."
+  },
   "slot.error.interrupted": {
     "text": "its setup was interrupted",
     "note": "A slot's setup error, kept on the slot, when the setup was taken over from a Combwork that is gone (#1429). Read by agents and in the log."

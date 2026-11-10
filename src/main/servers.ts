@@ -119,7 +119,7 @@ import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
-import { detect, platformIdOf } from './platform/registry'
+import { detect, initialOf, platformIdOf } from './platform/registry'
 import { hasCapability, revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
 import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskAction, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
@@ -713,7 +713,7 @@ const withoutWorkflow = ({ workflow: _w, ...rest }: ProjectConfig): Omit<Project
 /** A project's version control for agents, lean: in force, found, and the offer when they differ. */
 function versionControlOf(p: ProjectPlatform): Record<string, unknown> {
   const d = p.detected
-  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : 'none'
+  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : d.platform === 'jj' ? say(API.project.vcsJj, { root: d.root ?? '', colocated: d.jj?.colocated ? 'yes' : 'no' }) : 'none'
   return { platform: p.id, found, ...(p.offer ? { offers: p.offer.offer, why: p.offer.why } : {}) }
 }
 
@@ -3647,7 +3647,7 @@ async function platformOfCard(c: TaskCard): Promise<PlatformId> {
     const p = projectByName(c.project)
     return platformIdOf(p, (await workspace.projectConfig(p)).platform)
   } catch {
-    return detect(workspace.path!).platform
+    return initialOf(detect(workspace.path!))
   }
 }
 

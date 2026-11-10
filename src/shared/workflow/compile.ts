@@ -5,10 +5,10 @@
 // In the app (#1263): the runtime compiles a project's resolved options (main/workflow/rulesets.ts) and stores each
 // ruleset a card starts under.
 
-import { deliversCommits, hasCapability, merges } from '../platform/descriptors'
+import { accepts, deliversCommits, hasCapability, merges } from '../platform/descriptors'
 import type { Category, StageId } from './facts'
 import { STAGE_CATEGORY } from './facts'
-import { contradictions, reviewerAgent, type Contradiction, type WorkflowOptions } from './options'
+import { contradictions, reviewerAgent, userReportsMerge, type Contradiction, type WorkflowOptions } from './options'
 import { GUARDS, isGuard, MOVES, type GuardId, type MoveId } from './pieces'
 
 export const RULESET_VERSION = 1
@@ -65,7 +65,7 @@ export function ruleOptions(o: WorkflowOptions): WorkflowOptions {
 }
 
 /** Does any rule need the card's change (so its folder must be clean and its revision ready)? */
-export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges')
+export const needsChange = (o: WorkflowOptions): boolean => deliversCommits(o.platform) && (o.review !== 'none' || o.finish === 'committed' || o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'userIntegrates')
 
 /**
  * The stages the options produce (§16.5.2), in board order: Review with any review; Approved when something follows a
@@ -79,7 +79,8 @@ export function producedStages(o: WorkflowOptions): StageId[] {
   // on #1417): where work merges (Git) a merge (Combwork's, the agent's, or one Combwork doesn't check); where it is
   // accepted (None) your OK after the reviewer agent's pass (N1).
   const approves = review || o.okBefore.mode !== 'never'
-  const approved = merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : o.review === 'agentThenYou'
+  // Where its user integrates (jj, HI-2799), your integration follows the approval, as a merge Combwork doesn't check follows Git's.
+  const approved = merging ? approves && (o.finish === 'combworkMerges' || o.finish === 'agentMerges' || o.finish === 'notChecked') : accepts(o.platform) ? o.review === 'agentThenYou' : approves && o.finish === 'userIntegrates'
   const out: StageId[] = ['hold', 'todo', 'active']
   if (review) out.push('review')
   if (approved) out.push('approved')
@@ -93,6 +94,8 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   const review = o.review !== 'none'
   const agent = reviewerAgent(o.review)
   if (o.dependenciesDone) g.start.push('start.notBlocked', 'start.dependenciesIntegrated')
+  // HI-2799: a jj card can't start yet (its slot's line under jj is a later card's): refused first, whatever else holds.
+  if (o.platform === 'jj') g.start.push('start.platformReady')
   if (o.folder === 'slots') g.start.push('start.slotAvailable')
   g.submit.push('submit.notDuplicate')
   if (needsChange(o)) g.submit.push('submit.ready', 'submit.clean')
@@ -116,7 +119,7 @@ function guardsOf(o: WorkflowOptions): Record<MoveId, GuardId[]> {
   }
   if (review || o.okBefore.mode !== 'never') g.approve.push('approval.given')
   // G10 holds the report of a merge Combwork doesn't check too (#1592): only its containment isn't checked.
-  if ((o.finish === 'agentMerges' || o.finish === 'notChecked') && o.okBefore.mode !== 'never') g.reportMerge.push('approval.given')
+  if ((o.finish === 'agentMerges' || userReportsMerge(o.finish)) && o.okBefore.mode !== 'never') g.reportMerge.push('approval.given')
   if (o.finish === 'agentMerges') g.reportMerge.push('done.contained')
   if (o.finish === 'combworkMerges') {
     if (review) g.integrate.push('integrate.approved')

@@ -16,6 +16,41 @@
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { Maybe } from './types'
 
+/**
+ * jj's id (HI-2795's J2, agreed with J1, HI-2794, which imports it): a project platform since J6 (HI-2799), so these are
+ * `PlatformId`'s own. jj's port is still reached only by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`),
+ * never `slotWorkspaces`, until jj's card work is enabled (no jj card starts yet: `start.platformReady`).
+ */
+export type JjPlatform = Extract<PlatformId, 'jj'>
+/** The platforms a workspace port can be: a project's. */
+export type WorkspacePlatform = PlatformId
+
+/**
+ * Who a workspace is, beyond its folder (HI-2795): its store, its own name there and its creation generation (the
+ * folder's file ids at creation: a folder replaced at the same path, even a same-named workspace of the same store, is
+ * another). Recorded on a slot's or copy's row by a platform whose workspaces need it (jj); Git's rows have none.
+ */
+export interface WorkspaceIdentity {
+  store: string
+  workspace: string
+  generation: string
+}
+
+/** The caller's proof it still holds the folder (its operation's token, checked in a write): false stops before a mutation. */
+export interface WorkspaceFence {
+  still(): boolean | Promise<boolean>
+}
+
+/**
+ * Durable state a multi-step change keeps between its steps (HI-2795: a jj removal, a stale recovery), so an
+ * interrupted one resumes where it was: board_meta, by key, in the pool's store. `read` answers what was written last.
+ */
+export interface WorkspaceJournal {
+  read(): unknown
+  write(v: unknown): Promise<void>
+  clear(): Promise<void>
+}
+
 /** One of the store's workspaces as the platform lists it: its folder (absolute) and the line it has checked out (null: none, detached). */
 export interface WorkspaceListing {
   path: string
@@ -46,7 +81,7 @@ export interface WorkspaceStep {
  * null as each says (unknown is never clean, never gone, never removable: R2.1), and a step answers what the tool said.
  */
 export interface WorkspacePort {
-  platform: PlatformId
+  platform: WorkspacePlatform
 
   // Inspection: no side effects on the repository.
   /** The store's workspaces, the project's own folder included; null when they can't be listed (never an empty list). */
@@ -96,14 +131,14 @@ export interface WorkspacePort {
    * A check or review copy put at exactly `revision` (HI-2789: copies.ts's reuse of a copy): tracked changes dropped and
    * what isn't ignored removed (dependencies stay); `failed` names the step the tool refused.
    */
-  resetTo(folder: string, revision: string): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
+  resetTo(folder: string, revision: string, o?: { identity?: WorkspaceIdentity | null; fence?: WorkspaceFence }): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
 
   // Removal (R2.5: the platform's own, never forced on a folder holding anyone's work; the callers' guards first).
   /**
    * The workspace at `folder` removed by the tool, which refuses one with changes; `force` only for a check or review
    * copy, which holds nobody's work (its build outputs go with it).
    */
-  remove(repo: string, folder: string, o?: { force?: boolean }): Promise<WorkspaceStep>
+  remove(repo: string, folder: string, o?: { force?: boolean; identity?: WorkspaceIdentity | null; journal?: WorkspaceJournal; fence?: WorkspaceFence }): Promise<WorkspaceStep>
 
   // A card's line, once merged (§16.10.1).
   /** The line deleted only from `at` (compare and swap). */
@@ -116,6 +151,25 @@ export interface WorkspacePort {
 
   /** Repair after a moved workspace or project (the relocation capability, §16.3.6's gate: relocation); absent where it isn't supported. */
   relocate?: Relocation
+
+  // Owned members (HI-2795): a platform whose working copy is recorded by its own commands (jj) has them; Git hasn't, so
+  // the pool calls `dirty` as before and its git commands are unchanged (tests/slotTraces.test.ts).
+  /**
+   * The workspace's identity as it is now (store, name, generation), read after `create`, recorded on the row and
+   * compared before every change; null when it can't be read (then nothing is changed).
+   */
+  identity?(folder: string): Promise<WorkspaceIdentity | null>
+  /**
+   * An explicit record of the folder's files (jj: a snapshot, a write), allowed only to the holder of the folder's
+   * operation (`fence`), after its writers are proved ended: its changed files then, or unknown (stale, not the
+   * recorded workspace, the fence lost). The pool calls it instead of `dirty` where it holds the slot.
+   */
+  record?(folder: string, fence: WorkspaceFence, identity?: WorkspaceIdentity | null): Promise<Maybe<string[]>>
+  /**
+   * A copy's verification after its quiescence barrier (HI-2795: credit): recorded (`record`), then exactly `revision`
+   * with nothing else, not stale, not divergent, read at one operation. True, false, or unknown.
+   */
+  copyIntact?(folder: string, revision: string, fence: WorkspaceFence, identity?: WorkspaceIdentity | null): Promise<Maybe<boolean>>
 }
 
 /**

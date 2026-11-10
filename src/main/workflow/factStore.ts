@@ -811,6 +811,11 @@ export class FactStore {
     return this.conn.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(this.metaKey(key)) as { value: string } | undefined)?.value ?? null)
   }
 
+  /** A workspace-wide board_meta value, unscoped (HI-2799: the platform fence), read in the write under way if there is one. */
+  boardMeta(key: string): string | null {
+    return this.conn.read((db) => (db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined)?.value ?? null)
+  }
+
   setMeta(key: string, value: string): void {
     this.conn.write((db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(this.metaKey(key), value))
   }

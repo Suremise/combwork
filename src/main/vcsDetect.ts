@@ -43,3 +43,14 @@ export function otherVcsOf(folder: string): { name: string; root: string } | nul
     dir = up
   }
 }
+
+/**
+ * The Jujutsu repository holding a folder (HI-2799), read from its files only: the nearest `.jj` at or above it, before
+ * any other system's marker, and whether a `.git` sits beside it (colocated). A hint: jj itself confirms it before a switch
+ * (`jjContextOf`). Null when the nearest marker isn't jj's.
+ */
+export function jjOf(folder: string): { root: string; colocated: boolean } | null {
+  const other = otherVcsOf(folder)
+  if (!other || other.name !== 'Jujutsu') return null // i18n-ignore: a product's name, the marker's
+  return { root: other.root, colocated: existsSync(join(other.root, '.git')) }
+}

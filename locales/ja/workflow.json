@@ -579,5 +579,20 @@
   "workflow.why.stopOwnRuns": "実行を残したままだと、レビュー中の作業を変更したりテストしたりし続けてしまいます。",
   "workflow.why.strict": "マージキューはいずれにせよマージ結果をテストするため、これは主に履歴の形を変えるだけです。",
   "workflow.why.style": "マージコミットなら各カードのコミットがそのまま残り、Combworkの従来のマージ方法と同じです。",
-  "workflow.why.target": "完成した作業はリポジトリの既定のブランチに入り、ソロではプロジェクトが現在いるブランチに入ります。"
+  "workflow.why.target": "完成した作業はリポジトリの既定のブランチに入り、ソロではプロジェクトが現在いるブランチに入ります。",
+  "workflow.contradiction.jjNeedsSlots": "jjでは、カードごとに専用フォルダーが必要です。プロジェクトフォルダーを共有するエージェントにはまだ対応していません。",
+  "workflow.contradiction.jjYouIntegrate": "jjでは、レビュー済みの作業はご自身で統合します。Combworkはマージしません。",
+  "workflow.form.levelForJj": "jjプロジェクトの既定値です。",
+  "workflow.form.levelJj": "jj",
+  "workflow.refused.platform.changed.message": "{card}は、このルールでは開始できません。プロジェクトは現在{platform}を使っています。",
+  "workflow.refused.platform.changed.next": "もう一度開始してください。{platform}のルールで確認されます。",
+  "workflow.refused.platform.switching.message": "{card}は今は開始できません。このリポジトリのバージョン管理を切り替え中です。",
+  "workflow.refused.platform.switching.next": "切り替えが終わってから、もう一度お試しください。",
+  "workflow.refused.start.platformReady.message": "{card}は開始できません。jjのプロジェクトではまだカードを実行できません。",
+  "workflow.refused.start.platformReady.next": "Combworkのカードの外で作業するか、「バージョン管理」でプロジェクトをGitに切り替えてください。",
+  "workflow.rule.start.platformReady": "カードは、Combworkがバージョン管理に対応している場合のみ実行する",
+  "workflow.summary.jj.pair": "クイックチェックの後、レビュアーエージェントが各カードを合格にし、その後ご自身で統合します。",
+  "workflow.summary.jj.solo": "各カードは専用のjjワークスペースで作業し、レビューはなし。作業はご自身で統合します。",
+  "workflow.summary.jj.team": "クイックチェックとテストの後、レビュアーエージェントとあなたが各カードを確認し、その後ご自身で統合します。",
+  "workflow.value.finish.userIntegrates": "ご自身で統合"
 }

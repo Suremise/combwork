@@ -1608,8 +1608,8 @@ fix (Provider Setup, Retry).
 The adapter's interface (P2 proves it, P3 builds it; names are the builders'):
 
 ```ts
-interface PlatformDescriptor { id: 'none' | 'git'; capabilities: Capability[]; revisionShort(id: string): string
-  integration: 'merge' | 'accept'; deliverables: 'commits' | 'paths'; repository: boolean }  // HI-2822's workflow facts
+interface PlatformDescriptor { id: 'none' | 'git' | 'jj'; capabilities: Capability[]; revisionShort(id: string): string
+  integration: 'merge' | 'accept' | 'user'; deliverables: 'commits' | 'paths'; repository: boolean }  // HI-2822's workflow facts
 interface PlatformAdapter {
   detect(folder): Detection                               // §16.3.5
   head(where: Folder): Revision | Unknown                 // revisions: reads without side effects (no snapshot)
@@ -1872,7 +1872,8 @@ revision; Git's words (branch, commit, merge commit) appear only in the Git adap
 | Upgrading to 1.0 | Git projects get Git and None projects None, with options matching how they work today (§16.17); a one-time notice offers the presets. |
 | A None project gets `git init` (by the user or an agent) | Combwork notices (the refresh that ensures `.combwork`'s exclude, §8) and offers to switch to Git, with the switching warning (§16.6.5), from the next card. |
 | The repository disappears (`.git` removed or moved) | Combwork says so and offers None. Until the user switches, Git's rules hold rather than pass: their facts are unknown (§16.3.1). |
-| Mercurial, Jujutsu or another system is found (`combworkVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." A colocated jj+git repository (`.jj` beside `.git`) is Jujutsu too, so None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts; `otherVcsOf` already treats it so for Initialise repository (§8) [P1, answering HB3's round 1 finding 16]. |
+| Mercurial or another system is found (`combworkVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." |
+| A jj repository is found (1.5.0, HI-2799: `vcsDetect.ts` `jjOf`, the nearest `.jj`, before any other marker) | Detection is `jj` (`Detection.jj.colocated`: a `.git` beside it), never what a project takes by itself (`initialOf`: a project with nothing recorded takes None). A None or Git project is offered jj (`jjFound`) where it's colocated; a non-colocated one is shown and refused (J7). A jj project whose `.jj` is gone is offered Git back, or None (`jjGone`). Initialise repository still refuses inside jj (`otherVcsOf`, §8). Before 1.5.0 a colocated pair was None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts, so Git ↔ jj is the repository's switch (§16.3.6, J6). |
 | A subfolder of a larger repository | Git, showing the repository root; the tab says branch and merge actions affect that whole repository. (Today the Git view refuses actions there, §8; 1.0 keeps refusing Combwork's merges into a parent repository unless the project's options name its target explicitly: OP-29.) |
 
 Everything is visible in the Version Control tab itself, not only through the Assistant [#1122 c].
@@ -2233,15 +2234,15 @@ operation withdrawn (refused, nothing run or changed), and `tests/repoOpsImports
 | **None** (no version control) | Supported, unchanged (§16.3.3). | Unchanged. |
 | **Git**, the project's own repository | Supported, unchanged: slots as worktrees, or the project folder shared (G11). | Unchanged. |
 | **Git**, a subfolder of a larger repository | Supported, unchanged (OP-29: Combwork merges only into a target the project names). | Unchanged. |
-| **jj, colocated** (`.jj` beside `.git`) | **None**, as today (§16.3.5): detected, offered nothing but None. | A platform: jj workspaces as slots (made by jj, colocated as jj makes them), the gates below. |
+| **jj, colocated** (`.jj` beside `.git`) | **None**, as today (§16.3.5): detected, offered nothing but None. | A platform (J6, HI-2799: chosen, never taken by itself): read-only views, cards refused until jj's card work is enabled, the gates below. |
 | **jj, non-colocated, Git-backed** | None, as today. | A platform, same adapter, once its tool, trust-root and file-list paths pass (J7). |
 | jj with another storage backend | None. | **Not supported** (untested, not proposed). |
 | Mercurial, other systems | None, as today. | None. |
 
 Switching between Git and jj (1.5.0) is stricter than §16.6.5's "from the next card": it drains the repository's lanes,
 queue, leases and review copies first, keeps historic facts under the platform that wrote them, and makes new slots
-(HI-2781 part 2 §7; J6 builds it). No mode is changed by detection alone, and Combwork never initialises jj or
-converts a repository's colocation.
+(HI-2781 part 2 §7; J6 built it: below, *jj in the window and the switch*). No mode is changed by detection alone,
+and Combwork never initialises jj or converts a repository's colocation.
 
 ##### Compatibility matrix and gates
 
@@ -2258,8 +2259,8 @@ works.
 | Containment, sameness | Ancestry, then replay (§16.3.2) | Accepted fact; equal hash | Replay, change id as a hint only | J3 |
 | Observe | Refs, reflogs and the write record | The deliverables' watcher | Operation heads (read without snapshotting) **plus** the file watch; a colocated repository's Git refs and index too | J3 |
 | Attribution | Trailers, only card, assigned (§16.3.2) | Combwork's records | Lease and change association, trailers where the project's messages allow; divergence shown, never resolved by choice | J3 |
-| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private copies rebased, squashed or merged; conflicts typed | J4 |
-| **Integration: target advance** | CAS (§16.9.2) | — | **Open** (below) | **gate: advance** (J1) |
+| Integration: candidate | Merge, squash, rebase in the queue's worktree | Acceptance | Private new commits (duplicated, squashed or merged) for the user to integrate (decision A); conflicts read from the commits, evidence pinned (`platform/jjCandidates.ts`, unregistered) | J4 |
+| **Integration: target advance** | CAS (§16.9.2) | — | **Not supported**: no automatic advance; the user merges and containment records it (J1 decided, below) | **gate: advance** (closed, HI-2794) |
 | Publish | G18's push of a captured head containing the owed result (R4.6) | — | A bookmark push, its rule (R4.6's, or exact-result only) J5's to decide, tested against a local bare remote | **gate: publish** (J5) |
 | Recovery, undo | Journal (§16.9.2) | — | Journal plus named-operation undo with a preview; never global latest-operation undo unattended | J5, J7 |
 | **Attributes and filters** (`.gitattributes` eol/text, clean/smudge, diff and merge drivers) | Supported (git applies them) | — | **Not supported** by jj (v0.47.1's Git compatibility page) | **gate: attributes**: a repository using them can't switch to jj |
@@ -2270,8 +2271,453 @@ works.
 | **Relocation** (moved workspace or project, the name upgrade's repair) | Supported (`workspaceMove.ts`, `combworkMove.ts`) | Supported | **Not supported**: no jj workspace move was validated | **gate: relocation**: a jj project's workspace or slots aren't moved; the move refuses with the reason |
 | Plain `git` run by an agent in a jj workspace | — | — | Add and commit seen through import (HI-2781); reset, rebase, merge and index-conflict states unvalidated | **gate: plainGit** (J7): guidance and detection before it's allowed |
 
-The gates' ids are the descriptor's (J0 adds them); their detection (which file or config makes a repository use
-attributes, hooks, LFS or submodules) is J0's and J7's to specify, failing closed: unreadable is "uses it".
+The gates' ids are the descriptor's (J0 added them: `Gate`, `GATES` in `shared/platform/descriptors.ts`; jj's descriptor,
+J6's, lists those closed). J0 specifies their detection; the compatibility assessment that runs it is J6's (shown
+before a switch), completed by J7. It reads what Git and jj would actually apply, never one source of it: the
+**effective** Git config of the store, every level and include Git reads (system, global, `XDG_CONFIG_HOME`, the
+store's, a worktree's, `include` and `includeIf`, as `git config --show-origin --show-scope` lists them, run with
+the store's environment), jj's effective config (`jj config list`: user, repository and workspace levels), and every
+attribute source Git applies. Anything it can't read, list or resolve (an unreadable file, an include it can't follow,
+a configured path outside what it can read, a tool that doesn't answer) is "uses it": the gate stays closed.
+- **attributes:** any of Git's attribute sources (the system `gitattributes`, the file `core.attributesFile` names or
+  its default `XDG_CONFIG_HOME/git/attributes`, every tracked `.gitattributes`, the store's `info/attributes`) setting
+  `text`, `eol`, `filter`, `diff`, `merge`, `working-tree-encoding` or `ident`; or `core.autocrlf`, `core.eol` or a
+  `filter.<name>.clean`, `.smudge` or `.process` set in the effective config.
+- **lfs:** `filter=lfs` in any attribute source, an `lfs.*` or `filter.lfs.*` key in the effective config, or a
+  `.lfsconfig`.
+- **submodules:** a `.gitmodules`, a gitlink in the tree, or a `submodule.*` key in the effective config.
+- **hooks:** `core.hooksPath` at any level (its folder, resolved as Git resolves it, holding any file), or a file in
+  the store's `hooks/` that isn't a `*.sample`.
+- **signing:** `commit.gpgSign` or `tag.gpgSign` at any level, or jj's `signing.behavior` set to `own` or `force`.
+
+##### jj's runner and detection (1.5.0's J0, HI-2793)
+
+J0 built jj's execution and read-only detection, and enables nothing: `PlatformId` stays `'none' | 'git'`, jj isn't in
+`repoPorts.ts`' ports, and a `.jj` is still None (§16.3.5), so no project, folder, lock, file list or trust root
+changes. Git's runner and worker are untouched.
+- **The pinned version:** `resources/tested-vcs.json` (beside `tested-clis.json`, which the real tier's CLI records
+  write) names the jj Combwork is tested with (0.47.1, HI-2781's) and the official Windows build it was tested on (its
+  URL and SHA-256). `shared/jjTool.ts` reads it. Only that version is **supported** (`ok`): jj's command line and files
+  change between 0.x releases, so a newer one is `untested` (the runner starts it, for a report, but nothing trusts
+  what it says: detection is unknown with it, and every J card's reads ask `jjSupported`) and an older one `old` (not
+  run). Supporting another version is a change of the pin, with its real-jj run.
+- **The runner** (`platform/jjRunner.ts`, `jjProcess.ts`, its own worker `jjWorker.ts`, built as `jj-worker`): the
+  standalone `jj.exe` on Combwork's PATH (R1.5), checked lazily (`jj --version`, one check at a time: when something
+  asks, so nothing runs at startup for users without jj).
+  - **Every command** is non-interactive whatever the user's, repository's or workspace's config says: `--no-pager`,
+    `--color=never`, and `--config` overrides (they win over every config level, jj 0.47.1's config.md) giving
+    `ui.editor`, `ui.diff-editor` and `ui.merge-editor` a program that isn't there (an editor fails at once rather than
+    waits) and `fsmonitor.backend="none"`; `JJ_EDITOR` the same program; no credential prompts
+    (`GIT_TERMINAL_PROMPT=0`, `GCM_INTERACTIVE=never`, `SSH_ASKPASS_REQUIRE=never`); its standard input closed after
+    what it is given. Combwork never edits jj's config files.
+  - **A read** (every command unless the caller asks to write; J0 has no writer) adds `--ignore-working-copy` (R5.3:
+    no snapshot, and a stale workspace isn't brought up to date) and `--config=snapshot.auto-update-stale=false`. J0's
+    reads are `jj --version`, `jj root` and `jj git root` (pinned, below); colocation is read from the files (below), not from
+    `jj git colocation status`.
+  - **Bounds:** an output cap (16 MB unless given), a time limit (a minute unless given) and cancellation (an
+    `AbortSignal`). Each ends jj's whole process tree by identity (`processTree.ts`, moved from cw-progress, which ends
+    its command's the same way: listed with start times, children first, each ended only while its pid still names
+    the process listed, so a reused pid is never ended, #655), and the result settles once its output has closed, after
+    that teardown. Such a result, a missing tool or a jj too old is code -1 and never an answer (rule 3).
+  - **Shutdown** (`shutdown(ms)`): ends every command under way, each one's tree, then jj's worker, within its bound;
+    a command asked after it starts nothing. The J card that first runs jj for a project calls it as Combwork quits.
+  - The bounds become Advanced settings with that card too.
+- **Detection** (`platform/jjDetect.ts`, `jjContextOf(folder)`): the nearest `.jj` at or above the folder (at most
+  256 levels); its shared repository (`.jj/repo`, or the file a `jj workspace add` workspace has naming it: `linked`); a
+  Git-backed store only (`store/type` is `git`; another backend is unknown and gets no store identity); and its Git
+  store, named as Git's context and repository lock name a store (`repoLock.ts` `commonGitDir`): the common git dir
+  `store/git_target` leads to (a worktree's administrative folder followed to its `commondir`, never a store of its
+  own), real (links, junctions and drive aliases resolved), compared case-insensitively (`sameStore`), and a Git folder
+  (it has a HEAD). So a colocated pair, its jj-made workspaces and Git's context of the same folders are one store
+  with one lock (R1.1). `colocated`: the workspace's root has a `.git` whose common dir is that store (a jj-made
+  workspace of a colocated repository has a Git worktree). `nestedGit`: a Git root nearer the folder than the
+  workspace's. Marker files are read bounded (one line, at most 4 KB, no NUL): anything else is malformed, unknown,
+  never followed. jj's files are hints (their format is no API), so the supported jj confirms them, reading only:
+  `jj root` and `jj git root` must name the same root and store. Both are pinned to the repository's one operation
+  head (`--at-op <H>`, H read from `.jj/repo/op_heads/heads` as J3's reads take it, `jjView.ts` `readOpHeads`;
+  HI-2831): with two heads (two commands that started from one operation: two agents, an external jj), any jj command
+  that loads the repository, `--ignore-working-copy` reads included, writes a merge operation to reconcile them, and a
+  pinned read never does. So with several heads, or none readable, detection is unknown (`opHeads`, its detail the
+  count or the folder) and asks jj nothing; it never merges them (a later jj write does, and the next detection
+  answers). A head that lands after H was read isn't merged by the pinned read either. The answer is a `JjContext`,
+  `none` (no `.jj`, no process run), or unknown with a code (`noRepo`, `emptyPointer`, `repoGone`, `storeType`,
+  `backend`, `gitStore`, `tool`, `opHeads`, `notRun`, `disagrees`) and its data (a path, jj's words, the command and
+  what was expected; never prose), never facts from the files alone. It never runs `jj git init`, changes colocation or snapshots.
+- **Copy Diagnostics** names jj's state (its version and path, the tested version, old or untested), checking it
+  when asked (no process when jj isn't on PATH).
+- **Tests:**
+  - `tests/jjRunner.test.ts` (a fake jj): the version's states, the prefix and environment, the cap, the time limit,
+    cancellation and shutdown, each ending the fake's whole tree and nothing else (a process of the test's own
+    started first survives), in this thread and through the built worker, and a missing tool.
+  - `tests/jjDetect.test.ts` (hand-made layouts, a stub jj): each unknown, an untested jj never asked, reads pinned to
+    the one head and nothing asked with several or none, malformed markers, a worktree's administrative folder as `git_target` resolving to its common dir.
+  - `tests/jjReal.test.ts` on the real pinned jj, fetched and checked by `npm run jj:fetch` into the test area's
+    `tools` folder (never system-wide), every repository a `tempDir()` with jj's and git's config isolated: the version,
+    a missing tool, colocated and non-colocated repositories, linked workspaces, nested roots, a damaged `.jj`, the cap
+    and cancellation on real jj, store identity against Git's own context (`sameStore`), and that detection writes
+    nothing: `.jj`, the whole `.git` (refs, config, index) and the operation log as they were, in a colocated
+    repository with plain-Git commits and branches jj hasn't imported, and in a stale linked workspace with a local
+    edit (not updated, not snapshotted, the edit still there), and with two operation heads (`opHeads`: `.jj`, the heads
+    and `.git` exactly as they were, where an unpinned `jj git root` merges them). Without the fetched jj it is skipped, saying so;
+    `CW_JJ_REAL=1` makes its absence fail: a card's acceptance is its run with `CW_JJ_REAL=1` at the submitted
+    revision, never a skipped run.
+- **Left to the J cards:** registering jj's context port and routing R9's six seams by the project's platform. Each
+  seam is routed by the J card implementing its port, **before** that card enables it for jj: `slotWorkspaces()` and
+  `slotRelocation()` J2's port, routed by the project's platform once jj is one (J6: J2 reaches jj's port by injection
+  only, below), `queueIntegration()` J4's and J5's, `lineRepoReads()` and `lineRepoOps()` J6's, as is jj's
+  descriptor (its capabilities, operations and closed gates, with HI-2822's workflow facts: integration `user`, the user
+  integrating under option A; deliverables `commits`; a repository needed). `lineHistory()`: J3 supplies jj's history and evidence (below) unregistered; J6 composes them into jj's
+  adapter and routes `lineHistory()` before it enables jj.
+- **Several operation heads** (found by J3, HI-2831): detection's `jj git root` loads the repository, and with two
+  operation heads any command that does, `--ignore-working-copy` included, writes a merge operation. HI-2831 fixes
+  detection; J3's reads never load the repository unpinned.
+
+##### jj's history, attribution and evidence (1.5.0's J3, HI-2796)
+
+J3 built jj's side of port 3, unregistered as J0's runner is (jj isn't a `PlatformId`; J6 composes it): which commit a
+card's work is, whether a check or a pass earns credit, which card a commit belongs to, and the watcher. The rule it
+holds everywhere: **the change id and the immutable commit id are kept apart.** A change id follows rewrites (an
+association, a hint), but it can be divergent, split, squashed with another card's or made fresh for a commit Git made,
+so credit is only ever on the exact commit id and its content (R3.1, R3.2), and attribution only on recorded provenance
+(R3.5). Everything was established on the pinned 0.47.1 (HI-2796's probes) and is held by its real-jj tests.
+
+- **Reads never write** (R3.4): every read through jj is pinned, `--at-op <H>` (J0's `--ignore-working-copy` with
+  it), where H is the **single** operation head read from `.jj/repo/op_heads/heads` (a file per head). With two heads
+  any read that loads the repository writes a merge operation; `--at-op` never does. So with none or several heads
+  nothing is read through jj (unknown), and a pinned answer (`Pinned`, its op beside its value) is used only after the
+  head files still say exactly H. Answers are a value or a typed unknown (`heads`, `tool`, `failed`, `malformed`,
+  `ambiguous`, `none`, `moved`: protocol codes, as J0's), and only the pinned jj's are trusted (`jjSupported`).
+  `platform/jjReads.ts`: a commit (`commitAt`: its commit id, change id, parents, empty, divergent, conflict; named by
+  its full id or a revset giving exactly one, so a divergent change id is `ambiguous`, never one picked), a change id's
+  commits, a revision's files, a config value, and a commit's evolution (below).
+- **The view** (`platform/jjView.ts`), read synchronously on main with no process and bounded: the heads (at most 64,
+  each a 128-hex name), a workspace's checkout record (`working_copy/checkout`, at most 4 KB: protobuf field 2, the
+  64-byte operation id, and field 3, the workspace's name; any other field or wire type, a duplicate, a truncation or
+  a missing field is malformed) and, colocated, Git's state beside it (HEAD's content, the index, the workspace's and
+  the store's HEAD reflogs, packed refs, every ref and ref log under `refs/heads`, at most 1,024 entries, and an
+  operation under way). Its parts are read as one moment: the heads are read again after the rest, and a moved head
+  is unknown. Unreadable or malformed is null, never an empty token: only "not there" (a fresh repository's missing
+  packed refs or reflogs) is an absence; any other failure to stat or list (access, I/O) is unknown, never "gone".
+  An intent's fingerprint (`jjFingerprint`) is
+  exactly these parts: it never walks the working tree (rule 5); the tree's content is the boundary's.
+- **The snapshot boundary** (`platform/jjBoundary.ts`): the only place Combwork records a jj working copy, a separate
+  operation its caller authorises (a check's start and end; a submission, once J6 wires it), never something an
+  observer, reader or credit decision does. Under the store's repository lock (its caller's, port 1's `withRepoLock`
+  for the workspace's context once J6 composes jj: J3 imports no lock of Git's) it checks its owner (the lease lending
+  the workspace to the card) before the snapshot and after every await; takes the single head H0 (with `expect`, a
+  check's end, H0 must be exactly that, else `moved`); runs `jj util snapshot` (written, `auto-update-stale=false`:
+  a stale workspace refuses, `stale`; its recovery is J2's explicit operation); reads the moment the snapshot left
+  (head H1, the checkout record, which must be at H1 and name the workspace, and Git's state); reads, pinned at H1,
+  the workspace's @ and `snapshot.auto-track` (anything but `all()` refuses: an untracked file would escape it); then
+  checks the moment is still the same before answering `{ before: H0, op: H1, recorded: H1 ≠ H0, at, view }`. It never
+  retries onto a newer operation. Only the pinned jj writes. Refusals: `owner`, `heads`, `moved`, `stale`,
+  `cancelled`, `autoTrack`, `unknown`.
+- **A check run's credit** (`platform/jjChecks.ts`, the jj side of §16.13's bracket), decided by a pure function
+  (`jjCredit`) from the captures, in order:
+  1. the start boundary B1: anything recorded means disk wasn't @, so `dirty`;
+  2. tested: B1's @ is the revision, or an empty @ whose one parent is (jj's state after `jj commit`), else
+     `notContained`, as is a divergent or conflicted revision or @. Equal change ids count for nothing;
+  3. the start evidence E1 at H1: the revision's files (jj's list at H1), their and their folders' stat snapshot (off
+     main, `snapshotLine`'s: a deleted file is a "gone" line, one it can't stat makes the snapshot unknown), and the
+     moment still B1's;
+  4. t0 once the write record has settled; the command; t1 once it has settled again;
+  5. the write record for [t0, t1], jj's and Git's own folders left out (an edit and its undo show); where it isn't
+     complete, the stat snapshot again (unequal or unreadable: `changed`);
+  6. the moment before the end boundary: still H1, the same checkout record and Git state, else `moved` (any
+     operation by anyone, a bookmark set elsewhere included; a plain Git commit jj hasn't imported shows in Git's
+     state);
+  7. the end boundary B2, strict at H1: anything since H1 is `moved`; anything it records (a raw write, an add, a
+     delete or a rename the watcher missed) is `changed`, as is another @;
+  8. the final moment after B2, still B2's and E1's, read with nothing awaited before the decision.
+  Unknown at any step fails closed.
+- **A pass carrying over** (`jjSameRevision`): the same commit id, or the same change by content (Git's own replay on
+  the Git-backed store, §16.3.2's), never equal change ids; a divergent or conflicted side never carries, the same
+  commit id included (a reviewed commit can become one variant of a divergent change keeping its exact id).
+- **Attribution** (`platform/jjAttribution.ts`): a commit is a card's only on positive provenance: its commit id, or one
+  in its **complete** evolution (`jj evolog`, pinned, at most 100 entries: a 101st means capped; each line validated;
+  the first the commit itself; the heads unchanged after), recorded for that card and no other. A squash's evolution
+  holds both sides (probed), so a squash across two cards is `several`; a change id in its evolution recorded for
+  another card is `changeId`; a divergent commit is `divergent`; an incomplete evolution is `history`. All ambiguous,
+  refused or left to the user. Nothing recorded (a Git commit imported, another workspace's commit) is none: the lease
+  only scopes which workspace's history is read, and never assigns a commit by itself.
+- **Facts' optional ids** (`platform/jjFacts.ts`, rule 4): `data.platform.jj = { changeId, commitId, operation?,
+  workspace? }`, in the field §16.4.1 keeps for one platform's own data (Started, Adopted and Submitted have it), each
+  field validated or the whole record ignored; old facts are read as written. A submission's ids count only when their
+  commit id is the fact's own revision (an adoption's, its head; never a start's base, the target's). No shared schema
+  changes.
+- **The watcher** (`platform/jjObserve.ts`): the heads' folder watched as a hint and a rescan (the minute's) for missed
+  events. On a new single head it reads the view pinned there (each local bookmark's commit, the workspace's @) and
+  reports `lineMoved` and `folderMoved` only while the heads are still that one. With several heads, or a conflicted
+  bookmark, it reads or reports nothing and its token (`refsNow`) is null. Disposing closes the watch, clears the
+  timer and aborts reads under way. Unsnapshotted edits never reach the operation log: the write record's file watch
+  (the common observer) covers them (R3.3).
+- **Tests:** `tests/jjHistory.test.ts` (hand-made `.jj` files and a simulated jj): the bounded readers and their
+  malformed inputs, the parsers and evolution's completeness (capped, malformed, truncated, not the commit), the facts'
+  readers, attribution's rules, the boundary's refusals, and the bracket with races at each barrier (an owner lost at an
+  await; an operation, a bookmark-only one included, during the run, before and inside the end boundary and before the
+  final read; a colocated Git change at the same points). `tests/jjHistoryReal.test.ts` on the pinned jj, the
+  acceptance (`CW_JJ_REAL=1`), feeding real operations through the production capture and decision functions: a
+  clean run, a raw write, an edit and its undo, a missed event, a plain Git commit and its import, a bookmark set during
+  the run and racing the end boundary, a Git ref racing it, a stable change id rewritten with new content (and a
+  description-only rewrite carrying by content), a divergent change, a split, a squash across two cards, a stale
+  workspace and the observer with two heads, which nothing merged.
+
+##### jj's workspaces: slots and copies (1.5.0's J2, HI-2795)
+
+J2 built jj's workspace lifecycle port (`platform/jjWorkspacePort.ts`), a stale workspace's recovery
+(`platform/jjRecovery.ts`) and the pools' platform identity, and enables nothing: jj's port isn't in `workspacePorts.ts`'
+`PORTS` and `PlatformId` stays `'none' | 'git'` (agreed with J1, HI-2794: `JjPlatform` and `WorkspacePlatform =
+PlatformId | JjPlatform` are `workspacePort.ts`' types, so a jj in `project.json` stays J6's switch). A slot pool or copy
+pool gets jj's port only by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`): the tests do; Combwork doesn't
+yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings); the evidence is jj 0.47.1's.
+- **Workspaces are made by `jj workspace add` only** (R2.6): never `jj git init`, never a Git worktree command on them.
+  `add` and `forget` snapshot the workspace they run from and refuse `--ignore-working-copy` (probed), so they run from
+  a **control workspace** of Combwork's per project (`<worktrees>/<project>/.cw-jj-control`, named `cw-<project
+  hash>-control`, sparse and empty: its snapshot is always empty), never lent, sized or tidied as a slot, its record
+  (board_meta `jj_control:…`: phase, store, name, folder, generation) checked before each use (its generation, no file
+  in it). Making it is the one command run from the project folder, which snapshots the project folder's working copy:
+  only under the store's repository lock, with the project folder quiet (no session, no process: jj's sharedFolder gate
+  is closed), as an explicit owned record; refused otherwise. A slot or copy is added with `--sparse-patterns full`,
+  `-r <revision>`, and `--colocate` or `--no-colocate` as the project's repository is, named `cw-<project hash>-<folder's
+  name>` (collision-safe across projects of one store), and read back (listed at that root, its working copy an empty
+  child of exactly the revision, the same store, linked, colocated as chosen). A folder that exists, or sits in another
+  repository or workspace, is refused.
+- **Reads are pinned** (HB3's note: a plain `--ignore-working-copy` read can write a "reconcile divergent operations"
+  operation when the operation heads diverged): the store's one operation head (its `op_heads`, a hint) confirmed by
+  jj, then `--at-op <id> --ignore-working-copy`; several heads are unknown. Staleness: the operation the folder's files
+  were last updated at (`.jj/working_copy/checkout`, confirmed by reading at it) names another working-copy commit than
+  the head: stale, so unknown to every read, never clean, lent, reset or removed.
+- **No checked-out line** (jj 0.47.1 has no current bookmark): `line`, `shownLine`, `currentLine` and `heads().line`
+  answer none; `prepare`, `attach`, `createOnNewLine`, `detach`, `dropLine` and `restoreLine` are refused until J3/J4
+  freeze a card's line under jj, so no card starts in a jj slot. `checkout` (synchronous, no process) answers null.
+  `head`: `@`'s parent when `@` is empty with one parent, else `@`; unknown when stale, divergent or merge-parented.
+- **`dirty` is unknown** (a read can't see edits jj hasn't recorded: `--ignore-working-copy status` in a stale
+  workspace says "no changes"). The port's new optional **`record(folder, fence)`** is the explicit snapshot, a write,
+  only for the holder of the folder's operation: the pool calls it instead of `dirty` where it holds the slot (a warm,
+  a settle, a removal's guards); Git has none, so its git commands are unchanged (`tests/slotTraces.test.ts`). A
+  listing's read (`check`) and the card hooks' reads get unknown for jj: "can't check", or refused.
+- **Identity** (schema step 28, `workspace identity`): `slots` and `copies` gained `platform` (`'git'` for every row
+  before), `store`, `workspace` and `generation` (the folder's and its `.jj`'s file ids and birth time at creation), and
+  `copy_leases.intact`. A jj row is `jj` from the write that reserves it; its identity is recorded once made, and
+  checked against the folder before every change: a folder replaced at the same path (even a same-named workspace of
+  the same store) has another generation and is never changed or trashed. Unreadable file ids refuse.
+- **Every write is owned** (HR1's HI-2795 round 1): right before each jj write (a record, a reset's snapshot, `new` and
+  `abandon`, a forget, a recovery's update and each restored path) the writer's operation still holds the folder and the
+  folder is still the recorded workspace (`owns`: its generation, its checkout's name and its store, read with no jj
+  process), else nothing is written. A removal's intent and its forget are inside the store's lock, after both are
+  checked again there. The pool records a jj slot only once no writer, job, session or process is in it (the rename
+  probe), checked again right before the snapshot; a busy one is left as it is, not ready. Recovery checks the
+  folder's generation at entry (fresh or resumed) and before every step, and its bounds apply to every entry and to a
+  file's size before it is read; every live file is read from its opened handle in bounded chunks, never past the
+  size it was compared with plus one byte (`readCapped`), so a file growing meanwhile is refused unread.
+- **Per-row platform** (R2.6): a pool lends and makes only slots of its own platform; a slot of another is settled,
+  released and removed by its own platform's port (a Git slot in a pool made with jj's finishes under Git), and one
+  with no port there is kept (`cantCheck`).
+- **Removal**, journalled (board_meta `slot_wsremove:…`, `copy_wsremove:…`): the identity checked, `jj workspace
+  forget` from the control, read back whatever its exit (0.47.1 commits a forget before unlinking a colocated Git
+  worktree; a link left is recorded, never pruned with others), phase `forgotten`, the generation checked again right
+  before `trash()` (never the project, its store or above them), the journal cleared. A removal cut short keeps the
+  slot out of the pool (dirty; a copy with an error) and the next removal, or a takeover of its operation, resumes it
+  from its phase. A stale slot isn't removed.
+- **Copies**: a warming reservation (the lease and its `lease` operation in one write) is the only time Combwork writes
+  in a copy: made, or reset (`record` into the copy's own change, `jj new <revision>`, the old change abandoned only as
+  the copy's own: no descendant, bookmark or other workspace's), and checked **before the run** (exactly the revision:
+  `@-` is it, `@` empty after a record, not stale, not divergent, read at one operation) right before the handing
+  write. A stale or divergent copy is disposed of (forget, then the Recycle Bin: no snapshot, nothing abandoned; probed:
+  forget hides the copy's empty working-copy commit itself) and made again, never reset. While handed out nothing in
+  Combwork writes in it. **Credit** is taken after the quiescence barrier: a `recover`-kind verification operation
+  records the copy, checks the same invariant against its files, and stores `intact` (1 or 0) on the lease in the write
+  that frees the copy, so nothing reuses it or reads a result before. jj's check and review credit (J3's) requires
+  `intact = 1`; Git leases keep null.
+- **Stale recovery** (`recoverStale`): explicit only, J7's operation, never the pool's clean-up; its journal resumes it
+  after any stop. Phases: planned (the stale operation S and the workspace's commit then, WS, read pinned), preserved
+  (the files that differ from WS: WS's tracked files plus what git lists as not ignored by jj's rules, with no
+  repository of the workspace's own; their bytes copied outside every workspace, each fsynced, a manifest fsynced last,
+  read back; refused with nothing changed past 2,000 files or 512 MB, or on a link, a junction or another kind of file),
+  updated (a rescan right before `update-stale`, preserving again if anything changed; P1, its snapshot, found only by
+  its exact shape: parents `[S]`, a snapshot, this workspace; what P1 recorded, X, that the manifest doesn't is written
+  beside its path as `.cw-recovered-<token>-late` and X kept), restoring (path by path, journalled before each step:
+  the current file moved aside atomically, put back as preserved only when the updated version and the moved-aside one
+  both equal WS's; otherwise the current file stays and the preserved version goes beside it; nothing overwritten, a
+  name taken meanwhile skipped), restored (an owned record, X abandoned only when it is exactly the preserved delta and
+  nobody else's, the preserved copy to the Recycle Bin).
+- **Tests** (`CW_JJ_REAL=1` runs them on the pinned jj; without the fetched jj they're skipped): `tests/jjWorkspaces.test.ts`
+  (the port, colocated and not: made from the control without snapshotting the project folder, two agents, stale with
+  a local edit, divergence, removal with ignored files, a crash between forget and the trash, a same-store same-name
+  same-root replacement, an immutable copy under a source rewrite, an unsnapshotted edit in a copy, the control refused
+  when the project folder isn't quiet), `tests/jjSlotPool.test.ts` (the pools with jj's port injected: lend, release
+  and look by the holder's record, leases and a takeover across a restart, a removal cut short and resumed, a Git slot
+  finishing under Git, a copy's verification after its barrier, a source rewritten during a live run) and
+  `tests/jjRecovery.test.ts` (HI-2781's case, overlaps, a local deletion against an upstream edit, every stop resumed,
+  a write at the seam, writes after preservation and after the rescan, an unrelated divergent change, a junction,
+  diverged operation heads refused with nothing written).
+
+##### jj in the window and the switch (1.5.0's J6, HI-2799)
+
+J6 made jj a platform: `PlatformId` is `'none' | 'git' | 'jj'` (J2's `JjPlatform` and `WorkspacePlatform` are its own),
+and its design is HI-2799/s11 to s26. Under Darren's option A (HI-2794) the window offers no jj mutation and Combwork never
+merges under jj.
+- **The descriptor** (`PLATFORMS.jj`): capabilities `revisions, isolation, containment, sameness, authorship, observe`;
+  never `integration` (gate advance, J4 and J5 included); `operations: []`; commit and change ids shown at 12
+  (`revisionShort`, `changeShort`); `gates` every gate still closed (all ten in J6), which the window shows as "Not
+  supported with jj" (`shared/platform/gateTexts.ts`). Git's and None's `gates` are empty.
+- **Workflow options for jj**: Git's rows without a merge step or a shared folder (`FORM_GROUPS.jj`); finish
+  `userIntegrates` ("You integrate it yourself", jj's only finish: `jjYouIntegrate` otherwise) in slots only
+  (`jjNeedsSlots`); presets Solo, Pair, Team; workspace and Combwork defaults for jj as for the others. Every jj ruleset
+  carries `start.platformReady`, which the runtime refuses before asking the adapter anything (no override crosses it):
+  **no jj card starts yet** (J2 refuses prepare and attach in a jj slot; a card's line under jj is a later card's). jj's
+  adapter (`platform/jjPlatform.ts`) answers unknown or nothing for everything else.
+- **Views** (`platform/jjViews.ts`; IPC `jj:repo`, `jj:history`, `jj:compare`, `jj:bookmarks`, `jj:conflicts`; the
+  window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
+  colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
+  and a `jj rebase -r <commit> -d <target>` to start from, its containment "can't check yet" until J5 records the user's
+  integration, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
+  conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,
+  a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
+  `bookmarks()`, for the user to pick one by commit id; then `diff --summary` and `--git`, capped), Bookmarks
+  (`--all-remotes`; a conflicted one with its sides; a local one whose `@git` or Git branch, read from the store's files,
+  differs marked `gitDiffers`), Conflicts (`conflicts()` among the visible commits, `resolve --list` each). **jj is confirmed pinned**
+  (`pinnedContextOf`): J0's detection would run `jj root` and `jj git root` unpinned, and on 0.47.1 an unpinned command
+  merges diverged heads (a write, R5.3), even when a second head appears between a check and the command (HR2's round 1).
+  So the single head is read from the files first (none, several or an unreadable `.jj`: `heads`, nothing run), J0's
+  confirmation pins its commands at the head it reads (`--at-op`, HI-2831), and the heads are read again after (anything else: `moved`). Every view, the switch's jj check and the fallback go through it.
+- **The switch** (`workflow/storeSwitch.ts`, through `setPlatform` when `storeWide`: to jj, jj → Git, or to Git where jj
+  is colocated). Its **group** is every project of this workspace on the repository (its Git store, `commonGitDir`)
+  whose choice is Git or jj, plus the project switched (None → jj too); the warning names them, and its `token` (a hash
+  of each member, its choice and options, the fence's generation and the store) must still match at the switch, else
+  `groupChanged`. Refused, each with its list and Check Again reading it afresh: `drain` (active or paused lanes, cards
+  in flight, a member's merge queue with work, open slot leases, unfreed copy leases), `otherWorkspace` (the store is a
+  project of another open workspace), `switching`; to jj, jj's confirmation (`jjContextOf`: colocated, the same store,
+  the tested jj: `noJj`, `jjSeparate`, `jjTool`, `jjUnknown`) and the **compatibility assessment**
+  (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
+  -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
+  `.gitattributes`, `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
+  without a Windows extension, in `core.hooksPath` or the store's `hooks/`: a `*.sample` and jj's own `docs.url` aren't
+  hooks), `commit.gpgSign` or `tag.gpgSign` true, and jj's `signing.behavior`; anything unreadable is "uses it". `core.autocrlf` counts by its effective value (the last level's): false converts nothing, as jj does. Git for
+  Windows' own system config and attributes (`core.autocrlf true`, `filter.lfs.*`, `diff=astextplain`) trip attributes
+  and lfs, so a default Windows install is refused until they're off. Back to Git (`fallback`): one head, no conflicted
+  local bookmark, every local bookmark's `@git` and Git branch its commit, no conflicted commit in `::bookmarks()`;
+  `.jj` stays. jj → None is a project's own switch (no jj card can be in flight), recorded in its fence membership.
+- **The platform fence** (`platform/platformFence.ts`, `platform/fenceAdmit.ts`): rows in the workspace database's
+  `board_meta`: `platform_fence:<store>` (generation, `settled` or `switching`, its owner, each member's `current` choice
+  and the last attempt it took part in, its generation's, with its before and after, each a snapshot of `platform`,
+  `platformFound` and `workflow`, refused past 64 KB; a former member outside a later switch keeps its current choice,
+  its old attempt dropped), `platform_member:<project id>`, `platform_store:<project id>` (each refresh's detection, written when it
+  changed) and `platform_switching`. Every admission checks it **in its own write transaction**, so the database
+  serializes it with the switch's writes and no new lock is taken: a lane's start (its save's `also`), a card's start
+  (the runtime's start write: `platform.switching` or `platform.changed`, refusals with their next step), a slot's lease
+  (`SlotStore.take`) and a copy's (`CopyStore.take`). A queue entry needs none: only a card in flight is enqueued, and
+  no member has one once A is written. Membership is looked up first, by the project's id: a participant of the switch under
+  way (its attempt the fence's generation) is refused whatever it compiled; a former member outside it, one that left
+  for None, is held to its own `current` as a settled fence holds every member (HR2's round 1); of a settled one, held to
+  its `current` (a stale start is re-resolved by the caller's
+  next attempt, a runtime made afresh for the project's new platform). Not a member: the store map; absent or
+  unreadable is refused while any store switches; an unchanged None project outside a group is the only exemption; a
+  Git or jj one on a switched store must match its members. Malformed rows fail closed.
+- **The switch's steps**, in lock order (the store's repository lock, the workflow writes, each project.json's lock):
+  A writes the fence `switching` with each member's before and after; **then** the drain is read again (nothing can be
+  admitted after A, so what it reads is final: anything running rolls the fence back and refuses); each member's
+  project.json is written; B settles the fence, each member's `current` its after. A failure between A and B is settled
+  in the switch's own `finally`, still under the lock, from each member's disk (`readKeptJson`): forward when every
+  member shows its after, else those showing after written back to their before (read back), the rest untouched, and
+  **stuck** (left switching, its admissions refused, said in the log) when a member shows neither or can't be read.
+  Only the participants are reconciled and take a new `current`. A member that is on another repository, none, or no
+  longer a project of the workspace leaves its fence at the next refresh (`dropMember`), never while it takes part in a
+  switch under way.
+  **Recovery** (`recoverFences`, after each refresh) settles a switching fence the same way only when its owner is gone
+  (its token in no switch this process is making, its pid not alive), under the same locks, the fence read again there.
+  The fence is per workspace database: another Combwork process (Dev beside the installed one) on the same repository
+  isn't fenced, as the queue isn't beyond the repository lock.
+- **Tests**: `tests/platformFence.test.ts` (the rules on a map), `tests/storeSwitch.test.ts` (two projects on one store,
+  the switch paused after A and after its drain read while the other starts a card, a lane, a slot and a copy lease;
+  the drain; a group changed; a failed save rolled back per member and fresh admissions after it; a save persisted
+  though its call failed; recovery during a live switch; a dead owner's recovered; a member edited by hand left stuck),
+  `tests/platformRegistry.test.ts` (detection, offers), `tests/jjViewsReal.test.ts` on the pinned jj (`CW_JJ_REAL=1`:
+  the views writing nothing, two heads read as such, a divergent change and a conflicted bookmark in Compare, a
+  conflicted commit, the fallback's refusals, the assessment's gates), and the e2e suite `jjview` (the real app).
+
+##### jj's merge-queue candidates (1.5.0's J4, HI-2797)
+
+J4 built the candidate a jj card's integration is made of (`platform/jjCandidates.ts`), and enables nothing: jj has no
+`integration` capability, `integrationOf('jj')` stays null and the queue offers no Combwork merging for jj (decision A:
+the user integrates, J1's gate stays closed). The composition that offers a candidate to the user (J5's containment
+record, J6's view) injects what it needs: the runner, the store's paths, the folder its writes run from (J2's control
+workspace), the store's lock, the owner (the queue's lease), a durable journal and Git's replay on the store. Its design
+is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a conflicted `jj duplicate` or `jj new` **exits 0**.
+- **Private commits, never a rewrite.** Rebase: `jj duplicate -r 'base..revision' --onto <target's head>`, new change
+  ids, so the builder's later amend never rebases the candidate, and always a copy, even for a card already on the
+  target (the user is never handed the builder's own change, which a bookmark would follow through the builder's
+  amends). A merge in the suffix returns the card (Rebase and fast-forward's linear policy). Squash: a scratch merge,
+  then a fresh child of the target given the merge's tree (`jj restore --from <scratch> --into <it>`), the scratch
+  abandoned. Merge: `jj new <target's head> <revision>`, the reviewed commit only a parent; if the builder rewrites it
+  later, jj rebases the candidate to a new commit, and `jjCandidateNow` reads it as `superseded`: the recorded commit
+  never moves. Strict's update (G8) isn't built for jj.
+- **Every write validated.** Each runs from the folder with `--ignore-working-copy` (no workspace's files touched),
+  under the store's lock, the owner checked just before it, with the attempt's marker (`combwork.txn`). After it: one
+  operation head, whose one parent is the head read just before; the marker in its args; its added and removed commits
+  (read pinned, never from jj's output) what this step should make; bookmarks, tags and every workspace's @ unchanged;
+  Git's refs unchanged but for jj's own `refs/jj/keep/<id>` of exactly the commits it added or removed. Anything else is
+  `raced` and nothing more is written. What each step may make is data (`JjStep`: a duplicate's count and root, a new
+  commit's parents, a restore's commit and change, an abandon's set), journalled with the head it starts from before its
+  command runs, and checked by the same function (`shapeProblem`) here and in recovery. Visibility is
+  `::visible_heads()`, never `all()`: on 0.47.1 a revset naming a hidden commit makes it part of `all()` there (probed).
+- **Conflicts read, never assumed** (R4.8): every commit the attempt made is read pinned (a middle duplicate's conflict
+  counts), its conflicted files listed with their sides (`file list -T`, `conflict_side_count`) and their hunks read in
+  git's marker style (`ui.conflict-marker-style=git`), bounded by the conflict record's limits and parsed by its parser,
+  the target's side first. A conflict of more than two sides can't be written in git's style: listed, its text not read.
+- **Phases journalled before their step:** planned, writing, written, pinning, pinned, abandoning, abandoned, done. Every
+  commit the attempt made is **pinned before any is abandoned**, so evidence is never unreachable: a Git ref in the
+  backing store under the attempt's own prefix `refs/cw/jj/<card>/<attempt>/` (`c<n>` for each commit, `candidate` for
+  the result), never an exportable bookmark. A create is create-only (`update-ref <ref> <oid> 0…0`) and read back; a pin
+  is **owned only when the journal records its own create succeeding**. A ref found there first is a collision: never
+  owned, never touched again, and the attempt answers `raced`. A prefix is a namespace, never provenance.
+- **Abandons guarded by their revset**, evaluated by jj at the operation the command loads: of the set S, every commit
+  with no descendant outside S and no bookmark, remote bookmark, tag or working copy on it or above it in S, so what is
+  abandoned is closed under descendants and no surviving commit is rebased. A commit kept back stays visible and pinned,
+  and the attempt is `interrupted` (never a candidate or a clean failure). The squash's scratch, and on a failure (a
+  conflict, not on top, not the same change) every commit of the attempt, go this way. The pins are **read at the
+  abandon's boundary** (after its last await, never the journal's word): an owned pin moved or gone stops it
+  (`interrupted`, the evidence left visible), and they are read again after the abandon and before any outcome, so a pin
+  lost meanwhile is never reported as retained evidence (HR2's round 1).
+- **Outcomes:** a candidate (its commit, change id, the commits that stay, its owned refs); a failure returning the card
+  (`conflict` with its files, hunks and pinned evidence; `notUpToDate` in the queue's existing words, sameness being
+  §16.3.2's replay on the store through J3's `jjSameRevision`, change ids never counted); a `signing` pause (gate:
+  signing); a typed unknown before anything is planned (several heads, nothing merged); or `interrupted` (a lost owner,
+  a cancel, a race, a pin refused, a commit kept back), with the record for recovery.
+- **Recovery** (`recoverJjAttempt`, its later caller's to run): the attempt's objects found only by provenance, the
+  operations carrying its marker walking back from the single head to its planned operation (at most 200), never by
+  description or change id. A marked operation's commits are owned only when it was validated in the attempt (the
+  journal's), or is its journalled step validated now as the attempt would have (the step's parent, its view's
+  bookmarks, tags and workspaces unchanged, the step's shape). Any other marked operation's additions are **uncertain**:
+  kept apart, never owned, pinned or abandoned (a restore that raced an outside descendant rebases it: that rebased
+  commit is never adopted, HR2's round 1). Each journalled pin reconciled with the ref now: its own create
+  read back is owned; an intent with no outcome whose ref holds the intended commit is **ambiguous** (kept, never owned,
+  never deleted); anything else a collision. What isn't held is pinned now, create-only. It never abandons or deletes,
+  and never answers a success.
+- **Drop** (`dropJjAttempt`): the attempt's visible commits abandoned (guarded), then only its owned refs deleted with
+  exact-old deletes (a moved ref is `raced`, preserved). Refused for any commit the target reaches (an ancestor of the
+  target bookmark, local or remote, or of its Git branch or a remote's: a Git move jj hasn't imported) and when the target
+  can't be read or is conflicted: those commits and pins stay. What the target reaches is **read again under the lock
+  right before each delete** (an exact-old delete guards the pin's value, not containment): a target moved onto a pinned
+  commit meanwhile stops the drop there with every remaining pin kept. A record with uncertain commits, or an
+  unvalidated step, is refused whole (recovery first).
+- **Residual race:** an operation started from the same base operation as one of the attempt's own. jj 0.47.1 has no
+  conditional operation (J1's finding (a)), so only a later command reconciling the two heads would act on it; it shows
+  as `raced` (two heads, or a parent other than the head read), is reported, and nothing more is written or cleaned up.
+- **Check materialisation:** a candidate is an immutable commit, so the merge checks' copy is J2's copy pool leased at
+  its commit (exactly it, credited only with `intact = 1`).
+- **Tests:** `tests/jjCandidates.test.ts` (the delta validator, the guard's revset, the parsers) and
+  `tests/jjCandidatesReal.test.ts` on the pinned jj (`CW_JJ_REAL=1`), both Git-backed modes: each style clean and
+  conflicted with the builder's change, workspace (an unrecorded edit), bookmarks and Git refs intact; a conflicted
+  middle commit; a card already on top; a merge in the suffix; a racing operation; two heads; an owner lost and a cancel
+  at every boundary; an outside descendant before the scratch's and the conflict's abandon; a ref created by someone
+  else first (an unrelated commit, and the very commit), then recovery and drop leaving it; crashes after written,
+  during pinning and after pinned, and between a create and its journal; a drop refused for the candidate and for a
+  descendant of it as the target; a drop's delete racing a moved ref; a stale attempt's drop beside a newer one; a
+  superseded merge candidate; a candidate leased in a check copy; and HR2's round 1: an outside descendant made just
+  before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
+  abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
+  Git branch).
 
 ##### Open: jj's target advance (J1's gate)
 
@@ -2289,6 +2735,58 @@ contract fixes:
   never a boolean.
 - **If J1 can't prove it,** jj has no automatic advance (gate: advance stays closed, rule 6), and the trade-off comes
   back to Darren; Git's guarantees are never weakened to match.
+
+**J1's finding (HI-2794, 9 Nov): the tested jj 0.47.1 CLI protocol does not meet R4.1, and no conforming protocol has
+been proved.** gate:advance stays **closed**. **Decided** (Darren, 9 Nov [HI-2794]: "Let's do A and not request them to
+change anything right now"): jj has **no automatic advance**. jj work goes on toward **user-performed integration**: the
+user merges, and Combwork's containment checks (J3) record the result. An attended advance (a merge the user starts,
+with a preview) isn't taken, and nothing is asked of the jj project for now: that is carded on hold, for later, if
+Combwork's use grows. J4/J5 build no advance of their own on jj. The evidence is an **unregistered diagnostic probe**, `platform/jjAdvanceProbe.ts`: in no
+port, writing no fact, imported by nothing in `src` (`tests/integrationPortsImports.test.ts`). Its verdicts are
+observations, never a CAS result: `advancedObserved` is not Integrated evidence and `notApplied` is not permission to
+retry. It tries the strongest protocol the CLI offers, one step at a time, each mutation journaled first and the lease
+checked just before it:
+1. **Base:** the single operation head P0, read pinned (`--at-op`, which never merges), with the Git refs and every
+   worktree's HEAD. It refuses unless T = `T@git` = the Git ref = E, nothing else is pending export, and no worktree has
+   T checked out.
+2. **Prepare:** `jj --at-op P0 --no-integrate-operation bookmark move T --from E --to R`. This is a conditional set
+   evaluated in exactly P0; it gives an operation O that isn't a head yet, with its id. The probe validates O: its
+   parent is P0, it carries the attempt's marker (`--config=combwork.txn=…`, kept in its `args`), and its view differs
+   from P0's only in T.
+3. **Integrate:** `jj op integrate O`. This doesn't export.
+4. **Export:** `jj git export`. Per ref, this is a real Git compare-and-swap against `T@git`.
+5. **Observe:** every head and its ancestry back to P0, each view, the Git refs and the worktrees, each read twice.
+   Anything torn, incomplete, unexpected or unexplained is Unknown.
+
+`tests/jjAdvanceProbeReal.test.ts` runs it on the pinned jj in both Git-backed modes, with racers placed by hooks
+between steps and between the observation's reads. It shows where the protocol falls short:
+- **(a) No single conditional operation.** The precondition holds in P0, but O becomes part of the repository only
+  when it is integrated. Nothing re-checks T at that moment. Every step exits 0 whatever happened.
+- **(b) A race doesn't refuse the late writer.** A concurrent move of T to X from the same operation lands as well, and
+  T is left **conflicted**. So does a move backwards. **(b′) Moves along one line of history aren't conflicts:** jj's
+  operation merge takes the descendant silently. A racer moving T to R's descendant wins (the probe says Unknown), and
+  our R over a racer's ancestor of it removes their move with nothing to show it (observed as advanced).
+- **(c) Two visible steps.** Between integrate and export, jj says R and Git says E. A Git move there makes the export
+  fail (exit 0, a warning), and so does a stale `refs/heads/T.lock`: `partialExport`.
+- **(d) The export isn't confined to T.** It writes every pending bookmark and tag, someone else's included, and it
+  **detaches** Git checkouts of what it moves, clean or dirty, in the main worktree and in linked ones (exit 0). A
+  checkout made and detached during the attempt can't be seen by comparing before and after.
+- **(e) Later imports.** After an external Git move, the next ordinary jj command imports it and conflicts T (and may
+  abandon commits).
+- **ABA** is invisible, as it is with Git's CAS.
+- **Recovery:**
+  - Prepared but not integrated, and an object made with no operation: `notApplied`, because no marked operation is in
+    any head's complete history.
+  - Integrated but not exported: `partialExport`, or observed as advanced once another jj command exports.
+  - Crashed inside the export (simulated: the ref written, its operation not recorded): `partialExport`.
+  - Another agent's operation after integrate: Unknown.
+  - A lease lost before each mutation: nothing more runs.
+  - A checkout made stale doesn't apply to a bookmark move, since it rewrites no commit: that case is J4's (candidate
+    preparation), and the owed push is J5's.
+
+On jj 0.47.1, a read is a write when operation heads have diverged: any command not pinned with `--at-op`, even with
+`--ignore-working-copy`, merges them into a new "reconcile divergent operations" operation. Ports that must not write
+(R5.3) read pinned.
 
 ##### Type map
 
@@ -2369,10 +2867,10 @@ R9 (HI-2792) finished the routing and closed 1.4.0's refactor with the audit:
   - common (the folder fence);
   - historic migration (1.1's refs and exclude-line upgrade, the 1.1 folder move, 1.0's slot migration);
   - defect with its card: none left. HI-2821 moved HI-2753's move proof behind port 3's optional `ownWork` (Git's in `platform/gitOwnWork.ts`), its hold through port 1's `holdRefs`; a platform without `ownWork` doesn't offer the move (rule 6).
-- **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0, and J0 routes each by the project's platform.
+- **The seams:** the remaining "platform with lines" lookups are counted per caller: `lineHistory()`, `lineRepoReads()`, `lineRepoOps()`, `queueIntegration()`, `slotWorkspaces()`, `slotRelocation()`. They resolve to Git alone in 1.4.0; the J card implementing each one's port routes it by the project's platform (J0's section above).
 - **The guard:** `tests/gitAudit.test.ts` (check:repo) fails on a new edge, a new name across a constrained edge, a stale edge, a changed seam count, or a changed count of platform-id switches (HI-2822). `node scripts/gitInventory.mjs` reruns HI-2781's inventory beside it.
 - **The text audit:** shared, UI and agent text that names Git is Git-facing and stays. The platform-id switches older than 1.4.0 over the workflow options' schema, the window and a few main modules are carded as HI-2822, before J0.
-- **The descriptor's workflow facts** (HI-2822): beside its capabilities and operations, each descriptor says how its integration combines work (`integration`: Git `merge`, None `accept`), what a code card delivers (`deliverables`: Git `commits`, None declared `paths`), and whether it needs its repository found in the folder (`repository`: Git only). The workflow options (their presets, All off, contradictions, stages and the form's rows), the runtime's declared paths, the queue's controls, the watcher's two halves, the switch's refusal and the Version Control tab read these (`merges()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()`), the isolation capability, or an operation (Start the next version: `createLine`), never the id. Behaviour is unchanged for Git and None.
+- **The descriptor's workflow facts** (HI-2822): beside its capabilities and operations, each descriptor says how its integration combines work (`integration`: Git `merge`, None `accept`, jj `user`: the user integrates, option A), what a code card delivers (`deliverables`: Git and jj `commits`, None declared `paths`), and whether it needs its repository found in the folder (`repository`: Git and jj). The workflow options (their presets, All off, contradictions, stages and the form's rows), the runtime's declared paths, the queue's controls, the watcher's two halves, the switch's refusal and the Version Control tab read these (`merges()`, `accepts()`, `deliversCommits()`, `declaresPaths()`, `needsRepository()`), the isolation capability, a gate (jj's closed `sharedFolder`: slots only), or an operation (Start the next version: `createLine`), never the id. Behaviour is unchanged for Git and None.
 - **The switch guard:** `tests/gitAudit.mjs`'s `SWITCHES` lists, per file, the switches on a platform's id left outside the descriptors, the adapters and the registry, each justified: Git-facing text that names Git (the project status's `git at`, the tab's fact line), git's own status read on Git's page, and HI-1997's one-time step over stored Git options. `tests/gitAudit.test.ts` fails on a new one, or one gone.
 
 **What the R cards inherit:** each keeps this section's invariants at its boundary and names, in its summary, the
@@ -3124,6 +3622,10 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
   platform the window showed) isn't the one in force is refused ("Changed meanwhile"), and so is an options save read
   before a switch (`setWorkflowOptions` checks the platform under the lock). The window greys Git out with the same
   reason; `project:updateConfig` refuses `platform`.
+- **Git ↔ jj (1.5.0, HI-2799) is the repository's switch**, not this one: every project on the repository using Git
+  or jj switches together, only once nothing runs on it, under the platform fence, and to jj only after the
+  compatibility assessment (§16.3.6, *jj in the window and the switch*). The choice is **None · Git · jj**; jj only
+  where a jj repository colocated with Git is found (`noJj`, `jjSeparate` in its tooltip otherwise).
 - **The warning:** what changes, that it applies from the next card, the running lanes and the cards in flight
   (`cardsInFlight`, as for options) that keep their platform's ruleset; for a Git card in flight, that its merge queue
   carries on and stays in the tab and the panel until clear. **No "Apply to cards in flight"** across platforms.

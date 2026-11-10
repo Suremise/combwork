@@ -39,6 +39,8 @@ import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/age
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
+import { admit } from '../platform/platformFence'
+import { PLATFORM_NAME } from '../../shared/platform/switching'
 
 export { APPLY_OPTIONS } from '../../shared/workflow/workView'
 
@@ -175,6 +177,8 @@ export interface WorkflowConfig {
   project: string
   /** The project key (`AM`). */
   projectKey: string
+  /** The project's identity as the slot and copy tables key it (HI-2799: the platform fence's admissions); absent in tests. */
+  projectId?: () => string
   /** The project's resolved options (§16.6.6); a card in flight keeps its own ruleset. */
   options: () => WorkflowOptions
   /** Where cards' own folders go (the P2 spike's stand-in for slots, its unit tests only: the app lends slots, `slotFor`). */
@@ -997,6 +1001,9 @@ export class Workflow {
         // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
         // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
         // then refused: the boundary passed either way), then the start is checked against it.
+        // The platform fence (HI-2799): a start is an admission on the project's repository, decided in this transaction.
+        const fenced = this.cfg.projectId ? admit({ get: (k) => this.store.boardMeta(k), set: () => undefined }, this.cfg.projectId(), g.o.platform) : null
+        if (fenced) return undone(fenced.why === 'switching' ? { rule: 'platform.switching', values: { card: card.key } } : { rule: 'platform.changed', values: { card: card.key, platform: workflowText(PLATFORM_NAME[fenced.now]) } })
         if (this.enforced() && !opts.drag) {
           this.applyLaneBoundary(w, this.store.card(card.id))
           // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
@@ -1034,6 +1041,9 @@ export class Workflow {
     const builder = builderOpt ?? agentOf(actor) ?? 'user'
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(say(W.blocked, { card: card.key, why: s.blocked }))
+    // HI-2799: a platform whose card work isn't enabled yet (jj) refuses before its adapter is asked anything; no override
+    // crosses it, since the adapter couldn't do what it would allow.
+    if (r.guards.start.includes('start.platformReady')) return { rule: 'start.platformReady', values: { card: card.key } }
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)

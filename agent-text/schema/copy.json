@@ -27,10 +27,19 @@
   "copy.error.closed": {
     "placeholders": {}
   },
+  "copy.error.identityUnread": {
+    "placeholders": {}
+  },
   "copy.error.interrupted": {
     "placeholders": {}
   },
+  "copy.error.notExact": {
+    "placeholders": {}
+  },
   "copy.error.notListed": {
+    "placeholders": {}
+  },
+  "copy.error.removalCutShort": {
     "placeholders": {}
   },
   "copy.error.setupExit": {

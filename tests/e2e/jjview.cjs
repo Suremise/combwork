@@ -1,0 +1,256 @@
+// jj (Jujutsu) in the Version Control tab (HI-2799, J6; SPEC §16.3.5, §16.3.6 "jj in the window and the switch",
+// §16.6.5): the real app, the pinned jj (npm run jj:fetch) on its PATH, a throwaway profile and workspace, no CLI agent.
+// - shop: a Git project in a jj repository colocated with Git (made by jj): the fact and the jjFound offer; Git's own
+//   sections first (Git's UI kept). The switch to jj refused while a card is in flight (the drain, listed, Check Again),
+//   then made: the group named, every gate clear, jj's limits listed. jj's sections: Repository (the unsupported list,
+//   Waiting for you to integrate), History (change id beside commit id, divergent, conflicted, working copy), Compare (a
+//   divergent change id lists both commits, one picked), Bookmarks (a conflicted one with its sides), Conflicts. A card's
+//   start refused (cards don't run in a jj project yet). Back to Git refused (conflicted bookmark and commit), then,
+//   once jj's state is fixed, made: Git's sections again.
+// - notes: a colocated jj repository whose .gitattributes sets eol: the switch refused, the gate listed.
+// - loose: a jj repository with no colocated Git: jj greyed out, its reason in the tooltip.
+// Screenshots of each step in both themes, and the jj sections in all seven locales.
+const lib = require('./lib.cjs')
+const fs = require('fs')
+const path = require('path')
+const { execFileSync } = require('child_process')
+const { jjDir, portableJj } = require('../jjPortable.cjs')
+
+const HUNG_MS = 30000
+const exe = portableJj()
+if (!exe) {
+  console.log('SKIP jjview: the pinned jj isn\'t fetched (npm run jj:fetch)')
+  process.exit(process.env.CW_JJ_REAL === '1' ? 1 : 0)
+}
+
+const work = path.join(lib.WORK, 'jjview')
+const userData = path.join(work, 'profile')
+const ws = path.join(work, 'ws')
+const shop = path.join(ws, 'shop')
+const notes = path.join(ws, 'notes')
+const loose = path.join(ws, 'loose')
+// Beside the suite's other files, so --keep-files keeps them with a passed run.
+const shots = lib.WORK
+let failed = 0
+const check = (name, ok, extra = '') => {
+  if (!ok) failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${ok || !extra ? '' : ` (${extra})`}`)
+}
+
+// jj's and git's config for the fixtures and the app alike: no user's, no system's (attributes included), no autocrlf.
+const home = path.join(work, 'home')
+const jjConfig = path.join(home, 'jj.toml')
+const gitConfig = path.join(home, 'gitconfig')
+const gitEnvOfTools = () => ({ ...lib.gitEnv({ GIT_CONFIG_GLOBAL: gitConfig, GIT_ATTR_NOSYSTEM: '1', XDG_CONFIG_HOME: home, JJ_CONFIG: jjConfig, NO_COLOR: '1' }) })
+const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: gitEnvOfTools(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', t).trim()
+const heads = (cwd) => fs.readdirSync(path.join(cwd, '.jj', 'repo', 'op_heads', 'heads'))
+
+function project(dir, cfg) {
+  fs.mkdirSync(path.join(dir, '.combwork'), { recursive: true })
+  fs.writeFileSync(path.join(dir, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [], ...cfg }))
+}
+
+/** A jj repository (colocated unless `loose`), .combwork ignored, with base and main, the bookmark main on main. */
+function jjRepo(dir, o = {}) {
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, '.gitignore'), '.combwork/\n')
+  jj(dir, 'git', 'init', o.loose ? '--no-colocate' : '--colocate')
+  fs.writeFileSync(path.join(dir, 'base.txt'), 'base\n')
+  if (o.attributes) fs.writeFileSync(path.join(dir, '.gitattributes'), '*.txt text eol=lf\n')
+  jj(dir, 'commit', '-m', 'base')
+  fs.writeFileSync(path.join(dir, 'a.txt'), 'one\n')
+  jj(dir, 'commit', '-m', 'main work')
+  jj(dir, 'bookmark', 'set', 'main', '-r', '@-')
+}
+
+;(async () => {
+  fs.rmSync(work, { recursive: true, force: true })
+  fs.mkdirSync(home, { recursive: true })
+  fs.writeFileSync(jjConfig, '[user]\nname = "Combwork Test"\nemail = "test@example.invalid"\n[ui]\npaginate = "never"\n')
+  fs.writeFileSync(gitConfig, `[user]\n\tname = ${lib.TEST_GIT_IDENTITY.name}\n\temail = ${lib.TEST_GIT_IDENTITY.email}\n[core]\n\tautocrlf = false\n`)
+
+  // shop: a feature line, a change made divergent, and a merge storing a conflict on the bookmark "merged".
+  jjRepo(shop)
+  jj(shop, 'new', 'main', '-m', 'left')
+  fs.writeFileSync(path.join(shop, 'a.txt'), 'left\n')
+  jj(shop, 'new', 'main', '-m', 'right')
+  fs.writeFileSync(path.join(shop, 'a.txt'), 'right\n')
+  jj(shop, 'new', 'description(substring:"left")', 'description(substring:"right")', '-m', 'merge')
+  jj(shop, 'bookmark', 'set', 'merged', '-r', '@')
+  jj(shop, 'new', 'main', '-m', 'feature')
+  fs.writeFileSync(path.join(shop, 'f.txt'), 'feature\n')
+  jj(shop, 'new')
+  const feature = id(shop, 'description(substring:"feature")')
+  const featureChange = id(shop, feature, 'change_id')
+  const op = heads(shop)[0]
+  jj(shop, '--ignore-working-copy', 'describe', '-r', feature, '-m', 'feature v1')
+  jj(shop, '--at-op', op, 'describe', '-r', feature, '-m', 'feature v2')
+  jj(shop, 'status')
+  const base = id(shop, 'description(substring:"base")')
+  project(shop, { platform: 'git', workflow: { platform: 'git', preset: 'solo', options: { finish: 'committed', folder: 'project' } } })
+  jjRepo(notes, { attributes: true })
+  project(notes, { platform: 'git', workflow: { platform: 'git', preset: null, options: {} } })
+  jjRepo(loose, { loose: true })
+  project(loose, { platform: 'none' })
+
+  const env = { ...gitEnvOfTools(), PATH: `${jjDir()};${lib.baseEnv().PATH ?? ''}` }
+  delete env.CW_USER_DATA
+  const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
+  try {
+    page.on('pageerror', (e) => check('no page errors', false, e.message))
+    const inv = (ch, ...a) => page.evaluate(([c, x]) => window.combwork.invoke(c, ...x), [ch, a])
+    const text = async (loc) => ((await loc.innerText().catch(() => '')) ?? '').replace(/\s+/g, ' ').trim()
+    const until = (fn, ms) => lib.until(fn, ms, 200)
+    await lib.openWorkspace(inv, page, ws)
+    const vcTab = page.locator('.tabs .tab', { hasText: 'Version Control' })
+    const head = page.locator('[data-vc-head]')
+    const offer = page.locator('[data-vc-offer]')
+    const dialog = page.locator('.dialog')
+    const sections = () => page.locator('.git-sections [role="tab"]').evaluateAll((b) => b.map((x) => x.getAttribute('data-section')))
+    const shoot = async (loc, name) => {
+      await page.mouse.move(5, 5)
+      for (const theme of ['dark', 'light']) {
+        await page.evaluate((t) => document.documentElement.setAttribute('data-theme', t), theme)
+        await loc.screenshot({ path: path.join(shots, `jjview-${name}-${theme}.png`) })
+      }
+      await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
+    }
+    const toTab = async (name) => {
+      await page.getByText(name, { exact: true }).first().click()
+      await vcTab.first().click()
+      await until(async () => (await head.count()) === 1, HUNG_MS)
+    }
+    const section = async (name) => {
+      await page.locator(`.git-sections [data-section="${name}"]`).click()
+      return page.locator(`[data-jj-section="${name.replace(/^jj/, '').toLowerCase()}"]`)
+    }
+
+    // --- shop as Git: Git's UI kept, jj found and offered.
+    await toTab('shop')
+    check('shop: Git chosen, jj offered beside None', !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && (await head.locator('[data-platform="jj"]').count()) === 1, HUNG_MS)), await text(head))
+    check("Git's own sections, unchanged", JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), JSON.stringify(await sections()))
+    check('the jjFound offer: jj found at the root, Switch to jj…', !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'jjFound' && /jj found at/.test(await text(offer)), HUNG_MS)), await text(offer))
+    await shoot(page.locator('.vc-view'), 'offer')
+
+    // --- The drain: a card in flight refuses the switch, listed; Check Again reads it again.
+    const card = await inv('tasks:create', { title: 'In flight', project: 'shop' })
+    const moved = await inv('tasks:move', card.number, 'doing', { confirm: true, reason: 'jjview: a card in flight' })
+    check('a card started in shop', !!moved && (await inv('tasks:list')).find((t) => t.number === card.number)?.column === 'doing', JSON.stringify(moved))
+    await head.locator('[data-platform="jj"]').click()
+    const drained = dialog.filter({ has: page.locator('[data-vc-store-drain]') })
+    check('refused while the card is in flight: the drain lists it', !!(await until(async () => (await drained.count()) === 1 && (await text(drained)).includes('In flight'), HUNG_MS)), await text(dialog))
+    await shoot(drained, 'drain')
+    await inv('tasks:move', card.number, 'done', { confirm: true, reason: 'jjview: done' })
+    await drained.getByRole('button', { name: 'Check Again' }).click()
+
+    // --- The switch: the group, the gates, jj's limits.
+    const warn = dialog.filter({ has: page.locator('[data-vc-store="jj"]') })
+    check('the warning: shop alone in its group, every gate clear, jj’s limits listed', !!(await until(async () => (await warn.count()) === 1 && (await warn.locator('[data-vc-store-drain]').count()) === 0 && (await warn.locator('[data-gate-state="clear"]').count()) === 5 && (await warn.locator('[data-vc-store-unsupported] li').count()) === 5, HUNG_MS)), await text(dialog))
+    await shoot(warn, 'switch-to-jj')
+    await warn.getByRole('button', { name: 'Switch', exact: true }).click()
+    check('shop uses jj: header and project.json', !!(await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)) && JSON.parse(fs.readFileSync(path.join(shop, '.combwork', 'project.json'), 'utf8')).platform === 'jj')
+    check("jj's sections", !!(await until(async () => JSON.stringify(await sections()) === JSON.stringify(['workflow', 'jjRepo', 'jjHistory', 'jjCompare', 'jjBookmarks', 'jjConflicts']), HUNG_MS)), JSON.stringify(await sections()))
+
+    // --- Repository.
+    const repo = await section('jjRepo')
+    check('Repository: the root, colocated, the unsupported list (every gate)', !!(await until(async () => (await text(repo)).includes(shop) && /Colocated with Git/.test(await text(repo)) && (await repo.locator('[data-jj-unsupported] li').count()) === 10, HUNG_MS)), await text(repo))
+    check('…and Waiting for you to integrate, no merge offered', (await repo.locator('[data-jj-integrate]').count()) === 1 && (await page.locator('[data-action*="merge" i]').count()) === 0)
+    await shoot(page.locator('.vc-view'), 'repository')
+
+    // --- History: change id beside commit id, divergent, conflicted, working copy.
+    const hist = await section('jjHistory')
+    check('History: the feature’s two variants divergent, each with the change id and its own commit id', !!(await until(async () => (await hist.locator(`[data-change="${featureChange}"]`).count()) >= 2 && (await hist.locator('[data-jj-badge="divergent"]').count()) >= 2, HUNG_MS)), await text(hist))
+    check('…a conflicted commit and the working copy', (await hist.locator('[data-jj-badge="conflict"]').count()) >= 1 && /working copy/.test(await text(hist)))
+    await shoot(page.locator('.vc-view'), 'history')
+
+    // --- Compare: an ambiguous change id lists both commits; one picked.
+    const cmp = await section('jjCompare')
+    await cmp.locator('[data-jj-from]').fill(base)
+    await cmp.locator('[data-jj-to]').fill(featureChange)
+    await cmp.locator('[data-action="jj-compare"]').click()
+    const amb = cmp.locator('[data-jj-resolve="to"][data-jj-resolve-state="ambiguous"]')
+    check('Compare: the divergent change id names 2 commits, none picked', !!(await until(async () => (await amb.count()) === 1 && (await amb.locator('[data-action="jj-pick"]').count()) === 2, HUNG_MS)), await text(cmp))
+    await shoot(page.locator('.vc-view'), 'compare-ambiguous')
+    await amb.locator('[data-action="jj-pick"]').first().click()
+    await cmp.locator('[data-action="jj-compare"]').click()
+    check('…one picked by its commit id: what changed', !!(await until(async () => (await cmp.locator('[data-jj-compare-result]').count()) === 1 && /f\.txt/.test(await text(cmp.locator('[data-jj-files]'))), HUNG_MS)), await text(cmp))
+    await shoot(page.locator('.vc-view'), 'compare')
+
+    // --- Bookmarks and Conflicts.
+    const bm = await section('jjBookmarks')
+    check('Bookmarks: main, merged, read only', !!(await until(async () => (await bm.locator('[data-jj-bookmark="main"]').count()) >= 1 && (await bm.locator('[data-jj-bookmark="merged"]').count()) >= 1, HUNG_MS)), await text(bm))
+    await shoot(page.locator('.vc-view'), 'bookmarks')
+    const cf = await section('jjConflicts')
+    check('Conflicts: the merge, with a.txt', !!(await until(async () => (await cf.locator('[data-jj-conflicts] > li').count()) >= 1 && /a\.txt/.test(await text(cf)), HUNG_MS)), await text(cf))
+    await shoot(page.locator('.vc-view'), 'conflicts')
+
+    // --- A card can't start in a jj project.
+    const next = await inv('tasks:create', { title: 'Under jj', project: 'shop' })
+    const r = await inv('tasks:move', next.number, 'doing').catch((e) => ({ error: String(e) }))
+    check("a card's start refused: cards don't run in a jj project yet", /don.t run in a jj project yet/.test(JSON.stringify(r)), JSON.stringify(r))
+
+    // --- Unsupported features: notes' .gitattributes refuses the switch, listed.
+    await toTab('notes')
+    await head.locator('[data-platform="jj"]').click()
+    const gated = dialog.filter({ has: page.locator('[data-vc-store-gates]') })
+    check('notes: refused, attributes used (.gitattributes eol)', !!(await until(async () => (await gated.locator('[data-gate="attributes"][data-gate-state="uses"]').count()) === 1 && /eol=lf/.test(await text(gated)), HUNG_MS)), await text(dialog))
+    await shoot(gated, 'gates')
+    await gated.getByRole('button', { name: 'Close', exact: true }).click()
+    check('…and notes stays Git', JSON.parse(fs.readFileSync(path.join(notes, '.combwork', 'project.json'), 'utf8')).platform === 'git')
+
+    // --- A jj repository without colocated Git: jj greyed out, its reason in the tooltip.
+    await toTab('loose')
+    const looseJj = head.locator('[data-platform="jj"]')
+    check('loose: jj not available', (await looseJj.getAttribute('aria-disabled')) === 'true')
+    const tip = await lib.hoverTip(page, looseJj, (t) => /colocated/.test(t))
+    if (!tip) await page.screenshot({ path: path.join(shots, 'jjview-loose-tip.png') })
+    check('…its tooltip says why', /no colocated Git repository/.test(tip ?? ''), tip)
+
+    // --- Back to Git: refused while jj's state can't go back, then made.
+    await toTab('shop')
+    await head.locator('[data-platform="git"]').click()
+    const fb = dialog.filter({ has: page.locator('[data-vc-store-fallback]') })
+    check('back to Git refused: a commit storing conflicts listed', !!(await until(async () => (await fb.locator('[data-fallback="conflictedCommit"]').count()) >= 1, HUNG_MS)), await text(dialog))
+    await shoot(fb, 'fallback-refused')
+    // The user fixes it with jj: the conflicted merge abandoned, everything exported.
+    jj(shop, 'abandon', 'merged')
+    jj(shop, 'bookmark', 'delete', 'merged')
+    jj(shop, 'git', 'export')
+    await fb.getByRole('button', { name: 'Check Again' }).click()
+    const back = dialog.filter({ has: page.locator('[data-vc-store="git"]') })
+    check('…then the warning to go back to Git', !!(await until(async () => (await back.count()) === 1 && (await back.locator('[data-vc-store-fallback]').count()) === 0, HUNG_MS)), await text(dialog))
+    await shoot(back, 'switch-to-git')
+    await back.getByRole('button', { name: 'Switch', exact: true }).click()
+    check("shop is Git again, Git's sections back, .jj left in place", !!(await until(async () => (await head.locator('[data-platform="git"][aria-checked="true"]').count()) === 1 && JSON.stringify(await sections()) === JSON.stringify(['workflow', 'changes', 'history', 'branches', 'queue']), HUNG_MS)) && fs.existsSync(path.join(shop, '.jj')))
+
+    // --- All seven locales: jj's Repository section of notes after a switch would need clear gates; shop's offer and
+    // the jj option's tooltip in each language, and a jj project's sections (shop again) in each.
+    await head.locator('[data-platform="jj"]').click()
+    await until(async () => (await warn.count()) === 1, HUNG_MS)
+    await warn.getByRole('button', { name: 'Switch', exact: true }).click()
+    await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)
+    await section('jjRepo')
+    // The window's language, as a change of it reaches the window (vcswitch's way).
+    const speak = (language) => app.evaluate(({ BrowserWindow }, ev) => BrowserWindow.getAllWindows()[0].webContents.send('cw:event', ev), { type: 'language-changed', language })
+    const english = (await inv('app:info')).language
+    const catalogue = (code) => Object.assign({}, ...fs.readdirSync(path.join(lib.ROOT, 'locales', code)).filter((f) => f.endsWith('.json')).map((f) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', code, f), 'utf8'))))
+    for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
+      await speak({ ...english, code: language, locale: language, messages: catalogue(language) })
+      const cat = Object.assign({}, ...['jj', 'git'].map((a) => JSON.parse(fs.readFileSync(path.join(lib.ROOT, 'locales', language, `${a}.json`), 'utf8'))))
+      // Repository may be the same word in a language: the unsupported list's heading and Compare's label say it.
+      const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported']]
+      check(`${language}: jj's sections in the language`, want.every(Boolean) && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want[0]) && (await text(page.locator('.vc-view'))).includes(want[1]), HUNG_MS)), await text(page.locator('.git-sections')))
+      await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-repository-${language}.png`) })
+    }
+    await speak(english)
+  } finally {
+    await app.close().catch(() => undefined)
+  }
+  console.log(`screenshots: ${shots}`)
+  console.log(failed ? `${failed} FAILED` : 'ALL PASSED')
+  process.exit(failed ? 1 : 0)
+})().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

@@ -9,7 +9,7 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
-import { resolve as resolvePath } from 'path'
+import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
@@ -194,6 +194,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // trailers written before, as the adoption's store keyed them).
     store,
     project: project.path,
+    projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path),
     get projectKey() {
       return store.projectKey()
     },

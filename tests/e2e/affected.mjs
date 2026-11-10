@@ -193,11 +193,13 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'agentslots', 'gitbranchcards', 'lanesslots', 'lanestages', 'mergedialogslots', 'slotrelease', 'unusedslots', 'p6lane', 'workflowdefaults', 'workflowoptions', 'advanced', 'keys', 'cardattach', 'image', 'i18nshots'] },
   // Where a Version Control or workflow default came from (HI-1837).
   { paths: ['src/renderer/src/components/OriginText.tsx'], suites: ['versioncontrol', 'workflowdefaults', 'workflowoptions'] },
-  { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions'] },
+  { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions', 'jjview'] },
+  // jj in the Version Control tab and the switch (HI-2799).
+  { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts'], suites: ['jjview', 'vcswitch'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
   // Switching the version control (#1419): the switch, detection's offers, the shared rules.
-  { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions'] },
+  { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions', 'jjview'] },
   { paths: ['src/main/gitInit.ts', 'src/shared/gitInit.ts', 'src/renderer/src/components/InitRepo.tsx'], suites: ['gitinit', 'gitview'] },
   { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
   // The providers' version checks' GET (#1582): the test copies turn the checks off, so these drive its callers only.
@@ -353,7 +355,7 @@ export const AREAS = [
   { paths: ['tests/e2e/reviewcopiesreal.cjs'], suites: ['reviewcopiesreal'] },
   { paths: ['tests/e2e/followupsubmit.cjs'], suites: ['followupsubmit'] },
   { paths: ['tests/e2e/reviewerpool.cjs', 'src/main/reviewerPool.ts', 'src/shared/workflow/reviewerPool.ts', 'src/main/laneStart.ts', 'src/shared/laneBrief.ts', 'src/renderer/src/components/LaneStartDialog.tsx', 'src/main/loopReviewer.ts'], suites: ['reviewerpool'] },
-  { paths: ['tests/e2e/isolatedcheck.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/workflow/launcher.ts', 'src/main/progressReporters/wrapper.ts', 'src/main/progressReporters/report.mts', 'src/main/workflow/runLink.ts', 'src/main/workflow/runChecks.ts'], suites: ['isolatedcheck', 'progressreport'] },
+  { paths: ['tests/e2e/isolatedcheck.cjs', 'src/main/copies.ts', 'src/main/copiesApp.ts', 'src/main/workflow/launcher.ts', 'src/main/progressReporters/wrapper.ts', 'src/main/processTree.ts', 'src/main/progressReporters/report.mts', 'src/main/workflow/runLink.ts', 'src/main/workflow/runChecks.ts'], suites: ['isolatedcheck', 'progressreport'] },
   { paths: ['tests/e2e/slotcards.cjs', 'tests/e2e/slotrecovery.cjs', 'src/main/slotCards.ts', 'src/main/finishPath.ts', 'src/main/laneStart.ts', 'src/main/platform/gitPlatform.ts', 'src/main/workflow/service.ts'], suites: ['slotcards', 'slotrecovery', 'lanestart'] },
   { paths: ['tests/e2e/slotpool.cjs', 'src/main/slots.ts', 'src/main/slotsApp.ts', 'src/main/slotJobs.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts'], suites: ['slotpool', 'slotsessions'] },
   { paths: ['tests/e2e/slotwriterhold.cjs', 'src/main/agentFolders.ts', 'src/main/slots.ts', 'src/main/slotsApp.ts'], suites: ['slotwriterhold'] },
@@ -665,7 +667,7 @@ const FAKE_FIXTURES = ['tests/fixtures/claude-initialize.json', 'tests/fixtures/
  * So are the Windows Sandbox checks' own files (tests/sandbox/, HI-2690): no e2e suite or scenario loads or reads them
  * (tests/e2esuites.test.ts checks), the Sandbox runs them on a packaged build, and UNIT_SCANS selects their unit tests.
  */
-export const UNIT_ONLY = ['tests/sandbox/', 'scripts/dialectRelease.mjs', 'tests/oldNames.mjs', 'tests/oldNamesAllow.json', 'tests/presenceChecks.mjs', 'tests/presenceAllow.json', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/readyWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/']
+export const UNIT_ONLY = ['tests/sandbox/', 'scripts/dialectRelease.mjs', 'tests/oldNames.mjs', 'tests/oldNamesAllow.json', 'tests/presenceChecks.mjs', 'tests/presenceAllow.json', 'vitest.config.ts', '.github/workflows/ci.yml', 'scripts/testWaits.mjs', 'scripts/readyWaits.mjs', 'scripts/i18nExtract.mjs', 'scripts/i18nValues.mjs', 'scripts/i18nCheck.mjs', 'scripts/i18nCoverage.mjs', 'scripts/i18nGuard.mjs', 'i18n/allow/', 'scripts/agentTextExtract.mjs', 'scripts/agentTextGuard.mjs', 'scripts/agentTextBoth.mjs', 'scripts/agentTextFiles.mjs', 'agent-text/allow/', 'tests/i18n/', 'tests/workflow/', 'src/shared/workflow/', 'src/shared/platform/', 'src/main/workflow/', 'src/main/platform/', 'src/shared/jjTool.ts', 'resources/tested-vcs.json', 'scripts/fetchJj.mjs', 'tests/jjPortable.cjs']
 
 /** Whether a file is a unit test (tests/*.test.ts, their helpers and fixtures, UNIT_ONLY): npm test covers it, no e2e suite. */
 export const unitTest = (f) => /^tests\/[^/]+\.ts$/i.test(f) || under(f, UNIT_ONLY) || (/^tests\/fixtures\//i.test(f) && !FAKE_FIXTURES.includes(f))

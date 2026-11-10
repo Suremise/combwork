@@ -8,6 +8,12 @@
   "workflow.contradiction.focusedNeedsRunner": {
     "placeholders": {}
   },
+  "workflow.contradiction.jjNeedsSlots": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.jjYouIntegrate": {
+    "placeholders": {}
+  },
   "workflow.contradiction.mergeNeedsSlots": {
     "placeholders": {}
   },
@@ -148,6 +154,9 @@
     "placeholders": {
       "kind": "select"
     }
+  },
+  "workflow.jj.notYet": {
+    "placeholders": {}
   },
   "workflow.move.answer": {
     "placeholders": {}
@@ -703,6 +712,25 @@
       "folder": "plain"
     }
   },
+  "workflow.refused.platform.changed.message": {
+    "placeholders": {
+      "card": "plain",
+      "platform": "plain"
+    }
+  },
+  "workflow.refused.platform.changed.next": {
+    "placeholders": {
+      "platform": "plain"
+    }
+  },
+  "workflow.refused.platform.switching.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.platform.switching.next": {
+    "placeholders": {}
+  },
   "workflow.refused.platform.targetGone.message": {
     "placeholders": {
       "card": "plain",
@@ -828,6 +856,14 @@
     }
   },
   "workflow.refused.start.notBlocked.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.platformReady.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.start.platformReady.next": {
     "placeholders": {}
   },
   "workflow.refused.start.slotAvailable.change": {
@@ -1053,6 +1089,9 @@
     "placeholders": {}
   },
   "workflow.rule.start.notBlocked": {
+    "placeholders": {}
+  },
+  "workflow.rule.start.platformReady": {
     "placeholders": {}
   },
   "workflow.rule.start.slotAvailable": {
@@ -1315,6 +1354,9 @@
     "placeholders": {}
   },
   "workflow.value.finish.notChecked": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.userIntegrates": {
     "placeholders": {}
   },
   "workflow.value.folder.project": {
