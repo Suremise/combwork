@@ -4,8 +4,10 @@
 // observation isn't asked again. The workflow and the reconciler are stood in for; waitingOf's own reading is real.
 import { describe, expect, it, vi } from 'vitest'
 
-const asked: [number, string][] = []
-vi.mock('../src/main/workflow/reconciler', () => ({ reconcileCard: (_ws: unknown, n: number, project: string) => void asked.push([n, project]) }))
+const asked: [unknown, number, string][] = []
+vi.mock('../src/main/workflow/reconciler', () => ({ reconcileCard: (ws: unknown, n: number, project: string) => void asked.push([ws, n, project]) }))
+// The service holding the project, as the reconciler follows it (the IPC hands over the window's proxy).
+vi.mock('../src/main/workspace', async (original) => ({ ...(await original<typeof import('../src/main/workspace')>()), workspaceOf: () => 'the holder' }))
 
 const C = (c: string): string => c.repeat(40)
 const card = (id: number, key: string) => ({ id, key, stage: 'approved' })
@@ -26,6 +28,6 @@ describe('Waiting for you to integrate asks for a reconciliation of a card with 
       [1, null],
       [2, 'notYet']
     ])
-    expect(asked).toEqual([[1, 'shop']])
+    expect(asked).toEqual([['the holder', 1, 'shop']])
   })
 })

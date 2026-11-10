@@ -12,7 +12,7 @@ import { boardConn, jjPort } from './slotsApp'
 import { containedKey, type JjContained } from './workflow/reconcile'
 import { workflowFor } from './workflow/service'
 import type { Workflow } from './workflow/runtime'
-import type { WorkspaceService } from './workspace'
+import { workspaceOf, type WorkspaceService } from './workspace'
 
 /** What the window's SQL needs of a connection (the board's reader or writer, or a test's own). */
 type SqlConn = { prepare(sql: string): { all(...a: (string | number)[]): unknown[]; run(...a: (string | number)[]): { changes: number | bigint } } }
@@ -42,7 +42,9 @@ export async function jjWaiting(ws: WorkspaceService, projectPath: string): Prom
   // changes no jj operation or ref, so in a repository not colocated with Git nothing else would run one until the next
   // jj command; what it records reaches the panel as a board change.
   const name = ws.info()?.projects.find((x) => x.path.toLowerCase() === projectPath.toLowerCase())?.name
-  if (name) for (const r of rows) if (!r.contained) reconcileCard(ws, r.card, name)
+  // The service holding the project, as the reconciler follows it (the IPC's workspace is the window's proxy).
+  const holder = workspaceOf(projectPath)
+  if (name) for (const r of rows) if (!r.contained) reconcileCard(holder, r.card, name)
   return rows
 }
 
