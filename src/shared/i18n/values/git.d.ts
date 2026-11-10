@@ -428,6 +428,7 @@ interface CombworkMessageValues {
   'git.vc.stepNotice.choose': undefined
   'git.vc.stepNotice.notNow': undefined
   'git.vc.stepNotice.text': { n: number; projects: string | number }
+  'git.vc.store.autocrlf': { command: string | number }
   'git.vc.store.card': { project: string | number; card: string | number; title: string | number }
   'git.vc.store.clear': { gate: string | number }
   'git.vc.store.conflictedBookmark': { name: string | number }
@@ -446,6 +447,7 @@ interface CombworkMessageValues {
   'git.vc.store.notExported': { name: string | number }
   'git.vc.store.queue': { project: string | number }
   'git.vc.store.slot': { project: string | number; slot: string | number; agent: string | number }
+  'git.vc.store.stock': undefined
   'git.vc.store.toGit': undefined
   'git.vc.store.toJj': undefined
   'git.vc.store.unknown': { gate: string | number; what: string | number }

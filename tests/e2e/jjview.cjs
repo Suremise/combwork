@@ -223,11 +223,14 @@ function jjRepo(dir, o = {}) {
     const r = await inv('tasks:move', next.number, 'doing').catch((e) => ({ error: String(e) }))
     check("a card's start refused: cards don't run in a jj project yet", /don.t run in a jj project yet/.test(JSON.stringify(r)), JSON.stringify(r))
 
-    // --- Unsupported features: notes' .gitattributes refuses the switch, listed.
+    // --- Unsupported features: notes' .gitattributes refuses the switch, listed; its own core.autocrlf too, with the hint
+    // to turn it off there alone (HI-2872), and the note that Git for Windows' stock settings don't count.
+    execFileSync('git', ['config', 'core.autocrlf', 'true'], { cwd: notes, env: gitEnvOfTools(), windowsHide: true, stdio: 'ignore' })
     await toTab('notes')
     await head.locator('[data-platform="jj"]').click()
     const gated = dialog.filter({ has: page.locator('[data-vc-store-gates]') })
     check('notes: refused, attributes used (.gitattributes eol)', !!(await until(async () => (await gated.locator('[data-gate="attributes"][data-gate-state="uses"]').count()) === 1 && /eol=lf/.test(await text(gated)), HUNG_MS)), await text(dialog))
+    check('…core.autocrlf with the hint to turn it off in the repository, and the stock note', (await gated.locator('[data-gate="attributes"] [data-gate-hint="autocrlf"]').count()) === 1 && /git config core\.autocrlf false/.test(await text(gated.locator('[data-gate-hint="autocrlf"]'))) && /core\.autocrlf \(local\) = true/.test(await text(gated)) && (await gated.locator('[data-vc-store-stock]').count()) === 1, await text(gated))
     await shoot(gated, 'gates')
     await gated.getByRole('button', { name: 'Close', exact: true }).click()
     check('…and notes stays Git', JSON.parse(fs.readFileSync(path.join(notes, '.combwork', 'project.json'), 'utf8')).platform === 'git')

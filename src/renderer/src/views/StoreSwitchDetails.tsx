@@ -26,6 +26,8 @@ const M = {
   clear: msg({ id: 'git.vc.store.clear', defaultMessage: '{gate}: not used', description: 'A feature jj doesn’t support, not used by this repository (HI-2799). {gate} is its name.' }),
   uses: msg({ id: 'git.vc.store.uses', defaultMessage: '{gate}: used ({what})', description: 'A feature jj doesn’t support, used by this repository (HI-2799): {what} says where (a setting, a file), as found.' }),
   unknown: msg({ id: 'git.vc.store.unknown', defaultMessage: '{gate}: couldn’t be checked ({what}), so it counts as used', description: 'A feature jj doesn’t support whose use Combwork couldn’t read (HI-2799): unreadable counts as used, so the switch is refused.' }),
+  stock: msg({ id: 'git.vc.store.stock', defaultMessage: 'Git for Windows’ own default settings (its LFS filter, the diff driver for Office documents) don’t count: only what the repository or your own Git settings use.', description: 'Under the gates in the warning before switching to jj (HI-2872): Git for Windows’ stock system settings are ignored. Keep Git for Windows (a product’s name) and LFS.' }),
+  autocrlf: msg({ id: 'git.vc.store.autocrlf', defaultMessage: 'Git converts line endings here (core.autocrlf). If this repository doesn’t need that, turn it off for it alone: run {command} in it, then Check Again.', description: 'Under Git attributes in the warning before switching to jj (HI-2872), when Git’s line-ending conversion is on. {command} is a git command, kept as it is; core.autocrlf is a Git setting; Check Again is the dialog’s button.' }),
   unsupported: msg({ id: 'git.vc.store.unsupported', defaultMessage: 'Not supported with jj, whatever the repository:', description: 'In the warning before switching to jj (HI-2799): above what Combwork never does with jj (merging, pushing, moving…). Keep jj.' }),
   limit: msg({ id: 'git.vc.store.limit', defaultMessage: '{gate}: {why}', description: 'A limit of jj in Combwork (HI-2799): its name and why.' }),
   toJj: msg({ id: 'git.vc.store.toJj', defaultMessage: 'Combwork never creates a jj repository or changes how it is colocated: .jj and .git stay as they are. Cards don’t run in a jj project yet.', description: 'In the warning before switching to jj (HI-2799). Keep jj, .jj and .git.' }),
@@ -83,9 +85,11 @@ export function StoreSwitchDetails({ store, to }: { store: StoreSwitch; to: Plat
             {store.gates.map((g) => (
               <li key={g.gate} data-gate={g.gate} data-gate-state={'clear' in g ? 'clear' : 'uses' in g ? 'uses' : 'unknown'} className={'clear' in g ? undefined : 'caution'}>
                 <Icon name={'clear' in g ? 'check' : 'warning'} /> {'clear' in g ? tr(M.clear, { gate: tr(GATE_TEXT[g.gate].name) }) : 'uses' in g ? tr(M.uses, { gate: tr(GATE_TEXT[g.gate].name), what: g.uses.join('; ') }) : tr(M.unknown, { gate: tr(GATE_TEXT[g.gate].name), what: g.unknown })}
+                {'uses' in g && g.autocrlf && <div className="hint" data-gate-hint="autocrlf">{tr(M.autocrlf, { command: 'git config core.autocrlf false' /* i18n-ignore: a command */ })}</div>}
               </li>
             ))}
           </ul>
+          <p className="hint" data-vc-store-stock="">{tr(M.stock)}</p>
         </>
       )}
       {store.unsupported && store.unsupported.length > 0 && (
