@@ -77,7 +77,7 @@ const gitFalse = (v: string | null): boolean => v !== null && /^(false|no|off|0|
 export const GFW_STOCK_CONFIG: Readonly<Record<string, string>> = {
   'filter.lfs.clean': 'git-lfs clean -- %f',
   'filter.lfs.smudge': 'git-lfs smudge -- %f',
-  'filter.lfs.process': 'git-lfs filter-process',
+  'filter.lfs.process': 'git-lfs filter-process', // i18n-ignore: a Git config value, compared, never shown
   'filter.lfs.required': 'true',
   'diff.astextplain.textconv': 'astextplain',
 }
