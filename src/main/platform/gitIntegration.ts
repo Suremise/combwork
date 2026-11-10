@@ -18,6 +18,7 @@ import { isUnknown, type Unknown } from './types'
 import { readConflicts } from '../workflow/conflictRead'
 import { destinationOf, fetchHeadOf, prePushOf, publishOf, redactTransport } from './gitTransport'
 import { checkSigning } from './gitSigning'
+import type { SigningStatus } from '../../shared/gitSigning'
 import { boundedSpawn } from './boundedSpawn'
 import { gitExe } from '../gitTool'
 import { withLauncherEnv } from '../gitWorker'
@@ -105,6 +106,11 @@ async function preSign(h: CandidateHost, f: string, who: string[]): Promise<Cand
   const use = gitExe()
   const env = use.launcherEnv ? withLauncherEnv(commitEnv(), use.launcherEnv) : commitEnv()
   const status = await (h.reads.signCheck ??= checkSigning({ git: (cwd, args) => h.run(cwd, args), spawn: h.spawn ?? ((file, args, o) => boundedSpawn(file, args, o)), cwd: f, who, env }).then((i) => i.status))
+  return signingPause(status)
+}
+
+/** What a signing check's status does to the step about to sign (exported for the canary dialect's cases, HI-2883). */
+export function signingPause(status: SigningStatus): CandidatePause | Again | null {
   if (status.kind === 'needsSomeone') return { pause: 'signingWaits', message: status.detail }
   if (status.kind === 'couldNotComplete') return { pause: 'signingWaits', message: say(SIGN_UNFINISHED) }
   if (status.kind === 'cantSign') return { pause: 'signing', message: status.message }
