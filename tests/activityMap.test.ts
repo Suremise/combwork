@@ -40,7 +40,7 @@ describe("each provider's recorded tool names go to their stations", () => {
     expect(got.get('Edit')).toBe('edit')
     expect(got.get('Write')).toBe('edit')
     // Combwork's tools under their old server name: an MCP tool (Tools), never another station.
-    expect(got.get('hive · hive_inbox')).toBe('tools')
+    expect(got.get('hive · hive_inbox')).toBe('tools') // old-name: the recorded fixture (Claude Code 2.1.306) names Combwork's server as it was then
   })
 
   it("Codex: a code-mode script counts where its calls went, not as one Script", () => {
@@ -116,7 +116,7 @@ describe('names only, fail-closed (HR2, s11 gap 3)', () => {
     expect(mapLabel({ name: 'Script', summary: 'const r = await tools.exec_command({cmd:"x"})' })).toBe('Script')
     expect(mapLabel({ name: 'Agent', summary: 'Find every secret in the repo' })).toBe('Agent')
     expect(mapLabel({ name: 'mcp__combwork__cw_inbox', summary: 'ack m12' })).toBe('cw_inbox')
-    expect(mapLabel({ name: 'hive · hive_read_task', summary: 'HI-12' })).toBe('hive_read_task')
+    expect(mapLabel({ name: 'combwork · cw_read_task', summary: 'HI-12' })).toBe('cw_read_task')
   })
 
   it("shows a fetched URL's host only: no userinfo, port, path or query", () => {
