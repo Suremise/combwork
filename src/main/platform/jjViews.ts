@@ -79,23 +79,12 @@ export function headsHere(folder: string): string[] | null {
   return readOpHeads(jjRepo)
 }
 
-/** A runner whose every command reads at operation `op` (`--at-op`): never a merge of diverged heads (R5.3). */
-export function pinnedRunner(runner: JjRunner, op: string): JjRunner {
-  return {
-    run: (folder, args, o) => runner.run(folder, ['--at-op', op, ...args], o),
-    readiness: () => runner.readiness(),
-    readinessNow: () => runner.readinessNow(),
-    problem: () => runner.problem(),
-    shutdown: (ms) => runner.shutdown(ms)
-  }
-}
-
 /**
  * A project folder's jj context, confirmed by jj (J0's detection), and the operation it was confirmed at: or why not.
- * J0's confirmation (`jj root`, `jj git root`) would run unpinned, and on jj 0.47.1 an unpinned command merges diverged
- * heads, a write (R5.3, HR2's HI-2799 round 1: a head appearing between a check and the command). So the single head is
- * read from the files first (none, several or unreadable: nothing runs), every confirming command is pinned at it
- * (`--at-op`), and the heads are read again after: anything but that one head is `moved`.
+ * On jj 0.47.1 an unpinned command merges diverged heads, a write (R5.3, HR2's HI-2799 round 1: a head appearing between
+ * a check and the command). So the single head is read from the files first (none, several or unreadable: nothing
+ * runs), J0's confirmation pins its commands at the head it reads (HI-2831), and the heads are read again after:
+ * anything but that one head is `moved`.
  */
 export async function pinnedContextOf(folder: string, runner: JjRunner = jjRunner): Promise<{ ctx: JjContext; op: string } | { none: true } | JjViewUnknown> {
   if (!jjOf(folder)) return { none: true }
@@ -103,11 +92,12 @@ export async function pinnedContextOf(folder: string, runner: JjRunner = jjRunne
   if (!heads) return { jjUnknown: 'heads', detail: 'unreadable' } // i18n-ignore: a protocol code
   if (heads.length !== 1) return { jjUnknown: 'heads', detail: String(heads.length) }
   const op = heads[0]
-  const d = await jjContextOf(folder, pinnedRunner(runner, op))
+  const d = await jjContextOf(folder, runner)
   const after = headsHere(folder)
   if (!after || after.length !== 1 || after[0] !== op) return { jjUnknown: 'moved' }
   if ('jj' in d) return { ctx: d.jj, op }
   if ('none' in d) return { none: true }
+  if (d.unknown === 'opHeads') return { jjUnknown: 'heads', ...(d.detail ? { detail: d.detail.slice(0, 2000) } : {}) }
   return { jjUnknown: d.unknown, ...(d.detail ? { detail: d.detail.slice(0, 2000) } : {}) }
 }
 
