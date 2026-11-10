@@ -264,6 +264,26 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(internals(w.pool).running.size).toBe(0)
       })
 
+      it("another settle while a retry waits, the folder still busy (HR1's round 2): the waiting retry kept as it is; ready once quiet", { timeout: RETRY_TEST_MS }, async () => {
+        const w = world(colocated)
+        const { lent, row } = await integrated(w, 11)
+        w.sessions.add(row.folder.toLowerCase())
+        await w.pool.release(lent.lease.id, 'done')
+        const p = internals(w.pool)
+        const entry = p.settleWaits.get(row.name)!
+        expect(entry.timer).not.toBeNull()
+        const at = { gen: entry.gen, tries: entry.tries, timer: entry.timer }
+        // An ordinary settle (a drain's) runs while that retry is pending and finds it busy too: nothing armed, nothing dropped.
+        await w.pool.drained(row.name)
+        expect(p.settleWaits.get(row.name)).toBe(entry)
+        expect({ gen: entry.gen, tries: entry.tries, timer: entry.timer }).toEqual(at)
+        expect(w.store.slot(row.name)?.state).toBe('lent')
+        // The session gone: the waiting retry settles it, nothing else asked.
+        w.sessions.delete(row.folder.toLowerCase())
+        expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
+        expect(p.settleWaits.size).toBe(0)
+      })
+
       it("an older attempt's continuation after a newer wait is armed, and after it has fired (HR1's round 1): never re-arms, drops or changes it", { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row } = await integrated(w, 10)

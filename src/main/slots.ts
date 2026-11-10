@@ -1814,11 +1814,14 @@ export class SlotPool {
       // mustn't loop it.
       if (began && to !== s.state) this.deps.looked?.(name, to)
       // Armed only after this settle's fenced end (its row written above, its operation over).
-      if (busyDetach && this.settleLater(name, genAtStart)) {
-        const w = this.settleWaits.get(name)
-        if (w) log.info(`${userText(name)} isn't quiet yet (${latch.why ?? 'busy'}): looked at again (try ${w.tries})`)
-      }
-      else if (began) this.forgetSettleLater(name, genAtStart)
+      // Busy: a new wait armed, or (refused: a wait already pending, or a newer one's) the existing one left exactly as it
+      // is (HR1's round 2). Only a completed attempt that wasn't busy ends its own wait.
+      if (busyDetach) {
+        if (this.settleLater(name, genAtStart)) {
+          const w = this.settleWaits.get(name)
+          if (w) log.info(`${userText(name)} isn't quiet yet (${latch.why ?? 'busy'}): looked at again (try ${w.tries})`)
+        }
+      } else if (began) this.forgetSettleLater(name, genAtStart)
     }
     return began
   }
