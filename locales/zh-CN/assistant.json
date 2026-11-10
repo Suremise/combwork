@@ -1,5 +1,7 @@
 {
-  "assistant.banner.connectionSetup": "此工作区中没有已启用的 {cli} 账号，因此助手无法启动。请添加一个并登录。",
+  "assistant.banner.noAccountAny": "此工作区中没有已启用的账号，因此助手无法启动。请为 Combwork 支持的任一编程智能体添加一个账号并登录：助手会使用你账号顺序中的第一个。",
+  "assistant.banner.noAccountFor": "{others, select, yes {助手运行于 {cli}，但此工作区中没有已启用的 {cli} 账号，因此无法启动。请添加一个，或在助手设置中选择其他编程智能体的账号。} other {助手运行于 {cli}，但此工作区中没有已启用的 {cli} 账号，因此无法启动。请添加一个并登录。}}",
+  "assistant.banner.signedOut": "助手的 {cli} 账号 {name} 已退出登录，因此助手无法启动。请在“设置”→“账号与连接”中重新登录。",
   "assistant.chooseConnections.agent": "智能体",
   "assistant.chooseConnections.next": "之后",
   "assistant.chooseConnections.now": "现在",

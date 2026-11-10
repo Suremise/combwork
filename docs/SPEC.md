@@ -1158,6 +1158,12 @@ The design across every surface is HI-1755's design note and addendum. The decis
       - Exactly one eligible: *{name}, your {cli} account, is off in this workspace, so … can't start*, with **Turn On Here**. That is `connections:setOn` for this window's workspace only; another workspace's choice and the order are untouched.
       - Several: they are named, with **Choose in Settings** (Accounts & Connections).
       - None at all: as before, with **Add an Account**.
+    - **The Assistant panel** (HI-2899, `assistantNeed` in shared/connectionLabel.ts, `AssistantAccountBanner`, `data-assistant-need`) names only the CLI the Assistant would really start on (`assistantCli`: running, its CLI; one that names a CLI or a connection, its own; one that names neither, a new workspace's, the CLI of the first usable connection here, as its launch picks it in sessions.ts, decision A; Automatic's pick only where none is). Never "Claude Code" by default:
+      - its connection resolves but its account is signed out (`accountState`, a sign-in account): *{name}, the Assistant's {cli} account, is signed out…*, with **Open Accounts & Connections**;
+      - none resolves and accounts that would do are off here: the banner above (`off`), any CLI's for an Assistant that names none, its own CLI's otherwise;
+      - for an Assistant that names no CLI, nothing while Combwork still looks for the CLIs or while an account is on here whose CLI isn't installed (no account is missing: the missing CLI is the CLI warnings' to say);
+      - none added, for an Assistant that names no CLI (`noneAny`): provider-neutral, *No account is on in this workspace… Add one for any coding agent Combwork supports…*, with **Add an Account**;
+      - none of its own CLI's, for one that names its CLI (`noneFor`): *The Assistant runs on {cli}, and no {cli} account is on…*, with **Add an Account**, and **Assistant Settings…** (its connection, any CLI's) when another CLI's account is on here.
     - **The other texts:**
       - An agent's refused start (`main.connections.launch.offHere`, the Agent API's too) says the CLI's accounts are off here and to turn one on with On here.
       - The choice of connection's line (`connections.choice.offHereAll`, also Add Agent's Start-a-session-now reason) names those off here.

@@ -16,8 +16,9 @@ import { freshShort, freshTip } from '../freshResume'
 import { call } from '../api'
 import { commandKeybinding } from '../commands'
 import { legacyOf, placeText, placeTip } from '../agentPlace'
-import { cliReadyOf, ConnectionChoice, connectionCellText, connectionCli, firstUsableConnection, NoConnectionBanner, useConnections } from './ConnectionChoice'
-import { connectionOf } from '@shared/connectionLabel'
+import { AssistantAccountBanner, cliReadyOf, ConnectionChoice, connectionCellText, connectionCli, firstUsableConnection, useConnections } from './ConnectionChoice'
+import { assistantCli, assistantNeed } from '@shared/connectionLabel'
+import { accountState } from '@shared/accounts'
 import { agentProviderOf, cardLabelOf, confirm, get, notify, NO_PROJECTS, projectKey, revealAgent, runOnce, set, setActivity, setLoaded, setAssistantOpen, showAssistantView, showView, useDateStyle, useStarting, useStore, startingKey, startingLabel, assistantOnLeft, setAssistantSide } from '../store'
 import { cardLabel } from '@shared/projectKeys'
 import { loadAssistantChanges } from '../assistantUndo'
@@ -388,11 +389,21 @@ export function AssistantPanel() {
  * first usable one can run it here. Not for a test copy on its CLI test home.
  */
 function AssistantConnectionBanner({ a }: { a: AgentInfo }) {
-  const provider = agentProviderOf(a)
   const view = useConnections()
-  const shown = connectionOf(a.connection, provider, undefined, view)
-  if (!shown || shown.desired.ok || !view || view.testHome.includes(provider)) return null
-  return <NoConnectionBanner cli={provider} where="assistant" />
+  const settings = useStore((s) => s.settings)
+  const providers = useStore((s) => s.providers)
+  // HI-2899: the CLI it would really start on (an Assistant that names none: the first usable account's), and what's missing.
+  const cli = useAssistantCli(a)
+  const need = assistantNeed(a, cli, view, settings, cliReadyOf(providers), (x) => accountState(x) === 'signedOut')
+  return need.kind === 'ok' ? null : <AssistantAccountBanner need={need} settingsLabel={tr(M.settingsMenu)} />
+}
+
+/** The Assistant's CLI as its launch picks it (HI-2899, assistantCli): never Automatic's guess while an account would do. */
+function useAssistantCli(a: AgentInfo): ProviderId {
+  const view = useConnections()
+  const settings = useStore((s) => s.settings)
+  const providers = useStore((s) => s.providers)
+  return assistantCli(a, view, settings, cliReadyOf(providers), agentProviderOf(a))
 }
 
 /** The hidden panel: a strip down the right edge; click it to show the panel. Its mark (#399) shows what the Assistant is doing. */
@@ -615,7 +626,7 @@ function AssistantHeader({ project, a }: { project: ProjectInfo; a: AgentInfo })
     )
   }
   const kb = commandKeybinding('assistant.toggle')
-  const provider = providerDescriptor(agentProviderOf(a)).name
+  const provider = providerDescriptor(useAssistantCli(a)).name
   const state = agentState(live)
   return (
     <div className="assistant-header">
