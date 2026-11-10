@@ -193,6 +193,23 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(head(bare)).toBe(result)
   })
 
+  it('a target tracking a remote branch of another name: tested on, published to and hooked with that branch’s full ref (HR2’s s20 note)', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, queue } = following()
+    sh(e.project, 'push', '-q', 'origin', 'main:trunk')
+    sh(e.project, 'branch', '--set-upstream-to=origin/trunk', 'main')
+    const log = slash(join(tempDir('hook-'), 'log.txt'))
+    writeFileSync(join(e.project, '.git', 'hooks', 'pre-push'), `#!/bin/sh\n{ echo "args $1 $2"; cat; } >> "${log}"\n`)
+    const mainBefore = head(bare, 'main')
+    const onto = head(bare, 'trunk')
+    await queued(e, 'A', 'a.txt')
+    expect((await queue().drain('main')).map((o) => o.outcome)).toEqual(['integrated'])
+    const result = head(bare, 'trunk')
+    expect(result).not.toBe(onto)
+    expect(head(bare, 'main')).toBe(mainBefore)
+    expect(head(e.project, 'main')).toBe(result)
+    expect(readFileSync(log, 'utf8').trim().split(/\r?\n/)).toEqual([`args origin ${bare}`, `${result} ${result} refs/heads/trunk ${onto}`])
+  })
+
   it('a publication whose reply is lost is verified at the remote: shown there, Done, and never pushed twice', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, bare, queue } = following()
     const a = await queued(e, 'A', 'a.txt')
