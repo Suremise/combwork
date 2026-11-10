@@ -251,11 +251,16 @@ const onDb = (fn) => {
     if (!stopped) throw new Error('B1 never stopped')
     // HI-2906: the slot goes back to the pool by itself once its builder has left (detached at main; a slot's state is
     // `ready` when not lent), the pool's settle retried while the session was still leaving.
+    // Its bound: the retries' pauses grow to 30 s, and the folder can stay in use for a while after its builder's process
+    // has gone (seen: over 30 s), so two of the longest pauses beyond the usual bound.
     const back = await until(async () => {
       const s = (await inv('slots:list', shop)).find((x) => x.name === slot)
       return s && s.state === 'ready' ? s : null
-    }, HUNG_MS)
+    }, HUNG_MS * 2)
     check('after Done, the slot is back in the pool (ready, not lent)', !!back, JSON.stringify(await inv('slots:list', shop)))
+    // What held it meanwhile, as the app logged each retry (HI-2906), for the record.
+    const appLog = path.join(userData, 'logs', 'combwork.log')
+    for (const l of (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '').split(/\r?\n/).filter((x) => /isn't quiet|detaching|detached/.test(x))) console.log(`INFO app: ${l.slice(0, 300)}`)
     if (!back) throw new Error('the slot never came back to the pool')
     const wsName = w1.workspace
     fs.writeFileSync(path.join(w1.folder, 'draft.txt'), 'unrecorded\n')

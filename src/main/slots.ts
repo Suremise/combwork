@@ -1412,6 +1412,8 @@ const SETTLE_RETRY_MAX_MS = 30_000
 /** What one settle attempt's fences saw (HI-2906): whether any of them found the folder no longer quiet. */
 interface QuietLatch {
   lostQuiet: boolean
+  /** What its first refusal saw (for the log), where it was read. */
+  why?: string
 }
 
 /** A fence whose refusals (a false `still`, an unheld `commit`) set the attempt's latch before they are answered. */
@@ -1475,8 +1477,12 @@ export class SlotPool {
     // A record is a write in the folder (HR1, HI-2795 round 1): only once nothing else writes there, proved right before
     // it: the operation still holds the slot with no writer or job on it, no session in it, and no process in it.
     const busy = { unknown: true as const, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
-    if (!(await this.quietFor(s, token))) {
-      if (latch) latch.lostQuiet = true
+    const why = await this.notQuiet(s, token)
+    if (why) {
+      if (latch) {
+        latch.lostQuiet = true
+        latch.why ??= why
+      }
       return busy
     }
     const fence: WorkspaceFence = latched({ still: () => this.quietFor(s, token) }, latch)
@@ -1514,8 +1520,16 @@ export class SlotPool {
 
   /** Nothing but this operation (`token`) in a slot: no writer, no job, no session, no process (the rename probe). */
   private async quietFor(s: Slot, token: string): Promise<boolean> {
-    const held = await this.store.fenced(s.name, token, (_db, now) => !now.writer && !now.job).catch(() => false)
-    return held && !this.deps.sessionIn?.(s.folder) && (await quiet(s.folder))
+    return (await this.notQuiet(s, token)) === null
+  }
+
+  /** What keeps a slot from being quiet for this operation (quietFor's answer, for the log): null when it is. English. */
+  private async notQuiet(s: Slot, token: string): Promise<string | null> {
+    const held = await this.store.fenced(s.name, token, (_db, now) => (now.writer ? 'writer' : now.job ? 'job' : null)).catch(() => 'operation lost') // i18n-ignore: a log detail
+    if (held) return held
+    const session = this.deps.sessionIn?.(s.folder)
+    if (session) return `session ${session}` // i18n-ignore: a log detail
+    return (await quiet(s.folder)) ? null : 'the folder is in use' // i18n-ignore: a log detail
   }
 
   /** A slot's removal journal (HI-2795: a jj removal's phases, so an interrupted one resumes), board_meta by key. */
@@ -1783,6 +1797,8 @@ export class SlotPool {
             // while the folder wasn't quiet yet (its builder's session or a process still leaving it: jj's owned move is
             // fenced by quiet) is asked again soon, as nothing else may say when it has gone (HI-2906).
             busyDetach = latch.lostQuiet
+            // For the log only (the latch decided): what is in the way now, read after the refusal.
+            if (busyDetach && !latch.why) latch.why = `the detach's fence; now: ${(await this.notQuiet(s, token)) ?? 'quiet'}` // i18n-ignore: a log detail
           } else if (now !== null) to = now
         } finally {
           // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
@@ -1798,7 +1814,11 @@ export class SlotPool {
       // mustn't loop it.
       if (began && to !== s.state) this.deps.looked?.(name, to)
       // Armed only after this settle's fenced end (its row written above, its operation over).
-      if (busyDetach) this.settleLater(name)
+      if (busyDetach) {
+        this.settleLater(name)
+        const w = this.settleWaits.get(name)
+        if (w) log.info(`${userText(name)} isn't quiet yet (${latch.why ?? 'busy'}): looked at again (try ${w.tries})`)
+      }
       else if (began) this.forgetSettleLater(name, genAtStart)
     }
     return began
