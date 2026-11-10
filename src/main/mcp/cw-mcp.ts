@@ -84,7 +84,7 @@ const T = {
   'notify.arg.target': agentMsg({ id: 'tool.notify.arg.target', text: "What a click opens: '{ agent, project }' or '{ card }' (its key)." }),
   'inbox.arg.ack': agentMsg({ id: 'tool.inbox.arg.ack', text: 'Ids you have acted on ("m12"). Alone, it acks and lists nothing.' }),
   'inbox.arg.read': agentMsg({ id: 'tool.inbox.arg.read', text: 'With ack: acks, then reads what is new, in the same call.' }),
-  'listProviders.description': agentMsg({ id: 'tool.listProviders.description', text: 'The coding-agent providers, a line each: on, installed, default model, effort levels, modes and connections to use for agents. provider: one as JSON, its models and what each mode does.' }),
+  'listProviders.description': agentMsg({ id: 'tool.listProviders.description', text: 'The coding-agent providers, a line each: on, installed, default model, effort levels, modes and connections to use for agents (a connection on an account with other models: its own count and default). provider: one as JSON, its models, each connection\'s own, and what each mode does.' }),
   'listProviders.arg.provider': agentMsg({ id: 'tool.listProviders.arg.provider', text: 'Its id ("claude-code").' }),
   'listProviders.error.unknown': agentMsg({ id: 'tool.listProviders.error.unknown', text: 'No provider {provider}: one of {ids}.', note: 'cw_list_providers (HI-2814): provider names none; {ids} lists the providers’ ids.' }),
   'agentActivity.description': agentMsg({ id: 'tool.agentActivity.description', text: 'What one agent is doing, as JSON: status, model and effort, its folder, its task and latest reply (clipped), last tool calls, retry waits and its inbox. detail=true clips less. (detail: use-cw-api, tools.md)' }),

@@ -351,7 +351,7 @@
     "text": "Its id (\"claude-code\")."
   },
   "tool.listProviders.description": {
-    "text": "The coding-agent providers, a line each: on, installed, default model, effort levels, modes and connections to use for agents. provider: one as JSON, its models and what each mode does."
+    "text": "The coding-agent providers, a line each: on, installed, default model, effort levels, modes and connections to use for agents (a connection on an account with other models: its own count and default). provider: one as JSON, its models, each connection's own, and what each mode does."
   },
   "tool.listProviders.error.unknown": {
     "text": "No provider {provider}: one of {ids}.",
