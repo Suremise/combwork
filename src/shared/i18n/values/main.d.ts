@@ -339,6 +339,7 @@ interface CombworkMessageValues {
   'main.restart.resumedLine': { names: string | number }
   'main.restart.why.expired': undefined
   'main.restart.why.held': undefined
+  'main.restart.why.idle': undefined
   'main.restart.why.movedOn': undefined
   'main.restart.why.notReady': undefined
   'main.restart.why.notStopped': undefined
