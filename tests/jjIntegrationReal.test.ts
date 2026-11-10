@@ -630,4 +630,135 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       expect(s2.rows.find((r) => r.result === B)!.state).toBe('owed')
     })
   })
+
+  describe('a settled record keeps its evidence and is re-checked (HI-2873, Darren\'s B; design HI-2873/s7, s11, s14)', () => {
+    const push = (w: World, rev: string): void => {
+      w.setMain(rev)
+      w.jj('git', 'push', '--bookmark', 'main')
+    }
+    const owe = (w: World, card: string, result: string) => ({ card, cycle: 1, bundle: `b0-${token()}`, target: 'main', result, at: 1 })
+    /** T pushed and owed by HI-1, observed: published with its evidence. */
+    async function publishedT(w: World) {
+      const store = memoryObligations()
+      push(w, w.T)
+      reconstructObligations(store, [owe(w, 'HI-1', w.T)])
+      expect(await observePublish(w.deps(), 'main', store)).toMatchObject({ settled: [{ to: 'published' }], flagged: [] })
+      expect(store.rows[0]).toMatchObject({ state: 'published', pushed: w.T, seq: 1, seen: { remote: 'origin', pushed: w.T, head: w.T } })
+      expect(store.rows[0].seen!.print).toMatch(/\S/)
+      return store
+    }
+    const bare = (w: World, name: string): string => {
+      const at = join(resolve(w.repo, '..'), name)
+      plainGit(resolve(w.repo, '..'), 'clone', '-q', '--bare', w.remote, at)
+      return at
+    }
+
+    it('the remote moved back past the result after the record: checkThis, with what differs; the evidence kept', async () => {
+      const w = await world(true)
+      const store = await publishedT(w)
+      const seen = structuredClone(store.rows[0].seen)
+      await w.git(['push', '-q', '--force', w.remote, `${w.fBase}:refs/heads/main`])
+      const out = await observePublish(w.deps(), 'main', store)
+      expect(out, JSON.stringify(out)).toMatchObject({ flagged: [{ differs: [{ what: 'pushed', was: w.T, now: w.fBase }, { what: 'inRemote', was: 'yes', now: 'no' }] }] })
+      expect(store.rows[0]).toMatchObject({ state: 'checkThis', seen, check: { was: 'published' } })
+      // Terminal for automation: later passes leave it as it is, and reconstruction never brings it back.
+      push(w, w.T)
+      expect(await observePublish(w.deps(), 'main', store)).toMatchObject({ flagged: [] })
+      expect(store.rows[0].state).toBe('checkThis')
+      expect(reconstructObligations(store, [{ ...owe(w, 'HI-1', w.T), bundle: store.rows[0].bundle }])).toBe(0)
+    })
+
+    it('unchanged: stays published and is not written; the remote advancing past it: still published', async () => {
+      const w = await world(false)
+      const store = await publishedT(w)
+      const before = structuredClone(store.rows)
+      expect(await observePublish(w.deps(), 'main', store)).toMatchObject({ settled: [], flagged: [] })
+      expect(store.rows).toEqual(before)
+      w.jj('new', w.T, '--no-edit', '-m', 'after')
+      push(w, w.log(`children(${w.T})`)[0])
+      expect(await observePublish(w.deps(), 'main', store)).toMatchObject({ flagged: [] })
+      expect(store.rows).toEqual(before)
+    })
+
+    it('the remote URL changed (the same commits there): checkThis, the destination differs', async () => {
+      const w = await world(true)
+      const store = await publishedT(w)
+      const seenUrl = store.rows[0].seen!.url
+      const other = bare(w, 'moved.git')
+      w.jj('git', 'remote', 'set-url', 'origin', other)
+      const out = await observePublish(w.deps(), 'main', store)
+      expect(out, JSON.stringify(out)).toMatchObject({ flagged: [{ differs: [{ what: 'url', was: seenUrl }] }] })
+      expect(store.rows[0].state).toBe('checkThis')
+    })
+
+    it('notHeld, then the result pushed after all: checkThis; a stale row and an owed row in one pass: one flag, one settle', async () => {
+      const w = await world(true)
+      const store = memoryObligations()
+      w.jj('new', w.T, w.R, '--no-edit', '-m', 'merge by hand')
+      const A = w.log(`children(${w.T}) & children(${w.R})`)[0]
+      push(w, w.T)
+      reconstructObligations(store, [owe(w, 'HI-1', A)])
+      expect(await observePublish(w.deps(), 'main', store)).toMatchObject({ settled: [{ to: 'notHeld' }] })
+      reconstructObligations(store, [owe(w, 'HI-2', A)])
+      push(w, A)
+      const out = await observePublish(w.deps(), 'main', store)
+      expect(out, JSON.stringify(out)).toMatchObject({ settled: [{ key: { card: 'HI-2' }, to: 'published' }], flagged: [{ key: { card: 'HI-1' }, differs: [{ what: 'pushed', was: w.T, now: A }, { what: 'inRemote', was: 'no', now: 'yes' }] }] })
+      expect(store.rows.map((r) => [r.card, r.state, r.seq])).toEqual([['HI-1', 'checkThis', 1], ['HI-2', 'published', 2]])
+    })
+
+    it('the only remote removed after the record: a verified absence flags it; an owed row is never settled', async () => {
+      const w = await world(true)
+      const store = await publishedT(w)
+      w.jj('new', w.T, '--no-edit', '-m', 'later')
+      const L = w.log(`children(${w.T})`)[0]
+      reconstructObligations(store, [owe(w, 'HI-2', L)])
+      const seenUrl = store.rows[0].seen!.url
+      w.jj('git', 'remote', 'remove', 'origin')
+      const out = await observePublish(w.deps(), 'main', store)
+      expect(out, JSON.stringify(out)).toEqual({ noRemote: true, flagged: [{ key: expect.objectContaining({ card: 'HI-1' }), differs: [{ what: 'remote', was: 'origin', now: null }, { what: 'url', was: seenUrl, now: null }] }] })
+      expect(store.rows.map((r) => r.state)).toEqual(['checkThis', 'owed'])
+    })
+
+    it('the remote removed at the pre-settle final fence: nothing settled, nothing flagged, the sweep where it was', async () => {
+      const w = await world(true)
+      const store = await publishedT(w)
+      reconstructObligations(store, [owe(w, 'HI-2', w.T)])
+      let fenced = 0
+      const hook = (p: JjIntegrationPoint): void => {
+        if (p === 'finalFence' && ++fenced === 2) w.jj('git', 'remote', 'remove', 'origin')
+      }
+      const out = await observePublish(w.deps({ hook }), 'main', store)
+      expect(fenced).toBe(2)
+      expect(out, JSON.stringify(out)).toMatchObject({ jjUnknown: 'moved' })
+      expect(store.rows.map((r) => r.state)).toEqual(['published', 'owed'])
+      expect(store.getSweep('main')).toBeNull()
+    })
+
+    // As round 6 (HR2) for the settles: a change queued 1 or 2 microtasks deep at the final fence lands before the
+    // caller's continuation and nothing is flagged; at depth 3 it lands after the synchronous writes.
+    it.each([1, 2, 3])('a stale row, a change queued %i microtask(s) deep at the final fence: never between the final validation and the flag', async (depth) => {
+      const w = await world(true)
+      const rows = await publishedT(w)
+      await w.git(['push', '-q', '--force', w.remote, `${w.fBase}:refs/heads/main`])
+      const log: string[] = []
+      const store = { ...rows, flag: (...a: Parameters<typeof rows.flag>) => (log.push('flag'), rows.flag(...a)) }
+      let fenced = 0
+      const change = (): void => {
+        log.push('change')
+        appendFileSync(join(w.store, 'config'), `[Remote "origin"]\n\turl = ${join(resolve(w.repo, '..'), 'different.git').split('\\').join('/')}\n`)
+      }
+      const queue = (n: number): void => queueMicrotask(() => (n <= 1 ? change() : queue(n - 1)))
+      const hook = (p: JjIntegrationPoint): void => {
+        if (p === 'finalFence' && ++fenced === 2) queue(depth)
+      }
+      const out = await observePublish(w.deps({ hook }), 'main', store)
+      await new Promise((r) => setImmediate(r))
+      expect(fenced).toBe(2)
+      if (depth < 3) {
+        expect(out, JSON.stringify(out)).not.toHaveProperty('flagged')
+        expect(log).toEqual(['change'])
+        expect(rows.rows[0].state).toBe('published')
+      } else expect(log).toEqual(['flag', 'change'])
+    })
+  })
 })
