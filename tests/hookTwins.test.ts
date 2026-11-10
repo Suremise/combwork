@@ -3,7 +3,7 @@
 // one delivered response at a time, never another occurrence's reply; the rest handled each time.
 import http from 'http'
 import { describe, expect, it } from 'vitest'
-import { TWINS_PER_RUN, carrying, claimTwin, decisionOnly, endOccurrences, endTwins, hasContext, hooksDoubled } from '../src/main/hookTwins'
+import { TWINS_PER_RUN, answering, carrying, claimTwin, decisionOnly, endTwins, hasContext, hooksDoubled } from '../src/main/hookTwins'
 import { claudeCode } from '../src/main/providers/claude/adapter'
 
 const deny = { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'x.txt is locked by Bo' } }
@@ -11,7 +11,7 @@ const notice = { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalC
 let n = 0
 const run = (): string => `run${++n}`
 /** A delivery of the identity `key` whose body is the same each time (a copy). */
-const claim = (r: string, key: string, onDoubled?: () => void) => claimTwin(r, key, { key }, onDoubled)
+const claim = (r: string, key: string, onDoubled?: () => void) => claimTwin(r, { key, unique: true }, { key }, onDoubled)
 
 describe('duplicate hook deliveries (HI-2777)', () => {
   it('a hook with no identity is never matched', () => {
@@ -136,10 +136,16 @@ describe('duplicate hook deliveries (HI-2777)', () => {
   })
 })
 
-/** A delivery as the hook route takes it (servers.ts): the identities it ends first, then its claim. */
+/** A delivery as the hook route claims it (servers.ts), its response still open. */
 function deliver(r: string, body: Record<string, any>) {
-  endOccurrences(r, claudeCode.hookOccurrencesEnded(body))
   return claimTwin(r, claudeCode.hookOccurrence(body), body)
+}
+
+/** A delivery claimed and, if the first, answered (its response written): the CLI may go on to its next event. */
+function handled(r: string, body: Record<string, any>) {
+  const c = deliver(r, body)
+  if (c?.first) c.entry.answered()
+  return c
 }
 
 describe('only a copy is a twin (HI-2850)', () => {
@@ -152,26 +158,28 @@ describe('only a copy is a twin (HI-2850)', () => {
 
   it("the recorded case (HB3, 10 Nov 01:49:35): a message queued mid-turn is submitted under the turn's prompt_id; it is handled, nothing doubled", () => {
     const r = run()
-    expect(deliver(r, prompt('[CW] New in your inbox: 1 task (HI-2797) (m38350).'))!.first).toBe(true)
-    expect(deliver(r, tool('PreToolUse', 'toolu_01Pcb5g3E3EJTReWRnxeHLiP'))!.first).toBe(true)
-    expect(deliver(r, tool('PostToolUse', 'toolu_01Pcb5g3E3EJTReWRnxeHLiP'))!.first).toBe(true)
+    expect(handled(r, prompt('[CW] New in your inbox: 1 task (HI-2797) (m38350).'))!.first).toBe(true)
+    expect(handled(r, tool('PreToolUse', 'toolu_01Pcb5g3E3EJTReWRnxeHLiP'))!.first).toBe(true)
+    expect(handled(r, tool('PostToolUse', 'toolu_01Pcb5g3E3EJTReWRnxeHLiP'))!.first).toBe(true)
     // The queued message, attached at the tool boundary: the same prompt_id, its own text.
-    expect(deliver(r, prompt(queued))!.first).toBe(true)
+    expect(handled(r, prompt(queued))!.first).toBe(true)
     expect(hooksDoubled(r)).toBe(false)
     endTwins(r)
   })
 
-  it('a real copy (the body the same) is still a twin: of a prompt, a queued prompt and a tool call', () => {
+  it('a real copy, arriving while the first is answered (the CLI runs both handlers at once), is a twin: of a prompt, a queued prompt and a tool call', () => {
     const r = run()
     const a = deliver(r, prompt('go'))!
+    expect(a.first).toBe(true)
     expect(deliver(r, prompt('go'))!.first).toBe(false)
     expect(hooksDoubled(r)).toBe(true)
-    expect(a.first).toBe(true)
+    a.entry.answered()
     // Its keys in another order (another writer's JSON): the same copy.
     const pre = tool('PreToolUse', 'toolu_x')
     expect(deliver(r, pre)!.first).toBe(true)
     expect(deliver(r, Object.fromEntries(Object.entries(pre).reverse()))!.first).toBe(false)
-    expect(deliver(r, prompt(queued))!.first).toBe(true)
+    const q = deliver(r, prompt(queued))!
+    expect(q.first).toBe(true)
     expect(deliver(r, prompt(queued))!.first).toBe(false)
     endTwins(r)
   })
@@ -186,26 +194,64 @@ describe('only a copy is a twin (HI-2850)', () => {
     endTwins(r)
   })
 
-  it('the same text queued again later in the turn, after a tool call, is a prompt of its own; its copy is still a twin', () => {
+  it("HR2's case: two messages queued with the same text, submitted one after the other with no tool call between: both handled, nothing doubled", () => {
     const r = run()
-    expect(deliver(r, prompt('continue'))!.first).toBe(true)
-    expect(deliver(r, tool('PreToolUse', 'toolu_a'))!.first).toBe(true)
-    expect(deliver(r, tool('PostToolUse', 'toolu_a'))!.first).toBe(true)
-    expect(deliver(r, prompt('continue'))!.first).toBe(true)
-    expect(deliver(r, prompt('continue'))!.first).toBe(false)
+    expect(handled(r, prompt('go on'))!.first).toBe(true)
+    // Claude Code submits the second only once the first's handlers have answered.
+    expect(handled(r, prompt('Same again.'))!.first).toBe(true)
+    expect(handled(r, prompt('Same again.'))!.first).toBe(true)
+    expect(handled(r, prompt('Same again.'))!.first).toBe(true)
+    expect(hooksDoubled(r)).toBe(false)
     endTwins(r)
   })
 
-  it("a sub-agent's tool calls (agent_id, beside the main turn) end no prompt and are never taken for each other", () => {
+  it('…and with hooks really doubled: each of them handled once, its own copy answered from it', () => {
     const r = run()
-    expect(deliver(r, prompt('review it'))!.first).toBe(true)
+    for (let k = 0; k < 3; k++) {
+      const a = deliver(r, prompt('Same again.'))!
+      expect(a.first).toBe(true)
+      expect(deliver(r, prompt('Same again.'))!.first).toBe(false)
+      a.entry.answered()
+    }
+    expect(hooksDoubled(r)).toBe(true)
+    endTwins(r)
+  })
+
+  it('a tool call or the session start is one event whenever its copy comes, even after the first was answered', () => {
+    const r = run()
+    expect(handled(r, tool('PreToolUse', 'toolu_late'))!.first).toBe(true)
+    expect(deliver(r, tool('PreToolUse', 'toolu_late'))!.first).toBe(false)
+    const start = { ...base, hook_event_name: 'SessionStart', source: 'startup' }
+    expect(handled(r, start)!.first).toBe(true)
+    expect(deliver(r, start)!.first).toBe(false)
+    endTwins(r)
+  })
+
+  it("a sub-agent's tool calls (agent_id) are never taken for each other, and a prompt's copy beside them is its twin", () => {
+    const r = run()
+    const p = deliver(r, prompt('review it'))!
+    expect(p.first).toBe(true)
     const sub = { agent_id: 'a136948b260e2cd4d', agent_type: 'general-purpose' }
-    expect(claudeCode.hookOccurrencesEnded(tool('PreToolUse', 'toolu_s1', sub))).toBeNull()
-    expect(deliver(r, tool('PreToolUse', 'toolu_s1', sub))!.first).toBe(true)
-    expect(deliver(r, tool('PreToolUse', 'toolu_s2', sub))!.first).toBe(true)
-    expect(deliver(r, tool('PostToolUse', 'toolu_s1', sub))!.first).toBe(true)
-    // The prompt's copy, arriving while the sub-agent works: still its twin.
+    expect(handled(r, tool('PreToolUse', 'toolu_s1', sub))!.first).toBe(true)
+    expect(handled(r, tool('PreToolUse', 'toolu_s2', sub))!.first).toBe(true)
+    expect(handled(r, tool('PostToolUse', 'toolu_s1', sub))!.first).toBe(true)
     expect(deliver(r, prompt('review it'))!.first).toBe(false)
+    endTwins(r)
+  })
+
+  it("answering: the first's response finishing or closing ends its window; one already closed ends it at once", () => {
+    const listeners: Record<string, () => void> = {}
+    const res = { destroyed: false, closed: false, writableFinished: false, once: (e: 'finish' | 'close', f: () => void) => (listeners[e] = f) }
+    const r = run()
+    const a = deliver(r, prompt('x'))!
+    answering(res, a.entry)
+    expect(a.entry.open).toBe(true)
+    listeners.finish()
+    expect(a.entry.open).toBe(false)
+    expect(deliver(r, prompt('x'))!.first).toBe(true)
+    const b = deliver(r, prompt('y'))!
+    answering({ ...res, closed: true }, b.entry)
+    expect(b.entry.open).toBe(false)
     endTwins(r)
   })
 

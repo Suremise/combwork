@@ -15,11 +15,14 @@
  * Only a copy is a twin (HI-2850): the identity and the body, field for field. Claude Code sends each handler of one event
  * the same input (a SessionStart command forwards it byte for byte), while two distinct events can share an id: a
  * message queued while a turn runs (another session's, the user's typed ahead) is submitted into that turn with its
- * prompt_id, its own text in the body. And an identity a later event shows to be over ends (endOccurrences): Claude Code
- * runs every handler of an event before it goes on, so a prompt's copies have all come by the time its turn runs a tool,
- * and the same text queued again later in that turn is a prompt of its own.
+ * prompt_id, its own text in the body. And an identity the CLI may give two events (`unique: false`: a prompt_id, and
+ * two messages queued with the same text have the same body too) is matched only while its first delivery is still
+ * being answered: Claude Code runs every handler of an event at once and sends nothing more until each has answered, so
+ * a delivery that comes while the first's response is open belongs to the same event, and one after it may be another,
+ * which is handled (handled twice at worst, never dropped).
  */
 import { createHash } from 'crypto'
+import type { HookOccurrence } from './providers/types'
 
 /** How many identities a run keeps (the oldest go first: a duplicate of one older than that is handled again). */
 export const TWINS_PER_RUN = 4096
@@ -35,8 +38,20 @@ export class TwinEntry {
   private settle!: (v: unknown) => void
   private context: ContextState = 'unsent'
   private changed: (() => void)[] = []
+  /** The first delivery's response is still open (HI-2850: the CLI can't have gone on to another event yet). */
+  private answering = true
   constructor() {
     this.answer = new Promise((r) => (this.settle = r))
+  }
+
+  /** The first delivery's response has finished or closed: the CLI may send another event of the same identity now. */
+  answered(): void {
+    this.answering = false
+  }
+
+  /** Whether the first delivery's response is still open. */
+  get open(): boolean {
+    return this.answering
   }
 
   /** The first delivery's reply, computed. */
@@ -182,17 +197,19 @@ export function copyKey(key: string, body: unknown): string {
 }
 
 /**
- * A delivery of the occurrence `key` (null: it has no identity) of the run `run`, with its body: a twin only of an
- * earlier delivery of the same identity and the same body (HI-2850). Decided at arrival, before anything is awaited, so
- * of two deliveries arriving together one is always the first. `onDoubled` the first time a run has one.
+ * A delivery of the occurrence `occurrence` (null: it has no identity) of the run `run`, with its body: a twin only of
+ * an earlier delivery of the same identity and the same body (HI-2850), and of an identity that isn't unique only while
+ * that earlier delivery's response is open (answering). Decided at arrival, before anything is awaited, so of two
+ * deliveries arriving together one is always the first. `onDoubled` the first time a run has one.
  */
-export function claimTwin(run: string, occurrence: string | null, body: unknown, onDoubled?: () => void): TwinClaim | null {
+export function claimTwin(run: string, occurrence: HookOccurrence | null, body: unknown, onDoubled?: () => void): TwinClaim | null {
   if (!occurrence) return null
-  const key = copyKey(occurrence, body)
+  const key = copyKey(occurrence.key, body)
   let seen = runs.get(run)
   if (!seen) runs.set(run, (seen = new Map()))
   const had = seen.get(key)
-  if (had) {
+  // Answered already: the CLI may have gone on to another event with this identity and body, which is handled.
+  if (had && (occurrence.unique || had.open)) {
     if (!doubled.has(run)) {
       doubled.add(run)
       onDoubled?.()
@@ -200,19 +217,24 @@ export function claimTwin(run: string, occurrence: string | null, body: unknown,
     return { first: false, entry: had }
   }
   const entry = new TwinEntry()
+  // A newer occurrence of the same key takes its place, last in the order.
+  seen.delete(key)
   seen.set(key, entry)
   if (seen.size > TWINS_PER_RUN) seen.delete(seen.keys().next().value!)
   return { first: true, entry }
 }
 
 /**
- * The run's identities starting with `prefix` are over (HI-2850: a later event shows every copy of them has come): a
- * delivery of one after this is an occurrence of its own, handled. Deliveries already waiting on one carry on.
+ * The first delivery's response (HI-2850): the entry hears when it has finished or closed, after which a delivery of an
+ * identity that isn't unique is no longer its copy. One already closed is answered at once.
  */
-export function endOccurrences(run: string, prefix: string | null): void {
-  const seen = prefix ? runs.get(run) : undefined
-  if (!seen) return
-  for (const k of [...seen.keys()]) if (k.startsWith(prefix!)) seen.delete(k)
+export function answering(res: CarryingResponse, entry: TwinEntry): void {
+  if (res.destroyed || res.closed || res.writableFinished) {
+    entry.answered()
+    return
+  }
+  res.once('finish', () => entry.answered())
+  res.once('close', () => entry.answered())
 }
 
 /** Whether the run's hooks have arrived twice. */

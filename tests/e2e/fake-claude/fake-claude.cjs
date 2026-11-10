@@ -19,7 +19,7 @@
 //   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "subtools N" (a step)
 //   runs a sub-agent in the foreground whose N tool calls carry its agent_id; "queued N" (a step) takes N messages that
 //   came meanwhile into the turn at tool boundaries, each a UserPromptSubmit under the turn's prompt_id, as 2.1.321 does
-//   ("queuedsame N": all one text; HI-2850). "pad N" adds N KB to the
+//   ("queuedsame N": all one text, taken at one boundary; HI-2850). "pad N" adds N KB to the
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
 //   It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected);
 //   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
@@ -659,13 +659,14 @@ async function followDoorbell() {
  * "queued N": N messages that came while it works (another session's, as HB2's to HB3 on 10 Nov, HI-2850), each taken
  * into the turn at the next tool boundary as Claude Code 2.1.321 takes one: queued (enqueue), a Bash call, then taken
  * (remove, a queued_command attachment) with a UserPromptSubmit under the running turn's prompt_id and its own text.
- * `same`: every message the same text ("queuedsame N").
+ * `same` ("queuedsame N"): every message the same text, all taken at one boundary, one after the other with no tool
+ * call between (HR2's case: each submitted once the one before has been answered).
  */
 async function queuedMessages(n, same) {
   for (let k = 1; k <= n; k++) {
     const text = `<cross-session-message from="uds:fake" from-name="fake peer">\n${same ? 'Same again.' : `Message ${k} from a peer.`}\n</cross-session-message>`
     write({ type: 'queue-operation', operation: 'enqueue', content: text })
-    await checkpoint()
+    if (!same || k === 1) await checkpoint()
     write({ type: 'queue-operation', operation: 'remove', content: text })
     write({ type: 'attachment', uuid: randomUUID(), attachment: { type: 'queued_command', prompt: text } })
     await hook('UserPromptSubmit', { prompt: text })
