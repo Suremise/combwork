@@ -166,6 +166,7 @@ const until = lib.until
 
     // ---- 5. No managed settings at all (Darren's PC, HI-2850): a busy turn is never taken for hooks arriving twice.
     fs.rmSync(path.join(managedDir, 'managed-settings.json'), { force: true })
+    // Ready before any turn: a fresh start.
     check('5: the agent starts', (await start()) && !!(await until(async () => (await live())?.status === 'ready', HUNG_MS)))
     await busyTurn('5')
     check("5: the fake ran Combwork's handlers alone", fakeRows().length === 0)
@@ -175,6 +176,7 @@ const until = lib.until
     // ---- 6. A snippet whose HTTP hooks post to another URL (?copy=1, the same route): the CLI runs both handlers of every
     // event, so each hook really arrives twice. Each copy is answered from the first; each distinct event still handled.
     writeManaged(JSON.parse(JSON.stringify(snippet).replaceAll(`http://127.0.0.1:${PORT}/hook`, `http://127.0.0.1:${PORT}/hook?copy=1`)))
+    // Ready before any turn: a fresh start.
     check('6: the agent starts', (await start()) && !!(await until(async () => (await live())?.status === 'ready', HUNG_MS)))
     await busyTurn('6')
     check('6: the fake ran two HTTP handlers for each prompt and tool call', fakeRows().filter((r) => r.event === 'UserPromptSubmit' || r.event === 'PreToolUse').every((r) => r.handlers === 2) && fakeRows().some((r) => r.event === 'PreToolUse'), JSON.stringify(fakeRows().slice(0, 6)))
