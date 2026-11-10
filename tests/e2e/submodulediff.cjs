@@ -117,6 +117,17 @@ const commitFile = (dir, file, text, message) => {
   const folderRow = page.locator(`.split-main [data-gitlink-diff="${SUB}"] [data-gitlink="${SUB}"]`)
   check('Changes shows B → C (git’s own word for where the checkout is)', !!(await lib.until(async () => (await text(folderRow)) === `Submodule ${SUB}: ${B.slice(0, 7)} → ${C.slice(0, 7)}`, HUNG_MS)), await text(page.locator('.split-main')))
   await shots('changes')
+  // Back at the index's commit (B), a tracked file edited inside (HR3's round 1): B → B, with the dirty note and git's
+  // own -dirty line.
+  git(path.join(proj, SUB), 'checkout', '-q', B)
+  fs.writeFileSync(path.join(proj, SUB, 's.txt'), 'edited\n')
+  await page.locator('.split-list .pane-header').getByRole('button', { name: 'Refresh' }).click()
+  const dirtyHead = page.locator(`.split-main [data-gitlink-diff="${SUB}"] .gitlink-diff-head`)
+  check('a checkout dirty at the index’s commit: B → B, saying it has uncommitted changes inside', !!(await lib.until(async () => (await text(folderRow)) === `Submodule ${SUB}: ${B.slice(0, 7)} → ${B.slice(0, 7)}` && (await text(dirtyHead)).includes('Its folder has uncommitted changes inside.'), HUNG_MS)), await text(page.locator('.split-main')))
+  await page.locator('.split-main').getByRole('button', { name: 'Show git’s diff' }).click()
+  const folderGit = page.locator(`.split-main [data-gitlink-git="${SUB}"]`)
+  check('…and git’s own line says -dirty', !!(await lib.until(async () => (await text(folderGit)).replace(/ /g, ' ').includes(`Subproject commit ${B}-dirty`), HUNG_MS)), await text(folderGit))
+  await shots('changes-dirty')
 
   // --- The card's Work section: its files, the row in place of the path.
   await showBoard(page)

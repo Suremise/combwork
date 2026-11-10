@@ -5,7 +5,7 @@ import { lstat, readFile, readlink, realpath, stat } from 'original-fs/promises'
 import { insideReal } from './fsutil'
 import { gitExe, gitExeGone, gitProblem, gitTool, noteGitMissing, noteGitRan, PATH_GIT, type GitExe } from './gitTool'
 import type { GitDiff, GitStatus } from '../shared/types'
-import { gitlinkOf, parseRawRows, parseSubprojectPatch, subprojectLine, unresolved, type GitlinkChange, type GitlinkSide } from '../shared/gitlink'
+import { gitlinkOf, parseRawRows, parseSubprojectPatch, subprojectLine, type GitlinkChange, type GitlinkSide } from '../shared/gitlink'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
@@ -526,10 +526,12 @@ async function workingGitlink(projectPath: string, ref: string, rel: string): Pr
     if (!born.ok && !born.err.trim()) return null
     throw e
   }
-  if (!link || !unresolved(link.to)) return link
+  // Every working gitlink side is read from git's own line, its id resolved or not: a checkout dirty at the index's
+  // commit has raw's (nonzero) id, and only the patch says it is dirty (HR3's round 1).
+  if (!link || link.to.kind !== 'gitlink') return link
   const p = await git(projectPath, ['--literal-pathspecs', 'diff', '--no-color', '--no-ext-diff', '--submodule=short', ref, '--', rel])
   if (!p.ok) throw failure('git diff', p) // i18n-ignore: a git command, as it is
-  const now = parseSubprojectPatch(p.out)
+  const now = parseSubprojectPatch(p.out, link.from.kind === 'gitlink')
   if (!now) throw combworkError(M.gitlinkUnread, { path: rel })
   return { ...link, to: { kind: 'gitlink', commit: now.commit }, ...(now.dirty ? { dirty: true } : {}) }
 }

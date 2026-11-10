@@ -6683,9 +6683,11 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
   - **Told by its mode, never by a failed read**: one `git --literal-pathspecs diff --raw -z --no-abbrev --no-renames`
     of that path per diff opened (the comparison's two commits, or the ref against the working tree). Only a side of
     mode 160000 is a gitlink, so one whose commit is in the parent's store is still one. A blob's id is never shown.
-  - **The working tree's commit** is raw's, or, where raw gives zeros (the checkout moved), git's own patch line for
-    that path (`--submodule=short`, its gitlink section only), with `-dirty` as "uncommitted changes inside". A line
-    that can't be read is an error with Retry, never an empty side or a guessed id. An unpopulated folder shows the
+  - **The working tree's commit** is git's own patch line for that path (`--submodule=short`, its gitlink section
+    only), read for every working gitlink side: raw gives zeros once the checkout moved, and a checkout dirty at the
+    index's commit has raw's id but only the patch says `-dirty` ("uncommitted changes inside"; that section has no
+    `index` line, so it is taken as the gitlink's only where raw says both sides are gitlinks, and only as the one
+    section). A line that can't be read is an error with Retry, never an empty side or a guessed id. An unpopulated folder shows the
     index's commit; a deleted one, the submodule removed. A ref that isn't a commit yet (no commit in the repository)
     has no committed side to be a gitlink.
   - **The Work section** reads a submission's files as raw rows (`filesChanged`: the same paths and letters as

@@ -111,6 +111,12 @@ describe('shared/gitlink: raw rows and git’s patch line', () => {
     // A file made a gitlink: two sections; the file's `+` lines are never read as a commit.
     const typeChange = `diff --git a/s b/s\ndeleted file mode 100644\nindex 1234567..0000000\n--- a/s\n+++ /dev/null\n@@ -1 +0,0 @@\n-Subproject commit ${a}\ndiff --git a/s b/s\nnew file mode 160000\nindex 0000000..bbbbbbb\n--- /dev/null\n+++ b/s\n@@ -0,0 +1 @@\n+Subproject commit ${b}\n`
     expect(parseSubprojectPatch(typeChange)).toEqual({ commit: b, dirty: false })
+    // HR3's round 1: a checkout dirty at the index's commit gets a section with no index line. Taken only when raw's
+    // modes say both sides are gitlinks, and only as one section.
+    const dirtyOnly = `diff --git a/s b/s\n--- a/s\n+++ b/s\n@@ -1 +1 @@\n-Subproject commit ${a}\n+Subproject commit ${a}-dirty\n`
+    expect(parseSubprojectPatch(dirtyOnly)).toBeNull()
+    expect(parseSubprojectPatch(dirtyOnly, true)).toEqual({ commit: a, dirty: true })
+    expect(parseSubprojectPatch(`${dirtyOnly}${dirtyOnly}`, true)).toBeNull()
     // A file whose text looks like git's line is not a gitlink section.
     expect(parseSubprojectPatch(`diff --git a/s b/s\nindex 1234567..89abcde 100644\n+Subproject commit ${b}\n`)).toBeNull()
     expect(parseSubprojectPatch('')).toBeNull()
@@ -223,6 +229,19 @@ describe('gitDiff (the Changes tab): a ref against the working tree', () => {
     expect(file.modified).toBe('a file now\n')
     rmSync(join(project, SUB))
     renameSync(aside, join(project, SUB))
+  })
+
+  it('a checkout dirty at the index’s commit (raw’s id resolved): dirty, with git’s exact -dirty line (HR3’s round 1)', async () => {
+    const { project, A, B } = fixture()
+    writeFileSync(join(project, SUB, 's.txt'), 'edited\n')
+    // Against the base: the committed move A → B, the checkout still at B (the index's), dirty.
+    const moved = await gitDiff(project, SUB, 'main')
+    expect(moved.gitlink).toEqual({ from: { kind: 'gitlink', commit: A }, to: { kind: 'gitlink', commit: B }, dirty: true })
+    expect([moved.original, moved.modified]).toEqual([subprojectLine(A), subprojectLine(B, true)])
+    // Against HEAD: the gitlink unchanged (B → B), dirty only.
+    const same = await gitDiff(project, SUB)
+    expect(same.gitlink).toEqual({ from: { kind: 'gitlink', commit: B }, to: { kind: 'gitlink', commit: B }, dirty: true })
+    expect([same.original, same.modified]).toEqual([subprojectLine(B), subprojectLine(B, true)])
   })
 
   it('a file made a gitlink keeps the file’s side; an ordinary file is read as before', async () => {

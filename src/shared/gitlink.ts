@@ -77,13 +77,19 @@ export function subprojectLine(commit: string, dirty = false): string {
  * is dirty, from the `+Subproject commit` line of its gitlink section only (`new file mode 160000`, or an `index` line
  * ending in 160000). A type change has two sections; the other one's lines are never read. Null when there isn't exactly
  * one such line, so a doubtful read is an error, never a guessed id.
+ *
+ * `bothGitlinks` (HR3's round 1): raw's modes already say both sides are gitlinks, so the patch is one section, the
+ * gitlink's, and it is taken as such even without a header: a checkout dirty at the index's commit gets no `index` line
+ * from git (`-Subproject commit A`, `+Subproject commit A-dirty`). Only exactly one section is; more is doubtful (null).
  */
-export function parseSubprojectPatch(patch: string): { commit: string; dirty: boolean } | null {
+export function parseSubprojectPatch(patch: string, bothGitlinks = false): { commit: string; dirty: boolean } | null {
   const found: { commit: string; dirty: boolean }[] = []
+  const lines = patch.split(/\r?\n/)
+  if (bothGitlinks && lines.filter((l) => l.startsWith('diff --git ')).length !== 1) return null
   let gitlink = false
-  for (const line of patch.split(/\r?\n/)) {
+  for (const line of lines) {
     if (line.startsWith('diff --git ')) {
-      gitlink = false
+      gitlink = bothGitlinks
       continue
     }
     if (/^(new file mode|new mode) 160000$/.test(line) || /^index [0-9a-f]+\.\.[0-9a-f]+ 160000$/.test(line)) gitlink = true
