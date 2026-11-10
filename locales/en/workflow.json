@@ -91,6 +91,10 @@
     "defaultMessage": "{card} is tested and ready to merge: update {target} in {folder} now?",
     "description": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12."
   },
+  "workflow.forYou.queuePublish": {
+    "defaultMessage": "Combwork pushed {card} ({result}) to {endpoint} for {target}, but never heard whether the push arrived, and {target} there doesn’t show it now. Approve if {result} was published (someone may have removed it since); decline if it wasn’t, and the queue tests {card} again. Until you answer, the queue for {target} waits.",
+    "description": "A For you request (Approve, HI-1183, §16.9.4, “The target branch follows its remote”): the merge queue pushed a merge to the remote, the push’s answer was lost (the network, a crash), and the remote’s branch doesn’t contain it now, so Combwork can’t tell whether it was published and asks. {card} a card key like AM-12; {result} a short commit id; {endpoint} the remote’s address without credentials; {target} the branch."
+  },
   "workflow.forYou.queueStuck": {
     "defaultMessage": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Combwork changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
     "description": "A For you request (Decide, §16.9.2's terminal state): the merge queue was updating the branch {target}, checked out in the folder {folder}, and something (a crash, another program) left it half done, so the merge queue for {target} is paused until the user settles it. {card} is a card key like AM-12; {files} how many files the merge left part way; the card's Work section is a section of the card's dialog (glossary 2.4: work); {project} the project folder; {finish} and {undo} are git commands for PowerShell (keep them exactly, with (PowerShell) after them). Translate each choice of {how}; keep the codes before the braces."
@@ -802,6 +806,14 @@
   "workflow.option.folder.title": {
     "defaultMessage": "Where cards are built",
     "description": "A workflow option (glossary 2.6, G11)."
+  },
+  "workflow.option.followRemote.desc": {
+    "defaultMessage": "Before each test merge, the merge queue fetches the remote branch the target tracks and tests on its latest commit, pushes each merge there only if nobody pushed meanwhile (testing again if they did), and then brings the local target up to date.",
+    "description": "What the workflow option “The target branch follows its remote” does (glossary 2.1: merge queue; 2.5: test merge). “Push the target branch after merging” is another option’s name."
+  },
+  "workflow.option.followRemote.title": {
+    "defaultMessage": "The target branch follows its remote",
+    "description": "A workflow option (glossary 2.6, G21): the target branch is the one it tracks on its remote; Combwork’s merge queue fetches it before each test merge and publishes each merge there first."
   },
   "workflow.option.identity.desc": {
     "defaultMessage": "Commits are made with the name and email from the project’s git config (else your global one).",
@@ -2087,6 +2099,18 @@
     "defaultMessage": "the path {path}, which is outside the project",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": a card's path that isn't in its project. {path} is the path."
   },
+  "workflow.unreadable.remoteBehind": {
+    "defaultMessage": "where to start from: {target} has commits that {endpoint} doesn’t (push or pull them first)",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183): the local branch {target} has commits the remote branch it follows (at {endpoint}, an address) lacks, so Combwork won't start a card's work from either."
+  },
+  "workflow.unreadable.remoteHead": {
+    "defaultMessage": "the branch {branch} on {endpoint}, which {target} follows",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183): fetching the remote branch {branch} from {endpoint} (a remote's address) failed; {target} is the local branch that follows it. Git's own words follow."
+  },
+  "workflow.unreadable.remoteSetup": {
+    "defaultMessage": "the remote branch {target} follows (it must track one, on a remote with a single push address)",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183, “The target branch follows its remote”): the branch on a remote that the target branch {target} tracks; it tracks none, or its remote has several push addresses or none."
+  },
   "workflow.unreadable.replay": {
     "defaultMessage": "{revision} applied onto {onto}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the result of applying a revision's change onto another commit. {revision} and {onto} are short commit ids."
@@ -2250,6 +2274,10 @@
   "workflow.why.folder": {
     "defaultMessage": "Pairs and teams build in parallel, each card apart from the others.",
     "description": "Why the presets set “Where cards are built” as they do (Solo: the project folder)."
+  },
+  "workflow.why.followRemote": {
+    "defaultMessage": "Following a remote reaches it and its sign-in before every merge, so it stays yours unless you turn it on.",
+    "description": "Why the presets leave “The target branch follows its remote” off."
   },
   "workflow.why.identity": {
     "defaultMessage": "Commits name the project’s identity, whoever’s computer made them.",

@@ -330,6 +330,8 @@
   "tips.memorySnapshot.title": "O Combwork fechou por falta de memória?",
   "tips.mergeBranch.text": "⑂ ao lado de um branch em Controle de versão → Branches e remotes faz o merge dele no branch que você escolher, um merge por vez. O branch de um cartão que não está concluído pergunta antes, e o cartão fica marcado como mesclado fora das regras.",
   "tips.mergeBranch.title": "Fazer merge de um branch à mão",
+  "tips.mergeFollowRemote.text": "Compartilha o main com outras pessoas? Ative “O branch de destino segue o seu remote” em Controle de versão → Fluxo de trabalho: a fila de merge faz fetch antes de cada merge de teste, testa sobre o último commit do remote e só faz push se ninguém tiver feito push nesse meio-tempo; se alguém fez, testa de novo.",
+  "tips.mergeFollowRemote.title": "Faça merge com base no remote da sua equipe",
   "tips.mergeMessage.text": "Quando o Combwork faz o merge, Controle de versão → Fluxo de trabalho define a mensagem de commit do merge: a do Combwork cita o cartão, a do próprio branch mantém as chaves de cartão fora do seu histórico. Com Squash, cada cartão entra então como um só commit com a mensagem do seu executor.",
   "tips.mergeMessage.title": "Merges com suas próprias mensagens de commit",
   "tips.mergePush.text": "Quando o Combwork faz o merge, Controle de versão → Fluxo de trabalho pode fazer push do branch de destino depois de cada merge, nunca forçado. Se o remote recusar, a fila pausa e diz por quê: faça pull e retome, ou desative e retome.",

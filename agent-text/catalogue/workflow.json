@@ -117,6 +117,11 @@
     "note": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12.",
     "audience": "both"
   },
+  "workflow.forYou.queuePublish": {
+    "text": "Combwork pushed {card} ({result}) to {endpoint} for {target}, but never heard whether the push arrived, and {target} there doesn’t show it now. Approve if {result} was published (someone may have removed it since); decline if it wasn’t, and the queue tests {card} again. Until you answer, the queue for {target} waits.",
+    "note": "A For you request (Approve, HI-1183, §16.9.4, “The target branch follows its remote”): the merge queue pushed a merge to the remote, the push’s answer was lost (the network, a crash), and the remote’s branch doesn’t contain it now, so Combwork can’t tell whether it was published and asks. {card} a card key like AM-12; {result} a short commit id; {endpoint} the remote’s address without credentials; {target} the branch.",
+    "audience": "both"
+  },
   "workflow.forYou.queueStuck": {
     "text": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Combwork changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
     "note": "A For you request (Decide, §16.9.2's terminal state): the merge queue was updating the branch {target}, checked out in the folder {folder}, and something (a crash, another program) left it half done, so the merge queue for {target} is paused until the user settles it. {card} is a card key like AM-12; {files} how many files the merge left part way; the card's Work section is a section of the card's dialog (glossary 2.4: work); {project} the project folder; {finish} and {undo} are git commands for PowerShell (keep them exactly, with (PowerShell) after them). Translate each choice of {how}; keep the codes before the braces.",
@@ -285,6 +290,16 @@
   "workflow.option.folder.title": {
     "text": "Where cards are built",
     "note": "A workflow option (glossary 2.6, G11).",
+    "audience": "both"
+  },
+  "workflow.option.followRemote.desc": {
+    "text": "Before each test merge, the merge queue fetches the remote branch the target tracks and tests on its latest commit, pushes each merge there only if nobody pushed meanwhile (testing again if they did), and then brings the local target up to date.",
+    "note": "What the workflow option “The target branch follows its remote” does (glossary 2.1: merge queue; 2.5: test merge). “Push the target branch after merging” is another option’s name.",
+    "audience": "both"
+  },
+  "workflow.option.followRemote.title": {
+    "text": "The target branch follows its remote",
+    "note": "A workflow option (glossary 2.6, G21): the target branch is the one it tracks on its remote; Combwork’s merge queue fetches it before each test merge and publishes each merge there first.",
     "audience": "both"
   },
   "workflow.option.identity.desc": {
@@ -1495,6 +1510,21 @@
   "workflow.unreadable.pathOutside": {
     "text": "the path {path}, which is outside the project",
     "note": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": a card's path that isn't in its project. {path} is the path.",
+    "audience": "both"
+  },
+  "workflow.unreadable.remoteBehind": {
+    "text": "where to start from: {target} has commits that {endpoint} doesn’t (push or pull them first)",
+    "note": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183): the local branch {target} has commits the remote branch it follows (at {endpoint}, an address) lacks, so Combwork won't start a card's work from either.",
+    "audience": "both"
+  },
+  "workflow.unreadable.remoteHead": {
+    "text": "the branch {branch} on {endpoint}, which {target} follows",
+    "note": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183): fetching the remote branch {branch} from {endpoint} (a remote's address) failed; {target} is the local branch that follows it. Git's own words follow.",
+    "audience": "both"
+  },
+  "workflow.unreadable.remoteSetup": {
+    "text": "the remote branch {target} follows (it must track one, on a remote with a single push address)",
+    "note": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183, “The target branch follows its remote”): the branch on a remote that the target branch {target} tracks; it tracks none, or its remote has several push addresses or none.",
     "audience": "both"
   },
   "workflow.unreadable.replay": {

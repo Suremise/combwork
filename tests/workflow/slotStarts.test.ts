@@ -278,3 +278,44 @@ describe("a slot card's line before its slot's preparation (#1551)", () => {
     expect(slotPreparationOwed(e.wf, card, e.wf.state(card))).toBe(false)
   })
 })
+
+describe('a slotted card whose target follows its remote (G21, HI-1183)', () => {
+  /** Combwork merges, slots, the target tracking a bare remote; `ahead`: the remote has a commit the local target lacks. */
+  function following(ahead: boolean) {
+    const e = (env = setup({ ...opts, finish: 'combworkMerges', followRemote: true }, { autoRun: false }))
+    const bare = tempDir('remote-').replace(/\\/g, '/') + '/origin.git'
+    sh(e.project, 'init', '-q', '--bare', '-b', 'main', bare)
+    sh(e.project, 'remote', 'add', 'origin', bare)
+    sh(e.project, 'push', '-q', '-u', 'origin', 'main')
+    if (ahead) {
+      const other = tempDir('other-')
+      sh(other, 'clone', '-q', bare, '.')
+      sh(other, 'config', 'user.email', 'o@example.com')
+      sh(other, 'config', 'user.name', 'O')
+      commit(other, { 'theirs.txt': 'x\n' }, 'theirs')
+      sh(other, 'push', '-q', 'origin', 'main')
+    }
+    e.wf.cfg.slotFor = async () => ({ slot: 'slot-a', folder: tempDir('slot-'), lease: 'l-1', fresh: true })
+    return { e, bare }
+  }
+
+  it('starts from the remote’s head (fetched, never the local one), pinned until its line holds it', async () => {
+    const { e, bare } = following(true)
+    const card = e.wf.createCard({ title: 'From the remote' })
+    moved(await e.wf.start(card.key, B1))
+    const remote = sh(bare, 'rev-parse', 'main')
+    expect(remote).not.toBe(sh(e.project, 'rev-parse', 'main'))
+    expect(e.wf.state(card).started?.base).toBe(remote)
+    expect(sh(e.project, 'rev-parse', 'refs/cw/fetch/main')).toBe(remote)
+  })
+
+  it('a remote it can’t fetch, or a local target with commits the remote lacks, refuses the start with why', async () => {
+    const { e } = following(false)
+    commit(e.project, { 'local.txt': 'x\n' }, 'local only')
+    const card = e.wf.createCard({ title: 'Diverged' })
+    expect(refusedBy(await e.wf.start(card.key, B1), 'platform.unknown').message).toMatch(/push or pull/)
+    sh(e.project, 'remote', 'set-url', 'origin', tempDir('gone-').replace(/\\/g, '/') + '/none.git')
+    expect(refusedBy(await e.wf.start(card.key, B1), 'platform.unknown').message).toMatch(/which main follows/)
+    expect(e.wf.state(card).stage).toBe('todo')
+  })
+})

@@ -4,6 +4,12 @@
 
 ### Added
 
+- **Merge against your team's remote** (HI-1183). When others push to the same branch, a merge Combwork tested on your computer could meet a remote that had moved on. **The target branch follows its remote** (Version Control → Workflow, off by default) makes the remote branch the one the merge queue merges into.
+  - **Fetches before each test merge** and tests on the remote's latest commit; a local branch with commits the remote lacks pauses the queue, never forced or merged silently.
+  - **Pushes only if nobody pushed meanwhile**, testing the card again if someone did, then brings your local branch up to date (in its folder too). A card is Done once the remote has it.
+  - **Never redirected, never guessed:** each push goes to the one address captured for it, with the remote's sign-in settings kept encrypted only while it's under way; a push whose answer was lost is checked on the remote, and if it isn't there, For you asks rather than pushing again.
+  - New cards in slots start from the remote's latest commit. When the remote refuses a push (a protected branch, a hook), the queue now says so with the remote's own words, with or without this option.
+
 - **Start the next version, and branches from anywhere** (HI-2807). Setting up 1.4.0 took a `git branch` in a terminal; now Combwork does it.
   - **New branch…** (Version Control → Branches & remotes) has **Starts at**: the folder's branch by default, or any branch, tag or commit, with what it points at shown. A branch made elsewhere than the folder's commit doesn't switch the project folder unless you tick **Switch to it now**. Its name is checked as you type, a branch or tag of that name included.
   - **Start the next version…** (Version Control → Workflow, under **Work merges into**, while that is a version branch such as `1.3.0`): proposes `1.4.0` (editable), then makes it from `1.3.0` as shown, adds `1.3.0` to **Other branches work can merge into** and moves **Work merges into** to `1.4.0`, offering to move the Todo cards and free slots that can follow. Started cards and running lanes stay on `1.3.0`.

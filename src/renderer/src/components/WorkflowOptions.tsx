@@ -624,8 +624,11 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
         return <Switch checked={effective.noSelfReview || reviewerAgent(effective.review)} disabled={reviewerAgent(effective.review)} onChange={(v) => set('noSelfReview', v)} />
       case 'stopOwnRuns':
       case 'slotsUpToDate':
-      case 'strict':
       case 'pushTarget':
+        // G21 (HI-1183): a target that follows its remote is pushed: shown on, and set by G21.
+        return <Switch checked={effective.pushTarget || effective.followRemote} disabled={effective.followRemote} onChange={(v) => set('pushTarget', v)} />
+      case 'strict':
+      case 'followRemote':
       case 'dependenciesDone':
       case 'sharedFolderWarning':
         return <Switch checked={effective[key]} onChange={(v) => set(key, v)} />

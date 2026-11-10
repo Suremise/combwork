@@ -91,6 +91,11 @@
       "files": "plain"
     }
   },
+  "queue.failure.notPublished": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
   "queue.failure.notUpToDate": {
     "placeholders": {
       "target": "plain"
@@ -100,6 +105,11 @@
     "placeholders": {
       "head": "plain",
       "files": "plain"
+    }
+  },
+  "queue.failure.pushRefused": {
+    "placeholders": {
+      "target": "plain"
     }
   },
   "queue.failure.targetMoved": {
@@ -218,6 +228,9 @@
     }
   },
   "queue.paused.mergeChoice": {
+    "placeholders": {}
+  },
+  "queue.paused.publish": {
     "placeholders": {}
   },
   "queue.paused.resume": {

@@ -330,6 +330,8 @@
   "tips.memorySnapshot.title": "Wurde Combwork geschlossen, weil der Speicher ausging?",
   "tips.mergeBranch.text": "⑂ neben einem Branch unter Versionsverwaltung → Branches & Remotes mergt ihn in den Branch, den du wählst, ein Merge nach dem anderen. Der Branch einer Karte, die nicht erledigt ist, fragt zuerst, und die Karte wird als außerhalb der Regeln gemergt markiert.",
   "tips.mergeBranch.title": "Einen Branch von Hand mergen",
+  "tips.mergeFollowRemote.text": "Teilst du main mit anderen? Schalte „Der Zielbranch folgt seinem Remote“ unter Versionsverwaltung → Workflow ein: Die Merge-Warteschlange holt vor jedem Test-Merge, testet auf dem neuesten Commit des Remotes und pusht nur, wenn inzwischen niemand gepusht hat – sonst testet sie erneut.",
+  "tips.mergeFollowRemote.title": "Gegen das Remote deines Teams mergen",
   "tips.mergeMessage.text": "Wenn Combwork mergt, legt Versionsverwaltung → Workflow die Commit-Nachricht des Merges fest: Die von Combwork nennt die Karte, die eigene des Branches hält Kartenschlüssel aus deiner Historie heraus. Mit „Squash“ landet jede Karte dann als ein Commit mit der Nachricht ihres Bearbeiters.",
   "tips.mergeMessage.title": "Merges mit deinen eigenen Commit-Nachrichten",
   "tips.mergePush.text": "Wenn Combwork mergt, kann Versionsverwaltung → Workflow den Zielbranch nach jedem Merge pushen, nie erzwungen. Lehnt das Remote ab, hält die Warteschlange an und sagt warum: Pulle und setze fort, oder schalte es aus und setze fort.",
