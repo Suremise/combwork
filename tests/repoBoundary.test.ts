@@ -34,7 +34,7 @@ vi.mock('../src/main/advanced', async (original) => {
 })
 
 const { boundaryOf, gitVeto } = await import('../src/main/platform/repoBoundary')
-const { commonGitDir, takeStores, withRepoLock } = await import('../src/main/repoLock')
+const { commonGitDir, withRepoLock } = await import('../src/main/repoLock')
 const { repoContext, withFolderRepoLocks, excludeFile, mainTree, trustRoot } = await import('../src/main/platform/repoPorts')
 const { storeLock } = await import('../src/main/slotsApp')
 const { fileLockDepth } = await import('../src/main/fsutil')
