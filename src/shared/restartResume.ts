@@ -76,12 +76,12 @@ export const isOpen = (s: RestartState): boolean => OPEN_STATES.includes(s)
 /**
  * A new snapshot (Combwork closing again) added to the record, with that close's reason: each agent in it replaces its
  * earlier entry (it ran in this run, so that entry is out of date), and entries of agents not in it are kept as they
- * are, so an offer the user hasn't answered isn't lost. Final entries are dropped, but a skip no notice has named yet
- * (HI-2909, `unreported`: its workspace not ready in the run that closes now) is kept, unless its agent is in the snapshot.
+ * are, so an offer the user hasn't answered isn't lost. Final entries are dropped, a skip no notice has named yet
+ * (`unreported`) included: a later close replaces an earlier record's unreported skips (HI-2909, the Assistant's scope).
  */
 export function mergeSnapshot(record: RestartRecord | null, snapshot: readonly RestartEntry[], reason: RestartReason): RestartRecord {
   const now = new Set(snapshot.map(agentKey))
-  const kept = (record?.entries ?? []).filter((e) => (!isFinal(e.state) || unreported(e)) && !now.has(agentKey(e)))
+  const kept = (record?.entries ?? []).filter((e) => !isFinal(e.state) && !now.has(agentKey(e)))
   return { version: 1, reason, entries: [...kept, ...snapshot] }
 }
 

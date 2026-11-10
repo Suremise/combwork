@@ -64,18 +64,14 @@ describe('the restart record', () => {
     ])
   })
 
-  // HI-2909, HR2's round 2: a skip no notice has named yet survives another close, unless its agent ran again (the snapshot
-  // replaces it); one named already is dropped as any final entry.
-  it('keeps a skip not yet named through another close, unless its agent is in the snapshot; drops one named already', () => {
-    const before: RestartRecord = { version: 1, reason: 'update', entries: [entry({ agentId: 'idle', state: 'skipped', why: 'idle' }), entry({ agentId: 'old', state: 'skipped', why: 'expired' }), entry({ agentId: 'again', state: 'skipped', why: 'idle' }), entry({ agentId: 'told', state: 'skipped', why: 'idle', reported: true }), entry({ agentId: 'gone', state: 'skipped', why: 'removed' })] }
+  // HI-2909 (the Assistant's scope, after HR2's round 2): a skip not yet named keeps its record open, but a later close
+  // replaces the earlier record's unreported skips: the notice accounts for the agents of the latest close.
+  it("a skip not yet named keeps the record open; a later close replaces the earlier record's unreported skips", () => {
+    const before: RestartRecord = { version: 1, reason: 'update', entries: [entry({ agentId: 'idle', state: 'skipped', why: 'idle' }), entry({ agentId: 'old', state: 'skipped', why: 'expired' })] }
     expect(recordOpen(before)).toBe(true)
-    const after = mergeSnapshot(before, [entry({ agentId: 'again' })], 'restart')
-    expect(after.entries.map((e) => [e.agentId, e.state, e.why ?? null])).toEqual([
-      ['idle', 'skipped', 'idle'],
-      ['old', 'skipped', 'expired'],
-      ['again', 'pending', null]
-    ])
-    expect(mergeSnapshot({ version: 1, reason: 'update', entries: [entry({ agentId: 'told', state: 'skipped', why: 'idle', reported: true })] }, [], 'update').entries).toEqual([])
+    expect(recordOpen({ ...before, entries: before.entries.map((e) => ({ ...e, reported: true })) })).toBe(false)
+    const after = mergeSnapshot(before, [entry({ agentId: 'a2' })], 'restart')
+    expect(after.entries.map((e) => [e.agentId, e.state])).toEqual([['a2', 'pending']])
   })
 
   it('at a start: what the last run left queued or starting is pending again, and what waited over a day is skipped', () => {
