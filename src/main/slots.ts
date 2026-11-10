@@ -1919,8 +1919,9 @@ export class SlotPool {
         for (const name of this.owedSlots()) {
           if (this.closed) return
           if (!this.store.slot(name)) {
-            // A slot removed since: its record can't keep the pass alive.
-            await this.store.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(owedKey(this.store.project, name))) // agent-protocol: SQL
+            // A slot removed since: its record can't keep the pass alive. Its absence proved again in the delete itself, so a
+            // slot of that name made meanwhile (and its fresh record) keeps it (HR1's round 4).
+            await this.store.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ? AND NOT EXISTS (SELECT 1 FROM slots WHERE project = ? AND name = ?)').run(owedKey(this.store.project, name), this.store.project, name)) // agent-protocol: SQL
             continue
           }
           await this.settle(name)

@@ -143,7 +143,11 @@ function world(colocated: boolean, o: { queued?: boolean } = {}) {
     arm = fn
   }
   const stealOp = (name: string) => (db: Db): void => void db.prepare("UPDATE slots SET op = 'a-replacement' WHERE project = ? AND name = ?").run('p-jj', name)
-  return { h, repo, root, base, port, pool, store, git, prep, armAfterWritten, stealOp, sessions, hooks, clock, makePool, main: () => h.id(repo, 'main') }
+  // The next write through the connection queued behind `fn` (the queued world's seam, HI-2906: a write that got in first).
+  const armNextWrite = (fn: (db: Db) => void): void => {
+    before = fn
+  }
+  return { h, repo, root, base, port, pool, store, git, prep, armAfterWritten, armNextWrite, stealOp, sessions, hooks, clock, makePool, main: () => h.id(repo, 'main') }
 }
 
 /** A card's slot lent, prepared, its work committed and submitted, and the user's integration of it (HI-2906's cases). */
@@ -352,6 +356,53 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         await next.owedPass()
         expect(w.store.slot(row.name)?.state).toBe('ready')
         expect(next.owedOf(row.name)).toBeNull()
+      })
+
+      it("a removed slot's record, its slot made again with a fresh record before the clean-up's write (HR1's round 4): kept", { timeout: RETRY_TEST_MS }, async () => {
+        const w = world(colocated, { queued: true })
+        await w.store.conn.write((db) => void db.prepare("INSERT INTO board_meta (key, value) VALUES (?, '{\"why\":\"old\"}')").run(owedKey('p-jj', 'slot-z')))
+        expect(w.pool.owedSlots()).toContain('slot-z')
+        // After the pass read the slot as missing, and before its clean-up's write: slot-z is made again, with a new record.
+        w.armNextWrite((db) => {
+          db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES ('p-jj', 'slot-z', ?, 'lent', 41990, 'main', '2026-11-10T00:00:00Z', '2026-11-10T00:00:00Z')").run(join(w.root, 'slot-z'))
+          db.prepare("UPDATE board_meta SET value = '{\"why\":\"fresh\"}' WHERE key = ?").run(owedKey('p-jj', 'slot-z'))
+        })
+        await w.pool.owedPass()
+        expect(w.store.slot('slot-z')).not.toBeNull()
+        expect(w.pool.owedOf('slot-z')).toMatchObject({ why: 'fresh' })
+      })
+
+      it('close while the owed pass is inside a settle (HR1): close waits for it; then no running work or wake, the record kept', { timeout: RETRY_TEST_MS }, async () => {
+        const w = world(colocated)
+        const { lent, row } = await integrated(w, 13)
+        w.sessions.add(row.folder.toLowerCase())
+        await w.pool.release(lent.lease.id, 'done')
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        // The pass's settle held inside its record (the folder quiet by then, so it gets that far).
+        let release!: () => void
+        w.hooks.recordGate = new Promise<void>((r) => (release = r))
+        let entered = false
+        w.hooks.inRecord = () => void (entered = true)
+        w.sessions.delete(row.folder.toLowerCase())
+        expect(w.clock.fire()).toBe(true)
+        expect(await until(() => entered)).toBe(true)
+        w.hooks.recordGate = null
+        let closed = false
+        const closing = w.pool.close().then(() => void (closed = true))
+        // Close is pending while the settle is held (a few turns of the event loop pass and it still is).
+        for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r))
+        expect(closed).toBe(false)
+        expect(w.pool.closed).toBe(true)
+        // The folder busy again before the gate opens: the settle ends busy, its record kept, no wake after the close.
+        w.sessions.add(row.folder.toLowerCase())
+        release()
+        await closing
+        expect(closed).toBe(true)
+        expect(runningOf(w.pool).size).toBe(0)
+        expect(w.pool.owedWakePending()).toBe(false)
+        expect(w.clock.pending()).toEqual([])
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        expect(w.store.slot(row.name)?.op).toBeNull()
       })
 
       it("an operation taking an owed slot, then a pass: the slot untouched, still owed; a removed slot's record goes", { timeout: RETRY_TEST_MS }, async () => {
