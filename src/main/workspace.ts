@@ -33,7 +33,7 @@ import { createLogger, userText } from './logger'
 import { changeSessionRecord, changeSessions, exportSessions, readAgentSessions, readCardSessions, readSession, readSessions, releaseSessions, type SessionsPlace } from './sessionStore'
 import { allProviders } from './providers'
 import { worktreesRoot } from './worktrees'
-import { ensureCombworkExcluded, combworkVcs } from './combworkVcs'
+import { ensureCombworkExcluded, ensureJjExcluded, combworkVcs } from './combworkVcs'
 import { detect, initialOf, projectPlatform } from './platform/registry'
 import { currentLine, repoHolding } from './platform/repoPorts'
 import type { ProjectPlatform } from '../shared/platform/descriptors'
@@ -1517,6 +1517,8 @@ export class WorkspaceService {
   async ensureGitExclude(projectPath: string): Promise<void> {
     const r = await ensureCombworkExcluded(projectPath)
     if (r?.added) log.info(`Excluded .combwork from git in ${userText(r.root)}`)
+    // A non-colocated jj repository (HI-2800), which Git's keep-out doesn't hold: its Git store's info/exclude.
+    if (!r && (await ensureJjExcluded(projectPath).catch(() => null))?.added) log.info(`Excluded .combwork from jj in ${userText(projectPath)}`)
     // The line is there whatever git can do; git missing only means it couldn't confirm a .gitignore doesn't bring .combwork back (#346).
     const problem = r?.unconfirmed ? repoHolding(projectPath)?.runner.problem() : null
     if (r?.unconfirmed) log.info(`Git couldn't confirm .combwork is ignored in ${userText(r.root)}${problem ? ` (${problem})` : ''}`)

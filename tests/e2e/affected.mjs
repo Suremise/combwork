@@ -195,7 +195,7 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/OriginText.tsx'], suites: ['versioncontrol', 'workflowdefaults', 'workflowoptions'] },
   { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions', 'jjview'] },
   // jj in the Version Control tab and the switch (HI-2799).
-  { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts'], suites: ['jjview', 'vcswitch'] },
+  { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts', 'src/main/platform/jjOperations.ts', 'src/main/platform/jjOpView.ts', 'src/main/platform/jjSourcesPrint.ts', 'src/main/platform/jjPreviewTask.ts'], suites: ['jjview', 'vcswitch'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
   // Switching the version control (#1419): the switch, detection's offers, the shared rules.
@@ -256,7 +256,7 @@ export const AREAS = [
   { paths: ['src/main/compaction.ts'], suites: ['compact', 'overview', 'paneheader', 'idlestatus'] },
   { paths: ['src/shared/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
   { paths: ['src/main/diagnostics.ts', 'src/shared/redact.ts'], suites: ['about', 'testedclis'] },
-  { paths: ['src/main/files.ts', 'src/main/platform/gitFiles.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
+  { paths: ['src/main/files.ts', 'src/main/platform/gitFiles.ts', 'src/shared/platform/metadataDirs.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
   // The Files tab's Git menu (HI-2743): only the Files tab uses it.
   { paths: ['src/main/filesGit.ts', 'src/shared/gitIgnoreRules.ts', 'src/renderer/src/components/FilesGitMenu.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['files'] },
   { paths: ['src/main/attachmentsFolder.ts', 'src/shared/attachments.ts', 'src/renderer/src/attach.ts', 'src/renderer/src/components/AttachmentChips.tsx'], suites: ['image', 'files', 'assistantimages', 'storage', 'storageclose', 'dialogs', 'asarfiles', 'codex-extra'] },
@@ -409,7 +409,7 @@ export const AREAS = [
   { paths: ['src/main/mainStalls.ts', 'src/shared/mainStalls.ts', 'src/renderer/src/views/PerformanceStalls.tsx', 'src/main/threadPool.ts', 'src/main/stallWatchdog.ts', 'tests/e2e/stalls.cjs'], suites: ['stalls'] },
   { paths: ['src/main/exitLog.ts', 'src/main/memory.ts', 'src/main/diagnostics.ts', 'src/main/updater.ts', 'src/main/installDir.ts'], suites: ['crashdumps'] },
   // .combwork kept out of version control, and its notice (#345).
-  { paths: ['src/main/combworkVcs.ts', 'src/main/vcsDetect.ts', 'src/main/platform/gitKeepOut.ts', 'src/shared/combworkVcsText.ts', 'src/renderer/src/components/CombworkVcsNotice.tsx'], suites: ['combworkvcs', 'gitinit'] },
+  { paths: ['src/main/combworkVcs.ts', 'src/main/vcsDetect.ts', 'src/main/platform/gitKeepOut.ts', 'src/main/platform/jjKeepOut.ts', 'src/shared/combworkVcsText.ts', 'src/renderer/src/components/CombworkVcsNotice.tsx'], suites: ['combworkvcs', 'gitinit'] },
   // Hook tokens per launch (#345): the hook server, and hook commands reading their header from the auth file.
   { paths: ['src/main/hookTokens.ts'], suites: ['agents', 'ctxpercent', 'codex-extra', 'attention', 'claude-real', 'claudehome', 'codex', 'review'] },
   { paths: ['src/main/storage.ts', 'src/shared/storage.ts', 'src/renderer/src/components/Storage.tsx'], suites: ['storage', 'storageclose', 'asarfiles', 'purge'] },

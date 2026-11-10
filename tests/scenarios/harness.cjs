@@ -55,6 +55,21 @@ function dialectForRun(file, providerKey) {
 }
 
 /** Puts a run's dialect (dialectForRun) into a scenario workspace: `.combwork/dialects/<CLI>/<label>.json`. */
+/**
+ * A jj scenario's environment (HI-2800, sc.jj): the pinned jj (npm run jj:fetch) first on `basePath`, and a jj config in
+ * the scenario's folder (an identity and no pager), so neither Combwork's jj nor an agent's finds the user's. Throws when
+ * the pinned jj isn't fetched: the scenario fails at setup, saying so.
+ */
+function jjScenarioEnv(root, basePath) {
+  const { jjDir, portableJj } = require('../jjPortable.cjs')
+  if (!portableJj()) throw new Error("setup: this scenario needs the pinned jj, which isn't fetched (npm run jj:fetch)")
+  fs.mkdirSync(root, { recursive: true })
+  const config = path.join(root, 'jj.toml')
+  fs.writeFileSync(config, '[user]\nname = "Coder"\nemail = "coder@example.invalid"\n[ui]\npaginate = "never"\n')
+  // Git for Windows' system attributes (diff=astextplain) are jj's attributes gate (HI-2799): left out, as jjview does.
+  return { PATH: `${jjDir()};${basePath ?? ''}`, JJ_CONFIG: config, GIT_ATTR_NOSYSTEM: '1' }
+}
+
 function placeDialect(dialect, ws) {
   if (!dialect) return
   const dest = path.join(ws, '.combwork', 'dialects', ...dialect.path.split('/'))
@@ -584,6 +599,9 @@ async function runScenario(sc, providerKey, opts = {}) {
       // The fake OpenCode the same, on the run's own test home (the CLI-home seam: no OpenCode account needed).
       ...(p.provider === 'opencode' ? { FAKE_OPENCODE_LOG: opencodeLog, FAKE_OPENCODE_WAKES: opencodeWakes, FAKE_OPENCODE_FOLLOW_NOTICES: '1', FAKE_OPENCODE_MODEL_MS: '700', XDG_DATA_HOME: opencodeHome } : {})
     }
+    // A jj scenario (HI-2800, sc.jj): the pinned jj first on Combwork's PATH (whatever PATH the provider's settings gave
+    // it, Copilot's and Codex's included), so its sessions' shells find it too, with a jj config of the run's own.
+    if (sc.jj) Object.assign(env, jjScenarioEnv(root, env.PATH ?? lib.baseEnv().PATH))
     // Its token record starts empty: a scenario's Combwork appends to it (missing at the end, the run is invalid).
     fs.writeFileSync(tokenLog, '')
     ;({ app, inv, page } = await lib.launch({ userData, env }))

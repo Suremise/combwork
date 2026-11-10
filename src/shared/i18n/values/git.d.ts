@@ -263,6 +263,7 @@ interface CombworkMessageValues {
   'git.section.jjCompare': undefined
   'git.section.jjConflicts': undefined
   'git.section.jjHistory': undefined
+  'git.section.jjOperations': undefined
   'git.section.jjRepo': undefined
   'git.section.queue': undefined
   'git.section.workflow': undefined

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import type { WorkView } from '@shared/workflow/workView'
-import { isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjRepoView, type JjResolved, type JjRow, type JjView, type JjViewUnknown } from '@shared/jjViews'
+import { isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjView, type JjViewUnknown } from '@shared/jjViews'
 import { revisionShort, PLATFORMS } from '@shared/platform/descriptors'
 import { GATE_TEXT } from '@shared/platform/gateTexts'
-import { msg, tr } from '@shared/i18n'
+import { msg, tr, type Msg } from '@shared/i18n'
 import { call, errorMessage } from '../api'
-import { cardLabelOf, useLanguage, useStore } from '../store'
+import { cardLabelOf, notify, useLanguage, useStore } from '../store'
 import { timeAgo } from '../util'
 import { Icon, Tooltip } from '../components/ui'
 
@@ -34,6 +34,9 @@ const M = {
   op: msg({ id: 'jj.repo.op', defaultMessage: 'Operation {op}', description: 'The jj Repository section (HI-2799): jj’s current operation (its id, short), which every view is read at.' }),
   workspaces: msg({ id: 'jj.repo.workspaces', defaultMessage: 'Workspaces', description: 'A heading of the jj Repository section (HI-2799): jj’s workspaces (working folders) of this repository, Combwork’s slots among them.' }),
   workspace: msg({ id: 'jj.repo.workspace', defaultMessage: '{name}: change {change}, commit {commit}', description: 'A jj workspace in the Repository section (HI-2799): its name and its working copy’s change id and commit id (short).' }),
+  here: msg({ id: 'jj.repo.here', defaultMessage: 'project folder', description: 'A badge on the jj workspace that is the project folder itself (HI-2800). Lower case.' }),
+  stale: msg({ id: 'jj.repo.stale', defaultMessage: 'stale', description: 'A badge on a jj workspace whose files are behind its working-copy commit (HI-2800). Lower case.' }),
+  staleTip: msg({ id: 'jj.repo.staleTip', defaultMessage: 'Its files are behind its working-copy commit: another workspace rewrote it. jj workspace update-stale updates them, but edits jj hasn’t recorded can end up in a separate commit: look before you run it. Combwork doesn’t run it.', description: 'Tooltip of the stale badge on a jj workspace (HI-2800). Keep jj workspace update-stale (a command).' }),
   unsupported: msg({ id: 'jj.repo.unsupported', defaultMessage: 'Not supported with jj in Combwork', description: 'A heading of the jj Repository section (HI-2799): what Combwork doesn’t do or support with jj. Keep jj.' }),
   edits: msg({ id: 'jj.repo.edits', defaultMessage: 'jj has no uncommitted changes: edits are recorded in the working-copy commit when jj snapshots them.', description: 'A note in the jj Repository section (HI-2799), in place of Git’s Changes. Keep jj.' }),
   integrate: msg({ id: 'jj.integrate.head', defaultMessage: 'Waiting for you to integrate', description: 'A heading of the jj Repository section (HI-2799, option A): cards that passed review, which the user brings into their target themselves.' }),
@@ -75,7 +78,58 @@ const M = {
   // Conflicts.
   conflictsIntro: msg({ id: 'jj.conflicts.intro', defaultMessage: 'jj can keep a conflict in a commit and carry on. These commits store conflicts; resolve them with jj in a terminal (jj resolve).', description: 'The top of jj’s Conflicts section (HI-2799). Keep jj and jj resolve (a command).' }),
   noConflicts: msg({ id: 'jj.conflicts.none', defaultMessage: 'No commit stores a conflict.', description: 'jj’s Conflicts section (HI-2799) when there are none.' }),
-  conflictFiles: msg({ id: 'jj.conflicts.files', defaultMessage: '{n, plural, one {# conflicted file} other {# conflicted files}}', description: 'Under a conflicted jj commit (HI-2799).' })
+  conflictFiles: msg({ id: 'jj.conflicts.files', defaultMessage: '{n, plural, one {# conflicted file} other {# conflicted files}}', description: 'Under a conflicted jj commit (HI-2799).' }),
+  // Operations (HI-2800).
+  opsIntro: msg({ id: 'jj.ops.intro', defaultMessage: 'jj records every command as an operation. Preview one to see what undoing it would change. Combwork changes nothing here: when undoing it would touch nothing else, it gives you the command to run yourself.', description: 'The top of jj’s Operations section (HI-2800). Keep jj.' }),
+  opsOlder: msg({ id: 'jj.ops.older', defaultMessage: 'Show Older', description: 'A button under jj’s operations list (HI-2800): shows the next page of older operations.' }),
+  opPreview: msg({ id: 'jj.ops.preview', defaultMessage: 'Preview Undo', description: 'A button on one jj operation (HI-2800): shows what undoing (reverting) it would change, without changing anything.' }),
+  opSnapshot: msg({ id: 'jj.ops.snapshot', defaultMessage: 'snapshot', description: 'A badge on a jj operation that recorded a workspace’s files (a working-copy snapshot, HI-2800). Lower case.' }),
+  opBy: msg({ id: 'jj.ops.by', defaultMessage: '{user} in {workspace}', description: 'Who ran a jj operation and in which workspace (HI-2800), after its description. {user} is user@host as jj records it.' }),
+  opNone: msg({ id: 'jj.ops.none', defaultMessage: 'No operations.', description: 'jj’s Operations section (HI-2800) when there are none.' }),
+  previewHead: msg({ id: 'jj.ops.previewHead', defaultMessage: 'Undoing “{description}”', description: 'The heading of a jj operation’s undo preview (HI-2800). {description} is the operation as jj named it.' }),
+  previewAt: msg({ id: 'jj.ops.previewAt', defaultMessage: 'A preview at operation {at}. If anything else changes before you run it, preview again: this isn’t a guarantee about a later command.', description: 'Under a jj undo preview’s heading (HI-2800): the preview holds only for the repository as it was at that operation ({at}, a short id). Keep jj.' }),
+  previewSnapshot: msg({ id: 'jj.ops.previewSnapshot', defaultMessage: 'Run in the project folder, jj first records any edits you haven’t recorded yet, as its own operation, then undoes this one.', description: 'A note on a jj undo preview and its command (HI-2800): jj snapshots the working copy before the revert, as a separate operation. Keep jj.' }),
+  did: msg({ id: 'jj.ops.did', defaultMessage: 'What it changed (undoing it puts these back)', description: 'A heading in a jj undo preview (HI-2800): the bookmarks, refs, commits and workspaces the operation changed.' }),
+  didNothing: msg({ id: 'jj.ops.didNothing', defaultMessage: 'Nothing that undoing it would change.', description: 'A jj undo preview (HI-2800) for an operation that changed nothing.' }),
+  later: msg({ id: 'jj.ops.later', defaultMessage: 'Later work undoing it would also change', description: 'A heading in a jj undo preview (HI-2800): changes made since the operation that undoing it would touch too.' }),
+  added: msg({ id: 'jj.ops.added', defaultMessage: '{n, plural, one {# commit made} other {# commits made}}: {ids}', description: 'In a jj undo preview (HI-2800): the commits the operation made (or rewrote into), short ids.' }),
+  hidden: msg({ id: 'jj.ops.hidden', defaultMessage: '{n, plural, one {# commit hidden} other {# commits hidden}}: {ids}', description: 'In a jj undo preview (HI-2800): the commits the operation hid (abandoned or rewrote), short ids. Undoing it brings them back.' }),
+  opChange: msg({ id: 'jj.ops.change', defaultMessage: '{what}: {before} → {after}', description: 'One thing a jj operation changed (HI-2800): {what} names it (a bookmark, a Git ref…), {before} and {after} its value (short commit ids, or “none”). Keep the arrow.' }),
+  absent: msg({ id: 'jj.ops.absent', defaultMessage: 'none', description: 'In a jj undo preview (HI-2800): a bookmark, ref or workspace that didn’t exist (before) or doesn’t any more (after). Lower case.' }),
+  conflictedValue: msg({ id: 'jj.ops.conflicted', defaultMessage: 'conflicted ({sides})', description: 'In a jj undo preview (HI-2800): a bookmark or ref whose target is conflicted; {sides} are its commits, short ids.' }),
+  whyChanged: msg({ id: 'jj.ops.why.changed', defaultMessage: '{what} changed since: now {now}', description: 'Later work in a jj undo preview (HI-2800): something the operation changed was changed again since.' }),
+  whyDescendant: msg({ id: 'jj.ops.why.descendant', defaultMessage: 'Commit {commit} was made on top of what it made: undoing it would rebase that commit', description: 'Later work in a jj undo preview (HI-2800).' }),
+  whyRewritten: msg({ id: 'jj.ops.why.rewritten', defaultMessage: 'Commit {commit} it made was rewritten or abandoned since', description: 'Later work in a jj undo preview (HI-2800).' }),
+  whyRestored: msg({ id: 'jj.ops.why.restored', defaultMessage: 'Commit {commit} it hid is back since', description: 'Later work in a jj undo preview (HI-2800).' }),
+  command: msg({ id: 'jj.ops.command', defaultMessage: 'Undoing it changes only what it changed. To undo it, run this in the project folder:', description: 'Above the jj command a preview offers (HI-2800). Combwork never runs it itself.' }),
+  copy: msg({ id: 'jj.ops.copy', defaultMessage: 'Copy', description: 'A button beside the jj command of an undo preview (HI-2800): copies it, after checking the repository hasn’t changed since the preview.' }),
+  copied: msg({ id: 'jj.ops.copied', defaultMessage: 'Command copied', description: 'A notification (HI-2800): the jj undo command was copied.' }),
+  movedAtCopy: msg({ id: 'jj.ops.movedAtCopy', defaultMessage: 'The repository changed since this preview, so nothing was copied. Here it is again: look at it before copying.', description: 'In a jj undo preview (HI-2800): Copy found the repository changed since the preview; the preview shown is the new one.' }),
+  noCommand: msg({ id: 'jj.ops.noCommand', defaultMessage: 'No command: {why}', description: 'In a jj undo preview (HI-2800): Combwork gives no command, and why ({why}).' }),
+  // Why no command (HI-2800/s19's E1–E7).
+  'refused.tool': msg({ id: 'jj.ops.refused.tool', defaultMessage: 'jj isn’t the version Combwork is tested with.', description: 'Why a jj undo preview gives no command (HI-2800). Keep jj.' }),
+  'refused.heads': msg({ id: 'jj.ops.refused.heads', defaultMessage: 'jj’s operation log has more than one head.', description: 'Why a jj undo preview gives no command (HI-2800). Keep jj.' }),
+  'refused.moved': msg({ id: 'jj.ops.refused.moved', defaultMessage: 'the repository changed since the preview.', description: 'Why a jj undo preview gives no command (HI-2800): a new operation was recorded meanwhile.' }),
+  'refused.parents': msg({ id: 'jj.ops.refused.parents', defaultMessage: 'it joins operations that ran at the same time (or is the first one), so undoing it can’t be previewed.', description: 'Why a jj undo preview gives no command (HI-2800): a merge of concurrent operations, or the root operation.' }),
+  'refused.shape': msg({ id: 'jj.ops.refused.shape', defaultMessage: 'jj recorded it in a form Combwork can’t read whole.', description: 'Why a jj undo preview gives no command (HI-2800): the operation’s view isn’t exactly what the tested jj writes. Keep jj.' }),
+  'refused.bounds': msg({ id: 'jj.ops.refused.bounds', defaultMessage: 'it changed more than a preview shows.', description: 'Why a jj undo preview gives no command (HI-2800): too many bookmarks, refs or commits to account for.' }),
+  'refused.unimported': msg({ id: 'jj.ops.refused.unimported', defaultMessage: 'Git has changes jj hasn’t recorded yet (a branch, a tag or HEAD moved with git): your jj command would take them in first. Run any jj command, then preview again.', description: 'Why a jj undo preview gives no command (HI-2800): the colocated Git repository’s refs or HEAD differ from what jj last recorded. Keep jj and Git, git and HEAD.' }),
+  'refused.workingCopy': msg({ id: 'jj.ops.refused.workingCopy', defaultMessage: 'it changed a workspace’s working copy: undoing it would update files there, which a preview can’t check.', description: 'Why a jj undo preview gives no command (HI-2800): a commit, describe, new, snapshot, workspace added or forgotten.' }),
+  'refused.gitOwn': msg({ id: 'jj.ops.refused.gitOwn', defaultMessage: 'it recorded a change made in Git: undoing it changes nothing in Git, and jj would import it again.', description: 'Why a jj undo preview gives no command (HI-2800): an import of Git’s refs or a fetch. Keep jj and Git.' }),
+  'refused.overlap': msg({ id: 'jj.ops.refused.overlap', defaultMessage: 'undoing it would also change later work, listed above.', description: 'Why a jj undo preview gives no command (HI-2800).' }),
+  'refused.stale': msg({ id: 'jj.ops.refused.stale', defaultMessage: 'the project folder’s workspace is stale. jj workspace update-stale updates it, but edits jj hasn’t recorded can end up in a separate commit.', description: 'Why a jj undo preview gives no command (HI-2800): the project folder’s files are behind its working-copy commit. Keep jj workspace update-stale (a command).' }),
+  'refused.nothing': msg({ id: 'jj.ops.refused.nothing', defaultMessage: 'it changed nothing to undo.', description: 'Why a jj undo preview gives no command (HI-2800).' }),
+  // An entry's kind, in a preview.
+  'kind.bookmark': msg({ id: 'jj.ops.kind.bookmark', defaultMessage: 'Bookmark {name}', description: 'A jj bookmark in an undo preview (HI-2800). {name} is its name.' }),
+  'kind.tag': msg({ id: 'jj.ops.kind.tag', defaultMessage: 'Tag {name}', description: 'A jj tag in an undo preview (HI-2800).' }),
+  'kind.remoteBookmark': msg({ id: 'jj.ops.kind.remoteBookmark', defaultMessage: 'Bookmark {name}@{remote}', description: 'A remote’s bookmark (and whether it is tracked) in a jj undo preview (HI-2800). Keep the @.' }),
+  'kind.remoteTag': msg({ id: 'jj.ops.kind.remoteTag', defaultMessage: 'Tag {name}@{remote}', description: 'A remote’s tag in a jj undo preview (HI-2800). Keep the @.' }),
+  'kind.remote': msg({ id: 'jj.ops.kind.remote', defaultMessage: 'Remote {name}', description: 'A remote in a jj undo preview (HI-2800).' }),
+  'kind.gitref': msg({ id: 'jj.ops.kind.gitref', defaultMessage: 'Git ref {name}', description: 'A Git ref as jj records it, in a jj undo preview (HI-2800). Keep Git.' }),
+  'kind.githead': msg({ id: 'jj.ops.kind.githead', defaultMessage: 'Git HEAD of {name}', description: 'A workspace’s Git HEAD as jj records it, in a jj undo preview (HI-2800). Keep Git HEAD.' }),
+  'kind.wc': msg({ id: 'jj.ops.kind.wc', defaultMessage: 'Working copy of {name}', description: 'A workspace’s working-copy commit in a jj undo preview (HI-2800). {name} is the workspace.' }),
+  'kind.head': msg({ id: 'jj.ops.kind.head', defaultMessage: 'Head commit {name}', description: 'A visible head commit in a jj undo preview (HI-2800). {name} is its short id.' }),
+  tracked: msg({ id: 'jj.ops.tracked', defaultMessage: '{commit}, {state, select, Tracked {tracked} other {not tracked}}', description: 'A remote bookmark’s value in a jj undo preview (HI-2800): its commit and whether it is tracked. Lower case.' })
 }
 
 const changeShort = PLATFORMS.jj.changeShort!
@@ -254,8 +308,13 @@ export function JjRepoSection({ project }: { project: ProjectInfo }) {
           ) : (
             <ul data-jj-workspaces="">
               {v.workspaces.map((w) => (
-                <li key={w.name} className="mono">
-                  {tr(M.workspace, { name: w.name, change: changeShort(w.change), commit: commitShort(w.commit) })}
+                <li key={w.name} className="mono" data-jj-workspace={w.name} {...(w.stale ? { 'data-jj-stale': '' } : {})}>
+                  {tr(M.workspace, { name: w.name, change: changeShort(w.change), commit: commitShort(w.commit) })} {w.here && <span className="badge">{tr(M.here)}</span>}{' '}
+                  {w.stale && (
+                    <Tooltip content={tr(M.staleTip)}>
+                      <span className="badge warn">{tr(M.stale)}</span>
+                    </Tooltip>
+                  )}
                 </li>
               ))}
             </ul>
@@ -452,6 +511,194 @@ export function JjConflictsSection({ project }: { project: ProjectInfo }) {
                 </li>
               ))}
             </ul>
+          )}
+        </>
+      )}
+    </Frame>
+  )
+}
+
+/** A value as a preview shows it: short commit ids, conflicted sides, a remote ref's tracking; absent as "none". */
+function valueText(v: string | null): string {
+  if (v === null) return tr(M.absent)
+  if (v === 'present') return '✓' // i18n-ignore: a mark, not text
+  const ids = [...v.matchAll(/"([0-9a-f]{40})"/g)].map((m) => commitShort(m[1]))
+  const state = /state:(Tracked|New)\}$/.exec(v)?.[1]
+  const base = v.startsWith('Conflicted') || v.includes('target:Conflicted') ? tr(M.conflictedValue, { sides: ids.join(', ') }) : ids.join(', ') || tr(M.absent)
+  return state ? tr(M.tracked, { commit: base, state }) : base
+}
+
+/** An entry's key as a preview names it (`bookmark:main`: Bookmark main). */
+function keyText(key: string): string {
+  const [kind, ...rest] = key.split(':')
+  const name = rest.join(':')
+  if (kind === 'remote') {
+    const [remote, sub, ...n] = rest
+    if (!sub) return tr(M['kind.remote'], { name: remote })
+    return tr(sub === 'tag' ? M['kind.remoteTag'] : M['kind.remoteBookmark'], { name: n.join(':'), remote })
+  }
+  if (kind === 'head') return tr(M['kind.head'], { name: commitShort(name) })
+  if (kind === 'commit') return commitShort(name)
+  const k = ({ bookmark: M['kind.bookmark'], tag: M['kind.tag'], gitref: M['kind.gitref'], githead: M['kind.githead'], wc: M['kind.wc'] } as Record<string, Msg | undefined>)[kind]
+  return k ? tr(k, { name }) : key
+}
+
+function overlapText(o: JjOpOverlap): string {
+  if (o.why === 'changedSince') return tr(M.whyChanged, { what: keyText(o.key), now: valueText(o.now) })
+  const commit = commitShort(o.key.replace(/^commit:/, ''))
+  return tr(o.why === 'descendant' ? M.whyDescendant : o.why === 'rewrittenSince' ? M.whyRewritten : M.whyRestored, { commit })
+}
+
+const REFUSED: Record<JjOpRefusal, Msg> = {
+  tool: M['refused.tool'],
+  heads: M['refused.heads'],
+  moved: M['refused.moved'],
+  parents: M['refused.parents'],
+  shape: M['refused.shape'],
+  bounds: M['refused.bounds'],
+  unimported: M['refused.unimported'],
+  workingCopy: M['refused.workingCopy'],
+  gitOwn: M['refused.gitOwn'],
+  overlap: M['refused.overlap'],
+  stale: M['refused.stale'],
+  nothing: M['refused.nothing']
+}
+
+/** One operation's undo preview: what it changed, later work it would touch, and the command only when nothing else would change. */
+function OperationPreview({ project, p, note, onReplace }: { project: ProjectInfo; p: JjOperationPreview; note: string | null; onReplace: (p: JjView<JjOperationPreview>, note: string | null) => void }) {
+  const [busy, setBusy] = useState(false)
+  const copy = (): void => {
+    setBusy(true)
+    // Copy asks main again at the moment the preview was read at (the head and Git's state): any change since copies
+    // nothing and shows the new preview.
+    call('jj:operationPreview', project.path, p.op, p.moment)
+      .then(async (again) => {
+        if (!isJjViewUnknown(again) && again.command && again.moment === p.moment) {
+          await navigator.clipboard.writeText(again.command)
+          notify('success', tr(M.copied))
+          return
+        }
+        onReplace(await call('jj:operationPreview', project.path, p.op, null), tr(M.movedAtCopy))
+      })
+      .catch((e: unknown) => notify('error', tr(M.readFailed, { error: errorMessage(e) })))
+      .finally(() => setBusy(false))
+  }
+  const did: JjOpChange[] = p.did.filter((d) => !d.key.startsWith('head:'))
+  const nothing = did.length === 0 && p.commits.added.length === 0 && p.commits.hidden.length === 0
+  return (
+    <div className="jj-op-preview" data-jj-op-preview={p.op} data-jj-refused={p.refused ?? ''}>
+      <h4>{tr(M.previewHead, { description: p.description || tr(M.noDescription) })}</h4>
+      {note && (
+        <div className="banner warn" data-jj-moved-at-copy="">
+          {note}
+        </div>
+      )}
+      <p className="hint">{tr(M.previewAt, { at: p.at.slice(0, 12) })}</p>
+      <h5>{tr(M.did)}</h5>
+      {nothing ? (
+        <p className="faint">{tr(M.didNothing)}</p>
+      ) : (
+        <ul className="jj-op-did" data-jj-op-did="">
+          {p.commits.added.length > 0 && <li>{tr(M.added, { n: p.commits.added.length, ids: p.commits.added.map(commitShort).join(', ') })}</li>}
+          {p.commits.hidden.length > 0 && <li>{tr(M.hidden, { n: p.commits.hidden.length, ids: p.commits.hidden.map(commitShort).join(', ') })}</li>}
+          {did.map((d) => (
+            <li key={d.key} data-key={d.key}>
+              {tr(M.opChange, { what: keyText(d.key), before: valueText(d.before), after: valueText(d.after) })}
+            </li>
+          ))}
+        </ul>
+      )}
+      {p.later.length > 0 && (
+        <>
+          <h5>{tr(M.later)}</h5>
+          <ul className="jj-op-later" data-jj-op-later="">
+            {p.later.map((o) => (
+              <li key={`${o.key}:${o.why}`}>{overlapText(o)}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {p.command ? (
+        <div data-jj-op-command="">
+          <p className="hint">{tr(M.command)}</p>
+          <div className="jj-op-command-row">
+            {/* An operation id is 128 characters: it wraps rather than run past the page. */}
+            <code className="mono jj-command" style={{ wordBreak: 'break-all' }}>
+              {p.command}
+            </code>{' '}
+            <button type="button" className="btn small" data-action="jj-op-copy" onClick={copy} disabled={busy}>
+              <Icon name="copy" /> {tr(M.copy)}
+            </button>
+          </div>
+          <p className="hint">{tr(M.previewSnapshot)}</p>
+        </div>
+      ) : (
+        <p className="caution" data-jj-op-nocommand="">
+          {tr(M.noCommand, { why: tr(REFUSED[p.refused ?? 'shape']) })}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function OperationLine({ row, selected, onPreview }: { row: JjOperationRow; selected: boolean; onPreview: () => void }) {
+  return (
+    <li className={`jj-row jj-op${selected ? ' selected' : ''}`} data-jj-op={row.id}>
+      <span className="mono faint">{row.id.slice(0, 12)}</span> {row.snapshot && <span className="badge">{tr(M.opSnapshot)}</span>} <span className="jj-desc">{row.description || <span className="faint">{tr(M.noDescription)}</span>}</span>{' '}
+      <span className="faint">
+        {tr(M.opBy, { user: row.user, workspace: row.workspace })} · {timeAgo(row.time)}
+      </span>{' '}
+      <button type="button" className="btn small subtle" data-action="jj-op-preview" onClick={onPreview}>
+        <Icon name="discard" /> {tr(M.opPreview)}
+      </button>
+    </li>
+  )
+}
+
+/** jj's operations, each named as jj named it, and a preview of undoing one (HI-2800). Nothing here writes. */
+export function JjOperationsSection({ project }: { project: ProjectInfo }) {
+  const r = useJjRead<JjOperationsView>(() => call('jj:operations', project.path, null), project.path)
+  const [older, setOlder] = useState<{ for: string; first: string; rows: JjOperationRow[]; next: string | null } | null>(null)
+  const [preview, setPreview] = useState<{ for: string; op: string; v: JjView<JjOperationPreview> | null; note: string | null } | null>(null)
+  const first = r.data && !isJjViewUnknown(r.data) ? r.data : null
+  // Older pages belong to the first page they were read after: a refreshed list starts again.
+  const extra = older && first && older.for === project.path && older.first === first.op ? older : null
+  const rows = first ? [...first.rows, ...(extra?.rows ?? [])] : []
+  const next = extra ? extra.next : (first?.next ?? null)
+  const shown = preview?.for === project.path ? preview : null
+  const showOlder = (): void => {
+    if (!next || !first) return
+    void call('jj:operations', project.path, next).then((v) => {
+      if (isJjViewUnknown(v)) return
+      setOlder({ for: project.path, first: first.op, rows: [...(extra?.rows ?? []), ...v.rows], next: v.next })
+    })
+  }
+  const ask = (op: string): void => {
+    setPreview({ for: project.path, op, v: null, note: null })
+    call('jj:operationPreview', project.path, op, null).then(
+      (v) => setPreview({ for: project.path, op, v, note: null }),
+      (e: unknown) => setPreview({ for: project.path, op, v: { jjUnknown: 'failed', detail: errorMessage(e) }, note: null })
+    )
+  }
+  return (
+    <Frame name="operations" r={r}>
+      {() => (
+        <>
+          <p className="hint">{tr(M.opsIntro)}</p>
+          {shown && (shown.v === null ? <p className="faint">{tr(M.reading)}</p> : isJjViewUnknown(shown.v) ? <Unknown u={shown.v} /> : <OperationPreview project={project} p={shown.v} note={shown.note} onReplace={(v, note) => setPreview({ for: project.path, op: shown.op, v, note })} />)}
+          {rows.length === 0 ? (
+            <p className="faint">{tr(M.opNone)}</p>
+          ) : (
+            <ul className="jj-rows" data-jj-operations="">
+              {rows.map((row) => (
+                <OperationLine key={row.id} row={row} selected={shown?.op === row.id} onPreview={() => ask(row.id)} />
+              ))}
+            </ul>
+          )}
+          {next && (
+            <button type="button" className="btn small subtle" data-action="jj-ops-older" onClick={showOlder}>
+              {tr(M.opsOlder)}
+            </button>
           )}
         </>
       )}

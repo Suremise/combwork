@@ -10,8 +10,8 @@ import { PLATFORMS } from '../../shared/platform/descriptors'
 import { isJjViewUnknown, JJ_CONFLICTS_MAX, JJ_DIFF_MAX, JJ_HISTORY_MAX, jjRevisionInput, type JjBookmarkRow, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjRepoView, type JjResolved, type JjRow, type JjView, type JjViewUnknown, type JjWorkspaceRow } from '../../shared/jjViews'
 import { jjContextOf, type JjContext } from './jjDetect'
 import { jjRunner, type JjRunner } from './jjRunner'
-import { isJjUnknown, JjReads, type JjMaybe } from './jjReads'
-import { CHANGE_ID, COMMIT_ID, readOpHeads } from './jjView'
+import { isJjUnknown, jjUnknown, JjReads, type JjMaybe } from './jjReads'
+import { CHANGE_ID, COMMIT_ID, readCheckout, readOpHeads } from './jjView'
 
 const SEP = '\x1f'
 
@@ -55,7 +55,7 @@ export function parseRow(line: string): JjRow | null {
 /** The root commit jj shows below everything (all zeros): never a row of its own. */
 const isRoot = (r: JjRow): boolean => /^0+$/.test(r.commit)
 
-const unknownOf = (u: { jjUnknown: string; detail?: string }): JjViewUnknown => ({ jjUnknown: u.jjUnknown as JjViewUnknown['jjUnknown'], ...(u.detail ? { detail: u.detail.slice(0, 2000) } : {}) })
+export const unknownOf = (u: { jjUnknown: string; detail?: string }): JjViewUnknown => ({ jjUnknown: u.jjUnknown as JjViewUnknown['jjUnknown'], ...(u.detail ? { detail: u.detail.slice(0, 2000) } : {}) })
 
 /**
  * The operation heads of the jj repository holding `folder`, from its files alone (no process): its shared repository
@@ -102,14 +102,14 @@ export async function pinnedContextOf(folder: string, runner: JjRunner = jjRunne
 }
 
 /** A project folder's jj context for a view (pinnedContextOf's), or why not. */
-async function contextOf(folder: string, runner: JjRunner): Promise<JjContext | JjViewUnknown> {
+export async function contextOf(folder: string, runner: JjRunner): Promise<JjContext | JjViewUnknown> {
   const c = await pinnedContextOf(folder, runner)
   if ('ctx' in c) return c.ctx
   return 'none' in c ? { jjUnknown: 'noRepo' } : c
 }
 
 /** Reads for a context, run in its workspace root. */
-const readsOf = (c: JjContext, runner: JjRunner): JjReads => new JjReads({ folder: c.root, jjRepo: c.jjRepo }, runner)
+export const readsOf = (c: JjContext, runner: JjRunner): JjReads => new JjReads({ folder: c.root, jjRepo: c.jjRepo }, runner)
 
 async function rowsAt(reads: JjReads, op: string, revset: string, max: number): Promise<JjMaybe<{ rows: JjRow[]; capped: boolean }>> {
   const out = await reads.run(op, ['log', '--no-graph', '-r', revset, '-n', String(max + 1), '-T', ROW_TEMPLATE])
@@ -119,6 +119,28 @@ async function rowsAt(reads: JjReads, op: string, revset: string, max: number): 
   if (!rows.every((r): r is JjRow => r !== null)) return { jjUnknown: 'malformed', detail: 'logRow' } // i18n-ignore: a protocol code
   const shown = rows.filter((r) => !isRoot(r))
   return { rows: shown.slice(0, max), capped: shown.length > max }
+}
+
+/** A workspace's working-copy commit at an operation, or why not. */
+async function wcAt(reads: JjReads, at: string, workspace: string): Promise<JjMaybe<string>> {
+  const out = await reads.run(at, ['log', '--no-graph', '-r', `present(${JSON.stringify(workspace)}@)`, '-n', '2', '-T', 'commit_id ++ "\\n"'])
+  if (isJjUnknown(out)) return out
+  const ids = out.split('\n').filter(Boolean)
+  return ids.length === 1 && COMMIT_ID.test(ids[0]) ? ids[0] : jjUnknown('malformed', 'workingCopy')
+}
+
+/**
+ * Whether the project folder's workspace is stale at `at` (J2's read: the operation its files were last updated at names
+ * another working-copy commit than `at` does); null when that can't be read (counted as stale: E7).
+ */
+export async function staleAt(reads: JjReads, root: string, at: string): Promise<boolean | null> {
+  const co = readCheckout(join(root, '.jj'))
+  if (!co) return null
+  if (co.op === at) return false
+  const then = await wcAt(reads, co.op, co.workspace)
+  const now = await wcAt(reads, at, co.workspace)
+  if (isJjUnknown(then) || isJjUnknown(now)) return null
+  return then !== now
 }
 
 /** The Repository section. */
@@ -139,7 +161,10 @@ export async function jjRepoView(folder: string, runner: JjRunner = jjRunner): P
       if (typeof name !== 'string' || !COMMIT_ID.test(commit ?? '') || !CHANGE_ID.test(change ?? '')) return { jjUnknown: 'malformed', detail: 'workspaceList' } // i18n-ignore: a protocol code
       rows.push({ name, commit, change })
     }
-    return rows
+    // The project folder's workspace, stale or not (HI-2800, J2's read): explained in the window, never recovered here.
+    const co = readCheckout(join(c.root, '.jj'))
+    const stale = co ? await staleAt(reads, c.root, op) : null
+    return rows.map((r) => (co && r.name === co.workspace ? { ...r, here: true, stale } : r))
   })
   return { ...base, op: isJjUnknown(ws) ? null : ws.op, heads: 1, workspaces: isJjUnknown(ws) ? unknownOf(ws) : ws.value }
 }

@@ -16,7 +16,7 @@ import { at, GitProblem, GitSetupNotes, HistorySection, useGitRead } from './Git
 import { BranchesSection } from './GitBranches'
 import { switchAfterInit, switchPlatform, useWorkflowForm, VersionControlHeader } from './VersionControlHeader'
 import { PresetStep } from '../components/PresetStep'
-import { JjBookmarksSection, JjCompareSection, JjConflictsSection, JjHistorySection, JjRepoSection } from './JjSections'
+import { JjBookmarksSection, JjCompareSection, JjConflictsSection, JjHistorySection, JjOperationsSection, JjRepoSection } from './JjSections'
 
 /**
  * The project's Version Control tab (#1416, SPEC §16.6; the Git tab before 1.0, its id still `changes`): the header
@@ -208,6 +208,8 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
               <JjBookmarksSection project={project} />
             ) : section === 'jjConflicts' ? (
               <JjConflictsSection project={project} />
+            ) : section === 'jjOperations' ? (
+              <JjOperationsSection project={project} />
             ) : s && !s.isRepo && !s.gitProblem ? (
               <GitSetupNotes project={project} />
             ) : section === 'changes' ? (

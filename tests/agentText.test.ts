@@ -10,7 +10,7 @@ import { inRequestScope } from '../src/shared/agentText/asyncScope'
 import { formatIcu, IcuError, parseIcu, placeholdersOf, type Part } from '../src/shared/agentText/icu'
 import { chainFromFile, loadProcessDialect } from '../src/shared/agentText/processDialect'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
-import { boardSkillsLine, controlRules, combworkInstructions, journalRule, withLatestHandover } from '../src/shared/combworkGuidance'
+import { boardSkillsLine, controlRules, combworkInstructions, journalRule, withLatestHandover, withPlatformRule } from '../src/shared/combworkGuidance'
 import { deliveredNotes } from '../src/shared/workspaceNotes'
 import { instructionsStarter } from '../src/shared/projectTabs'
 import { shareInstructions } from '../src/shared/instructions'
@@ -197,6 +197,8 @@ describe('the canary dialect over the session contract (card 1)', () => {
     for (const level of ['look', 'agents', 'projects'] as const) for (const cs of [true, false]) out.push({ name: `control ${level} ${cs}`, text: controlRules(level, cs), values: [] })
     out.push({ name: 'journal', text: journalRule([]), values: [] })
     out.push({ name: 'handover', text: withLatestHandover('', 'handovers/2026-10-03-web.md'), values: ['handovers/2026-10-03-web.md'] })
+    // A jj project's rule (HI-2800), after the contract.
+    out.push({ name: 'jj', text: withPlatformRule('', 'jj'), values: [] })
     out.push({ name: 'notes', text: deliveredNotes('MACHINE NOTE').text, values: ['MACHINE NOTE', 'Workspace notes'] })
     out.push({ name: 'notes cut', text: deliveredNotes('MACHINE NOTE\n'.repeat(500), 600).text, values: ['MACHINE NOTE', 'Workspace notes'] })
     out.push({ name: 'starter', text: instructionsStarter('webapp', 'Codex'), values: ['webapp', 'Codex'] })

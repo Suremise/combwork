@@ -6,6 +6,7 @@
 
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { IgnoreRule } from '../../shared/gitIgnoreRules'
+import { METADATA_DIRS } from '../../shared/platform/metadataDirs'
 import { gitRepoPorts } from './gitRepoPorts'
 import type { RepoContext, RepoLockOptions, RepoPorts } from './repoContext'
 
@@ -37,8 +38,11 @@ export async function currentLine(projectPath: string): Promise<string | null> {
   return null
 }
 
-/** Every repository platform's own folders (Git's `.git`): hidden in the Files tab, never file content (HI-2792). */
-export const repoMetadataDirs = (): string[] => ORDER.flatMap((p) => p.metadataDirs)
+/**
+ * Every repository platform's own folders (Git's `.git`): hidden in the Files tab, never file content (HI-2792). jj's
+ * `.jj` too, whatever the project's platform (HI-2800: jj has no repository context port, and a `.jj` is its store).
+ */
+export const repoMetadataDirs = (): string[] => [...new Set([...ORDER.flatMap((p) => p.metadataDirs), ...METADATA_DIRS])]
 
 /**
  * What the repository holding `folder` ignores of its entries `rels` (HI-2792, the Files tab): each platform asked in

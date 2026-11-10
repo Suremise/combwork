@@ -133,7 +133,8 @@ export async function diagnostics(opts: { recording?: boolean } = {}): Promise<s
     providerLines.push(`- **${tool}**: ${g.state === 'missing' ? "not found on Combwork's PATH" : g.version ? `${g.version}${g.path ? ` at \`${g.path}\`` : ''}${g.state === 'old' ? ' (older than Combwork needs)' : ''}` : `unknown${g.error ? ` (${g.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
   }
 
-  // Jujutsu (HI-2793's J0): not a platform yet, so not among repoTools(); checked here (no process when it isn't on PATH).
+  // Jujutsu (HI-2793's J0; a platform since HI-2799): it has no repository context port, so it isn't among repoTools();
+  // checked here (no process when it isn't on PATH).
   const jj = await jjRunner.readiness().catch(() => null)
   providerLines.push(`- **Jujutsu**: ${!jj ? 'unknown' : jj.state === 'missing' ? "not found on Combwork's PATH" : jj.version ? `${jj.version}${jj.path ? ` at \`${jj.path}\`` : ''}; tested with ${TESTED_JJ.version}${jj.state === 'old' ? ' (older: not run)' : jj.state === 'untested' ? ' (newer: untested, not trusted)' : ''}` : `unknown${jj.error ? ` (${jj.error})` : ''}`}`) // i18n-ignore: Copy Diagnostics' report: a bug report for the maintainer, in English (the design keeps diagnostics content English)
 

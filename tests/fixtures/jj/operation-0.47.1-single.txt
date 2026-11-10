@@ -1,0 +1,45 @@
+Operation {
+    view_id: ViewId(
+        "e35b4d6765c4d36d251c6fb55b01451c21a89b2973bf0fca8d582f2714e52313b5a80a0a3f2685cdca37d8113f2b1eba0388d60479b89cb9a502d53a210a8d1b",
+    ),
+    parents: [
+        OperationId(
+            "e7ce94493476c4b5b87971957b6d65af66937e37c68c5e4ab4885304c702a497e05815a5a0efa047c3f1a00b1c9d723749301bb4d780c03ccc645c90126c0084",
+        ),
+    ],
+    metadata: OperationMetadata {
+        time: TimestampRange {
+            start: Timestamp {
+                timestamp: MillisSinceEpoch(
+                    1794292360562,
+                ),
+                tz_offset: 0,
+            },
+            end: Timestamp {
+                timestamp: MillisSinceEpoch(
+                    1794292360577,
+                ),
+                tz_offset: 0,
+            },
+        },
+        description: "new empty commit",
+        hostname: "test-host",
+        username: "test-user",
+        is_snapshot: false,
+        workspace_name: Some(
+            WorkspaceNameBuf(
+                "default",
+            ),
+        ),
+        attributes: {
+            "args": "jj --no-pager '--color=never' --config 'user.name=t' --config 'user.email=t@e' new",
+        },
+    },
+    commit_predecessors: Some(
+        {
+            CommitId(
+                "aabc9f31134515612b4ce53163a32f54fe8b2221",
+            ): [],
+        },
+    ),
+}

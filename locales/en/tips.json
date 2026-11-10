@@ -1107,6 +1107,14 @@
     "defaultMessage": "A check nobody else can spoil",
     "description": "A tip's title."
   },
+  "tips.jjOperations.text": {
+    "defaultMessage": "In a jj project, Version Control → Operations lists jj’s operations by name. Preview Undo shows what undoing one would change, and gives you the command to run when nothing else would change. Combwork never runs it.",
+    "description": "A tip (HI-2800). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj."
+  },
+  "tips.jjOperations.title": {
+    "defaultMessage": "Preview undoing a jj operation",
+    "description": "A tip's title (HI-2800). Keep jj."
+  },
   "tips.keepAwake.text": {
     "defaultMessage": "While an agent works, Combwork stops Windows from sleeping (the screen can still lock), and lets it sleep once they're done. Choose when in Settings → General.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
