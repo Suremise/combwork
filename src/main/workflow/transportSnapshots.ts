@@ -6,14 +6,21 @@ import type { TransportSnapshot } from '../platform/integration'
 
 /** The store the queue uses (tests give one of their own: no Electron there). */
 export interface TransportStore {
-  /** Keeps a project's snapshot; its id and digest, or null when it can't be kept safely (never in plain text). */
-  save(project: string, snap: TransportSnapshot): Promise<{ id: string; digest: string } | null>
+  /**
+   * Keeps a snapshot of a project's target; its id and digest, or null when it can't be kept safely (never in plain text).
+   * Owned by that target (HR2's HI-1183 round 2): only its own queue's clean-up, which runs under its lease between its
+   * entries, ever drops it, so another target's clean-up can't take one between its save and its IntegrationStarted.
+   */
+  save(project: string, target: string, snap: TransportSnapshot): Promise<{ id: string; digest: string } | null>
   /** The snapshot of `id`, only if it decrypts and its digest is `digest`; null otherwise. */
   load(id: string, digest: string): Promise<TransportSnapshot | null>
   drop(id: string): Promise<void>
-  /** Drops every snapshot of the project whose id isn't kept. */
-  dropExcept(project: string, keep: ReadonlySet<string>): Promise<void>
+  /** Drops every snapshot of the project's target whose id isn't kept. */
+  dropExcept(project: string, target: string, keep: ReadonlySet<string>): Promise<void>
 }
+
+/** Who owns a snapshot: its project (case aside, as Windows paths are) and its target. */
+export const ownerOf = (project: string, target: string): string => `${project.toLowerCase()}\n${target}`
 
 /** The digest a record names: of the snapshot as captured, in a stable form. */
 export const snapshotDigest = (snap: TransportSnapshot): string => createHash('sha256').update(JSON.stringify([snap.remote, snap.url, snap.ref, snap.config, snap.objects, snap.alternates, snap.format])).digest('hex')
@@ -35,15 +42,15 @@ export function snapshotOf(text: string): TransportSnapshot | null {
 export function memoryTransportStore(): TransportStore & { raw: Map<string, string> } {
   const raw = new Map<string, string>()
   const digests = new Map<string, string>()
-  const projects = new Map<string, string>()
+  const owners = new Map<string, string>()
   return {
     raw,
-    async save(project, snap) {
+    async save(project, target, snap) {
       const id = randomBytes(12).toString('hex')
       const digest = snapshotDigest(snap)
       raw.set(id, JSON.stringify(snap))
       digests.set(id, digest)
-      projects.set(id, project.toLowerCase())
+      owners.set(id, ownerOf(project, target))
       return { id, digest }
     },
     async load(id, digest) {
@@ -56,8 +63,8 @@ export function memoryTransportStore(): TransportStore & { raw: Map<string, stri
       raw.delete(id)
       digests.delete(id)
     },
-    async dropExcept(project, keep) {
-      for (const id of [...raw.keys()]) if (projects.get(id) === project.toLowerCase() && !keep.has(id)) {
+    async dropExcept(project, target, keep) {
+      for (const id of [...raw.keys()]) if (owners.get(id) === ownerOf(project, target) && !keep.has(id)) {
         raw.delete(id)
         digests.delete(id)
       }

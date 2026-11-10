@@ -4,7 +4,7 @@ import { readFile } from 'original-fs/promises'
 import { app, safeStorage } from 'electron'
 import { writeJsonAtomic } from './fsutil'
 import { createLogger } from './logger'
-import { snapshotDigest, snapshotOf, type TransportStore } from './workflow/transportSnapshots'
+import { ownerOf, snapshotDigest, snapshotOf, type TransportStore } from './workflow/transportSnapshots'
 
 /**
  * Follow mode's captured transports (HI-1183, SPEC §16.9.4), the only place Combwork keeps one: `queue-transport.json` in
@@ -23,8 +23,8 @@ const log = createLogger('queue')
 const file = (): string => join(app.getPath('userData'), 'queue-transport.json')
 
 interface Entry {
-  /** Its project, lower case: a clean-up is a project's alone (the store is the profile's). */
-  project: string
+  /** Its project (lower case) and target: a clean-up is that target's queue's alone (the store is the profile's). */
+  owner: string
   digest: string
   at: string
   blob: string
@@ -49,7 +49,7 @@ async function read(): Promise<Store> {
   try {
     const parsed = JSON.parse(text) as Record<string, Partial<Entry>>
     const out: Store = {}
-    for (const [id, e] of Object.entries(parsed ?? {})) if (e && typeof e.blob === 'string' && typeof e.digest === 'string') out[id] = { project: String(e.project ?? ''), digest: e.digest, at: String(e.at ?? ''), blob: e.blob }
+    for (const [id, e] of Object.entries(parsed ?? {})) if (e && typeof e.blob === 'string' && typeof e.digest === 'string') out[id] = { owner: String(e.owner ?? ''), digest: e.digest, at: String(e.at ?? ''), blob: e.blob }
     return out
   } catch (e) {
     // Damaged: as if empty; a begun publication then pauses as unknown (its snapshot gone), never guessed.
@@ -62,13 +62,13 @@ async function read(): Promise<Store> {
 const safe = (): boolean => safeStorage.isEncryptionAvailable() && safeStorage.getSelectedStorageBackend?.() !== 'basic_text'
 
 export const queueTransportStore: TransportStore = {
-  save(project, snap) {
+  save(project, target, snap) {
     if (!safe()) return Promise.resolve(null)
     return serial(async () => {
       const store = await read()
       const id = randomBytes(12).toString('hex')
       const digest = snapshotDigest(snap)
-      store[id] = { project: project.toLowerCase(), digest, at: new Date().toISOString(), blob: safeStorage.encryptString(JSON.stringify(snap)).toString('base64') }
+      store[id] = { owner: ownerOf(project, target), digest, at: new Date().toISOString(), blob: safeStorage.encryptString(JSON.stringify(snap)).toString('base64') }
       await writeJsonAtomic(file(), store)
       return { id, digest }
     })
@@ -94,10 +94,10 @@ export const queueTransportStore: TransportStore = {
       await writeJsonAtomic(file(), store)
     })
   },
-  dropExcept(project, keep) {
+  dropExcept(project, target, keep) {
     return serial(async () => {
       const store = await read()
-      const gone = Object.keys(store).filter((id) => store[id].project === project.toLowerCase() && !keep.has(id))
+      const gone = Object.keys(store).filter((id) => store[id].owner === ownerOf(project, target) && !keep.has(id))
       if (!gone.length) return
       for (const id of gone) delete store[id]
       await writeJsonAtomic(file(), store)

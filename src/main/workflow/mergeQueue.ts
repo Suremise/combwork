@@ -751,7 +751,7 @@ export class MergeQueue {
     const on = await I.contains(this.project, onto, result)
     if (isUnknown(on)) return again(gitSaid(on))
     if (!on) return { pause: 'needsYou', message: `The test merge ${result.slice(0, 12)} doesn't contain ${onto.slice(0, 12)}, the remote's head it was tested on, so Combwork didn't publish it.` } // i18n-ignore: git's side of a pause, in English as git's are
-    const saved = await this.cfg.transport?.save(this.project, snap)
+    const saved = await this.cfg.transport?.save(this.project, target, snap)
     if (!saved) return { pause: 'remoteUnsupported' }
     const publish: PublishFact = { remote: snap.remote, endpoint: snap.display, ref: snap.ref, onto, snapshot: saved.id, digest: saved.digest }
     const started = await this.startAdvance(card, entry, { entry: entry.id, expected, result, checkedOut: folder, publish })
@@ -828,15 +828,19 @@ export class MergeQueue {
     if (id) await this.cfg.transport?.drop(id)
   }
 
-  /** The snapshots this project's begun publications still need: the host drops the rest (crash leftovers). */
-  async pruneSnapshots(): Promise<void> {
+  /**
+   * A target's snapshots its begun publications no longer need (crash leftovers), dropped by its own queue's host between
+   * its entries, under its lease (HR2's round 2): never another target's, which may be between its save and its
+   * IntegrationStarted.
+   */
+  async pruneSnapshots(target: string): Promise<void> {
     if (!this.cfg.transport) return
     const keep = new Set<string>()
     for (const card of this.wf.store.cards()) {
       const e = openEntry(this.wf.state(card))
-      if (e?.state === 'started' && e.started?.publish) keep.add(e.started.publish.snapshot)
+      if (e?.state === 'started' && e.started?.publish && e.target === target) keep.add(e.started.publish.snapshot)
     }
-    await this.cfg.transport.dropExcept(this.project, keep)
+    await this.cfg.transport.dropExcept(this.project, target, keep)
   }
 
   /**

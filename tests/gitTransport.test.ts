@@ -50,17 +50,19 @@ describe('follow mode’s transport helpers (HI-1183)', () => {
   it('the store keeps a snapshot by id and digest: a changed or missing one is never returned', async () => {
     const store = memoryTransportStore()
     const s = snap()
-    const kept = (await store.save('C:/P', s))!
+    const kept = (await store.save('C:/P', 'main', s))!
     expect(kept.digest).toBe(snapshotDigest(s))
     expect(await store.load(kept.id, kept.digest)).toEqual(s)
     expect(await store.load(kept.id, 'other')).toBeNull()
     store.raw.set(kept.id, JSON.stringify({ ...s, url: 'https://elsewhere/r.git' }))
     expect(await store.load(kept.id, kept.digest)).toBeNull()
-    // A project's clean-up drops only its own.
-    const other = (await store.save('C:/Q', s))!
-    await store.dropExcept('c:/p', new Set())
+    // A target's clean-up drops only its own (HR2's round 2): never another project's, nor another target's.
+    const other = (await store.save('C:/Q', 'main', s))!
+    const sibling = (await store.save('C:/P', 'release', s))!
+    await store.dropExcept('c:/p', 'main', new Set())
     expect(store.raw.has(kept.id)).toBe(false)
     expect(store.raw.has(other.id)).toBe(true)
+    expect(store.raw.has(sibling.id)).toBe(true)
   })
 
   it('query and fragment credentials go too, in a URL and bare (HR2’s round 1)', () => {

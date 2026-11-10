@@ -265,7 +265,7 @@ async function runHost(h: Host): Promise<void> {
       }
       await prunePins(wf, h.projectPath)
       // G21 (HI-1183): snapshots no begun publication of the project needs (crash leftovers) dropped.
-      await new MergeQueue(wf, queueConfig(h, r)).pruneSnapshots().catch((e) => log.warn('dropping unused transport snapshots', e))
+      await new MergeQueue(wf, queueConfig(h, r)).pruneSnapshots(h.target).catch((e) => log.warn('dropping unused transport snapshots', e))
     } while (h.again && alive(h))
   } finally {
     // The queue is empty, paused or its workspace is going: the lease goes (its folder kept while the queue needs it).

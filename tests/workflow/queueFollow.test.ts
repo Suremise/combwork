@@ -324,6 +324,26 @@ describe('the target follows its remote (G21, HI-1183)', () => {
     expect(e.wf.state(a).stage).toBe('merging')
   })
 
+  it('another target’s clean-up between a save and its IntegrationStarted never takes the snapshot: the restart verifies and merges (HR2’s round 2)', { timeout: GIT_HEAVY_MS }, async () => {
+    const { e, bare, transport, queue } = following()
+    const a = await queued(e, 'A', 'a.txt')
+    // Another target's queue host finishing and cleaning up at the worst moment, and its own target's too, after the save.
+    const other = queue()
+    const racing = { ...transport, save: async (p: string, t: string, s: Parameters<typeof transport.save>[2]) => {
+      const kept = await transport.save(p, t, s)
+      await other.pruneSnapshots('release')
+      return kept
+    } }
+    await expect(queue({ transport: racing, hooks: { afterPublish: () => Promise.reject(new Error('crash')) } }).drain('main')).rejects.toThrow('crash')
+    expect(transport.raw.size).toBe(1)
+    expect((await restarted(e, transport).drain('main')).map((o) => o.outcome)).toContain('integrated')
+    expect(e.wf.state(a).stage).toBe('done')
+    expect(head(bare)).toBe(head(e.project))
+    // Its own target's clean-up then drops what no begun publication needs.
+    await restarted(e, transport).pruneSnapshots('main')
+    expect(transport.raw.size).toBe(0)
+  })
+
   it('a snapshot gone (or changed) at recovery is unknown: never rebuilt from the configuration as it is now', { timeout: GIT_HEAVY_MS }, async () => {
     const { e, transport, queue } = following()
     await queued(e, 'A', 'a.txt')
