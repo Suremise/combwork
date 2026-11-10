@@ -7,10 +7,13 @@
 // pinned write nothing), and the answer stands only while H is still the head (JjReads.pinned). The views' parse and
 // comparison run on jj's worker (runner.preview).
 //
-// Git's own state is part of the moment (HR2's HI-2800 round 1): a plain Git move jj hasn't imported leaves the
-// operation heads as they were. Git's refs and HEAD are read (read-only git, `--no-optional-locks`, never an import),
-// compared with jj's record at H (E8), and read again, with J3's file fingerprint of the colocated Git state, after
-// everything else: any change between is `moved`. The preview's `moment` hashes all of it, and Copy sends it back.
+// Git's own state is part of the moment (HR2's HI-2800 rounds 1 and 2): a plain Git move jj hasn't imported leaves the
+// operation heads as they were. Git's refs and HEAD are read (read-only git, `--no-optional-locks`, never an import) and
+// compared with jj's record at H (E8), inside J5's verified capture (jjSourcesPrint.ts, HI-2798): a print of every
+// source those reads rest on (the operation heads, HEAD, packed refs, every loose ref under refs/heads, refs/tags and
+// refs/remotes, a reftable, the store's config) before and after them, equal, and the same print checked once more
+// synchronously in the continuation that answers. The preview's `moment` hashes H, the print and Git's answers, and Copy
+// sends it back.
 
 import { createHash } from 'crypto'
 import { join } from 'path'
@@ -19,7 +22,8 @@ import { isJjViewUnknown, JJ_OPERATIONS_MAX, type JjOperationPreview, type JjOpe
 import { jjRunner, type JjRunner } from './jjRunner'
 import { isJjUnknown, jjUnknown, type JjMaybe, type JjReads } from './jjReads'
 import { contextOf, readsOf, staleAt, unknownOf } from './jjViews'
-import { jjFingerprint, readCheckout } from './jjView'
+import { readCheckout, workspaceGitDir } from './jjView'
+import { rawSourcesPrint } from './jjSourcesPrint'
 import type { JjContext } from './jjDetect'
 import { commitList, isOpId, OP_COMMITS_MAX, operationFacts, previewOf, revertCommand, soleParent, VIEW_TEXT_MAX, type OpCommits, type OperationFacts, type OpGitState } from './jjOpView'
 
@@ -111,12 +115,24 @@ async function gitStateOf(c: JjContext, git: GitRead): Promise<{ state: OpGitSta
   return { state: { refs: rows, colocated: c.colocated, workspace, head }, text: `${refs.out}\n${head ?? ''}` }
 }
 
-/** The moment: the head, J3's fingerprint of the workspace (its Git files, colocated) and Git's refs and HEAD, hashed. */
-function momentOf(c: JjContext, H: string, gitText: string): string | null {
-  const fp = jjFingerprint({ jjRepo: c.jjRepo, workspace: join(c.root, '.jj'), root: c.root, store: c.store, colocated: c.colocated })
-  if (fp === null) return null
-  return `${H}:${createHash('sha256').update(`${fp}\n${gitText}`).digest('hex').slice(0, 32)}`
+/**
+ * The print of every Git source E8's reads rest on (the Operations view's list, the Assistant's on HI-2800): jj's
+ * operation heads, the store's HEAD and, for a workspace with its own Git folder, that HEAD, the packed refs, every loose
+ * ref under refs/heads, refs/tags and refs/remotes, a reftable if the store has one, and the store's config. The same in
+ * both Git-backed modes (a non-colocated store's included). Undefined when any can't be read.
+ */
+function gitPrint(c: JjContext): string | undefined {
+  const own = c.colocated ? workspaceGitDir(c.root) : null
+  return rawSourcesPrint({
+    jjRepo: c.jjRepo,
+    files: [{ label: 'HEAD', path: join(c.store, 'HEAD') }, ...(own && own !== c.store ? [{ label: 'workspace HEAD', path: join(own, 'HEAD') }] : []), { label: 'packed', path: join(c.store, 'packed-refs') }, { label: 'config', path: join(c.store, 'config') }],
+    trees: ['heads', 'tags', 'remotes'].map((t) => ({ label: `refs/${t}`, path: join(c.store, 'refs', t) })).concat([{ label: 'reftable', path: join(c.store, 'reftable') }])
+  })
 }
+
+/** The moment: the head, the print and Git's answers, hashed. */
+const momentOf = (H: string, print: string, gitText: string): string => `${H}:${createHash('sha256').update(`${print}
+${gitText}`).digest('hex').slice(0, 32)}`
 
 /** A refusal before anything is compared (E2, E3's operation shape), as a preview with no command. */
 const refusedEarly = (at: string, moment: string, op: string, facts: OperationFacts | null, refused: JjOperationPreview['refused'], detail?: string): JjOperationPreview => ({ at, moment, op, description: facts?.description ?? '', did: [], commits: { added: [], hidden: [] }, later: [], command: null, refused, ...(detail ? { detail: detail.slice(0, 2000) } : {}) })
@@ -139,10 +155,12 @@ export async function jjOperationPreview(folder: string, op: string, moment?: st
   if (isJjViewUnknown(c)) return c
   const reads = readsOf(c, runner)
   const r = await reads.pinned(async (H): Promise<JjMaybe<JjOperationPreview>> => {
-    // Git's state first: what E8 compares, and the moment the answer stands for.
-    const before = await gitStateOf(c, git)
-    const at = before ? momentOf(c, H, before.text) : null
-    if (!before || !at) return jjUnknown('moved', 'git')
+    // Git's state first, as a verified capture: the print, the reads, the print again (equal: the answers belong to
+    // those bytes). What E8 compares, and the moment the answer stands for.
+    const print = gitPrint(c)
+    const before = print ? await gitStateOf(c, git) : null
+    if (!print || !before || gitPrint(c) !== print) return jjUnknown('moved', 'git')
+    const at = momentOf(H, print, before.text)
     const opText = await reads.run(H, ['debug', 'object', 'operation', op])
     if (isJjUnknown(opText)) return opText
     const facts = operationFacts(opText)
@@ -180,10 +198,9 @@ export async function jjOperationPreview(folder: string, op: string, moment?: st
     const stale = await staleAt(reads, c.root, H)
     const input = { op, facts, parent, views: { parent: views[0], op: views[1], head: views[2] }, commits, stale, git: before.state }
     const core = await (runner.preview ? runner.preview(input) : Promise.resolve(previewOf(input)))
-    // The fence's end: Git's state and the workspace's fingerprint read again, after every awaited read; a change since
-    // the first read (a plain Git move meanwhile) is no answer.
-    const after = await gitStateOf(c, git)
-    if (!after || momentOf(c, H, after.text) !== at) return jjUnknown('moved', 'git')
+    // The fence's end, in this continuation after the last awaited read, nothing awaited before the answer: the same print,
+    // else a Git change meanwhile (a tag, a remote ref, HEAD) is no answer.
+    if (gitPrint(c) !== print) return jjUnknown('moved', 'git')
     return { at: H, moment: at, op, description: facts.description, did: core.did, commits: core.commits, later: core.later, command: core.refused === null ? revertCommand(op) : null, refused: core.refused }
   })
   if (isJjUnknown(r)) return unknownOf(r)

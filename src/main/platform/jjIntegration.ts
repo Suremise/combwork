@@ -12,7 +12,6 @@
 // from these and the reconciler records `Integrated { by: 'outside' }` with this provenance (jjFacts.ts).
 
 import { readFileSync } from 'original-fs'
-import { createHash } from 'crypto'
 import { dirname, isAbsolute, join, resolve } from 'path'
 import type { JjAttemptRecord, JjPin } from './jjCandidates'
 import { parseRefs } from './jjCandidates'
@@ -21,6 +20,7 @@ import type { StoreLock } from './jjBoundary'
 import { isJjUnknown, JjReads, jjUnknown, type JjCommit, type JjReadUnknown } from './jjReads'
 import type { JjRunner } from './jjRunner'
 import { COMMIT_ID, readOpHeads, type ViewOf } from './jjView'
+import { rawSourcesPrint } from './jjSourcesPrint'
 import type { RunResult } from './repoContext'
 import type { Containment, Maybe } from './types'
 import { isUnknown } from './types'
@@ -559,30 +559,12 @@ export async function configSources(deps: JjIntegrationDeps): Promise<ConfigSour
  * be read (a read error but "not there").
  */
 export function sourcesPrint(store: string, jjRepo: string, target: string, sources: ConfigSources): string | undefined {
-  const h = createHash('sha256')
-  const heads = readOpHeads(jjRepo)
-  if (!heads) return undefined
-  h.update(`heads:${[...heads].sort().join(',')}\n`)
-  h.update(`env:${sources.env}\n`)
-  const file = (f: string): Buffer | null | undefined => {
-    try {
-      return readFileSync(f)
-    } catch (e) {
-      const code = (e as { code?: string }).code
-      return code === 'ENOENT' || code === 'ENOTDIR' ? null : undefined
-    }
-  }
-  const add = (label: string, f: string): boolean => {
-    const b = file(f)
-    if (b === undefined) return false
-    h.update(`${label}:${b === null ? '-' : createHash('sha256').update(b).digest('hex')}\n`)
-    return true
-  }
-  if (!add('HEAD', join(store, 'HEAD'))) return undefined
-  if (!add('ref', join(store, 'refs', 'heads', ...target.split('/')))) return undefined
-  if (!add('packed', join(store, 'packed-refs'))) return undefined
-  for (const f of sources.files) if (!add(`config:${f.toLowerCase()}`, f)) return undefined
-  return h.digest('hex')
+  // The verified capture's print, shared with the Operations preview (jjSourcesPrint.ts, HI-2800): these sources, as before.
+  return rawSourcesPrint({
+    jjRepo,
+    env: sources.env,
+    files: [{ label: 'HEAD', path: join(store, 'HEAD') }, { label: 'ref', path: join(store, 'refs', 'heads', ...target.split('/')) }, { label: 'packed', path: join(store, 'packed-refs') }, ...sources.files.map((f) => ({ label: `config:${f.toLowerCase()}`, path: f }))]
+  })
 }
 
 /** Parses `jj git remote list` (`name url` a line). */

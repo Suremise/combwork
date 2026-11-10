@@ -2848,10 +2848,14 @@ start), and the skills' jj-slot workflow.
   workspace's HEAD at its `githead:` (`unimported` otherwise: a plain Git move leaves jj's operation heads as they were,
   and the user's command would import it first). A clean metadata-only operation (a bookmark created or deleted, a
   remote bookmark tracked or untracked) is eligible.
-- **Its moment**: the preview names H and says it is a preview at H, not a guarantee about a later command. Its
-  `moment` hashes H, J3's fingerprint of the workspace (`jjFingerprint`: colocated, Git's HEAD, index, reflogs, packed
-  refs and branch files) and Git's refs and HEAD as E8 read them; they are read first and again after every other read
-  (the fence's end), and any change between is no answer (`moved`). **Copy** asks main again with that moment
+- **Its moment**: the preview names H and says it is a preview at H, not a guarantee about a later command. E8's Git
+  reads sit inside **J5's verified capture** (HR2's round 2; the Assistant's call to reuse it): `rawSourcesPrint`
+  (`platform/jjSourcesPrint.ts`, extracted from J5's `sourcesPrint`, whose own sources are unchanged) prints the raw
+  bytes of every source they rest on, in both Git-backed modes: jj's operation heads, the store's HEAD (and a colocated
+  workspace's own HEAD), the packed refs, every loose ref under `refs/heads`, `refs/tags` and `refs/remotes`, a reftable,
+  and the store's config. Print, read, print again (equal: the answers belong to those bytes), and the same print
+  checked once more synchronously in the continuation that answers, after the last awaited read: any change is no
+  answer (`moved`). The `moment` hashes H, the print and Git's answers. **Copy** asks main again with that moment
   (`jj:operationPreview`'s `moment`), and another moment (the head, or Git's state) gives no command (`moved`): the
   window shows the fresh preview, for the user to look at before copying again. The note also says the user's command
   first records any unrecorded edits, as its own snapshot operation S, before reverting.

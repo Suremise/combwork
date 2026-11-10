@@ -15,8 +15,8 @@ import { TESTED_JJ } from '../src/shared/jjTool'
 import { createJjRunner } from '../src/main/platform/jjRunner'
 import { jjContextOf } from '../src/main/platform/jjDetect'
 import { readOpHeads } from '../src/main/platform/jjView'
-import { jjOperationPreview, jjOperations } from '../src/main/platform/jjOperations'
-import { operationFacts, viewEntries, type ViewEntries } from '../src/main/platform/jjOpView'
+import { jjOperationPreview, jjOperations, type GitRead } from '../src/main/platform/jjOperations'
+import { operationFacts, previewOf, viewEntries, type OpPreviewInput, type ViewEntries } from '../src/main/platform/jjOpView'
 import { isJjViewUnknown, type JjOperationPreview } from '../src/shared/jjViews'
 import { tempDir } from './tempDir'
 
@@ -301,5 +301,98 @@ describe.skipIf(!exe)('jj operations: the revert preview on the real jj (HI-2800
     git(r.root, 'update-ref', '--no-deref', 'HEAD', r.id('main-'))
     expect((await preview(r, O)).refused).toBe('unimported')
     expect(readOpHeads(r.ctx.jjRepo)).toEqual(heads)
+  })
+  /** Git as the preview reads it (read-only, no optional locks), with `during` run inside the n-th call, before it answers. */
+  function gitWith(during: (call: number, args: string[]) => void): GitRead {
+    let n = 0
+    return async (cwd, args) => {
+      n++
+      try {
+        const out = execFileSync('git', ['--no-optional-locks', ...args], { cwd, env, windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+        during(n, args)
+        return { ok: true, out, code: 0 }
+      } catch (e) {
+        during(n, args)
+        const x = e as { status?: number; stdout?: string }
+        return { ok: false, out: x.stdout ?? '', code: x.status ?? null }
+      }
+    }
+  }
+
+  it("the verified capture (HR2's round 2): a tag or a remote ref made during the last Git read, or during the last awaited read of all, gives no answer; and Copy after one gives no command", async () => {
+    const r = await repo('capture')
+    jj(r.root, 'bookmark', 'create', 'feature', '-r', 'main')
+    const O = r.head()
+    const shown = await preview(r, O)
+    expect(shown.command).not.toBeNull()
+    const heads = readOpHeads(r.ctx.jjRepo)
+    // A tag made during HEAD's read (the last Git read): its answer is unchanged, the refs read before it lack the tag.
+    let made = false
+    const tagLate = await jjOperationPreview(r.root, O, null, runner, gitWith((n, args) => {
+      if (args[0] === 'rev-parse' && !made) {
+        git(r.root, 'tag', 'late', r.id('main'))
+        made = true
+      }
+    }))
+    expect(made).toBe(true)
+    expect(isJjViewUnknown(tagLate) && tagLate.jjUnknown).toBe('moved')
+    git(r.root, 'tag', '-d', 'late')
+    // A remote ref made during the refs' own read.
+    made = false
+    const remoteLate = await jjOperationPreview(r.root, O, null, runner, gitWith((n, args) => {
+      if (args.includes('for-each-ref') && !made) {
+        git(r.root, 'update-ref', 'refs/remotes/origin/late', r.id('main'))
+        made = true
+      }
+    }))
+    expect(made).toBe(true)
+    expect(isJjViewUnknown(remoteLate) && remoteLate.jjUnknown).toBe('moved')
+    git(r.root, 'update-ref', '-d', 'refs/remotes/origin/late')
+    // During the last awaited read of all (the worker's preview): the synchronous check at the answer catches it.
+    made = false
+    const lastRead = await jjOperationPreview(r.root, O, null, { ...runner, preview: async (input: OpPreviewInput) => {
+      git(r.root, 'tag', 'latest', r.id('main'))
+      made = true
+      return previewOf(input)
+    } })
+    expect(made).toBe(true)
+    expect(isJjViewUnknown(lastRead) && lastRead.jjUnknown).toBe('moved')
+    // Copy after it: the moment shown isn't the moment now.
+    const atCopy = await preview(r, O, shown.moment)
+    expect(atCopy.refused).toBe('moved')
+    expect(atCopy.command).toBeNull()
+    git(r.root, 'tag', '-d', 'latest')
+    // Deleting it leaves an empty refs/tags the first print didn't have: still another moment. A fresh preview offers it.
+    expect((await preview(r, O)).command).toBe(shown.command)
+    expect(readOpHeads(r.ctx.jjRepo)).toEqual(heads)
+  })
+
+  it('a non-colocated store: an eligible preview, and a tag made in its Git store during the refs read gives no answer', async () => {
+    const parent = tempDir('jjo-loose-')
+    const root = join(parent, 'repo')
+    mkdirSync(root)
+    jj(root, 'git', 'init', '--no-colocate')
+    writeFileSync(join(root, 'a.txt'), 'a\n')
+    jj(root, 'commit', '-m', 'a')
+    jj(root, 'bookmark', 'create', 'feature', '-r', '@-')
+    const real = resolve(realpathSync.native(root))
+    const O = jj(real, '--ignore-working-copy', 'op', 'log', '--no-graph', '-n', '1', '-T', 'id').trim()
+    const p = await jjOperationPreview(real, O, null, runner)
+    if (isJjViewUnknown(p)) throw new Error(JSON.stringify(p))
+    expect(p.refused).toBeNull()
+    const store = join(real, '.jj', 'repo', 'store', 'git')
+    const commit = jj(real, '--ignore-working-copy', 'log', '--no-graph', '-r', '@-', '-T', 'commit_id').trim()
+    let made = false
+    const late = await jjOperationPreview(real, O, null, runner, gitWith((n, args) => {
+      if (args.includes('for-each-ref') && !made) {
+        git(real, `--git-dir=${store}`, 'tag', 'late', commit)
+        made = true
+      }
+    }))
+    expect(made).toBe(true)
+    expect(isJjViewUnknown(late) && late.jjUnknown).toBe('moved')
+    // And with the tag there, jj hasn't imported it: E8.
+    const after = await jjOperationPreview(real, O, null, runner)
+    expect(!isJjViewUnknown(after) && after.refused).toBe('unimported')
   })
 })
