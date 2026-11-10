@@ -152,7 +152,7 @@ async function drainOf(ws: WorkspaceService, members: readonly Member[]): Promis
 async function jjReady(path: string, store: string): Promise<SwitchRefusal | null> {
   // Diverged operation heads: nothing asked of jj (an unpinned command would merge them, a write).
   const heads = headsHere(path)
-  if (heads && heads.length !== 1) return { why: 'jjUnknown', code: 'heads' }
+  if (heads && heads.length !== 1) return { why: 'jjUnknown', code: 'heads' } // i18n-ignore: a code, never shown as text
   const d = await jjContextOf(path)
   if ('none' in d) return { why: 'noJj' } // i18n-ignore: a code or SQL, never shown as text
   if ('unknown' in d) return d.unknown === 'tool' ? { why: 'jjTool', state: d.tool?.state ?? 'unknown' } : { why: 'jjUnknown', code: d.unknown } // i18n-ignore: a code or SQL, never shown as text

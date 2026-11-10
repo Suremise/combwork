@@ -579,5 +579,20 @@
   "workflow.why.stopOwnRuns": "Ein weiterlaufender Lauf würde die Arbeit im Review weiter ändern oder testen.",
   "workflow.why.strict": "Die Merge-Warteschlange testet das gemergte Ergebnis ohnehin, daher ändert das vor allem die Form der Historie.",
   "workflow.why.style": "Ein Merge-Commit behält die eigenen Commits jeder Karte, so wie Combwork schon immer gemergt hat.",
-  "workflow.why.target": "Fertige Arbeit geht in den Standardbranch des Repositorys; allein in den Branch, auf dem das Projekt steht."
+  "workflow.why.target": "Fertige Arbeit geht in den Standardbranch des Repositorys; allein in den Branch, auf dem das Projekt steht.",
+  "workflow.contradiction.jjNeedsSlots": "Mit jj braucht jede Karte ihren eigenen Ordner: Agenten im gemeinsamen Projektordner werden noch nicht unterstützt.",
+  "workflow.contradiction.jjYouIntegrate": "Mit jj integrierst du die reviewte Arbeit selbst: Combwork mergt sie nicht.",
+  "workflow.form.levelForJj": "Die Standards für jj-Projekte.",
+  "workflow.form.levelJj": "jj",
+  "workflow.refused.platform.changed.message": "{card} kann unter diesen Regeln nicht starten: Das Projekt verwendet jetzt {platform}.",
+  "workflow.refused.platform.changed.next": "Starte sie erneut: Dann wird sie nach den Regeln von {platform} geprüft.",
+  "workflow.refused.platform.switching.message": "{card} kann jetzt nicht starten: Die Versionsverwaltung ihres Repositorys wird gerade gewechselt.",
+  "workflow.refused.platform.switching.next": "Versuche es gleich noch einmal, sobald der Wechsel beendet ist.",
+  "workflow.refused.start.platformReady.message": "{card} kann nicht starten: Karten laufen in einem jj-Projekt noch nicht.",
+  "workflow.refused.start.platformReady.next": "Arbeite außerhalb von Combworks Karten daran oder wechsle das Projekt in der Versionsverwaltung zu Git.",
+  "workflow.rule.start.platformReady": "Karten laufen nur dort, wo Combwork die Versionsverwaltung unterstützt",
+  "workflow.summary.jj.pair": "Ein Reviewer-Agent lässt jede Karte nach den schnellen Checks bestehen, dann integrierst du sie selbst.",
+  "workflow.summary.jj.solo": "Jede Karte in ihrem eigenen jj-Workspace, kein Review: Du integrierst die Arbeit selbst.",
+  "workflow.summary.jj.team": "Ein Reviewer-Agent, dann du, prüfen jede Karte nach den schnellen Checks und den Tests, dann integrierst du sie selbst.",
+  "workflow.value.finish.userIntegrates": "Du integrierst sie selbst"
 }

@@ -309,5 +309,7 @@
   "service.workspace.sharedNames": "Nazwy agentów są teraz unikalne w całym obszarze roboczym, więc każdego agenta da się odróżnić. {shared}: nadal działają, ale zmień nazwę jednego z każdej grupy, np. agenta {agent} w projekcie {project} na {suggestion}.",
   "service.workspace.stillClosing": "Obszar roboczy {name} wciąż się zamyka: poczekaj, aż skończy, i spróbuj ponownie.",
   "service.workspace.stillOpening": "Obszar roboczy {name} wciąż się otwiera: poczekaj, aż skończy, i spróbuj ponownie.",
-  "service.workspace.twoCalled": "Dwóch agentów nazywa się {name}"
+  "service.workspace.twoCalled": "Dwóch agentów nazywa się {name}",
+  "service.workspace.platformJjFound": "{project} jest repozytorium jj współistniejącym z Gitem. Combwork zostaje przy obecnej kontroli wersji, dopóki nie przełączysz jej na jj w zakładce Kontrola wersji projektu.",
+  "service.workspace.platformJjGone": "Repozytorium jj projektu {project} zniknęło. Przełącz go na Git lub Brak w jego zakładce Kontrola wersji."
 }

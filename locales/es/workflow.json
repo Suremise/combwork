@@ -579,5 +579,20 @@
   "workflow.why.stopOwnRuns": "Una ejecución que siguiera en marcha seguiría cambiando o probando el trabajo en revisión.",
   "workflow.why.strict": "La cola de fusión prueba el resultado fusionado de todos modos, así que esto cambia sobre todo la forma del historial.",
   "workflow.why.style": "Un commit de fusión conserva los commits propios de cada tarjeta, como Combwork siempre ha fusionado.",
-  "workflow.why.target": "El trabajo terminado va a la rama predeterminada del repositorio; trabajando en solitario, a la rama en la que está el proyecto."
+  "workflow.why.target": "El trabajo terminado va a la rama predeterminada del repositorio; trabajando en solitario, a la rama en la que está el proyecto.",
+  "workflow.contradiction.jjNeedsSlots": "Con jj, cada tarjeta necesita su propia carpeta: aún no se admite que los agentes compartan la carpeta del proyecto.",
+  "workflow.contradiction.jjYouIntegrate": "Con jj, integras tú mismo el trabajo revisado: Combwork no lo fusiona.",
+  "workflow.form.levelForJj": "Los valores predeterminados de los proyectos jj.",
+  "workflow.form.levelJj": "jj",
+  "workflow.refused.platform.changed.message": "{card} no puede empezar con estas reglas: su proyecto usa ahora {platform}.",
+  "workflow.refused.platform.changed.next": "Vuelve a iniciarla: entonces se comprueba con las reglas de {platform}.",
+  "workflow.refused.platform.switching.message": "{card} no puede empezar ahora: se está cambiando el control de versiones de su repositorio.",
+  "workflow.refused.platform.switching.next": "Inténtalo de nuevo en un momento, cuando el cambio haya terminado.",
+  "workflow.refused.start.platformReady.message": "{card} no puede empezar: las tarjetas aún no se ejecutan en un proyecto jj.",
+  "workflow.refused.start.platformReady.next": "Trabaja en ella fuera de las tarjetas de Combwork, o vuelve a poner el proyecto en Git en Control de versiones.",
+  "workflow.rule.start.platformReady": "Las tarjetas solo se ejecutan donde Combwork admite el control de versiones",
+  "workflow.summary.jj.pair": "Un agente revisor aprueba cada tarjeta tras las comprobaciones rápidas y luego la integras tú mismo.",
+  "workflow.summary.jj.solo": "Cada tarjeta en su propio workspace de jj, sin revisión: integras tú mismo el trabajo.",
+  "workflow.summary.jj.team": "Un agente revisor y luego tú comprobáis cada tarjeta tras las comprobaciones rápidas y las pruebas, y después la integras tú mismo.",
+  "workflow.value.finish.userIntegrates": "La integras tú mismo"
 }

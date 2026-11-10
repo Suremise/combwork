@@ -579,5 +579,20 @@
   "workflow.why.stopOwnRuns": "Pozostawione uruchomienie dalej zmieniałoby lub testowało pracę w recenzji.",
   "workflow.why.strict": "Kolejka scalania i tak testuje scalony wynik, więc to głównie zmienia kształt historii.",
   "workflow.why.style": "Commit scalający zachowuje własne commity każdej karty, tak jak Combwork zawsze scalał.",
-  "workflow.why.target": "Gotowa praca trafia do domyślnej gałęzi repozytorium; przy pracy solo do gałęzi, na której jest projekt."
+  "workflow.why.target": "Gotowa praca trafia do domyślnej gałęzi repozytorium; przy pracy solo do gałęzi, na której jest projekt.",
+  "workflow.contradiction.jjNeedsSlots": "W jj każda karta potrzebuje własnego folderu: agenci współdzielący folder projektu nie są jeszcze obsługiwani.",
+  "workflow.contradiction.jjYouIntegrate": "W jj zrecenzowaną pracę włączasz sam: Combwork jej nie scala.",
+  "workflow.form.levelForJj": "Ustawienia domyślne projektów jj.",
+  "workflow.form.levelJj": "jj",
+  "workflow.refused.platform.changed.message": "Karta {card} nie może wystartować według tych reguł: projekt używa teraz opcji {platform}.",
+  "workflow.refused.platform.changed.next": "Uruchom ją ponownie: zostanie wtedy sprawdzona według reguł opcji {platform}.",
+  "workflow.refused.platform.switching.message": "Karta {card} nie może teraz wystartować: kontrola wersji jej repozytorium jest właśnie przełączana.",
+  "workflow.refused.platform.switching.next": "Spróbuj za chwilę, gdy przełączenie się zakończy.",
+  "workflow.refused.start.platformReady.message": "Karta {card} nie może wystartować: karty jeszcze nie działają w projekcie jj.",
+  "workflow.refused.start.platformReady.next": "Pracuj nad nią poza kartami Combwork lub przełącz projekt na Git w zakładce Kontrola wersji.",
+  "workflow.rule.start.platformReady": "Karty działają tylko tam, gdzie Combwork obsługuje kontrolę wersji",
+  "workflow.summary.jj.pair": "Agent recenzent zalicza każdą kartę po szybkich sprawdzeniach, a potem włączasz ją sam.",
+  "workflow.summary.jj.solo": "Każda karta we własnym obszarze roboczym jj, bez recenzji: pracę włączasz sam.",
+  "workflow.summary.jj.team": "Agent recenzent, a potem Ty sprawdzacie każdą kartę po szybkich sprawdzeniach i testach, a potem włączasz ją sam.",
+  "workflow.value.finish.userIntegrates": "Włączasz to sam"
 }
