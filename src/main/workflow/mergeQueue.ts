@@ -787,8 +787,11 @@ export class MergeQueue {
           continue
         }
         if (!head) return this.pause(target, card, entry, 'needsYou')
-        // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read.
-        const found = await this.history(card, s).contains(this.project, target, { base, revision, key: s.latest?.key }, head)
+        // Already in the target (merged by hand meanwhile): observed, no empty merge. Asked of the head just read. A forward
+        // merge (HI-2885) only when its source is in the target's history: one whose files the target already has (main
+        // after a release, into the next version) still lands as a merge commit.
+        const there = await this.history(card, s).contains(this.project, target, { base, revision, key: s.latest?.key }, head)
+        const found = s.forward && !isUnknown(there) && there && there.method !== 'merge' && there.method !== 'fastForward' ? null : there
         if (!isUnknown(found) && found) {
           // A forward merge (HI-2679) has no line to reconcile: its attempt's own frozen commit, proven in the target just
           // now, is what is recorded (never a newer source head's).
