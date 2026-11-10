@@ -38,9 +38,20 @@ export interface WorkspaceIdentity {
   generation: string
 }
 
+/** A database a fence's transaction hands its callback (the pool's workspace database, as board_meta's store reads it). */
+export interface FenceDb {
+  prepare(sql: string): { get(...a: unknown[]): unknown; run(...a: unknown[]): unknown }
+}
+
 /** The caller's proof it still holds the folder (its operation's token, checked in a write): false stops before a mutation. */
 export interface WorkspaceFence {
   still(): boolean | Promise<boolean>
+  /**
+   * The fence's own write transaction (HI-2866, HR1's round 2): `fn` runs inside it only while the holder's record there
+   * still holds (the operation's token, its lease open, no writer or job), checked in that same transaction, so a final
+   * record commits atomically with the fence; `held: false`, and `fn` never run, otherwise. The pool's fences have it.
+   */
+  commit?<T>(fn: (db: FenceDb) => T): Promise<{ held: true; value: T } | { held: false }>
 }
 
 /**
@@ -81,6 +92,21 @@ export interface WorkspaceStep {
 /** HI-1182: how Combwork checks a folder out while submodules and Git LFS are set up there (Git: LFS files left as pointers, `git lfs pull` fills them). */
 export interface CheckoutOptions {
   skipSmudge?: boolean
+}
+
+/**
+ * An owned write's proof (HI-2866, jj's prepare and detach): the row's recorded identity, the holder's fence (checked,
+ * with the folder's quiescence, right before every write), the lease it is for, and, for a detach, the card's line it
+ * settles and the target whose head it is put back on (re-read under the lock right before the write).
+ */
+export interface OwnedWrite {
+  identity?: WorkspaceIdentity | null
+  fence?: WorkspaceFence
+  lease?: string
+  /** A detach's: the card's line (its preparation) being settled. */
+  settles?: string
+  /** A detach's: the target whose head `revision` is, read again right before the write. */
+  target?: string
 }
 
 /** A tool's run in a files step (HI-1182): `code` null when it didn't exit by itself (ended, timed out, not started). */
@@ -193,10 +219,14 @@ export interface WorkspacePort {
   prune(repo: string): Promise<void>
 
   // Preparation.
-  /** The folder switched to a line: the one it has (`base` null) or a new one made from `base`. Refused by the tool rather than lose files. */
-  prepare(folder: string, line: string, base: string | null, o?: CheckoutOptions): Promise<WorkspaceStep>
+  /**
+   * The folder switched to a line: the one it has (`base` null) or a new one made from `base`. Refused by the tool rather
+   * than lose files. `o`'s owned-write members (HI-2866) are a platform's whose workspaces need them (jj: refused without
+   * them); Git ignores them, its git commands unchanged.
+   */
+  prepare(folder: string, line: string, base: string | null, o?: CheckoutOptions & OwnedWrite): Promise<WorkspaceStep>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
-  detach(folder: string, revision: string, o?: { quiet?: boolean }): Promise<WorkspaceStep>
+  detach(folder: string, revision: string, o?: { quiet?: boolean } & OwnedWrite): Promise<WorkspaceStep>
 
   /**
    * A check or review copy put at exactly `revision` (HI-2789: copies.ts's reuse of a copy): tracked changes dropped and

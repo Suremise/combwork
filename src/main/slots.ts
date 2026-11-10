@@ -51,7 +51,7 @@ import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
-import type { WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import type { FenceDb, WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { isPlatformId } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
@@ -1167,6 +1167,12 @@ export interface PoolDeps {
   store: SlotStore
   /** How its slots' folders are made, inspected, prepared and removed (HI-2786's R4); unset: `slotWorkspaces()`, Git's worktrees. */
   workspaces?: WorkspacePort
+  /**
+   * The port its new slots are made with, by its project's platform now (HI-2866: the app's, so a project switched between
+   * Git and jj lends the new platform's), when `workspaces` isn't set; `refreshPorts` reads the platform again first.
+   */
+  workspacesFor?: () => WorkspacePort
+  refreshPorts?: () => Promise<void>
   /** The project's folder (its repository). */
   project: string
   /** Where its slots go: `<workspace>.worktrees/<project>` (worktreesRoot). */
@@ -1382,7 +1388,7 @@ export class SlotPool {
 
   /** The workspace lifecycle port its slots are made and inspected with (SPEC §16.3.6 Port 2): the deps', else the slots' platform's. */
   private get port(): WorkspacePort {
-    return this.deps.workspaces ?? slotWorkspaces()
+    return this.deps.workspaces ?? this.deps.workspacesFor?.() ?? slotWorkspaces()
   }
 
   /**
@@ -1411,6 +1417,33 @@ export class SlotPool {
     if (!(await this.quietFor(s, token))) return { unknown: true, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
     const fence: WorkspaceFence = { still: () => this.quietFor(s, token) }
     return port.record(s.folder, fence, s.identity ?? null)
+  }
+
+  /**
+   * A jj write's fence for this operation (HI-2866): `still` is quietFor; `commit` runs a final record (the binding's
+   * publication) in the store's own transaction, only while the row there is still this operation's (the token), with
+   * no writer or job, and (for a lease's write) the lease still open: one commit with the record, so an owner cancelled
+   * or replaced while the write waited for the database publishes nothing (HR1's round 2).
+   */
+  private ownedFence(s: Slot, token: string, lease: string | null): WorkspaceFence {
+    return {
+      still: () => this.quietFor(s, token),
+      commit: async <T>(fn: (db: FenceDb) => T): Promise<{ held: true; value: T } | { held: false }> => {
+        try {
+          return await this.store.fenced(s.name, token, (db, now) => {
+            if (now.writer || now.job) return { held: false as const }
+            if (lease !== null) {
+              const open = db.prepare('SELECT 1 AS one FROM slot_leases WHERE id = ? AND project = ? AND ended_at IS NULL').get(lease, this.store.project)
+              if (!open || now.op?.lease !== lease) return { held: false as const }
+            }
+            return { held: true as const, value: fn(db) }
+          })
+        } catch (e) {
+          if (e instanceof OpLost) return { held: false }
+          throw e
+        }
+      }
+    }
   }
 
   /** Nothing but this operation (`token`) in a slot: no writer, no job, no session, no process (the rename probe). */
@@ -1520,6 +1553,8 @@ export class SlotPool {
   async lend(req: LeaseRequest, o: { target?: string; install?: boolean } = {}): Promise<LendResult> {
     if ((req.card === undefined) === (req.lane === undefined)) throw new Error('a lease is for a card or a lane') // agent-protocol: a programming error (its caller's), never an agent's or the user's
     if (this.closed) return { ok: false, refusal: { why: 'noSlot', size: 0 } }
+    // The project's platform read again first (HI-2866): a lending is made with the platform in force now.
+    await this.deps.refreshPorts?.()
     await this.refresh()
     const target = o.target ?? (await this.defaultTarget())
     const holder = await this.deps.holder.self()
@@ -1670,7 +1705,7 @@ export class SlotPool {
           // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries
           // again (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
           // Git couldn't list the worktrees (HI-2810): the slot as it was, the next look tries again.
-          if (now !== null && !(now === 'ready' && s.state !== 'ready' && !(await this.detach(s)))) to = now
+          if (now !== null && !(now === 'ready' && s.state !== 'ready' && !(await this.detach(s, token)))) to = now
         } finally {
           // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
           await this.store.fenced(name, token, (db) => this.store.setIn(db, name, to, {}, { op: null })).catch((e) => {
@@ -1688,11 +1723,41 @@ export class SlotPool {
   }
 
   /**
+   * A stale jj slot's recovery (HI-2866, J2's `recoverStale`): the user's explicit action, never the pool's clean-up. Run
+   * under a settle-kind operation of the slot (taken only while it is free and as it was read, as a look is), with that
+   * operation's quiescence as its fence and its own journal, so an interrupted recovery resumes on the next try. `run`
+   * is the caller's (the app's: J2's recovery with its dependencies). A slot of another platform, busy, or not stale is
+   * refused with why; a recovered slot rejoins the pool only through its next look and preparation's check.
+   */
+  async recoverStale(name: string, run: (s: Slot, fence: WorkspaceFence, journal: WorkspaceJournal, quietNow: () => Promise<boolean>) => Promise<{ ok: true } | { ok: false; why: string }>): Promise<{ ok: true } | { ok: false; why: string }> {
+    const seen = this.store.slot(name)
+    if (this.closed || !seen) return { ok: false, why: 'noSlot' } // i18n-ignore: a protocol code
+    if ((seen.platform ?? 'git') !== 'jj' || !seen.identity) return { ok: false, why: 'notJj' } // i18n-ignore: a protocol code
+    if (seen.op || seen.writer || this.store.openLease(name) || seen.state === 'creating' || seen.state === 'removing') return { ok: false, why: 'busy' } // i18n-ignore: a protocol code
+    const token = newToken()
+    let out: { ok: true } | { ok: false; why: string } = { ok: false, why: 'busy' } // i18n-ignore: a protocol code
+    await this.op(token, async () => {
+      const holder = await this.deps.holder.self()
+      if (this.closed || !(await this.store.beginSettle(name, seen.state, seen.folder, token, holder))) return
+      try {
+        const s = this.store.slot(name) ?? seen
+        const fence: WorkspaceFence = { still: () => this.quietFor(s, token) }
+        out = await run(s, fence, this.store.journal(`slot_jjrecover:${this.store.project}:${name}`), () => this.quietFor(s, token))
+      } finally {
+        await this.store.fenced(name, token, (db) => this.store.setIn(db, name, seen.state, {}, { op: null })).catch((e) => {
+          if (!(e instanceof OpLost)) throw e
+        })
+      }
+    })
+    return out
+  }
+
+  /**
    * A clean slot on a line, switched to its target's head, detached. Only after a card's or a lane's lease: an adopted
    * worktree (a carried lease, #1441) stays on its agent's own line. False when it should be and isn't (unread, or the
    * switch failed); true when it is, or needn't be.
    */
-  private async detach(s: Slot): Promise<boolean> {
+  private async detach(s: Slot, token?: string): Promise<boolean> {
     const last = this.store.lastLease(s.name)
     if (!s.target || !last || (last.kind !== 'card' && last.kind !== 'lane')) return true
     const port = this.portOf(s)
@@ -1700,7 +1765,10 @@ export class SlotPool {
     if (isUnknown(h.line)) return false
     if (!h.line) return true
     if (isUnknown(h.target) || !h.target) return false
-    const r = await port.detach(s.folder, h.target)
+    // jj's (HI-2866): an owned write settling exactly the card's binding (the line it answered), fenced by this operation
+    // with the folder quiet, the target read again right before it. Git ignores the options.
+    const owned = port.platform === 'jj' ? { identity: s.identity ?? null, fence: token ? this.ownedFence(s, token, null) : { still: () => false }, settles: h.line, target: s.target } : {}
+    const r = await port.detach(s.folder, h.target, owned)
     if (!r.ok) {
       log.warn(`detaching ${userText(s.name)} at ${userText(s.target)}: ${userText(r.err.trim())}`)
       return false
@@ -2164,7 +2232,7 @@ export class SlotPool {
    * quiet): a reason, and nothing changes. A slot already on the line is prepared (a repeat changes nothing). `retry`:
    * not now (busy, or not ready); `error`: it can't be (changes not committed, git or the install failed).
    */
-  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; ready?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
+  async prepare(leaseId: string, p: { line: string; base: string; install: boolean; target?: string; ready?: () => Promise<string | null>; around?: <T>(fn: () => Promise<T>) => Promise<T> }): Promise<PrepareResult> {
     const lease = this.store.lease(leaseId)
     if (!lease || lease.to) return { error: sayStored(T.leaseEnded) }
     const name = lease.slot
@@ -2183,7 +2251,8 @@ export class SlotPool {
         }
         const there = on === p.line
         if (!there) {
-          const d = await this.port.dirty(slot.folder)
+          // Its holder's record where the port has one (jj, HI-2866: a read can't see unrecorded edits); Git's dirty as before.
+          const d = await this.dirtyOwned(slot, token)
           if (isUnknown(d) || d.length) {
             await end()
             return { error: isUnknown(d) ? sayStored(T.filesUnread, { slot: name }) : sayStored(T.uncommitted, { slot: name }) }
@@ -2221,7 +2290,10 @@ export class SlotPool {
           const sw = async (): Promise<{ notYet: string } | WorkspaceStep> => {
             const notYet = await last()
             if (notYet) return { notYet }
-            return this.port.prepare(slot.folder, p.line, had ? null : p.base, { skipSmudge: filesOn })
+            // jj's preparation is an owned write (HI-2866): the row's identity, this operation's fence with the folder quiet,
+            // the lease and the card's target. Git ignores them.
+            const owned = this.port.platform === 'jj' ? { identity: slot.identity ?? null, fence: this.ownedFence(slot, token, leaseId), lease: leaseId, ...(p.target ? { target: p.target } : {}) } : {}
+            return this.port.prepare(slot.folder, p.line, had ? null : p.base, { skipSmudge: filesOn, ...owned })
           }
           const r = await (p.around ? p.around(sw) : sw())
           if ('notYet' in r) {
@@ -2548,9 +2620,12 @@ export class SlotPool {
     const t = await port.lineHead(this.deps.project, target)
     if (isUnknown(t) || !t) return { why: 'cantCheck', detail: sayStored(T.noBranch, { target }) }
     if (t === head) return null
-    const base = await lineHistory().mergeBase(this.deps.project, t, head)
+    // A jj slot's commits are its store's (HI-2866): §16.3.2's test asked of that Git store (a non-colocated project folder
+    // has no Git of its own); a Git slot's of the project, as before.
+    const repo = port.platform === 'jj' && s.identity?.store ? s.identity.store : this.deps.project
+    const base = await lineHistory().mergeBase(repo, t, head)
     if (isUnknown(base) || !base) return { why: 'cantCheck', detail: sayStored(T.noBase, { target }) }
-    const c = await lineHistory().contains(this.deps.project, target, { base, revision: head }, t)
+    const c = await lineHistory().contains(repo, target, { base, revision: head }, t)
     if (isUnknown(c)) return { why: 'cantCheck', detail: c.what }
     return c ? null : { why: 'unmerged', target }
   }

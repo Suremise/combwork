@@ -74,7 +74,8 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
         expect(isUnknown(await h.port.record!(a, yes, idB))).toBe(true)
         // jj has no checked-out line: every line operation refused, never mapped to a near equivalent (R5.2).
         expect((await h.port.prepare(a, 'card', base)).err).toBe(JJ_REFUSED.line)
-        expect((await h.port.detach(a, base)).err).toBe(JJ_REFUSED.line)
+        // A detach settles one card's binding (HI-2866): without one named (and bound), refused.
+        expect((await h.port.detach(a, base)).err).toBe(JJ_REFUSED.notBound)
         expect((await h.port.dropLine(repo, 'main', base)).err).toBe(JJ_REFUSED.line)
       })
 

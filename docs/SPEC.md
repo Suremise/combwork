@@ -2972,6 +2972,69 @@ start), and the skills' jj-slot workflow.
   closed gate, each tagged with its gate (`tests/jjLimits.test.ts` holds it to `PLATFORMS.jj.gates` and to each gate's
   name in `GATE_TEXT`).
 
+##### jj's slots for cards (1.5.0's J9a, HI-2866)
+
+Darren chose (b) on HI-2801 (10 Nov): jj cards run in 1.5.0, still under decision A. J9 is split: J9a (this) the slots and
+copies, J9b (HI-2868) the runtime, J9c (HI-2869) the window, J9d (HI-2870) the guidance, and J9e (HI-2874) the only
+activation point, after them; until J9e, `start.platformReady` still refuses every jj start, so nothing here runs for a
+real card. Its design is HI-2866/s7, s10 and s13 (HR1's). **Nothing in Combwork makes or moves a bookmark** (A): a
+jj card's line is a key, Combwork's jj writes are owned writes in its own workspaces.
+- **A card's line under jj** is `jj:<workspace>/<card>.<cycle>` (`platform/jjSlotPrep.ts`): a locator of one card
+  cycle's preparation of one slot, never a ref (the port refuses it as one; `lineHead` answers none; `deleteMergedLine`
+  skips it). A lane keeps one lease for all its cards, so the lease identifies nothing: two cards in one lane's lease,
+  or two cycles of one card, have different keys. Every identity check compares the whole key, the lease, the card, the
+  cycle and the folder's generation now.
+- **The completed binding** of each slot is its pointer, board_meta `slot_jjcur:<store>:<workspace>` = `{ prep, key,
+  card, cycle, lease, target, base, generation, submitted }`, the only thing `line()`/`heads().line` answer from, and
+  only while the folder's generation is the binding's and its working copy descends from the binding's base (read
+  pinned); unreadable or mismatched is unknown, a detached binding (`key` null) and no binding are none, and an
+  unfinished preparation is never shown. `submitted` (J9b records it at a submission, by compare and swap while the slot
+  is still bound to that key and generation) is what a reuse of the slot allows over the base.
+- **`prepare` and `detach` are owned, journalled writes** (`WorkspacePort`'s new optional `OwnedWrite`: the row's
+  identity, the holder's fence, the lease, a detach's `settles` and `target`; Git ignores them, its git commands
+  unchanged). Each preparation has its own journal, `slot_jjprep:<store>:<workspace>:<prep>`, planned with a copy of the
+  pointer (`prev`); the pointer moves only when it finishes. Under the store's repository lock: the folder recorded (J2's
+  owned snapshot); at the single head H, the chain over `prev`'s base (with no binding, an empty working copy) exactly
+  `prev`'s submitted commits, those contained in `prev`'s target (§16.3.2's test on the backing store), the new base a
+  visible commit, and for a detach the target still at its head. The guard (the fence: the pool's operation, the folder
+  quiet; the folder's identity; the pointer still exactly `prev`; the head still H) runs after every journal write and
+  right before each jj write (HR1, round 1: an await can outlive the holder). The write is marked, `jj
+  --config=cw.prep=<mark> new <base>`, its mark journalled with `writing` before it runs, and jj's operation log decides
+  what happened: exactly one marked operation after H, H its parent, its working copy empty on the base, is the
+  preparation's own write (its operation and commit journalled with `written`); no marked operation means it never ran;
+  anything else is uncertain and stays so, never retried blind. The old empty working copy is abandoned only as the
+  slot's own, with the head still the write's. Before publishing, the folder is recorded again and its working copy must
+  still be the very commit the marked write made, empty on the base (an unrecorded edit or someone else's write since
+  leaves it uncertain), then the guard once more; the binding is published by compare and swap against `prev` whole (its
+  submitted endpoints included) and only while the journal is still this attempt's (each attempt takes the journal up
+  with a fresh `run`), inside the pool's own fenced transaction (the fence's `commit`: the row still this operation's
+  token, its lease open, no writer or job, checked in the same commit; HR1's round 2), so an owner cancelled or replaced
+  while the publication waited for the database publishes nothing. Anything else refuses before the write and keeps the slot as it is: a read failure, extra or
+  unintegrated work, a lost fence, a replaced folder, a binding changed meanwhile (`superseded`), the head or target
+  moved. A fence lost after the write keeps the journal at `written`, for the holder's next attempt to confirm and
+  publish. A crash resumes from the journal's phase by the same reading; a retry after publication recognises its own
+  binding and writes nothing.
+- **Composition:** jj's port is registered by the app with its dependencies (`slotsApp.ts`: the control workspace's
+  record and the bindings in the workspace database, the store's repository lock, re-entrant within one async context so
+  a jj write inside a held lock runs straight through, the Recycle Bin, the project folder's quiet, containment on the
+  store). The slot and copy pools make new slots and copies with their project's platform's port, read again before
+  each lending (`workspacesFor`, `refreshPorts`), so a project switched between Git and jj lends the new platform's;
+  existing rows keep their own (J2's per-row platform: a Git slot finishes under Git). `slotWorkspaces()` is now Git's
+  explicitly, for the callers not yet asking by platform.
+- **The pool:** a jj slot's preparation reads it through `record` (its holder's snapshot) and passes the owned options;
+  its settle passes its operation's token as the detach's fence; the removal guard asks §16.3.2's test of a jj slot's
+  Git store. A lane-held jj slot isn't settled by the post-Done path (it holds no slot operation): the pool's settle does
+  it once the lease is released.
+- **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
+  settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
+  **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
+- **Tests** (the real jj, both Git-backed modes): `tests/jjSlotPrepReal.test.ts` (a card cycle prepared and prepared
+  again; one lane's lease and two cards, B only once A's submitted work is in the target, A's late settle never
+  matching B; a card's next cycle; refusals before any write for extra work, a lost fence, a replaced folder and a binding
+  published meanwhile; a detach with the target moving first; crashes before the write and after it before
+  publication, resumed without a second write) and `tests/jjSlotPoolPrep.test.ts` (the pool's own prepare, settle after
+  integration, kept when not integrated, and the recovery action).
+
 ##### Open: jj's target advance (J1's gate)
 
 How jj advances a target with R4.1's guarantee is **not decided here**: J1 decides it, with evidence. What the

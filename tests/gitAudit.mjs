@@ -197,6 +197,8 @@ export const EDGES = [
   { file: 'src/main/nameUpgradeProjects', module: 'src/main/platform/gitKeepOut', class: 'historic', names: ['gitDirOf'], op: 'the exclude line upgrade (HI-2594)', why: "1.1's name upgrade rewrites git's exclude line" },
   { file: 'src/main/platform/adapters', module: 'src/main/platform/gitPlatform', class: 'registry', names: ['GitPlatform'], why: "the workflow adapters' map (HI-2792)" },
   { file: 'src/main/platform/historyPorts', module: 'src/main/platform/gitHistory', class: 'registry', names: ['gitHistory'], why: "the history port's map (R6)" },
+  { file: 'src/main/slotsApp', module: 'src/main/repoLock', class: 'common', names: ['withRepoLock'], why: "jj's store lock for its workspace port's writes (HI-2866): the repository lock keyed by the store, every platform's" },
+  { file: 'src/main/slotsApp', module: 'src/main/git', class: 'registry', names: ['git'], why: "jj's stale-slot recovery composed with the app's deps (HI-2866): J2's recoverStale reads the workspace's files through git, read-only" },
   { file: 'src/main/platform/integrationPorts', module: 'src/main/platform/gitIntegration', class: 'registry', names: ['gitIntegration'], why: "the integration port's map (R7, R8)" },
   { file: 'src/main/platform/observe', module: 'src/main/git', class: 'impl', names: ['git', 'readRefsOffMain'], why: "the watcher's Git reads (refs off main's thread, git's reflog): ObservePort's Git half, kept with the common watcher (R6)" },
   { file: 'src/main/platform/repoContext', module: 'src/shared/gitIgnoreRules', class: 'impl', names: ['IgnoreRule'], why: "RepoFiles' ignore rule type: the Files tab's rule, Git's syntax" },

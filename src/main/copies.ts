@@ -492,8 +492,12 @@ export interface CopyPoolDeps {
   reviewOn: () => boolean
   /** How long a returning copy is held back before it shows as still in use (Settings → Advanced). */
   quietWaitMs: () => number
-  /** How its copies are made, reset, verified and removed (HI-2795); unset: Git's worktrees. jj's by injection only. */
+  /** How its copies are made, reset, verified and removed (HI-2795); unset: Git's worktrees. */
   workspaces?: WorkspacePort
+  /** The port its new copies are made with, by its project's platform now (HI-2866: the app's), when `workspaces` isn't set. */
+  workspacesFor?: () => WorkspacePort
+  /** Reads the project's platform again before a lending (HI-2866). */
+  refreshPorts?: () => Promise<void>
   now?: () => number
 }
 
@@ -515,7 +519,7 @@ export class CopyPool {
 
   /** The pool's port: the deps', else Git's (HI-2795). */
   private get port(): WorkspacePort {
-    return this.deps.workspaces ?? defaultPort()
+    return this.deps.workspaces ?? this.deps.workspacesFor?.() ?? defaultPort()
   }
 
   /** A copy's own port: the pool's for its platform, else its platform's (a Git copy in a jj pool is removed by Git). */
@@ -614,6 +618,7 @@ export class CopyPool {
   async leaseCopy(req: CopyRequest): Promise<CopyLeaseResult> {
     if (req.kind === 'review' && !this.deps.reviewOn()) return { ok: false, refusal: { why: 'off' } }
     if (this.closed) return { ok: false, refusal: { why: 'noCopy', size: 0 } }
+    await this.deps.refreshPorts?.()
     await this.refresh()
     const holder = await this.deps.holder.self()
     const size = await this.deps.size()

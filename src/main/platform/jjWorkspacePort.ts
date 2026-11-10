@@ -17,7 +17,7 @@
 // - Removal is `forget`, read back, then the folder to the Recycle Bin, journalled; the folder's creation generation
 //   (its file ids) is checked right before the trash, so a folder replaced at the same path is never trashed.
 
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { existsSync } from 'original-fs'
 import { lstat, readdir, readFile, realpath, stat } from 'original-fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'path'
@@ -26,7 +26,8 @@ import { UNREADABLE } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Maybe, type Unknown } from './types'
 import { jjContextOf, type JjContext } from './jjDetect'
 import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
-import type { WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
+import type { OwnedWrite, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
+import { chainIsBinding, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
 
 /** Why a jj workspace step was refused (a protocol code: the pool words what it shows). */
 export const JJ_REFUSED = {
@@ -41,7 +42,15 @@ export const JJ_REFUSED = {
   exists: 'the folder exists already', // i18n-ignore: jj's side of an error, in English as jj's messages are
   tool: 'jj is not the version Combwork is tested with', // i18n-ignore: jj's side of an error, in English as jj's messages are
   notEmpty: "the workspace's working copy isn't empty", // i18n-ignore: jj's side of an error, in English as jj's messages are
-  generation: "the folder's file ids can't be read" // i18n-ignore: as above
+  generation: "the folder's file ids can't be read", // i18n-ignore: as above
+  superseded: "the slot's binding changed since this preparation began", // i18n-ignore: as above
+  unintegrated: "the slot holds work that isn't its last card's integrated work", // i18n-ignore: as above
+  notIntegrated: "the slot's last card's work isn't in its target yet", // i18n-ignore: as above
+  base: "the card's base isn't a visible commit", // i18n-ignore: as above
+  moved: 'the repository changed since the check', // i18n-ignore: as above
+  uncertain: "a write's result couldn't be read back: decided on the next pass", // i18n-ignore: as above
+  notBound: "the slot isn't bound to that card's preparation", // i18n-ignore: as above
+  journal: "the preparation's record can't be read" // i18n-ignore: as above
 } as const
 
 /** What jj's port needs beside jj: where a project's control workspace goes and its record, and the trash and the lock. */
@@ -58,6 +67,16 @@ export interface JjPortDeps {
   lock: <T>(store: string, fn: () => Promise<T>) => Promise<T>
   /** The Recycle Bin (trash.ts), or a test's. */
   trash: (path: string) => Promise<void>
+  /**
+   * Where a store's slot bindings and preparation journals live (HI-2866: board_meta, jjSlotPrep.ts), or null where none
+   * is kept (then no slot is bound: `line` answers none, `prepare` and `detach` refuse).
+   */
+  prep?: (store: string) => JjPrepStore | null
+  /**
+   * §16.3.2's containment test on the backing Git store (J5's fallback, gitHistory.contains): a previous card's submitted
+   * work in its target before its slot is reused. Absent: such a slot is never reused (kept).
+   */
+  contains?: (store: string, target: string, change: { base: string; revision: string }, at: string) => Promise<Maybe<unknown | null>>
   /** Test hooks, run between steps. */
   hooks?: { afterForget?: (folder: string) => void | Promise<void> }
 }
@@ -72,11 +91,19 @@ export interface JjWorkspacePort extends WorkspacePort {
   owns(folder: string, identity: WorkspaceIdentity | null | undefined): Promise<boolean>
   /** The pinned operation for a folder's repository: the one op head, confirmed by jj; unknown with several. */
   pinned(folder: string): Promise<Maybe<string>>
+  /**
+   * A card's submitted commits recorded on its slot's binding (HI-2866; J9b calls it at a submission): only while the slot
+   * is still bound to that line and generation, by compare and swap. What a reuse of the slot then allows over the base.
+   */
+  submitted(folder: string, line: string, commits: readonly string[], identity: WorkspaceIdentity | null | undefined): Promise<boolean>
   /** Runs jj (the port's runner) in a folder, pinned at `op` (a read) or writing. For recovery and tests. */
   jj(folder: string, args: readonly string[], o?: { op?: string; write?: boolean }): Promise<JjRunResult>
 }
 
 const SEPARATOR = '\u001f'
+/** How far back the operation log is read for a preparation's marked write, and its records' end. */
+const OP_WALK = 200
+const OP_END = 'cw-op-end'
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length)
 const step = (ok: boolean, err = ''): WorkspaceStep => ({ ok, err })
 const ownedPrefix = (repoHash: string): string => `cw-${repoHash}-`
@@ -120,6 +147,8 @@ export async function checkoutOf(folder: string): Promise<{ op: string; name: st
   }
   return op && name ? { op, name } : null
 }
+
+type JjPrepPhaseEnd = 'refused' | 'superseded'
 
 export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
   const runner = deps.runner ?? jjRunner
@@ -304,6 +333,211 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     return false
   }
 
+  /**
+   * A slot's completed binding as it stands (HI-2866): its pointer, only while the folder is the one it was made for (its
+   * generation) and its working copy descends from the binding's base, read pinned. Null with no binding (none kept, or a
+   * fresh or detached slot); unknown when any part can't be read, never a guess.
+   */
+  const bindingNow = async (folder: string): Promise<Maybe<JjBinding | null>> => {
+    const ctx = await contextOf(folder)
+    const u = unknown(UNREADABLE.state, { folder })
+    if (!ctx) return u
+    const prep = deps.prep?.(ctx.store) ?? null
+    if (!prep) return null
+    const co = await checkoutOf(folder)
+    if (!co) return u
+    const b = prep.pointer(ctx.store, co.name)
+    if (b === 'unreadable') return withDetail(u, JJ_REFUSED.journal)
+    if (!b) return null
+    if ((await generationOf(folder)) !== b.generation) return withDetail(u, JJ_REFUSED.identity)
+    const op = await pinned(folder)
+    if (isUnknown(op)) return op
+    const out = await read(folder, op, ['log', '--no-graph', '-r', `present(${b.base}) & ::${revsetName(co.name)}@`, '-T', 'commit_id ++ "\\n"'], u)
+    if (isUnknown(out)) return out
+    return lines(out)[0] === b.base ? b : withDetail(u, JJ_REFUSED.notBound)
+  }
+
+  /**
+   * A slot moved onto `next.base` for a binding, as an owned, journalled write (HI-2866/s10 §2, s13; HR1's round 1):
+   * under the store's lock, the journal planned with the pointer it starts from (`prev`) and taken up by this attempt (a
+   * fresh `run`), then the folder recorded, its chain over `prev`'s base checked (exactly `prev`'s submitted commits,
+   * contained in `prev`'s target; with no binding, an empty working copy), `next.base` visible, and for a detach the
+   * target still at it. The guard (the fence, the folder's identity, the pointer still exactly `prev`, the operation head
+   * still the check's) runs after every journal write and right before each jj write, and again right before the binding
+   * is published, whose compare and swap also requires the journal still this attempt's.
+   *
+   * The write is marked: `jj --config=cw.prep=<mark> new <base>`, the mark journalled before it runs, so jj's operation
+   * log tells this preparation's own write apart from anyone else's. Landed means exactly one marked operation after the
+   * check's operation, its parent that operation, its working copy empty on the base; none marked means it never ran;
+   * anything else is uncertain and stays so (no blind retry). Before publishing, the folder is recorded (a snapshot) and
+   * its working copy must still be the very commit the marked write made, empty on the base: an edit or a foreign write
+   * since leaves it uncertain. A crash resumes from the journal by the same reading.
+   */
+  const ownedMove = async (folder: string, kind: JjPrepJournal['kind'], next: Omit<JjBinding, 'generation'>, o: OwnedWrite, target?: string): Promise<WorkspaceStep> => {
+    if (!o.identity || !o.fence) return step(false, JJ_REFUSED.fence)
+    const identity = o.identity
+    const fence = o.fence
+    const ctx = await contextOf(folder)
+    const prep = ctx ? (deps.prep?.(ctx.store) ?? null) : null
+    if (!ctx || !prep || !samePath(ctx.store, identity.store)) return step(false, JJ_REFUSED.control)
+    const store = ctx.store
+    const ws = identity.workspace
+    const bound: JjBinding = { ...next, generation: identity.generation }
+    return deps.lock(store, async () => {
+      const ptr0 = prep.pointer(store, ws)
+      if (ptr0 === 'unreadable') return step(false, JJ_REFUSED.journal)
+      // Already this preparation's (a retry after its publication, before the caller's fact): the same binding, nothing written.
+      if (ptr0 && ptr0.prep === bound.prep && ptr0.key === bound.key && ptr0.base === bound.base && ptr0.generation === bound.generation) return step(true)
+      const j0 = prep.journal(store, ws, bound.prep)
+      if (j0 === 'unreadable') return step(false, JJ_REFUSED.journal)
+      // A detach settles exactly the card's binding: never another's (a late settle after the slot was prepared again).
+      if (kind === 'detach' && (!ptr0 || ptr0.key !== o.settles)) return step(false, JJ_REFUSED.notBound)
+      const run = randomUUID()
+      const fresh = !j0 || j0.phase === 'done' || j0.phase === 'superseded' || j0.phase === 'refused'
+      let j: JjPrepJournal = fresh ? { kind, prep: bound.prep, next: bound, prev: ptr0, phase: 'planned', run } : { ...j0, run }
+      const save = async (patch: Partial<JjPrepJournal>): Promise<void> => {
+        j = { ...j, ...patch }
+        await prep.writeJournal(store, ws, j)
+      }
+      await save({})
+      const refuse = async (why: string, phase: JjPrepPhaseEnd = 'refused'): Promise<WorkspaceStep> => {
+        await save({ phase, why })
+        return step(false, why)
+      }
+      // Every write's precondition: still the holder's (with the folder quiet), still the recorded workspace, the slot's
+      // binding still exactly the one this preparation started from, and (when given) the operation head still `at`.
+      const guard = async (at?: string): Promise<string | null> => {
+        if (!(await fence.still())) return JJ_REFUSED.fence
+        if (!(await owns(folder, identity))) return JJ_REFUSED.identity
+        const now = prep.pointer(store, ws)
+        if (now === 'unreadable' || !sameBinding(now, j.prev)) return JJ_REFUSED.superseded
+        if (at !== undefined && (await pinned(folder)) !== at) return JJ_REFUSED.moved
+        return null
+      }
+      const refuseFor = (g: string): Promise<WorkspaceStep> => refuse(g, g === JJ_REFUSED.superseded ? 'superseded' : 'refused')
+      // After the write landed, a failed guard keeps the journal at `written` (the holder's next attempt confirms and
+      // publishes it), except a pointer that moved, which supersedes it.
+      const stopAfterWrite = async (g: string): Promise<WorkspaceStep> => (g === JJ_REFUSED.superseded ? refuseFor(g) : step(false, g))
+      const g0 = await guard()
+      if (g0) return j.phase === 'written' ? stopAfterWrite(g0) : refuseFor(g0)
+      /**
+       * Whether the marked write landed, read from jj's operation log (newest first, from the head back to the check's
+       * operation): its operation and commit (exactly one marked operation, its parent the check's, its working copy empty
+       * on the base), `none` (no marked operation since the check: it never ran), else `uncertain`.
+       */
+      const landed = async (): Promise<{ op: string; commit: string } | 'none' | 'uncertain'> => {
+        if (!j.checkedAt || !j.mark) return 'uncertain'
+        const head = await pinned(folder)
+        if (isUnknown(head)) return 'uncertain'
+        if (head === j.checkedAt) return 'none'
+        const out = await read(folder, head, ['op', 'log', '--no-graph', '--limit', String(OP_WALK), '-T', `id ++ "${SEPARATOR}" ++ parents.map(|p| p.id()).join(",") ++ "${SEPARATOR}" ++ self.attributes() ++ "${SEPARATOR}${OP_END}\\n"`], unknown(UNREADABLE.state, { folder }))
+        if (isUnknown(out)) return 'uncertain'
+        const ops: { id: string; parents: string[]; marked: boolean }[] = []
+        let reached = false
+        for (const rec of out.split(`${SEPARATOR}${OP_END}`)) {
+          const [id, parents, attrs] = rec.replace(/^\r?\n/, '').split(SEPARATOR)
+          if (!id) continue
+          if (id === j.checkedAt) {
+            reached = true
+            break
+          }
+          ops.push({ id, parents: parents ? parents.split(',') : [], marked: (attrs ?? '').includes(`cw.prep=${j.mark}`) })
+        }
+        if (!reached) return 'uncertain'
+        const marked = ops.filter((x) => x.marked)
+        if (!marked.length) return 'none'
+        if (marked.length > 1 || marked[0].parents.length !== 1 || marked[0].parents[0] !== j.checkedAt) return 'uncertain'
+        const wc = await wcAt(folder, marked[0].id, ws)
+        if (isUnknown(wc) || !wc.empty || wc.parents.length !== 1 || wc.parents[0] !== bound.base) return 'uncertain'
+        return { op: marked[0].id, commit: wc.commit }
+      }
+      // Resumed after its write began: jj's operation log decides.
+      if (j.phase === 'writing') {
+        const l = await landed()
+        if (l === 'uncertain') return step(false, JJ_REFUSED.uncertain)
+        if (l === 'none') await save({ phase: 'recorded', mark: undefined, wrote: undefined })
+        else await save({ phase: 'written', wrote: l })
+      }
+      if (j.phase !== 'written') {
+        const rec = await port.record!(folder, fence, identity)
+        if (isUnknown(rec)) return refuse(rec.detail ?? rec.what)
+        await save({ phase: 'recorded' })
+        const H = await pinned(folder)
+        if (isUnknown(H)) return refuse(H.detail ?? H.what)
+        const stale = await staleAt(folder, H)
+        if (isUnknown(stale) || stale) return refuse(isUnknown(stale) ? (stale.detail ?? stale.what) : JJ_REFUSED.stale)
+        const wc = await wcAt(folder, H, ws)
+        if (isUnknown(wc)) return refuse(wc.detail ?? wc.what)
+        if (wc.divergent || wc.conflict) return refuse(wc.divergent ? JJ_REFUSED.divergent : JJ_REFUSED.unintegrated)
+        // The chain over the previous binding's base (or, with none, the working copy's own parent: nothing may be there).
+        const over = j.prev?.base ?? (wc.empty && wc.parents.length === 1 ? wc.parents[0] : null)
+        if (!over) return refuse(JJ_REFUSED.notEmpty)
+        const out = await read(folder, H, ['log', '--no-graph', '-r', `(${over}::${revsetName(ws)}@) ~ ${over}`, '-T', `commit_id ++ "${SEPARATOR}" ++ empty ++ "\\n"`], unknown(UNREADABLE.revisionIn, { folder }))
+        if (isUnknown(out)) return refuse(out.detail ?? out.what)
+        const chain = lines(out)
+          .map((l) => l.split(SEPARATOR))
+          .filter(([c, e]) => !(c === wc.commit && e === 'true'))
+          .map(([c]) => c)
+        if (!chainIsBinding(chain, j.prev)) return refuse(JJ_REFUSED.unintegrated)
+        if (j.prev?.submitted.length) {
+          if (!j.prev.target || !deps.contains) return refuse(JJ_REFUSED.notIntegrated)
+          const th = await bookmarkAt(folder, H, j.prev.target)
+          if (isUnknown(th) || !th) return refuse(JJ_REFUSED.notIntegrated)
+          const c = await deps.contains(store, j.prev.target, { base: j.prev.base, revision: j.prev.submitted[j.prev.submitted.length - 1] }, th)
+          if (isUnknown(c) || !c) return refuse(JJ_REFUSED.notIntegrated)
+        }
+        const at = await read(folder, H, ['log', '--no-graph', '-r', `present(${bound.base}) & ::visible_heads()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: bound.base }))
+        if (isUnknown(at) || lines(at)[0] !== bound.base) return refuse(JJ_REFUSED.base)
+        if (target) {
+          const th = await bookmarkAt(folder, H, target)
+          if (isUnknown(th) || th !== bound.base) return refuse(JJ_REFUSED.moved)
+        }
+        await save({ phase: 'checked', checkedAt: H, from: wc.commit })
+        const g1 = await guard(H)
+        if (g1) return refuseFor(g1)
+        await save({ phase: 'writing', mark: run })
+        // Right before the write, after the journal's await: everything again.
+        const g2 = await guard(H)
+        if (g2) return refuseFor(g2)
+        const nu = await jj(folder, [`--config=cw.prep=${run}`, 'new', bound.base], { write: true })
+        const l = await landed()
+        if (l === 'uncertain') return step(false, JJ_REFUSED.uncertain)
+        if (l === 'none') return refuse(nu.ok ? JJ_REFUSED.uncertain : nu.err)
+        await save({ phase: 'written', wrote: l })
+        // The previous working copy, if jj kept it (jj abandons an empty one itself): abandoned only as the slot's own,
+        // only with nothing else written since its own write.
+        if (wc.empty && wc.commit !== l.commit) {
+          const kept = await read(folder, l.op, ['log', '--no-graph', '-r', `present(${wc.commit}) & visible_heads() & empty() & ~bookmarks() & ~working_copies()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: wc.commit }))
+          if (!isUnknown(kept) && lines(kept).length) {
+            const g3 = await guard(l.op)
+            if (g3) return stopAfterWrite(g3)
+            await jj(folder, ['abandon', wc.commit], { write: true })
+          }
+        }
+      }
+      // Confirmed before publishing: recorded (unrecorded edits become visible), the working copy still exactly the
+      // commit the marked write made, empty on the base; then the guard right before the compare and swap.
+      const wrote = j.wrote
+      if (!wrote) return step(false, JJ_REFUSED.uncertain)
+      const files = await port.record!(folder, fence, identity)
+      if (isUnknown(files)) return files.detail === JJ_REFUSED.fence || files.detail === JJ_REFUSED.identity ? stopAfterWrite(files.detail) : step(false, JJ_REFUSED.uncertain)
+      const s = await state(folder)
+      if (isUnknown(s)) return step(false, JJ_REFUSED.uncertain)
+      if (files.length || s.stale || s.wc.divergent || s.wc.commit !== wrote.commit || !s.wc.empty || s.wc.parents.length !== 1 || s.wc.parents[0] !== bound.base) return step(false, JJ_REFUSED.uncertain)
+      const g4 = await guard(s.op)
+      if (g4) return stopAfterWrite(g4)
+      // Published in the fence's own transaction where it has one (the pool's: its operation's token, its lease open, no
+      // writer or job, checked in the same commit as the compare and swap; HR1's round 2), so an owner cancelled or
+      // replaced while the write waited publishes nothing and the journal stays `written`.
+      const fin = j
+      const pub = fence.commit && prep.publishIn ? await fence.commit((db) => prep.publishIn!(db, store, ws, fin.prev, bound, fin)) : { held: true as const, value: await prep.publish(store, ws, j.prev, bound, j) }
+      if (!pub.held) return step(false, JJ_REFUSED.fence)
+      // Not published: the pointer moved, or a later attempt took the preparation over (its journal is its own now).
+      if (!pub.value) return step(false, JJ_REFUSED.superseded)
+      return step(true)
+    })
+  }
+
   const port: JjWorkspacePort = {
     platform: 'jj',
     nameFor: (repo, folder) => nameFor(createHash('sha256').update(resolve(repo).toLowerCase()).digest('hex').slice(0, 8), folder),
@@ -330,17 +564,23 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (!s.wc.empty) return s.wc.commit
       return s.wc.parents.length === 1 ? s.wc.parents[0] : withDetail(u, 'merge') // i18n-ignore: a protocol detail
     },
-    line: async () => null,
+    // A card's line under jj is its preparation's key, from the slot's completed binding (HI-2866): never a bookmark.
+    line: async (folder) => {
+      const bd = await bindingNow(folder)
+      return isUnknown(bd) ? bd : (bd?.key ?? null)
+    },
     shownLine: async () => '',
     currentLine: async () => null,
     checkout: () => null,
     heads: async (folder, target): Promise<WorkspaceHeads> => {
       const head = await port.head(folder)
       const t = await port.lineHead(folder, target)
-      return { line: null, head, target: t }
+      return { line: await port.line(folder), head, target: t }
     },
     dirty: async (folder) => withDetail(unknown(UNREADABLE.uncommitted, { folder }), 'jj: a read without a snapshot can\'t see unrecorded edits'), // i18n-ignore: a protocol detail
     lineHead: async (repo, line) => {
+      // A preparation's key is no bookmark: it has no head of its own (HI-2866).
+      if (isJjLineKey(line)) return null
       const op = await pinned(repo)
       return isUnknown(op) ? op : bookmarkAt(repo, op, line)
     },
@@ -421,8 +661,32 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         for (const w of l) if (gone.some((g) => samePath(g, w.root))) await jj(from, ['workspace', 'forget', '--', w.name], { write: true })
       })
     },
-    prepare: async () => step(false, JJ_REFUSED.line),
-    detach: async () => step(false, JJ_REFUSED.line),
+    // A card cycle's preparation (HI-2866/s13): always onto its base (a card's line under jj is made, never "the one it
+    // has"), owned and journalled; its binding published once the slot is on the base.
+    prepare: async (folder, line, base, o = {}) => {
+      const k = parseJjLineKey(line)
+      if (!k || !base || !o.lease) return step(false, JJ_REFUSED.line)
+      if (!o.identity || k.workspace !== o.identity.workspace) return step(false, JJ_REFUSED.identity)
+      return ownedMove(folder, 'prepare', { prep: k.prep, key: line, card: k.card, cycle: k.cycle, lease: o.lease, target: o.target ?? null, base, submitted: [] }, o)
+    },
+    // A slot put back on its target's head after its card is Done (HI-2866/s13): only the card's own binding (`settles`),
+    // its chain exactly the card's integrated submitted work, the target still at `revision` right before the write.
+    detach: async (folder, revision, o = {}) => {
+      const k = o.settles ? parseJjLineKey(o.settles) : null
+      if (!k || !o.target) return step(false, JJ_REFUSED.notBound)
+      return ownedMove(folder, 'detach', { prep: `detach:${k.prep}`, key: null, card: null, cycle: null, lease: null, target: null, base: revision, submitted: [] }, o, o.target)
+    },
+    submitted: async (folder, line, commits, identity) => {
+      const ctx = await contextOf(folder)
+      const prep = ctx ? (deps.prep?.(ctx.store) ?? null) : null
+      if (!ctx || !prep || !identity || !samePath(ctx.store, identity.store)) return false
+      return deps.lock(ctx.store, async () => {
+        const now = prep.pointer(ctx.store, identity.workspace)
+        if (now === 'unreadable' || !now || now.key !== line || now.generation !== identity.generation) return false
+        const next = { ...now, submitted: [...commits] }
+        return prep.publish(ctx.store, identity.workspace, now, next, { kind: 'prepare', prep: now.prep, next, prev: now, phase: 'done' })
+      })
+    },
 
     record: async (folder, fence, identity) => {
       const u = unknown(UNREADABLE.uncommitted, { folder })
