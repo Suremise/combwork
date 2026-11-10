@@ -33,7 +33,7 @@ import { copiesDirOf, grantsCopies } from './copies'
 import { agentWorkflowRole, inWorkflow, launchWorkflow, reviewsWork, type LaunchWorkflow } from '../shared/workflow/roles'
 import { agentLaunchSettings, agentProvider, autoProviderPending, canSwitchModeLive, extraArgsProblem, isProviderEnabled, modeAllowed, permissionLabel, providerDescriptor, providerSettings, splitArgs, tasksWillWake } from '../shared/providers'
 import { isCliOwnMode, modeInEffect } from '../shared/cliOwnMode'
-import { dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
+import { accountInfo, dialectModelId, modelIdName, modelSwitched, resolvedModel } from '../shared/models'
 import type {
   AutoCompactSetting,
   AgentDef,
@@ -47,6 +47,7 @@ import type {
   ModelSwitch,
   RuntimeFacts,
   McpServerDef,
+  AgentInstallInfo,
   McpServerInfo,
   PermissionMode,
   ProjectConfig,
@@ -2877,7 +2878,10 @@ class SessionManager {
     // Performance metrics for this launch go to the workspace it started in (none, if that closes meanwhile).
     const metrics = metricsHandle(workspaceOf(projectPath))
     const { sessionId } = opts
-    const info = providerService.info(adapter.id)
+    // The account it launches on (HI-2852): a sign-in account's own models and default, as its folder says; a server's
+    // connection and a launch on the CLI's own home, the CLI's catalogue.
+    const modelAccount = conn ? ({ id: conn.id, kind: conn.server ? 'server' : 'signIn' } as const) : null
+    const info = accountInfo(providerService.info(adapter.id), modelAccount) ?? providerService.info(adapter.id)
     if (!info.path) throw combworkError(msg({ id: 'session.start.cliRequired', defaultMessage: '{provider} is required to run sessions.', description: "Starting an agent failed: its coding agent's CLI wasn't found. {provider} is the coding agent's name." }), { provider: adapter.descriptor.name }, { kind: 'conflict' })
 
     let resume = opts.resume
@@ -2994,7 +2998,7 @@ class SessionManager {
       mcpServers: eff.mcpServers[TOOLS_SERVER] && dialectEnv.CW_DIALECT_FILE ? { ...eff.mcpServers, [TOOLS_SERVER]: { ...eff.mcpServers[TOOLS_SERVER], env: { ...eff.mcpServers[TOOLS_SERVER].env, ...dialectEnv } } } : eff.mcpServers,
       model: eff.model,
       // An effort the model that runs doesn't take (HI-1770: one moved onto it, or a connection's default) is kept, not used.
-      effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, conn, eff.effort) ? null : eff.effort,
+      effort: eff.effort && eff.connection && !eff.connection.startsWith('!') && !effortUsable(adapter.id, eff.model, modelAccount, eff.effort) ? null : eff.effort,
       permissionMode: mode,
       extraArgs: eff.extraArgs,
       use200kContext: eff.use200kContext,
@@ -6394,6 +6398,13 @@ class SessionManager {
     if (windowChanged && st.sessionId) emit({ type: 'usage-changed', projectPath: st.projectPath, sessionId: st.sessionId })
   }
 
+  /** Its CLI's models as its launch's account offers them (HI-2852: a sign-in account's own; a server's, the CLI's). */
+  private launchedInfo(st: LiveSessionState): AgentInstallInfo {
+    const info = providerService.info(st.provider)
+    const c = st.launchedConnection
+    return (c ? accountInfo(info, { id: c.id, kind: c.server ? 'server' : 'signIn' }) : info) ?? info
+  }
+
   /**
    * Whether the session runs another model than its launch gave it, after a report (HI-2609, modelSwitched): the same
    * object while that stands unchanged (so nothing is sent again), a new one when it starts or the model changes again,
@@ -6404,7 +6415,7 @@ class SessionManager {
     const st = l.state
     if (!d.modelId || st.launchedConnection?.server) return st.modelSwitch
     if (d.modelAt && Date.parse(d.modelAt) < Date.parse(st.startedAt)) return st.modelSwitch
-    const s = modelSwitched(st.provider, st.launchedWith, d.modelId, providerService.info(st.provider))
+    const s = modelSwitched(st.provider, st.launchedWith, d.modelId, this.launchedInfo(st))
     if (!s) return undefined
     const was = st.modelSwitch
     return was && was.launched === s.launched && was.running === s.running ? was : { ...s, since: new Date().toISOString() }
@@ -6420,7 +6431,7 @@ class SessionManager {
     log.warn(`${userText(label)}: its CLI reports model ${s.running}, not ${s.launched} as launched`)
     if (l.modelSwitchTold) return
     l.modelSwitchTold = true
-    const info = providerService.info(st.provider)
+    const info = this.launchedInfo(st)
     const values = { agent: label, cli: l.adapter.descriptor.name, launched: modelIdName(st.provider, s.launched, info), running: modelIdName(st.provider, s.running, info) }
     toast('warning', tr(M.modelSwitchTitle, values), tr(M.modelSwitch, values), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label))
   }

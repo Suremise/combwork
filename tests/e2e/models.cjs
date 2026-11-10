@@ -130,6 +130,30 @@ const check = (name, ok, extra = '') => {
   await light('models-effort-unsupported-light.png')
   await cancelConnection()
 
+  // --- Each account's own models (HI-2852): Claude Code offers each account its own. A second account whose folder answers
+  // with 2.1.321's recorded reply (Fable 5.2) beside Max (the 2.1.289 reply, Fable 5.1): each connection's dialog lists its
+  // own account's, and the CLI's own list (its home's) stays as it was. Asked again by Check again, as the user would.
+  const fableAccount = await inv('connections:add', 'claude-code', 'Fable')
+  const fableFolder = (await inv('connections:list')).connections.find((c) => c.id === fableAccount.id)?.folder
+  fs.writeFileSync(path.join(fableFolder, 'fake-models.json'), JSON.stringify({ reply: 'claude-initialize-2.1.321-account.json' }))
+  await inv('provider:refresh', 'claude-code')
+  const fableLabel = async (account) => {
+    await editConnection(account)
+    const label = (await options(modelSelect)).find((o) => o.value === 'fable')?.label ?? null
+    await cancelConnection()
+    return label
+  }
+  let fableShown = null
+  const fableOwn = await lib.until(async () => (fableShown = await fableLabel(fableAccount)) === 'Fable (Fable 5.2)', HUNG_MS)
+  check("the account offered Fable 5.2: its connection's picker lists Fable (Fable 5.2)", !!fableOwn, fableShown)
+  const maxLabel = await fableLabel(claudeAccount)
+  check("…while Max's lists its own account's Fable (Fable 5.1)", maxLabel === 'Fable (Fable 5.1)', maxLabel)
+  const own = (await info('claude-code')).accountCatalogs ?? {}
+  check("…each kept as its account's, and the CLI's own list unchanged", own[fableAccount.id]?.catalog?.models.some((m) => m.label === 'Fable 5.2') && !own[claudeAccount.id]?.catalog?.models.some((m) => m.label === 'Fable 5.2') && JSON.stringify((await info('claude-code')).catalog?.models.map((m) => m.value)) === JSON.stringify(reported.map((m) => m.value)), JSON.stringify(Object.keys(own)))
+  await editConnection(fableAccount)
+  await page.screenshot({ path: path.join(lib.WORK, 'models-account-fable.png') })
+  await cancelConnection()
+
   // --- Codex's, in its connection's dialog too.
   await editConnection(codexAccount)
   const codexOffered = (await options(modelSelect)).map((o) => o.value)
