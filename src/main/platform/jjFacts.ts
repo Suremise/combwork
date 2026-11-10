@@ -16,8 +16,18 @@ export interface JjIds {
   workspace?: string
 }
 
-/** What a fact's `data.platform` holds for jj. */
-export const jjPlatform = (ids: JjIds): { jj: JjIds } => ({ jj: { ...ids } })
+/** One commit of a submission's chain (HI-2868): its immutable commit id and its change id, read pinned at the boundary. */
+export interface JjChainEntry {
+  commit: string
+  change: string
+}
+
+/**
+ * What a fact's `data.platform` holds for jj. A submission's `chain` (HI-2868, J9b1) is every commit of `base::revision ~
+ * base`, oldest first: each is the card's accepted provenance, so another card claiming one, or a rewrite of one (its
+ * change id), is refused.
+ */
+export const jjPlatform = (ids: JjIds, chain?: readonly JjChainEntry[]): { jj: JjIds & { chain?: JjChainEntry[] } } => ({ jj: { ...ids, ...(chain ? { chain: chain.map((c) => ({ ...c })) } : {}) } })
 
 /**
  * jj's ids in a fact's `data.platform`, or null: none recorded, or any field not what it must be (a change id of 32
@@ -28,7 +38,7 @@ export function jjIdsOf(platform: unknown): JjIds | null {
   if (!platform || typeof platform !== 'object') return null
   const j = (platform as { jj?: unknown }).jj
   if (!j || typeof j !== 'object') return null
-  const { changeId, commitId, operation, workspace, ...rest } = j as Record<string, unknown>
+  const { changeId, commitId, operation, workspace, chain: _chain, ...rest } = j as Record<string, unknown>
   if (Object.keys(rest).length) return null
   if (typeof changeId !== 'string' || !CHANGE_ID.test(changeId) || typeof commitId !== 'string' || !COMMIT_ID.test(commitId)) return null
   if (operation !== undefined && (typeof operation !== 'string' || !OP_ID.test(operation))) return null
@@ -37,9 +47,28 @@ export function jjIdsOf(platform: unknown): JjIds | null {
 }
 
 /**
+ * A submission's chain in its `data.platform` (HI-2868), or null: none recorded (a fact from before, or another platform's),
+ * or any entry not a 40-hex commit id with a change id of jj's alphabet. A partly valid chain is null, never half read.
+ */
+export function jjChainOf(platform: unknown): JjChainEntry[] | null {
+  const j = platform && typeof platform === 'object' ? (platform as { jj?: unknown }).jj : null
+  const chain = j && typeof j === 'object' ? (j as { chain?: unknown }).chain : undefined
+  if (!Array.isArray(chain) || !chain.length) return null
+  const out: JjChainEntry[] = []
+  for (const e of chain) {
+    if (!e || typeof e !== 'object') return null
+    const { commit, change, ...rest } = e as Record<string, unknown>
+    if (Object.keys(rest).length || typeof commit !== 'string' || !COMMIT_ID.test(commit) || typeof change !== 'string' || !CHANGE_ID.test(change)) return null
+    out.push({ commit, change })
+  }
+  return out
+}
+
+/**
  * The commits recorded for each card, and the cards each change id was recorded for, from cards' facts: a Submitted's or
- * an Adopted's jj ids whose commit id is the fact's own revision (`revision`, or `head`). A record whose ids
- * disagree with the fact's revision is left out (never trusted over the immutable id).
+ * an Adopted's jj ids whose commit id is the fact's own revision (`revision`, or `head`), and a Submitted's whole chain
+ * (HI-2868) where its last entry is that same pair. A record whose ids disagree with the fact's revision is left out
+ * (never trusted over the immutable id); a fact from before, with no chain, is read as it always was.
  */
 export function recordedIds(cards: readonly { card: string; facts: readonly Fact[] }[]): { commits: Map<string, Set<string>>; changes: Map<string, Set<string>> } {
   const commits = new Map<string, Set<string>>()
@@ -60,6 +89,13 @@ export function recordedIds(cards: readonly { card: string; facts: readonly Fact
       if (own !== ids.commitId) continue
       add(commits, ids.commitId, card)
       add(changes, ids.changeId, card)
+      const chain = f.kind === 'Submitted' ? jjChainOf(data.platform) : null
+      const last = chain?.at(-1)
+      if (!chain || last?.commit !== ids.commitId || last.change !== ids.changeId) continue
+      for (const c of chain) {
+        add(commits, c.commit, card)
+        add(changes, c.change, card)
+      }
     }
   }
   return { commits, changes }

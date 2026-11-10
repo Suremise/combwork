@@ -14,8 +14,8 @@ import { JjPlatform } from './jjPlatform'
 const ADAPTERS: Record<PlatformId, (wf: Workflow, none: NoneAdapter) => PlatformAdapter> = {
   git: (wf) => new GitPlatform(wf),
   none: (wf, none) => new NonePlatform(wf, none),
-  // HI-2799: jj's card work isn't enabled yet; its adapter answers nothing it couldn't stand behind.
-  jj: () => new JjPlatform()
+  // HI-2868: jj's card work, behind `start.platformReady` until J9e; its dependencies come from the workflow's config.
+  jj: (wf) => new JjPlatform(wf)
 }
 
 /** Every platform's adapter for one workflow, built in the order the map names them (as the runtime built them before). */

@@ -163,7 +163,28 @@
       "kind": "select"
     }
   },
+  "workflow.jj.containment": {
+    "placeholders": {}
+  },
   "workflow.jj.notYet": {
+    "placeholders": {}
+  },
+  "workflow.jj.start.carryTarget": {
+    "placeholders": {
+      "slot": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.jj.start.noSlot": {
+    "placeholders": {}
+  },
+  "workflow.jj.start.notWorkspace": {
+    "placeholders": {}
+  },
+  "workflow.jj.start.slots": {
+    "placeholders": {}
+  },
+  "workflow.jj.start.target": {
     "placeholders": {}
   },
   "workflow.move.answer": {
@@ -735,6 +756,21 @@
   "workflow.refused.platform.changed.next": {
     "placeholders": {
       "platform": "plain"
+    }
+  },
+  "workflow.refused.platform.jjRefused.message": {
+    "placeholders": {
+      "why": "select",
+      "card": "plain",
+      "base": "plain",
+      "commit": "plain",
+      "other": "plain",
+      "max": "number"
+    }
+  },
+  "workflow.refused.platform.jjRefused.next": {
+    "placeholders": {
+      "why": "select"
     }
   },
   "workflow.refused.platform.switching.message": {

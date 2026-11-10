@@ -1595,6 +1595,7 @@ offered, and its row says why [#1112 plan, note "Core model v2"].
 |---|---|---|---|
 | **revisions** | Name an exact state of the work; read the current one; say whether it is **ready** (no unresolved conflicts stored in it, nothing pending to snapshot). | A commit id (`rev-parse HEAD` in the card's folder); always ready (git can't commit unresolved conflicts). | A content hash of the card's deliverables (§16.3.3); ready unless a deliverable has conflict markers the check option names. |
 | **isolation** | Parallel working folders for cards. | Worktrees: slots (§16.10). | Not in 1.0 (OP-16): everyone works in the project folder. |
+| **checkCopies** | A check run in a copy of its own at the card's revision (§16.13's `--isolated`; HI-2868: apart from isolation, since jj has slots but no check copies in 1.5.0). | Check copies (#1435). | None (OP-16). |
 | **integration** | Combine an approved change into the target, and **advance the target atomically**: move it from an expected revision to the result, or fail without changing it. | Merge (merge commit or squash) by Combwork's merge queue (§16.9) or the agent; the target is a branch, advanced with compare-and-swap (§16.9.2). | **Acceptance**: an approved revision is recorded as accepted; nothing is copied (OP-16). |
 | **containment** | Is revision R (or its change) in target T? | Ancestor of the target, or a target commit with the same change (a squash) (§16.3.4). | R has an Accepted fact. |
 | **sameness** | Is R2 the same change as R1? | Replay equivalence: replaying the reviewed change onto the new base gives exactly the new tree (§16.3.2; patch-id as a first test, OP-33). | Same hash (any edit is a new revision) [#1112 B]. |
@@ -2571,7 +2572,7 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
 J6 made jj a platform: `PlatformId` is `'none' | 'git' | 'jj'` (J2's `JjPlatform` and `WorkspacePlatform` are its own),
 and its design is HI-2799/s11 to s26. Under Darren's option A (HI-2794) the window offers no jj mutation and Combwork never
 merges under jj.
-- **The descriptor** (`PLATFORMS.jj`): capabilities `revisions, isolation, containment, sameness, authorship, observe`;
+- **The descriptor** (`PLATFORMS.jj`): capabilities `revisions, isolation, containment, sameness, authorship, observe` (no `checkCopies`: HI-2868);
   never `integration` (gate advance, J4 and J5 included); `operations: []`; commit and change ids shown at 12
   (`revisionShort`, `changeShort`); `gates` every gate still closed (all ten in J6), which the window shows as "Not
   supported with jj" (`shared/platform/gateTexts.ts`). Git's and None's `gates` are empty.
@@ -3034,6 +3035,75 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   published meanwhile; a detach with the target moving first; crashes before the write and after it before
   publication, resumed without a second write) and `tests/jjSlotPoolPrep.test.ts` (the pool's own prepare, settle after
   integration, kept when not integrated, and the recovery action).
+
+##### jj cards in the runtime, through Review (1.5.0's J9b1, HI-2868)
+
+J9b is split: J9b1 (this) a jj card's start, submission, checks and sameness, through Review to Approved; J9b2 (HI-2882)
+reconciling it to Integrated, with the observer. Still **behind the guard**: every jj ruleset carries
+`start.platformReady` until J9e (HI-2874); a test compiles jj rulesets without it through one seam
+(`setJjCardsReadyForTests`, compile.ts), which J9e removes. Its design is HI-2868/s7 to s19 (HR1's). Decision A holds:
+Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and create-only `refs/cw/cards/…` pins.
+- **Composition:** `JjPlatform` is built with its workflow (`adapters.ts`) and takes its dependencies from the workflow's
+  config (`cfg.jj`, the app's `jjCards.ts`, set while slots run): J9a's registered port, the store's lock, `git
+  --git-dir <store>`, J5's reads (pinned in the project folder), the card's lease and slot rows read synchronously, and
+  the pins' ownership records in board_meta.
+- **Start:** a code card in its builder's slot (jj needs slots; a no-code card starts where its agent is, with no line);
+  its target `card.target || o.target`, required (jj has no default branch); its base J5's `jjTargetHead`; its line J9a's
+  key `jj:<workspace>/<card>.<n>`, `n` the card's start ordinal (one more than its Started and Adopted facts: unique per
+  cycle, known at the plan, the cycle rechecked by the evidence in the Started write). `Started.platform.jj` records the
+  slot's workspace, store and generation. **A restart** of the same card in the same slot (its binding this card's, one
+  of its own keys, the same folder generation and target) **carries**: the start records the old base, and J9a's
+  preparation publishes the new key with the old base and submitted commits, no jj write. On another target it is
+  refused, its earlier work kept in the slot; in another slot it starts fresh, the old slot kept until integrated or
+  recovered.
+- **Evidence** (the runtime's fence, read before an intent and again in its write): the project's **provenance epoch**
+  (below), the card's cycle and stage; for a started card J3's view of the slot (the single operation head, the
+  workspace's name, a colocated workspace's Git state; not the checkout record's operation, which a snapshot that
+  records nothing moves), the folder's generation, the slot's binding pointer, the lease and slot rows (open, the same
+  slot, no operation or job, its builder's writer only), and the target's ref. `content` is the same without the epoch,
+  so another card's submission meanwhile gathers the intent again once instead of refusing it.
+- **The provenance epoch:** a counter in board_meta (`provenance_epoch:<project id>`) the fact store moves in the same
+  transaction as every Submitted or Adopted fact it appends, whatever the platform; never a per-card seq.
+- **The lease's hold** (HR2's round 1): the app's `slotHold` answers whether the card's lease is open, on its Started slot,
+  its builder's and (a card lease) this card's, with no operation or job in the slot and no writer but its builder's
+  under this lease, beside what it read. A submission and a check need it held at entry (refused `unbound` otherwise,
+  nothing read or written), at every boundary await (held and unchanged), and in the final write (its print in the
+  evidence): an ended or foreign lease is refused, never compared with itself.
+- **Submission:** J3's boundary (the snapshot under the store's lock, its owner the card's held lease and slot rows and
+  its stage); a predicted submission only reads. Refused: something recorded or a non-empty `@` (`submit.empty`, commit it
+  with `jj commit`); `@` with more than one parent, the chain not from the binding's base, a divergent or conflicted
+  commit, more than 500 commits, or a commit another card recorded (`platform.jjRefused`, worded by its reason); the
+  slot not bound to this card's key. A revision an agent names is a hex prefix the Git store resolves to exactly the
+  head: never a change id or a revset. **Attribution**: every commit of the chain `base::P ~ base` is recorded by no card
+  or by this one (J3's `jjAttribute` over every card's recorded ids); the start's base is never authorship. The fixed
+  endpoints are on the Git store (the base where P and the target's head meet now, the files and key from it to P).
+  `Submitted.platform.jj` records P's ids and the whole chain (`chain`: each commit and change id, oldest first), read
+  by `recordedIds` as the card's provenance (a fact from before, with no chain, is read as it always was).
+- **Retention:** the runtime's post-write `pin` action (one per submission, `refs/cw/cards/<key>/<n>`), on jj in one
+  ordered action: its intent journalled (board_meta `jj_pin:<ref>`), the ref created only if absent (`update-ref` with
+  the zero oid), read back, its ownership recorded (`owned` true; a ref there before any intent of ours at the same
+  commit `false`; an interrupted create whose ref is there `uncertain`; at another commit the action fails and nothing
+  is overwritten), and only then the slot's binding's submitted commits advanced, seq-ordered (`submittedSeq`: an older
+  submission's record never replaces a newer one's). The action is bound to its own submission (HR2's round 1): the
+  Submitted fact records the slot it was made from (`platform.jjSlot`: folder, line key, store, workspace, generation),
+  the pin is made in that store, and only that binding is advanced, while still bound to that key at that generation and
+  while the live folder is still that workspace (its generation, its checkout's workspace and store: the port's ownership
+  check, under the store's lock and again right before the publication; HR2's round 2): a restart in another slot or
+  under a new key, a removed folder, or a folder replaced at the same path is never filled from a late action. No ref is ever deleted here; reclaiming only `owned` ones is later.
+- **Checks:** J3's bracket in one adapter call: B1 (the snapshot) and the revision read at its head, the run, then
+  always the end (its write record, J3's stat fallback, B2) whatever the run did, and the credit. **No check copies**:
+  the new capability `checkCopies` (Git's) is what a check copy needs, apart from `isolation` (slots); the check API,
+  the submit refusal, the checks view and cw-progress offer `--isolated` by it, and a jj card's `--isolated` is refused
+  before anything runs.
+- **Sameness:** J3's `jjSameRevision` with Git's `sameChange` on the store. **Containment** (`contains`) is a typed
+  unknown in J9b1: J9b2's proof (J5's `jjContains`) decides it; `targetHead` is J5's `jjTargetHead`.
+- **Approved:** a jj card that passes review waits in Approved (`userIntegrates`, its OK asked first where G10 applies)
+  until J9b2's reconciliation finds it in its target.
+- **Tests** (the real jj, both Git-backed modes): `tests/jjCards.test.ts` (start, commit, a predicted submission writing
+  nothing, submit, pin, a credited check, review and pass; the submission's refusals, the lease ended or an operation
+  installed before the write; attribution of another card's intermediate commit and its rewrite, and the card's own
+  rewrite; a claim committed between the plan and the write; restart carry and the changed target; pin ownership and
+  seq order; check credit, a transient edit, a throw, `--isolated`; the guard without the seam; the epoch).
 
 ##### Open: jj's target advance (J1's gate)
 

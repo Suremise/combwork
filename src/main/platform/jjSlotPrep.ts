@@ -30,6 +30,11 @@ export interface JjBinding {
   generation: string
   /** The card's submitted commits (J9b records them), oldest first: what the slot may hold over `base` when reused. */
   submitted: string[]
+  /**
+   * The Submitted fact `submitted` was recorded from (its seq, HI-2868): a later submission's record replaces it, an
+   * earlier one's never does. Absent until the card's first submission is retained.
+   */
+  submittedSeq?: number
 }
 
 export type JjPrepPhase = 'planned' | 'recorded' | 'checked' | 'writing' | 'written' | 'done' | 'superseded' | 'refused'
@@ -90,7 +95,7 @@ export const isJjLineKey = (line: string | null | undefined): boolean => !!line 
 /** Two bindings are the same, every field (the submitted endpoints included); null only equals null. */
 export function sameBinding(a: JjBinding | null, b: JjBinding | null): boolean {
   if (a === null || b === null) return a === b
-  return a.prep === b.prep && a.key === b.key && a.card === b.card && a.cycle === b.cycle && a.lease === b.lease && a.target === b.target && a.base === b.base && a.generation === b.generation && a.submitted.length === b.submitted.length && a.submitted.every((c, i) => c === b.submitted[i])
+  return a.prep === b.prep && a.key === b.key && a.card === b.card && a.cycle === b.cycle && a.lease === b.lease && a.target === b.target && a.base === b.base && a.generation === b.generation && a.submitted.length === b.submitted.length && a.submitted.every((c, i) => c === b.submitted[i]) && a.submittedSeq === b.submittedSeq
 }
 
 const COMMIT = /^[0-9a-f]{40}$/
@@ -102,7 +107,8 @@ export function bindingOf(v: unknown): JjBinding | null {
   const okNum = (x: unknown): boolean => x === null || (typeof x === 'number' && Number.isInteger(x) && x >= 0)
   if (typeof b.prep !== 'string' || !(b.key === null || typeof b.key === 'string') || !okNum(b.card) || !okNum(b.cycle) || !(b.lease === null || typeof b.lease === 'string') || !(b.target === null || typeof b.target === 'string')) return null
   if (typeof b.base !== 'string' || !COMMIT.test(b.base) || typeof b.generation !== 'string' || !Array.isArray(b.submitted) || !b.submitted.every((c) => typeof c === 'string' && COMMIT.test(c))) return null
-  return { prep: b.prep, key: b.key as string | null, card: b.card as number | null, cycle: b.cycle as number | null, lease: b.lease as string | null, target: b.target as string | null, base: b.base, generation: b.generation, submitted: [...(b.submitted as string[])] }
+  if (b.submittedSeq !== undefined && !(typeof b.submittedSeq === 'number' && Number.isInteger(b.submittedSeq) && b.submittedSeq > 0)) return null
+  return { prep: b.prep, key: b.key as string | null, card: b.card as number | null, cycle: b.cycle as number | null, lease: b.lease as string | null, target: b.target as string | null, base: b.base, generation: b.generation, submitted: [...(b.submitted as string[])], ...(b.submittedSeq !== undefined ? { submittedSeq: b.submittedSeq as number } : {}) }
 }
 
 const PHASES: readonly JjPrepPhase[] = ['planned', 'recorded', 'checked', 'writing', 'written', 'done', 'superseded', 'refused']
