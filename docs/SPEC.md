@@ -5385,7 +5385,7 @@ remote lacks refuses the start with why: never the local head instead.
 #### 16.9.5 Signing checked before the queue signs <a id="spec-signing-check"></a>
 
 **Built [HI-1185]** (the design agreed with HR1 on the card, s7 to s17). Agents' own commits failing fast instead of
-prompting (the ready check's part 2) waits for Darren's decision (HI-1185/r10), and isn't built.
+prompting (the ready check's part 2) was split off by Darren's decision (HI-1185/r61) and built as HI-2867 (below).
 
 **The read** (`platform/gitSigning.ts`), in the folder a commit runs in, with that commit's own `-c` overrides
 (`git config --show-scope`): `commit.gpgsign`; `gpg.format` (openpgp by default, ssh, x509); `user.signingkey`, shown
@@ -5439,6 +5439,44 @@ optional `signing` (jj has none, so nothing is shown).
   changed settings cancel it and wait for it before starting anew; Check again with nothing in flight starts a fresh check.
 - **A finished check is kept apart** from what is in flight: written only by its own generation, reused for a minute
   while its settings (re-read at each look) stay, and swept at expiry and when its owner goes.
+
+**Agents' own commits never wait for a passphrase [HI-2867]** (the design agreed with HR2 on the card, s7 and s10; its
+measurements recorded there). An agent's signed commit used to wait on a pinentry or passphrase prompt nobody was there
+to answer, or (Windows' own `ssh-keygen`, measured) on the agent's own terminal. Now it signs with nobody there or fails
+at once, saying why. **Signing is never turned off**: no `commit.gpgsign` or `tag.gpgsign` entry, no fallback to an
+unsigned commit; every failure stays one, with git's own nonzero exit.
+- **Only the session's environment, never config.** A session with Combwork's tools (none "as from a terminal") gets two
+  `GIT_CONFIG_*` entries, first so the user's own entries after them still win: `gpg.program` and `gpg.ssh.program` set
+  to `cw-sign.exe`, and the variables it reads (`CW_SIGN_*`). Entries naming another Combwork's `cw-sign.exe` (a dev
+  build started from a session) are dropped. Combwork writes no git, ssh or gpg configuration.
+- **The launcher, `cw-sign.exe`** (`resources/cw-sign/cw-sign.cs`, compiled at each build by Windows' own .NET Framework
+  `csc.exe` into `out/bin`, shipped as `resources\bin`; none built, sessions get no entries and sign as before). Git
+  names one program with no arguments of its own, a `.cmd` loses arguments to cmd's parsing and a `#!/bin/sh` script
+  runs only where git finds `sh` on PATH (both measured), so it is a program of its own. It hands git's arguments to
+  `cw-sign.js` in `CW_SIGN_ARGV` (their count, then base64 of their UTF-8 joined by NUL), never re-quoted, and relays
+  stdin, stdout and stderr byte for byte through pipes of its own: started with exactly those three handles to inherit
+  (`PROC_THREAD_ATTRIBUTE_HANDLE_LIST`), because a gpg-agent gpg starts otherwise inherits git's pipe and git waits for
+  its end as long as the agent runs (measured). It puts itself in a job object that ends its processes when its last
+  handle closes (the session ending its tree), detached or not; once `cw-sign.js` has finished, the job stops ending what
+  is left, so a gpg-agent gpg started stays. A job it can't make or join is a failure (exit 2).
+- **The signer, `cw-sign.js`** (Node's built-ins and Combwork's chunks, run by Combwork's executable as Node): the signer
+  git would have run without Combwork, read from git in the commit's folder with Combwork's two entries taken out (only
+  when they are exactly Combwork's: `CW_SIGN_OURS`, the keys and `CW_SIGN_SELF`'s path; else nothing is dropped and it
+  refuses), every other scope, include and command entry kept, `gpg.program` and `gpg.openpgp.program` as one setting
+  (§16.9.5's read). A result that is a `cw-sign.exe` refuses: it never runs itself.
+- **What changes:** only a known installation's (the check's list above) signing call (gpg's detach-sign, `ssh-keygen -Y
+  sign`): gpg gets `--batch --no-tty --pinentry-mode error`, ssh-keygen `SSH_ASKPASS_REQUIRE=never`, both started with
+  no console of their own (detached), within the Advanced setting's bound (**Agents' signer: give up after**, 120 s by
+  default: long enough for a hardware key's touch). Verification and every other signer run exactly as git gave them, as
+  before: the protection is for known installations only.
+- **What the agent reads:** the signer's own words, then, when they say it needs someone (the check's `needsSomeone`
+  words), an agent message: signing needs someone, nobody can in a session, signing stays on, don't commit unsigned or
+  change signing settings unless the user says so, and the unattended setup (ssh-agent, gpg-agent's cache, the Signing
+  section). A signer ended at its bound says so instead, never claiming a prompt.
+- **The off switch:** Advanced → **Agents' signed commits never wait for a passphrase** (on by default), read at launch.
+- **Not measured** (recorded as limitations, the user's machine left alone): Gpg4win's gpg (not installed where it was
+  built; the same GnuPG options), and Windows' ssh-agent service with a detached signer (loading a key would change the
+  user's machine-wide agent; a private Git for Windows agent was measured).
 
 ### 16.10 Slots, review copies and sessions
 

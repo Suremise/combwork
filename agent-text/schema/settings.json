@@ -1454,6 +1454,18 @@
   "settings.advanced.cw.retry.tellAssistantAfterSeconds.title": {
     "placeholders": {}
   },
+  "settings.advanced.cw.sessions.signFailFast.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.signFailFast.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": {
+    "placeholders": {}
+  },
   "settings.advanced.cw.sessions.terminalType.desc": {
     "placeholders": {}
   },

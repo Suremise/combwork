@@ -2355,6 +2355,22 @@
     "defaultMessage": "Retry wait: tell the Assistant after",
     "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"300 s\"). A retry wait: an agent's coding agent waiting to try its model request again."
   },
+  "settings.advanced.cw.sessions.signFailFast.desc": {
+    "defaultMessage": "When a repository signs commits, an agent's commit with Git for Windows' gpg or ssh-keygen, GnuPG's gpg or Windows' ssh-keygen signs with nobody there, or fails at once and tells the agent why, instead of waiting for a passphrase nobody can type. Signing stays on, and your git and gpg settings are never changed: sessions get a signer of Combwork's in their environment only. Other signers run as before. Turned off, sessions use git's own signer, as before.",
+    "description": "What the advanced setting \"Agents' signed commits never wait for a passphrase\" does (Settings → Advanced). gpg, ssh-keygen, Git for Windows and GnuPG are names: keep them."
+  },
+  "settings.advanced.cw.sessions.signFailFast.title": {
+    "defaultMessage": "Agents' signed commits never wait for a passphrase",
+    "description": "An advanced setting's title (Settings → Advanced), listed under Combwork: agents' commits signed with gpg or ssh fail at once rather than waiting for someone to type a passphrase."
+  },
+  "settings.advanced.cw.sessions.signTimeoutSeconds.desc": {
+    "defaultMessage": "How long an agent's signed commit lets gpg or ssh-keygen run before Combwork ends it and the commit fails. Long enough for a hardware key you touch; a signer still running then is waiting for someone.",
+    "description": "What the advanced setting \"Agents' signer: give up after\" does (Settings → Advanced). gpg and ssh-keygen are names: keep them."
+  },
+  "settings.advanced.cw.sessions.signTimeoutSeconds.title": {
+    "defaultMessage": "Agents' signer: give up after",
+    "description": "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"120 s\"): how long an agent's commit may wait for its signer."
+  },
   "settings.advanced.cw.sessions.terminalType.desc": {
     "defaultMessage": "Combwork starts each session with TERM=xterm-256color, as its terminal is, and without Windows Terminal's WT_SESSION, so the CLIs draw the same whether Combwork was opened from the Start menu or a terminal (Claude Code draws ❯ rather than >). A TERM in your own environment or the session's is kept. Turned off, sessions get the environment Combwork was opened with.",
     "description": "What the advanced setting \"Sessions say their terminal is xterm-256color\" does (Settings → Advanced). TERM, WT_SESSION and xterm-256color are names: keep them; ❯ and > are the characters Claude Code draws as its prompt mark."

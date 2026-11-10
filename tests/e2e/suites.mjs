@@ -263,6 +263,7 @@ export const SUITES = [
   { name: 'packaged', needs: ['packaged'] },
   { name: 'packaged-mcp', needs: ['packaged'] },
   { name: 'packaged-progress', needs: ['packaged'] },
+  { name: 'packaged-sign', needs: ['packaged'] },
   { name: 'packaged-transcript', needs: ['packaged'] },
   { name: 'packaged-workers', needs: ['packaged'] },
   { name: 'pages' },

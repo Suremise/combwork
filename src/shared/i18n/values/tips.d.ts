@@ -23,6 +23,8 @@ interface CombworkMessageValues {
   'tips.agentStates.title': undefined
   'tips.agentWorkflowRole.text': undefined
   'tips.agentWorkflowRole.title': undefined
+  'tips.agentsSignedCommits.text': undefined
+  'tips.agentsSignedCommits.title': undefined
   'tips.agentsTempFolder.text': undefined
   'tips.agentsTempFolder.title': undefined
   'tips.allKeysToCli.text': undefined

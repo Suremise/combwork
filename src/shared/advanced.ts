@@ -299,6 +299,12 @@ export const LEGACY_ADVANCED: ReadonlySet<string> = new Set(['cw.assistant.other
 /** Whether sessions are started with TERM=xterm-256color and no WT_SESSION (HI-2004): read by main's ptyHost. */
 export const TERMINAL_TYPE = 'cw.sessions.terminalType'
 
+/** Whether agents' sessions sign through cw-sign, never waiting for a passphrase (HI-2867): read by main's sessions at launch. */
+export const SIGN_FAIL_FAST = 'cw.sessions.signFailFast'
+
+/** How long cw-sign lets a known signer run before ending it (HI-2867), in seconds. */
+export const SIGN_TIMEOUT = 'cw.sessions.signTimeoutSeconds'
+
 /** Whether reviewers review in review copies (#1435, SPEC §16.10.5): read by main's copiesApp. */
 export const COPIES_REVIEW = 'cw.copies.review'
 
@@ -467,6 +473,29 @@ const SOURCES: readonly AdvancedSource[] = [
     desc: msg({ id: 'settings.advanced.cw.sessions.terminalType.desc', defaultMessage: "Combwork starts each session with TERM=xterm-256color, as its terminal is, and without Windows Terminal's WT_SESSION, so the CLIs draw the same whether Combwork was opened from the Start menu or a terminal (Claude Code draws ❯ rather than >). A TERM in your own environment or the session's is kept. Turned off, sessions get the environment Combwork was opened with.", description: 'What the advanced setting "Sessions say their terminal is xterm-256color" does (Settings → Advanced). TERM, WT_SESSION and xterm-256color are names: keep them; ❯ and > are the characters Claude Code draws as its prompt mark.' }),
     kind: 'boolean',
     default: true,
+    applies: 'sessions'
+  },
+  // HI-2867 (SPEC §16.9.5): agents' own signed commits fail at once, with a reason, instead of waiting for a passphrase
+  // nobody can enter; the signer's bound, a CLI-facing timeout, beside it.
+  {
+    id: SIGN_FAIL_FAST,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.sessions.signFailFast.title', defaultMessage: "Agents' signed commits never wait for a passphrase", description: "An advanced setting's title (Settings → Advanced), listed under Combwork: agents' commits signed with gpg or ssh fail at once rather than waiting for someone to type a passphrase." }),
+    desc: msg({ id: 'settings.advanced.cw.sessions.signFailFast.desc', defaultMessage: "When a repository signs commits, an agent's commit with Git for Windows' gpg or ssh-keygen, GnuPG's gpg or Windows' ssh-keygen signs with nobody there, or fails at once and tells the agent why, instead of waiting for a passphrase nobody can type. Signing stays on, and your git and gpg settings are never changed: sessions get a signer of Combwork's in their environment only. Other signers run as before. Turned off, sessions use git's own signer, as before.", description: 'What the advanced setting "Agents\' signed commits never wait for a passphrase" does (Settings → Advanced). gpg, ssh-keygen, Git for Windows and GnuPG are names: keep them.' }),
+    kind: 'boolean',
+    default: true,
+    applies: 'sessions'
+  },
+  {
+    id: SIGN_TIMEOUT,
+    group: 'cw',
+    title: msg({ id: 'settings.advanced.cw.sessions.signTimeoutSeconds.title', defaultMessage: "Agents' signer: give up after", description: "An advanced setting's title (Settings → Advanced), followed by its value in seconds (\"120 s\"): how long an agent's commit may wait for its signer." }),
+    desc: msg({ id: 'settings.advanced.cw.sessions.signTimeoutSeconds.desc', defaultMessage: "How long an agent's signed commit lets gpg or ssh-keygen run before Combwork ends it and the commit fails. Long enough for a hardware key you touch; a signer still running then is waiting for someone.", description: 'What the advanced setting "Agents\' signer: give up after" does (Settings → Advanced). gpg and ssh-keygen are names: keep them.' }),
+    kind: 'number',
+    default: 120,
+    min: 10,
+    max: 3600,
+    unit: 's',
     applies: 'sessions'
   },
   {
