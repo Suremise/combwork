@@ -1558,6 +1558,12 @@
       "subfolder": "select"
     }
   },
+  "api.project.vcsJj": {
+    "placeholders": {
+      "root": "plain",
+      "colocated": "select"
+    }
+  },
   "api.project.vcsUnsupported": {
     "placeholders": {
       "name": "plain"

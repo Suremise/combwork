@@ -12,20 +12,21 @@ import type { ReconcileHooks } from '../workflow/reconcile'
 import type { CheckBracket, FinishInputs, HeadMove, PlatformAdapter, RunRevision, StartPlan, SubmitPlan } from './adapter'
 import type { Disposable, ObserveEvent } from './observe'
 import type { Containment, Maybe, Unknown } from './types'
+import { agentMsg, say } from '../../shared/agentText'
 
 /** What jj's adapter can't answer yet, for agents and the log (the start's guard words it for the window first). */
-// i18n-ignore: unreachable from the window (start.platformReady refuses first); agents' and the log's English
-const NOT_YET: Unknown = { unknown: true, what: "a jj project's card work (not enabled yet)" }
+const NOT_YET_TEXT = agentMsg({ id: 'workflow.jj.notYet', text: "a jj project's card work (not enabled yet)", note: "HI-2799: what Combwork couldn't read for a card of a project using jj: its card work isn't enabled yet." })
+const notYet = (): Unknown => ({ unknown: true, what: say(NOT_YET_TEXT) })
 
 export class JjPlatform implements PlatformAdapter {
   readonly id = 'jj' as const
 
   async start(): Promise<Maybe<StartPlan>> {
-    return NOT_YET
+    return notYet()
   }
 
   async revisionNow(): Promise<Maybe<string | null>> {
-    return NOT_YET
+    return notYet()
   }
 
   async runRevision(): Promise<RunRevision> {
@@ -37,7 +38,7 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   async finishInputs(): Promise<FinishInputs> {
-    return { contained: NOT_YET, currentRevision: NOT_YET }
+    return { contained: notYet(), currentRevision: notYet() }
   }
 
   async headMoved(): Promise<HeadMove | null> {
@@ -45,11 +46,11 @@ export class JjPlatform implements PlatformAdapter {
   }
 
   async contains(): Promise<Maybe<Containment | null>> {
-    return NOT_YET
+    return notYet()
   }
 
   async targetHead(): Promise<Maybe<string | null>> {
-    return NOT_YET
+    return notYet()
   }
 
   /** Nothing to reconcile: no jj card has started. */
