@@ -548,7 +548,11 @@
   "reply.provider.connection": {
     "placeholders": {
       "name": "plain",
-      "id": "plain"
+      "id": "plain",
+      "own": "select",
+      "models": "plural",
+      "hasModel": "select",
+      "model": "plain"
     }
   },
   "reply.provider.more": {

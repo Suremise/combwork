@@ -29,7 +29,7 @@ const { advanced } = await import('../src/main/advanced')
 const { provider } = await import('../src/main/providers')
 const { providerService } = await import('../src/main/providerService')
 const { parseClaudeInitialize } = await import('../src/main/providers/claude/models')
-const { accountInfo, connectionModels, modelGroups } = await import('../src/shared/models')
+const { accountInfo, connectionModels, listedConnections, modelGroups, offeredModels } = await import('../src/shared/models')
 
 const CLI = 'claude-code' as const
 const fixture = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'claude-initialize-2.1.321-account.json'), 'utf8'))
@@ -132,6 +132,42 @@ describe('accountInfo: one account’s models, never another home’s', () => {
     const names = (id: string) => modelGroups(CLI, connectionModels({ id, kind: 'signIn' }, info), null).flatMap((g) => g.models.map((m) => m.label))
     expect(names('a-1').some((l) => l.includes('Fable 5.2'))).toBe(true)
     expect(names('a-2').some((l) => l.includes('Fable 5.2'))).toBe(false)
+  })
+})
+
+// HI-2856: GET /v1/providers (and cw_list_providers from it) lists each connection with its own account's models.
+describe('listedConnections: each connection its own account’s models, as the providers listing gives them', () => {
+  const p: ModelCatalog = { source: 'cli', version: '1', at: '', models: [model('claude-fable-5-1[1m]', 'Fable')], defaultModel: 'claude-opus-5-5' }
+  const a1: ModelCatalog = { source: 'cli', version: '1', at: '', models: recorded.models, defaultModel: 'claude-opus-5-5' }
+  const a2: ModelCatalog = { source: 'cli', version: '1', at: '', models: [model('sonnet', 'Sonnet'), model('claude-fable-5-1', 'Fable 5.1')], defaultModel: 'sonnet' }
+  const info = { catalog: p, defaultModel: 'claude-opus-5-5', accountCatalogs: { 'a-1': { catalog: a1, defaultModel: 'claude-opus-5-5' }, 'a-2': { catalog: a2, defaultModel: 'sonnet' }, 'a-same': { catalog: p, defaultModel: 'claude-opus-5-5' } } }
+  const ofId: Record<string, Pick<Account, 'id' | 'kind' | 'server' | 'home'>> = {
+    'a-1': { id: 'a-1', kind: 'signIn' },
+    'a-2': { id: 'a-2', kind: 'signIn' },
+    'a-same': { id: 'a-same', kind: 'signIn' },
+    'a-home': { id: 'a-home', kind: 'signIn', home: 'cli' },
+    'a-srv': { id: 'a-srv', kind: 'server', server: { baseUrl: 'http://127.0.0.1:1', models: [{ id: 'deepseek-flash', as: ['opus'] }], modelsFrom: 'typed' } }
+  }
+  const conn = (id: string, account: string) => ({ id, name: id.toUpperCase(), account })
+  const providerModels = offeredModels(CLI, info, null)
+  const rows = listedConnections(CLI, [conn('c-1', 'a-1'), conn('c-2', 'a-2'), conn('c-same', 'a-same'), conn('c-home', 'a-home'), conn('c-srv', 'a-srv'), conn('c-gone', 'a-gone')], (id) => ofId[id], info, null, providerModels)
+  const byId = (id: string) => rows.find((c) => c.id === id)!
+
+  it('two accounts answering differently: each connection lists its own account’s models and default', () => {
+    expect(byId('c-1').models?.map((m) => m.label).some((l) => l.includes('Fable 5.2'))).toBe(true)
+    expect(byId('c-1').defaultModel).toBe('claude-opus-5-5')
+    expect(byId('c-2').models?.map((m) => m.value)).toEqual(['sonnet', 'claude-fable-5-1'])
+    expect(byId('c-2').defaultModel).toBe('sonnet')
+    expect(providerModels.some((m) => m.label.includes('Fable 5.2'))).toBe(false)
+  })
+  it('a connection offering the provider’s models leaves its list out (the reply stays lean); its default is always said', () => {
+    expect(byId('c-same')).toEqual({ id: 'c-same', name: 'C-SAME', defaultModel: 'claude-opus-5-5' })
+    expect(byId('c-home')).toEqual({ id: 'c-home', name: 'C-HOME', defaultModel: 'claude-opus-5-5' })
+    expect(byId('c-gone')).toEqual({ id: 'c-gone', name: 'C-GONE', defaultModel: 'claude-opus-5-5' })
+  })
+  it('a server connection keeps its own list', () => {
+    expect(byId('c-srv').models?.map((m) => m.value)).toEqual(['deepseek-flash'])
+    expect(byId('c-srv').defaultModel).toBe('deepseek-flash')
   })
 })
 
