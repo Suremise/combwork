@@ -4873,7 +4873,7 @@ for (const id of ['jj-plain-git', 'jj-card-submit', 'jj-card-review', 'jj-card-p
   const sc = module.exports.SCENARIOS.find((x) => x.id === id)
   module.exports.SCENARIOS.push({
     ...sc,
-    id: `${id}-separate`,
+    id: `${id}-nc`,
     title: `${sc.title.replace(' (colocated with Git)', '')}; its repository not colocated with Git (HI-2896)`,
     separate: true,
     async setup(c) {
