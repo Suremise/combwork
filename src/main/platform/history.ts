@@ -160,6 +160,8 @@ export type ObserveEvent =
   | { kind: 'lineMoved'; project: string; line: string; from: string | null; to: string | null }
   | { kind: 'folderMoved'; project: string; folder: string; from: string | null; to: string | null }
   | { kind: 'written'; project: string; folder: string; paths: string[] }
+  /** HI-2882: something a platform keeps (jj's retained bundles) may have changed, or its minute's tick: its adapter decides. */
+  | { kind: 'invalidated'; project: string; what: string }
 
 export interface Disposable {
   dispose(): void

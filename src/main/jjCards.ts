@@ -19,6 +19,9 @@ import { jjContextOf } from './platform/jjDetect'
 import type { JjCardDeps, JjPinRecord } from './platform/jjPlatform'
 import type { JjBundle, JjIntegrationDeps } from './platform/jjIntegration'
 import { boardConn, jjPort, storeLock } from './slotsApp'
+import { boardFile } from './boardStore'
+import { commitPublishOff } from './jjPublish'
+import { mergeBundles, type SqlDb } from './platform/jjObligations'
 import { SlotStore } from './slots'
 import type { WorkspaceService } from './workspace'
 
@@ -44,7 +47,21 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
         git: (args) => gitOn(ctx.store, args),
         gitContains: (store, target, c, at) => historyFor('git').contains(store, target, c, at),
         lock: (fn) => storeLock(ctx.store, fn),
-        journal: (card: string, cycle: number, bundles: JjBundle[]) => journal(`jj_bundles:${card.toLowerCase()}:${cycle}`).write(bundles)
+        // Merged in one write with what is journalled (HR1's round 1): an observer's older snapshot never erases a bundle
+        // another observer's proof journalled.
+        journal: (card: string, cycle: number, bundles: JjBundle[]) =>
+          boardConn(ws).write((db) => {
+            const key = `jj_bundles:${card.toLowerCase()}:${cycle}`
+            const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined // i18n-ignore: SQL
+            let stored: JjBundle[] = []
+            try {
+              const v = r ? (JSON.parse(r.value) as unknown) : []
+              stored = Array.isArray(v) ? (v as JjBundle[]) : []
+            } catch {
+              stored = []
+            }
+            db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(mergeBundles(stored, bundles))) // i18n-ignore: SQL
+          })
       }
     },
     slotHold: (lease, expect) => {
@@ -55,6 +72,18 @@ export function jjCardsFor(ws: WorkspaceService, projectPath: string, projectId:
       if (!s) return null
       const held = !l.to && l.slot === expect.slot && l.agent === expect.agent && (l.card === null || l.card === expect.card) && !s.op && !s.job && (!s.writer || (s.writer.lease === lease && s.writer.agent === expect.agent))
       return { held, print: `lease:${l.to ? 'ended' : 'open'}:${l.slot}:${l.agent}:${l.card ?? '-'}:${s.op ? s.op.token : '-'}:${s.job ?? '-'}:${s.writer ? s.writer.run : '-'}` }
+    },
+    // J9b2's (HI-2882): the project's rows on the workspace database, its bundles' journal, and the publish worker.
+    records: {
+      projectId: () => projectId() || basename(projectPath),
+      dbFile: () => boardFile(ws.path!),
+      read: (fn) => boardConn(ws).read((db) => fn(db as unknown as SqlDb)),
+      write: async (fn) => void (await boardConn(ws).write((db) => fn(db as unknown as SqlDb))),
+      bundles: (card, cycle) => {
+        const v = journal(`jj_bundles:${card.toLowerCase()}:${cycle}`).read()
+        return Array.isArray(v) ? (v as JjBundle[]) : []
+      },
+      publish: (req) => commitPublishOff(req)
     },
     pins: {
       read: (ref) => {

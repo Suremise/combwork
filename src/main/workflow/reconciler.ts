@@ -15,7 +15,7 @@ import { boardReadOnly } from '../boardStore'
 import { onCombworkEvent } from '../events'
 import { createLogger } from '../logger'
 import type { Disposable, ObserveEvent } from '../platform/history'
-import { historyOf, observePort } from '../platform/historyPorts'
+import { historyOf, observePort, repoWatchOf } from '../platform/historyPorts'
 import { openWorkspaces, WorkspaceService } from '../workspace'
 import type { PlatformId } from '../../shared/platform/descriptors'
 import { reconcile } from './reconcile'
@@ -39,6 +39,12 @@ interface Followed {
   platform: PlatformId
   alive: () => boolean
   watch: Disposable
+  /** The platform's own repository watch (HI-2882: jj's operations and refs), beside the watcher's. */
+  repoWatch: Disposable
+  /** Ends what a run of this follow has under way (jj's publish requests) once it is dropped. */
+  abort: AbortController
+  /** A continuation run asked for by the platform's pass (`afterRun`'s `more`). */
+  again2: NodeJS.Timeout | null
   timer: NodeJS.Timeout | null
   /** Lines (Git branches) that moved since the last run: their Done cards are looked at too. */
   lines: Set<string>
@@ -53,6 +59,9 @@ const keyOf = (path: string): string => path.toLowerCase()
 
 /** For tests: told when a project's run ends (its path). */
 export const reconcilerTestHooks: { ran: ((path: string) => void) | null } = { ran: null }
+
+/** How long a continuation run waits after a run whose platform pass had more to do (HI-2882/s13 §2; a test's own). */
+export const reconcilerTiming = { continueMs: 2000 }
 
 /** Follows the open workspaces' projects: a watch for each new one, and the ones gone let go. */
 function follow(): void {
@@ -73,6 +82,9 @@ function follow(): void {
       ...n,
       alive: () => !life.aborted && n.ws.lifetime === life && n.ws.path === wsPath,
       watch: { dispose: () => undefined },
+      repoWatch: { dispose: () => undefined },
+      abort: new AbortController(),
+      again2: null,
       timer: null,
       lines: new Set(),
       cards: new Set(),
@@ -80,6 +92,7 @@ function follow(): void {
       again: false
     }
     f.watch = observePort.subscribe(n.path, (e) => onObserved(f, e))
+    f.repoWatch = repoWatchOf(n.platform)?.(n.path, (e) => onObserved(f, e)) ?? { dispose: () => undefined }
     followed.set(k, f)
   }
 }
@@ -88,11 +101,25 @@ function drop(k: string): void {
   const f = followed.get(k)
   if (!f) return
   followed.delete(k)
+  // Its requests' cancel fences set first, synchronously (HI-2882/s19), then its watches and timers.
+  f.abort.abort()
   f.watch.dispose()
+  f.repoWatch.dispose()
   if (f.timer) clearTimeout(f.timer)
+  if (f.again2) clearTimeout(f.again2)
 }
 
 function onObserved(f: Followed, e: ObserveEvent): void {
+  if (e.kind === 'invalidated') {
+    // The platform decides whether it wants a run (a retained bundle due, its tick's page).
+    void (async () => {
+      const wf = await workflowFor(f.ws, f.path).catch(() => null)
+      if (!wf || !f.alive()) return
+      const adapter = wf.platform(wf.cfg.options())
+      if (!adapter.invalidated || (await adapter.invalidated(e.what))) schedule(f)
+    })().catch((err) => f.alive() && log.warn('a platform invalidation', err))
+    return
+  }
   if (e.kind === 'lineMoved') f.lines.add(e.line)
   schedule(f)
 }
@@ -189,6 +216,18 @@ async function reconcileProject(f: Followed): Promise<void> {
     if (!f.alive()) return
     if (unsettled.has(t)) continue
     if (wf.store.meta(`target:${t}`) !== th) await wf.locked(() => wf.store.setMeta(`target:${t}`, th))
+  }
+  // The platform's own pass, once per run, unfinished cards or none (HI-2882: jj's publish observations and retained
+  // bundles); more to do, a continuation run after a pause (a timer, never a loop), while the follow lives.
+  const adapter = wf.platform(wf.cfg.options())
+  if (!adapter.afterRun || !f.alive()) return
+  const { more } = await adapter.afterRun(f.abort.signal)
+  if (more && f.alive() && !f.again2) {
+    f.again2 = setTimeout(() => {
+      f.again2 = null
+      if (f.alive()) void runFor(f)
+    }, reconcilerTiming.continueMs)
+    f.again2.unref?.()
   }
 }
 
