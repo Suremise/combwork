@@ -8,9 +8,11 @@
 //   follows a change of the record (a board change);
 // - the user integrates it (moves main onto it): Done; Waiting is empty; the card dialog's Work section shows its
 //   Workspace (in its line's place), its change id beside the revision and how its integration was proved;
+// - B1 stopped, the slot back in the pool by itself (HI-2906: ready, detached at main);
 // - the slot made stale (its working-copy commit rewritten from the project folder): Slots and copies says Stale with
 //   Recover…; the confirmation names the folder unrecorded edits go to; an edit there is kept in it, and the slot is
-//   recovered (not stale any more); a second Recover… of a slot that isn't stale says so;
+//   recovered (not stale any more), its Recover… gone;
+// - the next card starts in that same slot (HI-2906);
 // - Publish records to check and Leftovers follow a change while mounted (Refresh);
 // Screenshots of each in both themes, and of Waiting, the Work section and the stale slot's row in all seven locales, in
 // both themes.
@@ -242,15 +244,38 @@ const onDb = (fn) => {
 
     // --- A stale slot: its working-copy commit rewritten from the project folder; Recover… keeps its unrecorded edit.
     // The prerequisite: nothing works in the slot (recovery's own condition, which it checks again and refuses with
-    // "something works in it"). After Done, B1 is stopped: its session was the slot's. Its return to the pool after Done
-    // is HI-2906's (the post-Done detach a jj slot refuses): not asserted here until it is fixed.
+    // "something works in it"). After Done, B1 is stopped: its session was the slot's.
     await inv('session:stop', shop, b1.id)
     const stopped = await until(async () => !(await live(b1.id)) || (await live(b1.id))?.status === 'exited', HUNG_MS)
     check('B1 stopped: nothing works in the slot', !!stopped, JSON.stringify(await live(b1.id)))
     if (!stopped) throw new Error('B1 never stopped')
+    // HI-2906: the slot goes back to the pool by itself once its builder has left (detached at main; a slot's state is
+    // `ready` when not lent), the pool's settle retried while the session was still leaving.
+    // Its bound: the retries' pauses grow to 30 s, and the folder can stay in use for a while after its builder's process
+    // has gone (seen: over 30 s), so two of the longest pauses beyond the usual bound.
+    const back = await until(async () => {
+      const s = (await inv('slots:list', shop)).find((x) => x.name === slot)
+      return s && s.state === 'ready' ? s : null
+    }, HUNG_MS * 2)
+    check('after Done, the slot is back in the pool (ready, not lent)', !!back, JSON.stringify(await inv('slots:list', shop)))
+    // What held it meanwhile, as the app logged each retry (HI-2906), for the record.
+    const appLog = path.join(userData, 'logs', 'combwork.log')
+    for (const l of (fs.existsSync(appLog) ? fs.readFileSync(appLog, 'utf8') : '').split(/\r?\n/).filter((x) => /isn't quiet|detaching|detached/.test(x))) console.log(`INFO app: ${l.slice(0, 300)}`)
+    // Not back: the processes still naming this run's folders (read only, nothing ended), for what holds the slot.
+    if (!back) {
+      try {
+        const ps = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.ToLower().Contains('${work.toLowerCase().replace(/'/g, "''")}') } | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.Name) $($_.CommandLine)" }`], { encoding: 'utf8', windowsHide: true, timeout: 30_000 })
+        for (const l of ps.split(/\r?\n/).filter(Boolean)) console.log(`INFO process: ${l.slice(0, 400)}`)
+      } catch (e) {
+        console.log(`INFO process listing failed: ${e}`)
+      }
+    }
+    if (!back) throw new Error('the slot never came back to the pool')
     const wsName = w1.workspace
     fs.writeFileSync(path.join(w1.folder, 'draft.txt'), 'unrecorded\n')
-    jj(shop, 'describe', '-r', `${wsName}@`, '-m', 'rewritten elsewhere')
+    // The slot's working-copy commit rewritten from the project folder, its own working copy untouched (a write of its
+    // checkout state can race Combwork's reads there on Windows: Access is denied).
+    jj(shop, '--ignore-working-copy', 'describe', '-r', `${wsName}@`, '-m', 'rewritten elsewhere')
     check('the slot is stale', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot)?.stale === true, HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
     await toProject()
     await section('workflow')
@@ -269,6 +294,18 @@ const onDb = (fn) => {
     const kept2 = fs.existsSync(aside) ? fs.readdirSync(aside, { recursive: true }).some((f) => String(f).endsWith('draft.txt')) || fs.existsSync(path.join(w1.folder, 'draft.txt')) : false
     check('…its unrecorded edit is kept', kept2, fs.existsSync(aside) ? JSON.stringify(fs.readdirSync(aside, { recursive: true })) : 'no aside folder')
     check('…and Recover… is gone from its row', !!(await until(async () => (await row.locator('[data-action="recover"]').count()) === 0, HUNG_MS)), await text(row))
+
+    // --- HI-2906: the next card gets that same slot. The user, having looked, removes the draft the recovery kept in the
+    // slot (its copy is aside), then starts another card for B1.
+    fs.rmSync(path.join(w1.folder, 'draft.txt'), { force: true })
+    const n2 = (await inv('tasks:create', { title: 'Shop second', project: 'shop', agent: b1.id })).number
+    const started2 = await inv('tasks:move', n2, 'doing', { confirm: true, reason: 'jjwindow: the next card' }).catch((e) => ({ error: String(e) }))
+    const w2 = await until(async () => {
+      const v = await inv('tasks:work', n2)
+      return v?.folder && v.workspace ? v : null
+    }, HUNG_MS)
+    check('the next card starts in that same slot', !!w2 && w2.folder.toLowerCase() === w1.folder.toLowerCase() && w2.workspace === w1.workspace, JSON.stringify({ started2, w2, slots: await inv('slots:list', shop) }))
+    check('…lent to it', !!(await until(async () => (await inv('slots:list', shop)).find((s) => s.name === slot)?.state === 'lent', HUNG_MS)), JSON.stringify(await inv('slots:list', shop)))
 
   } finally {
     await app.close().catch(() => undefined)
