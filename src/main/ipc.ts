@@ -63,6 +63,7 @@ import { boardState, boardWaits, cardHeads, exportBoard, movedNames, onBoardUpgr
 import { cardCosts, cardRoundCosts, laneCosts } from './cardCosts'
 import { badgeDescription } from '../shared/taskbar'
 import * as files from './files'
+import * as filesGit from './filesGit'
 import * as mcp from './mcp'
 import * as mcpCatalog from './mcpCatalog'
 import * as notes from './notes'
@@ -89,7 +90,7 @@ import { missingWorktree, recreateWorktree, unlinkMissingWorktree } from './agen
 import { CW_DIR, projectAgents as agentsOf } from '../shared/defaults'
 import type { MoveOptions, TaskCard } from '../shared/types'
 import { killPty, ptyBuffer, ptySize, resizePty, writePty } from './ptyHost'
-import { apiInfo, createViewer, regenerateToken, revokeViewer } from './servers'
+import { apiInfo, claudeSnippetFacts, createViewer, regenerateToken, revokeViewer } from './servers'
 import * as projectAgents from './projectAgents'
 import * as templates from './templates'
 import * as branchWatch from './branchWatch'
@@ -144,6 +145,7 @@ import { checkLevelChange, levelForm, setLevelOptions } from './workflow/levels'
 import { rulesetsNow } from './workflow/rulesets'
 import { poolFor, slotTest, slotViews } from './slotsApp'
 import { projectSlotCopy, setSlotDefault, setSlotSetting, slotLevelForm } from './slotSettings'
+import { githubHostsForm, setGithubHosts } from './githubHosts'
 import { copyViews, stopIsolated } from './copiesApp'
 import { retargetApply, retargetArg } from './workflow/retarget'
 import { branchQueueCard, forwardMerge, markQueueSeen, mergedOutsideQueue, pauseQueue, queueCardChange, queueHistory, queueViews, resumeQueue } from './workflow/queueControls'
@@ -1040,6 +1042,13 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'slots:list': async (p) => slotViews(await poolFor(workspace, workspace.assertProject(p))),
     'slots:setSetting': (p, key, value) => setSlotSetting(workspace, workspace.assertProject(p), key, value),
     'slots:copyOf': (p) => projectSlotCopy(workspace, workspace.assertProject(p)),
+    // A workspace's (null) or project's GitHub hosts (HI-2779): parsed again in setGithubHosts, whoever asks.
+    'github:form': (p) => githubHostsForm(workspace, p ? workspace.assertProject(p) : null, process.env),
+    'github:set': async (p, change) => {
+      const at = p ? workspace.assertProject(p) : null
+      await setGithubHosts(workspace, at, change)
+      return githubHostsForm(workspace, at, process.env)
+    },
     'slots:levelForm': (level) => slotLevelForm(workspace, level),
     'slots:setLevelDefault': async (level, key, value) => {
       await setSlotDefault(workspace, level, key, value)
@@ -1343,6 +1352,11 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'files:watch': (p) => files.watchProject(p),
     'files:setUnsaved': (paths) => quitControl.setUnsaved(win(), Array.isArray(paths) ? paths.filter((p) => typeof p === 'string') : []),
     'files:unwatch': (p) => files.unwatchProject(p),
+    'files:gitInfo': (p, items) => filesGit.gitInfo(p, items),
+    'files:gitExclude': (p, items, target, ext) => filesGit.gitExclude(p, items, target, ext === true),
+    'files:gitUntrack': (p, items) => filesGit.gitUntrack(p, items),
+    'files:gitInclude': (p, items) => filesGit.gitInclude(p, items),
+    'files:gitRuleText': (p, items) => filesGit.ignoreRuleText(p, items),
 
     'attachments:list': (p) => files.listAttachments(p),
     'attachments:read': (p, path) => files.readAttachment(p, path),
@@ -1809,9 +1823,9 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
       await Promise.all([providerService.refresh(id, true), checkGit()])
       return providerService.shown()
     },
-    'provider:task': async (id, task) => {
+    'provider:task': async (id, task, host) => {
       await refreshPathBeforeStart()
-      return providerService.runProviderTask(id, task)
+      return providerService.runProviderTask(id, task, false, typeof host === 'string' && host ? host : undefined)
     },
     'provider:retryUpdate': async (id) => {
       await refreshPathBeforeStart()
@@ -1874,6 +1888,7 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'session:restartForTools': (p, agentId, when) => sessions.restartForTools(p, agentId, { when: when === 'atSafePoint' ? 'atSafePoint' : 'ifIdle' }),
 
     'api:info': () => apiInfo(),
+    'api:claudeSnippet': () => claudeSnippetFacts(),
     'api:regenerateToken': async () => {
       await regenerateToken()
       return apiInfo()

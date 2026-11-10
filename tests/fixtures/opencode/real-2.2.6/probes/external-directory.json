@@ -1,0 +1,500 @@
+{
+ "build": {
+  "path": "<bin>\\opencode.exe",
+  "sha256": "98cb0aa854c7c015cf6febafa7afb872c359bfe5a823a526f3b4fd347a9e9677",
+  "version": "2.2.6"
+ },
+ "upstream": "127.0.0.1:11434",
+ "copies": "<root>/opencodedirs-ws.worktrees/alpha/copies",
+ "launches": {
+  "reviewer (Build)": {
+   "defaultAgent": "build",
+   "permissions": null,
+   "externalDirectoryRules": false,
+   "providerPolicies": [
+    {
+     "action": "provider.use",
+     "resource": "*",
+     "effect": "deny"
+    },
+    {
+     "action": "provider.use",
+     "resource": "cwtest",
+     "effect": "allow"
+    }
+   ]
+  },
+  "reviewer (Plan)": {
+   "defaultAgent": "plan",
+   "permissions": null,
+   "externalDirectoryRules": false,
+   "providerPolicies": [
+    {
+     "action": "provider.use",
+     "resource": "*",
+     "effect": "deny"
+    },
+    {
+     "action": "provider.use",
+     "resource": "cwtest",
+     "effect": "allow"
+    }
+   ]
+  },
+  "builder (Build)": {
+   "defaultAgent": "build",
+   "permissions": null,
+   "externalDirectoryRules": false,
+   "providerPolicies": [
+    {
+     "action": "provider.use",
+     "resource": "*",
+     "effect": "deny"
+    },
+    {
+     "action": "provider.use",
+     "resource": "cwtest",
+     "effect": "allow"
+    }
+   ]
+  }
+ },
+ "asks": [],
+ "turns": [
+  {
+   "phase": "reviewer (Build): read 1",
+   "turn": "msg_1bf1bdf890018UL0pC4TBwNXfH",
+   "prior": null
+  },
+  {
+   "phase": "reviewer (Build): write 1",
+   "turn": "msg_1bf1e52a7001eIYUDFK5V0RFTd",
+   "prior": "msg_1bf1bdf890018UL0pC4TBwNXfH"
+  },
+  {
+   "phase": "reviewer (Plan): write 1",
+   "turn": "msg_1bf1e97b8001ILg18znp5epNCs",
+   "prior": null
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "turn": "msg_1bf1f1031001iCu1y5xBcxKxwb",
+   "prior": null
+  }
+ ],
+ "results": {
+  "read": {
+   "file": "marker-1.txt",
+   "tools": [
+    {
+     "name": "read",
+     "status": "completed",
+     "input": {
+      "path": "<root>/opencodedirs-ws.worktrees/alpha/copies/probe-f5d182/marker-1.txt"
+     },
+     "result": "Read file <root>/opencodedirs-ws.worktrees/alpha/copies/probe-f5d182/marker-1.txt, lines 1-1\n1: cw-marker-48c7b06d",
+     "error": null
+    }
+   ],
+   "readCalls": 24
+  },
+  "write": {
+   "file": "written-1.txt",
+   "bytes": "cw-written-b6c2e182",
+   "tools": [
+    {
+     "name": "write",
+     "status": "completed",
+     "input": {
+      "path": "<root>/opencodedirs-ws.worktrees/alpha/copies/probe-f5d182/written-1.txt",
+      "content": "cw-written-b6c2e182"
+     },
+     "result": "Created file successfully: <root>/opencodedirs-ws.worktrees/alpha/copies/probe-f5d182/written-1.txt",
+     "error": null
+    }
+   ]
+  },
+  "plan": {
+   "tried": [
+    {
+     "name": "write",
+     "status": "error",
+     "input": {
+      "path": "<root>/opencodedirs-ws.worktrees/alpha/copies/probe-f5d182/plan-1.txt",
+      "content": "cw-plan-009168fe"
+     },
+     "result": "",
+     "error": "Cannot use write to modify files outside the Plan directory: <home>\\.opencode\\plan"
+    }
+   ],
+   "filesWritten": []
+  },
+  "baseline": {
+   "file": "builder-1.txt",
+   "bytes": "cw-builder-1a3febf6",
+   "asks": []
+  }
+ },
+ "phases": [
+  {
+   "at": "2026-11-09T07:00:30.778Z",
+   "phase": "reviewer (Build): launch"
+  },
+  {
+   "at": "2026-11-09T07:00:36.789Z",
+   "phase": "reviewer (Build): read 1"
+  },
+  {
+   "at": "2026-11-09T07:03:17.279Z",
+   "phase": "reviewer (Build): write 1"
+  },
+  {
+   "at": "2026-11-09T07:03:30.073Z",
+   "phase": "reviewer (Build): stop"
+  },
+  {
+   "at": "2026-11-09T07:03:30.199Z",
+   "phase": "reviewer (Plan): launch"
+  },
+  {
+   "at": "2026-11-09T07:03:35.006Z",
+   "phase": "reviewer (Plan): write 1"
+  },
+  {
+   "at": "2026-11-09T07:04:00.939Z",
+   "phase": "reviewer (Plan): stop"
+  },
+  {
+   "at": "2026-11-09T07:04:01.063Z",
+   "phase": "builder (Build): launch"
+  },
+  {
+   "at": "2026-11-09T07:04:05.847Z",
+   "phase": "builder (Build): write 1"
+  },
+  {
+   "at": "2026-11-09T07:05:27.013Z",
+   "phase": "builder (Build): stop"
+  },
+  {
+   "at": "2026-11-09T07:05:28.432Z",
+   "phase": "closed"
+  }
+ ],
+ "requests": [
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): read 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Plan): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Plan): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "reviewer (Plan): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  },
+  {
+   "phase": "builder (Build): write 1",
+   "method": "POST",
+   "path": "/v1/chat/completions",
+   "model": "qwen3:8b",
+   "status": 200
+  }
+ ],
+ "run": {
+  "suite": "opencodereal-dirs",
+  "code": "e0a979803c31",
+  "at": "2026-11-09T07:05Z",
+  "record": "run-20261109-070023"
+ }
+}

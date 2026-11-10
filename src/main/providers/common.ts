@@ -23,7 +23,7 @@ export function readFirstLine(path: string, max = 1 << 20): Promise<string> {
 /** Helpers shared by provider adapters. */
 
 /** `ended`: it didn't exit by itself (its timeout ended it, or it couldn't start): its code says nothing then. */
-export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number; ended?: true }> {
+export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number; ended?: true; timedOut?: true }> {
   const shell = /\.(cmd|bat)$/i.test(file)
   // Through cmd, Node joins the command and its arguments as they are: a path with spaces ("C:\My Tools\agy.cmd") would be
   // read as "C:\My" (HI-2548), so it and any argument with a space are quoted.
@@ -33,7 +33,9 @@ export function run(file: string, args: string[], timeoutMs = 15000, env?: NodeJ
       const raw = err ? (err as NodeJS.ErrnoException & { code?: number | string }).code : 0
       const code = err ? (raw as unknown as number) || 1 : 0
       const ended = !!err && (!!(err as { killed?: boolean }).killed || typeof raw !== 'number')
-      resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: typeof code === 'number' ? code : 1, ...(ended ? { ended: true as const } : {}) })
+      // timedOut (HI-2779): killed at its timeout, told from a program that couldn't start (ENOENT), which ends too.
+      const timedOut = !!err && !!(err as { killed?: boolean }).killed
+      resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code: typeof code === 'number' ? code : 1, ...(ended ? { ended: true as const } : {}), ...(timedOut ? { timedOut: true as const } : {}) })
     })
   })
 }
@@ -572,6 +574,7 @@ function installInfoIn(info: AgentInstallInfo, shown: (s: string) => string): Ag
 const READINESS = {
   notInstalled: msg({ id: 'providers.readiness.notInstalled', defaultMessage: '{provider} is not installed.', description: "Provider Setup and Settings → Providers: Combwork didn't find the coding agent's CLI. {provider} is its name (Claude Code)." }),
   signedOut: msg({ id: 'providers.readiness.signedOut', defaultMessage: '{provider} is not signed in.', description: "Provider Setup and Settings → Providers: the coding agent's CLI has no sign-in. {provider} is its name." }),
+  updateStayed: msg({ id: 'providers.readiness.updateStayed', defaultMessage: "{provider} stayed on {version} after updating to {offered}: an organisation's policy may set its version or channel, or the update didn't take. Check again later, or update again.", description: 'Provider Setup and Settings → Providers: the coding agent was updated but is still on its old version (HI-2777). {provider} is its name, {version} the version it stayed on, {offered} the one offered. "Check again" and "update" name the buttons beside it.' }),
   update: msg({ id: 'providers.readiness.update', defaultMessage: '{provider} {version} is available.', description: 'Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.' }),
   install: msg({ id: 'providers.action.install', defaultMessage: 'Install', description: "Provider Setup's button: installs the coding agent's CLI in a terminal." }),
   signIn: msg({ id: 'providers.action.signIn', defaultMessage: 'Sign in', description: "Provider Setup's button: signs the coding agent's CLI in, in a terminal." }),
@@ -596,6 +599,14 @@ export const updateIssue = (provider: string, version: string | null, detail?: T
   level: 'info',
   message: installText({ m: READINESS.update, values: { provider, version: version ?? '' } }),
   ...(detail ? { detail: detail.map(installText) } : { action: { label: installText(READINESS.updateAction), task: 'update' } })
+})
+
+/** It stayed on its version after an update (HI-2777): said tentatively, with Update still offered. */
+export const updateStayedIssue = (provider: string, version: string, offered: string): ReadinessIssue => ({
+  id: 'update',
+  level: 'info',
+  message: installText({ m: READINESS.updateStayed, values: { provider, version, offered } }),
+  action: { label: installText(READINESS.updateAction), task: 'update' }
 })
 
 const EXPORT_SUBTITLE = msg({ id: 'providers.export.subtitle', defaultMessage: '{provider} session `{session}` · project {project}', description: "The Markdown export of a conversation (Sessions tab → Export): the line under its title. {provider} is the coding agent (Claude Code), {session} the session's id (`…` marks it: keep the marks), {project} the project." })

@@ -4,7 +4,7 @@ import { msg, tr } from '../../../shared/i18n'
 import { basename, join, resolve } from 'path'
 import { mkdir, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, statSync } from 'original-fs'
-import type { AgentInstallInfo, McpServerDef, MemorySource, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
+import type { AgentInstallInfo, LaunchedSignInHost, McpServerDef, MemorySource, ReadinessIssue, SessionUsage, SubSession } from '../../../shared/types'
 import { assertSessionId } from '../../../shared/defaults'
 import type { StartHint } from '../../../shared/startFailure'
 import { COPILOT, COPILOT_DESCRIPTOR, COPILOT_FOOTER_MODES, copilotCanApproveEdits, copilotCanSwitchLive, copilotFooterMode, copilotModeFlags } from '../../../shared/copilot'
@@ -20,8 +20,10 @@ import { launchOverrides } from '../../advancedValues'
 import { overrideId } from '../../../shared/advanced'
 import { copilotTranscriptTurns } from './turns'
 import { CopilotConversationParser, CopilotUsageParser, copilotDetailsMemo, copilotEventsPath, copilotImageData, eventsDetails, listCopilotSessions, parseEvents, workspaceInfo, type CopilotDetailsMemo } from './events'
-import { readCopilotModels } from './models'
-import { copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, copilotUpdateUpToDate, locateCopilot } from './install'
+import { COPILOT_HOST_TEXT, copilotInstallCommand, copilotLatestVersion, copilotLoginCommand, copilotReadiness, copilotUpdateCommand, copilotUpdateRetry, copilotUpdateUpToDate, launchRoute, locateCopilot, primaryContext, primaryModels } from './install'
+import { signInSnapshot } from './hosts'
+import { resolveGithubHosts, type ResolvedGithubHosts } from '../../../shared/githubHost'
+import { combworkError } from '../../combworkError'
 import { advanced } from '../../advanced'
 import { agentMsg, say } from '../../../shared/agentText'
 
@@ -151,6 +153,11 @@ export class CopilotAdapter implements ProviderAdapter {
   get startupQuestion(): RegExp {
     return advanced.pattern('copilot.trust.prompt')
   }
+  // Its turn's state in an OSC 7501 sequence (HI-2802, recorded with 1.0.106; 1.0.107 is the same release): "state=working" as a turn
+  // starts, "state=done" as it ends. An advanced setting (#367), read at each launch.
+  terminalTurn(): RegExp {
+    return advanced.pattern('copilot.terminal.turn')
+  }
   // Copilot writes a session's token totals (session.shutdown) only as it exits by itself (#465). Ctrl+C cancels what
   // runs (a turn, a dialog), and twice in a row exits ("ctrl+c again to exit"); three cover a turn or dialog first, at a
   // lane's end (quit), where its turn is over. Stop types them on conditions instead (HI-2272, exitKeys.ts): a key that
@@ -190,9 +197,12 @@ export class CopilotAdapter implements ProviderAdapter {
     return copilotUpdateUpToDate(executable, exitCode)
   }
 
-  /** Copilot's own sign-in, run in a terminal for the user to complete (never typed into by Combwork). */
-  loginCommand(executable: string): CommandSpec {
-    return copilotLoginCommand(executable)
+  /**
+   * Copilot's own sign-in, run in a terminal for the user to complete (never typed into by Combwork): on `host`
+   * (HI-2779), `copilot login --host`, in that host's environment.
+   */
+  loginCommand(executable: string, host?: string): CommandSpec {
+    return copilotLoginCommand(executable, host)
   }
 
   isNewer(latest: string, current: string): boolean {
@@ -207,8 +217,19 @@ export class CopilotAdapter implements ProviderAdapter {
    * The account's models, from an ACP session of the installed CLI (models.ts): no prompt, no cost. Only while Copilot
    * is turned on in Settings: the ACP session it opens leaves a folder in Copilot's session store for a moment.
    */
-  listModels(executable: string, env: Record<string, string>): Promise<CatalogRead | null> {
-    return isProviderEnabled(config.settings, this.id) ? readCopilotModels(executable, env) : Promise.resolve(null)
+  listModels(_executable: string, _env: Record<string, string>): Promise<CatalogRead | null> {
+    // The first GitHub host's (HI-2779): the listing its sign-in check just got, never another host's.
+    return Promise.resolve(isProviderEnabled(config.settings, this.id) ? primaryModels() : null)
+  }
+
+  /** What a launch on these hosts would sign in as (HI-2779): as prepareLaunch records it, with the switches as they are now. */
+  signInHostFor(hosts: ResolvedGithubHosts, env: Record<string, string>): Promise<LaunchedSignInHost | null> {
+    return signInSnapshot(hosts, copilotEnv(launchRoute(hosts, env).env))
+  }
+
+  /** What its catalogue was read in (HI-2779: its host, home and sign-in by name): a cached one is used only in the same. */
+  catalogContext(): string | null {
+    return primaryContext()
   }
 
   /** The model in Copilot's own settings.json (or COPILOT_MODEL), which it runs unless Combwork passes one. */
@@ -252,6 +273,15 @@ export class CopilotAdapter implements ProviderAdapter {
   }
 
   async prepareLaunch(ctx: LaunchContext): Promise<Record<string, SkillDelivery>> {
+    // The GitHub hosts it signs in on (HI-2779): its project's, else its workspace's, else the environment's, written into
+    // its environment as its checks and Sign in get them. A host Copilot can't sign in on yet doesn't start.
+    const hosts = ctx.githubHosts ?? resolveGithubHosts(null, null, ctx.env)
+    if (hosts.copilot.problem === 'chooseCopilotHost') throw combworkError(COPILOT_HOST_TEXT.chooseHost, { repoHost: hosts.repo.host }, { kind: 'conflict' })
+    if (hosts.copilot.problem === 'ghesProxyUnsupported') throw combworkError(COPILOT_HOST_TEXT.proxy, undefined, { kind: 'conflict' })
+    ctx.env = launchRoute(hosts, ctx.env).env
+    // What it signs in as (hosts.ts signInSnapshot): in the environment it runs with (its token switch applied), the stored
+    // login's own host where nothing chose one. The restart comparison works it out the same way.
+    ctx.signInHost = (await signInSnapshot(hosts, copilotEnv(ctx.env, launchOverrides(ctx.overrides, COPILOT, 'noAutoUpdate'), launchOverrides(ctx.overrides, COPILOT, 'stripGitHubTokens')))) ?? undefined
     const delivered = await syncAgentsSkills(ctx, this.descriptor.name)
     const plugin = this.pluginDir(ctx)
     await mkdir(plugin, { recursive: true })

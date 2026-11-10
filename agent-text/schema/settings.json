@@ -1028,6 +1028,12 @@
   "settings.advanced.copilot.signIn.hookMessage.title": {
     "placeholders": {}
   },
+  "settings.advanced.copilot.terminal.turn.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.copilot.terminal.turn.title": {
+    "placeholders": {}
+  },
   "settings.advanced.copilot.trust.prompt.desc": {
     "placeholders": {}
   },
@@ -1675,6 +1681,102 @@
       "shown": "plain"
     }
   },
+  "settings.advanced.opencode.ambient.integrations.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.ambient.integrations.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.env.credentials.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.env.credentials.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.pollSeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.pollSeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.repairMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.repairMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.retryMinutes.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.history.retryMinutes.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.line.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.line.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.variantId.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.variantId.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.variants.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.models.variants.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.askOutsideFolder.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.askOutsideFolder.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.keepProjectConfigOut.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.keepProjectConfigOut.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.noAutoUpdate.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.noAutoUpdate.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.ownProviderOnly.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.ownProviderOnly.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.stripCredentials.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.override.stripCredentials.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.rules.loaded.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.rules.loaded.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.server.readySeconds.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.server.readySeconds.title": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.version.desc": {
+    "placeholders": {}
+  },
+  "settings.advanced.opencode.version.title": {
+    "placeholders": {}
+  },
   "settings.advanced.reset.desc": {
     "placeholders": {}
   },
@@ -1809,6 +1911,13 @@
     "placeholders": {
       "title": "plain",
       "shape": "plain"
+    }
+  },
+  "settings.agent.error.githubHost": {
+    "placeholders": {
+      "title": "plain",
+      "copilot": "select",
+      "why": "plain"
     }
   },
   "settings.agent.error.isAction": {
@@ -2119,6 +2228,18 @@
       "max": "plain"
     }
   },
+  "settings.agent.tool.githubChoose": {
+    "placeholders": {}
+  },
+  "settings.agent.tool.githubEffective": {
+    "placeholders": {
+      "value": "plain",
+      "origin": "select"
+    }
+  },
+  "settings.agent.tool.githubProxy": {
+    "placeholders": {}
+  },
   "settings.agent.tool.keptCard": {
     "placeholders": {
       "card": "plain",
@@ -2218,6 +2339,11 @@
   "settings.agent.tool.takes.fallback": {
     "placeholders": {
       "shape": "plain"
+    }
+  },
+  "settings.agent.tool.takes.githubHost": {
+    "placeholders": {
+      "copilot": "select"
     }
   },
   "settings.agent.tool.takes.nothing": {
@@ -2779,6 +2905,18 @@
     "placeholders": {}
   },
   "settings.general.userName.title": {
+    "placeholders": {}
+  },
+  "settings.github.copilotHost.desc": {
+    "placeholders": {}
+  },
+  "settings.github.copilotHost.title": {
+    "placeholders": {}
+  },
+  "settings.github.host.desc": {
+    "placeholders": {}
+  },
+  "settings.github.host.title": {
     "placeholders": {}
   },
   "settings.keybindings.editor.desc": {

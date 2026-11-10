@@ -1115,6 +1115,50 @@
     "defaultMessage": "A name is at most {max} characters.",
     "description": "Why an agent name can't be used: it is longer than {max} characters."
   },
+  "agents.opencode.auto": {
+    "defaultMessage": "Approve all",
+    "description": "OpenCode's no-guardrails mode (it approves every permission its rules don't deny, without asking). Keep it short."
+  },
+  "agents.opencode.autoDescription": {
+    "defaultMessage": "Approves every permission OpenCode’s rules don’t explicitly deny, without asking. Use only where unattended changes are acceptable.",
+    "description": "What OpenCode's no-guardrails mode does (the mode picker)."
+  },
+  "agents.opencode.build": {
+    "defaultMessage": "Build",
+    "description": "OpenCode's default mode: its Build agent with its own permission rules. Keep it short; Build is the name OpenCode gives that agent."
+  },
+  "agents.opencode.buildDescription": {
+    "defaultMessage": "OpenCode’s Build agent with its own permission rules: it asks before what they don’t allow.",
+    "description": "What OpenCode's Build mode does (the mode picker). Build is the name OpenCode gives that agent."
+  },
+  "agents.opencode.extensionNote": {
+    "defaultMessage": "You have an OpenCode copy inside an editor. Combwork doesn't use the editor's copy. Install the standalone OpenCode 2; your editor keeps working as before.",
+    "description": "Provider Setup → OpenCode, when only an editor copy was found: why Combwork needs the standalone CLI."
+  },
+  "agents.opencode.installNote": {
+    "defaultMessage": "Install OpenCode 2 from its official standalone Windows download: Install fetches the newest 2.x release from GitHub, checks it against the release’s SHA256SUMS and puts `opencode.exe` in %LOCALAPPDATA%\\Programs\\OpenCode. OpenCode 1 (`opencode-ai`) and the archived opencode project aren’t supported. If OpenCode 2 is installed somewhere else, set its path in Settings → OpenCode.",
+    "description": "Provider Setup → OpenCode: how it is installed. Keep opencode.exe, opencode-ai, SHA256SUMS and %LOCALAPPDATA%\\Programs\\OpenCode exactly as they are; Install is a button, Settings → OpenCode a place in Combwork."
+  },
+  "agents.opencode.modelPlaceholder": {
+    "defaultMessage": "Model ID, e.g. ollama/qwen3:8b",
+    "description": "Placeholder of the custom model ID box (OpenCode). Keep the model ID exactly as it is."
+  },
+  "agents.opencode.noPlanLimits": {
+    "defaultMessage": "OpenCode reports plan limits only for an OpenCode Go or Console workspace it's signed in to. Other providers' limits aren't available through it, so none are shown.",
+    "description": "In place of the plan limits for OpenCode (Overview, the status bar's hover) while none is known: OpenCode gives limits only for its own OpenCode Go or Console service. OpenCode, OpenCode Go and Console are product names: keep them."
+  },
+  "agents.opencode.plan": {
+    "defaultMessage": "Plan",
+    "description": "OpenCode's Plan agent as a mode: it plans first. Keep it short; Plan is the name OpenCode gives that agent."
+  },
+  "agents.opencode.planDescription": {
+    "defaultMessage": "OpenCode’s Plan agent: it plans and reads, and asks before changing anything.",
+    "description": "What OpenCode's Plan mode does (the mode picker). Plan is the name OpenCode gives that agent."
+  },
+  "agents.opencode.signInHelp": {
+    "defaultMessage": "Connect the account to a model provider again: Settings → Accounts & Connections → the OpenCode account → Sign in (it runs opencode auth login).",
+    "description": "How to sign an OpenCode account in to a model provider again. opencode auth login is a command: keep it; Settings → Accounts & Connections is a place in Combwork and Sign in a button."
+  },
   "agents.overrides.off": {
     "defaultMessage": "Off",
     "description": "A choice of an agent's Use 200K context setting. Keep it short."

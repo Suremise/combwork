@@ -372,6 +372,13 @@ export interface FactData {
    * line is null: the source is never the card's branch); its authority for the queue in place of a review (§16.9).
    */
   ForwardRequested: { from: string; to: string; source: string; by: 'user' | 'assistant'; reason?: string }
+  /**
+   * HI-2753: a card in flight moved from the target it started on (`from`) to `to`, its line kept, by the user or the
+   * Assistant (`by`): proved at `head` (the line's) and `toHead` (`to`'s) that everything it would bring into `to` is its
+   * own (`retargetCard.ts`). `base`: its latest submission's merge base with `to` (a card reviewed: the same commits), which
+   * the fold puts on that submission and its approval. `lane`: its running lane, moved with it in the same write.
+   */
+  Retargeted: { from: string; to: string; line: string; head: string; toHead: string; by: 'user' | 'assistant'; base?: string; lane?: string }
   Blocked: { reason: string }
   Unblocked: Record<string, never>
   /** A decision added, its words changed, or removed (`removed`, its last words): each a new generation (#1216). */
@@ -697,6 +704,20 @@ export function foldCard(facts: readonly Fact[], initial: StageId = 'todo'): Car
       }
       case 'ForwardRequested': {
         s.forward = f.data as FactData['ForwardRequested']
+        break
+      }
+      case 'Retargeted': {
+        // HI-2753: its target from here on is the new one; its line, base, submissions and verdicts stay. Its latest
+        // submission's base is the one with the new target (the same commits, checked as it was written).
+        const d = f.data as FactData['Retargeted']
+        if (!s.started) break
+        s.started = { ...s.started, target: d.to }
+        if (d.base && s.latest) {
+          const sub = { ...s.latest, base: d.base }
+          s.submissions = s.submissions.map((x) => (x.id === sub.id ? sub : x))
+          if (s.approved && s.approved.revision === s.latest.revision) s.approved = { ...s.approved, base: d.base }
+          s.latest = sub
+        }
         break
       }
       case 'IntegrationRequested': {

@@ -20,7 +20,7 @@ import { AGENT_WAIT_MAX_SECONDS, WAIT_MAX_SECONDS } from '../../shared/watch'
 import { LANE_EVENTS } from '../../shared/laneWatch'
 import { CLAIM_WAIT_MAX_SECONDS, CLAIM_WAIT_SECONDS } from '../../shared/mergeSlot'
 import { REPLY_MS, STOP_ASK_MS, agentApiCall } from './agentApiCall'
-import { MAX_ROWS, refusedText, type Refused, connectionListText, connectionChangedText, type ConnectionPublic, templateListText, templatePlanText, templateLoadedText, connectionsAppliedText, type TemplatePlanPublic, type TemplateLoadPublic, type ConnectionsAppliedPublic,agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, readTaskQuery, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
+import { MAX_ROWS, refusedText, type Refused, providerListText, type ProviderPublic, connectionListText, connectionChangedText, type ConnectionPublic, templateListText, templatePlanText, templateLoadedText, connectionsAppliedText, type TemplatePlanPublic, type TemplateLoadPublic, type ConnectionsAppliedPublic,agentWatchText, attachmentText, type AttachmentReply, changeListText, messageQueuedText, type ChangeGroupListed, undoText, type UndoneListed, intentText, type IntentDone, askedAssistantText, type AskedAssistant, notifiedText, journalEntryText, journalRecallText, type JournalEntryDetail, type JournalRow, batchText, consoleEventsText, consoleSourcesText, changedText, claimText, createdText, docOutlineText, docSectionText, type DocHeadingRow, mergeSlotText, noteText, queueResumedText, queueText, teamText, type TeamPublic, queuesText, releasableText, slotReleasedText, type ReleasablePublic, notesListText, noteWrittenText, projectListText, readTaskQuery, projectStatusReply, releaseText, reorderText, settingChangedText, settingListText, settingText, skillListText, taskListText, taskWaitText, type NoteEntry, type ProjectRow, type SettingDetail, type SettingRow, type SkillRow, type TaskBatch, type TaskChange, type TaskReorder, type TaskRow } from '../../shared/toolReplies'
 import type { LaneInfo, MergeSlotInfo } from '../../shared/types'
 import type { QueuePublic } from '../../shared/workflow/queue'
 import { LOOP_STEPS } from '../../shared/workflow/facts'
@@ -84,7 +84,9 @@ const T = {
   'notify.arg.target': agentMsg({ id: 'tool.notify.arg.target', text: "What a click opens: '{ agent, project }' or '{ card }' (its key)." }),
   'inbox.arg.ack': agentMsg({ id: 'tool.inbox.arg.ack', text: 'Ids you have acted on ("m12"). Alone, it acks and lists nothing.' }),
   'inbox.arg.read': agentMsg({ id: 'tool.inbox.arg.read', text: 'With ack: acks, then reads what is new, in the same call.' }),
-  'listProviders.description': agentMsg({ id: 'tool.listProviders.description', text: 'The coding-agent providers as JSON: on, installed, and the models, effort levels, modes and connections to use for agents.' }),
+  'listProviders.description': agentMsg({ id: 'tool.listProviders.description', text: 'The coding-agent providers, a line each: on, installed, default model, effort levels, modes and connections to use for agents. provider: one as JSON, its models and what each mode does.' }),
+  'listProviders.arg.provider': agentMsg({ id: 'tool.listProviders.arg.provider', text: 'Its id ("claude-code").' }),
+  'listProviders.error.unknown': agentMsg({ id: 'tool.listProviders.error.unknown', text: 'No provider {provider}: one of {ids}.', note: 'cw_list_providers (HI-2814): provider names none; {ids} lists the providers’ ids.' }),
   'agentActivity.description': agentMsg({ id: 'tool.agentActivity.description', text: 'What one agent is doing, as JSON: status, model and effort, its folder, its task and latest reply (clipped), last tool calls, retry waits and its inbox. detail=true clips less. (detail: use-cw-api, tools.md)' }),
   'createProject.description': agentMsg({ id: 'tool.createProject.description', text: 'Create a project: a new folder in the workspace, turned on. Only when the user asked for one.' }),
   'createProject.arg.name': agentMsg({ id: 'tool.createProject.arg.name', text: 'Folder name.' }),
@@ -129,7 +131,7 @@ const T = {
   'lane.arg.applyNow': agentMsg({ id: 'tool.lane.arg.applyNow', text: 'start: a changed list applies now, not after the card in flight.' }),
   'lane.arg.lane': agentMsg({ id: 'tool.lane.arg.lane', text: 'end: the lane id.' }),
   'queue.arg.target': agentMsg({ id: 'tool.queue.arg.target', text: 'The target branch.' }),
-  'queue.arg.items': agentMsg({ id: 'tool.queue.arg.items', text: 'retarget: the card keys and slot names to move, from the preview named.' }),
+  'queue.arg.items': agentMsg({ id: 'tool.queue.arg.items', text: 'retarget: the card keys, lane names and slot names to move, from the preview named.' }),
   'queue.arg.preview': agentMsg({ id: 'tool.queue.arg.preview', text: "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing." }),
   'queue.reply.retargetPreview': agentMsg({ id: 'tool.queue.reply.retargetPreview', text: 'Preview {preview}: can follow {to}: {move}. Stay: {stay}. To move them, ask the user, then retarget with preview and items.', note: 'HI-2680: cw_queue retarget\'s reply without a preview. {move} and {stay} are lists ("-" for none).' }),
   'queue.reply.retarget': agentMsg({ id: 'tool.queue.reply.retarget', text: 'Moved to {to}: {moved}. Left where they were: {skipped}.', note: 'HI-2680: cw_queue retarget\'s reply. {moved} and {skipped} are lists ("-" for none).' }),
@@ -687,8 +689,16 @@ const tools: Tool[] = [
   {
     name: 'cw_list_providers',
     description: say(T['listProviders.description']),
-    inputSchema: { type: 'object', properties: {} },
-    run: () => api('GET', '/v1/providers')
+    inputSchema: { type: 'object', properties: { provider: { type: 'string', description: say(T['listProviders.arg.provider']) } } },
+    // A line each (HI-2814: the JSON of every provider outgrew its reply budget); one in full on request.
+    run: async (a) => {
+      const all = (await api('GET', '/v1/providers')) as ProviderPublic[]
+      if (typeof a.provider !== 'string' || !a.provider.trim()) return providerListText(all)
+      const want = a.provider.trim().toLowerCase()
+      const one = all.find((p) => p.id.toLowerCase() === want || p.name.toLowerCase() === want)
+      if (!one) throw new Error(say(T['listProviders.error.unknown'], { provider: a.provider.trim(), ids: all.map((p) => p.id).join(', ') }))
+      return one
+    }
   },
   {
     name: 'cw_agent_activity',
@@ -1007,8 +1017,8 @@ const tools: Tool[] = [
           const v = (await api('POST', '/v1/workflow/retarget', { project, from: a.from, to: a.target })) as { preview: string; to: string; move: string[]; stay: { key?: string; slot?: string; lane?: string; why: string }[] }
           return say(T['queue.reply.retargetPreview'], { preview: v.preview, to: v.to, move: v.move.join(', ') || '-', stay: v.stay.map((s) => `${s.key ?? s.slot ?? s.lane} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
         }
-        const r = (await api('POST', '/v1/workflow/retarget', { project, preview: a.preview, items: a.items })) as { moved: { cards: { key: string }[]; slots: string[] }; skipped: { key?: string; slot?: string; why: string }[]; to: string }
-        return say(T['queue.reply.retarget'], { moved: [...r.moved.cards.map((c) => c.key), ...r.moved.slots].join(', ') || '-', to: r.to, skipped: r.skipped.map((s) => `${s.key ?? s.slot} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
+        const r = (await api('POST', '/v1/workflow/retarget', { project, preview: a.preview, items: a.items })) as { moved: { cards: { key: string }[]; slots: string[]; lanes?: string[] }; skipped: { key?: string; slot?: string; lane?: string; why: string }[]; to: string }
+        return say(T['queue.reply.retarget'], { moved: [...(r.moved.lanes ?? []), ...r.moved.cards.map((c) => c.key), ...r.moved.slots].join(', ') || '-', to: r.to, skipped: r.skipped.map((s) => `${s.key ?? s.slot ?? s.lane} (${s.why})`).join(', ') || '-' }) // agent-protocol: a list of keys and codes
       }
       if (a.action !== 'remove' && a.action !== 'retry') throw new Error(say(T['queue.error.action.assistant']))
       return intentText((await api('POST', `/v1/queue/${a.action}`, { card: a.card, reason: a.reason })) as IntentDone)

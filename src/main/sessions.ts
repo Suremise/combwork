@@ -40,6 +40,8 @@ import type {
   AgentInfo,
   EffortLevel,
   FileLockMode,
+  HookCause,
+  HooksMissing,
   LaunchDialect,
   LiveSessionState,
   ModelSwitch,
@@ -80,7 +82,7 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
-import type { Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, HookOccurrence, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
@@ -88,13 +90,14 @@ import { emit, emitTo, onCombworkEvent, toast } from './events'
 import { presentWindow, testNotifyLog, testQuiet } from './testQuiet'
 import { hashText, heldOpen, insideReal, isInUse, placeRelative, removePath, samePlace, treeSignature, syncCopy, syncCopyLocked, syncCopyNow, trashAllOrNothing, withFileLock } from './fsutil'
 import { createLogger, hookJournal, userText } from './logger'
-import { COMPACTING_TEXT, HOOKS_MISSING_NOTE, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
+import { HOOK_AUTH_FILE_ENV, HOOK_URL_ENV } from '../shared/claudeHookHandlers'
+import { COMPACTING_TEXT, HOOKS_DOUBLED_NOTE, hooksMissingNote, addRetryWaited, retryWaitCurrent } from '../shared/runtime'
 import { applyStep, compactionOver, expireTasks, failedTurnStep, hookStep, idleAfter, idleQuestionGone, markedIdle, safeguardAnswered, SAFEGUARD_IDLE_MESSAGE, startupScreen, startupWatched, titleStep, type HookStatusInput, type HookStep } from './hookStatus'
-import { memoModel, memoTools, memoTurn, noteSafeguard, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
+import { latestStop, memoModel, memoTools, memoTurn, newTurn, noteSafeguard, placeEvent, safeguardComment, safeguardText, seenInTurn, withScreenStops, type GuardTurns, type SafeguardEvent, type ScreenStop } from '../shared/safeguards'
 import { applyStatus, idleNow, NO_STATUS, type StatusState } from './statusLineState'
 import { acceptTurn, admit, describe as describeTurn, endRunning, expectInjected, failureTurn, heard, newLedger, openCalls, reconciles, silentFor, unheardStop, type ScreenReading, type TurnLedger } from './turnLedger'
 import { Compaction } from './compaction'
-import { lastTitle } from './terminalTitle'
+import { lastTerminalTurn, lastTitle, type TerminalTurn } from './terminalTitle'
 import { asksYou } from '../shared/inbox'
 import type { DeliveryHooks, NewDelivery } from './deliveries'
 import { readyFor } from './readiness'
@@ -131,7 +134,7 @@ import { dialectModelSuggestions } from './dialects/suggestions'
 import { apiChainChanged, forgetApiChain, requestApiChain } from './dialects/apiChain'
 import type { DialectUsage } from '../shared/dialects'
 import { SESSION } from './sessionText'
-import { reportPlanUsage } from './planUsage'
+import { forgetConnectionUsage, reportPlanUsage } from './planUsage'
 import { devConsole, sessionSourceId } from './devConsole'
 import { flightRecorder } from './flightRecorder'
 import { DETAILS_FIELDS, HOOK_FIELDS, HOOK_MADE_FIELDS, STATUSLINE_FIELDS, safeWord } from '../shared/devConsole'
@@ -143,6 +146,7 @@ import { headerOf } from './revisions'
 import { utf8Bytes } from '../shared/metrics'
 import { cardNamesOf, scopeOfHost } from './projectKeys'
 import { inWorkspace, openWorkspaces, workspace, workspaceFor, workspaceOf, WorkspaceService, type SessionsFile } from './workspace'
+import { githubHostsFor } from './githubHosts'
 import { agentTempSetting, prepareAgentTemp, protectedFolders, withAgentTemp } from './agentTemp'
 import { ServerMarks } from './serverMarks'
 import { usageHistory, type StoredUsage } from './usageHistory'
@@ -180,6 +184,8 @@ const MOVED_FRESH = {
 
 /** The statuses in which a CLI's exit key cancels a turn (or its dialog) rather than arming its exit (HI-2272). */
 const EXIT_IN_TURN: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
+/** A stop's causes that are someone's Stop (HI-2815): the user's, the Assistant's, an agent's; not a lane's end, a closed window or one unsaid. */
+const STOPPED_ON_PURPOSE: ReadonlySet<StopCause> = new Set<StopCause>(['you', 'assistant', 'agent'])
 /** The statuses of an agent in a turn (or starting one): reached from any other, its next turn has begun (HI-2312). */
 const BUSY: ReadonlySet<SessionStatus> = new Set<SessionStatus>(['starting', 'working', 'waiting'])
 
@@ -433,6 +439,10 @@ interface LiveSession {
   turnsBegun?: boolean
   /** For the check's why: where its CLI's settings turn hooks off now, and whether it is newer than Combwork was tested with. */
   hooksOffIn?: () => string | null
+  /** What on the PC would keep its hooks away (HI-2777: the adapter's hookCause, read at launch), once read. */
+  hookCause?: HookCause | null
+  /** The hook events heard from this launch (HI-2777: SessionStart alone tells a snippet naming another port). */
+  heard?: Set<string>
   newerThanTested?: boolean
   /** When the cost estimate was last worked out (providers that don't report cost, or the user's prices: #436). */
   costAt?: number
@@ -502,6 +512,11 @@ interface LiveSession {
   titleRead?: boolean
   /** The unfinished title sequence the last output ended with. */
   titleCarry?: string
+  /** For a CLI that writes its turn's state to the terminal (ProviderAdapter.terminalTurn, HI-2802): its pattern, now. */
+  terminalTurnOf?: () => RegExp | null
+  /** What it last wrote of its turn, this launch, and the unfinished OSC sequence the last output ended with. */
+  terminalSaid?: TerminalTurn
+  terminalCarry?: string
   /** Asks its hooks reported that are still open, and the one it waits on (HookStatusInput). */
   open?: Ask[]
   waitingOn?: Ask | null
@@ -519,6 +534,8 @@ interface LiveSession {
   /** Bytes of the transcript already read for safeguard stops (#606), and what the adapter keeps between reads (its model, its last tool calls). */
   guardOffset?: number
   guardMemo?: Record<string, unknown>
+  /** HI-2754: when its latest prompt came (ms), the user's or one Combwork typed: a stop before it hit an older turn. */
+  promptAt?: number
   /** A blocking ask naming no tool, from a CLI that tells a safeguard prompt by its screen, until the screen says whether it is one (#606). `applied`: the status rules took it (else the turn ledger found it stale). */
   guardAsk?: { ask: Ask; at: number; applied: boolean }
   /** When it began waiting on a safeguard prompt (#606): typed into since, or the prompt gone from its screen, it may be answered. */
@@ -543,6 +560,8 @@ interface LiveSession {
   turnSeen?: object
   /** This launch resumes a conversation (a failed start's Retry resumes it again). */
   resumed?: boolean
+  /** A resumed launch's transcript size just before its spawn (HI-2816; -1 none found): only growth past it says the CLI is up. */
+  resumedBytes?: number
   /** The Combwork Assistant's mode (its id) its conversation was last given, started in or told: recorded with it. */
   mode?: string
   /** This launch gave its conversation instructions of Combwork's own (SessionRecord.promptAdded): recorded with it. */
@@ -1339,6 +1358,8 @@ class SessionManager {
     return this.deliveries
   }
   hookUrl = ''
+  /** The fixed hook URL on the Agent API's port while it listens (HI-2777: Claude Code's hooks and the admin snippet's), else null. */
+  fixedHookUrl: () => string | null = () => null
   apiEnv: (projectPath: string, agentId: string) => Record<string, string> = () => ({})
   /** Combwork's bin folder (cw-progress), first on each session's PATH; null until written, or when it couldn't be. */
   binDir: string | null = null
@@ -1983,6 +2004,8 @@ class SessionManager {
     if (opts.resumeId && this.cleaning.has(`${projectPath.toLowerCase()}|${opts.resumeId.toLowerCase()}`)) throw combworkError(msg({ id: 'session.start.cleaning', defaultMessage: "Combwork is archiving, deleting or cleaning up this session's files. Try again in a moment.", description: "Resuming a conversation is refused for a moment: Combwork is moving or removing its files." }), undefined, { kind: 'conflict' })
     const pending: PendingStart = { projectPath, resumeId: opts.resumeId, cancelled: false, done: Promise.resolve(), outcome: Promise.resolve(null as never), runId: randomBytes(12).toString('hex') }
     this.starting.set(id, pending)
+    // Started again (the user, a lane update, a Retry, a switch's resume): someone's earlier Stop no longer holds it (HI-2815).
+    this.stoppedOnPurpose.delete(id)
     // A new start: an earlier one's failure is over (HI-1976). Cleared here, before it runs, never once it settles: its
     // CLI may exit meanwhile, and that failure (onExit's) must stand (HR6's round 1).
     startBegins(projectPath, agentId)
@@ -2337,7 +2360,7 @@ class SessionManager {
       throw combworkError(msg({ id: 'session.start.otherFolder', defaultMessage: 'This session ran in {folder}. Resume it with the agent that works in that folder.', description: "Resuming a session is refused: it ran in another folder (another agent's worktree). {folder} is that folder's path." }), { folder: existing.cwd ?? projectPath }, { kind: 'conflict' })
     }
     // Providers that choose their own session id report it once started (see the start hook).
-    const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.fixedSessionId ? randomUUID() : '')
+    const sessionId = opts.resumeId ?? (adapter.descriptor.capabilities.fixedSessionId ? (adapter.newSessionId?.() ?? randomUUID()) : '')
 
     const mode = assistant ? (await this.assistantInstructions(projectPath, agent).catch(() => null))?.mode : undefined
     times.mark('assistantInstructions')
@@ -2515,6 +2538,8 @@ class SessionManager {
 
   /** Switches of connection waiting for their agent's safe point (HI-1755), by liveId: at most one per agent. */
   private switches = new Map<string, SwitchOp>()
+  /** When each agent was last stopped at someone's request and not started since (HI-2815, stoppedOnPurposeAt), by liveId. */
+  private stoppedOnPurpose = new Map<string, number>()
   /** Agents whose switch is resuming them now: that start is the switch's, not the user's. */
   private switchResuming = new Set<string>()
   /**
@@ -2717,6 +2742,15 @@ class SessionManager {
    * `restarting` once its exit was typed (its run ending, or ended and about to resume), null for none. Either way not free
    * for a new conversation (HI-2739: a lane started meanwhile owes it one instead).
    */
+  /**
+   * When an agent was last stopped at someone's request (HI-2815: the user, the Assistant or an agent, through stop()),
+   * in ms since the epoch; 0 if never, or once it has been started again since (start()). While it is set, nothing of
+   * Combwork's own starts it: neither a lane's new conversation owed before it (HI-2034) nor its lane's next card.
+   */
+  stoppedOnPurposeAt(projectPath: string, agentId: string): number {
+    return this.stoppedOnPurpose.get(liveId(projectPath, agentId)) ?? 0
+  }
+
   switchUnderWay(projectPath: string, agentId: string): 'waiting' | 'restarting' | null {
     const op = this.switches.get(liveId(projectPath, agentId))
     return !op ? null : op.typed ? 'restarting' : 'waiting'
@@ -2937,6 +2971,7 @@ class SessionManager {
     const tempDir = tempSetting ? await prepareAgentTemp({ setting: tempSetting, host: projectPath, agentId: agent.id, assistant: assistantHost, protect: [...(await protectedFolders(openWorkspaces())), projectPath, cwd] }) : null
     times?.mark('tempDir')
     const binPath = (env: Record<string, string>, dir: string | null): Record<string, string> => (policy.tools ? withBinOnPath(env, dir) : env)
+    const fixedHookUrl = this.fixedHookUrl()
     const ctx: LaunchContext = {
       projectPath,
       agentId: agent.id,
@@ -2960,6 +2995,7 @@ class SessionManager {
       othersHere: () => this.othersIn(cwd, id),
       extraDirs,
       hookUrl: `${this.hookUrl}?run=${state.runId}`,
+      fixedHookUrl,
       hookAuthFile: hookAuth.file,
       privateDir: hookAuth.dir,
       guidance,
@@ -2968,6 +3004,8 @@ class SessionManager {
       promptAddedBefore,
       // Its connection's overrides of its CLI (HI-2670), as this launch read them.
       overrides: policy.overrides,
+      // The whole "as from a terminal" preset (HI-2731's Independent role or a connection with every switch off): HI-2761.
+      asFromTerminal: !policy.guidance && !policy.tools && !policy.typing && Object.values(policy.overrides).every((v) => !v),
       trustedCombworkTools: workspace.isAssistantHome(projectPath) ? assistantTools(config.settings.assistant?.control, config.settings.assistant?.changeSettings === true, journalSettingsOf(workspaceOf(projectPath)).enabled) : undefined,
       // Not typed in without its connection's typing (HI-2670), nor given on the command line.
       initialPrompt: policy.typing ? l.initialPrompt : undefined,
@@ -2983,6 +3021,10 @@ class SessionManager {
       // no cw-progress on its PATH.
       env: withAgentTemp(binPath(withServerEnv(conn?.server?.env, withoutAccountEnv(conn ? adapter : null, childEnv({
         CW_HOOK_TOKEN: hookAuth.token,
+        // Claude Code's hook commands (HI-2777: SessionStart, the admin snippet's status line) read where to post and the
+        // auth file's header from these, so no command names a port or holds the token.
+        [HOOK_URL_ENV]: fixedHookUrl ?? this.hookUrl,
+        [HOOK_AUTH_FILE_ENV]: hookAuth.file,
         CW_RUN_ID: state.runId,
         ...(state.sessionId ? { CW_SESSION_ID: state.sessionId } : {}),
         ...(policy.tools ? { CW_PROJECT: basename(projectPath), CW_PROJECT_PATH: projectPath, CW_WORKSPACE: workspaceOf(projectPath).path!, CW_AGENT: agent.name, CW_PROVIDER: adapter.id } : {}),
@@ -2996,12 +3038,16 @@ class SessionManager {
         ...(workspace.isAssistantHome(projectPath) || !policy.tools ? {} : this.apiEnv(projectPath, agent.id))
       }))), this.binDir), tempDir)
     }
+    // The GitHub hosts a CLI signing in on one launches with (HI-2779): its project's, its workspace's, else the environment's.
+    if (adapter.descriptor.capabilities.githubHost) ctx.githubHosts = await githubHostsFor(workspaceOf(projectPath), projectPath, ctx.env)
     const delivered = await adapter.prepareLaunch(ctx)
     times?.mark('prepareLaunch')
     // A local model's limits as applied (HI-2682), for its context meter: this launch's, never read again.
     state.localLimits = ctx.localLimits ?? undefined
     // The /model lineup it asked Claude Code for (HI-2684), or why none.
     state.picker = ctx.picker
+    // The GitHub hosts it signs in on (HI-2779), as resolved for this launch: its usage stays attributed to them.
+    state.signInHost = ctx.signInHost
     l.launchEnv = ctx.env
     // What the session got, measured on the copies its CLI reads (not their sources: a kept old copy is what it reads).
     const deliveredSizes = await deliveredSkillSizes(adapter, ctx, delivered).catch(() => ({ catalog: 0, bytes: 0, unmeasured: Object.values(delivered).filter((d) => d.revision).length }))
@@ -3014,6 +3060,9 @@ class SessionManager {
     // Not while its folder is being changed under it (#646: a Git switch or pull there): it starts once that is done.
     await folderSteady(cwd)
     times?.mark('folderSteady')
+    // A resumed conversation's transcript as it is before its CLI can write (HI-2816): the transcript fallback counts only
+    // what it gains from here, however soon the CLI writes and whenever Combwork first looks. Not found: any counts.
+    if (l.resumed) l.resumedBytes = await this.liveTranscript(l).then((t) => (t ? stat(t).then((s) => s.size) : -1)).catch(() => -1)
     // Its connection, the last await (HI-1755): its choice as saved now (read under the lock saves take), resolved again,
     // must still be the one prepared. From here to the spawn nothing awaits, so no save lands between. Another chosen,
     // or the one prepared removed: this launch ends, and it starts again on the choice saved now (launchOnChosen).
@@ -3054,11 +3103,21 @@ class SessionManager {
     l.hookHistory = []
     l.hookBlock = undefined
     l.titleAttention = adapter.titleAttention?.(info.version, ctx) ?? undefined
+    l.terminalTurnOf = adapter.terminalTurn ? () => adapter.terminalTurn!() : undefined
+    l.terminalSaid = undefined
+    l.terminalCarry = ''
     l.turnScreen = adapter.turnScreen?.(info.version) ?? undefined
     l.ledger = newLedger()
     // Whether its hooks reach Combwork (#1336), and what can say why they don't.
     l.hooksWatch = newHooksWatch(Date.now(), !!adapter.descriptor.capabilities.startHook, adapter.transcriptTurns ? (adapter.turnsJoin ?? 'id') : null)
     l.hooksOffIn = adapter.hooksOffIn ? () => adapter.hooksOffIn!(ctx) : undefined
+    // Read once, in the background: the warning names it if its hooks don't come (HI-2777).
+    if (adapter.hookCause) {
+      void adapter.hookCause(ctx).then(
+        (c) => (l.hookCause = c),
+        () => (l.hookCause = null)
+      )
+    }
     l.newerThanTested = info.tested?.installed === 'newer'
     // What it was given: Combwork's guidance revision and each skill as delivered (the Agent API's project status shows
     // them). A skill not delivered as asked (kept old copy, failed copy) leaves it needing a restart.
@@ -3125,6 +3184,7 @@ class SessionManager {
           this.inputBlockedDrawn(id, l)
         })
         this.watchTitle(id, data)
+        this.watchTerminalTurn(id, data)
         this.watchReadyOutput(id, data)
         this.recognisePrompt(l, data)
       },
@@ -3226,6 +3286,8 @@ class SessionManager {
       ...(l.handedOverFrom ? { handedOverFrom: l.handedOverFrom } : {}),
       // The connection its latest run launched on (HI-1755), id and name as then: what it actually ran on.
       ...(state.launchedConnection ? { connection: { id: state.launchedConnection.id, name: state.launchedConnection.name } } : {}),
+      // The GitHub hosts its latest run signed in on (HI-2779), as resolved at its launch.
+      ...(state.signInHost ? { signInHost: state.signInHost } : {}),
       // On a server connection (HI-1772), kept once set: its CLI's cost reports are never counted for it.
       ...(state.launchedConnection?.server ? { serverRan: true as const } : {}),
       // Free (HI-1772, Darren 27 Oct) only while every run of it was on a server on this PC: kept once set, each.
@@ -3274,6 +3336,8 @@ class SessionManager {
   stop(projectPath: string, agentId?: string, cause?: StopCause): void {
     const agents = agentId ? [agentId] : this.projectStates(projectPath).map((s) => s.agentId)
     for (const a of agents) {
+      // Someone's Stop (HI-2815): what Combwork owed it since (a lane's new conversation) doesn't start it again.
+      if (cause && STOPPED_ON_PURPOSE.has(cause)) this.stoppedOnPurpose.set(liveId(projectPath, a), Date.now())
       // A switch of connection waiting for it ends with it (HI-1755): a stop is the user's.
       this.switches.get(liveId(projectPath, a))?.cancel('stopped')
       const l = this.live.get(liveId(projectPath, a))
@@ -3589,6 +3653,33 @@ class SessionManager {
       now.titleAsks = asks
       if (step) this.carryOut(id, now, step, 'title')
     }).catch((e) => log.warn('title: could not apply it', e))
+  }
+
+  /**
+   * For CLIs that write their turn's state to the terminal (Copilot's OSC 7501, HI-2802): what it last said is kept all
+   * along (a turn may end before its hooks are found missing), and shown only while they are (terminalTurnShown).
+   */
+  private watchTerminalTurn(id: string, data: string): void {
+    const l = this.live.get(id)
+    if (!l?.terminalTurnOf || (!l.terminalCarry && !data.includes('\x1b'))) return
+    const re = l.terminalTurnOf()
+    if (!re) return
+    const { turn, carry } = lastTerminalTurn(re, l.terminalCarry ?? '', data)
+    l.terminalCarry = carry
+    if (!turn || turn === l.terminalSaid) return
+    l.terminalSaid = turn
+    if (!l.state.hooksMissing) return
+    // i18n-ignore: the developer console's event data, recorded like a log, stays English (#1104)
+    devConsole.capture([sessionSourceId(l.state.projectPath, l.state.agentId)], () => ({ kind: 'terminal', name: 'turn state', provider: l.state.provider, made: { terminal: turn }, summary: `terminal: its turn ${turn} (its hooks missing)` }))
+    this.terminalTurnShown(l)
+  }
+
+  /** While its hooks are missing (#1336), what its terminal last said of its turn (HI-2802) is its status's last resort. */
+  private terminalTurnShown(l: LiveSession): void {
+    const h = l.state.hooksMissing
+    if (!h || !l.terminalSaid || h.terminal === l.terminalSaid) return
+    l.state.hooksMissing = { ...h, terminal: l.terminalSaid }
+    this.emitState(l.state)
   }
 
   /** For CLIs whose first hook waits for the first prompt: the prompt showing in the terminal means ready. */
@@ -3951,9 +4042,22 @@ class SessionManager {
         return null
       }
     })()
-    const why = hooksRefused(st.runId) ? 'refused' : offIn ? 'off' : l.newerThanTested ? 'newer' : undefined
+    // What on the PC would keep them away (HI-2777), read at launch: a setting and where; else hooksOffIn's answer. An
+    // allowlist without the token's variable sends them with no token, which Combwork refuses: the allowlist is the cause.
+    const cause = l.hookCause ?? (offIn ? { why: 'off' as const, setting: 'disableAllHooks', where: offIn, snippet: false } : null) // i18n-ignore: a select key and a setting's name, never shown
+    const remote = !!l.adapter.descriptor.capabilities.remoteHookPolicy
+    const events = l.heard ?? new Set<string>()
+    const why: HooksMissing['why'] =
+      cause?.why === 'blocked' ? 'blocked'
+      : hooksRefused(st.runId) ? 'refused'
+      : cause ? cause.why
+      : remote && events.has('SessionStart') && [...events].every((e) => e === 'SessionStart') ? 'partial'
+      : l.newerThanTested ? 'newer'
+      : remote && after === 'start' ? 'org'
+      : undefined
+    const snippet = cause ? cause.snippet : why === 'partial' || why === 'org'
     const turn = after === 'transcript' ? l.hooksWatch?.flagged : null
-    st.hooksMissing = { since: new Date().toISOString(), after, ...(turn ? { turn } : {}), ...(why ? { why } : {}), ...(why === 'off' ? { offIn: offIn! } : {}) }
+    st.hooksMissing = { since: new Date().toISOString(), after, ...(turn ? { turn } : {}), ...(why ? { why } : {}), ...(cause && why === cause.why ? { offIn: cause.where, setting: cause.setting, ...(cause.also ? { also: cause.also } : {}) } : {}), ...(snippet ? { snippet } : {}), ...(l.terminalSaid ? { terminal: l.terminalSaid } : {}) }
     this.emitState(st)
     noteHooksMissing(st.projectPath, st.agentId, true)
     const label = this.label(st)
@@ -3962,7 +4066,7 @@ class SessionManager {
     // Once a conversation (a restart with the same hooks problem says it again only in its pane).
     if (!this.hooksTold.first(`${st.agentId}\n${st.sessionId || st.runId}`)) return
     // A toast, kept in Notifications.
-    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Combwork isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_MISSING_NOTE, { provider: l.adapter.descriptor.name, why: why ?? 'other', where: offIn ?? '', after }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label)) // i18n-ignore: select keys, never shown
+    toast('warning', tr(msg({ id: 'session.notice.hooksMissingTitle', defaultMessage: "Combwork isn't hearing from {agent}'s hooks", description: "A notification's title: an agent's coding agent has stopped sending Combwork its hooks (the calls that tell Combwork what it is doing). {agent} is the agent." }), { agent: label }), hooksMissingNote(st, tr) ?? '', undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label))
   }
 
   /** Its hooks came again (#1336): its status is Combwork's to tell again, and its lanes go on. */
@@ -5178,8 +5282,11 @@ class SessionManager {
   /** What follows from the live transcript growing: status, usage, details, compaction, cost. */
   private async transcriptChanged(l: LiveSession, projectPath: string, agentId: string, src: string, size: number, force: boolean, hooks: number): Promise<void> {
     const sessionId = l.state.sessionId
-    // Fallback if hooks never arrive: a transcript means the session is up.
-    if (l.state.status === 'starting') {
+    // Fallback if hooks never arrive: a transcript means the session is up. Not a resumed conversation's as it was, there
+    // before its CLI started (HI-2816: a held or slow resume showed ready, and deliveries tried to type into it): only
+    // what it gained since its size before the spawn.
+    const before = l.resumed ? (l.resumedBytes ?? -1) : -1
+    if (l.state.status === 'starting' && size > before) {
       this.fact(l.state, { lifecycle: 'running' })
       l.state.status = 'ready'
       this.emitState(l.state)
@@ -5409,7 +5516,8 @@ class SessionManager {
       return
     }
     const before = st.safeguard
-    const next = noteSafeguard(before, ev)
+    // HI-2754: a stop no older than the latest prompt hit the latest turn; one read late is history only.
+    const next = placeEvent(before, ev, l.promptAt)
     if (!next) return
     st.safeguard = next
     this.emitState(st)
@@ -5477,7 +5585,11 @@ class SessionManager {
       const model = memoModel(memo)
       const turn = memoTurn(memo)
       // Counted unless the CLI's record of it in this turn was read first.
-      if (!turn || !this.guardSeen(l, turn, 'screen')) noted = noteSafeguard(noted, { kind: 'stop', at, model, tools: memoTools(memo) }) ?? noted
+      if (!turn || !this.guardSeen(l, turn, 'screen')) {
+        const counted = noteSafeguard(noted, { kind: 'stop', at, model, tools: memoTools(memo) })
+        // HI-2754: the prompt on screen is this turn's stop.
+        if (counted) noted = latestStop(counted, at, l.promptAt)
+      }
       // Kept on the session's record with its turn, so Performance counts it though the transcript may never record it
       // (HB3's didn't), and once if it does (withScreenStops), whenever Combwork reads it.
       if (st.sessionId) {
@@ -5978,6 +6090,29 @@ class SessionManager {
   }
 
   /** The launch a hook call belongs to: named by its run id, else (older launch folders) by session id. */
+  /** A hook's occurrence identity (HI-2777: hookTwins), as its launch's CLI gives one; null when it gives none. */
+  hookOccurrence(runId: string, body: Record<string, any>): HookOccurrence | null {
+    const l = this.findLaunch(runId, body.session_id)?.[1]
+    return l?.adapter.hookOccurrence?.(body) ?? null
+  }
+
+  /**
+   * A launch's hooks arrive twice (HI-2777): its CLI ran Combwork's handler and a differing one of the admin snippet's
+   * (a timeout changed since it was pasted, an older snippet). Each occurrence with an identity is handled once; the
+   * others twice. Logged, and the user told once a run to copy the snippet again.
+   */
+  hooksDoubled(runId: string): void {
+    const found = this.findLaunch(runId, null)
+    if (!found) return
+    const st = found[1].state
+    const label = this.label(st)
+    log.warn(`${userText(label)}: its hooks arrive twice (Combwork's and a managed snippet's that differs); tool calls and prompts are handled once, other hooks twice`)
+    hookJournal(`run=${st.runId} hooks doubled`)
+    st.hooksDoubled = true
+    this.emitState(st)
+    toast('warning', tr(msg({ id: 'session.notice.hooksDoubledTitle', defaultMessage: "{agent}'s hooks arrive twice", description: "A notification's title: an agent's coding agent sends Combwork each of its hooks twice (the calls that tell Combwork what it is doing). {agent} is the agent." }), { agent: label }), tr(HOOKS_DOUBLED_NOTE, { provider: found[1].adapter.descriptor.name }), undefined, st.projectPath, agentTarget(st.projectPath, st.agentId, label))
+  }
+
   private findLaunch(runId: string | null, sessionId: unknown): [string, LiveSession] | null {
     if (runId) {
       const id = this.runs.get(runId)
@@ -6002,6 +6137,29 @@ class SessionManager {
     const count = workspaceOf(st.projectPath).info()?.projects.find((p) => p.path.toLowerCase() === st.projectPath.toLowerCase())?.agents.length ?? 1
     // agent-protocol: a fallback name, never seen (every launch has its agent's name)
     return count > 1 ? `${project} · ${st.agentName ?? 'Agent'}` : project // i18n-ignore: a fallback name, never seen (every launch has its agent's name)
+  }
+
+  /**
+   * Live details a provider's own reader found for a launch outside its hooks and transcript (HI-2762: OpenCode's history,
+   * read from its server): its cost, its plan's limits. Taken as a status line's are; nothing for a launch that ended.
+   */
+  reportDetails(runId: string, d: LiveDetails): void {
+    const id = this.runs.get(runId)
+    const l = id ? this.live.get(id) : undefined
+    if (!l || l.state.runId !== runId) return
+    this.applyDetails(l, d)
+  }
+
+  /**
+   * A launch's own report that its connection has no plan limits now (HI-2762: OpenCode's server says its account isn't
+   * signed in to a service with any): what was kept for that connection goes. Not for a launch that ended, nor one on no
+   * connection (its provider's limits are other launches' too).
+   */
+  clearPlanUsage(runId: string): void {
+    const id = this.runs.get(runId)
+    const l = id ? this.live.get(id) : undefined
+    if (!l || l.state.runId !== runId || !l.state.launchedConnection) return
+    forgetConnectionUsage(l.state.launchedConnection.id)
   }
 
   /** A provider's status report (Claude Code's status line): the session's model, effort and cost, and the plan's limits. */
@@ -6609,6 +6767,9 @@ class SessionManager {
   }
 
   private hookReplyHere(runId: string | null, body: Record<string, any>): Promise<Record<string, unknown> | null> {
+    // A CLI whose start context goes into its session (HI-2771): its start step answers once it is done (or out of time).
+    const intoSession = this.sessionContextStep(runId, body)
+    if (intoSession) return intoSession
     if (body.hook_event_name === 'SessionStart') return this.startReply(runId, body)
     const afterCompaction = this.compactionContextReply(runId, body)
     if (afterCompaction) return afterCompaction
@@ -6670,6 +6831,82 @@ class SessionManager {
     return null
   }
 
+  /** The whole start step's budget (HI-2771): building the view and putting it, well inside the launcher's 5 s wait. */
+  static readonly SESSION_CONTEXT_MS = 2500
+  /** Each launch's start context in its session (HI-2771): its start step taken, compactions refreshed, its queue, its generation. */
+  private sessionContexts = new WeakMap<LiveSession, { started: boolean; compactions: Set<string>; chain: Promise<void>; gen: number }>()
+  /** The post that was its launch's start (its first baseline): its own expanded hooks are history the start's view covers. */
+  private startPosts = new WeakSet<object>()
+
+  private sessionContextOf(l: LiveSession): { started: boolean; compactions: Set<string>; chain: Promise<void>; gen: number } {
+    const s = this.sessionContexts.get(l) ?? { started: false, compactions: new Set<string>(), chain: Promise.resolve(), gen: 0 }
+    this.sessionContexts.set(l, s)
+    return s
+  }
+
+  /**
+   * On a CLI whose start context goes into its session (startContextTrigger): at its launch's start (its first baseline,
+   * before its TUI takes input) the step that puts or removes it, answered once done or out of time. Null for any other
+   * post (a compaction's refresh comes from its hooks, compactionIntoSession).
+   */
+  private sessionContextStep(runId: string | null, body: Record<string, any>): Promise<null> | null {
+    const l = this.findLaunch(runId, body.session_id)?.[1]
+    const trigger = l?.adapter.deliverStartContext ? l.adapter.startContextTrigger?.(body) : null
+    if (!l || trigger?.source !== 'start') return null
+    const s = this.sessionContextOf(l)
+    if (s.started) return null
+    s.started = true
+    this.startPosts.add(body)
+    return this.deliverSessionContext(l, s, l.resumed ? 'resume' : 'startup')
+  }
+
+  /**
+   * A compaction's end, as the CLI's hooks have it (HI-2771: OpenCode's tracker makes compactEnd of a live event, or of a
+   * resync's snapshot that finds one completed while the stream was down): the view refreshed in its session, each
+   * compaction once by its identity (its turn), queued behind the launch's deliveries. Not one the start's own post
+   * brings (closed history the start's view already covers), nor a sub-agent's.
+   */
+  private compactionIntoSession(l: LiveSession, post: Record<string, any>, hook: NormalizedHook): void {
+    if (!l.adapter.deliverStartContext || hook.event.kind !== 'compactEnd' || hook.ids.sub || this.startPosts.has(post)) return
+    const s = this.sessionContextOf(l)
+    const id = hook.ids.turn ?? ''
+    if (s.compactions.has(id)) return
+    s.compactions.add(id)
+    void this.deliverSessionContext(l, s, 'compact')
+  }
+
+  /**
+   * One delivery, queued behind the launch's last (one at a time, so an older view never lands after a newer one), within
+   * SESSION_CONTEXT_MS: the view built and put (the Assistant's, its journal on, guidance on, not kept out), else Combwork's
+   * entry removed. Dropped before it sends when a newer delivery was asked for, the launch is no longer this agent's
+   * running one, or its session changed; its request cut off at the deadline is uncertain, never taken as delivered.
+   */
+  private deliverSessionContext(l: LiveSession, s: { chain: Promise<void>; gen: number }, source: string): Promise<null> {
+    const gen = ++s.gen
+    const sessionId = l.state.sessionId
+    const current = (signal: AbortSignal): boolean => !signal.aborted && gen === s.gen && this.live.get(liveId(l.state.projectPath, l.state.agentId)) === l && l.state.sessionId === sessionId
+    const barred = (): boolean => l.policy?.guidance === false || !!this.keepsOut(l.state.projectPath, l.state.agentId)
+    const run = s.chain.then(async () => {
+      const ac = new AbortController()
+      const timer = setTimeout(() => ac.abort(), SessionManager.SESSION_CONTEXT_MS)
+      try {
+        if (!current(ac.signal) || !sessionId) return
+        const built = !barred() && this.startContext ? this.startContext(l.state, source).catch(() => null) : Promise.resolve(null)
+        const text = await Promise.race([built, new Promise<null>((done) => ac.signal.addEventListener('abort', () => done(null), { once: true }))])
+        // Asked again once it is made (as startContextFor): out of time, superseded, or barred meanwhile, nothing is sent.
+        if (!current(ac.signal)) return
+        const outcome = await l.adapter.deliverStartContext!(l.state.runId, sessionId, text && !barred() ? text : null, ac.signal)
+        log.info(`start context into ${l.state.agentId}'s session (${source}): ${outcome}`)
+      } catch (e) {
+        log.warn('start context into a session', e)
+      } finally {
+        clearTimeout(timer)
+      }
+    })
+    s.chain = run.catch(() => undefined)
+    return run.then(() => null, () => null)
+  }
+
   /** The start context for a launch, in its CLI's reply form, or null (none, or it couldn't be made). */
   private async startContextFor(l: LiveSession, source: string | null): Promise<Record<string, unknown> | null> {
     if (!this.startContext || !l.adapter.startContextReply) return null
@@ -6697,6 +6934,7 @@ class SessionManager {
     const l = this.findLaunch(runId, body.session_id)?.[1]
     if (!l?.hookHistory) return null
     const event = clip(typeof body.hook_event_name === 'string' ? body.hook_event_name : '?', HOOK_SHORT_MAX).text
+    ;(l.heard ??= new Set()).add(event)
     const obs: HookObservation = { l, started: performance.now(), fired: { at: Date.now(), event, receiver: l.hooks?.receivers[event] ?? 'combwork', response: 'none', ledger: 'none', ms: 0 } }
     this.hookObs.set(body, obs)
     return obs
@@ -6868,6 +7106,17 @@ class SessionManager {
     if (l.adapter.prepareHook) {
       await l.adapter.prepareHook(body, { agentId: st.agentId, workspacePath: workspaceOf(st.projectPath).path!, sessionId: st.sessionId, memo: (l.hookMemo ??= {}), alive: () => this.live.get(id) === l }).catch((e) => log.warn(`${userText(this.label(st))}: could not read what its hook needs`, e))
       if (this.live.get(id) !== l) return
+    }
+    // A body that stands for several hooks (HI-2760: OpenCode's forwarded events and snapshots, which its prepareHook
+    // turns into zero or more): each is handled in turn, in this same place in the launch's order, as a hook of its own.
+    if (Array.isArray(body.combworkExpanded)) {
+      for (const sub of body.combworkExpanded as Record<string, any>[]) {
+        if (this.live.get(id) !== l) return
+        // A compaction's end among them (live, or recovered by a resync): the start context refreshed in the session (HI-2771).
+        if (l.adapter.deliverStartContext) this.compactionIntoSession(l, body, l.adapter.normalizeHook(sub))
+        await this.handleHookIn(runId, sub, arrived, hooksBefore, at, null, null)
+      }
+      return
     }
     const hook = l.adapter.normalizeHook(body)
     const label = this.label(st)
@@ -7392,11 +7641,21 @@ class SessionManager {
     const carriedOn = !!st.signIn && worked
     if (carriedOn) st.signIn = undefined
     const needed = asksYou(st)
+    // HI-2754: a prompt starts a new turn: a stop before it no longer says the latest turn was stopped.
+    let turnStarted = false
+    if (ev?.kind === 'prompt') {
+      l.promptAt = Date.now()
+      const fresh = newTurn(st.safeguard)
+      if (fresh !== st.safeguard) {
+        st.safeguard = fresh
+        turnStarted = true
+      }
+    }
     const facts = this.fact(st, this.factsOf(l, step, ev, carriedOn))
     const stepped = applyStep(st, step)
     const guarded = this.settleSafeguard(l)
     // A turn's end is reported even when the status stays (its background task count may have changed).
-    if (stepped || step.actions.includes('turnEnded') || carriedOn || facts || guarded) this.emitState(st)
+    if (stepped || step.actions.includes('turnEnded') || carriedOn || facts || guarded || turnStarted) this.emitState(st)
     // At its prompt now: its screen looked at once for its question by itself (HI-2191), which its CLI may have drawn
     // before this hook was carried out, with nothing drawn since to look at it by.
     if (stepped && cause !== 'screen' && AT_PROMPT.has(st.status)) this.idleScreenDrawn(id, l)
@@ -8180,8 +8439,9 @@ class SessionManager {
         const same = !!st && !!kept?.read.path && samePlace(kept.read.path, ext.transcriptPath) && kept.read.size === st.size && kept.read.mtime === st.mtimeMs
         const usage = kept ? this.titled(kept.usage) : null
         if (!same) void usageHistory.ingestExternal(projectPath, { id: ext.id, provider: adapter.id, transcriptPath: ext.transcriptPath }).catch(() => undefined)
-        // Known to be empty: not listed. Not known yet: listed without figures until the worker has it.
-        if (usage && usage.requests === 0) continue
+        // Known to be empty: not listed. Not known yet: listed without figures until the worker has it. A sub-session is
+        // listed under its session though it made no request of its own (an OpenCode fork holding only what it copied, HI-2774).
+        if (usage && usage.requests === 0 && !ext.sub) continue
         items.push({
           id: ext.id,
           provider: adapter.id,
@@ -8834,13 +9094,51 @@ class SessionManager {
   async adopt(projectPath: string, sessionId: string): Promise<void> {
     projectPath = workspace.assertSessionHost(projectPath)
     assertSessionId(sessionId)
+    // One adoption of a session at a time (HR2 on HI-2774): its provider's record and Combwork's are made, or taken back,
+    // as one, never interleaved with another's.
+    const k = `${projectPath.toLowerCase()}|${sessionId}`
+    const before = this.adoptions.get(k) ?? Promise.resolve()
+    const mine = before.catch(() => undefined).then(() => this.adoptNow(projectPath, sessionId))
+    const kept = mine.catch(() => undefined)
+    this.adoptions.set(k, kept)
+    void kept.then(() => {
+      if (this.adoptions.get(k) === kept) this.adoptions.delete(k)
+    })
+    return mine
+  }
+  private adoptions = new Map<string, Promise<unknown>>()
+
+  private async adoptNow(projectPath: string, sessionId: string): Promise<void> {
     const src = await this.providerTranscript(projectPath, sessionId)
     const provider = src?.provider ?? 'claude-code'
     // As its record says, if it has one (HI-1829): a conversation that ran on a server is never read Claude-priced.
     const rec = await workspace.sessionRecord(projectPath, sessionId).catch(() => undefined)
     const usage = src ? await this.usageFor(projectPath, src.path, sessionId, provider, { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }) : null
     // A sub-session (a Codex guardian review, say) stays one: never an agent's session to resume.
-    const sub = src ? (await providerAdapter(provider).listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub : undefined
+    const adapter = providerAdapter(provider)
+    // Found in another of the host's folders, it is still one: its transcript's first line says so too (HI-2774).
+    const sub = src ? ((await adapter.listSessions(projectPath).catch(() => [])).find((e) => e.id === sessionId)?.sub ?? (await adapter.subSessionOf(src.path, sessionId).catch(() => null)) ?? undefined) : undefined
+    // A conversation the CLI keeps by a record of Combwork's (OpenCode's mark, HI-2774) is taken over in the CLI's data
+    // first, or refused with why; what that made is taken back if the record can't be written, so nothing half-adopted stays.
+    let handle: AdoptionHandle | null = null
+    if (src && !sub && adapter.adopting) {
+      const file = await workspace.sessionsFile(projectPath)
+      const cfg = await workspace.projectConfig(projectPath)
+      handle = await adapter.adopting(projectPath, sessionId, src.path, this.sessionFolders(projectPath, file.sessions, cfg))
+    }
+    try {
+      await handle?.commit()
+      await this.writeAdopted(projectPath, sessionId, provider, src, sub, usage)
+    } catch (e) {
+      if (handle) await handle.done(false).catch((u) => log.warn(`Taking back an adoption's record in ${userText(projectPath)}`, u))
+      throw e
+    }
+    if (handle) await handle.done(true).catch((u) => log.warn(`Ending an adoption in ${userText(projectPath)}`, u))
+    if (src && config.settings.sessions.backupTranscripts) await syncCopy(src.path, this.backupPath(projectPath, sessionId)).catch(() => undefined)
+  }
+
+  /** An adopted session's record (a seam for tests: its write failing must take back what the adoption made). */
+  writeAdopted = async (projectPath: string, sessionId: string, provider: ProviderId, src: { path: string } | null, sub: SubSession | undefined, usage: SessionUsage | null): Promise<void> => {
     await workspace.upsertSession(projectPath, {
       ...(sub ? { sub } : {}),
       id: sessionId,
@@ -8852,7 +9150,6 @@ class SessionManager {
       lastActiveAt: usage?.lastActivity ?? new Date().toISOString(),
       ...(src && !providerDescriptor(provider).capabilities.fixedSessionId ? { transcriptPath: src.path } : {})
     })
-    if (src && config.settings.sessions.backupTranscripts) await syncCopy(src.path, this.backupPath(projectPath, sessionId)).catch(() => undefined)
   }
 }
 

@@ -115,6 +115,19 @@
   "providers.codex.storePwsh.warning": {
     "placeholders": {}
   },
+  "providers.copilot.host.choose": {
+    "placeholders": {
+      "repoHost": "plain"
+    }
+  },
+  "providers.copilot.host.proxy": {
+    "placeholders": {}
+  },
+  "providers.copilot.host.signedOut": {
+    "placeholders": {
+      "host": "plain"
+    }
+  },
   "providers.copilot.planNote": {
     "placeholders": {}
   },
@@ -128,6 +141,62 @@
   },
   "providers.copilot.updateModified": {
     "placeholders": {}
+  },
+  "providers.opencode.adoptRefused": {
+    "placeholders": {
+      "why": "select"
+    }
+  },
+  "providers.opencode.claudeAgentModel": {
+    "placeholders": {
+      "provider": "plain",
+      "model": "plain"
+    }
+  },
+  "providers.opencode.effortNeedsModel": {
+    "placeholders": {
+      "provider": "plain",
+      "effort": "plain"
+    }
+  },
+  "providers.opencode.effortNotListed": {
+    "placeholders": {
+      "provider": "plain",
+      "effort": "plain",
+      "model": "plain"
+    }
+  },
+  "providers.opencode.historyBusy": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "providers.opencode.noModel": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "providers.opencode.noOwner": {
+    "placeholders": {
+      "provider": "plain"
+    }
+  },
+  "providers.opencode.otherAccount": {
+    "placeholders": {
+      "provider": "plain",
+      "session": "plain"
+    }
+  },
+  "providers.opencode.protectedArg": {
+    "placeholders": {
+      "provider": "plain",
+      "arg": "plain"
+    }
+  },
+  "providers.opencode.v1Found": {
+    "placeholders": {
+      "count": "plural"
+    }
   },
   "providers.readiness.notInstalled": {
     "placeholders": {
@@ -143,6 +212,13 @@
     "placeholders": {
       "provider": "plain",
       "version": "plain"
+    }
+  },
+  "providers.readiness.updateStayed": {
+    "placeholders": {
+      "provider": "plain",
+      "version": "plain",
+      "offered": "plain"
     }
   },
   "providers.settings.hooksOff": {

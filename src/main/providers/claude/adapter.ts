@@ -4,7 +4,7 @@ import { msg, tr } from '../../../shared/i18n'
 import { join, basename } from 'path'
 import { mkdir, open, readdir, readFile, stat, writeFile } from 'original-fs/promises'
 import { existsSync, readFileSync, realpathSync } from 'original-fs'
-import type { AgentInstallInfo, AutoCompactSetting, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
+import type { AgentInstallInfo, AutoCompactSetting, HookCause, McpServerDef, MemorySource, PathDataCopy, PlanLimit, PlanUsage, ReadinessIssue, RetryWait, SubSession } from '../../../shared/types'
 import { CW_DIR, assertSessionId, isSessionId } from '../../../shared/defaults'
 import { isCliOwnMode } from '../../../shared/cliOwnMode'
 import { CLAUDE_CODE, CLAUDE_DESCRIPTOR, CLAUDE_FOOTER_MODES, baseModel, canSwitchLive, footerMode, hookMode } from '../../../shared/claude'
@@ -14,9 +14,9 @@ import { config } from '../../config'
 import { claudeAutoMemory, claudeFileAllowed, containsPlace, contentHash, ContentTooLarge, copyMissing, copySkillTree, sourceProblem, tooBigToDeliver, isDir, isFile, linksNotCopied, placeMatcher, readJson, realPath, removePath, writeJsonAtomic, type PlannedCopies } from '../../fsutil'
 import { createLogger, userText } from '../../logger'
 import { plainHttpsJson } from '../../plainHttpsJson'
-import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, userMemoryLabel } from '../common'
+import { EDITOR_EXTENSION_PATH, EDITOR_ROOTS, compareVersions, connectionMemoryLabel, hookForwardCommand, exportSubtitleText, hookIds, keepBounded, notInstalledIssue, readFirstLine, run, runsThroughCmd, signedOutIssue, taskArgs, toSpawnable, updateIssue, updateStayedIssue, userMemoryLabel } from '../common'
 import type { StartHint } from '../../../shared/startFailure'
-import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
+import type { ConnectionStatus, TrustReading, TrustTarget, Ask, BackgroundTaskEvent, CatalogRead, CommandSpec, ExternalSession, HookOccurrence, LaunchContext, LaunchHooks, LiveDetails, LockDecision, NormalizedHook, ProviderAdapter, SkillDelivery, SkillRoots, TranscriptTurn } from '../types'
 import { autoCompactOf, effectiveEnv, settingsScopes } from './autoCompact'
 import { claudeScopeHooks, rowsOfHooksTable } from '../../hookListing'
 import type { HookListing } from '../../../shared/hooks'
@@ -27,7 +27,9 @@ import { claudeBackgroundTasks } from './background'
 import { claudeRetryWait } from './retry'
 import { claudeSafeguards } from './safeguards'
 import { claudeTranscriptTurns } from './turns'
-import { claudeUpdateChannel, type UpdateChannel } from './updateChannel'
+import { claudeUpdateChannel, windowsChannelSources, type UpdateChannel } from './updateChannel'
+import { readHookCause } from './hookPolicy'
+import { CLAUDE_HOOK_EVENTS, HOOK_TOKEN_ENV, claudeHookHandlers, type HookTimeouts } from '../../../shared/claudeHookHandlers'
 import { isWingetPath, wingetUpgradeCommand, wingetUpToDate, wingetVersion } from '../winget'
 import type { SafeguardEvent } from '../../../shared/safeguards'
 import { ConversationParser, claudeImageData } from './conversation'
@@ -73,7 +75,10 @@ export const MAY_BE_SHORT = /(^|-).{1,6}-\d+(-|$)/
 /** How much of a transcript is read for the cwd it records (its first lines carry none). */
 const CWD_HEAD = 64 * 1024
 
-export const HOOK_EVENTS = ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'Notification', 'Stop', 'StopFailure', 'PreCompact', 'PostCompact', 'SessionEnd'] as const // i18n-ignore: Claude Code's hook event names
+export const HOOK_EVENTS = CLAUDE_HOOK_EVENTS
+
+/** The hooks' timeouts as Settings → Advanced has them now: the launch's, and the admin snippet's (HI-2777). */
+export const launchHookTimeouts = (): HookTimeouts => ({ hook: advanced.number('claude-code.hooks.timeoutSeconds'), preToolUse: advanced.number('claude-code.hooks.preToolUseTimeoutSeconds') })
 
 /** Tools that edit files: PreToolUse checks them against other agents' file locks. */
 export const EDIT_TOOLS = 'Edit|Write|MultiEdit|NotebookEdit' // i18n-ignore: Claude Code's tool names, matched
@@ -352,7 +357,8 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (!info.found) return [notInstalledIssue(name)]
     const out: ReadinessIssue[] = []
     if (info.loggedIn === false) out.push(signedOutIssue(name))
-    if (info.updateAvailable) out.push(updateIssue(name, info.latestVersion))
+    // Staying on its version after an update (HI-2777), Provider Setup says a policy may decide it, Update still offered.
+    if (info.updateAvailable) out.push(info.updateStayed ? updateStayedIssue(name, info.updateStayed.version, info.updateStayed.offered) : updateIssue(name, info.latestVersion))
     return out
   }
 
@@ -569,26 +575,12 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
 
     // Their timeouts are advanced settings (#367).
     const timeout = advanced.number('claude-code.hooks.timeoutSeconds')
-    const hook = {
-      type: 'http',
-      url: ctx.hookUrl,
-      timeout,
-      headers: { Authorization: 'Bearer $CW_HOOK_TOKEN' }, // i18n-ignore: an HTTP header Claude Code sends
-      allowedEnvVars: ['CW_HOOK_TOKEN']
-    }
-    const hooks: Record<string, unknown[]> = {}
-    for (const ev of HOOK_EVENTS) {
-      // SessionStart only supports command hooks (not http), so it forwards its JSON with curl.
-      if (ev === 'SessionStart') {
-        hooks[ev] = [{ hooks: [{ type: 'command', command: hookForwardCommand(ctx.hookUrl, ctx.hookAuthFile, timeout), timeout }] }]
-        continue
-      }
-      // Every tool's start and end, so the turn ledger sees each call begin (#648: a tool after a turn's Stop carries it on,
-      // a tool end with no start since is late news). PreToolUse answers an edit with a lock decision, so it gets a longer
-      // timeout; if Combwork doesn't answer, the edit goes ahead. Any other tool is answered at once.
-      if (ev === 'PreToolUse') hooks[ev] = [{ matcher: '*', hooks: [{ ...hook, timeout: advanced.number('claude-code.hooks.preToolUseTimeoutSeconds') }] }]
-      else hooks[ev] = [ev === 'PostToolUse' ? { matcher: '*', hooks: [hook] } : { hooks: [hook] }]
-    }
+    // The admin snippet's handlers for this Combwork's port (HI-2777), so a session given both runs each once: HTTP hooks
+    // to the fixed URL, the run told by its token; SessionStart (command hooks only) a command reading CW_HOOK_URL and
+    // CW_HOOK_AUTH_FILE. Every tool's start and end, so the turn ledger sees each call begin (#648); PreToolUse answers an
+    // edit with a lock decision, so it waits longer (if Combwork doesn't answer, the edit goes ahead). With the Agent API
+    // not listening, hookUrl's server, which knows the run by its token too: then they differ from the snippet's.
+    const hooks = claudeHookHandlers([ctx.fixedHookUrl ?? ctx.hookUrl], launchHookTimeouts())
     // The status line forwards Claude Code's status JSON (model, effort, cost, plan limits) to Combwork and
     // prints nothing, so no line is added to the terminal. Switched off (#1285), the user's own runs after it, given the
     // same JSON, and shows its output: Combwork still reads the status.
@@ -607,7 +599,7 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     // What Combwork passed, for the agent's Hooks dialog (HI-982: launchHooks).
     keepBounded(this.hooksByRun, ctx.runId, hooks)
     // The user's --settings merged in: Combwork passes only this file (#330).
-    const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.hookUrl, envVar: 'CW_HOOK_TOKEN' })
+    const settings = mergeLaunchSettings({ hooks, statusLine }, theirs, { url: ctx.fixedHookUrl ?? ctx.hookUrl, envVar: HOOK_TOKEN_ENV })
     if (memoryDir) settings[field] = memoryDir
     // A server connection's models in /model (HI-2684): their exact IDs and labels, unless a lineup of the user's wins.
     if (ctx.server && test) {
@@ -709,6 +701,29 @@ export class ClaudeCodeAdapter implements ProviderAdapter {
     if (obj(scopes[0]?.json)?.allowManagedHooksOnly === true) return scopes[0].label
     const deciding = scopes.find((s) => typeof obj(s.json)?.disableAllHooks === 'boolean')
     return deciding && obj(deciding.json)!.disableAllHooks === true ? deciding.label : null
+  }
+
+  /**
+   * A hook's occurrence identity (HI-2777), from Claude Code's own ids as its recorded hooks carry them (2.1.291,
+   * 2.1.296): a tool call's tool_use_id (PreToolUse, PostToolUse), a prompt's prompt_id (UserPromptSubmit, one each), and
+   * the process's own start (SessionStart with source "startup": one launch is one process). A Stop repeats under its
+   * prompt_id (stop_hook_active), and the others carry none: never matched. A prompt_id isn't one prompt's alone
+   * (HI-2850, 2.1.321): a message queued while a turn runs is submitted into it under its prompt_id, and two queued
+   * with the same text have the same body, so it isn't unique (hookTwins: a copy only while the first is answered).
+   */
+  hookOccurrence(body: Record<string, any>): HookOccurrence | null {
+    const id = (v: unknown): string | null => (typeof v === 'string' && /^[\w.:-]{1,128}$/.test(v) ? v : null)
+    const ev = body.hook_event_name
+    if (ev === 'PreToolUse' || ev === 'PostToolUse') return id(body.tool_use_id) ? { key: `${ev}:${body.tool_use_id}`, unique: true } : null
+    if (ev === 'UserPromptSubmit') return id(body.prompt_id) ? { key: `${ev}:${body.prompt_id}`, unique: false } : null
+    if (ev === 'SessionStart' && body.source === 'startup') return id(body.session_id) ? { key: `${ev}:startup:${body.session_id}`, unique: true } : null
+    return null
+  }
+
+  /** What on this PC would keep Combwork's hooks from the launch (HI-2777: hookPolicy.ts). */
+  hookCause(ctx: LaunchContext): Promise<HookCause | null> {
+    const scopes = settingsScopes(ctx.cwd, ctx.env.CLAUDE_CONFIG_DIR || claudeHome(), ctx.extraArgs)
+    return readHookCause(windowsChannelSources(ctx.env.CLAUDE_CONFIG_DIR || claudeHome()), scopes, { url: ctx.fixedHookUrl ?? ctx.hookUrl, envVar: HOOK_TOKEN_ENV })
   }
 
   /** Combwork's hooks as each launch's prepareLaunch built them (HI-982), until launchHooks takes them. */

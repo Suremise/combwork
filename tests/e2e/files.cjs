@@ -213,7 +213,85 @@ const check = (name, ok, extra = '') => {
   await sleep(300)
   await page.screenshot({ path: path.join(shots, '3-details.png') })
 
-  // Attachments tab (#387): the old .combwork/images moved into .combwork/attachments, every kind listed, filters by kind.
+  // The Git menu (HI-2743): Exclude from Git, Include Again, Why Is This Ignored? and Stop Tracking, on the project folder.
+  const gitOut = (...a) => execSync(`git ${a.join(' ')}`, { cwd: proj, env: lib.gitEnv(), encoding: 'utf8' })
+  const ignoreFile = () => fs.readFileSync(path.join(proj, '.gitignore'), 'utf8')
+  const menuItem = (text) => page.locator('.menu .menu-item', { hasText: text })
+  const shown = async (loc) => !!(await lib.until(async () => (await loc.count()) > 0, HUNG_MS))
+  // The menu opens once git has said what the row is: wait for its Git section.
+  const gitMenu = async (rel) => {
+    await page.keyboard.press('Escape')
+    // A row in a closed folder: open it first.
+    if (!(await row(rel).count()) && rel.includes('/')) {
+      await row(rel.slice(0, rel.lastIndexOf('/'))).click()
+      await lib.until(async () => (await row(rel).count()) === 1, HUNG_MS)
+    }
+    await row(rel).click({ button: 'right' })
+    return shown(page.locator('.menu .menu-header', { hasText: 'Git' }))
+  }
+  check('git menu: a row has a Git section', await gitMenu('made-outside.txt'))
+  check('git menu: an untracked file offers Exclude from Git, not Stop Tracking', (await menuItem('Exclude from Git').count()) === 1 && (await menuItem('Stop Tracking').count()) === 0)
+  await page.screenshot({ path: path.join(shots, '7-git-menu-dark.png') })
+  await menuItem('Exclude from Git').click()
+  check('git menu: Exclude offers .gitignore (shared) and Only on this PC', (await shown(page.locator('.menu .menu-header', { hasText: 'Shared with everyone' }))) && (await page.locator('.menu .menu-header', { hasText: 'Only on this PC' }).count()) === 1)
+  check('git menu: …and All *.txt files', (await menuItem('All *.txt files').count()) === 2)
+  await page.screenshot({ path: path.join(shots, '7-git-exclude-dark.png') })
+  await menuItem('This file').first().click()
+  check('exclude: appends the exact path to .gitignore, in its LF', !!(await lib.until(() => ignoreFile() === 'dist/\n/made-outside.txt\n', HUNG_MS)), JSON.stringify(ignoreFile()))
+  check('exclude: the row dims, its tooltip naming the rule', !!(await lib.until(async () => (await cls(row('made-outside.txt'))).includes('ignored') && /Ignored by \.gitignore:2 `\/made-outside\.txt`/.test((await row('made-outside.txt').getAttribute('title').catch(() => '')) ?? ''), HUNG_MS)))
+  check('exclude: the toast names the file and the branch', !!(await lib.until(async () => (await page.locator('.toast').allInnerTexts()).some((t) => /Added \/made-outside\.txt to \.gitignore on (main|master)/.test(t)), HUNG_MS)), JSON.stringify(await page.locator('.toast').allInnerTexts()))
+  check('exclude: shows as a change to .gitignore', /\.gitignore/.test(gitOut('status', '--porcelain')))
+
+  // Include Again: our own plain line goes, nothing else.
+  check('include: offered for a file our line ignores', (await gitMenu('made-outside.txt')) && (await shown(menuItem('Include Again'))) && (await menuItem('Why Is This Ignored?').count()) === 1)
+  await menuItem('Include Again').click()
+  check('include: removes only its line', !!(await lib.until(() => ignoreFile() === 'dist/\n', HUNG_MS)), JSON.stringify(ignoreFile()))
+  check('include: the row is no longer dimmed', !!(await lib.until(async () => !(await cls(row('made-outside.txt'))).includes('ignored') && (await cls(row('made-outside.txt'))) !== '', HUNG_MS)))
+
+  // Why Is This Ignored?: a wider rule (dist/) offers no Include Again, and opens .gitignore at its line.
+  check('why: a folder a wider rule ignores offers Why, not Include Again', (await gitMenu('dist')) && (await shown(menuItem('Why Is This Ignored?'))) && (await menuItem('Include Again').count()) === 0)
+  await menuItem('Why Is This Ignored?').click()
+  check('why: opens .gitignore in the Files tab', !!(await lib.until(() => selected('.gitignore'), HUNG_MS)))
+
+  // Stop Tracking, Keep the File: git rm --cached after a confirmation naming the branch.
+  check('untrack: offered for a tracked file', (await gitMenu('src/util.ts')) && (await shown(menuItem('Stop Tracking'))))
+  await menuItem('Stop Tracking').click()
+  const dialogText = await page.locator('.dialog').innerText({ timeout: HUNG_MS }).catch(() => '')
+  check('untrack: the confirmation names the branch and says the file stays', /on (main|master)/.test(dialogText) && /stays on disk/.test(dialogText), dialogText)
+  await page.getByRole('button', { name: 'Stop Tracking', exact: true }).click()
+  check('untrack: git no longer tracks it, the file stays on disk', !!(await lib.until(() => gitOut('ls-files', 'src/util.ts') === '' && exists('src/util.ts'), HUNG_MS)))
+  check('untrack: the removal is a staged deletion', /^D {2}src\/util\.ts/m.test(gitOut('status', '--porcelain')))
+
+  // Only on this PC, then Why Is This Ignored?: .git/info/exclude isn't in the tree, so Combwork's viewer shows it at the rule's line.
+  const excludeFile = () => fs.readFileSync(path.join(proj, '.git', 'info', 'exclude'), 'utf8')
+  check('exclude (this PC): offered again', (await gitMenu('made-outside.txt')) && (await shown(menuItem('Exclude from Git'))))
+  await menuItem('Exclude from Git').click()
+  await shown(page.locator('.menu .menu-header', { hasText: 'Only on this PC' }))
+  await menuItem('This file').nth(1).click()
+  check('exclude (this PC): writes .git/info/exclude, not .gitignore', !!(await lib.until(() => excludeFile().split(/\r?\n/).includes('/made-outside.txt'), HUNG_MS)) && ignoreFile() === 'dist/\n', JSON.stringify(excludeFile()))
+  const ruleLine = excludeFile().split(/\r?\n/).indexOf('/made-outside.txt') + 1
+  check('why (this PC): offered with Include Again', (await gitMenu('made-outside.txt')) && (await shown(menuItem('Why Is This Ignored?'))) && (await menuItem('Include Again').count()) === 1)
+  await menuItem('Why Is This Ignored?').click()
+  const ruleAt = page.locator('.ignore-rule-at')
+  check('why (this PC): the viewer names the file, line and rule', !!(await lib.until(async () => (await ruleAt.innerText({ timeout: 1000 }).catch(() => '')) === `Line ${ruleLine} of .git/info/exclude: \`/made-outside.txt\``, HUNG_MS)), await ruleAt.innerText().catch(() => ''))
+  // Monaco puts the cursor on the rule's line: its line number is the current one.
+  check('why (this PC): the editor is at the rule\'s line', !!(await lib.until(async () => (await page.locator('.ignore-rule-file .line-numbers.active-line-number').innerText({ timeout: 1000 }).catch(() => '')).trim() === String(ruleLine), HUNG_MS)))
+  await page.screenshot({ path: path.join(shots, '7-git-why-viewer.png') })
+  await page.locator('.dialog-footer').getByRole('button', { name: 'Close' }).click()
+  await lib.until(async () => (await ruleAt.count()) === 0, HUNG_MS)
+  await gitMenu('made-outside.txt')
+  await shown(menuItem('Include Again'))
+  await menuItem('Include Again').click()
+  check('include (this PC): removes its line from .git/info/exclude', !!(await lib.until(() => !excludeFile().split(/\r?\n/).includes('/made-outside.txt'), HUNG_MS)))
+
+  // Show Changes: a modified file's diff in Version Control → Changes.
+  check('show changes: offered for a modified file', (await gitMenu('src/app.ts')) && (await shown(menuItem('Show Changes'))))
+  await menuItem('Show Changes').click()
+  check('show changes: opens Changes at that file', !!(await lib.until(async () => (await page.locator('.row.selected[data-path="src/app.ts"]').count()) === 1, HUNG_MS)))
+  await page.locator('.tab', { hasText: 'Files' }).click()
+  await lib.until(async () => (await row('made-outside.txt').count()) === 1, HUNG_MS)
+
+    // Attachments tab (#387): the old .combwork/images moved into .combwork/attachments, every kind listed, filters by kind.
   await page.locator('.tab', { hasText: 'Attachments' }).click()
   await lib.until(async () => (await page.locator('.thumb').count()) === 8, 10000)
   await page.screenshot({ path: path.join(shots, '4-attachments.png') })
@@ -269,6 +347,12 @@ const check = (name, ok, extra = '') => {
   await inv('settings:update', { appearance: { theme: 'light' } })
   await sleep(800)
   await page.screenshot({ path: path.join(shots, '6-light.png') })
+  check('git menu (light): opens', await gitMenu('made-outside.txt'))
+  await page.screenshot({ path: path.join(shots, '7-git-menu-light.png') })
+  await menuItem('Exclude from Git').click()
+  await shown(page.locator('.menu .menu-header', { hasText: 'Shared with everyone' }))
+  await page.screenshot({ path: path.join(shots, '7-git-exclude-light.png') })
+  await page.keyboard.press('Escape')
 
   console.log(results.join('\n'))
   await app.close()

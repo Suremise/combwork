@@ -1,0 +1,8 @@
+{
+ "status": 409,
+ "body": {
+  "_tag": "ConflictError",
+  "message": "Session already exists: ses_e428cefc2ffeSDNwiHFcRk8o1D",
+  "resource": "ses_e428cefc2ffeSDNwiHFcRk8o1D"
+ }
+}

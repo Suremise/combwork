@@ -1,0 +1,6 @@
+$ opencode auth list --standalone
+code 0
+--- stdout
+No authenticated integrations
+
+--- stderr

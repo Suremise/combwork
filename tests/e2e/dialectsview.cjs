@@ -108,6 +108,11 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   check("Antigravity's CLI file is listed, for every Antigravity agent", !!(await until(async () => (await agy.count()) && (await agy.innerText()).includes('Every Antigravity agent'), HUNG_MS)), await agy.innerText().catch(() => ''))
   await agy.scrollIntoViewIfNeeded()
   await shot('antigravity')
+  // …and OpenCode's (HI-2764), with New Model File on its group.
+  const oc = row('opencode/cli.json')
+  check("OpenCode's CLI file is listed, for every OpenCode agent, with New Model File on its group", !!(await until(async () => (await oc.count()) && (await oc.innerText()).includes('Every OpenCode agent'), HUNG_MS)) && (await page.locator('[data-action="dialect-new:opencode"]').count()) === 1, await oc.innerText().catch(() => ''))
+  await oc.scrollIntoViewIfNeeded()
+  await shot('opencode')
 
   // --- Each file's on/off switch names the layer its texts fall back to (HI-2524).
   const onTip = (p, want) => lib.hoverTip(page, row(p).locator('.skill-delivered'), (t) => t.includes(want), HUNG_MS)
@@ -307,6 +312,11 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   check('Import puts the picked file in the folder, as a test copy when its model is claimed', imported?.path === 'claude-code/Imported.json' && imported.testCopy === true && !('model' in JSON.parse(read('claude-code/Imported.json'))), JSON.stringify(imported))
   const again = await inv('dialects:import', picked.token, 'claude-code', 'Imported again').catch((e) => ({ error: String(e) }))
   check('…and its token is spent', !!again?.error, JSON.stringify(again))
+  // Import Dialect File lists every provider's folder, OpenCode's too (HI-2764): a file imported into it.
+  const pickedOc = await inv('dialects:pickImport')
+  const intoOc = await inv('dialects:import', pickedOc.token, 'opencode', 'Imported OC')
+  check("Import puts a file in OpenCode's folder too", intoOc?.path === 'opencode/Imported OC.json' && fs.existsSync(path.join(dialects, 'opencode', 'Imported OC.json')), JSON.stringify(intoOc))
+  await inv('dialects:delete', 'opencode/Imported OC.json')
   check('a file the user made can be deleted (to the Recycle Bin)', (await inv('dialects:delete', 'claude-code/Imported.json')) === null && !fs.existsSync(path.join(dialects, 'claude-code', 'Imported.json')))
 
   // --- Export writes the file as it is.
@@ -329,6 +339,11 @@ const read = (rel) => fs.readFileSync(path.join(dialects, ...rel.split('/')), 'u
   await create()
   check('New Model File makes an empty file claiming the model as typed', !!(await until(() => fs.existsSync(path.join(dialects, 'claude-code', 'Qwen local.json')), HUNG_MS)) && JSON.stringify(JSON.parse(read('claude-code/Qwen local.json'))) === JSON.stringify({ name: 'Qwen local', model: 'qwen3:32b', texts: {} }), read('claude-code/Qwen local.json'))
   check("…listed as Yours, with its model's line", !!(await until(async () => /Yours/.test(await row('claude-code/Qwen local.json').innerText().catch(() => '')) && /qwen3:32b/.test(await row('claude-code/Qwen local.json').locator('.desc').innerText().catch(() => '')), HUNG_MS)))
+  // OpenCode's group (HI-2764): a model file for an OpenCode model ID, `provider/model`, saved as typed.
+  await newOn('opencode').click()
+  await fill({ name: 'Qwen on Ollama', model: 'ollama/qwen3:8b' })
+  await create()
+  check("New Model File on OpenCode's group claims an OpenCode model ID as typed", !!(await until(() => fs.existsSync(path.join(dialects, 'opencode', 'Qwen on Ollama.json')), HUNG_MS)) && JSON.stringify(JSON.parse(read('opencode/Qwen on Ollama.json'))) === JSON.stringify({ name: 'Qwen on Ollama', model: 'ollama/qwen3:8b', texts: {} }), fs.existsSync(path.join(dialects, 'opencode', 'Qwen on Ollama.json')) ? read('opencode/Qwen on Ollama.json') : 'no file')
   await newOn('codex').click()
   await fill({ name: 'Blank' })
   await create()

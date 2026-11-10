@@ -86,6 +86,7 @@ interface CombworkMessageValues {
   'tasks.error.targetHasWork': { unknown: string; card: string | number; target: string | number }
   'tasks.error.targetLane': { card: string | number; builder: string | number; target: string | number }
   'tasks.error.targetMissing': { unknown: string; target: string | number }
+  'tasks.error.targetMoveRefused': { why: string; card: string | number; from: string | number; rule: string; to: string | number; builder: string | number; laneTarget: string | number; ref: string | number; lock: string | number; hasDetail: string; detail: string | number }
   'tasks.error.targetMoved': { card: string | number }
   'tasks.error.targetNotAgents': undefined
   'tasks.error.targetNotListed': { hasTargets: string; target: string | number; default: string | number; hasOthers: string; others: string | number }
@@ -155,6 +156,7 @@ interface CombworkMessageValues {
   'tasks.history.repaired': { from: string | number; to: string | number }
   'tasks.history.requestClosed': { why: string }
   'tasks.history.restored': { project: string | number }
+  'tasks.history.retargeted': { from: string | number; to: string | number }
   'tasks.history.returned': { round: string | number }
   'tasks.history.reviewCopyLeased': { agent: string | number; copy: string | number; revision: string | number }
   'tasks.history.reviewCopyWaiting': { agent: string | number }

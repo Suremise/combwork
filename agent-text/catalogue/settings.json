@@ -1684,6 +1684,16 @@
     "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
     "audience": "both"
   },
+  "settings.advanced.copilot.terminal.turn.desc": {
+    "text": "What Copilot writes to its terminal (an OSC sequence, without its ESC ]) as a turn starts and ends; the first group is the state (working, done). Combwork reads it only while an agent's hooks aren't arriving, to show it working or finished; wrong, such an agent shows only that its status is unknown.",
+    "note": "What the advanced setting \"Turn state in the terminal\" is for, and what goes wrong when it is wrong (Settings → Advanced). \"OSC sequence\" and \"ESC ]\" are terminal terms: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.copilot.terminal.turn.title": {
+    "text": "Turn state in the terminal",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
   "settings.advanced.copilot.trust.prompt.desc": {
     "text": "Copilot's question before a folder's first session. Combwork shows the agent as waiting for you while it is on screen.",
     "note": "What the advanced setting \"Trust question\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
@@ -2679,6 +2689,166 @@
     "note": "Under an advanced setting whose value no longer finds what the CLI was recorded showing (Settings → Advanced). {cli} is the CLI's name, {version} its version; {shown} is the CLI's own text, in English.",
     "audience": "both"
   },
+  "settings.advanced.opencode.ambient.integrations.desc": {
+    "text": "OpenCode's providers that can use a sign-in this PC already has (an AWS profile, a gcloud login, the Azure CLI's), by their ids: Combwork denies each unless the account saved a credential for it. Wrong, an agent could use one of those sign-ins unasked.",
+    "note": "What the advanced setting \"Providers using this PC's sign-ins\" is (Settings → Advanced, under OpenCode). AWS, gcloud and Azure CLI are names.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.ambient.integrations.title": {
+    "text": "Providers using this PC's sign-ins",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): OpenCode's providers that can use a sign-in the PC already has.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.env.credentials.desc": {
+    "text": "The names of the environment variables Combwork leaves out of OpenCode while Keep other credentials from OpenCode is on: every variable OpenCode's providers read as a key or token, and the clouds' own (AWS, Azure, Google). Combwork's own variables are always kept. Wrong, a key set on this PC could reach an OpenCode agent unasked.",
+    "note": "What the advanced setting \"Credentials left out of OpenCode\" is (Settings → Advanced, under OpenCode). Keep other credentials from OpenCode is the name of another setting; AWS, Azure and Google are names.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.env.credentials.title": {
+    "text": "Credentials left out of OpenCode",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the environment variables' names Combwork leaves out.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.history.pollSeconds.desc": {
+    "text": "How often Combwork checks a running OpenCode agent's session for changes, and reads it again when it changed, for its history, tokens and cost. Longer, they're behind for longer; shorter, more reads.",
+    "note": "What the advanced setting \"History: check interval\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.history.pollSeconds.title": {
+    "text": "History: check interval",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.history.repairMinutes.desc": {
+    "text": "How often Combwork looks for OpenCode sessions whose history it couldn't read, and tries again for those whose OpenCode data changed since. Longer, a history stays incomplete for longer.",
+    "note": "What the advanced setting \"History: repair interval\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.history.repairMinutes.title": {
+    "text": "History: repair interval",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.history.retryMinutes.desc": {
+    "text": "How long Combwork waits before trying again to read an OpenCode session's history it couldn't read, when nothing in that account's OpenCode data changed meanwhile.",
+    "note": "What the advanced setting \"History: retry after\" is for (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.history.retryMinutes.title": {
+    "text": "History: retry after",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.line.desc": {
+    "text": "One line of opencode models' list: the model's id, its provider and model as provider/model (its first group). Wrong, no OpenCode models are offered.",
+    "note": "What the advanced setting \"A model in opencode models\" is (Settings → Advanced, under OpenCode). opencode models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.line.title": {
+    "text": "A model in opencode models",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of one line of the CLI's model list. opencode models is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.variantId.desc": {
+    "text": "The field of a model's variant with its id, the effort level Combwork passes when an OpenCode session starts. Wrong, no effort is offered for OpenCode models.",
+    "note": "What the advanced setting \"Model list: a variant's id field\" is for, and what goes wrong when it is wrong (Settings → Advanced, under OpenCode).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.variantId.title": {
+    "text": "Model list: a variant's id field",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the field of one of a model's variants that holds its id.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.variants.desc": {
+    "text": "The field of a model in OpenCode's model list with its variants, which Combwork offers as its effort levels. Wrong, no effort is offered for OpenCode models.",
+    "note": "What the advanced setting \"Model list: a model's variants field\" is for, and what goes wrong when it is wrong (Settings → Advanced, under OpenCode).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.models.variants.title": {
+    "text": "Model list: a model's variants field",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the field of OpenCode's model list that holds a model's variants.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.askOutsideFolder.desc": {
+    "text": "Combwork's private OpenCode config makes an OpenCode agent ask before it reads or changes anything outside its own folder (OpenCode's external_directory permission). A reviewer's review copies, the agent's skills and its temp folder stay allowed. Approve all approves these questions without asking you, and a rule in the project's own OpenCode config, when you let it load, comes after Combwork's and wins. An agent nobody is watching waits at such a question until you answer it in its pane. Turned off, OpenCode agents reach any folder on this PC without asking, as OpenCode's own rules allow outside Combwork.",
+    "note": "What the advanced setting \"Ask before reaching outside the agent's folder\" does (Settings → Advanced, under OpenCode). external_directory is the name of an OpenCode permission: keep it. Approve all is the name of a permission mode: use its translated name.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.askOutsideFolder.title": {
+    "text": "Ask before reaching outside the agent's folder",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.keepProjectConfigOut.desc": {
+    "text": "Combwork runs OpenCode with OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1, so nothing of the project's own OpenCode setup loads, and Combwork gives OpenCode the project's AGENTS.md itself. Turned off, OpenCode loads what it would outside Combwork: the project's opencode.json and any opencode.json in a folder above it, its .opencode folder (MCP servers, agents, and plugins, whose code runs), the skills in its .agents and .claude folders and in your home folder's .claude, and the instructions its config names. A project's MCP server with the same name as one Combwork gave the agent then replaces it, Combwork's own tools included.",
+    "note": "What the advanced setting \"Keep the project's OpenCode config out\" does (Settings → Advanced, under OpenCode), as OpenCode 2.2.6 was recorded loading each (HI-2763, HI-2761). OPENCODE_DISABLE_PROJECT_CONFIG=1 and OPENCODE_DISABLE_CLAUDE_CODE=1 are environment variables; opencode.json, .opencode, .agents, .claude and AGENTS.md are file and folder names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.keepProjectConfigOut.title": {
+    "text": "Keep the project's OpenCode config out",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.noAutoUpdate.desc": {
+    "text": "Combwork runs OpenCode with update: \"disable\" in its private config and OPENCODE_DISABLE_AUTOUPDATE=1 (its agents, and checking its accounts and models), so it runs the version installed and never changes between an agent's restarts; Update in Provider Setup updates it when you choose. Turned off, OpenCode may update itself as it would outside Combwork.",
+    "note": "What the advanced setting \"Don't let OpenCode update itself\" does (Settings → Advanced, under OpenCode). update: \"disable\" is a config setting and OPENCODE_DISABLE_AUTOUPDATE=1 an environment variable: keep them. Update is a button's name and Provider Setup a dialog's.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.noAutoUpdate.title": {
+    "text": "Don't let OpenCode update itself",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.ownProviderOnly.desc": {
+    "text": "Combwork's private OpenCode config denies every provider but the one in the connection's model (ollama in ollama/qwen3:8b), so nothing OpenCode does on the agent's behalf goes to another provider: not a title or compaction set to another provider's model, nor an image request falling back to another provider's model, nor OpenCode's free cloud models. A connection with this on must name its model. It decides which provider OpenCode uses, not where the provider's address points, and isn't a firewall: web search, MCP servers, plugins and commands can still reach the network. Turned off, OpenCode may use any provider it can, as it would outside Combwork; Claude Agent stays denied either way.",
+    "note": "What the advanced setting \"Keep OpenCode to the connection's own provider\" does (Settings → Advanced, under OpenCode). ollama and ollama/qwen3:8b are a provider's and a model's ids, and Claude Agent a provider's name: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.ownProviderOnly.title": {
+    "text": "Keep OpenCode to the connection's own provider",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.stripCredentials.desc": {
+    "text": "Combwork leaves the variables OpenCode reads as a provider's key or token out of its environment (the shell its agents run commands in too: GITHUB_TOKEN and HF_TOKEN among them), and denies Amazon Bedrock, Google Vertex and Azure unless the account saved a credential for them, so an AWS profile, a gcloud login or an Azure CLI sign-in on this PC is never used unasked. OpenCode's Claude Agent provider is denied either way. Turned off, OpenCode gets those variables and may use those sign-ins as it would outside Combwork.",
+    "note": "What the advanced setting \"Keep other credentials from OpenCode\" does (Settings → Advanced, under OpenCode). GITHUB_TOKEN and HF_TOKEN are environment variables; Amazon Bedrock, Google Vertex, Azure, gcloud, Azure CLI and Claude Agent are names: keep them.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.override.stripCredentials.title": {
+    "text": "Keep other credentials from OpenCode",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): one of Combwork's overrides of the CLI, on by default.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.rules.loaded.desc": {
+    "text": "What OpenCode shows on the agent (its /api/agent reply) once it has loaded Combwork's rule to ask before folders outside the agent's own. With Ask before reaching outside the agent's folder on, Combwork waits for it before OpenCode's window opens, so no tool runs before the rule applies, and the agent doesn't start without it. Wrong, OpenCode agents don't start.",
+    "note": "What the advanced setting \"Combwork's folder rule, in OpenCode's agent\" is (Settings → Advanced, under OpenCode). /api/agent is an address: keep it. The quoted setting title is another advanced setting's: use its translated title.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.rules.loaded.title": {
+    "text": "Combwork's folder rule, in OpenCode's agent",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the rule Combwork waits to see on OpenCode's agent.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.server.readySeconds.desc": {
+    "text": "How long an OpenCode agent's private server gets to answer before the launch gives up and ends it. Too short, an agent on a slow PC doesn't start.",
+    "note": "What the advanced setting \"Server: time to start\" is for, and what goes wrong when it is wrong (Settings → Advanced).",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.server.readySeconds.title": {
+    "text": "Server: time to start",
+    "note": "An advanced setting's title (Settings → Advanced), listed under its CLI or Combwork.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.version.desc": {
+    "text": "What opencode --version prints: the version is its first group. Combwork uses only OpenCode 2 or later. Wrong, OpenCode isn't found.",
+    "note": "What the advanced setting \"The version in opencode --version\" is (Settings → Advanced, under OpenCode). opencode --version is a command: keep it.",
+    "audience": "both"
+  },
+  "settings.advanced.opencode.version.title": {
+    "text": "The version in opencode --version",
+    "note": "An advanced setting's title (Settings → Advanced, under OpenCode): the pattern of the CLI's version line. opencode --version is a command: keep it.",
+    "audience": "both"
+  },
   "settings.advanced.reset.desc": {
     "text": "Restore every setting in Settings to its default, the advanced settings in advanced.json too. Workspaces and projects, and a workspace's own advanced values, are not affected.",
     "note": "What the setting \"Reset all settings\" does, under its title (Settings → Advanced).",
@@ -2820,6 +2990,10 @@
   "settings.agent.error.fallbackShape": {
     "text": "{title} takes a list of {shape}, or null for Combwork's list.",
     "note": "A provider's fallback list given something other than a list. {shape} is an entry's JSON fields: code, as written."
+  },
+  "settings.agent.error.githubHost": {
+    "text": "{title} takes a host name only, such as github.com or yourcompany.ghe.com (no scheme but https://, no user name, token, path, query or port){copilot, select, yes {: github.com or a GHE.com host, never a GitHub Enterprise Server, or repo (the same as the GitHub host) or ghes-proxy} other {}}, or null to inherit. Refused: {why}.",
+    "note": "A GitHub host setting given a value it refuses (HI-2779). {copilot} is yes for where Copilot signs in. {why} is the reason code as written (credentials, path, query, port, scheme, invalid, empty, notCloud): keep it. repo and ghes-proxy are values as written."
   },
   "settings.agent.error.isAction": {
     "text": "it is a button, a status or a list",
@@ -3125,6 +3299,18 @@
     "text": "a whole number from {min} to {max}",
     "note": "What a number workflow option takes. {min} and {max} are numbers as written."
   },
+  "settings.agent.tool.githubChoose": {
+    "text": "none: the repositories are on GitHub Enterprise Server, so where Copilot signs in must be chosen (Copilot agents don't start until then)",
+    "note": "What \"Copilot signs in on\" resolves to when the repositories are on a GHES host and nothing is chosen (HI-2779)."
+  },
+  "settings.agent.tool.githubEffective": {
+    "text": "{value}, {origin, select, project {set for the project} workspace {from the workspace} environment {from Combwork's environment (GH_HOST, COPILOT_GH_HOST)} other {the default}}",
+    "note": "What a GitHub host setting resolves to now (HI-2779). {value} is a host, or settings.agent.tool.githubChoose. {origin} is a key, never shown."
+  },
+  "settings.agent.tool.githubProxy": {
+    "text": "GitHub Enterprise Server's Copilot proxy, not supported yet (Copilot agents don't start)",
+    "note": "What \"Copilot signs in on\" resolves to when the GHES Copilot proxy is chosen (HI-2779)."
+  },
   "settings.agent.tool.keptCard": {
     "text": "{card} into {target}",
     "note": "HI-2674: a card in flight keeping its target. {card} is its key (HI-12); {target} a branch."
@@ -3190,7 +3376,7 @@
     "note": "When a change applies: to new sessions (#676). Restart session is the name of the button: keep it as the window shows it."
   },
   "settings.agent.tool.retarget": {
-    "text": "These still on {from} can follow {to} (Todo cards with no work, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.",
+    "text": "These still on {from} can follow {to} (Todo cards with no work, cards started with only their own work, running lanes with their card, free clean slots): {items}. To move them, ask the user, then cw_queue retarget with preview {preview} and the items they agree to (each moves only as listed here); {stay, plural, =0 {nothing else stays} one {# other thing stays, with why in the preview} other {# others stay, with why in the preview}}.",
     "note": "HI-2680: after a change of a project's target, in cw_update_setting's reply: what the retarget can move. {items} are card keys and slot names."
   },
   "settings.agent.tool.switchRefused": {
@@ -3212,6 +3398,10 @@
   "settings.agent.tool.takes.fallback": {
     "text": "the whole list: [{shape}], or null for Combwork's list",
     "note": "What a provider's fallback list takes. {shape} is an entry's JSON fields: code, as written."
+  },
+  "settings.agent.tool.takes.githubHost": {
+    "text": "a host name only, such as github.com or yourcompany.ghe.com{copilot, select, yes {: github.com or a GHE.com host, or repo (the same as the GitHub host) or ghes-proxy (not supported yet)} other {}}; or null to inherit",
+    "note": "What a GitHub host setting takes (HI-2779). {copilot} is yes for where Copilot signs in. repo, ghes-proxy and null are values as written: keep them."
   },
   "settings.agent.tool.takes.nothing": {
     "text": "nothing through the tools",
@@ -4090,6 +4280,26 @@
   "settings.general.userName.title": {
     "text": "Your name",
     "note": "A setting's title (Settings → General).",
+    "audience": "both"
+  },
+  "settings.github.copilotHost.desc": {
+    "text": "Usually the same as the GitHub host. With repositories on GitHub Enterprise Server, choose where your Copilot licence is: github.com or your GHE.com host.",
+    "note": "What the setting “Copilot signs in on” is for (HI-2779). GHE.com is GitHub’s product name.",
+    "audience": "both"
+  },
+  "settings.github.copilotHost.title": {
+    "text": "Copilot signs in on",
+    "note": "A setting (HI-2779): the GitHub host GitHub Copilot signs in on, which can differ from the repositories’ host.",
+    "audience": "both"
+  },
+  "settings.github.host.desc": {
+    "text": "github.com, your GHE.com host (yourcompany.ghe.com) or your GitHub Enterprise Server’s name. Only the name: no path, port or token.",
+    "note": "What the setting “GitHub host” takes (HI-2779). GHE.com is GitHub’s product name; keep the host names.",
+    "audience": "both"
+  },
+  "settings.github.host.title": {
+    "text": "GitHub host",
+    "note": "A setting (HI-2779): the host of the repositories: github.com, a GHE.com host (yourcompany.ghe.com) or a GitHub Enterprise Server.",
     "audience": "both"
   },
   "settings.keybindings.editor.desc": {

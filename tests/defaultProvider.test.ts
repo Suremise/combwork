@@ -6,7 +6,7 @@ import { AUTO_PROVIDER, PROVIDERS, agentProvider, autoProvider, autoProviderPend
 import { DEFAULT_APP_CONFIG, DEFAULT_SETTINGS, mergeDefaults, migrateConfig } from '../src/shared/defaults'
 import type { AppSettings, ProviderId } from '../src/shared/types'
 
-const ALL = ['claude-code', 'codex', 'copilot', 'antigravity']
+const ALL = ['claude-code', 'codex', 'copilot', 'antigravity', 'opencode']
 
 /** Settings with these providers turned on and this default. */
 function settings(on: string[], defaultProvider: string = AUTO_PROVIDER): AppSettings {
@@ -50,8 +50,8 @@ describe('Automatic', () => {
 
   it('never resolves from partial detection: Codex found before Claude Code has answered (#506)', () => {
     // Detection as Combwork hears it: found, missing, or null while still looking.
-    // Antigravity answered missing at once; the others as below.
-    const heard: Partial<Record<ProviderId, boolean | null>> = { 'claude-code': null, codex: true, copilot: null, antigravity: false }
+    // Antigravity and OpenCode answered missing at once; the others as below.
+    const heard: Partial<Record<ProviderId, boolean | null>> = { 'claude-code': null, codex: true, copilot: null, antigravity: false, opencode: false }
     setInstalledCheck((id) => heard[id] ?? null)
     expect(autoProviderPending(settings(ALL))).toBe(true)
     // Its best guess meanwhile is Claude Code (not yet known missing), never Codex.
@@ -70,8 +70,8 @@ describe('Automatic', () => {
     const answers: [ProviderId, boolean][] = [['claude-code', true], ['codex', true], ['copilot', false]]
     const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]
     for (const order of orders) {
-      // Antigravity answered missing at once; the other three in each order.
-      const heard: Partial<Record<ProviderId, boolean | null>> = { antigravity: false }
+      // Antigravity and OpenCode answered missing at once; the other three in each order.
+      const heard: Partial<Record<ProviderId, boolean | null>> = { antigravity: false, opencode: false }
       setInstalledCheck((id) => heard[id] ?? null)
       for (const [n, k] of order.entries()) {
         expect(autoProviderPending(settings(ALL)), `order ${order}, before answer ${n + 1}`).toBe(true)
@@ -84,7 +84,7 @@ describe('Automatic', () => {
     }
     // Claude Code missing: Codex, once all have answered, in either order.
     for (const first of ['claude-code', 'codex'] as ProviderId[]) {
-      const heard: Partial<Record<ProviderId, boolean | null>> = { copilot: false, antigravity: false }
+      const heard: Partial<Record<ProviderId, boolean | null>> = { copilot: false, antigravity: false, opencode: false }
       setInstalledCheck((id) => heard[id] ?? null)
       heard[first] = first === 'codex'
       expect(autoProviderPending(settings(ALL))).toBe(true)
@@ -140,7 +140,7 @@ describe('which providers Combwork warns about (the banner, the status bar, Prov
 })
 
 describe("Combwork's order (HI-2139: no order of the user's)", () => {
-  it('Claude Code, Codex, GitHub Copilot, Antigravity CLI: Automatic picks the first turned on and installed in it', () => {
+  it('Claude Code, Codex, GitHub Copilot, Antigravity CLI, OpenCode: Automatic picks the first turned on and installed in it', () => {
     expect(PROVIDERS.map((p) => p.id)).toEqual(ALL)
     installed(ALL)
     expect(autoProvider(settings(ALL))).toBe('claude-code')

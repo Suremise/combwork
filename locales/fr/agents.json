@@ -396,5 +396,16 @@
   "agents.workflowTools.restartTitle": "Redémarrer {agents} pour le nouveau flux de travail ?",
   "agents.workflowTools.restartMessage": "{count, plural, one {{agents} est en train de travailler. Les outils que le flux de travail de son projet permet désormais se chargent à son redémarrage ; il continue dans la même conversation.} many {{agents} sont en train de travailler. Les outils que le flux de travail de leur projet permet désormais se chargent à leur redémarrage ; chacun continue dans la même conversation.} other {{agents} sont en train de travailler. Les outils que le flux de travail de leur projet permet désormais se chargent à leur redémarrage ; chacun continue dans la même conversation.}}",
   "agents.workflowTools.restartWhenDone": "{count, plural, one {Redémarrer une fois son tour terminé} many {Redémarrer une fois leurs tours terminés} other {Redémarrer une fois leurs tours terminés}}",
-  "agents.workflowTools.later": "Plus tard"
+  "agents.workflowTools.later": "Plus tard",
+  "agents.opencode.auto": "Tout approuver",
+  "agents.opencode.autoDescription": "Approuve sans demander chaque autorisation que les règles d’OpenCode ne refusent pas explicitement. À utiliser uniquement là où des modifications sans surveillance sont acceptables.",
+  "agents.opencode.build": "Build",
+  "agents.opencode.buildDescription": "L’agent Build d’OpenCode avec ses propres règles d’autorisation : il demande avant ce qu’elles n’autorisent pas.",
+  "agents.opencode.extensionNote": "Tu as une copie d’OpenCode dans un éditeur. Combwork n’utilise pas la copie de l’éditeur. Installe OpenCode 2 autonome ; ton éditeur continue de fonctionner comme avant.",
+  "agents.opencode.installNote": "Installe OpenCode 2 depuis son téléchargement Windows autonome officiel : Installer récupère la version 2.x la plus récente sur GitHub, la vérifie avec le SHA256SUMS de la version et place `opencode.exe` dans %LOCALAPPDATA%\\Programs\\OpenCode. OpenCode 1 (`opencode-ai`) et le projet opencode archivé ne sont pas pris en charge. Si OpenCode 2 est installé ailleurs, indique son chemin dans Paramètres → OpenCode.",
+  "agents.opencode.modelPlaceholder": "ID de modèle, par ex. ollama/qwen3:8b",
+  "agents.opencode.noPlanLimits": "OpenCode ne signale les limites de forfait que pour un espace de travail OpenCode Go ou Console auquel il est connecté. Les limites des autres fournisseurs ne sont pas disponibles par son biais, donc aucune n’est affichée.",
+  "agents.opencode.plan": "Plan",
+  "agents.opencode.planDescription": "L’agent Plan d’OpenCode : il planifie et lit, et demande avant de modifier quoi que ce soit.",
+  "agents.opencode.signInHelp": "Reconnecte le compte à un fournisseur de modèles : Paramètres → Comptes et connexions → le compte OpenCode → Se connecter (il exécute opencode auth login)."
 }

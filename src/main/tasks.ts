@@ -9,6 +9,8 @@ import { RETURNED_COMMENT, returnedCommentFrom } from './workflow/queueState'
 import { fmt, msg, tr, type Msg } from '../shared/i18n'
 import { COLUMN_CHOICES, TASK_COLUMNS, cardMatches, isTaskColumn, restoreOrders, searchedWords, sortCards } from '../shared/tasks'
 import { branchExists, dropEmptyLines, ownWork, pickTarget, projectTargets } from './workflow/targets'
+import { checkCardMove, holdChecked, IN_FLIGHT_STAGES, laneOf, laneStill, MoveRefused, moveTestHooks, rulesInto, stillAsChecked, stillHeld, type LaneSeen, type MoveRefusal } from './workflow/retargetCard'
+import type { RefHold } from './platform/refHold'
 import { HISTORY, setStoredAgentRenderer, setStoredForAgents, storedAgentText, storedIds, storedLineText, storedText } from '../shared/taskHistory'
 import { MAX_CONTEXT, MAX_CONTEXT_REF, parseDocRef } from '../shared/docRefs'
 import { contextProblems } from './docSections'
@@ -35,7 +37,7 @@ import { answerFits, approveNote, ASK_ACTIONS, CATEGORY_STAGE, DECISION_ANSWERS_
 import { askActionAvailable, kindProposed, reviewSkipOf, type ForYouAnswer } from '../shared/workflow/workView'
 import { LANE_MAX_ROUNDS } from '../shared/lanes'
 import { REFUSALS, refusal as refusalOf, type Refusal } from '../shared/workflow/refusals'
-import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, type CardQuery } from './boardStore'
+import { archiveBatchDocs, boardReadToken, boardGeneration, boardSavepoint, cardChanges, movedNames, boardRead, boardReadOnly, cardHeads, cardHeadDocs, headChanges, archivedSummaryDocs, boardChanged, boardWrite, cardDoc, cardDocs, cardNumbers, cardPlaces, costDocs, deleteCard, cardKeys, cardRevs, hasCard, holdChanges, holdDocs, keepOwnNumber, putCard, archiveComments, archivedComments, commentArchiveOf, searchCards, setArchiveBatches, setAsideAdded, setAsideFile, setAsideFiles, SET_ASIDE, takeNumber, decisionChanges, cardsOnBoard, inBoardWrite, type CardQuery } from './boardStore'
 import type { Evicted } from './schema/commentArchive'
 import { keysForSearch } from './projectKeys'
 import { config } from './config'
@@ -2058,7 +2060,103 @@ const TARGET = {
   changed: msg({ id: 'tasks.error.targetChanged', defaultMessage: '{card}’s Merges into changed since it was listed, so it stays as it is.', description: 'HI-2680: a card left out of a retarget: its Merges into changed between the preview and the move. {card} is its key (HI-12).' }),
   moved: msg({ id: 'tasks.error.targetMoved', defaultMessage: '{card}’s old branch changed while its Merges into was being changed, so it stays as it is. Look at what arrived there first.', description: 'HI-2556: an error changing a card’s Merges into: its old branch, found with no work of its own, moved (a commit arrived) before Combwork could remove it, so nothing was changed. {card} is the card’s key (HI-12).' }),
   checkedOut: msg({ id: 'tasks.error.targetCheckedOut', defaultMessage: '{unknown, select, yes {Combwork can’t tell whether {card}’s old branch is in use, so its Merges into stays as it is.} other {{card}’s old branch is still checked out in {folder}, so its Merges into stays as it is. Try again once that folder has moved on.}}', description: 'HI-2556: an error changing a card’s Merges into: its old branch (which has no work of its own and would be removed so its next start begins fresh) is still checked out in a folder. {card} is the card’s key (HI-12), {folder} a folder’s path. unknown yes: git couldn’t say. Keep the select keys.' }),
-  inLane: msg({ id: 'tasks.error.targetLane', defaultMessage: '{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.', description: 'HI-2556: an error setting a card’s Merges into to another branch than its lane’s. {card} is the card’s key (HI-12), {builder} the lane’s builder agent, {target} the lane’s branch.' })
+  inLane: msg({ id: 'tasks.error.targetLane', defaultMessage: '{card} is in {builder}’s lane, which merges into {target}: a lane’s cards merge where it does. Take it out of the lane first.', description: 'HI-2556: an error setting a card’s Merges into to another branch than its lane’s. {card} is the card’s key (HI-12), {builder} the lane’s builder agent, {target} the lane’s branch.' }),
+  moveRefused: msg({
+    id: 'tasks.error.targetMoveRefused',
+    defaultMessage:
+      '{why, select, queued {{card} is in the merge queue for {from}: it can move once its entry is done or taken out.} notInTarget {{card} stays on {from}: {rule, select, firstParent {its branch merged in history {to} doesn’t have} otherRef {some of its commits are on another branch, tag or worktree too} reflog {its branch was moved onto commits {to} doesn’t have (a fast-forward, a reset or a rebase)} other {it was started from a commit {to} doesn’t have}}. Merge {from} into {to} first, or put it back and start it again on {to}.} reviewed {{card} stays on {from}: its reviewed work would bring other commits into {to} than it was reviewed with. Send it back to Doing, move it, then submit it again.} noLine {{card} works in the project folder, not on a branch of its own, so it stays on {from}.} targetMissing {There is no branch {to} in this repository: make it first, then pick it.} lane {{card} is in {builder}’s lane, which merges into {laneTarget}: a lane and its card move together, with a retarget of Work merges into (Also retarget what can move).} locked {Another git operation holds {ref}, so {card} stays on {from}. Try again once it ends; if no git is running there, remove {lock} and try again.} changed {{card} or its branch changed while it was being moved, so it stays on {from}. Try again.} other {Combwork can’t tell whether everything {card} would bring into {to} is its own work, so it stays on {from}.}}{hasDetail, select, yes { ({detail})} other {}}',
+    description:
+      'HI-2753: an error moving a card already started (in Doing, Review or Passed) from the branch it started on ({from}) to another ({to}), its work kept: why it stays. {card} is its key (HI-12); {builder} a lane’s builder agent and {laneTarget} that lane’s branch; {ref} a git ref (refs/heads/main) and {lock} a file path; {detail} what git or the check said, in English. Work merges into and Also retarget what can move are names in the window (Version Control → Workflow, Save…): as translated there. Keep the select keys.'
+  })
+}
+
+/**
+ * HI-2753: whether a change of the card's Merges into would move it in flight (started, not Done): such a change runs in
+ * a change of its own (`moveInFlight` takes the lanes' lock before the board's), never inside a batch.
+ */
+export async function targetMovesInFlight(n: number): Promise<boolean> {
+  const ws = workspace
+  const card = await getTask(n, ws)
+  if (!card.project || !ws.path) return false
+  const { workflowFor } = await import('./workflow/service')
+  const wf = await workflowFor(ws, join(ws.path, card.project)).catch(() => null)
+  return !!wf && IN_FLIGHT_STAGES.includes(wf.state(wf.store.card(n)).stage)
+}
+
+/** HI-2753: a move of a card in flight refused, in words (TARGET.moveRefused). */
+function moveRefusedError(n: number, r: MoveRefusal, v: { from: string; to: string; builder?: string; laneTarget?: string }): TaskConflictError {
+  const detail = r.why === 'cantCheck' || r.why === 'notInTarget' || r.why === 'changed' ? (r.detail ?? '') : ''
+  return new TaskConflictError(withValues(TARGET.moveRefused, { why: r.why, rule: r.rule ?? 'anchor', card: cardRef(n), from: v.from, to: v.to, builder: v.builder ?? '', laneTarget: v.laneTarget ?? '', ref: r.ref ?? '', lock: r.lock ?? '', hasDetail: detail ? 'yes' : 'no', detail })) // i18n-ignore: select keys
+}
+
+/**
+ * HI-2753 (SPEC §16.5.4): moves a card in flight to `target` (null: the project's default) with its line and work kept,
+ * when everything it would bring there is provably its own (retargetCard.ts's proof); `withLane`, its running lane moves
+ * with it (a retarget's lane group), else a lane on another branch refuses it. The check outside every lock; then the
+ * lanes' lock, the board's, git's locks on the line and the target held as checked (an agent's commit meanwhile fails or
+ * makes it refuse), the card and its lane checked again, and one board write: its `Retargeted` fact (its rules merging
+ * into the new target), its Merges into, and its lane's rules. Git's locks are released after the write settles.
+ */
+async function moveInFlight(n: number, target: string | null, def: string, actor: TaskActor, wf: Workflow, projectPath: string, names: ReadonlyMap<string, string>, o: { commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; withLane?: LaneSeen | true }): Promise<TaskCard> {
+  const ws = workspace
+  const to = target ?? def
+  if (ws.path && inBoardWrite(ws.path)) throw new Error('A card in flight is moved in a change of its own, never inside another board change') // i18n-ignore: a programming error, never shown
+  const rec = wf.store.card(n)
+  const from = wf.state(rec).started?.target ?? ''
+  if (o.expect !== undefined && (rec.target ?? null) !== o.expect) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))
+  const lane = laneOf(wf, rec)
+  const laneVals = lane ? { builder: (wf.store.laneBuilder(lane.id) && names.get(wf.store.laneBuilder(lane.id)!)) ?? wf.store.laneBuilder(lane.id) ?? '', laneTarget: lane.target ?? def } : {}
+  if (lane && (lane.target ?? def) !== to && !o.withLane) throw moveRefusedError(n, { why: 'lane' }, { from, to, ...laneVals }) // i18n-ignore: a reason's code, said in words where it is shown
+  const checked = await checkCardMove(wf, projectPath, rec, to)
+  if (!checked.ok) throw moveRefusedError(n, checked, { from, to, ...laneVals })
+  const c = checked.check
+  if (o.expectHead !== undefined && c.head !== o.expectHead) throw moveRefusedError(n, { why: 'changed' }, { from, to }) // i18n-ignore: a reason's code, said in words where it is shown
+  await moveTestHooks.checked?.(c)
+  // The lanes' module loaded here: it imports the session services, which import this module (a cycle at load).
+  const { withLanesLock } = await import('./lanes')
+  let hold: RefHold | null = null
+  try {
+    return await recordingAs(actor, () =>
+      withLanesLock(ws, () =>
+        boardLock(ws, async () => {
+          hold = await holdChecked(projectPath, c)
+          const card = await getTask(n, ws)
+          if (card.archived) throw new TaskPermissionError(withValues(ERR.archived, { card: cardRef(n) }))
+          const now = wf.store.card(n)
+          if (o.expect !== undefined && (now.target ?? null) !== o.expect) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))
+          const again = stillAsChecked(wf, now, c)
+          if (again) throw new MoveRefused(again)
+          // A retarget's lane group: its lane only as its preview saw it (id, rules, list, queued list).
+          if (typeof o.withLane === 'object' && (c.lane?.id !== o.withLane.id || !laneStill(wf, o.withLane))) throw new MoveRefused({ why: 'changed' }) // i18n-ignore: a reason's code, said in words where it is shown
+          const targets = await projectTargets(ws, projectPath).catch(() => null)
+          if (o.expectDefault !== undefined && targets?.default !== o.expectDefault) throw new TaskConflictError(withValues(TARGET.defaultMoved, { card: cardRef(n) }))
+          if (!targets || (targets.default !== to && !targets.others.includes(to))) throw new MoveRefused({ why: 'changed' }) // i18n-ignore: a reason's code, said in words where it is shown
+          const rules = rulesInto(wf, now, to)
+          if (c.lane && rules.lane && o.withLane) {
+            const l = wf.lane(c.lane.id)!
+            wf.store.saveRuleset(rules.lane)
+            wf.store.saveLane({ ...l, ruleset: rules.lane.id })
+          }
+          const own = to === targets.default ? null : to
+          const before = structuredClone(card)
+          note(card, actorName(actor), storedText(HISTORY.retargeted, { from, to }))
+          await saveCard(ws, n, card, before, () => wf.store.updateCard(n, { target: own ?? undefined }), o.commit)
+          await wf.write(now, rules.card, actorOf(actor), (w) => {
+            w.fact('Retargeted', { from, to, line: c.line, head: c.head, toHead: c.toHead, by: actor.kind === 'assistant' ? 'assistant' : 'user', ...(c.base ? { base: c.base } : {}), ...(c.lane && o.withLane ? { lane: c.lane.id } : {}) }) // i18n-ignore: a fact's kind and codes, not text
+          })
+          // Last, in the tick the board's change commits in: git still holds both branches as they were checked.
+          stillHeld(hold)
+          changed(ws)
+          return card
+        })
+      )
+    )
+  } catch (e) {
+    if (e instanceof MoveRefused) throw moveRefusedError(n, e.refusal, { from, to, ...laneVals })
+    throw e
+  } finally {
+    await (hold as RefHold | null)?.close()
+  }
 }
 
 /** A card's Merges into as a call names it (HI-2556), checked against the project's targets: null for the default. */
@@ -2094,7 +2192,7 @@ function refuseOtherLaneTarget(wf: Workflow, n: number, target: string | null, d
  * targets (null or the default: none of its own). Only while its branch has no work (never started, or nothing of its
  * own on a line it had), and as its running lane's, if any.
  */
-export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { commit?: () => void; expect?: string | null; expectDefault?: string } = {}): Promise<TaskCard> {
+export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { commit?: () => void; expect?: string | null; expectDefault?: string; expectHead?: string; expectFrom?: string; withLane?: LaneSeen | true } = {}): Promise<TaskCard> {
   if (actor.kind === 'agent') throw new TaskPermissionError(TARGET.agents)
   const ws = workspace
   // Its project's runtime, before the board's lock (made the first time, it takes that lock itself).
@@ -2104,6 +2202,14 @@ export async function setTarget(n: number, raw: unknown, actor: TaskActor, o: { 
   const wf = first.project ? await workflowFor(ws, projectPath).catch(() => null) : null
   const def = first.project ? ((await projectTargets(ws, projectPath).catch(() => null))?.default ?? null) : null
   const names = new Map(first.project ? projectAgents(await ws.projectConfig(projectPath)).map((a) => [a.id, a.name] as const) : [])
+  // HI-2753: a card in flight moves with its work kept, when that work is provably its own (its own path and locks).
+  if (wf && def && IN_FLIGHT_STAGES.includes(wf.state(wf.store.card(n)).stage)) {
+    const target = await targetPick(first.project, raw, actor)
+    // A retarget's move only from the target it was seen on (a stale preview, after an earlier move, moves nothing).
+    if (o.expectFrom !== undefined && wf.state(wf.store.card(n)).started?.target !== o.expectFrom) throw new TaskConflictError(withValues(TARGET.changed, { card: cardRef(n) }))
+    if ((target ?? def) === wf.state(wf.store.card(n)).started?.target && (wf.store.card(n).target ?? null) === target) return first
+    return moveInFlight(n, target, def, actor, wf, projectPath, names, o)
+  }
   return recordingAs(actor, () =>
     boardLock(ws, async () => {
       const card = await getTask(n, ws)

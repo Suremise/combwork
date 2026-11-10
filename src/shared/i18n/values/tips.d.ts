@@ -151,6 +151,8 @@ interface CombworkMessageValues {
   'tips.cardWork.title': undefined
   'tips.chooseConnections.text': undefined
   'tips.chooseConnections.title': undefined
+  'tips.claudeManagedPolicy.text': undefined
+  'tips.claudeManagedPolicy.title': undefined
   'tips.claudeStatusLine.text': undefined
   'tips.claudeStatusLine.title': undefined
   'tips.cliOverrides.text': undefined
@@ -198,6 +200,8 @@ interface CombworkMessageValues {
   'tips.consoleText.title': undefined
   'tips.copilot.text': undefined
   'tips.copilot.title': undefined
+  'tips.copilotGithubHost.text': undefined
+  'tips.copilotGithubHost.title': undefined
   'tips.copilotModes.text': undefined
   'tips.copilotModes.title': undefined
   'tips.copyDiagnostics.text': undefined
@@ -220,6 +224,8 @@ interface CombworkMessageValues {
   'tips.editTemplates.title': undefined
   'tips.fileLinks.text': undefined
   'tips.fileLinks.title': undefined
+  'tips.filesGit.text': undefined
+  'tips.filesGit.title': undefined
   'tips.filesTab.text': undefined
   'tips.filesTab.title': undefined
   'tips.flightRecorder.text': undefined
@@ -370,6 +376,14 @@ interface CombworkMessageValues {
   'tips.off.title': undefined
   'tips.oneAgent.text': undefined
   'tips.oneAgent.title': undefined
+  'tips.opencode.text': undefined
+  'tips.opencode.title': undefined
+  'tips.opencodeHistory.text': undefined
+  'tips.opencodeHistory.title': undefined
+  'tips.opencodeOutsideFolder.text': undefined
+  'tips.opencodeOutsideFolder.title': undefined
+  'tips.opencodeOwnProvider.text': undefined
+  'tips.opencodeOwnProvider.title': undefined
   'tips.outageResume.text': undefined
   'tips.outageResume.title': undefined
   'tips.overview.text': { key: string | number }

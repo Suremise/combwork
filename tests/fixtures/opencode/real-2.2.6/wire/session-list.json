@@ -1,0 +1,53 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "ses_e42901879ffehRGV1HTyullSDc",
+    "projectID": "b360c067ad1fce6b3a18f3cbfc4baf360e536438",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794179590024,
+     "updated": 1794179590024
+    },
+    "location": {
+     "directory": "<root>\\project"
+    }
+   },
+   {
+    "id": "ses_TPLt1XJL62ZsBDcM7RNtbvfxxx",
+    "projectID": "b360c067ad1fce6b3a18f3cbfc4baf360e536438",
+    "cost": 0,
+    "tokens": {
+     "input": 0,
+     "output": 0,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    },
+    "time": {
+     "created": 1794179590013,
+     "updated": 1794179590013
+    },
+    "location": {
+     "directory": "<root>\\project"
+    }
+   }
+  ],
+  "cursor": {
+   "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTQyOTAxODc5ZmZlaFJHVjFIVHl1bGxTRGMiLCJ0aW1lIjoxNzk0MTc5NTkwMDI0LCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
+   "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfVFBMdDFYSkw2MlpzQkRjTTdSTnRidmZ4eHgiLCJ0aW1lIjoxNzk0MTc5NTkwMDEzLCJkaXJlY3Rpb24iOiJuZXh0In19"
+  }
+ }
+}

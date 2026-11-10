@@ -1,0 +1,23 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "per_1bd706d51001E5tzmika3BR58p",
+    "sessionID": "ses_e428fc2ecffex263I9wXsnv2XZ",
+    "action": "shell",
+    "resources": [
+     "echo r0-shell-marker"
+    ],
+    "save": [
+     "echo *"
+    ],
+    "source": {
+     "type": "tool",
+     "messageID": "msg_1bd703f8d001MyMGf37DsURKbF",
+     "id": "call_oxm8z7a8"
+    }
+   }
+  ]
+ }
+}

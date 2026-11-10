@@ -1,0 +1,129 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "msg_1bfc1a287001yp8wrIjy71M4Ax",
+    "time": {
+     "created": 1794218500743
+    },
+    "type": "idle",
+    "outcome": "failed",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc1a26c001vtV57uJV0pskVZ",
+    "time": {
+     "created": 1794218500719,
+     "completed": 1794218500742
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [],
+    "finish": "error",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc18809001sRiM75lgDBuPOJ",
+    "time": {
+     "created": 1794218493971,
+     "streamed": 1794218500690,
+     "completed": 1794218500711
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "Okay, the user wants me to use the read tool to read the file img.png in the current folder and then say DONE. Let me check the available tools. The read function is listed, which reads files or directories. The parameters are path, limit, offset. Since the user just wants to read the file, I'll set the path to \"img.png\". The default limit is 2000 lines, which should be enough for most images. Wait, but img.png is a binary file. The read tool mentions supporting images, so it should handle that. I don't need to specify limit or offset unless the file is large. The user didn't mention any specific lines, so just read the entire file. Then, after reading, I should respond with DONE. Let me make sure the function call is correct. The read tool's parameters are path, so the arguments should be {\"path\": \"img.png\"}. No other parameters needed. Alright, that should do it.\n",
+      "native": {
+       "reasoningField": "reasoning"
+      },
+      "time": {
+       "created": 1794218498740,
+       "completed": 1794218500685
+      }
+     },
+     {
+      "type": "tool",
+      "id": "call_9v452e02",
+      "name": "read",
+      "executed": false,
+      "state": {
+       "status": "completed",
+       "input": {
+        "path": "img.png"
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "Image read successfully"
+        },
+        {
+         "type": "file",
+         "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8DwnwGMgRQAH+4D/dJQfRoAAAAASUVORK5CYII=",
+         "mime": "image/png",
+         "name": "img.png"
+        }
+       ],
+       "metadata": {
+        "truncated": false
+       }
+      },
+      "time": {
+       "created": 1794218500668,
+       "ran": 1794218500688,
+       "completed": 1794218500709
+      }
+     }
+    ],
+    "finish": "tool-calls",
+    "rawFinish": "tool_calls",
+    "cost": 0,
+    "tokens": {
+     "input": 2915,
+     "output": 225,
+     "reasoning": 0,
+     "cache": {
+      "read": 1863,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc186db001voeG1g27627P4I",
+    "time": {
+     "created": 1794218493949
+    },
+    "text": "Use the read tool to read the file img.png in this folder, then say DONE.",
+    "type": "user"
+   }
+  ],
+  "cursor": {
+   "previous": "eyJpZCI6Im1zZ18xYmZjMWEyODcwMDF5cDh3cklqeTcxTTRBeCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+   "next": "eyJpZCI6Im1zZ18xYmZjMTg2ZGIwMDF2b2VHMWcyNzYyN1A0SSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+ }
+}

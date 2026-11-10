@@ -2,7 +2,7 @@
 
 <h1 align="center">Combwork</h1>
 
-<p align="center"><strong>Your AI coding agents, organised.</strong><br>Run Claude Code, Codex and GitHub Copilot CLI agents across your projects, on your own accounts or a model server you choose.</p>
+<p align="center"><strong>Your AI coding agents, organised.</strong><br>Run Claude Code, Codex, GitHub Copilot CLI, Antigravity CLI and OpenCode agents across your projects, on your own accounts or a model server you choose.</p>
 
 <p align="center"><a href="https://github.com/Suremise/combwork/actions/workflows/ci.yml"><img src="https://github.com/Suremise/combwork/actions/workflows/ci.yml/badge.svg" alt="CI"></a> <a href="https://github.com/Suremise/combwork/releases/latest"><img src="https://img.shields.io/github/v/release/Suremise/combwork" alt="Latest release"></a> <a href="LICENSE"><img src="https://img.shields.io/badge/licence-MIT-blue.svg" alt="Licence: MIT"></a></p>
 
@@ -10,7 +10,7 @@
 
 ---
 
-Combwork is a free, open-source Windows app for running coding agents. It looks and feels like a streamlined VS Code, but it is built around **agent sessions** rather than a text editor. Open a workspace, mark the projects you're working on, and give each one an agent, a builder and a reviewer, or a whole team: **Claude Code**, **Codex** and the **GitHub Copilot CLI**, side by side in one project if you like. A task board, reviews and a merge queue keep their work in order, by rules you set. Combwork shows what every agent is doing and what it costs, and tells you when one finishes or needs you. A **Assistant** in each workspace can run the work for you: it plans cards, starts lanes, follows each one to the end and asks you only for real decisions.
+Combwork is a free, open-source Windows app for running coding agents. It looks and feels like a streamlined VS Code, but it is built around **agent sessions** rather than a text editor. Open a workspace, mark the projects you're working on, and give each one an agent, a builder and a reviewer, or a whole team: **Claude Code**, **Codex**, the **GitHub Copilot CLI**, Google's **Antigravity CLI** and **OpenCode**, side by side in one project if you like. A task board, reviews and a merge queue keep their work in order, by rules you set. Combwork shows what every agent is doing and what it costs, and tells you when one finishes or needs you. A **Assistant** in each workspace can run the work for you: it plans cards, starts lanes, follows each one to the end and asks you only for real decisions.
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="docs/images/hero-light.png">
@@ -66,7 +66,7 @@ Combwork is a free, open-source Windows app for running coding agents. It looks 
 
 ## Features
 
-- **Claude Code, Codex and GitHub Copilot CLI** — each agent's connection decides its CLI, so one project can mix them, with Claude Code builders and Codex reviewers, say; each CLI's own terminal is shown. Help → Provider Setup installs them and says which versions this Combwork was tested with. **Hand Over to…** passes an agent's work to another, of any CLI, through a handover.
+- **Claude Code, Codex, GitHub Copilot CLI, Antigravity CLI and OpenCode** — each agent's connection decides its CLI, so one project can mix them, with Claude Code builders and Codex reviewers, say; each CLI's own terminal is shown. Help → Provider Setup installs them and says which versions this Combwork was tested with. **Hand Over to…** passes an agent's work to another, of any CLI, through a handover.
 - **Your whole team at a glance** — the Session tab shows the agents as **Panes** (a terminal each, up to six to a page) or **Tiles** (each agent's state, card, progress and latest reply), with the ones waiting for you standing out; click a tile for the **focus view**. Up to 12 agents per project, or 24 if you raise the limit.
 - **Task board** — one board for the workspace, from On Hold and Todo through Active, Review and Approved to Done, with stages you can rename. Cards waiting for you show **For you**; what you decide about a card is pinned above its comments as a **decision**, and agents follow it over the description.
 - **Assistant** — one per workspace, in a panel beside your agents: ask it what they are doing, or let it run the work. Four working modes (Coordinator, Planner, QA triager and Release manager) or your own; you decide how far it may go, and **Undo** takes back what it changed.
@@ -92,7 +92,7 @@ The seven languages besides English were translated by AI, and Combwork says so 
 ## Requirements
 
 - Windows 10 or 11 (x64)
-- At least one coding agent CLI, the standalone one: [Claude Code](https://code.claude.com/docs/en/setup), [Codex](https://developers.openai.com/codex) or the [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli), on your own plan, or Claude Code with a model server such as DeepSeek or Ollama. Help → Provider Setup offers to install them; Claude Code and Codex sign in under Settings → Accounts & Connections, and GitHub Copilot once for the whole PC. Copies built into editor extensions are not used.
+- At least one coding agent CLI, the standalone one: [Claude Code](https://code.claude.com/docs/en/setup), [Codex](https://developers.openai.com/codex), the [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli) Google's [Antigravity CLI](https://antigravity.google) or [OpenCode](https://opencode.ai/docs) 2, on your own plan, or Claude Code with a model server such as DeepSeek or Ollama. Help → Provider Setup offers to install them; Claude Code, Codex and OpenCode sign in under Settings → Accounts & Connections, and GitHub Copilot and Antigravity once for the whole PC. Copies built into editor extensions are not used.
 - Git (optional): for Version Control, slots and the merge queue. Projects without it get workflows too.
 
 ## Install
@@ -121,7 +121,7 @@ npm run release    # build and upload a draft GitHub release (see RELEASING.md)
 | Path | Contents |
 |---|---|
 | `src/main` | Electron main process: workspaces, sessions (node-pty), hooks, Agent API, tray |
-| `src/main/providers` | Provider adapters (Claude Code, Codex, GitHub Copilot): launch, hooks, transcripts, usage |
+| `src/main/providers` | Provider adapters (Claude Code, Codex, GitHub Copilot, Antigravity, OpenCode): launch, hooks, transcripts, usage |
 | `src/main/mcp/cw-mcp.ts` | The built-in `combwork` MCP server |
 | `src/preload` | Typed bridge between the UI and the main process |
 | `src/renderer` | React UI |
@@ -154,4 +154,4 @@ for writing and reviewing them are in [tests/README.md](tests/README.md).
 
 Combwork is released under the [MIT License](LICENSE). It includes open-source libraries under their own licences; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Electron's and Chromium's licences are installed alongside the app.
 
-Combwork is independently developed and isn't affiliated with, endorsed or sponsored by Anthropic, OpenAI or GitHub. Claude and Claude Code are products of Anthropic; Codex and ChatGPT of OpenAI; GitHub Copilot and the Copilot CLI of GitHub. Each CLI is installed separately under its maker's terms.
+Combwork is independently developed and isn't affiliated with, endorsed or sponsored by Anthropic, OpenAI, GitHub, Google or Anomaly. Claude and Claude Code are products of Anthropic; Codex and ChatGPT of OpenAI; GitHub Copilot and the Copilot CLI of GitHub; Antigravity and the Antigravity CLI of Google; OpenCode of Anomaly. Each CLI is installed separately under its maker's terms.

@@ -150,6 +150,7 @@ function replies(): { name: string; text: string }[] {
   const detail: R.SettingDetail = { id: 'sessions.compactAbove', title: 'Suggest compacting above', path: 'Settings → Sessions → Suggest compacting above', shownAs: 'Einstellungen', scope: 'workspace', project: 'alpha', value: 'on', default: 'off', takes: 'on or off', desc: 'Suggests compacting.', tip: 'A tip.', helps: 'when long', restart: 'at the next launch', readOnly: 'the user decides', docs: 'User guide section' }
   add('setting', R.settingText(detail))
   add('setting default', R.settingText({ ...detail, value: 'off', project: undefined }))
+  add('setting effective', R.settingText({ ...detail, value: 'inherit', effective: 'tenant.ghe.com, from the workspace' }))
   add('setting changed', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', project: 'alpha', old: 'on', new: 'off', restart: 'at the next launch' }))
   add('setting changed now', R.settingChangedText({ title: 'x', id: 'sessions.compactAbove', path: 'Settings → Sessions → Suggest compacting above', old: 'on', new: 'off' }))
   add('setting changed with a note', R.settingChangedText({ title: 'x', id: 'project.workflow.target', path: 'Version Control → Workflow → Work merges into', project: 'alpha', old: '1.1.0', new: '1.2.0', note: 'It applies to cards started from now on outside running lanes.' }))
@@ -205,6 +206,8 @@ function replies(): { name: string; text: string }[] {
   const usage: R.AccountUsagePublic[] = [{ account: 'acc', limits: [{ label: '5h', usedPercent: 40, resetsAt: '2026-10-18T12:00:00Z' }, { label: '5h', usedPercent: 40, resetsAt: null }], move: { percent: 90, limit: 'weekly', to: 'Sonnet' } }, { account: 'acc', limits: [], move: { percent: 90, limit: 'fiveHour', to: 'Sonnet' } }, { account: 'acc', limits: [], move: { percent: 90, limit: 'any', to: 'Sonnet' } }]
   add('connections', R.connectionListText({ connections: [conn, { id: 'x', name: 'Opus', account: 'acc', cli: null, usable: false }], accounts: [{ id: 'x', name: 'Work', cli: 'codex', on: false }, { id: 'x', name: 'Work2', cli: 'codex' }], usage }))
   add('connections none', R.connectionListText({ connections: [], accounts: [] }))
+  const provider: R.ProviderPublic = { id: 'x', name: 'Cli', enabled: true, installed: true, version: '1.0', tested: { version: '0.9', installed: 'newer' }, problem: 'x', defaultModel: 'opus', models: [{ value: 'opus', label: 'Opus' }], efforts: [{ value: 'high', label: 'High' }], context200k: false, modes: [{ value: 'plan', label: 'Plan', description: 'x' }], connections: [{ id: 'x', name: 'Opus' }] }
+  add('providers', R.providerListText([provider, { ...provider, enabled: false, installed: false, version: null, tested: null, problem: null, defaultModel: null, models: [], efforts: [], connections: [] }]))
   add('connection made', R.connectionChangedText('Made', conn))
   add('connection changed', R.connectionChangedText('Changed', conn))
   add('templates', R.templateListText({ project: 'alpha', templates: [{ scope: 'workspace', from: 'x', file: 'team.json', name: 'tpl', agents: 2, workflow: ['Git', 'None', 'x'], problem: 'x' }, { scope: 'workspace', file: 'team.json', name: 'tpl', agents: 2, workflow: [] }] }))

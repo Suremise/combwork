@@ -21,6 +21,8 @@ import type { PlatformId } from './platform/descriptors'
 import { LANE_MAX_ROUNDS, LOOP_STEP_WAIT_MAX_MINUTES, LOOP_WAIT_MAX_HOURS } from './loopLimits'
 import { AGENT_LIMIT_MAX, DEFAULT_PROJECT_CONFIG, DEFAULT_SETTINGS, FILE_LOCK_MODES, SLOT_COPY_DEFAULT } from './defaults'
 import { SLOT_COPY_TEXT } from './slotDefaults'
+import { GITHUB_HOST_TEXT } from './githubHostText'
+import { parseCopilotChoice, parseGithubHost } from './githubHost'
 import { PRICES_CHECKED } from './prices'
 import { LISTED_ADVANCED, advancedDef, advancedTakesText, advancedText, agentText, checkAdvanced, cliFacing, englishText, groupName, linesOf, listOf, shownText, withValues, type Text, type TextPart } from './advanced'
 import { agentMsg, say, type AgentMsg } from './agentText'
@@ -90,6 +92,8 @@ interface Row {
   workflowLevel?: { level: WorkflowLevel; platform: PlatformId }
   /** A slot default (HI-1765): the copied files at Combwork's level, the workspace's, or the project's own (`slots.copy`). */
   slotLevel?: WorkflowLevel | 'project'
+  /** A GitHub host setting (HI-2779): the workspace's or the project's own `github.host` or `github.copilotHost`. */
+  githubLevel?: { level: 'workspace' | 'project'; field: 'host' | 'copilotHost' }
 }
 
 /** A permission mode's name, as text: the window's words where the descriptor has them (#885). */
@@ -747,8 +751,16 @@ function levelRows(): Row[] {
     ].filter((r) => r.workflow !== 'identity')),
     // The copied files, a Git slot default at each level (HI-1765): `workflow.git.slotCopy`, `workspace.workflow.git.slotCopy`.
     slotCopyRow('workflow', 'git.slotCopy', 'global'),
-    slotCopyRow('workspace', 'workflow.git.slotCopy', 'workspace')
+    slotCopyRow('workspace', 'workflow.git.slotCopy', 'workspace'),
+    // The workspace's GitHub hosts (HI-2779): `workspace.github.host`, `workspace.github.copilotHost`.
+    githubRow('workspace', 'github.host', 'workspace', 'host'),
+    githubRow('workspace', 'github.copilotHost', 'workspace', 'copilotHost')
   ]
+}
+
+/** A GitHub host setting as a hidden row of the Assistant's settings tool (HI-2779): a host, or null to inherit. */
+function githubRow(section: string, key: string, level: 'workspace' | 'project', field: 'host' | 'copilotHost'): Row {
+  return { section, key, githubLevel: { level, field }, title: field === 'host' ? GITHUB_HOST_TEXT.host : GITHUB_HOST_TEXT.copilot, desc: field === 'host' ? GITHUB_HOST_TEXT.hostDesc : GITHUB_HOST_TEXT.copilotDesc, type: 'text', hidden: true }
 }
 
 /** The copied files as a hidden row of the Assistant's settings tool (HI-1765), at a level or the project's own: text, or null to inherit. */
@@ -825,6 +837,9 @@ const PROJECT_ROWS: Row[] = [
   { section: 'agents', key: 'agents', title: msg({ id: 'settings.project.agents.title', defaultMessage: 'Agents', description: "A setting's title (Project Settings → Agents)." }), desc: withValues(msg({ id: 'settings.project.agents.desc', defaultMessage: "The Assistant adds agents up to the project's Maximum agents (Version Control → Workflow), and you can add more yourself, up to {max, number}, each working in the project folder or a slot. Agents without their own settings use this project's.", description: 'What the setting "Agents" does, under its title (Project Settings → Agents). {max} is the most agents a project can have (24).' }), { max: AGENT_LIMIT_MAX }), type: 'custom', wide: true },
   // The project's own copied files (HI-1765: its slots.copy, as Version Control → Slots and copies sets it), for the Assistant's tool.
   slotCopyRow('workflow', 'slotCopy', 'project'),
+  // The project's own GitHub hosts (HI-2779, Version Control → GitHub): `project.githubHost`, `project.copilotHost`.
+  githubRow('workflow', 'githubHost', 'project', 'host'),
+  githubRow('workflow', 'copilotHost', 'project', 'copilotHost'),
   { section: 'agents', key: 'worktreeSetup', title: msg({ id: 'settings.project.worktreeSetup.title', defaultMessage: 'Setup command', description: "A setting's title (Project Settings → Agents)." }), desc: msg({ id: 'settings.project.worktreeSetup.desc', defaultMessage: "Runs in a new worktree before its agent's first session, e.g. npm install. Its output shows in the agent's pane.", description: 'What the setting "Setup command" does, under its title (Project Settings → Agents).' }), tip: msg({ id: 'settings.project.worktreeSetup.tip', defaultMessage: 'Runs with cmd.exe in the worktree folder. If it fails, the pane offers to retry or to start the agent without it.', description: 'The info tip of the setting "Setup command" (Project Settings → Agents): more on what it does and when it applies.' }), type: 'text', placeholder: 'npm install', hidden: true }, // i18n-ignore: a command, not text
   { section: 'advanced', key: 'metadata', title: msg({ id: 'settings.project.metadata.title', defaultMessage: 'Settings file', description: "A setting's title (Project Settings → Advanced)." }), desc: msg({ id: 'settings.project.metadata.desc', defaultMessage: "Stored in the project's .combwork/project.json (excluded from git). Changes apply to new sessions; restart a running session to apply them.", description: 'What the setting "Settings file" does, under its title (Project Settings → Advanced).' }), type: 'custom' },
   { section: 'advanced', key: 'reset', title: msg({ id: 'settings.project.reset.title', defaultMessage: 'Reset project settings', description: "A setting's title (Project Settings → Advanced)." }), desc: msg({ id: 'settings.project.reset.desc', defaultMessage: 'Everything on this page goes back to Inherit. Agents, and skill and MCP opt-outs, are kept.', description: 'What the setting "Reset project settings" does, under its title (Project Settings → Advanced).' }), type: 'custom' }
@@ -964,6 +979,10 @@ const DOCS: Record<string, string> = {
   advanced: 'troubleshooting' // i18n-ignore: a user guide heading's id (#1535)
 }
 const DOCS_BY_ID: Record<string, string> = {
+  'workspace.github.host': 'copilot-github-enterprise', // i18n-ignore: a user guide heading's id (#1535)
+  'workspace.github.copilotHost': 'copilot-github-enterprise', // i18n-ignore: a user guide heading's id (#1535)
+  'project.githubHost': 'copilot-github-enterprise', // i18n-ignore: a user guide heading's id (#1535)
+  'project.copilotHost': 'copilot-github-enterprise', // i18n-ignore: a user guide heading's id (#1535)
   'project.key': 'project-keys', // i18n-ignore: a user guide heading's id (#1535)
   'workflow.defaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
   'workflow.workspaceDefaults': 'workflow-defaults', // i18n-ignore: a user guide heading's id (#1535)
@@ -994,7 +1013,7 @@ const DOCS_BY_ID: Record<string, string> = {
 }
 
 /** Where a setting is, in English (the tools name it so) or as the user sees it: "Settings → Sessions → Suggest compacting above". */
-function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel' | 'slotLevel'>, scope: SettingScope, format: (t: TextPart) => string): string {
+function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel' | 'slotLevel' | 'githubLevel'>, scope: SettingScope, format: (t: TextPart) => string): string {
   const where = (list: SettingsSectionInfo[]): string => {
     const found = list.find((x) => x.id === e.section)
     return found ? format(found.text.label) : e.section
@@ -1003,7 +1022,7 @@ function settingPathOf(e: Pick<SettingEntry, 'section' | 'text' | 'workflowLevel
   // A project's workflow options are its Version Control tab's (HI-1766), not a section of Project Settings.
   if (scope === 'project' && e.section === 'workflow') return format(withValues(PATHS.versionControl, { title }))
   // A level's default (HI-1768): Settings → Version Control, its part (Combwork defaults or Workspace defaults).
-  const level = e.workflowLevel?.level ?? (e.slotLevel === 'global' || e.slotLevel === 'workspace' ? e.slotLevel : null)
+  const level = e.workflowLevel?.level ?? (e.slotLevel === 'global' || e.slotLevel === 'workspace' ? e.slotLevel : e.githubLevel?.level === 'workspace' ? 'workspace' : null)
   if (level) return format(withValues(PATHS.level, { section: format(SETTINGS_SECTIONS.find((x) => x.id === 'workflow')!.text.label), part: format(level === 'global' ? LEVEL_PART.global : LEVEL_PART.workspace), title }))
   if (scope === 'project') return format(withValues(PATHS.project, { section: where(PROJECT_SETTINGS_SECTIONS), title }))
   return format(withValues(PATHS.settings, { section: where(SETTINGS_SECTIONS), title }))
@@ -1109,7 +1128,7 @@ export function settingEntry(id: string): SettingEntry | undefined {
  * advanced value (#367) is advanced.json's override (`advanced`: its values) or the default, or the workspace's own (null:
  * Settings → Advanced's).
  */
-export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'advanced' | 'workflow' | 'slotDefaults' | 'commands'> | null, advanced?: Record<string, unknown> | null): unknown {
+export function settingValue(e: SettingEntry, settings: AppSettings, project?: ProjectConfig | null, ws?: Pick<WorkspaceConfig, 'advanced' | 'workflow' | 'slotDefaults' | 'commands' | 'github'> | null, advanced?: Record<string, unknown> | null): unknown {
   if (e.action) return undefined
   // The user's commands (HI-1954): their names, and each point's in order, as the tools read them (sensitive: they never set them).
   const commands = commandsSettingValue(e.id, settings, ws)
@@ -1121,6 +1140,9 @@ export function settingValue(e: SettingEntry, settings: AppSettings, project?: P
   if (e.slotLevel === 'global') return settings.slotDefaults?.copy ?? 'inherit'
   if (e.slotLevel === 'workspace') return ws?.slotDefaults?.copy ?? 'inherit'
   if (e.slotLevel === 'project') return project ? (project.slots?.copy ?? project.worktreeCopy ?? 'inherit') : undefined
+  // A GitHub host setting (HI-2779): the level's own value, or inherit.
+  if (e.githubLevel?.level === 'workspace') return ws?.github?.[e.githubLevel.field] ?? 'inherit'
+  if (e.githubLevel?.level === 'project') return project ? (project.github?.[e.githubLevel.field] ?? 'inherit') : undefined
   if (e.scope === 'project') {
     if (!project) return undefined
     // The project's own value of a workflow option, or inherit (#1278: the workspace's, then Combwork's, then all-off).
@@ -1172,6 +1194,7 @@ export function settingDefault(e: SettingEntry): unknown {
  * Numbers go in as text ({min}, {n}), as the tools always wrote them (no grouping).
  */
 const AGENT = {
+  githubHost: agentMsg({ id: 'settings.agent.error.githubHost', text: '{title} takes a host name only, such as github.com or yourcompany.ghe.com (no scheme but https://, no user name, token, path, query or port){copilot, select, yes {: github.com or a GHE.com host, never a GitHub Enterprise Server, or repo (the same as the GitHub host) or ghes-proxy} other {}}, or null to inherit. Refused: {why}.', note: 'A GitHub host setting given a value it refuses (HI-2779). {copilot} is yes for where Copilot signs in. {why} is the reason code as written (credentials, path, query, port, scheme, invalid, empty, notCloud): keep it. repo and ghes-proxy are values as written.' }),
   automatic: agentMsg({ id: 'settings.agent.option.automatic', text: 'Automatic', note: 'The Language setting\'s choice "auto" (follow Windows), as the tools name it.' }),
   defaultChoice: agentMsg({ id: 'settings.agent.option.default', text: '"" (default)', note: 'A select setting\'s empty value, the default, in the list of what it takes. "" is the value as written: keep it.' }),
   // Why a value isn't taken.
@@ -1312,6 +1335,13 @@ export function checkSettingValue(e: SettingEntry, raw: unknown, ctx: SettingCon
   if (inheritable && (raw === null || raw === 'inherit') && (kind === 'number' || kind === 'effort')) return { value: kind === 'effort' ? 'inherit' : null }
   // A slot default (HI-1765), at a level or the project's own: null or "inherit" inherits.
   if (e.slotLevel && (raw === null || raw === 'inherit')) return { value: null }
+  // A GitHub host (HI-2779): a host name only, or for Copilot also repo or ghes-proxy; null or "inherit" inherits. The
+  // setter parses it again (main/githubHosts.ts), whoever asks.
+  if (e.githubLevel) {
+    if (raw === null || raw === 'inherit') return { value: null }
+    const parsed = e.githubLevel.field === 'host' ? parseGithubHost(raw) : parseCopilotChoice(raw)
+    return parsed.ok ? { value: 'value' in parsed ? parsed.value : parsed.host } : { error: say(AGENT.githubHost, { title: agentTitle(e), copilot: e.githubLevel.field === 'copilotHost' ? 'yes' : 'no', why: parsed.reason }) }
+  }
   switch (kind) {
     case 'boolean':
       if (typeof raw === 'boolean') return { value: raw }
@@ -1416,13 +1446,15 @@ export function effortTakes(e: SettingEntry, levels: { value: string }[]): strin
 export function settingPatch(
   e: SettingEntry,
   value: unknown
-): { settings: Record<string, unknown> } | { project: (cfg: ProjectConfig) => Partial<ProjectConfig> } | { workflowLevel: { level: WorkflowLevel; platform: PlatformId; key: OptionKey; value: unknown } } | { slotLevel: { level: WorkflowLevel; key: 'copy'; value: string | null } } | { advanced: { id: string; scope: 'app' | 'workspace'; value: unknown } } | { prices: { provider: ProviderId; value: Record<string, unknown> } } | { fallback: { provider: ProviderId; kind: 'models' | 'efforts'; list: unknown[] | null } } {
+): { settings: Record<string, unknown> } | { project: (cfg: ProjectConfig) => Partial<ProjectConfig> } | { workflowLevel: { level: WorkflowLevel; platform: PlatformId; key: OptionKey; value: unknown } } | { slotLevel: { level: WorkflowLevel; key: 'copy'; value: string | null } } | { github: { level: 'workspace' | 'project'; field: 'host' | 'copilotHost'; value: string | null } } | { advanced: { id: string; scope: 'app' | 'workspace'; value: unknown } } | { prices: { provider: ProviderId; value: Record<string, unknown> } } | { fallback: { provider: ProviderId; kind: 'models' | 'efforts'; list: unknown[] | null } } {
   if (e.advanced) return { advanced: { ...e.advanced, value } }
   // A level's default (#1422): one option (null: inherit), saved as the editor saves the level.
   if (e.workflowLevel && e.workflow) return { workflowLevel: { ...e.workflowLevel, key: e.workflow, value } }
   // A slot default (HI-1765): a level's, saved as Settings saves it; a project's own slots.copy (null inherits, its
   // worktreeCopy from before 1.0 cleared with it), as Version Control → Slots and copies sets it.
   if (e.slotLevel === 'global' || e.slotLevel === 'workspace') return { slotLevel: { level: e.slotLevel, key: 'copy', value: value as string | null } }
+  // A GitHub host (HI-2779): the workspace's or the project's own, through the setter that parses it again.
+  if (e.githubLevel) return { github: { ...e.githubLevel, value: value as string | null } }
   if (e.slotLevel === 'project') {
     return {
       project: (cfg) => {

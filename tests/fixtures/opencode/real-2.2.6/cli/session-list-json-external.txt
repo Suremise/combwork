@@ -1,0 +1,30 @@
+$ opencode session list --format json --standalone
+code 0
+--- stdout
+[
+  {
+    "id": "ses_e403f932affeEEwzcBWI8UJ5m6",
+    "updated": 1794218421464,
+    "created": 1794218421464,
+    "projectId": "3d3d56c1a692effdb53f488b54b58ae0b6a674fc",
+    "directory": "<root>\\project"
+  },
+  {
+    "id": "ses_e403fa0feffeN1e5vqozf4owt9",
+    "title": "Say the word ONE (fork #1)",
+    "updated": 1794218419699,
+    "created": 1794218417921,
+    "projectId": "3d3d56c1a692effdb53f488b54b58ae0b6a674fc",
+    "directory": "<root>\\project"
+  },
+  {
+    "id": "ses_e403ffb46ffeRo33fkB8wbcBeQ",
+    "title": "Say the word ONE",
+    "updated": 1794218415927,
+    "created": 1794218394815,
+    "projectId": "3d3d56c1a692effdb53f488b54b58ae0b6a674fc",
+    "directory": "<root>\\project"
+  }
+]
+
+--- stderr

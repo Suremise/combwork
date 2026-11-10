@@ -1,0 +1,6 @@
+$ opencode auth list --format json --standalone
+code 0
+--- stdout
+[]
+
+--- stderr

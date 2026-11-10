@@ -10,7 +10,7 @@ import { kindOf } from '@shared/notify'
 import { TerminalView } from './TerminalView'
 import { UpdateStatusRow } from './Updates'
 import { discardDrafts, saveAllDrafts, unsavedFiles } from './FileView'
-import type { CustomCommand, ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli } from '@shared/types'
+import type { CustomCommand, ProviderId, ProviderTask, QuitChoice, QuitSession, SessionStatus, TestedCli, HostCheck } from '@shared/types'
 import { PROVIDERS, enabledProviders, installSourceText, isProviderEnabled, providerDescriptor, shownText } from '@shared/providers'
 import { distinguishingParents } from '@shared/folderLabels'
 import { GIT_DOWNLOAD, GIT_MIN, gitFixText, gitOldText, gitProblemText } from '@shared/gitTool'
@@ -824,6 +824,53 @@ function TestedLine({ tested, installed }: { tested: TestedCli; installed: strin
   )
 }
 
+/** Each GitHub host's sign-in state (HI-2779), in Provider Setup's words. */
+const HOST_STATE = {
+  installed: msg({ id: 'shell.setup.host.installed', defaultMessage: 'Not signed in', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): no credentials found for this host.' }),
+  configured: msg({ id: 'shell.setup.host.configured', defaultMessage: 'Credentials set, identity not checked', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): a token is set or a login is stored for this host, but nothing has checked it.' }),
+  configuredModels: msg({ id: 'shell.setup.host.configuredModels', defaultMessage: 'Credentials set, models available; identity not checked', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): credentials are set and Copilot listed models, but that doesn’t prove whose they are.' }),
+  verified: msg({ id: 'shell.setup.host.verified', defaultMessage: 'GitHub CLI signed in as {account} on {host}', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): the GitHub CLI checked its login on this host. {account} is the login, {host} the host. It says nothing of a Copilot seat.' }),
+  denied: msg({ id: 'shell.setup.host.denied', defaultMessage: 'Every model is unavailable to this account: an organisation’s policy or the plan may not allow Copilot here', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): Copilot listed models, each marked unavailable to the account.' }),
+  noSignIn: msg({ id: 'shell.setup.host.noSignIn', defaultMessage: 'Runs a model of its own (BYOK or offline): no GitHub sign-in needed', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): Copilot is set up with its own model provider (BYOK) or offline, so it doesn’t sign in to GitHub. BYOK: bring your own key.' }),
+  unverified: msg({ id: 'shell.setup.host.unverified', defaultMessage: 'Couldn’t confirm the sign-in', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): a check answered with an error Combwork can’t classify; its message follows.' }),
+  unknown: msg({ id: 'shell.setup.host.unknown', defaultMessage: 'Couldn’t reach the host to check', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): a check timed out or answered nothing readable.' }),
+  chooseHost: msg({ id: 'shell.setup.host.chooseHost', defaultMessage: 'Choose where Copilot signs in', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): the repositories are on GitHub Enterprise Server and no Copilot host was chosen.' }),
+  proxyUnsupported: msg({ id: 'shell.setup.host.proxy', defaultMessage: 'GitHub Enterprise Server’s Copilot proxy: not supported yet', description: 'Provider Setup, a GitHub host’s sign-in state (HI-2779): GHES’s Copilot proxy (a preview) was chosen.' })
+}
+const HOST_ROW = {
+  heading: msg({ id: 'shell.setup.host.heading', defaultMessage: 'Sign-in per GitHub host', description: 'A heading in Provider Setup → GitHub Copilot (HI-2779): one row per GitHub host the open projects use.' }),
+  usedBy: msg({ id: 'shell.setup.host.usedBy', defaultMessage: '{projects, select, none {{workspace}} other {{workspace}: {projects}}}', description: 'Provider Setup (HI-2779): who uses a GitHub host: a workspace’s name, and its projects named (none: the workspace’s own default).' }),
+  via: msg({ id: 'shell.setup.host.via', defaultMessage: 'Through {source}{account, select, none {} other {, as {account}}}', description: 'Provider Setup (HI-2779): the sign-in’s source by name ({source}: a variable such as COPILOT_GITHUB_TOKEN, Copilot login, GitHub CLI), and its account (none: unknown).' }),
+  models: msg({ id: 'shell.setup.host.models', defaultMessage: '{available, plural, one {# model offered} other {# models offered}}{unavailable, plural, =0 {} other {, # unavailable to this account}}', description: 'Provider Setup (HI-2779): what Copilot listed for this host: models offered, and those marked unavailable.' }),
+  repo: msg({ id: 'shell.setup.host.repo', defaultMessage: 'Repositories on {host}', description: 'Provider Setup (HI-2779): the repositories’ host, when it differs from where Copilot signs in. {host} is the host.' }),
+  tokens: msg({ id: 'shell.setup.host.tokens', defaultMessage: 'Copilot takes a token from COPILOT_GITHUB_TOKEN first. GH_TOKEN and GITHUB_TOKEN are kept from Copilot agents unless Settings → Advanced → GitHub Copilot → Keep GH_TOKEN and GITHUB_TOKEN from Copilot is off. Combwork never reads a token.', description: 'Provider Setup → GitHub Copilot (HI-2779): which token variables Copilot uses, and where the switch keeping two of them out is (its name as Settings shows it). Keep the variable names.' })
+}
+
+/** Provider Setup's rows of a CLI's sign-in per GitHub host (HI-2779). */
+function HostChecks({ checks }: { checks: HostCheck[] }) {
+  return (
+    <div className="setup-hosts" data-host-checks={checks.length}>
+      <div className="setup-hosts-h">{tr(HOST_ROW.heading)}</div>
+      {checks.map((c) => (
+        <div key={c.key} className="setup-host" data-host={c.host ?? ''} data-state={c.state} data-source={c.source ?? ''}>
+          <div>
+            <strong className="mono">{c.host ?? c.repoHost}</strong>{' '}
+            <span className={cx('badge', c.state === 'verified' || c.state === 'noSignIn' ? 'success' : c.state === 'configured' ? '' : 'warn')}>
+              {c.state === 'verified' ? tr(HOST_STATE.verified, { account: c.account ?? '?', host: c.host ?? '' }) : c.state === 'configured' && c.models ? tr(HOST_STATE.configuredModels) : tr(HOST_STATE[c.state])}
+            </span>
+          </div>
+          {c.usedBy.length > 0 && <div className="hint">{c.usedBy.map((u) => tr(HOST_ROW.usedBy, { workspace: u.workspace, projects: u.projects.length ? fmt.list(u.projects) : 'none' })).join(' · ')}</div>}
+          {c.host && c.repoHost !== c.host && <div className="hint">{tr(HOST_ROW.repo, { host: c.repoHost })}</div>}
+          {c.source && c.state !== 'verified' && <div className="hint">{tr(HOST_ROW.via, { source: c.source, account: c.account || 'none' })}</div>}
+          {c.models && <div className="hint">{tr(HOST_ROW.models, { available: c.models.available, unavailable: c.models.unavailable })}</div>}
+          {c.diagnostic && <div className="hint mono setup-host-diagnostic">{c.diagnostic}</div>}
+        </div>
+      ))}
+      <p className="hint">{tr(HOST_ROW.tokens)}</p>
+    </div>
+  )
+}
+
 export function AgentSetupDialog() {
   const open = useStore((s) => s.setupOpen)
   const providers = useStore((s) => s.providers)
@@ -844,9 +891,9 @@ export function AgentSetupDialog() {
   const p = providerDescriptor(tab)
   const info = providers[tab]
   const on = isProviderEnabled(settings, tab)
-  const start = async (kind: ProviderTask, retryUpdate = false): Promise<void> => {
+  const start = async (kind: ProviderTask, retryUpdate = false, host?: string): Promise<void> => {
     try {
-      const key = retryUpdate ? await call('provider:retryUpdate', tab) : await call('provider:task', tab, kind)
+      const key = retryUpdate ? await call('provider:retryUpdate', tab) : await call('provider:task', tab, kind, host)
       setTask({ key, kind, issues: (info?.readiness ?? []).filter((r) => r.action?.task === kind).map((r) => r.id) })
       setFinished(null)
       setRunning(true)
@@ -958,7 +1005,7 @@ export function AgentSetupDialog() {
             </div>
             {info.tested && <TestedLine tested={info.tested} installed={info.version} />}
             <div className="setup-badges">
-              {info.loggedIn === true && (
+              {info.loggedIn === true && !info.hostChecks?.length && (
                 <span className="badge success" data-signin={info.authMethod ?? ''}>
                   <Icon name="account" /> {tr(msg({ id: 'shell.setup.signedInAs', defaultMessage: '{account, select, none {Signed in} other {Signed in as {account}}}{method, select, none {} other { ({method})}}', description: 'A badge in Provider Setup: the CLI is signed in. {account} is the account, {method} how it signed in (none: not known).' }), { account: info.account || 'none', method: info.authMethod || 'none' })}
                 </span>
@@ -984,12 +1031,13 @@ export function AgentSetupDialog() {
             {issues
               .filter((r) => r.action)
               .map((r) => (
-                <button key={r.id} className="btn primary" disabled={running} onClick={() => void start(r.action!.task)}>
+                <button key={r.id} className="btn primary" disabled={running} data-host={r.action!.host ?? ''} onClick={() => void start(r.action!.task, false, r.action!.host)}>
                   {r.action!.label}
                 </button>
               ))}
           </div>
         </div>
+        {p.capabilities.githubHost && !!info.hostChecks?.length && <HostChecks checks={info.hostChecks} />}
         {issues
           .filter((r) => r.detail?.length)
           .map((r) => (

@@ -1179,6 +1179,10 @@
   "api.status.signInExpired": {
     "text": "Its CLI's sign-in has expired: the user must sign in again ({reason})"
   },
+  "api.status.terminalTurn": {
+    "text": "{state, select, working {Working} done {Finished} other {Ready}} (from its terminal: no hooks from {provider})",
+    "note": "An agent's status (the Agent API's statusMessage) while its CLI ({provider}) sends no hooks: what its terminal says of its turn instead (state: working, done, idle). It can't say the agent waits for the user."
+  },
   "api.status.unknownState": {
     "text": "{state}: Combwork has heard nothing of its turn and seen no sign of its end, so it isn't given work; the user can mark it idle"
   },

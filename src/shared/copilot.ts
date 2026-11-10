@@ -269,6 +269,7 @@ export const COPILOT_DESCRIPTOR: ProviderDescriptor = {
     contextLimit: false,
     autoCompactReserve: null,
     imagePaste: false,
+    githubHost: true,
     // Its view tool returns images as images and text as text; a PDF comes back as its raw bytes (checked with 1.0.95).
     attachments: ['image', 'text'],
     // A PreToolUse "ask" brings up Copilot's own approval dialog, even with --allow-all (checked with 1.0.93).

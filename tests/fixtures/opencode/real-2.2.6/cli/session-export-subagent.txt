@@ -1,0 +1,95 @@
+$ opencode session export ses_e40636cefffe4iaKCYy8miDkrx --standalone
+code 0
+--- stdout
+{
+  "info": {
+    "id": "ses_e40636cefffe4iaKCYy8miDkrx",
+    "parentID": "ses_e4063a6e4ffeyrnGITrRGOIyc0",
+    "projectID": "1ae5e58725ac5a2887f33939ab4d028a6fd843d8",
+    "agent": "general",
+    "cost": 0,
+    "tokens": {
+      "input": 1196,
+      "output": 96,
+      "reasoning": 0,
+      "cache": {
+        "read": 2762,
+        "write": 0
+      }
+    },
+    "outcome": "succeeded",
+    "time": {
+      "created": 1794216071955,
+      "updated": 1794216072994,
+      "busy": 1794216071958,
+      "idle": 1794216072996
+    },
+    "title": "Test subagent response",
+    "location": {
+      "directory": "<root>\\project"
+    }
+  },
+  "messages": [
+    {
+      "id": "msg_1bf9c93140028WdzML7H6asn7M",
+      "time": {
+        "created": 1794216071962
+      },
+      "text": "You are a subagent spawned by another session.\nReply with exactly the word PONG and nothing else.",
+      "type": "user"
+    },
+    {
+      "id": "msg_1bf9c931d001XQUxHUBH7HvszR",
+      "time": {
+        "created": 1794216071967,
+        "streamed": 1794216072993,
+        "completed": 1794216072994
+      },
+      "type": "assistant",
+      "agent": "general",
+      "model": {
+        "id": "qwen3:8b",
+        "providerID": "probe"
+      },
+      "content": [
+        {
+          "type": "reasoning",
+          "text": "Okay, the user wants me to reply with exactly \"PONG\" and nothing else. Since I'm a subagent spawned by another session, the response should be straightforward. I need to make sure not to include any additional text or explanations. Let me check if there are any tools or functions that need to be called here. The user's instruction is simple, so no tool calls are necessary. Just output \"PONG\" as specified.\n",
+          "native": {
+            "reasoningField": "reasoning"
+          },
+          "time": {
+            "created": 1794216072230,
+            "completed": 1794216072991
+          }
+        },
+        {
+          "type": "text",
+          "text": "PONG"
+        }
+      ],
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+        "input": 1196,
+        "output": 96,
+        "reasoning": 0,
+        "cache": {
+          "read": 2762,
+          "write": 0
+        }
+      }
+    },
+    {
+      "id": "msg_1bf9c9724001y01Q7jv738wZHB",
+      "time": {
+        "created": 1794216072996
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+    }
+  ]
+}
+
+--- stderr

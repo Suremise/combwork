@@ -450,6 +450,8 @@ interface CombworkMessageValues {
   'settings.advanced.copilot.signIn.errorType.title': undefined
   'settings.advanced.copilot.signIn.hookMessage.desc': undefined
   'settings.advanced.copilot.signIn.hookMessage.title': undefined
+  'settings.advanced.copilot.terminal.turn.desc': undefined
+  'settings.advanced.copilot.terminal.turn.title': undefined
   'settings.advanced.copilot.trust.prompt.desc': undefined
   'settings.advanced.copilot.trust.prompt.title': undefined
   'settings.advanced.copilot.turnFailed.errorType.desc': undefined
@@ -652,6 +654,38 @@ interface CombworkMessageValues {
   'settings.advanced.off': undefined
   'settings.advanced.on': undefined
   'settings.advanced.openLogs': undefined
+  'settings.advanced.opencode.ambient.integrations.desc': undefined
+  'settings.advanced.opencode.ambient.integrations.title': undefined
+  'settings.advanced.opencode.env.credentials.desc': undefined
+  'settings.advanced.opencode.env.credentials.title': undefined
+  'settings.advanced.opencode.history.pollSeconds.desc': undefined
+  'settings.advanced.opencode.history.pollSeconds.title': undefined
+  'settings.advanced.opencode.history.repairMinutes.desc': undefined
+  'settings.advanced.opencode.history.repairMinutes.title': undefined
+  'settings.advanced.opencode.history.retryMinutes.desc': undefined
+  'settings.advanced.opencode.history.retryMinutes.title': undefined
+  'settings.advanced.opencode.models.line.desc': undefined
+  'settings.advanced.opencode.models.line.title': undefined
+  'settings.advanced.opencode.models.variantId.desc': undefined
+  'settings.advanced.opencode.models.variantId.title': undefined
+  'settings.advanced.opencode.models.variants.desc': undefined
+  'settings.advanced.opencode.models.variants.title': undefined
+  'settings.advanced.opencode.override.askOutsideFolder.desc': undefined
+  'settings.advanced.opencode.override.askOutsideFolder.title': undefined
+  'settings.advanced.opencode.override.keepProjectConfigOut.desc': undefined
+  'settings.advanced.opencode.override.keepProjectConfigOut.title': undefined
+  'settings.advanced.opencode.override.noAutoUpdate.desc': undefined
+  'settings.advanced.opencode.override.noAutoUpdate.title': undefined
+  'settings.advanced.opencode.override.ownProviderOnly.desc': undefined
+  'settings.advanced.opencode.override.ownProviderOnly.title': undefined
+  'settings.advanced.opencode.override.stripCredentials.desc': undefined
+  'settings.advanced.opencode.override.stripCredentials.title': undefined
+  'settings.advanced.opencode.rules.loaded.desc': undefined
+  'settings.advanced.opencode.rules.loaded.title': undefined
+  'settings.advanced.opencode.server.readySeconds.desc': undefined
+  'settings.advanced.opencode.server.readySeconds.title': undefined
+  'settings.advanced.opencode.version.desc': undefined
+  'settings.advanced.opencode.version.title': undefined
   'settings.advanced.reset.desc': undefined
   'settings.advanced.reset.tip': undefined
   'settings.advanced.reset.title': undefined
@@ -1134,6 +1168,10 @@ interface CombworkMessageValues {
   'settings.general.userName.placeholder': undefined
   'settings.general.userName.tip': undefined
   'settings.general.userName.title': undefined
+  'settings.github.copilotHost.desc': undefined
+  'settings.github.copilotHost.title': undefined
+  'settings.github.host.desc': undefined
+  'settings.github.host.title': undefined
   'settings.journal.cap': undefined
   'settings.journal.days': undefined
   'settings.journal.delete': undefined

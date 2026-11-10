@@ -148,6 +148,13 @@ function slotRefused(e: unknown): boolean {
   return false
 }
 
+/**
+ * Whether someone stopped an agent and nothing started it since (HI-2815, sessions.stoppedOnPurposeAt): whether or not its
+ * old run has exited yet (HR2's round 2: a graceful exit takes a while, its status still idle meanwhile). Only a start
+ * clears it, so a run still live is never taken for a restart.
+ */
+const stoppedByOne = (projectPath: string, agentId: string): boolean => sessions.stoppedOnPurposeAt(projectPath, agentId) > 0
+
 /** A start the lane no longer asks for: its lane ended, was changed or isn't the builder's, or the card isn't its next. */
 class LaneChanged extends Error {}
 
@@ -158,7 +165,7 @@ class LaneChanged extends Error {}
  * and no wait for a slot (HI-2029: either may have begun since the look). `now`: the card as the start's write sees it.
  */
 function stillDue(ws: WorkspaceService, path: string, lane: { id: string; project: string; builder: { id: string } }, n: number, now?: TaskCard): boolean {
-  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase() || laneStartHeld(ws, lane.project, lane.builder.id) || laneWaitsForSlot(ws, lane.id) || builderOwed(ws, lane.id)) return false
+  if (!ws.path || ws.path.toLowerCase() !== path.toLowerCase() || laneStartHeld(ws, lane.project, lane.builder.id) || laneWaitsForSlot(ws, lane.id) || builderOwed(ws, lane.id) || stoppedByOne(join(path, lane.project), lane.builder.id)) return false
   const v = laneNow(ws, { lane: lane.id }, now)
   return !!v && v.builder.id === lane.builder.id && laneStartDue(v)?.number === n
 }
@@ -261,7 +268,9 @@ async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fenc
       continue
     }
     // Its start launching its agents (HI-2029): never started under it, as the builder's status then says (starting).
-    const holds = laneStartHeld(ws, lane.project, lane.builder.id) ? 'busy' : await builderWait(projectPath, lane.builder)
+    // Stopped by someone and not started since (HI-2815: a Stop stops it): its card waits until the user, a lane update or
+    // a Retry starts it, never started on it by Combwork (HR2: not in the pass that dropped its owed new conversation).
+    const holds = laneStartHeld(ws, lane.project, lane.builder.id) ? 'busy' : stoppedByOne(projectPath, lane.builder.id) ? 'stopped' : await builderWait(projectPath, lane.builder)
     if (holds) {
       wait(holds)
       continue

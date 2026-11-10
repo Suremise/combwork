@@ -129,6 +129,21 @@
     "note": "Provider Setup and Settings → Providers (#585): a warning that Codex's commands fail (Windows) while the Microsoft Store's PowerShell 7, the one found first, is running anywhere, e.g. in a terminal. Codex is the coding agent's name.",
     "audience": "both"
   },
+  "providers.copilot.host.choose": {
+    "text": "{repoHost} is a GitHub Enterprise Server host: choose where Copilot signs in (github.com or your GHE.com host) in Version Control → GitHub. Its Copilot agents don’t start until you do.",
+    "note": "Provider Setup, GitHub Copilot (HI-2779): a project’s repositories are on a GitHub Enterprise Server host ({repoHost}), where cloud Copilot can’t sign in, and no Copilot host was chosen. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name.",
+    "audience": "both"
+  },
+  "providers.copilot.host.proxy": {
+    "text": "GitHub Enterprise Server’s Copilot proxy is a preview Combwork doesn’t support yet: choose github.com or your GHE.com host in Version Control → GitHub. Its Copilot agents don’t start until you do.",
+    "note": "Provider Setup, GitHub Copilot (HI-2779): the Copilot sign-in setting chose GitHub Enterprise Server’s Copilot proxy (a GitHub preview), not supported yet. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name.",
+    "audience": "both"
+  },
+  "providers.copilot.host.signedOut": {
+    "text": "Copilot isn’t signed in on {host}.",
+    "note": "Provider Setup, GitHub Copilot (HI-2779): no sign-in found for a GitHub host Combwork’s projects use. {host} is the host (github.com, yourcompany.ghe.com).",
+    "audience": "both"
+  },
   "providers.copilot.planNote": {
     "text": "Copilot Free uses Auto only; choosing a model needs a paid plan.",
     "note": "A note in Provider Setup under GitHub Copilot. Copilot Free is the plan's name; Auto is Copilot's model choice: keep both names.",
@@ -148,6 +163,56 @@
     "note": "Provider Setup after WinGet portable removal failed. The exit code can also mean other removal failures, so the cause is tentative. Update anyway is the adjacent button; keep WinGet, Copilot and --force unchanged.",
     "audience": "both"
   },
+  "providers.opencode.adoptRefused": {
+    "text": "Combwork can't take this OpenCode session over: {why, select, notRead {it hasn't been read from OpenCode yet} otherFolder {it ran in a folder that isn't this project's} otherMark {Combwork already has another session under its id} other {it isn't one of its account's sessions any more}}.",
+    "note": "An error when adopting (taking over) a session from the Sessions tab: an OpenCode session made outside Combwork (in OpenCode's own window) couldn't be adopted. {why} picks the reason. OpenCode is a product's name.",
+    "audience": "both"
+  },
+  "providers.opencode.claudeAgentModel": {
+    "text": "{provider} didn't start: {model} is a model of OpenCode's Claude Agent provider, which Combwork doesn't run through OpenCode. Run Claude Code as its own provider instead, or choose another model.",
+    "note": "Why an OpenCode agent didn't start (its pane): its model belongs to OpenCode's nested Claude Agent provider, which Combwork never allows. {provider} is OpenCode, {model} the model's id. Claude Agent and Claude Code are product names: keep them.",
+    "audience": "both"
+  },
+  "providers.opencode.effortNeedsModel": {
+    "text": "{provider} didn't start: the connection's effort is {effort}, which OpenCode sets as a variant of the model, and the connection names no model. Choose its model (a provider and model, such as ollama/qwen3:8b) or the default effort in Agent Settings.",
+    "note": "Why an OpenCode agent didn't start (its pane): an effort level is chosen, but OpenCode sets effort as a variant of a model and no model is chosen. {provider} is OpenCode, {effort} the effort as chosen (e.g. high). ollama/qwen3:8b is a model id: keep it. Agent Settings is a place in Combwork.",
+    "audience": "both"
+  },
+  "providers.opencode.effortNotListed": {
+    "text": "{provider} didn't start: the connection's effort is {effort}, and OpenCode doesn't list {effort} as a variant of {model} on this account, so Combwork can't set it. Choose one of the model's efforts, or the default, in Agent Settings. If OpenCode's models couldn't be read just now, start the agent again.",
+    "note": "Why an OpenCode agent didn't start (its pane): the chosen effort level isn't one of the variants OpenCode lists for the chosen model on this account (or the list couldn't be read). {provider} is OpenCode, {effort} the effort as chosen (e.g. high), {model} the model's id. Agent Settings is a place in Combwork.",
+    "audience": "both"
+  },
+  "providers.opencode.historyBusy": {
+    "text": "{provider} didn't start: Combwork's reader of OpenCode sessions didn't answer in time, so it couldn't take this session over from an earlier run. Start the agent again.",
+    "note": "Why an OpenCode agent didn't start (its pane): Combwork's background reader of OpenCode session histories didn't confirm in time that it let go of the session's earlier run. {provider} is OpenCode.",
+    "audience": "both"
+  },
+  "providers.opencode.noModel": {
+    "text": "{provider} didn't start: Combwork keeps OpenCode to the provider in the connection's model, and this connection names none, so OpenCode would choose one itself, perhaps one of its free cloud models. Choose the connection's model (a provider and model, such as ollama/qwen3:8b) in Agent Settings, or turn off \"Keep OpenCode to the connection's own provider\" in Settings → Advanced.",
+    "note": "Why an OpenCode agent didn't start (its pane): Combwork only allows the provider of the connection's model, and no model (or no valid provider/model id) is set. {provider} is OpenCode. ollama/qwen3:8b is a model id: keep it. Agent Settings and Settings → Advanced are places in Combwork; the quoted text is an advanced setting's title: use that setting's translated title.",
+    "audience": "both"
+  },
+  "providers.opencode.noOwner": {
+    "text": "{provider} didn't start: Combwork couldn't read its own process's identity, which the agent's private OpenCode server is tied to so that it ends with Combwork. Windows PowerShell may be blocked on this PC.",
+    "note": "Why an OpenCode agent didn't start (its pane): Combwork couldn't get the identity it ties the agent's server's lifetime to. {provider} is OpenCode. Windows PowerShell is a program's name: keep it.",
+    "audience": "both"
+  },
+  "providers.opencode.otherAccount": {
+    "text": "{provider} didn't resume {session}: it is in another OpenCode account's data, not the account this agent runs on now. Start a new session, or move the agent back to that account.",
+    "note": "Why an OpenCode agent didn't resume a session (its pane): each OpenCode account keeps its own sessions, and this one was made on another account. {provider} is OpenCode, {session} the session's id.",
+    "audience": "both"
+  },
+  "providers.opencode.protectedArg": {
+    "text": "{provider} didn't start: the agent's extra arguments include {arg}, which Combwork sets itself for every OpenCode launch. Remove it from the agent's extra arguments (Agent Settings).",
+    "note": "Why an OpenCode agent didn't start (its pane): its extra command-line arguments include one Combwork controls (its server, its session, its mode). {provider} is OpenCode, {arg} the argument as typed. Agent Settings is a place in Combwork.",
+    "audience": "both"
+  },
+  "providers.opencode.v1Found": {
+    "text": "{count, plural, one {The opencode found is} other {The opencode copies found are}} not OpenCode 2: OpenCode 1 (opencode-ai), the archived opencode project or an editor’s copy. Combwork needs OpenCode 2: Install puts it in its own folder, and your other copy keeps working.",
+    "note": "Provider Setup → OpenCode, when only copies Combwork doesn't support were found. opencode and opencode-ai are names: keep them; Install is a button.",
+    "audience": "both"
+  },
   "providers.readiness.notInstalled": {
     "text": "{provider} is not installed.",
     "note": "Provider Setup and Settings → Providers: Combwork didn't find the coding agent's CLI. {provider} is its name (Claude Code).",
@@ -161,6 +226,11 @@
   "providers.readiness.update": {
     "text": "{provider} {version} is available.",
     "note": "Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version.",
+    "audience": "both"
+  },
+  "providers.readiness.updateStayed": {
+    "text": "{provider} stayed on {version} after updating to {offered}: an organisation's policy may set its version or channel, or the update didn't take. Check again later, or update again.",
+    "note": "Provider Setup and Settings → Providers: the coding agent was updated but is still on its old version (HI-2777). {provider} is its name, {version} the version it stayed on, {offered} the one offered. \"Check again\" and \"update\" name the buttons beside it.",
     "audience": "both"
   },
   "providers.settings.hooksOff": {

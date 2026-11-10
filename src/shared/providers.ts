@@ -7,9 +7,10 @@ import { CLAUDE_CODE, CLAUDE_DESCRIPTOR } from './claude'
 import { CODEX_DESCRIPTOR } from './codex'
 import { COPILOT_DESCRIPTOR } from './copilot'
 import { ANTIGRAVITY_DESCRIPTOR } from './antigravity'
+import { OPENCODE_DESCRIPTOR } from './opencode'
 
 /**
- * Providers: the coding-agent CLIs Combwork can run (Claude Code, Codex, GitHub Copilot, Antigravity CLI). Everything the UI and the shared
+ * Providers: the coding-agent CLIs Combwork can run (Claude Code, Codex, GitHub Copilot, Antigravity CLI, OpenCode). Everything the UI and the shared
  * settings logic need to know about one lives in its descriptor, so a new provider needs a descriptor
  * here and an adapter in src/main/providers — nothing else checks which provider an agent uses.
  */
@@ -33,6 +34,11 @@ export interface ProviderText {
   safeguardHelp: Msg | null
   /** The custom model ID box's placeholder (modelPlaceholder). */
   modelPlaceholder: Msg
+  /**
+   * What the plan limits say while none is known, where the provider's sessions report them only in some cases (HI-2762:
+   * OpenCode, only for an OpenCode Go or Console workspace): in place of the general "hasn't reported" note.
+   */
+  noPlanLimits?: Msg
 }
 
 /** A field as the window shows it: its message in the language shown now, else its English (#800). */
@@ -74,6 +80,17 @@ export interface ModelGroup {
 }
 
 export interface ProviderCapabilities {
+  /**
+   * An organisation can govern the CLI with remote settings Combwork can't read (HI-2777: Claude Code's server-managed
+   * settings), which may allow only their own hooks: the hooks warning says so when nothing local explains them, and
+   * offers the admin snippet.
+   */
+  remoteHookPolicy?: boolean
+  /**
+   * The CLI signs in on a GitHub host (HI-2779: Copilot): it follows the workspace's and project's GitHub host settings,
+   * and Provider Setup checks its sign-in per host in use (AgentInstallInfo.hostChecks), with Sign in per host.
+   */
+  githubHost?: boolean
   /** Combwork chooses the session id at launch (Claude Code); otherwise the provider reports it once started. */
   fixedSessionId: boolean
   /** How a running session changes permission mode: cycling a key (Claude's Shift+Tab), a menu, or not at all. */
@@ -350,7 +367,7 @@ export interface ProviderDescriptor {
 export const DEFAULT_PROVIDER: ProviderId = CLAUDE_CODE
 
 /** Every provider Combwork knows, in display order. */
-export const PROVIDERS: ProviderDescriptor[] = [CLAUDE_DESCRIPTOR, CODEX_DESCRIPTOR, COPILOT_DESCRIPTOR, ANTIGRAVITY_DESCRIPTOR]
+export const PROVIDERS: ProviderDescriptor[] = [CLAUDE_DESCRIPTOR, CODEX_DESCRIPTOR, COPILOT_DESCRIPTOR, ANTIGRAVITY_DESCRIPTOR, OPENCODE_DESCRIPTOR]
 
 const UNKNOWN: ProviderDescriptor = {
   ...CLAUDE_DESCRIPTOR,

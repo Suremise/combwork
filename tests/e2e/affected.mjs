@@ -157,6 +157,7 @@ export const AREAS = [
   // The Combwork tools' description limits (HI-2012): replysize checks them.
   { paths: ['tests/e2e/toolLimits.cjs'], suites: ['replysize'] },
   { paths: ['tests/e2e/toolsides.cjs', 'src/shared/assistantTools.ts', 'src/main/mcp/cw-mcp.ts', 'src/main/sessions.ts', 'src/shared/workflow/roles.ts', 'src/main/launchSides.ts', 'src/main/workflowTools.ts', 'src/renderer/src/components/AgentDialogs.tsx'], suites: ['toolsides', 'replysize'] },
+  { paths: ['src/main/providers/opencode/', 'src/shared/opencode.ts', 'src/main/opencodeHistoryHost.ts', 'src/main/opencodeHistoryWorker.ts', 'tests/e2e/fake-opencode/'], suites: ['opencode', 'opencode-assistant', 'opencode-history', 'opencode-isolation', 'opencode-launch', 'opencode-providers', 'opencode-status', 'opencode-tools', 'opencodereal', 'opencodereal-dirs'] },
   { paths: ['src/main/providers/antigravity/', 'src/main/statusLineState.ts', 'src/shared/antigravity.ts', 'tests/e2e/fake-agy/'], suites: ['antigravity', 'antigravity-windows', 'antigravityreal'] },
   { paths: ['src/main/assistantMemory.ts', 'src/shared/assistantMemory.ts', 'src/renderer/src/components/AssistantMemory.tsx', 'src/renderer/src/components/AssistantView.tsx'], suites: ['assistantmemory', 'assistantimages'] },
   { paths: ['src/main/journal.ts', 'src/main/journalService.ts', 'src/main/walCheckpoint.ts', 'src/main/walCheckpointWorker.ts','src/shared/journal.ts', 'src/renderer/src/components/JournalSettings.tsx', 'tests/e2e/journal.cjs'], suites: ['journal', 'replysize'] },
@@ -252,6 +253,8 @@ export const AREAS = [
   { paths: ['src/shared/safeguards.ts', 'src/main/providers/claude/safeguards.ts', 'src/main/providers/codex/safeguards.ts', 'src/main/cardSessions.ts'], suites: ['safeguards'] },
   { paths: ['src/main/diagnostics.ts', 'src/shared/redact.ts'], suites: ['about', 'testedclis'] },
   { paths: ['src/main/files.ts', 'src/renderer/src/views/FilesTab.tsx', 'src/renderer/src/components/FileView.tsx', 'src/renderer/src/components/DocEditor.tsx', 'src/renderer/src/components/Editors.tsx', 'src/renderer/src/editorDrafts.ts', 'src/renderer/src/monaco.ts', 'src/renderer/src/monacoLang.ts'], suites: ['files', 'editor', 'drafts', 'unsaved', 'icons', 'image', 'assistantimages', 'asarfiles'] },
+  // The Files tab's Git menu (HI-2743): only the Files tab uses it.
+  { paths: ['src/main/filesGit.ts', 'src/shared/gitIgnoreRules.ts', 'src/renderer/src/components/FilesGitMenu.ts'], suites: ['files'] },
   { paths: ['src/main/attachmentsFolder.ts', 'src/shared/attachments.ts', 'src/renderer/src/attach.ts', 'src/renderer/src/components/AttachmentChips.tsx'], suites: ['image', 'files', 'assistantimages', 'storage', 'storageclose', 'dialogs', 'asarfiles', 'codex-extra'] },
   { paths: ['src/main/heldLine.ts', 'tests/e2e/idlequestion.cjs'], suites: ['idlequestion', 'wakeuntaken'] },
   // Codex's offer of a cheaper model (HI-2609): read on its screen, hidden per launch, and a model switch marked.
@@ -378,7 +381,9 @@ export const AREAS = [
   { paths: ['src/main/projectRemoval.ts', 'src/renderer/src/components/ProjectRemoval.tsx'], suites: ['board', 'storage'] },
   // Combwork's one way to the Recycle Bin (a test copy's trash folder, #414): the suites that delete something.
   { paths: ['src/main/trash.ts'], suites: ['board', 'files', 'storage', 'sessiontree', 'templateshare', 'unusedwt', 'skills', 'transcript', 'unsaved', 'assistantimages'] },
-  { paths: ['src/main/providerService.ts', 'src/main/taskKeys.ts'], suites: ['providers', 'codex-setup', 'startfail', 'models', 'testedclis', 'freshpath', 'providerdetect'] },
+  { paths: ['src/main/providerService.ts', 'src/main/taskKeys.ts', 'src/main/updateStayed.ts'], suites: ['providers', 'codex-setup', 'startfail', 'models', 'testedclis', 'freshpath', 'providerdetect'] },
+  // GitHub hosts and Copilot's sign-in per host (HI-2779).
+  { paths: ['tests/e2e/githubhosts.cjs', 'src/shared/githubHost.ts', 'src/main/githubHosts.ts', 'src/main/githubHostChanges.ts', 'src/main/providers/copilot/hosts.ts', 'src/main/providers/copilot/install.ts', 'src/main/providers/copilot/models.ts', 'src/renderer/src/components/GithubHosts.tsx', 'src/shared/githubHostText.ts', 'src/renderer/src/signInHost.ts'], suites: ['githubhosts', 'providers'] },
   { paths: ['src/main/keySteps.ts'], suites: ['codex', 'codex-setup'] },
   { paths: ['src/main/rendererWatch.ts'], suites: ['rendercrash', 'windowhealth'] },
   { paths: ['src/shared/windowHealth.ts', 'src/renderer/src/windowHealth.ts', 'src/renderer/src/pageMarks.ts'], suites: ['windowhealth'] },
@@ -410,7 +415,7 @@ export const AREAS = [
   { paths: ['src/main/watches.ts', 'src/shared/watch.ts', 'src/shared/agentWatch.ts', 'src/shared/usageWatch.ts', 'src/main/loopCheck.ts', 'src/main/intentWatch.ts'], suites: ['agentmessage', 'deliveries', 'agentwatch', 'cardloop', 'decisionwake', 'lanewatch', 'loopwakes', 'loopwatch', 'quitwait', 'replysize', 'replytell', 'wakepaste', 'wakeuntaken', 'watchrelease'] },
   { paths: ['src/renderer/src/components/watchLine.ts'], suites: ['agentstable', 'agentwatch', 'cardloop'] },
   // Lane watches (#531), and stalls as cards and lanes tell them.
-  { paths: ['src/shared/laneWatch.ts', 'src/main/cardStall.ts', 'src/main/agentStarts.ts'], suites: ['lanewatch', 'watchrelease', 'loopwatch', 'replysize'] },
+  { paths: ['src/shared/laneWatch.ts', 'src/main/cardStall.ts', 'src/main/agentStarts.ts', 'src/shared/stallSafeguard.ts'], suites: ['lanewatch', 'watchrelease', 'loopwatch', 'replysize'] },
   { paths: ['src/main/taskbar.ts', 'src/shared/taskbar.ts'], suites: ['taskbar', 'progress'] },
   { paths: ['src/main/titleBar.ts', 'src/shared/titleBar.ts'], suites: ['carddialog'] },
   // A window fitted to the display it opens on (#812).
@@ -579,6 +584,8 @@ export const AREAS = [
   // A typed prompt's line breaks for Codex (HI-1327): the fake Codex's (codexnewline) and the real one's (codex-newline).
   { paths: ['tests/e2e/codexnewline.cjs', 'tests/e2e/codex-newline.cjs', 'src/shared/terminalInput.ts', 'src/main/providers/codex/'], suites: ['codexnewline', 'codex-newline'] },
   // An agent's Hooks dialog and Activity's lock blocks (HI-982), on the fake Claude Code and the fake Codex.
+  { paths: ['tests/e2e/claudemanaged.cjs', 'tests/e2e/fake-claude/', 'src/shared/claudeHookHandlers.ts', 'src/main/hookTwins.ts', 'src/main/hookTokens.ts', 'src/main/providers/claude/hookPolicy.ts', 'src/main/providers/claude/adapter.ts', 'src/main/providers/claude/updateChannel.ts', 'src/main/servers.ts', 'src/renderer/src/components/AdminSnippetDialog.tsx', 'src/renderer/src/views/ProjectView.tsx'], suites: ['claudemanaged'] },
+  { paths: ['tests/e2e/claudemanagedreal.cjs'], suites: ['claudemanagedreal'] },
   { paths: ['tests/e2e/hooksview.cjs', 'src/main/hookListing.ts', 'src/shared/hooks.ts', 'src/renderer/src/components/HooksDialog.tsx', 'src/main/servers.ts', 'src/main/providers/codex/', 'src/main/providers/claude/', 'src/main/providers/copilot/'], suites: ['hooksview'] },
   // The fake Codex CLI: every suite that runs it.
   { paths: ['tests/e2e/fake-codex/'], suites: ['accounts', 'attachread', 'connectionfirst','carryingon', 'codexqueued', 'codexnudge', 'attention', 'footerfit', 'skilldelivery', 'models', 'sessiontree', 'termsize', 'freshpath', 'defaultprovider', 'providerdetect', 'codexfolder', 'turnledger', 'flightrecorder', 'hookshealth', 'hookstranscript', 'workspacenotes', 'reviewcopies', 'slotguidance', 'p7lane', 'codexnewline', 'hooksview', 'wakeputoff', 'lockask', 'dialectlaunch', 'agenttemp', 'independentlaunch'] },

@@ -396,5 +396,16 @@
   "agents.workflowTools.restartTitle": "新しいワークフローのために{agents}を再起動しますか？",
   "agents.workflowTools.restartMessage": "{count, plural, other {{agents}は作業中です。プロジェクトのワークフローで使えるようになったツールは再起動時に読み込まれ、同じ会話のまま続けます。}}",
   "agents.workflowTools.restartWhenDone": "{count, plural, other {ターンが終わったら再起動}}",
-  "agents.workflowTools.later": "後で"
+  "agents.workflowTools.later": "後で",
+  "agents.opencode.auto": "すべて承認",
+  "agents.opencode.autoDescription": "OpenCodeのルールが明示的に拒否していない権限を、確認せずにすべて承認します。無人での変更が許容される場所でのみ使ってください。",
+  "agents.opencode.build": "Build",
+  "agents.opencode.buildDescription": "独自の権限ルールを持つOpenCodeのBuildエージェント。ルールが許可していないことの前に確認します。",
+  "agents.opencode.extensionNote": "エディター内にOpenCodeのコピーがあります。Combworkはエディターのコピーを使いません。スタンドアロンのOpenCode 2をインストールしてください。エディターはこれまでどおり動作します。",
+  "agents.opencode.installNote": "公式のスタンドアロンWindows版ダウンロードからOpenCode 2をインストールしてください。「インストール」はGitHubから最新の2.xリリースを取得し、リリースのSHA256SUMSで検証して、`opencode.exe`を%LOCALAPPDATA%\\Programs\\OpenCodeに配置します。OpenCode 1（`opencode-ai`）とアーカイブされたopencodeプロジェクトはサポートされません。OpenCode 2が別の場所にインストールされている場合は、「設定」→「OpenCode」でパスを設定してください。",
+  "agents.opencode.modelPlaceholder": "モデルID（例：ollama/qwen3:8b）",
+  "agents.opencode.noPlanLimits": "OpenCode がプランの上限を報告するのは、サインインしている OpenCode Go または Console のワークスペースだけです。ほかのプロバイダーの上限は OpenCode からは取得できないため、表示されません。",
+  "agents.opencode.plan": "Plan",
+  "agents.opencode.planDescription": "OpenCodeのPlanエージェント。計画して読み取り、何かを変更する前に確認します。",
+  "agents.opencode.signInHelp": "アカウントをモデルプロバイダーにもう一度接続してください：「設定」→「アカウントと接続」→ OpenCodeのアカウント →「サインイン」（opencode auth loginを実行します）。"
 }

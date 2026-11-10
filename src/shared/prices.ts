@@ -3,6 +3,7 @@ import { CLAUDE_CODE, baseModel } from './claude'
 import { CODEX } from './codex'
 import { COPILOT } from './copilot'
 import { ANTIGRAVITY } from './antigravity'
+import { OPENCODE } from './opencode'
 import { providerDescriptor, providerSettings } from './providers'
 import { msg, tr } from './i18n'
 
@@ -23,7 +24,7 @@ const claude = (input: number, output: number, cachedInput = input / 10): ModelP
 const openai = (input: number, cachedInput: number, output: number, cacheWrite?: number): ModelPrice => ({ input, cachedInput, output, ...(cacheWrite !== undefined ? { cacheWrite } : {}) })
 
 /** When each provider's shipped prices were last checked against its published ones (Settings → <provider> → API prices says so). */
-export const PRICES_CHECKED: Record<ProviderId, string> = { [CLAUDE_CODE]: '2026-09-30', [CODEX]: '2026-11-07', [COPILOT]: '2026-09-30', [ANTIGRAVITY]: '2026-11-07' }
+export const PRICES_CHECKED: Record<ProviderId, string> = { [CLAUDE_CODE]: '2026-09-30', [CODEX]: '2026-11-07', [COPILOT]: '2026-09-30', [ANTIGRAVITY]: '2026-11-07', [OPENCODE]: '2026-11-09' }
 
 export const SHIPPED_PRICES: Record<ProviderId, Record<string, ModelPrice>> = {
   [CLAUDE_CODE]: {
@@ -67,7 +68,10 @@ export const SHIPPED_PRICES: Record<ProviderId, Record<string, ModelPrice>> = {
   [COPILOT]: {},
   // Antigravity runs against the user's Google plan and publishes no per-token prices (checked 7 Nov 2026, HI-2544): no
   // table ships, and its sessions show as unpriced. Prices a user adds are used.
-  [ANTIGRAVITY]: {}
+  [ANTIGRAVITY]: {},
+  // OpenCode reaches many vendors' models through the account's own sign-ins and keys, each priced by its vendor (checked
+  // 9 Nov 2026, HI-2759): no table ships, and its sessions show as unpriced. Prices a user adds are used.
+  [OPENCODE]: {}
 }
 
 /** Claude Code's aliases, and the dated ids its transcripts show, map to the table's ids. */
@@ -151,6 +155,20 @@ const UNPRICED = msg({
 
 /** What to say about a cost that is unknown because the model has no price: where to add one. */
 export const unpricedText = (model: string, providerName: string): string => tr(UNPRICED, { model, provider: providerName })
+
+const ZERO_REPORTED = msg({
+  id: 'project.cost.zeroReported',
+  defaultMessage: '{provider} reported this session’s cost as $0. A subscription, a free model or a model on this PC can still use your plan’s allowance: $0 isn’t a measure of it.',
+  description: "Added to the hover of a session's cost when the coding agent itself reported $0 for a session that used tokens (HI-2762: OpenCode gives $0 for a model it has no price for). {provider} is the coding agent (OpenCode…). $0 is the amount as shown: keep it."
+})
+
+/**
+ * A reported cost of $0 for a session that used tokens (HI-2762): said as such, never a price (a subscription's or a local
+ * model's use isn't free of allowance). Null when it doesn't apply: an estimate, a cost above 0, or no tokens.
+ */
+export function zeroCostNote(cost: number | null, estimated: boolean, tokens: number, providerName: string): string | null {
+  return cost === 0 && !estimated && tokens > 0 ? tr(ZERO_REPORTED, { provider: providerName }) : null
+}
 
 /** A session's API-equivalent cost from its token counts; null when the model's price is unknown. */
 export function estimateCost(usage: Pick<SessionUsage, 'provider' | 'model' | 'inputTokens' | 'cacheReadTokens' | 'cacheWriteTokens' | 'outputTokens'>, settings?: Pick<AppSettings, 'providers'> | null): number | null {

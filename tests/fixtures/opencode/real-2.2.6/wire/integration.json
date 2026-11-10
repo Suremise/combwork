@@ -1,0 +1,75 @@
+{
+ "status": 200,
+ "body": {
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": [
+   {
+    "id": "302ai",
+    "name": "302.AI",
+    "methods": [
+     {
+      "type": "key"
+     },
+     {
+      "type": "env",
+      "names": [
+       "302AI_API_KEY"
+      ]
+     }
+    ],
+    "connections": []
+   },
+   {
+    "id": "abacus",
+    "name": "Abacus",
+    "methods": [
+     {
+      "type": "key"
+     },
+     {
+      "type": "env",
+      "names": [
+       "ABACUS_API_KEY"
+      ]
+     }
+    ],
+    "connections": []
+   },
+   {
+    "id": "abliteration-ai",
+    "name": "abliteration.ai",
+    "methods": [
+     {
+      "type": "key"
+     },
+     {
+      "type": "env",
+      "names": [
+       "ABLIT_KEY"
+      ]
+     }
+    ],
+    "connections": []
+   },
+   {
+    "id": "above",
+    "name": "above.dev",
+    "methods": [
+     {
+      "type": "key"
+     },
+     {
+      "type": "env",
+      "names": [
+       "ABOVE_API_KEY"
+      ]
+     }
+    ],
+    "connections": []
+   }
+  ]
+ },
+ "trimmed": "the first 4 of 240 integrations, as 2.2.6 listed them with no account"
+}

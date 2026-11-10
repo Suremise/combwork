@@ -199,6 +199,18 @@
     "defaultMessage": "{agent} wasn’t started: its context size ({context, number} tokens, {contextFrom}) is too small for any output budget. Set a larger context size.",
     "description": "An error starting an agent on a local model (HI-2682): its context is so small that no output budget fits. {agent} is the agent's name; {context} is a number of tokens; {contextFrom} says where it was set."
   },
+  "providers.claude.policy.file": {
+    "defaultMessage": "Claude Code's managed settings file",
+    "description": "Where a Claude Code setting that blocks Combwork's hooks was found: the managed-settings.json an administrator gives Claude Code (C:\\Program Files\\ClaudeCode). Used after \"in\" or as a subject in the hooks warning."
+  },
+  "providers.claude.policy.hkcu": {
+    "defaultMessage": "your Claude Code policy in the registry (HKCU)",
+    "description": "Where a Claude Code setting that blocks Combwork's hooks was found: a policy in the Windows registry for the current user. Used after \"in\" or as a subject in the hooks warning. Keep HKCU."
+  },
+  "providers.claude.policy.hklm": {
+    "defaultMessage": "the computer's Claude Code policy in the registry (HKLM)",
+    "description": "Where a Claude Code setting that blocks Combwork's hooks was found: a policy in the Windows registry for the whole computer. Used after \"in\" or as a subject in the hooks warning. Keep HKLM."
+  },
   "providers.cmdTooLong": {
     "defaultMessage": "{file} has to run through cmd.exe, which takes a command line of at most {max, number} characters, and this launch needs about {length, number}. Set the CLI's path in Settings to its .exe (or install the standalone CLI), which has no such limit.",
     "description": "Starting an agent is refused: its CLI is a .cmd or .bat launcher, and cmd.exe can't take a command line this long. {file} is the launcher's file name; {max} and {length} are numbers of characters. Keep cmd.exe and .exe as they are."
@@ -323,6 +335,30 @@
     "defaultMessage": "Copilot isn't signed in: sign in as Provider Setup shows, then start it again.",
     "description": "Why GitHub Copilot didn't start, in the agent's pane, with a button that goes where it says. Agent Settings, Provider Setup and Settings → … are Combwork's names: use them as shown."
   },
+  "providers.copilot.host.choose": {
+    "defaultMessage": "{repoHost} is a GitHub Enterprise Server host: choose where Copilot signs in (github.com or your GHE.com host) in Version Control → GitHub. Its Copilot agents don’t start until you do.",
+    "description": "Provider Setup, GitHub Copilot (HI-2779): a project’s repositories are on a GitHub Enterprise Server host ({repoHost}), where cloud Copilot can’t sign in, and no Copilot host was chosen. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name."
+  },
+  "providers.copilot.host.deviceCode": {
+    "defaultMessage": "For a code to enter instead, run `copilot login --host {host} --device-code` in a terminal.",
+    "description": "Provider Setup, under GitHub Copilot’s Sign in for a GitHub host (HI-2779): another way to sign in. {host} is the host. `…` marks a command: keep it."
+  },
+  "providers.copilot.host.gh": {
+    "defaultMessage": "With no login of its own there, Copilot uses the GitHub CLI’s login on {host} (`gh auth login --hostname {host}`), never one on another host.",
+    "description": "Provider Setup, under GitHub Copilot’s Sign in for a GitHub host (HI-2779): Copilot falls back to the GitHub CLI’s sign-in on the same host only. {host} is the host. `…` marks a command: keep it."
+  },
+  "providers.copilot.host.proxy": {
+    "defaultMessage": "GitHub Enterprise Server’s Copilot proxy is a preview Combwork doesn’t support yet: choose github.com or your GHE.com host in Version Control → GitHub. Its Copilot agents don’t start until you do.",
+    "description": "Provider Setup, GitHub Copilot (HI-2779): the Copilot sign-in setting chose GitHub Enterprise Server’s Copilot proxy (a GitHub preview), not supported yet. Version Control → GitHub names the setting’s place. GHE.com is GitHub’s product name."
+  },
+  "providers.copilot.host.signInRuns": {
+    "defaultMessage": "**Sign in** runs `copilot login --host {host}` in a terminal: it opens {host} in your browser to authorise Copilot. Combwork never signs in for you.",
+    "description": "Provider Setup, under GitHub Copilot's Sign in for a GitHub host other than github.com (HI-2779): what it does. {host} is the host. **…** marks bold text and `…` a command: keep the marks and the command."
+  },
+  "providers.copilot.host.signedOut": {
+    "defaultMessage": "Copilot isn’t signed in on {host}.",
+    "description": "Provider Setup, GitHub Copilot (HI-2779): no sign-in found for a GitHub host Combwork’s projects use. {host} is the host (github.com, yourcompany.ghe.com)."
+  },
   "providers.copilot.parens.message": {
     "defaultMessage": "Copilot can't approve edits in a folder whose path has parentheses, so this agent asks before each edit, as in Ask. Rename the folder to give it Accept edits.",
     "description": "The notice that a GitHub Copilot agent asks before each edit. Ask and Accept edits are permission modes as Combwork names them: use their names as shown."
@@ -350,6 +386,10 @@
   "providers.copilot.signIn.runs": {
     "defaultMessage": "**Sign in** runs `copilot login` in a terminal: it opens GitHub in your browser to authorise Copilot. Combwork never signs in for you.",
     "description": "Provider Setup, under GitHub Copilot's Sign in: what it does. **…** marks bold text and `…` a command: keep the marks and the command."
+  },
+  "providers.copilot.signIn.switch": {
+    "defaultMessage": "Settings → Advanced → GitHub Copilot → **Keep GH_TOKEN and GITHUB_TOKEN from Copilot** decides this, for every workspace.",
+    "description": "Provider Setup, under GitHub Copilot’s Sign in, after the tokens Combwork keeps from Copilot (HI-2779): where that switch is. The path and the switch’s name are as Settings shows them (keep them as translated there); **…** marks bold text: keep the marks."
   },
   "providers.copilot.updateAnyway": {
     "defaultMessage": "Update anyway",
@@ -431,6 +471,50 @@
     "defaultMessage": "User {file} (all projects)",
     "description": "In the Memory view: the user's own instructions file, which every project's agents read. {file} is its name (CLAUDE.md)."
   },
+  "providers.opencode.adoptRefused": {
+    "defaultMessage": "Combwork can't take this OpenCode session over: {why, select, notRead {it hasn't been read from OpenCode yet} otherFolder {it ran in a folder that isn't this project's} otherMark {Combwork already has another session under its id} other {it isn't one of its account's sessions any more}}.",
+    "description": "An error when adopting (taking over) a session from the Sessions tab: an OpenCode session made outside Combwork (in OpenCode's own window) couldn't be adopted. {why} picks the reason. OpenCode is a product's name."
+  },
+  "providers.opencode.claudeAgentModel": {
+    "defaultMessage": "{provider} didn't start: {model} is a model of OpenCode's Claude Agent provider, which Combwork doesn't run through OpenCode. Run Claude Code as its own provider instead, or choose another model.",
+    "description": "Why an OpenCode agent didn't start (its pane): its model belongs to OpenCode's nested Claude Agent provider, which Combwork never allows. {provider} is OpenCode, {model} the model's id. Claude Agent and Claude Code are product names: keep them."
+  },
+  "providers.opencode.connections.setUp": {
+    "defaultMessage": "Set Up runs `opencode auth login` on this account, so you can connect it to the model providers you use. Answer in the terminal; Combwork types nothing into it.",
+    "description": "Settings → Accounts & Connections, above an OpenCode account's Set Up terminal: what Set Up is for. opencode auth login is a command: keep it. Set Up names a button."
+  },
+  "providers.opencode.effortNeedsModel": {
+    "defaultMessage": "{provider} didn't start: the connection's effort is {effort}, which OpenCode sets as a variant of the model, and the connection names no model. Choose its model (a provider and model, such as ollama/qwen3:8b) or the default effort in Agent Settings.",
+    "description": "Why an OpenCode agent didn't start (its pane): an effort level is chosen, but OpenCode sets effort as a variant of a model and no model is chosen. {provider} is OpenCode, {effort} the effort as chosen (e.g. high). ollama/qwen3:8b is a model id: keep it. Agent Settings is a place in Combwork."
+  },
+  "providers.opencode.effortNotListed": {
+    "defaultMessage": "{provider} didn't start: the connection's effort is {effort}, and OpenCode doesn't list {effort} as a variant of {model} on this account, so Combwork can't set it. Choose one of the model's efforts, or the default, in Agent Settings. If OpenCode's models couldn't be read just now, start the agent again.",
+    "description": "Why an OpenCode agent didn't start (its pane): the chosen effort level isn't one of the variants OpenCode lists for the chosen model on this account (or the list couldn't be read). {provider} is OpenCode, {effort} the effort as chosen (e.g. high), {model} the model's id. Agent Settings is a place in Combwork."
+  },
+  "providers.opencode.historyBusy": {
+    "defaultMessage": "{provider} didn't start: Combwork's reader of OpenCode sessions didn't answer in time, so it couldn't take this session over from an earlier run. Start the agent again.",
+    "description": "Why an OpenCode agent didn't start (its pane): Combwork's background reader of OpenCode session histories didn't confirm in time that it let go of the session's earlier run. {provider} is OpenCode."
+  },
+  "providers.opencode.noModel": {
+    "defaultMessage": "{provider} didn't start: Combwork keeps OpenCode to the provider in the connection's model, and this connection names none, so OpenCode would choose one itself, perhaps one of its free cloud models. Choose the connection's model (a provider and model, such as ollama/qwen3:8b) in Agent Settings, or turn off \"Keep OpenCode to the connection's own provider\" in Settings → Advanced.",
+    "description": "Why an OpenCode agent didn't start (its pane): Combwork only allows the provider of the connection's model, and no model (or no valid provider/model id) is set. {provider} is OpenCode. ollama/qwen3:8b is a model id: keep it. Agent Settings and Settings → Advanced are places in Combwork; the quoted text is an advanced setting's title: use that setting's translated title."
+  },
+  "providers.opencode.noOwner": {
+    "defaultMessage": "{provider} didn't start: Combwork couldn't read its own process's identity, which the agent's private OpenCode server is tied to so that it ends with Combwork. Windows PowerShell may be blocked on this PC.",
+    "description": "Why an OpenCode agent didn't start (its pane): Combwork couldn't get the identity it ties the agent's server's lifetime to. {provider} is OpenCode. Windows PowerShell is a program's name: keep it."
+  },
+  "providers.opencode.otherAccount": {
+    "defaultMessage": "{provider} didn't resume {session}: it is in another OpenCode account's data, not the account this agent runs on now. Start a new session, or move the agent back to that account.",
+    "description": "Why an OpenCode agent didn't resume a session (its pane): each OpenCode account keeps its own sessions, and this one was made on another account. {provider} is OpenCode, {session} the session's id."
+  },
+  "providers.opencode.protectedArg": {
+    "defaultMessage": "{provider} didn't start: the agent's extra arguments include {arg}, which Combwork sets itself for every OpenCode launch. Remove it from the agent's extra arguments (Agent Settings).",
+    "description": "Why an OpenCode agent didn't start (its pane): its extra command-line arguments include one Combwork controls (its server, its session, its mode). {provider} is OpenCode, {arg} the argument as typed. Agent Settings is a place in Combwork."
+  },
+  "providers.opencode.v1Found": {
+    "defaultMessage": "{count, plural, one {The opencode found is} other {The opencode copies found are}} not OpenCode 2: OpenCode 1 (opencode-ai), the archived opencode project or an editor’s copy. Combwork needs OpenCode 2: Install puts it in its own folder, and your other copy keeps working.",
+    "description": "Provider Setup → OpenCode, when only copies Combwork doesn't support were found. opencode and opencode-ai are names: keep them; Install is a button."
+  },
   "providers.readiness.notInstalled": {
     "defaultMessage": "{provider} is not installed.",
     "description": "Provider Setup and Settings → Providers: Combwork didn't find the coding agent's CLI. {provider} is its name (Claude Code)."
@@ -442,6 +526,10 @@
   "providers.readiness.update": {
     "defaultMessage": "{provider} {version} is available.",
     "description": "Provider Setup and Settings → Providers: a newer version of the coding agent is out. {provider} is its name, {version} the version."
+  },
+  "providers.readiness.updateStayed": {
+    "defaultMessage": "{provider} stayed on {version} after updating to {offered}: an organisation's policy may set its version or channel, or the update didn't take. Check again later, or update again.",
+    "description": "Provider Setup and Settings → Providers: the coding agent was updated but is still on its old version (HI-2777). {provider} is its name, {version} the version it stayed on, {offered} the one offered. \"Check again\" and \"update\" name the buttons beside it."
   },
   "providers.settings.hooksOff": {
     "defaultMessage": "{source, select, inline {The --settings in Extra arguments} other {The settings file {file} (--settings in Extra arguments)}} turns off all hooks (disableAllHooks). Combwork's hooks are how it knows what the agent is doing (its status, file locks, what it is told) and they carry its status line, so Combwork doesn't start an agent without them. Take disableAllHooks out of those settings, or remove the --settings from Extra arguments in Agent Settings or Settings → Claude Code.",
@@ -490,6 +578,38 @@
   "providers.transcript.interrupted": {
     "defaultMessage": "Interrupted by you",
     "description": "A notice in a conversation, in the Sessions tab's transcript viewer and its Markdown export: the user stopped the agent's turn."
+  },
+  "providers.transcript.opencodeForked": {
+    "defaultMessage": "Forked from another session: everything above was copied from it.",
+    "description": "A notice in an OpenCode session's history (the Sessions tab's transcript viewer): this session is a fork (a copy made to continue separately) of another session; the messages above the notice came from that session, those below are this one's own."
+  },
+  "providers.transcript.opencodeForkedSomewhere": {
+    "defaultMessage": "This session was forked from another one: some of it was copied from that session.",
+    "description": "A notice at the start of an OpenCode session's history (the Sessions tab's transcript viewer): this session is a fork (a copy made to continue separately) of another session, and Combwork can't tell where the copied part ends."
+  },
+  "providers.transcript.opencodeIncomplete": {
+    "defaultMessage": "Combwork couldn't read the end of this session from {provider}: {problem}. What's shown is what it had read before.",
+    "description": "A notice at the end of an OpenCode session's history (the Sessions tab's transcript viewer): Combwork's newest read of the session from OpenCode failed, so the end may be missing. {provider} is OpenCode; {problem} says why, one of the providers.transcript.opencodeProblem.* messages."
+  },
+  "providers.transcript.opencodeProblem.exit": {
+    "defaultMessage": "OpenCode ended with an error",
+    "description": "Why Combwork couldn't read an OpenCode session's end ({problem} in providers.transcript.opencodeIncomplete): the opencode command exited with an error. OpenCode is a product's name."
+  },
+  "providers.transcript.opencodeProblem.parse": {
+    "defaultMessage": "what OpenCode gave couldn't be read",
+    "description": "Why Combwork couldn't read an OpenCode session's end ({problem} in providers.transcript.opencodeIncomplete): OpenCode's answer wasn't in a shape Combwork knows. OpenCode is a product's name."
+  },
+  "providers.transcript.opencodeProblem.size": {
+    "defaultMessage": "the session is larger than Combwork reads",
+    "description": "Why Combwork couldn't read an OpenCode session's end ({problem} in providers.transcript.opencodeIncomplete): it is over Combwork's size limit."
+  },
+  "providers.transcript.opencodeProblem.timeout": {
+    "defaultMessage": "it took too long",
+    "description": "Why Combwork couldn't read an OpenCode session's end ({problem} in providers.transcript.opencodeIncomplete): OpenCode didn't answer in time."
+  },
+  "providers.transcript.opencodeRevertStaged": {
+    "defaultMessage": "OpenCode has this message and everything after it marked to be undone.",
+    "description": "A notice in an OpenCode session's history (the Sessions tab's transcript viewer), placed before a message: the user chose to undo (revert) the conversation from here in OpenCode, and hasn't confirmed it yet, so what follows is still shown. OpenCode is a product's name."
   },
   "providers.transcript.resumed": {
     "defaultMessage": "Session resumed",

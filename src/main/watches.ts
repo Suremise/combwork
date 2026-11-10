@@ -20,7 +20,7 @@ import { coalesced } from './coalesce'
 import { createLogger, userText } from './logger'
 import { listLanes } from './lanes'
 import { keepAsked, LANE_CARD_CHANGES, laneCardMark, laneOverPart, laneHits, laneLimitLine, laneWakeLine, laneWatchLabel, mergeDue, mergeStallReason, newLaneBase, laneTitlesOf, withAlwaysEvents, readSavedLaneCondition, readSavedLaneMark, verdictsOf, type LaneAgentHit, type LaneAsked, type LaneHit, type LaneMark, type LaneNow, type LaneWatchAgents, type LaneWatchCards, type LaneWatchCondition, type WaitHit } from '../shared/laneWatch'
-import { cardStallIn, laneOrderView } from './cardStall'
+import { cardStallWith, laneOrderView } from './cardStall'
 import { noteLoopWatch } from './loopCheck'
 import { isResuming } from './restartResume'
 import { sessions } from './sessions'
@@ -1681,13 +1681,14 @@ async function lanesIn(ws: WorkspaceService, rec: Pick<WatchRecord, 'scope' | 'l
       const found = byNumber.get(lc.number)
       // A card moved to another project is gone from the lane.
       const card = found && same(found.project, l.project) ? found : null
-      const stalled = card && !card.archived ? await cardStallIn(ws, card, agents, order) : null
+      const stall = card && !card.archived ? await cardStallWith(ws, card, agents, order) : null
+      const stalled = stall?.why ?? null
       // An ended lane's cards are another lane's or nobody's: no requests of theirs are told for it.
       const asked = running(l) && asks ? newestAsk(asks.get(lc.number)) : undefined
       marks[lc.number] = laneCardMark(card, stalled, asked)
       changed.push({ mark: marks[lc.number], updatedAt: card?.updatedAt })
       const v = card ? verdictsOf(card) : null
-      cards.push({ number: lc.number, blocked: card?.blocked ?? null, stalled, failedBy: v?.failed?.by ?? null, passedBy: v?.passed?.by ?? null, ...(asked ? { asked } : {}) })
+      cards.push({ number: lc.number, blocked: card?.blocked ?? null, stalled, ...(stall?.safeguard ? { stalledSafeguard: stall.safeguard } : {}), failedBy: v?.failed?.by ?? null, passedBy: v?.passed?.by ?? null, ...(asked ? { asked } : {}) })
     }
     const pair = `${l.builder.name}${l.reviewer ? ` / ${l.reviewer.name}` : ''}`
     const label = `${pair}${l.name ? ` (${l.name})` : ''}`

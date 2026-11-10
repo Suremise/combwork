@@ -143,7 +143,8 @@ const shot = (page, n) => page.screenshot({ path: path.join(scratch, `agents-${n
   // Another launch's token, or none, isn't taken (#345).
   const [h1, h2] = [hooks[l1.sessionId], hooks[l2.sessionId]]
   check("another launch's token is refused", (await post({ url: h1.url, token: h2.token }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
-  check('a call naming no launch is refused', (await post({ url: h1.url.replace(/\?.*/, ''), token: h1.token }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
+  // The fixed URL (no ?run=) finds the launch by its token (HI-2777), so naming no launch is that URL with a token Combwork didn't issue.
+  check('a call naming no launch is refused', (await post({ url: h1.url.replace(/\?.*/, ''), token: 'f'.repeat(48) }, { session_id: l1.sessionId, hook_event_name: 'Notification' })).status === 401)
   // Combwork's log says so, once each (#711): a hook a CLI sent but Combwork refused leaves a trace on Combwork's side.
   const combworkLog = () => fs.readFileSync(path.join(userData, 'logs', 'combwork.log'), 'utf8')
   const refusedLines = () => combworkLog().split('\n').filter((x) => x.includes('Refused a hook call'))

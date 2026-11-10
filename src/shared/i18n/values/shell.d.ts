@@ -69,6 +69,7 @@ interface CombworkMessageValues {
   'shell.command.help.restoreBoard09': undefined
   'shell.command.help.shortcuts': undefined
   'shell.command.help.tips': undefined
+  'shell.command.hooks.adminSnippet': undefined
   'shell.command.layout': { layout: string | number }
   'shell.command.mcp.import': undefined
   'shell.command.notes.open': undefined
@@ -330,6 +331,22 @@ interface CombworkMessageValues {
   'shell.setup.gitProblemDetail': { problem: string | number; fix: string | number }
   'shell.setup.gitUnknown': undefined
   'shell.setup.gitUnknownDetail': { error: string | number; min: string | number }
+  'shell.setup.host.chooseHost': undefined
+  'shell.setup.host.configured': undefined
+  'shell.setup.host.configuredModels': undefined
+  'shell.setup.host.denied': undefined
+  'shell.setup.host.heading': undefined
+  'shell.setup.host.installed': undefined
+  'shell.setup.host.models': { available: number; unavailable: number }
+  'shell.setup.host.noSignIn': undefined
+  'shell.setup.host.proxy': undefined
+  'shell.setup.host.repo': { host: string | number }
+  'shell.setup.host.tokens': undefined
+  'shell.setup.host.unknown': undefined
+  'shell.setup.host.unverified': undefined
+  'shell.setup.host.usedBy': { projects: string; workspace: string | number }
+  'shell.setup.host.verified': { account: string | number; host: string | number }
+  'shell.setup.host.via': { source: string | number; account: string }
   'shell.setup.install': { provider: string | number }
   'shell.setup.installed': { provider: string | number }
   'shell.setup.looking': { provider: string | number }

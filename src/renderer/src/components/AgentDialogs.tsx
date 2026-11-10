@@ -301,6 +301,7 @@ export function AddAgentDialog() {
       {newOn && (
         <ConnectionDialog
           account={newOn}
+          projectPath={path}
           onClose={(saved) => {
             setNewOn(null)
             if (saved) choose(saved.id)
@@ -560,6 +561,7 @@ function AgentSettingsModal({
       {newOn && (
         <ConnectionDialog
           account={newOn}
+          projectPath={mcpProject}
           onClose={(saved) => {
             setNewOn(null)
             if (saved) put({ connection: saved.id })

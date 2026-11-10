@@ -1,0 +1,15 @@
+{
+ "status": 200,
+ "body": {
+  "data": {
+   "id": "msg_1be134526001R6SS4GC6oHqqc5",
+   "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+   "time": {
+    "created": 1794190296359
+   },
+   "type": "compaction",
+   "payload": {},
+   "delivery": "steer"
+  }
+ }
+}

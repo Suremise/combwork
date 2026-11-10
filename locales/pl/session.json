@@ -112,6 +112,7 @@
   "session.newConversation.pending": "Agent właśnie dostał prompt, który nie trafił jeszcze do jego CLI.",
   "session.notice.finished": "{agent}: zakończono",
   "session.notice.finishedBody": "Agent zakończył zadanie.",
+  "session.notice.hooksDoubledTitle": "Hooki agenta {agent} docierają podwójnie",
   "session.notice.hooksMissingTitle": "Combwork nie otrzymuje hooków agenta {agent}",
   "session.notice.lineLost": "Ekran jego CLI przejął go przed wysłaniem. Wyślij go ponownie, jeśli jest nadal potrzebny: {text}",
   "session.notice.lineLostTitle": "{agent}: wiersz wpisany przez Combwork nie dotarł",

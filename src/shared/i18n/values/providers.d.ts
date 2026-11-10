@@ -51,6 +51,9 @@ interface CombworkMessageValues {
   'providers.claude.localLimits.oursOutput': { connection: string | number }
   'providers.claude.localLimits.outputNotBelow': { agent: string | number; output: number; outputFrom: string | number; context: number; contextFrom: string | number }
   'providers.claude.localLimits.tooSmall': { agent: string | number; context: number; contextFrom: string | number }
+  'providers.claude.policy.file': undefined
+  'providers.claude.policy.hkcu': undefined
+  'providers.claude.policy.hklm': undefined
   'providers.cmdTooLong': { file: string | number; max: number; length: number }
   'providers.codex.connections.setUp': undefined
   'providers.codex.developerUnread.agentMessage': undefined
@@ -82,6 +85,12 @@ interface CombworkMessageValues {
   'providers.copilot.hint.mcp': undefined
   'providers.copilot.hint.model': undefined
   'providers.copilot.hint.signIn': undefined
+  'providers.copilot.host.choose': { repoHost: string | number }
+  'providers.copilot.host.deviceCode': { host: string | number }
+  'providers.copilot.host.gh': { host: string | number }
+  'providers.copilot.host.proxy': undefined
+  'providers.copilot.host.signInRuns': { host: string | number }
+  'providers.copilot.host.signedOut': { host: string | number }
   'providers.copilot.parens.message': undefined
   'providers.copilot.parens.title': undefined
   'providers.copilot.planNote': undefined
@@ -89,6 +98,7 @@ interface CombworkMessageValues {
   'providers.copilot.signIn.gh': undefined
   'providers.copilot.signIn.ignored': { n: number; variables: string | number }
   'providers.copilot.signIn.runs': undefined
+  'providers.copilot.signIn.switch': undefined
   'providers.copilot.updateAnyway': undefined
   'providers.copilot.updateManual': { provider: string | number }
   'providers.copilot.updateModified': undefined
@@ -109,9 +119,21 @@ interface CombworkMessageValues {
   'providers.localLimits.switched': { model: string | number }
   'providers.memory.connection': { file: string | number; name: string | number }
   'providers.memory.user': { file: string | number }
+  'providers.opencode.adoptRefused': { why: string }
+  'providers.opencode.claudeAgentModel': { provider: string | number; model: string | number }
+  'providers.opencode.connections.setUp': undefined
+  'providers.opencode.effortNeedsModel': { provider: string | number; effort: string | number }
+  'providers.opencode.effortNotListed': { provider: string | number; effort: string | number; model: string | number }
+  'providers.opencode.historyBusy': { provider: string | number }
+  'providers.opencode.noModel': { provider: string | number }
+  'providers.opencode.noOwner': { provider: string | number }
+  'providers.opencode.otherAccount': { provider: string | number; session: string | number }
+  'providers.opencode.protectedArg': { provider: string | number; arg: string | number }
+  'providers.opencode.v1Found': { count: number }
   'providers.readiness.notInstalled': { provider: string | number }
   'providers.readiness.signedOut': { provider: string | number }
   'providers.readiness.update': { provider: string | number; version: string | number }
+  'providers.readiness.updateStayed': { provider: string | number; version: string | number; offered: string | number }
   'providers.settings.hooksOff': { source: string; file: string | number }
   'providers.settings.noFile': undefined
   'providers.settings.noValue': undefined
@@ -124,6 +146,14 @@ interface CombworkMessageValues {
   'providers.transcript.aborted': undefined
   'providers.transcript.apiError': undefined
   'providers.transcript.interrupted': undefined
+  'providers.transcript.opencodeForked': undefined
+  'providers.transcript.opencodeForkedSomewhere': undefined
+  'providers.transcript.opencodeIncomplete': { provider: string | number; problem: string | number }
+  'providers.transcript.opencodeProblem.exit': undefined
+  'providers.transcript.opencodeProblem.parse': undefined
+  'providers.transcript.opencodeProblem.size': undefined
+  'providers.transcript.opencodeProblem.timeout': undefined
+  'providers.transcript.opencodeRevertStaged': undefined
   'providers.transcript.resumed': undefined
   'providers.transcript.turnEnded': { reason: string | number }
   'providers.unknown': { provider: string | number }

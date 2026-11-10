@@ -16,6 +16,7 @@ import { call, errorMessage } from '../api'
 import { agentProviderOf, cardLabelOf, confirm, notify, openVersionControl, set as setStore, setActivity, useStore } from '../store'
 import { cx } from '../util'
 import { SlotCopyLevel, SlotsAndCopies } from './SlotsAndCopies'
+import { GithubHosts } from './GithubHosts'
 import { ORIGIN_TEXT } from '../workflowOrigins'
 import { OriginText } from './OriginText'
 import { providerDescriptor } from '@shared/providers'
@@ -75,9 +76,11 @@ const T = {
   noChecks: msg({ id: 'workflow.form.noChecks', defaultMessage: 'No checks.', description: 'Under “Checks pass before review” when it has none.' }),
   retargetChoice: msg({ id: 'workflow.form.retargetChoice', defaultMessage: 'Also retarget what can move from {from} to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# free slot} other {# free slots}}', description: 'HI-2680: a tick box in the dialog before saving workflow options that change Work merges into: after saving, move the Todo cards with no work of their own and the free slots still on the old branch {from} to the new one {to}. Card and slot counts.' }),
   retargetCard: msg({ id: 'workflow.form.retargetCard', defaultMessage: '{card} {title}: to the new branch', description: 'HI-2680: a card the retarget moves to the new Work merges into, in the dialog before saving. {card} is its key (HI-12).' }),
+  retargetStarted: msg({ id: 'workflow.form.retargetStarted', defaultMessage: '{card} {title}: to the new branch, its branch and work kept', description: 'HI-2753: a card already started (in Doing, Review or Passed) that the retarget moves to the new Work merges into, in the dialog before saving: its own branch and commits stay, since all of its work is its own. {card} is its key (HI-12).' }),
+  retargetLane: msg({ id: 'workflow.form.retargetLane', defaultMessage: '{hasCard, select, yes {{lane}, with its card {card} {title}: to the new branch} other {{lane}: its next cards start from the new branch}}', description: 'HI-2753: a running lane (a card loop) that the retarget moves to the new Work merges into, in the dialog before saving: with its card in flight ({card}, its key, and {title}), both in one step, or with none in flight. {lane} names the lane (its name and builder). Keep the select keys.' }),
   retargetSlot: msg({ id: 'workflow.form.retargetSlot', defaultMessage: '{slot}: free, to the new branch', description: 'HI-2680: a free slot the retarget moves to the new Work merges into (its folder detached at the new branch), in the dialog before saving. {slot} is its name (slot-a).' }),
   retargetStays: msg({ id: 'workflow.form.retargetStays', defaultMessage: 'These stay on {from}:', description: 'HI-2680: in the dialog before saving workflow options, above what the retarget leaves on the old branch {from}, each with why.' }),
-  retargetKeep: msg({ id: 'workflow.form.retargetKeep', defaultMessage: '{what}: {why, select, work {it has work on its branch} started {already started} lane {a running lane keeps its branch until it ends} lent {lent} dirty {it has changes not committed} busy {in use} unmerged {it holds commits {from} lacks} targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} moved {it moved meanwhile} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}', description: 'HI-2680: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name.' }),
+  retargetKeep: msg({ id: 'workflow.form.retargetKeep', defaultMessage: '{what}: {why, select, work {it has work on its branch} started {already started} lane {a running lane keeps its branch until it ends} queued {it is in the merge queue} notInTarget {it has commits {to} doesn’t have} reviewed {its reviewed work would bring other commits} noLine {it works in the project folder} lent {lent} dirty {it has changes not committed} busy {in use} unmerged {it holds commits {from} lacks} targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} moved {it moved meanwhile} gone {its folder is gone} setAside {set aside: look at its folder} other {Combwork can’t tell}}', description: 'HI-2680, HI-2753: a card, slot or lane the retarget leaves where it is, and why (a select: keep the keys). {what} is its name; {from} the old branch, {to} the new one. queued: in the merge queue; notInTarget: a started card with commits the new branch lacks; reviewed: a reviewed card whose change would differ on the new branch; noLine: it has no branch of its own.' }),
   retargetDone: msg({ id: 'workflow.form.retargetDone', defaultMessage: '{skipped, plural, =0 {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}} other {Moved to {to}: {cards, plural, one {# card} other {# cards}} and {slots, plural, one {# slot} other {# slots}}; # left where they were}}', description: 'HI-2680: a notification after the retarget: how many cards and slots moved to the new branch {to}, and how many were left (each listed with why in its text).' }),
   retargetSkipped: msg({ id: 'workflow.form.retargetSkipped', defaultMessage: '{what}: {why, select, targetChanged {the target changed meanwhile} refused {not allowed now} changed {it changed meanwhile} busy {in use} dirty {it has changes not committed} moved {it moved meanwhile} unmerged {it holds commits the old branch lacks} gone {its folder is gone} setAside {set aside until you remove it: look at its folder first} failed {it couldn’t be moved; Combwork looks at it again} other {Combwork can’t tell}}', description: 'HI-2680: a line of the notification after the retarget: a card or slot left where it was ({what}: its key or name), and why (a select: keep the keys).' }),
   retargetFailed: msg({ id: 'workflow.form.retargetFailed', defaultMessage: 'The options were saved, but nothing was retargeted', description: 'HI-2680: an error’s title: the workflow options were saved, but the retarget that should follow failed. Its text says why.' }),
@@ -394,7 +397,7 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
     const picked = new Set<number>()
     // HI-2680: Also retarget what can move, ticked when anything can.
     const retargets = 'retarget' in check ? check.retarget : undefined
-    const retarget = new Set<'on'>(retargets && retargets.cards.move.length + retargets.slots.move.length > 0 ? ['on'] : [])
+    const retarget = new Set<'on'>(retargets && retargets.cards.move.length + retargets.slots.move.length + (retargets.laneMoves?.length ?? 0) > 0 ? ['on'] : [])
     let stale = false
     const ok = await confirm({
       title: tr(T.confirmTitle),
@@ -705,6 +708,9 @@ function WorkflowEditor({ source, project, onDirty }: { source: FormSource; proj
             {/* A Git project's slots and copies, after where cards are built (a level has none: they're a project's). */}
             {g.id === 'where' && project && <SlotsAndCopies project={project} slots={effective.folder === 'slots'} />}
             {g.id === 'where' && !project && source.level && platform === 'git' && <SlotCopyLevel level={source.level} />}
+            {/* The GitHub hosts (HI-2779): a Git project's own, and the workspace's default (Combwork's level has none). */}
+            {g.id === 'where' && project && <GithubHosts projectPath={project.path} />}
+            {g.id === 'where' && !project && source.level === 'workspace' && platform === 'git' && <GithubHosts projectPath={null} />}
           </Fragment>
         )
       })}
@@ -907,7 +913,7 @@ function ChecksEditor({ names, commands, onChange }: { names: string[]; commands
  */
 /** HI-2680: what a retarget left where it was, a line each (the toast's text). */
 function retargetSkippedText(r: RetargetResult): string {
-  return r.skipped.map((s) => tr(T.retargetSkipped, { what: s.key ?? s.slot ?? '', why: s.why })).join('\n')
+  return r.skipped.map((s) => tr(T.retargetSkipped, { what: s.key ?? s.slot ?? s.lane ?? '', why: s.why })).join('\n')
 }
 
 function SaveDetails({ changes, check, picked, retarget, title }: { changes: string[]; check: WorkflowCheck | WorkflowLevelCheck; picked: Set<number>; retarget?: Set<'on'>; title: (k: OptionKey) => string }) {
@@ -1017,7 +1023,9 @@ const LANE_KEEPS = 'lane' // i18n-ignore: a select key
 
 /** HI-2680: the Save… dialog's Retarget: what can follow the new target, what stays and why, and its tick box. */
 function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPreview; choice: Set<'on'>; onChange: () => void }) {
-  const movable = p.cards.move.length + p.slots.move.length
+  const lanes = p.laneMoves ?? []
+  const movable = p.cards.move.length + p.slots.move.length + lanes.length
+  const laneName = (l: { name: string | null; builder: string }): string => (l.name ? tr(T.lane, { builder: l.builder, name: l.name }) : tr(T.laneUnnamed, { builder: l.builder }))
   return (
     <div className="workflow-retarget" data-retarget="">
       {movable > 0 && (
@@ -1032,13 +1040,18 @@ function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPr
               onChange()
             }}
           />{' '}
-          {tr(T.retargetChoice, { cards: p.cards.move.length, slots: p.slots.move.length, from: p.from, to: p.to })}
+          {tr(T.retargetChoice, { cards: p.cards.move.length + lanes.filter((l) => l.card).length, slots: p.slots.move.length, from: p.from, to: p.to })}
         </label>
       )}
       <ul>
+        {lanes.map((l) => (
+          <li key={`lm${l.id}`} data-retarget-move={l.id}>
+            {tr(T.retargetLane, { lane: laneName(l), hasCard: l.card ? 'yes' : 'no', card: l.card?.key ?? '', title: l.card?.title ?? '' })}
+          </li>
+        ))}
         {p.cards.move.map((c) => (
           <li key={`c${c.number}`} data-retarget-move={c.key}>
-            {tr(T.retargetCard, { card: c.key, title: c.title })}
+            {tr(c.started ? T.retargetStarted : T.retargetCard, { card: c.key, title: c.title })}
           </li>
         ))}
         {p.slots.move.map((s) => (
@@ -1053,17 +1066,17 @@ function RetargetDetails({ preview: p, choice, onChange }: { preview: RetargetPr
           <ul>
             {p.cards.keep.map((c) => (
               <li key={`ck${c.number}`} data-retarget-keep={c.key}>
-                {tr(T.retargetKeep, { what: `${c.key} ${c.title}`, why: c.why, from: p.from })}
+                {tr(T.retargetKeep, { what: `${c.key} ${c.title}`, why: c.why, from: p.from, to: p.to })}
               </li>
             ))}
             {p.slots.keep.map((s) => (
               <li key={`sk${s.name}`} data-retarget-keep={s.name}>
-                {tr(T.retargetKeep, { what: s.name, why: s.why, from: p.from })}
+                {tr(T.retargetKeep, { what: s.name, why: s.why, from: p.from, to: p.to })}
               </li>
             ))}
             {p.lanes.map((l) => (
               <li key={`l${l.id}`} data-retarget-keep={l.id}>
-                {tr(T.retargetKeep, { what: l.name ? tr(T.lane, { builder: l.builder, name: l.name }) : tr(T.laneUnnamed, { builder: l.builder }), why: LANE_KEEPS, from: p.from })}
+                {tr(T.retargetKeep, { what: laneName(l), why: l.why ?? LANE_KEEPS, from: p.from, to: p.to })}
               </li>
             ))}
           </ul>

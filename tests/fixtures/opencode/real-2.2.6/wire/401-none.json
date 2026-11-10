@@ -1,0 +1,12 @@
+{
+ "status": 401,
+ "headers": {
+  "connection": "keep-alive",
+  "content-length": "64",
+  "content-type": "application/json",
+  "date": "Sun, 08 Nov 2026 23:13:09 GMT",
+  "keep-alive": "timeout=5",
+  "vary": "Origin, Accept-Encoding"
+ },
+ "body": "{\"_tag\":\"UnauthorizedError\",\"message\":\"Authentication required\"}"
+}

@@ -94,8 +94,35 @@ interface CombworkMessageValues {
   'files.find.noMatch': { filter: string | number }
   'files.find.placeholder': undefined
   'files.find.searching': undefined
+  'files.git.allExt': { ext: string | number }
+  'files.git.exclude': undefined
+  'files.git.excludeFailed': undefined
+  'files.git.excluded': { added: number; file: string | number; line: string | number; branch: string }
+  'files.git.excludedDetail': { file: string }
+  'files.git.ignoredBy': { file: string | number; line: string | number; pattern: string | number }
   'files.git.inFolder': { status: string | number }
+  'files.git.inGitignore': undefined
+  'files.git.include': undefined
+  'files.git.includeFailed': undefined
+  'files.git.included': { line: string | number; file: string | number; branch: string }
+  'files.git.initialise': undefined
+  'files.git.onThisPc': undefined
+  'files.git.ruleAt': { line: string | number; file: string | number; pattern: string | number }
+  'files.git.ruleClose': undefined
+  'files.git.ruleTitle': { name: string | number }
+  'files.git.section': undefined
+  'files.git.showChanges': undefined
   'files.git.status': { status: string }
+  'files.git.thisItem': { count: number; folder: string }
+  'files.git.untrack': undefined
+  'files.git.untrackButton': undefined
+  'files.git.untrackDetail': undefined
+  'files.git.untrackFailed': undefined
+  'files.git.untrackMessage': { branch: string; count: number }
+  'files.git.untrackTitle': { count: number; name: string | number }
+  'files.git.untracked': { count: number; branch: string }
+  'files.git.why': undefined
+  'files.git.whyFailed': undefined
   'files.header': undefined
   'files.header.info': undefined
   'files.image.actualSize': undefined

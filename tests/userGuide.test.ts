@@ -12,13 +12,14 @@ import { GIT_VIEW_GUIDE } from '../src/shared/gitRepo'
 import { GIT_GUIDE } from '../src/shared/gitTool'
 import { CW_FOLDER_GUIDE } from '../src/shared/combworkVcsText'
 import { UNUSED_WORKTREES_GUIDE } from '../src/shared/unusedWorktrees'
+import { MANAGED_POLICY_GUIDE } from '../src/shared/claudeHookHandlers'
 
 const root = join(__dirname, '..')
 const guide = readFileSync(join(root, 'docs', 'USER_GUIDE.md'), 'utf8')
 const ids = (md: string): Set<string> => new Set(docOutline(md).filter((h) => h.fixed).map((h) => h.slug))
 
 /** The window's links that aren't tips or settings, by the constant `openGuideAt` is called with. */
-const CONSTANTS: Record<string, string> = { BOARD_UPGRADE_GUIDE, GIT_VIEW_GUIDE, GIT_GUIDE, CW_FOLDER_GUIDE, UNUSED_WORKTREES_GUIDE }
+const CONSTANTS: Record<string, string> = { BOARD_UPGRADE_GUIDE, GIT_VIEW_GUIDE, GIT_GUIDE, CW_FOLDER_GUIDE, UNUSED_WORKTREES_GUIDE, MANAGED_POLICY_GUIDE }
 
 /** Every link the app makes into the guide, each with where it comes from. */
 const appLinks = (): [string, string][] => [

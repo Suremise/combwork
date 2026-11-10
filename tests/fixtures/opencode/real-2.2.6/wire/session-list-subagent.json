@@ -1,0 +1,63 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "ses_e4063a6e4ffeyrnGITrRGOIyc0",
+    "projectID": "1ae5e58725ac5a2887f33939ab4d028a6fd843d8",
+    "cost": 0,
+    "tokens": {
+     "input": 7694,
+     "output": 1631,
+     "reasoning": 0,
+     "cache": {
+      "read": 2766,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794216057118,
+     "updated": 1794216074594,
+     "busy": 1794216057418,
+     "idle": 1794216074596
+    },
+    "title": "Task tool subagent PONG",
+    "location": {
+     "directory": "<root>\\project"
+    }
+   },
+   {
+    "id": "ses_e40636cefffe4iaKCYy8miDkrx",
+    "parentID": "ses_e4063a6e4ffeyrnGITrRGOIyc0",
+    "projectID": "1ae5e58725ac5a2887f33939ab4d028a6fd843d8",
+    "agent": "general",
+    "cost": 0,
+    "tokens": {
+     "input": 1196,
+     "output": 96,
+     "reasoning": 0,
+     "cache": {
+      "read": 2762,
+      "write": 0
+     }
+    },
+    "outcome": "succeeded",
+    "time": {
+     "created": 1794216071955,
+     "updated": 1794216072994,
+     "busy": 1794216071958,
+     "idle": 1794216072996
+    },
+    "title": "Test subagent response",
+    "location": {
+     "directory": "<root>\\project"
+    }
+   }
+  ],
+  "cursor": {
+   "previous": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTQwNjNhNmU0ZmZleXJuR0lUclJHT0l5YzAiLCJ0aW1lIjoxNzk0MjE2MDc0NTk0LCJkaXJlY3Rpb24iOiJwcmV2aW91cyJ9fQ",
+   "next": "eyJhbmNob3IiOnsiaWQiOiJzZXNfZTQwNjM2Y2VmZmZlNGlhS0NZeThtaURrcngiLCJ0aW1lIjoxNzk0MjE2MDcyOTk0LCJkaXJlY3Rpb24iOiJuZXh0In19"
+  }
+ }
+}

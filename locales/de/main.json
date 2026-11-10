@@ -5,6 +5,7 @@
   "main.accounts.inUse": "Die Verbindung {name} wird verwendet: Stoppe die Agenten darauf und schließe die Anmeldung, dann entferne sie.",
   "main.accounts.keyRemoveFailed": "Die Verbindung {name} wurde nicht entfernt: Ihr Schlüssel konnte nicht gelöscht werden. Es wurde nichts geändert; „Entfernen“ versucht es erneut.",
   "main.accounts.leftover": "Die Verbindung {name} ist nur halb entfernt: Entferne sie zuerst erneut.",
+  "main.accounts.letGoFailed": "{name} wurde nicht entfernt: Combwork konnte seine eigene Arbeit in seinem Ordner nicht rechtzeitig beenden. Nichts wurde geändert; „Entfernen“ versucht es erneut.",
   "main.accounts.makeFailed": "Der Ordner der Verbindung konnte nicht erstellt werden: {error}",
   "main.accounts.noHome": "Der Ordner von {cli} ({folder}) existiert noch nicht: Starte {cli} einmal, dann füge die Verbindung hinzu.",
   "main.accounts.noName": "Gib der Verbindung einen Namen.",

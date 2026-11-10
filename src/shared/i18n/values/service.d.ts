@@ -72,6 +72,15 @@ interface CombworkMessageValues {
   'service.files.notKept': undefined
   'service.files.outside': undefined
   'service.files.throughLink': undefined
+  'service.filesGit.busy': undefined
+  'service.filesGit.failed': { why: string | number }
+  'service.filesGit.linked': { file: string | number }
+  'service.filesGit.notIgnored': undefined
+  'service.filesGit.notRepo': undefined
+  'service.filesGit.notUtf8': { file: string | number }
+  'service.filesGit.nothing': undefined
+  'service.filesGit.ruleChanged': undefined
+  'service.filesGit.tooLarge': { file: string | number }
   'service.forward.byAssistant': undefined
   'service.forward.byUser': undefined
   'service.forward.description': { from: string | number; source: string | number; to: string | number; by: string | number }
@@ -233,6 +242,7 @@ interface CombworkMessageValues {
   'service.providers.task': { task: string; cli: string | number }
   'service.providers.taskDone': { task: string | number }
   'service.providers.taskFailed': { task: string | number; code: string | number }
+  'service.providers.unknownHost': { cli: string | number }
   'service.slots.notPrepared': { slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeFailed': { agent: string | number; slot: string | number; card: string | number; why: string | number }
   'service.slots.resumeHeld': { card: string | number; agent: string | number; slot: string | number; why: string | number }
@@ -257,7 +267,9 @@ interface CombworkMessageValues {
   'service.workflowNotice.mergeStalled': undefined
   'service.workflowNotice.merging': { card: string | number }
   'service.workflowNotice.notMerged': { card: string | number }
+  'service.workflowNotice.safeguardGuidance': { provider: string | number }
   'service.workflowNotice.stalled': { card: string | number }
+  'service.workflowNotice.stalledSafeguard': { card: string | number; agent: string | number; provider: string | number; time: string | number; stops: number }
   'service.workspace.advancedNotHere': { setting: string | number }
   'service.workspace.agentGone': undefined
   'service.workspace.badName': { chars: string | number }

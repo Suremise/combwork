@@ -3,7 +3,8 @@ import { dirname, join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentInstallInfo } from '../src/shared/types'
 import { redactLog } from '../src/shared/redact'
-import { copilotCheckEnv, copilotReadiness, copilotSignIn, copilotUpdateCommand, copilotUpdateRetry, ignoredTokens, installKind, parseCopilotConfig, parseCopilotVersion, parseGhStatus, storedLogin } from '../src/main/providers/copilot/install'
+import { copilotCheckEnv, copilotReadiness, copilotSignIn, copilotUpdateCommand, copilotUpdateRetry, ignoredTokens, installKind, parseCopilotConfig, parseCopilotVersion, parseGhStatus } from '../src/main/providers/copilot/install'
+import { storedLoginFor } from '../src/main/providers/copilot/hosts'
 import { tempDir } from './tempDir'
 
 // Provider Setup's Copilot readiness (#452): which sign-in its agents get, from the CLI's config.json (login names only),
@@ -34,22 +35,28 @@ describe('Copilot sign-in detection', () => {
     expect(copilotSignIn({ GH_TOKEN: '  ' }, stored, null)).toMatchObject({ source: 'stored' })
   })
 
-  it('is signed out with no login, no token and gh missing or signed out', () => {
+  it('is signed out with no login, no token and gh missing or without a login there', () => {
     const out = { loggedIn: false, source: null, account: null, variable: null }
     expect(copilotSignIn({}, null, null)).toEqual(out)
-    expect(copilotSignIn({}, parseCopilotConfig(configText([])), parseGhStatus(ghJson([{ active: true, login: 'gh-user', state: 'error' }])))).toEqual(out)
     expect(copilotSignIn({}, null, parseGhStatus(JSON.stringify({ hosts: {} })))).toEqual(out)
   })
 
-  it('names the last login of several, and an Enterprise host after it', () => {
+  it('takes a gh error as unknown, not signed out (HI-2779: an error can be the network as well as a bad token)', () => {
+    expect(copilotSignIn({}, parseCopilotConfig(configText([])), parseGhStatus(ghJson([{ active: true, login: 'gh-user', state: 'error' }])))).toEqual({ loggedIn: null, source: 'gh', account: 'gh-user', variable: null })
+  })
+
+  it('names the last login of several on the host asked for, never another host’s (HI-2779)', () => {
     const two = [{ host: GH, login: 'first' }, { host: GH, login: 'second' }]
-    expect(storedLogin(parseCopilotConfig(configText(two, { host: GH, login: 'second' })))).toBe('second')
-    expect(storedLogin(parseCopilotConfig(configText(two)))).toBe('first')
-    expect(storedLogin(parseCopilotConfig(configText(two, { host: GH, login: 'gone' })))).toBe('first')
-    expect(storedLogin(parseCopilotConfig(configText([{ host: 'https://acme.ghe.com/', login: 'me' }])))).toBe('me (acme.ghe.com)')
-    expect(storedLogin({ loggedInUsers: [{ host: GH }] })).toBe('')
-    expect(storedLogin({ loggedInUsers: 'nope' })).toBeNull()
-    expect(storedLogin(null)).toBeNull()
+    expect(storedLoginFor(parseCopilotConfig(configText(two, { host: GH, login: 'second' })), 'github.com')).toBe('second')
+    expect(storedLoginFor(parseCopilotConfig(configText(two)), 'github.com')).toBe('first')
+    expect(storedLoginFor(parseCopilotConfig(configText(two, { host: GH, login: 'gone' })), 'github.com')).toBe('first')
+    const acme = parseCopilotConfig(configText([{ host: 'https://acme.ghe.com/', login: 'me' }]))
+    expect(storedLoginFor(acme, 'acme.ghe.com')).toBe('me')
+    expect(storedLoginFor(acme, 'github.com')).toBeNull()
+    expect(storedLoginFor({ loggedInUsers: [{ host: GH }] }, 'github.com')).toBe('')
+    expect(storedLoginFor({ loggedInUsers: [{ login: 'nohost' }] }, 'github.com')).toBe('nohost')
+    expect(storedLoginFor({ loggedInUsers: 'nope' }, 'github.com')).toBeNull()
+    expect(storedLoginFor(null, 'github.com')).toBeNull()
   })
 
   it('reads a damaged config.json or gh reply as nothing', () => {
@@ -127,7 +134,9 @@ describe('Copilot readiness', () => {
 
   it('says when a token in Combwork’s environment isn’t passed to agents', () => {
     const [issue] = copilotReadiness({ ...base, loggedIn: false }, { GH_TOKEN: 'secret-not-read', PATH: 'x' })
-    expect(issue.detail!.at(-1)).toContain('`GH_TOKEN`')
+    expect(issue.detail!.at(-2)).toContain('`GH_TOKEN`')
+    // Where the switch keeping it out is (HI-2779): named, never changed.
+    expect(issue.detail!.at(-1)).toContain('Keep GH_TOKEN and GITHUB_TOKEN from Copilot')
     expect(issue.detail!.join('\n')).not.toContain('secret-not-read')
   })
 

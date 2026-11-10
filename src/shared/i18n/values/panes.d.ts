@@ -65,6 +65,7 @@ interface CombworkMessageValues {
   'panes.footer.reading': undefined
   'panes.footer.retryWaited': { minutes: number; provider: string | number; waits: number; time: string | number; ongoing: string }
   'panes.footer.settingsName': undefined
+  'panes.footer.signInHost': { host: string | number; repo: string; repoHost: string | number; account: string }
   'panes.footer.stale': undefined
   'panes.footer.tasks': { n: number }
   'panes.footer.tasksTip': { n: number }
@@ -160,14 +161,17 @@ interface CombworkMessageValues {
   'panes.resume.tip': { session: string | number; when: string | number }
   'panes.running.cards': { n: number }
   'panes.running.waitingFor': undefined
+  'panes.runtime.hooksDoubledNote': { provider: string | number }
   'panes.runtime.hooksMissing': { provider: string | number }
-  'panes.runtime.hooksMissingNote': { provider: string | number; why: string; where: string | number; after: string }
+  'panes.runtime.hooksMissingNote': { provider: string | number; why: string; where: string | number; setting: string | number; also: string; alsoWhere: string | number; after: string; remote: string }
   'panes.runtime.needsInput': undefined
   'panes.runtime.retrying': { why: string; status: string | number; provider: string | number; when: string; time: string | number; tries: string; attempt: number; max: number }
   'panes.runtime.signin': undefined
   'panes.runtime.silent': { known: string; minutes: number }
   'panes.runtime.starting': undefined
   'panes.runtime.stopped': undefined
+  'panes.runtime.terminalTurn': { state: string; provider: string | number }
+  'panes.runtime.terminalTurnNote': undefined
   'panes.runtime.working': undefined
   'panes.safeguard.asks': undefined
   'panes.safeguard.idle': undefined

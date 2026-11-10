@@ -6,10 +6,12 @@ import type { Text, TextPart } from './advanced'
 import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
+import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { FreshReason } from './sessionFresh'
 import type { TipsState } from './tips'
+import type { GithubHostSettings } from './githubHost'
 import type { SuggestedPreset, TemplateAgent, TemplateScope } from './templates'
 import type { ConnectionOption } from './templateConnections'
 import type { KeepAwakeSetting } from './keepAwake'
@@ -562,6 +564,11 @@ export interface ModelCatalog {
   defaultModel?: string
   /** When it was read (ISO). */
   at: string
+  /**
+   * The context it was read in (HI-2779: a CLI signing in on a GitHub host: its host, home and sign-in by name, never a
+   * token): a cached catalogue is only used again in the same context.
+   */
+  context?: string
 }
 
 export interface WindowState {
@@ -1049,6 +1056,8 @@ export interface WorkspaceConfig {
   stepsDone?: string[]
   /** The workspace's default slot options (HI-1765), between Combwork's and each project's own. */
   slotDefaults?: SlotDefaults
+  /** The workspace's GitHub host and Copilot sign-in host (HI-2779, shared/githubHost.ts), each project's default. */
+  github?: GithubHostSettings
   /** HI-1368's When this workspace closes, run, as saved before HI-1954: read once into `commands`, then dropped. */
   onClose?: CloseCommandSetting
   /** The workspace's own commands (HI-1954, Settings → Commands at its level) and its open and close points. */
@@ -1666,18 +1675,28 @@ export interface WorkflowCheck {
 export interface RetargetPreview {
   from: string
   to: string
-  cards: { move: { number: number; key: string; title: string }[]; keep: { number: number; key: string; title: string; why: 'work' | 'started' | 'cantCheck' }[] }
+  /**
+   * HI-2753: a card in flight started on `from` moves too when its work is provably its own (`started`: its line's head
+   * as checked, and its own target then, which the apply expects); one that can't stays with why.
+   */
+  cards: { move: { number: number; key: string; title: string; started?: { head: string; own: string | null } }[]; keep: { number: number; key: string; title: string; why: RetargetCardKeep }[] }
   slots: { move: { name: string; folder: string; target: string | null; head: string }[]; keep: { name: string; why: 'lent' | 'dirty' | 'busy' | 'unmerged' | 'cantCheck' }[] }
-  lanes: { id: string; name: string | null; builder: string }[]
+  /** Running lanes on `from` that stay, with why (none given: more than one card of it in flight). */
+  lanes: { id: string; name: string | null; builder: string; why?: RetargetCardKeep }[]
+  /** HI-2753: running lanes on `from` that move to `to`, each with its card in flight (moved with it in one write), if any. */
+  laneMoves?: { id: string; name: string | null; builder: string; ruleset: string; cards: number[]; pending: number[] | null; card: { number: number; key: string; title: string; head: string; own: string | null } | null }[]
 }
+
+/** Why a card stays on the old target in a retarget (HI-2680, HI-2753): its own work, or why its move in flight can't be made. */
+export type RetargetCardKeep = 'work' | 'started' | 'cantCheck' | 'queued' | 'notInTarget' | 'reviewed' | 'noLine'
 
 /** What a retarget did (HI-2680): each item moved, or skipped with why (never all or nothing). */
 export interface RetargetResult {
   from: string
   to: string
-  moved: { cards: { number: number; key: string }[]; slots: string[] }
+  moved: { cards: { number: number; key: string }[]; slots: string[]; lanes?: string[] }
   /** A card's (`card`, `key`) or a slot's (`slot`), with why it didn't move. */
-  skipped: { card?: number; key?: string; slot?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
+  skipped: { card?: number; key?: string; slot?: string; lane?: string; why: 'targetChanged' | 'refused' | 'changed' | 'busy' | 'dirty' | 'moved' | 'unmerged' | 'cantCheck' | 'gone' | 'setAside' | 'failed'; detail?: string }[]
 }
 
 export interface KeptTargets {
@@ -1831,6 +1850,8 @@ export interface ProjectConfig {
    * Each left out reads today's `worktreeSetup`, none, and `worktreeCopy` (which stay as they are, for 0.9.3).
    */
   slots?: SlotOptions
+  /** The project's own GitHub host and Copilot sign-in host (HI-2779), over its workspace's. */
+  github?: GithubHostSettings
   /** The project's review and check copies (#1435): how many it keeps (left out: the larger of 2 and its reviewers plus one). */
   copies?: { size?: number }
   /** From before HI-1766 (Project Settings → Card loops): see `fileLocks`. */
@@ -2293,9 +2314,27 @@ export interface MergeResult {
   moveError?: string
 }
 
+/**
+ * The GitHub hosts a launch used (HI-2779): where its CLI signed in (`host`) and the repositories' host (`repoHost`), and
+ * where the sign-in host came from. Never a token or an account's secret.
+ */
+export interface LaunchedSignInHost {
+  host: string
+  repoHost: string
+  origin: 'project' | 'workspace' | 'environment' | 'default'
+  /** The sign-in's source by name (a variable's name, `Copilot login`, `local model`); null: none known at launch (gh's, or none). */
+  source?: string | null
+  /** The account where the CLI's own files say it (a stored login's); null when not known (a token's never is). */
+  account?: string | null
+  /** The CLI's home the launch ran on. */
+  home?: string
+}
+
 export interface SessionRecord {
   /** The connection its latest run launched on (HI-1755), id and name as then; absent: none (a provider without connections). */
   connection?: { id: string; name: string }
+  /** The GitHub hosts its latest run signed in on (HI-2779), as resolved at that launch; absent: github.com, or not a GitHub CLI. */
+  signInHost?: LaunchedSignInHost
   /**
    * A run of it was on a server connection (HI-1772), kept once set: its CLI's own cost reports price the server's model
    * as a Claude model, so they are never counted (`withoutCostReports`): Combwork's estimate by the real model id only.
@@ -2479,6 +2518,25 @@ export interface InboxSummary {
   overdue: number
 }
 
+/**
+ * What on the PC Combwork found that would keep its hooks from a CLI's sessions (HI-2777), for the warning when they
+ * don't arrive: a setting (its name, as the CLI has it) and where it was found (in the window's language). Only what is
+ * local: an organisation's remote settings, when it has them, decide over it.
+ */
+export interface HookCause {
+  /**
+   * off: hooks turned off (disableAllHooks); managedOnly: managed settings allow only their own; blocked: an HTTP hook
+   * allowlist; unreadable: a source Combwork couldn't read (`where`), so it can't tell.
+   */
+  why: 'off' | 'managedOnly' | 'blocked' | 'unreadable'
+  setting: string
+  where: string
+  /** Whether the admin snippet would help (not when managed settings turn every hook off). */
+  snippet: boolean
+  /** managedOnly: a scope below that turns hooks off too (it doesn't stop managed hooks). */
+  also?: string
+}
+
 /** LiveSessionState.hooksMissing (#1336): since when, what showed it, and why when Combwork can tell. */
 export interface HooksMissing {
   since: string
@@ -2486,9 +2544,26 @@ export interface HooksMissing {
   after: 'start' | 'prompt' | 'transcript'
   /** transcript: the turn that showed it, by the transcript's id for it (Claude Code's promptId, Codex's turn_id, Copilot's interactionId). */
   turn?: string
-  why?: 'refused' | 'off' | 'newer'
-  /** off: the settings that turn them off, as the CLI's adapter names them. */
+  /**
+   * refused: wrong token; off, managedOnly, blocked: a setting found on the PC (HI-2777: setting, offIn); unreadable: a
+   * settings source Combwork couldn't read (offIn), so it can't tell; partial: its
+   * SessionStart came but no other hook (an admin snippet naming another port, or an allowlist); org: nothing local
+   * explains hooks absent from the start (an organisation's remote policy may); newer: an untested CLI.
+   */
+  why?: 'refused' | 'off' | 'newer' | 'managedOnly' | 'blocked' | 'unreadable' | 'partial' | 'org'
+  /** off, managedOnly, blocked: the setting's name (HI-2777). */
+  setting?: string
+  /** Whether the admin snippet would help (HI-2777): the warning offers it. */
+  snippet?: boolean
+  /** off, managedOnly, blocked: where the setting was found, as the CLI's adapter names it. */
   offIn?: string
+  /** managedOnly: a scope below that turns hooks off too, which doesn't stop managed hooks (HI-2777). */
+  also?: string
+  /**
+   * What its CLI last wrote to its terminal of its turn (HI-2802, Copilot's OSC 7501; ProviderAdapter.terminalTurn), while
+   * its hooks are missing: working, done (finished) or idle (none begun). It never says a person must act.
+   */
+  terminal?: 'working' | 'done' | 'idle'
 }
 
 /**
@@ -2617,6 +2692,8 @@ export interface LiveSessionState {
   localLimits?: LaunchedLimits
   /** The /model picker rows this launch asked Claude Code for (HI-2684), on a server connection, or why none. */
   picker?: LaunchedPicker
+  /** The GitHub hosts this launch signed in on (HI-2779, LaunchContext.signInHost), as resolved then: never relabelled. */
+  signInHost?: LaunchedSignInHost
   launchedConnection?: {
     id: string
     name: string
@@ -2674,6 +2751,11 @@ export interface LiveSessionState {
    * refused its hooks (their token), its settings turn hooks off (`offIn`: where), or it is newer than Combwork was tested with.
    */
   hooksMissing?: HooksMissing
+  /**
+   * Its hooks arrive twice (HI-2777): its CLI runs Combwork's handlers and an admin snippet's that differ. Tool calls and
+   * prompts are handled once; the user is told to copy the snippet again.
+   */
+  hooksDoubled?: boolean
   /**
    * Its deliveries (#647: messages left for it, main/deliveries.ts) not received yet, and how many are overdue; shown in
    * its pane ("✉ 2 unread"), where the user can cancel those waiting. Absent when there are none.
@@ -3652,6 +3734,11 @@ export interface AgentInstallInfo {
   source: string | null
   latestVersion: string | null
   updateAvailable: boolean
+  /**
+   * It stayed on `version` after an update offering `offered` (HI-2777): an organisation's policy may decide its version
+   * or channel. Tentative: the update stays available, and Provider Setup says so in place of its usual offer.
+   */
+  updateStayed?: { version: string; offered: string }
   /** An explicit retry offered after a known update failure; never run automatically. */
   updateRetry?: ProviderUpdateRetry
   loggedIn: boolean | null
@@ -3681,6 +3768,46 @@ export interface AgentInstallInfo {
   observedEfforts?: Record<string, EffortLevel>
   /** The version this Combwork release was tested with and how the installed one compares (#365); null when the release names none. */
   tested?: TestedCli | null
+  /**
+   * Its sign-in per GitHub host in use (HI-2779, capabilities.githubHost): one row per host the open workspaces and their
+   * projects resolve to, each with its own evidence. Absent: a CLI without GitHub hosts. `loggedIn` above is the first row's.
+   */
+  hostChecks?: HostCheck[]
+  /** Each host check's catalogue (HI-2779), by its key; a host with no listing has none (the fallback list, labelled so). */
+  hostCatalogs?: Record<string, ModelCatalog>
+  /** Which host check each folder resolves to (HI-2779): workspaces (their default) and projects with settings of their own, lower-cased. */
+  hostRouteOf?: Record<string, string>
+}
+
+/**
+ * How far a sign-in on one GitHub host is known (HI-2779), each from its own evidence, never inferred from a remembered
+ * entry: `installed` (no credentials for this host), `configured` (a token variable set, or a stored login for this host,
+ * never checked), `verified` (the GitHub CLI checked its login on exactly this host: its identity, not a Copilot seat),
+ * `denied` (every model listed is marked unavailable to the account), `noSignIn` (a local model, BYOK or offline: no
+ * GitHub sign-in needed), `unverified` (a check answered with an error it can't classify: see `diagnostic`), `unknown`
+ * (a check timed out or answered nothing readable), `chooseHost` (a GitHub Enterprise Server repository host and no Copilot
+ * host chosen), `proxyUnsupported` (GHES's Copilot proxy chosen: not supported yet).
+ */
+export type HostCheckState = 'installed' | 'configured' | 'verified' | 'denied' | 'noSignIn' | 'unverified' | 'unknown' | 'chooseHost' | 'proxyUnsupported'
+
+/** One GitHub host's sign-in check (HI-2779), as Provider Setup shows it. No token, nor anything derived from one. */
+export interface HostCheck {
+  /** Its route: the sign-in host, the repositories' host and the CLI's home (no secret). */
+  key: string
+  /** Where the CLI signs in; null while there is none to (chooseHost, proxyUnsupported). */
+  host: string | null
+  repoHost: string
+  origin: 'project' | 'workspace' | 'environment' | 'default'
+  state: HostCheckState
+  /** The sign-in's source, by name: a variable's name, `Copilot login`, `GitHub CLI`, `local model`. */
+  source: string | null
+  account: string | null
+  /** What a check answered when it couldn't be classified (an error's message, at most 300 characters). */
+  diagnostic?: string
+  /** What the model listing for this host found: models offered, and those marked unavailable to the account. */
+  models?: { available: number; unavailable: number; metadata: 'all' | 'some' | 'none' }
+  /** Who resolves to it: each workspace's name and the projects there (none named: the workspace's own default). */
+  usedBy: { workspace: string; projects: string[] }[]
 }
 
 export interface ProviderUpdateRetry {
@@ -3703,7 +3830,8 @@ export interface ReadinessIssue {
   level: 'error' | 'warning' | 'info'
   message: string
   /** Button: a provider task Combwork runs in a terminal. */
-  action?: { label: string; task: ProviderTask }
+  /** `host`: the GitHub host a sign-in is for (HI-2779), where the CLI signs in per host. */
+  action?: { label: string; task: ProviderTask; host?: string }
   /** Shown in Provider Setup with the button: what the task will ask and how to choose (paragraphs, `code` allowed). */
   detail?: string[]
 }
@@ -3719,6 +3847,42 @@ export interface FileEntry {
   modified: string
   /** Ignored by git, or Combwork's own .combwork folder — shown dimmed. */
   ignored: boolean
+  /** The rule git ignores it by (HI-2743), for its tooltip: absent when git didn't name one. */
+  ignoredBy?: IgnoreRule
+}
+
+/** One item of the Files tab's Git menu (HI-2743), as git sees it. */
+export interface FileGitItem {
+  rel: string
+  isDir: boolean
+  /** Git tracks it (a folder: a file in it). */
+  tracked: boolean
+  /** The rule that ignores it: `file` is that rule's file as a Files tab path when the tab shows it, `removable` where Include again takes the line out. */
+  rule: (IgnoreRule & { file: string | null; removable: IgnoreTarget | null }) | null
+}
+
+/** What the Files tab's Git menu shows: none of it outside a repository. */
+export interface FileGitInfo {
+  repo: boolean
+  branch: string | null
+  items: FileGitItem[]
+}
+
+/** The file of a rule outside the Files tab's tree, for Why is this ignored?'s viewer: as git names it, its full path, its text, and the rule's line and pattern. */
+export interface FileGitRuleText {
+  file: string
+  path: string
+  text: string
+  line: number
+  pattern: string
+}
+
+/** A Git menu action done: the ignore file written (none for Stop tracking), the lines added or removed, how many items, and the branch it changed. */
+export interface FileGitDone {
+  file: string | null
+  lines: string[]
+  count: number
+  branch: string | null
 }
 
 /** A file opened in the Files tab editor. */
@@ -4232,8 +4396,8 @@ export interface LaneStatus {
   agent?: string
   /** offSide (HI-2664): the lane part `agent`'s role doesn't do. */
   part?: 'builder' | 'reviewer'
-  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
-  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
+  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation; `stopped` (HI-2815): someone stopped its builder. */
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies' | 'stopped'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
   waitsFor?: string
   /** startWait `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in its `blockedBy` order. */

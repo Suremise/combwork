@@ -1,0 +1,279 @@
+{
+ "status": 200,
+ "body": {
+  "data": [
+   {
+    "id": "msg_1bfc04f37001Eh4T75KpIqCux9",
+    "time": {
+     "created": 1794218413879
+    },
+    "type": "idle",
+    "outcome": "failed",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc04f1e001vZGPvcImXaPwg8",
+    "time": {
+     "created": 1794218413858,
+     "completed": 1794218413878
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [],
+    "finish": "error",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc04f150013De1251rQwCYq7",
+    "time": {
+     "created": 1794218413851
+    },
+    "text": "Say the word TWO and nothing else.",
+    "type": "user"
+   },
+   {
+    "id": "msg_1bfc047560012A4SGGwDK5ArAk",
+    "time": {
+     "created": 1794218411862
+    },
+    "type": "idle",
+    "outcome": "failed",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc0473f001c4S5t3c1ZWuICh",
+    "time": {
+     "created": 1794218411841,
+     "completed": 1794218411861
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [],
+    "finish": "error",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc047350014rqJktTqS3b1Nf",
+    "time": {
+     "created": 1794218411835
+    },
+    "text": "Use the read tool to read the file img.png in this folder, then say DONE.",
+    "type": "user"
+   },
+   {
+    "id": "msg_1bfc03f77001uimFsJ6KKZ5h4r",
+    "time": {
+     "created": 1794218409847
+    },
+    "type": "idle",
+    "outcome": "failed",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc03f5e0014GOV34XdWZiDuc",
+    "time": {
+     "created": 1794218409826,
+     "completed": 1794218409846
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [],
+    "finish": "error",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc03f50001c0QExm7UEX3swV",
+    "time": {
+     "created": 1794218409818
+    },
+    "text": "And this one? One word.",
+    "files": [
+     {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8DwnwGMgRQAH+4D/dJQfRoAAAAASUVORK5CYII=",
+      "mime": "image/png",
+      "source": {
+       "type": "inline"
+      },
+      "name": "inline.png"
+     }
+    ],
+    "type": "user"
+   },
+   {
+    "id": "msg_1bfc03794001103qfhMuVCkaZq",
+    "time": {
+     "created": 1794218407828
+    },
+    "type": "idle",
+    "outcome": "failed",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc0377a001hq1S8hx27kFHC5",
+    "time": {
+     "created": 1794218407805,
+     "completed": 1794218407826
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [],
+    "finish": "error",
+    "error": {
+     "type": "provider.invalid-request",
+     "message": "Multimodal data provided, but model does not support multimodal requests.",
+     "status": 400,
+     "response": {
+      "body": "{\"error\":{\"message\":\"Multimodal data provided, but model does not support multimodal requests.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":null}}\n"
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc03761001XFihvp89M3iJ5u",
+    "time": {
+     "created": 1794218407798
+    },
+    "text": "What colour is this image? Answer in one word.",
+    "files": [
+     {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEUlEQVR4nGP4z8DwnwGMgRQAH+4D/dJQfRoAAAAASUVORK5CYII=",
+      "mime": "image/png",
+      "source": {
+       "type": "uri",
+       "uri": "file:///<root>/project/img.png"
+      },
+      "name": "img.png"
+     }
+    ],
+    "type": "user"
+   },
+   {
+    "id": "msg_1bfc030a0001WY7KWTK2y7l76k",
+    "time": {
+     "created": 1794218406048
+    },
+    "type": "idle",
+    "outcome": "succeeded"
+   },
+   {
+    "id": "msg_1bfc00627001JxUbvgI6cLa1Sg",
+    "time": {
+     "created": 1794218395184,
+     "streamed": 1794218406044,
+     "completed": 1794218406045
+    },
+    "type": "assistant",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "content": [
+     {
+      "type": "reasoning",
+      "text": "Okay, the user is asking me to say the word \"ONE\" and nothing else. Let me make sure I understand the request correctly. They want a simple response with just the word \"ONE\" in uppercase. \n\nFirst, I need to check if there are any instructions or constraints that might affect this. The user mentioned using the tools provided, but since the task is straightforward and doesn't require any external data or processing, I don't need to call any functions here. The tools listed are for more complex tasks like file operations, searching, or executing commands, which aren't necessary for this request.\n\nI should also consider if there's a possibility of a trick or hidden instruction. The user might be testing if I follow simple commands without overcomplicating. Since the instruction is clear and direct, the best approach is to comply exactly as asked.\n\nNo functions need to be invoked because the task doesn't involve any of the tools mentioned. The response should be plain text with the word \"ONE\" in uppercase. I'll ensure there's no additional text, formatting, or hidden content. Just the single word as specified.\n",
+      "native": {
+       "reasoningField": "reasoning"
+      },
+      "time": {
+       "created": 1794218403961,
+       "completed": 1794218406041
+      }
+     },
+     {
+      "type": "text",
+      "text": "ONE"
+     }
+    ],
+    "finish": "stop",
+    "rawFinish": "stop",
+    "cost": 0,
+    "tokens": {
+     "input": 4761,
+     "output": 233,
+     "reasoning": 0,
+     "cache": {
+      "read": 4,
+      "write": 0
+     }
+    }
+   },
+   {
+    "id": "msg_1bfc004e6001vaYvNWgz3ClAIT",
+    "time": {
+     "created": 1794218395166
+    },
+    "text": "Say the word ONE and nothing else.",
+    "type": "user"
+   }
+  ],
+  "cursor": {
+   "previous": "eyJpZCI6Im1zZ18xYmZjMDRmMzcwMDFFaDRUNzVLcElxQ3V4OSIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6InByZXZpb3VzIn0",
+   "next": "eyJpZCI6Im1zZ18xYmZjMDA0ZTYwMDF2YVl2TldnejNDbEFJVCIsIm9yZGVyIjoiZGVzYyIsImRpcmVjdGlvbiI6Im5leHQifQ"
+  }
+ }
+}

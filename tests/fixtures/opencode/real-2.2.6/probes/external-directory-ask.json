@@ -1,0 +1,448 @@
+{
+ "build": {
+  "version": "2.2.6",
+  "sha256": "98cb0aa854c7c015cf6febafa7afb872c359bfe5a823a526f3b4fd347a9e9677",
+  "path": "<bin>/opencode.exe"
+ },
+ "cases": {
+  "combwork": {
+   "config": {
+    "permissions": [
+     {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "ask"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/copies/*",
+      "effect": "allow"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/private/opencode-config/skills/*",
+      "effect": "allow"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/agent-temp/*",
+      "effect": "allow"
+     }
+    ],
+    "projectConfig": null,
+    "projectLetIn": false
+   },
+   "effects": {
+    "plan#1": {
+     "outside": "deny",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "build#1": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "ask",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    },
+    "plan#2": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "ask",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    },
+    "build#2": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "ask",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    }
+   },
+   "warmUp": "plan#1"
+  },
+  "switchOff": {
+   "config": {
+    "permissions": null,
+    "projectConfig": null,
+    "projectLetIn": false
+   },
+   "effects": {
+    "plan#1": {
+     "outside": "deny",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "build#1": {
+     "outside": "allow",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "plan#2": {
+     "outside": "allow",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "build#2": {
+     "outside": "allow",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    }
+   },
+   "warmUp": "plan#1"
+  },
+  "projectLetIn": {
+   "config": {
+    "permissions": [
+     {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "ask"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/copies/*",
+      "effect": "allow"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/private/opencode-config/skills/*",
+      "effect": "allow"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/agent-temp/*",
+      "effect": "allow"
+     }
+    ],
+    "projectConfig": {
+     "$schema": "https://opencode.ai/config.json",
+     "permissions": [
+      {
+       "action": "external_directory",
+       "resource": "<root>/outside/allowed/*",
+       "effect": "allow"
+      }
+     ]
+    },
+    "projectLetIn": true
+   },
+   "effects": {
+    "plan#1": {
+     "outside": "deny",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "build#1": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    },
+    "plan#2": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    },
+    "build#2": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    }
+   },
+   "warmUp": "plan#1"
+  },
+  "projectKeptOut": {
+   "config": {
+    "permissions": [
+     {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "ask"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/copies/*",
+      "effect": "allow"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/private/opencode-config/skills/*",
+      "effect": "allow"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/agent-temp/*",
+      "effect": "allow"
+     }
+    ],
+    "projectConfig": {
+     "$schema": "https://opencode.ai/config.json",
+     "permissions": [
+      {
+       "action": "external_directory",
+       "resource": "<root>/outside/allowed/*",
+       "effect": "allow"
+      }
+     ]
+    },
+    "projectLetIn": false
+   },
+   "effects": {
+    "plan#1": {
+     "outside": "deny",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "build#1": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "ask",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    },
+    "plan#2": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "ask",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    },
+    "build#2": {
+     "outside": "ask",
+     "outsideBackslashed": "ask",
+     "outsideAllowed": "ask",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "ask"
+    }
+   },
+   "warmUp": "plan#1"
+  },
+  "projectLetInAllowAll": {
+   "config": {
+    "permissions": [
+     {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "ask"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/copies/*",
+      "effect": "allow"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/private/opencode-config/skills/*",
+      "effect": "allow"
+     },
+     {
+      "action": "external_directory",
+      "resource": "<root>/agent-temp/*",
+      "effect": "allow"
+     }
+    ],
+    "projectConfig": {
+     "$schema": "https://opencode.ai/config.json",
+     "permissions": [
+      {
+       "action": "external_directory",
+       "resource": "*",
+       "effect": "allow"
+      }
+     ]
+    },
+    "projectLetIn": true
+   },
+   "effects": {
+    "plan#1": {
+     "outside": "deny",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "build#1": {
+     "outside": "allow",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "plan#2": {
+     "outside": "allow",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    },
+    "build#2": {
+     "outside": "allow",
+     "outsideBackslashed": "allow",
+     "outsideAllowed": "allow",
+     "reviewCopy": "allow",
+     "skills": "allow",
+     "temp": "allow",
+     "privateDir": "allow"
+    }
+   },
+   "warmUp": "plan#1"
+  }
+ },
+ "model": {
+  "outside#1": {
+   "asks": [
+    {
+     "action": "external_directory",
+     "resources": [
+      "<root>/outside/*"
+     ],
+     "save": [
+      "<root>/outside/*"
+     ]
+    }
+   ],
+   "replies": [
+    {
+     "sessionID": "ses_e3fdb251cffe7GUPSO7y7cqTCo",
+     "requestID": "per_1c025027c001JXYumtd7uzc0tO",
+     "reply": "reject"
+    }
+   ],
+   "tools": [
+    {
+     "input": {
+      "content": "cw-outside",
+      "path": "<root>/outside/written.txt"
+     }
+    }
+   ],
+   "toolResults": [
+    {
+     "type": "session.tool.failed",
+     "error": {
+      "type": "aborted",
+      "message": "The user declined this tool call"
+     }
+    }
+   ],
+   "written": null
+  },
+  "reviewCopy#1": {
+   "asks": [],
+   "replies": [],
+   "tools": [
+    {
+     "input": {
+      "content": "cw-reviewCopy",
+      "path": "<root>/copies/rev1/written.txt"
+     }
+    }
+   ],
+   "toolResults": [
+    {
+     "type": "session.tool.success",
+     "error": null
+    }
+   ],
+   "written": "cw-reviewCopy"
+  }
+ },
+ "auto": {
+  "outside#1": {
+   "asks": [
+    {
+     "action": "external_directory",
+     "resources": [
+      "<root>/outside/*"
+     ],
+     "save": [
+      "<root>/outside/*"
+     ]
+    }
+   ],
+   "replies": [
+    {
+     "sessionID": "ses_e3fdae261ffeXoz2YNz9NHPjP0",
+     "requestID": "per_1c0255da5001iw3K0QxSQNBS7Q",
+     "reply": "once"
+    }
+   ],
+   "tools": [
+    {
+     "input": {
+      "content": "cw-auto",
+      "path": "<root>/outside/auto.txt"
+     }
+    }
+   ],
+   "toolResults": [
+    {
+     "type": "session.tool.success",
+     "error": null
+    }
+   ],
+   "written": "cw-auto"
+  }
+ },
+ "upstream": "127.0.0.1:11434 (Ollama qwen3:8b, the config provider cwtest)",
+ "note": "cases: POST /api/session/<id>/permission {action: external_directory, resources: [r], agent} (2.2.6: evaluates, and asks when approval is needed), a session per agent, in the order plan, build, plan, build; each ask rejected. plan#1 is the first session after serve answered /api/info: its rules were not loaded yet (its first request denied, the rest allowed whatever the config), so the later sessions are the record. model: the Build agent on the combwork config asked to write, each ask rejected. auto: the TUI attached with --auto (opencode --server <url> --session <id> --auto <folder>), the same config, nothing replied by the probe. Paths shown with forward slashes."
+}

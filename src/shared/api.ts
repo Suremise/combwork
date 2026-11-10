@@ -1,8 +1,10 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
+import type { IgnoreTarget } from './gitIgnoreRules'
 import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
 import type { ActivityCardAgent, ActivityDetail, ActivityNow, ActivityTurns, EndProcessResult } from './activity'
 import type { SessionHooks } from './hooks'
+import type { ClaudeSnippetFacts } from './claudeHookHandlers'
 import type { AgentLeftovers } from './agentProcesses'
 import type { FreshRow, FreshWhy } from './freshStarts'
 import type { AntivirusStatus, AvAction, AvChangeResult, AvMovePlan, AvSuggestionReply } from './antivirus'
@@ -75,6 +77,9 @@ import type {
   FallbackModel,
   FileContent,
   FileEntry,
+  FileGitDone,
+  FileGitInfo,
+  FileGitRuleText,
   GitDiff,
   HiddenProject,
   GitStatus,
@@ -150,6 +155,7 @@ import type {
 } from './types'
 import type { PlatformId } from './platform/descriptors'
 import type { SlotLevelForm, SlotOptionOrigin } from './slotDefaults'
+import type { GithubHostChange, GithubHostsForm } from './githubHost'
 import type { MetricsQuery, MetricsReport } from './metrics'
 import type { Fact } from './workflow/facts'
 import type { CommitMessage, WorkflowOptions } from './workflow/options'
@@ -427,6 +433,9 @@ export interface CombworkRequests {
   'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
   /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Combwork's, the default), and where they come from. */
   'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
+  /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */
+  'github:form': (projectPath: string | null) => GithubHostsForm
+  'github:set': (projectPath: string | null, change: GithubHostChange) => GithubHostsForm
   /** Combwork's or the workspace's slot defaults (HI-1765: Settings → Workflow defaults, Git), with what each inherits. */
   'slots:levelForm': (level: WorkflowLevel) => SlotLevelForm
   /** Sets one of a level's slot defaults (an empty string: none), or with null removes it, so it inherits. */
@@ -1026,6 +1035,16 @@ export interface CombworkRequests {
   /** The files with unsaved edits in the renderer (absolute paths), so quitting can ask about them. */
   'files:setUnsaved': (paths: string[]) => void
   'files:unwatch': (projectPath: string) => void
+  /** The Files tab's Git menu (HI-2743): whether the project is a repository, its branch, and each item's tracked and ignored state. */
+  'files:gitInfo': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitInfo
+  /** Exclude from git: a line per item (or one `*.ext` line) in the top .gitignore (`shared`) or .git/info/exclude (`local`). */
+  'files:gitExclude': (projectPath: string, items: { rel: string; isDir: boolean }[], target: IgnoreTarget, ext: boolean) => FileGitDone
+  /** Stop tracking, keep the file: `git rm --cached`. */
+  'files:gitUntrack': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
+  /** Include again: removes the plain line that ignores the item. */
+  'files:gitInclude': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitDone
+  /** Why is this ignored?: the file of the rule that ignores the item, its text and line, for Combwork's viewer (a rule outside the Files tab's tree). */
+  'files:gitRuleText': (projectPath: string, items: { rel: string; isDir: boolean }[]) => FileGitRuleText
 
   'attachments:list': (projectPath: string) => SessionAttachmentGroup[]
   /** A kept attachment's text, for the viewer's previews. */
@@ -1090,7 +1109,7 @@ export interface CombworkRequests {
   /** Looks again (one provider, or all), including the latest version. */
   'provider:refresh': (provider?: ProviderId) => Record<ProviderId, AgentInstallInfo>
   /** Runs install, update, sign-in or setup in a terminal; returns the terminal's key. */
-  'provider:task': (provider: ProviderId, task: ProviderTask) => string
+  'provider:task': (provider: ProviderId, task: ProviderTask, host?: string) => string
   /** Runs the retry offered for the last failed update, only at the user's request. */
   'provider:retryUpdate': (provider: ProviderId) => string
   /** Stops every running agent of a provider (turning it off). */
@@ -1174,6 +1193,8 @@ export interface CombworkRequests {
   'session:restartForTools': (projectPath: string, agentId: string, when: 'ifIdle' | 'atSafePoint') => 'restarting' | 'busy' | 'same' | 'notRunning'
 
   'api:info': () => AgentApiInfo
+  /** What the Claude Code admin snippet is made from (HI-2777): ports and the hooks' timeouts. */
+  'api:claudeSnippet': () => ClaudeSnippetFacts
   'api:regenerateToken': () => AgentApiInfo
   /** A new read-only viewer token with this name (#620). */
   'api:createViewer': (name: string) => AgentApiInfo

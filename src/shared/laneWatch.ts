@@ -8,6 +8,7 @@ import { agentMsg, isSaid, say, sayWithId, type Said } from './agentText'
 import { NOTICE_PREFIX } from './doorbell'
 // Types only: agentWatch loads the translations, which cw-mcp (toolReplies imports this) never does.
 import type { AgentEvent, WatchedAgent } from './agentWatch'
+import type { StallSafeguard } from './stallSafeguard'
 
 const T = {
   mergeStallIdle: agentMsg({ id: 'wake.lane.mergeStallIdle', text: 'Every card passed, but {builder} has been idle for {minutes} min with no merge slot claimed.', note: "Why a lane's merge has stalled (#869), in a lane watch's wake and the Agent API: its builder idle with no merge slot claimed. builder: its name; minutes: how long." }),
@@ -133,7 +134,8 @@ export interface LaneNow {
   /** HI-2522: its name, else "B1 / R1": a wake line too long names it so, never by its id. Left out: by its id. */
   short?: string
   mark: LaneMark
-  cards: { number: number; blocked: string | null; stalled: string | null; failedBy: string | null; passedBy: string | null; asked?: LaneAsked | null }[]
+  /** `stalledSafeguard` (HI-2754): the stall's agent idle with its latest turn stopped by a safety filter (stallSafeguard.ts). */
+  cards: { number: number; blocked: string | null; stalled: string | null; stalledSafeguard?: StallSafeguard; failedBy: string | null; passedBy: string | null; asked?: LaneAsked | null }[]
   /** Why its merge has stalled (#869), when it has. */
   mergeStall?: string | null
   /** Why it waits (#1270), as main worked it out: a pause the other events don't tell (a card not merged, merging). */
@@ -156,7 +158,7 @@ export interface LaneHit {
   id: string
   label: string
   short?: string
-  parts: { n: number | null; event: LaneEvent; text: string; detail?: string }[]
+  parts: { n: number | null; event: LaneEvent; text: string; detail?: string; safeguard?: StallSafeguard }[]
 }
 
 /** A card's latest failed and passed verdicts: when, and by whom ("R1 (alpha)"). */
@@ -260,7 +262,7 @@ export function laneHits(before: LaneMark | null | undefined, now: LaneNow, even
     if (on.has('reblocked') && is.b && was.b && was.r !== undefined && is.r !== undefined && is.r > was.r) parts.push({ n: c.number, event: 'reblocked', text: say(T.reblocked, { card }), ...(c.blocked ? { detail: c.blocked } : {}) })
     // Its block lifted (#922, #1272): the agent or the user cleared it, so the lane goes on.
     if (on.has('unblocked') && !is.b && was.b) parts.push({ n: c.number, event: 'unblocked', text: say(T.unblocked, { card }) })
-    if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: say(T.stalled, { card }), ...(c.stalled ? { detail: c.stalled } : {}) })
+    if (on.has('stalled') && is.s && !was.s) parts.push({ n: c.number, event: 'stalled', text: say(T.stalled, { card }), ...(c.stalled ? { detail: c.stalled } : {}), ...(c.stalledSafeguard ? { safeguard: c.stalledSafeguard } : {}) })
     if (on.has('moved') && is.c !== was.c) parts.push({ n: c.number, event: 'moved', text: say(T.moved, { card, column: columnLabel(is.c) }) })
     // A new request for the user on it (HI-1991): an agent's question (cw_ask_user) or Combwork's own, under For you. The
     // agent asking isn't waiting at a prompt, so `waiting` never tells it. A mark from before has no `q`.

@@ -55,7 +55,7 @@ describe('the settings catalogue as Settings shows it', () => {
         // A language's own name, the permission and file lock modes' names (the agents area's, #885; the CLI's own setting's,
         // #1284), and the workflow
         // options' words, the Workflow section's own (#1278: the workflow area's, glossary 2.6).
-        if (m.id.startsWith('language.') || m.id.startsWith('workflow.') || /^agents\.(claude|codex|copilot|antigravity|cliOwn|fileLock)\./.test(m.id)) continue
+        if (m.id.startsWith('language.') || m.id.startsWith('workflow.') || /^agents\.(claude|codex|copilot|antigravity|opencode|cliOwn|fileLock)\./.test(m.id)) continue
         expect(m.id, e.id).toMatch(/^settings\./)
         expect(EN[m.id], `${e.id}: ${m.id}`).toEqual({ defaultMessage: m.defaultMessage, description: m.description })
         expect(m.description.length, m.id).toBeGreaterThan(10)
@@ -109,14 +109,14 @@ describe('the settings catalogue as Settings shows it', () => {
 
   it("names permission modes and file lock modes in the language shown: the choices, the tips and the texts that quote them (#885)", () => {
     pseudo()
-    const english = ['Block', 'Ask me', 'Approve for me', 'Accept edits', 'Bypass permissions', 'Full access', 'Autopilot']
+    const english = ['Block', 'Ask me', 'Approve for me', 'Accept edits', 'Bypass permissions', 'Full access', 'Autopilot', 'Approve all']
     const shown = (id: string): string[] => {
       const e = settingEntry(id)
       expect(e, id).toBeTruthy()
       const s = shownSetting(e!)
       return [s.title, s.desc, s.tip, ...(e!.options ?? []).map((o) => shownText(o.text)), ...(e!.text.confirmOn ? [shownText(e!.text.confirmOn.title)] : [])]
     }
-    for (const id of ['workflow.git.fileLocks', 'workspace.workflow.none.fileLocks', 'project.workflow.fileLocks', 'claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode'])
+    for (const id of ['workflow.git.fileLocks', 'workspace.workflow.none.fileLocks', 'project.workflow.fileLocks', 'claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode', 'opencode.enableDangerousMode'])
       for (const text of shown(id)) for (const name of english) expect(text, `${id}: ${name}`).not.toContain(name)
     expect(problems).toEqual([])
   })
@@ -222,7 +222,7 @@ describe('with a translation loaded (as a language file gives it)', () => {
     const zh = Object.assign({}, ...['settings', 'agents'].map((a) => JSON.parse(readFileSync(join(ROOT, `locales/zh-CN/${a}.json`), 'utf8')) as Record<string, string>))
     setProblemReporter((p) => problems.push(p))
     setLanguage('zh-CN', zh, 'zh-CN')
-    for (const id of ['claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode']) {
+    for (const id of ['claude-code.enableDangerousMode', 'codex.enableDangerousMode', 'copilot.enableDangerousMode', 'opencode.enableDangerousMode']) {
       const e = settingEntry(id)!
       const s = shownSetting(e)
       expect([s.title, s.tip, shownText(e.text.confirmOn!.title)], id).toEqual([expect.stringMatching(/^启用“[^“”]+”选项$/), expect.stringMatching(/^只有连接可以选择“[^“”]+”。/), expect.stringMatching(/^启用“[^“”]+”选项？$/)])

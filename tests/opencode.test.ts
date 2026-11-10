@@ -1,0 +1,566 @@
+// OpenCode 2 as a provider (HI-2759, against 2.2.6; the runtime facts are HI-2758's, the recordings HI-2763's): readiness
+// and versions (V1, the archived project and editor copies refused), the catalog from `opencode models` (Claude Agent's
+// never offered), the environment (credentials stripped, ambient chains blocked, Combwork's roots and switches set last),
+// the provider and MCP policies, the private config, saved credentials, session ids and the launch arguments.
+import { readFileSync } from 'fs'
+import { basename, join } from 'path'
+import { describe, expect, it } from 'vitest'
+import * as electron from 'electron'
+import { tempDir } from './tempDir'
+
+const base = tempDir('cw-opencode-')
+process.env.CW_USER_DATA = join(base, 'userdata')
+;(electron.app as unknown as { getPath: () => string }).getPath = () => join(base, 'profile')
+
+const { isRejectedPath, isSupportedVersion, newestV2, parseOpencodeVersion, installScript, opencodeUpdateCommand } = await import('../src/main/providers/opencode/install')
+const { isVariantId, parseOpencodeModels, parseOpencodeModelsApi } = await import('../src/main/providers/opencode/models')
+const { ambientBlockers, credentialPattern, opencodeEnv, opencodeRoots } = await import('../src/main/providers/opencode/home')
+const { chosenAmbient, checkConfig, launchConfig, loginConfig, mcpPolicies, opencodeServer, parseAuthList, providerPolicies } = await import('../src/main/providers/opencode/config')
+const { isSessionId, newSessionId, protectedArg, launchGuidance } = await import('../src/main/providers/opencode/adapter')
+const { LAUNCHER_SOURCE, launcherEnv } = await import('../src/main/providers/opencode/launcher')
+const { OPENCODE_DESCRIPTOR, isClaudeAgentModel, isOpencodeModelId, opencodeAgentOf, opencodeModeFlags, opencodeModelLabel } = await import('../src/shared/opencode')
+const { effortName } = await import('../src/shared/models')
+const { TOOLS_SERVER } = await import('../src/shared/assistantTools')
+
+const FIX = join(__dirname, 'fixtures', 'advanced')
+const fixture = (name: string) => readFileSync(join(FIX, name), 'utf8')
+const AMBIENT = ['amazon-bedrock', 'google-vertex', 'azure']
+
+describe('install and readiness (opencode 2.2.6)', () => {
+  it('its version, as `opencode --version` prints it; only OpenCode 2 or later is used', () => {
+    expect(parseOpencodeVersion(fixture('version-opencode-2.2.6.txt'))).toBe('2.2.6')
+    expect(parseOpencodeVersion('opencode v2.3.0-beta.1\r\n')).toBe('2.3.0-beta.1')
+    // V1's and the archived project's forms aren't this pattern: not found, so never used.
+    expect(parseOpencodeVersion('1.19.5\n')).toBeNull()
+    expect(parseOpencodeVersion('opencode version 0.0.55\n')).toBeNull()
+    expect(isSupportedVersion('2.2.6')).toBe(true)
+    expect(isSupportedVersion('1.19.5')).toBe(false)
+    expect(isSupportedVersion('0.0.55')).toBe(false)
+  })
+
+  it("an editor's copy and OpenCode 1's npm package are never used; the standalone OpenCode 2 is", () => {
+    expect(isRejectedPath('C:\\Users\\d\\.vscode\\extensions\\sst-dev.opencode-1.0\\bin\\opencode.exe')).toBe(true)
+    expect(isRejectedPath('C:\\Users\\d\\AppData\\Roaming\\npm\\node_modules\\opencode-ai\\bin\\opencode.exe')).toBe(true)
+    expect(isRejectedPath('C:\\Users\\d\\AppData\\Local\\Programs\\OpenCode\\opencode.exe')).toBe(false)
+    expect(isRejectedPath('C:\\Users\\d\\AppData\\Roaming\\npm\\node_modules\\@opencode\\cli\\bin\\opencode.exe')).toBe(false)
+  })
+
+  it('the newest OpenCode 2 release from GitHub\'s list, never the V1 release it labels "Latest", nor drafts and prereleases', () => {
+    expect(newestV2([{ tag_name: 'v1.19.5' }, { tag_name: 'v2.2.5' }, { tag_name: 'v2.2.6' }, { tag_name: 'v2.3.0', prerelease: true }, { tag_name: 'v2.9.0', draft: true }, { tag_name: 'nightly' }, null])).toBe('2.2.6')
+    expect(newestV2([{ tag_name: 'v1.19.5' }])).toBeNull()
+  })
+
+  it('install and update: the official standalone asset, checked against SHA256SUMS; npm installs through npm', () => {
+    const s = installScript('C:\\Users\\O\'Neil\\AppData\\Local\\Programs\\OpenCode')
+    expect(s).toContain("'^v2\\.\\d+\\.\\d+$'")
+    expect(s).toContain('opencode-windows-$arch.zip')
+    expect(s).toContain('SHA256SUMS')
+    expect(s).toContain('Get-FileHash -Algorithm SHA256')
+    expect(s).toContain("'C:\\Users\\O''Neil\\AppData\\Local\\Programs\\OpenCode'")
+    expect(opencodeUpdateCommand('C:\\Users\\d\\AppData\\Roaming\\npm\\opencode.cmd').args.join(' ')).toContain('npm install -g @opencode/cli@latest')
+    expect(opencodeUpdateCommand('D:\\tools\\oc\\opencode.exe').args.join(' ')).toContain("'D:\\tools\\oc'")
+  })
+})
+
+describe('the catalog (opencode models)', () => {
+  it('each provider/model line is a model, its id kept as listed; Claude Agent\'s and odd lines are left out', () => {
+    const models = parseOpencodeModels(fixture('models-opencode-2.2.6.txt'))
+    expect(models.map((m) => m.value)).toEqual(['ollama/qwen3:8b', 'opencode/big-pickle', 'opencode/crouton-alpha-free', 'opencode/glm-5.3-flash-free'])
+    expect(models[0].label).toBe('qwen3:8b (ollama)')
+    expect(parseOpencodeModels('claude-agent/claude-opus-5-5\nnot a model\nollama/qwen3:8b\nollama/qwen3:8b\n').map((m) => m.value)).toEqual(['ollama/qwen3:8b'])
+  })
+
+  it('model ids are unknown-safe: any provider/model is one, Claude Agent\'s is recognised in any case', () => {
+    expect(isOpencodeModelId('openrouter/anthropic/claude-x')).toBe(true)
+    expect(isOpencodeModelId('gpt-6')).toBe(false)
+    expect(isClaudeAgentModel('Claude-Agent/opus')).toBe(true)
+    expect(isClaudeAgentModel('anthropic/claude-opus-5-5')).toBe(false)
+    expect(opencodeModelLabel('nolabel')).toBe('nolabel')
+  })
+
+  it("with variants (HI-2767): `opencode api GET /api/model`'s models, each model's variants its efforts, as 2.2.6 listed them", () => {
+    expect(parseOpencodeModelsApi(fixture('models-api-opencode-2.2.6.json'))).toEqual([{ value: 'cwtest/qwen3:8b', label: 'qwen3:8b (cwtest)', efforts: ['low', 'medium', 'high'] }])
+  })
+
+  it("variants are kept to safe ids and a bound; a model listing none offers none; Claude Agent's and odd entries are left out; a reply that isn't a listing is null", () => {
+    const many = Array.from({ length: 40 }, (_, i) => ({ id: `v${i}` }))
+    const text = JSON.stringify({
+      data: [
+        { providerID: 'ollama', id: 'qwen3:8b', variants: [{ id: 'low' }, { id: 'high' }, { id: 'low' }, { id: '-bad' }, { id: 'a b' }, { id: '"q"' }, { id: 7 }, {}, null] },
+        { providerID: 'ollama', id: 'many', variants: many },
+        { providerID: 'ollama', id: 'none' },
+        { providerID: 'claude-agent', id: 'claude-opus-5-5', variants: [{ id: 'high' }] },
+        { providerID: 'x' },
+        'junk',
+        { providerID: 'ollama', id: 'qwen3:8b', variants: [{ id: 'max' }] }
+      ]
+    })
+    expect(parseOpencodeModelsApi(text)!.map((m) => [m.value, m.efforts])).toEqual([['ollama/qwen3:8b', ['low', 'high']], ['ollama/many', many.slice(0, 32).map((v) => v.id)], ['ollama/none', []]])
+    for (const bad of ['', 'not json', '{"data":{}}', '[]', 'null']) expect(parseOpencodeModelsApi(bad), bad).toBeNull()
+    expect(parseOpencodeModelsApi('{"data":[]}')).toEqual([])
+    // The field names are advanced settings (#367).
+    expect(parseOpencodeModelsApi(JSON.stringify({ data: [{ providerID: 'p', id: 'm', levels: [{ name: 'deep' }] }] }), { variants: 'levels', variantId: 'name' })![0].efforts).toEqual(['deep'])
+    expect([isVariantId('high'), isVariantId('x-1.2_b'), isVariantId(''), isVariantId('a/b'), isVariantId('x'.repeat(41))]).toEqual([true, true, false, false, false])
+  })
+
+  it('an effort only a model reports is named with the shared names in the language shown, else capitalised', () => {
+    expect([effortName('opencode', 'low'), effortName('opencode', 'high'), effortName('opencode', 'turbo')]).toEqual(['Low', 'High', 'Turbo'])
+    expect(effortName('opencode', 'medium', undefined, ((m: { defaultMessage: string }) => `[${m.defaultMessage}]`) as never)).toBe('[Medium]')
+  })
+})
+
+describe('the environment (design s10, s13)', () => {
+  const hostile = {
+    PATH: 'C:\\Windows',
+    XDG_DATA_HOME: 'C:\\Users\\d\\.local\\share',
+    XDG_CONFIG_HOME: 'C:\\evil',
+    OPENCODE_CONFIG_DIR: 'C:\\evil\\cfg',
+    OPENCODE_CONFIG: 'C:\\evil\\opencode.json',
+    OPENCODE_PASSWORD: 'evil',
+    OPENCODE_DB: 'C:\\evil\\db',
+    AWS_PROFILE: 'prod',
+    AWS_SHARED_CREDENTIALS_FILE: 'C:\\Users\\d\\.aws\\credentials',
+    GOOGLE_APPLICATION_CREDENTIALS: 'C:\\Users\\d\\adc.json',
+    OPENAI_API_KEY: 'sk-x',
+    GITHUB_TOKEN: 'ghp-x',
+    HF_TOKEN: 'hf-x',
+    CW_HOOK_TOKEN: 'keep-me',
+    CW_AGENT: 'Agent 1'
+  }
+
+  it('inherited credentials and roots go; the ambient chains point at nothing; Combwork\'s roots, config, password and switches are set last', () => {
+    const env = opencodeEnv({ base: hostile, home: 'C:\\acct\\a', configDir: 'C:\\priv\\cfg', password: 'pw', ambientDir: 'C:\\priv\\amb', strip: true, noUpdate: true, keepOut: true })
+    expect(env).toMatchObject({ ...opencodeRoots('C:\\acct\\a'), OPENCODE_CONFIG_DIR: 'C:\\priv\\cfg', OPENCODE_PASSWORD: 'pw', OPENCODE_DISABLE_PROJECT_CONFIG: '1', OPENCODE_DISABLE_CLAUDE_CODE: '1', OPENCODE_DISABLE_AUTOUPDATE: '1', PATH: 'C:\\Windows', CW_HOOK_TOKEN: 'keep-me', CW_AGENT: 'Agent 1' })
+    expect(env).toMatchObject(ambientBlockers('C:\\priv\\amb'))
+    for (const k of ['AWS_PROFILE', 'GOOGLE_APPLICATION_CREDENTIALS', 'OPENAI_API_KEY', 'GITHUB_TOKEN', 'HF_TOKEN', 'OPENCODE_CONFIG', 'OPENCODE_DB']) expect(env[k], k).toBeUndefined()
+    expect(env.AWS_SHARED_CREDENTIALS_FILE).toBe('C:\\priv\\amb\\aws-credentials')
+  })
+
+  it('two accounts get disjoint roots', () => {
+    const a = opencodeRoots('C:\\acct\\a')
+    const b = opencodeRoots('C:\\acct\\b')
+    for (const k of Object.keys(a)) expect(a[k]).not.toBe(b[k as keyof typeof b])
+  })
+
+  it('with the switches off: credentials and the project config pass, but never over Combwork\'s roots, config or password', () => {
+    const env = opencodeEnv({ base: hostile, home: 'C:\\acct\\a', configDir: 'C:\\priv\\cfg', password: 'pw', ambientDir: 'C:\\priv\\amb', strip: false, noUpdate: false, keepOut: false })
+    expect(env).toMatchObject({ AWS_PROFILE: 'prod', OPENAI_API_KEY: 'sk-x', GITHUB_TOKEN: 'ghp-x', XDG_DATA_HOME: 'C:\\acct\\a', OPENCODE_CONFIG_DIR: 'C:\\priv\\cfg', OPENCODE_PASSWORD: 'pw' })
+    for (const k of ['OPENCODE_DISABLE_PROJECT_CONFIG', 'OPENCODE_DISABLE_CLAUDE_CODE', 'OPENCODE_DISABLE_AUTOUPDATE', 'OPENCODE_CONFIG', 'OPENCODE_DB', 'METADATA_SERVER_DETECTION']) expect(env[k], k).toBeUndefined()
+    expect(env.AWS_SHARED_CREDENTIALS_FILE).toBe('C:\\Users\\d\\.aws\\credentials')
+  })
+
+  it('an ambient chain the account chose keeps its files; the others stay blocked', () => {
+    const b = ambientBlockers('C:\\amb', new Set(['amazon-bedrock']))
+    expect(b.AWS_CONFIG_FILE).toBeUndefined()
+    expect(b.CLOUDSDK_CONFIG).toBe('C:\\amb\\gcloud')
+    expect(b.AZURE_CONFIG_DIR).toBe('C:\\amb\\azure')
+  })
+
+  it("every variable OpenCode 2.2.6's integrations read is left out; Combwork's own never are", () => {
+    const list = JSON.parse(fixture('integrations-opencode-2.2.6.json')) as { methods: { names?: string[] }[] }[]
+    const names = list.flatMap((i) => i.methods.flatMap((m) => m.names ?? []))
+    expect(names.length).toBeGreaterThan(200)
+    const p = credentialPattern()
+    for (const n of names) expect(p.test(n), n).toBe(true)
+    const env = opencodeEnv({ base: Object.fromEntries([...names.map((n) => [n, 'x']), ['CW_HOOK_TOKEN', 't'], ['CW_API_TOKEN', 't']]), home: 'C:\\a', configDir: 'C:\\c', strip: true })
+    expect(Object.keys(env).filter((k) => names.includes(k))).toEqual([])
+    expect(env.CW_HOOK_TOKEN).toBe('t')
+  })
+})
+
+describe('the policies and the private config (design s7 to s16)', () => {
+  it("Claude Agent is denied always; the ambient integrations unless the account saved one; all when the listing failed; with the switch off only Claude Agent", () => {
+    const saved = new Map([['amazon-bedrock', ['key']], ['anthropic', ['key']]])
+    expect(providerPolicies(AMBIENT, saved, true)).toEqual([
+      { action: 'provider.use', resource: 'claude-agent', effect: 'deny' },
+      { action: 'provider.use', resource: 'google-vertex', effect: 'deny' },
+      { action: 'provider.use', resource: 'azure', effect: 'deny' }
+    ])
+    expect(providerPolicies(AMBIENT, null, true).map((p) => p.resource)).toEqual(['claude-agent', ...AMBIENT])
+    expect(providerPolicies(AMBIENT, saved, false)).toEqual([{ action: 'provider.use', resource: 'claude-agent', effect: 'deny' }])
+    for (const strip of [true, false]) {
+      expect(checkConfig(AMBIENT, saved, strip, true).policies).toContainEqual({ action: 'provider.use', resource: 'claude-agent', effect: 'deny' })
+      expect(launchConfig({ model: null, agent: null, mcpServers: {}, instructions: [], ambient: AMBIENT, saved, strip, noUpdate: false }).policies).toContainEqual({ action: 'provider.use', resource: 'claude-agent', effect: 'deny' })
+    }
+    expect(loginConfig(true).policies).toContainEqual({ action: 'provider.use', resource: 'claude-agent', effect: 'deny' })
+  })
+
+  it("the connection's own provider only (HI-2769): every provider denied, its own allowed, the denies after it still winning; checks and sign-ins keep every provider", () => {
+    // 2.2.6's rule within a document (HI-2768): the last matching statement wins; none: allowed.
+    const allowed = (policies: { action: string; resource: string; effect: string }[], provider: string): boolean => {
+      let effect = 'allow'
+      for (const p of policies) if (p.action === 'provider.use' && (p.resource === '*' || p.resource === provider)) effect = p.effect
+      return effect === 'allow'
+    }
+    const saved = new Map([['amazon-bedrock', ['key']]])
+    const own = providerPolicies(AMBIENT, saved, true, 'ollama')
+    expect(own.slice(0, 3)).toEqual([
+      { action: 'provider.use', resource: '*', effect: 'deny' },
+      { action: 'provider.use', resource: 'ollama', effect: 'allow' },
+      { action: 'provider.use', resource: 'claude-agent', effect: 'deny' }
+    ])
+    expect(['ollama', 'opencode', 'opencode-go', 'openai', 'claude-agent', 'google-vertex'].filter((p) => allowed(own, p))).toEqual(['ollama'])
+    // An ambient provider as its own: allowed only with a saved credential (stripCredentials still decides); Claude Agent never.
+    expect(allowed(providerPolicies(AMBIENT, saved, true, 'amazon-bedrock'), 'amazon-bedrock')).toBe(true)
+    expect(allowed(providerPolicies(AMBIENT, saved, true, 'google-vertex'), 'google-vertex')).toBe(false)
+    expect(allowed(providerPolicies(AMBIENT, saved, false, 'google-vertex'), 'google-vertex')).toBe(true)
+    expect(allowed(providerPolicies(AMBIENT, saved, true, 'claude-agent'), 'claude-agent')).toBe(false)
+    // Off (none given): OpenCode's own rules, as before.
+    expect(providerPolicies(AMBIENT, saved, true)).toEqual(providerPolicies(AMBIENT, saved, true, null))
+    expect(providerPolicies(AMBIENT, saved, true).some((p) => p.resource === '*')).toBe(false)
+    const cfg = launchConfig({ model: 'ollama/qwen3:8b', agent: null, mcpServers: {}, instructions: [], ambient: AMBIENT, saved, strip: true, noUpdate: false, ownProvider: 'ollama' })
+    expect((cfg.policies as { action: string; resource: string }[]).filter((p) => p.action === 'provider.use').slice(0, 2).map((p) => p.resource)).toEqual(['*', 'ollama'])
+    expect((checkConfig(AMBIENT, saved, true, true).policies as { resource: string; action: string }[]).some((p) => p.action === 'provider.use' && p.resource === '*')).toBe(false)
+    expect((loginConfig(true).policies as { resource: string; action: string }[]).some((p) => p.action === 'provider.use' && p.resource === '*')).toBe(false)
+  })
+
+  it("an ambient chain is chosen only by a saved credential with that integration's external method, never by a key or another integration's row", () => {
+    expect([...chosenAmbient(new Map([['amazon-bedrock', ['aws-profile']]]))]).toEqual(['amazon-bedrock'])
+    expect([...chosenAmbient(new Map([['amazon-bedrock', ['key']], ['anthropic', ['aws-profile']], ['azure', ['key']]]))]).toEqual([])
+    expect([...chosenAmbient(null)]).toEqual([])
+  })
+
+  it('MCP: every server denied, then each given allowed by name; local commands and remote URLs in 2.2.6\'s shape', () => {
+    expect(mcpPolicies(['combwork'])).toEqual([{ action: 'mcp.use', resource: '*', effect: 'deny' }, { action: 'mcp.use', resource: 'combwork', effect: 'allow' }])
+    expect(opencodeServer({ command: 'node', args: ['cw-mcp.js'], env: { CW_TOKEN: 't' } })).toEqual({ type: 'local', command: ['node', 'cw-mcp.js'], environment: { CW_TOKEN: 't' } })
+    expect(opencodeServer({ url: 'http://127.0.0.1:9/mcp', headers: { a: 'b' } })).toEqual({ type: 'remote', url: 'http://127.0.0.1:9/mcp', headers: { a: 'b' } })
+    expect(opencodeServer({})).toBeNull()
+  })
+
+  it('a launch config: the update hold, the model, the agent, the servers allowed, the instructions given explicitly', () => {
+    const cfg = launchConfig({ model: 'ollama/qwen3:8b', agent: 'plan', mcpServers: { combwork: { command: 'node', args: ['x'] }, __proto__: { command: 'y' } } as never, instructions: ['C:\\p\\AGENTS.md'], ambient: AMBIENT, saved: null, strip: true, noUpdate: true })
+    expect(cfg).toMatchObject({ update: 'disable', model: 'ollama/qwen3:8b', default_agent: 'plan', instructions: ['C:\\p\\AGENTS.md'] })
+    expect(Object.keys((cfg.mcp as { servers: object }).servers)).toEqual(['combwork'])
+    expect(cfg.policies).toContainEqual({ action: 'mcp.use', resource: '*', effect: 'deny' })
+    expect(launchConfig({ model: null, agent: null, mcpServers: {}, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: false })).not.toHaveProperty('update')
+  })
+
+  it("the outside-folder rules (HI-2775) decide as 2.2.6 was recorded deciding: ask outside, the grants allowed, a project's rule let in wins, kept out it doesn't, none without them", () => {
+    type Rule = { action: string; resource: string; effect: string }
+    type Case = { config: { permissions: Rule[] | null; projectConfig: { permissions: Rule[] } | null; projectLetIn: boolean }; effects: Record<string, Record<string, string>> }
+    const rec = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', 'probes', 'external-directory-ask.json'), 'utf8')) as { cases: Record<string, Case>; model: Record<string, { asks: { resources: string[] }[]; written: string | null }>; auto: Record<string, { asks: unknown[]; replies: { reply: string }[]; written: string | null }> }
+    // Combwork's rules for the probe's folders are exactly the ones 2.2.6 ran with.
+    const ours = launchConfig({ model: null, agent: 'build', mcpServers: {}, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: true, outsideAllowed: ['<root>\\copies', '<root>/private/opencode-config/skills/', '<root>/agent-temp', '<root>\\COPIES'] }).permissions
+    expect(ours).toEqual(rec.cases.combwork.config.permissions)
+    // 2.2.6's decision (Permission.evaluate): the agent's own rules (`* * allow` first), then each config document's in
+    // order, the last that matches wins; `*` across slashes, slashes either way, any case.
+    const kw = (value: string, pattern: string) => new RegExp('^' + pattern.replace(/\\/g, '/').replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$', 'si').test(value.replace(/\\/g, '/'))
+    const decide = (c: Case, resource: string) => [{ action: '*', resource: '*', effect: 'allow' }, ...(c.config.permissions ?? []), ...(c.config.projectLetIn ? (c.config.projectConfig?.permissions ?? []) : [])].findLast((r) => kw('external_directory', r.action) && kw(resource, r.resource))!.effect
+    const RESOURCES: Record<string, string> = { outside: '<root>/outside/*', outsideBackslashed: '<root>\\outside\\*', outsideAllowed: '<root>/outside/allowed/*', reviewCopy: '<root>/copies/rev1/*', skills: '<root>/private/opencode-config/skills/probe-skill/*', temp: '<root>/agent-temp/*', privateDir: '<root>/private/*' }
+    for (const [name, c] of Object.entries(rec.cases))
+      for (const agent of ['build#1', 'plan#2', 'build#2']) for (const [k, resource] of Object.entries(RESOURCES)) expect(decide(c, resource), `${name} ${agent} ${k}`).toBe(c.effects[agent][k])
+    expect(rec.cases.combwork.effects['build#2']).toMatchObject({ outside: 'ask', reviewCopy: 'allow', skills: 'allow', temp: 'allow', privateDir: 'ask' })
+    expect(rec.cases.switchOff.effects['build#2'].outside).toBe('allow')
+    // The ask's resource as 2.2.6 raised it for a write: the file's folder, slashed, and /*: the form the grants take.
+    expect(rec.model['outside#1'].asks.map((a) => a.resources)).toEqual([['<root>/outside/*']])
+    expect([rec.model['outside#1'].written, rec.model['reviewCopy#1'].written]).toEqual([null, 'cw-reviewCopy'])
+    // Approve all: the TUI with --auto answered the ask once, and the write went through.
+    expect(rec.auto['outside#1']).toMatchObject({ asks: [{}], replies: [{ reply: 'once' }], written: 'cw-auto' })
+  })
+
+  it("saved credentials from `opencode auth list --format json` (HI-2758's shape): methods by integration, env connections apart", () => {
+    const r = parseAuthList(JSON.stringify([{ id: 'probe', name: 'Probe Ollama', connections: [{ type: 'credential', id: 'cred_1', label: 'a-saved', method: 'key' }, { type: 'env', name: 'PROBE_API_KEY' }] }, { id: 'anthropic', name: 'Anthropic', connections: [{ type: 'env', name: 'ANTHROPIC_API_KEY' }] }]))!
+    expect([...r.saved]).toEqual([['probe', ['key']]])
+    expect(r.integrations).toEqual([{ id: 'probe', name: 'Probe Ollama', saved: 1, env: ['PROBE_API_KEY'] }, { id: 'anthropic', name: 'Anthropic', saved: 0, env: ['ANTHROPIC_API_KEY'] }])
+    expect(parseAuthList('[]')!.saved.size).toBe(0)
+    expect(parseAuthList('Error: no server')).toBeNull()
+  })
+
+  it("guidance goes in the private config's AGENTS.md: Combwork's only with its tools, then the instructions and notes", () => {
+    expect(launchGuidance({ guidance: 'G', instructions: 'I', notes: 'N', mcpServers: { [TOOLS_SERVER]: {} } })).toBe('G\n\nI\n\nN\n')
+    expect(launchGuidance({ guidance: 'G', instructions: '', notes: '', mcpServers: {} })).toBe('')
+  })
+})
+
+describe('sessions, modes and the launch', () => {
+  it("Combwork picks a session id OpenCode's API takes (`ses_` and 26 base62), never a path or a quote", () => {
+    const ids = new Set(Array.from({ length: 50 }, () => newSessionId()))
+    expect(ids.size).toBe(50)
+    for (const id of ids) {
+      expect(id).toMatch(/^ses_[A-Za-z0-9]{26}$/)
+      expect(isSessionId(id)).toBe(true)
+    }
+    for (const bad of ['', 'xyz', '12b14cd0-6972-4a51-8d38-f8c898d76659', 'ses_..\\x', 'ses_a"b']) expect(isSessionId(bad), bad).toBe(false)
+  })
+
+  it('modes: Build and Plan by their agent, Approve all by --auto; the CLI\'s own passes nothing', () => {
+    expect(OPENCODE_DESCRIPTOR.permissionModes.map((m) => m.value)).toEqual(['build', 'plan', 'auto', 'cli-own'])
+    expect(OPENCODE_DESCRIPTOR.permissionModes.find((m) => m.value === 'auto')?.danger).toBe(true)
+    expect([opencodeAgentOf('build'), opencodeAgentOf('plan'), opencodeAgentOf('auto'), opencodeAgentOf('cli-own')]).toEqual(['build', 'plan', 'build', null])
+    expect([opencodeModeFlags('auto'), opencodeModeFlags('plan')]).toEqual([['--auto'], []])
+  })
+
+  it("an agent's extra arguments may not set what Combwork does: the server, the session, the mode", () => {
+    for (const a of ['--server http://x', '--standalone', '--session=ses_1', '-s ses_1', '--continue', '-c', '--auto', '--prompt hi']) expect(protectedArg([a]), a).not.toBeNull()
+    expect(protectedArg(['--log-level debug'])).toBeNull()
+  })
+
+  it("the launcher is told what it runs in its environment; its source holds every step of the recipe", () => {
+    const env = launcherEnv({ executable: 'C:\\oc\\opencode.exe', cwd: 'C:\\p', sessionId: 'ses_x', intent: 'resume', tuiArgs: ['--auto'], dirs: ['C:\\p', 'C:\\q'], privateDir: 'C:\\priv', owner: '1:2', marks: 'C:\\acct\\combwork-sessions', readyMs: 30000 })
+    expect(env).toMatchObject({ CW_OC_EXE: 'C:\\oc\\opencode.exe', CW_OC_INTENT: 'resume', CW_OC_TUI_ARGS: '--auto', CW_OC_DIRS: 'C:\\p\u001fC:\\q', CW_OC_INFO: 'C:\\priv\\opencode-server.json', CW_OC_OWNER: '1:2' })
+    for (const step of ['0x2000', 'AssignProcessToJobObject(job, GetCurrentProcess())', '"serve", "--hostname", "127.0.0.1"', '/api/info', '"--server", url, "--session", session', 'WaitHandle.WaitAny', 'c != created']) expect(LAUNCHER_SOURCE, step).toContain(step)
+    // New sessions only are created; a resume never creates one: its one POST sets its model and effort (HI-2767).
+    const resume = LAUNCHER_SOURCE.slice(LAUNCHER_SOURCE.indexOf('} else {\n      if (got == 404)'))
+    const resumeSteps = resume.slice(0, resume.indexOf('try {'))
+    expect(resumeSteps).not.toContain('url + "/api/session", auth')
+    expect(resumeSteps.match(/Http\("POST"/g)).toEqual(['Http("POST"'])
+    expect(resumeSteps).toContain('Http("POST", url + "/api/session/" + Uri.EscapeDataString(session) + "/model", auth, "{\\"model\\":" + ModelRef(modelProvider, modelId, variant) + "}"')
+    expect(resumeSteps).toContain('!ModelIs(reply, modelProvider, modelId, variant)')
+    // The model and effort reach it in its environment: a variant only with a model.
+    const launchBase = { executable: 'x', cwd: 'C:\\p', sessionId: 'ses_x', intent: 'new' as const, tuiArgs: [], dirs: [], privateDir: 'C:\\priv', owner: '', marks: 'm', readyMs: 1 }
+    expect(launcherEnv({ ...launchBase, model: 'ollama/qwen3:8b', variant: 'high' })).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: 'high' })
+    expect(launcherEnv({ ...launchBase, model: 'ollama/qwen3:8b', variant: null })).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: '' })
+    expect(launcherEnv({ ...launchBase, model: null, variant: 'high' })).toMatchObject({ CW_OC_MODEL: '', CW_OC_VARIANT: '' })
+  })
+})
+
+describe.runIf(process.platform === 'win32')('a launch prepared and built (against the fake opencode 2.2.6)', async () => {
+  const { opencode } = await import('../src/main/providers/opencode/adapter')
+  const { createRequire } = await import('module')
+  const { existsSync, mkdirSync, writeFileSync } = await import('fs')
+  const { childEnv } = createRequire(import.meta.url)('./e2e/runContext.cjs') as { childEnv: (vars?: Record<string, string>) => Record<string, string> }
+  const FAKE = join(__dirname, 'e2e', 'fake-opencode', 'opencode.cmd')
+  const ctx = (over: Record<string, unknown> = {}) => {
+    const cwd = join(base, 'proj')
+    mkdirSync(cwd, { recursive: true })
+    writeFileSync(join(cwd, 'AGENTS.md'), '# project rules\n')
+    return {
+      projectPath: cwd, agentId: 'a-1', executable: FAKE, cwd, workspacePath: base, runId: `r-${Math.random()}`, sessionId: newSessionId(),
+      resume: false, name: '', skills: [], mcpServers: { [TOOLS_SERVER]: { command: 'node', args: ['cw-mcp.js'], env: { CW_TOKEN: 't' } } }, model: 'ollama/qwen3:8b', effort: null, permissionMode: 'plan', extraArgs: [],
+      hookUrl: 'http://127.0.0.1:5000/hook?run=r1', hookAuthFile: join(base, 'auth.txt'), privateDir: join(base, `private-${Math.random()}`), guidance: 'Combwork guidance', allowBackgroundSessions: false, use200kContext: false,
+      env: childEnv({ OPENAI_API_KEY: 'sk-ambient', CW_AGENT: 'Agent 1' }), connectionHome: join(base, 'accounts', 'oc-1'),
+      overrides: { 'opencode.override.noAutoUpdate': true, 'opencode.override.keepProjectConfigOut': true, 'opencode.override.stripCredentials': true },
+      ...over
+    } as never
+  }
+
+  it('the private config (servers allowed by name, Claude Agent and the ambient chains denied, the project AGENTS.md given), the launcher\'s command and environment', async () => {
+    const c = ctx() as { privateDir: string; sessionId: string; connectionHome: string; cwd: string }
+    expect(await opencode.prepareLaunch(c as never)).toEqual({})
+    const cfg = JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8'))
+    expect(cfg).toMatchObject({ update: 'disable', model: 'ollama/qwen3:8b', default_agent: 'plan', instructions: [join(c.cwd, 'AGENTS.md')], mcp: { servers: { [TOOLS_SERVER]: { type: 'local', command: ['node', 'cw-mcp.js'], environment: { CW_TOKEN: 't' } } } } })
+    expect(cfg.policies.map((p: { resource: string; effect: string }) => `${p.resource}:${p.effect}`)).toEqual(['*:deny', 'ollama:allow', 'claude-agent:deny', 'amazon-bedrock:deny', 'google-vertex:deny', 'azure:deny', '*:deny', `${TOOLS_SERVER}:allow`])
+    expect(JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'service.json'), 'utf8'))).toEqual({ disabled: true })
+    expect(readFileSync(join(c.privateDir, 'opencode-config', 'AGENTS.md'), 'utf8')).toBe('Combwork guidance\n')
+    const cmd = opencode.buildCommand(FAKE, c as never)
+    expect(cmd.file.toLowerCase()).toMatch(/powershell\.exe$/)
+    expect(cmd.env).toMatchObject({ XDG_DATA_HOME: c.connectionHome, OPENCODE_CONFIG_DIR: join(c.privateDir, 'opencode-config'), OPENCODE_DISABLE_PROJECT_CONFIG: '1', OPENCODE_DISABLE_CLAUDE_CODE: '1', OPENCODE_DISABLE_AUTOUPDATE: '1', CW_OC_INTENT: 'new', CW_OC_SESSION: c.sessionId, CW_AGENT: 'Agent 1' })
+    expect(cmd.env!.OPENCODE_PASSWORD).toMatch(/^[0-9a-f]{48}$/)
+    const [ownerPid, created] = cmd.env!.CW_OC_OWNER.split(':')
+    expect([ownerPid, /^[0-9]{15,19}$/.test(created)]).toEqual([String(process.pid), true])
+    expect(cmd.env!.OPENAI_API_KEY).toBeUndefined()
+    // A bare Node launcher (the fake's opencode.cmd) runs as its node and script; anything else .cmd goes through cmd.exe.
+    expect([basename(cmd.env!.CW_OC_EXE).toLowerCase(), basename(cmd.env!.CW_OC_PREFIX)]).toEqual(['node.exe', 'fake-opencode.cjs'])
+    // Built once: a second build of the same launch is a bug.
+    expect(() => opencode.buildCommand(FAKE, c as never)).toThrow()
+  }, 60000)
+
+  it("refuses Claude Agent's models, Combwork's own flags in extra arguments, and a resume of a session another account made", async () => {
+    await expect(opencode.prepareLaunch(ctx({ model: 'claude-agent/claude-opus-5-5' }))).rejects.toThrow(/Claude Agent/)
+    await expect(opencode.prepareLaunch(ctx({ extraArgs: ['--server http://evil'] }))).rejects.toThrow(/--server/)
+    await expect(opencode.prepareLaunch(ctx({ resume: true }))).rejects.toThrow(/another OpenCode account/)
+  }, 60000)
+
+  it('resumes a session the account made (its record there), as a resume', async () => {
+    const c = ctx({ resume: true }) as { connectionHome: string; sessionId: string }
+    const { sessionMark } = await import('../src/main/providers/opencode/launcher')
+    mkdirSync(join(c.connectionHome, 'combwork-sessions'), { recursive: true })
+    writeFileSync(sessionMark(c.connectionHome, c.sessionId), '{}')
+    await opencode.prepareLaunch(c as never)
+    expect(opencode.buildCommand(FAKE, c as never).env).toMatchObject({ CW_OC_INTENT: 'resume' })
+    expect(existsSync(sessionMark(c.connectionHome, c.sessionId))).toBe(true)
+  }, 60000)
+
+  it("the connection's own provider only (HI-2769): no model or a malformed one refused, new or resumed; an unknown but valid id taken; the switch off (or the terminal preset) takes none and adds no allowlist", async () => {
+    const OWN = 'opencode.override.ownProviderOnly'
+    const providerRules = (c: { privateDir: string }) => (JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8')).policies as { action: string; resource: string; effect: string }[]).filter((p) => p.action === 'provider.use').map((p) => `${p.resource}:${p.effect}`)
+    for (const model of [null, '', '   ', 'qwen3', '/qwen3']) await expect(opencode.prepareLaunch(ctx({ model }))).rejects.toThrow(/names none.*Keep OpenCode to the connection's own provider/)
+    // A resume is refused the same way, before anything about its session.
+    await expect(opencode.prepareLaunch(ctx({ model: null, resume: true }))).rejects.toThrow(/names none/)
+    // A provider/model id OpenCode may know though Combwork doesn't: allowed, its provider the only one.
+    const c = ctx({ model: 'mylab/some-model:7b' }) as { privateDir: string }
+    await opencode.prepareLaunch(c as never)
+    expect(providerRules(c).slice(0, 2)).toEqual(['*:deny', 'mylab:allow'])
+    // Off: no model needed, and OpenCode's own rules (Claude Agent still denied).
+    const ctxOverrides = { 'opencode.override.noAutoUpdate': true, 'opencode.override.keepProjectConfigOut': true, 'opencode.override.stripCredentials': true }
+    const off = ctx({ model: null, overrides: { ...ctxOverrides, [OWN]: false } }) as { privateDir: string }
+    await opencode.prepareLaunch(off as never)
+    expect(providerRules(off)).toEqual(['claude-agent:deny', 'amazon-bedrock:deny', 'google-vertex:deny', 'azure:deny'])
+    // The Independent role's terminal preset: every override off.
+    const terminal = ctx({ model: null, overrides: { 'opencode.override.noAutoUpdate': false, 'opencode.override.keepProjectConfigOut': false, 'opencode.override.stripCredentials': false, [OWN]: false } }) as { privateDir: string }
+    await opencode.prepareLaunch(terminal as never)
+    expect(providerRules(terminal)).toEqual(['claude-agent:deny'])
+  }, 60000)
+
+  it("asks before an outside folder (HI-2775): every launch, new or resumed, in any mode; the review copies, its skills and its temp folder allowed; the switch off (or the terminal preset) adds no rule", async () => {
+    const { sessionMark } = await import('../src/main/providers/opencode/launcher')
+    const ASK = 'opencode.override.askOutsideFolder'
+    const copies = join(base, 'ws space.worktrees', 'proj', 'copies')
+    const temp = join(base, 'agent temp', 'a-1')
+    const written = (c: { privateDir: string }) => JSON.parse(readFileSync(join(c.privateDir, 'opencode-config', 'opencode.json'), 'utf8'))
+    const slashed = (p: string) => `${p.replace(/\\/g, '/')}/*`
+    const reviewer = ctx({ extraDirs: [copies], tempDir: temp, permissionMode: 'build' }) as { privateDir: string }
+    const resumed = ctx({ extraDirs: [copies], resume: true }) as { privateDir: string; connectionHome: string; sessionId: string }
+    mkdirSync(join(resumed.connectionHome, 'combwork-sessions'), { recursive: true })
+    writeFileSync(sessionMark(resumed.connectionHome, resumed.sessionId), '{}')
+    const auto = ctx({ permissionMode: 'auto' }) as { privateDir: string }
+    for (const c of [reviewer, resumed, auto]) await opencode.prepareLaunch(c as never)
+    const skills = (c: { privateDir: string }) => slashed(join(c.privateDir, 'opencode-config', 'skills'))
+    expect(written(reviewer).permissions).toEqual([
+      { action: 'external_directory', resource: '*', effect: 'ask' },
+      { action: 'external_directory', resource: slashed(copies), effect: 'allow' },
+      { action: 'external_directory', resource: skills(reviewer), effect: 'allow' },
+      { action: 'external_directory', resource: slashed(temp), effect: 'allow' }
+    ])
+    expect(written(resumed).permissions.map((r: { resource: string }) => r.resource)).toEqual(['*', slashed(copies), skills(resumed)])
+    // Approve all asks the same: its --auto approves each ask (the TUI replies once), as 2.2.6 was recorded doing.
+    expect(written(auto).permissions.map((r: { resource: string }) => r.resource)).toEqual(['*', skills(auto)])
+    // The rest of the private folder isn't allowed: the hook token and the config with the servers' tokens are there.
+    expect(JSON.stringify(written(reviewer).permissions)).not.toContain(`${reviewer.privateDir.replace(/\\/g, '/')}/*`)
+    // Off, and the Independent role's terminal preset (every override off): 2.2.6's own rules, no permissions.
+    const on = { 'opencode.override.noAutoUpdate': true, 'opencode.override.keepProjectConfigOut': true, 'opencode.override.stripCredentials': true }
+    const off = ctx({ extraDirs: [copies], overrides: { ...on, [ASK]: false } }) as { privateDir: string }
+    const terminal = ctx({ model: null, overrides: { 'opencode.override.noAutoUpdate': false, 'opencode.override.keepProjectConfigOut': false, 'opencode.override.stripCredentials': false, 'opencode.override.ownProviderOnly': false, [ASK]: false } }) as { privateDir: string }
+    // The launcher waits for the rule on the mode's agent before the TUI (2.2.6 loads it a moment late): its pattern given.
+    expect(opencode.buildCommand(FAKE, reviewer as never).env).toMatchObject({ CW_OC_RULES: String.raw`\{"action":"external_directory","resource":"\*","effect":"ask"\}`, CW_OC_RULES_AGENT: 'build' })
+    // The agent the session starts as: Plan's own; the CLI's own mode (no default_agent written) is OpenCode's Build.
+    const { CLI_OWN_MODE } = await import('../src/shared/cliOwnMode')
+    for (const [mode, agent] of [['plan', 'plan'], ['auto', 'build'], [CLI_OWN_MODE, 'build']]) {
+      const c = ctx({ permissionMode: mode }) as { privateDir: string }
+      await opencode.prepareLaunch(c as never)
+      expect(opencode.buildCommand(FAKE, c as never).env!.CW_OC_RULES_AGENT, mode).toBe(agent)
+    }
+    for (const c of [off, terminal]) {
+      await opencode.prepareLaunch(c as never)
+      expect(written(c)).not.toHaveProperty('permissions')
+      expect(JSON.stringify(written(c))).not.toContain('external_directory')
+      expect(opencode.buildCommand(FAKE, c as never).env).toMatchObject({ CW_OC_RULES: '', CW_OC_RULES_AGENT: '' })
+    }
+  }, 60000)
+
+  it("an effort is the model's variant, checked against this account's listing of exactly that model (HI-2767); refused when it can't be set", async () => {
+    const withModels = (models: string, over: Record<string, unknown> = {}) => ctx({ env: childEnv({ OPENAI_API_KEY: 'sk-ambient', CW_AGENT: 'Agent 1', FAKE_OPENCODE_MODELS: models }), ...over })
+    // Listed for the model: passed to the launcher with it.
+    const listed = withModels('ollama/qwen3:8b#low|high', { effort: 'high' }) as never
+    await opencode.prepareLaunch(listed)
+    expect(opencode.buildCommand(FAKE, listed).env).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: 'high' })
+    // No effort chosen: the model alone, which sets its default.
+    const none = withModels('ollama/qwen3:8b#low|high') as never
+    await opencode.prepareLaunch(none)
+    expect(opencode.buildCommand(FAKE, none).env).toMatchObject({ CW_OC_MODEL: 'ollama/qwen3:8b', CW_OC_VARIANT: '' })
+    // Not one of its variants, another model's variant, or the listing failing (the fallback has no variants): refused.
+    await expect(opencode.prepareLaunch(withModels('ollama/qwen3:8b#low|high', { effort: 'max' }))).rejects.toThrow(/doesn't list max as a variant of ollama\/qwen3:8b/)
+    await expect(opencode.prepareLaunch(withModels('ollama/qwen3:8b#low,ollama/other#max', { effort: 'max' }))).rejects.toThrow(/doesn't list max as a variant of ollama\/qwen3:8b/)
+    const failing = ctx({ effort: 'low', env: childEnv({ CW_AGENT: 'Agent 1', FAKE_OPENCODE_MODELS: 'ollama/qwen3:8b#low', FAKE_OPENCODE_API_FAIL: '1' }) })
+    await expect(opencode.prepareLaunch(failing)).rejects.toThrow(/doesn't list low as a variant/)
+    // An effort with no model to set it on (the own-provider switch off): refused, never guessed.
+    const off = { 'opencode.override.noAutoUpdate': true, 'opencode.override.keepProjectConfigOut': true, 'opencode.override.stripCredentials': true, 'opencode.override.ownProviderOnly': false }
+    await expect(opencode.prepareLaunch(ctx({ model: null, effort: 'low', overrides: off }))).rejects.toThrow(/names no model/)
+    const noModel = ctx({ model: null, overrides: off }) as never
+    await opencode.prepareLaunch(noModel)
+    expect(opencode.buildCommand(FAKE, noModel).env).toMatchObject({ CW_OC_MODEL: '', CW_OC_VARIANT: '' })
+  }, 120000)
+
+  it("gives the launch's first task to the TUI as --prompt (a Combwork start, the Assistant's), none without one", async () => {
+    const c = ctx({ initialPrompt: '[CW] Work on "AL-1"\u001fnow', permissionMode: 'build' }) as never
+    await opencode.prepareLaunch(c)
+    expect(opencode.buildCommand(FAKE, c).env!.CW_OC_TUI_ARGS.split('\u001f')).toEqual(['--prompt', '[CW] Work on "AL-1" now'])
+    const d = ctx({ permissionMode: 'build' }) as never
+    await opencode.prepareLaunch(d)
+    expect(opencode.buildCommand(FAKE, d).env!.CW_OC_TUI_ARGS).toBe('')
+  }, 60000)
+})
+
+describe("the real tier's test provider (CW_TEST_OPENCODE_PROVIDER, HI-2763): a test seam, never the production recipe", async () => {
+  const { testProviderOf, withTestProvider } = await import('../src/main/providers/opencode/config')
+  const raw = JSON.stringify({ id: 'cwtest', baseURL: 'http://127.0.0.1:47123/v1', model: 'qwen3:8b' })
+
+  it('read only by an unpackaged build, only well formed, only on loopback', () => {
+    expect(testProviderOf(raw, false)).toEqual({ id: 'cwtest', baseURL: 'http://127.0.0.1:47123/v1', model: 'qwen3:8b' })
+    expect(testProviderOf(raw, true)).toBeNull()
+    expect(testProviderOf(undefined, false)).toBeNull()
+    for (const bad of ['not json', JSON.stringify({ id: 'cwtest', baseURL: 'https://api.example.com/v1', model: 'm' }), JSON.stringify({ id: 'Bad Id', baseURL: 'http://127.0.0.1:1/v1', model: 'm' }), JSON.stringify({ id: 'x', baseURL: 'http://127.0.0.1:1/v1', model: '' })]) expect(testProviderOf(bad, false), bad).toBeNull()
+  })
+
+  it('unset, every config is exactly as written; set, its provider, a deny-all but it in place of the provider policies (the MCP ones kept), and on a launch its model', () => {
+    const launch = launchConfig({ model: 'ollama/qwen3:8b', agent: 'build', mcpServers: { combwork: { command: 'node' } }, instructions: [], ambient: AMBIENT, saved: null, strip: true, noUpdate: true })
+    expect(withTestProvider(launch, null, true)).toBe(launch)
+    const tp = testProviderOf(raw, false)!
+    const t = withTestProvider(launch, tp, true)
+    expect(t).toMatchObject({ update: 'disable', model: 'cwtest/qwen3:8b', providers: { cwtest: { package: '@opencode/ai/providers/openai-compatible', settings: { baseURL: 'http://127.0.0.1:47123/v1' }, models: { 'qwen3:8b': { name: 'qwen3:8b' } } } } })
+    expect((t.policies as { action: string; resource: string; effect: string }[]).map((p) => `${p.action}:${p.resource}:${p.effect}`)).toEqual(['provider.use:*:deny', 'provider.use:cwtest:allow', 'mcp.use:*:deny', 'mcp.use:combwork:allow'])
+    const check = withTestProvider(checkConfig(AMBIENT, null, true, true), tp, false)
+    expect(check.model).toBeUndefined()
+    expect((check.policies as { resource: string }[])[0]).toEqual({ action: 'provider.use', resource: '*', effect: 'deny' })
+    expect((withTestProvider(loginConfig(true), tp, false).policies as { resource: string }[]).map((p) => p.resource)).toEqual(['*', 'cwtest', '*'])
+  })
+})
+
+describe.runIf(process.platform === 'win32')("an account's Set Up (HR1 on HI-2759: never the raw CLI)", async () => {
+  const { opencode } = await import('../src/main/providers/opencode/adapter')
+  const FAKE = join(__dirname, 'e2e', 'fake-opencode', 'opencode.cmd')
+
+  it("is its sign-in, prepared as one: auth login, standalone, on the account's roots and its own login config, the switches set", () => {
+    const home = join(base, 'accounts', 'oc-setup')
+    const cmd = opencode.accountSetUpCommand(FAKE, home)
+    expect(cmd.args.slice(-3)).toEqual(['auth', 'login', '--standalone'])
+    expect(cmd.env).toMatchObject({ XDG_DATA_HOME: home, OPENCODE_CONFIG_DIR: join(home, 'combwork-login'), OPENCODE_DISABLE_PROJECT_CONFIG: '1', OPENCODE_DISABLE_CLAUDE_CODE: '1', OPENCODE_DISABLE_AUTOUPDATE: '1' })
+    const cfg = JSON.parse(readFileSync(join(home, 'combwork-login', 'opencode.json'), 'utf8'))
+    expect(cfg.policies).toContainEqual({ action: 'provider.use', resource: 'claude-agent', effect: 'deny' })
+    expect(JSON.parse(readFileSync(join(home, 'combwork-login', 'service.json'), 'utf8'))).toEqual({ disabled: true })
+  })
+})
+
+describe("subagents' sessions in the Sessions tab (HI-2773)", () => {
+  it('lists a subagent\'s mirror under its parent, in the folder it ran in, and finds its transcript; never a session Combwork made', async () => {
+    const { OpencodeAdapter } = await import('../src/main/providers/opencode/adapter')
+    const { buildMirror, placeholderMirror } = await import('../src/main/providers/opencode/mirror')
+    const { mirrorDir, mirrorPath } = await import('../src/main/providers/opencode/historyCore')
+    const { mkdirSync, writeFileSync } = await import('fs')
+    const rec = (rel: string) => JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', rel), 'utf8'))
+    const list: any[] = rec('wire/session-list-subagent.json').body.data
+    const home = tempDir('cw-oc-subs-')
+    const project = tempDir('cw-oc-subs-project-')
+    const parent = { ...list.find((s) => !s.parentID), location: { directory: project } }
+    const child = { ...list.find((s) => s.parentID), location: { directory: project } }
+    mkdirSync(mirrorDir(home), { recursive: true })
+    writeFileSync(mirrorPath(home, parent.id), buildMirror({ w: 1 }, parent, []))
+    writeFileSync(mirrorPath(home, child.id), buildMirror({ w: 1 }, child, [...rec('messages/subagent-child.json').body.data].reverse()))
+    writeFileSync(mirrorPath(home, 'ses_placeholderPLACEHOLDER0'), placeholderMirror())
+    const a = new OpencodeAdapter()
+    a.allHomes = () => [home]
+    const found = await a.listSessions(project, (id) => id === parent.id)
+    expect(found.map((s) => [s.id, s.sub])).toEqual([[child.id, { parentId: parent.id, kind: 'subagent' }]])
+    expect(found[0].transcriptPath).toBe(mirrorPath(home, child.id))
+    // Another folder has none of it; one the caller has already is left out.
+    expect(await a.listSessions(tempDir('cw-oc-subs-other-'))).toEqual([])
+    expect(await a.listSessions(project, (id) => id === child.id || id === parent.id)).toEqual([])
+    expect(await a.subSessionOf(mirrorPath(home, child.id), child.id)).toEqual({ parentId: parent.id, kind: 'subagent' })
+    expect(await a.subSessionOf(mirrorPath(home, parent.id), parent.id)).toBeNull()
+    // Its transcript by id (it has no mark); the parent without its mark has none (never made by Combwork).
+    expect(await a.transcriptPath(project, child.id)).toBe(mirrorPath(home, child.id))
+    expect(await a.transcriptPath(project, parent.id)).toBeNull()
+  })
+
+  it("lists sessions its TUI made (HI-2774: found by discovery): a fork under its source, a new one as a session of its own, each in its folder", async () => {
+    const { OpencodeAdapter } = await import('../src/main/providers/opencode/adapter')
+    const { buildMirror } = await import('../src/main/providers/opencode/mirror')
+    const { mirrorDir, mirrorPath } = await import('../src/main/providers/opencode/historyCore')
+    const { mkdirSync, writeFileSync } = await import('fs')
+    const fork = JSON.parse(readFileSync(join(__dirname, 'fixtures', 'opencode', 'real-2.2.6', 'wire', 'fork.json'), 'utf8'))
+    const home = tempDir('cw-oc-ext-')
+    const project = tempDir('cw-oc-ext-project-')
+    const forked = { ...fork.fork.info, location: { directory: project } }
+    const fresh = { id: 'ses_e403f932affeEEwzcBWI8UJ5m6', cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 2 }, location: { directory: project } }
+    mkdirSync(mirrorDir(home), { recursive: true })
+    writeFileSync(mirrorPath(home, forked.id), buildMirror({ w: -1, source: 'export', updated: 2, external: true }, forked, [...fork.fork.messages].reverse()))
+    writeFileSync(mirrorPath(home, fresh.id), buildMirror({ w: -1, source: 'export', updated: 2, external: true }, fresh, []))
+    const a = new OpencodeAdapter()
+    a.allHomes = () => [home]
+    const found = await a.listSessions(project)
+    expect(found.map((s) => [s.id, s.sub ?? null]).sort()).toEqual([[forked.id, { parentId: fork.source.info.id, kind: 'fork' }], [fresh.id, null]].sort())
+    expect(await a.listSessions(tempDir('cw-oc-ext-other-'))).toEqual([])
+    expect(await a.transcriptPath(project, fresh.id)).toBe(mirrorPath(home, fresh.id))
+    expect(await a.subSessionOf(mirrorPath(home, forked.id), forked.id)).toEqual({ parentId: fork.source.info.id, kind: 'fork' })
+  })
+})

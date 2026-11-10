@@ -1,0 +1,6 @@
+--- before any prompt (a new session): GET /api/experimental/session/<sid>/log?after=0 -> 200, text/event-stream
+data: {"type":"log.synced","aggregateID":"ses_haPS6Dn7lN6af4iOPAJmZK5uid","seq":0}
+
+--- after 6 failed prompts
+data: {"type":"log.synced","aggregateID":"ses_haPS6Dn7lN6af4iOPAJmZK5uid","seq":25}
+

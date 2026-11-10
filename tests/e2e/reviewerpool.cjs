@@ -493,19 +493,18 @@ const commitIn = (dir, files, message, trailer) => {
     // Busy with P (no question yet): the design waits, its lane waiting for a reviewer. (That nothing gives it while ZE-R1
     // is busy is the unit tests' control; here, what follows is what frees it.)
     check('…ZE-R1, reviewing P, is busy: the design waits for a reviewer', !!(await until(async () => (await lane(lq.lane.id))?.status?.reason === 'reviewer', HUNG_MS)) && JSON.stringify(await designsQ()) === '[]', JSON.stringify({ given: await designsQ(), status: (await lane(lq.lane.id))?.status }))
-    // ZE-R1 asks the user about P, then watches P (as the cli's CR1 did).
+    // ZE-R1 asks the user about P: the request frees it, so Q's waiting design goes to it at once, typed into its session
+    // as a wake. Its watch of P (as the cli's CR1 did) is typed only once that wake is read: typed while Combwork types the
+    // wake, the suite's line and the wake's disturb each other (HI-2836: every try lost under load, the watch never set).
     const askP = await intent(tzr, p, 'ask', { kind: 'decide', text: 'Do you accept the bounded "not reproduced" conclusion?' })
     const askReq = (await facts(p)).findLast((f) => f.kind === 'ApprovalRequested' && f.data.asker === zr1.id)?.data?.request
     check('ZE-R1 asks the user about P', askP.status === 200 && !!askReq, JSON.stringify(askP.body))
-    await idle(zeta, zr1.id)
-    await lib.typeLine(inv, lib.ptyKey(zeta, zr1.id), home, null, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${p}`], changes: ['comment', 'verdict'], wake: true })}`, { live: () => live(zeta, zr1.id) })
-    check('ZE-R1 watches P', !!(await until(async () => (await live(zeta, zr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(zeta, zr1.id)))
     check("Q's waiting design goes to ZE-R1, P held on its question (HI-2559)", !!(await until(async () => JSON.stringify(await designsQ()) === JSON.stringify([zr1.id]), HUNG_MS)), JSON.stringify(await designsQ()))
     check('…told of it once, and it reads it', !!(await zReadOnce(q1)), JSON.stringify(await zToldOf(q1)))
     await idle(zeta, zr1.id)
     check('ZE-R1 answers the design: ok', (await intent(tzr, q, 'loop-step', { step: 'ok', design: q1, text: 'Q: good' })).status === 200)
     await lib.typeLine(inv, lib.ptyKey(zeta, zr1.id), home, null, `cw cw_wait_for_tasks ${JSON.stringify({ cards: [`#${p}`], changes: ['comment', 'verdict'], wake: true })}`, { live: () => live(zeta, zr1.id) })
-    check('ZE-R1 watches P again', !!(await until(async () => (await live(zeta, zr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(zeta, zr1.id)))
+    check('ZE-R1 watches P', !!(await until(async () => (await live(zeta, zr1.id))?.status === 'watching', HUNG_MS)), JSON.stringify(await live(zeta, zr1.id)))
     const revQ = commitIn(zeta, { 'q.txt': 'q\n' }, 'Q done', keyQ)
     check('ZE-B2 submits Q', (await intent(tzb2, q, 'submit', { summary: 'Q: ready', revision: revQ })).status === 200 && !!(await until(async () => (await card(q))?.column === 'review', HUNG_MS)))
     check('Q goes to ZE-R1, watching, P still held', !!(await until(async () => JSON.stringify(await assigned(q)) === JSON.stringify([zr1.id, zr1.id]), HUNG_MS)), JSON.stringify(await assigned(q)))

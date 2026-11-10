@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 type Live = { status: string; sessionId: string; cwd?: string }
-const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), oldTools: new Set<string>(), switching: new Map<string, 'waiting' | 'restarting'>(), owed: [] as unknown[], noCode: [] as number[], lanesOn: false, view: null as unknown, starts: [] as { n: number; agentId: string; note: string; guard?: (now: unknown) => void }[], startRefuses: null as null | string, placementDue: null as unknown, startGuardView: null as unknown }))
+const state = vi.hoisted(() => ({ live: new Map<string, Live>(), calls: [] as string[], afterRecord: null as null | (() => void), enforced: false, options: null as unknown, recorded: [] as unknown[], briefs: [] as string[], onStart: null as null | ((id: string) => void), lanes: [] as unknown[], lanesHeld: null as null | Promise<void>, lend: { slot: 'slot-c' } as { slot: string } | { waiting: string }, slotWaits: [] as string[], waits: [] as unknown[], onGetTask: null as null | (() => void), beforeLaunch: null as null | ((agentId: string) => void), whileStopping: null as null | ((agentId: string) => void), pending: new Set<string>(), oldTools: new Set<string>(), switching: new Map<string, 'waiting' | 'restarting'>(), stoppedAt: new Map<string, number>(), owed: [] as unknown[], noCode: [] as number[], lanesOn: false, view: null as unknown, starts: [] as { n: number; agentId: string; note: string; guard?: (now: unknown) => void }[], startRefuses: null as null | string, placementDue: null as unknown, startGuardView: null as unknown }))
 
 vi.mock('../src/main/sessions', () => ({
   sessions: {
@@ -16,6 +16,8 @@ vi.mock('../src/main/sessions', () => ({
     sideAllows: (_p: string, id: string) => !state.oldTools.has(id),
     // Its switch under way (HI-2739: a restart for its tools): `state.switching`.
     switchUnderWay: (_p: string, id: string) => state.switching.get(id) ?? null,
+    // When someone last stopped it (HI-2815): `state.stoppedAt`.
+    stoppedOnPurposeAt: (_p: string, id: string) => state.stoppedAt.get(id) ?? 0,
     start: async (_p: string, o: { agentId: string }) => {
       state.calls.push(`start ${o.agentId}`)
       state.onStart?.(o.agentId)
@@ -139,6 +141,7 @@ beforeEach(() => {
   state.pending.clear()
   state.oldTools.clear()
   state.switching.clear()
+  state.stoppedAt.clear()
   state.owed.length = 0
   state.calls.length = 0
   state.afterRecord = null
@@ -697,6 +700,40 @@ describe("a lane's brief names its own workspace's cards, never the default work
     await launchRecordedLane(second, ALPHA, 'lane-o')
     named(state.briefs[0])
     expect(state.briefs[0]).not.toContain('BE-9')
+  })
+})
+
+describe("an owed new conversation whose agent someone stopped since (HI-2815: a user's Stop stops it)", () => {
+  const ALPHA = 'D:\\ws\\alpha'
+  const owedAt = new Date(Date.now() - 60_000)
+  const owing = (): void => {
+    state.lanes = [{ id: 'lane-o', state: 'active', builder: { id: 'b1', name: 'B1' }, reviewer: null, cards: [324], rounds: 3, freshStart: [{ id: 'f1', agent: 'b1', role: 'builder', since: owedAt.toISOString(), oldSession: null }] }]
+  }
+  const entries = (): unknown[] => (state.lanes as { freshStart?: unknown[] }[])[0].freshStart ?? []
+
+  it("stopped after it was owed (the reported case: not free at the lane's start, then the user stopped it): never started again, and owed no more", async () => {
+    owing()
+    state.stoppedAt.set('b1', owedAt.getTime() + 1000)
+    expect(await launchFresh(ws, ALPHA, 'lane-o', 'f1')).toBe('gone')
+    expect(state.calls).toEqual([])
+    expect(state.briefs).toEqual([])
+    expect(entries()).toEqual([])
+  })
+
+  it('stopped while its launch was under way: nothing started, and owed no more', async () => {
+    owing()
+    state.beforeLaunch = (id) => void state.stoppedAt.set(id, Date.now())
+    expect(await launchFresh(ws, ALPHA, 'lane-o', 'f1')).toBe('gone')
+    expect(state.calls).toEqual([])
+    expect(entries()).toEqual([])
+  })
+
+  it("stopped before it was owed (or never): started with the lane's brief, as before", async () => {
+    owing()
+    state.stoppedAt.set('b1', owedAt.getTime() - 1000)
+    expect(await launchFresh(ws, ALPHA, 'lane-o', 'f1')).toBe('launched')
+    expect(state.calls).toEqual(['start b1'])
+    expect(entries()).toEqual([])
   })
 })
 

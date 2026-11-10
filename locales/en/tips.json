@@ -599,6 +599,14 @@
     "defaultMessage": "High effort for every builder, in one go",
     "description": "A tip's title (HI-2109). Glossary: builder, effort."
   },
+  "tips.claudeManagedPolicy.text": {
+    "defaultMessage": "If your organisation's Claude Code policy allows only managed hooks, Combwork can't tell what its agents are doing. Claude Code Admin Snippet… gives your administrator a block to paste into its managed settings once, so Combwork's hooks run too.",
+    "description": "A tip. Claude Code Admin Snippet… is a command: keep it as Combwork shows it. \"Managed hooks\" are hooks an administrator sets for everyone."
+  },
+  "tips.claudeManagedPolicy.title": {
+    "defaultMessage": "Claude Code under your organisation's policy",
+    "description": "A tip's title (HI-2777): Combwork with Claude Code where an organisation manages Claude Code's settings."
+  },
   "tips.claudeStatusLine.text": {
     "defaultMessage": "Combwork's status line feeds an agent's footer and shows nothing in the pane. Turn off Settings → Advanced → Combwork's status line in place of yours to see the one in your Claude Code settings again: Combwork still reads the status.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -787,6 +795,14 @@
     "defaultMessage": "Run agents on GitHub Copilot",
     "description": "A tip's title."
   },
+  "tips.copilotGithubHost.text": {
+    "defaultMessage": "Repositories on yourcompany.ghe.com or your own GitHub Enterprise Server? Set the GitHub host in Version Control → GitHub, for the workspace or a project: Copilot then signs in and checks its sign-in on that host, and Provider Setup shows each host apart.",
+    "description": "A tip (HI-2779). Names of Combwork's menus, views, settings and commands (Version Control → GitHub, GitHub host, Provider Setup): keep them as Combwork shows them. Keep the example host name."
+  },
+  "tips.copilotGithubHost.title": {
+    "defaultMessage": "Copilot on your company’s GitHub",
+    "description": "A tip's title (HI-2779): GitHub Copilot with GitHub Enterprise (a GHE.com host or GitHub Enterprise Server)."
+  },
   "tips.copilotModes.text": {
     "defaultMessage": "Copilot agents start in Accept edits: they edit files in their own folder and use the Combwork tools without asking, and ask before other commands, other MCP tools and web access. Choose Ask to approve each edit too, or Allow all to approve everything.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
@@ -874,6 +890,14 @@
   "tips.fileLinks.title": {
     "defaultMessage": "Ctrl+click a path in the terminal",
     "description": "A tip's title."
+  },
+  "tips.filesGit.text": {
+    "defaultMessage": "Right-click a file or folder in the Files tab: Exclude from Git adds it to .gitignore (or only to this PC's .git/info/exclude), Stop Tracking takes a committed file out of git but leaves it on disk, and Why Is This Ignored? opens a dimmed file's rule.",
+    "description": "A tip (HI-2743). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep .gitignore and .git/info/exclude."
+  },
+  "tips.filesGit.title": {
+    "defaultMessage": "Keep a file out of git from the Files tab",
+    "description": "A tip's title (HI-2743)."
   },
   "tips.filesTab.text": {
     "defaultMessage": "The Files tab browses and edits the project, previews Markdown, CSV, HTML and images, and keeps unsaved edits as you switch.",
@@ -1474,6 +1498,38 @@
   "tips.oneAgent.title": {
     "defaultMessage": "Resume or stop just one agent",
     "description": "A tip's title (HI-2665)."
+  },
+  "tips.opencode.text": {
+    "defaultMessage": "Agents can use OpenCode 2. Provider Setup installs it; each OpenCode account keeps its own provider sign-ins and sessions, and each agent runs a private OpenCode server that ends with it.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. OpenCode is a product name."
+  },
+  "tips.opencode.title": {
+    "defaultMessage": "Run agents on OpenCode",
+    "description": "A tip's title. OpenCode is a product name."
+  },
+  "tips.opencodeHistory.text": {
+    "defaultMessage": "An OpenCode agent's conversation shows in the Sessions tab, and its tokens and cost in the Overview and its pane's footer, as OpenCode reports them. A $0 cost isn't a measure of your plan's allowance; limits show only for OpenCode Go or Console.",
+    "description": "A tip (HI-2762). Names of Combwork's views: keep them as Combwork shows them. OpenCode, OpenCode Go and Console are product names. $0 is an amount: keep it."
+  },
+  "tips.opencodeHistory.title": {
+    "defaultMessage": "An OpenCode agent's history, tokens and cost",
+    "description": "A tip's title (HI-2762). OpenCode is a product name."
+  },
+  "tips.opencodeOutsideFolder.text": {
+    "defaultMessage": "An OpenCode agent asks before it reads or changes anything outside its own folder, and waits for your answer in its pane. Review copies stay allowed, and Approve all approves without asking; Settings → Advanced → OpenCode turns this off.",
+    "description": "A tip. Names of Combwork's menus, settings and modes (Approve all): keep them as Combwork shows them. OpenCode is a product name."
+  },
+  "tips.opencodeOutsideFolder.title": {
+    "defaultMessage": "OpenCode agents ask before other folders",
+    "description": "A tip's title. OpenCode is a product name."
+  },
+  "tips.opencodeOwnProvider.text": {
+    "defaultMessage": "An OpenCode agent uses only the provider in its connection's model, so nothing it does goes to another provider or to OpenCode's free cloud models. Name the connection's model, such as ollama/qwen3:8b; Settings → Advanced → OpenCode turns this off.",
+    "description": "A tip. Names of Combwork's menus, views and settings: keep them as Combwork shows them. OpenCode is a product name; ollama/qwen3:8b is a model id: keep it."
+  },
+  "tips.opencodeOwnProvider.title": {
+    "defaultMessage": "OpenCode keeps to the connection's provider",
+    "description": "A tip's title. OpenCode is a product name."
   },
   "tips.outageResume.text": {
     "defaultMessage": "Turn on Settings → Advanced → Resume agents after a connection drops, and an agent stopped by a router restart or a Wi-Fi blip waits for the connection, then reruns what was cut off by itself. Never for a usage limit or an expired sign-in.",

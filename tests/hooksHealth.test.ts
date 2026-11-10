@@ -209,6 +209,19 @@ describe('what follows', () => {
     expect(hooksMissingNote(live(), tr)).toBeNull()
   })
 
+  it('its terminal saying its turn (HI-2802): working or finished, labelled as from there, still nothing typed into it', () => {
+    const working = live({ provider: 'copilot', hooksMissing: { ...missing, terminal: 'working' } })
+    expect(hooksMissingText(working)).toBe('Working (from its terminal: no hooks from GitHub Copilot)')
+    expect(hooksMissingText(working, tr)).toBe('Working (from its terminal: no hooks from GitHub Copilot)')
+    expect(runtimeLabel({ ...working, hooksMissing: { ...missing, terminal: 'done' } })).toBe('Finished (from its terminal: no hooks from GitHub Copilot)')
+    expect(hooksMissingText({ ...working, hooksMissing: { ...missing, terminal: 'idle' } }, tr)).toBe('Ready (from its terminal: no hooks from GitHub Copilot)')
+    // What it can't show is said in the note; its state stays stalled, and nothing is typed into it.
+    expect(hooksMissingNote(working, tr)).toMatch(/Restart the session.*Meanwhile its status comes from its terminal.*can't show when it asks you something, such as a permission\.$/)
+    expect(hooksMissingNote(live({ provider: 'copilot', hooksMissing: missing }), tr)).not.toContain('Meanwhile')
+    expect(agentState(working)).toBe('stalled')
+    expect(readyFor(working)).toBe(false)
+  })
+
   const rec = (over: Partial<LaneRecord> = {}): LaneRecord => ({ id: 'lane-1', project: 'alpha', name: null, builder: { id: 'b1', name: 'B1' }, reviewer: { id: 'r1', name: 'R1' }, cards: [1, 2], rounds: 10, waitMinutes: 360, state: 'active', startedBy: 'B1 (alpha)', startedAt: '', updatedAt: '', endedAt: null, mergeCommit: null, ...over })
   const card = (number: number, column: TaskCard['column'], over: Partial<TaskCard> = {}): TaskCard => ({ number, title: `Card ${number}`, column, project: 'alpha', blocked: null, history: [], comments: [], archived: false, ...over }) as unknown as TaskCard
 

@@ -56,8 +56,13 @@ function cliInRecord(record, suites, need) {
  * across records); any two versions of it among all the records' suites, passed or not, are refused. A CLI no record
  * vouches for keeps its earlier entry, with the reason from a record where its suites ran (or "none of its real suites
  * ran").
+ *
+ * `also` (HI-2780, `--also <cli>`): CLIs (keys of CLI_PROVIDERS) that may be tested at more than one version at the same
+ * commit, each version from its own record in which all its real suites ran and passed at that version. Then the newest is
+ * the entry's version and the others its `also` (each with when it was tested); any version seen that no record vouches
+ * for (a failed or partial run of it) is still refused.
  */
-export function manifestFromRecords(records, suites, current = {}) {
+export function manifestFromRecords(records, suites, current = {}, { also = [] } = {}) {
   const manifest = { ...current }
   const updated = []
   const problems = []
@@ -76,7 +81,19 @@ export function manifestFromRecords(records, suites, current = {}) {
     // Every version any record's suites ran, passed or not: one record vouching can't hide another's other version.
     const versions = [...new Set(seen.flatMap((s) => s.versions))].sort()
     const showing = seen.filter((s) => s.versions.length)
-    if (versions.length > 1) problems.push(showing.length === 1 ? showing[0].problem : `${name}: the records ran different versions (${versions.join(', ')})`)
+    if (versions.length > 1 && also.includes(need)) {
+      // Each version vouched for by its own record (HI-2780); one seen but not vouched for refuses them all.
+      const unvouched = versions.filter((v) => !vouched.some((s) => s.version === v))
+      if (unvouched.length) {
+        problems.push(`${name}: ${unvouched.join(', ')} ran in a record where not all its real suites passed at that version`)
+        continue
+      }
+      const byVersion = versions.map((v) => ({ version: v, testedAt: vouched.filter((s) => s.version === v).map((s) => String(s.record.when ?? '')).sort().at(-1).slice(0, 10) }))
+      byVersion.sort((a, b) => compareVersions(b.version, a.version))
+      const [newest, ...others] = byVersion
+      manifest[id] = { version: newest.version, testedAt: newest.testedAt, record: codes[0], also: others.map((o) => ({ version: o.version, testedAt: o.testedAt })) }
+      updated.push(id)
+    } else if (versions.length > 1) problems.push(showing.length === 1 ? showing[0].problem : `${name}: the records ran different versions (${versions.join(', ')})`)
     else if (!vouched.length) problems.push((seen.find((s) => s.ran) ?? seen[0]).problem)
     else {
       const when = vouched.map((s) => String(s.record.when ?? '')).sort().at(-1)
@@ -85,6 +102,17 @@ export function manifestFromRecords(records, suites, current = {}) {
     }
   }
   return { manifest, updated, problems }
+}
+
+/** Dotted versions compared by their numbers (1.0.107 after 1.0.99), a prerelease (`-x`) before its release. */
+export function compareVersions(a, b) {
+  const [ma, pa] = String(a).split('-', 2)
+  const [mb, pb] = String(b).split('-', 2)
+  const na = ma.split('.').map((x) => parseInt(x, 10) || 0)
+  const nb = mb.split('.').map((x) => parseInt(x, 10) || 0)
+  for (let i = 0; i < Math.max(na.length, nb.length); i++) if ((na[i] ?? 0) !== (nb[i] ?? 0)) return (na[i] ?? 0) - (nb[i] ?? 0)
+  if (pa === pb) return 0
+  return pa === undefined ? 1 : pb === undefined ? -1 : pa < pb ? -1 : 1
 }
 
 /**

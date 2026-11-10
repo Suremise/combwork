@@ -4,6 +4,7 @@ import { basename, dirname, extname, join, relative, resolve, sep } from 'path'
 import { CW_DIR, assertSessionId } from '../shared/defaults'
 import type { AttachmentContent, FileContent, FileEntry, SessionAttachment, SessionAttachmentGroup } from '../shared/types'
 import { attachmentKind, isSessionFolder } from '../shared/attachments'
+import { parseCheckIgnore, type IgnoreRule } from '../shared/gitIgnoreRules'
 import { attachmentsDir, movedAttachment } from './attachmentsFolder'
 import { emit } from './events'
 import { heldOpen, insideReal, isInUse, trashAllOrNothing, withFileLock } from './fsutil'
@@ -79,25 +80,26 @@ const NOT_A_REPO = /not a git repository/i
  * The entries git ignores, or null when git couldn't say (#222). check-ignore exits 0 (some ignored) or 1 (none); a
  * failure (128) used to read as "none ignored", so a listing made while another git command rewrote the index (a
  * user's `git add`, an agent's commit) showed ignored folders undimmed. A busy index is tried again briefly; outside
- * a repository nothing is ignored.
+ * a repository nothing is ignored. Each with the rule git ignores it by (-v, HI-2743: its tooltip names it).
  */
-async function ignoredSet(projectPath: string, rels: string[]): Promise<Set<string> | null> {
-  const out = new Set<string>()
+async function ignoredSet(projectPath: string, rels: string[]): Promise<Map<string, IgnoreRule> | null> {
+  const out = new Map<string, IgnoreRule>()
   // Chunked to stay under the Windows command-line limit.
   for (let i = 0; i < rels.length; i += 200) {
     // -z needs --stdin, which the helper does not support, so read one path per line.
-    const args = ['check-ignore', '--', ...rels.slice(i, i + 200)]
+    const args = ['check-ignore', '-v', '--', ...rels.slice(i, i + 200)]
     let r = await git(projectPath, args)
     for (let t = 1; t < IGNORE_TRIES && r.code !== 0 && r.code !== 1 && INDEX_BUSY.test(r.err); t++) {
       await new Promise((res) => setTimeout(res, IGNORE_RETRY_MS))
       r = await git(projectPath, args)
     }
     if (r.code !== 0 && r.code !== 1) {
-      if (NOT_A_REPO.test(r.err)) return new Set()
+      if (NOT_A_REPO.test(r.err)) return new Map()
       ignoreFailed(projectPath, r.err)
       return null
     }
-    for (const p of r.out.split(/\r?\n/)) if (p) out.add(p.replace(/\/$/, ''))
+    // A path a negation (`!keep.log`) matched is listed by -v but isn't ignored: parseCheckIgnore leaves it out.
+    for (const [p, rule] of parseCheckIgnore(r.out)) out.set(p, rule)
   }
   return out
 }
@@ -116,14 +118,14 @@ function ignoreFailed(projectPath: string, err: string): void {
  * whose check-ignore failed: it shows them as they were rather than undimmed, and the folder is listed again shortly
  * (at most RELIST_MAX times in a row while it keeps failing).
  */
-const lastIgnored = new Map<string, Set<string>>()
+const lastIgnored = new Map<string, Map<string, IgnoreRule>>()
 const LAST_IGNORED_MAX = 500
 /** Folders whose listing failed to check what is ignored: a re-list pending, and how many in a row so far. */
 const relists = new Map<string, { pending: boolean; count: number }>()
 export const RELIST_MAX = 3
 const RELIST_MS = 500
 
-function rememberIgnored(key: string, ignored: Set<string>): void {
+function rememberIgnored(key: string, ignored: Map<string, IgnoreRule>): void {
   relists.delete(key)
   lastIgnored.delete(key)
   lastIgnored.set(key, ignored)
@@ -162,10 +164,14 @@ export async function listDir(projectPath: string, rel: string): Promise<FileEnt
   if (ignored) rememberIgnored(key, ignored)
   else {
     // Git couldn't say: as last known (nothing for a folder not listed before), and listed again shortly.
-    ignored = lastIgnored.get(key) ?? new Set()
+    ignored = lastIgnored.get(key) ?? new Map()
     relistLater(projectPath, toRel(projectPath, dir), key)
   }
-  for (const f of out) f.ignored = ignored.has(f.relPath) || f.relPath === CW_DIR || f.relPath.startsWith(`${CW_DIR}/`)
+  for (const f of out) {
+    const rule = ignored.get(f.relPath)
+    f.ignored = !!rule || f.relPath === CW_DIR || f.relPath.startsWith(`${CW_DIR}/`)
+    if (rule) f.ignoredBy = rule
+  }
   return out.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name, undefined, { sensitivity: 'base', numeric: true }) : a.isDir ? -1 : 1))
 }
 

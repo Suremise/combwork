@@ -1,4 +1,4 @@
-// Which fake providers run each scenario (HI-2663). A fake run (fake, fake-codex, fake-copilot, fake-antigravity) tests Combwork's
+// Which fake providers run each scenario (HI-2663). A fake run (fake, fake-codex, fake-copilot, fake-antigravity, fake-opencode) tests Combwork's
 // machinery: each fake sends `cw TOOL {json}` to the same Combwork MCP server (tests/e2e/fake-bridge.cjs; Copilot's own
 // MCP client, tests/e2e/fake-copilot-api.cjs), so what a call does after the server is the same for every provider.
 // Running a scenario on all three proves something only where its fake script exercises what differs per CLI: skill
@@ -48,7 +48,26 @@ const MODEL_TRIALS_ONLY = [
 
 const NOT_A_TRIAL = ['tool-sweep']
 
-const FAKES = ['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity']
+const FAKES = ['fake', 'fake-codex', 'fake-copilot', 'fake-antigravity', 'fake-opencode']
+
+/**
+ * A fake provider whose runs wait for a card, every scenario left out with why (HI-2761). fake-opencode waited for HI-2760
+ * (its agents' turn status: the harness knows a prompt was taken from the agent's status), which lifted it. None waits now.
+ */
+const PROVIDER_WAITS = {}
+
+/**
+ * Scenarios a fake provider leaves out until a card lands, each group with why (HI-2760). fake-opencode's own run
+ * (2026-11-09T01-59-16-fake-opencode, then 02-32-38 for those not about the transcript). The ones that read the agent's
+ * transcript ran once HI-2762 gave OpenCode agents their history (2026-11-09T02-52-58-fake-opencode).
+ * HI-2772 lifted review-in-copy's (an OpenCode reviewer is lent its review copy: since HI-2775 an external_directory
+ * allow in its launch config, after the ask for every other outside folder), and HI-2771 assistant-journal-recall's (an OpenCode Assistant's state view goes into its session as an
+ * instruction entry). None waits now.
+ */
+const SCENARIO_WAITS = {}
+
+/** Why a provider leaves this scenario out until a card lands (SCENARIO_WAITS), or null. */
+const waitOf = (providerKey, id) => (SCENARIO_WAITS[providerKey] ?? []).find((w) => w.ids.includes(id))?.why ?? null
 
 /** The fakes a scenario runs on: every fake, ['fake'], or [] (model trials only). */
 function fakesFor(id) {
@@ -60,7 +79,11 @@ function fakesFor(id) {
 /** What's wrong with the lists, against the scenarios' ids: [] when nothing. */
 function scopeProblems(ids) {
   const named = [...FAKE_CLAUDE_ONLY, ...MODEL_TRIALS_ONLY, ...NOT_A_TRIAL]
+  const waiting = Object.entries(SCENARIO_WAITS).flatMap(([p, ws]) => ws.flatMap((w) => w.ids.map((id) => ({ p, id }))))
   return [
+    ...waiting.filter((w) => !ids.includes(w.id)).map((w) => `${w.id}: no such scenario (${w.p}'s waits)`),
+    ...waiting.filter((w, i) => waiting.findIndex((x) => x.p === w.p && x.id === w.id) !== i).map((w) => `${w.id}: listed twice (${w.p}'s waits)`),
+    ...waiting.filter((w) => !fakesFor(w.id).includes(w.p)).map((w) => `${w.id}: ${w.p} doesn't run it anyway (${w.p}'s waits)`),
     ...named.filter((id) => !ids.includes(id)).map((id) => `${id}: no such scenario`),
     ...named.filter((id, i) => named.indexOf(id) !== i).map((id) => `${id}: listed twice`),
     ...NOT_A_TRIAL.filter((id) => MODEL_TRIALS_ONLY.includes(id)).map((id) => `${id}: runs nowhere (neither a model trial nor on a fake)`)
@@ -68,7 +91,7 @@ function scopeProblems(ids) {
 }
 
 /**
- * The scenarios a run takes, for a provider (its key: fake, fake-codex, fake-copilot, fake-antigravity, claude-code, codex): { run, excluded }.
+ * The scenarios a run takes, for a provider (its key: fake, fake-codex, fake-copilot, fake-antigravity, fake-opencode, claude-code, codex): { run, excluded }.
  * listed: the scenarios asked for (all, or --only's). excluded: [{ id, why }], those a run of this provider leaves out,
  * each to be said (never silently dropped), with where it does run.
  */
@@ -77,9 +100,12 @@ function selectFor(listed, providerKey) {
   const run = []
   const excluded = []
   for (const s of listed) {
-    if (fake) {
+    if (PROVIDER_WAITS[providerKey]) excluded.push({ id: s.id, why: PROVIDER_WAITS[providerKey] })
+    else if (fake) {
       const on = fakesFor(s.id)
-      if (on.includes(providerKey)) run.push(s)
+      const wait = waitOf(providerKey, s.id)
+      if (on.includes(providerKey) && wait) excluded.push({ id: s.id, why: wait })
+      else if (on.includes(providerKey)) run.push(s)
       else excluded.push({ id: s.id, why: on.length ? `runs on ${on.join(', ')} only (tests/scenarios/fakeScope.cjs): --provider ${on[0]}` : 'model trials only: no fake runs it (tests/scenarios/fakeScope.cjs)' })
     } else if (NOT_A_TRIAL.includes(s.id)) excluded.push({ id: s.id, why: "the fakes' plumbing only: model trials leave it out (tests/scenarios/fakeScope.cjs)" })
     else run.push(s)
@@ -87,4 +113,4 @@ function selectFor(listed, providerKey) {
   return { run, excluded }
 }
 
-module.exports = { FAKES, FAKE_CLAUDE_ONLY, MODEL_TRIALS_ONLY, NOT_A_TRIAL, fakesFor, scopeProblems, selectFor }
+module.exports = { FAKES, PROVIDER_WAITS, SCENARIO_WAITS, FAKE_CLAUDE_ONLY, MODEL_TRIALS_ONLY, NOT_A_TRIAL, fakesFor, scopeProblems, selectFor }

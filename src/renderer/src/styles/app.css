@@ -4475,6 +4475,14 @@ p.hint {
   user-select: text;
 }
 /* An agent's Hooks dialog (HI-982): its two tables in the dialog's own scroll, a long command cut to two lines. */
+/* Claude Code's admin snippet (HI-2777): the block an administrator copies. */
+.admin-snippet {
+  width: 100%;
+  resize: vertical;
+  margin: 8px 0;
+  font-size: 12px;
+}
+
 .hooks-head {
   align-items: flex-start;
   gap: 8px;
@@ -4808,6 +4816,30 @@ h2.section#unused-worktrees {
 }
 .setup-detail .hint {
   margin: 0 0 6px;
+  line-height: 1.45;
+}
+/* A CLI's sign-in per GitHub host (HI-2779): a row each, its state beside the host. */
+.setup-hosts {
+  margin: 0 2px 12px;
+}
+.setup-hosts-h {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.setup-host {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+}
+.setup-host .hint {
+  margin: 2px 0 0;
+}
+.setup-host-diagnostic {
+  overflow-wrap: anywhere;
+}
+.setup-hosts > p.hint {
+  margin: 6px 0 0;
   line-height: 1.45;
 }
 /* Settings → Accounts (HI-980) */
@@ -15348,3 +15380,7 @@ button.progress-lane-retry {
 /* As wide as its placeholder (HI-2708: "Not set: 200,000 assumed" is longer in German and Polish), 13em at least. */
 .server-model-limit .input { field-sizing: content; min-width: 13em; max-width: 100%; }
 .server-model-limits .hint.warn { color: var(--warning); }
+/* Why Is This Ignored?'s viewer (HI-2743): the rule's line, then its file, read-only. */
+.ignore-rule-at { margin-bottom: 8px; font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.ignore-rule-file { height: min(50vh, 420px); border: 1px solid var(--border); }
+.ignore-rule-file .monaco { height: 100%; }

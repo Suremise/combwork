@@ -294,6 +294,51 @@
     "note": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project.",
     "audience": "both"
   },
+  "service.filesGit.busy": {
+    "text": "Another git command is using the repository. Try again in a moment.",
+    "note": "An error from the Files tab's Git menu: git's index is locked by another git command (an agent's commit, say).",
+    "audience": "both"
+  },
+  "service.filesGit.failed": {
+    "text": "Git could not do it: {why}",
+    "note": "An error from the Files tab's Git menu. {why} is git's own message (English).",
+    "audience": "both"
+  },
+  "service.filesGit.linked": {
+    "text": "{file} is a link, or leads outside the repository, so Combwork leaves it alone. Change it by hand.",
+    "note": "An error from the Files tab's Git menu (HI-2743): the ignore file ({file}: .gitignore or .git/info/exclude) is a symbolic link or junction, or its folder leads outside the repository, so Combwork won't write through it.",
+    "audience": "both"
+  },
+  "service.filesGit.notIgnored": {
+    "text": "Git no longer ignores it.",
+    "note": "An error from the Files tab's Git menu: the file isn't ignored any more.",
+    "audience": "both"
+  },
+  "service.filesGit.notRepo": {
+    "text": "This project is not a git repository.",
+    "note": "An error from the Files tab's Git menu (HI-2743): the project folder isn't in a git repository.",
+    "audience": "both"
+  },
+  "service.filesGit.notUtf8": {
+    "text": "{file} is not UTF-8 text, so Combwork leaves it alone.",
+    "note": "An error from the Files tab's Git menu: the ignore file ({file}) isn't UTF-8, so Combwork won't rewrite it.",
+    "audience": "both"
+  },
+  "service.filesGit.nothing": {
+    "text": "Choose a file or folder in the project.",
+    "note": "An error from the Files tab's Git menu: it was given nothing to act on.",
+    "audience": "both"
+  },
+  "service.filesGit.ruleChanged": {
+    "text": "The rule that ignores it has changed. Look again with Why is this ignored?.",
+    "note": "An error from Include again in the Files tab's Git menu: the line it would remove isn't there any more, or it isn't one Combwork can remove. Why is this ignored? is the menu item (files.git.why).",
+    "audience": "both"
+  },
+  "service.filesGit.tooLarge": {
+    "text": "{file} is too large to show here.",
+    "note": "An error from Why Is This Ignored? in the Files tab's Git menu: the rule's file ({file}) is too large to show in Combwork's viewer.",
+    "audience": "both"
+  },
   "service.forward.missing": {
     "text": "{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}",
     "note": "HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.",
@@ -720,8 +765,8 @@
     "audience": "both"
   },
   "service.lanes.targetFixed": {
-    "text": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch.",
-    "note": "HI-2556: an error changing a running lane’s Merges into (fixed for its life). {builder} is the lane’s builder agent, {target} its branch.",
+    "text": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch. Once {target} has been merged into another branch, a retarget of Work merges into moves the lane and its card there (Also retarget what can move).",
+    "note": "HI-2556, HI-2753: an error changing a running lane’s Merges into (fixed for its life, except through a retarget once its branch has been merged into another). {builder} is the lane’s builder agent, {target} its branch. Work merges into and Also retarget what can move are names in the window (Version Control → Workflow, Save…): as translated there.",
     "audience": "both"
   },
   "service.lanes.targetMissing": {
@@ -812,6 +857,11 @@
   "service.providers.stopFirst": {
     "text": "Stop all running {cli} agents before updating it.",
     "note": "An error updating the coding agent CLI {cli} (\"Codex\") while agents run it.",
+    "audience": "both"
+  },
+  "service.providers.unknownHost": {
+    "text": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
+    "note": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"GitHub Copilot\") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button.",
     "audience": "both"
   },
   "service.slots.notPrepared": {

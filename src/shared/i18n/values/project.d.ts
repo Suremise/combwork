@@ -11,6 +11,7 @@ interface CombworkMessageValues {
   'project.agents.settings': undefined
   'project.agents.turnedOff': { provider: string | number }
   'project.apply.new': { live: string }
+  'project.banner.adminSnippet': undefined
   'project.banner.change': undefined
   'project.banner.chooseInSettings': undefined
   'project.banner.connectionSetup': { cli: string | number }
@@ -178,6 +179,7 @@ interface CombworkMessageValues {
   'project.cost.unknown': undefined
   'project.cost.unpriced': { model: string | number; provider: string | number }
   'project.cost.withFree': { cost: string | number }
+  'project.cost.zeroReported': { provider: string | number }
   'project.empty.addAgent': { project: string | number; provider: string | number }
   'project.empty.allSessions': undefined
   'project.empty.markActive': undefined

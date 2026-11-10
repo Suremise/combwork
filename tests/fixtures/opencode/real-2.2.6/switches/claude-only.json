@@ -1,0 +1,42 @@
+{
+ "variant": "claude-only",
+ "env": {
+  "OPENCODE_DISABLE_CLAUDE_CODE": "1"
+ },
+ "configSources": [
+  "<root>\\cfg\\opencode.json",
+  "<root>\\cfg",
+  "<root>\\opencode.json",
+  "<root>\\project\\opencode.json",
+  "<root>\\project\\.opencode\\opencode.json",
+  "<root>\\project\\.opencode"
+ ],
+ "codewords": [
+  "CODEWORD-GLOBAL-CFG",
+  "CODEWORD-PROJ-AGENTS-MD",
+  "CODEWORD-PROJ-AGENTS-SKILL",
+  "CODEWORD-PROJ-INSTRUCTIONS-FIELD"
+ ],
+ "tools": [
+  "edit",
+  "glob",
+  "grep",
+  "question",
+  "read",
+  "shell",
+  "skill",
+  "subagent",
+  "webfetch",
+  "websearch",
+  "write",
+  "execute"
+ ],
+ "mcpPings": [
+  "ping_hijack_root"
+ ],
+ "markers": [
+  "plugin-dotplug.txt",
+  "plugin-rootplug.txt",
+  "start-hijack_root T-EVIL-hijack_root"
+ ]
+}

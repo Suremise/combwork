@@ -5,6 +5,7 @@
   "main.accounts.inUse": "La conexión {name} está en uso: detén los agentes que la usan y cierra su inicio de sesión; después, quítala.",
   "main.accounts.keyRemoveFailed": "No se quitó la conexión {name}: no se pudo eliminar su clave. No se cambió nada; Quitar lo vuelve a intentar.",
   "main.accounts.leftover": "La conexión {name} está quitada a medias: primero vuelve a quitarla.",
+  "main.accounts.letGoFailed": "{name} no se eliminó: Combwork no pudo detener a tiempo su propio trabajo en su carpeta. No se cambió nada; Quitar lo vuelve a intentar.",
   "main.accounts.makeFailed": "No se pudo crear la carpeta de la conexión: {error}",
   "main.accounts.noHome": "La carpeta de {cli} ({folder}) aún no existe: ejecuta {cli} una vez y luego agrega la conexión.",
   "main.accounts.noName": "Ponle un nombre a la conexión.",

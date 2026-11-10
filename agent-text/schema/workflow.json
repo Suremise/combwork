@@ -703,6 +703,15 @@
       "folder": "plain"
     }
   },
+  "workflow.refused.platform.targetGone.message": {
+    "placeholders": {
+      "card": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.refused.platform.targetGone.next": {
+    "placeholders": {}
+  },
   "workflow.refused.platform.unknown.message": {
     "placeholders": {
       "card": "plain",

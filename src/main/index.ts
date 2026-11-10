@@ -27,6 +27,7 @@ import { appendFile, readFile, stat } from 'original-fs/promises'
 import { Readable } from 'stream'
 import type { AppInfo, CloseReason, McpServerDef, QuitChoice, QuitScope, QuitSession, TaskCard, WindowState } from '../shared/types'
 import { providerService } from './providerService'
+import { watchGithubHostChanges } from './githubHostChanges'
 import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
@@ -123,6 +124,7 @@ import { abandonWindowStorage } from './storage'
 import { agentTokenFile } from './agentTokens'
 import { progress, setTaskbarTestHook, startProgress } from './progressService'
 import { startMergeSlots } from './mergeSlotHost'
+import { startOpencodeHistory, stopOpencodeHistory } from './opencodeHistoryHost'
 import { startLanes } from './lanes'
 import { startLaneStarts } from './laneStarts'
 import { startHandOverCheck } from './handOverCheck'
@@ -1241,6 +1243,8 @@ app.whenReady().then(async () => {
   // An agent no longer waiting for you: its entries say so, in whichever window owns them.
   startNoticeResolver()
   providerService.setLiveSessionCounter((p) => sessions.liveCount(p))
+  // A GitHub host change (HI-2779): its CLIs checked again, and the running agents a restart would move named.
+  watchGithubHostChanges(() => sessions.liveStates())
   // Agents stopped by a refused sign-in can carry on once the CLI is signed in again (#309).
   providerService.onSignedIn((p) => sessions.signedInAgain(p, true))
   // Connections (HI-980, HI-1755): new workspaces' defaults and the watches on their logins. Waited for: their order's
@@ -1353,6 +1357,8 @@ app.whenReady().then(async () => {
   // Long runs agents report (the Progress panel): stale runs, and the setting.
   startProgress()
   startMergeSlots()
+  // OpenCode agents' history, usage and plan limits, read from their servers (HI-2762).
+  startOpencodeHistory()
   startLanes()
   // A lane's next card, started on its builder once the card before it is Done (HI-1990).
   startLaneStarts()
@@ -1434,6 +1440,7 @@ app.on('will-quit', () => {
   // Any other way out (the updater's install, a renderer crash's quit) clears it too.
   clearDiscoveryNow()
   killAll()
+  stopOpencodeHistory()
   stopOrphanWatch()
   closeProcessTracking()
   unwatchAll()

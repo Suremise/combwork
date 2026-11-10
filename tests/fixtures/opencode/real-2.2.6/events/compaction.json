@@ -1,0 +1,501 @@
+{
+ "source": "HI-2762's R0 (HB2, 9 Nov 2026): one prompt, then POST /compact, on the probe provider (local Ollama qwen3:8b). Each *.delta type cut to its first three; the recorder's own t is dropped.",
+ "events": [
+  {
+   "type": "server.connected",
+   "data": {}
+  },
+  {
+   "created": 1794190289430,
+   "type": "session.inbox.enqueued",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "inboxID": "msg_1be132a14001UDXOGkoZoKS0Xl",
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "item": {
+     "type": "user",
+     "payload": {
+      "text": "Reply with the single word OK."
+     },
+     "delivery": "steer"
+    }
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 1,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190289432,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 2,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190289442,
+   "metadata": {
+    "instructions": {
+     "initial": true
+    }
+   },
+   "type": "session.instructions.updated",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "delta": {
+     "core/codemode": "1f1291478accf8b3e4d96a40c150bf844d60557dede4aae56c47ea0043bbdce2",
+     "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
+     "core/date": "92b15ba69e41b58abd2e121f9dbae18f05891be3cf4e617a4d55342d2626508a",
+     "core/environment": "cd093767e3960d6ce89500f563fc35238bf5d35e760ac07d9f712bacc46d0495"
+    }
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 3,
+    "version": 2
+   }
+  },
+  {
+   "created": 1794190289443,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "inboxID": "msg_1be132a14001UDXOGkoZoKS0Xl"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 4,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190293887,
+   "type": "session.usage.updated",
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "cost": 0,
+    "tokens": {
+     "input": 457,
+     "output": 312,
+     "reasoning": 0,
+     "cache": {
+      "read": 0,
+      "write": 0
+     }
+    }
+   }
+  },
+  {
+   "created": 1794190293887,
+   "type": "session.renamed",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "title": "OK reply"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 6,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190294666,
+   "type": "session.step.started",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "agent": "build",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+    "started": 1794190289470
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 7,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190294669,
+   "type": "session.reasoning.started",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "ordinal": 0,
+    "native": {
+     "reasoningField": "reasoning"
+    }
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 8,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190294773,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "ordinal": 0,
+    "delta": "Okay, the user just asked me to reply with the single word"
+   }
+  },
+  {
+   "created": 1794190294873,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "ordinal": 0,
+    "delta": " \"OK\". Let me make sure I understand the request correctly"
+   }
+  },
+  {
+   "created": 1794190294974,
+   "type": "session.reasoning.delta",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "ordinal": 0,
+    "delta": ". They want a simple, straightforward response without any additional text"
+   }
+  },
+  {
+   "created": 1794190296264,
+   "type": "session.text.started",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "ordinal": 0
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 9,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296273,
+   "type": "session.reasoning.ended",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "ordinal": 0,
+    "text": "Okay, the user just asked me to reply with the single word \"OK\". Let me make sure I understand the request correctly. They want a simple, straightforward response without any additional text or explanation. \n\nFirst, I'll check if there are any specific instructions or context that might affect this. The user mentioned using the tools provided, but in this case, the request is very direct. Since the user is asking for a single word reply, I don't need to use any of the functions or tools listed. \n\nI should also consider if there's a possibility of misunderstanding. The user might be testing if I follow instructions correctly or ensuring that I don't add extra information. My response should strictly be \"OK\" without any punctuation or additional words.\n\nI'll confirm that there are no hidden requirements or hidden steps. The user's message is clear and concise. Therefore, the appropriate response is to type \"OK\" as requested.\n",
+    "native": {
+     "reasoningField": "reasoning"
+    }
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 10,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296275,
+   "type": "session.text.delta",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "ordinal": 0,
+    "delta": "OK"
+   }
+  },
+  {
+   "created": 1794190296275,
+   "type": "session.text.ended",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "ordinal": 0,
+    "text": "OK"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 11,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296276,
+   "type": "session.step.streamed",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 12,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296326,
+   "type": "session.step.ended",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "assistantMessageID": "msg_1be132a32001Rn7a8oE3Tl9HTI",
+    "finish": "stop",
+    "rawFinish": "stop",
+    "tokens": {
+     "input": 4766,
+     "output": 193,
+     "reasoning": 0,
+     "cache": {
+      "read": 4,
+      "write": 0
+     }
+    },
+    "cost": 0,
+    "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+    "files": []
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 13,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296328,
+   "type": "session.usage.updated",
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "cost": 0,
+    "tokens": {
+     "input": 5223,
+     "output": 505,
+     "reasoning": 0,
+     "cache": {
+      "read": 4,
+      "write": 0
+     }
+    }
+   }
+  },
+  {
+   "created": 1794190296330,
+   "type": "session.execution.succeeded",
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 14,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296359,
+   "type": "session.inbox.enqueued",
+   "data": {
+    "inboxID": "msg_1be134526001R6SS4GC6oHqqc5",
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "item": {
+     "type": "compaction",
+     "payload": {},
+     "delivery": "steer"
+    }
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 15,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296360,
+   "type": "session.execution.started",
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 16,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296361,
+   "type": "session.inbox.delivered",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "inboxID": "msg_1be134526001R6SS4GC6oHqqc5"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 17,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190296361,
+   "type": "session.compaction.started",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "reason": "manual",
+    "inputID": "msg_1be134526001R6SS4GC6oHqqc5"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 18,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190299902,
+   "type": "session.compaction.delta",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "text": "<template"
+   }
+  },
+  {
+   "created": 1794190299911,
+   "type": "session.compaction.delta",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "text": ">\n"
+   }
+  },
+  {
+   "created": 1794190299919,
+   "type": "session.compaction.delta",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "text": "##"
+   }
+  },
+  {
+   "created": 1794190300586,
+   "type": "session.usage.updated",
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "cost": 0,
+    "tokens": {
+     "input": 5798,
+     "output": 972,
+     "reasoning": 0,
+     "cache": {
+      "read": 4767,
+      "write": 0
+     }
+    }
+   }
+  },
+  {
+   "created": 1794190300587,
+   "type": "session.compaction.ended",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "reason": "manual",
+    "model": {
+     "id": "qwen3:8b",
+     "providerID": "probe"
+    },
+    "text": "<template>\n## Objective\n- Reply with the single word OK.\n\n## Requirements\n- Summarize the conversation into a structured summary for another agent.\n- Exclude setup details like repository conventions and environment info.\n\n## Work State\n### Completed\n- User requested a summary and the assistant acknowledged with \"OK\".\n\n## Next Move\n1. Generate the structured summary as specified.\n</template>",
+    "tokens": {
+     "input": 575,
+     "output": 467,
+     "reasoning": 0,
+     "cache": {
+      "read": 4763,
+      "write": 0
+     }
+    },
+    "cost": 0
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 20,
+    "version": 1
+   }
+  },
+  {
+   "created": 1794190300588,
+   "type": "session.execution.succeeded",
+   "data": {
+    "sessionID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB"
+   },
+   "durable": {
+    "aggregateID": "ses_e41ecd6c5ffeJS6R4YB1tAYSRB",
+    "seq": 21,
+    "version": 1
+   }
+  }
+ ]
+}

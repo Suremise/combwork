@@ -1,4 +1,5 @@
-import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, CatalogModel, EffortLevel, LaunchedLimits, LaunchedPicker, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, ServerModel, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
+import type { ResolvedGithubHosts } from '../../shared/githubHost'
+import type { AgentInstallInfo, AutoCompactSetting, BackgroundTaskType, HookCause, CatalogModel, EffortLevel, LaunchedLimits, LaunchedPicker, LaunchedSignInHost, McpServerDef, MemorySource, PathDataCopy, PermissionMode, PlanUsage, ProviderId, ProviderUpdateRetry, ReadinessIssue, RetryWait, ServerModel, SessionUsage, SubSession, TranscriptImageRef, TranscriptItem } from '../../shared/types'
 import type { ProviderDescriptor } from '../../shared/providers'
 import type { StartHint } from '../../shared/startFailure'
 import type { SafeguardEvent } from '../../shared/safeguards'
@@ -64,6 +65,12 @@ export interface LaunchContext {
   /** Hook endpoint for this launch, with its run id (…/hook?run=<runId>). */
   hookUrl: string
   /**
+   * The fixed hook URL on Combwork's Agent API port (HI-2777: …/hook, the run told by its token), or null while the Agent
+   * API isn't listening. Claude Code's hooks post here, identical to the admin snippet's, so a session given both runs
+   * each once. It is the launch's CW_HOOK_URL too (hookUrl's server, without the run, when null).
+   */
+  fixedHookUrl?: string | null
+  /**
    * The file holding this launch's hook Authorization header, for hook commands (`curl -H @<file>`): in Combwork's user
    * data, never the project, so no generated file holds the token (#345). HTTP hooks read `CW_HOOK_TOKEN` instead.
    */
@@ -93,6 +100,12 @@ export interface LaunchContext {
    * buildCommand agree when one changes meanwhile; read with launchOverrides. Missing: each read as it is now.
    */
   overrides?: Readonly<Record<string, boolean>>
+  /**
+   * Whether this launch is the whole "as from a terminal" preset (HI-2731's Independent role, or a connection with every
+   * switch off, HI-2670): no guidance, tools or typing, and each override off. Read from the launch policy, never from
+   * what servers it happens to have (HI-2761).
+   */
+  asFromTerminal?: boolean
   /** Tools of the combwork MCP server this launch may use without asking, for providers that can pre-approve tools. */
   trustedCombworkTools?: string[]
   /** The first task, given on the command line so the CLI starts on it (e.g. from the Combwork Assistant). */
@@ -111,6 +124,10 @@ export interface LaunchContext {
   localLimits?: LaunchedLimits | null
   /** The /model lineup the adapter asked for on a server connection (HI-2684), set by prepareLaunch: kept on the session. */
   picker?: LaunchedPicker
+  /** The GitHub hosts the launch signs in on (HI-2779), set by prepareLaunch where the CLI has them: kept on the session. */
+  signInHost?: LaunchedSignInHost
+  /** Its project's GitHub hosts as resolved for this launch (HI-2779), for a CLI with capabilities.githubHost. */
+  githubHosts?: ResolvedGithubHosts
   /** The user lets sessions move into the CLI's own background service (see capabilities.backgroundSessions). */
   allowBackgroundSessions: boolean
   /** A 200K context window instead of the model's 1M one (capabilities.contextLimit). */
@@ -217,6 +234,12 @@ export interface CommandSpec {
 export type KeyStep = { keys: string; waitMs?: number; heldOn?: (screen: string) => boolean } | { pick: (screen: string) => string | null; what: string; waitMs?: number }
 export type KeySteps = KeyStep[]
 
+/** An adoption under way, as a provider takes it over in its own data (ProviderAdapter.adopting, HI-2774). */
+export interface AdoptionHandle {
+  commit(): Promise<void>
+  done(ok: boolean): Promise<void>
+}
+
 export interface ExternalSession {
   id: string
   transcriptPath: string
@@ -286,6 +309,16 @@ export type HookEvent =
   | { kind: 'compactEnd' }
   | { kind: 'end' }
   | { kind: 'ignore' }
+
+/**
+ * A hook's occurrence identity (HI-2777, hookTwins). `unique`: the CLI's id names one event alone (a tool call's id, the
+ * process's start), so a copy of it is a twin whenever it comes; not unique (HI-2850: a prompt_id, which a message
+ * queued into a running turn shares), a copy only while the first delivery's response is open.
+ */
+export interface HookOccurrence {
+  key: string
+  unique: boolean
+}
 
 export interface NormalizedHook {
   event: HookEvent
@@ -431,6 +464,17 @@ export interface SkillRoots {
 }
 
 /**
+ * A hook post that brings a start context into the session (HI-2771): its launch's start. A compaction's end comes as the
+ * normalized compactEnd hooks of its posts, live or recovered by a resync, each compaction once (SessionManager).
+ */
+export type StartContextTrigger = { source: 'start' }
+/**
+ * What putting or removing a start context did (HI-2771): put, removed (or none was there), not sent (no such run or
+ * server, or it was too large to send), refused, or uncertain (sent, then cut off: the server may have taken it).
+ */
+export type StartContextDelivery = 'put' | 'removed' | 'notSent' | 'tooLarge' | 'refused' | 'uncertain'
+
+/**
  * Everything Combwork needs from a coding-agent CLI. One adapter per provider, registered in
  * providers/index.ts; the rest of Combwork never checks which provider it is talking to.
  */
@@ -457,7 +501,19 @@ export interface ProviderAdapter {
   agentRemoved?(agentId: string, workspacePath: string): Promise<void>
   /** An update's exit code that means its installer had nothing newer (HI-2729: WinGet's 0x8A15002B): it ended well. */
   updateUpToDate?(executable: string, exitCode: number): boolean
-  loginCommand(executable: string): CommandSpec
+  /**
+   * The context its catalogue was read in (HI-2779: a CLI signing in on a GitHub host), a key with no secret in it; null
+   * when it has none now. Absent: a CLI whose catalogue doesn't depend on one. A cached catalogue is used only in its own.
+   */
+  catalogContext?(): string | null
+  /**
+   * What a launch on these GitHub hosts would sign in as (HI-2779, capabilities.githubHost), worked out as prepareLaunch
+   * records it: `env` is Combwork's environment, before the hosts are written into it. A change compares it with running
+   * agents' records.
+   */
+  signInHostFor?(hosts: ResolvedGithubHosts, env: Record<string, string>): Promise<LaunchedSignInHost | null>
+  /** The CLI's sign-in; `host`: the GitHub host it signs in on (HI-2779, capabilities.githubHost), else its default. */
+  loginCommand(executable: string, host?: string): CommandSpec
   /**
    * Who a home folder is signed in as (HI-980: an account's folder, given in `env` under the descriptor's
    * `capabilities.connections.homeEnv`), from the CLI's own status: never a token. `ok: false` when it couldn't be told
@@ -486,8 +542,17 @@ export interface ProviderAdapter {
    * descriptor's `typedNewlines`, as Settings → Advanced chooses it; null: a space (as before). Absent: always a space.
    */
   typedNewline?(version: string | null): TypedNewline | null
-  /** A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder). */
-  accountLoginCommand?(executable: string): CommandSpec
+  /**
+   * A connection's sign-in, when it differs from loginCommand (HI-1757: Codex keeps the login in the connection's folder).
+   * `home`: the connection's folder; the spec's `env`, when it has one, is put over the sign-in's environment (HI-2759:
+   * OpenCode's roots and its sign-in config are derived from the folder).
+   */
+  accountLoginCommand?(executable: string, home?: string): CommandSpec
+  /**
+   * A connection's Set Up, when the CLI's own run on the folder (with connectionSetUpArgs) isn't safe for it (HI-2759:
+   * OpenCode's needs its private config and roots, so its Set Up is its sign-in); its `env` is put over the run's.
+   */
+  accountSetUpCommand?(executable: string, home: string): CommandSpec
   /**
    * Environment variables the CLI reads as a login (HI-1757: Codex's CODEX_ACCESS_TOKEN), left out wherever it runs on a
    * connection (its sign-in, its checks, its sessions: withoutAccountEnv), so they can't stand in for the connection's own.
@@ -527,6 +592,8 @@ export interface ProviderAdapter {
   /** Where this launch's CLI reads a delivered Combwork skill (its copy), for measuring what the session got. */
   skillCopyPath(ctx: LaunchContext, skill: string): string
   buildCommand(executable: string, ctx: LaunchContext): CommandSpec
+  /** A new session's id, for a provider Combwork picks it for (capabilities.fixedSessionId) in a form of its own (HI-2759: OpenCode's `ses_…`); absent: a UUID. */
+  newSessionId?(): string
   /** Something the user should know about this launch (a mode the CLI can't fully give there), shown once per agent while Combwork runs. */
   launchNotice?(ctx: LaunchContext): { title: string; message: string } | null
   /** Something in a folder agents work in (any provider's) that stops this CLI working there (#509: a stray .codex), or null. */
@@ -540,6 +607,12 @@ export interface ProviderAdapter {
    * absent) when its title doesn't say: its hooks then tell Combwork (see hookStatus).
    */
   titleAttention?(version: string | null, ctx?: Pick<LaunchContext, 'overrides'>): ((title: string) => boolean) | null
+  /**
+   * For CLIs that write their turn's state to the terminal in an OSC sequence (Copilot's OSC 7501, HI-2802): a test of an
+   * OSC payload whose first group is the state ("working", "done", else idle). Read only while the launch's hooks are
+   * missing, as a status of last resort: it says working and finished, never that a person must act.
+   */
+  terminalTurn?(): RegExp | null
   lockReply(decision: LockDecision): Record<string, unknown>
   /**
    * The reply that puts Combwork's fixed notice text before the model at this hook (#650: the CLI's own event name, as the
@@ -558,6 +631,16 @@ export interface ProviderAdapter {
    * carries it, as for a start.
    */
   readonly startContextAfterCompaction?: 'prompt'
+  /**
+   * A CLI whose start context goes into its session itself, not a hook's reply (HI-2771: OpenCode, whose hooks take no
+   * reply): which of its hook posts brings one (startContextTrigger) and how it is put or removed (deliverStartContext).
+   */
+  startContextTrigger?(body: Record<string, any>): StartContextTrigger | null
+  /**
+   * Puts the start context (text) in the run's session, or removes Combwork's own (null), within signal; never throws.
+   * What it did, as far as it knows: a request the signal cut off after it was sent is 'uncertain', never a success.
+   */
+  deliverStartContext?(runId: string, sessionId: string, text: string | null, signal: AbortSignal): Promise<StartContextDelivery>
   /**
    * Whether the turn a drain carries on comes back to Combwork as a new prompt hook, with the notice as its prompt (Copilot):
    * the turn ledger then takes it as Combwork's own in the running turn, not a new one.
@@ -629,6 +712,17 @@ export interface ProviderAdapter {
    * never changed: the settings' name in the window's language, or null when none does (or Combwork can't tell).
    */
   hooksOffIn?(ctx: LaunchContext): string | null
+  /**
+   * What on the PC would keep Combwork's hooks from the launch's sessions (HI-2777), read once at launch, never changed:
+   * a setting and where it was found, or null when nothing local does. Absent: hooksOffIn alone says.
+   */
+  hookCause?(ctx: LaunchContext): Promise<HookCause | null>
+  /**
+   * A hook's occurrence identity (HI-2777), where the CLI gives one: its own id for one tool call or one prompt, so a
+   * delivery of it that arrives twice (two differing handlers run) is handled once; only a copy, its body the same, is
+   * matched (HI-2850). Null for a hook without one, which is never matched. Absent: no hook is.
+   */
+  hookOccurrence?(body: Record<string, any>): HookOccurrence | null
   /**
    * The launch's hooks for its Hooks dialog (HI-982), once its command is built: Combwork's own as passed for it, and the CLI's
    * others as far as this provider can establish them. Read-only, never changing a hook or a CLI's config. Absent: the
@@ -736,6 +830,15 @@ export interface ProviderAdapter {
    * `mtimeMs`: the file's, from a stat the caller has (HI-1681), so it isn't stat'd again.
    */
   subSessionOf(path: string, sessionId: string, mtimeMs?: number): Promise<SubSession | null>
+  /**
+   * A conversation started outside Combwork is being adopted (sessions.adopt), not a sub-session: for a CLI that resumes
+   * only what Combwork recorded in its own data (OpenCode's mark, HI-2774), that record is made now, or the adoption is
+   * refused with a translated reason (thrown). Resolves with the adoption's handle (null: nothing to do): `commit()` just
+   * before the record is written (throws a translated refusal when it can no longer be, e.g. its account is going away),
+   * and `done(ok)` after (ok: the record was written), which takes back what it made only when no adoption committed.
+   * `folders`: the host's session folders, the only ones a session may have run in.
+   */
+  adopting?(projectPath: string, sessionId: string, transcriptPath: string, folders: string[]): Promise<AdoptionHandle | null>
   /**
    * What the CLI keeps by a folder's path rather than in it (Claude Code: ~/.claude/projects/<path as name>/, its
    * transcripts and auto memory), for a folder that moved (#146). With apply, copied to the new path's name: never moved

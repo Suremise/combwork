@@ -1,0 +1,645 @@
+[
+ {
+  "id": "evt_1bd70a7f9001MpTTWPtOO1NpBD",
+  "type": "server.connected",
+  "data": {}
+ },
+ {
+  "id": "evt_1bd70a8ed001PjS6ODahyb3cuZ",
+  "created": 1794179639533,
+  "type": "session.created",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "slug": "glowing-nebula",
+   "version": "2.2.6",
+   "projectID": "4d35a8790f706e10813b9ec115735309ebfab217",
+   "location": {
+    "directory": "<root>\\project"
+   },
+   "subpath": ""
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 0,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70aae4002fvPAdFkbTWV7oh",
+  "created": 1794179640036,
+  "type": "session.inbox.enqueued",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "inboxID": "msg_1bd70a90b001nW9ymVAzUR2bsh",
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "item": {
+    "type": "user",
+    "payload": {
+     "text": "Reply OK."
+    },
+    "delivery": "steer"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 1,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70aae6001ZuqmQTXSSNNyhD",
+  "created": 1794179640038,
+  "type": "session.execution.started",
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 2,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70aaec00142B7krP9WFIi3f",
+  "created": 1794179640044,
+  "metadata": {
+   "instructions": {
+    "initial": true
+   }
+  },
+  "type": "session.instructions.updated",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "delta": {
+    "core/codemode": "1f1291478accf8b3e4d96a40c150bf844d60557dede4aae56c47ea0043bbdce2",
+    "core/skill-guidance": "8394362d28c82fa4d13c7a9f5568c05680f6687e07db8f426a0e3c92f3027dc9",
+    "core/date": "f5037a79687112a772ccf5ed4b2589caebf713959392bc4d0630977e1a6b4009",
+    "core/environment": "48dfc73e398b2515d89e1dd5fa19617a16f678434d64bc87b84034e95387f94a"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 3,
+   "version": 2
+  }
+ },
+ {
+  "id": "evt_1bd70aaed001VznZA5IOi7FpRX",
+  "created": 1794179640045,
+  "type": "session.inbox.delivered",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "inboxID": "msg_1bd70a90b001nW9ymVAzUR2bsh"
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 4,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70abeb001swi1fLO89fHJSv",
+  "created": 1794179640299,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179640063
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 5,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70abed001V8oqoiC8Llg5e8",
+  "created": 1794179640301,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 2,
+   "at": 1794179642358,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 6,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70b43c0011A2yCH1x1athyK",
+  "created": 1794179642428,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179642368
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 7,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70b43e001vmJWRqapvQJ0ZC",
+  "created": 1794179642430,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 3,
+   "at": 1794179646520,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 8,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70c4700010X99fajHXEAmcb",
+  "created": 1794179646576,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179646528
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 9,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70c4720011E78kTgzVQthSf",
+  "created": 1794179646578,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 4,
+   "at": 1794179654195,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 10,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70e26a0012gwjCoqs7LrEIG",
+  "created": 1794179654250,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179654202
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 11,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd70e26c001AOPyYO6GiR7HTY",
+  "created": 1794179654252,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 5,
+   "at": 1794179663628,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 12,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd710747001lC0cLkLLPOj3Nw",
+  "created": 1794179663687,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179663636
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 13,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7107480011Ziva1N3TyV76C",
+  "created": 1794179663688,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 6,
+   "at": 1794179675401,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 14,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd713542001wx67bh9eb30oxq",
+  "created": 1794179675458,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179675409
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 15,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd713544001VLAvRFCxvaBYKk",
+  "created": 1794179675460,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 7,
+   "at": 1794179687300,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 16,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7163bd001eTbkfOWVt3bybb",
+  "created": 1794179687357,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179687309
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 17,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7163bf0011T2aU0SNqCLfjq",
+  "created": 1794179687359,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 8,
+   "at": 1794179696758,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 18,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7188ad001XWKPLjiKN4akq6",
+  "created": 1794179696813,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179696765
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 19,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd7188ae001s624wI9XSjK4ax",
+  "created": 1794179696814,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 9,
+   "at": 1794179705253,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 20,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd71a9dc00103O9pgCNXEbZpO",
+  "created": 1794179705308,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179705260
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 21,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd71a9de001O5MvcqD7aNDeaa",
+  "created": 1794179705310,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 10,
+   "at": 1794179714869,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 22,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd71cf6c001T47YAixdGznvw5",
+  "created": 1794179714924,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179714875
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 23,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd71cf6e0010whi7xFRGZKEgZ",
+  "created": 1794179714926,
+  "type": "session.retry.scheduled",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "attempt": 11,
+   "at": 1794179725867,
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 24,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd71fa610017Us8FtSgDZrLp8",
+  "created": 1794179725921,
+  "type": "session.step.started",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "agent": "build",
+   "model": {
+    "id": "qwen3:8b",
+    "providerID": "probe"
+   },
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "started": 1794179725874
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 25,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd71fa8f001UqJN6Gw79q2BhW",
+  "created": 1794179725968,
+  "type": "session.step.failed",
+  "location": {
+   "directory": "<root>\\project"
+  },
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "assistantMessageID": "msg_1bd70aaf6001pi5vg3HRl4GMFi",
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   },
+   "snapshot": "f9f4a137eafda739c874d9f1ff5de0924cc85bea",
+   "files": []
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 26,
+   "version": 1
+  }
+ },
+ {
+  "id": "evt_1bd71fa92001ACNDf7IkqhyJCo",
+  "created": 1794179725970,
+  "type": "session.execution.failed",
+  "data": {
+   "sessionID": "ses_e428f579affegLCbzeTnTzOto4",
+   "error": {
+    "type": "provider.transport",
+    "message": "ECONNREFUSED: Unable to connect. Is the computer able to access the url?"
+   }
+  },
+  "durable": {
+   "aggregateID": "ses_e428f579affegLCbzeTnTzOto4",
+   "seq": 27,
+   "version": 1
+  }
+ }
+]

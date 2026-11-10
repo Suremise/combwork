@@ -204,7 +204,7 @@ options through Combwork (`workflow:setOptions`, under the project's lock), neve
 write that lost the agents just added, #1588), and make an agent's watch with its own token (`POST /v1/tasks/wait`), as
 its Combwork tool does, so a model trial gets the same fixture as a fake (#1545).
 
-- **The fakes** (`fake`, the default, `fake-codex`, `fake-copilot` and `fake-antigravity`) act each scenario out with their scripted commands (`skill NAME`, `boardmove`,
+- **The fakes** (`fake`, the default, `fake-codex`, `fake-copilot`, `fake-antigravity` and `fake-opencode`) act each scenario out with their scripted commands (`skill NAME`, `boardmove`,
   `boardreview`, `boardcomment`). It checks the harness itself and the board rules Combwork enforces, at no cost. Checks
   only a model's own work can meet are skipped there (listed as SKIP). `fake-copilot` is the real Copilot CLI, offline,
   in a home of the run's own: a scripted stand-in model (`tests/e2e/fake-copilot-api.cjs`) turns the same commands into
@@ -216,6 +216,11 @@ its Combwork tool does, so a model trial gets the same fixture as a fake (#1545)
   through the profile's Combwork server, `run_command`, `edit_file`) between PreToolUse and PostToolUse and in agy
   1.5.0's transcript, Combwork's notices followed as a model does (`FAKE_AGY_FOLLOW_NOTICES`). A fake run stops before
   any session unless Combwork selected the fake itself, never another copy of the CLI it found (HI-2548).
+  `fake-opencode` (HI-2761) is the fake OpenCode (`tests/e2e/fake-opencode`) through Combwork's OpenCode adapter, on the
+  run's own OpenCode test home: a skill loaded with OpenCode's `skill` tool from the launch's private config folder,
+  Combwork's tools through Code Mode's `execute`. Its runs wait for HI-2760 (`PROVIDER_WAITS` in `fakeScope.cjs`): the
+  harness sees a prompt taken from the agent's status or transcript, which an OpenCode agent doesn't have before it, so
+  every scenario is listed as NOT RUN with that reason until HI-2760 lifts it and records its baseline.
   - **Which fakes run a scenario** (HI-2663, `fakeScope.cjs`): every fake reaches Combwork through the same MCP server,
     so all four run only the scenarios whose script exercises what differs per CLI (skill delivery, launch guidance and
     modes, the shell, lines Combwork types in, hooks, slot and copy folders), and loss of work, crash and settings

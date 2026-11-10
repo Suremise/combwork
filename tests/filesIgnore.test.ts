@@ -32,7 +32,7 @@ vi.mock('../src/main/git', async (original) => {
       if (f) return { out: '', ok: false, buf: Buffer.alloc(0), err: '', code: 128, ...f }
       const r = await real.git(cwd, args, max)
       if (r.code !== 0 && r.code !== 1) realFailures++
-      else if (args.includes('dist/') && !/^dist\/?$/m.test(r.out)) unnamed.push({ code: r.code, ok: r.ok, out: r.out.slice(0, 200), err: r.err.slice(0, 300) })
+      else if (args.includes('dist/') && !/\tdist\/?$/m.test(r.out)) unnamed.push({ code: r.code, ok: r.ok, out: r.out.slice(0, 200), err: r.err.slice(0, 300) })
       return r
     }
   }

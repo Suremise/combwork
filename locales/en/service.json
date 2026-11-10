@@ -283,6 +283,42 @@
     "defaultMessage": "Path leads outside the project (through a link)",
     "description": "An error in the Files tab: a file's path goes through a link (a symbolic link or junction) to somewhere outside the project."
   },
+  "service.filesGit.busy": {
+    "defaultMessage": "Another git command is using the repository. Try again in a moment.",
+    "description": "An error from the Files tab's Git menu: git's index is locked by another git command (an agent's commit, say)."
+  },
+  "service.filesGit.failed": {
+    "defaultMessage": "Git could not do it: {why}",
+    "description": "An error from the Files tab's Git menu. {why} is git's own message (English)."
+  },
+  "service.filesGit.linked": {
+    "defaultMessage": "{file} is a link, or leads outside the repository, so Combwork leaves it alone. Change it by hand.",
+    "description": "An error from the Files tab's Git menu (HI-2743): the ignore file ({file}: .gitignore or .git/info/exclude) is a symbolic link or junction, or its folder leads outside the repository, so Combwork won't write through it."
+  },
+  "service.filesGit.notIgnored": {
+    "defaultMessage": "Git no longer ignores it.",
+    "description": "An error from the Files tab's Git menu: the file isn't ignored any more."
+  },
+  "service.filesGit.notRepo": {
+    "defaultMessage": "This project is not a git repository.",
+    "description": "An error from the Files tab's Git menu (HI-2743): the project folder isn't in a git repository."
+  },
+  "service.filesGit.notUtf8": {
+    "defaultMessage": "{file} is not UTF-8 text, so Combwork leaves it alone.",
+    "description": "An error from the Files tab's Git menu: the ignore file ({file}) isn't UTF-8, so Combwork won't rewrite it."
+  },
+  "service.filesGit.nothing": {
+    "defaultMessage": "Choose a file or folder in the project.",
+    "description": "An error from the Files tab's Git menu: it was given nothing to act on."
+  },
+  "service.filesGit.ruleChanged": {
+    "defaultMessage": "The rule that ignores it has changed. Look again with Why is this ignored?.",
+    "description": "An error from Include again in the Files tab's Git menu: the line it would remove isn't there any more, or it isn't one Combwork can remove. Why is this ignored? is the menu item (files.git.why)."
+  },
+  "service.filesGit.tooLarge": {
+    "defaultMessage": "{file} is too large to show here.",
+    "description": "An error from Why Is This Ignored? in the Files tab's Git menu: the rule's file ({file}) is too large to show in Combwork's viewer."
+  },
   "service.forward.byAssistant": {
     "defaultMessage": "the Assistant",
     "description": "HI-2679: who asked for a forward merge, in its card’s description: the Combwork Assistant."
@@ -780,8 +816,8 @@
     "description": "HI-2556: an error putting a card whose own Merges into is another branch than the lane’s into that lane. {card} is the card’s key (HI-12); {cardTarget} and {target} are branch names."
   },
   "service.lanes.targetFixed": {
-    "defaultMessage": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch.",
-    "description": "HI-2556: an error changing a running lane’s Merges into (fixed for its life). {builder} is the lane’s builder agent, {target} its branch."
+    "defaultMessage": "{builder}’s lane merges into {target} until it ends: start a new lane for another branch. Once {target} has been merged into another branch, a retarget of Work merges into moves the lane and its card there (Also retarget what can move).",
+    "description": "HI-2556, HI-2753: an error changing a running lane’s Merges into (fixed for its life, except through a retarget once its branch has been merged into another). {builder} is the lane’s builder agent, {target} its branch. Work merges into and Also retarget what can move are names in the window (Version Control → Workflow, Save…): as translated there."
   },
   "service.lanes.targetMissing": {
     "defaultMessage": "{unknown, select, yes {Combwork can’t tell whether the branch {target} exists, so the lane wasn’t started.} other {There is no branch {target} in this repository: make it first, then start the lane on it.}}",
@@ -927,6 +963,10 @@
     "defaultMessage": "{task} exited with code {code}",
     "description": "A notification: a coding agent CLI's task ({task}: \"Codex install\") ended with the exit code {code}."
   },
+  "service.providers.unknownHost": {
+    "defaultMessage": "No project uses that GitHub host for {cli} now. Check again, then sign in.",
+    "description": "An error: Provider Setup was asked to sign a coding agent CLI ({cli}: \"GitHub Copilot\") in on a GitHub host none of the open projects uses any more (HI-2779). Check again is the button."
+  },
   "service.slots.notPrepared": {
     "defaultMessage": "Combwork couldn't get {slot} ready for {card}: {why}",
     "description": "A notice: a card was started in a slot (a worktree Combwork lends to a card or a lane), and Combwork couldn't check out the card's branch there or install its dependencies. {slot} is the slot's name (slot-b), {card} the card's key, {why} git's or the setup's reason, in English."
@@ -1023,9 +1063,17 @@
     "defaultMessage": "{card} passed review: the lane waits for it to be merged",
     "description": "A line of a lane's notification: the lane takes one card at a time, and its card (its key, e.g. HI-12) passed review but isn't merged yet, so the next card can't start."
   },
+  "service.workflowNotice.safeguardGuidance": {
+    "defaultMessage": "Check {provider}’s guidance on its safety filter.",
+    "description": "HI-2754: the line after a stalled card's safeguard stop in a lane's notification, for a coding agent ({provider}) with no help of its own about it."
+  },
   "service.workflowNotice.stalled": {
     "defaultMessage": "{card} has stalled",
     "description": "A line of a lane's notification: a card (its key, e.g. HI-12) has stalled: nothing has happened on it for a long time, or its agent stopped."
+  },
+  "service.workflowNotice.stalledSafeguard": {
+    "defaultMessage": "{card} has stalled. {agent}’s latest turn was stopped by {provider}’s safety filter at {time} ({stops, plural, one {# stop} other {# stops}} this session): look at its pane.",
+    "description": "HI-2754: a line of a lane's notification: a card (its key, e.g. HI-12) has stalled, and the agent it waits on ({agent}) is idle because its latest turn was stopped by its coding agent's safety filter ({provider}: Codex, Claude Code) at a time ({time}: \"18:54\", hours and minutes on a 24-hour clock), with how many stops this session. The provider's own help, or safeguardGuidance, follows on the next line."
   },
   "service.workspace.advancedNotHere": {
     "defaultMessage": "{setting} can't be set for a workspace.",

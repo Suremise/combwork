@@ -40,6 +40,20 @@ its installation id). It is skipped when agy isn't installed or signed in, or th
 Close your own agy first: one writing to `~\.gemini` meanwhile fails that check. Every fake agy suite stops before any
 session unless Combwork selected the fake (a fake it can't run must never fall back to the real one).
 
+**The real OpenCode** (`opencodereal`, `needs: ['opencode']`, HI-2763; Darren's HI-2758 option A: no account, key, sign-in
+or cloud call) runs only the pinned build: v2.2.6's `opencode-windows-x64.zip`, unzipped to
+`%LOCALAPPDATA%\combwork-test\opencode-2.2.6` (the zip's SHA-256 `f75c16b3…bb24be`, its `opencode.exe`'s `98cb0aa8…e9677`,
+which the suite checks), never one on the PATH. Its one prompt goes to your local Ollama's `qwen3:8b` through a logging
+proxy the suite starts. The test seam `CW_TEST_OPENCODE_PROVIDER` (dev builds only) makes Combwork's launch config deny
+every provider but that one, and the suite types nothing unless the written config holds that. It is skipped when the
+pinned build or Ollama's `qwen3:8b` isn't there, and fails if your OpenCode folders (`~\.config`, `.local\share`,
+`.local\state`, `.cache` and `%APPDATA%`/`%LOCALAPPDATA%`/`%ProgramData%\opencode`) or the machine-wide service's port
+(28894) changed. `opencodereal` also gives its connection an effort (HI-2767): low for its one prompt, whose requests must carry `reasoning_effort` low, and high on its resume, read back from the session. `opencodereal-dirs` (HI-2772, HI-2775) runs under the same conditions: a reviewer in Build reads and writes in the
+review copies folder unasked, one in Plan is asked to write there and doesn't, and a builder lent no copy is asked for it
+(waiting for the user, OpenCode's external_directory) and, rejected, writes nothing there; any ask is rejected, and a step the model never tries in three prompts makes the run `SKIPPED inconclusive`, never a pass. The fake OpenCode (`fake-opencode/`) is modelled on recordings of the real one only
+(`tests/fixtures/opencode/real-2.2.6`, its README says which); `opencode`, `opencode-assistant`, `opencode-isolation` and
+`opencode-launch` run it, and stop before any session unless Combwork selected it.
+
 A suite passes when it exits cleanly and prints no `FAIL` line. **Environment failures are a SKIP, not a FAIL**, but
 only where it is certain: a real suite marks each step that waits on the CLI answering (a turn) with
 `lib.cliStep(name, { session: <pty key> }, fn)`, and its `check` reports to `lib.checked(ok)`. When a check in such a step

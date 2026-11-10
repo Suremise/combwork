@@ -1,0 +1,159 @@
+$ opencode session export ses_e403fa0feffeN1e5vqozf4owt9 --standalone
+code 0
+--- stdout
+{
+  "info": {
+    "id": "ses_e403fa0feffeN1e5vqozf4owt9",
+    "fork": {
+      "sessionID": "ses_e403ffb46ffeRo33fkB8wbcBeQ",
+      "boundary": {
+        "type": "before",
+        "messageID": "msg_1bfc03761001XFihvp89M3iJ5u"
+      }
+    },
+    "projectID": "3d3d56c1a692effdb53f488b54b58ae0b6a674fc",
+    "cost": 0,
+    "tokens": {
+      "input": 28,
+      "output": 188,
+      "reasoning": 0,
+      "cache": {
+        "read": 4758,
+        "write": 0
+      }
+    },
+    "outcome": "succeeded",
+    "time": {
+      "created": 1794218417921,
+      "updated": 1794218419699,
+      "busy": 1794218417934,
+      "idle": 1794218419701
+    },
+    "title": "Say the word ONE (fork #1)",
+    "location": {
+      "directory": "<root>\\project"
+    }
+  },
+  "messages": [
+    {
+      "id": "msg_1bfc05f01002lc1UqYesUxBW1t_4",
+      "time": {
+        "created": 1794218395166
+      },
+      "text": "Say the word ONE and nothing else.",
+      "type": "user"
+    },
+    {
+      "id": "msg_1bfc05f01002lc1UqYesUxBW1t_7",
+      "time": {
+        "created": 1794218395184,
+        "streamed": 1794218406044,
+        "completed": 1794218406045
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+        "id": "qwen3:8b",
+        "providerID": "probe"
+      },
+      "content": [
+        {
+          "type": "reasoning",
+          "text": "Okay, the user is asking me to say the word \"ONE\" and nothing else. Let me make sure I understand the request correctly. They want a simple response with just the word \"ONE\" in uppercase. \n\nFirst, I need to check if there are any instructions or constraints that might affect this. The user mentioned using the tools provided, but since the task is straightforward and doesn't require any external data or processing, I don't need to call any functions here. The tools listed are for more complex tasks like file operations, searching, or executing commands, which aren't necessary for this request.\n\nI should also consider if there's a possibility of a trick or hidden instruction. The user might be testing if I follow simple commands without overcomplicating. Since the instruction is clear and direct, the best approach is to comply exactly as asked.\n\nNo functions need to be invoked because the task doesn't involve any of the tools mentioned. The response should be plain text with the word \"ONE\" in uppercase. I'll ensure there's no additional text, formatting, or hidden content. Just the single word as specified.\n",
+          "native": {
+            "reasoningField": "reasoning"
+          },
+          "time": {
+            "created": 1794218403961,
+            "completed": 1794218406041
+          }
+        },
+        {
+          "type": "text",
+          "text": "ONE"
+        }
+      ],
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+        "input": 4761,
+        "output": 233,
+        "reasoning": 0,
+        "cache": {
+          "read": 4,
+          "write": 0
+        }
+      }
+    },
+    {
+      "id": "msg_1bfc05f01002lc1UqYesUxBW1t_14",
+      "time": {
+        "created": 1794218406048
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+    },
+    {
+      "id": "msg_1bfc05f0c001dl8blyaWmYmVHL",
+      "time": {
+        "created": 1794218417936
+      },
+      "text": "Say the word FORKED and nothing else.",
+      "type": "user"
+    },
+    {
+      "id": "msg_1bfc05f13001lZ3M4PmYy5yBVO",
+      "time": {
+        "created": 1794218417941,
+        "streamed": 1794218419698,
+        "completed": 1794218419699
+      },
+      "type": "assistant",
+      "agent": "build",
+      "model": {
+        "id": "qwen3:8b",
+        "providerID": "probe"
+      },
+      "content": [
+        {
+          "type": "reasoning",
+          "text": "Okay, the user is asking me to say the word \"FORKED\" and nothing else. Let me check the previous interaction to make sure I understand the context.\n\nIn the history, the user first told me to say \"ONE\", and I complied. Now they're following up with \"FORKED\". Since there's no additional context provided, I should just respond with the exact word they asked for. \n\nI need to ensure that I don't add any extra text or explanation. The user probably wants a straightforward answer. Let me confirm there are no hidden instructions or commands in their query. The query is simple: \"Say the word FORKED and nothing else.\" \n\nSo, the correct response is just \"FORKED\". No need to use any tools here since it's a direct request without any underlying tasks or questions. I'll make sure to follow the instruction precisely.\n",
+          "native": {
+            "reasoningField": "reasoning"
+          },
+          "time": {
+            "created": 1794218418027,
+            "completed": 1794218419696
+          }
+        },
+        {
+          "type": "text",
+          "text": "FORKED"
+        }
+      ],
+      "finish": "stop",
+      "rawFinish": "stop",
+      "cost": 0,
+      "tokens": {
+        "input": 28,
+        "output": 188,
+        "reasoning": 0,
+        "cache": {
+          "read": 4758,
+          "write": 0
+        }
+      }
+    },
+    {
+      "id": "msg_1bfc065f5001xkJ8jhEZTigLeH",
+      "time": {
+        "created": 1794218419701
+      },
+      "type": "idle",
+      "outcome": "succeeded"
+    }
+  ]
+}
+
+--- stderr

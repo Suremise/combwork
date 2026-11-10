@@ -1,0 +1,30 @@
+$ opencode stats
+code 0
+--- stdout
+opencode stats · 2026 so far · all projects
+
+activity
+   Jan  Feb Mar Apr  May Jun Jul  Aug Sep Oct  Nov
+Mo  ············································
+
+Tu  ············································
+
+We  ············································
+
+Th ·············································
+
+Fr ·············································
+
+Sa ·············································
+
+Su ············································█
+
+   less ·░▒▓█ more
+
+3 sessions
+3 prompts · 4 steps · 15.2k tokens
+100.0% tool success · 1 active day · best streak 1 day
+
+opencode.ai
+
+--- stderr

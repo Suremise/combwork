@@ -5,6 +5,7 @@
   "main.accounts.inUse": "{name} 正在使用中：请先停止使用它的智能体并关闭它的登录，然后再删除它。",
   "main.accounts.keyRemoveFailed": "未能删除 {name}：无法删除它的密钥。未做任何更改；点击“删除”可再试一次。",
   "main.accounts.leftover": "{name} 只删除了一部分：请先再删除一次。",
+  "main.accounts.letGoFailed": "未移除 {name}：Combwork 未能及时停止它自己在该文件夹中的工作。未做任何更改；点击“删除”可再试一次。",
   "main.accounts.makeFailed": "无法创建连接的文件夹：{error}",
   "main.accounts.noHome": "{cli} 的文件夹（{folder}）还不存在：请先运行一次 {cli}，然后再添加连接。",
   "main.accounts.noName": "请为连接命名。",

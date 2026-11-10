@@ -16,11 +16,16 @@
 //   top-level field Claude Code doesn't send (cw_test_new_field: true), as a CLI update adding one would (#698). "edit <file>" first sends PreToolUse for
 //   an Edit of that file and records the tool call. "background N" starts a background command that ends after
 //   N seconds; its task notification then starts a turn by itself, as in Claude Code. "subagent N" (once or more)
-//   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "pad N" adds N KB to the
+//   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "subtools N" (a step)
+//   runs a sub-agent in the foreground whose N tool calls carry its agent_id; "queued N" (a step) takes N messages that
+//   came meanwhile into the turn at tool boundaries, each a UserPromptSubmit under the turn's prompt_id, as 2.1.321 does
+//   ("queuedsame N": all one text, taken at one boundary; HI-2850). "pad N" adds N KB to the
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
 //   It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected);
 //   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
-//   its session doesn't start (no SessionStart: Combwork sees it starting) until fake-start-go-<agent> (HI-1707: never ready).
+//   its session doesn't start (no SessionStart: Combwork sees it starting; nothing written, its title included, and no MCP
+//   server connected) until fake-start-go-<agent> (HI-1707: never ready; HI-2816). With fake-start-write-<agent>, it first
+//   writes a line of its start to its transcript.
 //   "holduntil NAME": the turn doesn't end until the test makes a file NAME in its home (CLAUDE_CONFIG_DIR).
 //   "askwhen NAME": the permission prompt once the test makes a file NAME in its home (#667), not after a set time.
 //   "waitfile NAME" as a step ("waitfile go then cw cw_inbox {}"): the steps after it wait for that file.
@@ -395,6 +400,23 @@ function recordSizes(dir, id) {
 recordSizes(home, sessionId)
 const settings = opts['--settings'] ? JSON.parse(fs.readFileSync(opts['--settings'], 'utf8')) : {}
 const hookUrl = settings.hooks?.Stop?.[0]?.hooks?.[0]?.url
+// Its status line posts where Combwork's statusLine command does (its first quoted URL: the launch's, with &statusline).
+const statusUrl = /"(http[^"]+)"/.exec(settings.statusLine?.command ?? '')?.[1] ?? null
+// Managed settings (HI-2777): managed-settings.json in fake-managed in its home (Claude Code's own is in Program Files,
+// which tests never touch; the suite gives Combwork the same folder as CW_TEST_CLAUDE_MANAGED_DIR). With one, hooks run as Claude Code runs them: each event's handlers from the
+// managed settings and (unless allowManagedHooksOnly) the --settings, a handler defined in both once, HTTP ones posted
+// with their allowedEnvVars headers, command ones (and the status line) run with the hook's JSON on stdin; the status
+// line the managed one when it sets one (or allows only managed hooks), else the --settings one.
+const managed = (() => {
+  const dir = home ? path.join(home, 'fake-managed') : null
+  if (!dir) return null
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dir, 'managed-settings.json'), 'utf8'))
+  } catch {
+    return null
+  }
+})()
+const managedOnly = managed?.allowManagedHooksOnly === true
 // HTTP hooks send the launch's token from the environment; command hooks (SessionStart) and the status line run
 // Combwork's curl command, which reads the header from the launch's auth file (#345).
 const token = process.env.CW_HOOK_TOKEN || ''
@@ -496,7 +518,78 @@ const hookFailed = (event, entry) => {
  */
 const hooksOff = () => fs.existsSync(path.join(home, `fake-nohooks-${String(process.env.CW_AGENT || 'agent').replace(/[^\w-]/g, '_')}`))
 
+/**
+ * An event's handlers under managed settings: managed first, then the --settings' unless only managed run; each once, as
+ * Claude Code 2.1.319 matches them (HI-2777's claudemanagedreal): an HTTP handler by its URL (a different timeout is the
+ * same handler), a command one by its command.
+ */
+function handlersFor(event) {
+  const groups = [...(managed?.hooks?.[event] ?? []), ...(managedOnly ? [] : (settings.hooks?.[event] ?? []))]
+  const seen = new Set()
+  const handlers = []
+  for (const g of groups) {
+    for (const h of g?.hooks ?? []) {
+      const k = h.type === 'http' ? `http ${h.url}` : `${h.type} ${h.command ?? JSON.stringify(h)}`
+      if (!seen.has(k)) {
+        seen.add(k)
+        handlers.push(h)
+      }
+    }
+  }
+  return handlers
+}
+
+/** Runs a command handler as Claude Code does: through a shell, the JSON on stdin, its stdout read (as JSON where it is). */
+function runCommand(command, input, seconds) {
+  return new Promise((resolve) => {
+    const child = spawn(command, { shell: true, windowsHide: true, env: process.env })
+    let printed = ''
+    child.stdout.on('data', (c) => (printed += c))
+    child.stderr.resume()
+    const t = setTimeout(() => child.kill(), (seconds || 10) * 1000)
+    child.on('close', (code) => {
+      clearTimeout(t)
+      resolve({ code, out: printed })
+    })
+    child.on('error', () => resolve({ code: -1, out: '' }))
+    child.stdin.end(input)
+  })
+}
+
+/** A handler's headers with $VAR / ${VAR} from the environment, only for its allowedEnvVars (others empty). */
+const headersOf = (h) => Object.fromEntries(Object.entries(h.headers ?? {}).map(([k, v]) => [k, String(v).replace(/\$\{?(\w+)\}?/g, (_, n) => ((h.allowedEnvVars ?? []).includes(n) ? (process.env[n] ?? '') : ''))]))
+
+async function runHandler(event, h, body) {
+  try {
+    if (h.type === 'http') {
+      const res = await fetch(h.url, { method: 'POST', headers: { ...headersOf(h), 'Content-Type': 'application/json' }, body })
+      if (!res.ok) hookFailed(event, { status: res.status, url: h.url })
+      return await res.json().catch(() => null)
+    }
+    if (h.type === 'command') {
+      const r = await runCommand(h.command, body, h.timeout)
+      if (r.code !== 0) hookFailed(event, { exit: r.code })
+      try {
+        return r.out.trim() ? JSON.parse(r.out) : null
+      } catch {
+        return null
+      }
+    }
+  } catch (e) {
+    hookFailed(event, { error: String(e?.cause?.code ?? e?.cause?.message ?? e?.message ?? e) })
+  }
+  return null
+}
+
+/** Each handler run at once, as Claude Code runs them; a deny wins, then the first reply with something in it. */
+async function managedHook(event, body) {
+  const replies = (await Promise.all(handlersFor(event).map((h) => runHandler(event, h, body)))).filter((r) => r && typeof r === 'object')
+  if (home) fs.appendFileSync(path.join(home, 'fake-managed-hooks.jsonl'), JSON.stringify({ agent: String(process.env.CW_AGENT || 'agent'), event, handlers: handlersFor(event).length, replies: replies.length }) + '\n')
+  return replies.find((r) => r.hookSpecificOutput?.permissionDecision === 'deny') ?? replies.find((r) => Object.keys(r).length) ?? null
+}
+
 async function hook(event, extra = {}) {
+  if (managed && !hooksOff()) return managedHook(event, JSON.stringify({ hook_event_name: event, session_id: sessionId, transcript_path: transcript, cwd, permission_mode: runMode(), ...(promptId && event !== 'SessionStart' ? { prompt_id: promptId } : {}), ...extra }))
   if (!hookUrl || hooksOff()) return null
   try {
     const res = await fetch(hookUrl, {
@@ -562,6 +655,45 @@ async function followDoorbell() {
 }
 
 /** A tool call of its own (a Bash), whose PostToolUse reply may carry a notice (#650: "checkpoint" as a step). */
+/**
+ * "queued N": N messages that came while it works (another session's, as HB2's to HB3 on 10 Nov, HI-2850), each taken
+ * into the turn at the next tool boundary as Claude Code 2.1.321 takes one: queued (enqueue), a Bash call, then taken
+ * (remove, a queued_command attachment) with a UserPromptSubmit under the running turn's prompt_id and its own text.
+ * `same` ("queuedsame N"): every message the same text, all taken at one boundary, one after the other with no tool
+ * call between (HR2's case: each submitted once the one before has been answered).
+ */
+async function queuedMessages(n, same) {
+  for (let k = 1; k <= n; k++) {
+    const text = `<cross-session-message from="uds:fake" from-name="fake peer">\n${same ? 'Same again.' : `Message ${k} from a peer.`}\n</cross-session-message>`
+    write({ type: 'queue-operation', operation: 'enqueue', content: text })
+    if (!same || k === 1) await checkpoint()
+    write({ type: 'queue-operation', operation: 'remove', content: text })
+    write({ type: 'attachment', uuid: randomUUID(), attachment: { type: 'queued_command', prompt: text } })
+    await hook('UserPromptSubmit', { prompt: text })
+  }
+}
+
+/**
+ * "subtools N": a sub-agent the Agent tool runs in the foreground, its N tool calls (Read) sending their hooks with its
+ * agent_id and agent_type, as Claude Code 2.1's do, then the Agent call's PostToolUse (HI-2850; SubagentStop isn't one
+ * of Combwork's hooks).
+ */
+async function foregroundSubagent(n) {
+  const id = `toolu_${randomUUID().slice(0, 8)}`
+  const agentId = `a${randomUUID().replace(/-/g, '').slice(0, 16)}`
+  const input = { description: 'Look around', prompt: 'Read the files.', subagent_type: 'general-purpose' }
+  await hook('PreToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
+  write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Agent', input }], usage: { input_tokens: 10, output_tokens: 5 } } })
+  const sub = { agent_id: agentId, agent_type: 'general-purpose' }
+  for (let k = 1; k <= n; k++) {
+    const call = { tool_name: 'Read', tool_input: { file_path: path.join(cwd, 'x.txt') }, tool_use_id: `toolu_${randomUUID().slice(0, 8)}`, ...sub }
+    await hook('PreToolUse', call)
+    await hook('PostToolUse', call)
+  }
+  write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'Looked around.' }] }] } })
+  await hook('PostToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
+}
+
 async function checkpoint() {
   const id = `toolu_${randomUUID().slice(0, 8)}`
   const call = { tool_name: 'Bash', tool_input: { command: 'echo checkpoint' }, tool_use_id: id }
@@ -715,6 +847,10 @@ async function runPrompt(text, enter = null) {
     const call = parseToolStep(step)
     if (call) await ownCall(call.tool, call.args)
     if (/\bcheckpoint\b/i.test(step)) await checkpoint()
+    const queued = /\bqueued(same)?\s+(\d+)/i.exec(step)
+    if (queued) await queuedMessages(Number(queued[2]), !!queued[1])
+    const subtools = /\bsubtools\s+(\d+)/i.exec(step)
+    if (subtools) await foregroundSubagent(Number(subtools[1]))
     if (/\bratelimited\b/i.test(step)) await rateLimited()
     // "shell: <command line>": runs it in cmd with the session's environment (PATH, CW_*), as an agent's shell
     // would; the agent, command, exit code and output go to fake-shell.jsonl in its home.
@@ -767,8 +903,14 @@ async function runPrompt(text, enter = null) {
 
 /** Posts a status line, as Claude Code's statusLine command does (Combwork's curl command, with the launch's auth file). */
 async function statusLine(body) {
-  if (!hookUrl || hooksOff()) return
-  await fetch(`${hookUrl}&statusline`, {
+  if (hooksOff()) return
+  const managedLine = managed && (managedOnly || managed.statusLine) ? managed.statusLine : null
+  if (managed && (managedOnly || managed.statusLine)) {
+    if (managedLine?.type === 'command') await runCommand(managedLine.command, JSON.stringify({ session_id: sessionId, ...body }), 10)
+    return
+  }
+  if (!statusUrl) return
+  await fetch(statusUrl, {
     method: 'POST',
     headers: { Authorization: commandAuth(), 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, ...body })
@@ -1466,6 +1608,10 @@ async function main() {
     process.stdout.write('', () => process.exit(1))
     return
   }
+  // Held (fake-start-hold-<agent>): not started at all until fake-start-go-<agent>, so nothing written to its transcript
+  // meanwhile, its title included (HI-2816). fake-start-write-<agent>: a line of its start written first, held or not.
+  if (take('fake-start-write')) write({ type: 'system', subtype: 'informational', content: 'Session resumed', level: 'info' })
+  if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   // --name: Claude Code keeps it as the session's name (a custom title, as /rename does).
   if (opts['--name']) {
     if (take('fake-title-untimed')) fs.appendFileSync(transcript, JSON.stringify({ type: 'custom-title', customTitle: opts['--name'], sessionId }) + '\n')
@@ -1481,7 +1627,6 @@ async function main() {
       })()
     : null
   void connectOwnServer(server, held)
-  if (take('fake-start-hold')) while (!take('fake-start-go')) await sleep(100)
   await sessionStart(opts['--resume'] ? 'resume' : 'startup')
   promptLine()
   setInterval(() => void whileIdle(), 200)
