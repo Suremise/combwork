@@ -302,6 +302,8 @@ export function jjPort(): JjWorkspacePort {
     },
     // HI-2887 (Darren's r9: automatic): the project folder held against agent launches while its control is made.
     projectHold: (repo) => holdLaunches(repo),
+    // Darren's (a) on HI-2887: a lost control is made again automatically, under the same hold.
+    remakeAllowed: () => true,
     made: (repo, ws) => log.info(`Made jj's control workspace for ${userText(basename(repo))} at ${userText(ws)}: the project folder's working copy recorded once`),
     lock: storeLock,
     trash: async (p) => void (await trash(p)),

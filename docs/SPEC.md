@@ -3056,11 +3056,12 @@ making ends. Logged, and the user guide's jj section says it.
   baseline proves nothing); an empty token folder of its own is removed (`rmdir`, never recursive); anything else, and any
   registration under its name, is kept as a residue the record lists, reported, for the user to remove (the pool's prune
   forgets a residue registration whose folder is gone, from the next control: no snapshot). A first set-up interrupted
-  before it was ever ready is made again; **a control that was ready once and is lost isn't made again automatically**
-  (another snapshot of the project folder): refused, saying why, until the user's decision covers it (asked on HI-2887).
+  before it was ever ready is made again; **a control that was ready once and is lost is made again automatically too**
+  (Darren's (a) on HI-2887, 10 Nov: under the same condition, recording the working copy again); the port refuses it
+  unless its composition allows it (`remakeAllowed`, the app's: true).
 - **Tests:** `tests/jjControl.test.ts` (the real jj, both modes: made with the project folder held open and an uncommitted
   edit recorded into the user's `@`, refused with an agent there; each crash point; a replaced `ws`; a user's file kept;
-  an empty attempt folder removed; a lost control refused, then made again when allowed; two makings at once; a
+  an empty attempt folder removed; a lost control refused without `remakeAllowed`, made again with it; two makings at once; a
   replacement while the lock is awaited), `tests/launchHolds.test.ts`.
 
 ##### jj cards in the runtime, through Review (1.5.0's J9b1, HI-2868)
