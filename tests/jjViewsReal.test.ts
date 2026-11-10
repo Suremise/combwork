@@ -186,7 +186,10 @@ describe.skipIf(!exe)('jj views, compatibility and fallback on the real jj (HI-2
     expect(used.signing).toMatchObject({ uses: ['commit.gpgsign (local)'] })
     // A config value Git applies: core.autocrlf in the repository's config is attributes' too.
     git(r.root, 'config', 'core.autocrlf', 'true')
-    expect((await assessJj(r.root, r.ctx.store, gitDeps)).attributes).toMatchObject({ uses: expect.arrayContaining(['core.autocrlf (local)']) })
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).attributes).toMatchObject({ uses: expect.arrayContaining(['core.autocrlf (local) = true']) })
+    // Turned off at a later level: Git converts nothing, as jj does.
+    git(r.root, 'config', 'core.autocrlf', 'false')
+    expect((await assessJj(r.root, r.ctx.store, gitDeps)).attributes).not.toMatchObject({ uses: expect.arrayContaining([expect.stringContaining('core.autocrlf')]) })
     // Unreadable is "uses it": git itself failing.
     const broken = await assessJj(r.root, r.ctx.store, { ...gitDeps, git: async () => ({ ok: false, out: '', err: 'boom' }) })
     expect(broken.attributes).toMatchObject({ unknown: expect.stringContaining('boom') })

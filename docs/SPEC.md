@@ -2582,9 +2582,9 @@ merges under jj.
   -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
   `.gitattributes`, `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
   without a Windows extension, in `core.hooksPath` or the store's `hooks/`: a `*.sample` and jj's own `docs.url` aren't
-  hooks), `commit.gpgSign` or `tag.gpgSign` true, and jj's `signing.behavior`; anything unreadable is "uses it". Git for
-  Windows' own system config and attributes (`core.autocrlf`, `filter.lfs.*`, `diff=astextplain`) trip attributes and
-  lfs, so a default Windows install is refused until they're off. Back to Git (`fallback`): one head, no conflicted
+  hooks), `commit.gpgSign` or `tag.gpgSign` true, and jj's `signing.behavior`; anything unreadable is "uses it". `core.autocrlf` counts by its effective value (the last level's): false converts nothing, as jj does. Git for
+  Windows' own system config and attributes (`core.autocrlf true`, `filter.lfs.*`, `diff=astextplain`) trip attributes
+  and lfs, so a default Windows install is refused until they're off. Back to Git (`fallback`): one head, no conflicted
   local bookmark, every local bookmark's `@git` and Git branch its commit, no conflicted commit in `::bookmarks()`;
   `.jj` stays. jj → None is a project's own switch (no jj card can be in flight), recorded in its fence membership.
 - **The platform fence** (`platform/platformFence.ts`, `platform/fenceAdmit.ts`): rows in the workspace database's

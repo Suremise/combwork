@@ -59,6 +59,8 @@ export function parseConfig(out: string): ConfigEntry[] | null {
 
 /** A Git boolean that is true (`true`, `yes`, `on`, `1`; a key with no value). */
 const gitTrue = (v: string | null): boolean => v === null || /^(true|yes|on|1)$/i.test(v.trim())
+/** A Git boolean that is false (`false`, `no`, `off`, `0`, an empty value). */
+const gitFalse = (v: string | null): boolean => v !== null && /^(false|no|off|0|)$/i.test(v.trim())
 
 /** Each attribute line of a file naming an attribute jj doesn't apply, as `<file>: <line>` (at most 3), and lfs's. */
 export function attributeUses(text: string, file: string): { uses: string[]; lfs: string[] } {
@@ -118,10 +120,13 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
   const entries = cfg.ok ? parseConfig(cfg.out) : null
   if (!entries) for (const g of REPO_GATES) unknownAt(a, g, `git config: ${cfg.err || 'unreadable'}`) // i18n-ignore: what was found, shown as data beside its message
   let hooksPath: string | null = null
+  let autocrlf: { at: string; value: string | null } | null = null
   let attributesFile: string | null = null
   for (const e of entries ?? []) {
     const at = `${e.key} (${e.scope})`
-    if (e.key === 'core.autocrlf' || e.key === 'core.eol' || /^filter\.[^.]+\.(clean|smudge|process)$/.test(e.key)) {
+    // core.autocrlf as Git applies it: its last value, a later level's winning. False converts nothing, as jj does.
+    if (e.key === 'core.autocrlf') autocrlf = { at, value: e.value }
+    else if (e.key === 'core.eol' || /^filter\.[^.]+\.(clean|smudge|process)$/.test(e.key)) {
       if (e.key.startsWith('filter.lfs.')) add(a, 'lfs', at)
       else add(a, 'attributes', at)
     }
@@ -131,6 +136,7 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
     if (e.key === 'core.hookspath') hooksPath = e.value
     if (e.key === 'core.attributesfile') attributesFile = e.value
   }
+  if (autocrlf && !gitFalse(autocrlf.value)) add(a, 'attributes', `${autocrlf.at} = ${autocrlf.value ?? 'true'}`) // i18n-ignore: what was found, shown as data beside its message
   // Attribute sources: the system's and the global one as Git names them, every tracked .gitattributes, info/attributes.
   const sources: string[] = []
   for (const v of ['GIT_ATTR_SYSTEM', 'GIT_ATTR_GLOBAL']) {

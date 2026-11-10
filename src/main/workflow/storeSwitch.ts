@@ -125,7 +125,8 @@ async function groupOf(ws: WorkspaceService, path: string): Promise<Group | null
 /** Another open workspace with a project on the store: its admissions can't be fenced from here (s17). */
 async function otherWorkspaceOn(ws: WorkspaceService, store: string): Promise<string | null> {
   for (const other of openWorkspaces()) {
-    if (other === ws || !other.path) continue
+    // The same workspace (a window's service and the one IPC hands over are the same folder): never "another".
+    if (other === ws || !other.path || (ws.path && other.path.toLowerCase() === ws.path.toLowerCase())) continue
     for (const p of other.info()?.projects ?? []) if ((await storeOf(p.path)) === store) return basename(other.path)
   }
   return null
