@@ -328,8 +328,18 @@ export class JjPlatform implements PlatformAdapter {
     // A card not started yet (HI-2887, HB6's proof): its start itself makes jj workspaces (the control's, its slot's),
     // each a jj operation, so the single head moves under it. Leaving the head out here, only that start's own move
     // gathers it once more (its slot now there, nothing made again); a target that moved is read afresh by that pass.
-    const todo = (primed as Primed | null)?.view === null
-    return (todo ? parts.filter((x) => !x.startsWith('head:')) : parts).join('|')
+    const p = primed as Primed | null
+    if (p?.view === null) return parts.filter((x) => !x.startsWith('head:')).join('|')
+    // A started card (HI-2890): any jj operation moves the single head, another workspace's or a read's snapshot in the
+    // slot as much as the card's own work. The answer by content names the slot's own head in its place, read pinned
+    // (no snapshot): an operation that leaves the slot's working copy and its head as they were gathers the intent
+    // again once; a new commit or recorded edit in the slot changes it and still refuses. The rest stays (the
+    // workspace, a colocated Git state, the generation, the binding, the lease, the target).
+    const i = parts.findIndex((x) => x === 'jj')
+    if (i < 0 || !p?.folder) return null
+    const at = await this.headOf(p.folder)
+    if (isUnknown(at)) return null
+    return [...parts.slice(0, i + 1), `at:${at.at.commit}:${at.head}`, ...parts.slice(i + 2)].join('|')
   }
 
   /** The slot's head as J2 reads it, pinned: `@-` when `@` is empty with one parent, else `@`. */
