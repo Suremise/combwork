@@ -79,7 +79,14 @@ const homeAgent = () => JSON.parse(fs.readFileSync(path.join(assistantHome, '.co
     await shots('codex-on')
     await page.locator('.assistant-panel .assistant-idle .act-start').click()
     const launched = await lib.until(() => lines(path.join(accountsRoot, work.id, 'fake-launches.jsonl')).find(inHome) ?? null, HUNG_MS)
-    check('Start Assistant launches it on the fake Codex, in the Work connection’s folder', !!launched && launched.home === path.join(accountsRoot, work.id), JSON.stringify(launched))
+    let notes = []
+    if (!launched) {
+      await page.locator('.activity-btn.unread').click().catch(() => undefined)
+      notes = await page.locator('.notif-panel .notif-item').allInnerTexts().catch(() => [])
+      await page.screenshot({ path: path.join(lib.WORK, 'assistantcodex-after-start.png') })
+    }
+    const why = launched ? '' : JSON.stringify({ notes, toasts: await page.locator('.toast').allInnerTexts().catch(() => []), log: lib.combworkLogLines(userData).filter((l) => /assistant|refus|start|codex|connection/i.test(l)).slice(-25) })
+    check('Start Assistant launches it on the fake Codex, in the Work connection’s folder', !!launched && launched.home === path.join(accountsRoot, work.id), JSON.stringify(launched) + why)
     const live = await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === 'assistant' && s.status !== 'stopped') ?? null, HUNG_MS)
     check('…running as Codex', live?.provider === 'codex', JSON.stringify(live && { provider: live.provider, launchedConnection: live.launchedConnection }))
     check('…and nothing launched on Claude Code', !lines(path.join(claudeHome, 'fake-launches.jsonl')).some(inHome))
