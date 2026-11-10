@@ -10,6 +10,7 @@ import { git } from '../git'
 import { again, isAgain } from './again'
 import { commitEnv, commitFailed, configRead, joined, readCommitStream } from './gitCommits'
 import * as G from './git'
+import { CANDIDATE_TEXT } from './candidateText'
 import type { Again, CandidateHost, CandidatePause, CandidateTestFail, IntegrationPort, QueueGitOptions, RecoveryFound } from './integration'
 import { shellLine, type QueueCommand, type QueueFileSide, type QueueStuck } from '../../shared/workflow/queue'
 import { isUnknown, type Unknown } from './types'
@@ -18,9 +19,6 @@ import { agentMsg, say } from '../../shared/agentText'
 
 // The card's log when its candidate isn't what was reviewed (agent-facing: the builder reads it on the card).
 const NOT_SAME = agentMsg({ id: 'queue.candidate.notSame', text: "{card}: {revision} brought up to date with {target} ({expected}) isn't the same change as reviewed: bring it up to date yourself and submit it again.", note: "A card's log from the merge queue (strict, G8): the reviewed revision, brought up to date with the target in the queue's worktree, isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids; target: the branch." })
-const NOT_ON_TOP = agentMsg({ id: 'queue.candidate.notOnTop', text: "{card}: {revision} rebased onto {expected} isn't on top of the target: rebase it onto the target yourself and submit it again.", note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision doesn't sit on the target's head, so the card goes back. card: its key; revision and expected: short commit ids." })
-const MERGE_COMMIT = agentMsg({ id: 'queue.candidate.mergeCommit', text: '{card}: {revision} rebased onto {expected} would land a merge commit (Rebase and fast-forward lands a linear history): rebase it onto the target yourself and submit it again.', note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision would add a merge commit to the target, so the card goes back. card: its key; revision and expected: short commit ids." })
-const REBASED_NOT_SAME = agentMsg({ id: 'queue.candidate.rebasedNotSame', text: "{card}: {revision} rebased onto {expected} isn't the same change as reviewed: rebase it onto the target yourself and submit it again.", note: "A card's log from the merge queue (Rebase and fast-forward): the rebased revision isn't the same change as was reviewed, so the card goes back. card: its key; revision and expected: short commit ids." })
 
 /**
  * The conflicted files `diff --name-only -z` lists, as they are named (HR4's HI-1181 round 1): split on NUL, never on
@@ -512,14 +510,14 @@ async function rebaseOnto(h: CandidateHost, c: { card: string; revision: string;
     if (isUnknown(head)) return again(gitSaid(head))
     result = head
   }
-  const notUp = (m: typeof NOT_ON_TOP | typeof MERGE_COMMIT | typeof REBASED_NOT_SAME): CandidateTestFail => ({ fail: 'notUpToDate', log: say(m, { card: c.card, revision: revision.slice(0, 7), expected: expected.slice(0, 7) }) })
+  const notUp = (m: (typeof CANDIDATE_TEXT)[keyof typeof CANDIDATE_TEXT]): CandidateTestFail => ({ fail: 'notUpToDate', log: say(m, { card: c.card, revision: revision.slice(0, 7), expected: expected.slice(0, 7) }) })
   const anc = await h.run(h.project, ['merge-base', '--is-ancestor', expected, result])
-  if (anc.code === 1) return notUp(NOT_ON_TOP)
+  if (anc.code === 1) return notUp(CANDIDATE_TEXT.notOnTop)
   if (anc.code !== 0) return again(anc.err)
   const twoParents = await h.run(h.project, ['rev-list', '--min-parents=2', `${expected}..${result}`])
   if (!twoParents.ok) return again(twoParents.err)
-  if (twoParents.out.trim()) return notUp(MERGE_COMMIT)
-  if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: result }))) return notUp(REBASED_NOT_SAME)
+  if (twoParents.out.trim()) return notUp(CANDIDATE_TEXT.mergeCommit)
+  if (!(await G.sameChange(h.project, { base, revision, key: c.key }, { base: expected, revision: result }))) return notUp(CANDIDATE_TEXT.rebasedNotSame)
   await h.run(h.project, ['update-ref', `refs/cw/queue/${refSafe(c.card)}`, result])
   return { result }
 }
