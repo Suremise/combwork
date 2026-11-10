@@ -395,7 +395,8 @@
     "text": "end lane {lane}"
   },
   "api.change.forward": {
-    "text": "bring {to} up to date with {from} in {project}"
+    "text": "bring {to} up to date with {from} in {project}{override, select, yes {, with the user’s override of the release path’s direction} other {}}",
+    "note": "HI-2892: override yes when the request overrides the release path’s direction (the user’s explicit choice)."
   },
   "api.change.forwardAny": {
     "text": "bring a branch up to date with another"
@@ -1107,6 +1108,10 @@
   },
   "api.queue.notAgents": {
     "text": "Project agents can't {what}: the merge queue's controls are the user's, and the Assistant's within Settings → Assistant → Control. Tell the user if it should be done."
+  },
+  "api.queue.overrideArg": {
+    "text": "override is true or left out: only the JSON boolean true, when the user explicitly asked for this merge against the release path’s direction",
+    "note": "HI-2892: POST /v1/queue/forward with an override that isn’t the boolean true."
   },
   "api.queue.projectRequired": {
     "text": "project is required"

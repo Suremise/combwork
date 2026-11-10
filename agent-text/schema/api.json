@@ -536,7 +536,8 @@
     "placeholders": {
       "to": "plain",
       "from": "plain",
-      "project": "plain"
+      "project": "plain",
+      "override": "select"
     }
   },
   "api.change.forwardAny": {
@@ -1585,6 +1586,9 @@
     "placeholders": {
       "what": "plain"
     }
+  },
+  "api.queue.overrideArg": {
+    "placeholders": {}
   },
   "api.queue.projectRequired": {
     "placeholders": {}

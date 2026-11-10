@@ -53,6 +53,8 @@ const Q = {
   hook: agentMsg({ id: 'queue.failure.hook', text: 'a git hook refused its merge commit', note: 'What came back: a git hook refused the merge commit.' }),
   targetMoved: agentMsg({ id: 'queue.failure.targetMoved', text: '{target} moved while it was being merged', note: 'What came back: its target branch moved during the merge.' }),
   pushRefused: agentMsg({ id: 'queue.failure.pushRefused', text: 'publishing it to {target}’s remote was refused (a pre-push hook or the remote); it is tested again after Resume', note: 'What came back (HI-1183, follow mode): the project’s pre-push hook or the remote refused the push of the merge; nothing was published.' }),
+  direction: agentMsg({ id: 'queue.failure.direction', text: 'a forward merge into {target} against the release path’s direction (into an older version or the default branch, or two branches Combwork can’t order), its request with no override; nothing merged', note: 'What came back (HI-2892): a forward merge card the queue refused to merge, against the release path’s direction.' }),
+  nextDirection: agentMsg({ id: 'queue.next.direction', text: 'Leave it to the user or the Assistant: Remove from queue ends it (Retry is refused); only a new request with the user’s explicit override merges it.', note: 'The next step after a forward merge came back against the release path’s direction (HI-2892).' }),
   notPublished: agentMsg({ id: 'queue.failure.notPublished', text: 'the user said its publication to {target}’s remote didn’t happen; it is tested again', note: 'What came back (HI-1183, follow mode): an unknown publication the user said wasn’t published.' }),
   folderBusy: agentMsg({ id: 'queue.failure.folderBusy', text: 'the folder {target} is checked out in was busy', note: 'What came back: the folder its target branch is checked out in was busy.' }),
   notUpToDate: agentMsg({ id: 'queue.failure.notUpToDate', text: "it isn't up to date with {target}", note: 'What came back: under Strict, the card isn\'t up to date with its target.' }),
@@ -344,6 +346,8 @@ function failureText(f: FactData['IntegrationFailed'], room: number): string {
       return say(Q.pushRefused, { target: f.target })
     case 'notPublished':
       return say(Q.notPublished, { target: f.target })
+    case 'direction':
+      return say(Q.direction, { target: f.target })
     case 'folderBusy':
       return say(Q.folderBusy, { target: f.target })
     case 'notUpToDate': {
@@ -372,6 +376,7 @@ function nextStep(f: FactData['IntegrationFailed']): string {
     if (f.focused?.why === 'noRunner') return say(Q.nextRunner)
     return say(Q.nextRepick)
   }
+  if (f.reason === 'direction') return say(Q.nextDirection)
   if (f.transient) return say(Q.nextTransient)
   if (f.reason === 'conflict') return say(Q.nextConflict, { target: f.target })
   return say(Q.nextFix)

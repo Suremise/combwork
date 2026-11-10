@@ -17,7 +17,8 @@ import { fmt, msg, tr } from '../../shared/i18n'
 import { withValues } from '../../shared/advanced'
 import { forwardOf } from '../../shared/workflow/compile'
 import { merges } from '../../shared/platform/descriptors'
-import { branchExists, forwardSources, projectTargets } from './targets'
+import { branchExists, defaultBranch, forwardSources, projectTargets } from './targets'
+import { forwardDirection, forwardPermitted, type ForwardDirection, type ForwardOverride } from '../../shared/workflow/forwardOrder'
 import { isRefusal } from './runtime'
 import { basename, join } from 'path'
 import { existsSync } from 'original-fs'
@@ -129,8 +130,14 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
   const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
+  // HI-2892: only those in the release path's direction into it: none offered, none counted, against it.
   const sources = targets.length ? await forwardSources(ws, projectPath, targets) : []
-  if (sources.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, sources)
+  const main = sources.length > 1 ? await defaultBranch(ws, projectPath) : null
+  for (const v of views) {
+    if (!targets.includes(v.target)) continue
+    const f = await forwardOfTarget(projectPath, v.target, sources.filter((b) => b !== v.target && forwardDirection(b, v.target, main).dir === 'forward'))
+    if (f.others.length) v.forward = f
+  }
   return views
 }
 
@@ -143,7 +150,7 @@ async function existingTargets(ws: WorkspaceService, projectPath: string): Promi
   return out
 }
 
-/** A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources), and how far behind each it is. */
+/** A target's forward merges (HI-2679): the other branches it may be brought up to date with (forwardSources, HI-2892: in the release path's direction), and how far behind each it is. */
 async function forwardOfTarget(projectPath: string, to: string, sources: readonly string[]): Promise<QueueForward> {
   const others = sources.filter((b) => b !== to)
   const behind: QueueForward['behind'] = []
@@ -418,7 +425,8 @@ export async function mergedOutsideQueue(ws: WorkspaceService, projectPath: stri
  * with its reason: the card's intent (cardIntents.ts), then its target's queue told of it (Retry's requeue runs it).
  */
 export async function queueCardChange(ws: WorkspaceService, n: number, actor: TaskActor, kind: 'removeFromQueue' | 'retryMerge', reason: string, guard?: () => void): Promise<{ done: IntentDone; card: TaskCard }> {
-  // A forward merge's Retry (HI-2679): its source frozen again, at its head now, for the new attempt.
+  // A forward merge's Retry (HI-2679): its source frozen again, at its head now, for the new attempt; HI-2892: refused
+  // against the release path's direction, unless its own request recorded the user's override.
   const forward = kind === 'retryMerge' ? await forwardSourceNow(ws, n) : null
   const r = await runCardIntent({ n, plain: false }, actor, { kind, reason, ...(guard ? { guard } : {}), ...(forward ? { forward } : {}) })
   const projectPath = ws.path && r.card.project ? join(ws.path, r.card.project) : null
@@ -428,13 +436,18 @@ export async function queueCardChange(ws: WorkspaceService, n: number, actor: Ta
   return r
 }
 
-/** A forward merge card's source head now (HI-2679), for its Retry; null for any other card, or one that can't be read. */
+/**
+ * A forward merge card's source head now (HI-2679), for its Retry; null for any other card, or one that can't be read.
+ * HI-2892: throws ForwardRefused for one against the release path's direction with no override recorded.
+ */
 async function forwardSourceNow(ws: WorkspaceService, n: number): Promise<{ source: string } | null> {
   for (const p of ws.info()?.projects ?? []) {
     const wf = await workflowFor(ws, p.path).catch(() => null)
     const rec = wf?.store.cards().find((c) => c.id === n)
     const f = rec ? wf!.state(rec).forward : null
     if (!f) continue
+    const d = forwardDirection(f.from, f.to, await defaultBranch(ws, p.path))
+    if (!forwardPermitted(d, f.override)) throw new ForwardRefused(withValues(FORWARD_TEXT.directionRetry, { card: rec!.key, from: f.from, to: f.to, ...directionValues(d) }), { kind: 'invalid' })
     const head = await lineHistory().lineHead(p.path, f.from)
     return head && !isUnknown(head) ? { source: head } : null
   }
@@ -455,6 +468,9 @@ const FORWARD_TEXT = {
   notTargets: msg({ id: 'service.forward.notTargets', defaultMessage: '{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.', description: 'HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch.' }),
   missing: msg({ id: 'service.forward.missing', defaultMessage: '{unknown, select, yes {Combwork can’t read the branch {branch}, so nothing was queued.} other {There is no branch {branch} in this repository, so nothing was queued.}}', description: 'HI-2679: a forward merge refused: one of its branches doesn’t exist (or git couldn’t say). Keep the select keys.' }),
   raced: msg({ id: 'service.forward.raced', defaultMessage: 'The forward merge’s card changed while it was being queued, so nothing more was done: look at the card, then ask again if needed.', description: 'HI-2679: a forward merge whose new card was changed (started, moved) before it could be queued; rare.' }),
+  direction: msg({ id: 'service.forward.direction', defaultMessage: '{to} isn’t brought up to date with {from}: {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Nothing was queued. {dir, select, backward {Bring {from} up to date with {to} instead, or, if you mean it, ask the Assistant with your explicit override.} other {If you mean it, ask the Assistant with your explicit override.}}', description: 'HI-2892: a forward merge refused: it would bring branch {to} up to date with branch {from} against the release path’s direction (forward merges go from a release, or main, into the next version). {why} says why (select: translate each; keep the keys): {to} is an older version, {to} is the repository’s default branch (main), the two names are the same version, or Combwork can’t order them. {dir}: backward (the reverse is the right way) or other. Branch names stay as they are.' }),
+  directionRetry: msg({ id: 'service.forward.directionRetry', defaultMessage: '{card} isn’t merged again: its request recorded no override, and {why, select, older {{to} is an older version than {from}, and forward merges go from a release into the next version} default {{to} is the repository’s default branch, which a release reaches through its pull request} sameVersion {{from} and {to} name the same version, so which comes first can’t be told} other {Combwork can’t tell which of {from} and {to} comes first on the release path}}. Remove it from the queue; to merge it anyway, ask the Assistant with your explicit override.', description: 'HI-2892: Retry merge refused on a forward-merge card ({card}: its key, such as HI-12) that brings branch {to} up to date with branch {from} against the release path’s direction, its request made without the user’s override. {why} as in the refused request (select: translate each; keep the keys). Remove from queue is the card’s command: as translated there.' }),
+  openNoOverride: msg({ id: 'service.forward.openNoOverride', defaultMessage: '{card} is bringing {to} up to date with {from} already, without an override, so the override wasn’t applied to it: remove it from the queue first, then ask again.', description: 'HI-2892: a forward merge asked with the user’s explicit override while a card ({card}: its key) for the same pair of branches ({from} into {to}) is open already, made without one: nothing changed.' }),
   noGit: msg({ id: 'service.forward.noGit', defaultMessage: 'This project merges no work through Combwork’s merge queue, so it has nothing to bring up to date.', description: 'HI-2679: a forward merge asked of a project that isn’t a Git project merging through the queue.' })
 }
 
@@ -464,8 +480,10 @@ const FORWARD_TEXT = {
  * of them or the repository's default branch (HI-2885: main into the next version, after a release).
  * Already contained: nothing is made. One open for the pair already: that card. Else a card of Combwork's, started on its
  * forward rules (`forwardOf`) and queued in `to`'s queue with `from`'s head frozen.
+ * HI-2892: only in the release path's direction (forwardOrder.ts), unless `override` (the user's explicit choice, through
+ * the Agent API alone), recorded in the card's request; an open card without one is never given it.
  */
-export async function forwardMerge(ws: WorkspaceService, projectPath: string, from: string, to: string, actor: TaskActor, guard?: () => void): Promise<ForwardDone> {
+export async function forwardMerge(ws: WorkspaceService, projectPath: string, from: string, to: string, actor: TaskActor, guard?: () => void, opts: { override?: boolean } = {}): Promise<ForwardDone> {
   if (actor.kind !== 'user' && actor.kind !== 'assistant') throw new ForwardRefused(M_FORWARD_AGENTS, { kind: 'forbidden' })
   const t = await projectTargets(ws, projectPath)
   const wf = await workflowFor(ws, projectPath)
@@ -474,6 +492,10 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   // HI-2885: from one of them or the repository's default branch (main, after a release), into one of them.
   const sources = await forwardSources(ws, projectPath, all)
   if (from === to || !sources.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, sources: fmt.list(sources), targets: fmt.list(all) }), { kind: 'invalid' })
+  // HI-2892: the release path's direction, or the user's explicit override (bypassing the direction alone).
+  const d = forwardDirection(from, to, await defaultBranch(ws, projectPath))
+  if (d.dir !== 'forward' && opts.override !== true) throw new ForwardRefused(withValues(FORWARD_TEXT.direction, { from, to, ...directionValues(d) }), { kind: 'invalid' })
+  const override: ForwardOverride | undefined = d.dir !== 'forward' ? { by: actor.kind === 'assistant' ? 'assistant' : 'user', dir: d.dir, why: d.why } : undefined
   // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
   const [source, dest] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]
   for (const [branch, h] of [[from, source], [to, dest]] as const) if (!h || isUnknown(h)) throw new ForwardRefused(withValues(FORWARD_TEXT.missing, { branch, unknown: isUnknown(h) ? 'yes' : 'no' }), { kind: 'conflict' }) // i18n-ignore: select keys
@@ -491,12 +513,13 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
       const st = wf.state(c)
       return !!st.forward && st.forward.from === from && st.forward.to === to && st.stage !== 'done'
     })
+    if (open && override && !wf.state(open).forward?.override) throw new ForwardRefused(withValues(FORWARD_TEXT.openNoOverride, { card: open.key, from, to }), { kind: 'conflict' })
     if (open) return { card: await readTask(open.id, { kind: 'user' }), queued: false, from, to }
     guard?.()
     const made = await createTask({ title: tr(FORWARD_TEXT.title, { from, to }), description: tr(FORWARD_TEXT.description, { from, to, source: (source as string).slice(0, 12), by: tr(by === 'user' ? FORWARD_TEXT.byUser : FORWARD_TEXT.byAssistant) }), project: basename(projectPath), labels: ['forward'] }, actor, { ...(guard ? { commit: guard } : {}) })
     // Stored by the start's own write, which records it.
     const ruleset = forwardOf(wf.currentRuleset(false), to)
-    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string) }, by, ruleset, guard), undefined, guard)
+    const r = await runIntent(wf, made.number, actor, (x) => x.forwardStart(made.number, { from, to, source: source as string, base: base && !isUnknown(base) ? base : (dest as string), ...(override ? { override } : {}) }, by, ruleset, guard), undefined, guard)
     // Refused (only in a race): thrown, so the card made just now goes with the rest of this change.
     if (isRefusal(r.reply)) throw new ForwardRefused(FORWARD_TEXT.raced, { kind: 'conflict' })
     return { card: r.saved ?? made, queued: true, from, to }
@@ -504,6 +527,9 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   if ('card' in done && done.queued) queueChanged(ws, projectPath, to)
   return done
 }
+
+/** A direction's values for its refusals (HI-2892): why, and whether the reverse is the release path's way. */
+const directionValues = (d: ForwardDirection): { why: string; dir: string } => (d.dir === 'forward' ? { why: 'other', dir: 'other' } : { why: d.why, dir: d.dir === 'backward' ? 'backward' : 'other' }) // i18n-ignore: select keys
 
 /** HI-2679: a forward merge asked by a project agent (or a script): the user's and the Assistant's alone. */
 const M_FORWARD_AGENTS = msg({ id: 'service.forward.notAgents', defaultMessage: 'Only the user or the Assistant brings one branch up to date with another.', description: 'HI-2679: a forward merge refused: asked by a project agent or a script.' })

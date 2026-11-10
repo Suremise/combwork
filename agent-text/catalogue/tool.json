@@ -453,6 +453,10 @@
   "tool.queue.arg.items": {
     "text": "retarget: the card keys, lane names and slot names to move, from the preview named."
   },
+  "tool.queue.arg.override": {
+    "text": "forward: true only when the user explicitly asked for this merge against the release path (into an older version or main, or an unordered pair); recorded on its card.",
+    "note": "HI-2892."
+  },
   "tool.queue.arg.preview": {
     "text": "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing."
   },

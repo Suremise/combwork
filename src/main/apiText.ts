@@ -145,7 +145,7 @@ export const API = {
     nextVersion: agentMsg({ id: 'api.change.nextVersion', text: 'start the next version of {project}', note: 'HI-2807: cw_branch nextVersion.' }),
     retargetAny: agentMsg({ id: 'api.change.retargetAny', text: "move cards and slots to a project's new target" }),
     retarget: agentMsg({ id: 'api.change.retarget', text: 'move cards and slots from {from} to {to} in {project}' }),
-    forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}' }),
+    forward: agentMsg({ id: 'api.change.forward', text: 'bring {to} up to date with {from} in {project}{override, select, yes {, with the user’s override of the release path’s direction} other {}}', note: 'HI-2892: override yes when the request overrides the release path’s direction (the user’s explicit choice).' }),
     pauseQueue: agentMsg({ id: 'api.change.pauseQueue', text: 'pause the merge queue of {project}' }),
     pauseTeam: agentMsg({ id: 'api.change.pauseTeam', text: 'pause the team' }),
     planTemplate: agentMsg({ id: 'api.change.planTemplate', text: 'plan loading a template' }),
@@ -404,6 +404,7 @@ export const API = {
     retargetArgs: agentMsg({ id: 'api.queue.retargetArgs', text: "Give preview and items (the preview id and the cards and slots to move, as the target change's reply listed them), or from and to alone for a new preview (the finished target and the new one)" }),
     retargetGone: agentMsg({ id: 'api.queue.retargetGone', text: "Preview {preview} isn't known any more (each is kept for a day, until Combwork restarts): ask for a new one with from and to, and show it to the user again" }),
     branchArgs: agentMsg({ id: 'api.queue.branchArgs', text: 'name and from are required: the new branch and where it starts (a branch, a tag or a commit)', note: 'HI-2807: cw_branch create without them.' }),
+    overrideArg: agentMsg({ id: 'api.queue.overrideArg', text: 'override is true or left out: only the JSON boolean true, when the user explicitly asked for this merge against the release path’s direction', note: 'HI-2892: POST /v1/queue/forward with an override that isn’t the boolean true.' }),
     forwardArgs: agentMsg({ id: 'api.queue.forwardArgs', text: "from and to are required: the branch to bring in (one of the project's targets, or the repository's default branch) and the one to bring up to date (one of its targets)" }),
     targetRequired: agentMsg({ id: 'api.queue.targetRequired', text: 'target is required: the branch the queue merges into{listed, select, yes { ({targets})} other {}}' })
   },

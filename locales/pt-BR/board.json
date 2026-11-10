@@ -739,7 +739,7 @@
   "board.queue.removeTitle": "Remover {card} da fila de merge?",
   "board.queue.resume": "Retomar a fila",
   "board.queue.resumeFailed": "Não foi possível retomar a fila de merge",
-  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {conflito} other {conflito em {files}}}} checks {{check, select, none {verificações falharam} other {verificações falharam: {check}}}} hook {um hook falhou} folderBusy {a pasta em que {target} está em checkout estava ocupada} notUpToDate {não está atualizado com {target}} focused {seus testes específicos não puderam ser escolhidos ou comprovados} other {{why}}}",
+  "board.queue.returnWhy": "{reason, select, conflict {{files, select, none {conflito} other {conflito em {files}}}} checks {{check, select, none {verificações falharam} other {verificações falharam: {check}}}} hook {um hook falhou} folderBusy {a pasta em que {target} está em checkout estava ocupada} notUpToDate {não está atualizado com {target}} focused {seus testes específicos não puderam ser escolhidos ou comprovados} direction {na contramão das versões, sem exceção} other {{why}}}",
   "board.queue.returned": "{card} devolvido: {why}",
   "board.queue.returnedTo": "{card} devolvido ao executor {builder}: {why}",
   "board.queue.runBy": "Executada pelo perfil {profile}",
