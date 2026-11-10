@@ -4505,14 +4505,18 @@ async function team(c) {
  * A lane registered as its builder (`key`) registers its own (cw_lane start, with its own token), which starts nobody:
  * a lane a script records starts its stopped agents on its brief (HI-1900, HI-1934), and the scenarios start them
  * themselves. So the builder is started for its token, registers its lane, and is stopped again (HI-1939). Its reply.
+ * `keepRunning`: left running instead, as a builder that registers its own lane is, for Combwork to start the lane's
+ * first card on (combworkStartedLaneCard). The stop here is the user's Stop, and since HI-2815 Combwork starts no lane
+ * card on a builder someone stopped (HI-2819, found by 1.3.0-rc.2's scenarios).
  */
-async function builderLane(c, key, body) {
+async function builderLane(c, key, body, { keepRunning = false } = {}) {
   const id = c.agents[key].id
   const live = async () => (await c.inv('session:live')).some((x) => x.projectPath.toLowerCase() === c.alpha.toLowerCase() && x.agentId === id)
   // Already running when the setup started its card first (HI-2270: card-loop-design-check).
   if (!(await live())) await c.startAgent(key)
   const r = await c.as(key, 'POST', '/v1/lanes', { project: 'alpha', ...body })
   if (r.status !== 200) throw new Error(`lane: ${r.status} ${JSON.stringify(r.body)}`)
+  if (keepRunning) return r
   await c.inv('session:stop', c.alpha, id)
   const lib = require('../e2e/lib.cjs')
   if (!(await lib.until(async () => !(await live()), 60000))) throw new Error(`setup: ${key} didn't stop after registering its lane`)
@@ -4591,8 +4595,8 @@ function laneStartLanded({ column, live, deliveries, shown }, n) {
   return (deliveries ?? []).some((x) => x.kind === 'task' && x.card === n && DELIVERY_REACHED.includes(x.state) && /^m\d+$/.test(x.id) && new RegExp(`\\b${x.id}\\b`).test(shown ?? ''))
 }
 /**
- * Combwork's own start of a lane's first card, waited for (HI-2278): over a card in Todo, Combwork starts it on the stopped builder
- * (HI-2029, laneStarts) about a second after builderLane. Waited for until it has landed (laneStartLanded), so nothing of
+ * Combwork's own start of a lane's first card, waited for (HI-2278): over a card in Todo, Combwork starts it on the builder,
+ * left running by builderLane (HI-2029, laneStarts; HI-2819: never one the user stopped, HI-2815), about a second after it. Waited for until it has landed (laneStartLanded), so nothing of
  * the start is still on its way as the subject looks at the board.
  */
 async function combworkStartedLaneCard(c, key, n) {
@@ -4635,8 +4639,9 @@ async function twoLanes(c, { d = false, aColumn = 'todo', cColumn = 'todo' } = {
   await c.card('c', { title: 'README: usage', description: 'README.md: a Usage section with one example of greet().', agent: 'builder2', column: cColumn })
   if (d) await c.card('d', { title: 'README: licence line', description: 'README.md: a line saying the licence is MIT.', agent: 'builder2' })
   for (const [key, builder, reviewer, cards] of [['coder', 'Coder', 'Implementer', [c.cards.a, c.cards.b]], ['builder2', 'Builder2', 'Reviewer2', [c.cards.c, ...(d ? [c.cards.d] : [])]]]) {
-    await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` })
-    if ((key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')) await combworkStartedLaneCard(c, key, cards[0])
+    const started = (key === 'builder2' && cColumn === 'todo') || (key === 'coder' && aColumn === 'todo')
+    await builderLane(c, key, { builder, reviewer, cards, name: `${builder}'s lane` }, { keepRunning: started })
+    if (started) await combworkStartedLaneCard(c, key, cards[0])
   }
 }
 /**
