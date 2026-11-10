@@ -68,7 +68,7 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
   beforeAll(async () => {
     mkdirSync(join(wsPath, '.combwork'), { recursive: true })
     mkdirSync(join(p, '.combwork'), { recursive: true })
-    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1', 'h2', 'h3', 'h4', 'h5'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
+    writeFileSync(join(p, '.combwork', 'project.json'), JSON.stringify({ version: 2, agents: [...['b1', 'b2', 'b3', 'b4', 'b5', 'b6', 'b7', 'b8', 'b9', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'g1', 'g2', 'g3', 'g4', 'g5', 'g6', 'g7', 'h1', 'h2', 'h3', 'h4', 'h5', 'i1', 'i2'].map((id) => ({ id, name: id.toUpperCase(), workflowRole: 'either' })), { id: 'r1', name: 'R1' }, { id: 'o1', name: 'O1', workflowRole: 'either' }] }))
     w = createWorkspaceService()
     await w.open(wsPath)
   })
@@ -263,6 +263,57 @@ describe("Combwork starts a lane's next card (HI-1990)", () => {
       expect(rung()).toBe(false)
       await lanes.endLane(w, lane2.id, { abandoned: true })
     } finally {
+      sessions.watchFor = wasWatchFor
+    }
+  })
+  it("HI-2889 (HR1): a lane changed while its builder's watch is being ended, under the watch's lock: the watch is kept and nothing starts", async () => {
+    const watches = await import('../src/main/watches')
+    const { LANE_DEFAULT_EVENTS } = await import('../src/shared/laneWatch')
+    const wasWatchFor = sessions.watchFor
+    sessions.watchFor = watches.watchFor
+    try {
+      // Its watch follows its lane and x1, a card of the lane then; x1 is taken out of the lane while the end waits.
+      const x1 = await card('Kept one', 'i1')
+      const x2 = await card('Kept two', 'i1')
+      const x3 = await card('Kept three', 'i1')
+      const lane = (await lanes.startLane(w, { project: 'alpha', builder: 'i1', reviewer: 'r1', cards: [x1, x2, x3], by: 'I1 (alpha)' })).lane
+      await run(() => tasks.updateTask(x1, { column: 'done' }, user))
+      const b = builder('ready', 'i1')
+      await watches.registerLaneWatch(w, p, 'i1', { ids: [lane.id], events: [...LANE_DEFAULT_EVENTS] }, undefined, { cards: [x1], changes: ['column'] })
+      sessions.watchChanged(p, 'i1')
+      expect(b.status).toBe('watching')
+      watches.testHooks.inOwnLaneEnd = async () => {
+        watches.testHooks.inOwnLaneEnd = undefined
+        await lanes.startLane(w, { project: 'alpha', builder: 'i1', reviewer: 'r1', cards: [x3, x2], by: 'the Assistant' })
+      }
+      await checkLaneStarts(w)
+      expect(watches.testHooks.inOwnLaneEnd).toBeUndefined()
+      expect((await lanes.getLane(w, lane.id)).cards.map((c) => c.number)).toEqual([x3, x2])
+      expect(watches.watchFor(p, 'i1')).not.toBeNull()
+      expect([await columnOf(x2), await columnOf(x3)]).toEqual(['todo', 'todo'])
+      expect(rung()).toBe(false)
+      await lanes.endLane(w, lane.id, { abandoned: true })
+
+      // Its lane ended meanwhile: the watch on it alone is kept too, and nothing starts.
+      const y1 = await card('Ended one', 'i2')
+      const y2 = await card('Ended two', 'i2')
+      const lane2 = (await lanes.startLane(w, { project: 'alpha', builder: 'i2', reviewer: 'r1', cards: [y1, y2], by: 'I2 (alpha)' })).lane
+      await run(() => tasks.updateTask(y1, { column: 'done' }, user))
+      const b2 = builder('ready', 'i2')
+      await watches.registerLaneWatch(w, p, 'i2', { ids: [lane2.id], events: [...LANE_DEFAULT_EVENTS] })
+      sessions.watchChanged(p, 'i2')
+      expect(b2.status).toBe('watching')
+      watches.testHooks.inOwnLaneEnd = async () => {
+        watches.testHooks.inOwnLaneEnd = undefined
+        await lanes.endLane(w, lane2.id, { abandoned: true })
+      }
+      await checkLaneStarts(w)
+      expect(watches.testHooks.inOwnLaneEnd).toBeUndefined()
+      expect(watches.watchFor(p, 'i2')).not.toBeNull()
+      expect(await columnOf(y2)).toBe('todo')
+      expect(rung()).toBe(false)
+    } finally {
+      watches.testHooks.inOwnLaneEnd = undefined
       sessions.watchFor = wasWatchFor
     }
   })

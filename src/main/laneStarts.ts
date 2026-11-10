@@ -276,7 +276,13 @@ async function lookAt(ws: WorkspaceService, path: string, found: PassFound, fenc
     // Its turn over, watching its own lane alone (HI-2889: HB2 after each Done, the lane's card waiting 15 min for the
     // lane-next stall): that watch waits for what this start is, so it ends and the card starts. A watch on anything
     // else (another card, an agent, usage, other lanes) is the builder's own wait, still left to the stall.
-    if (holds === 'watching' && fence.current() && stillDue(ws, path, lane, next.number) && (await endOwnLaneWatch(projectPath, lane.builder.id, { id: lane.id, cards: lane.cards.map((c) => c.number) })) !== null) holds = await builderWait(projectPath, lane.builder)
+    // Decided again under the watch's lock, just before it is removed (HR1 on HI-2889): this look still current, the card
+    // still due on the same builder, still watching, and the lane's cards as they are then.
+    const watchingOwnLane = (): readonly number[] | null => {
+      if (!fence.current() || !stillDue(ws, path, lane, next.number) || sessions.liveFor(projectPath, lane.builder.id)?.status !== 'watching') return null
+      return laneNow(ws, { lane: lane.id })?.cards.map((c) => c.number) ?? null
+    }
+    if (holds === 'watching' && watchingOwnLane() && (await endOwnLaneWatch(projectPath, lane.builder.id, lane.id, watchingOwnLane)) !== null) holds = await builderWait(projectPath, lane.builder)
     if (holds) {
       wait(holds)
       continue
