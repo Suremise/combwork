@@ -513,7 +513,7 @@ export class SlotStore {
         if (held) return { ok: false as const, refusal: { why: 'inUse' as const, slot: held.slot as string, agent: held.agent as string, card: (held.card as number | null) ?? null, lane: (held.lane as string | null) ?? null } }
         const all = (db.prepare('SELECT * FROM slots WHERE project = ? ORDER BY name').all(this.project) as Row[]).map(slotOfRow)
         // Only a slot of this pool's platform (HI-2795, R2.6): a Git slot finishes under Git, never lent from a jj pool.
-        const usable = (s: Slot): boolean => (s.platform ?? 'git') === (o.platform ?? 'git') && s.state === 'ready' && !s.warmError && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name) && !db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(asideKey(this.project, s.name))
+        const usable = (s: Slot): boolean => (s.platform ?? 'git') === (o.platform ?? 'git') && this.freeIn(db, s)
         let slot: Slot | undefined
         let fresh = false
         // Names reserved by renames under way (#1441): never made by a lend, asked for by name or not.
@@ -563,6 +563,22 @@ export class SlotStore {
       if (hit) return { ok: false, refusal: { why: 'noSlot', size: o.size } }
       throw e
     }
+  }
+
+  /**
+   * A slot free for a lease, its platform aside (HI-2886: `take` lends only these, and only these no longer use the target
+   * they recorded): ready, no failed setup, no operation, job or writer, no open lease of any kind, not set aside.
+   */
+  private freeIn(db: DatabaseSync, s: Slot): boolean {
+    return s.state === 'ready' && !s.warmError && !s.op && !s.job && !s.writer && !openLeaseIn(db, this.project, s.name) && !db.prepare('SELECT 1 FROM board_meta WHERE key = ?').get(asideKey(this.project, s.name))
+  }
+
+  /**
+   * The slots that use the target they record (HI-2886), on one snapshot: every slot recording one but a free one
+   * (`freeIn`), whose recorded target is only the last its lease served. Inside a board write, that write's own state.
+   */
+  targetsInUse(): { name: string; target: string }[] {
+    return this.conn.read((db) => this.slotsIn(db).flatMap((s) => (s.target && !this.freeIn(db, s) ? [{ name: s.name, target: s.target }] : [])))
   }
 
   private dispatchOf(db: DatabaseSync, agent: string): SlotLease | null {

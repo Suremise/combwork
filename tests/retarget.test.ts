@@ -3,8 +3,8 @@
 // seen with, the project's target still the new one, the caller still allowed), and the finished branch kept in Other
 // branches work can merge into while anything records it, serial with a lane start on it.
 import { mkdirSync, rmSync, writeFileSync } from 'fs'
-import { join } from 'path'
-import { afterAll, describe, expect, it } from 'vitest'
+import { dirname, join } from 'path'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import { tempDir } from './tempDir'
 import { commit, gitRepo, sh } from './workflow/harness'
@@ -24,6 +24,9 @@ const { agentActor } = await import('../src/shared/workflow/facts')
 const { preset } = await import('../src/shared/workflow/options')
 const { settingEntry } = await import('../src/shared/settingsCatalog')
 const settingsTools = await import('../src/main/settingsTools')
+const slotsApp = await import('../src/main/slotsApp')
+const slots = await import('../src/main/slots')
+const { writesAt } = await import('../src/main/dbWrites')
 
 type WS = ReturnType<typeof createWorkspaceService>
 const opened: WS[] = []
@@ -303,5 +306,178 @@ describe('the finished branch in Other branches work can merge into (HI-2680)', 
     await inWorkspace(w, () => settingsTools.applySetting(settingEntry('project.workflow.otherTargets')!, ['main', '1.1.0'], repo))
     const r = await inWorkspace(w, () => settingsTools.applySetting(settingEntry('project.workflow.target')!, '1.2.0', repo))
     expect(r.note).toMatch(/These still on 1\.1\.0 can follow 1\.2\.0 .*: .*\. To move them, ask the user, then cw_queue retarget/)
+  })
+})
+
+describe('a slot counts against a branch in Other branches only while it uses it (HI-2886)', () => {
+  let slotN = 0
+  /** Takes 1.2.0 out of Other branches work can merge into, as the tab saves it. */
+  const removeByForm = (w: WS, repo: string) => inWorkspace(w, () => form.setWorkflowOptions(w, repo, { preset: 'pair', options: { ...pair, target: '1.1.0', otherTargets: ['main'] } }))
+  /** The same, as the settings tool saves it. */
+  const removeByTool = (w: WS, repo: string) => inWorkspace(w, () => settingsTools.applySetting(settingEntry('project.workflow.otherTargets')!, ['main'], repo))
+  const othersOf = async (w: WS, repo: string) => (await w.projectConfig(repo)).workflow?.options.otherTargets
+  const poolOf = (w: WS, repo: string) => slotsApp.poolFor(w, repo)
+  /** A slot of the project recording `target`, ready unless `set` (its other columns) says otherwise; its name. */
+  async function slot(w: WS, repo: string, target: string, set: Record<string, string | number> = {}): Promise<string> {
+    const id = (await poolOf(w, repo)).deps.store.project
+    const name = `slot-${++slotN}`
+    const at = new Date().toISOString()
+    await store.boardWrite(w, async () =>
+      store.boardWriteOp(w, (db) => {
+        db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, ?, ?, 'ready', ?, ?, ?, ?)").run(id, name, join(base, 'slots', name), 41000 + 10 * slotN, target, at, at)
+        const cols = Object.keys(set)
+        if (cols.length) db.prepare(`UPDATE slots SET ${cols.map((k) => `${k} = ?`).join(', ')} WHERE project = ? AND name = ?`).run(...Object.values(set), id, name)
+      })
+    )
+    return name
+  }
+  /** A lease of `name` (a card's or a carried one), open or ended. */
+  async function lease(w: WS, repo: string, name: string, kind: 'card' | 'carried', open: boolean): Promise<void> {
+    const id = (await poolOf(w, repo)).deps.store.project
+    const at = new Date().toISOString()
+    await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare('INSERT INTO slot_leases (id, project, slot, kind, card, agent, from_at, ended_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(`l-${name}`, id, name, kind, kind === 'card' ? 9000 + slotN : null, `a-${name}`, at, open ? null : at)))
+  }
+  /** Gone, with its leases and any set-aside record. */
+  async function drop(w: WS, repo: string, name: string): Promise<void> {
+    const id = (await poolOf(w, repo)).deps.store.project
+    await store.boardWrite(w, async () =>
+      store.boardWriteOp(w, (db) => {
+        db.prepare('DELETE FROM slots WHERE project = ? AND name = ?').run(id, name)
+        db.prepare('DELETE FROM board_meta WHERE key = ?').run(slots.asideKey(id, name))
+      })
+    )
+  }
+  /** The pool's own lend of `name`, as a card's start asks for it. */
+  const take = async (w: WS, repo: string, name: string) => (await poolOf(w, repo)).deps.store.take({ card: 8000 + ++slotN, agent: `t-${slotN}`, slot: name }, { size: 99, root: join(base, 'slots'), target: null, token: `tk-${slotN}`, holder: { pid: process.pid, started: 1 } })
+  const refusedFor = (name: string) => new RegExp(`1\\.2\\.0 can’t be taken out .*${name}`)
+
+  it('a free slot that last served it (ready, its lease ended) no longer keeps it: both saves take it out', async () => {
+    for (const remove of [removeByForm, removeByTool]) {
+      const { w, repo } = await project()
+      const name = await slot(w, repo, '1.2.0')
+      await lease(w, repo, name, 'card', false)
+      // Read in the save's own board write, after the pool was opened (HI-2886): never a list read before its locks.
+      const pooled = (await poolOf(w, repo)).deps.store
+      const read = pooled.targetsInUse.bind(pooled)
+      const inWrite: boolean[] = []
+      pooled.targetsInUse = () => (inWrite.push(store.inBoardWrite(dirname(repo))), read())
+      try {
+        await remove(w, repo)
+      } finally {
+        pooled.targetsInUse = read
+      }
+      expect(inWrite).toEqual([true])
+      expect(await othersOf(w, repo)).toEqual(['main'])
+      // Still lendable, and still recording 1.2.0 (only its next start records another).
+      expect((await poolOf(w, repo)).deps.store.slot(name)?.target).toBe('1.2.0')
+      expect(await take(w, repo, name)).toMatchObject({ ok: true })
+    }
+  })
+
+  it('a slot that uses it keeps it, named, in both saves: lent, dirty, gone, set aside, reserved, with a job, a writer, an open lease or a failed setup; take refuses each too', async () => {
+    const { w, repo } = await project()
+    const cases: { what: string; set?: Record<string, string | number>; lease?: 'card' | 'carried'; aside?: boolean }[] = [
+      { what: 'lent', set: { state: 'lent' }, lease: 'card' },
+      { what: 'dirty', set: { state: 'dirty' } },
+      { what: 'gone', set: { state: 'gone' } },
+      { what: 'set aside', aside: true },
+      { what: 'reserved by an operation', set: { op: 'tk-op', op_kind: 'warm', op_pid: 1, op_started: 1 } },
+      { what: 'a job', set: { job: 'job-1' } },
+      { what: 'a writer', set: { writer_run: 'run-1', writer_lease: 'l-x', writer_agent: 'b1', writer_pid: 1, writer_started: 1 } },
+      { what: 'an open card lease', lease: 'card' },
+      { what: 'an open carried lease', lease: 'carried' },
+      { what: 'a failed setup', set: { warm_error: 'setup failed' } }
+    ]
+    for (const c of cases) {
+      const name = await slot(w, repo, '1.2.0', c.set)
+      if (c.lease) await lease(w, repo, name, c.lease, true)
+      if (c.aside) {
+        const id = (await poolOf(w, repo)).deps.store.project
+        await store.boardWrite(w, async () => store.boardWriteOp(w, (db) => db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?)').run(slots.asideKey(id, name), '{}')))
+      }
+      await expect(removeByForm(w, repo), c.what).rejects.toThrow(refusedFor(name))
+      await expect(removeByTool(w, repo), c.what).rejects.toThrow(refusedFor(name))
+      expect((await poolOf(w, repo)).deps.store.targetsInUse(), c.what).toEqual([{ name, target: '1.2.0' }])
+      expect(await take(w, repo, name), c.what).toMatchObject({ ok: false })
+      expect(await othersOf(w, repo), c.what).toEqual(['main', '1.2.0'])
+      await drop(w, repo, name)
+    }
+    await removeByForm(w, repo)
+    expect(await othersOf(w, repo)).toEqual(['main'])
+  })
+
+  it('a lease taken on another connection before the save is seen by it: refused; once the slot is free again, it goes', async () => {
+    const { w, repo } = await project()
+    const name = await slot(w, repo, '1.2.0')
+    const id = (await poolOf(w, repo)).deps.store.project
+    const other = new slots.SlotStore(slots.fileSlotConn(store.boardFile(dirname(repo))), id)
+    try {
+      const r = await other.take({ card: 7001, agent: 'o1', slot: name }, { size: 99, root: join(base, 'slots'), target: null, token: 'tk-other', holder: { pid: process.pid, started: 1 } })
+      if (!r.ok) throw new Error(`not lent: ${JSON.stringify(r.refusal)}`)
+      await expect(removeByForm(w, repo)).rejects.toThrow(refusedFor(name))
+      // Its start ended and the slot settled free (no operation, the lease ended): nothing uses 1.2.0 any more.
+      await other.end(r.lease.id, 'done')
+      await other.conn.write((db) => db.prepare('UPDATE slots SET op = NULL, op_kind = NULL, op_lease = NULL, op_pid = NULL, op_started = NULL WHERE project = ? AND name = ?').run(id, name))
+    } finally {
+      other.conn.close()
+    }
+    await removeByForm(w, repo)
+    expect(await othersOf(w, repo)).toEqual(['main'])
+  })
+
+  it("a lease asked for while the save decides waits for the save's board write: the save goes through, the lend after it", async () => {
+    const { w, repo } = await project()
+    const name = await slot(w, repo, '1.2.0')
+    // The save held at its file write: inside its board write, after its check.
+    const real = w.mutateProjectConfig.bind(w)
+    const order: string[] = []
+    let reached!: () => void
+    const atWrite = new Promise<void>((r) => (reached = r))
+    let release!: () => void
+    const gate = new Promise<void>((r) => (release = r))
+    w.mutateProjectConfig = (async (...args: Parameters<typeof real>) => {
+      if (store.inBoardWrite(dirname(repo))) {
+        reached()
+        await gate
+        const out = await real(...args)
+        order.push('save')
+        return out
+      }
+      return real(...args)
+    }) as typeof w.mutateProjectConfig
+    try {
+      const save = removeByForm(w, repo)
+      await atWrite
+      // Asked from outside the save's change: its own board write, never the save's, waiting for the board's lock.
+      const lend = take(w, repo, name).then((r) => (order.push('lend'), r))
+      await vi.waitFor(() => expect(writesAt(dirname(repo), dirname(repo))).toBe(2))
+      release()
+      await save
+      expect(await lend).toMatchObject({ ok: true })
+      expect(order).toEqual(['save', 'lend'])
+      expect(await othersOf(w, repo)).toEqual(['main'])
+    } finally {
+      w.mutateProjectConfig = real
+    }
+  })
+
+  it("inside a board write, the slots read are that write's own, uncommitted ones included", async () => {
+    const { w, repo } = await project()
+    const uses = await retarget.slotUses(w, repo)
+    const id = (await poolOf(w, repo)).deps.store.project
+    const at = new Date().toISOString()
+    const seen = await store.boardWrite(w, async () => {
+      store.boardWriteOp(w, (db) => db.prepare("INSERT INTO slots (project, name, folder, state, port_base, target, created_at, used_at) VALUES (?, 'slot-u', ?, 'lent', 49990, '1.2.0', ?, ?)").run(id, join(base, 'slots', `u-${n}`), at, at))
+      return uses.inUse()
+    })
+    expect(seen).toEqual([{ name: 'slot-u', target: '1.2.0' }])
+  })
+
+  it("a branch's deletion (the Assistant's undo) still counts a free slot recording it", async () => {
+    const { w, repo } = await project()
+    const name = await slot(w, repo, '1.2.0')
+    const uses = await retarget.slotUses(w, repo)
+    expect(await retarget.referencesTo(w, repo, '1.2.0', () => uses.all())).toEqual([name])
+    expect(await retarget.referencesTo(w, repo, '1.2.0', () => uses.inUse())).toEqual([])
   })
 })

@@ -3884,7 +3884,11 @@ whose option is off isn't in the ruleset at all, so it can't refuse.
   none); gone → `gone`; anything else → `dirty`, set aside (`board_meta` `slot_aside:`, with what it was moving to and
   what was found): no later look makes it ready, and it is never lent, carried or renamed (a rename that met one carries it to the new name), until it is removed. A store failure
   at its end leaves its operation and intent recorded, settled by the next refresh's recovery. A branch taken out of G7b is refused while anything records
-  it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, slots),
+  it (`referencesTo`: cards' own targets, cards in flight started on it, open queue entries, running lanes, and slots that use it, HI-2886: every
+  slot recording it but a free one, free as `SlotStore.take` lends (ready, no failed setup, no operation, job or writer, no open lease of
+  any kind, not set aside), whose recorded target is only the last its lease served; the slots read inside the save's board write, the
+  pool opened before its locks, since every slot write is a board write too; the Assistant's undo deleting a branch it made still counts
+  every slot recording it, its clean-up checking against it),
   checked under the lanes' lock and in the board's write, so a lane start on it (which picks again under the lanes'
   lock) and the removal are serial; it is never taken out by itself. The window: Save…'s preview with **Also retarget
   what can move**, applied after the save; the Assistant: the setting's reply lists what can move with a preview id

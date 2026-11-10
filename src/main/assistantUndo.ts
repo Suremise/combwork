@@ -17,7 +17,7 @@ import { inWorkspace, workspaceOf, type WorkspaceService } from './workspace'
 import { lineRepoOps } from './platform/repoOpsPorts'
 import { withFolderRepoLocks } from './platform/repoPorts'
 import { workflowWrite } from './workflow/writes'
-import { referencesTo, slotTargets } from './workflow/retarget'
+import { referencesTo, slotUses } from './workflow/retarget'
 import { projectTargets } from './workflow/targets'
 
 /**
@@ -602,14 +602,14 @@ async function undoBranch(ws: WorkspaceService, c: RecordedChange, guard: Guard)
   try {
     return await withFolderRepoLocks([projectPath], () =>
       workflowWrite(async () => {
-        const slots = await slotTargets(ws, projectPath)
+        const slots = await slotUses(ws, projectPath)
         return lanes.withLanesLock(ws, () =>
           boardWrite(ws, async () => {
             guard?.()
             const r = await lineRepoOps('deleteLines').removeMadeLine(projectPath, name, commit, async () => {
               const t = await projectTargets(ws, projectPath).catch(() => null)
               if (t?.default === name || t?.others.includes(name)) return 'target'
-              return (await referencesTo(ws, projectPath, name, slots)).length ? 'card' : null
+              return (await referencesTo(ws, projectPath, name, () => slots.all())).length ? 'card' : null
             }, guard)
             if (r.removed) return { undone: ['branch'], skipped: [] }
             if (r.why === 'gone') return goneAll(['branch'])
