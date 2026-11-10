@@ -509,6 +509,29 @@ describe('the restart queue (HI-1707)', () => {
     expect(h.starts).toEqual([])
   })
 
+  // HR2's round 2: its workspace not ready in the run that read it, a skip survives that run's close and is named once at
+  // the start where its workspace is.
+  it("a skip whose workspace wasn't ready before another update: kept through that close, then named once", async () => {
+    const ws = workspace(join(dir, 'ws'), ['i1'])
+    h.workspaces = [ws]
+    await startWith([entry(ws.path, 'i1', { status: 'finished', state: 'skipped', why: 'idle' })], { reason: 'update' })
+    // The workspace's merge slots never recover in this run: nothing is said.
+    m.workspaceRecovering(ws.path, new Promise(() => undefined))
+    await queueSettles(() => m.startRestartRecovery())
+    expect(h.toasts).toEqual([])
+    // Combwork closes for another update, nothing running in it.
+    await m.recordClosing('update', { snapshotMs: 1000, tellMs: 50 })
+    await m.restartRecordSaved()
+    expect(saved()?.entries.map((e) => [e.agentId, e.state, e.why])).toEqual([['i1', 'skipped', 'idle']])
+    // The next start, its workspace ready: named once, and the record goes.
+    h.toasts = []
+    await relaunch(ws)
+    await vi.waitFor(() => expect(h.toasts).toHaveLength(1), { timeout: HUNG_MS })
+    expect(h.toasts[0].message).toContain('Not resumed: i1 (alpha): it was idle, with no card or lane waiting for it.')
+    await m.restartRecordSaved()
+    expect(saved()).toBeNull()
+  })
+
   it('a record whose entries are all over a day old: the start names them as expired, starts none, and the record goes', async () => {
     const ws = workspace(join(dir, 'ws'), ['a1'])
     h.workspaces = [ws]

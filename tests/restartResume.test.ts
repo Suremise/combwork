@@ -5,7 +5,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { app } from 'electron'
-import { atStart, checkRequest, mergeSnapshot, parseRecord, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
+import { atStart, checkRequest, mergeSnapshot, parseRecord, recordOpen, resumeNote, REQUEST_FILE, type RestartEntry, type RestartRecord, type RequestTarget } from '../src/shared/restartResume'
 import { dropLoggerListenersAfterEach, loggerListenerCounts } from './loggerListeners'
 import { tempDir } from './tempDir'
 
@@ -62,6 +62,20 @@ describe('the restart record', () => {
       ['a1', 'new', 'pending'],
       ['a2', 's1', 'pending']
     ])
+  })
+
+  // HI-2909, HR2's round 2: a skip no notice has named yet survives another close, unless its agent ran again (the snapshot
+  // replaces it); one named already is dropped as any final entry.
+  it('keeps a skip not yet named through another close, unless its agent is in the snapshot; drops one named already', () => {
+    const before: RestartRecord = { version: 1, reason: 'update', entries: [entry({ agentId: 'idle', state: 'skipped', why: 'idle' }), entry({ agentId: 'old', state: 'skipped', why: 'expired' }), entry({ agentId: 'again', state: 'skipped', why: 'idle' }), entry({ agentId: 'told', state: 'skipped', why: 'idle', reported: true }), entry({ agentId: 'gone', state: 'skipped', why: 'removed' })] }
+    expect(recordOpen(before)).toBe(true)
+    const after = mergeSnapshot(before, [entry({ agentId: 'again' })], 'restart')
+    expect(after.entries.map((e) => [e.agentId, e.state, e.why ?? null])).toEqual([
+      ['idle', 'skipped', 'idle'],
+      ['old', 'skipped', 'expired'],
+      ['again', 'pending', null]
+    ])
+    expect(mergeSnapshot({ version: 1, reason: 'update', entries: [entry({ agentId: 'told', state: 'skipped', why: 'idle', reported: true })] }, [], 'update').entries).toEqual([])
   })
 
   it('at a start: what the last run left queued or starting is pending again, and what waited over a day is skipped', () => {
