@@ -522,6 +522,8 @@ interface CombworkMessageValues {
   'tips.storageCleanup.title': undefined
   'tips.storagePurge.text': undefined
   'tips.storagePurge.title': undefined
+  'tips.submodulesInDiffs.text': undefined
+  'tips.submodulesInDiffs.title': undefined
   'tips.submodulesLfs.text': undefined
   'tips.submodulesLfs.title': undefined
   'tips.taskbarBadge.text': undefined

@@ -498,6 +498,8 @@
   "tips.storageCleanup.title": "Sehen, was Combwork aufbewahrt, und aufräumen",
   "tips.storagePurge.text": "„Bereinigen…“ unter Projekteinstellungen → Speicher oder „Dateien von Combwork bereinigen…“ an einer Sitzung entfernt alles, was Combwork für Sitzungen aufbewahrt: Sicherungen, Anhänge, Reste. Es listet vorher jede Datei auf; Dateien der Coding-Agenten und deine Nutzungssummen bleiben.",
   "tips.storagePurge.title": "Bereinigen, was Combwork aufbewahrt",
+  "tips.submodulesInDiffs.text": "Verschiebt eine Karte ein Submodul auf einen anderen Commit, zeigen Änderungen und der Abschnitt „Arbeit“ der Karte es als „Submodul lib/sub: 0bbdde2 → 0fc182f“. „Git-Diff anzeigen“ zeigt die Zeilen von git selbst.",
+  "tips.submodulesInDiffs.title": "Ein verschobenes Submodul in einer Zeile",
   "tips.submodulesLfs.text": "Bei Submodulen oder Git LFS checkt Combwork die Submodule aus und holt die LFS-Dateien in jeden Slot und jede Review-Kopie, vor dem Setup-Skript, ohne die Einstellungen deines Repositorys zu ändern. Slots und Kopien → Submodule und LFS einrichten schaltet das aus.",
   "tips.submodulesLfs.title": "Submodule und Git LFS in Slots",
   "tips.taskbarBadge.text": "Die Taskleistenschaltfläche von Combwork zeigt, wie viele Agenten dich brauchen, und blinkt, wenn einer dich etwas fragt, während Combwork im Hintergrund ist.",

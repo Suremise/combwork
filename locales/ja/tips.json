@@ -498,6 +498,8 @@
   "tips.storageCleanup.title": "Combworkが保存しているものを確認して整理",
   "tips.storagePurge.text": "「プロジェクト設定」→「ストレージ」の「パージ…」、またはセッションの「Combworkのファイルをパージ…」で、Combworkがセッションのために保持しているもの（バックアップ、添付ファイル、残り）を削除できます。先にすべてのファイルを一覧表示し、エージェント自身のファイルと使用量の合計はそのままです。",
   "tips.storagePurge.title": "Combworkが保持しているものをパージ",
+  "tips.submodulesInDiffs.text": "カードがサブモジュールを別のコミットに移動すると、「変更」とカードの「作業」セクションに「サブモジュール lib/sub: 0bbdde2 → 0fc182f」と表示されます。「git の差分を表示」で git 自身の行を表示します。",
+  "tips.submodulesInDiffs.title": "移動したサブモジュールを1行で表示",
   "tips.submodulesLfs.text": "サブモジュールや Git LFS を使うリポジトリでは、Combwork が各スロットとレビュー用コピーでセットアップスクリプトの前にサブモジュールをチェックアウトし、LFS ファイルを取得します。リポジトリの設定は変更しません。「スロットとコピー」→「サブモジュールと LFS をセットアップ」でオフにできます。",
   "tips.submodulesLfs.title": "スロットでのサブモジュールと Git LFS",
   "tips.taskbarBadge.text": "タスクバーのCombworkのボタンには、応答を待っているエージェントの数が表示され、Combworkがバックグラウンドにあるときにエージェントが質問すると点滅します。",

@@ -391,6 +391,26 @@
     "defaultMessage": "jj doesn’t support submodules.",
     "description": "Why jj can’t be used with submodules (HI-2799). Keep jj."
   },
+  "git.gitlink.binary": {
+    "defaultMessage": "The file’s side is binary: its content can’t be shown.",
+    "description": "HI-2864: in place of git's lines for a submodule replaced by a binary file (or the reverse): that file isn't text."
+  },
+  "git.gitlink.dirty": {
+    "defaultMessage": "Its folder has uncommitted changes inside.",
+    "description": "HI-2864: after a submodule's row in the Changes tab: the submodule's own folder has changes not committed in it."
+  },
+  "git.gitlink.hideGit": {
+    "defaultMessage": "Hide git’s diff",
+    "description": "HI-2864: the same button once git's own lines are shown: hides them again."
+  },
+  "git.gitlink.showGit": {
+    "defaultMessage": "Show git’s diff",
+    "description": "HI-2864: a button under a submodule's row in the Changes tab: shows the change as git itself writes it (\"Subproject commit …\" lines)."
+  },
+  "git.gitlink.summary": {
+    "defaultMessage": "{change, select, moved {Submodule {path}: {from} → {to}} added {Submodule {path} added at {to}} removed {Submodule {path} removed (was {from})} toFile {Submodule {path} ({from}) replaced by a file} toLink {Submodule {path} ({from}) replaced by a symbolic link} fromFile {A file replaced by submodule {path} ({to})} other {A symbolic link replaced by submodule {path} ({to})}}",
+    "description": "HI-2864: a change to a submodule (a git repository inside the project, kept at one commit) in a diff or a card's list of changed files. {path}: its folder. {from}/{to}: the commit before and after (short ids). {change} picks the kind: moved to another commit, added, removed, replaced by a file or symbolic link, or a file or symbolic link replaced by it. Keep the select keys. Glossary: submodule, commit."
+  },
   "git.head.detachedAt": {
     "defaultMessage": "detached at {commit}",
     "description": "What the project folder has checked out when HEAD is detached. {commit} is a short commit hash. Lower case: also in the status bar (\"detached at abc1234 · rebasing\")."

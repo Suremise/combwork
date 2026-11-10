@@ -15,6 +15,7 @@ import { agentFolder, awayFromProject } from '../agentPlace'
 import { cx, timeAgo } from '../util'
 import { CardQueue, SHOW_QUEUE_WORK } from './CardQueue'
 import { CardRoundCostTable } from './CardCost'
+import { GitlinkRow } from './GitlinkDiff'
 import { Icon, Tooltip } from './ui'
 
 // A card's work (#1224, SPEC §16.4; #1223's work view): the dialog's Work section and the board card's badges. What the
@@ -274,8 +275,10 @@ function RevisionRow({ r, noCode, verdicts, checks, project, folder, short, agen
               <span className="card-work-file-status">{f.status}</span>
               {openable ? (
                 <button type="button" className="link" title={tr(M.openFile, { path: f.path })} onClick={() => open(f.path)}>
-                  {f.path}
+                  {f.gitlink ? <GitlinkRow path={f.path} change={f.gitlink} className="gitlink-file" /> : f.path}
                 </button>
+              ) : f.gitlink ? (
+                <GitlinkRow path={f.path} change={f.gitlink} className="gitlink-file" />
               ) : (
                 <span>{f.path}</span>
               )}

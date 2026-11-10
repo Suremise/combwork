@@ -2083,6 +2083,14 @@
     "defaultMessage": "Purge what Combwork keeps",
     "description": "A tip's title."
   },
+  "tips.submodulesInDiffs.text": {
+    "defaultMessage": "When a card moves a submodule to another commit, Changes and a card’s Work section show it as “Submodule lib/sub: 0bbdde2 → 0fc182f”. Show git’s diff shows git’s own lines.",
+    "description": "A tip (HI-2864). A submodule: a git repository inside the project, kept at one commit. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.submodulesInDiffs.title": {
+    "defaultMessage": "A moved submodule in one line",
+    "description": "A tip's title (HI-2864). A submodule: a git repository inside the project, kept at one commit."
+  },
   "tips.submodulesLfs.text": {
     "defaultMessage": "With submodules or Git LFS, Combwork checks out the submodules and fetches the LFS files in each slot and review copy before its setup script, never changing your repository’s settings. Slots and copies → Set up submodules and LFS turns it off.",
     "description": "A tip (HI-1182). A slot: a folder Combwork lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Keep Git LFS. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

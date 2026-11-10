@@ -10,6 +10,7 @@ import { cx } from '../util'
 import { languageFor } from '../monacoLang'
 import { Pager } from './DataTable'
 import { DiffView } from './Editors'
+import { GitlinkDiff } from './GitlinkDiff'
 import { PaneResizer } from './Resizer'
 import { Icon, IconButton, LoadFailed, StaleNote, Tooltip } from './ui'
 
@@ -319,7 +320,7 @@ export function ComparePage({ project, base, head, lines, selector, listWidth, o
                 <IconButton icon={inline ? 'split-horizontal' : 'list-flat'} title={tr(inline ? M.sideBySide : M.inline)} onClick={() => setInline(!inline)} />
               </div>
               <div className="editor-host" data-compare-diff={diff.path}>
-                {diff.binary ? <div className="empty-state">{diff.modified || tr(M.binary)}</div> : <DiffView original={diff.original} modified={diff.modified} language={languageFor(diff.path)} inline={inline} />}
+                {diff.gitlink ? <GitlinkDiff diff={diff} change={diff.gitlink} inline={inline} /> : diff.binary ? <div className="empty-state">{diff.modified || tr(M.binary)}</div> : <DiffView original={diff.original} modified={diff.modified} language={languageFor(diff.path)} inline={inline} />}
               </div>
             </>
           ) : diffError ? (

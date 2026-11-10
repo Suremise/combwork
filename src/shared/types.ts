@@ -7,6 +7,7 @@ import type { AvOffer } from './antivirus'
 import type { ActivityKind, ActivityTarget, UndoFinalWhy } from './assistantActivity'
 import type { AttachmentKind } from './attachments'
 import type { IgnoreRule, IgnoreTarget } from './gitIgnoreRules'
+import type { GitlinkChange } from './gitlink'
 import type { AgentProcess } from './agentProcesses'
 import type { StartFailure } from './startFailure'
 import type { FreshReason } from './sessionFresh'
@@ -3777,6 +3778,8 @@ export interface GitDiff {
   original: string
   modified: string
   binary: boolean
+  /** HI-2864: either side is a submodule (mode 160000). Its sides are git's own `Subproject commit` lines; a file's or link's side is its content. */
+  gitlink?: GitlinkChange
 }
 
 /** A recent workspace as a window sees it (File → Open Recent, the welcome page; #144). */

@@ -82,6 +82,7 @@
   "service.fsutil.notCopied": "无法复制 {name}",
   "service.git.exitCode": "退出码 {code}",
   "service.git.failed": "{command} 失败：{why}",
+  "service.git.gitlinkUnread": "无法读取子模块 {path} 所在的提交。",
   "service.git.outside": "路径在项目之外",
   "service.git.tooLarge": "文件太大，无法比较差异（{kb, number} KB）。",
   "service.gitCompare.noBranch": "这里已没有分支 {branch}。",

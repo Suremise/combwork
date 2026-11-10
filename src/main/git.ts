@@ -5,6 +5,7 @@ import { lstat, readFile, readlink, realpath, stat } from 'original-fs/promises'
 import { insideReal } from './fsutil'
 import { gitExe, gitExeGone, gitProblem, gitTool, noteGitMissing, noteGitRan, PATH_GIT, type GitExe } from './gitTool'
 import type { GitDiff, GitStatus } from '../shared/types'
+import { gitlinkOf, parseRawRows, parseSubprojectPatch, subprojectLine, unresolved, type GitlinkChange, type GitlinkSide } from '../shared/gitlink'
 import { gitProblemData } from '../shared/gitTool'
 import { withValues } from '../shared/advanced'
 import { msg, tr } from '../shared/i18n'
@@ -347,6 +348,7 @@ const M = {
   failed: msg({ id: 'service.git.failed', defaultMessage: '{command} failed: {why}', description: "An error in the Changes tab: a git command ({command}, as it is: \"git status\") failed; {why} is git's own first line, or why git can't run." }),
   exitCode: msg({ id: 'service.git.exitCode', defaultMessage: 'exit code {code}', description: 'Why a git command failed when git said nothing: the number it exited with.' }),
   outside: msg({ id: 'service.git.outside', defaultMessage: 'Path is outside the project', description: "An error showing a file's changes: its path leads out of the project." }),
+  gitlinkUnread: msg({ id: 'service.git.gitlinkUnread', defaultMessage: "Couldn't read which commit submodule {path} is at.", description: "An error in the Changes tab (HI-2864): git's output about a submodule's commit ({path}, its folder) couldn't be read, so its change isn't shown. Glossary: submodule." }),
   tooLarge: msg({ id: 'service.git.tooLarge', defaultMessage: 'File is too large to diff ({kb, number} KB).', description: "Shown in place of a file's changes in the Changes tab: the file is too large ({kb} KB) to compare." })
 }
 
@@ -450,27 +452,84 @@ export function isBinary(buf: Buffer): boolean {
   return false
 }
 
+/**
+ * HI-2864 (design HI-2864/s10): whether either side of one path is a submodule, from git's modes (160000), never from
+ * a read that failed: a gitlink's commit can be in this repository's store, so reading it can succeed. `revs` are one
+ * commit (against the working tree) or two. The path is literal (`--literal-pathspecs`), the output NUL-separated.
+ * Output that isn't raw rows is an error, never "not a submodule". Null: no gitlink on either side, or no row (unchanged
+ * or untracked).
+ */
+export async function gitlinkChange(cwd: string, revs: string[], path: string): Promise<GitlinkChange | null> {
+  const r = await git(cwd, ['--literal-pathspecs', 'diff', '--raw', '-z', '--no-abbrev', '--no-renames', '--no-ext-diff', ...revs, '--', path])
+  if (!r.ok) throw failure('git diff --raw', r) // i18n-ignore: a git command, as it is
+  const rows = parseRawRows(r.out)
+  if (!rows) throw combworkError(M.gitlinkUnread, { path })
+  const row = rows.find((x) => x.path === path)
+  return row ? gitlinkOf(row) : null
+}
+
+/** A gitlink diff's sides as git writes them in a patch; a file's or link's side is the content read for it. */
+function gitlinkSides(change: GitlinkChange, original: Buffer, modified: Buffer): { original: Buffer; modified: Buffer } {
+  const line = (s: GitlinkSide, dirty: boolean, read: Buffer): Buffer => (s.kind === 'gitlink' ? Buffer.from(subprojectLine(s.commit, dirty), 'utf8') : read)
+  return { original: line(change.from, false, original), modified: line(change.to, !!change.dirty, modified) }
+}
+
 export async function gitDiff(projectPath: string, file: string, base?: string): Promise<GitDiff> {
   const abs = resolve(projectPath, file)
   if (!abs.toLowerCase().startsWith(resolve(projectPath).toLowerCase() + sep)) throw combworkError(M.outside)
   const ref = (base && (await mergeBase(projectPath, base))) || 'HEAD'
-  const head = await git(projectPath, ['show', `${ref}:${file.replace(/\\/g, '/')}`], MAX_DIFF_BYTES * 2)
-  const original = head.ok ? head.buf : Buffer.alloc(0)
-  let modified = Buffer.alloc(0)
+  const rel = file.replace(/\\/g, '/')
+  // A path reached through a linked folder that leads outside is refused first, before git is asked anything about it.
+  const there = await lstat(abs).catch(() => null)
+  if (there && !there.isSymbolicLink() && !insideReal(abs, [projectPath])) throw combworkError(M.outside)
+  const link = await workingGitlink(projectPath, ref, rel)
+  // A gitlink side is never read as a file: its line is git's (a folder isn't read, a commit object isn't shown).
+  const head = link?.from.kind === 'gitlink' ? null : await git(projectPath, ['show', `${ref}:${rel}`], MAX_DIFF_BYTES * 2)
+  const original = head?.ok ? head.buf : Buffer.alloc(0)
+  const working = link?.to.kind === 'gitlink' ? Buffer.alloc(0) : await workingCopy(projectPath, abs)
+  const gitlink = link ? { gitlink: link } : {}
+  if (!Buffer.isBuffer(working)) return { ...tooLargeDiff(file, working.tooLarge), ...gitlink }
+  const sides = link ? gitlinkSides(link, original, working) : { original, modified: working }
+  if (isBinary(sides.original) || isBinary(sides.modified)) return { path: file, original: '', modified: '', binary: true, ...gitlink }
+  return { path: file, original: sides.original.toString('utf8'), modified: sides.modified.toString('utf8'), binary: false, ...gitlink }
+}
+
+/** A path's working copy: its content, a link's target as git stores it, empty when deleted; its size when too large. */
+async function workingCopy(projectPath: string, abs: string): Promise<Buffer | { tooLarge: number }> {
   try {
     const s = await lstat(abs)
     // A link is shown as git stores it (the path it points to), never followed: it could lead outside the project.
-    if (s.isSymbolicLink()) modified = Buffer.from(await readlink(abs), 'utf8')
-    else {
-      // Nor a file reached through a linked folder that leads outside.
-      if (!insideReal(abs, [projectPath])) throw Object.assign(combworkError(M.outside), { outside: true })
-      if (s.size > MAX_DIFF_BYTES) return tooLargeDiff(file, s.size)
-      modified = await readFile(abs)
-    }
+    if (s.isSymbolicLink()) return Buffer.from(await readlink(abs), 'utf8')
+    // Nor a file reached through a linked folder that leads outside.
+    if (!insideReal(abs, [projectPath])) throw Object.assign(combworkError(M.outside), { outside: true })
+    if (s.size > MAX_DIFF_BYTES) return { tooLarge: s.size }
+    return await readFile(abs)
   } catch (e) {
     if ((e as { outside?: boolean }).outside) throw e
     // Deleted in the working tree.
+    return Buffer.alloc(0)
   }
-  if (isBinary(original) || isBinary(modified)) return { path: file, original: '', modified: '', binary: true }
-  return { path: file, original: original.toString('utf8'), modified: modified.toString('utf8'), binary: false }
+}
+
+/**
+ * The Changes tab's gitlink change of one path, ref against the working tree. The working tree's commit is raw's only
+ * when the checkout is at the index's; otherwise raw gives zeros, and git's own patch line says it (and whether it is
+ * dirty), read from its gitlink section alone. A line that can't be read is an error, never an empty side or a guess.
+ * A ref that isn't a commit yet (a repository with none) has no committed side to be a gitlink: null, as before.
+ */
+async function workingGitlink(projectPath: string, ref: string, rel: string): Promise<GitlinkChange | null> {
+  let link: GitlinkChange | null
+  try {
+    link = await gitlinkChange(projectPath, [ref], rel)
+  } catch (e) {
+    const born = await git(projectPath, ['rev-parse', '--verify', '-q', `${ref}^{commit}`])
+    if (!born.ok && !born.err.trim()) return null
+    throw e
+  }
+  if (!link || !unresolved(link.to)) return link
+  const p = await git(projectPath, ['--literal-pathspecs', 'diff', '--no-color', '--no-ext-diff', '--submodule=short', ref, '--', rel])
+  if (!p.ok) throw failure('git diff', p) // i18n-ignore: a git command, as it is
+  const now = parseSubprojectPatch(p.out)
+  if (!now) throw combworkError(M.gitlinkUnread, { path: rel })
+  return { ...link, to: { kind: 'gitlink', commit: now.commit }, ...(now.dirty ? { dirty: true } : {}) }
 }

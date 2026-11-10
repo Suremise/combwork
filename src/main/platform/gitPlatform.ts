@@ -462,16 +462,35 @@ export class GitPlatform implements PlatformAdapter {
   /** The combined change of a shared-folder card's own commits, applied in order (§16.3.2). */
   private async ownChange(base: string, commits: string[]): Promise<Maybe<{ files: FileChange[]; key: string | null }>> {
     const files = new Map<string, string>()
+    // HI-2864: a path with a gitlink in any of the commits: where its change starts (the first such commit's parent) and
+    // ends (the last commit changing it), so its sides are read from those trees, not stitched from the commits' rows.
+    const ends = new Map<string, { from: string; to: string; gitlink: boolean }>()
     const keys: string[] = []
     for (const c of commits) {
       const parent = await G.resolve(this.project, `${c}^`)
       if (isUnknown(parent)) return parent
       const ch = await G.change(this.project, parent ?? base, c)
       if (isUnknown(ch)) return ch
-      for (const f of ch.files) files.set(f.path, f.status)
+      for (const f of ch.files) {
+        files.set(f.path, f.status)
+        const e = ends.get(f.path)
+        ends.set(f.path, { from: e?.from ?? parent ?? base, to: c, gitlink: !!e?.gitlink || !!f.gitlink })
+      }
       if (ch.key) keys.push(ch.key)
     }
-    return { files: [...files].map(([path, status]) => ({ path, status })), key: keys.length ? keys.join('+') : null }
+    const out: FileChange[] = []
+    for (const [path, status] of files) {
+      const e = ends.get(path)
+      if (!e?.gitlink) {
+        out.push({ path, status })
+        continue
+      }
+      const [from, to] = await Promise.all([G.treeSide(this.project, e.from, path), G.treeSide(this.project, e.to, path)])
+      if (isUnknown(from)) return from
+      if (isUnknown(to)) return to
+      out.push({ path, status, ...(from.kind === 'gitlink' || to.kind === 'gitlink' ? { gitlink: { from, to } } : {}) })
+    }
+    return { files: out, key: keys.length ? keys.join('+') : null }
   }
 
   /**

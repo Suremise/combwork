@@ -82,6 +82,7 @@
   "service.fsutil.notCopied": "{name}をコピーできませんでした",
   "service.git.exitCode": "終了コード{code}",
   "service.git.failed": "{command}が失敗しました：{why}",
+  "service.git.gitlinkUnread": "サブモジュール {path} がどのコミットにあるかを読み取れませんでした。",
   "service.git.outside": "パスがプロジェクトの外にあります",
   "service.git.tooLarge": "ファイルが大きすぎるため、差分を表示できません（{kb, number} KB）。",
   "service.gitCompare.noBranch": "ブランチ{branch}はもうありません。",
