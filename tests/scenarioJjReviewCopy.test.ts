@@ -97,6 +97,11 @@ describe("what changed in a jj review copy while its reviewer had it", () => {
       expect(writes([{ name: 'Bash', input: cmd, cwd: COPY }]), cmd).toEqual([])
     }
     expect(writes([{ name: 'Read', input: `${COPY}\\greet.js` }])).toEqual([])
+    // Quoted text is no command: a script's `->`, `;` or `|` (Claude Code's read in run 2026-11-10T18-01-19-claude-code).
+    const run = `cd "C:/ws/.copies/alpha/copy-1" && cat greet.js && node -e "const g=require('./greet.js');console.log(JSON.stringify(g('  Ann  ')));try{g(undefined)}catch(e){console.log('undefined ->',e.message)}"`
+    expect(writes([{ name: 'Bash', input: run }])).toEqual([])
+    expect(writes([{ name: 'Bash', input: `jj log -r @- -T 'description ++ "; rm x | > y"'`, cwd: COPY }])).toEqual([])
+    expect(writes([{ name: 'Bash', input: `jj commit -m "fix; the greeting"`, cwd: COPY }])).toHaveLength(1)
     // Elsewhere: the reviewer's own scratch, the project folder.
     expect(writes([{ name: 'Write', input: 'C:\\Temp\\scratch\\notes.md' }])).toEqual([])
     expect(writes([{ name: 'Bash', input: 'jj commit -m x', cwd: 'C:\\ws\\alpha' }])).toEqual([])

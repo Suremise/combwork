@@ -79,7 +79,9 @@ function copyWrites(o, copy) {
       continue
     }
     if (!SHELL_TOOL.test(t.name) || !(names || inCopy(t.cwd))) continue
-    const text = commandText(input)
+    // Quoted text emptied first: a script's or a message's `;`, `|` or `>` is no command or redirection (an argument it
+    // stands for, `-R "<copy>"`'s path, still counts as one; the copy is found in the input above).
+    const text = commandText(input).replace(/"[^"]*"|'[^']*'/g, '""')
     for (const words of commands(text)) {
       const jj = jjCall(words)
       const writes = jj ? JJ_RECORDS.has(jj[0]) || !!JJ_RECORDS_IN[jj[0]]?.has(jj[1]) : WRITES.test(words[0]?.replace(/^[&(]+/, '') ?? '') || (words[0] === 'sed' && words.some((w) => w.startsWith('-i'))) || REDIRECT.test(words.join(' ').replace(/2>\s*\S+|>\s*(\$null|nul|\/dev\/null)\b/gi, ''))
