@@ -190,7 +190,7 @@ function jjRepo(dir, o = {}) {
     const toCheck = repo2.locator('[data-jj-to-check]')
     check('Publish records to check: both, each with what differs', !!(await until(async () => (await toCheck.locator('[data-jj-to-check-row]').count()) === 2 && /now has 2222222/.test(await text(toCheck)) && /back in its target/.test(await text(toCheck)), HUNG_MS)), await text(toCheck))
     const leftovers = repo2.locator('[data-jj-leftovers]')
-    check('Leftovers: the one still there listed, the one proved gone pruned', !!(await until(async () => (await leftovers.locator(`[data-jj-leftover="${kept}"]`).count()) === 1 && (await leftovers.locator('[data-jj-leftover]').count()) === 1, HUNG_MS)), await text(leftovers))
+    check('Leftovers: the one still there listed, the one proved gone pruned', !!(await until(async () => JSON.stringify(await leftovers.locator('[data-jj-leftover]').evaluateAll((l) => l.map((x) => x.getAttribute('data-jj-leftover')))) === JSON.stringify([kept]), HUNG_MS)), await text(leftovers))
     const control = (() => {
       const r = new DatabaseSync(path.join(ws, '.combwork', 'combwork.db'), { readOnly: true })
       try {
@@ -200,7 +200,8 @@ function jjRepo(dir, o = {}) {
       }
     })()
     check('…the journal keeps the kept one only', control.residues.length === 1 && control.residues[0].path === kept && fs.existsSync(kept), JSON.stringify(control))
-    await shoot(page.locator('.vc-view'), 'to-check')
+    await shoot(toCheck, 'to-check')
+    await shoot(leftovers, 'leftovers')
     await toCheck.locator('[data-jj-to-check-row="SHOP-1"] [data-jj-mark-checked]').click()
     const ask = dialog.filter({ hasText: 'Mark SHOP-1 as checked?' })
     check('Mark as checked asks first, saying nothing changes in the repository', !!(await until(async () => (await ask.count()) === 1 && /changes nothing in the repository/.test(await text(ask)), HUNG_MS)), await text(dialog))
@@ -335,6 +336,8 @@ function jjRepo(dir, o = {}) {
       const want = [cat['git.section.jjCompare'], cat['jj.repo.unsupported'], cat['jj.toCheck.head'], cat['jj.leftovers.head']]
       check(`${language}: jj's sections in the language`, want.every(Boolean) && !!(await until(async () => (await text(page.locator('.git-sections'))).includes(want[0]) && (await text(page.locator('.vc-view'))).includes(want[1]), HUNG_MS)), await text(page.locator('.git-sections')))
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-repository-${language}.png`) })
+      await page.locator('[data-jj-to-check]').screenshot({ path: path.join(shots, `jjview-to-check-${language}.png`) })
+      await page.locator('[data-jj-leftovers]').screenshot({ path: path.join(shots, `jjview-leftovers-${language}.png`) })
       const opsHere = await section('jjOperations')
       check(`${language}: Operations in the language`, !!cat['jj.ops.intro'] && !!(await until(async () => (await text(opsHere)).includes(cat['jj.ops.intro'].slice(0, 20)), HUNG_MS)), await text(opsHere))
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-operations-${language}.png`) })
