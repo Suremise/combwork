@@ -27,7 +27,7 @@ const SCENARIOS = {
   7: 'Install by hand over the previous release, running (/S --force-run)',
   8: "The installer's edge cases over the previous release, and a notification under the new app ID",
   9: 'A clean install used as a new user would, then searched: no trace of the old name anywhere (HI-2592)',
-  10: 'Upgrade from a 1.1 release candidate (--previous-rc, e.g. RC2), running, as its updater runs the installer (--updated /S --force-run): the names upgrade (HI-2587) moves only what is still old',
+  10: 'Upgrade from a release candidate (--previous-rc), running, as its updater runs the installer (--updated /S --force-run): from a 1.1 RC the names upgrade (HI-2587) moves only what is still old; from a later one its data is carried over as it was (HI-2834)',
   11: "The profile move the installer couldn't make (a file in 1.0's local profile folder held as it ran): the app refuses to start while it is held, then moves it itself (HI-2602)"
 }
 const KINDS = ['fresh', 'upgrade', 'manual', 'edges', 'clean', 'upgrade-rc', 'profile-move']
@@ -106,13 +106,22 @@ function overPrevious(n, pre, era = '1.0') {
   }
 }
 
-/** What a run kind must produce in this run: an upgrade's by the era of the release it started from (meta.previousEra). */
+/**
+ * The era of the release an upgrade kind starts from: scenario 10's its release candidate's (meta.previousRcEra, HI-2834;
+ * a 1.1 RC's when the meta has none), the others' --previous's (meta.previousEra).
+ */
+function eraOf(kind, meta) {
+  if (kind === 'upgrade-rc') return ERAS.includes(meta?.previousRcEra) ? meta.previousRcEra : 'rc'
+  return ERAS.includes(meta?.previousEra) ? meta.previousEra : '1.0'
+}
+/** The run kinds that upgrade over an earlier release, each its scenario and its files' prefix. */
+const UPGRADES = { upgrade: [4, 's4'], manual: [7, 's7'], 'upgrade-rc': [10, 's10'] }
+
+/** What a run kind must produce in this run: an upgrade's by the era of the release it started from (eraOf). */
 function required(kind, meta) {
-  if (kind === 'upgrade' || kind === 'manual') {
-    const era = ERAS.includes(meta?.previousEra) ? meta.previousEra : '1.0'
-    return era === '1.0' ? REQUIRED[kind] : overPrevious(kind === 'upgrade' ? 4 : 7, kind === 'upgrade' ? 's4' : 's7', era)
-  }
-  return REQUIRED[kind]
+  if (!UPGRADES[kind]) return REQUIRED[kind]
+  const era = eraOf(kind, meta)
+  return era === (kind === 'upgrade-rc' ? 'rc' : '1.0') ? REQUIRED[kind] : overPrevious(...UPGRADES[kind], era)
 }
 
 const entriesOf = s => (s?.uninstallEntries ? [].concat(s.uninstallEntries) : [])
@@ -144,7 +153,9 @@ function evaluate(meta, files) {
     if (!d) return null
     if (d.completed !== true) add(req.scenario, `${key}: the driver finished its step`, false, d.error || 'it stopped before the end (interrupted, timed out or failed)')
     const list = Array.isArray(d.checks) ? d.checks : []
-    for (const c of list) checks.push({ scenario: c.scenario || req.scenario, name: c.name, ok: c.ok === true, detail: c.ok === true ? undefined : c.detail })
+    // An upgrade's drivers number their checks as scenario 4's (drive.cjs mark, after-upgrade): reported under the
+    // scenario that ran them (HI-2834: scenario 10's were listed under 4, beside 4's own).
+    for (const c of list) checks.push({ scenario: UPGRADES[kind] ? req.scenario : c.scenario || req.scenario, name: c.name, ok: c.ok === true, detail: c.ok === true ? undefined : c.detail })
     for (const id of req.ids) if (!list.some(c => c.id === id)) add(req.scenario, `${key}: check "${id}" ran`, false, 'missing from the driver\'s record')
     for (const f of req.facts) if (d.facts?.[f] === undefined) add(req.scenario, `${key}: fact "${f}" recorded`, false, 'missing from the driver\'s record')
     return d
@@ -188,8 +199,7 @@ function evaluate(meta, files) {
     }
   }
 
-  const eraOf = kind => (kind === 'upgrade-rc' ? 'rc' : ERAS.includes(meta.previousEra) ? meta.previousEra : '1.0')
-  for (const [kind, n, pre] of [['upgrade', 4, 's4'], ['manual', 7, 's7'], ['upgrade-rc', 10, 's10']]) {
+  for (const [kind, [n, pre]] of Object.entries(UPGRADES)) {
     if (!ran.includes(kind)) continue
     const prevRun = need(n, `${pre}-prev-run`)
     const prevSt = need(n, `${pre}-prev-state`)
@@ -219,7 +229,7 @@ function evaluate(meta, files) {
       const folders = JSON.stringify({ roaming: [pr.roamingCombwork?.exists, pr.roamingOld?.exists], local: [pr.localCombwork?.exists, pr.localOld?.exists] })
       const byInstaller = /"by"\s*:\s*"installer"/.test(String(pr.localCombwork?.record))
       // From 1.0 the installer moves its profile folders (HI-2461); from 1.1 on there is nothing of 1.0's to move (HI-2727).
-      if (eraOf(kind) === 'combwork') {
+      if (eraOf(kind, meta) === 'combwork') {
         add(n, 'The profile folders kept where they were: %APPDATA%\\Combwork and %LOCALAPPDATA%\\Combwork, none of the 1.0 app\'s made', pr.roamingCombwork?.exists && pr.localCombwork?.exists && !pr.roamingOld?.exists && !pr.localOld?.exists, folders)
         add(n, 'No profile move by the installer (nothing of 1.0\'s to move): no record in %LOCALAPPDATA%\\Combwork', !byInstaller, String(pr.localCombwork?.record))
       } else {
@@ -275,7 +285,10 @@ function evaluate(meta, files) {
   const differences = asarNote ? [asarNote] : []
   // A kind left out for the previous release (HI-2727: the profile move is 1.0's): a note, never a silent gap.
   for (const [kind, why] of Object.entries(meta.skipped || {})) differences.push(`**${kind}** ${why}.`)
-  if (meta.previousEra && (ran.includes('upgrade') || ran.includes('manual'))) differences.push(`The upgrade starts from **${meta.previousVersion}**, ${meta.previousEra === 'combwork' ? "already under Combwork's names: its data is checked carried over as it was, nothing renamed" : meta.previousEra === 'rc' ? 'a 1.1 release candidate: what it still keeps under the old names is checked moved' : "under 1.0's names: the names upgrade and the profile move are checked"}.`)
+  const startsFrom = era => (era === 'combwork' ? "already under Combwork's names: its data is checked carried over as it was, nothing renamed" : era === 'rc' ? 'a 1.1 release candidate: what it still keeps under the old names is checked moved' : "under 1.0's names: the names upgrade and the profile move are checked")
+  if (meta.previousEra && (ran.includes('upgrade') || ran.includes('manual'))) differences.push(`The upgrade starts from **${meta.previousVersion}**, ${startsFrom(meta.previousEra)}.`)
+  // HI-2834: scenario 10's, from its release candidate's version (a meta from before it names no era: a 1.1 RC's).
+  if (ran.includes('upgrade-rc') && meta.previousRcVersion) differences.push(`Scenario 10's upgrade starts from the release candidate **${meta.previousRcVersion}**, ${startsFrom(eraOf('upgrade-rc', meta))}.`)
   if ((ran.includes('upgrade') || ran.includes('manual')) && meta.previousVersion === meta.installerVersion) {
     differences.push(`The previous release and this build both say **${meta.installerVersion}**: the in-app updater (no downgrades, only newer versions) would not offer this build, so the upgrade check is a reinstall over it, run by hand with the updater's arguments. The previous release's "updated to …" notice can't show.`)
   }
