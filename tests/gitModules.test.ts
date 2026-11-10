@@ -7,7 +7,7 @@
 // repository a glob of it would match kept; junctions never followed; relative URLs resolved as git resolves them; LFS
 // pointers filled by the step alone, its objects in the common dir; git-lfs missing a clear failure.
 import { execFileSync, spawn } from 'child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -414,8 +414,58 @@ describe("a copy's removed submodules", () => {
     mkdirSync(target)
     put(target, { 'precious.txt': 'precious\n' })
     symlinkSync(target, join(copy, 's'), 'junction')
+    // Never followed, and never handed over with it: a named failure (HR2's round 1), the target as it was.
+    const seen: { cwd: string; args: string[] }[] = []
+    expect(await prepareGitFiles(exec({ seen }), { folder: copy, project: p, disposable: true })).toEqual({ ok: false, error: "the folder of removed submodule s isn't plainly this copy's own clone (a link, or another repository), so it was left as it is: move it away" })
+    expect(seen.some((s) => s.args[0] === 'clean')).toBe(false)
+    expect(readFileSync(join(target, 'precious.txt'), 'utf8')).toBe('precious\n')
+    // Moved away (the junction alone), the next run finishes: nothing left to remove.
+    rmdirSync(join(copy, 's'))
     expect(await prepareGitFiles(exec(), { folder: copy, project: p, disposable: true })).toEqual({ ok: true, ran: true })
     expect(readFileSync(join(target, 'precious.txt'), 'utf8')).toBe('precious\n')
+  })
+
+  it('a removed submodule’s folder holding another repository is left, named, never removed', async () => {
+    const sub = repo('sub-11')
+    const p = repo('proj-11')
+    g(p, 'submodule', 'add', '-q', sub, 's')
+    const withSub = commitAll(p, 'sub')
+    g(p, 'rm', '-q', 's')
+    g(p, 'rm', '-q', '-f', '.gitmodules')
+    const without = commitAll(p, 'none')
+    const copy = worktree(p, withSub)
+    await prepareGitFiles(exec(), { folder: copy, project: p, disposable: true })
+    g(copy, 'checkout', '-q', '--detach', '--force', without)
+    // Someone replaced the folder with a repository of their own.
+    rmSync(join(copy, 's'), { recursive: true, force: true })
+    g(copy, 'init', '-q', join(copy, 's'))
+    put(copy, { 's/mine.txt': 'mine\n' })
+    expect(await prepareGitFiles(exec(), { folder: copy, project: p, disposable: true })).toMatchObject({ ok: false, error: expect.stringContaining('removed submodule s') })
+    expect(readFileSync(join(copy, 's', 'mine.txt'), 'utf8')).toBe('mine\n')
+  })
+})
+
+describe("a submodule's clone in the worktree's git dir", () => {
+  it('a junction at <git dir>/modules/<name> to a clone elsewhere is never taken for this worktree’s own: no update runs, the clone untouched', async () => {
+    const sub = repo('sub-12', { 'v.txt': '1\n' })
+    const p = repo('proj-12')
+    g(p, 'submodule', 'add', '-q', sub, 's')
+    commitAll(p, 'sub at 1')
+    const wt = worktree(p)
+    expect(await prepareGitFiles(exec(), { folder: wt, project: p, disposable: true })).toEqual({ ok: true, ran: true })
+    // Its clone moved outside the worktree's git dir, a junction left in its place, the clone's worktree still the checkout.
+    const gitDir = g(wt, 'rev-parse', '--absolute-git-dir')
+    const outside = join(root, 'outside-clone-12')
+    renameSync(join(gitDir, 'modules', 's'), outside)
+    symlinkSync(outside, join(gitDir, 'modules', 's'), 'junction')
+    g(root, 'config', '--file', join(outside, 'config'), 'core.worktree', join(wt, 's'))
+    const head = readFileSync(join(outside, 'HEAD'), 'utf8')
+    const cfg = readFileSync(join(outside, 'config'), 'utf8')
+    const seen: { cwd: string; args: string[] }[] = []
+    expect(await prepareGitFiles(exec({ seen }), { folder: wt, project: p, disposable: true })).toEqual({ ok: false, error: "submodule s: s holds files or a repository Combwork didn't set up. Move it away, or turn off Set up submodules and LFS" })
+    expect(seen.some((s) => s.args[0] === 'submodule' || s.args[0] === 'clean')).toBe(false)
+    expect(readFileSync(join(outside, 'HEAD'), 'utf8')).toBe(head)
+    expect(readFileSync(join(outside, 'config'), 'utf8')).toBe(cfg)
   })
 })
 

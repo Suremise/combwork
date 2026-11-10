@@ -6651,7 +6651,8 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
 - **Submodules, with no config written:** never `git submodule sync`, a top-level `--init` (both write the shared
   `.git/config`, so the project folder's) or `foreach`. Before anything changes, each first-level submodule's folder must
   be missing, empty or this worktree's own clone (its `.git` file naming `<worktree git dir>/modules/<name>`, whose
-  `core.worktree` is that folder, by real paths, no link on the way); anything else stops the step, naming it, and
+  `core.worktree` is that folder, by real paths, no link on the way, and that clone itself strictly inside the
+  worktree's `modules` folder with no link from there down to it); anything else stops the step, naming it, and
   nothing is touched. Then one `git submodule update` (`--force` in a copy or the queue's folder, which hold nobody's
   work) whose `submodule.active=.` and each URL the repository config doesn't set (from `.gitmodules`, a relative one
   resolved as `git submodule init` would, else a clear failure) come only from git's command-line config in the
@@ -6663,7 +6664,9 @@ refuses such repositories (§16.3, HI-2799's gates), so the step is the Git work
 - **Removed submodules:** a copy removes the folder of one its revision no longer has only when its own private clone
   claims it (core.worktree a literal path strictly inside the copy, no link, its `.git` naming that clone back, no
   gitlink there now), by `git clean -ffdx` of that path with literal pathspecs; its clone stays. Read from the copy's
-  git dir, so a reset cut short is finished by the next. A slot leaves such a folder, which shows as uncommitted.
+  git dir, so a reset cut short is finished by the next. A leftover that isn't plainly that clone (a link on the way,
+  another repository) is removed by nothing and fails the preparation, naming it, so the copy is never handed over
+  with it; a copy whose setup failed goes as any does. A slot leaves such a folder, which shows as uncommitted.
 - **Uncommitted work in a submodule** is uncommitted (submit.clean, a slot's preparation), named by its path, as git's
   status reports it (a user's `ignore` setting honoured).
 - **LFS** is the superproject's: `git lfs pull`, its objects in the common dir, so downloaded once per repository. A

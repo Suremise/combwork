@@ -58,6 +58,7 @@ const T = {
   noLfsFilter: agentMsg({ id: 'gitFiles.error.noLfsFilter', text: "Git LFS is used, but it isn't set up for this repository: run git lfs install", note: "A slot's or copy's setup error (HI-1182): git-lfs is installed but no LFS filter is configured (git lfs install was never run), so git lfs pull would leave pointer files. Git LFS and git lfs install are a name and a command, as they are." }),
   lfs: agentMsg({ id: 'gitFiles.error.lfs', text: 'git lfs pull: {error}', note: "A slot's or copy's setup error (HI-1182): `git lfs pull` failed. {error} is git-lfs's first line, else failed." }),
   removeLeft: agentMsg({ id: 'gitFiles.error.removeLeft', text: "the folder of removed submodule {path} couldn't be removed: {error}", note: "A copy's setup error (HI-1182): a submodule the revision no longer has left its folder, and Combwork couldn't remove it. {path} is the folder, {error} git's first line or why." }),
+  doubtfulLeft: agentMsg({ id: 'gitFiles.error.doubtfulLeft', text: "the folder of removed submodule {path} isn't plainly this copy's own clone (a link, or another repository), so it was left as it is: move it away", note: "A copy's setup error (HI-1182): a submodule its revision no longer has left a folder that Combwork can't be sure it cloned itself, so it removes nothing and the copy isn't handed over. {path} is the folder." }),
   stopped: agentMsg({ id: 'gitFiles.error.stopped', text: 'the setup of submodules and Git LFS was ended', note: "A slot's or copy's setup error (HI-1182): the run was ended (its time limit, or the workspace closing) before it finished." })
 }
 
@@ -284,12 +285,28 @@ export async function submoduleFolder(x: Pick<GitFilesExec, 'git'>, root: string
   if (!names.length) return 'init'
   const target = await gitFileTarget(full)
   if (!target) return 'foreign'
-  const module = join(gitDir, 'modules', s.name)
-  const [t, m, f] = await Promise.all([real(target), real(module), real(full)])
+  // The clone itself owned too (HR2's HI-1182 round 1): inside this worktree's modules folder, no link on the way.
+  const m = await ownedModule(gitDir, join(gitDir, 'modules', s.name))
+  const [t, f] = await Promise.all([real(target), real(full)])
   if (!t || !m || !f || !same(t, m)) return 'foreign'
-  const wt = await moduleWorktree(x, module)
+  const wt = await moduleWorktree(x, m)
   const w = wt ? await real(wt) : null
   return w && same(w, f) ? 'ours' : 'foreign'
+}
+
+/**
+ * A private module's folder as this worktree owns it (HI-1182): a folder strictly inside `<gitDir>/modules`, by its path
+ * and its real path, with no symlink or junction from that folder (it too) down to it; its real path, else null.
+ */
+async function ownedModule(gitDir: string, module: string): Promise<string | null> {
+  const root = join(gitDir, 'modules')
+  const rootSt = await lstat(root).catch(() => null)
+  if (!rootSt || rootSt.isSymbolicLink() || !rootSt.isDirectory()) return null
+  if (!strictlyInside(root, module) || (await linked(root, module)) !== false) return null
+  const st = await lstat(module).catch(() => null)
+  if (!st || !st.isDirectory()) return null
+  const [r, m] = await Promise.all([real(root), real(module)])
+  return r && m && strictlyInside(r, m) ? m : null
 }
 
 // ---- A copy's removed submodules ----
@@ -323,22 +340,26 @@ async function privateModules(gitDir: string): Promise<string[]> {
 export async function removeLeftSubmodules(x: GitFilesExec, folder: string, gitDir: string): Promise<string | null> {
   const mods = await privateModules(gitDir)
   for (const mod of mods) {
-    const wt = await moduleWorktree(x, mod)
+    const owned = await ownedModule(gitDir, mod)
+    if (!owned) continue
+    const wt = await moduleWorktree(x, owned)
+    // A clone naming no checkout in this copy (none, or outside it): nothing of this copy's to remove.
     if (!wt || !strictlyInside(folder, wt)) continue
     const rel = relative(resolve(folder), wt).split(sep).join('/')
     const full = insidePath(folder, rel)
     if (!full) continue
     const l = await linked(folder, full)
+    // Gone already (removed by an earlier run, or never checked out): nothing left.
     if (l === 'missing') continue
-    const target = await gitFileTarget(full)
-    if (l || !target) continue
-    const [t, m] = await Promise.all([real(target), real(mod)])
-    if (!t || !m || !same(t, m) || !strictlyInside(join(gitDir, 'modules'), m)) continue
     const staged = await x.git(folder, ['ls-files', '-s', '-z', '--', rel], { env: LITERAL })
     if (!staged.ok) return stored(T.removeLeft, { path: rel, error: firstLine(staged) })
-    if (nul(staged.out).some((e) => e.startsWith('160000 '))) continue
-    // Tracked files there now (a folder at that path in the new revision): not a leftover submodule; left as reset left it.
+    // The revision has something at that path (a gitlink again, or tracked files): not a leftover; left as reset left it.
     if (nul(staged.out).length) continue
+    // A leftover that isn't plainly this copy's own clone (a link on the way, no gitdir file, another repository): left
+    // untouched, and the copy isn't handed over with it (HR2's HI-1182 round 1).
+    const target = l ? null : await gitFileTarget(full)
+    const t = target ? await real(target) : null
+    if (!t || !same(t, owned)) return stored(T.doubtfulLeft, { path: rel })
     x.note(`Removing the folder of submodule ${rel}, which this revision no longer has (its clone stays).`) // i18n-ignore: the run's log, beside git's own output
     const r = await x.git(folder, ['clean', '-ffdxq', '--', rel], { env: LITERAL, log: true })
     if (!r.ok) return stored(T.removeLeft, { path: rel, error: firstLine(r) })
@@ -434,7 +455,7 @@ export async function prepareGitFiles(x: GitFilesExec, s: GitFilesStep): Promise
       const fence = { ...NO_PROMPT, GIT_CEILING_DIRECTORIES: resolve(s.folder) }
       const where = await x.git(full, ['rev-parse', '--path-format=absolute', '--absolute-git-dir', '--show-toplevel'], { env: fence })
       const [g, top] = where.ok ? where.out.trim().split(/\r?\n/) : []
-      const [rg, rm, rt, rf] = await Promise.all([g ? real(g) : null, real(join(gitDir, 'modules', sub.name)), top ? real(top) : null, real(full)])
+      const [rg, rm, rt, rf] = await Promise.all([g ? real(g) : null, ownedModule(gitDir, join(gitDir, 'modules', sub.name)), top ? real(top) : null, real(full)])
       if (!rg || !rm || !rt || !rf || !same(rg, rm) || !same(rt, rf)) {
         x.note(`Submodule ${sub.path} isn't this folder's own clone now: its own submodules are left as they are.`) // i18n-ignore: the run's log, beside git's own output
         continue

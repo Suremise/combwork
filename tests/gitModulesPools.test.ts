@@ -5,7 +5,7 @@
 // (HI-1182/s10–s16): the step before the setup, before every ready (a failure then a retry with no switch; the setting
 // off then on in a retained folder), changed and removed gitlinks, and a project with neither running no step.
 import { execFileSync, spawn } from 'child_process'
-import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'fs'
 import { createRequire } from 'module'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -223,6 +223,54 @@ describe('review and check copies', { timeout: 120_000 }, () => {
     const c = await lease(at3, 3)
     expect(existsSync(join(c.copy.folder, 'libs', 's'))).toBe(false)
     expect(sh(c.copy.folder, 'status', '--porcelain', '--ignored')).toBe('')
+  })
+})
+
+describe('review and check copies: a doubtful leftover (HR2’s round 1)', { timeout: 120_000 }, () => {
+  /** A project whose submodule a later commit removes, a copy leased at the first and returned: [pool, copy folder, the later revision]. */
+  async function returnedCopy() {
+    const { ws, p } = project()
+    const at1 = sh(p, 'rev-parse', 'HEAD')
+    g(p, 'rm', '-q', 'libs/s')
+    g(p, 'rm', '-q', '-f', '.gitmodules')
+    g(p, 'commit', '-q', '-m', 'no sub')
+    const at2 = sh(p, 'rev-parse', 'HEAD')
+    const pool = copies(ws, p, [], { setup: '', archive: '', copy: '' })
+    const a = await pool.leaseCopy({ kind: 'check', card: 1, revision: at1, agent: 'a1', ref: null })
+    if (!a.ok) throw new Error(JSON.stringify(a.refusal))
+    await pool.returnCopy(a.lease.id, 'runEnded')
+    return { pool, folder: a.copy.folder, at2 }
+  }
+
+  it('another repository where the removed submodule was fails the lease, naming it, untouched; moved away, the next lease is ready', async () => {
+    const { pool, folder, at2 } = await returnedCopy()
+    // The submodule's checkout replaced by someone's own repository (the copy's reset leaves a nested repository).
+    rmSync(join(folder, 'libs', 's'), { recursive: true, force: true })
+    g(folder, 'init', '-q', join(folder, 'libs', 's'))
+    writeFileSync(join(folder, 'libs', 's', 'mine.txt'), 'mine\n')
+    const b = await pool.leaseCopy({ kind: 'check', card: 2, revision: at2, agent: 'a1', ref: null })
+    expect(b).toMatchObject({ ok: false, refusal: { why: 'setupFailed', error: expect.stringContaining('removed submodule libs/s') } })
+    expect(readFileSync(join(folder, 'libs', 's', 'mine.txt'), 'utf8')).toBe('mine\n')
+    // Moved away, the failed copy goes as any copy whose setup failed does (tidy), and the next lease is ready.
+    const away = join(tempDir('gitmodules-moved-'), 's')
+    renameSync(join(folder, 'libs', 's'), away)
+    await pool.tidy()
+    const c = await pool.leaseCopy({ kind: 'check', card: 3, revision: at2, agent: 'a1', ref: null })
+    expect(c.ok, JSON.stringify(c)).toBe(true)
+    expect(readFileSync(join(away, 'mine.txt'), 'utf8')).toBe('mine\n')
+  })
+
+  it("a junction there is removed by the copy's reset as a link (git clean), its target untouched", async () => {
+    const { pool, folder, at2 } = await returnedCopy()
+    const target = join(tempDir('gitmodules-precious-'), 'precious')
+    mkdirSync(target)
+    writeFileSync(join(target, 'keep.txt'), 'keep\n')
+    rmSync(join(folder, 'libs', 's'), { recursive: true, force: true })
+    symlinkSync(target, join(folder, 'libs', 's'), 'junction')
+    const b = await pool.leaseCopy({ kind: 'check', card: 2, revision: at2, agent: 'a1', ref: null })
+    expect(b.ok, JSON.stringify(b)).toBe(true)
+    expect(existsSync(join(folder, 'libs', 's'))).toBe(false)
+    expect(readFileSync(join(target, 'keep.txt'), 'utf8')).toBe('keep\n')
   })
 })
 

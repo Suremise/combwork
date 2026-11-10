@@ -5,6 +5,11 @@
       "path": "plain"
     }
   },
+  "gitFiles.error.doubtfulLeft": {
+    "placeholders": {
+      "path": "plain"
+    }
+  },
   "gitFiles.error.foreign": {
     "placeholders": {
       "name": "plain",
