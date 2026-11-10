@@ -41,9 +41,9 @@ const check = (name, ok, extra = '') => {
 const home = path.join(work, 'home')
 const jjConfig = path.join(home, 'jj.toml')
 const gitConfig = path.join(home, 'gitconfig')
-const toolEnv = () => ({ ...lib.gitEnv({ GIT_CONFIG_GLOBAL: gitConfig, GIT_ATTR_NOSYSTEM: '1', XDG_CONFIG_HOME: home, JJ_CONFIG: jjConfig, NO_COLOR: '1' }) })
-const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: toolEnv(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-const git = (cwd, ...args) => execFileSync('git', args, { cwd, env: toolEnv(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+const gitEnvOfTools = () => ({ ...lib.gitEnv({ GIT_CONFIG_GLOBAL: gitConfig, GIT_ATTR_NOSYSTEM: '1', XDG_CONFIG_HOME: home, JJ_CONFIG: jjConfig, NO_COLOR: '1' }) })
+const jj = (cwd, ...args) => execFileSync(exe, args, { cwd, env: gitEnvOfTools(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+const git = (cwd, ...args) => execFileSync('git', args, { cwd, env: gitEnvOfTools(), windowsHide: true, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const id = (cwd, rev, t = 'commit_id') => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', rev, '-T', t).trim()
 const heads = (cwd) => fs.readdirSync(path.join(cwd, '.jj', 'repo', 'op_heads', 'heads'))
 
@@ -95,7 +95,7 @@ function jjRepo(dir, o = {}) {
   jjRepo(loose, { loose: true })
   project(loose, { platform: 'none' })
 
-  const env = { ...toolEnv(), PATH: `${jjDir()};${lib.baseEnv().PATH ?? ''}` }
+  const env = { ...gitEnvOfTools(), PATH: `${jjDir()};${lib.baseEnv().PATH ?? ''}` }
   delete env.CW_USER_DATA
   const { app, page } = await lib.launch({ userData, env, viewport: { width: 1400, height: 950 } })
   try {
