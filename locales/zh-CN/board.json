@@ -971,7 +971,7 @@
   "board.work.base": "基准",
   "board.work.branch": "分支",
   "board.work.carriedOver": "{from} 的通过结论对 {to} 继续有效：属于相同的变更。",
-  "board.work.change": "{commits, plural, other {变更 {change}（# 个提交）}}",
+  "board.work.change": "{commits, plural, =1 {变更 {change}} other {变更 {change}（# 个提交）}}",
   "board.work.check": "{name}：{result, select, passed {通过} failed {失败} other {已停止}}{counted, select, no {（不计入）} other {}}",
   "board.work.failed": "无法读取卡片的工作记录：{error}",
   "board.work.files": "{n, plural, =0 {没有更改文件} other {更改了 # 个文件}}",

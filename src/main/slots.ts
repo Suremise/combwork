@@ -889,7 +889,21 @@ export class SlotStore {
           }
         }),
       write: (v) => this.conn.write((db) => void db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(v))),
-      clear: () => this.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key))
+      clear: () => this.conn.write((db) => void db.prepare('DELETE FROM board_meta WHERE key = ?').run(key)),
+      update: (fn) =>
+        this.conn.write((db) => {
+          const r = db.prepare('SELECT value FROM board_meta WHERE key = ?').get(key) as { value: string } | undefined
+          let current: unknown = null
+          try {
+            current = r ? (JSON.parse(r.value) as unknown) : null
+          } catch {
+            current = { unreadable: true }
+          }
+          const next = fn(current)
+          if (next === undefined) return false
+          db.prepare('INSERT INTO board_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, JSON.stringify(next))
+          return true
+        })
     }
   }
 

@@ -264,6 +264,39 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
       expect(left.sort()).toEqual([...residues.filter((_, i) => i < 20 && i % 2 === 0).map((r) => r.path), join(dir, 'gone-registered'), join(dir, 'bad\u0000name')].sort())
     })
 
+    it("the prune's write waiting for the board's lock (HR2's round 1): a leftover recreated meanwhile kept; a residue added meanwhile, nothing written", async () => {
+      const w = setup('ctlq')
+      expect((await w.port.create(w.repo, join(w.root, 'slot-a'), w.base)).ok).toBe(true)
+      const rec = w.record()!
+      const dir = join(resolve(w.repo, '..'), 'leftovers-q')
+      mkdirSync(dir, { recursive: true })
+      const gone = { path: join(dir, 'gone'), why: 'unrecorded' }
+      const other = { path: join(dir, 'other'), why: 'unrecorded' }
+      const late = { path: join(dir, 'late'), why: 'lost' }
+      const journals = w.h.journals
+      const hold = (during: () => void) => {
+        journals.gate = () => {
+          journals.gate = null
+          during()
+        }
+      }
+      // Recreated while the write waits (the record unchanged): kept; the other, still gone, pruned.
+      w.set({ ...rec, residues: [gone, other] })
+      hold(() => mkdirSync(gone.path))
+      expect(await w.port.pruneResidues(w.repo)).toBe(1)
+      expect(w.record()!.residues).toEqual([gone])
+      // Recreated, and another residue recorded, while it waits: the record changed, so nothing is written.
+      rmSync(gone.path, { recursive: true })
+      w.set({ ...rec, residues: [gone] })
+      hold(() => {
+        mkdirSync(gone.path)
+        const now = w.record()!
+        w.set({ ...now, residues: [...now.residues!, late] })
+      })
+      expect(await w.port.pruneResidues(w.repo)).toBe(0)
+      expect(w.record()!.residues).toEqual([gone, late])
+    })
+
     it('two simultaneous makings: one control; replaced while the recovery waits for the lock: kept, a fresh one made', async () => {
       const w = setup('ctlf')
       const [a, b] = await Promise.all([w.port.create(w.repo, join(w.root, 'slot-a'), w.base), w.port.create(w.repo, join(w.root, 'slot-b'), w.base)])

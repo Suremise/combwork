@@ -971,7 +971,7 @@
   "board.work.base": "ベース",
   "board.work.branch": "ブランチ",
   "board.work.carriedOver": "{from}の合格は{to}に引き継がれます：同じ変更です。",
-  "board.work.change": "{commits, plural, other {変更 {change}（コミット#件）}}",
+  "board.work.change": "{commits, plural, =1 {変更 {change}} other {変更 {change}（コミット#件）}}",
   "board.work.check": "{name}：{result, select, passed {成功} failed {失敗} other {停止}}{counted, select, no {（対象外）} other {}}",
   "board.work.failed": "カードの作業を読み込めませんでした：{error}",
   "board.work.files": "{n, plural, =0 {変更されたファイルはありません} other {#件のファイルを変更}}",

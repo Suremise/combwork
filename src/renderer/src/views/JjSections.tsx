@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import { isJjViewUnknown, jjRevisionInput, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjLeftover, type JjOpChange, type JjOperationPreview, type JjOperationRow, type JjOperationsView, type JjOpOverlap, type JjOpRefusal, type JjRepoView, type JjResolved, type JjRow, type JjToCheckRow, type JjView, type JjViewUnknown, type JjWaitingCard } from '@shared/jjViews'
 import { revisionShort, PLATFORMS } from '@shared/platform/descriptors'
@@ -151,14 +151,15 @@ const changeShort = PLATFORMS.jj.changeShort!
 const commitShort = (id: string): string => revisionShort('jj', id)
 
 /** One jj read for a project, again on Refresh and on coming back to the window. */
-function useJjRead<T>(read: () => Promise<JjView<T>>, key: string): { data: JjView<T> | null; error: string | null; loading: boolean; reload: () => void } {
-  const [s, setS] = useState<{ key: string; data: JjView<T> | null; error: string | null; loading: boolean }>({ key, data: null, error: null, loading: true })
+function useJjRead<T>(read: () => Promise<JjView<T>>, key: string): { data: JjView<T> | null; error: string | null; loading: boolean; reload: () => void; stamp: number } {
+  const [s, setS] = useState<{ key: string; data: JjView<T> | null; error: string | null; loading: boolean; stamp: number }>({ key, data: null, error: null, loading: true, stamp: 0 })
   const reload = useCallback(() => {
     let live = true
     setS((p) => ({ ...p, key, loading: true }))
+    // Each finished read counts (HI-2869): what reads beside the section (Repository's panels) reads again with it.
     read().then(
-      (data) => live && setS({ key, data, error: null, loading: false }),
-      (e: unknown) => live && setS({ key, data: null, error: errorMessage(e), loading: false })
+      (data) => live && setS((p) => ({ key, data, error: null, loading: false, stamp: p.stamp + 1 })),
+      (e: unknown) => live && setS((p) => ({ key, data: null, error: errorMessage(e), loading: false, stamp: p.stamp + 1 }))
     )
     return () => {
       live = false
@@ -172,7 +173,7 @@ function useJjRead<T>(read: () => Promise<JjView<T>>, key: string): { data: JjVi
     return () => window.removeEventListener('focus', f)
   }, [reload])
   const mine = s.key === key
-  return { data: mine ? s.data : null, error: mine ? s.error : null, loading: !mine || s.loading, reload: () => void reload() }
+  return { data: mine ? s.data : null, error: mine ? s.error : null, loading: !mine || s.loading, reload: () => void reload(), stamp: s.stamp }
 }
 
 export function unknownText(u: JjViewUnknown): string {
@@ -260,18 +261,19 @@ function RowLine({ row }: { row: JjRow }) {
 
 /** Option A (HI-2794): the project's passed cards, each with its reviewed commit, its target, a command to integrate it, and
  * its last containment observation for exactly that approval (HI-2869). */
-function IntegratePanel({ project }: { project: ProjectInfo }) {
+/** Repository's panels read again with each of its reads (`tick`: its Refresh, the window's focus) and on board changes. */
+function IntegratePanel({ project, tick }: { project: ProjectInfo; tick: number }) {
   const tasks = useStore((s) => s.tasks)
-  const passed = tasks.filter((t) => t.project === project.name && t.column === 'passed' && !t.archived)
+  // Each read of the board (a tasks-changed: a containment observation written, a card moved).
+  const reads = useStore((s) => s.boardReads)
   const [rows, setRows] = useState<JjWaitingCard[]>([])
-  const key = passed.map((t) => t.number).join(',')
   useEffect(() => {
     let live = true
     void call('jj:waiting', project.path).then((r) => live && setRows(r), () => live && setRows([]))
     return () => {
       live = false
     }
-  }, [key, project.path])
+  }, [project.path, tick, reads])
   return (
     <section className="jj-integrate" data-jj-integrate="">
       <h4>{tr(M.integrate)}</h4>
@@ -315,23 +317,32 @@ function unknownWhy(why: string | undefined): string {
 }
 
 /** The publish records to check (J9b2's checkThis, HI-2869): a page at a time, each with what differs and Mark as checked. */
-function ToCheckPanel({ project }: { project: ProjectInfo }) {
+function ToCheckPanel({ project, tick }: { project: ProjectInfo; tick: number }) {
+  // The publish pass writes from its worker's connection: the board's poll tells the window (a tasks-changed).
+  const reads = useStore((s) => s.boardReads)
   const [rows, setRows] = useState<JjToCheckRow[]>([])
   const [more, setMore] = useState(false)
+  // A fresh read replaces what a slower earlier one (or a Show more of the old list) would answer.
+  const gen = useRef(0)
+  const drop = useCallback(() => void ++gen.current, [])
   const load = useCallback(
-    (after: JjToCheckRow | null) =>
-      call('jj:toCheck', project.path, after ? { target: after.target, checkAt: after.checkAt, card: after.card, cycle: after.cycle, bundle: after.bundle } : null).then(
+    (after: JjToCheckRow | null) => {
+      const mine = after ? gen.current : ++gen.current
+      return call('jj:toCheck', project.path, after ? { target: after.target, checkAt: after.checkAt, card: after.card, cycle: after.cycle, bundle: after.bundle } : null).then(
         (r) => {
+          if (mine !== gen.current) return
           setRows((prev) => (after ? [...prev, ...r.rows] : r.rows))
           setMore(r.more)
         },
         () => undefined
-      ),
+      )
+    },
     [project.path]
   )
   useEffect(() => {
     void load(null)
-  }, [load])
+    return drop
+  }, [load, drop, tick, reads])
   if (!rows.length) return null
   const mark = async (r: JjToCheckRow): Promise<void> => {
     if (!(await confirm({ title: tr(M.markTitle, { card: r.card }), message: tr(M.markMessage), confirmLabel: tr(M.markChecked) }))) return
@@ -367,7 +378,7 @@ function ToCheckPanel({ project }: { project: ProjectInfo }) {
 }
 
 /** What an interrupted or lost set-up of jj slots left (HI-2887's residues, HI-2869): listed for the user to remove. */
-function LeftoversPanel({ project }: { project: ProjectInfo }) {
+function LeftoversPanel({ project, tick }: { project: ProjectInfo; tick: number }) {
   const [list, setList] = useState<{ rows: JjLeftover[]; total: number }>({ rows: [], total: 0 })
   useEffect(() => {
     let live = true
@@ -375,7 +386,7 @@ function LeftoversPanel({ project }: { project: ProjectInfo }) {
     return () => {
       live = false
     }
-  }, [project.path])
+  }, [project.path, tick])
   if (!list.rows.length) return null
   return (
     <section className="jj-leftovers" data-jj-leftovers="">
@@ -425,9 +436,9 @@ export function JjRepoSection({ project }: { project: ProjectInfo }) {
               ))}
             </ul>
           )}
-          <IntegratePanel project={project} />
-          <ToCheckPanel project={project} />
-          <LeftoversPanel project={project} />
+          <IntegratePanel project={project} tick={r.stamp} />
+          <ToCheckPanel project={project} tick={r.stamp} />
+          <LeftoversPanel project={project} tick={r.stamp} />
           <h4>{tr(M.unsupported)}</h4>
           <ul className="jj-unsupported" data-jj-unsupported="">
             {v.gates.map((g) => (

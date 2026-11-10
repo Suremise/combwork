@@ -903,9 +903,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         const absent = async (p: string): Promise<boolean> => lstat(p).then(() => false, (e: { code?: string }) => e?.code === 'ENOENT' || e?.code === 'ENOTDIR')
         const candidates: Res[] = []
         for (const r of batch) if ((await absent(r.path)) && (!r.name || !listed.some((w) => w.name === r.name))) candidates.push(r)
-        // The final continuation, nothing awaited until the write: the head, the record and each absence again.
-        if (readOpHeads(ctx.jjRepo)?.join() !== op) return 0
-        if (JSON.stringify(c.journal.read()) !== JSON.stringify(snap)) return 0
+        if (!c.journal.update) return 0
         const absentNow = (p: string): boolean => {
           try {
             lstatSync(p)
@@ -915,10 +913,18 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
             return code === 'ENOENT' || code === 'ENOTDIR'
           }
         }
-        const drop = new Set(candidates.filter((r) => absentNow(r.path)))
-        const rest = all.filter((r) => !drop.has(r))
-        await c.journal.write({ ...snap, residues: rest, pruneCursor: rest.length ? (start + PRUNE_BATCH - drop.size) % rest.length : 0 })
-        return drop.size
+        // The final step runs inside the journal's own write (HR2's round 1), after any wait for its lock, nothing awaited:
+        // the record still exactly the one read, the head unchanged, each absence again; anything else writes nothing.
+        let dropped = 0
+        const wrote = await c.journal.update((current) => {
+          if (JSON.stringify(current) !== JSON.stringify(snap)) return undefined
+          if (readOpHeads(ctx.jjRepo)?.join() !== op) return undefined
+          const drop = new Set(candidates.filter((r) => absentNow(r.path)))
+          const keep = all.filter((r) => !drop.has(r))
+          dropped = drop.size
+          return { ...snap, residues: keep, pruneCursor: keep.length ? (start + PRUNE_BATCH - drop.size) % keep.length : 0 }
+        })
+        return wrote ? dropped : 0
       })
     },
     binding: (folder) => bindingNow(folder),

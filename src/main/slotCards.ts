@@ -68,6 +68,7 @@ import { withoutWriteFence, type CardRecord } from './workflow/factStore'
 import type { SlotForStart, Workflow } from './workflow/runtime'
 import { agentRunsGoing, setJjCards, setSlotStarts, workflowEnforced, workflowFor, ENFORCE } from './workflow/service'
 import { jjCardsFor } from './jjCards'
+import { setJjCardsReadyForTests } from '../shared/workflow/compile'
 import { openWorkspaces, workspaceFor, type WorkspaceService } from './workspace'
 import { teamPauseOf } from './teamPause'
 import { cardAttachments } from './cardAttachments'
@@ -2025,6 +2026,9 @@ export function startSlotCards(): void {
   setSlotStarts({ leaseFor: (ws, project, card, builder, o) => leaseForStart(ws, project, card, builder, o), unused: slotUnused, standIn })
   // jj's card work's dependencies (HI-2868), for each project's workflow.
   setJjCards(jjCardsFor)
+  // HI-2869: an unpackaged test copy starts jj cards before J9e (its window's e2e, jjwindow): CW_TEST_JJ_CARDS=1. Never
+  // a packaged build, whatever its environment; J9e removes this with the guard.
+  if (!app.isPackaged && process.env.CW_TEST_JJ_CARDS === '1') setJjCardsReadyForTests(true)
   // The pool's size: the project's builders (#1430's roles: builders and either), at least one (slots.ts).
   setBuilderCount(async (projectPath) => {
     const ws = workspaceFor(projectPath)

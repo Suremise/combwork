@@ -2,12 +2,14 @@
 // workspace database's tables (board migration 29) through a connection of their own.
 // - the list pages in (target, flag time, key) order: more than a page of rows flagged at the same moment, across
 //   targets, each listed once; another project's, resolved and unflagged rows left out;
+// - a journal's update (the leftovers' prune, HR2's round 1) decides inside its own write, on what is stored then;
 // - Mark as checked is a compare-and-set on the row shown: another project's, a re-flagged row and one already resolved
 //   are refused; the acknowledgement changes only `check.resolvedAt` (`seen` and the differences kept).
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
 import { TO_CHECK_PAGE, markCheckedIn, toCheckPage, type ToCheckCursor } from '../src/main/jjWindow'
+import { SlotStore, fileSlotConn } from '../src/main/slots'
 import { admitted } from './admitted'
 import { tempDir } from './tempDir'
 
@@ -88,5 +90,27 @@ describe("the window's publish records to check (HI-2869/s13 §3)", () => {
     expect(toCheckPage(db, 'p1').rows).toEqual([])
     // p2's row is still listed for p2.
     expect(toCheckPage(db, 'p2').rows.map((r) => r.card)).toEqual(['AM-1'])
+  })
+})
+
+describe("a slot journal's update (HI-2869, HR2's round 1)", () => {
+  it('decides inside its write on what is stored then: writes its answer, or nothing for undefined', async () => {
+    const db = database()
+    const conn = fileSlotConn(db.location()!)
+    closers.unshift(() => conn.close())
+    const a = new SlotStore(conn, 'p1').journal('jj_control:x')
+    const conn2 = fileSlotConn(db.location()!)
+    closers.unshift(() => conn2.close())
+    const b = new SlotStore(conn2, 'p1').journal('jj_control:x')
+    await a.write({ residues: [1] })
+    // Another writer's change after a read: the update sees it, not the earlier read.
+    expect(a.read()).toEqual({ residues: [1] })
+    await b.write({ residues: [1, 2] })
+    const seen: unknown[] = []
+    expect(await a.update!((cur) => (seen.push(cur), undefined))).toBe(false)
+    expect(seen).toEqual([{ residues: [1, 2] }])
+    expect(a.read()).toEqual({ residues: [1, 2] })
+    expect(await a.update!((cur) => ({ ...(cur as object), pruneCursor: 1 }))).toBe(true)
+    expect(b.read()).toEqual({ residues: [1, 2], pruneCursor: 1 })
   })
 })

@@ -3204,9 +3204,13 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
   lost set-up, a folder not empty or not proved Combwork's), at most 100 listed with the total, each with **Show in
   folder**; Combwork never deletes them. Before listing, a bounded prune (`pruneResidues`, under the store's lock) drops
   a residue only on a **proved absence**: its path's `lstat` says ENOENT or ENOTDIR (any other error keeps it) and its
-  name isn't registered at the pinned operation head; the last step reads nothing asynchronously (the operation heads,
-  the journal compared with its snapshot, each `lstat` again) before the write. 16 a batch from a rotating cursor kept in
-  the journal, so every residue is reached.
+  name isn't registered at the pinned operation head. The last step runs inside the journal's own write (the journal's
+  `update`, in the board write's transaction, after any wait for its lock: HR2's round 1), reading nothing
+  asynchronously: the record still exactly the one read, the operation heads unchanged, each `lstat` again; anything
+  else writes nothing. 16 a batch from a rotating cursor kept in the journal, so every residue is reached.
+- **Reading again:** Repository's three panels read again with each of its reads (its Refresh, the window's focus) and,
+  Waiting and the publish records, with each read of the board (a `tasks-changed`: a containment record written, a
+  card moved, the publish pass's worker writing from its own connection), a slower earlier answer dropped.
 - **Stale slots**: Slots and copies marks a jj slot *stale* (J2's `stale`, read with the slot list) with **Recover…**:
   a confirmation naming the folder its unrecorded edits are copied to (`.cw-recovery/<slot>`), then J9a's
   `slots:recoverStale`, its refusal said (busy, no longer stale, not the recorded workspace, or jj's failure).
@@ -3216,8 +3220,15 @@ only writes are an acknowledgement, the containment record and the leftovers' pr
 - **Tests:** `tests/jjReconcile.test.ts` (the record for exactly the approval, an older observation dropped, newer ones
   replacing it at equal and earlier clocks, gone with Integrated; not shown for another approval), `tests/jjWindow.test.ts`
   (paging more than a page flagged at once across targets, other projects' and resolved rows out; Mark as checked's
-  compare-and-set), `tests/jjControl.test.ts` (the prune: present, registered, unreadable and changed-meanwhile residues
-  kept, rotating batches).
+  compare-and-set; a slot journal's `update` deciding on what is stored then), `tests/jjControl.test.ts` (the prune:
+  present, registered, unreadable and changed-meanwhile residues kept, rotating batches; a leftover recreated, or a
+  residue added, while the write waits for its lock), and the e2e suites `jjview` (the publish records and leftovers,
+  seeded, Mark as checked, Refresh) and `jjwindow`: a real jj card in the app, colocated (a non-colocated project can't
+  be switched to before J9f, HI-2896, which checks these views there). An unpackaged build starts jj cards before J9e
+  for it alone (`CW_TEST_JJ_CARDS=1`, `slotCards.ts`; never a packaged one, J9e removes it with the guard): a fake
+  builder's card in its slot, submitted through the Agent API and passed by the user; Waiting's observation, shown when
+  written and following a change; the user's integration (Done, the Work section's jj rows); a stale slot recovered
+  through its confirmation, its unrecorded edit kept; light and dark, and the seven locales.
 
 ##### Open: jj's target advance (J1's gate)
 

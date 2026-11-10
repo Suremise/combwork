@@ -62,6 +62,12 @@ export interface WorkspaceJournal {
   read(): unknown
   write(v: unknown): Promise<void>
   clear(): Promise<void>
+  /**
+   * HI-2869: a compare-and-set inside the write itself: `fn` runs synchronously in the write's transaction (after any wait
+   * for its lock), given what is stored then, and answers the value to store, or undefined to write nothing. Whether it
+   * wrote. Absent where a journal can't offer it (its caller then writes nothing).
+   */
+  update?(fn: (current: unknown) => unknown): Promise<boolean>
 }
 
 /** One of the store's workspaces as the platform lists it: its folder (absolute) and the line it has checked out (null: none, detached). */

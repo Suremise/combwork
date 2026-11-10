@@ -191,6 +191,7 @@ export const SUITES = [
   { name: 'isolatedcheck' },
   { name: 'isolation', everything: "the run context (runContext.cjs) and testQuiet.ts: what every test copy and its children are given" },
   { name: 'jjview' },
+  { name: 'jjwindow' },
   { name: 'journal' },
   { name: 'journalbrowse' },
   { name: 'keys' },
