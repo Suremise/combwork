@@ -13,7 +13,7 @@
 
 import { boardReadOnly } from '../boardStore'
 import { onCombworkEvent } from '../events'
-import { createLogger } from '../logger'
+import { createLogger, userText } from '../logger'
 import type { Disposable, ObserveEvent } from '../platform/history'
 import { historyOf, observePort, repoWatchOf } from '../platform/historyPorts'
 import { openWorkspaces, WorkspaceService } from '../workspace'
@@ -23,6 +23,9 @@ import { workflowFor } from './service'
 import { isUnknown } from '../platform/types'
 
 const log = createLogger('workflow')
+
+/** The last reason each card couldn't be reconciled, said once (a bounded map: one entry per card id seen). */
+const untold = new Map<number, string>()
 
 /** How long the reconciler waits after a project's last event before it runs (the watcher has debounced already). */
 export const RECONCILE_DEBOUNCE_MS = 400
@@ -72,7 +75,10 @@ function follow(): void {
   }
   for (const [k, f] of followed) {
     const n = now.get(k)
-    if (!n || n.ws !== f.ws || !f.alive()) drop(k)
+    // A project switched to another platform is followed afresh (HI-2896): its watches are its platform's (jj's
+    // repository watch), never the ones it had (a project switched from Git kept Git's alone, so a non-colocated jj
+    // repository, whose operations change no Git ref, was never reconciled).
+    if (!n || n.ws !== f.ws || n.platform !== f.platform || !f.alive()) drop(k)
   }
   for (const [k, n] of now) {
     if (followed.has(k)) continue
@@ -199,8 +205,14 @@ async function reconcileProject(f: Followed): Promise<void> {
     const target = s.started.target
     const wanted = UNFINISHED.includes(card.stage) || asked.includes(card.id) || (card.stage === 'done' && !!target && moved.has(target))
     if (!wanted) continue
-    const settle = (): void => {
+    const settle = (what?: string): void => {
       if (card.stage === 'done' && target) unsettled.add(target)
+      // Why a card couldn't be reconciled, said once per card and reason (HI-2896: an unknown is never "not integrated",
+      // so it writes nothing, and without this nothing would say why).
+      if (what && untold.get(card.id) !== what) {
+        untold.set(card.id, what)
+        log.info(`#${card.id} not reconciled this run: ${userText(what)}`)
+      }
     }
     try {
       await reconcile(wf, card, { unknown: settle })

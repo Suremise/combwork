@@ -2441,10 +2441,26 @@ module.exports.SCENARIOS = [
       c.column = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body?.column
       if (c.column !== 'passed') throw new Error(`setup: the passed jj card is in ${c.column}, not Passed (waiting for the user to integrate)`)
       c.bookmarks = jjBookmarks(c)
+      c.bookmarksBefore = c.bookmarks
     },
     prompt: (c) => `[CW] #${c.cards.p} passed review (Implementer). Carry on with it as your skills say.`,
     fake: (c) => `skill work-on-card then cw cw_read_task {"number":${c.cards.p}} then say #${c.cards.p} passed review. Nothing for me to merge: it waits in Approved for you to integrate it, its work kept in its slot.`,
     observe: (o) => [['read the work-on-card skill', read(o, 'work-on-card'), o.skillsRead.join(',')]],
+    // The user integrates, after the run (HI-2896's done-when, both modes): the target bookmark set on the reviewed commit
+    // with jj, as the user would; Combwork records Integrated and moves the card to Done (J9b2's reconcile, its observer).
+    // The bookmarks as the agent left them are read first (the safety check's), then this move is the expected one.
+    async after(c) {
+      const left = jjBookmarks(c)
+      jjIn(c, 'bookmark', 'set', c.target, '-r', c.sub.revision)
+      c.bookmarks = jjBookmarks(c)
+      let card = null
+      for (const t = Date.now(); Date.now() - t < 120000; await new Promise((r) => setTimeout(r, 500))) {
+        card = (await c.api('GET', `/v1/tasks/${c.cards.p}`)).body
+        if (card?.column === 'done') break
+      }
+      const integrated = ((await c.inv('tasks:facts', c.cards.p)) ?? []).filter((f) => f.kind === 'Integrated').map((f) => f.data)
+      return { leftBookmarks: left, column: card?.column ?? null, integrated }
+    },
     expect: (o, c) => {
       const n = c.cards.p
       const ownMoves = movesOf(o, n).filter((x) => x.ok)
@@ -2456,7 +2472,9 @@ module.exports.SCENARIOS = [
         ['ran no merge, rebase or squash to integrate it', merges.length === 0, merges.map((t) => t.input.slice(0, 120)).join(' | ')],
         ...jjSafetyChecks(o, c),
         ["kept the reviewed work in its slot: the working copy empty on the submitted commit", empty === 'true' && parents.length === 1 && parents[0] === c.sub.revision, JSON.stringify({ empty, parents, revision: c.sub.revision })],
-        ['said the card waits for the user to integrate it', /integrat/i.test(said), said.slice(0, 300)]
+        ['said the card waits for the user to integrate it', /integrat/i.test(said), said.slice(0, 300)],
+        ["left the project's bookmarks as they were (read before the user's integration)", o.after?.leftBookmarks !== undefined && o.after.leftBookmarks === c.bookmarksBefore, String(o.after?.leftBookmarks)],
+        ["once the user set the target on the reviewed commit, Combwork recorded it Integrated (by the user) and the card went Done", o.after?.column === 'done' && (o.after?.integrated ?? []).length === 1, JSON.stringify(o.after ?? null).slice(0, 400)]
       ]
     }
   },
