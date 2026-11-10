@@ -405,6 +405,71 @@ describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.v
     })
   })
 
+  describe.each(modes)('round 1 (HR2), colocated: %s', (colocated) => {
+    it('an outside descendant made just before the restore runs: raced; recovery keeps what that operation made uncertain, never owned; drop refuses and the outside work stays', async () => {
+      const w = await world(colocated)
+      let outsideChange = ''
+      const hook = (p: JjCandidatePoint, r: JjAttemptRecord): void => {
+        if (p !== 'run:restore') return
+        const empty = r.commits[1]
+        h.jj(w.repo, '--ignore-working-copy', 'new', empty, '--no-edit', '-m', 'outside')
+        outsideChange = w.log(`children(${empty})`, 'change_id')[0]
+      }
+      const out = await prepareJjCandidate(w.deps({ hook }), w.req('squash'))
+      expect(isInterrupted(out) && out.interrupted.why, JSON.stringify(out)).toBe('raced')
+      if (!isInterrupted(out)) return
+      // jj rebased the outside descendant onto the restored commit: the same change, a new commit.
+      const outsideNow = w.log(`change_id(${outsideChange})`)
+      expect(outsideNow).toHaveLength(1)
+      const rec = await recoverJjAttempt(w.deps(), out.record)
+      expect('recovered' in rec, JSON.stringify(rec)).toBe(true)
+      if (!('recovered' in rec)) return
+      expect(rec.recovered.commits).not.toContain(outsideNow[0])
+      expect(rec.recovered.uncertain).toContain(outsideNow[0])
+      expect(rec.record.pins.some((p) => p.oid === outsideNow[0])).toBe(false)
+      const dropped = await dropJjAttempt(w.deps(), rec.record, 'main')
+      expect(isInterrupted(dropped) && dropped.interrupted.why).toBe('uncertain')
+      expect(w.log(`change_id(${outsideChange}) & ::visible_heads()`)).toEqual(outsideNow)
+    })
+
+    it.each(['deleted', 'moved'] as const)('a pin %s at the abandon boundary: interrupted, the evidence left visible, never a retained-evidence conflict', async (how) => {
+      const w = await world(colocated, { card: [{ 'f.txt': 'card\n' }], target: { 'f.txt': 'target\n' } })
+      const hook = async (p: JjCandidatePoint, r: JjAttemptRecord): Promise<void> => {
+        if (!p.startsWith('beforeAbandon:')) return
+        for (const pin of r.pins) await w.git(how === 'deleted' ? ['update-ref', '-d', pin.ref] : ['update-ref', pin.ref, w.base])
+      }
+      const out = await prepareJjCandidate(w.deps({ hook }), w.req('merge'))
+      expect(isInterrupted(out) && out.interrupted.why, JSON.stringify(out)).toBe('pin')
+      if (!isInterrupted(out)) return
+      expect(w.log(`${out.record.result} & ::visible_heads()`)).toEqual([out.record.result])
+    })
+
+    it('a pin deleted after the abandon: interrupted, never reported as retained evidence', async () => {
+      const w = await world(colocated, { card: [{ 'f.txt': 'card\n' }], target: { 'f.txt': 'target\n' } })
+      const hook = async (p: JjCandidatePoint, r: JjAttemptRecord): Promise<void> => {
+        if (p === 'abandoned') await w.git(['update-ref', '-d', r.pins[0].ref])
+      }
+      const out = await prepareJjCandidate(w.deps({ hook }), w.req('merge'))
+      expect(isInterrupted(out) && out.interrupted.why, JSON.stringify(out)).toBe('pin')
+    })
+
+    it.each(colocated ? (['bookmark', 'git branch'] as const) : (['bookmark'] as const))('the target moved onto the candidate during a drop (its %s): stopped at that delete, every pin kept', async (how) => {
+      const w = await world(colocated)
+      const out = await prepareJjCandidate(w.deps(), w.req('merge'))
+      if (!isCandidate(out)) throw new Error(JSON.stringify(out))
+      let moved = false
+      const hook = async (p: JjCandidatePoint): Promise<void> => {
+        if (!p.startsWith('beforeDelete:') || moved) return
+        moved = true
+        if (how === 'bookmark') h.jj(w.repo, '--ignore-working-copy', 'bookmark', 'set', 'main', '-r', out.candidate.result)
+        else await w.git(['update-ref', 'refs/heads/main', out.candidate.result])
+      }
+      const dropped = await dropJjAttempt(w.deps({ hook }), out.record, 'main')
+      expect(isInterrupted(dropped) && dropped.interrupted.why, JSON.stringify(dropped)).toBe('raced')
+      for (const p of out.record.pins) expect(await w.ref(p.ref)).toBe(p.oid)
+    })
+  })
+
   it("a drop's exact-old delete finding the ref moved: raced, the ref preserved", async () => {
     const w = await world(true)
     const out = await prepareJjCandidate(w.deps(), w.req('merge'))

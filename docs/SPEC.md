@@ -2562,8 +2562,10 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   operation head, whose one parent is the head read just before; the marker in its args; its added and removed commits
   (read pinned, never from jj's output) what this step should make; bookmarks, tags and every workspace's @ unchanged;
   Git's refs unchanged but for jj's own `refs/jj/keep/<id>` of exactly the commits it added or removed. Anything else is
-  `raced` and nothing more is written. Visibility is `::visible_heads()`, never `all()`: on 0.47.1 a revset naming a
-  hidden commit makes it part of `all()` there (probed).
+  `raced` and nothing more is written. What each step may make is data (`JjStep`: a duplicate's count and root, a new
+  commit's parents, a restore's commit and change, an abandon's set), journalled with the head it starts from before its
+  command runs, and checked by the same function (`shapeProblem`) here and in recovery. Visibility is
+  `::visible_heads()`, never `all()`: on 0.47.1 a revset naming a hidden commit makes it part of `all()` there (probed).
 - **Conflicts read, never assumed** (R4.8): every commit the attempt made is read pinned (a middle duplicate's conflict
   counts), its conflicted files listed with their sides (`file list -T`, `conflict_side_count`) and their hunks read in
   git's marker style (`ui.conflict-marker-style=git`), bounded by the conflict record's limits and parsed by its parser,
@@ -2578,21 +2580,32 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   with no descendant outside S and no bookmark, remote bookmark, tag or working copy on it or above it in S, so what is
   abandoned is closed under descendants and no surviving commit is rebased. A commit kept back stays visible and pinned,
   and the attempt is `interrupted` (never a candidate or a clean failure). The squash's scratch, and on a failure (a
-  conflict, not on top, not the same change) every commit of the attempt, go this way.
+  conflict, not on top, not the same change) every commit of the attempt, go this way. The pins are **read at the
+  abandon's boundary** (after its last await, never the journal's word): an owned pin moved or gone stops it
+  (`interrupted`, the evidence left visible), and they are read again after the abandon and before any outcome, so a pin
+  lost meanwhile is never reported as retained evidence (HR2's round 1).
 - **Outcomes:** a candidate (its commit, change id, the commits that stay, its owned refs); a failure returning the card
   (`conflict` with its files, hunks and pinned evidence; `notUpToDate` in the queue's existing words, sameness being
   §16.3.2's replay on the store through J3's `jjSameRevision`, change ids never counted); a `signing` pause (gate:
   signing); a typed unknown before anything is planned (several heads, nothing merged); or `interrupted` (a lost owner,
   a cancel, a race, a pin refused, a commit kept back), with the record for recovery.
 - **Recovery** (`recoverJjAttempt`, its later caller's to run): the attempt's objects found only by provenance, the
-  operations carrying its marker walking back from the single head to its planned operation (at most 200) and the
-  commits they added, never by description or change id; each journalled pin reconciled with the ref now: its own create
+  operations carrying its marker walking back from the single head to its planned operation (at most 200), never by
+  description or change id. A marked operation's commits are owned only when it was validated in the attempt (the
+  journal's), or is its journalled step validated now as the attempt would have (the step's parent, its view's
+  bookmarks, tags and workspaces unchanged, the step's shape). Any other marked operation's additions are **uncertain**:
+  kept apart, never owned, pinned or abandoned (a restore that raced an outside descendant rebases it: that rebased
+  commit is never adopted, HR2's round 1). Each journalled pin reconciled with the ref now: its own create
   read back is owned; an intent with no outcome whose ref holds the intended commit is **ambiguous** (kept, never owned,
   never deleted); anything else a collision. What isn't held is pinned now, create-only. It never abandons or deletes,
   and never answers a success.
 - **Drop** (`dropJjAttempt`): the attempt's visible commits abandoned (guarded), then only its owned refs deleted with
   exact-old deletes (a moved ref is `raced`, preserved). Refused for any commit the target reaches (an ancestor of the
-  target bookmark, local or remote) and when the target can't be read or is conflicted: those commits and pins stay.
+  target bookmark, local or remote, or of its Git branch or a remote's: a Git move jj hasn't imported) and when the target
+  can't be read or is conflicted: those commits and pins stay. What the target reaches is **read again under the lock
+  right before each delete** (an exact-old delete guards the pin's value, not containment): a target moved onto a pinned
+  commit meanwhile stops the drop there with every remaining pin kept. A record with uncertain commits, or an
+  unvalidated step, is refused whole (recovery first).
 - **Residual race:** an operation started from the same base operation as one of the attempt's own. jj 0.47.1 has no
   conditional operation (J1's finding (a)), so only a later command reconciling the two heads would act on it; it shows
   as `raced` (two heads, or a parent other than the head read), is reported, and nothing more is written or cleaned up.
@@ -2606,7 +2619,10 @@ is HI-2797/s11, s14 and s17 (HR2's); the evidence is jj 0.47.1's, where a confli
   else first (an unrelated commit, and the very commit), then recovery and drop leaving it; crashes after written,
   during pinning and after pinned, and between a create and its journal; a drop refused for the candidate and for a
   descendant of it as the target; a drop's delete racing a moved ref; a stale attempt's drop beside a newer one; a
-  superseded merge candidate; and a candidate leased in a check copy.
+  superseded merge candidate; a candidate leased in a check copy; and HR2's round 1: an outside descendant made just
+  before the restore runs (raced; recovery keeps the rebased work uncertain; drop refuses), pins deleted or moved at the
+  abandon's boundary and after it, and the target moved onto the candidate during a drop (its bookmark, and colocated its
+  Git branch).
 
 ##### Open: jj's target advance (J1's gate)
 

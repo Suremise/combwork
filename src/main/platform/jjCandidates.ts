@@ -76,10 +76,48 @@ export interface JjAttemptRecord {
   pins: JjPin[]
   abandoned?: string[]
   kept?: string[]
+  /**
+   * The write under way, journalled before its command runs: its name, the head it was started from, and what it may make.
+   * Recovery validates a marked operation against it before taking its commits as the attempt's.
+   */
+  step?: { name: string; parent: string; shape: JjStep }
+  /**
+   * Commits a marked operation added that recovery couldn't validate as this attempt's own step (another parent, a side
+   * effect, another shape: e.g. an outside descendant jj rebased). Never owned, never pinned or abandoned by the attempt;
+   * while any are recorded, drop refuses.
+   */
+  uncertain?: string[]
+}
+
+/** What one write may make: its shape, checked against the operation's delta (shapeProblem). */
+export type JjStep =
+  | { kind: 'duplicate'; n: number; onto: string }
+  | { kind: 'new'; parents: string[] }
+  | { kind: 'restore'; into: string; change: string; parent: string }
+  | { kind: 'abandon'; will: string[] }
+
+/** Why a delta isn't the shape its step may make (null: it is). Pure: the caller read the delta at the operation. */
+export function shapeProblem(step: JjStep, d: { added: readonly JjCommit[]; removed: readonly string[] }): string | null {
+  switch (step.kind) {
+    case 'duplicate': {
+      if (d.removed.length || d.added.length !== step.n) return 'shape'
+      const ids = new Set(d.added.map((c) => c.commit))
+      const roots = d.added.filter((c) => !c.parents.some((x) => ids.has(x)))
+      const named = new Set(d.added.flatMap((c) => c.parents))
+      const heads = d.added.filter((c) => !named.has(c.commit))
+      return roots.length === 1 && heads.length === 1 && roots[0].parents.join() === step.onto ? null : 'shape'
+    }
+    case 'new':
+      return !d.removed.length && d.added.length === 1 && d.added[0].parents.join() === step.parents.join() ? null : 'shape'
+    case 'restore':
+      return d.removed.join() === step.into && d.added.length === 1 && d.added[0].parents.join() === step.parent && d.added[0].change === step.change ? null : 'shape'
+    case 'abandon':
+      return !d.added.length && sameSet(d.removed, step.will) ? null : 'shape'
+  }
 }
 
 /** Why an attempt stopped short: never a candidate, a retained-evidence failure, or anything to act on but recovery. */
-export type JjInterruptWhy = 'owner' | 'cancelled' | 'raced' | 'heads' | 'failed' | 'malformed' | 'pin' | 'kept' | 'tool' | 'gone'
+export type JjInterruptWhy = 'owner' | 'cancelled' | 'raced' | 'heads' | 'failed' | 'malformed' | 'pin' | 'kept' | 'tool' | 'gone' | 'uncertain'
 
 export interface JjInterrupted {
   interrupted: { attempt: string; phase: JjAttemptPhase; why: JjInterruptWhy; detail?: string; commits: string[]; refs: string[]; kept?: string[] }
@@ -104,6 +142,7 @@ export const isCandidate = (o: unknown): o is JjCandidate => !!o && typeof o ===
 export type JjCandidatePoint =
   | 'planned'
   | `beforeWrite:${string}`
+  | `run:${string}`
   | `afterWrite:${string}`
   | 'written'
   | `beforePin:${string}`
@@ -348,10 +387,10 @@ class Attempt {
 
   /**
    * One jj write: the owner checked, the head read, the write run from the folder (its working copy ignored, the marker,
-   * the identity), then validated (deltaProblem) and its added commits read at the new head. `expect` says whether the
-   * delta is what this step should have made.
+   * the identity), then validated (deltaProblem) and its added commits read at the new head, which must be the shape
+   * its step may make (shapeProblem). The step is journalled before the command runs, for recovery.
    */
-  async write(name: string, args: readonly string[], expect: (d: JjOpDelta) => string | null): Promise<JjOpDelta> {
+  async write(name: string, args: readonly string[], shape: JjStep): Promise<JjOpDelta> {
     return this.deps.lock(async () => {
       this.check()
       const parent = this.head()
@@ -359,6 +398,9 @@ class Attempt {
       await this.hook(`beforeWrite:${name}`)
       if (this.head() !== parent) throw new Stop('raced', `beforeWrite:${name}`)
       this.check()
+      this.rec.step = { name, parent, shape }
+      await this.deps.journal(structuredClone(this.rec))
+      await this.hook(`run:${name}`)
       const who = this.deps.identity ? [`--config=user.name=${toml(this.deps.identity.name)}`, `--config=user.email=${toml(this.deps.identity.email)}`] : []
       const r = await this.deps.runner.run(this.deps.folder, ['--ignore-working-copy', '--config=snapshot.auto-update-stale=false', marker(this.rec.attempt), ...who, ...args], { write: true, signal: this.deps.signal, timeout: this.deps.timeout })
       if (r.cancelled) throw new Stop('cancelled', name)
@@ -374,11 +416,12 @@ class Attempt {
       if (why) throw new Stop('raced', `${name}: ${why}`)
       if (this.head() !== op) throw new Stop('raced', `after ${name}`) // i18n-ignore: a protocol detail for logs and tests, never shown
       const d: JjOpDelta = { op, parent, added, removed }
-      const bad = expect(d)
+      const bad = shapeProblem(shape, d)
       if (bad) throw new Stop('raced', `${name}: ${bad}`)
       // Only now are its commits the attempt's: an operation validated as its own.
       this.rec.ops.push(op)
       for (const c of added) if (!this.rec.commits.includes(c.commit)) this.rec.commits.push(c.commit)
+      this.rec.step = undefined
       await this.deps.journal(structuredClone(this.rec))
       await this.hook(`afterWrite:${name}`)
       return d
@@ -438,13 +481,13 @@ class Attempt {
    */
   async abandon(ids: readonly string[]): Promise<string[]> {
     const owned = ids.filter((c) => this.rec.commits.includes(c))
-    // Held: an owned pin, or a journalled intent whose ref holds exactly the commit now (recovery's ambiguous: not owned,
-    // never deleted, but it keeps the commit reachable all the same).
-    const held = new Set(this.rec.pins.filter((p) => p.state === 'created').map((p) => p.oid))
-    for (const p of this.rec.pins) if (p.state === 'intent' && !held.has(p.oid) && (await this.refNow(p.ref)) === p.oid) held.add(p.oid)
-    if (owned.some((c) => !held.has(c))) throw new Stop('pin', 'abandon before pin') // i18n-ignore: a protocol detail for logs and tests, never shown
     await this.phase('abandoning')
     await this.hook(`beforeAbandon:${owned.length}`)
+    // The pins as they are now, at the boundary (never the journal's word alone): every owned pin still at its commit,
+    // and every commit to abandon held by one (or by a journalled intent whose ref holds it: recovery's ambiguous, never
+    // owned or deleted, but it keeps the commit reachable all the same).
+    const held = await this.held()
+    if (owned.some((c) => !held.has(c))) throw new Stop('pin', 'abandon before pin') // i18n-ignore: a protocol detail for logs and tests, never shown
     const op = this.head()
     const visible = new Set((await this.commits(op, visibleOf(owned))).map((c) => c.commit))
     const live = owned.filter((c) => visible.has(c))
@@ -452,13 +495,30 @@ class Attempt {
     const will = live.length ? (await this.commits(op, guard)).map((c) => c.commit) : []
     const kept = live.filter((c) => !will.includes(c))
     if (will.length) {
-      await this.write('abandon', ['abandon', '-r', guard], (d) => (d.added.length ? 'rebased' : sameSet(d.removed, will) ? null : 'abandoned'))
+      await this.write('abandon', ['abandon', '-r', guard], { kind: 'abandon', will })
     }
     this.rec.abandoned = [...(this.rec.abandoned ?? []), ...will]
     this.rec.kept = kept
     await this.phase('abandoned')
     await this.hook('abandoned')
+    // The evidence still held after the abandon: a pin lost meanwhile is never reported as retained.
+    await this.held()
     return kept
+  }
+
+  /**
+   * The commits the attempt's pins hold now: each owned pin read and required at its commit (moved or gone: `pin`, never
+   * taken from the journal), and each journalled intent whose ref holds exactly its commit.
+   */
+  async held(): Promise<Set<string>> {
+    const held = new Set<string>()
+    for (const p of this.rec.pins) {
+      if (p.state !== 'created' && p.state !== 'intent') continue
+      const now = await this.refNow(p.ref)
+      if (now === p.oid) held.add(p.oid)
+      else if (p.state === 'created') throw new Stop('pin', `lost:${p.ref}`) // i18n-ignore: a protocol detail for logs and tests, never shown
+    }
+    return held
   }
 
   /** The attempt's owned refs (its own creates, not dropped). */
@@ -574,25 +634,19 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
       if (suffix.some((c) => c.parents.length > 1)) return { fail: 'notUpToDate', log: notUp(CANDIDATE_TEXT.mergeCommit), evidence: [], refs: [], record: structuredClone(rec) }
       if (!suffix.length) return { fail: 'notUpToDate', log: notUp(CANDIDATE_TEXT.rebasedNotSame), evidence: [], refs: [], record: structuredClone(rec) }
       await a.phase('writing')
-      const d = await a.write('duplicate', ['duplicate', '-r', `${req.base}..${req.revision}`, '--onto', req.expected], (x) => {
-        if (x.removed.length || x.added.length !== suffix.length) return 'shape'
-        const h = headOf(x.added)
-        const roots = x.added.filter((c) => !c.parents.some((p) => x.added.some((y) => y.commit === p)))
-        if (!h || roots.length !== 1 || roots[0].parents.join() !== req.expected) return 'shape'
-        return null
-      })
+      const d = await a.write('duplicate', ['duplicate', '-r', `${req.base}..${req.revision}`, '--onto', req.expected], { kind: 'duplicate', n: suffix.length, onto: req.expected })
       rec.result = headOf(d.added)!.commit
     } else if (req.style === 'merge') {
       await a.phase('writing')
-      const d = await a.write('merge', ['new', req.expected, req.revision, '--no-edit', '-m', req.message], (x) => (x.removed.length || x.added.length !== 1 || x.added[0].parents.join() !== `${req.expected},${req.revision}` ? 'shape' : null))
+      const d = await a.write('merge', ['new', req.expected, req.revision, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected, req.revision] })
       rec.result = d.added[0].commit
     } else {
       await a.phase('writing')
-      const m = await a.write('scratch', ['new', req.expected, req.revision, '--no-edit', '-m', `combwork scratch ${req.attempt}`], (x) => (x.removed.length || x.added.length !== 1 || x.added[0].parents.join() !== `${req.expected},${req.revision}` ? 'shape' : null)) // i18n-ignore: a protocol detail for logs and tests, never shown
+      const m = await a.write('scratch', ['new', req.expected, req.revision, '--no-edit', '-m', `combwork scratch ${req.attempt}`], { kind: 'new', parents: [req.expected, req.revision] }) // i18n-ignore: a protocol detail for logs and tests, never shown
       const merged = m.added[0].commit
-      const s = await a.write('squash', ['new', req.expected, '--no-edit', '-m', req.message], (x) => (x.removed.length || x.added.length !== 1 || x.added[0].parents.join() !== req.expected ? 'shape' : null))
+      const s = await a.write('squash', ['new', req.expected, '--no-edit', '-m', req.message], { kind: 'new', parents: [req.expected] })
       const empty = s.added[0].commit
-      const t = await a.write('restore', ['restore', '--from', merged, '--into', empty], (x) => (x.removed.join() !== empty || x.added.length !== 1 || x.added[0].parents.join() !== req.expected || x.added[0].change !== s.added[0].change ? 'shape' : null))
+      const t = await a.write('restore', ['restore', '--from', merged, '--into', empty], { kind: 'restore', into: empty, change: s.added[0].change, parent: req.expected })
       rec.result = t.added[0].commit
       scratch = [merged]
     }
@@ -623,6 +677,7 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
       // Pinned already: the attempt's commits out of the user's log, guarded; anything kept back is an interruption.
       const kept = await a.abandon(rec.commits)
       if (kept.length) throw new Stop('kept')
+      await a.held()
       await a.phase('done')
       const evidence = fail.fail === 'conflict' ? (conflicts?.evidence ?? []) : [...rec.commits]
       return { ...fail, evidence, refs: a.owned(), record: structuredClone(rec) }
@@ -634,6 +689,7 @@ export async function prepareJjCandidate(deps: JjCandidateDeps, req: JjCandidate
     // The candidate still visible, at exactly its commit, at the head it is answered for.
     const at = a.head()
     if (!(await a.commits(at, visibleOf([result.commit]))).length) throw new Stop('gone', result.commit)
+    await a.held()
     await a.phase('done')
     const stays = rec.commits.filter((c) => !(rec.abandoned ?? []).includes(c) && c !== rec.result).concat(result.commit)
     return { candidate: { result: result.commit, commits: (await a.commits(at, visibleOf(stays))).map((c) => c.commit), change: result.change, op: at, refs: a.owned() }, record: structuredClone(rec) }
@@ -662,8 +718,13 @@ export interface JjRecovered {
   recovered: {
     attempt: string
     phase: JjAttemptPhase
-    /** Commits the attempt's own validated operations added (provenance: their marker, never a description). */
+    /** Commits the attempt owns: added by its own validated operations (journalled, or its last step validated now). */
     commits: string[]
+    /**
+     * Commits a marked operation added that couldn't be validated as the attempt's step (another parent, a side effect,
+     * another shape: an outside descendant jj rebased, say). Preserved, never owned, pinned or abandoned; drop refuses.
+     */
+    uncertain: string[]
     /** Refs the attempt owns: its own creates, read back. */
     owned: string[]
     /** A create whose outcome the journal never recorded, the ref at the intended commit: kept, not owned. */
@@ -675,10 +736,13 @@ export interface JjRecovered {
 }
 
 /**
- * An interrupted attempt's recovery (s14 §11, s17 §1): explicit, its later caller's to run. Its objects are found only by
- * provenance: operations carrying its marker, walking back from the single head to its planned operation (bounded), and
- * the commits their views added; refs only through its journal's pins. What is unpinned is pinned (create-only); nothing
- * is abandoned or dropped, and the answer is never a candidate.
+ * An interrupted attempt's recovery (s14 §11, s17 §1, HR2's round 1): explicit, its later caller's to run. Its objects are
+ * found only by provenance: operations carrying its marker, walking back from the single head to its planned operation
+ * (bounded). A marked operation's commits are the attempt's only when that operation was validated in the attempt (its
+ * journal's `ops`), or is its journalled last step validated now as the attempt would have (the step's parent, nothing
+ * else changed in its view, the step's shape); any other marked operation's additions are `uncertain`: kept apart, never
+ * owned. Refs only through its journal's pins. What it owns unpinned is pinned (create-only); nothing is abandoned or
+ * dropped, and the answer is never a candidate.
  */
 export async function recoverJjAttempt(deps: JjCandidateDeps, record: JjAttemptRecord): Promise<JjRecovered | JjInterrupted> {
   const rec = structuredClone(record)
@@ -695,15 +759,36 @@ export async function recoverJjAttempt(deps: JjCandidateDeps, record: JjAttemptR
     }
     const reach = log.findIndex((e) => e.id === rec.baseOp)
     if (reach < 0) throw new Stop('malformed', log.length > limit ? 'history:capped' : 'history:baseOp')
-    const commits: string[] = []
+    const owns = new Set(rec.commits)
+    const uncertain = new Set(rec.uncertain ?? [])
     for (const e of log.slice(0, reach).reverse()) {
       if (!markerIn(e.args, rec.attempt)) continue
       if (e.parents.length !== 1) throw new Stop('malformed', `merge op ${e.id}`) // i18n-ignore: a protocol detail for logs and tests, never shown
-      for (const c of await a.commits(e.id, `::visible_heads() ~ ::at_operation(${e.parents[0]}, visible_heads())`)) if (!commits.includes(c.commit)) commits.push(c.commit)
+      const parent = e.parents[0]
+      const added = await a.commits(e.id, `::visible_heads() ~ ::at_operation(${parent}, visible_heads())`)
+      if (rec.ops.includes(e.id)) {
+        // Validated in the attempt: its commits are the journal's already.
+        if (added.some((c) => !owns.has(c.commit))) throw new Stop('malformed', `journal commits differ: ${e.id}`) // i18n-ignore: a protocol detail for logs and tests, never shown
+        continue
+      }
+      // The journalled step under way, validated now as the attempt would have: its parent, its view's other parts, its shape.
+      const step = rec.step
+      let mine = false
+      if (step && parent === step.parent) {
+        const removed = (await a.commits(e.id, `at_operation(${parent}, ::visible_heads()) ~ ::visible_heads()`)).map((c) => c.commit)
+        const [was, now] = [await a.sides(parent), await a.sides(e.id)]
+        const same = was.bookmarks.join('\n') === now.bookmarks.join('\n') && was.tags.join('\n') === now.tags.join('\n') && was.workspaces.join('\n') === now.workspaces.join('\n')
+        mine = same && shapeProblem(step.shape, { added, removed }) === null
+      }
+      if (mine) {
+        rec.ops.push(e.id)
+        for (const c of added) owns.add(c.commit)
+        rec.step = undefined
+      } else for (const c of added) if (!owns.has(c.commit)) uncertain.add(c.commit)
     }
-    // The journal's commits must be among them (a commit it recorded and no marked operation made isn't the attempt's).
-    if (rec.commits.some((c) => !commits.includes(c))) throw new Stop('malformed', 'journal commits not found') // i18n-ignore: a protocol detail for logs and tests, never shown
-    rec.commits = commits
+    // The journal's commits must each have come from a marked operation in the walk (none recorded otherwise).
+    rec.commits = [...owns]
+    rec.uncertain = [...uncertain].filter((c) => !owns.has(c))
     const owned: string[] = []
     const ambiguous: string[] = []
     const collisions: string[] = []
@@ -722,18 +807,18 @@ export async function recoverJjAttempt(deps: JjCandidateDeps, record: JjAttemptR
       } else if (p.state === 'collision') collisions.push(p.ref)
     }
     await deps.journal(structuredClone(rec))
-    // What isn't held by an owned or ambiguous pin is pinned now: fresh, create-only refs.
+    // What it owns and isn't held by an owned or ambiguous pin is pinned now: fresh, create-only refs. Uncertain commits never.
     const held = new Set(rec.pins.filter((p) => owned.includes(p.ref) || ambiguous.includes(p.ref)).map((p) => p.oid))
     const prefix = pinPrefix(rec.card, rec.attempt)
     let n = rec.pins.length
-    for (const c of commits) {
+    for (const c of rec.commits) {
       if (held.has(c)) continue
       let ref = `${prefix}r${n++}`
       while (rec.pins.some((p) => p.ref === ref)) ref = `${prefix}r${n++}`
       await a.pin(ref, c)
       owned.push(ref)
     }
-    return { recovered: { attempt: rec.attempt, phase: rec.phase, commits, owned, ambiguous, collisions }, record: structuredClone(rec) }
+    return { recovered: { attempt: rec.attempt, phase: rec.phase, commits: [...rec.commits], uncertain: [...rec.uncertain], owned, ambiguous, collisions }, record: structuredClone(rec) }
   } catch (e) {
     if (e instanceof Stop) return a.interrupted(e)
     throw e
@@ -747,25 +832,47 @@ export interface JjDropped {
 }
 
 /**
- * An attempt's clean-up (s14 §11, s17 §1–2): its still-visible commits abandoned (guarded), then its owned refs deleted
- * with exact-old deletes. Refused for anything the target reaches (the candidate, or any pinned commit, an ancestor of
- * the target bookmark's commit, local or remote) and when that can't be read: those commits and pins stay. Ambiguous and
- * colliding refs are never deleted.
+ * Which of `ids` the target reaches now: an ancestor of (or) its bookmark, local or remote, as jj shows it at the single
+ * head, or of its Git branch or a remote's (a Git move jj hasn't imported). A target that isn't there, is conflicted or
+ * can't be read stops (nothing is taken as unreached).
+ */
+async function reachedNow(a: Attempt, target: string, ids: readonly string[]): Promise<{ op: string; reached: Set<string> }> {
+  const op = a.head()
+  const name = JSON.stringify(target)
+  const tips = await a.commits(op, `bookmarks(exact:${name}) | remote_bookmarks(exact:${name})`)
+  if (!tips.length) throw new Stop('malformed', 'no target') // i18n-ignore: a protocol detail for logs and tests, never shown
+  const rows = lines(await a.read(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_T])).map((l) => l.split(SEP))
+  if (rows.some((f) => f[0] === target && f[2] === 'true')) throw new Stop('malformed', 'target conflicted') // i18n-ignore: a protocol detail for logs and tests, never shown
+  const reached = new Set(ids.length ? (await a.commits(op, `${set([...ids])} & ::(bookmarks(exact:${name}) | remote_bookmarks(exact:${name}))`)).map((c) => c.commit) : [])
+  for (const c of ids) {
+    if (reached.has(c)) continue
+    const r = await a.deps.git(['for-each-ref', '--format=%(refname)', '--contains', c, `refs/heads/${target}`, 'refs/remotes/'])
+    if (!r.ok) throw new Stop('failed', r.err)
+    if (lines(r.out).some((n) => n === `refs/heads/${target}` || (n.startsWith('refs/remotes/') && n.endsWith(`/${target}`)))) reached.add(c)
+  }
+  if (!a.reads.stillAt(op)) throw new Stop('raced', 'target read') // i18n-ignore: a protocol detail for logs and tests, never shown
+  return { op, reached }
+}
+
+/**
+ * An attempt's clean-up (s14 §11, s17 §1–2, HR2's round 1): its still-visible commits abandoned (guarded), then its owned
+ * refs deleted with exact-old deletes. Refused for anything the target reaches (the candidate, or any pinned commit, an
+ * ancestor of the target bookmark, local or remote, or of its Git branch), read again under the lock right before each
+ * delete: a target that moved onto a pinned commit meanwhile stops the drop with that pin and the rest kept. Refused
+ * whole while the record has uncertain commits (recovery's), and when the target can't be read. Ambiguous and colliding
+ * refs are never deleted.
  */
 export async function dropJjAttempt(deps: JjCandidateDeps, record: JjAttemptRecord, target: string): Promise<JjDropped | JjInterrupted> {
   const rec = structuredClone(record)
   const a = new Attempt(deps, rec)
   try {
     a.check()
-    const op = a.head()
-    const name = JSON.stringify(target)
-    const tips = await a.commits(op, `bookmarks(exact:${name}) | remote_bookmarks(exact:${name})`)
-    if (!tips.length) throw new Stop('malformed', 'no target') // i18n-ignore: a protocol detail for logs and tests, never shown
-    const rows = lines(await a.read(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_T])).map((l) => l.split(SEP))
-    if (rows.some((f) => f[0] === target && f[2] === 'true')) throw new Stop('malformed', 'target conflicted') // i18n-ignore: a protocol detail for logs and tests, never shown
+    if (rec.uncertain?.length) throw new Stop('uncertain', rec.uncertain.join(','))
+    // A write whose operation was never validated (interrupted mid-step): recovery first.
+    if (rec.step) throw new Stop('uncertain', `step:${rec.step.name}`)
     const owned = rec.pins.filter((p) => p.state === 'created')
     const ids = [...new Set([...rec.commits, ...owned.map((p) => p.oid)])]
-    const reached = new Set((await a.commits(op, `${set(ids)} & ::(bookmarks(exact:${name}) | remote_bookmarks(exact:${name}))`)).map((c) => c.commit))
+    const { op, reached } = await reachedNow(a, target, ids)
     const visible = (await a.commits(op, visibleOf(ids))).map((c) => c.commit)
     const kept = visible.length ? await a.abandon(visible.filter((c) => !reached.has(c) && rec.commits.includes(c))) : []
     const keptRefs: JjDropped['dropped']['keptRefs'] = []
@@ -782,9 +889,13 @@ export async function dropJjAttempt(deps: JjCandidateDeps, record: JjAttemptReco
       }
       await deps.lock(async () => {
         await a.hook(`beforeDelete:${p.ref}`)
+        // The target read again at the delete's own boundary: exact-old deletion guards the pin's value, not containment.
+        const now = await reachedNow(a, target, [p.oid])
+        if (now.reached.has(p.oid)) throw new Stop('raced', `target reaches ${p.oid}`) // i18n-ignore: a protocol detail for logs and tests, never shown
+        a.check()
         const r = await deps.git(['update-ref', '-d', p.ref, p.oid])
-        const now = await a.refNow(p.ref)
-        if (!r.ok || now !== null) throw new Stop('raced', `delete:${p.ref}`)
+        const left = await a.refNow(p.ref)
+        if (!r.ok || left !== null) throw new Stop('raced', `delete:${p.ref}`)
         p.state = 'dropped'
         dropped.push(p.ref)
         await deps.journal(structuredClone(rec))

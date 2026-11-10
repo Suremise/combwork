@@ -3,7 +3,7 @@
 // commits), the guarded abandon's revset, and the parsers of refs, conflicted files and operations. The real jj's
 // behaviour is jjCandidatesReal.test.ts'.
 import { describe, expect, it } from 'vitest'
-import { deltaProblem, guardedSet, parseConflicted, parseOpLine, parseRefs, pinPrefix, rootFile } from '../src/main/platform/jjCandidates'
+import { deltaProblem, guardedSet, parseConflicted, parseOpLine, parseRefs, pinPrefix, rootFile, shapeProblem } from '../src/main/platform/jjCandidates'
 
 const op = (c: string): string => c.repeat(128)
 const id = (c: string): string => c.repeat(40)
@@ -48,6 +48,35 @@ describe("an operation's delta", () => {
 
   it('reads the marker as jj records it in the args, quoted or escaped', () => {
     expect(deltaProblem({ ...base, entry: { ...base.entry, args: 'args: jj new "--config=combwork.txn=\\"t123456\\""' } })).toBeNull()
+  })
+})
+
+describe("a step's shape (the same check in preparation and in recovery)", () => {
+  const c = (commit: string, parents: string[], change = 'k'.repeat(32)) => ({ commit, change, parents, empty: false, divergent: false, conflict: false })
+  it('duplicate: n commits, one root on the target, one head, nothing removed', () => {
+    const step = { kind: 'duplicate' as const, n: 2, onto: id('t') }
+    expect(shapeProblem(step, { added: [c(id('1'), [id('t')]), c(id('2'), [id('1')])], removed: [] })).toBeNull()
+    expect(shapeProblem(step, { added: [c(id('1'), [id('t')])], removed: [] })).toBe('shape')
+    expect(shapeProblem(step, { added: [c(id('1'), [id('x')]), c(id('2'), [id('1')])], removed: [] })).toBe('shape')
+    expect(shapeProblem(step, { added: [c(id('1'), [id('t')]), c(id('2'), [id('t')])], removed: [] })).toBe('shape')
+  })
+  it('new: one commit on exactly its parents', () => {
+    const step = { kind: 'new' as const, parents: [id('t'), id('r')] }
+    expect(shapeProblem(step, { added: [c(id('1'), [id('t'), id('r')])], removed: [] })).toBeNull()
+    expect(shapeProblem(step, { added: [c(id('1'), [id('r'), id('t')])], removed: [] })).toBe('shape')
+    expect(shapeProblem(step, { added: [c(id('1'), [id('t'), id('r')])], removed: [id('9')] })).toBe('shape')
+  })
+  it("restore: exactly its commit rewritten, on its parent, its change kept; an outside descendant rebased isn't its shape", () => {
+    const step = { kind: 'restore' as const, into: id('e'), change: 'k'.repeat(32), parent: id('t') }
+    expect(shapeProblem(step, { added: [c(id('f'), [id('t')])], removed: [id('e')] })).toBeNull()
+    expect(shapeProblem(step, { added: [c(id('f'), [id('t')]), c(id('d'), [id('f')], 'm'.repeat(32))], removed: [id('e'), id('o')] })).toBe('shape')
+    expect(shapeProblem(step, { added: [c(id('f'), [id('t')], 'm'.repeat(32))], removed: [id('e')] })).toBe('shape')
+  })
+  it('abandon: exactly what it would abandon, nothing added (nothing rebased)', () => {
+    const step = { kind: 'abandon' as const, will: [id('1'), id('2')] }
+    expect(shapeProblem(step, { added: [], removed: [id('2'), id('1')] })).toBeNull()
+    expect(shapeProblem(step, { added: [c(id('3'), [id('t')])], removed: [id('1'), id('2')] })).toBe('shape')
+    expect(shapeProblem(step, { added: [], removed: [id('1')] })).toBe('shape')
   })
 })
 
