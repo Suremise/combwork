@@ -11,7 +11,9 @@
 //   start refused (cards don't run in a jj project yet). Back to Git refused (conflicted bookmark and commit), then,
 //   once jj's state is fixed, made: Git's sections again.
 // - notes: a colocated jj repository whose .gitattributes sets eol: the switch refused, the gate listed.
-// - loose: a jj repository with no colocated Git: jj greyed out, its reason in the tooltip.
+// - loose: a jj repository not colocated with Git (HI-2896): jj offered and switched to (the gates read through jj's store,
+//   all clear), its Repository saying so; back to Git greyed out (no Git working copy), its reason in the tooltip; None,
+//   the project's own switch, made. Its header in all seven locales.
 // Screenshots of each step in both themes, and the jj sections in all seven locales.
 const lib = require('./lib.cjs')
 const fs = require('fs')
@@ -235,13 +237,29 @@ function jjRepo(dir, o = {}) {
     await gated.getByRole('button', { name: 'Close', exact: true }).click()
     check('…and notes stays Git', JSON.parse(fs.readFileSync(path.join(notes, '.combwork', 'project.json'), 'utf8')).platform === 'git')
 
-    // --- A jj repository without colocated Git: jj greyed out, its reason in the tooltip.
+    // --- A jj repository not colocated with Git (HI-2896): switched to jj like a colocated one; no Git to go back to.
     await toTab('loose')
     const looseJj = head.locator('[data-platform="jj"]')
-    check('loose: jj not available', (await looseJj.getAttribute('aria-disabled')) === 'true')
-    const tip = await lib.hoverTip(page, looseJj, (t) => /colocated/.test(t))
+    check('loose: jj offered (jjFound), not refused', (await looseJj.getAttribute('aria-disabled')) !== 'true' && !!(await until(async () => (await offer.getAttribute('data-vc-offer').catch(() => null)) === 'jjFound', HUNG_MS)), await text(head))
+    await shoot(page.locator('.vc-view'), 'loose-offer')
+    await looseJj.click()
+    check('loose: the warning, every gate clear (read through the store inside .jj)', !!(await until(async () => (await warn.count()) === 1 && (await warn.locator('[data-gate-state="clear"]').count()) === 5, HUNG_MS)), await text(dialog))
+    await shoot(warn, 'loose-switch-to-jj')
+    await warn.getByRole('button', { name: 'Switch', exact: true }).click()
+    check('loose uses jj: header and project.json', !!(await until(async () => (await head.locator('[data-platform="jj"][aria-checked="true"]').count()) === 1, HUNG_MS)) && JSON.parse(fs.readFileSync(path.join(loose, '.combwork', 'project.json'), 'utf8')).platform === 'jj')
+    check('loose: its fact says not colocated', !!(await until(async () => /not colocated with Git/.test(await text(head)), HUNG_MS)), await text(head))
+    const looseRepo = await section('jjRepo')
+    check('loose Repository: not colocated, its root', !!(await until(async () => /Not colocated with Git/.test(await text(looseRepo)) && (await text(looseRepo)).includes(loose), HUNG_MS)), await text(looseRepo))
+    await shoot(page.locator('.vc-view'), 'loose-repository')
+    const looseBookmarks = await section('jjBookmarks')
+    check('loose Bookmarks: main, nothing marked as differing from Git', !!(await until(async () => (await text(looseBookmarks)).includes('main'), HUNG_MS)) && (await looseBookmarks.locator('[data-jj-not-in-git]').count()) === 0, await text(looseBookmarks))
+    check('…and still no .git in its folder', !fs.existsSync(path.join(loose, '.git')))
+    const looseGit = head.locator('[data-platform="git"]')
+    check('loose: back to Git not available', (await looseGit.getAttribute('aria-disabled')) === 'true')
+    const tip = await lib.hoverTip(page, looseGit, (t) => /Git working copy/.test(t))
     if (!tip) await page.screenshot({ path: path.join(shots, 'jjview-loose-tip.png') })
-    check('…its tooltip says why', /no colocated Git repository/.test(tip ?? ''), tip)
+    check('…its tooltip says why and how (jj git colocation enable, or None)', /No Git working copy here/.test(tip ?? '') && /jj git colocation enable/.test(tip ?? ''), tip)
+    await shoot(head, 'loose-git-refused')
 
     // --- Back to Git: refused while jj's state can't go back, then made.
     await toTab('shop')
@@ -283,7 +301,20 @@ function jjRepo(dir, o = {}) {
       await page.locator('.vc-view').screenshot({ path: path.join(shots, `jjview-operations-${language}.png`) })
       await section('jjRepo')
     }
+    // loose's header (not colocated, Git refused) in each language: its fact in the language's words.
+    await toTab('loose')
+    for (const language of ['de', 'es', 'fr', 'ja', 'pl', 'pt-BR', 'zh-CN']) {
+      await speak({ ...english, code: language, locale: language, messages: catalogue(language) })
+      check(`${language}: loose's fact in the language`, !!(await until(async () => !/not colocated with Git/.test(await text(head)) && (await text(head)).includes(loose), HUNG_MS)), await text(head))
+      await head.screenshot({ path: path.join(shots, `jjview-loose-${language}.png`) })
+    }
     await speak(english)
+    // None: the project's own switch, always offered.
+    await head.locator('[data-platform="none"]').click()
+    const toNone = dialog.filter({ hasText: 'None' })
+    await until(async () => (await toNone.getByRole('button', { name: 'Switch', exact: true }).count()) === 1, HUNG_MS)
+    await toNone.getByRole('button', { name: 'Switch', exact: true }).click()
+    check('loose back to None', !!(await until(async () => JSON.parse(fs.readFileSync(path.join(loose, '.combwork', 'project.json'), 'utf8')).platform === 'none', HUNG_MS)))
   } finally {
     await app.close().catch(() => undefined)
   }

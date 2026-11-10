@@ -364,6 +364,11 @@ worker through `runner.preview`) parses jj 0.47.1's `debug object view` whole an
 its command is offered (E1–E7); the window's Operations section is `views/JjSections.tsx`. `platform/jjKeepOut.ts` keeps
 `.combwork` out of a non-colocated jj repository, and `shared/platform/metadataDirs.ts` names every platform's own folder
 (`.git`, `.jj`) for the Files tab, search, the watchers, the document tools and None's deliverables.
+A folder's repository boundary (1.5.0's J9f, HI-2896): `platform/repoBoundary.ts`, a leaf read with no process, names the
+nearest marker's platform (a non-colocated `.jj` hides any Git repository above it, an unreadable one is unknown), and
+`repoPorts`' folder helpers and `repoLock.commonGitDir` go by it. Every repository lock goes through one owner,
+`repoLock.takeStores` (stores deduplicated and ordered whatever platform named them, re-entrant only for a live owner);
+`slotsApp.storeLock` delegates to it.
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets

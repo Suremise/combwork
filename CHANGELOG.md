@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- **jj repositories that aren't colocated with Git** (HI-2896). A jj repository that keeps Git's data inside `.jj` (no `.git` in the folder) can now use **jj** as its version control too, as a colocated one does: the same views and switch, and the same slots and review copies once jj cards run. Combwork never runs git in such a folder, never exports, imports or changes colocation, and agents there are told to use jj for everything.
+  - **Back to Git** needs a Git working copy: make the repository colocated yourself (`jj git colocation enable`), then switch; **None** is always offered.
+  - **Inside a Git repository**: a repository that isn't colocated and sits inside a Git working tree can't use jj, since git commands run in it would change that other repository.
+  - **A past `jj git export` no longer counts against a target**: without colocation nothing exports by itself, so the target is your local bookmark.
+  - **Changing colocation while a project uses jj** stops what was waiting with nothing written; earlier slots aren't lent, and nothing is deleted.
+
 ### Fixed
 
 - **A lane's next card starts when its builder watches its own lane** (HI-2889). A builder that watched its lane after a card went Done ended its turn waiting on that watch, and Combwork never gives a card to an agent waiting on a watch, so the lane's next card sat in Todo until the lane-next stall raised it 15 minutes later. Now Combwork ends a watch on the builder's own lane alone (nothing else in it) and starts the card, which wakes the builder. A watch on anything else is still the builder's own wait, left as it is.

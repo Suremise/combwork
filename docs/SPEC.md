@@ -1874,7 +1874,7 @@ revision; Git's words (branch, commit, merge commit) appear only in the Git adap
 | A None project gets `git init` (by the user or an agent) | Combwork notices (the refresh that ensures `.combwork`'s exclude, §8) and offers to switch to Git, with the switching warning (§16.6.5), from the next card. |
 | The repository disappears (`.git` removed or moved) | Combwork says so and offers None. Until the user switches, Git's rules hold rather than pass: their facts are unknown (§16.3.1). |
 | Mercurial or another system is found (`combworkVcs.ts` `vcsOf`/`otherVcsOf`) | "Mercurial found: not supported yet, so this project uses None." |
-| A jj repository is found (1.5.0, HI-2799: `vcsDetect.ts` `jjOf`, the nearest `.jj`, before any other marker) | Detection is `jj` (`Detection.jj.colocated`: a `.git` beside it), never what a project takes by itself (`initialOf`: a project with nothing recorded takes None). A None or Git project is offered jj (`jjFound`) where it's colocated; a non-colocated one is shown and refused (J7). A jj project whose `.jj` is gone is offered Git back, or None (`jjGone`). Initialise repository still refuses inside jj (`otherVcsOf`, §8). Before 1.5.0 a colocated pair was None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts, so Git ↔ jj is the repository's switch (§16.3.6, J6). |
+| A jj repository is found (1.5.0, HI-2799: `vcsDetect.ts` `jjOf`, the nearest `.jj`, before any other marker) | Detection is `jj` (`Detection.jj.colocated`: a `.git` beside it), never what a project takes by itself (`initialOf`: a project with nothing recorded takes None). A None or Git project is offered jj (`jjFound`), colocated or not (HI-2896); a non-colocated one inside a Git working tree (`Detection.jj.inGit`) is shown and refused (`jjInGit`). A jj project whose `.jj` is gone is offered Git back, or None (`jjGone`). Initialise repository still refuses inside jj (`otherVcsOf`, §8). Before 1.5.0 a colocated pair was None: jj keeps git's HEAD detached there, which would break the Git adapter's line facts, so Git ↔ jj is the repository's switch (§16.3.6, J6). |
 | A subfolder of a larger repository | Git, showing the repository root; the tab says branch and merge actions affect that whole repository. (Today the Git view refuses actions there, §8; 1.0 keeps refusing Combwork's merges into a parent repository unless the project's options name its target explicitly: OP-29.) |
 
 Everything is visible in the Version Control tab itself, not only through the Assistant [#1122 c].
@@ -2243,7 +2243,7 @@ operation withdrawn (refused, nothing run or changed), and `tests/repoOpsImports
 | **Git**, the project's own repository | Supported, unchanged: slots as worktrees, or the project folder shared (G11). | Unchanged. |
 | **Git**, a subfolder of a larger repository | Supported, unchanged (OP-29: Combwork merges only into a target the project names). | Unchanged. |
 | **jj, colocated** (`.jj` beside `.git`) | **None**, as today (§16.3.5): detected, offered nothing but None. | A platform (J6, HI-2799: chosen, never taken by itself): read-only views, cards refused until jj's card work is enabled, the gates below. |
-| **jj, non-colocated, Git-backed** | None, as today. | A platform, same adapter, once its tool, trust-root and file-list paths pass (J7). |
+| **jj, non-colocated, Git-backed** | None, as today. | A platform, same adapter (J9f, HI-2896: switched, slots and review copies, a jj card to Integrated, as colocated), unless inside a Git working tree. |
 | jj with another storage backend | None. | **Not supported** (untested, not proposed). |
 | Mercurial, other systems | None, as today. | None. |
 
@@ -2597,13 +2597,14 @@ merges under jj.
   So the single head is read from the files first (none, several or an unreadable `.jj`: `heads`, nothing run), J0's
   confirmation pins its commands at the head it reads (`--at-op`, HI-2831), and the heads are read again after (anything else: `moved`). Every view, the switch's jj check and the fallback go through it.
 - **The switch** (`workflow/storeSwitch.ts`, through `setPlatform` when `storeWide`: to jj, jj → Git, or to Git where jj
-  is colocated). Its **group** is every project of this workspace on the repository (its Git store, `commonGitDir`)
+  is colocated). Its **group** is every project of this workspace on the repository (its Git store: `commonGitDir`, or
+  for a non-colocated jj repository the store its `.jj` names, HI-2896)
   whose choice is Git or jj, plus the project switched (None → jj too); the warning names them, and its `token` (a hash
   of each member, its choice and options, the fence's generation and the store) must still match at the switch, else
   `groupChanged`. Refused, each with its list and Check Again reading it afresh: `drain` (active or paused lanes, cards
   in flight, a member's merge queue with work, open slot leases, unfreed copy leases), `otherWorkspace` (the store is a
   project of another open workspace), `switching`; to jj, jj's confirmation (`jjContextOf`: colocated, the same store,
-  the tested jj: `noJj`, `jjSeparate`, `jjTool`, `jjUnknown`) and the **compatibility assessment**
+  the tested jj: `noJj`, `jjInGit`, `jjTool`, `jjUnknown`; colocated or not since HI-2896) and the **compatibility assessment**
   (`platform/jjCompat.ts`, `gates`): Git's effective config (`git config --list --show-origin --show-scope --includes
   -z`), the attribute sources (`git var GIT_ATTR_SYSTEM` and `GIT_ATTR_GLOBAL`, `core.attributesFile`, every tracked
   `.gitattributes`, `info/attributes`), `.gitmodules`, gitlinks, `.lfsconfig`, hooks (a file named as a Git hook, with or
@@ -2761,9 +2762,11 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   a conflicted result is never integrated); the export matrix holding (`partialExport` otherwise); and the heads and
   Git's ref the same after the reads. **The export matrix** (probed on 0.47.1: a non-colocated store has no
   `refs/heads` and no `@git` row until `jj git export`): colocated, the `T@git` row and the store's `refs/heads/T`
-  must both equal T (a missing row disagrees); non-colocated, a `@git` row needs the ref and both must equal T, and with
-  no row a ref present must equal T, its absence agreeing (a fresh store). A plain Git move jj hasn't imported shows as
-  a disagreement, never as the target.
+  must both equal T (a missing row disagrees); non-colocated (HI-2896, HR1's s10 answer), the local bookmark alone is
+  the target: nothing imports or exports without colocation (probed: after one manual `jj git export`, a later
+  `bookmark set` and even `jj git push` leave `T@git` and the ref behind), so a past export never disagrees; the row and
+  ref stay in the moment's print and its final fence (a change between the reads is `moved`), and a raw Git write to the
+  store is E8's. A plain Git move jj hasn't imported shows as a disagreement (colocated), never as the target.
 - **The proof** (`jjContains`): the head (equal to the caller's `at`, else `moved`); then a **J4 candidate bound to
   exactly the reviewed input** (a done record with `outcome: 'candidate'`, no step or uncertain commits, its reviewed
   revision and base equal to the change's, its owned `candidate` pin reading back its result now) that the head reaches
@@ -2957,7 +2960,7 @@ start), and the skills' jj-slot workflow.
 - **Compatibility**:
   - **Files**: `.jj` is a platform's own folder whatever the project's platform (`shared/platform/metadataDirs.ts`):
     hidden in the Files tab (`repoMetadataDirs`), skipped by search's walk and the files watcher, refused by the
-    document tools, never a None project's deliverable (a non-colocated jj repository is None), and never a project
+    document tools, never a None project's deliverable (a non-colocated jj repository a None project is in), and never a project
     write in the workflow's write log.
   - **Moves** (gate relocation): Repair of a moved `.combwork` folder's projects (`combworkMove.repairWorktrees`)
     leaves a worktree that is a jj workspace (a `.jj` in it) as it is: git's repair would make only git's half right.
@@ -3163,8 +3166,8 @@ Agent guidance for jj cards, before J9e turns their starts on. Its design is HI-
     unit-tested): the reviewer's tool calls (a file tool's edit there; a jj command that records, or a command that
     writes files, run there), and the copy's files and jj's `@` and its parent looked at again while it is still the
     reviewer's. Its review starts at the submitted revision.
-  - The fixture is a colocated repository only: a separate (non-colocated) one can't be switched to jj in 1.5.0
-    (`switchRefused`'s `jjSeparate`), so it has no cards to review.
+  - Its fixture was colocated only here; J9f (HI-2896) adds the non-colocated jj-card scenarios, HR2's non-colocated
+    review fixture among them.
 - **A slot's folder:** jj makes a workspace's folder but not its parent, so the port makes the parent first (the
   project's worktrees folder is absent before its first slot), inside the store's lock and before the control's proof:
   nothing is awaited between that proof's final check and the add (HI-2887).
@@ -3215,6 +3218,62 @@ Combwork's only writes are J5's create-only `refs/cw/jj-integrated/…` bundle p
   project scope, bounded reads with 10,000 settled rows; the commit with the lock held while its follow drops, cancelled
   before its commit, replaced, another database), `tests/jjRepoWatch.test.ts` (subscriptions bounded, a slot-only commit,
   pins, re-armed, disposed).
+
+##### Non-colocated jj repositories (1.5.0's J9f, HI-2896)
+
+Darren's yes (10 Nov): non-colocated jj as its own piece of J9, before J9e. A non-colocated repository keeps Git's data in
+`.jj/repo/store/git` (named by `store/git_target`) with no `.git` in the folder. Everything J2 to J9d built reads through
+`ctx.store` with `--git-dir` and was tested in both modes; J9f opens the app's edges. Its design is HI-2896/s10, s13 and
+s16 (HR1's). Decision A holds: Combwork never moves a bookmark, pushes, exports, imports or changes colocation.
+- **Detection and the switch**: jj is offered and switched to in both modes (`switchRefused`, `offer`); `foundKey` is
+  `jj:noncolocated` (the earlier `jj:separate` no longer matches, so a user who chose None then is offered jj once).
+  Refused `jjInGit` (`Detection.jj.inGit`, `vcsDetect.gitAbove`): a non-colocated root, or the folder its slots go in
+  (`<workspace>.worktrees\<project>`), inside a Git working tree, where any git run there reaches that repository.
+  `storeOf` names a jj repository's store from its files (`repoBoundary.boundaryOf`), so a non-colocated member keeps
+  its fence membership; `jjReady` confirms it whatever its colocation. The gates (`assessJj`'s `separate`) never run git
+  in the folder: Git's config and vars from the store (`--git-dir`), the tracked files from the single head's
+  working-copy commit's tree (`ls-tree -r -z --full-tree`, read pinned), plus the root's own `.gitattributes` on disk.
+  **Back to Git** has no Git working copy: refused `jjNoGitCopy` (make it colocated with `jj git colocation enable`,
+  the user's, then switch); jj → None stays the project's own switch. `setPlatform` refuses what detection shows before
+  comparing the group's token.
+- **The boundary** (`platform/repoBoundary.ts`, a leaf: file reads only, asynchronous, bounded): a folder's platform is
+  its nearest marker's. A `.jj` with no `.git` beside it is jj's, whatever Git repository is above; an unreadable one
+  (no repo, an empty pointer, another backend, no store, a `.jj` file, levels exhausted) is unknown, never Git's; a
+  `.jj` beside a `.git` naming the same store is a colocated pair (Git's context), beside any other `.git` still Git's
+  own repository there (no repository above is reached; whether jj can use it is J0's). Every first-match helper of
+  `repoPorts` takes it (`repoContext`, `repoContexts`, `withFolderRepoLocks`, `mainTree`, `trustRoot`, `excludeFile`,
+  `ignoredIn`, `fileListOf`, `currentLine`); a non-colocated folder's context is `platform: 'jj'` with its store, its
+  exclude file the store's `info/exclude` (Combwork's skill copies kept out there too), its main tree the repository's
+  own workspace, its trust root `none` (J7's). `repoLock.commonGitDir` vetoes such a folder (`git.repoLock.jjFolder`)
+  unless it is itself a Git dir (the bare store, as the store's own lock names it), and an unknown context refuses the
+  lock (`git.repoLock.unknownRepo`), never skipped. Git-only reads of a slot's folder (a reorder's put-back, Resume
+  taking a free slot, a takeover's cleanliness, the Slots panel's files) answer unknown for a non-colocated jj folder
+  (`gitCantRead`) and keep the slot. A jj card's start re-reads it: a Git working tree above the slot made after the
+  switch refuses it (`workflow.jj.start.inGit`), and J2's `nestedIn` already refuses a slot made inside one.
+- **One lock owner** (`repoLock.takeStores`): every take (`withRepoLock`, `withRepoLocks`, the ports' `withRepoLocks`,
+  `slotsApp.storeLock`) resolves to stores, each once by its key, sorted, before any platform grouping. Each physical
+  take is an owner, live until just before its first release; a nested take runs through only for a store a live
+  inherited owner holds (a continuation outliving its take takes the lock again). A nested take of a store ordered
+  before one already held never waits: taken if free at once, else refused (`git.repoLock.order`). Across processes both
+  aliases of a store name one lock file, taken in the same order.
+- **A colocation change** (the user's `jj git colocation enable/disable` moves the store between `.jj/repo/store/git`
+  and `.git`; linked workspaces keep their mode): the jj port's cached context is used only while its root's files name
+  its store; every lock it takes checks the store again inside it (`JjStoreChanged`, nothing written), as J9b's
+  integration lock does. J2's identity, the slot bindings' keys and the fence carry the store, so earlier slots aren't
+  lent and the switch's token changes.
+- **The views**: the header says colocated or not (`git.vc.fact.jj`), `jjInGit` its own fact; Bookmarks marks no
+  `gitDiffers` when not colocated (Git isn't a view of the repository there); E8 (`gitAgrees`, the store's refs against
+  the view's `gitref:` entries) refuses with `unimportedStore` (`jj git import`, the user's).
+- **Guidance**: `contract.agent.jjSeparate` (platformRule's `jj-separate`, `platformRuleKey`): no Git working copy, git
+  doesn't work there and could reach another repository, jj for everything, history included; never `jj git init` or
+  `jj git colocation`.
+- **Tests**: `tests/repoBoundary.test.ts` (the boundary, the veto, the ports' answers, the lock owner: aliases, nesting,
+  opposite orders, out of order, a deferred continuation, a failed take, another process), `tests/storeSwitch.test.ts`
+  (a non-colocated group switched under its store's lock, Git refused, None; `jjInGit` by its slots folder; an
+  unreadable `.jj`), `tests/platformRegistry.test.ts`, `tests/platformSwitch.test.ts`, `tests/jjViewsReal.test.ts`
+  (views and the gates through the store), `tests/jjIntegrationReal.test.ts` (a manual export then a move and a push),
+  `tests/jjColocationChange.test.ts` (both ways, while a slot's making waits for the lock) and `tests/jjCards.test.ts`
+  (an outer Git refuses a start) on the pinned jj, beside the existing both-mode suites.
 
 ##### Open: jj's target advance (J1's gate)
 
@@ -4128,7 +4187,7 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
 - **Git ↔ jj (1.5.0, HI-2799) is the repository's switch**, not this one: every project on the repository using Git
   or jj switches together, only once nothing runs on it, under the platform fence, and to jj only after the
   compatibility assessment (§16.3.6, *jj in the window and the switch*). The choice is **None · Git · jj**; jj only
-  where a jj repository colocated with Git is found (`noJj`, `jjSeparate` in its tooltip otherwise).
+  where a jj repository is found, colocated or not, and not inside a Git working tree (`noJj`, `jjInGit` in its tooltip otherwise; HI-2896).
 - **The warning:** what changes, that it applies from the next card, the running lanes and the cards in flight
   (`cardsInFlight`, as for options) that keep their platform's ruleset; for a Git card in flight, that its merge queue
   carries on and stays in the tab and the panel until clear. **No "Apply to cards in flight"** across platforms.
