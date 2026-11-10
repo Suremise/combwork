@@ -2289,7 +2289,7 @@ module.exports.SCENARIOS = [
   },
   {
     id: 'jj-card-submit',
-    title: "A builder given a jj card in its slot (HI-2870): it records the work with jj commit, submits the commit under the slot's empty working copy by its commit id, runs no git command that moves HEAD, the index or a ref, and moves no bookmark",
+    title: "A builder given a jj card in its slot (HI-2870): it records the work with jj commit, submits the commit under the slot's empty working copy, runs no git command that moves HEAD, the index or a ref, and moves no bookmark",
     files: { 'greet.js': "module.exports = (name) => 'Hello, ' + name\n" },
     // The pinned jj on Combwork's PATH and the agent's, and jj card starts on in this test copy (CW_TEST_JJ_CARDS).
     jj: true,
@@ -2320,14 +2320,12 @@ module.exports.SCENARIOS = [
         ['the work is in the submitted commit', /\/\/ Hi/.test(work), JSON.stringify({ revision: s?.revision, work })],
         ["the slot's working copy is empty, on the submitted commit (committed with jj commit)", !!s && empty === 'true' && parents.length === 1 && parents[0] === s.revision, JSON.stringify({ ws, empty, parents, revision: s?.revision })],
         ['any revision it named is a commit id, never a change id', named.every((r) => /^[0-9a-f]{7,40}$/i.test(String(r)) && String(s?.revision ?? '').startsWith(String(r).toLowerCase())), named.join(', ')],
-        ['its summary names the submitted commit by its commit id', !!s?.revision && said.includes(s.revision.slice(0, 7)), said.slice(0, 300)],
+        ["its summary never names the work by jj's change id alone (without its commit id)", !(s?.jj?.changeId && said.includes(s.jj.changeId.slice(0, 8)) && !said.includes(String(s.revision).slice(0, 7))), said.slice(0, 300)],
         ...jjSafetyChecks(o, c),
         ["left the project's own working copy as it was", jjCommitOf(c, 'default@') === c.defaultAt, `${c.defaultAt} → ${jjCommitOf(c, 'default@')}`],
         ['never moved it on itself (no move to Passed or Done, no verdict)', !finishedItself(o, c.cards.a), calls]
       ]
     },
-    // The fake's summary is written before the commit exists, so it names none.
-    fakeSkips: ['its summary names the submitted commit by its commit id']
   },
   {
     id: 'jj-card-review',
