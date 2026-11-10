@@ -45,13 +45,13 @@ export function parseDebug(text: string): DNode | null {
   }
   const peek = (): string => (ws(), text[at] ?? '')
   const take = (c: string): void => {
-    if (peek() !== c) throw new Malformed(`expected ${c} at ${at}`)
+    if (peek() !== c) throw new Malformed(`expected ${c} at ${at}`) // i18n-ignore: a parse error of jj's text, caught here and never shown
     at++
   }
   const word = (): string => {
     ws()
     const m = /^[A-Za-z_][A-Za-z0-9_]*|^-?[0-9]+/.exec(text.slice(at, at + 200))
-    if (!m) throw new Malformed(`expected a word at ${at}`)
+    if (!m) throw new Malformed(`expected a word at ${at}`) // i18n-ignore: a parse error of jj's text, caught here and never shown
     at += m[0].length
     return m[0]
   }
@@ -70,13 +70,13 @@ export function parseDebug(text: string): DNode | null {
         else if (e === '0') out += '\0'
         else if (e === 'u') {
           const m = /^\{([0-9a-fA-F]{1,6})\}/.exec(text.slice(at, at + 9))
-          if (!m) throw new Malformed('bad escape')
+          if (!m) throw new Malformed('bad escape') // i18n-ignore: a parse error of jj's text, caught here and never shown
           out += String.fromCodePoint(parseInt(m[1], 16))
           at += m[0].length
-        } else throw new Malformed('bad escape')
+        } else throw new Malformed('bad escape') // i18n-ignore: a parse error of jj's text, caught here and never shown
       } else out += c
     }
-    throw new Malformed('unterminated string')
+    throw new Malformed('unterminated string') // i18n-ignore: a parse error of jj's text, caught here and never shown
   }
   // A comma-separated sequence up to `close` (a trailing comma allowed).
   const seq = <T>(close: string, one: () => T): T[] => {
@@ -84,13 +84,13 @@ export function parseDebug(text: string): DNode | null {
     while (peek() !== close) {
       out.push(one())
       if (peek() === ',') at++
-      else if (peek() !== close) throw new Malformed(`expected , or ${close} at ${at}`)
+      else if (peek() !== close) throw new Malformed(`expected , or ${close} at ${at}`) // i18n-ignore: a parse error of jj's text, caught here and never shown
     }
     at++
     return out
   }
   const value = (depth: number): DNode => {
-    if (depth > 64) throw new Malformed('too deep')
+    if (depth > 64) throw new Malformed('too deep') // i18n-ignore: a parse error of jj's text, caught here and never shown
     const c = peek()
     if (c === '"') return { t: 'str', v: str() }
     if (c === '[') {
@@ -367,11 +367,11 @@ export function previewOf(input: OpPreviewInput): OpPreviewCore {
   const later: OpOverlap[] = []
   for (const d of did) {
     const now = H.get(d.key) ?? null
-    if (now !== d.after) later.push({ key: d.key, now, why: 'changedSince' })
+    if (now !== d.after) later.push({ key: d.key, now, why: 'changedSince' }) // i18n-ignore: a protocol code (JjOpOverlap.why), shown through the window's messages
   }
-  for (const id of c.descendants) later.push({ key: `commit:${id}`, now: id, why: 'descendant' })
-  for (const id of c.gone) later.push({ key: `commit:${id}`, now: null, why: 'rewrittenSince' })
-  for (const id of c.back) later.push({ key: `commit:${id}`, now: id, why: 'restoredSince' })
+  for (const id of c.descendants) later.push({ key: `commit:${id}`, now: id, why: 'descendant' }) // i18n-ignore: a protocol code (JjOpOverlap.why), shown through the window's messages
+  for (const id of c.gone) later.push({ key: `commit:${id}`, now: null, why: 'rewrittenSince' }) // i18n-ignore: a protocol code (JjOpOverlap.why), shown through the window's messages
+  for (const id of c.back) later.push({ key: `commit:${id}`, now: id, why: 'restoredSince' }) // i18n-ignore: a protocol code (JjOpOverlap.why), shown through the window's messages
   const core = { did, commits: { added: c.added, hidden: c.hidden }, later }
   if (!did.length && !c.added.length && !c.hidden.length) return { ...core, refused: 'nothing' }
   // E4: no working-copy change (the user's command would update files there, which the preview can't see).
@@ -399,7 +399,7 @@ export function previewOf(input: OpPreviewInput): OpPreviewCore {
 }
 
 /** The command the user runs (s19: plain, the full id, never `--at-op`). */
-export const revertCommand = (op: string): string => `jj op revert ${op}`
+export const revertCommand = (op: string): string => `jj op revert ${op}` // i18n-ignore: a jj command, as typed
 
 /** The parent of an operation's facts, when it has exactly one. */
 export const soleParent = (f: OperationFacts): string | null => (f.parents.length === 1 ? f.parents[0] : null)
