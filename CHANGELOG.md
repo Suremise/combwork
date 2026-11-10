@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Signed merges without waiting** (HI-1185). When your repository signs its commits, Version Control → Branches & remotes has a **Signing** section: how it signs, and whether it can sign with nobody there (a quick check that signs a throwaway text, with no prompt). When it would ask for a passphrase, it says how to set up signing that doesn't (an SSH key in the Windows agent, or gpg-agent's cache).
+  - **The merge queue checks first**: a key that needs you now pauses the queue before anything is merged, rather than after its time limit.
+  - Combwork never changes your git, ssh or gpg settings, and runs only the signing programs of Git for Windows, GnuPG and Windows' OpenSSH by itself.
+
 - **jj (Jujutsu) as a project's version control** (HI-2799). In a jj repository colocated with Git, the Version Control tab offers **jj** beside None and Git; Combwork never takes it by itself, never creates a jj repository and never changes its colocation.
   - **Read-only views**: **Repository** (where it is, the jj version, its workspaces, what isn't supported), **History** (each change id beside its commit id, *conflicted*, *divergent*, *working copy*), **Compare** (an id naming several commits lists them all, never one picked), **Bookmarks** (conflicted ones with their sides, ones not the same in Git marked) and **Conflicts**. Every read is pinned at jj's single operation head and changes nothing; with more than one head, nothing is read until jj reconciles them.
   - **You integrate reviewed work yourself**: Combwork never merges under jj. **Waiting for you to integrate** lists the passed cards with their reviewed commit and a `jj rebase` to start from. Cards don't run in a jj project yet: a start is refused, saying so.

@@ -1796,6 +1796,8 @@ export function registerIpc(getAppInfo: () => ReturnType<CombworkRequests['app:i
     'jj:bookmarks': (p) => jjBookmarks(workspace.assertProject(p)),
     'jj:conflicts': (p) => jjConflicts(workspace.assertProject(p)),
     'jj:compare': (p, from, to) => jjCompare(workspace.assertProject(p), String(from ?? ''), String(to ?? '')),
+    // HI-1185: Branches & remotes' Signing section (bounded, at most once a minute unless asked again).
+    'git:signing': async (p, force) => (await lineRepoReads().signing?.(workspace.assertProject(p), force === true)) ?? null,
     'git:info': async (p) => {
       p = workspace.assertProject(p)
       const reads = lineRepoReads()

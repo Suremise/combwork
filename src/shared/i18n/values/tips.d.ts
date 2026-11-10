@@ -250,6 +250,8 @@ interface CombworkMessageValues {
   'tips.gitInit.title': undefined
   'tips.gitRemotes.text': undefined
   'tips.gitRemotes.title': undefined
+  'tips.gitSigning.text': undefined
+  'tips.gitSigning.title': undefined
   'tips.gitView.text': { example: string | number }
   'tips.gitView.title': undefined
   'tips.gotoProject.text': { key: string | number }

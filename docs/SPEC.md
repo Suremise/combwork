@@ -4528,6 +4528,7 @@ card's test-merge ref goes once its entry has an outcome, and its submissions' p
      there is no diff to open; the Progress panel keeps Show log.
    - with `commit.gpgsign`, signing runs as configured; if it would wait for a passphrase (a pinentry window), the
      entry pauses with "signing waits for you" rather than failing, and a signing error pauses it with git's message.
+     Since HI-1185, a check before each step that signs (§16.9.5) pauses it up front, before anything is committed.
    **Built [#1350]:**
    - **Identity:** the repository's own (`git config user.name` / `user.email`: local, then
      global), G12 on or off (HI-2266: G12's saved value never stands in for it), passed to the merge with `-c`. With none, the entry pauses `identity`, naming the project folder: the
@@ -5167,6 +5168,49 @@ seconds, pinned at `refs/cw/fetch/<target>`). A remote it can't use, a failed fe
 remote lacks refuses the start with why: never the local head instead.
 
 **The one residue:** a hook is the user's own code, run in the project with the project's configuration.
+
+#### 16.9.5 Signing checked before the queue signs <a id="spec-signing-check"></a>
+
+**Built [HI-1185]** (the design agreed with HR1 on the card, s7 to s17). Agents' own commits failing fast instead of
+prompting (the ready check's part 2) waits for Darren's decision (HI-1185/r10), and isn't built.
+
+**The read** (`platform/gitSigning.ts`), in the folder a commit runs in, with that commit's own `-c` overrides
+(`git config --show-scope`): `commit.gpgsign`; `gpg.format` (openpgp by default, ssh, x509); `user.signingkey`, shown
+shortened (an openpgp id's last 16 digits, an ssh key file's name, a literal key's type and comment; never key material);
+the program git would run: `gpg.ssh.program` for ssh; for openpgp `gpg.program` and `gpg.openpgp.program`, one setting
+under two names, read together with the last line git reads winning. Each value's scope is shown as git reports it.
+
+**The check** signs a throwaway payload, in a temp folder removed after, in the commit's folder and environment, bounded
+at 5 s with its tree ended there. It runs only what Combwork can vouch for: the program a commit would run is resolved to
+a full path first (the configured one, or git's default on the commit's PATH with PATHEXT), and is run only when that
+path is a known installation: Git for Windows' own `usr\bin\gpg.exe` or `usr\bin\ssh-keygen.exe` (beside the git
+Combwork runs, or its `--exec-path`), GnuPG's `…\GnuPG\bin\gpg.exe` under Program Files, or Windows' own
+`System32\OpenSSH\ssh-keygen.exe`. Anything else, an unrecognised default found on PATH included, is `notChecked` and is
+never invoked; so are `gpg.ssh.defaultKeyCommand`, x509 and hardware ssh keys (`sk-`).
+- openpgp: `--batch --no-tty --pinentry-mode error --no-autostart --status-fd=2 -bsau <key>` on stdin, the key being
+  `user.signingkey` or git's default, the committer's identity as that commit would have it (`git var
+  GIT_COMMITTER_IDENT` with its overrides).
+- ssh: `ssh-keygen -Y sign -n git -f <key> <payload>`, a literal `key::` key written to a temp file as git does, a path's
+  `~/` expanded and a relative one resolved against the commit's folder, `SSH_ASKPASS_REQUIRE=never`, no stdin.
+- Outcomes: `unattended`, `needsSomeone` (the signer's words), `couldNotComplete` (the bound: never taken as proof
+  either way), `cantSign` (its words), `notChecked`, `off`, `unreadable` (never taken for off).
+- **Its limits, said:** a check that succeeds means only that this signer, key and environment signed just then, never
+  that another process's commit will or that a cache will still hold; an agent already running, a smartcard or a hardware
+  key may still ask in its own way, and the check then ends at its bound. Combwork never writes git, ssh or gpg
+  configuration, and never starts or stops an agent.
+
+**The queue** runs it, through its runner in the lease's job, just before each step that signs: strict's update, the merge
+or squash test merge, and a rebase that rewrites commits (an on-top linear suffix landing unchanged signs nothing, so it
+isn't checked). Once per entry pass; Resume is a new one. `needsSomeone` and `couldNotComplete` pause `signingWaits`, and
+`cantSign` pauses `signing`, before anything is committed or rewritten; `unreadable` is the existing `again`;
+`notChecked` and `unattended` go on to the commit, whose bound and classification (above) stay the backstop.
+
+**The Git view** (Version Control → Branches & remotes → **Signing**, under Commit identity, read-only): the settings
+above and the check's outcome, checked when shown at most once a minute per folder (callers share one), and **Check
+again**; with `needsSomeone` or `couldNotComplete`, how to sign unattended (an ssh key in the Windows OpenSSH agent;
+gpg-agent's cache). It reads as an agent's commit there would (no overrides). Its signer runs as a bounded spawn owned by
+the folder, ended when its workspace closes or Combwork quits. Reached through the repository reads port's optional
+`signing` (jj has none, so nothing is shown).
 
 ### 16.10 Slots, review copies and sessions
 

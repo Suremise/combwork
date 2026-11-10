@@ -242,6 +242,8 @@
   "tips.gitInit.title": "Ein Projekt mit einem Klick zum Git-Repository machen",
   "tips.gitRemotes.text": "Versionsverwaltung → Branches & Remotes: „Push nach…“ schickt diesen Branch oder alle Branches und Tags an ein beliebiges Remote, ohne zu ändern, was der Branch verfolgt. Dort lässt sich ein Remote auch umbenennen oder entfernen, und „Verfolgen“ eines Branches legt fest, was Pull und Push verwenden.",
   "tips.gitRemotes.title": "Auf ein Backup-Remote pushen",
+  "tips.gitSigning.text": "Versionsverwaltung → Branches & Remotes → Signieren zeigt, wie dein Repository Commits signiert und ob es ohne Anwesende signieren kann. Würde es nach einer Passphrase fragen, steht dort, wie du es einrichtest, damit die signierten Merges der Merge-Warteschlange unbeaufsichtigt weiterlaufen.",
+  "tips.gitSigning.title": "Signierte Merges ohne Warten",
   "tips.gitView.text": "In einem Git-Projekt zeigt der Tab „Versionsverwaltung“ Branch, Remotes, Verlauf und Tags des Projekts. Dort kannst du einen Branch wechseln oder anlegen, fetchen, pullen, pushen, taggen und die Commit-Identität festlegen. Die Statusleiste zeigt „{example}“: Ein Klick darauf führt dorthin.",
   "tips.gitView.title": "Git eines Projekts sehen und ändern",
   "tips.gotoProject.text": "Drück {key} und tippe ein paar Buchstaben seines Namens.",

@@ -55,7 +55,7 @@ describe("the merge queue's candidate through the integration port", () => {
 
   it("the port's contract imports no platform's code, only types", () => {
     const text = read('src/main/platform/integration.ts')
-    expect(importsOf('src/main/platform/integration.ts').sort()).toEqual(['src/main/platform/types', 'src/shared/workflow/conflicts', 'src/shared/workflow/queue'])
+    expect(importsOf('src/main/platform/integration.ts').sort()).toEqual(['src/main/platform/types', 'src/shared/gitSigning', 'src/shared/workflow/conflicts', 'src/shared/workflow/queue'])
     expect([...text.matchAll(/^import .*$/gm)].every((m) => m[0].startsWith('import type '))).toBe(true)
   })
 

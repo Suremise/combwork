@@ -270,6 +270,28 @@ interface CombworkMessageValues {
   'git.setup.learnMore': undefined
   'git.setup.notRepo': { project: string | number }
   'git.setup.withoutGit': undefined
+  'git.signing.cantSign': { message: string | number }
+  'git.signing.checkAgain': undefined
+  'git.signing.checking': undefined
+  'git.signing.couldNotComplete': undefined
+  'git.signing.defaultKey': undefined
+  'git.signing.format': undefined
+  'git.signing.formatName': { format: string }
+  'git.signing.heading': undefined
+  'git.signing.howGpg': undefined
+  'git.signing.howSsh': undefined
+  'git.signing.key': undefined
+  'git.signing.limits': undefined
+  'git.signing.needsSomeone': undefined
+  'git.signing.no': undefined
+  'git.signing.notChecked': { why: string; path: string | number }
+  'git.signing.off': undefined
+  'git.signing.program': undefined
+  'git.signing.scope': { scope: string }
+  'git.signing.signs': undefined
+  'git.signing.unattended': undefined
+  'git.signing.unreadable': { message: string | number }
+  'git.signing.yes': undefined
   'git.state': { state: string }
   'git.status.aheadBehind': { ahead: number; behind: number }
   'git.status.noUpstream': undefined

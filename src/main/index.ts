@@ -72,6 +72,7 @@ import { startBranchWatch } from './branchWatch'
 import { startObserving, stopObserving } from './platform/watching'
 import { startReconciling, stopReconciling } from './workflow/reconciler'
 import { queueFolderNeeded, releaseQueueRunners } from './workflow/queueRunner'
+import { endBoundedSpawns } from './platform/boundedSpawn'
 import { stopCodexChecks } from './codexChecks'
 import { queueLive, startQueueHosts, stopQueueHosts } from './workflow/queueHost'
 import { poolFor, startSlots, stopSlots } from './slotsApp'
@@ -1271,6 +1272,8 @@ app.whenReady().then(async () => {
   startReconciling()
   // A workspace closing gives up its merge queues' leases (#1360): their processes ended, then their rows deleted.
   WorkspaceService.closingTasks.add((path) => releaseQueueRunners((r) => !!r.cfg.workspace && r.cfg.workspace.toLowerCase() === path.toLowerCase()))
+  // HI-1185: a signing check of one of its projects still running is ended.
+  WorkspaceService.closingTasks.add(async (path) => endBoundedSpawns((owner) => !!owner && workspaceFor(owner)?.path?.toLowerCase() === path.toLowerCase()))
   // The merge queue (#1348): a host per project and target, started by enqueue actions and as workspaces open.
   startQueueHosts()
   // The slot pools (#1429): their idle slots tidied every hour.
@@ -1440,6 +1443,7 @@ app.on('will-quit', () => {
   // Any other way out (the updater's install, a renderer crash's quit) clears it too.
   clearDiscoveryNow()
   killAll()
+  endBoundedSpawns()
   stopOpencodeHistory()
   stopOrphanWatch()
   closeProcessTracking()

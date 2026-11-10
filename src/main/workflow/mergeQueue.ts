@@ -181,6 +181,11 @@ export interface QueueConfig {
    * a memory one in tests). Left out, follow mode pauses `remoteUnsupported`: nowhere safe to keep one.
    */
   transport?: TransportStore
+  /**
+   * HI-1185: runs a program other than git for the queue, bounded (the signing check's signer): the runner's recorded run
+   * in the app, in its lease's job; left out, a bounded spawn of the platform's own (tests).
+   */
+  spawn?: CandidateHost['spawn']
 }
 
 /**
@@ -1487,7 +1492,7 @@ export class MergeQueue {
 
   /** What a candidate's step is given of the queue: the repository, its own worktree, its runner and this round's reads. */
   private host(reads: EntryReads): CandidateHost {
-    return { project: this.project, folder: this.cfg.folder, run: (cwd, args, opts) => this.git(cwd, args, opts), signTimeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS, identity: () => this.identity(reads), reads }
+    return { project: this.project, folder: this.cfg.folder, run: (cwd, args, opts) => this.git(cwd, args, opts), ...(this.cfg.spawn ? { spawn: this.cfg.spawn } : {}), signTimeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS, identity: () => this.identity(reads), reads }
   }
 
   /**

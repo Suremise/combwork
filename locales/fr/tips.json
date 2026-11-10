@@ -242,6 +242,8 @@
   "tips.gitInit.title": "Faire d’un projet un dépôt git en un clic",
   "tips.gitRemotes.text": "Gestion de versions → Branches et dépôts distants : Push vers… envoie cette branche, ou toutes les branches et tous les tags, vers n’importe quel dépôt distant sans changer ce que suit la branche. On peut aussi y renommer ou supprimer un dépôt distant, et Suivre d’une branche choisit ce qu’utilisent Pull et Push.",
   "tips.gitRemotes.title": "Faire un push vers un dépôt distant de sauvegarde",
+  "tips.gitSigning.text": "Gestion de versions → Branches et dépôts distants → Signature montre comment ton dépôt signe les commits et s’il peut signer sans personne présente. S’il demanderait une phrase secrète, la section explique comment le configurer pour que les fusions signées de la file de fusion se poursuivent sans surveillance.",
+  "tips.gitSigning.title": "Des fusions signées sans attendre",
   "tips.gitView.text": "Dans un projet Git, l’onglet Gestion de versions affiche la branche, les dépôts distants, l’historique et les tags du projet, et te permet de changer de branche ou d’en créer une, de faire un fetch, un pull ou un push, de créer un tag et de définir l’identité des commits. La barre d’état affiche « {example} » : clique dessus pour y aller.",
   "tips.gitView.title": "Voir et modifier le git d’un projet",
   "tips.gotoProject.text": "Appuie sur {key} et tape quelques lettres du nom du projet.",

@@ -242,6 +242,8 @@
   "tips.gitInit.title": "Repozytorium git z projektu jednym kliknięciem",
   "tips.gitRemotes.text": "Kontrola wersji → Gałęzie i zdalne repozytoria: „Wypchnij do…” wysyła tę gałąź albo wszystkie gałęzie i tagi do dowolnego zdalnego repozytorium, nie zmieniając tego, co śledzi gałąź. Można tam też zmienić nazwę zdalnego repozytorium lub je usunąć, a „Śledź” przy gałęzi wybiera, czego używają „Ściągnij” i „Wypchnij”.",
   "tips.gitRemotes.title": "Wypychanie do zapasowego zdalnego repozytorium",
+  "tips.gitSigning.text": "Kontrola wersji → Gałęzie i zdalne repozytoria → Podpisywanie pokazuje, jak Twoje repozytorium podpisuje commity i czy może podpisywać, gdy nikogo nie ma. Jeśli prosiłoby o hasło, podpowiada, jak to skonfigurować, aby podpisane scalenia kolejki scalania przebiegały bez nadzoru.",
+  "tips.gitSigning.title": "Podpisane scalenia bez czekania",
   "tips.gitView.text": "W projekcie Git zakładka Kontrola wersji pokazuje gałąź, zdalne repozytoria, historię i tagi projektu i pozwala przełączyć lub utworzyć gałąź, pobrać, ściągnąć, wypchnąć, dodać tag i ustawić autora commitów. Pasek stanu pokazuje „{example}”: kliknij, żeby tam przejść.",
   "tips.gitView.title": "Zobacz i zmień gita projektu",
   "tips.gotoProject.text": "Naciśnij {key} i wpisz kilka liter nazwy projektu.",

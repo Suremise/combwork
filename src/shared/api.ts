@@ -1,5 +1,6 @@
 import type { CardAttachment, CardAttachmentGroup, CardDrafts } from './cardAttachments'
 import type { CardCleanupItem } from './cardCleanup'
+import type { SigningInfo } from './gitSigning'
 import type { BranchStart, ResolvedStart, StartPoints } from './nextVersion'
 import type { IgnoreTarget } from './gitIgnoreRules'
 import type { DialectCatalogue, DialectFile, DialectFileView, DialectRefusal, DialectRow, DialectUsage } from './dialects'
@@ -1089,6 +1090,8 @@ export interface CombworkRequests {
   'jj:conflicts': (projectPath: string) => JjView<JjConflictsView>
   'jj:compare': (projectPath: string, from: string, to: string) => JjView<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>
   'git:info': (projectPath: string) => GitRepoInfo
+  /** HI-1185: how the project's commits are signed, and whether its signer could sign just now with nobody there (null: a platform without signing). */
+  'git:signing': (projectPath: string, force?: boolean) => SigningInfo | null
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string
   'git:branchDrops': (projectPath: string, branch: string) => BranchDrops
