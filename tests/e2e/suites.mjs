@@ -43,6 +43,7 @@ export const SUITES = [
   { name: 'assistant' },
   { name: 'assistant-control' },
   { name: 'assistantbatch' },
+  { name: 'assistantcodex' },
   { name: 'assistantcompact' },
   { name: 'assistantend' },
   { name: 'assistantimages' },
