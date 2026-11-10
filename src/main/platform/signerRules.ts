@@ -22,8 +22,12 @@ export async function resolveProgramWith(isFile: (p: string) => Promise<boolean>
   return null
 }
 
-/** A signer's words that say it needs someone (a passphrase, a pinentry, an agent with the key unlocked). */
-export const NEEDS = /passphrase|pinentry|no gpg-agent|agent.*not running|can't connect to the agent|agent refused|inappropriate ioctl|no tty|cannot open \/dev\/tty|operation cancelled|could not open a connection to your authentication agent/i
+/**
+ * A signer's words that say it needs someone (a passphrase, a pinentry, an agent with the key unlocked). "No private key
+ * found for public key": ssh-keygen given a key's .pub file, whose private half only an agent holds, with none holding it
+ * (HI-2867): someone has to load it.
+ */
+export const NEEDS = /passphrase|pinentry|no gpg-agent|agent.*not running|can't connect to the agent|agent refused|inappropriate ioctl|no tty|cannot open \/dev\/tty|operation cancelled|could not open a connection to your authentication agent|no private key found for public key/i
 
 /** The known installations among `roots` (Git for Windows' folders) and the environment's: Git's gpg and ssh-keygen, GnuPG's (Gpg4win), Windows' OpenSSH. */
 export function knownSignerPaths(roots: readonly string[], env: NodeJS.ProcessEnv): string[] {
