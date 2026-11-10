@@ -2,7 +2,7 @@
   "type": "control_response",
   "response": {
     "subtype": "success",
-    "request_id": "hive-models",
+    "request_id": "combwork-models",
     "response": {
       "models": [
         {
