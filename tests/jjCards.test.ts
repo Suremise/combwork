@@ -36,10 +36,10 @@ import { BUSY, closers, ENDED, OPEN, opts, started, world } from './jjCardsWorld
 if (!jjExe) console.warn(`jjCards.test.ts skipped: jj ${TESTED_JJ.version} isn't fetched (npm run jj:fetch)`)
 
 // A hung test's bound (HI-2905, as HI-2897's for jjSlotPrepReal), not a time budget: each test makes a jj repository and
-// its slots and runs real starts, submissions and pins, tens of jj and Git processes (5–12.6 s each in a whole-file run
-// on jj 0.47.1, up to 17 s alone), and more under a loaded machine, where Vitest's 20 s default for unit tests timed out
-// the attribution and provenance-epoch tests.
-const REAL_JJ_MS = 60_000
+// its slots and runs real starts, submissions and pins, tens of jj and Git processes: 5–12.6 s each in a whole-file run
+// on jj 0.47.1, up to 17 s alone, and up to 44 s beside jjSlotPrepReal, 2 spinner workers and other lanes' runs, where
+// Vitest's 20 s default for unit tests timed out the attribution and provenance-epoch tests. About twice the worst seen.
+const REAL_JJ_MS = 90_000
 
 describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ.version}), HI-2868`, { timeout: REAL_JJ_MS }, () => {
   describe.each([true, false] as const)('colocated: %s', (colocated) => {
