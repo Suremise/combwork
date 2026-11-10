@@ -139,8 +139,9 @@ const check = (name, ok, extra = '') => {
     check(`with Haiku, Claude Code shows the mode it says (${m.expected.join(' or ')})`, m.expected.includes(m.observed), m.observed ?? 'none shown')
     check('…and Combwork shows that mode', !!m.observed && m.shown === m.observed, `${m.shown} / ${m.observed}`)
   })
-  // The warning matches what this Claude Code says: there exactly when Auto isn't offered (a guess when it doesn't say).
-  const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, m?.autoOffered)
+  // The warning matches what this Claude Code says for the connection's account (HI-2852: its own models, read in its
+  // folder): there exactly when Auto isn't offered (a guess when it doesn't say).
+  const [caveatRight, caveat] = await lib.haikuAutoCaveat(page, { timeoutMs: 30000 }) // its read starts the real CLI
   check("the connection dialog warns about Auto with Haiku exactly when Claude Code says it isn't offered", caveatRight, caveat)
   await stop(home, 'assistant')
 
