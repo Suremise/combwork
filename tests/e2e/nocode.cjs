@@ -254,7 +254,7 @@ const check = (name, ok, extra = '') => {
 
     // --- HI-2851: gamma's rules gain Review while the dialog is closed: opened again, it offers Skip review; they lose it
     // while the dialog is open (workflow-changed): the tick box goes. The dialog stays mounted, so neither is the first read.
-    const gammaOptions = (review) => ({ preset: null, options: { review, finish: 'committed', folder: 'project', otherTargets: ['1.2.0'] } })
+    const gammaOptions = (review) => ({ preset: null, options: { review, ...(review === 'agent' ? { noSelfReview: true } : {}), finish: 'committed', folder: 'project', otherTargets: ['1.2.0'] } })
     await inv('workflow:setOptions', gamma, gammaOptions('agent'))
     await newCard()
     check('HI-2851: gamma reviews now: the dialog opened again offers Skip review', !!(await lib.until(async () => (await skipBox.count()) === 1, HUNG_MS)))
