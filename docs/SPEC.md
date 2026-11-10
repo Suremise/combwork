@@ -2681,8 +2681,12 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   `git config --show-scope --show-origin -z --includes --list` gives every file a value comes from at every scope and
   each include and includeIf target as Git decodes it, comments, quotes and continuations included; each scope's own
   file is covered whether or not it exists yet). An include it can't resolve to a concrete file (a `~` path, a
-  condition it doesn't know) or an origin that isn't a file is unknown. At its end, with no await between it and the
-  synchronous settles, it takes the print again and checks the operation heads and the target's ref against the moment. Any difference, whether or not it would matter (a mixed-case
+  condition it doesn't know) or an origin that isn't a file is unknown. The set is a **verified capture** (HR2's round
+  5): discover, print, discover again, print again; the second discovery ran wholly while the files it found held the
+  first print's bytes, so the set describes exactly them, and an include added during either discovery shows as a
+  different set or different bytes (unknown). At its end, with no await between it and the synchronous settles, it takes
+  the print again and checks the operation heads and the target's ref against the moment. Whether J5 should settle
+  `published` automatically at all, or keep it re-verifiable, is put to Darren (the Assistant, after round 5). Any difference, whether or not it would matter (a mixed-case
   `[Remote "origin"]` section, a change in an included file), or a source it can't read, is unknown and every obligation
   stays owed. A pushed commit the store lacks is `notFetched`.
 - **Obligations, one per integration** (`(card, cycle, bundle)`, its result): created only where no row of that key

@@ -400,6 +400,30 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
     })
   })
 
+  describe("round 5 (HR2): the discovered file set is a verified capture (discover, print, discover again, print again)", () => {
+    // Each context check discovers twice: the check after the network read is discoveries 1–2, the pre-settle one 3–4.
+    it.each([3, 4] as const)('an include added during discovery %i of the pre-settle check, its file changed later: unknown, every row still owed', async (at) => {
+      const w = await world(true)
+      const store = memoryObligations()
+      w.setMain(w.T)
+      w.jj('git', 'push', '--bookmark', 'main')
+      reconstructObligations(store, [{ card: 'HI-1', cycle: 1, bundle: `b0-${token()}`, target: 'main', result: w.T, at: 1 }])
+      const late = join(w.store, 'late.cfg')
+      writeFileSync(late, '')
+      let discovered = 0
+      let fenced = 0
+      const hook = async (p: JjIntegrationPoint): Promise<void> => {
+        if (p === 'discovered' && ++discovered === at) appendFileSync(join(w.store, 'config'), '[include]\n\tpath = late.cfg\n')
+        if (p === 'finalFence' && ++fenced === 2) writeFileSync(late, `[Remote "origin"]\n\turl = ${join(resolve(w.repo, '..'), 'other.git').split('\\').join('/')}\n`)
+      }
+      const out = await observePublish(w.deps({ hook }), 'main', store)
+      expect(discovered).toBeGreaterThanOrEqual(at)
+      expect(out, JSON.stringify(out)).not.toHaveProperty('settled')
+      expect(out).toMatchObject({ jjUnknown: 'moved' })
+      expect(store.rows.map((r) => r.state)).toEqual(['owed'])
+    })
+  })
+
   describe('publish: observed, per integration (a local bare remote)', () => {
     const push = (w: World, rev: string): void => {
       w.setMain(rev)

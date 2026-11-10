@@ -64,7 +64,7 @@ export interface JjIntegrationDeps {
 }
 
 /** Where a test pauses (a race placed exactly there). */
-export type JjIntegrationPoint = 'afterProof' | 'afterRetain' | `beforePin:${string}` | 'afterRemote' | 'ancestry' | 'finalRemote' | 'finalFence'
+export type JjIntegrationPoint = 'afterProof' | 'afterRetain' | `beforePin:${string}` | 'afterRemote' | 'ancestry' | 'finalRemote' | 'finalFence' | 'discovered'
 
 const BOOKMARK_T = `name ++ "${SEP}" ++ if(remote, remote, "") ++ "${SEP}" ++ conflict ++ "${SEP}" ++ if(normal_target, normal_target.commit_id(), "") ++ "${SEP}" ++ tracked ++ "\\n"`
 
@@ -534,6 +534,7 @@ export async function configSources(deps: JjIntegrationDeps): Promise<ConfigSour
     }
   }
   const listed = await deps.git(['config', '--show-scope', '--show-origin', '-z', '--includes', '--list'])
+  await deps.hook?.('discovered')
   if (!listed.ok) return jjUnknown('failed', listed.err)
   const rows = parseConfigList(listed.out)
   if (!rows) return jjUnknown('malformed', 'config list') // i18n-ignore: a protocol detail for logs and tests, never shown
@@ -663,11 +664,20 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   const still = async (where: string): Promise<JjRefused | JjReadUnknown | null> => {
     // Every source fingerprinted before the awaited reads, and again at the synchronous end: any change between, or a
     // source that can't be read, is unknown (whether or not the change would matter).
-    // The files Git reads, found by Git (an include added meanwhile is written in one of them, so the print shows it).
+    // The files Git reads, found by Git, as a verified capture (HR2's round 5): discover, print, discover again, print
+    // again. The second discovery ran wholly while the files it found were the first print's bytes (the second print is
+    // equal), so the set it found describes exactly those bytes: an include added during either discovery is in a changed
+    // print or a different set. Any difference: unknown, nothing settled.
+    const first = await configSources(deps)
+    if (isJjUnknown(first)) return first
+    const firstPrint = sourcesPrint(deps.view.store, deps.view.jjRepo, target, first)
+    if (firstPrint === undefined) return jjUnknown('failed', `sources:${where}`)
     const sources = await configSources(deps)
     if (isJjUnknown(sources)) return sources
+    if (sources.files.join('|') !== first.files.join('|') || sources.env !== first.env) return jjUnknown('moved', `sourceSet:${where}`)
     const before = sourcesPrint(deps.view.store, deps.view.jjRepo, target, sources)
     if (before === undefined) return jjUnknown('failed', `sources:${where}`)
+    if (before !== firstPrint) return jjUnknown('moved', `sourceBytes:${where}`)
     const r2 = await remoteNow(th.op)
     if (isJjUnknown(r2) || isRefused(r2)) return r2
     if (r2.remote !== r1.remote || r2.url !== r1.url) return jjUnknown('moved', `remote:${where}`)
