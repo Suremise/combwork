@@ -2367,17 +2367,24 @@ class SessionManager {
     // A /rename in the CLI since the session was last named in Combwork is the newer name: Combwork takes it, and so passes
     // it back with --name rather than its own.
     let adopted: string | null = null
+    // The CLI's title not known now (HI-2839 review round 1): no --name, so the CLI keeps its own title, whatever it is.
+    let titleUnknown = false
     if (opts.resumeId && existing && (!opts.name?.trim() || opts.name.trim() === existing.name)) {
-      // Never waiting for the usage import's turn on its transcript (#1177): then the name is adopted at a later resume.
-      const usage = await this.usage(projectPath, opts.resumeId, undefined, { noWait: true }).catch(() => null)
+      // As its transcript has it now (HI-2839): a /rename just before Stop is in no history yet, and missing it here passes
+      // the older name with --name, which Claude Code keeps as the title over the user's.
+      const read = await this.resumeUsage(projectPath, opts.resumeId).catch(() => null)
       times.mark('usage')
-      adopted = cliRename({ ...existing, usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
+      titleUnknown = !read?.known
+      if (titleUnknown) log.info(`Session ${existing.id} is resumed without --name: its CLI's title couldn't be read in time`)
+      else adopted = cliRename({ ...existing, usage: read!.usage }, assistant ? ASSISTANT_NAME : basename(projectPath))
       if (adopted) {
         await workspace.upsertSession(projectPath, { id: existing.id, name: adopted, titleAtRename: adopted })
         log.info(`Session ${existing.id} takes the name ${userText(adopted)} it was given in the CLI`)
       }
     }
     const sessionName = adopted || opts.name?.trim() || existing?.name || (assistant ? `${ASSISTANT_NAME}${mode ? ` · ${mode}` : ''} · ${formatDateTime(new Date())}` : autoName(projectPath, agent, count))
+    // What the launch passes as --name: none while the CLI's title isn't known (above).
+    const launchName = titleUnknown ? '' : sessionName
     const key = this.key(projectPath, agentId)
     const runId = run
     const state: LiveSessionState = {
@@ -2422,7 +2429,7 @@ class SessionManager {
           quietExit: true,
           // What the setup command starts is the launch's too (an `npm install` left running).
           ...(tracked ? { track: (pid: number, cancelled: AbortSignal) => trackLaunch({ runId, projectPath, agentId, agentName: agent.name, gated: true }, pid, cancelled).then((r) => this.launchWord(r)) } : {}),
-          onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: sessionName, resume: !!opts.resumeId })
+          onExit: (code) => void this.afterSetup(projectPath, agentId, code, { sessionId, name: launchName, resume: !!opts.resumeId })
         })
         // Its setup's process runs now (spawnPty returned, not thrown): its slot's writer is the run's processes' to settle.
         this.writerSpawned(runId)
@@ -2435,7 +2442,7 @@ class SessionManager {
       return state
     }
     try {
-      await this.launch(projectPath, agent, { sessionId, name: sessionName, resume: !!opts.resumeId }, times)
+      await this.launch(projectPath, agent, { sessionId, name: launchName, resume: !!opts.resumeId }, times)
     } catch (e) {
       this.forget(id)
       emit({ type: 'session-status', state: { ...state, status: 'stopped', runtime: { ...state.runtime!, lifecycle: 'stopped' } } })
@@ -8271,6 +8278,41 @@ class SessionManager {
       if (window) return { ...usage, contextWindow: window }
     }
     return usage
+  }
+
+  /** How long a resume waits for the worker's turn on its transcript (HI-2839): past it, the history's usage, or none. */
+  resumeReadWaitMs = 3000
+
+  /**
+   * A stopped session's usage as its resume adopts a CLI /rename from it (HI-2839): the history's only while it has the
+   * whole transcript (its size and time as read); behind it (the import queued as the launch ended hasn't run yet), the
+   * transcript's, read by the worker from where it stopped. When the worker has the file's turn (that import under way),
+   * waited for up to `resumeReadWaitMs` rather than never (#1177: a start never waits long on it). `known` false: neither
+   * (that wait ran out, the read failed, the transcript couldn't be looked at), so the CLI's title now isn't known and the
+   * usage given is none: the resume passes no --name rather than a name that may be older than the CLI's (review round 1).
+   * No transcript: what the history or the record keeps, as `usage()` gives it (the CLI has nothing newer to resume from).
+   */
+  private async resumeUsage(projectPath: string, sessionId: string): Promise<{ usage: SessionUsage | null; known: boolean }> {
+    const rec = (await workspace.sessionsFile(projectPath)).sessions.find((s) => s.id === sessionId)
+    const p = await this.anyTranscript(projectPath, sessionId)
+    if (!p) return { usage: await this.usage(projectPath, sessionId, undefined, { noWait: true }), known: true }
+    const st = await stat(p).catch(() => null)
+    if (!st) return { usage: null, known: false }
+    const stored = (await usageHistory.storedUsage(projectPath).catch(() => null))?.get(sessionId)
+    if (stored && stored.read.path?.toLowerCase() === p.toLowerCase() && stored.read.size === st.size && stored.read.mtime === st.mtimeMs) return { usage: withScreenStopsIn(this.titled(stored.usage), rec?.screenStops), known: true }
+    const provider = await this.sessionProvider(projectPath, sessionId)
+    const o = { reportsIgnored: !!rec?.serverRan, costFree: !!rec?.serverLocal && !rec?.notLocal }
+    let usage = await this.usageFor(projectPath, p, sessionId, provider, { ...o, noWait: true })
+    if (!usage) {
+      let timer: NodeJS.Timeout | undefined
+      const late = new Promise<null>((done) => (timer = setTimeout(() => done(null), this.resumeReadWaitMs)))
+      try {
+        usage = await Promise.race([this.usageFor(projectPath, p, sessionId, provider, o), late])
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+    return usage ? { usage: withScreenStopsIn(usage, rec?.screenStops), known: true } : { usage: null, known: false }
   }
 
   /** A usage from the history with the title its CLI gives the session now (Codex's and Copilot's own index), when it has none. */
