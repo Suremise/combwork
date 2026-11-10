@@ -2676,9 +2676,13 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   parsed by Combwork: exactly one value at every level, the same from the store's own config alone (`--local`), and
   jj's. That last check **fingerprints, never interprets** (the Assistant's note after HR1's rounds 1–2 and HR2's round
   3): before its awaited reads it takes a print of every source the decision rests on, the raw bytes of jj's operation
-  heads, the target's loose ref, the packed refs, and the store's `config` with every file it includes (followed,
-  bounded); at its end, with no await between it and the synchronous settles, it takes the print again and checks the
-  operation heads and the target's ref against the moment. Any difference, whether or not it would matter (a mixed-case
+  heads, the store's HEAD (an `onbranch` condition), the target's loose ref, the packed refs, Git's config environment,
+  and every config file Git reads, **found by Git, never parsed by Combwork** (the Assistant's note on HR1's round 4:
+  `git config --show-scope --show-origin -z --includes --list` gives every file a value comes from at every scope and
+  each include and includeIf target as Git decodes it, comments, quotes and continuations included; each scope's own
+  file is covered whether or not it exists yet). An include it can't resolve to a concrete file (a `~` path, a
+  condition it doesn't know) or an origin that isn't a file is unknown. At its end, with no await between it and the
+  synchronous settles, it takes the print again and checks the operation heads and the target's ref against the moment. Any difference, whether or not it would matter (a mixed-case
   `[Remote "origin"]` section, a change in an included file), or a source it can't read, is unknown and every obligation
   stays owed. A pushed commit the store lacks is `notFetched`.
 - **Obligations, one per integration** (`(card, cycle, bundle)`, its result): created only where no row of that key

@@ -89,6 +89,7 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       view: { jjRepo: d.jj.jjRepo, store, colocated },
       folder: control,
       git: gitOn(store),
+      gitEnv: env,
       gitContains: (s, target, c, at) => gitHistory.contains(s, target, c, at),
       lock: (fn) => fn(),
       journal: (card, cycle, b) => void bundles.set(`${card}/${cycle}`, structuredClone(b)),
@@ -364,7 +365,8 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       ['a Git move of the target after the final fence', 'finalFence', 'ref'],
       ['the remote URL changed in Git config after the final fence', 'finalFence', 'url'],
       ["a mixed-case remote section appended after the final fence (HR2's round 3)", 'finalFence', 'section'],
-      ['an included config file changed after the final fence', 'finalFence', 'include']
+      ['an included config file changed after the final fence', 'finalFence', 'include'],
+      ["the file of an include with a trailing comment changed after the final fence (HR1's round 4)", 'finalFence', 'commented']
     ] as const
     it.each(cases)('%s: refused or unknown, every row still owed', async (_name, point, what) => {
       const w = await world(true)
@@ -376,6 +378,10 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       if (what === 'include') {
         writeFileSync(extra, '')
         await w.git(['config', 'include.path', 'extra.cfg'])
+      }
+      if (what === 'commented') {
+        writeFileSync(extra, '')
+        appendFileSync(join(w.store, 'config'), '[include]\n\tpath = extra.cfg # a valid Git comment\n')
       }
       // The first pass through each point is the check after the network read; the second is the one before the settles.
       let seen = 0

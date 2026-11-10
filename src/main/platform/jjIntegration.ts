@@ -29,9 +29,8 @@ const SEP = '\u001f'
 const ZERO = '0'.repeat(40)
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length > 0)
 const refSafe = (s: string): string => s.replace(/[^A-Za-z0-9._-]/g, '-')
-/** How deep includes are followed, and how many config files at most, for the sources' fingerprint. */
-export const INCLUDE_DEPTH = 10
-export const INCLUDE_MAX = 32
+/** How many config files the sources' fingerprint covers at most: more is unknown. */
+export const SOURCES_MAX = 64
 
 /** Why the evidence is refused: the port's further outcomes (R7/R8) and the publish's own. Never "not contained". */
 export type JjRefusal = 'conflictedTarget' | 'divergentChange' | 'partialExport' | 'ambiguousRemote' | 'disagree' | 'notFetched'
@@ -52,6 +51,8 @@ export interface JjIntegrationDeps {
   folder: string
   /** `git --git-dir <store>`; for `ls-remote`, run with no prompt (`GIT_TERMINAL_PROMPT=0`), bounded. */
   git: (args: readonly string[]) => Promise<RunResult>
+  /** The environment `git` runs with (its config scopes follow it): process.env when not given. */
+  gitEnv?: NodeJS.ProcessEnv
   /** §16.3.2's containment on the backing store (Git's `contains`), asked about the head given. */
   gitContains: (store: string, target: string, c: { base: string; revision: string; key?: string | null }, at: string) => Promise<Maybe<Containment | null>>
   lock: StoreLock
@@ -475,19 +476,93 @@ export function refFromFiles(store: string, ref: string): string | null | undefi
   return null
 }
 
+/** The config files Git reads for the store, found by Git (never parsed here), and the environment that steers Git's config. */
+export interface ConfigSources {
+  files: string[]
+  env: string
+}
+
+/** The includeIf conditions Combwork knows the inputs of (all covered by the print: the git dir's path, HEAD, config). */
+const CONDITIONS = /^includeif\.(gitdir|gitdir\/i|onbranch|hasconfig:remote\.\*\.url):.*\.path$/i
+
+/** Parses `git config --show-scope --show-origin -z --list` (scope NUL origin NUL key LF value NUL, repeated). */
+export function parseConfigList(out: string): { scope: string; origin: string; key: string; value: string }[] | null {
+  const parts = out.split('\u0000')
+  if (parts.at(-1) === '') parts.pop()
+  if (parts.length % 3 !== 0) return null
+  const rows: { scope: string; origin: string; key: string; value: string }[] = []
+  for (let i = 0; i < parts.length; i += 3) {
+    const kv = parts[i + 2]
+    const nl = kv.indexOf('\n')
+    rows.push({ scope: parts[i], origin: parts[i + 1], key: nl < 0 ? kv : kv.slice(0, nl), value: nl < 0 ? '' : kv.slice(nl + 1) })
+  }
+  return rows
+}
+
 /**
- * A fingerprint of every source the publish decision rests on (the Assistant's design note, after HR1's rounds 1–2 and
- * HR2's round 3): jj's operation heads, the target's loose ref and the store's packed refs, and the store's `config` with
- * every file it includes (followed, at most INCLUDE_DEPTH deep and INCLUDE_MAX files, relative to the file naming them).
- * Raw bytes only, never interpreted beyond finding the include paths: any difference between two prints means something
- * changed, whether or not it matters. Undefined when any source can't be read (an include past the bounds, a `~` path, a
- * read error but "not there"): unknown, never equal.
+ * The files the print covers (the Assistant's notes on rounds 4–5, HR1's round 4), discovered from Git's own decoded
+ * output, never a parser of Combwork's: every file Git reports a value from (system, global, local and everything they
+ * include, `--includes`), every include and includeIf target Git reports (resolved against the file naming it, so an
+ * empty or missing target is covered too), and each scope's own file whether or not it exists yet (the store's config
+ * and config.worktree; `GIT_CONFIG_GLOBAL`, else the XDG and home files; `GIT_CONFIG_SYSTEM`, else Git's install's
+ * etc/gitconfig). Unknown (fail closed) for anything it can't resolve to a concrete file: a `~` path, a condition it
+ * doesn't know, an origin that isn't a file or Git's own environment config, no home, more than SOURCES_MAX files.
  */
-export function sourcesPrint(store: string, jjRepo: string, target: string): string | undefined {
+export async function configSources(deps: JjIntegrationDeps): Promise<ConfigSources | JjReadUnknown> {
+  const env = deps.gitEnv ?? process.env
+  const files = new Set<string>()
+  const add = (f: string): void => void files.add(resolve(f))
+  add(join(deps.view.store, 'config'))
+  add(join(deps.view.store, 'config.worktree'))
+  if (env.GIT_CONFIG_GLOBAL) add(env.GIT_CONFIG_GLOBAL)
+  else {
+    const home = env.HOME && isAbsolute(env.HOME) ? env.HOME : env.USERPROFILE
+    if (!home) return jjUnknown('failed', 'no home') // i18n-ignore: a protocol detail for logs and tests, never shown
+    add(join(env.XDG_CONFIG_HOME || join(home, '.config'), 'git', 'config'))
+    add(join(home, '.gitconfig'))
+  }
+  if (!/^(1|true|yes|on)$/i.test(env.GIT_CONFIG_NOSYSTEM ?? '')) {
+    if (env.GIT_CONFIG_SYSTEM) add(env.GIT_CONFIG_SYSTEM)
+    else {
+      const exec = await deps.git(['--exec-path'])
+      if (!exec.ok || !exec.out.trim()) return jjUnknown('failed', exec.err || 'exec-path')
+      // Git for Windows: <install>/<mingw|ucrt>64/libexec/git-core, its system file <install>/etc/gitconfig; elsewhere
+      // <prefix>/libexec/git-core and <prefix>/etc/gitconfig. Both covered; an existing one is also among the origins.
+      const at = exec.out.trim()
+      add(join(at, '..', '..', 'etc', 'gitconfig'))
+      add(join(at, '..', '..', '..', 'etc', 'gitconfig'))
+    }
+  }
+  const listed = await deps.git(['config', '--show-scope', '--show-origin', '-z', '--includes', '--list'])
+  if (!listed.ok) return jjUnknown('failed', listed.err)
+  const rows = parseConfigList(listed.out)
+  if (!rows) return jjUnknown('malformed', 'config list') // i18n-ignore: a protocol detail for logs and tests, never shown
+  for (const r of rows) {
+    if (r.origin.startsWith('file:')) add(r.origin.slice(5))
+    else if (r.origin !== 'command line:') return jjUnknown('malformed', `origin ${r.origin}`) // i18n-ignore: a protocol detail for logs and tests, never shown
+    if (!/^include(if\..*)?\.path$/i.test(r.key)) continue
+    if (/^includeif\./i.test(r.key) && !CONDITIONS.test(r.key)) return jjUnknown('malformed', `condition ${r.key}`) // i18n-ignore: a protocol detail for logs and tests, never shown
+    if (!r.origin.startsWith('file:') || !r.value || r.value.startsWith('~')) return jjUnknown('malformed', `include ${r.value}`) // i18n-ignore: a protocol detail for logs and tests, never shown
+    add(isAbsolute(r.value) ? r.value : join(dirname(r.origin.slice(5)), r.value))
+  }
+  if (files.size > SOURCES_MAX) return jjUnknown('malformed', 'too many config files') // i18n-ignore: a protocol detail for logs and tests, never shown
+  const steering = Object.keys(env).filter((k) => /^GIT_CONFIG/i.test(k) || /^(HOME|USERPROFILE|XDG_CONFIG_HOME)$/i.test(k)).sort()
+  return { files: [...files].sort(), env: steering.map((k) => `${k}=${env[k]}`).join('\n') }
+}
+
+/**
+ * A fingerprint of every source the publish decision rests on, read synchronously (no process): jj's operation heads,
+ * the store's HEAD (an `onbranch` condition), the target's loose ref and the packed refs, Git's config environment, and
+ * the raw bytes of every config file `configSources` found (absent ones as absent). Raw bytes only, never interpreted:
+ * any difference between two prints means something changed, whether or not it matters. Undefined when any source can't
+ * be read (a read error but "not there").
+ */
+export function sourcesPrint(store: string, jjRepo: string, target: string, sources: ConfigSources): string | undefined {
   const h = createHash('sha256')
   const heads = readOpHeads(jjRepo)
   if (!heads) return undefined
   h.update(`heads:${[...heads].sort().join(',')}\n`)
+  h.update(`env:${sources.env}\n`)
   const file = (f: string): Buffer | null | undefined => {
     try {
       return readFileSync(f)
@@ -496,39 +571,16 @@ export function sourcesPrint(store: string, jjRepo: string, target: string): str
       return code === 'ENOENT' || code === 'ENOTDIR' ? null : undefined
     }
   }
-  const add = (label: string, b: Buffer | null | undefined): boolean => {
+  const add = (label: string, f: string): boolean => {
+    const b = file(f)
     if (b === undefined) return false
     h.update(`${label}:${b === null ? '-' : createHash('sha256').update(b).digest('hex')}\n`)
     return true
   }
-  if (!add('ref', file(join(store, 'refs', 'heads', ...target.split('/'))))) return undefined
-  if (!add('packed', file(join(store, 'packed-refs')))) return undefined
-  const seen = new Set<string>()
-  const walk = (f: string, depth: number): boolean => {
-    if (depth > INCLUDE_DEPTH || seen.size >= INCLUDE_MAX) return false
-    const key = resolve(f).toLowerCase()
-    if (seen.has(key)) return true
-    seen.add(key)
-    const b = file(f)
-    if (b === undefined || !add(`config:${key}`, b)) return false
-    if (b === null) return true
-    let inInclude = false
-    for (const raw of b.toString('utf8').split(/\r?\n/)) {
-      const l = raw.trim()
-      if (l.startsWith('[')) {
-        inInclude = /^\[\s*include(if)?\b/i.test(l)
-        continue
-      }
-      if (!inInclude) continue
-      const m = /^path\s*=\s*(.*)$/i.exec(l)
-      if (!m) continue
-      const v = m[1].trim().replace(/^"(.*)"$/, '$1')
-      if (!v || v.startsWith('~')) return false
-      if (!walk(isAbsolute(v) ? v : join(dirname(f), v), depth + 1)) return false
-    }
-    return true
-  }
-  if (!walk(join(store, 'config'), 0)) return undefined
+  if (!add('HEAD', join(store, 'HEAD'))) return undefined
+  if (!add('ref', join(store, 'refs', 'heads', ...target.split('/')))) return undefined
+  if (!add('packed', join(store, 'packed-refs'))) return undefined
+  for (const f of sources.files) if (!add(`config:${f.toLowerCase()}`, f)) return undefined
   return h.digest('hex')
 }
 
@@ -611,7 +663,10 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   const still = async (where: string): Promise<JjRefused | JjReadUnknown | null> => {
     // Every source fingerprinted before the awaited reads, and again at the synchronous end: any change between, or a
     // source that can't be read, is unknown (whether or not the change would matter).
-    const before = sourcesPrint(deps.view.store, deps.view.jjRepo, target)
+    // The files Git reads, found by Git (an include added meanwhile is written in one of them, so the print shows it).
+    const sources = await configSources(deps)
+    if (isJjUnknown(sources)) return sources
+    const before = sourcesPrint(deps.view.store, deps.view.jjRepo, target, sources)
     if (before === undefined) return jjUnknown('failed', `sources:${where}`)
     const r2 = await remoteNow(th.op)
     if (isJjUnknown(r2) || isRefused(r2)) return r2
@@ -623,7 +678,7 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     if (readOpHeads(deps.view.jjRepo)?.join() !== th.op) return jjUnknown('moved', `heads:${where}`)
     const refNowSync = refFromFiles(deps.view.store, `refs/heads/${target}`)
     if (refNowSync === undefined || refNowSync !== th.gitRef) return jjUnknown('moved', `ref:${where}`)
-    if (sourcesPrint(deps.view.store, deps.view.jjRepo, target) !== before) return jjUnknown('moved', `sources:${where}`)
+    if (sourcesPrint(deps.view.store, deps.view.jjRepo, target, sources) !== before) return jjUnknown('moved', `sources:${where}`)
     return null
   }
   const afterRemote = await still('afterRemote')

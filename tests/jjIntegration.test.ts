@@ -3,11 +3,16 @@
 // real jj's behaviour is jjIntegrationReal.test.ts'.
 import { describe, expect, it } from 'vitest'
 import { mkdirSync, writeFileSync } from 'fs'
-import { join } from 'path'
-import { chooseRemote, exportProblem, memoryObligations, parseBookmarkRows, parseLsRemote, parseRemotes, reconstructObligations, refFromFiles, sourcesPrint } from '../src/main/platform/jjIntegration'
+import { join, resolve } from 'path'
+import { execFile, execFileSync } from 'child_process'
+import { createRequire } from 'module'
+import { chooseRemote, configSources, exportProblem, memoryObligations, parseBookmarkRows, parseLsRemote, parseRemotes, reconstructObligations, refFromFiles, sourcesPrint, type ConfigSources, type JjIntegrationDeps } from '../src/main/platform/jjIntegration'
+import type { RunResult } from '../src/main/platform/repoContext'
 import { tempDir } from './tempDir'
 import { jjIntegratedOf, jjIntegratedPlatform } from '../src/main/platform/jjFacts'
 
+const require = createRequire(import.meta.url)
+const { gitEnv } = require('./e2e/runContext.cjs') as { gitEnv: (vars?: Record<string, string>) => NodeJS.ProcessEnv }
 const id = (c: string): string => c.repeat(40)
 const SEP = '\u001f'
 
@@ -102,63 +107,103 @@ describe('the synchronous final reads (HR1 round 2): a ref and a remote URL from
   })
 })
 
-describe("the sources' fingerprint (the Assistant's note): raw bytes, any change a difference, unreadable unknown", () => {
+describe("the sources' fingerprint (the Assistant's notes): Git finds the files, raw bytes compared, unreadable unknown", () => {
   const setup = () => {
     const top = tempDir('jjint-print-')
     const store = join(top, 'store')
     const jjRepo = join(top, 'jjrepo')
+    const home = join(top, 'home')
+    // A real (bare) Git dir, so Git reads its local scope; a global file of the test's own (never the run's shared one).
+    execFileSync('git', ['init', '--bare', '-q', store], { env: gitEnv(), windowsHide: true })
     mkdirSync(join(store, 'refs', 'heads'), { recursive: true })
     mkdirSync(join(jjRepo, 'op_heads', 'heads'), { recursive: true })
+    mkdirSync(home)
+    const globalCfg = join(top, 'global.cfg')
     writeFileSync(join(jjRepo, 'op_heads', 'heads', 'f'.repeat(128)), '')
-    writeFileSync(join(store, 'config'), '[remote "origin"]\n\turl = A\n')
+    writeFileSync(join(store, 'HEAD'), 'ref: refs/heads/main\n')
+    writeFileSync(join(store, 'config'), '[core]\n\tbare = true\n[remote "origin"]\n\turl = A\n')
     writeFileSync(join(store, 'refs', 'heads', 'main'), `${id('a')}\n`)
-    const print = (): string | undefined => sourcesPrint(store, jjRepo, 'main')
-    return { top, store, jjRepo, print }
+    const env = gitEnv({ HOME: home, USERPROFILE: home, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: globalCfg })
+    const git = (args: readonly string[]): Promise<RunResult> =>
+      new Promise((done) => {
+        execFile('git', ['--git-dir', store, ...args], { env, windowsHide: true, encoding: 'buffer', timeout: 30_000 }, (e, out, err) => done({ ok: !e, out: out.toString('utf8'), buf: out, err: err.toString('utf8'), code: e ? -1 : 0 }))
+      })
+    const deps = { git, gitEnv: env, view: { store, jjRepo, colocated: false } } as unknown as JjIntegrationDeps
+    const sources = async (): Promise<ConfigSources> => {
+      const s = await configSources(deps)
+      if ('jjUnknown' in s) throw new Error(JSON.stringify(s))
+      return s
+    }
+    const print = (s: ConfigSources): string | undefined => sourcesPrint(store, jjRepo, 'main', s)
+    return { top, store, jjRepo, home, globalCfg, env, deps, sources, print }
   }
-  it('is stable when nothing changes', () => {
+
+  it('is stable when nothing changes, and covers each scope file whether or not it exists', async () => {
     const w = setup()
-    expect(w.print()).toBeDefined()
-    expect(w.print()).toBe(w.print())
+    const s = await w.sources()
+    expect(s.files).toEqual(expect.arrayContaining([resolve(w.store, 'config'), resolve(w.store, 'config.worktree'), resolve(w.globalCfg)]))
+    expect(w.print(s)).toBeDefined()
+    expect(w.print(s)).toBe(w.print(s))
+    // Without GIT_CONFIG_GLOBAL: the XDG and home files, existing or not.
+    const bare = { ...w.env }
+    delete bare.GIT_CONFIG_GLOBAL
+    const h = await configSources({ ...w.deps, gitEnv: bare } as JjIntegrationDeps)
+    expect('files' in h && h.files).toEqual(expect.arrayContaining([resolve(w.home, '.gitconfig'), resolve(w.home, '.config', 'git', 'config')]))
   })
-  it("differs for a mixed-case remote section appended (HR2's round 3: never interpreted, so never ignored)", () => {
+
+  it("differs for a mixed-case remote section appended (HR2's round 3), for HEAD, a ref, the packed refs and the operation heads", async () => {
     const w = setup()
-    const a = w.print()
-    writeFileSync(join(w.store, 'config'), '[remote "origin"]\n\turl = A\n[Remote "origin"]\n\turl = B\n')
-    expect(w.print()).not.toBe(a)
+    const s = await w.sources()
+    const seen = new Set([w.print(s)])
+    const step = (f: () => void): void => {
+      f()
+      const p = w.print(s)
+      expect(seen.has(p)).toBe(false)
+      seen.add(p)
+    }
+    step(() => writeFileSync(join(w.store, 'config'), '[core]\n\tbare = true\n[remote "origin"]\n\turl = A\n[Remote "origin"]\n\turl = B\n'))
+    step(() => writeFileSync(join(w.store, 'HEAD'), 'ref: refs/heads/other\n'))
+    step(() => writeFileSync(join(w.store, 'refs', 'heads', 'main'), `${id('c')}\n`))
+    step(() => writeFileSync(join(w.store, 'packed-refs'), `${id('b')} refs/heads/other\n`))
+    step(() => writeFileSync(join(w.jjRepo, 'op_heads', 'heads', 'e'.repeat(128)), ''))
+    step(() => writeFileSync(w.globalCfg, '[remote "origin"]\n\turl = C\n'))
   })
-  it('follows includes (and includeIf, nested, relative to the file naming them): a change in an included file differs', () => {
+
+  it("follows includes as Git decodes them (HR1's round 4): a trailing comment, quotes over a continued line, nested and empty targets", async () => {
     const w = setup()
     mkdirSync(join(w.store, 'sub'))
-    writeFileSync(join(w.store, 'config'), '[remote "origin"]\n\turl = A\n[include]\n\tpath = extra.cfg\n[includeIf "gitdir:x"]\n\tpath = sub/cond.cfg\n')
-    writeFileSync(join(w.store, 'extra.cfg'), '[core]\n\tx = 1\n')
-    writeFileSync(join(w.store, 'sub', 'cond.cfg'), '[Include]\n\tpath = deeper.cfg\n')
-    writeFileSync(join(w.store, 'sub', 'deeper.cfg'), '')
-    const a = w.print()
-    expect(a).toBeDefined()
-    writeFileSync(join(w.store, 'extra.cfg'), '[remote "origin"]\n\turl = B\n')
-    const b = w.print()
+    writeFileSync(join(w.store, 'config'), '[core]\n\tbare = true\n[remote "origin"]\n\turl = A\n[include]\n\tpath = extra.cfg # a valid Git comment\n[includeIf "onbranch:main"]\n\tpath = "sub/co\\\nnd.cfg"\n')
+    writeFileSync(join(w.store, 'extra.cfg'), '[Include]\n\tpath = sub/empty.cfg\n')
+    writeFileSync(join(w.store, 'sub', 'cond.cfg'), '')
+    const s = await w.sources()
+    for (const f of ['extra.cfg', join('sub', 'cond.cfg'), join('sub', 'empty.cfg')]) expect(s.files).toContain(resolve(w.store, f))
+    // The real included file changing is a difference (the commented include followed to extra.cfg, not "extra.cfg # …").
+    const a = w.print(s)
+    writeFileSync(join(w.store, 'extra.cfg'), '[Include]\n\tpath = sub/empty.cfg\n[remote "origin"]\n\turl = B\n')
+    const b = w.print(s)
     expect(b).not.toBe(a)
-    writeFileSync(join(w.store, 'sub', 'deeper.cfg'), '[remote "origin"]\n\turl = C\n')
-    expect(w.print()).not.toBe(b)
+    // An empty (and so value-less) nested target gaining a value is a difference too.
+    writeFileSync(join(w.store, 'sub', 'empty.cfg'), '[remote "origin"]\n\turl = C\n')
+    expect(w.print(s)).not.toBe(b)
   })
-  it('a ref, the packed refs or the operation heads changing differs; a `~` include or too deep a chain is unknown', () => {
+
+  it('fails closed: a `~` include, an unknown condition', async () => {
     const w = setup()
-    const a = w.print()
-    writeFileSync(join(w.store, 'packed-refs'), `${id('b')} refs/heads/other\n`)
-    const b = w.print()
-    expect(b).not.toBe(a)
-    writeFileSync(join(w.store, 'refs', 'heads', 'main'), `${id('c')}\n`)
-    const c = w.print()
-    expect(c).not.toBe(b)
-    writeFileSync(join(w.jjRepo, 'op_heads', 'heads', 'e'.repeat(128)), '')
-    expect(w.print()).not.toBe(c)
     writeFileSync(join(w.store, 'config'), '[include]\n\tpath = ~/x.cfg\n')
-    expect(w.print()).toBeUndefined()
-    writeFileSync(join(w.store, 'config'), '[include]\n\tpath = config\n')
-    expect(w.print()).toBeDefined()
-    for (let i = 0; i < 12; i++) writeFileSync(join(w.store, `c${i}.cfg`), `[include]\n\tpath = c${i + 1}.cfg\n`)
-    writeFileSync(join(w.store, 'config'), '[include]\n\tpath = c0.cfg\n')
-    expect(w.print()).toBeUndefined()
+    expect(await configSources(w.deps)).toMatchObject({ jjUnknown: 'malformed' })
+    writeFileSync(join(w.store, 'config'), '[includeIf "somethingnew:x"]\n\tpath = y.cfg\n')
+    expect(await configSources(w.deps)).toMatchObject({ jjUnknown: 'malformed' })
+  })
+
+  it('names GIT_CONFIG_GLOBAL and GIT_CONFIG_SYSTEM where set, and carries the config environment in the print', async () => {
+    const w = setup()
+    const g = join(w.top, 'g.cfg')
+    const sys = join(w.top, 'sys.cfg')
+    const env = { ...gitEnv({ HOME: w.home, USERPROFILE: w.home, GIT_CONFIG_GLOBAL: g, GIT_CONFIG_SYSTEM: sys }) }
+    delete env.GIT_CONFIG_NOSYSTEM
+    const s = await configSources({ ...w.deps, gitEnv: env } as JjIntegrationDeps)
+    expect('files' in s && s.files).toEqual(expect.arrayContaining([resolve(g), resolve(sys)]))
+    expect('env' in s && s.env).toContain('GIT_CONFIG_GLOBAL=')
   })
 })
 
