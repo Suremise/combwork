@@ -523,21 +523,21 @@ export class JjPlatform implements PlatformAdapter {
         const integ = await d.integration()
         const ctx = await this.ctxOf(this.wf!.folderOf(s))
         const th = integ && s.started?.target ? await jjTargetHead(integ, s.started.target) : null
-        if (!ctx || !th || isJjUnknown(th) || integrationRefused(th)) return { unknown: 'sameness: the target' }
+        if (!ctx || !th || isJjUnknown(th) || integrationRefused(th)) return { unknown: 'sameness:target' } // i18n-ignore: a protocol code, for the log
         const b = await this.H.mergeBase(ctx.store, th.head, head)
-        if (isUnknown(b) || !b) return { unknown: 'sameness: the merge base' }
+        if (isUnknown(b) || !b) return { unknown: 'sameness:mergeBase' } // i18n-ignore: a protocol code, for the log
         const reads = new JjReads({ folder: this.wf!.folderOf(s), jjRepo: ctx.jjRepo }, this.runner())
         const op = reads.head()
-        if (isJjUnknown(op)) return { unknown: 'sameness: the heads' }
+        if (isJjUnknown(op)) return { unknown: 'sameness:heads' } // i18n-ignore: a protocol code, for the log
         const [a, n] = await Promise.all([reads.commitAt(op, approved.revision), reads.commitAt(op, head)])
-        if (isJjUnknown(a) || isJjUnknown(n) || !reads.stillAt(op)) return { unknown: 'sameness: the commits' }
+        if (isJjUnknown(a) || isJjUnknown(n) || !reads.stillAt(op)) return { unknown: 'sameness:commits' } // i18n-ignore: a protocol code, for the log
         let unread = false
         const same = await jjSameRevision({ base: approved.base, commit: a }, { base: b, commit: n }, async (x, y) => {
           const v = await this.H.sameChange(ctx.store, x, y)
           if (isUnknown(v)) unread = true
           return v === true
         })
-        return unread ? { unknown: 'sameness: the replay' } : { same, base: b }
+        return unread ? { unknown: 'sameness:replay' } : { same, base: b } // i18n-ignore: a protocol code, for the log
       },
       prove: async (_c, s, approved) => {
         const integ = await d.integration()
