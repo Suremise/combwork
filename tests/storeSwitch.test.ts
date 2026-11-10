@@ -185,8 +185,10 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
     const before = { p: await w.projectConfig(p), q: await w.projectConfig(q) }
     const token = (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token
     // P (None) is written, then Q's save fails.
+    // The first member is written, the second's save fails (whichever comes first: ids are random here).
+    let writes = 0
     ss.storeSwitchSeams.write = async (path, partial) => {
-      if (path === q) throw new Error('disk full')
+      if (++writes === 2) throw new Error('disk full')
       await w.mutateProjectConfig(path, () => partial, { existing: true })
     }
     await expect(sw.setPlatform(w, p, 'jj', { expected: 'none', token })).rejects.toThrow(/disk full/)
@@ -204,9 +206,11 @@ describe('a switch between Git and jj is the repository’s (HI-2799)', () => {
   it('a save that persisted though its call failed settles forward by the disk (2b)', async () => {
     const { w, p, q } = await workspace({ p: 'git', q: 'git' })
     const token = (await sw.checkPlatformSwitch(w, p, 'jj')).store!.token
+    // The last member's save persists, but its call fails (members are written in their ids' order, random here).
+    let writes = 0
     ss.storeSwitchSeams.write = async (path, partial) => {
       await w.mutateProjectConfig(path, () => partial, { existing: true })
-      if (path === q) throw new Error('lost reply')
+      if (++writes === 2) throw new Error('lost reply')
     }
     await expect(sw.setPlatform(w, p, 'jj', { expected: 'git', token })).rejects.toThrow(/lost reply/)
     expect(await platformIn(w, p)).toBe('jj')
