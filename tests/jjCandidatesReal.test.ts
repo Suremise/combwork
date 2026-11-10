@@ -26,12 +26,14 @@ import {
   jjCandidateNow,
   pinPrefix,
   prepareJjCandidate,
+  prepareJjUpdate,
   recoverJjAttempt,
   type JjAttemptRecord,
   type JjCandidateDeps,
   type JjCandidatePoint,
   type JjCandidateRequest,
-  type JjCandidateStyle
+  type JjCandidateStyle,
+  type JjUpdateRequest
 } from '../src/main/platform/jjCandidates'
 import { admitted } from './admitted'
 import { harness, jjExe } from './jjWorkspaceHarness'
@@ -379,6 +381,180 @@ describe.skipIf(!jjExe)(`jj merge-queue candidates on the real jj (${TESTED_JJ.v
       h.jj(w.builder, 'describe', 'builder@-', '-m', 'reworded')
       expect(await jjCandidateNow(w.deps(), out.candidate)).toBe('superseded')
       expect(await w.ref(`${pinPrefix('HI-1', out.record.attempt)}candidate`)).toBe(out.candidate.result)
+    })
+  })
+
+  type World = Awaited<ReturnType<typeof world>>
+
+  describe.each([true, false] as const)("strict's update (G8, HI-2853), colocated: %s", (colocated) => {
+    const ureq = (w: World, how: 'merge' | 'rebase', more: Partial<JjUpdateRequest> = {}): JjUpdateRequest => ({ card: 'HI-1', attempt: token(), revision: w.R, base: w.fBase, expected: w.T, how, message: 'HI-1: update', ...more })
+    const update = async (w: World, how: 'merge' | 'rebase' = 'merge'): Promise<JjAttemptRecord> => {
+      const out = await prepareJjUpdate(w.deps(), ureq(w, how))
+      if (!('updated' in out) || !out.updated || !('record' in out)) throw new Error(JSON.stringify(out))
+      return out.record
+    }
+
+    it.each(['merge', 'rebase'] as const)('%s: already up to date: null, nothing written', async (how) => {
+      const w = await world(colocated, { onTarget: true })
+      const heads = readOpHeads(w.view.jjRepo)
+      expect(await prepareJjUpdate(w.deps(), ureq(w, how, { base: w.T }))).toEqual({ updated: null })
+      expect(readOpHeads(w.view.jjRepo)).toEqual(heads)
+      expect(w.journal).toEqual([])
+    })
+
+    it.each(['merge', 'rebase'] as const)('%s: a private updated revision, the same change; the builder intact', async (how) => {
+      const w = await world(colocated)
+      const before = await w.intact()
+      const out = await prepareJjUpdate(w.deps(), ureq(w, how))
+      expect('updated' in out && out.updated, JSON.stringify(out)).toBeTruthy()
+      if (!('record' in out) || !('updated' in out) || !out.updated) return
+      expect(out.updated).not.toBe(w.R)
+      expect(w.log(out.updated, 'parents.map(|p| p.commit_id()).join(",")')).toEqual([how === 'merge' ? `${w.R},${w.T}` : w.T])
+      expect(out.record).toMatchObject({ kind: 'update', how, outcome: 'updated', phase: 'done', result: out.updated })
+      expect(out.record.updated).toBeUndefined()
+      expect(await w.ref(`${pinPrefix('HI-1', out.record.attempt)}candidate`)).toBe(out.updated)
+      expect(await w.intact()).toEqual(before)
+    })
+
+    it.each(['merge', 'rebase'] as const)("%s: a conflict read from the commits, the side git writes first as its hunks show", async (how) => {
+      const w = await world(colocated, { card: [{ 'f.txt': 'card\n' }], target: { 'f.txt': 'target\n' } })
+      const out = await prepareJjUpdate(w.deps(), ureq(w, how))
+      expect('fail' in out && out.fail, JSON.stringify(out)).toBe('conflict')
+      if (!('fail' in out) || out.fail !== 'conflict') return
+      const hunk = out.conflicts!.files[0].hunks[0]
+      // The merge update's parents are R then E: the card's side first (oursIs 'card'); a rebase writes the target's first.
+      expect(out.conflicts!.oursIs).toBe(how === 'merge' ? 'card' : 'target')
+      expect(hunk.ours).toEqual([how === 'merge' ? 'card' : 'target'])
+      expect(hunk.theirs).toEqual([how === 'merge' ? 'target' : 'card'])
+      for (const e of out.evidence) expect(w.log(`${e} & ::visible_heads()`)).toEqual([])
+      expect(out.record.outcome).toBe('conflict')
+    })
+
+    it('not the same change by replay: notSame, its commits pinned and out of the log', async () => {
+      const w = await world(colocated)
+      const out = await prepareJjUpdate(w.deps({ sameChange: async () => false }), ureq(w, 'merge'))
+      expect('fail' in out && out.fail, JSON.stringify(out)).toBe('notSame')
+      if (!('fail' in out)) return
+      expect(out.log).toMatch(/isn't the same change as reviewed/)
+      expect(out.record.outcome).toBe('notSame')
+      for (const c of out.record.commits) expect(w.log(`${c} & ::visible_heads()`)).toEqual([])
+    })
+
+    it('rebase: a merge in the suffix returns the card, nothing written', async () => {
+      const w = await world(colocated)
+      h.jj(w.repo, 'new', w.fBase, '-m', 'side')
+      writeFileSync(join(w.repo, 's.txt'), 'side\n')
+      h.jj(w.repo, 'new', '@', w.R, '-m', 'merge')
+      const M = h.id(w.repo, '@')
+      const heads = readOpHeads(w.view.jjRepo)
+      expect(await prepareJjUpdate(w.deps(), ureq(w, 'rebase', { revision: M }))).toMatchObject({ fail: 'notUpToDate' })
+      expect(readOpHeads(w.view.jjRepo)).toEqual(heads)
+    })
+
+    it.each(['owner', 'cancel'] as const)('%s at the write: interrupted, nothing written', async (how) => {
+      const w = await world(colocated)
+      let held = true
+      const ac = new AbortController()
+      const hook = (p: JjCandidatePoint): void => {
+        if (p !== 'beforeWrite:update') return
+        if (how === 'owner') held = false
+        else ac.abort()
+      }
+      const out = await prepareJjUpdate(w.deps({ owner: { still: () => held }, signal: ac.signal, hook }), ureq(w, 'merge'))
+      expect(isInterrupted(out) && out.interrupted).toMatchObject({ why: how === 'owner' ? 'owner' : 'cancelled', commits: [] })
+    })
+
+    it('a crash after written, recovered by J4: pinned, nothing abandoned, never an update', async () => {
+      const w = await world(colocated)
+      await expect(prepareJjUpdate(w.deps({ hook: (p) => void (p === 'written' && (() => { throw new Error('crash') })()) }), ureq(w, 'rebase'))).rejects.toThrow('crash')
+      const last = w.journal.at(-1)!
+      const rec = await recoverJjAttempt(w.deps(), last)
+      expect('recovered' in rec && rec.recovered.commits).toHaveLength(1)
+      if (!('recovered' in rec)) return
+      expect(rec.record.outcome).toBeUndefined()
+      expect(w.log(`${rec.recovered.commits[0]} & ::visible_heads()`)).toHaveLength(1)
+    })
+
+    it.each(['merge', 'squash'] as const)('a %s candidate built on a valid update: from U, recording it', async (style) => {
+      const w = await world(colocated)
+      const u = await update(w)
+      const out = await prepareJjCandidate(w.deps(), w.req(style, { updated: u }))
+      expect(isCandidate(out), JSON.stringify(out)).toBe(true)
+      if (!isCandidate(out)) return
+      expect(out.record.updated).toEqual({ attempt: u.attempt, result: u.result })
+      expect(out.record.revision).toBe(w.R)
+      if (style === 'merge') expect(w.log(out.candidate.result, 'parents.map(|p| p.commit_id()).join(",")')).toEqual([`${w.T},${u.result}`])
+    })
+
+    it('a rebase candidate given an update ignores it: built from R, recording none', async () => {
+      const w = await world(colocated)
+      const u = await update(w, 'rebase')
+      const out = await prepareJjCandidate(w.deps(), w.req('rebase', { updated: u }))
+      expect(isCandidate(out)).toBe(true)
+      if (!isCandidate(out)) return
+      expect(out.record.updated).toBeUndefined()
+      expect(w.log(out.candidate.result, 'parents.map(|p| p.commit_id()).join(",")')).toEqual([w.T])
+    })
+
+    it('an invalid update is refused before anything is written: each way it can be wrong', async () => {
+      const w = await world(colocated)
+      const u = await update(w)
+      const pin = `${pinPrefix('HI-1', u.attempt)}candidate`
+      const cases: [string, Partial<JjCandidateRequest>, () => Promise<void> | void][] = [
+        ['wrong card', { updated: { ...u, card: 'HI-9' } }, () => undefined],
+        ['wrong revision', { updated: { ...u, revision: w.fBase } }, () => undefined],
+        ['wrong base', { updated: { ...u, base: w.T } }, () => undefined],
+        ['mismatched result', { updated: { ...u, result: w.fBase } }, () => undefined],
+        ['interrupted', { updated: { ...u, phase: 'pinned', outcome: undefined } }, () => undefined],
+        ['not a leaf', { updated: { ...u, updated: { attempt: 'zzzzzz', result: w.T } } }, () => undefined],
+        ['a candidate, not an update', { updated: { ...u, kind: undefined } }, () => undefined]
+      ]
+      for (const [name, more, setup] of cases) {
+        await setup()
+        const heads = readOpHeads(w.view.jjRepo)
+        const n = w.journal.length
+        const out = await prepareJjCandidate(w.deps(), w.req('merge', more))
+        expect(out, name).toMatchObject({ jjUnknown: 'malformed' })
+        expect(readOpHeads(w.view.jjRepo), name).toEqual(heads)
+        expect(w.journal.length, name).toBe(n)
+      }
+      // The pin moved, then dropped: refused the same way.
+      await w.git(['update-ref', pin, w.fBase])
+      expect(await prepareJjCandidate(w.deps(), w.req('merge', { updated: u }))).toMatchObject({ jjUnknown: 'malformed', detail: 'update:pinMoved' })
+      await w.git(['update-ref', pin, u.result!])
+      const dropped = await dropJjAttempt(w.deps(), u, 'main')
+      expect('dropped' in dropped).toBe(true)
+      if ('dropped' in dropped) expect(await prepareJjCandidate(w.deps(), w.req('merge', { updated: dropped.record }))).toMatchObject({ jjUnknown: 'malformed' })
+    })
+
+    it('an update built on another target head (the target moved since): refused, nothing written', async () => {
+      const w = await world(colocated)
+      const u = await update(w)
+      h.jj(w.repo, 'new', 'main')
+      writeFileSync(join(w.repo, 't2.txt'), 'later\n')
+      h.jj(w.repo, 'commit', '-m', 'target 2')
+      h.jj(w.repo, 'bookmark', 'set', 'main', '-r', '@-')
+      const T2 = h.id(w.repo, 'main')
+      const heads = readOpHeads(w.view.jjRepo)
+      expect(await prepareJjCandidate(w.deps(), w.req('squash', { expected: T2, updated: u }))).toMatchObject({ jjUnknown: 'malformed', detail: 'update:expected' })
+      expect(readOpHeads(w.view.jjRepo)).toEqual(heads)
+    })
+
+    it('dropping an update under a live merge candidate: kept back, U and the candidate intact', async () => {
+      const w = await world(colocated)
+      const u = await update(w)
+      const out = await prepareJjCandidate(w.deps(), w.req('merge', { updated: u }))
+      if (!isCandidate(out)) throw new Error(JSON.stringify(out))
+      const dropped = await dropJjAttempt(w.deps(), u, 'main')
+      // J4's drop reports a guarded keep as kept (commit and refs), deleting nothing a live candidate depends on.
+      expect('dropped' in dropped, JSON.stringify(dropped)).toBe(true)
+      if (!('dropped' in dropped)) return
+      expect(dropped.dropped.kept).toEqual([u.result])
+      expect(dropped.dropped.refs).toEqual([])
+      expect(dropped.dropped.keptRefs.every((k) => k.why === 'kept')).toBe(true)
+      expect(w.log(`${u.result} & ::visible_heads()`)).toEqual([u.result])
+      expect(w.log(`${out.candidate.result} & ::visible_heads()`)).toEqual([out.candidate.result])
+      expect(await w.ref(`${pinPrefix('HI-1', u.attempt)}candidate`)).toBe(u.result)
     })
   })
 
