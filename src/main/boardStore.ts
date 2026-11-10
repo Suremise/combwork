@@ -15,6 +15,7 @@ import { LANE_RECORD_STEP, moveLaneRecords } from './schema/laneRecordStep'
 import { ACTIONS_DELIVERED_STEP, ASSISTANT_CHANGES_STEP, CARD_ATTACHMENTS_STEP, CARD_REVS_STEP, CARD_SEARCH_STEP, CARDS_STEP, FACTS_STEP, QUERIES, QUEUE_PAUSE_BY_STEP, QUEUE_PAUSE_MESSAGE_STEP, QUEUE_PAUSE_STATE_STEP, QUEUE_RUNNERS_STEP, COPIES_STEP, QUEUE_SEEN_STEP, SESSION_LEASES_STEP, SKILL_COPIES_STEP, SLOTS_STEP, UNDO_OUTCOMES_STEP } from './schema/v1_0'
 import { NAMES_STEP } from './schema/namesStep'
 import { VALUES_STEP } from './schema/valuesStep'
+import { WORKSPACE_IDENTITY_STEP } from './schema/workspaceIdentityStep'
 import { addCommentArchive, allArchivedComments, archivedCommentCount, archivedCommentRows, archiveCommentRows, COMMENT_ARCHIVE_STEP, mayHaveLostCards, type Evicted } from './schema/commentArchive'
 import { backupsOf, DbInUseError, fileSchemaVersion, groupBackupFamily, isIoError, openDb, OPENABLE_WAIT_MS, schemaVersion, soleCopy, untilOpenable, type Db, type Migration, type PendingGroup } from './db'
 import { checkpointsReleased, checkpointWhenIdle, timedCommit } from './walCheckpoint'
@@ -349,6 +350,14 @@ export const BOARD_MIGRATIONS: Migration[] = [
     name: COMMENT_ARCHIVE_STEP.name,
     group: UPGRADE_GROUP_ID,
     up: (db) => addCommentArchive(db)
+  },
+  {
+    // HI-2795 (jj's J2): slots' and copies' platform identity, and a copy lease's verification (schema/workspaceIdentityStep.ts).
+    // In the 1.0 group, as 25–27 are: every step outside it is 0.9's.
+    version: 28,
+    name: WORKSPACE_IDENTITY_STEP.name,
+    group: UPGRADE_GROUP_ID,
+    up: (db) => WORKSPACE_IDENTITY_STEP.up(db)
   }
 ]
 

@@ -37,6 +37,9 @@
       "what": "plain"
     }
   },
+  "slot.error.identityUnread": {
+    "placeholders": {}
+  },
   "slot.error.interrupted": {
     "placeholders": {}
   },

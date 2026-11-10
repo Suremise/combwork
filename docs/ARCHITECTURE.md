@@ -344,6 +344,14 @@ one head). `tests/jjHistory.test.ts` and, on the pinned jj, `tests/jjHistoryReal
 on user-performed integration, no automatic advance). It is one advance attempt step by step, plus a classifier of what
 it observed, and only its tests reach it (`tests/jjAdvanceProbeReal.test.ts`; `tests/integrationPortsImports.test.ts`
 fails on any import of it from `src`).
+jj's workspaces (1.5.0's J2, HI-2795; SPEC §16.3.6, jj's workspaces):
+`platform/jjWorkspacePort.ts` is jj's workspace lifecycle port (`createJjWorkspacePort`: made by `jj workspace add` from
+a sparse, empty control workspace, reads pinned at one operation, line operations refused, `record` the explicit
+snapshot, removal journalled and checked by the folder's creation generation), `platform/jjRecovery.ts` a stale
+workspace's resumable recovery (`recoverStale`), and `schema/workspaceIdentityStep.ts` the slots' and copies' platform
+and identity columns. `slots.ts` and `copies.ts` take a port per row (`portOf`) and call `record` where they hold the
+folder; jj's port reaches them only by injection (not in `workspacePorts.ts`), from the tests (`tests/jjWorkspaces`,
+`jjSlotPool`, `jjRecovery`, over `tests/jjWorkspaceHarness.ts`).
 
 **The queue in the app** (#1348, SPEC §16.9): `workflow/queueHost.ts` runs one host per open workspace, project and
 target. The runtime's `enqueue` action (written with each `IntegrationRequested`) and a workspace opening (its targets
