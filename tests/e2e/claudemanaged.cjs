@@ -84,14 +84,14 @@ const until = lib.until
      * A busy turn (HI-2850), as HB3's on 10 Nov: two messages taken in mid-turn (each a UserPromptSubmit under the turn's
      * prompt_id, its own text), the same text taken twice at two tool boundaries, a foreground sub-agent's two tool calls,
      * and a card watch, to its end. Each is an event of its own, so each is handled: five prompts, seven tool calls
-     * (four Bash, the Agent call, its sub-agent's two Reads), one SubagentStop.
+     * (four Bash, the Agent call, its sub-agent's two Reads).
      */
     const card = (await inv('tasks:create', { title: 'Watched while busy', project: 'alpha', agent: agent.id, column: 'doing' })).number
     const busyTurn = async (label) => {
       check(`${label}: a busy turn goes to work`, (await say(`queued 2 then queuedsame 2 then subtools 2 then cw cw_wait_for_tasks ${JSON.stringify({ cards: [card], column: 'done', wake: true, limitMinutes: 60 })}`)) > 0)
       check(`${label}: it ends watching the card`, !!(await until(async () => (await live())?.status === 'watching' && (await fired()).includes('Stop'), HUNG_MS)), JSON.stringify((await live())?.status))
       const f = await fired()
-      check(`${label}: every prompt (the turn's, two queued, the same text twice), tool call and SubagentStop handled once`, count(f, 'UserPromptSubmit') === 5 && count(f, 'PreToolUse') === 7 && count(f, 'PostToolUse') === 7 && count(f, 'SubagentStop') === 1, JSON.stringify(f))
+      check(`${label}: every prompt (the turn's, two queued, the same text twice) and tool call handled once`, count(f, 'UserPromptSubmit') === 5 && count(f, 'PreToolUse') === 7 && count(f, 'PostToolUse') === 7, JSON.stringify(f))
     }
     /** A prompt with an edit of x.txt and its status line's model, to its end: every event Combwork takes, once each. */
     const turn = async (model) => {

@@ -674,7 +674,8 @@ async function queuedMessages(n, same) {
 
 /**
  * "subtools N": a sub-agent the Agent tool runs in the foreground, its N tool calls (Read) sending their hooks with its
- * agent_id and agent_type, as Claude Code 2.1's do, then SubagentStop and the Agent call's PostToolUse (HI-2850).
+ * agent_id and agent_type, as Claude Code 2.1's do, then the Agent call's PostToolUse (HI-2850; SubagentStop isn't one
+ * of Combwork's hooks).
  */
 async function foregroundSubagent(n) {
   const id = `toolu_${randomUUID().slice(0, 8)}`
@@ -688,7 +689,6 @@ async function foregroundSubagent(n) {
     await hook('PreToolUse', call)
     await hook('PostToolUse', call)
   }
-  await hook('SubagentStop', { ...sub, stop_hook_active: false })
   write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'Looked around.' }] }] } })
   await hook('PostToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
 }
