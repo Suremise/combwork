@@ -126,9 +126,10 @@ describe('the session contract', () => {
     // folder about 35. #1529 (P8) held the agent's at its 1.0.0 size (2,656 characters, 2,787 with a handover): the
     // board rules became the intents and Combwork's refusals, and #903's act-then-ack line came in within it; the
     // Assistant's grew by that line, about 140. HI-686's route to the generalist skill (Darren's design: the contract
-    // points to it) added 15 ("; for other work, use generalist", the shortest that reads).
-    expect(agent.length).toBeLessThanOrEqual(2671)
-    expect(withLatestHandover(agent, 'handovers/2026-10-03-web-auth-refactor.md').length).toBeLessThanOrEqual(2802)
+    // points to it) added 15 ("; for other work, use generalist", the shortest that reads). HI-2865's never-by-name rule in the stop-what-you-start line added 121 (an agent of another
+    // project ended every lane's cw-progress runs by a `ps | grep` pattern).
+    expect(agent.length).toBeLessThanOrEqual(2792)
+    expect(withLatestHandover(agent, 'handovers/2026-10-03-web-auth-refactor.md').length).toBeLessThanOrEqual(2923)
     expect(assistant.length).toBeLessThan(820)
     for (const level of ['look', 'agents', 'projects'] as const) expect(controlRules(level).length).toBeLessThan(1200)
     const card = { number: 7, title: 'T', description: 'D', blockedBy: [], comments: [] } as unknown as TaskCard

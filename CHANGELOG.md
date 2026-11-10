@@ -62,6 +62,7 @@
 ### Changed
 
 - **The Assistant's list of coding agents is shorter** (HI-2814). Its `cw_list_providers` tool now gives a line per coding agent (on or off, installed and tested version, default model, efforts, modes and connections), and one in full, with its models and what each mode does, when the Assistant names it. With OpenCode as the fifth, the full list of all of them had grown past the size Combwork keeps a tool's reply to. The Agent API's `GET /v1/providers` is unchanged.
+- **Agents end processes only by their own handle** (HI-2865). An agent in one project ended every lane's runs with `ps -ef | grep cw-progress | xargs kill` (Git Bash's `ps` lists every process of yours), so other cards' tests stopped with exit 143. Combwork now tells every agent to end only what it started, by its handle or the pid and start time it took, never by name or a `ps`/`grep` pattern.
 - **GitHub Copilot 1.0.107 tested** (HI-2780), beside 1.0.106: Provider Setup ticks either. 1.0.107's release notes are 1.0.106's, and no differences were found in what was checked (its help, its terminal output, its model listing, Combwork's Copilot suites); WinGet offered only 1.0.106 when this was tested.
 
 ### Fixed
