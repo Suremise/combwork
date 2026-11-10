@@ -1,12 +1,14 @@
 // A program run to its end within a bound (HI-1185: the signing check outside the merge queue's runner, and in tests):
-// its output capped, its whole tree ended at the bound, no window, stdin only when given. Each live one is known, so a
-// workspace closing or Combwork quitting ends them (endBoundedSpawns).
+// its output capped, its whole tree ended at the bound or on its signal, no window, stdin only when given. Nothing here
+// blocks the thread it runs on (Electron's main carries every keystroke): the tree is ended by endTreeAsync, never
+// spawnSync. Each live run is known with its owner, so a workspace closing or Combwork quitting ends them and waits for
+// them to be gone (endBoundedSpawns).
 
 import { spawn, type ChildProcess } from 'child_process'
-import { endTree } from '../processTree'
+import { endTreeAsync } from '../processTree'
 import type { QueueGitResult } from './integration'
 
-const live = new Map<ChildProcess, string>()
+const live = new Map<ChildProcess, { owner: string; closed: Promise<void> }>()
 
 export interface BoundedOptions {
   cwd: string
@@ -17,10 +19,13 @@ export interface BoundedOptions {
   maxOutput?: number
   /** Who it runs for (a project path): endBoundedSpawns ends only those. */
   owner?: string
+  /** Ends it (its tree) when aborted; aborted already, nothing starts. */
+  signal?: AbortSignal
 }
 
 export function boundedSpawn(file: string, args: string[], o: BoundedOptions): Promise<QueueGitResult> {
   const max = o.maxOutput ?? 64 * 1024
+  if (o.signal?.aborted) return Promise.resolve({ ok: false, out: '', err: 'cancelled', code: -1, notRun: 'aborted' }) // i18n-ignore: a code, never shown
   return new Promise((res) => {
     let child: ChildProcess
     try {
@@ -28,16 +33,20 @@ export function boundedSpawn(file: string, args: string[], o: BoundedOptions): P
     } catch (e) {
       return res({ ok: false, out: '', err: e instanceof Error ? e.message : String(e), code: -1, notRun: String((e as NodeJS.ErrnoException).code ?? 'error') })
     }
-    live.set(child, o.owner ?? '')
+    let markClosed: () => void = () => undefined
+    live.set(child, { owner: o.owner ?? '', closed: new Promise<void>((r) => (markClosed = r)) })
     const out: Buffer[] = []
     const err: Buffer[] = []
     let outLen = 0
     let errLen = 0
     let timedOut = false
+    const end = (): void => void endTreeAsync(child).catch(() => undefined)
     const timer = setTimeout(() => {
       timedOut = true
-      endTree(child)
+      end()
     }, o.timeoutMs)
+    const onAbort = (): void => end()
+    o.signal?.addEventListener('abort', onAbort, { once: true })
     child.stdout?.on('data', (d: Buffer) => {
       if (outLen < max) out.push(d.subarray(0, max - outLen))
       outLen += d.length
@@ -51,7 +60,9 @@ export function boundedSpawn(file: string, args: string[], o: BoundedOptions): P
       if (settled) return
       settled = true
       clearTimeout(timer)
+      o.signal?.removeEventListener('abort', onAbort)
       live.delete(child)
+      markClosed()
       res({ ok: code === 0 && !timedOut, code, out: Buffer.concat(out).toString('utf8'), err: Buffer.concat(err).toString('utf8').trim(), ...(timedOut ? { timedOut } : {}), ...extra })
     }
     child.once('error', (e) => {
@@ -66,7 +77,13 @@ export function boundedSpawn(file: string, args: string[], o: BoundedOptions): P
   })
 }
 
-/** Ends the live bounded runs (of one owner, or all): a workspace closing, Combwork quitting. */
-export function endBoundedSpawns(owner?: (o: string) => boolean): void {
-  for (const [child, o] of live) if (!owner || owner(o)) endTree(child)
+/** Ends the live bounded runs (of one owner, or all) and waits until each is gone: a workspace closing, Combwork quitting. */
+export async function endBoundedSpawns(owner?: (o: string) => boolean): Promise<void> {
+  const ending: Promise<void>[] = []
+  for (const [child, run] of live) {
+    if (owner && !owner(run.owner)) continue
+    void endTreeAsync(child).catch(() => undefined)
+    ending.push(run.closed)
+  }
+  await Promise.all(ending)
 }

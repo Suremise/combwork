@@ -5208,9 +5208,20 @@ isn't checked). Once per entry pass; Resume is a new one. `needsSomeone` and `co
 **The Git view** (Version Control → Branches & remotes → **Signing**, under Commit identity, read-only): the settings
 above and the check's outcome, checked when shown at most once a minute per folder (callers share one), and **Check
 again**; with `needsSomeone` or `couldNotComplete`, how to sign unattended (an ssh key in the Windows OpenSSH agent;
-gpg-agent's cache). It reads as an agent's commit there would (no overrides). Its signer runs as a bounded spawn owned by
-the folder, ended when its workspace closes or Combwork quits. Reached through the repository reads port's optional
-`signing` (jj has none, so nothing is shown).
+gpg-agent's cache). It reads as an agent's commit there would (no overrides). Reached through the repository reads port's
+optional `signing` (jj has none, so nothing is shown).
+
+**The view's checks, their lifecycle** (HR1's round 1):
+- **Nothing blocks the main thread:** program lookup, the key file's start (at most 4 KB), the temp folder and the
+  signer's tree all go through asynchronous calls (`endTreeAsync`, never `spawnSync`).
+- **Each check is tracked from its admission**, its settings read included, by owner (the folder). A workspace closing,
+  a project removed or Combwork quitting gives it up wherever it is (`platform/ownedWork.ts`, platform-neutral: the app
+  imports no platform's module for it). A check still reading starts nothing after; one signing has its signer ended.
+  The close waits until each has ended and its signer and temp folder are gone.
+- **One in flight per folder**, admissions in turn: a look with the same settings joins it (Check again included);
+  changed settings cancel it and wait for it before starting anew; Check again with nothing in flight starts a fresh check.
+- **A finished check is kept apart** from what is in flight: written only by its own generation, reused for a minute
+  while its settings (re-read at each look) stay, and swept at expiry and when its owner goes.
 
 ### 16.10 Slots, review copies and sessions
 
