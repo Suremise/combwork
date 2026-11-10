@@ -1,7 +1,7 @@
 // Read-only jj detection's logic (HI-2793's J0), on hand-made .jj layouts and a stub runner: what its files say, what
 // jj is asked and how a disagreement, a tool that can't run or a read that didn't answer is unknown, never a guess
 // (SPEC §16.3.6 rule 3). The real jj's layouts are jjReal.test.ts's.
-import { mkdirSync, writeFileSync } from 'fs'
+import { mkdirSync, rmSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { describe, expect, it } from 'vitest'
 import { jjContextOf } from '../src/main/platform/jjDetect'
@@ -12,7 +12,11 @@ import { tempDir } from './tempDir'
 const OK: JjTool = { state: 'ok', version: '0.47.1', path: 'C:\\tools\\jj.exe' }
 const answer = (out: string, code = 0): JjRunResult => ({ out, ok: code === 0, buf: Buffer.from(out), err: code ? 'Error: no' : '', code })
 
-/** A stub jj: its tool, and an answer per command (by its arguments); every call recorded. */
+/** The one operation head a hand-made repository has (an id's shape: 128 hex digits). */
+const HEAD = 'a'.repeat(128)
+const PIN = ['--at-op', HEAD]
+
+/** A stub jj: its tool, and an answer per command (by its arguments, the pin left out); every call recorded. */
 function stub(answers: Record<string, JjRunResult>, tool: JjTool = OK): JjRunner & { calls: string[][] } {
   const calls: string[][] = []
   return {
@@ -23,14 +27,17 @@ function stub(answers: Record<string, JjRunResult>, tool: JjTool = OK): JjRunner
     shutdown: async () => undefined,
     run: async (_folder, args) => {
       calls.push([...args])
-      return answers[args.join(' ')] ?? answer('', 1)
+      const pinned = args[0] === '--at-op' ? args.slice(2) : args
+      return answers[pinned.join(' ')] ?? answer('', 1)
     }
   }
 }
 
-/** A first workspace: `.jj/repo` a folder, its store Git-backed at `git_target`. */
+/** A first workspace: `.jj/repo` a folder, its store Git-backed at `git_target`, one operation head. */
 function workspace(root: string, target: string, type = 'git'): void {
   mkdirSync(join(root, '.jj', 'repo', 'store'), { recursive: true })
+  mkdirSync(join(root, '.jj', 'repo', 'op_heads', 'heads'), { recursive: true })
+  writeFileSync(join(root, '.jj', 'repo', 'op_heads', 'heads', HEAD), '')
   mkdirSync(join(root, '.jj', 'working_copy'), { recursive: true })
   writeFileSync(join(root, '.jj', 'repo', 'store', 'type'), type)
   writeFileSync(join(root, '.jj', 'repo', 'store', 'git_target'), target)
@@ -60,7 +67,28 @@ describe('jj detection (read-only)', () => {
     const s = stub(confirms(root, join(root, '.git')))
     const d = await jjContextOf(join(root, 'src'), s)
     expect(d).toMatchObject({ jj: { root: resolve(root), store: resolve(root, '.git'), jjRepo: resolve(root, '.jj', 'repo'), workspace: resolve(root, '.jj'), folder: resolve(root, 'src'), subfolder: true, colocated: true, linked: false, tool: OK } })
-    expect(s.calls).toEqual([['root'], ['git', 'root']])
+    expect(s.calls).toEqual([[...PIN, 'root'], [...PIN, 'git', 'root']])
+  })
+
+  it('reads pinned to the one operation head; unknown, asking jj nothing, with several heads or none readable (HI-2831)', async () => {
+    const root = tempDir('jjd-heads-')
+    gitDir(join(root, '.git'))
+    workspace(root, '../../../.git')
+    const heads = join(root, '.jj', 'repo', 'op_heads', 'heads')
+    // Two heads (two commands from one operation): any read that loads the repository would merge them, a write.
+    writeFileSync(join(heads, 'b'.repeat(128)), '')
+    const two = stub(confirms(root, join(root, '.git')))
+    expect(await jjContextOf(root, two)).toMatchObject({ unknown: 'opHeads', detail: '2', tool: OK })
+    expect(two.calls).toEqual([])
+    // A name that isn't an operation id, or no head at all: unreadable, unknown too.
+    writeFileSync(join(heads, 'not-an-op'), '')
+    expect(await jjContextOf(root, two)).toMatchObject({ unknown: 'opHeads', detail: heads })
+    const bare = tempDir('jjd-noheads-')
+    gitDir(join(bare, '.git'))
+    workspace(bare, '../../../.git')
+    rmSync(join(bare, '.jj', 'repo', 'op_heads', 'heads', HEAD))
+    expect(await jjContextOf(bare, two)).toMatchObject({ unknown: 'opHeads' })
+    expect(two.calls).toEqual([])
   })
 
   it("a linked workspace: .jj/repo names the first workspace's repository, so one store", async () => {

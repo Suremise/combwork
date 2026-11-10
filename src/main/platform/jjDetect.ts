@@ -1,7 +1,9 @@
 // Read-only detection of a Jujutsu repository (SPEC §16.3.6, HI-2793's J0): which jj workspace holds a folder, its shared
 // store, whether it is Git-backed and colocated, and what the tool says. Never a write: no `jj git init`, no colocation
-// change, no snapshot (every command reads with `--ignore-working-copy`). jj's files are read as hints (their format is
-// not an API) and confirmed by jj itself: where the two disagree, or jj can't answer, the answer is unknown, never a
+// change, no snapshot (every command reads with `--ignore-working-copy`), and no merge of diverged operations: with two
+// operation heads any jj command that loads the repository writes a merge operation, `--ignore-working-copy` or not, so
+// detection reads the heads from their files, is unknown with several, and pins its reads to the one (`--at-op`, which
+// never integrates; HI-2831). jj's files are read as hints (their format is not an API) and confirmed by jj itself: where the two disagree, or jj can't answer, the answer is unknown, never a
 // guess (rule 3). Not wired into detection (registry.ts) yet: a .jj stays None until jj is a platform (J2, J6).
 
 import { open, realpath, stat } from 'original-fs/promises'
@@ -9,6 +11,7 @@ import { dirname, join, resolve } from 'path'
 import { jjSupported, type JjTool } from '../../shared/jjTool'
 import { sameStore } from './repoContext'
 import { jjRunner, type JjRunner, type JjRunOptions } from './jjRunner'
+import { readOpHeads } from './jjView'
 
 /**
  * A folder's jj repository, as port 1's context will carry it (J2 registers it). `store`: the backing Git store (its git
@@ -36,10 +39,12 @@ export interface JjContext {
  * Why detection couldn't say (a protocol code, never prose: a J card that shows it words it for its reader): the
  * repository's pointer (`.jj/repo`) missing or empty, the repository it names not there, the store's type unreadable
  * or not Git (`backend`: not supported), the Git store unreadable, the tool unusable (`tool`: missing, too old,
- * unchecked), a jj command that didn't answer (`notRun`: timed out, cancelled, its output past the cap, the tool gone),
- * or jj naming another root or Git store than its files do (`disagrees`).
+ * unchecked), the operation heads not exactly one readable head (`opHeads`: several, from commands that started from
+ * one operation, which a read through jj would merge, or none, malformed or past OP_HEADS_MAX), a jj command that
+ * didn't answer (`notRun`: timed out, cancelled, its output past the cap, the tool gone), or jj naming another root or
+ * Git store than its files do (`disagrees`).
  */
-export type JjUnknownWhy = 'noRepo' | 'emptyPointer' | 'repoGone' | 'storeType' | 'backend' | 'gitStore' | 'tool' | 'notRun' | 'disagrees'
+export type JjUnknownWhy = 'noRepo' | 'emptyPointer' | 'repoGone' | 'storeType' | 'backend' | 'gitStore' | 'tool' | 'opHeads' | 'notRun' | 'disagrees'
 
 /**
  * What detection found: a jj repository, none (no `.jj` at or above the folder), or unknown, with why and its data:
@@ -161,8 +166,15 @@ export async function jjContextOf(folder: string, runner: JjRunner = jjRunner, o
   const tool = await runner.readiness()
   // Only the pinned jj is trusted: an untested one (newer) is unknown here, never a context from formats unverified.
   if (!jjSupported(tool)) return unknown('tool', tool.error, { tool })
+  // Pinned to the one operation head (HI-2831): with several, a read that loads the repository would merge them (a
+  // write), so none is made; a head that lands after this is never merged by a pinned read either. `detail`: how many
+  // heads, or the folder when they can't be read.
+  const heads = readOpHeads(jjRepo)
+  if (!heads) return unknown('opHeads', join(jjRepo, 'op_heads', 'heads'), { tool })
+  if (heads.length > 1) return unknown('opHeads', String(heads.length), { tool })
+  const pin = ['--at-op', heads[0]]
   const ask = async (command: string[], expected: string): Promise<JjUnknown | null> => {
-    const r = await runner.run(root, command, o)
+    const r = await runner.run(root, [...pin, ...command], o)
     if (r.code === -1) return unknown('notRun', r.err, { command, expected, tool, ...(r.cancelled ? { cancelled: true as const } : {}) })
     const said = await jjFolder(r)
     return said && same(said, expected) ? null : unknown('disagrees', (r.out.trim() || r.err).slice(0, 400), { command, expected, tool })

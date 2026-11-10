@@ -2308,7 +2308,7 @@ changes. Git's runner and worker are untouched.
     what it is given. Combwork never edits jj's config files.
   - **A read** (every command unless the caller asks to write; J0 has no writer) adds `--ignore-working-copy` (R5.3:
     no snapshot, and a stale workspace isn't brought up to date) and `--config=snapshot.auto-update-stale=false`. J0's
-    reads are `jj --version`, `jj root` and `jj git root`; colocation is read from the files (below), not from
+    reads are `jj --version`, `jj root` and `jj git root` (pinned, below); colocation is read from the files (below), not from
     `jj git colocation status`.
   - **Bounds:** an output cap (16 MB unless given), a time limit (a minute unless given) and cancellation (an
     `AbortSignal`). Each ends jj's whole process tree by identity (`processTree.ts`, moved from cw-progress, which ends
@@ -2329,25 +2329,32 @@ changes. Git's runner and worker are untouched.
   workspace of a colocated repository has a Git worktree). `nestedGit`: a Git root nearer the folder than the
   workspace's. Marker files are read bounded (one line, at most 4 KB, no NUL): anything else is malformed, unknown,
   never followed. jj's files are hints (their format is no API), so the supported jj confirms them, reading only:
-  `jj root` and `jj git root` must name the same root and store. The answer is a `JjContext`, `none` (no `.jj`, no
-  process run), or unknown with a code (`noRepo`, `emptyPointer`, `repoGone`, `storeType`, `backend`, `gitStore`,
-  `tool`, `notRun`, `disagrees`) and its data (a path, jj's words, the command and what was expected; never prose),
-  never facts from the files alone. It never runs `jj git init`, changes colocation or snapshots.
+  `jj root` and `jj git root` must name the same root and store. Both are pinned to the repository's one operation
+  head (`--at-op <H>`, H read from `.jj/repo/op_heads/heads` as J3's reads take it, `jjView.ts` `readOpHeads`;
+  HI-2831): with two heads (two commands that started from one operation: two agents, an external jj), any jj command
+  that loads the repository, `--ignore-working-copy` reads included, writes a merge operation to reconcile them, and a
+  pinned read never does. So with several heads, or none readable, detection is unknown (`opHeads`, its detail the
+  count or the folder) and asks jj nothing; it never merges them (a later jj write does, and the next detection
+  answers). A head that lands after H was read isn't merged by the pinned read either. The answer is a `JjContext`,
+  `none` (no `.jj`, no process run), or unknown with a code (`noRepo`, `emptyPointer`, `repoGone`, `storeType`,
+  `backend`, `gitStore`, `tool`, `opHeads`, `notRun`, `disagrees`) and its data (a path, jj's words, the command and
+  what was expected; never prose), never facts from the files alone. It never runs `jj git init`, changes colocation or snapshots.
 - **Copy Diagnostics** names jj's state (its version and path, the tested version, old or untested), checking it
   when asked (no process when jj isn't on PATH).
 - **Tests:**
   - `tests/jjRunner.test.ts` (a fake jj): the version's states, the prefix and environment, the cap, the time limit,
     cancellation and shutdown, each ending the fake's whole tree and nothing else (a process of the test's own
     started first survives), in this thread and through the built worker, and a missing tool.
-  - `tests/jjDetect.test.ts` (hand-made layouts, a stub jj): each unknown, an untested jj never asked, malformed
-    markers, a worktree's administrative folder as `git_target` resolving to its common dir.
+  - `tests/jjDetect.test.ts` (hand-made layouts, a stub jj): each unknown, an untested jj never asked, reads pinned to
+    the one head and nothing asked with several or none, malformed markers, a worktree's administrative folder as `git_target` resolving to its common dir.
   - `tests/jjReal.test.ts` on the real pinned jj, fetched and checked by `npm run jj:fetch` into the test area's
     `tools` folder (never system-wide), every repository a `tempDir()` with jj's and git's config isolated: the version,
     a missing tool, colocated and non-colocated repositories, linked workspaces, nested roots, a damaged `.jj`, the cap
     and cancellation on real jj, store identity against Git's own context (`sameStore`), and that detection writes
     nothing: `.jj`, the whole `.git` (refs, config, index) and the operation log as they were, in a colocated
     repository with plain-Git commits and branches jj hasn't imported, and in a stale linked workspace with a local
-    edit (not updated, not snapshotted, the edit still there). Without the fetched jj it is skipped, saying so;
+    edit (not updated, not snapshotted, the edit still there), and with two operation heads (`opHeads`: `.jj`, the heads
+    and `.git` exactly as they were, where an unpinned `jj git root` merges them). Without the fetched jj it is skipped, saying so;
     `CW_JJ_REAL=1` makes its absence fail: a card's acceptance is its run with `CW_JJ_REAL=1` at the submitted
     revision, never a skipped run.
 - **Left to the J cards:** registering jj's context port and routing R9's six seams by the project's platform. Each
