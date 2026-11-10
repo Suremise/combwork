@@ -129,12 +129,12 @@ export async function jjRepoView(folder: string, runner: JjRunner = jjRunner): P
   return { ...base, op: isJjUnknown(ws) ? null : ws.op, heads: 1, workspaces: isJjUnknown(ws) ? unknownOf(ws) : ws.value }
 }
 
-/** The History section: the project workspace's ancestry and every bookmark's, newest first, a page of JJ_HISTORY_MAX. */
+/** The History section: every visible commit (every head's ancestry: a divergent change's variants all show), newest first, a page of JJ_HISTORY_MAX. */
 export async function jjHistory(folder: string, runner: JjRunner = jjRunner): Promise<JjView<JjHistoryView>> {
   const c = await contextOf(folder, runner)
   if (isJjViewUnknown(c)) return c
   const reads = readsOf(c, runner)
-  const r = await reads.pinned((op) => rowsAt(reads, op, '::@ | ::bookmarks()', JJ_HISTORY_MAX))
+  const r = await reads.pinned((op) => rowsAt(reads, op, '::visible_heads()', JJ_HISTORY_MAX))
   return isJjUnknown(r) ? unknownOf(r) : { op: r.op, ...r.value }
 }
 
@@ -281,7 +281,7 @@ export async function jjConflicts(folder: string, runner: JjRunner = jjRunner): 
   if (isJjViewUnknown(c)) return c
   const reads = readsOf(c, runner)
   const r = await reads.pinned(async (op): Promise<JjMaybe<Omit<JjConflictsView, 'op'>>> => {
-    const found = await rowsAt(reads, op, 'conflicts() & (::@ | ::bookmarks())', JJ_CONFLICTS_MAX)
+    const found = await rowsAt(reads, op, 'conflicts() & ::visible_heads()', JJ_CONFLICTS_MAX)
     if (isJjUnknown(found)) return found
     const rows: JjConflictsView['rows'] = []
     for (const row of found.rows) {

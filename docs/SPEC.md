@@ -2561,12 +2561,12 @@ merges under jj.
   window's `views/JjSections.tsx`), every read through J3's `JjReads`, pinned at the single head: Repository (root,
   colocation, tool, the head, workspaces, **Waiting for you to integrate**: each Passed card's reviewed commit, its target
   and a `jj rebase -r <commit> -d <target>` to start from, its containment "can't check yet" until J5 records the user's
-  integration, never "not integrated"), History (`::@ | ::bookmarks()`, 200 a page, change id beside commit id,
+  integration, never "not integrated"), History (`::visible_heads()`, every variant of a divergent change included, 200 a page, change id beside commit id,
   conflicted, divergent, empty, working copy), Compare (each side resolved to exactly one commit: a divergent change id,
   a conflicted bookmark or an ambiguous prefix lists every commit it names, through `change_id()`, `commit_id()` or
   `bookmarks()`, for the user to pick one by commit id; then `diff --summary` and `--git`, capped), Bookmarks
   (`--all-remotes`; a conflicted one with its sides; a local one whose `@git` or Git branch, read from the store's files,
-  differs marked `gitDiffers`), Conflicts (`conflicts()` in the history, `resolve --list` each). **The heads are read from
+  differs marked `gitDiffers`), Conflicts (`conflicts()` among the visible commits, `resolve --list` each). **The heads are read from
   the files before jj is asked anything** (`headsHere`): J0's detection runs `jj root` unpinned, and on 0.47.1 an unpinned
   command merges diverged heads (a write, R5.3), so with none or several heads every view, the switch's jj checks and the
   fallback answer `heads` having run nothing.
