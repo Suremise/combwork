@@ -48,6 +48,9 @@ const FAILURES: Failed[] = [
   { ...base, reason: 'checks', transient: true },
   { ...base, reason: 'hook' },
   { ...base, reason: 'targetMoved' },
+  // HI-1183's follow mode: the push of the merge refused, and an unknown publication the user said didn't happen.
+  { ...base, reason: 'pushRefused' },
+  { ...base, reason: 'notPublished' },
   { ...base, reason: 'folderBusy' },
   { ...base, reason: 'notUpToDate' },
   { ...base, reason: 'notUpToDate', files: ['src/a.ts'] },
@@ -65,7 +68,7 @@ const STATES: QueueState[] = [
   { state: 'testing', target: 'main', step: 'advance' },
   { state: 'testing', target: 'main', step: 'checks' },
   { state: 'testing', target: 'main', step: null },
-  ...(['approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user'] as const).map((reason) => ({ state: 'paused' as const, target: 'main', reason, card: 'HI-6' })),
+  ...(['approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', 'publishUnknown'] as const).map((reason) => ({ state: 'paused' as const, target: 'main', reason, card: 'HI-6' })),
   { state: 'paused', target: 'main', reason: 'needsYou', card: 'HI-6', stuck: true },
   { state: 'returned', reason: 'conflict', transient: false, failure: FAILURES[0] },
   { state: 'left', why: 'stale' },
@@ -75,7 +78,7 @@ const STATES: QueueState[] = [
   { state: 'notYet' }
 ]
 /** What the tests pass in, which isn't Combwork's wording: names, codes, paths and the queue's fixed words. */
-const VALUES = ['HI-7', 'HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', 'fed4321', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', '—', 'line 3', 'lines 1, 2', ...FAILURES.flatMap((f) => f.files ?? [])]
+const VALUES = ['HI-7', 'HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', 'fed4321', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', 'publishUnknown', '—', 'line 3', 'lines 1, 2', ...FAILURES.flatMap((f) => f.files ?? [])]
 
 function queueTexts(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []
