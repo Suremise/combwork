@@ -123,6 +123,106 @@
     "defaultMessage": "Loading…",
     "description": "The Activity tab, or a detail in it, while it loads."
   },
+  "activity.map.agentsWorking": {
+    "defaultMessage": "{agents, plural, one {# agent} other {# agents}} · {working, number} working",
+    "description": "In the centre of the Activity map's shared view: how many agents it shows, and how many of them work."
+  },
+  "activity.map.cardRole": {
+    "defaultMessage": "{card} · {role, select, builder {builder} other {reviewer}}",
+    "description": "In the centre of the Activity map: the agent's card ({card}, its key) and its role on it. Lower case role."
+  },
+  "activity.map.context": {
+    "defaultMessage": "Context {pct, number}%",
+    "description": "In the centre of the Activity map: how full the agent's context window is, in percent (as its pane footer shows)."
+  },
+  "activity.map.contextUnknown": {
+    "defaultMessage": "Context —",
+    "description": "In the centre of the Activity map when the agent's context isn't known (no usage yet, or no window reported)."
+  },
+  "activity.map.count": {
+    "defaultMessage": "{n, number} this turn",
+    "description": "Under a station's name on the Activity map: how many of the agent's tool calls in its current turn went there."
+  },
+  "activity.map.doing": {
+    "defaultMessage": "{doing, select, tool {Using a tool} writing {Writing} other {Thinking}}",
+    "description": "In the centre of the Activity map: what the agent does now."
+  },
+  "activity.map.feedHeading": {
+    "defaultMessage": "Last actions",
+    "description": "The heading of the Activity map's feed: the agents' latest tool calls."
+  },
+  "activity.map.label": {
+    "defaultMessage": "Activity map",
+    "description": "The Activity tab's map (a honeycomb of what agents do), for screen readers."
+  },
+  "activity.map.loading": {
+    "defaultMessage": "loading…",
+    "description": "Under a station's name on the Activity map, and in its feed, while the agent's calls haven't been read yet. Lower case."
+  },
+  "activity.map.needYou": {
+    "defaultMessage": "{n, plural, one {# needs you} other {# need you}}",
+    "description": "In the centre of the Activity map's shared view: how many agents wait for you."
+  },
+  "activity.map.needsYou": {
+    "defaultMessage": "Needs you",
+    "description": "On the Activity map: the agent waits for you (a question or a permission prompt)."
+  },
+  "activity.map.noCalls": {
+    "defaultMessage": "No tool calls yet.",
+    "description": "The Activity map's feed when the agents shown have made no tool call in the turns read."
+  },
+  "activity.map.notLoaded": {
+    "defaultMessage": "not shown",
+    "description": "Beside an agent's ring on the Activity map's shared view when it is past the agents the map reads (eight): its calls aren't on the map. Lower case."
+  },
+  "activity.map.notReported": {
+    "defaultMessage": "not reported",
+    "description": "Under a station's name on the Activity map when the agent's CLI doesn't report that kind of call (not an observed zero). Lower case."
+  },
+  "activity.map.partial": {
+    "defaultMessage": "From the latest calls read: not the whole history.",
+    "description": "Under the Activity map's feed when its counts are a sample (an agent made more calls than the map counts, or more agents run than it reads)."
+  },
+  "activity.map.pct": {
+    "defaultMessage": "{pct, number}%",
+    "description": "Beside an agent's ring on the Activity map's shared view: how full its context is, in percent."
+  },
+  "activity.map.ringTip": {
+    "defaultMessage": "{name}: {load, select, notLoaded {past the eight agents the map reads, so its calls aren’t shown} loading {its calls are being read} other {{known, select, no {context not known} other {context {pct, number}%}}}}. Click to show only this agent.",
+    "description": "Hover of an agent's ring on the Activity map's shared view. {name} is the agent; {pct} its context in percent; known no: its context isn't known. Keep the select keys."
+  },
+  "activity.map.show": {
+    "defaultMessage": "Show",
+    "description": "Before the Activity tab's toggles for its map: Map, Feed, Context."
+  },
+  "activity.map.state": {
+    "defaultMessage": "{state, select, working {Working} waiting {Waiting for you} failed {Failed or stalled} done {Done} other {Idle}}",
+    "description": "In the centre of the Activity map: the agent's state when it isn't working."
+  },
+  "activity.map.station": {
+    "defaultMessage": "{station, select, you {You} read {Read} edit {Edit} shell {Shell} agents {Agents} other {Tools}}",
+    "description": "A station on the Activity map: where an agent's tool calls go. You: its prompts and questions to you; Read: reading and searching files; Edit: changing files; Shell: commands; Agents: subagents and background tasks; Tools: everything else (the web, skills, Combwork's tools, other tools). Keep each one short."
+  },
+  "activity.map.stationTip": {
+    "defaultMessage": "{station}: {n, plural, one {# call} other {# calls}} this turn, {heat, plural, one {# call} other {# calls}} in the last ten minutes of the turns read. Last: {last, select, none {none} other {{last}}}",
+    "description": "Hover of a station on the Activity map. {station} is its name, {n} and {heat} counts, {last} the last call's name (a file, a host or a tool), none when there is none. Keep the select keys."
+  },
+  "activity.map.stripLabel": {
+    "defaultMessage": "Agents' context",
+    "description": "The Activity map's strip of the agents' context rings, for screen readers."
+  },
+  "activity.map.toggleContext": {
+    "defaultMessage": "Context",
+    "description": "A toggle above the Activity tab: show the agents' context rings on the map."
+  },
+  "activity.map.toggleFeed": {
+    "defaultMessage": "Feed",
+    "description": "A toggle above the Activity tab: show the map's feed of the last actions."
+  },
+  "activity.map.toggleMap": {
+    "defaultMessage": "Map",
+    "description": "A toggle above the Activity tab: show its map (a honeycomb of what agents do)."
+  },
   "activity.modelSwitch": {
     "defaultMessage": "Model changed: {launched} → {running}",
     "description": "In the Activity tab, under Now (HI-2609): the agent runs another model ({running}) than Combwork started it with ({launched}), its connection's. Both are model names (\"GPT-6 Astra\"); keep the arrow."

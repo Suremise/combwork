@@ -594,5 +594,7 @@
   "tips.opencodeHistory.text": "A conversa de um agente do OpenCode aparece na aba Sessões, e os tokens e o custo dele na Visão geral e no rodapé do painel, como o OpenCode os informa. Um custo de $0 não mede a cota do seu plano; limites só aparecem para o OpenCode Go ou o Console.",
   "tips.opencodeHistory.title": "O histórico, os tokens e o custo de um agente do OpenCode",
   "tips.versionControlJj.text": "Em um repositório jj colocado com o Git, escolha jj no alto da aba Controle de versão: o Histórico mostra cada change id ao lado do seu commit id, e Comparar, Bookmarks e Conflitos leem o repositório sem alterá-lo. Você mesmo integra o trabalho revisado.",
-  "tips.versionControlJj.title": "Veja um repositório jj"
+  "tips.versionControlJj.title": "Veja um repositório jj",
+  "tips.activityMap.text": "Atividade desenha seus agentes como um favo de mel: cada chamada de ferramenta vai até sua estação (Ler, Editar, Shell, Agentes, Ferramentas, Você), com um anel de contexto por agente. Escolha um agente em Agentes ▾ para ver o mapa dele; Mostrar desliga o mapa, seu registro e os anéis.",
+  "tips.activityMap.title": "Um mapa do que seus agentes estão fazendo"
 }

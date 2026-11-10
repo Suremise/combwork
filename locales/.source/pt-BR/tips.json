@@ -1,4 +1,6 @@
 {
+  "tips.activityMap.text": "Activity draws its agents as a honeycomb: each tool call goes out to its station (Read, Edit, Shell, Agents, Tools, You), with a context ring for each agent. Pick one agent in Agents ▾ for its own map; Show turns the map, its feed and the rings off.",
+  "tips.activityMap.title": "A map of what your agents are doing",
   "tips.activityTab.text": "The Activity tab has a tab per running agent: its card, its turn and tool call, its background tasks, subagents and processes. It opens as a snapshot; Play follows it live. An agent's ⋯ menu opens it on that agent.",
   "tips.activityTab.title": "See what each agent is running",
   "tips.activityWorkspace.text": "Activity, in the activity bar, shows every project's running agents together, their tabs grouped by project. A card in progress opens it on the agents working on that card, and a run or a lane in the Progress panel on its agents (Show in Activity).",

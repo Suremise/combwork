@@ -35,6 +35,8 @@ export interface ActivityTool {
   failed: boolean
   /** Its result is in the transcript. */
   done: boolean
+  /** A script's calls, by name only (HI-2240's `calls`; the Activity map's stations, HI-2903): absent for any other call. */
+  calls?: string[]
 }
 
 /** A turn: a prompt and what followed it, up to the next prompt. */
@@ -147,7 +149,7 @@ export function activityTurns(items: readonly TranscriptItem[], max = ACTIVITY_T
     }
     if (!turn) continue
     if (item.kind === 'tool') {
-      turn.tools.push({ itemId: item.id, name: item.tool.name, summary: cut(maskText(item.tool.summary), LINE), at: item.timestamp, until: nextAt[i - from], failed: item.tool.isError, done: item.tool.result !== null })
+      turn.tools.push({ itemId: item.id, name: item.tool.name, summary: cut(maskText(item.tool.summary), LINE), at: item.timestamp, until: nextAt[i - from], failed: item.tool.isError, done: item.tool.result !== null, ...(item.tool.calls?.length ? { calls: item.tool.calls.map((c) => c.name) } : {}) })
       turn.lastKind = 'tool'
     } else if (item.kind === 'assistant' && item.text.trim()) {
       turn.reply = cut(maskText(item.text), LINE)

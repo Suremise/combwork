@@ -460,6 +460,11 @@ interface CombworkMessageValues {
   'settings.advanced.copilotFooter.title': { mode: string | number }
   'settings.advanced.cw.accounts.usageMoves.desc': undefined
   'settings.advanced.cw.accounts.usageMoves.title': undefined
+  'settings.advanced.cw.activity.mapMotion.desc': undefined
+  'settings.advanced.cw.activity.mapMotion.off': undefined
+  'settings.advanced.cw.activity.mapMotion.on': undefined
+  'settings.advanced.cw.activity.mapMotion.system': undefined
+  'settings.advanced.cw.activity.mapMotion.title': undefined
   'settings.advanced.cw.agents.tempFolder.desc': undefined
   'settings.advanced.cw.agents.tempFolder.title': undefined
   'settings.advanced.cw.assistant.startView.desc': undefined

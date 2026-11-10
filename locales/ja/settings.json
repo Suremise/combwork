@@ -1634,5 +1634,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "OpenCodeエージェントのプライベートサーバーが応答するまでに与えられる時間。過ぎると起動をあきらめてサーバーを終了します。短すぎると、遅いPCではエージェントが起動しません。",
   "settings.advanced.opencode.server.readySeconds.title": "サーバー：起動までの時間",
   "settings.advanced.opencode.version.desc": "opencode --versionが出力するもの：バージョンは最初のグループです。CombworkはOpenCode 2以降のみを使います。間違っていると、OpenCodeが見つかりません。",
-  "settings.advanced.opencode.version.title": "opencode --versionのバージョン"
+  "settings.advanced.opencode.version.title": "opencode --versionのバージョン",
+  "settings.advanced.cw.activity.mapMotion.desc": "アクティビティマップは、エージェントのツール呼び出しごとに点をスポークに沿ってステーションへ送り、終わると戻します。「Windowsに従う」はWindowsの「アニメーションを表示する」設定に従います。「オン」は常に動かし、「オフ」はステーションを光らせるだけです。",
+  "settings.advanced.cw.activity.mapMotion.off": "オフ",
+  "settings.advanced.cw.activity.mapMotion.on": "オン",
+  "settings.advanced.cw.activity.mapMotion.system": "Windowsに従う",
+  "settings.advanced.cw.activity.mapMotion.title": "アクティビティマップの動くパルス"
 }

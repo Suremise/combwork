@@ -1634,5 +1634,10 @@
   "settings.advanced.opencode.server.readySeconds.desc": "Ile czasu ma prywatny serwer agenta OpenCode na odpowiedź, zanim uruchamianie się podda i go zakończy. Za krótko: agent na wolnym komputerze się nie uruchomi.",
   "settings.advanced.opencode.server.readySeconds.title": "Serwer: czas na uruchomienie",
   "settings.advanced.opencode.version.desc": "Co wypisuje opencode --version: wersja to jego pierwsza grupa. Combwork używa tylko OpenCode 2 lub nowszego. Błędna wartość: OpenCode nie zostanie znaleziony.",
-  "settings.advanced.opencode.version.title": "Wersja w opencode --version"
+  "settings.advanced.opencode.version.title": "Wersja w opencode --version",
+  "settings.advanced.cw.activity.mapMotion.desc": "Mapa aktywności wysyła kropkę wzdłuż szprychy do stacji przy każdym wywołaniu narzędzia przez agenta, a po jego zakończeniu z powrotem. Jak w Windows sprawia, że kropki działają zgodnie z ustawieniem Windows Pokaż animacje; Włączone zawsze je porusza; Wyłączone tylko podświetla stację.",
+  "settings.advanced.cw.activity.mapMotion.off": "Wyłączone",
+  "settings.advanced.cw.activity.mapMotion.on": "Włączone",
+  "settings.advanced.cw.activity.mapMotion.system": "Jak w Windows",
+  "settings.advanced.cw.activity.mapMotion.title": "Ruchome impulsy mapy aktywności"
 }

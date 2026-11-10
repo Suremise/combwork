@@ -538,6 +538,25 @@ Combwork only ever ends processes the agent's session started: never one you sta
 - **Left running**: a process whose parent has exited while the agent runs (a server started with `&` from a shell that has ended, a search a command left behind) is marked once it has run ten minutes, with how long and its CPU time, and has **End It…** in its details (the same question). Combwork says so once in a notice, which opens the agent, and tells the agent once at its next tool call or turn's end, so it can end it itself; Combwork doesn't end it. **Settings → Advanced → Processes left running: tell me and the agent** turns off the notice and the agent's line (Activity still marks it). The agent's CLI and what it runs directly (its MCP servers, a command under way) have a living parent, so they never count.
 - **Blocked edits** show under **Now** while they stand: *Edit blocked: app.ts is locked by HB3* when Combwork's file lock stopped the agent editing a file another agent is editing (or *waiting for your OK* with **Ask me**). The row goes once the other agent finishes and releases the file, the agent tries again or does something else, or its turn ends. Its history is in the agent's **Hooks…** dialog.
 
+#### The Activity map <a id="the-activity-map"></a>
+
+Above the list (beside it when the tab is wide), the **map** draws the same activity as a honeycomb: the agent in the centre, and around it six stations its tool calls go to:
+
+- **You**: its prompts; outlined in red, *Needs you*, while it waits for your answer or permission.
+- **Read**: reading and searching files. **Edit**: changing files (red while Combwork's file lock blocks one of its edits).
+- **Shell**: commands, with the program running now. **Agents**: subagents and background tasks.
+- **Tools**: everything else: the web, skills, Combwork's own tools and other MCP tools.
+
+Each station counts the calls of the agent's current turn and names the last one. Live, each new call sends a dot out along its spoke and back when it ends; a spoke thickens with the calls of the last ten minutes, and a station turns red when a call failed. **Last actions** beside it lists the newest calls. The map shows names, never content: a file by its last two folders, a web page by its host, a command only as its tool. A command's arguments, a search's words or a prompt never appear on it.
+
+- **One agent** in **Agents ▾**: its own map, with its context as a ring around it (the share of its context window, as its pane's footer shows it): amber from 70 %, red from 90 %.
+- **Several agents, or All**: one shared map, each agent in its own colour, with a small context ring per agent below it. Click an agent's ring to show its map alone. The shared map reads up to eight agents' calls; the rest are listed as *not shown*.
+- A station an agent's coding CLI can't report says *not reported*, and one still being read says *loading…*: neither is a zero. When the map counts only part of the calls (an agent made a great many, or more than eight agents run), it says so under **Last actions**.
+- **Show** above the list turns the **Map**, its **Feed** and the **Context** rings on and off, for every Activity view. With the map off, it reads nothing of its own.
+- Like the list, it is frozen when it opens: dots move only while it follows live (**Play**), and nothing is drawn while the tab is hidden. With Windows' **Show animations** off, a station flashes instead of a dot moving; **Settings → Advanced → The Activity map's moving pulses** chooses that yourself.
+
+The workspace's Activity (below) has the same map, across its projects.
+
 ### An agent's hooks <a id="agent-hooks"></a>
 
 **Hooks…** in an agent's **⋯** menu (or **Agent Hooks…** in the command palette) shows the hooks its running session has and what Combwork received from them. It's for finding out why an agent seems stuck or silent. Combwork only shows hooks here: it never changes or turns off a hook, and never edits a coding agent's settings.

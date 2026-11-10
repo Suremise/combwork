@@ -19,6 +19,7 @@
 export const SUITES = [
   { name: 'about' },
   { name: 'accounts' },
+  { name: 'activitymap' },
   { name: 'activitytab' },
   { name: 'activitywindows' },
   { name: 'activityworkspace' },

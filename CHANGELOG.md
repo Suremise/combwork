@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- **The Activity map** (HI-2903). Activity, a project's tab and the workspace's view, draws what its agents are doing as a honeycomb above the list (beside it when wide): the agent in the centre, and six stations its tool calls go to (You, Read, Edit, Shell, Agents, Tools), each counting its turn's calls and naming the last. Live, each call sends a dot out to its station and back; a failed call turns its station red, and the busiest spokes thicken. **Last actions** lists the newest calls.
+  - **One agent** shows its own map, with its context as a ring (amber from 70 %, red from 90 %); **several, or All**, one shared map with each agent in its own colour and a context ring each.
+  - **Names, never content**: a file by its last two folders, a web page by its host, a command only as its tool.
+  - **Show** turns the map, its feed and the rings on and off. It is frozen when Activity is, draws nothing while hidden, and follows Windows' **Show animations** (Settings → Advanced → **The Activity map's moving pulses** to choose).
+
 ### Fixed
 
 - **Version Control → Merge queue scrolls** (HI-2894). With more queues and history than fit, the page ran past the bottom of the window and couldn't be scrolled, so the queues further down couldn't be reached. Now it scrolls to its last queue, with the mouse wheel or the keyboard, and each history table keeps its own scroll inside it.
