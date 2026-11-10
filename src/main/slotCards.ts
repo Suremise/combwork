@@ -56,7 +56,7 @@ import { withRepoLock } from './repoLock'
 import { isResuming, onResumeEntry } from './restartResume'
 import { sessions } from './sessions'
 import { startBegun, startEnded, startWaits } from './agentStarts'
-import { holder, poolFor, setSlotFreed } from './slotsApp'
+import { holder, poolFor, poolIfMade, setSlotFreed } from './slotsApp'
 import { brokerWorkingIn } from './agentProcesses'
 import { processHeld, quiet as quietFolder, refusalText, setBuilderCount, type Slot, type SlotLease, type SlotPool, type SlotRefusal } from './slots'
 import { carriedOf, keptFor, keptGoing } from './slotMigration'
@@ -2042,6 +2042,10 @@ export function startSlotCards(): void {
     if (!where) return
     const ws = workspaceFor(where)
     if (ws?.path && heldRetries.has(retireKey(ws, where))) void settleSlotCards(ws, where)
+    // A session ending or going quiet may be what a slot owing a settle waited for (HI-2906): its pool's owed pass now
+    // (coalesced with one running). Only a pool already made: nothing owed is in one that isn't.
+    const made = ws?.path ? poolIfMade(ws, where) : null
+    if (made) void made.then((p) => p.owedPass()).catch((x) => log.warn(`looking at the slots that owe a settle in ${userText(where)}`, x))
   })
   setSlotFreed((ws, project) => {
     for (const l of slotFreed) l(project)

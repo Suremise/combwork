@@ -17,7 +17,7 @@ import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { boardFile, closeBoard, workspaceDb } from '../src/main/boardStore'
-import { fileSlotConn, SlotPool, SlotStore, type OpHolder } from '../src/main/slots'
+import { fileSlotConn, owedKey, SlotPool, SlotStore, type OpHolder } from '../src/main/slots'
 import { gitHistory } from '../src/main/platform/gitHistory'
 import { boardPrepStore, jjLineKey, type JjPrepStore } from '../src/main/platform/jjSlotPrep'
 import { recoverStale, type GitRun } from '../src/main/platform/jjRecovery'
@@ -77,7 +77,17 @@ function world(colocated: boolean, o: { queued?: boolean } = {}) {
   const port = h.portWith({ prep: () => prep, contains: (s, t, c, at) => gitHistory.contains(s, t, c, at) })
   // HI-2906's seams: a session seen only while the next detach runs (gone before it returns), and a hook on each look
   // at the sessions (a close started during a settle).
-  const hooks: { busyInNextDetach: boolean; detaching: boolean; onSession: (() => void) | null } = { busyInNextDetach: false, detaching: false, onSession: null }
+  const hooks: { busyInNextDetach: boolean; detaching: boolean; onSession: (() => void) | null; recordGate: Promise<void> | null; inRecord: (() => void) | null } = { busyInNextDetach: false, detaching: false, onSession: null, recordGate: null, inRecord: null }
+  // A gate on the look's record (HI-2906/s101: a settle held mid-look, so another can race it).
+  const record0 = port.record!.bind(port)
+  port.record = async (folder, fence, identity) => {
+    const gate = hooks.recordGate
+    if (gate) {
+      hooks.inRecord?.()
+      await gate
+    }
+    return record0(folder, fence, identity)
+  }
   const detach0 = port.detach.bind(port)
   port.detach = async (folder, revision, owned) => {
     hooks.detaching = hooks.busyInNextDetach
@@ -97,8 +107,29 @@ function world(colocated: boolean, o: { queued?: boolean } = {}) {
     hooks.onSession?.()
     return sessions.has(f.toLowerCase()) || hooks.detaching ? 'a builder leaving' : null
   }
-  const pool = new SlotPool({ store, workspaces: port, project: repo, root, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 4, runner, settle: async () => true, holder, sessionIn })
-  closers.push(() => pool.close())
+  // The owed pass's wakes, fired by the test (a fake clock, HI-2906/s101): never a real timer's pause.
+  const clock = {
+    wakes: [] as { fn: () => void; ms: number; cancelled: boolean }[],
+    pending: () => clock.wakes.filter((x) => !x.cancelled),
+    fire: (): boolean => {
+      const next = clock.wakes.find((x) => !x.cancelled)
+      if (!next) return false
+      next.cancelled = true
+      next.fn()
+      return true
+    }
+  }
+  const later = (fn: () => void, ms: number) => {
+    const wake = { fn, ms, cancelled: false }
+    clock.wakes.push(wake)
+    return { cancel: () => void (wake.cancelled = true) }
+  }
+  const makePool = (): SlotPool => {
+    const made = new SlotPool({ store, workspaces: port, project: repo, root, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 4, runner, settle: async () => true, holder, sessionIn, later })
+    closers.push(() => made.close())
+    return made
+  }
+  const pool = makePool()
   const git: GitRun = async (cwd, args) => {
     try {
       const buf = execFileSync('git', args, { cwd, env: h.env, windowsHide: true, timeout: 60_000, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] })
@@ -112,7 +143,7 @@ function world(colocated: boolean, o: { queued?: boolean } = {}) {
     arm = fn
   }
   const stealOp = (name: string) => (db: Db): void => void db.prepare("UPDATE slots SET op = 'a-replacement' WHERE project = ? AND name = ?").run('p-jj', name)
-  return { h, repo, root, base, port, pool, store, git, prep, armAfterWritten, stealOp, sessions, hooks, main: () => h.id(repo, 'main') }
+  return { h, repo, root, base, port, pool, store, git, prep, armAfterWritten, stealOp, sessions, hooks, clock, makePool, main: () => h.id(repo, 'main') }
 }
 
 /** A card's slot lent, prepared, its work committed and submitted, and the user's integration of it (HI-2906's cases). */
@@ -130,14 +161,8 @@ async function integrated(w: ReturnType<typeof world>, card: number) {
   return { lent, row, key }
 }
 
-/** The pool's retry state and operations (tests reach them, HI-2906: an older attempt's continuation, simulated). */
-type PoolInternals = {
-  settleWaits: Map<string, { gen: number; tries: number; timer: ReturnType<typeof setTimeout> | null }>
-  running: Set<Promise<unknown>>
-  settleLater(name: string, expected: number): boolean
-  forgetSettleLater(name: string, gen?: number): void
-}
-const internals = (pool: SlotPool): PoolInternals => pool as unknown as PoolInternals
+/** The pool's running operations (tests reach them, HI-2906: nothing left running after a close). */
+const runningOf = (pool: SlotPool): Set<Promise<unknown>> => (pool as unknown as { running: Set<Promise<unknown>> }).running
 
 /** Waits for a condition (the pool's retries run on their own timers): its answer, within a bound for a hung run. */
 async function until(fn: () => boolean, ms = HUNG_MS): Promise<boolean> {
@@ -150,7 +175,7 @@ async function until(fn: () => boolean, ms = HUNG_MS): Promise<boolean> {
 }
 // The longest a wait here waits: a bound for a hung run (the retries' pauses grow to 30 s), never how long it takes.
 const HUNG_MS = 45_000
-// The HI-2906 tests' own bound: their retries' pauses (1 s, 2 s, 4 s...) and the jj runs of each settle, under a loaded run.
+// The HI-2906 tests' own bound: the jj runs of their several settles, under a loaded run (their wakes are the test's own).
 const RETRY_TEST_MS = 90_000
 
 describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED_JJ.version}), HI-2866`, () => {
@@ -179,140 +204,173 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(w.h.jj(row.folder, '--ignore-working-copy', 'log', '--no-graph', '-r', `${row.identity!.workspace}@-`, '-T', 'commit_id').trim()).toBe(w.main())
       })
 
-      it("(a) busy at the first record check (HI-2906): its builder's session still in the slot at release; lent, not dirty, then detached and ready once it has gone, with no other call", { timeout: RETRY_TEST_MS }, async () => {
+      it("(1) busy at the first record check (HI-2906/s101): owed, lent (not dirty); quiet, a pass makes it ready, not owed; lent again", { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row, key } = await integrated(w, 4)
-        // The lease ends with the builder's session still in the folder: the drain's look can't record it (not quiet), so
-        // the slot stays as it was, a retry waiting.
         w.sessions.add(row.folder.toLowerCase())
         await w.pool.release(lent.lease.id, 'done')
         expect(w.store.slot(row.name)?.state).toBe('lent')
         expect(await w.port.line(row.folder)).toBe(key)
-        expect(w.pool.settleWaitOf(row.name)).toEqual({ tries: 1, waiting: true })
-        // Still busy at the first retry: one timer still, its tries grown (f: one per slot).
-        expect(await until(() => w.pool.settleWaitOf(row.name)?.tries === 2 && w.pool.settleWaitOf(row.name)?.waiting === true)).toBe(true)
-        // The session gone: a retry detaches it and it's ready, nothing else asked (no refresh).
+        expect(w.pool.owedOf(row.name)).toMatchObject({ why: expect.stringMatching(/session/) })
+        expect(w.pool.owedWakePending()).toBe(true)
+        // Still busy at the first pass: still owed, the next pass asked for (its pause grown).
+        w.clock.fire()
+        expect(await until(() => w.pool.owedWakePending())).toBe(true)
+        expect(w.clock.pending().at(-1)?.ms).toBe(2000)
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        // Quiet: the next pass settles it.
         w.sessions.delete(row.folder.toLowerCase())
+        w.clock.fire()
         expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
+        await w.pool.owedPass()
         expect(await w.port.line(row.folder)).toBeNull()
-        expect(w.pool.settleWaitOf(row.name)).toBeNull()
-        // And it's lent again.
+        expect(w.pool.owedOf(row.name)).toBeNull()
+        expect(w.pool.owedWakePending()).toBe(false)
         const again = await w.pool.lend({ card: 5, agent: 'a-5' }, { target: 'main' })
         expect(again.ok && again.slot.name).toBe(row.name)
       })
 
-      it('(b) quiet lost between a clean look and the detach, gone before it returns (HI-2906): the latch retries it; ready', { timeout: RETRY_TEST_MS }, async () => {
+      it('(2) quiet lost only while the detach runs, gone before it returns (the latch): owed; ready on the next pass', { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row, key } = await integrated(w, 6)
         w.hooks.busyInNextDetach = true
         await w.pool.release(lent.lease.id, 'done')
-        // The detach was refused by its fence; by now nothing is in the folder, so only the latch says why.
-        expect(w.hooks.busyInNextDetach).toBe(false)
         expect(w.store.slot(row.name)?.state).toBe('lent')
         expect(await w.port.line(row.folder)).toBe(key)
-        expect(w.pool.settleWaitOf(row.name)).toMatchObject({ waiting: true })
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        w.clock.fire()
         expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
-        expect(await w.port.line(row.folder)).toBeNull()
-        expect(w.pool.settleWaitOf(row.name)).toBeNull()
+        await w.pool.owedPass()
+        expect(w.pool.owedOf(row.name)).toBeNull()
       })
 
-      it('(c) known dirty (HI-2906): an edit left in the slot, nothing working there: dirty, and no retry waits', async () => {
+      it('(3) known dirty, and a refusal for good: not owed, no pass asked for', { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row } = await integrated(w, 7)
         writeFileSync(join(row.folder, 'left.txt'), 'left behind\n')
         await w.pool.release(lent.lease.id, 'done')
         expect(w.store.slot(row.name)?.state).toBe('dirty')
-        expect(w.pool.settleWaitOf(row.name)).toBeNull()
+        expect(w.pool.owedOf(row.name)).toBeNull()
+        expect(w.pool.owedWakePending()).toBe(false)
       })
 
-      it('an operation taking the slot while a retry waits (HI-2906): the retry does nothing to it, its wait ends, nothing re-armed', { timeout: RETRY_TEST_MS }, async () => {
-        const w = world(colocated)
-        const { lent, row, key } = await integrated(w, 9)
-        w.sessions.add(row.folder.toLowerCase())
-        await w.pool.release(lent.lease.id, 'done')
-        expect(w.pool.settleWaitOf(row.name)).toMatchObject({ waiting: true })
-        // Another operation takes the slot (another Combwork's, say) before the timer fires; the folder is quiet now.
-        w.sessions.delete(row.folder.toLowerCase())
-        await w.store.conn.write((db) => void db.prepare("UPDATE slots SET op = 'another', op_kind = 'warm' WHERE project = ? AND name = ?").run('p-jj', row.name))
-        expect(await until(() => w.pool.settleWaitOf(row.name) === null)).toBe(true)
-        expect(w.store.slot(row.name)?.op?.token).toBe('another')
-        expect(w.store.slot(row.name)?.state).toBe('lent')
-        expect(await w.port.line(row.folder)).toBe(key)
-      })
-
-      it('(e) close while a retry waits, and during a running retry (HI-2906): nothing re-armed, the running settle awaited', { timeout: RETRY_TEST_MS }, async () => {
+      it("(4) two settles racing on one owed slot (the Assistant's): the held one decides, the other writes nothing; ready once quiet, both orders", { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row } = await integrated(w, 8)
         w.sessions.add(row.folder.toLowerCase())
         await w.pool.release(lent.lease.id, 'done')
-        expect(w.pool.settleWaitOf(row.name)).toMatchObject({ waiting: true })
-        // A close started from inside the retry's own settle (its look at the sessions), the folder still busy: the
-        // settle ends busy after the abort, so nothing is armed again, and the close waits for it.
-        let closing: Promise<void> | null = null
-        w.hooks.onSession = () => {
-          if (closing) return
-          closing = w.pool.close()
-        }
-        expect(await until(() => closing !== null)).toBe(true)
-        await closing
-        expect(w.pool.closed).toBe(true)
-        expect(w.pool.settleWaitOf(row.name)).toBeNull()
-        expect(w.store.slot(row.name)?.op).toBeNull()
-        expect(w.store.slot(row.name)?.state).toBe('lent')
-        // Nothing left that could touch the database after its teardown: no wait, no timer, no running operation.
-        expect(internals(w.pool).settleWaits.size).toBe(0)
-        expect(internals(w.pool).running.size).toBe(0)
+        const owed0 = w.pool.owedOf(row.name)
+        expect(owed0).not.toBeNull()
+        // A drain's settle held mid-look; the pass's settle can't begin (the slot's operation is held) and writes nothing.
+        let release!: () => void
+        w.hooks.recordGate = new Promise<void>((r) => (release = r))
+        let entered = false
+        w.hooks.inRecord = () => void (entered = true)
+        w.sessions.delete(row.folder.toLowerCase())
+        const drain = w.pool.drained(row.name)
+        expect(await until(() => entered)).toBe(true)
+        w.hooks.recordGate = null
+        w.sessions.add(row.folder.toLowerCase())
+        await w.pool.owedPass()
+        expect(w.pool.owedOf(row.name)).toEqual(owed0)
+        // The held settle ends busy (the session back): still owed, and the next pass asked for.
+        release()
+        await drain
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        expect(w.pool.owedWakePending()).toBe(true)
+        // The reverse: the pass's settle held mid-look while a drain finds the slot's operation taken; then quiet.
+        w.sessions.delete(row.folder.toLowerCase())
+        let release2!: () => void
+        w.hooks.recordGate = new Promise<void>((r) => (release2 = r))
+        entered = false
+        w.clock.fire()
+        expect(await until(() => entered)).toBe(true)
+        w.hooks.recordGate = null
+        await w.pool.drained(row.name)
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        release2()
+        expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
+        await w.pool.owedPass()
+        expect(w.pool.owedOf(row.name)).toBeNull()
       })
 
-      it("another settle while a retry waits, the folder still busy (HR1's round 2): the waiting retry kept as it is; ready once quiet", { timeout: RETRY_TEST_MS }, async () => {
+      it("(5) a pass fired while a drain's settle runs, the drain ending busy (HR1's s97 ordering): still owed, the next pass asked for; ready once quiet", { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
-        const { lent, row } = await integrated(w, 11)
+        const { lent, row } = await integrated(w, 9)
         w.sessions.add(row.folder.toLowerCase())
         await w.pool.release(lent.lease.id, 'done')
-        const p = internals(w.pool)
-        const entry = p.settleWaits.get(row.name)!
-        expect(entry.timer).not.toBeNull()
-        const at = { gen: entry.gen, tries: entry.tries, timer: entry.timer }
-        // An ordinary settle (a drain's) runs while that retry is pending and finds it busy too: nothing armed, nothing dropped.
-        await w.pool.drained(row.name)
-        expect(p.settleWaits.get(row.name)).toBe(entry)
-        expect({ gen: entry.gen, tries: entry.tries, timer: entry.timer }).toEqual(at)
-        expect(w.store.slot(row.name)?.state).toBe('lent')
-        // The session gone: the waiting retry settles it, nothing else asked.
+        let release!: () => void
+        w.hooks.recordGate = new Promise<void>((r) => (release = r))
+        let entered = false
+        w.hooks.inRecord = () => void (entered = true)
         w.sessions.delete(row.folder.toLowerCase())
+        const drain = w.pool.drained(row.name)
+        expect(await until(() => entered)).toBe(true)
+        w.hooks.recordGate = null
+        w.sessions.add(row.folder.toLowerCase())
+        // The pending wake fires now, during the drain's settle: its pass finds the slot taken, decides nothing.
+        expect(w.clock.fire()).toBe(true)
+        expect(await until(() => w.pool.owedWakePending())).toBe(true)
+        release()
+        await drain
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        expect(w.pool.owedWakePending()).toBe(true)
+        w.sessions.delete(row.folder.toLowerCase())
+        w.clock.fire()
         expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
-        expect(p.settleWaits.size).toBe(0)
+        await w.pool.owedPass()
+        expect(w.pool.owedOf(row.name)).toBeNull()
       })
 
-      it("an older attempt's continuation after a newer wait is armed, and after it has fired (HR1's round 1): never re-arms, drops or changes it", { timeout: RETRY_TEST_MS }, async () => {
+      it('(6) a session ending (its event): the owed pass now, no wake fired', { timeout: RETRY_TEST_MS }, async () => {
         const w = world(colocated)
         const { lent, row } = await integrated(w, 10)
         w.sessions.add(row.folder.toLowerCase())
         await w.pool.release(lent.lease.id, 'done')
-        const p = internals(w.pool)
-        const entry = p.settleWaits.get(row.name)!
-        expect(entry.timer).not.toBeNull()
-        const at = { gen: entry.gen, tries: entry.tries, timer: entry.timer }
-        // An attempt started with no wait (generation 0), and one under an older generation, finishing now: nothing changes.
-        expect(p.settleLater(row.name, 0)).toBe(false)
-        expect(p.settleLater(row.name, at.gen - 1)).toBe(false)
-        p.forgetSettleLater(row.name, at.gen - 1)
-        expect(p.settleWaits.get(row.name)).toBe(entry)
-        expect({ gen: entry.gen, tries: entry.tries, timer: entry.timer }).toEqual(at)
-        // Its timer fires (the retry under way: its timer spent) and the folder is still busy, so the retry arms the next
-        // generation; an older continuation then still changes nothing.
-        expect(await until(() => p.settleWaits.get(row.name) === entry && entry.gen > at.gen && entry.timer !== null)).toBe(true)
-        const next = { gen: entry.gen, tries: entry.tries, timer: entry.timer }
-        expect(next.tries).toBe(at.tries + 1)
-        expect(p.settleLater(row.name, at.gen)).toBe(false)
-        expect(p.settleLater(row.name, 0)).toBe(false)
-        p.forgetSettleLater(row.name, at.gen)
-        expect(p.settleWaits.get(row.name)).toBe(entry)
-        expect({ gen: entry.gen, tries: entry.tries, timer: entry.timer }).toEqual(next)
-        // Its own (current) generation's clean-up does drop it.
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
         w.sessions.delete(row.folder.toLowerCase())
-        expect(await until(() => w.store.slot(row.name)?.state === 'ready')).toBe(true)
-        expect(p.settleWaits.size).toBe(0)
+        // As slotCards' session listener asks it: no wake fired.
+        await w.pool.owedPass()
+        expect(w.store.slot(row.name)?.state).toBe('ready')
+        expect(w.pool.owedOf(row.name)).toBeNull()
+      })
+
+      it('(7) restart: owed recorded, the pool closed; a new pool on the same database settles it on its first pass', { timeout: RETRY_TEST_MS }, async () => {
+        const w = world(colocated)
+        const { lent, row } = await integrated(w, 11)
+        w.sessions.add(row.folder.toLowerCase())
+        await w.pool.release(lent.lease.id, 'done')
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        await w.pool.close()
+        // (8) close: the pending wake cancelled, nothing left running, the record kept (durable).
+        expect(w.pool.owedWakePending()).toBe(false)
+        expect(w.clock.pending()).toEqual([])
+        expect(runningOf(w.pool).size).toBe(0)
+        w.sessions.delete(row.folder.toLowerCase())
+        const next = w.makePool()
+        expect(next.owedOf(row.name)).not.toBeNull()
+        await next.owedPass()
+        expect(w.store.slot(row.name)?.state).toBe('ready')
+        expect(next.owedOf(row.name)).toBeNull()
+      })
+
+      it("an operation taking an owed slot, then a pass: the slot untouched, still owed; a removed slot's record goes", { timeout: RETRY_TEST_MS }, async () => {
+        const w = world(colocated)
+        const { lent, row, key } = await integrated(w, 12)
+        w.sessions.add(row.folder.toLowerCase())
+        await w.pool.release(lent.lease.id, 'done')
+        w.sessions.delete(row.folder.toLowerCase())
+        await w.store.conn.write((db) => void db.prepare("UPDATE slots SET op = 'another', op_kind = 'warm' WHERE project = ? AND name = ?").run('p-jj', row.name))
+        await w.pool.owedPass()
+        expect(w.store.slot(row.name)?.op?.token).toBe('another')
+        expect(await w.port.line(row.folder)).toBe(key)
+        expect(w.pool.owedOf(row.name)).not.toBeNull()
+        expect(w.pool.owedWakePending()).toBe(true)
+        // A record for a slot no longer in the pool doesn't keep the pass alive.
+        await w.store.conn.write((db) => void db.prepare("INSERT INTO board_meta (key, value) VALUES (?, '{}')").run(owedKey('p-jj', 'slot-gone')))
+        expect(w.pool.owedSlots()).toContain('slot-gone')
+        await w.pool.owedPass()
+        expect(w.pool.owedSlots()).not.toContain('slot-gone')
       })
 
       it("released with the card's work not in the target yet: kept on the card, never detached", async () => {
@@ -331,8 +389,9 @@ describe.skipIf(!jjExe)(`the slot pool preparing jj slots for cards (jj ${TESTED
         expect(w.store.slot(row.name)?.state).not.toBe('ready')
         expect(await w.port.line(row.folder)).toBe(key)
         expect(w.h.id(row.folder, `${row.identity!.workspace}@-`)).toBe(R)
-        // A refusal for good, the folder quiet: no retry waits (HI-2906), the next refresh or event looks again.
-        expect(w.pool.settleWaitOf(row.name)).toBeNull()
+        // A refusal for good, the folder quiet: not owed, no pass asked for (HI-2906/s101); the next refresh or event looks again.
+        expect(w.pool.owedOf(row.name)).toBeNull()
+        expect(w.pool.owedWakePending()).toBe(false)
       })
 
       it("a queued publication (HR1's round 2): the slot's operation replaced after the last guard, while the write waits for the database: nothing published", async () => {

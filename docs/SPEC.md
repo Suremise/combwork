@@ -3027,18 +3027,22 @@ jj card's line is a key, Combwork's jj writes are owned writes in its own worksp
   its settle passes its operation's token as the detach's fence; the removal guard asks §16.3.2's test of a jj slot's
   Git store. A lane-held jj slot isn't settled by the post-Done path (it holds no slot operation): the pool's settle does
   it once the lease is released.
-- **A settle that couldn't run yet is retried** (HI-2906, design HI-2906/s6 and s15): the pool's settle right after a
-  lease ends can find its builder's session or a process still leaving the slot. jj's record and owned detach are fenced
-  by quiet, so the look or the detach is refused, and before this a jj slot then stayed `lent` until the next refresh
-  (up to an hour). Now each attempt carries a latch that the fences it hands out (the look's record, the detach) set
-  when they find the folder no longer quiet, never reconstructed from a later check. A busy look leaves the slot as it was
-  (never `dirty` for that); a busy one or a detach refused with the latch set asks for another settle after a pause
-  (1 s, doubling, at most 30 s; one timer per slot, keyed by generation so a stale callback or attempt never drops or
-  re-arms a newer one), armed only after the attempt's fenced end. The retry is an ordinary settle: it re-reads the slot
-  (an operation, writer or lease taking it meanwhile, set aside, made or removed: it does nothing, and the wait ends).
-  The pool's close drops every wait and awaits a running settle. A refusal with the latch clear (the binding not settled,
-  the target moved) or known dirty files schedule nothing: the next refresh or event looks again. Git's detach takes no
-  fence, so Git is unchanged.
+- **A settle that couldn't run yet is owed** (HI-2906, design HI-2906/s101, the Assistant's note on it): the pool's settle
+  right after a lease ends can find its builder's session or a process still leaving the slot. jj's record and owned
+  detach are fenced by quiet, so the look or the detach is refused; before, a jj slot then stayed `lent` until the next
+  refresh (up to an hour). Each attempt carries a latch its fences set when they find the folder no longer quiet (never
+  reconstructed from a later check). An attempt that ends busy (a busy look, never `dirty` for that; or a detach refused
+  with the latch set) records the slot as **owing a settle** (`slot_settle_owed:<project>:<slot>` in board_meta) in its
+  own fenced end write, with its row; one that decides (ready, dirty, gone, or a refusal with the latch clear: the
+  binding not settled, the target moved) clears it there; one that lost its operation writes neither. Attempts on a slot
+  never overlap (its operation), so the record is always the latest attempt's. **The owed pass** (`SlotPool.owedPass`)
+  settles each owed slot of the project in turn, one pass at a time (asked for while one runs, it runs again after);
+  records of slots no longer in the pool go. It is woken by the attempt that set a record (unless a pass runs, whose end
+  asks), by its own end while any slot is still owed (1 s, doubling, at most 30 s; from 1 s again once none is), by a
+  session ending or going quiet in the project (slotCards' session listener, only for a pool already made), by the
+  pool's start and by `refresh()`. A wake owns nothing: cancelled, or finding a slot taken, it loses nothing. The pool's
+  close cancels the wake and awaits the running pass and settles. A refusal for good and known dirty files aren't owed:
+  the next refresh or event looks again, with no periodic jj loop. Git's detach takes no fence, so Git is unchanged.
 - **Stale slots:** recovered only by the user's explicit action, `slots:recoverStale` → `SlotPool.recoverStale` (a
   settle-kind operation of the slot, its quiescence the fence, its own journal) → J2's `recoverStale`; the window's
   **Recover…** is J9c's. A recovered slot rejoins the pool only through its next look and preparation's check.
