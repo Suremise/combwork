@@ -2396,6 +2396,14 @@ yet. Its design is HI-2795/s21 (revised from s12, s15 and s18 on HR1's findings)
   `copy_leases.intact`. A jj row is `jj` from the write that reserves it; its identity is recorded once made, and
   checked against the folder before every change: a folder replaced at the same path (even a same-named workspace of
   the same store) has another generation and is never changed or trashed. Unreadable file ids refuse.
+- **Every write is owned** (HR1's HI-2795 round 1): right before each jj write (a record, a reset's snapshot, `new` and
+  `abandon`, a forget, a recovery's update and each restored path) the writer's operation still holds the folder and the
+  folder is still the recorded workspace (`owns`: its generation, its checkout's name and its store, read with no jj
+  process), else nothing is written. A removal's intent and its forget are inside the store's lock, after both are
+  checked again there. The pool records a jj slot only once no writer, job, session or process is in it (the rename
+  probe), checked again right before the snapshot; a busy one is left as it is, not ready. Recovery checks the
+  folder's generation at entry (fresh or resumed) and before every step, and its bounds apply to every entry and to a
+  file's size before it is read.
 - **Per-row platform** (R2.6): a pool lends and makes only slots of its own platform; a slot of another is settled,
   released and removed by its own platform's port (a Git slot in a pool made with jj's finishes under Git), and one
   with no port there is kept (`cantCheck`).

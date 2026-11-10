@@ -68,6 +68,8 @@ export interface JjWorkspacePort extends WorkspacePort {
   nameFor(repo: string, folder: string): string
   /** Whether a folder's workspace is stale (unknown when that can't be read). */
   stale(folder: string): Promise<Maybe<boolean>>
+  /** Whether a folder is still the recorded workspace (generation, name, store), read with no jj process: every write's precondition. */
+  owns(folder: string, identity: WorkspaceIdentity | null | undefined): Promise<boolean>
   /** The pinned operation for a folder's repository: the one op head, confirmed by jj; unknown with several. */
   pinned(folder: string): Promise<Maybe<string>>
   /** Runs jj (the port's runner) in a folder, pinned at `op` (a read) or writing. For recovery and tests. */
@@ -224,6 +226,19 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     return (await generationOf(folder)) === identity.generation
   }
 
+  /**
+   * The identity check at a mutation boundary (HR1, HI-2795 round 1): with no jj process, the folder is still the recorded
+   * workspace (its creation generation and its checkout's workspace name) of the recorded store. Run right before every
+   * write, after every await that could let another process in.
+   */
+  const owns = async (folder: string, identity: WorkspaceIdentity | null | undefined): Promise<boolean> => {
+    if (!identity) return false
+    if ((await generationOf(folder)) !== identity.generation) return false
+    if ((await checkoutOf(folder))?.name !== identity.workspace) return false
+    const ctx = await contextOf(folder)
+    return !!ctx && samePath(ctx.store, identity.store)
+  }
+
   /** A bookmark's commit at `op`: its id, null when there is none, unknown when conflicted or unreadable. */
   const bookmarkAt = async (folder: string, op: string, line: string): Promise<Maybe<string | null>> => {
     const out = await read(folder, op, ['bookmark', 'list', '-T', `if(!remote, name ++ "${SEPARATOR}" ++ conflict ++ "${SEPARATOR}" ++ if(normal_target, normal_target.commit_id(), "") ++ "\\n")`, '--', `exact:${line}`], unknown(UNREADABLE.line, { branch: line }))
@@ -294,6 +309,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     nameFor: (repo, folder) => nameFor(createHash('sha256').update(resolve(repo).toLowerCase()).digest('hex').slice(0, 8), folder),
     pinned,
     jj,
+    owns,
     stale: async (folder) => {
       const op = await pinned(folder)
       return isUnknown(op) ? op : staleAt(folder, op)
@@ -412,11 +428,13 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const u = unknown(UNREADABLE.uncommitted, { folder })
       const op = await pinned(folder)
       if (isUnknown(op)) return op
-      if (identity !== undefined && !(await isRecorded(folder, op, identity))) return withDetail(u, JJ_REFUSED.identity)
+      if (!(await isRecorded(folder, op, identity))) return withDetail(u, JJ_REFUSED.identity)
       const stale = await staleAt(folder, op)
       if (isUnknown(stale)) return stale
       if (stale) return withDetail(u, JJ_REFUSED.stale)
+      // Right before the write: still its holder's, still the recorded workspace.
       if (!(await fence.still())) return withDetail(u, JJ_REFUSED.fence)
+      if (!(await owns(folder, identity))) return withDetail(u, JJ_REFUSED.identity)
       // The explicit snapshot: `status` writing, never updating a stale copy (the runner's prefix keeps auto-update off).
       const snap = await jj(folder, ['--config=snapshot.auto-update-stale=false', 'status'], { write: true })
       if (!snap.ok) return withDetail(u, snap.err)
@@ -436,32 +454,47 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (isUnknown(s)) return s
       return !s.stale && !s.wc.divergent && !s.wc.conflict && s.wc.empty && s.wc.parents.length === 1 && s.wc.parents[0] === revision
     },
-    resetTo: async (folder, revision) => {
-      // A copy only, under its warm operation (copies.ts): stale or divergent copies are disposed of, never reset.
+    resetTo: async (folder, revision, o = {}) => {
+      // A copy only, under its warm operation (copies.ts), as an owned change (HR1, round 1): its identity and its
+      // operation checked before its first write and again before each later one; a replacement or a lost fence is
+      // refused untouched. Stale or divergent copies are disposed of, never reset.
+      const refused = (failed: 'checkout' | 'clean', err: string): { ok: false; failed: 'checkout' | 'clean'; err: string } => ({ ok: false, failed, err })
+      const mine = async (): Promise<string | null> => {
+        if (!o.fence || !(await o.fence.still())) return JJ_REFUSED.fence
+        return (await owns(folder, o.identity)) ? null : JJ_REFUSED.identity
+      }
+      const first = await mine()
+      if (first) return refused('checkout', first)
       const s = await state(folder)
-      if (isUnknown(s)) return { ok: false, failed: 'checkout', err: s.detail ?? s.what }
-      if (s.stale) return { ok: false, failed: 'checkout', err: JJ_REFUSED.stale }
-      if (s.wc.divergent) return { ok: false, failed: 'checkout', err: JJ_REFUSED.divergent }
+      if (isUnknown(s)) return refused('checkout', s.detail ?? s.what)
+      if (s.stale) return refused('checkout', JJ_REFUSED.stale)
+      if (s.wc.divergent) return refused('checkout', JJ_REFUSED.divergent)
       // Stray files into the copy's own change, then a new empty change at exactly the revision.
+      let why = await mine()
+      if (why) return refused('checkout', why)
       const snap = await jj(folder, ['--config=snapshot.auto-update-stale=false', 'status'], { write: true })
-      if (!snap.ok) return { ok: false, failed: 'clean', err: snap.err }
+      if (!snap.ok) return refused('clean', snap.err)
       const mid = await state(folder)
-      if (isUnknown(mid)) return { ok: false, failed: 'clean', err: mid.detail ?? mid.what }
+      if (isUnknown(mid)) return refused('clean', mid.detail ?? mid.what)
       const old = mid.wc.commit
+      why = await mine()
+      if (why) return refused('checkout', why)
       const nu = await jj(folder, ['new', revision], { write: true })
-      if (!nu.ok) return { ok: false, failed: 'checkout', err: nu.err }
+      if (!nu.ok) return refused('checkout', nu.err)
       const after = await state(folder)
-      if (isUnknown(after)) return { ok: false, failed: 'checkout', err: after.detail ?? after.what }
+      if (isUnknown(after)) return refused('checkout', after.detail ?? after.what)
       // The old change, if jj kept it (not empty): abandoned only as the copy's own (no descendant, no bookmark, no workspace's).
       const kept = await read(folder, after.op, ['log', '--no-graph', '-r', `${old} & visible_heads() & ~bookmarks() & ~working_copies()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: old }))
-      if (isUnknown(kept)) return { ok: false, failed: 'clean', err: kept.detail ?? kept.what }
+      if (isUnknown(kept)) return refused('clean', kept.detail ?? kept.what)
       if (lines(kept).length) {
+        why = await mine()
+        if (why) return refused('clean', why)
         const ab = await jj(folder, ['abandon', old], { write: true })
-        if (!ab.ok) return { ok: false, failed: 'clean', err: ab.err }
+        if (!ab.ok) return refused('clean', ab.err)
       }
       const end = await state(folder)
-      if (isUnknown(end)) return { ok: false, failed: 'checkout', err: end.detail ?? end.what }
-      return end.wc.empty && end.wc.parents.length === 1 && end.wc.parents[0] === revision && !end.stale ? { ok: true } : { ok: false, failed: 'checkout', err: JJ_REFUSED.identity }
+      if (isUnknown(end)) return refused('checkout', end.detail ?? end.what)
+      return end.wc.empty && end.wc.parents.length === 1 && end.wc.parents[0] === revision && !end.stale ? { ok: true } : refused('checkout', JJ_REFUSED.identity)
     },
 
     remove: async (repo, folder, o = {}) => {
@@ -487,13 +520,21 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           }
         }
         if (!(await fenced())) return step(false, JJ_REFUSED.fence)
-        await journal.write({ phase: 'forgetting', workspace: identity.workspace, folder, generation: identity.generation, store: identity.store })
-        phase = 'forgetting'
       }
-      if (phase === 'forgetting') {
+      if (phase === 'start' || phase === 'forgetting') {
         const from = await control(repo, ctx)
         if (!from) return step(false, JJ_REFUSED.control)
-        const forgot = await deps.lock(ctx.store, () => jj(from, ['workspace', 'forget', '--', identity.workspace], { write: true }))
+        // Inside the store's lock, right before the forget (HR1, round 1): the operation still holds the folder and the
+        // folder is still the recorded workspace, else nothing (registration, files, journal) is touched. The intent is
+        // written here, so a lock taken over meanwhile leaves no intent behind.
+        const forgot = await deps.lock(ctx.store, async () => {
+          if (!(await fenced())) return null
+          if (existsSync(folder) && !(await owns(folder, identity))) return 'identity' as const
+          if (phase === 'start') await journal.write({ phase: 'forgetting', workspace: identity.workspace, folder, generation: identity.generation, store: identity.store })
+          return jj(from, ['workspace', 'forget', '--', identity.workspace], { write: true })
+        })
+        if (forgot === null) return step(false, JJ_REFUSED.fence)
+        if (forgot === 'identity') return step(false, JJ_REFUSED.identity)
         // Read back whatever forget's exit (0.47.1 commits the forget before unlinking a colocated Git worktree).
         const op = await pinned(repo)
         if (isUnknown(op)) return step(false, op.detail ?? op.what)

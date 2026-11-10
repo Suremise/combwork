@@ -699,7 +699,9 @@ export class CopyPool {
       if (!made && port.identity) {
         // A jj copy (HI-2795/s21 §3): reset only when healthy; stale, divergent or not this copy any more, disposed of and
         // made again, never reset or updated.
-        const at = await port.resetTo(copy.folder, lease.revision)
+        // Owned (HR1, round 1): reset only as the copy recorded (its identity) by this operation (its fence); a replacement
+        // or a lost operation is refused untouched, and dispose refuses a replacement too (its generation).
+        const at = await port.resetTo(copy.folder, lease.revision, { identity: copy.identity ?? null, fence: this.fenceOf(name, token) })
         if (!at.ok) {
           if (!(await this.dispose(copy, token))) return await fail(sayStored(T.checkout, { error: port.errorLine(at.err) || 'failed' }))
           made = true

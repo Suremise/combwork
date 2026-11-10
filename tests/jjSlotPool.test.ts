@@ -145,6 +145,30 @@ describe.skipIf(!jjExe)(`the slot and copy pools over jj's port (jj ${TESTED_JJ.
     })
   }
 
+  it('a slot with a session in it is never recorded: no jj operation, no snapshot, not ready, until it is quiet', async () => {
+    const w = world(false)
+    const sessions = new Set<string>()
+    const conn = fileSlotConn(boardFile(w.ws))
+    closers.unshift(() => conn.close())
+    const store = new SlotStore(conn, 'p-jj')
+    const holder: OpHolder = { self: async () => ({ pid: 1, started: 1001 }), alive: async () => true, live: new Set() }
+    const pool = new SlotPool({ store, workspaces: w.h.port, project: w.repo, root: w.root, options: async () => ({ setup: '', archive: '', copy: '' }), builders: () => 2, cap: () => 4, runner: async () => ({ ok: true, exitCode: 0, logPath: null, settled: true }), settle: async () => true, holder, sessionIn: (f) => (sessions.has(f.toLowerCase()) ? 'a resumed agent' : null) })
+    const lent = await pool.lend({ card: 6, agent: 'a-6' }, { target: 'main' })
+    if (!lent.ok) throw new Error('not lent')
+    const folder = lent.slot.folder
+    sessions.add(folder.toLowerCase())
+    writeFileSync(join(folder, 'typing.txt'), 'in progress\n')
+    const opsBefore = w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '-T', 'id ++ "\\n"')
+    await pool.release(lent.lease.id, 'done')
+    await pool.refresh()
+    expect(w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '-T', 'id ++ "\\n"')).toBe(opsBefore)
+    expect(store.slot(lent.slot.name)?.state).not.toBe('ready')
+    // Quiet again: recorded, and with the agent's file in it, dirty.
+    sessions.clear()
+    await pool.refresh()
+    expect(store.slot(lent.slot.name)?.state).toBe('dirty')
+  })
+
   it('a Git slot in a colocated project finishes under Git: never lent by the jj pool, removed by git worktree remove', async () => {
     const w = world(true)
     const { pool, store } = w.pool(1)
@@ -180,6 +204,28 @@ describe.skipIf(!jjExe)(`the slot and copy pools over jj's port (jj ${TESTED_JJ.
     expect(readFileSync(join(next.copy.folder, 'base.txt'), 'utf8')).toBe('base\n')
     await pool.returnCopy(next.lease.id, 'verdict')
     expect(store.lease(next.lease.id)).toMatchObject({ intact: true })
+  })
+
+  it('a free jj copy replaced at the same root (same name, same store): reuse refuses it, never resets or disposes of it', async () => {
+    const w = world(true)
+    const { pool, store } = w.copies(1)
+    const first = await pool.leaseCopy({ kind: 'review', card: 10, revision: w.base, ref: 'sub-r', agent: 'r-1' })
+    if (!first.ok) throw new Error('not leased')
+    await pool.returnCopy(first.lease.id, 'verdict')
+    const id = store.copy(first.copy.name)!.identity!
+    const { rmSync } = await import('fs')
+    w.h.jj(w.repo, 'workspace', 'forget', id.workspace)
+    rmSync(first.copy.folder, { recursive: true, force: true })
+    w.h.jj(w.repo, 'workspace', 'add', first.copy.folder, '--name', id.workspace, '-r', w.base, '--colocate')
+    writeFileSync(join(first.copy.folder, 'theirs.txt'), 'theirs\n')
+    const before = w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '-T', 'id ++ "\\n"')
+    const again = await pool.leaseCopy({ kind: 'review', card: 11, revision: w.base, ref: 'sub-s', agent: 'r-1' })
+    // Not this copy: refused (another one may be made); the replacement untouched, nothing recorded in it.
+    expect(again.ok && again.copy.name).not.toBe(first.copy.name)
+    expect(readFileSync(join(first.copy.folder, 'theirs.txt'), 'utf8')).toBe('theirs\n')
+    expect(w.h.jj(first.copy.folder, '--ignore-working-copy', 'diff', '--summary', '-r', '@').trim()).toBe('')
+    expect(w.h.trashed.map((p) => p.toLowerCase())).not.toContain(first.copy.folder.toLowerCase())
+    expect(before.split('\n').every((l) => !l || w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '-T', 'id ++ "\\n"').includes(l))).toBe(true)
   })
 
   it("a jj copy's source rewritten during a live run: nothing resets it while leased; its files stay; the verification after the barrier fails", async () => {

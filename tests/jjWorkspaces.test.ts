@@ -65,10 +65,13 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
         writeFileSync(join(b, 'b.txt'), 'B\n')
         // Each agent's own jj commands, at once.
         await Promise.all([Promise.resolve().then(() => h.jj(a, 'describe', '-m', 'agent A')), Promise.resolve().then(() => h.jj(b, 'describe', '-m', 'agent B'))])
-        expect(await h.port.record!(a, yes)).toEqual(['a.txt'])
-        expect(await h.port.record!(b, yes)).toEqual(['b.txt'])
-        // A lost fence records nothing.
-        expect(isUnknown(await h.port.record!(a, no))).toBe(true)
+        const idA = await h.port.identity!(a)
+        const idB = await h.port.identity!(b)
+        expect(await h.port.record!(a, yes, idA)).toEqual(['a.txt'])
+        expect(await h.port.record!(b, yes, idB)).toEqual(['b.txt'])
+        // A lost fence, or another workspace's identity, records nothing.
+        expect(isUnknown(await h.port.record!(a, no, idA))).toBe(true)
+        expect(isUnknown(await h.port.record!(a, yes, idB))).toBe(true)
         // jj has no checked-out line: every line operation refused, never mapped to a near equivalent (R5.2).
         expect((await h.port.prepare(a, 'card', base)).err).toBe(JJ_REFUSED.line)
         expect((await h.port.detach(a, base)).err).toBe(JJ_REFUSED.line)
@@ -89,7 +92,7 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
         expect(await h.port.stale(a)).toBe(true)
         const head = await h.port.head(a)
         expect(isUnknown(head) && head.detail).toBe(JJ_REFUSED.stale)
-        const rec = await h.port.record!(a, yes)
+        const rec = await h.port.record!(a, yes, await h.port.identity!(a))
         expect(isUnknown(rec) && rec.detail).toBe(JJ_REFUSED.stale)
         // Nothing written: no snapshot, no update-stale, no reconcile.
         expect(ops(h, repo)).toEqual(before)
@@ -187,7 +190,7 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
         writeFileSync(join(copy, 'stray.txt'), 'x\n')
         mkdirSync(join(copy, 'node_modules'))
         writeFileSync(join(copy, 'node_modules', 'dep.js'), '//\n')
-        expect(await h.port.resetTo(copy, R)).toEqual({ ok: true })
+        expect(await h.port.resetTo(copy, R, { identity: id, fence: yes })).toEqual({ ok: true })
         expect(existsSync(join(copy, 'stray.txt'))).toBe(false)
         expect(existsSync(join(copy, 'node_modules', 'dep.js'))).toBe(true)
         expect(await h.port.copyIntact!(copy, R, yes, id)).toBe(true)
@@ -199,7 +202,7 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
         expect(await h.port.copyIntact!(copy, R, yes, id)).toBe(false)
         expect(readFileSync(join(copy, 'work.txt'), 'utf8')).toBe('v1\n')
         // A stale copy is never reset: disposed of (forget + trash), no snapshot.
-        expect((await h.port.resetTo(copy, R)).ok).toBe(false)
+        expect((await h.port.resetTo(copy, R, { identity: id, fence: yes })).ok).toBe(false)
         expect((await h.port.remove(repo, copy, { force: true, identity: id, journal: h.journals.of('c') })).ok).toBe(true)
         expect(existsSync(copy)).toBe(false)
       })
@@ -216,6 +219,44 @@ describe.skipIf(!jjExe)(`jj workspaces as slots and copies (jj ${TESTED_JJ.versi
       })
     })
   }
+
+  it('a reset is an owned change: a replacement at the same root (same name, same store) or a lost fence is refused with nothing written', async () => {
+    const h = harness()
+    const { repo, root, base } = h.repo('ownreset', true)
+    const copy = join(root, 'copy-1')
+    await h.port.create(repo, copy, base)
+    const id = (await h.port.identity!(copy))!
+    // A lost fence: refused before any write.
+    const before = ops(h, repo)
+    expect(await h.port.resetTo(copy, base, { identity: id, fence: no })).toMatchObject({ ok: false, err: JJ_REFUSED.fence })
+    expect(ops(h, repo)).toEqual(before)
+    // Replaced outside Combwork (forgotten, a new workspace of the same name at the same root) with work in it.
+    const { rmSync } = await import('fs')
+    h.jj(repo, 'workspace', 'forget', id.workspace)
+    rmSync(copy, { recursive: true, force: true })
+    h.jj(repo, 'workspace', 'add', copy, '--name', id.workspace, '-r', base, '--colocate')
+    writeFileSync(join(copy, 'theirs.txt'), 'theirs\n')
+    const mid = ops(h, repo)
+    expect(await h.port.resetTo(copy, base, { identity: id, fence: yes })).toMatchObject({ ok: false, err: JJ_REFUSED.identity })
+    expect(isUnknown(await h.port.record!(copy, yes, id))).toBe(true)
+    expect(ops(h, repo)).toEqual(mid)
+    expect(readFileSync(join(copy, 'theirs.txt'), 'utf8')).toBe('theirs\n')
+  })
+
+  it('removal: the store lock taken over before its callback leaves the registration, the files and the journal untouched', async () => {
+    const h = harness()
+    const { repo, root, base } = h.repo('lockremove', false)
+    const a = join(root, 'slot-a')
+    await h.port.create(repo, a, base)
+    const id = (await h.port.identity!(a))!
+    let held = true
+    const taking = h.portWith({ lock: async (_s, fn) => ((held = false), fn()) })
+    const r = await taking.remove(repo, a, { identity: id, journal: h.journals.of('lr'), fence: { still: () => held } })
+    expect(r).toEqual({ ok: false, err: JJ_REFUSED.fence })
+    expect(h.jj(repo, '--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"')).toContain(id.workspace)
+    expect(existsSync(join(a, 'base.txt'))).toBe(true)
+    expect(h.journals.of('lr').read()).toBeNull()
+  })
 
   it('the control workspace is made only when the project folder is quiet, and is never a slot', async () => {
     const h = harness({ quiet: async () => false })

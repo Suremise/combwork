@@ -214,6 +214,29 @@ describe.skipIf(!jjExe)(`a stale jj workspace's recovery (jj ${TESTED_JJ.version
     })
   }
 
+  it('a folder that isn\'t the recorded workspace (another generation: a replacement of the same name and store) is refused before any write', async () => {
+    const s = await stale(true)
+    const before = s.h.jj(s.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id')
+    const r = await recoverStale(s.deps(), { repo: s.repo, folder: s.slot, identity: { ...s.id, generation: 'another' }, journal: s.h.journals.of('g'), fence: yes, quiet })
+    expect(r).toEqual({ ok: false, why: 'identity' })
+    expect(s.h.jj(s.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id')).toBe(before)
+    expect(await s.h.port.stale(s.slot)).toBe(true)
+    expect(readFileSync(join(s.slot, 'local.txt'), 'utf8')).toBe('mine\n')
+    expect(s.h.journals.of('g').read()).toBeNull()
+  })
+
+  it('bounds: a file past the byte bound is refused before it is read; deletions count against the file bound; nothing written', async () => {
+    const { rmSync } = await import('fs')
+    const big = await stale(false, { local: (slot) => writeFileSync(join(slot, 'big.bin'), Buffer.alloc(64 * 1024)) })
+    const before = big.h.jj(big.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id')
+    expect(await run(big, big.deps({ bounds: { files: 100, bytes: 1024 } }))).toMatchObject({ ok: false, why: 'bounds' })
+    expect(big.h.jj(big.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id')).toBe(before)
+    expect(await big.h.port.stale(big.slot)).toBe(true)
+    const gone = await stale(false, { local: (slot) => (rmSync(join(slot, 'shared.txt')), rmSync(join(slot, 'base.txt'))) })
+    expect(await run(gone, gone.deps({ bounds: { files: 1, bytes: 1024 * 1024 } }), 'd')).toMatchObject({ ok: false, why: 'bounds' })
+    expect(await gone.h.port.stale(gone.slot)).toBe(true)
+  })
+
   it('pinned reads: with diverged operation heads recovery refuses and writes nothing (no reconcile, no snapshot)', async () => {
     const s = await stale(false)
     const op = s.h.jj(s.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()

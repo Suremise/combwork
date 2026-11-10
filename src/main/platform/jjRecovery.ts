@@ -92,6 +92,8 @@ interface Journal {
   phase: 'planned' | 'preserved' | 'updated' | 'restoring' | 'restored'
   store: string
   workspace: string
+  /** The folder's creation generation when recovery began: checked at entry and before every write (HR1, round 1). */
+  generation: string
   folder: string
   S: string
   WS: string
@@ -167,10 +169,17 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
   const { folder, journal } = req
   const bounds = deps.bounds ?? DEFAULT_BOUNDS
   const refuse = (why: RecoveryRefusal, detail?: string): RecoveryResult => ({ ok: false, why, ...(detail ? { detail } : {}) })
-  const fenced = async (): Promise<boolean> => (await req.fence.still()) && (await req.quiet())
+  // Every write's precondition (HR1, round 1): the caller's operation still holds the folder, and the folder is still the
+  // recorded workspace (its generation, name and store, read with no jj process). `fenced` adds the writers' quiescence
+  // (the rename probe) at each phase's start; `mine` is checked before each step within a phase.
+  const mine = async (): Promise<boolean> => (await req.fence.still()) && (await port.owns(folder, req.identity))
+  const fenced = async (): Promise<boolean> => (await mine()) && (await req.quiet())
 
   let j = journal.read() as Journal | null
-  if (j && (j.workspace !== req.identity.workspace || j.store.toLowerCase() !== req.identity.store.toLowerCase() || resolve(j.folder).toLowerCase() !== resolve(folder).toLowerCase())) return refuse('identity')
+  if (j && (j.workspace !== req.identity.workspace || j.store.toLowerCase() !== req.identity.store.toLowerCase() || j.generation !== req.identity.generation || resolve(j.folder).toLowerCase() !== resolve(folder).toLowerCase())) return refuse('identity')
+  // A folder that isn't the recorded workspace (a replacement at the same path, even of the same name and store) is
+  // refused before anything is read or written, fresh or resumed.
+  if (!(await port.owns(folder, req.identity))) return refuse('identity')
   const save = async (next: Journal): Promise<void> => {
     j = next
     await journal.write(next)
@@ -213,12 +222,18 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       const w = ws.get(path)
       if (w && w.mode !== '100644' && w.mode !== '100755') return refuse('link', path)
       if (!(await plainPath(folder, path))) return refuse('link', path)
-      const buf = await readFile(abs(folder, path)).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? null : undefined))
-      if (buf === undefined) return refuse('unreadable', path)
-      if (buf === null) {
+      // Its size first (HR1, round 1): a file past what the bounds have left is refused before it is read.
+      const st = await lstat(abs(folder, path)).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' ? null : undefined))
+      if (st === undefined) return refuse('unreadable', path)
+      if (st === null) {
         if (w) out.push({ path, kind: 'deleted', size: 0, sha256: null, blob: null, wsBlob: w.blob })
+        if (out.length > bounds.files) return refuse('bounds')
         continue
       }
+      if (bytes + st.size > bounds.bytes) return refuse('bounds')
+      const buf = await readFile(abs(folder, path)).catch(() => undefined)
+      if (buf === undefined) return refuse('unreadable', path)
+      if (buf.length !== st.size) return refuse('changing', path)
       const blob = blobOf(buf)
       if (w && w.blob === blob) continue
       bytes += buf.length
@@ -269,7 +284,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
     if (!co || co.name !== req.identity.workspace) return refuse('identity')
     const ws = await port.jj(folder, ['log', '--no-graph', '-r', `${revsetName(co.name)}@`, '-T', 'commit_id'], { op: co.op })
     if (!ws.ok || !/^[0-9a-f]{40}$/.test(ws.out.trim())) return refuse('unreadable', ws.err)
-    await save({ token: `r-${randomBytes(6).toString('hex')}`, phase: 'planned', store, workspace: co.name, folder: resolve(folder), S: co.op, WS: ws.out.trim() })
+    await save({ token: `r-${randomBytes(6).toString('hex')}`, phase: 'planned', store, workspace: co.name, generation: req.identity.generation, folder: resolve(folder), S: co.op, WS: ws.out.trim() })
   }
   let cur = j as unknown as Journal
 
@@ -305,7 +320,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
         cur = j as unknown as Journal
       }
       await deps.hooks?.beforeUpdate?.()
-      if (!(await req.fence.still())) return refuse('fence')
+      if (!(await mine())) return refuse('fence')
       const up = await port.jj(folder, ['workspace', 'update-stale'], { write: true })
       if (!up.ok && (await port.stale(folder)) === true) return refuse('update', up.err)
     }
@@ -346,6 +361,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
         const bytes = await git(folder, [`--git-dir=${store}`, 'cat-file', 'blob', after])
         if (!bytes.ok) return refuse('unreadable', path)
         if (!(await plainPath(folder, path))) return refuse('link', path)
+        if (!(await mine())) return refuse('fence')
         const name = freeName(abs(folder, path), `.cw-recovered-${cur.token}-late`)
         await mkdir(dirname(name), { recursive: true })
         await writeFile(name, bytes.buf, { flag: 'wx' })
@@ -358,6 +374,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
 
   // 4. restoring, path by path, journalled before each filesystem step.
   if (cur.phase === 'updated' || cur.phase === 'restoring') {
+    if (!(await fenced())) return refuse('busy')
     const manifest = await manifestOf(cur)
     const u = cur.U ? await treeOf(cur.U) : null
     if (!manifest || !u) return refuse('unreadable', 'manifest or U') // i18n-ignore: a protocol code, never wording
@@ -367,7 +384,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       cur = j as unknown as Journal
       const st = paths[e.path]
       if (st?.sub === 'done') continue
-      if (!(await req.fence.still())) return refuse('fence')
+      if (!(await mine())) return refuse('fence')
       const target = abs(folder, e.path)
       if (!(await plainPath(folder, e.path))) return refuse('link', e.path)
       const preservedFile = e.kind === 'file' ? join(cur.dir!, 'files', ...e.path.split('/')) : null
@@ -390,6 +407,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
         await setPath(s)
       }
       await deps.hooks?.beforePlace?.(e.path)
+      if (!(await mine())) return refuse('fence')
       const asideBuf = await readFile(s.aside).catch(() => null)
       const C = asideBuf ? blobOf(asideBuf) : null
       const U = u.get(e.path)?.blob ?? null
@@ -440,6 +458,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
   // 5. restored: recorded, X tidied only when it is exactly the preserved delta and nobody else's, the copy trashed.
   const manifest = (await manifestOf(cur)) ?? []
   const paths = cur.paths ?? {}
+  if (!(await fenced())) return refuse('busy')
   const rec = await port.record!(folder, req.fence, req.identity)
   if (isUnknown(rec)) return refuse('fence', rec.detail ?? rec.what)
   let xKept = !!cur.X
@@ -450,7 +469,7 @@ export async function recoverStale(deps: RecoveryDeps, req: RecoveryRequest): Pr
       const x = await treeOf(cur.X)
       const ws = await treeOf(cur.WS)
       const exact = !!x && !!ws && manifest.every((e) => (x.get(e.path)?.blob ?? null) === (e.kind === 'file' ? e.blob : null)) && [...x.keys()].every((p) => manifest.some((e) => e.path === p) || x.get(p)?.blob === ws.get(p)?.blob)
-      if (safe.ok && lines(safe.out).length === 1 && exact) {
+      if (safe.ok && lines(safe.out).length === 1 && exact && (await mine())) {
         const ab = await port.jj(folder, ['abandon', cur.X], { write: true })
         xKept = !ab.ok
       }

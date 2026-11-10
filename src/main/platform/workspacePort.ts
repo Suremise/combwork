@@ -131,7 +131,7 @@ export interface WorkspacePort {
    * A check or review copy put at exactly `revision` (HI-2789: copies.ts's reuse of a copy): tracked changes dropped and
    * what isn't ignored removed (dependencies stay); `failed` names the step the tool refused.
    */
-  resetTo(folder: string, revision: string): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
+  resetTo(folder: string, revision: string, o?: { identity?: WorkspaceIdentity | null; fence?: WorkspaceFence }): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
 
   // Removal (R2.5: the platform's own, never forced on a folder holding anyone's work; the callers' guards first).
   /**

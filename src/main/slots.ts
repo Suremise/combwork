@@ -1397,8 +1397,17 @@ export class SlotPool {
   private async dirtyOwned(s: Slot, token: string): Promise<Maybe<string[]>> {
     const port = this.portOf(s)
     if (!port.record) return port.dirty(s.folder)
-    const fence: WorkspaceFence = { still: () => this.store.fenced(s.name, token, () => true).catch(() => false) }
+    // A record is a write in the folder (HR1, HI-2795 round 1): only once nothing else writes there, proved right before
+    // it: the operation still holds the slot with no writer or job on it, no session in it, and no process in it.
+    if (!(await this.quietFor(s, token))) return { unknown: true, what: s.folder, detail: 'busy' } // i18n-ignore: a protocol detail, never shown
+    const fence: WorkspaceFence = { still: () => this.quietFor(s, token) }
     return port.record(s.folder, fence, s.identity ?? null)
+  }
+
+  /** Nothing but this operation (`token`) in a slot: no writer, no job, no session, no process (the rename probe). */
+  private async quietFor(s: Slot, token: string): Promise<boolean> {
+    const held = await this.store.fenced(s.name, token, (_db, now) => !now.writer && !now.job).catch(() => false)
+    return held && !this.deps.sessionIn?.(s.folder) && (await quiet(s.folder))
   }
 
   /** A slot's removal journal (HI-2795: a jj removal's phases, so an interrupted one resumes), board_meta by key. */
@@ -2028,14 +2037,25 @@ export class SlotPool {
           await this.port.prune(this.deps.project)
           made = true
         } else {
-          // Free since its last lease: what is in it now, not what was there then.
+          // Free since its last lease: what is in it now, not what was there then. A port that records (jj: a write in
+          // the folder, HR1's HI-2795 round 1) is asked only once nothing holds the slot; Git's read stays first, as before.
+          const held = async (): Promise<SlotRefusal | null> => {
+            const session = !!this.deps.sessionIn?.(slot.folder)
+            if (!session && (await quiet(slot.folder))) return null
+            await pass('ready', 'busy')
+            return session ? { why: 'busy', slot: name, held: 'session' } : await processHeld(name, slot.folder, this.deps.brokerIn)
+          }
+          const records = !!this.portOf(slot).record
+          if (records) {
+            const busy = await held()
+            if (busy) return busy
+          }
           const d = await this.dirtyOwned(slot, token)
           if (isUnknown(d) || d.length) return await pass('dirty', 'notClean')
           // Held (a session in it, or a process: a file or folder in it open): passed over, saying what holds it.
-          const session = !!this.deps.sessionIn?.(slot.folder)
-          if (session || !(await quiet(slot.folder))) {
-            await pass('ready', 'busy')
-            return session ? { why: 'busy', slot: name, held: 'session' } : await processHeld(name, slot.folder, this.deps.brokerIn)
+          if (!records) {
+            const busy = await held()
+            if (busy) return busy
           }
         }
       }
