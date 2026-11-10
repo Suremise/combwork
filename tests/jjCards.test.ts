@@ -324,6 +324,23 @@ describe.skipIf(!jjExe)(`jj cards in the runtime, through Review (jj ${TESTED_JJ
     })
   })
 
+  it.each([true, false] as const)("a project's first start, its slot made during the start (a jj operation moving the head): started, colocated %s (HI-2887)", async (colocated) => {
+    const w = await world(colocated)
+    const folder = join(w.root, 'slot-new')
+    let made = false
+    w.wf.cfg.slotFor = async () => {
+      // The app's lending makes the slot (and, the first time, the control) now: jj workspace adds, new operations.
+      if (!made) {
+        made = true
+        expect((await w.port.create(w.repo, folder, w.main())).ok).toBe(true)
+      }
+      return { slot: 'slot-new', folder, lease: 'L1', fresh: true }
+    }
+    const card = w.wf.createCard({ title: 'first start' })
+    moved(await w.wf.start(card.key, B1))
+    expect(w.wf.state(card).started).toMatchObject({ folder, slot: 'slot-new' })
+  })
+
   it('without the seam, a jj start is still refused start.platformReady', async () => {
     const w = await world(true)
     setJjCardsReadyForTests(false)
