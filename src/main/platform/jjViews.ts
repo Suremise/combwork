@@ -3,7 +3,9 @@
 // while the heads are still that one, and only by the pinned jj. With none or several heads nothing is read (unknown).
 // Off main: each is jj processes in jj's worker. Nothing here writes, snapshots or changes a bookmark.
 
-import { join } from 'path'
+import { join, resolve } from 'path'
+import { readFileSync, statSync } from 'original-fs'
+import { jjOf } from '../vcsDetect'
 import { PLATFORMS } from '../../shared/platform/descriptors'
 import { isJjViewUnknown, JJ_CONFLICTS_MAX, JJ_DIFF_MAX, JJ_HISTORY_MAX, jjRevisionInput, type JjBookmarkRow, type JjBookmarksView, type JjCompareView, type JjConflictsView, type JjHistoryView, type JjRepoView, type JjResolved, type JjRow, type JjView, type JjViewUnknown, type JjWorkspaceRow } from '../../shared/jjViews'
 import { jjContextOf, type JjContext } from './jjDetect'
@@ -55,8 +57,36 @@ const isRoot = (r: JjRow): boolean => /^0+$/.test(r.commit)
 
 const unknownOf = (u: { jjUnknown: string; detail?: string }): JjViewUnknown => ({ jjUnknown: u.jjUnknown as JjViewUnknown['jjUnknown'], ...(u.detail ? { detail: u.detail.slice(0, 2000) } : {}) })
 
-/** A project folder's jj context, confirmed by jj (J0's detection): or why not. */
+/**
+ * The operation heads of the jj repository holding `folder`, from its files alone (no process): its shared repository
+ * found as J0's detection finds it (`.jj/repo`, or the file a linked workspace has naming it). Null when there's no
+ * readable `.jj` here (detection then says why).
+ */
+export function headsHere(folder: string): string[] | null {
+  const at = jjOf(folder)
+  if (!at) return null
+  const repoAt = join(at.root, '.jj', 'repo')
+  let jjRepo = repoAt
+  try {
+    if (statSync(repoAt).isFile()) {
+      const pointer = readFileSync(repoAt, 'utf8').trim()
+      if (!pointer || /[\r\n\0]/.test(pointer) || pointer.length > 4096) return null
+      jjRepo = resolve(join(at.root, '.jj'), pointer)
+    }
+  } catch {
+    return null
+  }
+  return readOpHeads(jjRepo)
+}
+
+/**
+ * A project folder's jj context, confirmed by jj (J0's detection): or why not. Its heads are read from the files first:
+ * with none or several, nothing runs (J0's `jj root` isn't pinned, and on jj 0.47.1 an unpinned command merges diverged
+ * heads, a write: R5.3).
+ */
 async function contextOf(folder: string, runner: JjRunner): Promise<JjContext | JjViewUnknown> {
+  const heads = headsHere(folder)
+  if (heads && heads.length !== 1) return { jjUnknown: 'heads', detail: String(heads.length) }
   const d = await jjContextOf(folder, runner)
   if ('jj' in d) return d.jj
   if ('none' in d) return { jjUnknown: 'noRepo' }
@@ -202,6 +232,11 @@ export async function resolveAt(reads: JjReads, op: string, input: string): Prom
   if (!isJjUnknown(one)) return one.rows.length === 1 && !one.capped ? { commit: one.rows[0] } : one.rows.length === 0 ? { none: true } : { ambiguous: one.rows }
   const said = one.detail ?? ''
   if (/doesn't exist|didn't resolve|no such|not found/i.test(said)) return { none: true }
+  // A conflicted bookmark names every commit it points at.
+  if (/is conflicted/i.test(said) && /^[A-Za-z0-9._\-/]+$/.test(rev)) {
+    const sides = await rowsAt(reads, op, `bookmarks(exact:${JSON.stringify(rev)})`, 16)
+    return isJjUnknown(sides) ? { jjUnknown: 'ambiguous', detail: said } : { ambiguous: sides.rows }
+  }
   if (!/divergent|ambiguous/i.test(said)) return one
   // Every commit the id could mean: a change id's (divergent) or a prefix's, change and commit ids alike.
   const hex = /^[0-9a-f]+$/.test(rev)

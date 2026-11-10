@@ -42,10 +42,10 @@ import { CopyStore } from '../copies'
 import { boardConn } from '../slotsApp'
 import { jjContextOf } from '../platform/jjDetect'
 import { assessJj, REPO_GATES } from '../platform/jjCompat'
-import { BOOKMARK_TEMPLATE, gitBranches, parseBookmarkRows } from '../platform/jjViews'
+import { BOOKMARK_TEMPLATE, gitBranches, headsHere, parseBookmarkRows } from '../platform/jjViews'
 import { isJjUnknown, JjReads } from '../platform/jjReads'
 import { readOpHeads } from '../platform/jjView'
-import { jjRunner } from '../platform/jjRunner'
+import { jjRunner, type JjRunner } from '../platform/jjRunner'
 import { beginSwitch, type BeginMember, FENCE_KEY, fenceOrNull, mapStore, readFence, reconcile, settle, storeKey, type Fence, type Meta, type Snap } from '../platform/platformFence'
 import { metaOf, projectIdOf } from '../platform/fenceAdmit'
 
@@ -150,6 +150,9 @@ async function drainOf(ws: WorkspaceService, members: readonly Member[]): Promis
 
 /** jj itself confirms a colocated repository on exactly this store, with the tested jj (s11 §3c). */
 async function jjReady(path: string, store: string): Promise<SwitchRefusal | null> {
+  // Diverged operation heads: nothing asked of jj (an unpinned command would merge them, a write).
+  const heads = headsHere(path)
+  if (heads && heads.length !== 1) return { why: 'jjUnknown', code: 'heads' }
   const d = await jjContextOf(path)
   if ('none' in d) return { why: 'noJj' } // i18n-ignore: a code or SQL, never shown as text
   if ('unknown' in d) return d.unknown === 'tool' ? { why: 'jjTool', state: d.tool?.state ?? 'unknown' } : { why: 'jjUnknown', code: d.unknown } // i18n-ignore: a code or SQL, never shown as text
@@ -174,13 +177,15 @@ const UNSUPPORTED = PLATFORMS.jj.gates.filter((g) => !(REPO_GATES as readonly st
  * Back to Git (s11 §3): one operation head, no conflicted local bookmark, every local bookmark exported (its `@git` and
  * Git's branch both its commit), no conflicted commit among the bookmarks' history. Read pinned.
  */
-async function fallbackOf(path: string): Promise<FallbackProblem[]> {
-  const d = await jjContextOf(path)
+export async function fallbackOf(path: string, runner: JjRunner = jjRunner): Promise<FallbackProblem[]> {
+  const before = headsHere(path)
+  if (before && before.length !== 1) return [{ code: 'heads', n: before.length }]
+  const d = await jjContextOf(path, runner)
   if (!('jj' in d)) return [{ code: 'unknown', detail: 'unknown' in d ? d.unknown : 'noRepo' }] // i18n-ignore: a code or SQL, never shown as text
   const c = d.jj
   const heads = readOpHeads(c.jjRepo)
   if (!heads || heads.length !== 1) return [{ code: 'heads', n: heads?.length ?? 0 }]
-  const reads = new JjReads({ folder: c.root, jjRepo: c.jjRepo }, jjRunner)
+  const reads = new JjReads({ folder: c.root, jjRepo: c.jjRepo }, runner)
   const r = await reads.pinned(async (op) => {
     const out = await reads.run(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_TEMPLATE])
     if (isJjUnknown(out)) return out

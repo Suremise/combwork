@@ -94,11 +94,17 @@ async function bounded(p: string): Promise<string | null | 'unreadable'> {
   return readFile(p, 'utf8').catch(() => 'unreadable' as const)
 }
 
-/** Whether a folder holds any file (a hooks folder); null when it can't be listed (an absent folder holds none). */
-async function holdsFile(dir: string, skipSamples: boolean): Promise<boolean | null> {
+/** Git's hooks, by the names Git runs (githooks(5)): a file of another name in a hooks folder is never run. */
+const HOOKS = new Set(['applypatch-msg', 'pre-applypatch', 'post-applypatch', 'pre-commit', 'pre-merge-commit', 'prepare-commit-msg', 'commit-msg', 'post-commit', 'pre-rebase', 'post-checkout', 'post-merge', 'pre-push', 'pre-receive', 'update', 'proc-receive', 'post-receive', 'post-update', 'reference-transaction', 'push-to-checkout', 'pre-auto-gc', 'post-rewrite', 'sendemail-validate', 'fsmonitor-watchman', 'p4-changelist', 'p4-prepare-changelist', 'p4-post-changelist', 'p4-pre-submit', 'post-index-change'])
+
+/**
+ * The hooks a folder holds: each file named as a Git hook (with or without an extension Windows runs), never a sample
+ * (`*.sample`) or another file (jj's own `docs.url` beside them); null when it can't be listed (absent holds none).
+ */
+async function hooksIn(dir: string): Promise<string[] | null> {
   const ents = await readdir(dir, { withFileTypes: true }).catch((e: NodeJS.ErrnoException) => (e.code === 'ENOENT' || e.code === 'ENOTDIR' ? [] : null))
   if (!ents) return null
-  return ents.some((e) => !e.isDirectory() && !(skipSamples && e.name.endsWith('.sample')))
+  return ents.filter((e) => !e.isDirectory() && !e.name.endsWith('.sample') && HOOKS.has(e.name.toLowerCase().replace(/\.(exe|bat|cmd|ps1|sh)$/, ''))).map((e) => e.name)
 }
 
 /**
@@ -130,7 +136,8 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
   for (const v of ['GIT_ATTR_SYSTEM', 'GIT_ATTR_GLOBAL']) {
     const r = await deps.git(root, ['var', v])
     if (r.ok && r.out.trim()) sources.push(resolve(r.out.trim()))
-    else if (!r.ok && !/not a valid|unknown variable/i.test(r.err)) unknownAt(a, 'attributes', `git var ${v}: ${r.err}`) // i18n-ignore: what was found, shown as data beside its message
+    // No such source (GIT_ATTR_NOSYSTEM, no global file): git var exits 1 saying nothing. Anything it says is unknown.
+    else if (!r.ok && r.err.trim() && !/not a valid|unknown variable/i.test(r.err)) unknownAt(a, 'attributes', `git var ${v}: ${r.err}`) // i18n-ignore: what was found, shown as data beside its message
   }
   if (attributesFile) sources.push(isAbsolute(attributesFile) ? attributesFile : resolve(root, attributesFile))
   sources.push(join(store, 'info', 'attributes'))
@@ -167,9 +174,9 @@ export async function assessJj(root: string, store: string, deps: CompatDeps = D
   // Hooks: core.hooksPath (resolved as Git resolves it, from the working tree's top) holding any file, else the store's
   // hooks folder holding any file but the samples.
   const hooksDir = hooksPath ? (isAbsolute(hooksPath) ? hooksPath : resolve(root, hooksPath)) : join(store, 'hooks')
-  const held = await holdsFile(hooksDir, !hooksPath)
+  const held = await hooksIn(hooksDir)
   if (held === null) unknownAt(a, 'hooks', hooksDir)
-  else if (held) add(a, 'hooks', hooksPath ? `core.hooksPath ${hooksDir}` : hooksDir)
+  else for (const h of held.slice(0, 5)) add(a, 'hooks', join(hooksDir, h))
   // jj's own signing, at every level it reads.
   const jc = await deps.jj.run(root, ['config', 'list', 'signing.behavior'])
   if (!jc.ok && jc.code === -1) unknownAt(a, 'signing', `jj config list: ${jc.err}`) // i18n-ignore: what was found, shown as data beside its message
