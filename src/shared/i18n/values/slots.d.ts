@@ -10,5 +10,6 @@ interface CombworkMessageValues {
   'slots.release.otherCombwork': { slot: string | number; pid: string | number }
   'slots.setting.bad': undefined
   'slots.setting.badSize': { min: number; max: number }
+  'slots.setting.badSwitch': undefined
   'slots.setting.badText': { max: number }
 }

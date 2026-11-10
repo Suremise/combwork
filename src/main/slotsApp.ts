@@ -34,6 +34,7 @@ import { agentRunsGoing } from './workflow/service'
 import { openWorkspaces, workspaceFor, WorkspaceService } from './workspace'
 import { goneWriterCleared, goneWriterSettles, goneWriterStill, setRetiredHomes, setWriterHost, writerCleared, writerHeld, writerOver } from './agentFolders'
 import { BoundedLog, checkEnv, execCommand, FILE_IO, type Spawn } from './workflow/queueChecks'
+import type { WorkspaceFilesOutcome } from './platform/workspacePort'
 import { endLeaseJob, journalPath, LeaseJob, leaseJobGone, retireSeal, startLauncher, sweepSeals } from './workflow/queueJobs'
 import { defaultProbe } from './workflow/queueProcs'
 import { workflowFor } from './workflow/service'
@@ -180,8 +181,21 @@ export function appRunner(ws: WorkspaceService, projectPath: string, root: strin
     let end: SlotRunEnd = { ok: false, exitCode: null, spawnError: true, logPath: null, settled: false }
     try {
       const minutes = Math.max(1, Number(advanced.get(SLOTS_SETUP_MINUTES)) || 60)
-      const e = r.signal.aborted ? null : await execCommand({ spawn: jobSpawn(job), platform: process.platform, timeoutMs: minutes * 60_000, env: () => ({ ...checkEnv(childEnv()), ...r.env }) }, r.command, r.folder, out)
-      end = e ? { ok: !e.spawnError && !e.timedOut && e.exitCode === 0 && !r.signal.aborted, exitCode: e.exitCode, ...(e.timedOut ? { timedOut: true } : {}), ...(e.spawnError ? { spawnError: true } : {}), logPath: null, settled: false } : { ...end, error: sayStored(T.closed) }
+      if (r.files && !r.signal.aborted) {
+        // HI-1182: the submodules-and-LFS step, its tool in this job with no shell, within the same time limit.
+        const x = r.files.tool.exec({ spawn: jobSpawn(job), env: { ...checkEnv(childEnv()), ...r.env }, log: out, timeoutMs: minutes * 60_000, signal: r.signal })
+        let o: WorkspaceFilesOutcome
+        try {
+          o = await r.files.tool.prepare(x, r.files.step).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }))
+        } finally {
+          x.close()
+        }
+        if (!o.ok) out.write(Buffer.from(o.error + '\n'))
+        end = { ok: o.ok && !r.signal.aborted, exitCode: o.ok ? 0 : 1, ...(x.timedOut() ? { timedOut: true } : {}), ...(o.ok ? {} : { error: o.error }), logPath: null, settled: false }
+      }
+      const e = r.signal.aborted || r.files ? null : await execCommand({ spawn: jobSpawn(job), platform: process.platform, timeoutMs: minutes * 60_000, env: () => ({ ...checkEnv(childEnv()), ...r.env }) }, r.command, r.folder, out)
+      if (r.files && r.signal.aborted && !end.error && !end.ok) end = { ...end, error: sayStored(T.closed) }
+      else if (!r.files) end = e ? { ok: !e.spawnError && !e.timedOut && e.exitCode === 0 && !r.signal.aborted, exitCode: e.exitCode, ...(e.timedOut ? { timedOut: true } : {}), ...(e.spawnError ? { spawnError: true } : {}), logPath: null, settled: false } : { ...end, error: sayStored(T.closed) }
     } finally {
       r.signal.removeEventListener('abort', onClose)
       out.close()

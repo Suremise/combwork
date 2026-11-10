@@ -468,6 +468,12 @@ interface CombworkMessageValues {
   'workflow.slots.copyDesc': undefined
   'workflow.slots.desc': undefined
   'workflow.slots.fromSetup': undefined
+  'workflow.slots.gitFiles': undefined
+  'workflow.slots.gitFilesDesc': undefined
+  'workflow.slots.gitFilesLfs': { version: string | number }
+  'workflow.slots.gitFilesNoFilter': undefined
+  'workflow.slots.gitFilesNoLfs': undefined
+  'workflow.slots.gitFilesSubmodules': { n: number }
   'workflow.slots.heading': undefined
   'workflow.slots.held': { agent: string | number }
   'workflow.slots.inUse': undefined

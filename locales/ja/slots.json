@@ -8,5 +8,6 @@
   "slots.release.otherCombwork": "{slot}は、まだ実行中の別のCombwork（プロセス{pid}）が保持しています。そちらで解放するか、先にそのCombworkを終了してください。",
   "slots.setting.bad": "そのようなスロット設定はCombworkにありません。",
   "slots.setting.badSize": "レビュー用とチェック用のコピーの数は{min, number}から{max, number}までの整数で指定してください。",
+  "slots.setting.badSwitch": "「サブモジュールと LFS をセットアップ」はオンかオフで指定してください。",
   "slots.setting.badText": "スロットのスクリプトやファイルの一覧は、{max, number}文字以内のテキストで指定してください。"
 }

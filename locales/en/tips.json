@@ -2083,6 +2083,14 @@
     "defaultMessage": "Purge what Combwork keeps",
     "description": "A tip's title."
   },
+  "tips.submodulesLfs.text": {
+    "defaultMessage": "With submodules or Git LFS, Combwork checks out the submodules and fetches the LFS files in each slot and review copy before its setup script, never changing your repository’s settings. Slots and copies → Set up submodules and LFS turns it off.",
+    "description": "A tip (HI-1182). A slot: a folder Combwork lends to a card or a lane; a review copy: a folder at exactly the revision a reviewer reviews. Keep Git LFS. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."
+  },
+  "tips.submodulesLfs.title": {
+    "defaultMessage": "Submodules and Git LFS in slots",
+    "description": "A tip's title (HI-1182). A slot: a folder Combwork lends to a card or a lane. Keep Git LFS (a product's name)."
+  },
   "tips.taskbarBadge.text": {
     "defaultMessage": "Combwork's taskbar button shows how many agents need you, and flashes when one asks you something while Combwork is in the background.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them."

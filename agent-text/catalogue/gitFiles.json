@@ -1,0 +1,54 @@
+{
+  "gitFiles.error.badPath": {
+    "text": "submodule {name}'s path {path} isn't a folder inside this one",
+    "note": "A slot's or copy's setup error (HI-1182): .gitmodules gives a submodule a path that is empty, absolute or goes outside the folder. {name} is its name, {path} the path."
+  },
+  "gitFiles.error.doubtfulLeft": {
+    "text": "the folder of removed submodule {path} isn't plainly this copy's own clone (a link, or another repository), so it was left as it is: move it away",
+    "note": "A copy's setup error (HI-1182): a submodule its revision no longer has left a folder that Combwork can't be sure it cloned itself, so it removes nothing and the copy isn't handed over. {path} is the folder."
+  },
+  "gitFiles.error.foreign": {
+    "text": "submodule {name}: {path} holds files or a repository Combwork didn't set up. Move it away, or turn off Set up submodules and LFS",
+    "note": "A slot's or copy's setup error (HI-1182): a submodule's folder already holds something that isn't this folder's own submodule clone, so Combwork changes nothing. {name} is the submodule's name, {path} its folder. Set up submodules and LFS is a setting's name: keep it as Combwork shows it."
+  },
+  "gitFiles.error.lfs": {
+    "text": "git lfs pull: {error}",
+    "note": "A slot's or copy's setup error (HI-1182): `git lfs pull` failed. {error} is git-lfs's first line, else failed."
+  },
+  "gitFiles.error.nested": {
+    "text": "submodule {name}: git submodule update: {error}",
+    "note": "A slot's or copy's setup error (HI-1182): initialising the submodules inside submodule {name} failed. {error} is git's first line, else failed."
+  },
+  "gitFiles.error.noLfs": {
+    "text": "Git LFS is used, but git-lfs isn't installed",
+    "note": "A slot's or copy's setup error (HI-1182): the repository has files in Git LFS and git-lfs couldn't be run. Git LFS and git-lfs are names, as they are."
+  },
+  "gitFiles.error.noLfsFilter": {
+    "text": "Git LFS is used, but it isn't set up for this repository: run git lfs install",
+    "note": "A slot's or copy's setup error (HI-1182): git-lfs is installed but no LFS filter is configured (git lfs install was never run), so git lfs pull would leave pointer files. Git LFS and git lfs install are a name and a command, as they are."
+  },
+  "gitFiles.error.noUrl": {
+    "text": "submodule {name} has no URL in .gitmodules",
+    "note": "A slot's or copy's setup error (HI-1182): a submodule .gitmodules names has no url. {name} is its name."
+  },
+  "gitFiles.error.removeLeft": {
+    "text": "the folder of removed submodule {path} couldn't be removed: {error}",
+    "note": "A copy's setup error (HI-1182): a submodule the revision no longer has left its folder, and Combwork couldn't remove it. {path} is the folder, {error} git's first line or why."
+  },
+  "gitFiles.error.stopped": {
+    "text": "the setup of submodules and Git LFS was ended",
+    "note": "A slot's or copy's setup error (HI-1182): the run was ended (its time limit, or the workspace closing) before it finished."
+  },
+  "gitFiles.error.unread": {
+    "text": "Combwork couldn't tell whether submodules or Git LFS are used: {error}",
+    "note": "A slot's or copy's setup error (HI-1182): git's read of .gitmodules or the LFS attributes failed. {error} is git's first line."
+  },
+  "gitFiles.error.update": {
+    "text": "git submodule update: {error}",
+    "note": "A slot's or copy's setup error (HI-1182): `git submodule update` failed. {error} is git's first line, else failed."
+  },
+  "gitFiles.error.url": {
+    "text": "Combwork can't resolve submodule {name}'s URL {url}: set submodule.{name}.url",
+    "note": "A slot's or copy's setup error (HI-1182): a relative submodule URL Combwork can't resolve as git would. {name} is the submodule's name, {url} the URL; submodule.{name}.url is a git config key, as it is."
+  }
+}

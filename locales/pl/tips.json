@@ -498,6 +498,8 @@
   "tips.storageCleanup.title": "Zobacz, co przechowuje Combwork, i posprzątaj",
   "tips.storagePurge.text": "Wyczyść całkowicie… w Ustawieniach projektu → Miejsce na dysku albo Wyczyść całkowicie pliki Combwork… na sesji usuwa to, co Combwork przechowuje dla sesji: kopie, załączniki, pozostałości. Najpierw wymienia pliki; pliki agentów i sumy użycia zostają.",
   "tips.storagePurge.title": "Wyczyść całkowicie to, co przechowuje Combwork",
+  "tips.submodulesLfs.text": "Przy submodułach lub Git LFS Combwork pobiera submoduły i pliki LFS do każdego slotu i kopii do recenzji przed skryptem przygotowania, nie zmieniając ustawień repozytorium. Sloty i kopie → Przygotuj submoduły i LFS to wyłącza.",
+  "tips.submodulesLfs.title": "Submoduły i Git LFS w slotach",
   "tips.taskbarBadge.text": "Przycisk Combwork na pasku zadań pokazuje, ilu agentów Cię potrzebuje, i miga, gdy któryś o coś pyta, a Combwork jest w tle.",
   "tips.taskbarBadge.title": "Rzuć okiem na pasek zadań",
   "tips.teamPreset.text": "Zespół w Kontrola wersji → Przepływ pracy to Para z surowszymi sprawdzeniami: testy jednostkowe przechodzą przed recenzją i na scalonym wyniku, zależności są instalowane od zera przed każdym scaleniem, a karty z etykietą ui lub release czekają na Twoją zgodę.",

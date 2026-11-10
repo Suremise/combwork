@@ -498,6 +498,8 @@
   "tips.storageCleanup.title": "Voir ce que Combwork conserve, et faire le ménage",
   "tips.storagePurge.text": "Purger… dans Paramètres du projet → Stockage, ou Purger les fichiers de Combwork… sur une session, retire ce que Combwork conserve pour les sessions : sauvegardes, pièces jointes, restes. Il liste d’abord chaque fichier ; ceux des agents et tes totaux restent.",
   "tips.storagePurge.title": "Purger ce que Combwork conserve",
+  "tips.submodulesLfs.text": "Avec des sous-modules ou Git LFS, Combwork extrait les sous-modules et récupère les fichiers LFS dans chaque emplacement et copie de relecture avant son script de préparation, sans changer les réglages de ton dépôt. Emplacements et copies → Préparer les sous-modules et LFS le désactive.",
+  "tips.submodulesLfs.title": "Sous-modules et Git LFS dans les emplacements",
   "tips.taskbarBadge.text": "Le bouton de Combwork dans la barre des tâches montre combien d’agents ont besoin de toi, et clignote quand l’un d’eux te pose une question pendant que Combwork est en arrière-plan.",
   "tips.taskbarBadge.title": "Un coup d’œil à la barre des tâches",
   "tips.teamPreset.text": "Équipe, dans Gestion de versions → Flux de travail, c’est Binôme avec des vérifications plus strictes : les tests unitaires passent avant la relecture et sur le résultat fusionné, les dépendances sont installées de zéro avant chaque fusion, et les cartes étiquetées ui ou release attendent ton accord.",

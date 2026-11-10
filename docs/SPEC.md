@@ -3856,7 +3856,8 @@ back) works the same: cards in flight keep their platform's ruleset; a Git card 
     and ready**, read-only (`slots:list`: name, state, lent to whom for which card or lane, or a carried worktree),
     linking to Branches & remotes. With any G11: **Review and check copies** (`copies.size`; empty keeps OP-32's default,
     shown) with how many there are and are leased (`copies:list`), and **Reviewers review in review copies**
-    (#1435's switch, read-only here, with a link to Advanced).
+    (#1435's switch, read-only here, with a link to Advanced). Where the project folder uses submodules or Git LFS (or it
+    is off): **Set up submodules and LFS** (`slots.gitFiles`, HI-1182, §16.10.10), a switch, with what it uses.
   - **Project Settings:** no slot rows (HI-1765 removed its Slots and copies link): the setup command's catalog row stays,
     hidden, for `cw_update_setting`, and the copied files are `project.slotCopy`. Settings → Version Control's Combwork defaults (Git)
     and Workspace defaults set **Files copied into new slots** for the projects under them
@@ -6624,6 +6625,58 @@ checked every agent and process by hand.
   **After any restart** the team runs: nothing of a pause is kept.
 - **Not here:** pausing the user's own sessions (they stop with the install as before), or a pause of one project.
 
+#### 16.10.10 Submodules and Git LFS [HI-1182]
+
+Slots, review and check copies and the merge queue's folder are linked worktrees (§16.10.1): git makes them with empty
+submodule folders, and Combwork's checkouts there leave LFS files as pointers. In a Git repository that uses either,
+Combwork sets them up itself (`src/main/platform/gitModules.ts`; the design agreed on the card, HI-1182/s7–s16). jj
+refuses such repositories (§16.3, HI-2799's gates), so the step is the Git workspace port's (`filesNeeded`) alone.
+
+- **The setting:** Version Control → Slots and copies' **Set up submodules and LFS** (project.json `slots.gitFiles`:
+  `false` turns it off; left out, it is on). Shown where the project folder uses submodules or LFS, or where it is off,
+  with what it uses (`slots:gitFiles`: its submodules, LFS and git-lfs's version, or that git-lfs is missing or not set
+  up). Slots, copies and the queue read it as it is when they run.
+- **Detected per folder at its revision**, read before any run starts (one `git ls-files` for a tracked `.gitmodules`
+  and any file under `filter=lfs`, nested `.gitattributes` counted): a folder that uses neither runs nothing. A read
+  that fails is a preparation failure, never "unused".
+- **When:** before the setup script and before every ready, being idempotent: a slot as it is made and at every
+  preparation for a card (after its switch, or on the line it is on: a step that failed or was ended, or the setting
+  turned on since, is done then); a copy after every make or reset; the queue's folder before its install and checks
+  each time (a run of "Combwork (merge queue)"). A failure leaves the slot or copy not ready with why and the run's log,
+  as a setup failure does; in the queue it is a red check. While the setting is on, Combwork's own checkouts of these
+  folders run with `GIT_LFS_SKIP_SMUDGE=1` (that process only), so every LFS download happens in the step: a slot's
+  make and switch, a copy's make and reset, and every git the queue runs in its own folder (its add and checkouts, the
+  test merge, squash or rebase, strict's update, their aborts and resets), never one in the project's folder.
+- **The run:** one of Combwork's runs (the slot's, the copy's credited to its reviewer, the queue's), its gits with no
+  shell in the run's job, within the setup's time limit, ended with it, with no prompt (`GIT_TERMINAL_PROMPT=0`,
+  `GCM_INTERACTIVE=never`, `SSH_ASKPASS_REQUIRE=never`) and logged.
+- **Submodules, with no config written:** never `git submodule sync`, a top-level `--init` (both write the shared
+  `.git/config`, so the project folder's) or `foreach`. Before anything changes, each first-level submodule's folder must
+  be missing, empty or this worktree's own clone (its `.git` file naming `<worktree git dir>/modules/<name>`, whose
+  `core.worktree` is that folder, by real paths, no link on the way, and that clone itself strictly inside the
+  worktree's `modules` folder with no link from there down to it); anything else stops the step, naming it, and
+  nothing is touched. Then one `git submodule update` (`--force` in a copy or the queue's folder, which hold nobody's
+  work) whose `submodule.active=.` and each URL the repository config doesn't set (from `.gitmodules`, a relative one
+  resolved as `git submodule init` would, else a clear failure) come only from git's command-line config in the
+  environment, before whatever the run's environment carries, so the user's still win; a URL override, `active = false`
+  and `update = none` are git's to honour. A linked worktree clones its submodules into its own git dir, so each folder
+  clones each once. Nested ones: `git submodule update --init --recursive` inside each first-level clone checked again to
+  be this worktree's own, with `GIT_CEILING_DIRECTORIES` at the superproject: their config writes stay in those
+  private clones.
+- **Removed submodules:** a copy removes the folder of one its revision no longer has only when its own private clone
+  claims it (core.worktree a literal path strictly inside the copy, no link, its `.git` naming that clone back, no
+  gitlink there now), by `git clean -ffdx` of that path with literal pathspecs; its clone stays. Read from the copy's
+  git dir, so a reset cut short is finished by the next. A leftover that isn't plainly that clone (a link on the way,
+  another repository) is removed by nothing and fails the preparation, naming it, so the copy is never handed over
+  with it; a copy whose setup failed goes as any does. A slot leaves such a folder, which shows as uncommitted.
+- **Uncommitted work in a submodule** is uncommitted (submit.clean, a slot's preparation), named by its path, as git's
+  status reports it (a user's `ignore` setting honoured).
+- **LFS** is the superproject's: `git lfs pull`, its objects in the common dir, so downloaded once per repository. A
+  submodule's LFS files are smudged as the user's own git-lfs filter config says. git-lfs missing, or no LFS filter set
+  up (`git lfs install`, without which `git lfs pull` leaves pointers), fails the preparation, saying so; where the
+  user's config requires the filter, git's own checkout fails first, setting or not.
+- **Not here:** showing a moved gitlink as "submodule X: abc → def" in diffs (HI-2864).
+
 ### 16.11 Lanes, with or without the Assistant
 
 #### 16.11.1 Combwork owns the lane's card list
@@ -7981,7 +8034,7 @@ test only, in place of #1112 B's patch-id), OP-38, OP-40 and OP-41. The text of 
 | Push the target after Combwork merges (an option) | **Built [#1179]:** G18 (§16.6.1, §16.9.1's push after the merge) |
 | Update a branch from its target (merge or rebase) as a user action in the Version Control tab | **Built [HI-1180]** (rc.4): Branches & remotes' Update from <target> (§8) |
 | Conflict help on a returned card (the conflicting files and hunks from the test merge) | **Built [HI-1181]** (rc.4): the Work section's hunks and the wake's places (§16.9.1, Combwork's commits) |
-| Submodules and Git LFS in slots and review copies | On Hold, git-support: #1182 |
+| Submodules and Git LFS in slots and review copies | **Built [HI-1182]:** set up as a run of Combwork's in slots, review and check copies and the queue's folder, before the setup and every ready (§16.10.10); Version Control → Slots and copies' **Set up submodules and LFS** |
 | Remote targets: fetch before testing, push after (Team with a shared remote) | **Built [HI-1183]:** G21 (§16.6.2, §16.9.4) |
 | Rebase and fast-forward as a merge style | **Built [#1184]:** G6's third value (§16.9.1 step 4, linear landing) |
 | Signed queue commits without a prompt | On Hold, git-support: #1185 |

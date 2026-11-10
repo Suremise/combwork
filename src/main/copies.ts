@@ -33,7 +33,7 @@ import { basename, join, resolve } from 'path'
 import { placeMatcher, samePlace } from './fsutil'
 import { agentMsg, inDefaultDialect, say, sayWithId, type AgentMsg, type AgentValues, type Said } from '../shared/agentText'
 import { createLogger, userText } from './logger'
-import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRunner, type SlotRunEnd } from './slots'
+import { deletingIn, folderThere, IDLE_MS, lockHash, OpLost, quiet, releaseDeleteIn, type Holder, type OpHolder, type SlotConn, type SlotOptionsNow, type SlotRun, type SlotRunner, type SlotRunEnd } from './slots'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { isUnknown } from './platform/types'
 import type { WorkspaceFence, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort } from './platform/workspacePort'
@@ -679,6 +679,8 @@ export class CopyPool {
         return { why: 'noCopy', size: 0 }
       }
       const opts = await this.deps.options()
+      // HI-1182: with the setting on, Combwork's checkouts here leave LFS files for the step below.
+      const filesOn = opts.gitFiles !== false && !!this.port.files
       let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder))
       const listed = made ? true : await this.listed(copy.folder)
       // Git can't list the worktrees (HI-2810): passed over as it was, its lease dropped, looked at again next time.
@@ -713,7 +715,7 @@ export class CopyPool {
         // made again, never reset or updated.
         // Owned (HR1, round 1): reset only as the copy recorded (its identity) by this operation (its fence); a replacement
         // or a lost operation is refused untouched, and dispose refuses a replacement too (its generation).
-        const at = await port.resetTo(copy.folder, lease.revision, { identity: copy.identity ?? null, fence: this.fenceOf(name, token) })
+        const at = await port.resetTo(copy.folder, lease.revision, { identity: copy.identity ?? null, fence: this.fenceOf(name, token), skipSmudge: filesOn })
         if (!at.ok) {
           if (!(await this.dispose(copy, token))) return await fail(sayStored(T.checkout, { error: port.errorLine(at.err) || 'failed' }))
           made = true
@@ -722,7 +724,7 @@ export class CopyPool {
       if (made) {
         await mkdir(this.deps.dir, { recursive: true })
         await port.prune(this.deps.project)
-        const r = await port.create(this.deps.project, copy.folder, lease.revision)
+        const r = await port.create(this.deps.project, copy.folder, lease.revision, { skipSmudge: filesOn })
         if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: port.errorLine(r.err) || 'failed' }))
         if (port.identity) {
           const id = await port.identity(copy.folder)
@@ -732,8 +734,20 @@ export class CopyPool {
         if (opts.copy.trim()) await port.copyIgnored(this.deps.project, copy.folder, opts.copy).catch((e) => log.warn(`Could not copy files into ${userText(name)}`, e))
       } else if (!port.identity) {
         // The exact revision, and nothing else: tracked changes dropped, what isn't ignored removed (dependencies stay).
-        const at = await port.resetTo(copy.folder, lease.revision)
+        const at = await port.resetTo(copy.folder, lease.revision, { skipSmudge: filesOn })
         if (!at.ok) return await fail(sayStored(at.failed === 'checkout' ? T.checkout : T.clean, { error: port.errorLine(at.err) || 'failed' }))
+      }
+      // HI-1182: its submodules and LFS files at exactly this revision, after every make or reset and before its setup (a
+      // removed submodule's folder this copy cloned goes too); a folder that uses neither runs nothing.
+      if (filesOn) {
+        const files = port.files!
+        const need = await files.needed(copy.folder, true)
+        if (typeof need === 'object') return await fail(need.error)
+        if (need) {
+          const end = await this.run(name, token, { slot: name, of: 'copy', holder: lease.agent, what: 'gitFiles', command: files.title, folder: copy.folder, env: {}, files: { step: { folder: copy.folder, project: this.deps.project, disposable: true }, tool: files } })
+          if (!end.settled) return await fail(sayStored(T.setupNotEnded), end.logPath)
+          if (!end.ok) return await fail(end.error ?? (end.timedOut ? sayStored(T.setupTimedOut) : sayStored(T.setupExit, { code: String(end.exitCode) })), end.logPath)
+        }
       }
       const hash = await lockHash(copy.folder)
       const needed = made || (hash !== null && hash !== copy.installHash)
@@ -773,7 +787,7 @@ export class CopyPool {
   }
 
   /** A command of an operation's, in a job recorded on the copy first and cleared once settled (as slots' runs). */
-  private async run(name: string, token: string, r: { slot: string; of: 'copy'; holder: string | null; what: 'setup' | 'install'; command: string; folder: string; env: Record<string, string> }): Promise<SlotRunEnd> {
+  private async run(name: string, token: string, r: { slot: string; of: 'copy'; holder: string | null; what: 'setup' | 'install' | 'gitFiles'; command: string; folder: string; env: Record<string, string>; files?: SlotRun['files'] }): Promise<SlotRunEnd> {
     const job = newJob()
     await this.store.fenced(name, token, (db) => db.prepare('UPDATE copies SET job = ? WHERE project = ? AND name = ?').run(job, this.store.project, name))
     const end = await this.deps.runner({ ...r, job, signal: this.life.signal })

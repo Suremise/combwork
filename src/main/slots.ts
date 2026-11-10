@@ -51,7 +51,7 @@ import { withFolderRepoLocks } from './platform/repoPorts'
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import { isUnknown, type Maybe } from './platform/types'
-import type { WorkspaceFence, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
+import type { WorkspaceFence, WorkspaceFiles, WorkspaceFilesStep, WorkspaceIdentity, WorkspaceJournal, WorkspacePlatform, WorkspacePort, WorkspaceStep } from './platform/workspacePort'
 import { slotWorkspaces, workspacePortOf } from './platform/workspacePorts'
 import { isPlatformId } from '../shared/platform/descriptors'
 import { agentMsg, inDefaultDialect, say, type AgentMsg, type AgentValues } from '../shared/agentText'
@@ -320,7 +320,8 @@ export function slotOptionsOf(cfg: Pick<ProjectConfig, 'slots' | 'worktreeSetup'
   return {
     setup: cfg.slots?.setup ?? cfg.worktreeSetup ?? '',
     archive: cfg.slots?.archive ?? '',
-    copy: slotCopyOf(cfg, levels).value
+    copy: slotCopyOf(cfg, levels).value,
+    gitFiles: cfg.slots?.gitFiles !== false
   }
 }
 
@@ -1113,8 +1114,11 @@ export interface SlotRun {
   of?: 'copy'
   /** A copy's: the agent (its id) whose lease holds it as the run starts, which the run is credited to (HI-1710). */
   holder?: string | null
-  what: 'setup' | 'install' | 'archive'
+  what: 'setup' | 'install' | 'archive' | 'gitFiles'
+  /** The command line (a `gitFiles` run's: its title, the git commands it may run). */
   command: string
+  /** HI-1182: the submodules-and-LFS step (the platform's, its tool run with no shell in the run's job) instead of `command`. */
+  files?: { step: WorkspaceFilesStep; tool: Pick<WorkspaceFiles, 'prepare' | 'exec'> }
   folder: string
   env: Record<string, string>
   /** Its job's name on the process supervisor, recorded on the slot before the run starts. */
@@ -1143,6 +1147,8 @@ export interface SlotOptionsNow {
   setup: string
   archive: string
   copy: string
+  /** HI-1182: false turns off setting up submodules and Git LFS in slots and copies where used (Version Control → Slots and copies; left out: on). */
+  gitFiles?: boolean
 }
 
 /**
@@ -2080,7 +2086,7 @@ export class SlotPool {
       if (made) {
         const at = target ? await this.port.lineHead(this.deps.project, target) : await this.port.head(this.deps.project)
         if (isUnknown(at) || !at) return await fail(sayStored(T.gitRead, { what: target ?? 'HEAD' }))
-        const r = await this.port.create(this.deps.project, slot.folder, at)
+        const r = await this.port.create(this.deps.project, slot.folder, at, { skipSmudge: this.gitFilesOn(opts) })
         if (!r.ok) return await fail(sayStored(T.worktreeAdd, { error: this.port.errorLine(r.err) || 'failed' }))
         // Its identity where the platform records one (HI-2795: jj's store, name, creation generation), in a fenced write.
         if (this.port.identity) {
@@ -2090,6 +2096,9 @@ export class SlotPool {
         }
         log.info(`Made slot ${userText(name)} at ${at.slice(0, 7)} in ${userText(slot.folder)}`)
         if (opts.copy.trim()) await this.port.copyIgnored(this.deps.project, slot.folder, opts.copy).catch((e) => log.warn(`Could not copy files into slot ${userText(name)}`, e))
+        // HI-1182: its submodules and LFS files, before its setup (a slot reused is set up again as its card is prepared).
+        const files = await this.gitFiles(name, token, slot, opts)
+        if (files) return await fail(files.error, files.logPath)
       }
       const hash = await lockHash(slot.folder)
       // An existing slot is installed again only when asked (#1438: with G15 off nothing is installed for a card).
@@ -2110,6 +2119,28 @@ export class SlotPool {
       // Anything else: the slot left not ready, never half made and lent.
       return fail(e instanceof Error ? e.message : String(e)).catch(() => ({ why: 'warming' as const, slot: name }))
     }
+  }
+
+  /** HI-1182: whether Combwork's checkouts of this pool's folders leave LFS files for the step (the setting on, a platform that has it). */
+  private gitFilesOn(opts: SlotOptionsNow): boolean {
+    return opts.gitFiles !== false && !!this.port.files
+  }
+
+  /**
+   * HI-1182: a slot's submodules and LFS files set up (platform/gitFiles.ts), as a run of the slot's, when the setting is
+   * on and the folder uses either at its revision (read first: a folder that uses neither runs nothing). Idempotent, so
+   * run before every ready: why it failed (an unreadable use too, never taken for "unused"), or null.
+   */
+  private async gitFiles(name: string, token: string, slot: Slot, opts: SlotOptionsNow, known = false): Promise<{ error: string; logPath: string | null } | null> {
+    if (!this.gitFilesOn(opts)) return null
+    const files = this.port.files!
+    const need = known || (await files.needed(slot.folder, false))
+    if (typeof need === 'object') return { error: need.error, logPath: null }
+    if (!need) return null
+    const end = await this.run(name, token, { slot: name, what: 'gitFiles', command: files.title, folder: slot.folder, env: slotEnv(slot), files: { step: { folder: slot.folder, project: this.deps.project, disposable: false }, tool: files } })
+    if (!end.settled) return { error: sayStored(T.setupNotEnded), logPath: end.logPath }
+    if (!end.ok) return { error: end.error ?? (end.timedOut ? sayStored(T.setupTimedOut) : end.spawnError ? sayStored(T.setupNoStart, { command: files.title }) : sayStored(T.setupExit, { code: String(end.exitCode) })), logPath: end.logPath }
+    return null
   }
 
   /** A slot's setup or install run (the project's setup, else `npm ci` for a package lock): why it failed, or null. */
@@ -2164,7 +2195,17 @@ export class SlotPool {
           return { error: sayStored(T.gitRead, { what: p.line }) }
         }
         const hash = p.install ? await lockHash(slot.folder) : null
-        if (there && !(p.install && hash !== null && hash !== slot.installHash)) {
+        // HI-1182: its submodules and LFS set up before every ready while the setting is on (a step that failed or was
+        // ended before, the setting turned on since, a line already there all get it), read where the folder is now.
+        const opts = await this.deps.options()
+        const filesOn = this.gitFilesOn(opts)
+        const filesNeed = async (): Promise<boolean | { error: string }> => (filesOn ? this.port.files!.needed(slot.folder, false) : false)
+        let files = there ? await filesNeed() : false
+        if (typeof files === 'object') {
+          await end()
+          return { error: files.error }
+        }
+        if (there && !files && !(p.install && hash !== null && hash !== slot.installHash)) {
           await end()
           return { ok: true, revision: await this.headOf(slot.folder) }
         }
@@ -2180,7 +2221,7 @@ export class SlotPool {
           const sw = async (): Promise<{ notYet: string } | WorkspaceStep> => {
             const notYet = await last()
             if (notYet) return { notYet }
-            return this.port.prepare(slot.folder, p.line, had ? null : p.base)
+            return this.port.prepare(slot.folder, p.line, had ? null : p.base, { skipSmudge: filesOn })
           }
           const r = await (p.around ? p.around(sw) : sw())
           if ('notYet' in r) {
@@ -2192,6 +2233,24 @@ export class SlotPool {
             return { error: sayStored(T.switchFailed, { error: r.err.trim().split(/\r?\n/)[0] || 'failed' }) }
           }
           log.info(`Slot ${userText(name)} is on ${userText(p.line)} for lease ${leaseId}`)
+          files = await filesNeed()
+          if (typeof files === 'object') {
+            await end()
+            return { error: files.error }
+          }
+        }
+        if (files) {
+          // It changes the slot's files too: the same last word first.
+          const notYet = await last()
+          if (notYet) {
+            await end()
+            return { retry: notYet }
+          }
+          const failed = await this.gitFiles(name, token, slot, opts, true)
+          if (failed) {
+            await end({ warmLog: failed.logPath })
+            return { error: failed.error, ...(failed.logPath ? { logPath: failed.logPath } : {}) }
+          }
         }
         const now = p.install ? await lockHash(slot.folder) : null
         if (p.install && now !== null && now !== slot.installHash) {
@@ -2201,7 +2260,7 @@ export class SlotPool {
             await end()
             return { retry: notYet }
           }
-          const failed = await this.install(name, token, slot, 'install', (await this.deps.options()).setup, now)
+          const failed = await this.install(name, token, slot, 'install', opts.setup, now)
           if (failed) {
             await end({ warmLog: failed.logPath })
             return { error: failed.error, logPath: failed.logPath }
