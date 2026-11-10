@@ -11,7 +11,15 @@
  * time: a later delivery takes it only once the response carrying it has failed. A response that finished was written in
  * full, which isn't proof Claude Code read it: recovering context across a dropped connection is best effort. Hooks
  * without an identity are never matched here: each delivery is handled.
+ *
+ * Only a copy is a twin (HI-2850): the identity and the body, field for field. Claude Code sends each handler of one event
+ * the same input (a SessionStart command forwards it byte for byte), while two distinct events can share an id: a
+ * message queued while a turn runs (another session's, the user's typed ahead) is submitted into that turn with its
+ * prompt_id, its own text in the body. And an identity a later event shows to be over ends (endOccurrences): Claude Code
+ * runs every handler of an event before it goes on, so a prompt's copies have all come by the time its turn runs a tool,
+ * and the same text queued again later in that turn is a prompt of its own.
  */
+import { createHash } from 'crypto'
 
 /** How many identities a run keeps (the oldest go first: a duplicate of one older than that is handled again). */
 export const TWINS_PER_RUN = 4096
@@ -154,12 +162,33 @@ const runs = new Map<string, Map<string, TwinEntry>>()
 /** Runs whose hooks were seen arriving twice (told once each). */
 const doubled = new Set<string>()
 
+/** A body as JSON with its keys in order at every level: two copies of one input give the same text however they were written. */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`
+  if (v && typeof v === 'object') {
+    const o = v as Record<string, unknown>
+    return `{${Object.keys(o)
+      .sort()
+      .filter((k) => o[k] !== undefined)
+      .map((k) => `${JSON.stringify(k)}:${canonical(o[k])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(v) ?? 'null'
+}
+
+/** What a delivery is a copy of: its occurrence's identity and a digest of its whole body (HI-2850). */
+export function copyKey(key: string, body: unknown): string {
+  return `${key}#${createHash('sha256').update(canonical(body)).digest('base64url')}`
+}
+
 /**
- * A delivery of the occurrence `key` (null: it has no identity) of the run `run`: decided at arrival, before anything
- * is awaited, so of two deliveries arriving together one is always the first. `onDoubled` the first time a run has one.
+ * A delivery of the occurrence `key` (null: it has no identity) of the run `run`, with its body: a twin only of an
+ * earlier delivery of the same identity and the same body (HI-2850). Decided at arrival, before anything is awaited, so
+ * of two deliveries arriving together one is always the first. `onDoubled` the first time a run has one.
  */
-export function claimTwin(run: string, key: string | null, onDoubled?: () => void): TwinClaim | null {
-  if (!key) return null
+export function claimTwin(run: string, occurrence: string | null, body: unknown, onDoubled?: () => void): TwinClaim | null {
+  if (!occurrence) return null
+  const key = copyKey(occurrence, body)
   let seen = runs.get(run)
   if (!seen) runs.set(run, (seen = new Map()))
   const had = seen.get(key)
@@ -174,6 +203,16 @@ export function claimTwin(run: string, key: string | null, onDoubled?: () => voi
   seen.set(key, entry)
   if (seen.size > TWINS_PER_RUN) seen.delete(seen.keys().next().value!)
   return { first: true, entry }
+}
+
+/**
+ * The run's identities starting with `prefix` are over (HI-2850: a later event shows every copy of them has come): a
+ * delivery of one after this is an occurrence of its own, handled. Deliveries already waiting on one carry on.
+ */
+export function endOccurrences(run: string, prefix: string | null): void {
+  const seen = prefix ? runs.get(run) : undefined
+  if (!seen) return
+  for (const k of [...seen.keys()]) if (k.startsWith(prefix!)) seen.delete(k)
 }
 
 /** Whether the run's hooks have arrived twice. */

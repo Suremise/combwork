@@ -9,7 +9,10 @@
 // 3. the snippet without allowManagedHooksOnly: Combwork's own handlers and the snippet's are identical, so the CLI runs
 //    each once, and nothing arrives twice;
 // 4. a hook timeout changed after the snippet was pasted: the handlers differ, the CLI runs both, and Combwork handles
-//    each tool call and prompt once and says the hooks arrive twice.
+//    each tool call and prompt once and says the hooks arrive twice;
+// 5. no managed settings (HI-2850): a busy turn (messages taken in mid-turn under its prompt_id, the same text twice, a
+//    foreground sub-agent's tool calls, a card watch) has every event handled and nothing said to arrive twice;
+// 6. a snippet posting to another URL: every hook really arrives twice; the same busy turn has each event handled once.
 // Dev build, throwaway profile, workspace and CLI home. Nothing signs in or spends tokens.
 const lib = require('./lib.cjs')
 const { _electron } = require('playwright-core')
@@ -76,6 +79,19 @@ const until = lib.until
       await inv('session:stop', alpha, agent.id)
       await until(async () => !(await live()), HUNG_MS)
       fs.rmSync(fakeLog, { force: true })
+    }
+    /**
+     * A busy turn (HI-2850), as HB3's on 10 Nov: two messages taken in mid-turn (each a UserPromptSubmit under the turn's
+     * prompt_id, its own text), the same text taken twice at two tool boundaries, a foreground sub-agent's two tool calls,
+     * and a card watch, to its end. Each is an event of its own, so each is handled: five prompts, seven tool calls
+     * (four Bash, the Agent call, its sub-agent's two Reads), one SubagentStop.
+     */
+    const card = (await inv('tasks:create', { title: 'Watched while busy', project: 'alpha', agent: agent.id, column: 'doing' })).number
+    const busyTurn = async (label) => {
+      check(`${label}: a busy turn goes to work`, (await say(`queued 2 then queuedsame 2 then subtools 2 then cw cw_wait_for_tasks ${JSON.stringify({ cards: [card], column: 'done', wake: true, limitMinutes: 60 })}`)) > 0)
+      check(`${label}: it ends watching the card`, !!(await until(async () => (await live())?.status === 'watching' && (await fired()).includes('Stop'), HUNG_MS)), JSON.stringify((await live())?.status))
+      const f = await fired()
+      check(`${label}: every prompt (the turn's, two queued, the same text twice), tool call and SubagentStop handled once`, count(f, 'UserPromptSubmit') === 5 && count(f, 'PreToolUse') === 7 && count(f, 'PostToolUse') === 7 && count(f, 'SubagentStop') === 1, JSON.stringify(f))
     }
     /** A prompt with an edit of x.txt and its status line's model, to its end: every event Combwork takes, once each. */
     const turn = async (model) => {
@@ -145,6 +161,24 @@ const until = lib.until
     check('4: Combwork says its hooks arrive twice', !!(await until(async () => (await live())?.hooksDoubled, HUNG_MS)))
     check('4: the banner says so and offers the admin snippet', !!(await until(async () => /twice/.test((await page.locator('.banner.hooks-doubled').innerText().catch(() => '')) ?? ''), HUNG_MS)))
     await page.locator('.banner.hooks-doubled').screenshot({ path: path.join(lib.WORK, 'claudemanaged-doubled.png') })
+    await stop()
+    await inv('advanced:set', 'claude-code.hooks.timeoutSeconds', 5)
+
+    // ---- 5. No managed settings at all (Darren's PC, HI-2850): a busy turn is never taken for hooks arriving twice.
+    fs.rmSync(path.join(managedDir, 'managed-settings.json'), { force: true })
+    check('5: the agent starts', (await start()) && !!(await until(async () => (await live())?.status === 'ready', HUNG_MS)))
+    await busyTurn('5')
+    check("5: the fake ran Combwork's handlers alone", fakeRows().length === 0)
+    check('5: not doubled', !(await live())?.hooksDoubled)
+    await stop()
+
+    // ---- 6. A snippet whose HTTP hooks post to another URL (?copy=1, the same route): the CLI runs both handlers of every
+    // event, so each hook really arrives twice. Each copy is answered from the first; each distinct event still handled.
+    writeManaged(JSON.parse(JSON.stringify(snippet).replaceAll(`http://127.0.0.1:${PORT}/hook`, `http://127.0.0.1:${PORT}/hook?copy=1`)))
+    check('6: the agent starts', (await start()) && !!(await until(async () => (await live())?.status === 'ready', HUNG_MS)))
+    await busyTurn('6')
+    check('6: the fake ran two HTTP handlers for each prompt and tool call', fakeRows().filter((r) => r.event === 'UserPromptSubmit' || r.event === 'PreToolUse').every((r) => r.handlers === 2) && fakeRows().some((r) => r.event === 'PreToolUse'), JSON.stringify(fakeRows().slice(0, 6)))
+    check('6: Combwork says its hooks arrive twice', !!(await until(async () => (await live())?.hooksDoubled, HUNG_MS)))
     await stop()
   } catch (e) {
     check('the suite ran to its end', false, e?.stack ?? String(e))

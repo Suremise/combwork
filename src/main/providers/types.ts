@@ -709,10 +709,15 @@ export interface ProviderAdapter {
   hookCause?(ctx: LaunchContext): Promise<HookCause | null>
   /**
    * A hook's occurrence identity (HI-2777), where the CLI gives one: its own id for one tool call or one prompt, so a
-   * delivery of it that arrives twice (two differing handlers run) is handled once. Null for a hook without one, which
-   * is never matched. Absent: no hook is.
+   * delivery of it that arrives twice (two differing handlers run) is handled once; only a copy, its body the same, is
+   * matched (HI-2850). Null for a hook without one, which is never matched. Absent: no hook is.
    */
   hookOccurrence?(body: Record<string, any>): string | null
+  /**
+   * The identities this hook shows to be over (HI-2850), as a prefix of hookOccurrence's: the CLI has run every handler
+   * of them before sending it, so a later delivery of the same identity is an occurrence of its own. Null: none.
+   */
+  hookOccurrencesEnded?(body: Record<string, any>): string | null
   /**
    * The launch's hooks for its Hooks dialog (HI-982), once its command is built: Combwork's own as passed for it, and the CLI's
    * others as far as this provider can establish them. Read-only, never changing a hook or a CLI's config. Absent: the

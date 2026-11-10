@@ -3,60 +3,63 @@
 // one delivered response at a time, never another occurrence's reply; the rest handled each time.
 import http from 'http'
 import { describe, expect, it } from 'vitest'
-import { TWINS_PER_RUN, carrying, claimTwin, decisionOnly, endTwins, hasContext, hooksDoubled } from '../src/main/hookTwins'
+import { TWINS_PER_RUN, carrying, claimTwin, decisionOnly, endOccurrences, endTwins, hasContext, hooksDoubled } from '../src/main/hookTwins'
+import { claudeCode } from '../src/main/providers/claude/adapter'
 
 const deny = { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'x.txt is locked by Bo' } }
 const notice = { hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: 'You have a message' } }
 let n = 0
 const run = (): string => `run${++n}`
+/** A delivery of the identity `key` whose body is the same each time (a copy). */
+const claim = (r: string, key: string, onDoubled?: () => void) => claimTwin(r, key, { key }, onDoubled)
 
 describe('duplicate hook deliveries (HI-2777)', () => {
   it('a hook with no identity is never matched', () => {
-    expect(claimTwin(run(), null)).toBeNull()
+    expect(claimTwin(run(), null, {})).toBeNull()
   })
 
   it('the first delivery is handled, a second of the same identity gets its decision, a different identity is its own', async () => {
     const r = run()
     let told = 0
-    const a = claimTwin(r, 'PreToolUse:t1', () => told++)!
+    const a = claim(r,'PreToolUse:t1', () => told++)!
     expect(a.first).toBe(true)
-    const other = claimTwin(r, 'PreToolUse:t2', () => told++)!
+    const other = claim(r,'PreToolUse:t2', () => told++)!
     expect(other.first).toBe(true)
-    const twin = claimTwin(r, 'PreToolUse:t1', () => told++)!
+    const twin = claim(r,'PreToolUse:t1', () => told++)!
     expect(twin.first).toBe(false)
     expect(told).toBe(1)
     expect(hooksDoubled(r)).toBe(true)
     a.entry.computed(deny)
     expect(await twin.entry.twinReply(1000)).toEqual({ reply: deny, carries: false })
     // A third delivery: the same decision again, still never handled.
-    expect((await claimTwin(r, 'PreToolUse:t1')!.entry.twinReply(1000)).reply).toEqual(deny)
+    expect((await claim(r,'PreToolUse:t1')!.entry.twinReply(1000)).reply).toEqual(deny)
     endTwins(r)
     expect(hooksDoubled(r)).toBe(false)
   })
 
   it('launch A then managed B, with B\'s launch copy missing: B is handled (an identity never seen is a first)', () => {
     const r = run()
-    expect(claimTwin(r, 'PreToolUse:A')!.first).toBe(true)
-    expect(claimTwin(r, 'PreToolUse:B')!.first).toBe(true)
+    expect(claim(r,'PreToolUse:A')!.first).toBe(true)
+    expect(claim(r,'PreToolUse:B')!.first).toBe(true)
     expect(hooksDoubled(r)).toBe(false)
     endTwins(r)
   })
 
   it('interleaved and reordered: managed A, launch B, launch A, managed B: each handled once', () => {
     const r = run()
-    const firsts = ['A', 'B', 'A', 'B'].map((k) => claimTwin(r, `PostToolUse:${k}`)!.first)
+    const firsts = ['A', 'B', 'A', 'B'].map((k) => claim(r,`PostToolUse:${k}`)!.first)
     expect(firsts).toEqual([true, true, false, false])
     endTwins(r)
   })
 
   it('a twin arriving while the first is computed waits for it; the first never computed (the run ended) gives none', async () => {
     const r = run()
-    const a = claimTwin(r, 'PreToolUse:w')!
-    const waiting = claimTwin(r, 'PreToolUse:w')!.entry.twinReply(5000)
+    const a = claim(r,'PreToolUse:w')!
+    const waiting = claim(r,'PreToolUse:w')!.entry.twinReply(5000)
     setTimeout(() => a.entry.computed(deny), 20)
     expect((await waiting).reply).toEqual(deny)
-    const b = claimTwin(r, 'PreToolUse:x')!
-    const stuck = claimTwin(r, 'PreToolUse:x')!.entry.twinReply(5000)
+    const b = claim(r,'PreToolUse:x')!
+    const stuck = claim(r,'PreToolUse:x')!.entry.twinReply(5000)
     endTwins(r)
     expect(await stuck).toEqual({ reply: null, carries: false })
     expect(b.first).toBe(true)
@@ -64,29 +67,29 @@ describe('duplicate hook deliveries (HI-2777)', () => {
 
   it('waits at most its bound for a first reply never computed', async () => {
     const r = run()
-    claimTwin(r, 'PreToolUse:slow')
+    claim(r,'PreToolUse:slow')
     const started = Date.now()
-    expect(await claimTwin(r, 'PreToolUse:slow')!.entry.twinReply(50)).toEqual({ reply: null, carries: false })
+    expect(await claim(r,'PreToolUse:slow')!.entry.twinReply(50)).toEqual({ reply: null, carries: false })
     expect(Date.now() - started).toBeLessThan(2000)
     endTwins(r)
   })
 
   it('context: a delivered first keeps it from its twins, who get the decision only', async () => {
     const r = run()
-    const a = claimTwin(r, 'PostToolUse:c')!
+    const a = claim(r,'PostToolUse:c')!
     a.entry.computed(notice)
     a.entry.sending()
-    const twin = claimTwin(r, 'PostToolUse:c')!.entry.twinReply(5000)
+    const twin = claim(r,'PostToolUse:c')!.entry.twinReply(5000)
     a.entry.sent(true)
     expect(await twin).toEqual({ reply: null, carries: false })
   })
 
   it("context: an aborted first hands it to one twin at a time; three twins can't all take it", async () => {
     const r = run()
-    const a = claimTwin(r, 'PostToolUse:d')!
+    const a = claim(r,'PostToolUse:d')!
     a.entry.computed(notice)
     a.entry.sending()
-    const twins = [1, 2, 3].map(() => claimTwin(r, 'PostToolUse:d')!.entry.twinReply(5000))
+    const twins = [1, 2, 3].map(() => claim(r,'PostToolUse:d')!.entry.twinReply(5000))
     a.entry.sent(false)
     const got = await Promise.all(twins)
     expect(got.filter((g) => g.carries)).toHaveLength(1)
@@ -96,12 +99,12 @@ describe('duplicate hook deliveries (HI-2777)', () => {
 
   it('an aborted first response with a lock deny: the twin, the only reply received, carries the deny and its reason', async () => {
     const r = run()
-    const a = claimTwin(r, 'PreToolUse:lock')!
+    const a = claim(r,'PreToolUse:lock')!
     const warnDeny = { ...deny, hookSpecificOutput: { ...deny.hookSpecificOutput, additionalContext: 'Bo holds it' } }
     a.entry.computed(warnDeny)
     a.entry.sending()
     a.entry.sent(false)
-    const twin = await claimTwin(r, 'PreToolUse:lock')!.entry.twinReply(5000)
+    const twin = await claim(r,'PreToolUse:lock')!.entry.twinReply(5000)
     expect(twin.carries).toBe(true)
     expect(twin.reply).toEqual(warnDeny)
     endTwins(r)
@@ -109,18 +112,18 @@ describe('duplicate hook deliveries (HI-2777)', () => {
 
   it('a context still being sent when the bound runs out counts as sent: never given twice', async () => {
     const r = run()
-    const a = claimTwin(r, 'PostToolUse:e')!
+    const a = claim(r,'PostToolUse:e')!
     a.entry.computed(notice)
     a.entry.sending()
-    expect(await claimTwin(r, 'PostToolUse:e')!.entry.twinReply(30)).toEqual({ reply: null, carries: false })
+    expect(await claim(r,'PostToolUse:e')!.entry.twinReply(30)).toEqual({ reply: null, carries: false })
     endTwins(r)
   })
 
   it("keeps a run's newest identities, the oldest going first (a double then, never a drop)", () => {
     const r = run()
-    for (let i = 0; i <= TWINS_PER_RUN; i++) claimTwin(r, `PreToolUse:${i}`)
-    expect(claimTwin(r, 'PreToolUse:0')!.first).toBe(true)
-    expect(claimTwin(r, `PreToolUse:${TWINS_PER_RUN}`)!.first).toBe(false)
+    for (let i = 0; i <= TWINS_PER_RUN; i++) claim(r,`PreToolUse:${i}`)
+    expect(claim(r,'PreToolUse:0')!.first).toBe(true)
+    expect(claim(r,`PreToolUse:${TWINS_PER_RUN}`)!.first).toBe(false)
     endTwins(r)
   })
 
@@ -130,6 +133,91 @@ describe('duplicate hook deliveries (HI-2777)', () => {
     expect(decisionOnly(notice)).toBeNull()
     expect(hasContext(notice)).toBe(true)
     expect(hasContext(deny)).toBe(false)
+  })
+})
+
+/** A delivery as the hook route takes it (servers.ts): the identities it ends first, then its claim. */
+function deliver(r: string, body: Record<string, any>) {
+  endOccurrences(r, claudeCode.hookOccurrencesEnded(body))
+  return claimTwin(r, claudeCode.hookOccurrence(body), body)
+}
+
+describe('only a copy is a twin (HI-2850)', () => {
+  // The fields Claude Code sends (tests/fixtures/advanced/prompt-task-notification-claude-2.1.317.json).
+  const base = { session_id: 'a803e062-9d8d-4265-9f0c-f773a6aadf6d', transcript_path: 'C:\\home\\projects\\D--work\\a803e062-9d8d-4265-9f0c-f773a6aadf6d.jsonl', cwd: 'D:\\work', permission_mode: 'bypassPermissions' }
+  const turn = '16fb8131-909c-4601-8896-8dcdc5d83e19'
+  const prompt = (text: string, pid = turn) => ({ ...base, hook_event_name: 'UserPromptSubmit', prompt_id: pid, prompt: text })
+  const tool = (ev: 'PreToolUse' | 'PostToolUse', id: string, extra: Record<string, unknown> = {}) => ({ ...base, hook_event_name: ev, prompt_id: turn, tool_name: 'Bash', tool_input: { command: 'jj log' }, tool_use_id: id, ...extra })
+  const queued = '<cross-session-message from="uds:\\\\.\\pipe\\LOCAL\\cc-msg-e605" from-name="hive · HB2">\nHB2 here: my plan for the shared types, unless you object.\n</cross-session-message>'
+
+  it("the recorded case (HB3, 10 Nov 01:49:35): a message queued mid-turn is submitted under the turn's prompt_id; it is handled, nothing doubled", () => {
+    const r = run()
+    expect(deliver(r, prompt('[CW] New in your inbox: 1 task (HI-2797) (m38350).'))!.first).toBe(true)
+    expect(deliver(r, tool('PreToolUse', 'toolu_01Pcb5g3E3EJTReWRnxeHLiP'))!.first).toBe(true)
+    expect(deliver(r, tool('PostToolUse', 'toolu_01Pcb5g3E3EJTReWRnxeHLiP'))!.first).toBe(true)
+    // The queued message, attached at the tool boundary: the same prompt_id, its own text.
+    expect(deliver(r, prompt(queued))!.first).toBe(true)
+    expect(hooksDoubled(r)).toBe(false)
+    endTwins(r)
+  })
+
+  it('a real copy (the body the same) is still a twin: of a prompt, a queued prompt and a tool call', () => {
+    const r = run()
+    const a = deliver(r, prompt('go'))!
+    expect(deliver(r, prompt('go'))!.first).toBe(false)
+    expect(hooksDoubled(r)).toBe(true)
+    expect(a.first).toBe(true)
+    // Its keys in another order (another writer's JSON): the same copy.
+    const pre = tool('PreToolUse', 'toolu_x')
+    expect(deliver(r, pre)!.first).toBe(true)
+    expect(deliver(r, Object.fromEntries(Object.entries(pre).reverse()))!.first).toBe(false)
+    expect(deliver(r, prompt(queued))!.first).toBe(true)
+    expect(deliver(r, prompt(queued))!.first).toBe(false)
+    endTwins(r)
+  })
+
+  it('one identity, a body that differs: two occurrences, each handled (never a drop)', () => {
+    const r = run()
+    expect(deliver(r, tool('PreToolUse', 'toolu_y'))!.first).toBe(true)
+    expect(deliver(r, tool('PreToolUse', 'toolu_y', { tool_input: { command: 'other' } }))!.first).toBe(true)
+    expect(deliver(r, prompt('one'))!.first).toBe(true)
+    expect(deliver(r, prompt('two'))!.first).toBe(true)
+    expect(hooksDoubled(r)).toBe(false)
+    endTwins(r)
+  })
+
+  it('the same text queued again later in the turn, after a tool call, is a prompt of its own; its copy is still a twin', () => {
+    const r = run()
+    expect(deliver(r, prompt('continue'))!.first).toBe(true)
+    expect(deliver(r, tool('PreToolUse', 'toolu_a'))!.first).toBe(true)
+    expect(deliver(r, tool('PostToolUse', 'toolu_a'))!.first).toBe(true)
+    expect(deliver(r, prompt('continue'))!.first).toBe(true)
+    expect(deliver(r, prompt('continue'))!.first).toBe(false)
+    endTwins(r)
+  })
+
+  it("a sub-agent's tool calls (agent_id, beside the main turn) end no prompt and are never taken for each other", () => {
+    const r = run()
+    expect(deliver(r, prompt('review it'))!.first).toBe(true)
+    const sub = { agent_id: 'a136948b260e2cd4d', agent_type: 'general-purpose' }
+    expect(claudeCode.hookOccurrencesEnded(tool('PreToolUse', 'toolu_s1', sub))).toBeNull()
+    expect(deliver(r, tool('PreToolUse', 'toolu_s1', sub))!.first).toBe(true)
+    expect(deliver(r, tool('PreToolUse', 'toolu_s2', sub))!.first).toBe(true)
+    expect(deliver(r, tool('PostToolUse', 'toolu_s1', sub))!.first).toBe(true)
+    // The prompt's copy, arriving while the sub-agent works: still its twin.
+    expect(deliver(r, prompt('review it'))!.first).toBe(false)
+    endTwins(r)
+  })
+
+  it('hooks with no identity (Stop, Notification, SubagentStop) are never matched, however alike', () => {
+    const r = run()
+    for (const ev of ['Stop', 'Notification', 'SubagentStop']) {
+      const body = { ...base, hook_event_name: ev, prompt_id: turn }
+      expect(deliver(r, body)).toBeNull()
+      expect(deliver(r, body)).toBeNull()
+    }
+    expect(hooksDoubled(r)).toBe(false)
+    endTwins(r)
   })
 })
 
@@ -160,13 +248,13 @@ describe('a response that closed before it could carry context (review round 1)'
     try {
       expect(res.closed || res.destroyed).toBe(true)
       const r = run()
-      const a = claimTwin(r, 'PostToolUse:closed')!
+      const a = claim(r,'PostToolUse:closed')!
       const withDeny = { ...notice, decision: 'block', reason: 'held' }
       a.entry.computed(withDeny)
       a.entry.sending()
       // Its close event has passed: carrying hears it at once, rather than never.
       carrying(res, a.entry)
-      const twin = await claimTwin(r, 'PostToolUse:closed')!.entry.twinReply(5000)
+      const twin = await claim(r,'PostToolUse:closed')!.entry.twinReply(5000)
       expect(twin).toEqual({ reply: withDeny, carries: true })
       endTwins(r)
     } finally {
@@ -178,15 +266,15 @@ describe('a response that closed before it could carry context (review round 1)'
     const { res, done } = await abandonedResponse()
     try {
       const r = run()
-      const a = claimTwin(r, 'PostToolUse:twin')!
+      const a = claim(r,'PostToolUse:twin')!
       a.entry.computed(notice)
       a.entry.sending()
       a.entry.sent(false)
-      const first = await claimTwin(r, 'PostToolUse:twin')!.entry.twinReply(5000)
+      const first = await claim(r,'PostToolUse:twin')!.entry.twinReply(5000)
       expect(first.carries).toBe(true)
       // The twin's own response was gone while it waited: it can't carry it.
       carrying(res, a.entry)
-      const next = await claimTwin(r, 'PostToolUse:twin')!.entry.twinReply(5000)
+      const next = await claim(r,'PostToolUse:twin')!.entry.twinReply(5000)
       expect(next).toEqual({ reply: notice, carries: true })
       endTwins(r)
     } finally {

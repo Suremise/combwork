@@ -6096,6 +6096,12 @@ class SessionManager {
     return l?.adapter.hookOccurrence?.(body) ?? null
   }
 
+  /** The identities a hook shows to be over (HI-2850: hookTwins.endOccurrences), as a prefix; null when none. */
+  hookOccurrencesEnded(runId: string, body: Record<string, any>): string | null {
+    const l = this.findLaunch(runId, body.session_id)?.[1]
+    return l?.adapter.hookOccurrencesEnded?.(body) ?? null
+  }
+
   /**
    * A launch's hooks arrive twice (HI-2777): its CLI ran Combwork's handler and a differing one of the admin snippet's
    * (a timeout changed since it was pasted, an older snippet). Each occurrence with an identity is handled once; the
