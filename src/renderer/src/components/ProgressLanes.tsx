@@ -24,7 +24,7 @@ import { cx } from '../util'
 import { useAdvancedValue } from '../advanced'
 import { cardStalled } from './Board'
 import { usePanelFold } from './ProgressMerge'
-import { Icon, IconButton, Tooltip, useContextMenu } from './ui'
+import { Icon, IconButton, SearchInput, Tooltip, useContextMenu } from './ui'
 import { durationText } from '@shared/tasks'
 import { LaneCostTip, useLaneCost } from './CardCost'
 import { TeamPauseBand, TeamPauseButton } from './TeamPause'
@@ -1098,13 +1098,13 @@ function CardPicker({ lane: l, all, taken, onPick, onClose }: { lane: Lane; all:
   }
   return (
     <div className="progress-lane-picker" data-picker="">
-      <input
-        className="input small"
+      <SearchInput
+        className="small"
         autoFocus
         value={q}
         placeholder={tr(EDIT.search)}
         aria-label={tr(EDIT.search)}
-        onChange={(e) => setQ(e.target.value)}
+        onChange={setQ}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {
             e.preventDefault()
@@ -1115,7 +1115,7 @@ function CardPicker({ lane: l, all, taken, onPick, onClose }: { lane: Lane; all:
             pick(found[0].number)
           } else if (e.key === 'ArrowDown') {
             e.preventDefault()
-            e.currentTarget.parentElement?.querySelector<HTMLElement>('.progress-lane-picker-card')?.focus()
+            e.currentTarget.closest('.progress-lane-picker')?.querySelector<HTMLElement>('.progress-lane-picker-card')?.focus()
           }
         }}
       />

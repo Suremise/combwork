@@ -13005,7 +13005,7 @@ button.progress-run-show:focus-visible {
   align-items: center;
   gap: 4px;
 }
-.progress-lane-picker > .input {
+.progress-lane-picker > .search-box {
   flex: 1 1 160px;
   min-width: 0;
 }
