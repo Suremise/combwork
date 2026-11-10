@@ -129,7 +129,7 @@ async function makeViews(ws: WorkspaceService, projectPath: string, target: stri
   const also = scope ? [...scope.inFlight.keys(), ...(scope.current ? [scope.current] : []), ...targets] : []
   const views = (target ? [target] : queueTargets(wf, also)).map((t) => queueView(ws, wf, projectPath, t, scope))
   // HI-2885: from the sources allowed (the default branch too), so a project with one target still brings it up to date with main.
-  const sources = targets.length ? await forwardSources(projectPath, targets) : []
+  const sources = targets.length ? await forwardSources(ws, projectPath, targets) : []
   if (sources.length > 1) for (const v of views) if (targets.includes(v.target)) v.forward = await forwardOfTarget(projectPath, v.target, sources)
   return views
 }
@@ -472,7 +472,7 @@ export async function forwardMerge(ws: WorkspaceService, projectPath: string, fr
   if (!t || !wf || wf.currentRuleset(false).options.finish !== 'combworkMerges') throw new ForwardRefused(FORWARD_TEXT.noGit, { kind: 'invalid' })
   const all = [t.default, ...t.others]
   // HI-2885: from one of them or the repository's default branch (main, after a release), into one of them.
-  const sources = await forwardSources(projectPath, all)
+  const sources = await forwardSources(ws, projectPath, all)
   if (from === to || !sources.includes(from) || !all.includes(to)) throw new ForwardRefused(withValues(FORWARD_TEXT.notTargets, { from, to, sources: fmt.list(sources), targets: fmt.list(all) }), { kind: 'invalid' })
   // Git's answers first, outside the board's lock: the heads, whether there is anything to bring in, the base.
   const [source, dest] = [await lineHistory().lineHead(projectPath, from), await lineHistory().lineHead(projectPath, to)]

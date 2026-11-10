@@ -58,8 +58,9 @@ export async function branchExists(projectPath: string, branch: string): Promise
  * repository's default branch (`main`) whether or not it is one of them, once a release has gone to it. Only a default
  * branch git names and that exists now: one git can't read adds nothing.
  */
-export async function forwardSources(projectPath: string, targets: readonly string[]): Promise<string[]> {
-  const d = await lineHistory().defaultTarget(projectPath).catch(() => null)
+export async function forwardSources(ws: WorkspaceService, projectPath: string, targets: readonly string[]): Promise<string[]> {
+  const H = historyOf(projectPlatform(projectPath, (await ws.projectConfig(projectPath)).platform).id)
+  const d = H ? await H.defaultTarget(projectPath).catch(() => null) : null
   const main = d && !isUnknown(d) && (await branchExists(projectPath, d)) === true ? d : null
   return [...new Set([...targets, ...(main ? [main] : [])])]
 }
