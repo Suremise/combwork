@@ -40,6 +40,41 @@ export interface ChangeAt {
   key?: string | null
 }
 
+/** Which rule of the own-work proof failed (HI-2753's (a) to (d); retargetCard.ts says what each one is). */
+export type OwnWorkRule = 'firstParent' | 'otherRef' | 'reflog' | 'anchor'
+
+/** Why a line's work isn't provably its own: a rule that failed, or why it couldn't be read (its detail English, as the tool's). */
+export interface OwnWorkRefusal {
+  why: 'cantCheck' | 'notInTarget'
+  rule?: OwnWorkRule
+  detail?: string
+}
+
+/** What the proof is asked about: a line's head against a target (full ids), the points it was started from, its own refs. */
+export interface OwnWorkAsk {
+  line: string
+  head: string
+  target: string
+  anchors: readonly string[]
+  /** Whether a ref is the card's own (its lines, its pins, its queue refs, a stash). */
+  own: (ref: string) => boolean
+  /** The card's own working folder: its checkout isn't another's. */
+  folder: string
+  /** Rule (c) too: the line's own record of how it moved (a reviewed revision behind its head needs only the others). */
+  reflog: boolean
+}
+
+/**
+ * A platform's proof that what a line would bring into another target is its own work (HI-2821, HI-2753's move of a card
+ * in flight). Optional on the history port: a platform without one doesn't offer the move (§16.3.6's rule 6).
+ */
+export interface OwnWorkProof {
+  /** Null when every revision `head` would bring into `target` is provably the line's own; else the rule that failed. */
+  prove(repo: string, p: OwnWorkAsk): Promise<OwnWorkRefusal | null>
+  /** Whether `revision`'s change against `target` is the one against `base` (the same revisions brought), or why it can't say. */
+  sameCommits(repo: string, revision: string, base: string, target: string): Promise<boolean | { what: string }>
+}
+
 /**
  * A platform's history and content reads (port 3). `repo`/`folder`: the working folder asked in (a line is the store's,
  * so any of its workspaces answers it). Revisions are immutable full ids (§16.3.6's rule 4).
@@ -116,6 +151,8 @@ export interface HistoryPort {
   queueCheckFiles(folder: string): Promise<{ files: string[] | null; gitDir: string | null }>
   /** The raw change between two revisions, path by path with full content ids (focusedRun's parse), or null unreadable. */
   rawDiff(folder: string, from: string, to: string): Promise<string | null>
+  /** The own-work proof a card's move to another target needs (HI-2821); absent: the move isn't offered. */
+  ownWork?: OwnWorkProof
 }
 
 /** What the watcher tells its subscribers (platform-neutral: a line is a Git branch). */

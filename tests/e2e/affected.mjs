@@ -183,7 +183,7 @@ export const AREAS = [
   // git.ts's processes, started off main's thread (HI-1783): git.ts's suites.
   { paths: ['src/main/gitWorker.ts'], suites: ['gitdirect', 'unmerged', 'agents', 'changes', 'paneheader', 'claude-real', 'wsmove', 'wtrecreate', 'removeall', 'gitmissing', 'unusedwt', 'changespicker', 'gitview'] },
   // Git missing or too old (#346): Provider Setup's Git row, the status bar and every git-dependent screen.
-  { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts'], suites: ['gitdirect', 'gitmissing', 'providers'] },
+  { paths: ['src/main/gitTool.ts', 'src/shared/gitTool.ts', 'src/shared/gitLayout.ts'], suites: ['gitdirect', 'gitmissing', 'providers'] },
   // The Git view (#607): the Git tab's sections and the status bar's item.
   { paths: ['src/main/gitRepo.ts', 'src/shared/gitRepo.ts', 'src/shared/branchCleanup.ts', 'src/renderer/src/views/GitTab.tsx', 'src/renderer/src/views/GitBranches.tsx', 'src/renderer/src/gitReads.ts', 'src/main/platform/repoReads.ts', 'src/main/platform/gitRepoReads.ts', 'src/main/platform/repoReadsPorts.ts', 'src/main/platform/repoOps.ts', 'src/main/platform/gitRepoOps.ts', 'src/main/platform/repoOpsPorts.ts', 'src/main/repoOpsIpc.ts', 'src/shared/repoOpChannels.ts', 'src/renderer/src/repoOps.ts', 'src/renderer/src/repoOffers.ts'], suites: ['gitbranchcards', 'gitcleanup', 'gitupdate', 'gitview', 'gitremotes', 'changes', 'changespicker', 'gitmissing', 'unusedwt', 'inbox', 'gitinit', 'versioncontrol', 'mergedialogslots'] },
   // HI-2807: New branch… from a ref, a missing target's offer, Start the next version (gitview drives all three).
@@ -193,11 +193,13 @@ export const AREAS = [
   { paths: ['src/renderer/src/components/Tabs.tsx', 'src/shared/tabs.ts'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'agentslots', 'gitbranchcards', 'lanesslots', 'lanestages', 'mergedialogslots', 'slotrelease', 'unusedslots', 'p6lane', 'workflowdefaults', 'workflowoptions', 'advanced', 'keys', 'cardattach', 'image', 'i18nshots'] },
   // Where a Version Control or workflow default came from (HI-1837).
   { paths: ['src/renderer/src/components/OriginText.tsx'], suites: ['versioncontrol', 'workflowdefaults', 'workflowoptions'] },
-  { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions'] },
+  { paths: ['src/renderer/src/views/VersionControl.tsx', 'src/renderer/src/views/VersionControlHeader.tsx'], suites: ['versioncontrol', 'vcswitch', 'gitview', 'gitinit', 'changes', 'queuecard', 'workflowoptions', 'jjview'] },
+  // jj in the Version Control tab and the switch (HI-2799).
+  { paths: ['src/renderer/src/views/JjSections.tsx', 'src/renderer/src/views/StoreSwitchDetails.tsx', 'src/shared/jjViews.ts', 'src/shared/platform/gateTexts.ts', 'src/main/platform/jjViews.ts', 'src/main/platform/jjCompat.ts', 'src/main/platform/jjPlatform.ts', 'src/main/platform/platformFence.ts', 'src/main/platform/fenceAdmit.ts', 'src/main/workflow/storeSwitch.ts'], suites: ['jjview', 'vcswitch'] },
   // "How do you work?" (#1423): the step, its notice, the answer and the adoption on a board made by 1.0.
   { paths: ['src/renderer/src/components/PresetStep.tsx', 'src/shared/workflow/presetStep.ts', 'src/main/workflow/presetStep.ts', 'src/main/workflow/adoption.ts'], suites: ['presetstep', 'vcswitch', 'workflowoptions'] },
   // Switching the version control (#1419): the switch, detection's offers, the shared rules.
-  { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions'] },
+  { paths: ['src/main/workflow/platformSwitch.ts', 'src/main/platform/registry.ts', 'src/shared/platform/switching.ts', 'src/shared/workflow/projectWorkflow.ts'], suites: ['vcswitch', 'versioncontrol', 'workflowoptions', 'jjview'] },
   { paths: ['src/main/gitInit.ts', 'src/shared/gitInit.ts', 'src/renderer/src/components/InitRepo.tsx'], suites: ['gitinit', 'gitview'] },
   { paths: ['src/main/freshPath.ts', 'src/main/externalTerminal.ts'], suites: ['freshpath', 'gitmissing', 'providers'] },
   // The providers' version checks' GET (#1582): the test copies turn the checks off, so these drive its callers only.
@@ -311,12 +313,12 @@ export const AREAS = [
   // Maximum agents (HI-2001): the option, its migration, its refusals and the Load dialog's offer.
   { paths: ['tests/e2e/maxagents.cjs', 'src/shared/agentLimits.ts', 'src/renderer/src/components/ManyAgentsNote.tsx', 'src/main/workflow/preferences.ts', 'src/shared/workflow/preferences.ts'], suites: ['maxagents', 'agents24'] },
   { paths: ['src/main/repoLock.ts', 'src/main/repoLockCore.ts', 'src/main/repoLockWorker.ts', 'tests/e2e/repolock.cjs'], suites: ['repolock', 'repolocktyping', 'gitview', 'mergeslot'] },
-  { paths: ['src/main/workflow/queueHost.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/mergeMessage.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/main/repoLock.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeue.cjs'], suites: ['mergequeue', 'queueagents', 'queueupgrade'] },
+  { paths: ['src/main/workflow/queueHost.ts', 'src/main/workflow/mergeQueue.ts', 'src/main/workflow/mergeMessage.ts', 'src/main/workflow/queueRunner.ts', 'src/main/workflow/queueJobs.ts', 'src/main/workflow/queueChecks.ts', 'src/main/workflow/queueChecksApp.ts', 'src/main/repoLock.ts', 'src/main/queueTransportStore.ts', 'tests/e2e/queueFixture.cjs', 'tests/e2e/mergequeue.cjs'], suites: ['mergequeue', 'queueagents', 'queueupgrade'] },
   // HI-2790 (R7), HI-2791 (R8): the queue's candidate, advance, recovery, push and clean-up, moved behind the integration
   // port (its contract, lookup and Git's implementation, Git's commit stream reading, and `again`): a change there is a
   // change to the queue's test merge, strict's update, the journaled advance, a restart's recovery, the push and the lease's
   // workspace removal.
-  { paths: ['src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/again.ts'], suites: ['mergequeue', 'mergequeuecrash', 'mergequeuefolder', 'queueagents', 'queuecontrols', 'queuelease', 'queueupgrade'] },
+  { paths: ['src/main/platform/integration.ts', 'src/main/platform/integrationPorts.ts', 'src/main/platform/gitIntegration.ts', 'src/main/platform/gitCommits.ts', 'src/main/platform/gitTransport.ts', 'src/main/workflow/transportSnapshots.ts', 'src/main/platform/again.ts'], suites: ['mergequeue', 'mergequeuecrash', 'mergequeuefolder', 'queueagents', 'queuecontrols', 'queuelease', 'queueupgrade'] },
   // Agents under Combwork merges (#1354): the refusals, the wakes and the card's queue state.
   { paths: ['src/main/workflow/queueState.ts', 'src/shared/workflow/refusals.ts', 'src/main/mergeSlots.ts', 'tests/e2e/queueagents.cjs'], suites: ['queueagents'] },
   // Each card's focused tests (G20, HI-1367): chosen at submit, run by the merge queue; this repository's picker and runner.

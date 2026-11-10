@@ -19,7 +19,7 @@ import { branchChange, changeGroups, noteAgent, noteChange, recordedHere, record
 import { undoChanges, UndoNotFound } from './assistantUndo'
 import { cardAgent, knownAgent } from './activityTargets'
 import { routePattern } from './routePattern'
-import { fallbackEfforts, infoAt, modelGroups } from '../shared/models'
+import { fallbackEfforts, infoAt, listedConnections, offeredModels } from '../shared/models'
 import { agentRuntime, hooksMissingText, retryWaitText, unknownStateText } from '../shared/runtime'
 import { ASSISTANT_AGENT_ID, ASSISTANT_DIR, ASSISTANT_NAME } from '../shared/assistant'
 import { timeLeft } from '../shared/progress'
@@ -119,7 +119,7 @@ import { cardFacts, cardKind, cardReviewSkip, cardTarget, factRow, forYouOfCards
 import type { ForYouItem } from '../shared/workflow/workView'
 import { bracketFinished, bracketFor, bracketResolved, bracketStarted, cardRunRevision, takeResolved, type Bracket, type Recorded } from './workflow/runChecks'
 import { workflowSummary } from './workflow/optionsForm'
-import { detect, platformIdOf } from './platform/registry'
+import { detect, initialOf, platformIdOf } from './platform/registry'
 import { hasCapability, revisionShort, type PlatformId, type ProjectPlatform } from '../shared/platform/descriptors'
 import { ASK_ACTIONS, ASK_ACTIONS_MAX, CATEGORY_STAGE, LOOP_STEPS, type AskAction, type ForYouKind } from '../shared/workflow/facts'
 import { lastCardRead, newDecisions, noteCardRead, noticeText } from './decisionNotices'
@@ -713,7 +713,7 @@ const withoutWorkflow = ({ workflow: _w, ...rest }: ProjectConfig): Omit<Project
 /** A project's version control for agents, lean: in force, found, and the offer when they differ. */
 function versionControlOf(p: ProjectPlatform): Record<string, unknown> {
   const d = p.detected
-  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : 'none'
+  const found = d.other ? say(API.project.vcsUnsupported, { name: d.other }) : d.platform === 'git' ? say(API.project.vcsGit, { root: d.root ?? '', subfolder: d.subfolder ? 'yes' : 'no' }) : d.platform === 'jj' ? say(API.project.vcsJj, { root: d.root ?? '', colocated: d.jj?.colocated ? 'yes' : 'no' }) : 'none'
   return { platform: p.id, found, ...(p.offer ? { offers: p.offer.offer, why: p.offer.why } : {}) }
 }
 
@@ -1105,6 +1105,10 @@ route('GET', '/v1/providers', async () => {
   const here = contextWorkspace()
   return PROVIDERS.map((p) => {
     const info = providerService.info(p.id)
+    // The models of the GitHub host the caller's workspace resolves to (HI-2779), for a CLI signing in on one.
+    const at = infoAt(info, { workspacePath: here?.path ?? null })
+    // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
+    const models = offeredModels(p.id, at, s)
     return {
       id: p.id,
       name: p.name,
@@ -1114,16 +1118,16 @@ route('GET', '/v1/providers', async () => {
       // The version this Combwork release was tested with, and how the installed one compares (#365).
       tested: info.tested ? { version: info.tested.version, installed: info.found ? info.tested.installed : say(API.provider.notInstalled) } : null,
       problem: agentInstallInfo(info).readiness?.find((r) => r.level === 'error')?.message ?? null,
-      defaultModel: infoAt(info, { workspacePath: here?.path ?? null })?.defaultModel ?? null,
-      // What the pickers offer: the CLI's own models, else the fallback list in Settings (#125).
-      // The models of the GitHub host the caller's workspace resolves to (HI-2779), for a CLI signing in on one.
-      models: modelGroups(p.id, infoAt(info, { workspacePath: here?.path ?? null }), s).filter((g) => !g.unavailable).flatMap((g) => g.models.map((m) => ({ value: m.value, label: m.label }))),
+      // The CLI's own home's; each connection says its own account's (HI-2856).
+      defaultModel: at?.defaultModel ?? null,
+      models,
       efforts: fallbackEfforts(p.id, s),
       // Whether agents can be given context200k (a 200K window instead of the model's 1M).
       context200k: p.capabilities.contextLimit,
       modes: offeredModes(p.id, s).map((m) => ({ value: m.value, label: m.label, description: m.description })),
-      // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names.
-      ...(here ? { connections: connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id).map((c) => ({ id: c.id, name: c.name })) } : {})
+      // Its connections usable in the caller's workspace (HI-2108), in the order: what cw_add_agent's connection names. Each
+      // with its own account's default and, where they aren't the provider's, its models (HI-2856).
+      ...(here ? { connections: listedConnections(p.id, connectionsHere(here).filter((c) => accountById(c.account)?.provider === p.id), accountById, at, s, models) } : {})
     }
   })
 })
@@ -3643,7 +3647,7 @@ async function platformOfCard(c: TaskCard): Promise<PlatformId> {
     const p = projectByName(c.project)
     return platformIdOf(p, (await workspace.projectConfig(p)).platform)
   } catch {
-    return detect(workspace.path!).platform
+    return initialOf(detect(workspace.path!))
   }
 }
 

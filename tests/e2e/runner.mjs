@@ -121,6 +121,39 @@ export function suiteDevOnly(name, dir) {
 }
 
 /**
+ * Where a suite starts a test copy of Combwork (HI-2833): the first `file:line` of its files (suiteFiles) calling
+ * launch, lib.launch or Playwright's _electron.launch outside a comment, or null. Every copy starts through one of them:
+ * lib.cjs wraps Playwright's, and its launch() is the only helper of its own that does. (This comment names no call as
+ * written: tests/testQuiet.test.ts takes a file naming Playwright's as written for one starting Combwork.) Limits: it reads the
+ * source, not what runs, so a call behind a condition or in a helper file the suite requires but never calls counts, and
+ * a copy started another way (spawning Electron or the installer itself) doesn't.
+ */
+export function suiteStartsCombwork(name, dir) {
+  for (const f of suiteFiles(name, dir)) {
+    const lines = readFileSync(join(dir, f), 'utf8').split(/\r?\n/)
+    const at = lines.findIndex((l) => !/^\s*(\/\/|\/\*|\*)/.test(l) && /(?:^|[^\w.])(?:lib\.|_electron\.)?launch\(/.test(l.replace(/\s\/\/.*$/, '')))
+    if (at >= 0) return `${f}:${at + 1}`
+  }
+  return null
+}
+
+/**
+ * Real suites whose `noCombwork` (suites.mjs) disagrees with their source (HI-2833), as lines: one that starts no test
+ * Combwork must say so, or `npm run tested-clis` refuses its CLI's entry at the release (its record names no version);
+ * one that starts one must not, or the version its Combwork selected goes unchecked. Real: needing a CLI, not only the
+ * packaged build (as testedClis.mjs counts them).
+ */
+export function noCombworkProblems(suites, dir) {
+  const out = []
+  for (const s of suites.filter((x) => (x.needs ?? []).some((n) => n !== 'packaged'))) {
+    const starts = suiteStartsCombwork(s.name, dir)
+    if (!starts && !s.noCombwork) out.push(`${s.name}: starts no test Combwork (no launch( in its files), so its record names no CLI version: mark it noCombwork, saying why`)
+    if (starts && s.noCombwork) out.push(`${s.name}: marked noCombwork, but starts a test Combwork (${starts}): drop the mark`)
+  }
+  return out
+}
+
+/**
  * The command line: { jobs, all, affected (a base, or null), named, tier, record, fingerprint, build, packaged, noWait, preMerge } or
  * { error }. lang: the languages --lang gives (comma-separated, or the option again) for the i18nshots route, which
  * it runs alone (named, or nothing named) and keeps the screenshots of (keepFiles); every other suite runs in English.

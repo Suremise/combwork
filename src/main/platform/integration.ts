@@ -153,8 +153,12 @@ export interface IntegrationPort {
   contains(project: string, a: string, b: string): Promise<Maybe<boolean>>
   /** Where a target is pushed: its upstream, else the only remote or origin; `unreadable` for a read the tool couldn't make. */
   pushDest(h: CandidateHost, target: string): Promise<{ remote: string; ref: string } | null | 'unreadable'>
-  /** Pushes exactly `commit` to `dest`: never forced, never changing what the target tracks, no prompt, bounded. */
-  push(h: CandidateHost, dest: { remote: string; ref: string }, commit: string): Promise<'pushed' | { rejected: string } | { failed: string }>
+  /**
+   * Pushes exactly `commit` to `dest`: never forced, never changing what the target tracks, no prompt, bounded. `rejected`:
+   * not a fast-forward (the remote has commits the target hasn't); `refused` (HI-1183): the remote refused it (a hook, a
+   * protected branch), its own words; `failed`: anything else (a sign-in, the network, the bound).
+   */
+  push(h: CandidateHost, dest: { remote: string; ref: string }, commit: string): Promise<'pushed' | { rejected: string } | { refused: string } | { failed: string }>
 
   // The queue host's and runner's clean-up (§16.9.3): pins and the queue's own workspace.
 
@@ -173,7 +177,52 @@ export interface IntegrationPort {
    * isn't checked out), `{}` when it still does or can't be told, with the files it names now.
    */
   pausedCondition(project: string, target: string, reason: 'wrongBranch' | 'staged' | 'unstagedChanges', files: string[] | undefined): Promise<{ files?: string[] } | null>
+
+  // Follow mode (HI-1183, SPEC §16.9.4): the target is the branch it tracks on its remote. Optional: a platform without
+  // them has no follow mode (the option isn't shown), and the queue never calls them for one.
+
+  /**
+   * The one publication endpoint of a target and its transport settings, captured once for an attempt (§16.9.4's
+   * snapshot): the branch it tracks (else `noUpstream`), exactly one push URL (else `remoteAmbiguous`, the URLs without
+   * their credentials in `files`), a repository whose objects the sealed context can address (else `remoteUnsupported`).
+   */
+  destination?(h: CandidateHost, target: string): Promise<Again | { snapshot: TransportSnapshot } | { pause: FollowSetupPause; files?: string[] }>
+  /** Fetches the snapshot's ref from its endpoint in the sealed context, and sets the project's `into` ref to that fetch's own head. */
+  fetchHead?(h: CandidateHost, snap: TransportSnapshot, into: string): Promise<{ head: string } | { failed: string }>
+  /** The project's pre-push hook, run once in the project for the exact update (`lease` → `result`): none is `ok`. */
+  prePush?(h: CandidateHost, snap: TransportSnapshot, lease: string, result: string): Promise<'ok' | { refused: string } | { timedOut: string }>
+  /** The exact compare-and-swap publication of `result` over `lease` at the snapshot's endpoint, in the sealed context, with no hook. */
+  publish?(h: CandidateHost, snap: TransportSnapshot, lease: string, result: string): Promise<PublishReply>
+  /** A tool's words with the snapshot's credentials taken out (URL userinfo, authorization values, each secret value). */
+  redact?(text: string, snap: TransportSnapshot | null): string
 }
+
+/** Why follow mode can't use a target's remote (HI-1183): it tracks none, it has several push URLs or none, or the sealed context can't reach its objects. */
+export type FollowSetupPause = 'noUpstream' | 'remoteAmbiguous' | 'remoteUnsupported'
+
+/**
+ * Follow mode's captured transport (HI-1183, §16.9.4): the endpoint (its exact URL, which may hold credentials), the full
+ * ref, the allowlisted transport and sign-in settings as resolved then, and how to reach the project's objects. Secret:
+ * kept only in the protected store (queueTransportStore.ts), never in a fact, a log or a reply; `display` is what may be shown.
+ */
+export interface TransportSnapshot {
+  remote: string
+  url: string
+  /** The URL without userinfo, query or fragment: what a record, a log or a hook may name. */
+  display: string
+  ref: string
+  config: [string, string][]
+  objects: string
+  alternates: string[]
+  format: string
+}
+
+/**
+ * A publication's reply (HI-1183): `pushed`; `atResult` (the remote was at the result already, so the lease never
+ * applied); `stale` (the lease or a fast-forward refused it before anything was written: the remote moved); `refused`
+ * (the remote refused it: a hook, a protected branch; nothing written); `unknown` (anything else: it may have been published).
+ */
+export type PublishReply = 'pushed' | 'atResult' | { stale: string } | { refused: string } | { unknown: string }
 
 /** An advance begun into a checked-out target, as its journal recorded it. */
 export interface BegunAdvance {

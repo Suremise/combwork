@@ -8,6 +8,12 @@
   "workflow.contradiction.focusedNeedsRunner": {
     "placeholders": {}
   },
+  "workflow.contradiction.jjNeedsSlots": {
+    "placeholders": {}
+  },
+  "workflow.contradiction.jjYouIntegrate": {
+    "placeholders": {}
+  },
   "workflow.contradiction.mergeNeedsSlots": {
     "placeholders": {}
   },
@@ -113,6 +119,14 @@
       "folder": "plain"
     }
   },
+  "workflow.forYou.queuePublish": {
+    "placeholders": {
+      "card": "plain",
+      "result": "plain",
+      "endpoint": "plain",
+      "target": "plain"
+    }
+  },
   "workflow.forYou.queueStuck": {
     "placeholders": {
       "card": "plain",
@@ -148,6 +162,9 @@
     "placeholders": {
       "kind": "select"
     }
+  },
+  "workflow.jj.notYet": {
+    "placeholders": {}
   },
   "workflow.move.answer": {
     "placeholders": {}
@@ -234,6 +251,12 @@
     "placeholders": {}
   },
   "workflow.option.folder.title": {
+    "placeholders": {}
+  },
+  "workflow.option.followRemote.desc": {
+    "placeholders": {}
+  },
+  "workflow.option.followRemote.title": {
     "placeholders": {}
   },
   "workflow.option.identity.desc": {
@@ -703,6 +726,25 @@
       "folder": "plain"
     }
   },
+  "workflow.refused.platform.changed.message": {
+    "placeholders": {
+      "card": "plain",
+      "platform": "plain"
+    }
+  },
+  "workflow.refused.platform.changed.next": {
+    "placeholders": {
+      "platform": "plain"
+    }
+  },
+  "workflow.refused.platform.switching.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.platform.switching.next": {
+    "placeholders": {}
+  },
   "workflow.refused.platform.targetGone.message": {
     "placeholders": {
       "card": "plain",
@@ -828,6 +870,14 @@
     }
   },
   "workflow.refused.start.notBlocked.next": {
+    "placeholders": {}
+  },
+  "workflow.refused.start.platformReady.message": {
+    "placeholders": {
+      "card": "plain"
+    }
+  },
+  "workflow.refused.start.platformReady.next": {
     "placeholders": {}
   },
   "workflow.refused.start.slotAvailable.change": {
@@ -1055,6 +1105,9 @@
   "workflow.rule.start.notBlocked": {
     "placeholders": {}
   },
+  "workflow.rule.start.platformReady": {
+    "placeholders": {}
+  },
   "workflow.rule.start.slotAvailable": {
     "placeholders": {}
   },
@@ -1250,6 +1303,24 @@
       "path": "plain"
     }
   },
+  "workflow.unreadable.remoteBehind": {
+    "placeholders": {
+      "target": "plain",
+      "endpoint": "plain"
+    }
+  },
+  "workflow.unreadable.remoteHead": {
+    "placeholders": {
+      "branch": "plain",
+      "endpoint": "plain",
+      "target": "plain"
+    }
+  },
+  "workflow.unreadable.remoteSetup": {
+    "placeholders": {
+      "target": "plain"
+    }
+  },
   "workflow.unreadable.replay": {
     "placeholders": {
       "revision": "plain",
@@ -1315,6 +1386,9 @@
     "placeholders": {}
   },
   "workflow.value.finish.notChecked": {
+    "placeholders": {}
+  },
+  "workflow.value.finish.userIntegrates": {
     "placeholders": {}
   },
   "workflow.value.folder.project": {

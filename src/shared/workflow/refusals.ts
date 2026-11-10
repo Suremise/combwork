@@ -11,7 +11,7 @@ import { MOVE_NAMES, RULE_NAMES, workflowLine } from './texts'
 import { STAGE_TEXT, isStageId, type StageNames } from './stages'
 
 /** Refusals that aren't a guard of the piece library: the move itself, card references, facts that couldn't be read. */
-export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'platform.targetGone' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
+export type MoveRule = 'move.notFromHere' | 'move.noStage' | 'move.useIntent' | 'move.needsOverride' | 'move.doingNobody' | 'lane.oneAtATime' | 'lane.lineBehind' | 'card.plainNumber' | 'paths.excluded' | 'platform.unknown' | 'platform.targetGone' | 'platform.switching' | 'platform.changed' | 'review.noSubmission' | 'review.inProgress' | 'review.headMoved' | 'submit.empty' | 'submit.unchanged' | 'submit.sameRevisionNote' | 'submit.followUpNotBuilder' | 'check.revisionMismatch' | 'forward.notAgents' | 'evidence.changed' | 'loop.roundLimit' | 'loop.stepNotYours' | 'loop.stepNotHere' | 'loop.noStep' | 'loop.noReviewer' | 'loop.staleStep' | 'loop.tooEarly' | 'loop.followUpChecked' | 'loop.followUpMerging'| 'merge.combworkMerges' | 'merge.waitsForBlockers' | 'queue.advancing'
 
 export type RuleId = GuardId | MoveRule
 
@@ -34,6 +34,10 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
     msg({ id: 'workflow.refused.start.dependenciesIntegrated.message', defaultMessage: "{card} can't start: {waitsFor} isn't done yet.", description: "A refused start of a card. {card} and {waitsFor} are card keys (AM-12): the card waits for {waitsFor}'s work to be merged or accepted." }),
     msg({ id: 'workflow.refused.start.dependenciesIntegrated.next', defaultMessage: 'Wait for {waitsFor} to be done, or work on another card.', description: 'The next step after a refused start: {waitsFor} is the card key it waits for.' }),
     msg({ id: 'workflow.refused.start.dependenciesIntegrated.change', defaultMessage: 'This rule is set in Version Control → Cards start only when the cards they wait for are merged.', description: 'Where the rule that refused starting a card before the cards it waits for are done is changed.' })
+  ),
+  'start.platformReady': r(
+    msg({ id: 'workflow.refused.start.platformReady.message', defaultMessage: "{card} can't start: cards don't run in a jj project yet.", description: 'A refused start of a card in a project using jj (Jujutsu, HI-2799): Combwork shows its repository but doesn’t start card work there yet. {card} is a card key. Keep jj (the tool’s name).' }),
+    msg({ id: 'workflow.refused.start.platformReady.next', defaultMessage: 'Work on it outside Combwork’s cards, or switch the project to Git in Version Control.', description: 'The next step after a refused start in a jj project (HI-2799). Version Control is the tab’s name (glossary 2.1). Keep Git and jj.' })
   ),
   'start.slotAvailable': r(
     msg({ id: 'workflow.refused.start.slotAvailable.message', defaultMessage: "{card} can't start: no slot is free.", description: 'A refused start: every working folder (slot) is lent to other work. {card} is a card key.' }),
@@ -183,6 +187,14 @@ export const REFUSALS: Record<RuleId, RefusalText> = {
   'platform.unknown': r(
     msg({ id: 'workflow.refused.platform.unknown.message', defaultMessage: "{card}: Combwork couldn't read {what}, so the rule {rule} can't be checked.", description: 'A refused move: a fact a rule needs could not be read (git missing, folder gone). {what} says what, {rule} the rule id.' }),
     msg({ id: 'workflow.refused.platform.unknown.next', defaultMessage: 'Check Provider Setup or the folder, then try again.', description: 'The next step when Combwork could not read what a rule needs.' })
+  ),
+  'platform.switching': r(
+    msg({ id: 'workflow.refused.platform.switching.message', defaultMessage: "{card} can't start now: its repository's version control is being switched.", description: 'HI-2799: a refused start: the project’s repository is switching between Git and jj, and nothing starts on it meanwhile. {card} is a card key like AM-12.' }),
+    msg({ id: 'workflow.refused.platform.switching.next', defaultMessage: 'Try again in a moment, once the switch has finished.', description: 'HI-2799: the next step after a start refused while the repository’s version control is switched.' })
+  ),
+  'platform.changed': r(
+    msg({ id: 'workflow.refused.platform.changed.message', defaultMessage: "{card} can't start under these rules: its project uses {platform} now.", description: 'HI-2799: a refused start: the start was prepared under the project’s previous version control, and the project was switched meanwhile. {card} is a card key; {platform} is None, Git or jj.' }),
+    msg({ id: 'workflow.refused.platform.changed.next', defaultMessage: 'Start it again: it is then checked under {platform}’s rules.', description: 'HI-2799: the next step after a start refused because the project switched version control meanwhile. {platform} is None, Git or jj.' })
   ),
   'platform.targetGone': r(
     msg({ id: 'workflow.refused.platform.targetGone.message', defaultMessage: '{card} was started on {target}, which no longer exists in this repository.', description: 'HI-2753: a refused move (a submit): the branch the card was started on and merges into (its target, {target}) was deleted, as an integration branch is once it has been merged. {card} is a card key like AM-12.' }),

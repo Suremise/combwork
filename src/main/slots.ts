@@ -40,6 +40,7 @@
 
 import { createHash, randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
+import { admitOrThrow } from './platform/fenceAdmit'
 import { existsSync } from 'original-fs'
 import { mkdir, readdir, readFile, rename } from 'original-fs/promises'
 import { dirname, join } from 'path'
@@ -500,6 +501,8 @@ export class SlotStore {
         const at = this.iso()
         // The project being deleted (#1447): nothing lent or made until its reservation ends.
         if (deletingIn(db, this.project)) return { ok: false as const, refusal: { why: 'notReady' as const, slot: req.slot ?? say(T.aSlot), state: 'removing' as const, error: say(DELETING) } }
+        // The platform fence (HI-2799): a lease is an admission on the project's repository, refused while it switches.
+        admitOrThrow(db, this.project, o.platform ?? 'git')
         const mine = this.dispatchOf(db, req.agent)
         if (mine) {
           if ((req.card !== undefined && mine.card === req.card) || (req.lane !== undefined && mine.lane === req.lane)) return { ok: true as const, lease: mine, slot: this.slotIn(db, mine.slot)!, fresh: false, again: true }
@@ -1660,7 +1663,8 @@ export class SlotPool {
           // its card's line is no longer checked out (committed work stays on that line), so a merged one can be deleted.
           // Not detached (git couldn't read or switch it: an index lock, say): not ready yet either, so the next look tries
           // again (HR2's HI-2014 round 1, finding 4), never a ready slot left on its card's line.
-          if (!(now === 'ready' && s.state !== 'ready' && !(await this.detach(s)))) to = now
+          // Git couldn't list the worktrees (HI-2810): the slot as it was, the next look tries again.
+          if (now !== null && !(now === 'ready' && s.state !== 'ready' && !(await this.detach(s)))) to = now
         } finally {
           // Its operation ends with what it found, or the slot as it was (a failure: the next look tries again).
           await this.store.fenced(name, token, (db) => this.store.setIn(db, name, to, {}, { op: null })).catch((e) => {
@@ -1699,18 +1703,23 @@ export class SlotPool {
     return true
   }
 
-  /** What a slot is on disk now: gone (no folder, or git doesn't list it), dirty, or ready. */
-  private async look(s: Slot, token: string): Promise<SlotState> {
-    if (!(await this.present(s))) return 'gone'
+  /**
+   * What a slot is on disk now: gone (no folder, or git doesn't list it), dirty, or ready; null when git can't list its
+   * worktrees (HI-2810, SPEC §16.3.6 R2.1: unknown is never gone, nor ready), so the caller keeps the slot as it is.
+   */
+  private async look(s: Slot, token: string): Promise<SlotState | null> {
+    const there = await this.present(s)
+    if (there === null) return null
+    if (!there) return 'gone'
     const d = await this.dirtyOwned(s, token)
     return isUnknown(d) || d.length ? 'dirty' : 'ready'
   }
 
-  private async present(s: Slot): Promise<boolean> {
+  /** Whether a slot is there: its folder, and git lists it; null when git's listing fails (#734: never an empty one). */
+  private async present(s: Slot): Promise<boolean | null> {
     if (!(await folderThere(s.folder))) return false
-    // A listing that fails is an empty one here, as listWorktrees answered (the port says null: R4 keeps the pool's reading).
-    const listed = await this.portOf(s).list(this.deps.project).then((l) => l ?? [], () => null)
-    return !listed || listed.some((l) => samePlace(l.path, s.folder))
+    const listed = await this.portOf(s).list(this.deps.project).catch(() => null)
+    return listed ? listed.some((l) => samePlace(l.path, s.folder)) : null
   }
 
   /** Whether an operation's holder is gone: another process that ended, or this one, no longer running that token. */
@@ -1792,7 +1801,8 @@ export class SlotPool {
         else continue
       }
       if (this.store.openLease(s.name)) {
-        if (s.state === 'lent' && !(await this.present(s))) await this.store.markGone(s.name)
+        // Gone only when git says so (HI-2810: a failed listing leaves it lent, looked at again by the next refresh).
+        if (s.state === 'lent' && (await this.present(s)) === false) await this.store.markGone(s.name)
         continue
       }
       if (s.state === 'lent' || s.state === 'dirty' || s.state === 'gone') await this.settle(s.name)
@@ -1974,7 +1984,8 @@ export class SlotPool {
           }
           return
         }
-        const to = await this.look(s, token)
+        // Git couldn't list the worktrees (HI-2810): the slot as it was.
+        const to = (await this.look(s, token)) ?? s.state
         await this.store.fenced(s.name, token, (db) => this.store.setIn(db, s.name, to, {}, { op: null, ...job }))
       } catch (e) {
         if (!(e instanceof OpLost)) throw e
@@ -2030,7 +2041,10 @@ export class SlotPool {
       if (this.closed) return fresh ? await fail(sayStored(T.closed)) : await this.unreserve(name, lease, token, slot.state)
       let made = fresh
       if (!made) {
-        if (!(await this.present(slot))) {
+        const there = await this.present(slot)
+        // Git can't list the worktrees (HI-2810): nothing pruned or made, the slot as it was, another one tried.
+        if (there === null) return await pass(slot.state, 'cantList')
+        if (!there) {
           // Gone from disk while free: made again where it was (git's stale entry pruned first).
           if (await folderThere(slot.folder)) return await fail(sayStored(T.notListed))
           await this.store.fenced(name, token, () => undefined)
@@ -2087,7 +2101,8 @@ export class SlotPool {
       const rev = await this.port.head(slot.folder)
       const fields: SlotFields = { warmError: null, warmLog: null, ...(needed ? { installRev: isUnknown(rev) ? null : rev, installHash: hash } : {}), ...(made && target ? { target } : {}) }
       // Released meanwhile: the slot as it is now, not lent.
-      const after = this.store.lease(lease.id)?.to ? await this.look(this.store.slot(name) ?? slot, token) : 'lent'
+      // Unknown (git couldn't list the worktrees, HI-2810): not ready, looked at again by the next refresh.
+      const after = this.store.lease(lease.id)?.to ? ((await this.look(this.store.slot(name) ?? slot, token)) ?? 'dirty') : 'lent'
       await this.store.fenced(name, token, (db) => this.store.setIn(db, name, this.store.openIn(db, lease.id) ? 'lent' : after === 'lent' ? 'ready' : after, fields, { op: null }))
       return 'ready'
     } catch (e) {
@@ -2260,8 +2275,8 @@ export class SlotPool {
 
   /** Whether git lists a worktree at a recreation's `to`, on its line; null when git can't say (never taken for no). */
   private async madeOn(intent: RecreateIntent): Promise<boolean | null> {
-    // A listing that fails is an empty one here, as listWorktrees answered (R4 keeps the pool's reading).
-    const listed = await this.port.list(this.deps.project).then((l) => l ?? [], () => null)
+    // A listing that fails is unknown, never an empty one (HI-2810, #734).
+    const listed = await this.port.list(this.deps.project).catch(() => null)
     if (!listed) return null
     if (!listed.some((w) => samePlace(w.path, intent.to))) return false
     const on = await this.port.shownLine(intent.to)

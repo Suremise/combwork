@@ -330,6 +330,8 @@
   "tips.memorySnapshot.title": "Combwork zamknął się z braku pamięci?",
   "tips.mergeBranch.text": "⑂ obok gałęzi w Kontroli wersji → Gałęzie i zdalne repozytoria scala ją z wybraną gałęzią, po jednym scaleniu naraz. Gałąź karty, która nie jest gotowa, najpierw pyta, a karta zostaje oznaczona jako scalona poza regułami.",
   "tips.mergeBranch.title": "Scal gałąź ręcznie",
+  "tips.mergeFollowRemote.text": "Dzielisz main z innymi? Włącz „Gałąź docelowa podąża za zdalnym repozytorium” w Kontrola wersji → Przepływ pracy: kolejka scalania pobiera zmiany przed każdym scaleniem próbnym, testuje na najnowszym commicie zdalnym i wypycha tylko wtedy, gdy nikt w międzyczasie nie wypchnął zmian, a jeśli wypchnął, testuje ponownie.",
+  "tips.mergeFollowRemote.title": "Scalaj względem zdalnego repozytorium zespołu",
   "tips.mergeMessage.text": "Gdy scala Combwork, Kontrola wersji → Przepływ pracy ustala komunikat commita scalenia: komunikat Combwork nazywa kartę, a własny komunikat gałęzi trzyma klucze kart z dala od Twojej historii. Przy Squash każda karta trafia wtedy jako jeden commit z komunikatem jej wykonawcy.",
   "tips.mergeMessage.title": "Scalenia z własnymi komunikatami commitów",
   "tips.mergePush.text": "Gdy scala Combwork, Kontrola wersji → Przepływ pracy może wypychać gałąź docelową po każdym scaleniu, nigdy z wymuszeniem. Jeśli zdalne repozytorium odmówi, kolejka wstrzymuje się i mówi dlaczego: ściągnij zmiany i wznów albo wyłącz opcję i wznów.",
@@ -580,5 +582,7 @@
   "tips.opencodeOutsideFolder.text": "Agent OpenCode pyta, zanim odczyta lub zmieni cokolwiek poza swoim folderem, i czeka na Twoją odpowiedź w swoim panelu. Kopie do recenzji pozostają dozwolone, a Zatwierdzaj wszystko zatwierdza bez pytania; wyłączysz to w Ustawienia → Zaawansowane → OpenCode.",
   "tips.opencode.title": "Uruchamiaj agentów w OpenCode",
   "tips.opencodeHistory.text": "Rozmowa agenta OpenCode jest widoczna na karcie Sesje, a jego tokeny i koszt w Przeglądzie i stopce jego panelu, tak jak podaje je OpenCode. Koszt $0 nie mierzy limitu Twojego planu; limity są widoczne tylko dla OpenCode Go lub Console.",
-  "tips.opencodeHistory.title": "Historia, tokeny i koszt agenta OpenCode"
+  "tips.opencodeHistory.title": "Historia, tokeny i koszt agenta OpenCode",
+  "tips.versionControlJj.text": "W repozytorium jj współistniejącym z Gitem wybierz jj u góry zakładki Kontrola wersji: Historia pokazuje każdy identyfikator zmiany obok identyfikatora commita, a Porównanie, Zakładki i Konflikty odczytują repozytorium bez jego zmieniania. Zrecenzowaną pracę włączasz sam.",
+  "tips.versionControlJj.title": "Zobacz repozytorium jj"
 }

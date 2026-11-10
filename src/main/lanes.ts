@@ -41,6 +41,8 @@ import { lineWaiting, onLineWaitChanged } from './workflow/lineUpdates'
 import { hooksMissingFor, onHooksHealthChanged } from './hooksHealth'
 import { teamPauseOf } from './teamPause'
 import { independentIn } from './independent'
+import { admitOrThrow, projectIdOf } from './platform/fenceAdmit'
+import { platformIdOf } from './platform/registry'
 
 const log = createLogger('lanes')
 
@@ -1247,7 +1249,10 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
   const pool = s.pool ? true : reviewer ? false : undefined
   // Rounds and wait the start doesn't give (#412): the project's workflow options as they resolve now (HI-1766).
   const projectPath = ws.path ? join(ws.path, s.project) : s.project
-  const prefs = projectPreferences(ws, projectPath, ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null)
+  const laneCfg = ws.path ? await ws.projectConfig(projectPath).catch(() => null) : null
+  const prefs = projectPreferences(ws, projectPath, laneCfg)
+  // The platform fence (HI-2799): a new lane is an admission on its project's repository, refused while it switches.
+  const admission = { id: projectIdOf(laneCfg, projectPath), platform: platformIdOf(projectPath, laneCfg?.platform) }
   const defaults = { rounds: prefs.loopRounds, waitHours: prefs.loopWaitHours }
   const on = await enforced()
   // The texts for the caller name cards as it may see them (HR3's HI-2169 round 1): a builder's own start is a project
@@ -1384,6 +1389,7 @@ export async function startLane(ws: WorkspaceService, s: StartLane): Promise<Lan
     const brief = nextBrief(undefined, carried?.brief?.text ?? s.brief, s.briefNotIn)
     if (brief) rec.brief = brief
     lanes.push(rec)
+    also.push((db) => admitOrThrow(db, admission.id, admission.platform))
     also.push((db) => noteLaneIn(db, ws.path!, null, rec))
     return { rec, did: 'started' as const, replaced }
   })

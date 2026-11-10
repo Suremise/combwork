@@ -336,6 +336,8 @@ interface CombworkMessageValues {
   'tips.memorySnapshot.title': undefined
   'tips.mergeBranch.text': undefined
   'tips.mergeBranch.title': undefined
+  'tips.mergeFollowRemote.text': undefined
+  'tips.mergeFollowRemote.title': undefined
   'tips.mergeMessage.text': undefined
   'tips.mergeMessage.title': undefined
   'tips.mergePush.text': undefined
@@ -563,6 +565,8 @@ interface CombworkMessageValues {
   'tips.updateFromTarget.title': undefined
   'tips.usageMoves.text': undefined
   'tips.usageMoves.title': undefined
+  'tips.versionControlJj.text': undefined
+  'tips.versionControlJj.title': undefined
   'tips.versionControlSwitch.text': undefined
   'tips.versionControlSwitch.title': undefined
   'tips.versionControlTab.text': undefined

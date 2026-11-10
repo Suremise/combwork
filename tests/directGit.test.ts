@@ -32,6 +32,18 @@ describe('directGitPath (HI-2025)', () => {
     expect(directGitPath(path(SYS, 'C:\\Tools'), EXEC, has())).toBeNull()
   })
 
+  it("a ucrt64 install (HI-2812): its bin folder, matching the exec path, goes before the launcher", () => {
+    const ucrt = join(ROOT, 'ucrt64', 'bin')
+    const exec = 'C:/Program Files/Git/ucrt64/libexec/git-core'
+    const onlyUcrt = (p: string) => [join(CMD, 'git.exe'), join(ucrt, 'git.exe')].map((x) => x.toLowerCase()).includes(p.toLowerCase())
+    expect(directGitPath(path(SYS, CMD, 'C:\\Later'), exec, onlyUcrt)).toBe(path(SYS, ucrt, CMD, 'C:\\Later'))
+    // The bin folder is the exec path's, never another layout's that happens to hold a git.exe.
+    expect(directGitPath(path(SYS, CMD), exec, has())).toBeNull()
+    expect(directGitPath(path(SYS, CMD), EXEC, onlyUcrt)).toBeNull()
+    // A layout the product doesn't know: unchanged.
+    expect(directGitPath(path(SYS, CMD), 'C:/Program Files/Git/usr/libexec/git-core', has([join(ROOT, 'usr', 'bin', 'git.exe')]))).toBeNull()
+  })
+
   it('run once, then again on its own result: no second insertion', () => {
     const once = directGitPath(path(SYS, CMD), EXEC, has())!
     expect(directGitPath(once, EXEC, has())).toBeNull()

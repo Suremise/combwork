@@ -26,6 +26,7 @@
 
 import { randomBytes } from 'crypto'
 import type { DatabaseSync } from 'node:sqlite'
+import { admitOrThrow } from './platform/fenceAdmit'
 import { existsSync } from 'original-fs'
 import { mkdir } from 'original-fs/promises'
 import { basename, join, resolve } from 'path'
@@ -297,6 +298,8 @@ export class CopyStore {
         const at = this.iso()
         // The project being deleted (#1447): no copy leased or made until its reservation ends.
         if (deletingIn(db, this.project)) return { ok: false as const, size: 0 }
+        // The platform fence (HI-2799): a copy's lease is an admission on the project's repository, refused while it switches.
+        admitOrThrow(db, this.project, o.platform ?? 'git')
         const all = (db.prepare('SELECT * FROM copies WHERE project = ? ORDER BY name').all(this.project) as Row[]).map(copyOfRow)
         const leased = (c: Copy): boolean => !!db.prepare('SELECT 1 FROM copy_leases WHERE project = ? AND copy = ? AND freed_at IS NULL').get(this.project, c.name)
         // Only a copy of this pool's platform (HI-2795, R2.6): a Git copy is never reused by a jj pool.
@@ -677,7 +680,16 @@ export class CopyPool {
       }
       const opts = await this.deps.options()
       let made = fresh || copy.state === 'gone' || !(await folderThere(copy.folder))
-      if (!made && !(await this.listed(copy.folder))) {
+      const listed = made ? true : await this.listed(copy.folder)
+      // Git can't list the worktrees (HI-2810): passed over as it was, its lease dropped, looked at again next time.
+      if (listed === null) {
+        await this.store.fenced(name, token, (db) => {
+          this.store.dropIn(db, lease.id, 'cantList')
+          this.store.setIn(db, name, copy.state, {}, { op: null })
+        })
+        return 'skip'
+      }
+      if (!listed) {
         await this.store.fenced(name, token, (db) => {
           this.store.dropIn(db, lease.id, 'gone')
           this.store.setIn(db, name, 'creating', { warmError: sayStored(T.notListed) }, { op: null })
@@ -754,10 +766,10 @@ export class CopyPool {
     }
   }
 
-  private async listed(folder: string): Promise<boolean> {
-    // A listing that fails is an empty one here, as listWorktrees answered (R5 keeps the pool's reading; HI-2810).
-    const l = await this.port.list(this.deps.project).then((x) => x ?? [], () => null)
-    return !l || l.some((w) => samePlace(w.path, folder))
+  /** Whether the platform lists a workspace at `folder`; null when its listing fails (HI-2810, #734: unknown, never an empty one). */
+  private async listed(folder: string): Promise<boolean | null> {
+    const l = await this.port.list(this.deps.project).catch(() => null)
+    return l ? l.some((w) => samePlace(w.path, folder)) : null
   }
 
   /** A command of an operation's, in a job recorded on the copy first and cleared once settled (as slots' runs). */

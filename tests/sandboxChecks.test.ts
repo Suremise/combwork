@@ -172,17 +172,20 @@ const BLOCKED_ERR = 'Start-Process : This command cannot be run due to the error
 const SAC_ON = '\r\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\CI\\Policy\r\n    VerifiedAndReputablePolicyState    REG_DWORD    0x1\r\n'
 
 /** Runs the checks on the fakes with these guest commands scripted: two installers in one build folder. */
-function runChecks(name: string, guest: Json[], extra: string[] = [], vars: Json = {}, fail: Json = {}, previousName = 'Combwork-Setup-0.5.1.exe') {
+function runChecks(name: string, guest: Json[], extra: string[] = [], vars: Json = {}, fail: Json = {}, previousName = 'Combwork-Setup-0.5.1.exe', rcName = '') {
   const s = scratch(name, { guest, ...fail })
   const previous = path.join(s.dir, 'builds', 'app', 'previous', previousName)
   fs.mkdirSync(path.dirname(previous))
   fs.writeFileSync(previous, 'MZ')
+  // A release candidate for scenario 10 (--previous-rc), beside the previous release.
+  const rc = rcName && path.join(path.dirname(previous), rcName)
+  if (rc) fs.writeFileSync(rc, 'MZ')
   // Git for Windows' folder, for the clean install's git project (HI-2592): mapped, never run.
   const git = path.join(s.dir, 'git')
   fs.mkdirSync(path.join(git, 'cmd'), { recursive: true })
   fs.writeFileSync(path.join(git, 'cmd', 'git.exe'), 'MZ')
   const report = path.join(s.dir, 'report')
-  const r = runner(['--installer', path.join(s.dir, 'builds', 'app', 'Combwork-Setup-0.6.0.exe'), '--previous', previous, '--server', FAKE_SERVER, '--report', report, '--git', git, ...extra],
+  const r = runner(['--installer', path.join(s.dir, 'builds', 'app', 'Combwork-Setup-0.6.0.exe'), '--previous', previous, '--server', FAKE_SERVER, '--report', report, '--git', git, ...(rc ? ['--previous-rc', rc] : []), ...extra],
     s.env({ CW_SANDBOX_CHECKS_ROOT: path.join(s.dir, 'sandbox'), ...vars }))
   const calls: Json[string][][] = s.read().calls
   const guests: string[] = calls.filter((c) => c[0] === 'run').map((c) => c[1])
@@ -309,6 +312,29 @@ test('--previous-rc (HI-2587): a 1.1 release candidate adds scenario 10 beside t
   assert.strictEqual(p.guestPreviousRc, 'C:\\build\\Combwork-Setup-1.1.0-rc.2.exe')
   assert.deepStrictEqual(plan(['--installer', installer, '--previous', path.join(dist, `${OLD_SETUP}-1.0.0.exe`), '--repo', repo, '--server', FAKE_SERVER]).ran, ['fresh', 'upgrade', 'clean', 'profile-move'])
   assert.throws(() => plan(['--only', 'upgrade-rc', '--installer', installer, '--repo', repo, '--server', FAKE_SERVER]), /--only upgrade-rc needs --previous-rc/)
+  // A 1.1 RC: scenario 10 checks the names upgrade from it (era rc), and needs no Git of its own (HI-2834: unchanged).
+  assert.strictEqual(p.previousRcEra, 'rc')
+  assert.strictEqual(plan(['--only', 'upgrade-rc', '--installer', installer, '--previous-rc', rc, '--repo', repo, '--server', FAKE_SERVER]).git, null)
+  assert.strictEqual(plan(['--installer', installer, '--previous', path.join(dist, `${OLD_SETUP}-1.0.0.exe`), '--repo', repo, '--server', FAKE_SERVER]).previousRcEra, null)
+})
+
+// HI-2834: an RC from 1.1.0 on (1.3.0-rc.1) has Combwork's names: scenario 10 takes its era from its version, as 4 does.
+test('--previous-rc from 1.1.0 on: scenario 10 in the combwork era, with Git mapped for the workspace it carries over', () => {
+  const s = scratch('previous-rc-13')
+  const repo = path.join(s.dir, 'builds', 'app')
+  const dist = path.join(repo, 'dist')
+  fs.mkdirSync(dist)
+  for (const v of ['Combwork-Setup-1.2.0', 'Combwork-Setup-1.3.0-rc.1', 'Combwork-Setup-1.3.0-rc.2']) fs.writeFileSync(path.join(dist, `${v}.exe`), 'MZ')
+  const git = path.join(s.dir, 'git')
+  fs.mkdirSync(path.join(git, 'cmd'), { recursive: true })
+  fs.writeFileSync(path.join(git, 'cmd', 'git.exe'), 'MZ')
+  const installer = path.join(dist, 'Combwork-Setup-1.3.0-rc.2.exe')
+  const rc = path.join(dist, 'Combwork-Setup-1.3.0-rc.1.exe')
+  const only = plan(['--only', 'upgrade-rc', '--installer', installer, '--previous-rc', rc, '--repo', repo, '--server', FAKE_SERVER, '--git', git])
+  assert.deepStrictEqual(only.ran, ['upgrade-rc'])
+  assert.strictEqual(only.previousRcEra, 'combwork')
+  assert.strictEqual(only.previousEra, null)
+  assert.strictEqual(only.git, git)
 })
 
 // HI-2727: what the upgrade seeds and checks follows the release it starts from, by its version.
@@ -375,10 +401,46 @@ test('the run from a 1.1+ previous: Combwork.exe started before the upgrade, the
   assert.ok(old.guests.some((g) => /profile-move\.ps1/.test(g)))
 })
 
+test('the run over a 1.3 RC: scenario 10 drives the combwork era, starts Combwork.exe, has Git, and says where it started (HI-2834)', () => {
+  const run = runChecks('run-from-rc13', [], ['--only', 'upgrade-rc'], {}, {}, 'Combwork-Setup-0.5.1.exe', 'Combwork-Setup-1.3.0-rc.1.exe')
+  const { r, json, md, guests, starts } = run
+  assert.strictEqual(r.status, 1, r.stdout + r.stderr) // the fake drivers write no results: checks fail
+  assert.deepStrictEqual(json.meta.ran, ['upgrade-rc'])
+  assert.strictEqual(json.meta.previousRcEra, 'combwork')
+  assert.deepStrictEqual(guests.filter((g) => /drive\.cjs (mark|after-upgrade) /.test(g)).map((g) => g.split('drive.cjs ')[1]), ['mark s10-mark combwork', 'after-upgrade s10-after combwork'])
+  assert.match(guests.find((g) => /start-app\.ps1/.test(g)) ?? '', /-Exe "%LOCALAPPDATA%\\Programs\\Combwork\\Combwork\.exe" -Name s10-prev-started/)
+  assert.deepStrictEqual(starts.map((a) => a.tools.includes('git')), [true])
+  // Its missing records and screenshots are asked for under scenario 10, none under scenario 4 (the ids: the next test).
+  assert.deepStrictEqual([...new Set(json.checks.map((c: Json) => c.scenario))], [10], JSON.stringify(json.checks.map((c: Json) => [c.scenario, c.name])))
+  assert.match(md, /Scenario 10's upgrade starts from the release candidate \*\*1\.3\.0-rc\.1\*\*, already under Combwork's names/)
+  // From a 1.1 RC, as before: the rc era passed to the driver, no Git in its Sandbox.
+  const old = runChecks('run-from-rc11', [], ['--only', 'upgrade-rc'], {}, {}, 'Combwork-Setup-0.5.1.exe', 'Combwork-Setup-1.1.0-rc.2.exe')
+  assert.strictEqual(old.json.meta.previousRcEra, 'rc')
+  assert.ok(old.guests.some((g) => g.endsWith('drive.cjs mark s10-mark rc')), old.guests.join('\n'))
+  assert.deepStrictEqual(old.starts.map((a) => a.tools.includes('git')), [false])
+  assert.match(old.md, /Scenario 10's upgrade starts from the release candidate \*\*1\.1\.0-rc\.2\*\*, a 1\.1 release candidate/)
+})
+
+test("scenario 10's checks are reported under 10, its drivers' scenario-4 numbering notwithstanding (HI-2834)", () => {
+  const rec = (ids: string[]) => ({ completed: true, checks: ids.map((id) => ({ id, scenario: 4, name: `as drive.cjs names ${id}`, ok: true })), facts: { version: '1.3.0' } })
+  for (const era of ['rc', 'combwork']) {
+    const ids = UPGRADE_IDS[era]
+    const r = evaluate({ ran: ['upgrade-rc'], installerVersion: '1.3.0', previousRcEra: era, previousRcVersion: era === 'rc' ? '1.1.0-rc.2' : '1.3.0-rc.1', steps: [], shots: [] }, { 's10-mark': rec(ids.mark), 's10-after': rec(ids.after), 's10-notify': { completed: true, checks: [{ id: '10.notification', scenario: 10, name: 'n', ok: true }], facts: { exe: 'x' } } })
+    assert.deepStrictEqual([...new Set(r.checks.map((c: Json) => c.scenario))], [10], era)
+    assert.ok(!r.checks.some((c: Json) => /^s10-(mark|after): check /.test(c.name)), `${era}: an id missing`)
+  }
+  // Scenario 4's own, as before.
+  const own = evaluate({ ran: ['upgrade'], installerVersion: '1.3.0', previousEra: 'combwork', previousVersion: '1.2.0', steps: [], shots: [] }, { 's4-after': rec(UPGRADE_IDS.combwork.after) })
+  assert.ok(own.checks.some((c: Json) => c.scenario === 4 && c.name === 'as drive.cjs names 4.settings-kept'))
+})
+
 test("the report's upgrade requirements follow the era: from 1.0 as before, from 1.1+ the carried-over workspace's, the installer's record not required", () => {
   assert.deepStrictEqual(required('upgrade', { previousEra: '1.0' }), REQUIRED.upgrade)
   assert.deepStrictEqual(required('upgrade', {}), REQUIRED.upgrade)
   assert.deepStrictEqual(required('upgrade-rc', { previousEra: 'combwork' }), REQUIRED['upgrade-rc'])
+  // Scenario 10's by its release candidate's era (HI-2834): a 1.1 RC's as before, a later one's the carried-over workspace's.
+  assert.deepStrictEqual(required('upgrade-rc', { previousRcEra: 'rc' }), REQUIRED['upgrade-rc'])
+  assert.deepStrictEqual(required('upgrade-rc', { previousEra: '1.0', previousRcEra: 'combwork' }).drivers['s10-after'], { scenario: 10, ids: UPGRADE_IDS.combwork.after, facts: ['version'] })
   const from11 = required('upgrade', { previousEra: 'combwork' })
   assert.deepStrictEqual(from11.drivers['s4-mark'].ids, UPGRADE_IDS.combwork.mark)
   assert.deepStrictEqual(from11.drivers['s4-after'].ids, UPGRADE_IDS.combwork.after)

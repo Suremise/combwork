@@ -1,5 +1,6 @@
 // Agent text (dialects, HI-2065), card 3a (HI-2435): the canary dialect over where a card is with the merge queue
-// (queueState.ts: card reads, a lane's next, wakes, the queue's comment) and the workflow runtime's replies and wakes.
+// (queueState.ts: card reads, a lane's next, wakes, the queue's comment; gitIntegration.ts: a candidate's log, HI-2827)
+// and the workflow runtime's replies and wakes.
 // Every word of what they say comes through the catalogue, every queue id is said by some case, and text a record keeps
 // (a wake's action, the queue's comment) stays the Default under any dialect until stored text is said when read (5b).
 import { afterEach, describe, expect, it } from 'vitest'
@@ -8,6 +9,7 @@ import { join } from 'path'
 import { setChainResolver, setProcessChain, type DialectChain } from '../src/shared/agentText'
 import { canaryProblems, canaryTexts } from '../src/shared/agentText/canary'
 import { leftWake, queueLine, resubmittedText, returnedComment, returnedText, staleWake, type QueueState } from '../src/main/workflow/queueState'
+import { candidateLog } from '../src/main/platform/gitIntegration'
 import { CAME_BACK } from '../src/shared/workflow/queue'
 import type { FactData } from '../src/shared/workflow/facts'
 // @ts-expect-error: a plain .mjs module without types
@@ -73,7 +75,7 @@ const STATES: QueueState[] = [
   { state: 'notYet' }
 ]
 /** What the tests pass in, which isn't Combwork's wording: names, codes, paths and the queue's fixed words. */
-const VALUES = ['HI-7', 'HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', '—', 'line 3', 'lines 1, 2', ...FAILURES.flatMap((f) => f.files ?? [])]
+const VALUES = ['HI-7', 'HI-6', 'main', 'abc1234', 'quick', 'network', 'ECONNRESET', 'C:/logs/q.log', 'one | two | three', 'src/a.ts', 'src/b.ts', 'e2e:real-chat', 'e2e:packaged', 'Coder', 'fed4321', CAME_BACK, 'approval', 'mergeChoice', 'needsYou', 'pushFailed', 'folderBusy', 'rulesOff', 'user', '—', 'line 3', 'lines 1, 2', ...FAILURES.flatMap((f) => f.files ?? [])]
 
 function queueTexts(): { name: string; text: string }[] {
   const out: { name: string; text: string }[] = []
@@ -87,10 +89,12 @@ function queueTexts(): { name: string; text: string }[] {
   out.push({ name: 'stale', text: staleWake('HI-7', 'abc1234', null) })
   for (const to of ['review', 'active'] as const) out.push({ name: `left decision ${to}`, text: leftWake('HI-7', 'decision', to) })
   out.push({ name: 'left stale', text: leftWake('HI-7', 'stale', 'review') })
+  // HI-2827: the card's log when its candidate isn't what was reviewed, which R8 (HI-2791) moved into gitIntegration.ts.
+  for (const kind of ['notSame', 'notOnTop', 'mergeCommit', 'rebasedNotSame'] as const) out.push({ name: `candidate ${kind}`, text: candidateLog(kind, { card: 'HI-7', revision: 'abc1234def', target: 'main', expected: 'fed4321abc' }) })
   return out
 }
 
-describe('the canary dialect over the merge queue lines (queueState.ts)', () => {
+describe("the canary dialect over the merge queue lines (queueState.ts, and gitIntegration.ts's candidate logs)", () => {
   it('finds every word in the catalogue, and every queue id in some case', () => {
     canary()
     const seen = new Set<string>()

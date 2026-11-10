@@ -12,8 +12,9 @@ import { listLanes } from '../lanes'
 import { createLogger, userText } from '../logger'
 import { CombworkError, combworkError } from '../combworkError'
 import { foundKey, projectPlatform } from '../platform/registry'
-import { isPlatformId, type PlatformId } from '../../shared/platform/descriptors'
-import { PLATFORM_NAME, SWITCH_REFUSED, switchRefused, switchRefusalText } from '../../shared/platform/switching'
+import { isPlatformId, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
+import { PLATFORM_NAME, storeWide, SWITCH_REFUSED, switchRefused, switchRefusalText } from '../../shared/platform/switching'
+import { checkStoreSwitch, noteMemberChoice, storeSwitch } from './storeSwitch'
 import { setKept } from '../../shared/workflow/projectWorkflow'
 import { withValues } from '../../shared/advanced'
 import type { PlatformSwitchCheck } from '../../shared/types'
@@ -36,7 +37,7 @@ function projectOf(ws: WorkspaceService, projectPath: string): { path: string; n
 }
 
 function platformArg(to: unknown): PlatformId {
-  if (!isPlatformId(to)) throw new CombworkError({ lines: [`A version control is one of: none, git`] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
+  if (!isPlatformId(to)) throw new CombworkError({ lines: [`A version control is one of: none, git, jj`] }, { kind: 'invalid' }) // i18n-ignore: a mistake in a caller, never the window's
   return to
 }
 
@@ -63,13 +64,19 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
   const now = projectPlatform(project.path, (await ws.projectConfig(project.path)).platform)
   const same = now.id === to
   const lanes = same ? [] : (await listLanes(ws, { project: project.name })).filter((l) => l.state === 'active' || l.state === 'paused')
+  const detected = same ? null : switchRefused(to, now.detected)
+  // Git ↔ jj (HI-2799): the repository's projects switch together, after a drain and jj's checks.
+  const store = !same && !detected && storeWide(now.id, to, now.detected) ? await checkStoreSwitch(ws, project.path, to) : null
   return {
     from: now.id,
     to,
-    refused: same ? null : switchRefused(to, now.detected),
+    refused: detected ?? store?.refused ?? null,
+    ...(store ? { store: store.store } : {}),
     lanes: lanes.map((l) => ({ id: l.id, name: l.name, builder: l.builder.name })),
     inFlight: same ? [] : await cardsInFlight(ws, project),
-    gitFolder: to === 'none' && now.detected.platform === 'git',
+    // Git's repository stays in the folder, unused, when switched to a platform that needs none (the warning says Git's: a
+    // colocated jj repository is jj's, HI-2799).
+    gitFolder: !needsRepository(to) && now.detected.platform === 'git',
     queue: !same && (await queueInFlight(ws, project.path))
   }
 }
@@ -80,7 +87,17 @@ export async function checkPlatformSwitch(ws: WorkspaceService, projectPath: str
  * the caller's authority, checked again under the lock (the Assistant's Control). Nothing in flight changes. Returns the
  * platform it was and is now.
  */
-export function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
+export async function setPlatform(ws: WorkspaceService, projectPath: string, raw: unknown, o: { expected?: unknown; guard?: (current: PlatformId) => void; token?: unknown } = {}): Promise<{ from: PlatformId; to: PlatformId }> {
+  const to = platformArg(raw)
+  const project = projectOf(ws, projectPath)
+  const now = projectPlatform(project.path, (await ws.projectConfig(project.path)).platform)
+  const current = now.id
+  // Git ↔ jj (HI-2799): the repository's switch, its own locks and fence (storeSwitch.ts); refused when what the window
+  // showed isn't the platform in force, or the group it showed isn't the group now.
+  if (storeWide(current, to, now.detected)) {
+    const expected = o.expected === undefined || o.expected === null ? current : platformArg(o.expected)
+    return storeSwitch(ws, project.path, expected, to, { token: o.token, ...(o.guard ? { guard: o.guard } : {}) })
+  }
   // In its turn among workflow writes (#1422): an options save or a level's check never interleaves with it.
   // Its repository's lock first (#1642 round 5): a switch moves what the project's branches are measured against.
   return withFolderRepoLocks([projectPath], () => workflowWrite(() => switchPlatform(ws, projectPath, raw, o)), { quiet: true, project: projectPath })
@@ -97,6 +114,8 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
     if (expected && expected !== from) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
     o.guard?.(from)
     if (from === to) return {}
+    // A switch that became the repository's meanwhile (HI-2799) never takes this path: its drain and fence are storeSwitch's.
+    if (storeWide(from, to, now.detected)) throw combworkError(SWITCH_REFUSED.changed, { platform: PLATFORM_NAME[from] }, { kind: 'conflict' })
     const refused = switchRefused(to, now.detected)
     if (refused) {
       const t = switchRefusalText(refused)
@@ -108,6 +127,8 @@ async function switchPlatform(ws: WorkspaceService, projectPath: string, raw: un
     return { platform: to, platformFound: foundKey(now.detected), ...(cfg.workflow ? { workflow: setKept(cfg.workflow, to) } : {}) }
   })
   if (from === to) return { from, to }
+  // A member of a switched repository's fence (HI-2799): its admissions held to its new choice.
+  await noteMemberChoice(ws, project.path).catch((e) => log.warn('recording a switch in its repository’s platform fence', e))
   log.info(`${userText(basename(project.path))} switched its version control from ${from} to ${to}: from its next card`)
   // The window's project (its platform, the offer gone) and the runtime read it afresh; its stages, its queues' sections.
   await ws.refresh().catch((e) => log.warn('refreshing after a switch of version control', e))

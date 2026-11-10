@@ -189,6 +189,7 @@ async function theForm(page, app, inv) {
     await app.evaluate(() => { delete process.env.CW_TEST_SLOW_IPC })
 
     // --- The form as the upgrade left it: in groups, no preset, each option worded as an outcome with its origin.
+    // GitHub's host setting has its group between slots and loops (HI-2779).
     check('Git’s groups, in order', JSON.stringify(await groups()) === JSON.stringify(['presets', 'team', 'review', 'checks', 'merging', 'where', 'slots', 'github', 'loops', 'stages']), JSON.stringify(await groups()))
     const inGroup = async (g) => section.locator(`.workflow-group[data-group="${g}"] .workflow-option`).evaluateAll((els) => els.map((e) => e.getAttribute('data-option')))
     const layout = { review: await inGroup('review'), checks: await inGroup('checks'), merging: await inGroup('merging'), where: await inGroup('where'), loops: await inGroup('loops'), stages: await inGroup('stages') }
@@ -342,6 +343,14 @@ async function theForm(page, app, inv) {
     // G18 (#1179): pushing the target after a merge, shown while Combwork merges, off in the preset; switched on and saved.
     const push = row('pushTarget').locator('[role="switch"]')
     check('…G18 shown in Merging while Combwork merges, off', (await inGroup('merging')).includes('pushTarget') && (await push.getAttribute('aria-checked')) === 'false')
+    // G21 (HI-1183): the target following its remote, shown beside G18, off; on, G18 shows on and can't be turned off.
+    const follow = row('followRemote').locator('[role="switch"]')
+    check('…G21 shown in Merging after G18 while Combwork merges, off', (await inGroup('merging')).join(',').includes('pushTarget,followRemote') && (await follow.getAttribute('aria-checked')) === 'false')
+    await follow.click()
+    check('…G21 on: G18 shown on and fixed', !!(await lib.until(async () => (await push.getAttribute('aria-checked')) === 'true' && (await push.isDisabled()), HUNG_MS)))
+    await themes('follow', row('followRemote'))
+    await follow.click()
+    check('…G21 off again: G18 back as it was, off and free', !!(await lib.until(async () => (await push.getAttribute('aria-checked')) === 'false' && !(await push.isDisabled()), HUNG_MS)))
     await push.click()
     await themes('push', row('pushTarget'))
     // G6's third value (#1184): offered by name, chosen, and saved below.

@@ -1106,6 +1106,11 @@ async function runScenario(sc, providerKey, opts = {}) {
       return e.isDir ? (e.children ?? []).flatMap(flat) : [e.relPath]
     })
     observed.gitStatus = ctx.git('status', '--porcelain')
+    // alpha's branches and its Work merges into and other branches as the run left them (HI-2811: Start the next version).
+    observed.branches = String(ctx.git('branch', '--format=%(refname:short)')).split(/\r?\n/).map((b) => b.trim()).filter(Boolean)
+    observed.targets = await inv('workflow:form', alpha).then((f) => ({ target: f?.options?.target ?? null, otherTargets: f?.options?.otherTargets ?? [] })).catch(() => null)
+    // A scenario's own reading of what the run left, through Combwork (its `after`), for its checks: `observed.after`.
+    if (sc.after) observed.after = await sc.after(ctx).catch((e) => ({ error: String(e?.message ?? e) }))
     observed.live = (await inv('session:live')).map((x) => ({ project: path.basename(x.projectPath), agentId: x.agentId, status: x.status }))
     // Combwork's settings afterwards, for scenarios about changing them.
     observed.settings = await inv('settings:get')

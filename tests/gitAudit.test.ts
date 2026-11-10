@@ -1,15 +1,17 @@
 // The Git/None cutover audit's import rule (SPEC §16.3.6, HI-2792's R9; npm run check:repo): every import of a Git
 // module from outside Git's implementation is a classified edge in tests/gitAudit.mjs, taking only the names it lists,
 // and every "platform with lines" seam is counted per caller. A new edge, a new name across a constrained one, a new seam
-// call in a listed file, or a listed edge that is gone fails here, naming it. scripts/gitInventory.mjs prints the audit.
+// call in a listed file, or a listed edge that is gone fails here, naming it; so does a switch on a platform's id
+// (`platform === 'git'`) outside the descriptors, adapters and registry that SWITCHES doesn't justify (HI-2822).
+// scripts/gitInventory.mjs prints the audit.
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error: a plain .mjs module without types, shared with scripts/gitInventory.mjs
-import { audit, EDGES, SEAMS } from './gitAudit.mjs'
+import { audit, EDGES, SEAMS, SWITCHES } from './gitAudit.mjs'
 
 type Edge = { file: string; module: string; class: string; names?: string[]; op?: string; card?: string; why: string }
-type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[] }
+type Audit = { found: unknown[]; unlisted: string[]; stale: string[]; extraNames: string[]; seams: string[]; switches: string[] }
 const root = join(__dirname, '..')
 const run = (over: Record<string, string> = {}): Audit => audit(root, over)
 const text = (file: string): string => readFileSync(join(root, file), 'utf8')
@@ -17,7 +19,7 @@ const text = (file: string): string => readFileSync(join(root, file), 'utf8')
 describe('the Git/None cutover audit', () => {
   it('classifies every Git import outside Git\'s implementation, and counts every seam', () => {
     const a = run()
-    expect({ unlisted: a.unlisted, stale: a.stale, extraNames: a.extraNames, seams: a.seams }).toEqual({ unlisted: [], stale: [], extraNames: [], seams: [] })
+    expect({ unlisted: a.unlisted, stale: a.stale, extraNames: a.extraNames, seams: a.seams, switches: a.switches }).toEqual({ unlisted: [], stale: [], extraNames: [], seams: [], switches: [] })
   })
 
   it('gives each edge a class and a reason; a historic one its legacy operation, a defect its card', () => {
@@ -28,6 +30,7 @@ describe('the Git/None cutover audit', () => {
     // Only Git-facing UI may take any name: every other edge lists what it takes.
     expect(edges.filter((e) => e.class !== 'gitUi' && !e.names).map((e) => `${e.file} -> ${e.module}`)).toEqual([])
     expect(Object.entries(SEAMS as Record<string, { calls: Record<string, number>; why: string }>).filter(([, s]) => !s.why).map(([f]) => f)).toEqual([])
+    expect(Object.entries(SWITCHES as Record<string, { n: number; why: string }>).filter(([, s]) => !s.why || !(s.n > 0)).map(([f]) => f)).toEqual([])
   })
 
   it('fails a new Git import in a file whose listed edge is to another module (sessions.ts: the fence, not git)', () => {
@@ -92,6 +95,22 @@ describe('the Git/None cutover audit', () => {
     const file = 'src/main/antivirus.ts'
     const gone = text(file).replace(/^import \{ worktreesRoot \} from '\.\/worktrees'\r?\n/m, "const worktreesRoot = (s: string): string => s\n")
     expect(run({ [file]: gone }).stale).toEqual(['src/main/antivirus -> src/main/worktrees'])
+  })
+
+  it("fails a switch on a platform's id outside the descriptors, adapters and registry, and one more in a justified file (HI-2822)", () => {
+    const options = 'src/shared/workflow/options.ts'
+    expect(run({ [options]: `${text(options)}
+const g = (o: { platform: string }) => o.platform === 'git'
+` }).switches).toEqual(["src/shared/workflow/options: 1 switches on a platform's id, listed 0"])
+    const header = 'src/renderer/src/views/VersionControlHeader.tsx'
+    expect(run({ [header]: `${text(header)}
+const n = (platform: string) => platform !== 'none'
+` }).switches).toEqual(["src/renderer/src/views/VersionControlHeader: 2 switches on a platform's id, listed 1"])
+    // Its home is free to switch: the registry picks between the platforms.
+    const registry = 'src/main/platform/registry.ts'
+    expect(run({ [registry]: `${text(registry)}
+const r = (platform: string) => platform === 'none'
+` }).switches).toEqual([])
   })
 
   it('fails a new seam call in a listed file, and one in a file with none', () => {

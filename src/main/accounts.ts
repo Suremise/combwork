@@ -3,7 +3,7 @@ import { basename, join, resolve, sep } from 'path'
 import { app } from 'electron'
 import { watch, type FSWatcher } from 'original-fs'
 import { lstat, mkdir, readdir, readlink, realpath, rename, rmdir, symlink, unlink } from 'original-fs/promises'
-import type { AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, UsageMoveRule, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
+import type { AccountModels, AgentDef, AgentInfo, AppConfig, Account, Connection, ConnectionDefaults, ConnectionObserved, ConnectionProblem, LaunchValues, ModelCatalog, ProjectConfig, ProjectInfo, ProviderId, ServerConnection, ServerModel, UsageMoveRule, WorkspaceConfig, WorkspaceConnections } from '../shared/types'
 import { CW_DIR } from '../shared/defaults'
 import { readKeptJson, withFileLock } from './fsutil'
 import { baseValues, cliDefaults, connectionFor, homeAccount, pcAccountId, pcWideSignIn, seamAccountId, type AccountStore } from '../shared/connectionDefaults'
@@ -28,7 +28,7 @@ import type { TrustReading, TrustTarget } from './providers/types'
 import { trustRoot } from './platform/repoPorts'
 import { withoutAccountEnv } from './providers/common'
 import { providerService } from './providerService'
-import { modelCaps } from '../shared/models'
+import { accountInfo, cachedCatalogFor, modelCaps } from '../shared/models'
 import { openWorkspaces, setConnectionGuard, workspace, workspaceOf } from './workspace'
 import { dropKeysExcept, keyInfo, loadKeys, removeKey, withKey } from './keyStore'
 import { coverageView } from './keyCoverage'
@@ -58,6 +58,8 @@ const log = createLogger('accounts')
 const DEBOUNCE_MS = 1000
 /** Checks run at once over all connections: each starts the CLI. */
 const CHECKS_AT_ONCE = 2
+/** How many accounts' models reads (HI-2852) run at once: each starts its CLI. */
+const MODEL_READS_AT_ONCE = 2
 /** A watch that failed is tried again after 1, 2, 4, 8 and 16 s, then every minute while it is wanted. */
 const RETRY_MS = [1000, 2000, 4000, 8000, 16000]
 const RETRY_LATER_MS = 60_000
@@ -464,6 +466,8 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
     emit({ type: 'connections-changed' })
     log.info(`account ${a.id} added (${a.provider})`)
     syncWatches()
+    // Its own models (HI-2852), so its connection's dialog lists them: read again once it is signed in.
+    if (readsOwnModels(a)) void readAccountModels(a.id)
     return a
   })
 }
@@ -473,8 +477,9 @@ export async function addAccount(id: ProviderId, name: string, server?: ServerCo
  * account's home, else its catalogue's), and whether an effort is one that model takes (only where its efforts are
  * known): an effort it doesn't take is kept but not used.
  */
-export function effortUsable(cli: ProviderId, model: string | null, conn: Pick<Account, 'id' | 'home'> | null, effort: string): boolean {
-  const info = providerService.info(cli)
+export function effortUsable(cli: ProviderId, model: string | null, conn: Pick<Account, 'id' | 'home' | 'kind'> | null, effort: string): boolean {
+  // The account's own models and default (HI-2852), never the CLI's own home's.
+  const info = accountInfo(providerService.info(cli), conn) ?? providerService.info(cli)
   const runs = model || (conn && !conn.home ? provider(cli).configuredDefaultModel(accountFolder(conn.id)) : null) || info.defaultModel || null
   const caps = modelCaps(cli, runs, info, config.settings)
   return !caps.perModel || caps.efforts.some((e) => e.value === effort)
@@ -961,19 +966,29 @@ export async function removeAccount(id: string, opts: { closeTerminal?: boolean 
 // Who it is signed in as.
 // ---------------------------------------------------------------------------
 
-/** Running checks, at most CHECKS_AT_ONCE: the others wait their turn. */
-let running = 0
-const waiting: (() => void)[] = []
-async function slot<T>(fn: () => Promise<T>): Promise<T> {
-  if (running >= CHECKS_AT_ONCE) await new Promise<void>((r) => waiting.push(r))
-  running++
-  try {
-    return await fn()
-  } finally {
-    running--
-    waiting.shift()?.()
+/** At most `n` of what it runs at once: the others wait their turn. */
+function limiter(n: number): <T>(fn: () => Promise<T>) => Promise<T> {
+  let running = 0
+  const waiting: (() => void)[] = []
+  return async (fn) => {
+    if (running >= n) await new Promise<void>((r) => waiting.push(r))
+    running++
+    try {
+      return await fn()
+    } finally {
+      running--
+      waiting.shift()?.()
+    }
   }
 }
+
+/** Running checks, at most CHECKS_AT_ONCE. */
+const slot = limiter(CHECKS_AT_ONCE)
+/**
+ * Running models reads (HI-2852), at most MODEL_READS_AT_ONCE: their own turns, so a slow account's read never holds a
+ * launch's sign-in check (confirmAccount) waiting.
+ */
+const modelsSlot = limiter(MODEL_READS_AT_ONCE)
 
 /** Per account: the check under way, and the one queued after it (asked for while it ran). */
 const inFlight = new Map<string, { now: Promise<ConnectionObserved | null>; next?: Promise<ConnectionObserved | null> }>()
@@ -1298,8 +1313,11 @@ async function checkOnce(id: string): Promise<ConnectionObserved | null> {
   // Removed (or made again) while it ran: its answer is about a folder that's gone.
   if (generation(id) !== gen || !getAccount(id)) return null
   if (observed.error) log.warn(`account ${id}'s check failed: ${userText(observed.error)}`)
+  const wasIn = getAccount(id)?.observed?.loggedIn === true
   changeAccount(id, (x) => (x.observed = observed))
   if (observed.loggedIn === true) for (const fn of signedInListeners) fn(id)
+  // Signed in now (a new account, or signed in again): its own models read (HI-2852), not at every check.
+  if (observed.loggedIn === true && !wasIn) void readAccountModels(id)
   return observed
 }
 
@@ -1330,6 +1348,116 @@ function startCheck(id: string): Promise<ConnectionObserved | null> {
     })
   return now
 }
+
+// ---------------------------------------------------------------------------
+// Each sign-in account's own models (HI-2852): the CLI offers each account its own, so each is read in its folder.
+// ---------------------------------------------------------------------------
+
+/** For tests (HI-2852): run as an account's models read waits for its slot, and once it holds it, before the CLI starts. */
+export const accountModelHooks: { queued?: (id: string) => Promise<void>; started?: (id: string) => Promise<void> } = {}
+
+/** Whether an account's models are read in its own folder: a Combwork sign-in folder of a CLI that lists its models. */
+function readsOwnModels(a: Account | undefined): a is Account {
+  if (!a || isServer(a) || a.home || removing.has(a.id)) return false
+  return !!providerDescriptor(a.provider).capabilities.connections?.homeEnv && !!provider(a.provider).listModels
+}
+
+/** An account's models as kept (a catalogue of `version`, undefined: any) with its folder's own default. */
+function keptModels(a: Account, version: string | null | undefined): AccountModels {
+  const catalog = cachedCatalogFor(config.get().accountModelCatalogs?.[a.id], version ?? undefined, undefined)
+  return { catalog, defaultModel: provider(a.provider).configuredDefaultModel(accountFolder(a.id)) ?? catalog?.defaultModel ?? null }
+}
+
+/**
+ * Per account: its models read under way (at most one, a request meanwhile running it once more after it), and the
+ * read's number: only the latest read of the account's current entry may keep or publish its answer.
+ */
+const modelReads = new Map<string, { seq: number; running: boolean; again: boolean }>()
+
+/** Reads each of a CLI's sign-in accounts' models (after its check): never awaited by it, each published as it lands. */
+function refreshAccountModels(cli: ProviderId): void {
+  for (const a of list()) if (a.provider === cli && readsOwnModels(a)) void readAccountModels(a.id)
+}
+
+/** An account's models read, coalesced: a request while one runs runs it once more after, never a queue of them. */
+export async function readAccountModels(id: string): Promise<void> {
+  let st = modelReads.get(id)
+  if (!st) modelReads.set(id, (st = { seq: 0, running: false, again: false }))
+  if (st.running) {
+    st.again = true
+    return
+  }
+  st.running = true
+  try {
+    do {
+      st.again = false
+      await readModelsOnce(id, st, ++st.seq)
+    } while (st.again && modelReads.get(id) === st)
+  } catch (e) {
+    log.warn(`account ${id}'s models read failed`, e)
+  } finally {
+    st.running = false
+  }
+}
+
+async function readModelsOnce(id: string, st: { seq: number }, seq: number): Promise<void> {
+  const a = getAccount(id)
+  if (!readsOwnModels(a)) return
+  const cli = a.provider
+  const adapter = provider(cli)
+  const homeEnv = providerDescriptor(cli).capabilities.connections!.homeEnv
+  const { path: exe, version } = providerService.info(cli)
+  if (!exe) return
+  const gen = generation(id)
+  const dir = accountFolder(id)
+  // Still the account, CLI and read it was started for: not removed or made again, the same CLI copy, the latest read.
+  const current = (): boolean => {
+    const now = getAccount(id)
+    const info = providerService.info(cli)
+    return readsOwnModels(now) && now.provider === cli && generation(id) === gen && modelReads.get(id) === st && st.seq === seq && info.path === exe && info.version === version
+  }
+  await accountModelHooks.queued?.(id)
+  const read = await modelsSlot(async () => {
+    if (!current()) return undefined
+    try {
+      await assertRealFolder(dir)
+    } catch {
+      return undefined
+    }
+    await accountModelHooks.started?.(id)
+    // Checked again after the waits: the folder's check and the hook.
+    if (!current()) return undefined
+    return adapter.listModels!(exe, withoutAccountEnv(adapter, childEnv({ [homeEnv]: dir }))).catch(() => null)
+  })
+  if (read === undefined || !current()) return
+  let catalog: ModelCatalog | null
+  if (read) {
+    catalog = { source: 'cli', version, models: read.models, ...(read.defaultModel ? { defaultModel: read.defaultModel } : {}), at: new Date().toISOString() }
+    const keep = catalog
+    config.update((c) => void (c.accountModelCatalogs = { ...c.accountModelCatalogs, [id]: keep }))
+  } else {
+    // Its own last answer for this version, else none (the fallback list): never another account's or the CLI's home's.
+    catalog = cachedCatalogFor(config.get().accountModelCatalogs?.[id], version, undefined)
+    log.warn(`account ${id}: ${adapter.descriptor.name} ${version ?? ''} didn't say which models it has: ${catalog ? 'using its last answer' : 'using the fallback list'}`)
+  }
+  providerService.setAccountModels(cli, id, { catalog, defaultModel: adapter.configuredDefaultModel(dir) ?? catalog?.defaultModel ?? null })
+}
+
+providerService.setAccountModelSource({
+  cached: (cli, version) => {
+    if (!providerDescriptor(cli).capabilities.connections?.homeEnv || !provider(cli).listModels) return undefined
+    return Object.fromEntries(list().filter((a) => a.provider === cli && readsOwnModels(a)).map((a) => [a.id, keptModels(a, version)]))
+  },
+  refresh: refreshAccountModels
+})
+
+// A removed account's models go with it, and a read of it still under way is dropped (its entry is gone).
+removedHooks.push((id) => {
+  const a = getAccount(id)
+  modelReads.delete(id)
+  if (config.get().accountModelCatalogs?.[id]) config.update((c) => void delete c.accountModelCatalogs?.[id])
+  if (a) providerService.setAccountModels(a.provider, id, null)
+})
 
 /**
  * Who an account is signed in as for a launch (HI-1755): a fresh check, run again while its login keeps changing

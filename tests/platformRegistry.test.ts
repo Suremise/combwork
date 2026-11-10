@@ -46,19 +46,29 @@ describe('detection, per case of §16.3.5', () => {
     expect(detect(p)).toEqual({ platform: 'git', root, subfolder: true })
   })
 
-  it('Mercurial and Jujutsu are None, naming what was found', () => {
-    for (const [marker, name] of [['.hg', 'Mercurial'], ['.jj', 'Jujutsu']]) {
-      const p = tempDir('cw-platform-other-')
-      mkdirSync(join(p, marker))
-      expect(detect(p)).toEqual({ platform: 'none', other: name })
-    }
+  it('Mercurial is None, naming what was found; a .jj alone is jj without a colocated Git repository (HI-2799)', () => {
+    const p = tempDir('cw-platform-other-')
+    mkdirSync(join(p, '.hg'))
+    expect(detect(p)).toEqual({ platform: 'none', other: 'Mercurial' })
+    const j = tempDir('cw-platform-jj-')
+    mkdirSync(join(j, '.jj'))
+    expect(detect(j)).toEqual({ platform: 'jj', root: j, jj: { colocated: false } })
   })
 
-  it('a colocated jj+git repository is Jujutsu, so None', () => {
+  it('a colocated jj+git repository is jj (HI-2799), offered, never taken by itself', () => {
     const p = tempDir('cw-platform-jjgit-')
     gitInit(p)
     mkdirSync(join(p, '.jj'))
-    expect(detect(p)).toEqual({ platform: 'none', other: 'Jujutsu' })
+    expect(detect(p)).toEqual({ platform: 'jj', root: p, jj: { colocated: true } })
+    // A project with nothing recorded takes None, not jj; a None or Git project is offered jj.
+    expect(projectPlatform(p, undefined).id).toBe('none')
+    expect(projectPlatform(p, undefined).offer).toBeUndefined()
+    expect(projectPlatform(p, 'none').offer).toEqual({ offer: 'jj', why: 'jjFound' })
+    expect(projectPlatform(p, 'git').offer).toEqual({ offer: 'jj', why: 'jjFound' })
+    // A jj project whose .jj is gone is offered Git back, where Git is.
+    const g = tempDir('cw-platform-jjgone-')
+    gitInit(g)
+    expect(projectPlatform(g, 'jj').offer).toEqual({ offer: 'git', why: 'jjGone' })
   })
 })
 

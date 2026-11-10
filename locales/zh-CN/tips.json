@@ -330,6 +330,8 @@
   "tips.memorySnapshot.title": "Combwork 因内存耗尽而关闭？",
   "tips.mergeBranch.text": "在“版本控制”→“分支与远程仓库”中，分支旁的 ⑂ 会将它合并到你选择的分支，每次一个合并。尚未进入“已完成”的卡片的分支会先询问，卡片会被标记为在规则之外合并。",
   "tips.mergeBranch.title": "手动合并分支",
+  "tips.mergeFollowRemote.text": "与他人共用 main？在“版本控制”→“工作流程”中开启“目标分支跟随其远程仓库”：合并队列会在每次试合并前获取，在远程仓库的最新提交上测试，并且仅在期间无人推送时才推送，如有人推送则重新测试。",
+  "tips.mergeFollowRemote.title": "对照团队的远程仓库合并",
   "tips.mergeMessage.text": "由 Combwork 合并时，“版本控制”→“工作流程”决定合并的提交信息：Combwork 的信息写明卡片，分支自己的信息让卡片键不进入你的历史。选择“压缩合并”时，每张卡片会以一个提交落地，带有其构建者的信息。",
   "tips.mergeMessage.title": "使用你自己的提交信息合并",
   "tips.mergePush.text": "由 Combwork 合并时，可在“版本控制”→“工作流程”中让合并队列在每次合并后推送目标分支，从不强制推送。如果远程仓库拒绝，队列会暂停并说明原因：拉取后恢复，或关闭该选项后恢复。",
@@ -580,5 +582,7 @@
   "tips.opencodeOutsideFolder.text": "OpenCode 智能体在读取或更改其自身文件夹以外的任何内容前会先询问，并在它的窗格中等待你的回答。评审副本仍然允许，“全部批准”会直接批准；可在“设置”→“高级”→“OpenCode”中关闭。",
   "tips.opencode.title": "使用 OpenCode 运行智能体",
   "tips.opencodeHistory.text": "OpenCode 代理的对话显示在“会话”标签页中，其令牌和费用按 OpenCode 的报告显示在概览和其窗格的页脚中。$0 的费用并不能衡量你的套餐额度；只有 OpenCode Go 或 Console 才显示限额。",
-  "tips.opencodeHistory.title": "OpenCode 代理的历史记录、令牌和费用"
+  "tips.opencodeHistory.title": "OpenCode 代理的历史记录、令牌和费用",
+  "tips.versionControlJj.text": "在与 Git 共存的 jj 仓库中，可在“版本控制”标签页顶部选择 jj：其历史会并排显示每个变更 ID 和提交 ID，比较、书签和冲突会读取仓库而不更改它。已评审的工作由你自己整合。",
+  "tips.versionControlJj.title": "查看 jj 仓库"
 }

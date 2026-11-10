@@ -77,6 +77,22 @@ describe('delivery records (#647)', () => {
     expect(text(ev(1, '[CW] HI-46 is in Doing'), ev(2, `[CW] HI-46 is in Doing; latest comment by B1: "${back}"`))).toEqual(['2 changes, read the card'])
   })
 
+  it("HI-2808: a card's events with a loop step waiting for the agent's check lead with the step, before or after the rest", () => {
+    const combwork: DeliverySender = { kind: 'combwork', name: 'Combwork' }
+    const ev = (seq: number, body: string, meta?: Record<string, boolean>) => rec({ id: `m${seq}`, seq, kind: 'card-event', from: combwork, card: 46, body, ...(meta ? { meta } : {}) })
+    const pool = (seq: number) => ev(seq, 'HI-46 is in Review: you review it from the pool. Review its latest submission with the review-agent-work skill; your verdict frees you for the next card.')
+    const step = '[CW] HI-46 is in Review. The builder: "follow-up HI-46/s9 ready for your check (answer with its id): …". You review this card in its loop: check it and answer with cw_loop_step (ok, or gaps saying what\'s missing, and its id) (cw_read_task with latestComment for the comment in full).'
+    const stepped = (seq: number) => ev(seq, step, { awaitsCheck: true })
+    const text = (...events: DeliveryRecord[]) => inboxItems(events).map((i) => i.text)
+    // The pool's line and the step's wake on the same card (card-loop-follow-up-check): the step leads, whichever came first.
+    expect(text(pool(1), stepped(2))).toEqual([`${step} (with 1 more change: read the card)`])
+    expect(text(stepped(1), pool(2), ev(3, '[CW] HI-46 is in Review'))).toEqual([`${step} (with 2 more changes: read the card)`])
+    // A return from the merge queue that still holds leads over it (HI-2087); with neither, the count.
+    const back = '[CW] HI-46 came back from the merge queue: a conflict. Merge main, commit and submit again (cw_submit).'
+    expect(text(stepped(1), ev(2, back, { queueReturn: true }))).toEqual([`${back} (with 1 more change: read the card)`])
+    expect(text(pool(1), ev(2, '[CW] HI-46 is in Review'))).toEqual(['2 changes, read the card'])
+  })
+
   it("coalesces a card's events into one item, where its first one was; a message stays its own", () => {
     const combwork: DeliverySender = { kind: 'combwork', name: 'Combwork' }
     const items = inboxItems([

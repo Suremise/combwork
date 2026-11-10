@@ -4,7 +4,7 @@
 // through a whitelist: saving (`templateWorkflowOf`), reading a file or an edit (`readTemplateWorkflows`), and loading
 // (`overlayTemplateWorkflow`): a section naming a target, commands or an identity's name never carries them anywhere.
 
-import type { PlatformId } from '../platform/descriptors'
+import { merges, type PlatformId } from '../platform/descriptors'
 import { allOff, contradictions, FOCUSED_RUN, FORM_GROUPS, identityShown, OPTION_TAKES, PRESETS, sameOptionValue, type OptionKey, type PresetId, type WorkflowOptions } from './options'
 import { stageNameProblems } from './stages'
 
@@ -50,7 +50,7 @@ export const TEMPLATE_CARRIED = [
  * identity's name and email aren't carried either: `identity` is, as on or off only, made from the loading project's own
  * git identity.
  */
-export const TEMPLATE_NOT_CARRIED = ['target', 'targetOwn', 'otherTargets', 'pushTarget', 'commands', 'commitMessage', 'excluded'] as const satisfies readonly OptionKey[]
+export const TEMPLATE_NOT_CARRIED = ['target', 'targetOwn', 'otherTargets', 'pushTarget', 'followRemote', 'commands', 'commitMessage', 'excluded'] as const satisfies readonly OptionKey[]
 
 export type CarriedKey = (typeof TEMPLATE_CARRIED)[number]
 
@@ -187,9 +187,10 @@ export function overlayTemplateWorkflow(section: TemplateWorkflow, base: Workflo
   const changes = carriedFor(base.platform)
     .filter((k) => k in set && !sameOptionValue(k, base.options[k], options[k]))
     .map((k) => ({ key: k as OptionKey, now: shown(k, base.options[k]), next: shown(k, options[k]) }))
-  const named = [...new Set([...options.preChecks, ...(base.platform === 'git' ? options.mergeChecks : [])])]
+  const merging = merges(base.platform)
+  const named = [...new Set([...options.preChecks, ...(merging ? options.mergeChecks : [])])]
   const missingCommands = named.filter((n) => !options.commands[n]?.trim())
   // G20 on where Combwork merges needs this project's runner (HI-1949): flagged as a check's command is; saving still refuses it.
-  if (base.platform === 'git' && options.focusedTests && options.finish === 'combworkMerges' && !options.commands[FOCUSED_RUN]?.trim()) missingCommands.push(FOCUSED_RUN)
+  if (merging && options.focusedTests && options.finish === 'combworkMerges' && !options.commands[FOCUSED_RUN]?.trim()) missingCommands.push(FOCUSED_RUN)
   return { preset: section.preset, own, options, changes, missingCommands, identityOff }
 }

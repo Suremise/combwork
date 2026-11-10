@@ -30,7 +30,7 @@ import { adaptersFor } from '../platform/adapters'
 import { NoneAdapter } from '../platform/none'
 import { readBaseline } from '../noneBaseline'
 import { isUnknown, unknown, type Maybe } from '../platform/types'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { declaresPaths, hasCapability, needsRepository, type PlatformId } from '../../shared/platform/descriptors'
 import { FactStore, type CardRecord, type Tx } from './factStore'
 import { finishAccepts, recordFinish } from './finish'
 import { NOT_RUN_HERE, pauseWait, queueLine, queueStateOf, type QueueLive } from './queueState'
@@ -39,6 +39,8 @@ import { agentMsg, say, type AgentMsg, type AgentValues } from '../../shared/age
 import { inDefaultDialect } from '../../shared/agentText/asyncScope'
 
 import { ownRuleset, reviewSkipOf } from '../../shared/workflow/workView'
+import { admit } from '../platform/platformFence'
+import { PLATFORM_NAME } from '../../shared/platform/switching'
 
 export { APPLY_OPTIONS } from '../../shared/workflow/workView'
 
@@ -175,6 +177,8 @@ export interface WorkflowConfig {
   project: string
   /** The project key (`AM`). */
   projectKey: string
+  /** The project's identity as the slot and copy tables key it (HI-2799: the platform fence's admissions); absent in tests. */
+  projectId?: () => string
   /** The project's resolved options (§16.6.6); a card in flight keeps its own ruleset. */
   options: () => WorkflowOptions
   /** Where cards' own folders go (the P2 spike's stand-in for slots, its unit tests only: the app lends slots, `slotFor`). */
@@ -211,10 +215,11 @@ export interface WorkflowConfig {
    */
   movePending?: () => Promise<boolean>
   /**
-   * Whether the project's Git repository is gone (#1419, S20: `.git` removed or moved, or another version control found
-   * instead): a Git card's refusal for what couldn't be read then offers the switch to None as its next step.
+   * Whether the project's repository of `platform` is gone (#1419, S20: Git's `.git` removed or moved, or another version
+   * control found instead): a card of a platform that needs one, refused for what couldn't be read, then offers the switch
+   * to None as its next step.
    */
-  repositoryGone?: () => boolean
+  repositoryGone?: (platform: PlatformId) => boolean
   /**
    * The lock records still being written for the project (#1481: a lock taken before an intent is recorded before the
    * intent reads the cards' records); left out, none are.
@@ -817,8 +822,9 @@ export class Workflow {
   /** A refusal: recorded as `Refused` when an agent or the Assistant was refused (the user's refused drags aren't). */
   // agent-protocol: who can override a refusal, the Agent API's fixed `override` value (AGENT_API.md, §16.8.3)
   async refuse(card: CardRecord | null, actor: Actor, move: string, g: GuardRefusal, override: Refusal['override'] = 'the user'): Promise<Refusal> { // i18n-ignore: the override field, agent-facing (§16.8.3)
-    // A Git card refused for what couldn't be read, its repository gone (S20): the next step is the offer (#1419).
-    if (g.rule === 'platform.unknown' && card && this.rulesetOf(card).options.platform === 'git' && this.cfg.repositoryGone?.()) g = { ...g, values: { ...g.values, offer: 'repositoryGone' } }
+    // A card refused for what couldn't be read, its platform's repository gone (S20, Git): the next step is the offer (#1419).
+    const needs = g.rule === 'platform.unknown' && card ? this.rulesetOf(card).options.platform : null
+    if (needs && needsRepository(needs) && this.cfg.repositoryGone?.(needs)) g = { ...g, values: { ...g.values, offer: 'repositoryGone' } }
     const side = g.rule === 'move.notFromHere' && card ? this.sideOf(card, actor, move, g.values.stage) : null
     if (side) g = { ...g, values: { ...g.values, ...side } }
     const out = refusal(g.rule, g.values, override)
@@ -995,6 +1001,9 @@ export class Workflow {
         // Decided where the start is written, from the lane as it is there (HR6's #1270 round 1, the Assistant's round 4
         // design): a queued list whose boundary has passed applies first (committed with its wake even if this start is
         // then refused: the boundary passed either way), then the start is checked against it.
+        // The platform fence (HI-2799): a start is an admission on the project's repository, decided in this transaction.
+        const fenced = this.cfg.projectId ? admit({ get: (k) => this.store.boardMeta(k), set: () => undefined }, this.cfg.projectId(), g.o.platform) : null
+        if (fenced) return undone(fenced.why === 'switching' ? { rule: 'platform.switching', values: { card: card.key } } : { rule: 'platform.changed', values: { card: card.key, platform: workflowText(PLATFORM_NAME[fenced.now]) } })
         if (this.enforced() && !opts.drag) {
           this.applyLaneBoundary(w, this.store.card(card.id))
           // The lane and ruleset the gather used must still be the card's (HR6's round 4: a queued list that took the card
@@ -1032,6 +1041,9 @@ export class Workflow {
     const builder = builderOpt ?? agentOf(actor) ?? 'user'
     const warnings: string[] = []
     if (s.blocked && !r.guards.start.includes('start.notBlocked')) warnings.push(say(W.blocked, { card: card.key, why: s.blocked }))
+    // HI-2799: a platform whose card work isn't enabled yet (jj) refuses before its adapter is asked anything; no override
+    // crosses it, since the adapter couldn't do what it would allow.
+    if (r.guards.start.includes('start.platformReady')) return { rule: 'start.platformReady', values: { card: card.key } }
     // Its target's ref included, resolved as the plan resolves it (#1401: the default branch, when G7 is empty).
     const before = await this.evidenceOf(card, s, o, builder)
     const plan = await this.platform(o).start(card, o, builder, dry)
@@ -1635,9 +1647,9 @@ export class Workflow {
     await this.cfg.checksSettled?.()
     // The card's declared paths (None) are its data: what the evidence and the revision are read with (args, else the
     // pre-fill), written with the submission.
-    const setPaths = args.paths ?? (card.kind === 'code' && o.platform === 'none' && !card.paths ? this.prefill(card) : null)
+    const setPaths = args.paths ?? (card.kind === 'code' && declaresPaths(o.platform) && !card.paths ? this.prefill(card) : null)
     // Submit's paths as declare paths' (#1511): none under `.combwork`, `.git` or an excluded folder.
-    const bad = args.paths && o.platform === 'none' ? this.excludedPath(args.paths) : null
+    const bad = args.paths && declaresPaths(o.platform) ? this.excludedPath(args.paths) : null
     if (bad) return { rule: 'paths.excluded', values: { card: card.key, ...bad } }
     if (setPaths) card = { ...card, paths: setPaths }
     const before = await this.evidenceOf(card, s, o)
@@ -1658,7 +1670,7 @@ export class Workflow {
       inputs.checksMissing = o.preChecks.filter((name) => !s.checks.some((c) => c.name === name && c.revision === revision && c.result === 'passed' && c.counted))
       // The first missing check's newest run on the revision, if it passed and didn't count: the refusal says why (#1654).
       const last = inputs.checksMissing.length ? s.checks.findLast((c) => c.name === inputs.checksMissing![0] && c.revision === revision) : undefined
-      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: o.platform === 'git' && !last.isolated }
+      if (last && last.result === 'passed' && !last.counted && last.whyNot) inputs.checkUncounted = { whyNot: last.whyNot, ...(last.changes?.length ? { changes: last.changes } : {}), isolatable: hasCapability(o.platform, 'isolation') && !last.isolated }
     }
     // G13: the builder's own running work, whoever submits (an agent itself; the user's or the Assistant's move: the
     // card's builder). Read again in the write (`runsNow`): work started meanwhile counts.
@@ -2155,7 +2167,7 @@ export class Workflow {
     const s = this.state(card)
     if (s.stage !== 'todo' && s.stage !== 'hold' && s.stage !== 'active' && s.stage !== 'review') return null
     const o = this.rulesetOf(card, s).options
-    return checksView(o.preChecks, card.key, o.platform !== 'none')
+    return checksView(o.preChecks, card.key, hasCapability(o.platform, 'isolation'))
   }
 
   /** The merge slot claimed for a card (#1354): refused, and recorded as Refused, when Combwork merges it. */
@@ -2806,7 +2818,7 @@ export class Workflow {
    * declared paths stay what the revision covers. Agent-facing English; empty elsewhere (Git, no-code).
    */
   private async pathNotices(card: CardRecord, o: WorkflowOptions, given: boolean, signal?: AbortSignal): Promise<string[]> {
-    if (o.platform !== 'none' || card.kind !== 'code') return []
+    if (!declaresPaths(o.platform) || card.kind !== 'code') return []
     const paths = card.paths ?? []
     const out: string[] = []
     const outside = given ? [] : this.prefill(card).filter((p) => !this.none.covers(paths, p))
@@ -2821,7 +2833,7 @@ export class Workflow {
    * (HI-2352), for the window's drag to ask the user: null when nothing is, or it isn't a None code card.
    */
   private async leftOutOf(card: CardRecord, o: WorkflowOptions): Promise<{ paths: string[]; files: string[] } | null> {
-    if (o.platform !== 'none' || card.kind !== 'code') return null
+    if (!declaresPaths(o.platform) || card.kind !== 'code') return null
     const prefill = this.prefill(card)
     const paths = card.paths ?? prefill
     const outside = prefill.filter((p) => !this.none.covers(paths, p))

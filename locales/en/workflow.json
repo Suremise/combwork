@@ -15,6 +15,14 @@
     "defaultMessage": "Each card’s focused tests need the command that runs them.",
     "description": "Why workflow options cannot be saved (G20): “Each card’s focused tests” is on but the project has no command to run them (its runner, focused.run)."
   },
+  "workflow.contradiction.jjNeedsSlots": {
+    "defaultMessage": "With jj, each card needs its own folder: agents sharing the project folder aren’t supported yet.",
+    "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) was set to have everyone work in the project folder. Keep jj (the tool’s name)."
+  },
+  "workflow.contradiction.jjYouIntegrate": {
+    "defaultMessage": "With jj, you integrate the reviewed work yourself: Combwork doesn’t merge it.",
+    "description": "Why workflow options cannot be saved (HI-2799): a project using jj (Jujutsu) had another finish chosen than “You integrate it”. Keep jj (the tool’s name)."
+  },
   "workflow.contradiction.mergeNeedsSlots": {
     "defaultMessage": "When Combwork or the agent merges, each card needs its own folder.",
     "description": "Why workflow options cannot be saved: a merging option was chosen while everyone works in the project folder."
@@ -90,6 +98,10 @@
   "workflow.forYou.queueAdvance": {
     "defaultMessage": "{card} is tested and ready to merge: update {target} in {folder} now?",
     "description": "A For you request (Approve, §16.9.2): the merge queue has merged and checked the card's work, and waits for the user's OK before it updates the branch {target}, which is checked out in the folder {folder} (its files change there). Settings → Advanced → Merge into a checked-out branch: Ask each time. {card} is a card key like AM-12."
+  },
+  "workflow.forYou.queuePublish": {
+    "defaultMessage": "Combwork pushed {card} ({result}) to {endpoint} for {target}, but never heard whether the push arrived, and {target} there doesn’t show it now. Approve if {result} was published (someone may have removed it since); decline if it wasn’t, and the queue tests {card} again. Until you answer, the queue for {target} waits.",
+    "description": "A For you request (Approve, HI-1183, §16.9.4, “The target branch follows its remote”): the merge queue pushed a merge to the remote, the push’s answer was lost (the network, a crash), and the remote’s branch doesn’t contain it now, so Combwork can’t tell whether it was published and asks. {card} a card key like AM-12; {result} a short commit id; {endpoint} the remote’s address without credentials; {target} the branch."
   },
   "workflow.forYou.queueStuck": {
     "defaultMessage": "{card}'s merge into {target} stopped part way in {folder}, with {files, plural, one {# file} other {# files}} left between the two, and Combwork changes nothing more there. The card's Work section lists each file and its side, and the commands to copy. {how, select, both {To finish it, run {finish} (PowerShell) in {project}; to undo it, run {undo} (PowerShell) in {folder}.} finish {To finish it, run {finish} (PowerShell) in {folder}.} undo {To undo it, run {undo} (PowerShell) in {folder}.} other {Its files are neither as they were nor as merged: put them right by hand.}} Then answer here, and the queue looks again.",
@@ -327,6 +339,10 @@
     "defaultMessage": "The defaults of Git projects.",
     "description": "Beside the None · Git choice above workflow defaults, while Git is chosen."
   },
+  "workflow.form.levelForJj": {
+    "defaultMessage": "The defaults of jj projects.",
+    "description": "Beside the None · Git · jj choice above workflow defaults, while jj (Jujutsu, HI-2799) is chosen. Keep jj."
+  },
   "workflow.form.levelForNone": {
     "defaultMessage": "The defaults of projects without version control.",
     "description": "Beside the None · Git choice above workflow defaults, while None is chosen."
@@ -334,6 +350,10 @@
   "workflow.form.levelGit": {
     "defaultMessage": "Git",
     "description": "The choice of the defaults for Git projects (glossary 2.1: keep)."
+  },
+  "workflow.form.levelJj": {
+    "defaultMessage": "jj",
+    "description": "The choice of the defaults for projects using jj (Jujutsu, HI-2799). Keep jj: the tool’s name, lower case."
   },
   "workflow.form.levelNone": {
     "defaultMessage": "None",
@@ -802,6 +822,14 @@
   "workflow.option.folder.title": {
     "defaultMessage": "Where cards are built",
     "description": "A workflow option (glossary 2.6, G11)."
+  },
+  "workflow.option.followRemote.desc": {
+    "defaultMessage": "Before each test merge, the merge queue fetches the remote branch the target tracks and tests on its latest commit, pushes each merge there only if nobody pushed meanwhile (testing again if they did), and then brings the local target up to date.",
+    "description": "What the workflow option “The target branch follows its remote” does (glossary 2.1: merge queue; 2.5: test merge). “Push the target branch after merging” is another option’s name."
+  },
+  "workflow.option.followRemote.title": {
+    "defaultMessage": "The target branch follows its remote",
+    "description": "A workflow option (glossary 2.6, G21): the target branch is the one it tracks on its remote; Combwork’s merge queue fetches it before each test merge and publishes each merge there first."
   },
   "workflow.option.identity.desc": {
     "defaultMessage": "Commits are made with the name and email from the project’s git config (else your global one).",
@@ -1363,6 +1391,22 @@
     "defaultMessage": "Declare only the files of the work, outside {folder}: a card's paths narrow the project's work, never widen it.",
     "description": "The next step after a refused declaration of a card's paths: name files outside the excluded folder {folder} (#1511)."
   },
+  "workflow.refused.platform.changed.message": {
+    "defaultMessage": "{card} can't start under these rules: its project uses {platform} now.",
+    "description": "HI-2799: a refused start: the start was prepared under the project’s previous version control, and the project was switched meanwhile. {card} is a card key; {platform} is None, Git or jj."
+  },
+  "workflow.refused.platform.changed.next": {
+    "defaultMessage": "Start it again: it is then checked under {platform}’s rules.",
+    "description": "HI-2799: the next step after a start refused because the project switched version control meanwhile. {platform} is None, Git or jj."
+  },
+  "workflow.refused.platform.switching.message": {
+    "defaultMessage": "{card} can't start now: its repository's version control is being switched.",
+    "description": "HI-2799: a refused start: the project’s repository is switching between Git and jj, and nothing starts on it meanwhile. {card} is a card key like AM-12."
+  },
+  "workflow.refused.platform.switching.next": {
+    "defaultMessage": "Try again in a moment, once the switch has finished.",
+    "description": "HI-2799: the next step after a start refused while the repository’s version control is switched."
+  },
   "workflow.refused.platform.targetGone.message": {
     "defaultMessage": "{card} was started on {target}, which no longer exists in this repository.",
     "description": "HI-2753: a refused move (a submit): the branch the card was started on and merges into (its target, {target}) was deleted, as an integration branch is once it has been merged. {card} is a card key like AM-12."
@@ -1474,6 +1518,14 @@
   "workflow.refused.start.notBlocked.next": {
     "defaultMessage": "Wait for it to be unblocked, or work on another card.",
     "description": "The next step after a refused start of a blocked card."
+  },
+  "workflow.refused.start.platformReady.message": {
+    "defaultMessage": "{card} can't start: cards don't run in a jj project yet.",
+    "description": "A refused start of a card in a project using jj (Jujutsu, HI-2799): Combwork shows its repository but doesn’t start card work there yet. {card} is a card key. Keep jj (the tool’s name)."
+  },
+  "workflow.refused.start.platformReady.next": {
+    "defaultMessage": "Work on it outside Combwork’s cards, or switch the project to Git in Version Control.",
+    "description": "The next step after a refused start in a jj project (HI-2799). Version Control is the tab’s name (glossary 2.1). Keep Git and jj."
   },
   "workflow.refused.start.slotAvailable.change": {
     "defaultMessage": "This is set in Version Control → Where cards are built.",
@@ -1714,6 +1766,10 @@
   "workflow.rule.start.notBlocked": {
     "defaultMessage": "Blocked cards don't start",
     "description": "A rule of the workflow, named where a move skips or can't check it."
+  },
+  "workflow.rule.start.platformReady": {
+    "defaultMessage": "Cards run only where Combwork supports the version control",
+    "description": "A rule of the workflow, named where a move skips or can’t check it (HI-2799): cards don’t start in a project using jj (Jujutsu) yet."
   },
   "workflow.rule.start.slotAvailable": {
     "defaultMessage": "Each card in its own folder",
@@ -1983,6 +2039,18 @@
     "defaultMessage": "Pair with stricter checks: the unit tests too, a clean install before every merge, and your OK for cards labelled ui or release.",
     "description": "What the Team preset sets up, for a Git project (glossary 2.1: Team, Pair)."
   },
+  "workflow.summary.jj.pair": {
+    "defaultMessage": "A reviewer agent passes each card after the quick checks, then you integrate it yourself.",
+    "description": "What the Pair preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj."
+  },
+  "workflow.summary.jj.solo": {
+    "defaultMessage": "Each card in its own jj workspace, no review: you integrate the work yourself.",
+    "description": "What the Solo preset sets up, for a project using jj (Jujutsu, HI-2799). Keep jj; a jj workspace is a working folder jj makes."
+  },
+  "workflow.summary.jj.team": {
+    "defaultMessage": "A reviewer agent, then you, check each card after the quick checks and the tests, then you integrate it yourself.",
+    "description": "What the Team preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj."
+  },
   "workflow.summary.none.pair": {
     "defaultMessage": "A reviewer agent checks each card, after the quick checks pass.",
     "description": "What the Pair preset sets up, for a project without version control."
@@ -2087,6 +2155,18 @@
     "defaultMessage": "the path {path}, which is outside the project",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": a card's path that isn't in its project. {path} is the path."
   },
+  "workflow.unreadable.remoteBehind": {
+    "defaultMessage": "where to start from: {target} has commits that {endpoint} doesn’t (push or pull them first)",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183): the local branch {target} has commits the remote branch it follows (at {endpoint}, an address) lacks, so Combwork won't start a card's work from either."
+  },
+  "workflow.unreadable.remoteHead": {
+    "defaultMessage": "the branch {branch} on {endpoint}, which {target} follows",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183): fetching the remote branch {branch} from {endpoint} (a remote's address) failed; {target} is the local branch that follows it. Git's own words follow."
+  },
+  "workflow.unreadable.remoteSetup": {
+    "defaultMessage": "the remote branch {target} follows (it must track one, on a remote with a single push address)",
+    "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\" (HI-1183, “The target branch follows its remote”): the branch on a remote that the target branch {target} tracks; it tracks none, or its remote has several push addresses or none."
+  },
   "workflow.unreadable.replay": {
     "defaultMessage": "{revision} applied onto {onto}",
     "description": "What Combwork couldn't read, the object of \"Combwork couldn't read …\": the result of applying a revision's change onto another commit. {revision} and {onto} are short commit ids."
@@ -2150,6 +2230,10 @@
   "workflow.value.finish.notChecked": {
     "defaultMessage": "Not checked",
     "description": "A value of the workflow option “Who merges” (glossary 2.6, G5)."
+  },
+  "workflow.value.finish.userIntegrates": {
+    "defaultMessage": "You integrate it yourself",
+    "description": "A value of the workflow option “Who merges” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj; you bring the reviewed work into its target with jj."
   },
   "workflow.value.folder.project": {
     "defaultMessage": "Everyone in the project folder",
@@ -2250,6 +2334,10 @@
   "workflow.why.folder": {
     "defaultMessage": "Pairs and teams build in parallel, each card apart from the others.",
     "description": "Why the presets set “Where cards are built” as they do (Solo: the project folder)."
+  },
+  "workflow.why.followRemote": {
+    "defaultMessage": "Following a remote reaches it and its sign-in before every merge, so it stays yours unless you turn it on.",
+    "description": "Why the presets leave “The target branch follows its remote” off."
   },
   "workflow.why.identity": {
     "defaultMessage": "Commits name the project’s identity, whoever’s computer made them.",

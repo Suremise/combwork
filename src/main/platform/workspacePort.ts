@@ -17,13 +17,13 @@ import type { PlatformId } from '../../shared/platform/descriptors'
 import type { Maybe } from './types'
 
 /**
- * jj's id as a workspace platform (HI-2795's J2, agreed with J1, HI-2794, which imports it): only for workspaces, not a
- * project's platform. `PlatformId` stays 'none' | 'git' until J6's switch (a jj in it would make project.json accept it),
- * so jj's port is reached only by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`), never `slotWorkspaces`.
+ * jj's id (HI-2795's J2, agreed with J1, HI-2794, which imports it): a project platform since J6 (HI-2799), so these are
+ * `PlatformId`'s own. jj's port is still reached only by injection (`PoolDeps.workspaces`, `CopyPoolDeps.workspaces`),
+ * never `slotWorkspaces`, until jj's card work is enabled (no jj card starts yet: `start.platformReady`).
  */
-export type JjPlatform = 'jj'
-/** The platforms a workspace port can be: a project platform, or jj. */
-export type WorkspacePlatform = PlatformId | JjPlatform
+export type JjPlatform = Extract<PlatformId, 'jj'>
+/** The platforms a workspace port can be: a project's. */
+export type WorkspacePlatform = PlatformId
 
 /**
  * Who a workspace is, beyond its folder (HI-2795): its store, its own name there and its creation generation (the

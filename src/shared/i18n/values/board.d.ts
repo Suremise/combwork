@@ -691,16 +691,24 @@ interface CombworkMessageValues {
   'board.queue.pause.byAssistant': undefined
   'board.queue.pause.byYou': undefined
   'board.queue.pause.checkedOut': { target: string | number }
+  'board.queue.pause.fetchFailed': { target: string | number }
   'board.queue.pause.folderBusy': { target: string | number }
   'board.queue.pause.hookTimedOut': undefined
   'board.queue.pause.identity': undefined
   'board.queue.pause.mergeChoice': { card: string | number }
   'board.queue.pause.needsYou': undefined
+  'board.queue.pause.noUpstream': { target: string | number }
   'board.queue.pause.other': { reason: string | number }
+  'board.queue.pause.publishRefused': { card: string | number; target: string | number }
+  'board.queue.pause.publishUnknown': { card: string | number; target: string | number }
   'board.queue.pause.pushFailed': { card: string | number; target: string | number }
   'board.queue.pause.pushNoRemote': { card: string | number; target: string | number }
+  'board.queue.pause.pushRefused': { card: string | number; target: string | number }
   'board.queue.pause.pushRejected': { card: string | number; target: string | number }
   'board.queue.pause.pushUnreadable': { card: string | number; target: string | number }
+  'board.queue.pause.remoteAmbiguous': { target: string | number; files: string }
+  'board.queue.pause.remoteDiverged': { target: string | number }
+  'board.queue.pause.remoteUnsupported': { target: string | number }
   'board.queue.pause.rulesOff': undefined
   'board.queue.pause.signing': undefined
   'board.queue.pause.signingWaits': undefined

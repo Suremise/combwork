@@ -19,6 +19,7 @@ import { msg } from '../../shared/i18n/msg'
 import { withValues } from '../../shared/advanced'
 import { nextVersionName, type BranchStart, type ResolvedStart } from '../../shared/nextVersion'
 import type { PresetId, WorkflowOptions } from '../../shared/workflow/options'
+import { merges } from '../../shared/platform/descriptors'
 import type { NextVersionPlan, NextVersionResult, RetargetPreview, WorkflowForm } from '../../shared/types'
 import type { WorkspaceService } from '../workspace'
 import { saveWorkflowOptions, workflowForm } from './optionsForm'
@@ -51,7 +52,9 @@ export class NextVersionPartial extends CombworkError {
 /** What the dialog shows (HI-2807): the release, its head, the proposed name, and what can follow the new branch. */
 export async function nextVersionPlan(ws: WorkspaceService, projectPath: string): Promise<NextVersionPlan> {
   const form = await workflowForm(ws, projectPath)
-  if (form.platform !== 'git') throw new CombworkError(M.notGit, { kind: 'invalid' })
+  // A platform whose work merges into a target (Git; HI-2822: by its descriptor, never the id). Making the line is the
+  // repository operations port's, which refuses a platform that doesn't list it (HI-2788).
+  if (!merges(form.platform)) throw new CombworkError(M.notGit, { kind: 'invalid' })
   const from = (await projectTargets(ws, projectPath))?.default ?? ''
   // The release as its local branch (HR1's round 1, finding 2): a tag of the same name is never its head.
   const found = from ? await lineRepoReads().resolveStart(projectPath, from) : null
@@ -83,7 +86,7 @@ export async function startNextVersion(
 async function startLocked(ws: WorkspaceService, projectPath: string, a: Parameters<typeof startNextVersion>[2]): Promise<NextVersionResult> {
   a.check?.()
   const form = await workflowForm(ws, projectPath)
-  if (form.platform !== 'git') throw new CombworkError(M.notGit, { kind: 'invalid' })
+  if (!merges(form.platform)) throw new CombworkError(M.notGit, { kind: 'invalid' })
   const release = (await projectTargets(ws, projectPath))?.default ?? ''
   const from: BranchStart = a.from ?? { ref: release, commit: '' }
   if (from.ref !== release) throw combworkError(M.movedOn, { now: release, from: from.ref }, { kind: 'conflict' })

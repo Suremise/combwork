@@ -2,7 +2,7 @@ import { basename, join } from 'path'
 import { projectAgents } from '../shared/defaults'
 import { agentList, agentMsg, inDefaultDialect, inDialectOf, say } from '../shared/agentText'
 import { msg } from '../shared/i18n'
-import { laneBrief, type LaneRole } from '../shared/laneBrief'
+import { laneBrief, laneOptions, type LaneRole } from '../shared/laneBrief'
 import { laneStartDue, ownOpen } from '../shared/lanes'
 import { cardLabel } from '../shared/projectKeys'
 import type { LaneInfo, LaneStartInfo, LaneStartRequest, LaneStartResult } from '../shared/types'
@@ -149,7 +149,7 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   }
   // What the project's rules ask (none while they are off): a reviewer agent's review needs a reviewer.
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  let options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
   if (options && !reviewer && !req.pool && (options.review === 'agent' || options.review === 'agentThenYou')) throw combworkError(M.needsReviewer, { project }, { kind: 'invalid' })
   // The pool (#1443): only where the rules have it (with them off, the lane's reviewer is whoever the user names), and
   // only with someone in it besides the builder.
@@ -169,6 +169,8 @@ export async function startLaneFromWindow(ws: WorkspaceService, projectPath: str
   starting.add(key)
   try {
     const recorded = await startLane(ws, { project, builder: builder.id, reviewer: reviewer?.id ?? null, ...(pool ? { pool: true } : {}), cards: cards.map((c) => c.number), name: req.name?.trim() || null, by: inDefaultDialect(() => say(A.byUser)), ...(req.applyNow ? { applyNow: true } : {}), ...(req.target !== undefined ? { target: req.target } : {}) })
+    // From here, the lane's own Merges into (HI-2832), as it was recorded.
+    options = laneOptions(options, recorded.lane)
     const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, cards.map((c) => c.number)))
     if (where.inSlots) {
       // Its slot, lent before its agents start and kept for the whole lane (§16.10.2). None free: the lane is recorded
@@ -465,7 +467,7 @@ export async function briefAfterFailedPrepare(ws: WorkspaceService, projectPath:
   const reviewer = lane.reviewer ? (agents.find((a) => a.id === lane.reviewer!.id) ?? null) : null
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane)
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const slot = (await listLanes(ws)).find((l) => l.id === lane.id)?.slot ?? null
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
@@ -509,7 +511,7 @@ export async function launchRecordedLane(ws: WorkspaceService, projectPath: stri
   // Who the reply names, and whether Combwork starts a running builder's first card (the rules on, HI-2029).
   const who = { builder: builder.name, firstCardByCombwork: workflowEnforced() }
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane)
   // Its cards all no-code (HI-2338): no slot.
   const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, lane.cards))
   // Running now: left out of this start whatever they do meanwhile (its slot is decided from it), and named to the caller.
@@ -609,7 +611,7 @@ export async function startWaitingLane(ws: WorkspaceService, projectPath: string
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   if (over()) return false
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane)
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const brief = briefFor(lane.rounds, basename(projectPath), cards, builder, reviewer, pooled, options, { legacy: null }, slot, lane.slotWait?.note ?? '')
   const stoppedOnly = lane.slotWait?.stoppedOnly === true
@@ -678,9 +680,19 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
     log.warn(`Lane ${laneId}: ${userText(agent.name)}'s new conversation may not have started (a launch began and isn't proven): left for the user to retry`)
     return 'blocked'
   }
+  // Stopped by someone since it was owed (HI-2815: the user's Stop stops it): owed no more, and never started by it again.
+  // The lane stays: updating it starts a stopped builder on it (resumeLaneBuilder), and the user can start it themselves.
+  const since = Date.parse(entry.since)
+  const stoppedSince = (): boolean => sessions.stoppedOnPurposeAt(projectPath, agent.id) >= since
+  const dropStopped = async (): Promise<FreshOutcome> => {
+    await changeFreshStart(ws, laneId, entryId, () => null)
+    log.info(`Lane ${laneId}: ${userText(agent.name)} was stopped since its new conversation was owed: no longer owed`)
+    return 'gone'
+  }
+  if (stoppedSince()) return dropStopped()
   const cards = await laneCards(ws, basename(projectPath), lane.cards)
   const platform = ws.info()?.projects.find((p) => p.path.toLowerCase() === projectPath.toLowerCase())?.platform?.id
-  const options = workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null
+  const options = laneOptions(workflowEnforced() && platform ? resolvedOf(ws, projectPath, platform, cfg).options : null, lane)
   const pooled = lane.pool ? (poolOf(cfg, options)?.filter((a) => a.id !== builder.id).map((a) => a.name) ?? []) : null
   const where = await builderWhere(projectPath, builder, options, noCodeOnly(ws, lane.cards))
   const slot = (await listLanes(ws)).find((l) => l.id === laneId)?.slot ?? null
@@ -700,7 +712,7 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
   // is replaced and as the launch spawns; refused, the claim is given back and the next pass tries again.
   const still = (): void => {
     const f = freshStartsNow(ws, laneId).find((x) => x.id === entryId)
-    if (!f || f.blocked || !f.launching || teamPauseOf(ws)) throw new FreshGone()
+    if (!f || f.blocked || !f.launching || teamPauseOf(ws) || stoppedSince()) throw new FreshGone()
   }
   const [r] = await launchAgents(ws, projectPath, laneId, builder, reviewer, brief, undefined, undefined, { role: entry.role, still })
   if (r?.how === 'fresh' || r?.how === 'started') {
@@ -712,6 +724,8 @@ export async function launchFresh(ws: WorkspaceService, projectPath: string, lan
     await changeFreshStart(ws, laneId, entryId, ({ launching: _l, ...f }) => ({ ...f, blocked: { at: new Date().toISOString(), why: 'failed', message: (r.why ?? '').slice(0, 500) } })) // i18n-ignore: a fresh start's blocked reason, a select key (never shown as it is)
     return 'blocked'
   }
+  // Stopped by someone during the launch (HI-2815): nothing launched, and owed no more.
+  if (stoppedSince()) return dropStopped()
   // Not free after all, or gone meanwhile: the claim given back while the obligation is still this one.
   await changeFreshStart(ws, laneId, entryId, ({ launching: _l, ...f }) => f)
   return r?.how === 'deferred' ? 'notFree' : 'gone'

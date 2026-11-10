@@ -330,6 +330,8 @@
   "tips.memorySnapshot.title": "¿Combwork se cerró por quedarse sin memoria?",
   "tips.mergeBranch.text": "⑂ junto a una rama en Control de versiones → Ramas y remotos la fusiona en la rama que elijas, una fusión cada vez. La rama de una tarjeta que no está en Hecho pregunta antes, y la tarjeta queda marcada como fusionada fuera de las reglas.",
   "tips.mergeBranch.title": "Fusiona una rama a mano",
+  "tips.mergeFollowRemote.text": "¿Compartes main con otras personas? Activa “La rama de destino sigue a su remoto” en Control de versiones → Flujo de trabajo: la cola de fusión hace fetch antes de cada fusión de prueba, prueba sobre el último commit del remoto y hace push solo si nadie lo hizo mientras tanto; si alguien lo hizo, vuelve a probar.",
+  "tips.mergeFollowRemote.title": "Fusiona contra el remoto de tu equipo",
   "tips.mergeMessage.text": "Si Combwork fusiona, Control de versiones → Flujo de trabajo fija el mensaje del commit de la fusión: el de Combwork nombra la tarjeta y el propio de la rama mantiene las claves de tarjeta fuera de tu historial. Con Squash, cada tarjeta entra entonces como un solo commit con el mensaje de su autor.",
   "tips.mergeMessage.title": "Fusiones con tus propios mensajes de commit",
   "tips.mergePush.text": "Si Combwork fusiona, Control de versiones → Flujo de trabajo puede hacer push de la rama de destino después de cada fusión, nunca forzado. Si el remoto lo rechaza, la cola se pausa y explica por qué: haz pull y reanuda, o desactívalo y reanuda.",
@@ -580,5 +582,7 @@
   "tips.opencodeOutsideFolder.text": "Un agente de OpenCode pregunta antes de leer o cambiar algo fuera de su propia carpeta, y espera tu respuesta en su panel. Las copias de revisión siguen permitidas, y Aprobar todo aprueba sin preguntar; Configuración → Avanzado → OpenCode lo desactiva.",
   "tips.opencode.title": "Ejecutar agentes con OpenCode",
   "tips.opencodeHistory.text": "La conversación de un agente de OpenCode aparece en la pestaña Sesiones, y sus tokens y su coste en el Resumen y en el pie de su panel, tal como los informa OpenCode. Un coste de $0 no mide la cuota de tu plan; solo hay límites para OpenCode Go o Console.",
-  "tips.opencodeHistory.title": "El historial, los tokens y el coste de un agente de OpenCode"
+  "tips.opencodeHistory.title": "El historial, los tokens y el coste de un agente de OpenCode",
+  "tips.versionControlJj.text": "En un repositorio jj colocalizado con Git, elige jj arriba en la pestaña Control de versiones: su Historial muestra cada id de cambio junto a su id de commit, y Comparar, Marcadores y Conflictos leen el repositorio sin modificarlo. Integras tú mismo el trabajo revisado.",
+  "tips.versionControlJj.title": "Ve un repositorio jj"
 }

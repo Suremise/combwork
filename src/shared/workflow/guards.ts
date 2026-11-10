@@ -122,6 +122,7 @@ export const GUARD_FNS: Record<GuardId, Guard> = {
     if (isUnknownAnswer(w)) return unknownRefusal(i, 'start.dependenciesIntegrated', w)
     return w.length ? { rule: 'start.dependenciesIntegrated', values: { card: i.card.key, waitsFor: w[0] } } : null
   },
+  'start.platformReady': (i) => ({ rule: 'start.platformReady', values: { card: i.card.key } }),
   'start.slotAvailable': (i) => {
     // A no-code card takes no slot (HI-2335): this rule never holds it.
     if (i.slotFree === undefined || i.card.kind === 'no-code') return null

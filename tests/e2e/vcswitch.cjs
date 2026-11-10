@@ -18,6 +18,7 @@
 const lib = require('./lib.cjs')
 const fs = require('fs')
 const path = require('path')
+const { execFileSync } = require('child_process')
 const q = require('./queueFixture.cjs')
 
 const PORT = Number(lib.port(47857))
@@ -52,6 +53,9 @@ function writeProject(dir, cfg) {
   fs.mkdirSync(inner, { recursive: true })
   fs.writeFileSync(path.join(inner, 'index.js'), 'module.exports = 1\n')
   lib.gitProject(outer, { 'README.md': '# Outer\n' })
+  // The branch the outer repository has (a plain `git init`: no init.defaultBranch in the test's git config, so `master`),
+  // which a save names: one that doesn't exist is refused since HI-2807 (HI-2828).
+  const outerBranch = execFileSync('git', ['branch', '--show-current'], { cwd: outer, env: lib.gitEnv(), encoding: 'utf8' }).trim()
 
   const h = await q.startCombwork(fx, { port: PORT })
   const { page, inv, app } = h
@@ -285,7 +289,7 @@ function writeProject(dir, cfg) {
     const merging = q.queueOptions(fx, { target: '' })
     const op29 = await inv('workflow:setOptions', inner, { preset: null, options: merging }).then(() => 'saved', (e) => e.message)
     check('Combwork merges with no target of its own is refused (OP-29)', /This project is inside a larger repository: name the branch its work merges into\./.test(op29), op29)
-    const named = await inv('workflow:setOptions', inner, { preset: null, options: { ...merging, target: 'main' } }).then(() => 'saved', (e) => e.message)
+    const named = await inv('workflow:setOptions', inner, { preset: null, options: { ...merging, target: outerBranch } }).then(() => 'saved', (e) => e.message)
     check('…and saved once it names one', named === 'saved', named)
   } catch (e) {
     check('no exception', false, e.stack)

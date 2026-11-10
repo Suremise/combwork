@@ -23,6 +23,8 @@ const WINDOW: RefusalFormat = { one: (m, values) => tr(m, values), list: (items)
 /** A value for every placeholder the refusals have. */
 const SAMPLE: RefusalValues = {
   card: 'AM-12',
+  // platform.changed (HI-2799): the version control the project uses now.
+  platform: 'jj',
   revision: 'a3f2c1d',
   reason: 'waits for the design',
   waitsFor: 'AM-3',

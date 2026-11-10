@@ -375,6 +375,13 @@ function helpers(h) {
     must(`${key}-B2's card starts in slot-b on its own line from 1.2.0's head`, s3.ok && s3.line !== s1.line, s3.why)
     check('HI-2556: …its start records 1.2.0 as its target', (await x.fact(c1, 'Started'))?.data?.target === '1.2.0', JSON.stringify((await x.fact(c1, 'Started'))?.data))
     Object.assign(kept, { line3: s3.line })
+    // HI-2832: each builder's brief, whole, as the fake read it, names its own lane's Merges into: lane 2's 1.2.0, never
+    // the project's main; lane 1's main.
+    const briefOf = (b) => jsonl(path.join(fx.claudeHome, 'fake-wakes.jsonl')).filter((w) => w.agent === b.name).map((w) => w.text ?? '').find((t) => /You are the builder of a lane in /.test(t)) ?? ''
+    const brief2 = await until(() => briefOf(b2), HUNG_MS)
+    check(`HI-2832: ${key}-B2's brief says its work goes to 1.2.0, its lane's, not the project's main`, !!brief2 && /; work goes to 1\.2\.0\./.test(brief2) && !/work goes to main/.test(brief2), (brief2 || '').slice(0, 900))
+    const brief1 = await until(() => briefOf(b1), HUNG_MS)
+    check(`HI-2832: …${key}-B1's says main, the project's`, !!brief1 && /; work goes to main\./.test(brief1), (brief1 || '').slice(0, 900))
 
     // --- Lane 1's first card: counted checks in the slot, submitted.
     const counted = async (n) => ((await inv('tasks:work', n))?.checks ?? []).filter((c) => c.counted === true).map((c) => c.name)

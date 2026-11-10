@@ -49,6 +49,28 @@ Codex run.
 Every scenario ran once per provider. Models vary from run to run, so a single result is a sample, not a rate.
 
 <!-- old-name: begin baseline-run-records -->
+## Start the next version, the Assistant's cw_branch (HI-2811): fakes, Claude Code, Codex, fixtures v128, 9 November 2026
+
+HI-2807 gave the Assistant `cw_branch` (`nextVersion`) with no scenario. Three new ones, each a single turn (a scenario
+is one prompt), on alpha merging into 1.3.0 with a Todo card of its own 1.3.0 and Implementer's lane running on 1.3.0
+(its card started there, the builder stopped):
+- **assistant-next-version-ask**: "we're about ready for 1.4.0": a reply naming 1.4.0 puts it to the user; no cw_branch,
+  no retarget, nothing changed. Its first prompt, a question of what starting 1.4.0 would do, was answered by Codex with
+  nothing to decide (0 of 3), rightly: the prompt now leaves the step unagreed.
+- **assistant-next-version**: "Start 1.4.0": cw_branch nextVersion; 1.4.0 is Work merges into, 1.3.0 listed; a reply
+  names the Todo card and asks; no card moved; the lane stays on 1.3.0 (as the preview reads a lane's ruleset target).
+- **assistant-next-version-retarget**: start it and move what can follow, agreed: cw_queue retarget with the preview
+  cw_branch's reply gave, the Todo card among its items; it follows 1.4.0; the lane and its card stay on 1.3.0.
+
+The harness records alpha's branches and Work merges into (`observed.branches`, `observed.targets`) and a scenario's own
+reading after the run (`after`). Fake Claude Code only (FAKE_CLAUDE_ONLY, as assistant-retarget-release), the preview's
+move and the question skipped there (`fakeSkips`: a fixed script can't name a preview).
+- **Fakes**: all three pass (`results/2026-11-09T22-23-20-fake`).
+- **Claude Code** (default, CLI 2.1.321): all three pass (retarget `22-08-15-claude-code`; ask and next-version
+  `22-11-36` after the check read every reply of the turn, its last words being about the stalled lane it then watched;
+  ask with its final prompt `22-22-39`).
+- **Codex** (default): next-version and retarget pass (`22-14-20-codex`); ask with its final prompt 2 of 2 (`22-20-39-codex`).
+
 ## Builders carry on after answering a message (HI-2716): fakes, Codex (GPT-6.1 Sol, GPT-6 Astra), Claude Code, fixtures v127, 7 November 2026
 
 On 7 Nov in the cli project, CB1 and CB2 (Codex, GPT-6 Astra) parked five times on a watch of their own card in Doing

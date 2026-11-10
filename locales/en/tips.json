@@ -1339,6 +1339,14 @@
     "defaultMessage": "Merge a branch by hand",
     "description": "A tip's title (#1450): merging any branch outside cards."
   },
+  "tips.mergeFollowRemote.text": {
+    "defaultMessage": "Sharing main with others? Turn on The target branch follows its remote in Version Control → Workflow: the merge queue fetches before each test merge, tests on the remote’s latest commit, and pushes only if nobody pushed meanwhile, testing again if they did.",
+    "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them (The target branch follows its remote is a workflow option's name). Glossary: merge queue, test merge."
+  },
+  "tips.mergeFollowRemote.title": {
+    "defaultMessage": "Merge against your team’s remote",
+    "description": "A tip's title (G21, HI-1183): the workflow option that has Combwork's merge queue fetch the target's remote branch before each test merge and publish there first."
+  },
   "tips.mergeMessage.text": {
     "defaultMessage": "With Combwork merging, Version Control → Workflow sets the merge’s commit message: Combwork’s names the card, the branch’s own keeps card keys out of your history. With Squash, each card then lands as one commit with its builder’s message.",
     "description": "A tip. Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Squash is a merge style's name: use the word Combwork shows for it."
@@ -2246,6 +2254,14 @@
   "tips.usageMoves.title": {
     "defaultMessage": "Move agents before a plan runs out",
     "description": "A tip's title (HI-2195): an account's agents move to another account when its plan's usage reaches a share."
+  },
+  "tips.versionControlJj.text": {
+    "defaultMessage": "In a jj repository colocated with Git, choose jj atop the Version Control tab: its History shows each change id beside its commit id, and Compare, Bookmarks and Conflicts read the repository without changing it. You integrate reviewed work yourself.",
+    "description": "A tip (HI-2799). Names of Combwork's menus, views, settings and commands: keep them as Combwork shows them. Keep jj and Git."
+  },
+  "tips.versionControlJj.title": {
+    "defaultMessage": "See a jj repository",
+    "description": "A tip's title (HI-2799). Keep jj."
   },
   "tips.versionControlSwitch.text": {
     "defaultMessage": "Click None or Git atop a project’s Version Control tab to switch it from its next card; cards in flight keep the old rules. Each keeps its own workflow options, and when the folder changes (git init, say), Combwork offers the switch there.",

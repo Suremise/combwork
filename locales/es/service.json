@@ -309,5 +309,7 @@
   "service.workspace.sharedNames": "Ahora los nombres de los agentes son únicos en todo el espacio de trabajo, para poder distinguir cada agente. {shared}: siguen funcionando, pero cambia el nombre de uno de cada grupo; por ejemplo, el del agente {agent} del proyecto {project} a {suggestion}.",
   "service.workspace.stillClosing": "{name} todavía se está cerrando: espera a que termine y vuelve a intentarlo.",
   "service.workspace.stillOpening": "{name} todavía se está abriendo: espera a que termine y vuelve a intentarlo.",
-  "service.workspace.twoCalled": "Hay dos agentes llamados {name}"
+  "service.workspace.twoCalled": "Hay dos agentes llamados {name}",
+  "service.workspace.platformJjFound": "{project} es un repositorio jj colocalizado con Git. Combwork sigue con su control de versiones actual hasta que lo cambies a jj en su pestaña Control de versiones.",
+  "service.workspace.platformJjGone": "El repositorio jj de {project} ya no está. Cámbialo a Git o a Ninguno en su pestaña Control de versiones."
 }

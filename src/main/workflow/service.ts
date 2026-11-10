@@ -9,7 +9,7 @@
 // here; and whether reconciliation acts on what it observes is the Advanced switch "Workflow rules are enforced"
 // (`cw.workflow.enforce`), read at each use: off, Combwork is as P3 left it (facts recorded, nothing refused or moved).
 
-import { resolve as resolvePath } from 'path'
+import { basename, resolve as resolvePath } from 'path'
 import { projectAgents } from '../../shared/defaults'
 import { advanced } from '../advanced'
 import { FOCUSED_PICK_SECONDS, WORKFLOW_ENFORCE } from '../../shared/advanced'
@@ -21,7 +21,7 @@ import { observer } from '../platform/observe'
 import { detect } from '../platform/registry'
 import { isUnknown } from '../platform/types'
 import { msg } from '../../shared/i18n'
-import type { PlatformId } from '../../shared/platform/descriptors'
+import { declaresPaths, type PlatformId } from '../../shared/platform/descriptors'
 import type { WorkflowOptions } from '../../shared/workflow/options'
 import type { WorkspaceService } from '../workspace'
 import { FactStore } from './factStore'
@@ -146,7 +146,8 @@ export async function workflowFor(ws: WorkspaceService, projectPath: string): Pr
   }
   inst.resolved = resolved
   inst.wf.none.setExcluded(resolved.options.excluded)
-  if (resolved.options.platform === 'none') {
+  // Declared paths' content hashes (None's revisions), kept current before the runtime answers.
+  if (declaresPaths(resolved.options.platform)) {
     await syncHashes(inst, project.path)
     if (!open()) throw combworkError(M.closed, undefined, { kind: 'conflict' })
   }
@@ -193,6 +194,7 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // trailers written before, as the adoption's store keyed them).
     store,
     project: project.path,
+    projectId: () => ws.projectIdsNow().byPath.get(resolvePath(project.path).toLowerCase()) ?? basename(project.path),
     get projectKey() {
       return store.projectKey()
     },
@@ -218,8 +220,8 @@ function make(ws: WorkspaceService, project: { path: string; name: string }, lif
     // A branch rename Repair recorded and hasn't finished (#1305): its new name, which a card on the old line follows.
     pendingRename: async (line) => (await ws.projectConfig(project.path)).pendingBranchRenames?.find((r) => r.from.toLowerCase() === line.toLowerCase())?.to ?? null,
     // A move Repair hasn't recorded (#1343): the workspace's or the project's last folder isn't where it is now.
-    // Its Git repository gone, or another version control found (#1419, S20): what Combwork offers in its place is None.
-    repositoryGone: () => detect(project.path).platform !== 'git',
+    // Its repository gone (Git's), or another version control found (#1419, S20): what Combwork offers in its place is None.
+    repositoryGone: (platform) => detect(project.path).platform !== platform,
     movePending: async () => {
       const moved = (last: string | undefined, now: string): boolean => !!last && !samePlace(last, now)
       return moved(ws.config.lastPath, wsPath) || moved((await ws.projectConfig(project.path)).lastPath, project.path)

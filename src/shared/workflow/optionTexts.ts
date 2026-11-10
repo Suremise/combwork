@@ -3,7 +3,7 @@
 // settings catalog's rows the Assistant sets them by. Kept as messages, shown with tr() where they are rendered.
 
 import { msg, type Msg } from '../i18n/msg'
-import type { PlatformId } from '../platform/descriptors'
+import { accepts, type PlatformId } from '../platform/descriptors'
 import type { FormGroupId, OptionKey, PresetId } from './options'
 
 interface OptionText {
@@ -70,6 +70,10 @@ export const OPTION_TEXT: Partial<Record<OptionKey, OptionText>> = {
   pushTarget: {
     title: msg({ id: 'workflow.option.pushTarget.title', defaultMessage: 'Push the target branch after merging', description: 'A workflow option (glossary 2.6, G18): after Combwork’s merge queue merges a card, it pushes the target branch to its remote.' }),
     desc: msg({ id: 'workflow.option.pushTarget.desc', defaultMessage: 'After each merge, the merge queue pushes the target branch to the remote it tracks (or the only remote, or origin), never forced, and pauses, saying why, when the push is refused or fails.', description: 'What the workflow option “Push the target branch after merging” does (glossary 2.1: merge queue). Origin is git’s usual name for a remote: keep it.' })
+  },
+  followRemote: {
+    title: msg({ id: 'workflow.option.followRemote.title', defaultMessage: 'The target branch follows its remote', description: 'A workflow option (glossary 2.6, G21): the target branch is the one it tracks on its remote; Combwork’s merge queue fetches it before each test merge and publishes each merge there first.' }),
+    desc: msg({ id: 'workflow.option.followRemote.desc', defaultMessage: 'Before each test merge, the merge queue fetches the remote branch the target tracks and tests on its latest commit, pushes each merge there only if nobody pushed meanwhile (testing again if they did), and then brings the local target up to date.', description: 'What the workflow option “The target branch follows its remote” does (glossary 2.1: merge queue; 2.5: test merge). “Push the target branch after merging” is another option’s name.' })
   },
   commitMessage: {
     title: msg({ id: 'workflow.option.commitMessage.title', defaultMessage: 'Commit message', description: 'A workflow option (glossary 2.6, G19): the message of the commit Combwork’s merge queue makes when it merges a card (a merge commit, or a squash’s one commit).' }),
@@ -167,7 +171,8 @@ export const VALUE_TEXT = {
     combworkMerges: msg({ id: 'workflow.value.finish.combworkMerges', defaultMessage: 'Combwork merges', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     agentMerges: msg({ id: 'workflow.value.finish.agentMerges', defaultMessage: 'The agent merges, Combwork checks', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
     committed: msg({ id: 'workflow.value.finish.committed', defaultMessage: 'Committed is done', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
-    notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' })
+    notChecked: msg({ id: 'workflow.value.finish.notChecked', defaultMessage: 'Not checked', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5).' }),
+    userIntegrates: msg({ id: 'workflow.value.finish.userIntegrates', defaultMessage: 'You integrate it yourself', description: 'A value of the workflow option “Who merges” (glossary 2.6, G5) for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj; you bring the reviewed work into its target with jj.' })
   },
   style: {
     merge: msg({ id: 'workflow.value.style.merge', defaultMessage: 'Merge commit', description: 'A value of the workflow option “Merge style” (glossary 2.6, G6).' }),
@@ -218,7 +223,8 @@ export const PRESET_NOTE_TEXT: Partial<Record<PresetId, Msg>> = {
 export const optionTitle = (key: OptionKey, platform: PlatformId, folder?: 'slots' | 'project'): Msg | null => {
   const t = OPTION_TEXT[key]
   if (!t) return null
-  if (platform === 'none') return t.none ?? t.title
+  // `none`: the label where work is accepted, not merged (None's N options; HI-2822: by the descriptor).
+  if (accepts(platform)) return t.none ?? t.title
   return folder === 'project' && t.shared ? t.shared : t.title
 }
 
@@ -254,6 +260,7 @@ export const OPTION_WHY: Partial<Record<OptionKey, Msg>> = {
   target: msg({ id: 'workflow.why.target', defaultMessage: 'Finished work goes to the repository’s default branch; working solo, to the branch the project is on.', description: 'Why the presets set “Work merges into” as they do.' }),
   strict: msg({ id: 'workflow.why.strict', defaultMessage: 'The merge queue tests the merged result anyway, so this mostly changes the history’s shape.', description: 'Why the presets leave “Work is up to date with its target branch before it merges” off.' }),
   pushTarget: msg({ id: 'workflow.why.pushTarget', defaultMessage: 'Pushing reaches your remote and its sign-in, so it stays yours unless you turn it on.', description: 'Why the presets leave “Push the target branch after merging” off.' }),
+  followRemote: msg({ id: 'workflow.why.followRemote', defaultMessage: 'Following a remote reaches it and its sign-in before every merge, so it stays yours unless you turn it on.', description: 'Why the presets leave “The target branch follows its remote” off.' }),
   commitMessage: msg({ id: 'workflow.why.commitMessage', defaultMessage: 'Card titles can name people and details a public history shouldn’t keep; choose Combwork’s for the card’s key, linking each merge to its card.', description: 'Why the presets set “Commit message” to the branch’s own (HI-1997), and what choosing Combwork’s (the card’s key and title, with trailers) gives instead.' }),
   mergeChecks: msg({ id: 'workflow.why.mergeChecks', defaultMessage: 'The checks run on the work as it will be once merged, not only as it was built.', description: 'Why the presets set “Checks pass on the merged result” when Combwork merges.' }),
   focusedTests: msg({ id: 'workflow.why.focusedTests', defaultMessage: 'Each card’s own tests on the merged result catch what its change breaks there, without running every test for every card.', description: 'Why Team turns on “Each card’s focused tests pass on the merged result” when the project has the command that runs them.' }),
@@ -281,5 +288,11 @@ export const PRESET_SUMMARY: Record<PlatformId, Partial<Record<PresetId, Msg>>> 
     solo: msg({ id: 'workflow.summary.none.solo', defaultMessage: 'No review: a card is done when its builder submits it.', description: 'What the Solo preset sets up, for a project without version control.' }),
     pair: msg({ id: 'workflow.summary.none.pair', defaultMessage: 'A reviewer agent checks each card, after the quick checks pass.', description: 'What the Pair preset sets up, for a project without version control.' }),
     team: msg({ id: 'workflow.summary.none.team', defaultMessage: 'A reviewer agent, then you, check each card, after the quick checks and the tests pass.', description: 'What the Team preset sets up, for a project without version control.' })
+  },
+  // jj (HI-2799, option A): the user integrates what passed; Combwork never merges.
+  jj: {
+    solo: msg({ id: 'workflow.summary.jj.solo', defaultMessage: 'Each card in its own jj workspace, no review: you integrate the work yourself.', description: 'What the Solo preset sets up, for a project using jj (Jujutsu, HI-2799). Keep jj; a jj workspace is a working folder jj makes.' }),
+    pair: msg({ id: 'workflow.summary.jj.pair', defaultMessage: 'A reviewer agent passes each card after the quick checks, then you integrate it yourself.', description: 'What the Pair preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj.' }),
+    team: msg({ id: 'workflow.summary.jj.team', defaultMessage: 'A reviewer agent, then you, check each card after the quick checks and the tests, then you integrate it yourself.', description: 'What the Team preset sets up, for a project using jj (Jujutsu, HI-2799): Combwork never merges under jj.' })
   }
 }

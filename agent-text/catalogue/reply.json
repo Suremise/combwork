@@ -419,6 +419,18 @@
     "text": "cw_project_status gives one project in full (its agents' ids and sessions, its settings).",
     "note": "cw_list_projects's last line."
   },
+  "reply.provider.connection": {
+    "text": "{name} (id {id}{own, select, yes {; its account's {models, plural, one {# model} other {# models}}, default model {hasModel, select, yes {{model}} other {its CLI's own}}} other {}})",
+    "note": "cw_list_providers (HI-2814): one of a provider's connections usable here, what cw_add_agent's connection names. own (yes/no): its account's models or default aren't the provider's (HI-2856), so they are said; hasModel (yes/no): whether {model} has a value."
+  },
+  "reply.provider.more": {
+    "text": "cw_list_providers with provider (its id) gives one in full: its models with their labels, its efforts and its modes with what each does.",
+    "note": "cw_list_providers (HI-2814): the listing ends with how to get one provider in full."
+  },
+  "reply.provider.row": {
+    "text": "{name} ({id}): {on, select, yes {on} other {off}}, {installed, select, yes {installed{hasVersion, select, yes { {version}} other {}}{hasTested, select, yes { (tested with {tested}: {compared})} other {}}} other {not installed}}; default model {hasModel, select, yes {{model}} other {its CLI's own}}; {models, plural, one {# model} other {# models}}{hasEfforts, select, yes {; efforts {efforts}} other {}}; modes {modes}{hasConnections, select, yes {; connections {connections}} other {}}{hasProblem, select, yes {. Problem: {problem}} other {}}",
+    "note": "cw_list_providers (HI-2814): a provider in a line. The has… flags (yes/no) say whether {version}, {tested}, {model}, {efforts}, {connections} and {problem} have a value. {compared}: same, newer, older or unknown."
+  },
   "reply.queue.cancelled": {
     "text": "{key} cancelled ({reason})",
     "note": "A recent outcome of the merge queue: cancelled, why."

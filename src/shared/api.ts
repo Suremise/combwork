@@ -172,6 +172,7 @@ import type { AdvancedState } from './advanced'
 import type { GitTool } from './gitTool'
 import type { GitInitCheck, GitInitOptions } from './gitInit'
 import type { BranchAt, BranchDrops, BranchUpdateHow, BranchUpdatePlan, CompareLines, GitComparison, LeftoverInfo, GitHistory, GitRepoInfo, GitRepoSummary, PushScope } from './gitRepo'
+import type { JjBookmarksView, JjCompareView, JjConflictsView, JjHistoryView, JjRepoView, JjResolved, JjView } from './jjViews'
 import type { BoardFoldChange } from './tasks'
 import type { CardCost, CardRoundCosts, LaneCost } from './cardCosts'
 import type { ConsoleEvent, ConsoleRecordingInfo, ConsoleSource } from './devConsole'
@@ -414,7 +415,8 @@ export interface CombworkRequests {
    * Switches the project's version control from its next card (#1419), checked again under its lock: refused when
    * `expected` (the platform the window showed) isn't the one in force, or what is detected doesn't allow it.
    */
-  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId }) => { from: PlatformId; to: PlatformId }
+  /** `token` (HI-2799): a switch between Git and jj, the group its warning showed (`PlatformSwitchCheck.store.token`). */
+  'workflow:setPlatform': (projectPath: string, to: PlatformId, opts: { expected: PlatformId; token?: string }) => { from: PlatformId; to: PlatformId }
   /**
    * "How do you work?" answered Not now (#1423) for the platform the step showed: no preset, the options inherited, not
    * asked again for it. Ignored if the project uses another platform now, or was answered meanwhile.
@@ -1080,6 +1082,12 @@ export interface CombworkRequests {
   'git:tool': (recheck?: boolean) => GitTool
   /** The Git view (#607), the project folder's only (agents' worktrees change through the merge flow). The user's: no agent tool reaches these. */
   'git:summary': (projectPath: string) => GitRepoSummary
+  /** A jj project's views (HI-2799): read-only, pinned at the single operation head; the user's window only. */
+  'jj:repo': (projectPath: string) => JjView<JjRepoView>
+  'jj:history': (projectPath: string) => JjView<JjHistoryView>
+  'jj:bookmarks': (projectPath: string) => JjView<JjBookmarksView>
+  'jj:conflicts': (projectPath: string) => JjView<JjConflictsView>
+  'jj:compare': (projectPath: string, from: string, to: string) => JjView<JjCompareView | { from: JjResolved; to: JjResolved; op: string }>
   'git:info': (projectPath: string) => GitRepoInfo
   'git:deleteBranches': (projectPath: string, branches: BranchAt[], unmerged?: boolean) => string
   'git:deleteRemoteBranches': (projectPath: string, remote: string, branches: BranchAt[]) => string

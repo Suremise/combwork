@@ -24,7 +24,7 @@ import type { SafeguardNote, ScreenStop } from './safeguards'
 import type { AgentLeftovers, LeftoverProcessMode } from './agentProcesses'
 import type { UsageTimeline } from './usageTimeline'
 import type { PlatformId, ProjectPlatform } from './platform/descriptors'
-import type { SwitchRefusal } from './platform/switching'
+import type { StoreSwitch, SwitchRefusal } from './platform/switching'
 import type { Contradiction, PresetId, WorkflowOptions } from './workflow/options'
 import type { Refusal } from './workflow/refusals'
 import type { ReviewerMode, WorkflowRole } from './workflow/roles'
@@ -572,6 +572,16 @@ export interface ModelCatalog {
   context?: string
 }
 
+/**
+ * What a sign-in account's own folder says of its models (HI-2852: a CLI offers each account its own): its catalogue
+ * (null: none read and none kept for this version, so the fallback list, never another account's), and the model it
+ * runs when none is passed (its folder's settings, else its catalogue's default; null: unknown).
+ */
+export interface AccountModels {
+  catalog: ModelCatalog | null
+  defaultModel: string | null
+}
+
 export interface WindowState {
   x?: number
   y?: number
@@ -656,6 +666,8 @@ export interface AppConfig {
   observedDefaultEffort?: Record<ProviderId, Record<string, EffortLevel>>
   /** Per provider: the last good model catalog its CLI gave, keyed by the CLI version, so pickers fill at once on start. */
   modelCatalogs?: Record<ProviderId, ModelCatalog>
+  /** Per sign-in account (its id, HI-2852): the last good catalogue its CLI gave in the account's own folder. */
+  accountModelCatalogs?: Record<string, ModelCatalog>
   /** Per provider: the plan usage it last reported (account-wide), from sessions not on a connection. */
   planUsage: Record<ProviderId, PlanUsage>
   /** Per connection (its id, HI-1756): the plan usage its sessions last reported, that login's own limits. */
@@ -1757,6 +1769,8 @@ export interface PlatformSwitchCheck {
   gitFolder: boolean
   /** A card in flight goes through Combwork's merge queue (its ruleset's): the queue carries on, and stays shown. */
   queue: boolean
+  /** A switch between Git and jj (HI-2799): the repository's projects switch together, after a drain. */
+  store?: StoreSwitch
 }
 
 /** A project's Session tab as this user left it (AppConfig.ui.projectViews, HI-1749): ProjectConfig's view fields. */
@@ -3814,6 +3828,12 @@ export interface AgentInstallInfo {
   hostCatalogs?: Record<string, ModelCatalog>
   /** Which host check each folder resolves to (HI-2779): workspaces (their default) and projects with settings of their own, lower-cased. */
   hostRouteOf?: Record<string, string>
+  /**
+   * Each Combwork sign-in account's own models (HI-2852), by its id: what the CLI offers in that account's folder, read
+   * after the CLI's check and published as each read lands. Absent: a CLI whose accounts aren't read (no listing, no
+   * connection folders). `catalog` above is the CLI's own home's.
+   */
+  accountCatalogs?: Record<string, AccountModels>
 }
 
 /**
@@ -4433,8 +4453,8 @@ export interface LaneStatus {
   agent?: string
   /** offSide (HI-2664): the lane part `agent`'s role doesn't do. */
   part?: 'builder' | 'reviewer'
-  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation. */
-  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies'
+  /** startWait (HI-2029): why its card isn't started yet (LaneStartWhy); `fresh` (HI-2034): `agent` is owed its new conversation; `stopped` (HI-2815): someone stopped its builder. */
+  why?: 'busy' | 'watching' | 'queued' | 'failed' | 'refused' | 'fresh' | 'dependencies' | 'stopped'
   /** startWait `dependencies` (HI-2129): the card it depends on that isn't Done yet, by its key. */
   waitsFor?: string
   /** startWait `dependencies` (HI-2618): every card it depends on that isn't Done yet, by key, in its `blockedBy` order. */

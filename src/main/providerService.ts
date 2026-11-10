@@ -1,6 +1,6 @@
 import { homedir } from 'os'
 import { app } from 'electron'
-import type { AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
+import type { AccountModels, AgentInstallInfo, ModelCatalog, ProviderId, ProviderTask } from '../shared/types'
 import { cachedCatalogFor, observedEffortKey } from '../shared/models'
 import { autoProviderPending, isProviderEnabled, providerSettings, setInstalledCheck } from '../shared/providers'
 import { ptyArgs, shownInstallInfo, toSpawnable, withoutAccountEnv, withServerEnv } from './providers/common'
@@ -172,6 +172,26 @@ class ProviderService {
   private changed = new Set<() => void>()
 
   /**
+   * How each sign-in account's own models are known (HI-2852: accounts.ts registers it, so this service only publishes):
+   * `cached`, each eligible account's kept catalogue for a version (undefined: any) and its folder's default, at once;
+   * `refresh`, a read of each, started after the CLI's check and never awaited by it.
+   */
+  private accountModels: { cached(id: ProviderId, version: string | null | undefined): Record<string, AccountModels> | undefined; refresh(id: ProviderId): void } | null = null
+
+  setAccountModelSource(source: NonNullable<ProviderService['accountModels']>): void {
+    this.accountModels = source
+  }
+
+  /** One account's models as its read landed (HI-2852), or none (null: it was removed): published at once. */
+  setAccountModels(id: ProviderId, accountId: string, models: AccountModels | null): void {
+    const cur = this.info(id)
+    const map = { ...cur.accountCatalogs }
+    if (models) map[accountId] = models
+    else delete map[accountId]
+    this.set(id, { ...cur, accountCatalogs: map })
+  }
+
+  /**
    * How long a launch or a new agent waits for detection before it is refused (detected, settle). Tests only (unpackaged
    * builds): CW_TEST_DETECT_WAIT_MS shortens it.
    */
@@ -233,7 +253,8 @@ class ProviderService {
     const run = (this.refreshes.get(id) ?? 0) + 1
     this.refreshes.set(id, run)
     // The last good catalog fills the pickers at once (on start), until this refresh has asked the CLI again.
-    this.set(id, { ...prev, catalog: prev.catalog ?? this.cachedCatalog(id), checking: true })
+    // Each account's too (HI-2852), so a connection's dialog shows its own list at once.
+    this.set(id, { ...prev, catalog: prev.catalog ?? this.cachedCatalog(id), accountCatalogs: prev.accountCatalogs ?? this.accountModels?.cached(id, undefined), checking: true })
     const latestWanted = checkLatest ?? (isProviderEnabled(config.settings, id) && providerSettings(config.settings, id).checkUpdatesOnLaunch)
     let next: AgentInstallInfo
     try {
@@ -274,6 +295,8 @@ class ProviderService {
         latestVersion: latest,
         updateAvailable: !!(found.version && latest && adapter.isNewer(latest, found.version)),
         catalog,
+        // Each account's kept catalogue for this version (HI-2852) until its own read, started below, lands.
+        accountCatalogs: this.accountModels?.cached(id, found.version),
         configuredEffort: adapter.configuredDefaultEffort?.() ?? null,
         observedEfforts: this.observedEfforts(id),
         tested: tested ? compareTested(tested, found.version, (a, b) => adapter.isNewer(a, b)) : null,
@@ -296,6 +319,9 @@ class ProviderService {
     next.readiness = adapter.readiness(next)
     if (this.refreshes.get(id) !== run) return this.info(id)
     this.set(id, next)
+    // Each sign-in account's own models (HI-2852), read in its folder after the check: never awaited, so a slow account
+    // can't hold the CLI's readiness or a launch; each is published as it lands.
+    if (next.path) this.accountModels?.refresh(id)
     await noteSelectedCli(next, adapter.configHome?.() ?? null)
     return next
   }

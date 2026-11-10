@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ProjectInfo } from '@shared/types'
 import type { QueueView } from '@shared/workflow/queue'
+import { merges, needsRepository } from '@shared/platform/descriptors'
 import { msg, tr } from '@shared/i18n'
 import { gitStatusText, gitStatusTip, VC_SECTIONS, vcSections, vcSectionShown, type GitRepoSummary } from '@shared/gitRepo'
-import { get, notify, set, showVersionControl, useStore } from '../store'
+import { get, notify, set, showVersionControl, useLanguage, useStore } from '../store'
 import { loadTemplate, refreshWorkspace } from '../actions'
 import { Icon, Tooltip } from '../components/ui'
 import { tabIds, Tabs } from '../components/Tabs'
@@ -15,6 +16,7 @@ import { at, GitProblem, GitSetupNotes, HistorySection, useGitRead } from './Git
 import { BranchesSection } from './GitBranches'
 import { switchAfterInit, switchPlatform, useWorkflowForm, VersionControlHeader } from './VersionControlHeader'
 import { PresetStep } from '../components/PresetStep'
+import { JjBookmarksSection, JjCompareSection, JjConflictsSection, JjHistorySection, JjRepoSection } from './JjSections'
 
 /**
  * The project's Version Control tab (#1416, SPEC §16.6; the Git tab before 1.0, its id still `changes`): the header
@@ -53,7 +55,8 @@ function useDetectionCatchUp(project: ProjectInfo, s: GitRepoSummary | null): vo
   const asked = useRef<string | null>(null)
   const detected = project.platform?.detected
   const readGit = !!s && s.isRepo && !s.gitProblem
-  const differ = !!s && !s.gitProblem && !!detected && !detected.other && readGit !== (detected.platform === 'git')
+  // A jj repository colocated with Git (HI-2799) is jj's to detect, as another system is: git reads it too.
+  const differ = !!s && !s.gitProblem && !!detected && !detected.other && detected.platform !== 'jj' && readGit !== (detected.platform === 'git')
   const key = `${project.path}:${readGit}`
   useEffect(() => {
     // Agreeing again (however detection caught up: this refresh, F5, another's) rearms it for the next change (HR6's
@@ -104,6 +107,8 @@ function GitPreview({ project, s, error, template }: { project: ProjectInfo; s: 
 }
 
 export function VersionControl({ project }: { project: ProjectInfo }) {
+  // Its sections' names in the window's language, again when it changes.
+  useLanguage()
   const summary = useGitRead('git:summary', project)
   const s = summary.data
   const platform = project.platform?.id ?? (s?.isRepo ? 'git' : 'none')
@@ -114,14 +119,14 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
   // The project's workflow form, read once: the header's preset, and "How do you work?" while it asks (#1423).
   const form = useWorkflowForm(project)
   // A None folder with no repository of its own (none, or one around it): Git's page can be shown before it has one.
-  const noRepo = platform === 'none' && !!s && (!s.isRepo || !!s.parentRepo) && !s.gitProblem && !project.platform?.detected.other
+  const noRepo = !needsRepository(platform) && !!s && (!s.isRepo || !!s.parentRepo) && !s.gitProblem && !project.platform?.detected.other
   // Git's page shown before the repository (HI-1905): this component's alone, never saved, gone with the project or the
   // tab. It stays through an init that stopped part way (a repository with no commit yet) until the project is Git, and
   // ends once the folder has a repository of its own with a commit (made here, the switch then cancelled, or elsewhere):
   // None's page then, with Combwork's offer to switch.
   const [previewFor, setPreviewFor] = useState<string | null>(null)
   const [initError, setInitError] = useState<{ path: string; error: string } | null>(null)
-  const preview = platform === 'none' && previewFor === project.path && (noRepo || (!!s?.isRepo && !s.head))
+  const preview = !needsRepository(platform) && previewFor === project.path && (noRepo || (!!s?.isRepo && !s.head))
   useEffect(() => {
     setPreviewFor(null)
     setInitError(null)
@@ -152,7 +157,8 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
     if (switched) void loadTemplate(p.path, waiting.entry, waiting.from)
     else notify('warning', tr(M.templateNotApplied, { project: p.name, template: waiting.entry.name }))
   }
-  const status = platform === 'git' && !!s?.isRepo
+  // The line's status (its branch, ahead and behind) where work merges between lines (Git's); jj's user integrates (HI-2799).
+  const status = merges(platform) && !!s?.isRepo
   useDetectionCatchUp(project, s)
   const sectionsShown = VC_SECTIONS.filter((x) => shown.includes(x.id))
   const tabsId = useId()
@@ -192,6 +198,16 @@ export function VersionControl({ project }: { project: ProjectInfo }) {
               </div>
             ) : section === 'queue' ? (
               <GitQueueSection project={project} />
+            ) : section === 'jjRepo' ? (
+              <JjRepoSection project={project} />
+            ) : section === 'jjHistory' ? (
+              <JjHistorySection project={project} />
+            ) : section === 'jjCompare' ? (
+              <JjCompareSection project={project} />
+            ) : section === 'jjBookmarks' ? (
+              <JjBookmarksSection project={project} />
+            ) : section === 'jjConflicts' ? (
+              <JjConflictsSection project={project} />
             ) : s && !s.isRepo && !s.gitProblem ? (
               <GitSetupNotes project={project} />
             ) : section === 'changes' ? (
