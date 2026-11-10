@@ -5046,6 +5046,16 @@ merge commit or squashed counts once, a rebased one per commit), kept by both he
 can't be read; the window's listing includes every existing target, so a destination with nothing queued shows while it
 is behind. Automatic forward merges are later (they would refuse cycles).
 
+**`main` as a source (HI-2885, design s10).** A forward merge's `to` is one of the project's targets; its `from` is
+another of them or the repository's default branch (`G.defaultBranch`: `main` after a release, into the next version),
+whether or not that is a target, only when git names it and it exists (`forwardSources`, targets.ts); anything else is
+refused, naming both lists. The queue card's sources are that set, so a project with one target shows Bring Up to Date…
+with `main`. A forward entry counts as already in the destination only when its frozen source is an ancestor of it
+(merged or fast-forwarded), never by the same tree or a squash: one whose files the destination holds already (it was
+brought up to date with the release branch, and only the pull request's merge commit is new) is still merged, a `--no-ff`
+merge commit with the destination's tree, through the merge checks. A card's submission with nothing of its own is still
+refused (`submit.empty`), merge commit or not: a merge of `main` goes through a forward merge, never a card.
+
 #### 16.9.2 Advancing the target
 
 [P1, answering HR2's round 1 finding 9 and round 2 finding 4] The advance moves the target from the expected

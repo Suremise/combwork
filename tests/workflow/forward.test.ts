@@ -156,6 +156,58 @@ describe('a forward merge (HI-2679)', () => {
     expect(e.wf.state(card).stage).toBe('merging')
   })
 
+  it("HI-2885: main into the next version when it has main's files already (only the release's merge commit is new): still a merge commit, through the checks", { timeout: GIT_HEAVY_MS }, async () => {
+    const e = project({ mergeChecks: ['unit'], commands: { unit: 'npm test' } })
+    // 1.2.0 has the release fix's files by a commit of its own: the trees are the same, the histories diverge.
+    sh(e.project, 'checkout', '-q', '1.2.0')
+    commit(e.project, { 'fix.txt': 'the release fix\n' }, 'the release fix, brought up to date before')
+    sh(e.project, 'checkout', '-q', '--detach')
+    const dest = head(e, '1.2.0')
+    expect(sh(e.project, 'rev-parse', `${dest}^{tree}`)).toBe(sh(e.project, 'rev-parse', 'main^{tree}'))
+    const { card, source } = await forward(e)
+    const ran: string[] = []
+    const q = e.queue({ runCheck: async (_n, _c, _f, ctx) => (ran.push(ctx.revision), { ok: true, output: 'ok' }) })
+    expect(await q.drain('1.2.0')).toMatchObject([{ outcome: 'integrated' }])
+    const now = head(e, '1.2.0')
+    expect(sh(e.project, 'rev-list', '--parents', '-n', '1', now).split(' ').slice(1)).toEqual([dest, source])
+    expect(sh(e.project, 'rev-parse', `${now}^{tree}`)).toBe(sh(e.project, 'rev-parse', `${dest}^{tree}`))
+    expect(ran).toEqual([now])
+    expect(e.wf.store.facts(card.id).find((f) => f.kind === 'Integrated')?.data).toMatchObject({ revision: source, target: '1.2.0', result: now, method: 'merge', by: 'combwork' })
+  })
+
+  it('HI-2885: a forward that changes files goes through the checks to a merge commit too', { timeout: GIT_HEAVY_MS }, async () => {
+    const e = project({ mergeChecks: ['unit'], commands: { unit: 'npm test' } })
+    const dest = head(e, '1.2.0')
+    const { source } = await forward(e)
+    const ran: string[] = []
+    expect(await e.queue({ runCheck: async (_n, _c, _f, ctx) => (ran.push(ctx.revision), { ok: true, output: 'ok' }) }).drain('1.2.0')).toMatchObject([{ outcome: 'integrated' }])
+    const now = head(e, '1.2.0')
+    expect(sh(e.project, 'rev-list', '--parents', '-n', '1', now).split(' ').slice(1)).toEqual([dest, source])
+    expect(sh(e.project, 'show', `${now}:fix.txt`)).toBe('the release fix')
+    expect(ran).toEqual([now])
+  })
+
+  it("HI-2885: an ordinary card whose files its target holds already (another card's commits) is still found there, no empty merge", { timeout: GIT_HEAVY_MS }, async () => {
+    const e = project()
+    const card = e.wf.createCard({ title: 'Two files' })
+    const s = await e.wf.start(card.key, B1)
+    moved(s)
+    const folder = s.data!.folder as string
+    commit(folder, { 'a.txt': 'a\n', 'b.txt': 'b\n' }, `${card.key}: two files`)
+    moved(await e.wf.submit(card.key, B1, { summary: 'x' }))
+    // The same files reach main in two commits of their own: neither a merge nor a squash of the card's.
+    sh(e.project, 'checkout', '-q', 'main')
+    commit(e.project, { 'a.txt': 'a\n' }, 'a')
+    commit(e.project, { 'b.txt': 'b\n' }, 'b')
+    sh(e.project, 'checkout', '-q', '--detach')
+    const before = head(e, 'main')
+    moved(await e.wf.startReview(card.key, R1))
+    moved(await e.wf.verdict(card.key, R1, { pass: true, comment: 'ok' }))
+    expect(await e.queue().drain('main')).toMatchObject([{ card: card.key, outcome: 'integratedOutside' }])
+    expect(e.wf.store.facts(card.id).find((f) => f.kind === 'Integrated')?.data).toMatchObject({ method: 'sameTree', by: 'outside' })
+    expect(head(e, 'main')).toBe(before)
+  })
+
   it('is started only once, and only from Todo', async () => {
     const e = project()
     const { card, source } = await forward(e)

@@ -355,8 +355,8 @@
     "audience": "both"
   },
   "service.forward.notTargets": {
-    "text": "{from} and {to} must be two different branches this project merges work into: {targets}.",
-    "note": "HI-2679: a forward merge refused: its branches aren’t two of the project’s (Work merges into, Other branches work can merge into). {targets} is the list of them.",
+    "text": "{from} can’t be brought into {to}: {to} must be a branch this project merges work into ({targets}), and {from} another branch of {sources}.",
+    "note": "HI-2679, HI-2885: a forward merge refused: {to} isn’t one of the project’s branches (Work merges into, Other branches work can merge into: {targets}, a list), {from} isn’t one of those or the repository’s default branch ({sources}, a list), or the two are the same branch.",
     "audience": "both"
   },
   "service.forward.raced": {

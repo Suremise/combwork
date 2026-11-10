@@ -1099,7 +1099,7 @@
     "note": "HI-2807: cw_branch create without them."
   },
   "api.queue.forwardArgs": {
-    "text": "from and to are required: the branch to bring in and the one to bring up to date, two of the project's targets"
+    "text": "from and to are required: the branch to bring in (one of the project's targets, or the repository's default branch) and the one to bring up to date (one of its targets)"
   },
   "api.queue.notAgents": {
     "text": "Project agents can't {what}: the merge queue's controls are the user's, and the Assistant's within Settings → Assistant → Control. Tell the user if it should be done."

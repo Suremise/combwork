@@ -74,7 +74,7 @@
   "service.forward.missing": "{unknown, select, yes {Combwork ne peut pas lire la branche {branch}, donc rien n’a été mis en file.} other {Il n’y a pas de branche {branch} dans ce dépôt, donc rien n’a été mis en file.}}",
   "service.forward.noGit": "Ce projet ne fusionne aucun travail par la file de fusion de Combwork, il n’a donc rien à mettre à jour.",
   "service.forward.notAgents": "Seuls l’utilisateur ou l’Assistant mettent une branche à jour avec une autre.",
-  "service.forward.notTargets": "{from} et {to} doivent être deux branches différentes dans lesquelles ce projet fusionne du travail : {targets}.",
+  "service.forward.notTargets": "{from} ne peut pas être intégrée à {to} : {to} doit être une branche dans laquelle ce projet fusionne du travail ({targets}), et {from} une autre branche parmi {sources}.",
   "service.forward.raced": "La carte de la fusion de mise à jour a changé pendant sa mise en file, donc rien de plus n’a été fait : regarde la carte, puis redemande si besoin.",
   "service.forward.title": "Mettre à jour {to} avec {from}",
   "service.fsutil.keptBusy": "{file} est en cours d’enregistrement par un autre programme : rien n’a été modifié. Réessaie dans un instant.",
