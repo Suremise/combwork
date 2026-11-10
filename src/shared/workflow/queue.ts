@@ -205,6 +205,12 @@ export interface QueueView {
    * (#1356; the window's model only): an old ruleset's queue stays shown while they are.
    */
   inFlight: number[]
+  /**
+   * HI-2893: a past branch's queue: its target is none of the project's targets now (Work merges into, Other branches work
+   * can merge into) and it holds no entry (none testing or queued). The Merges tab leaves it out, Version Control lists
+   * its history under Past branches, and the Agent API lists it only when asked (`past=true`).
+   */
+  past?: true
 }
 
 /**

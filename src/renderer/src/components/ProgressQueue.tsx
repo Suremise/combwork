@@ -59,7 +59,8 @@ const FORWARD_T = {
   already: msg({ id: 'board.queue.forwardAlready', defaultMessage: '{to} is being brought up to date with {from} already', description: 'HI-2679: a notification: a forward merge for this pair is queued or waiting already; nothing new was queued.' })
 }
 
-export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView; runs: readonly ProgressRun[]; now: number; showProject: boolean }) {
+/** `inVersionControl`: shown in Version Control's Merge queue section, so without its link there (HI-2893). */
+export function QueueCard({ view: v, runs, now, showProject, inVersionControl = false }: { view: QueueView; runs: readonly ProgressRun[]; now: number; showProject: boolean; inVersionControl?: boolean }) {
   useLanguage()
   const [busy, setBusy] = useState(false)
   const testingRun = v.testing?.run ? (runs.find((r) => r.id === v.testing!.run) ?? null) : null
@@ -198,9 +199,11 @@ export function QueueCard({ view: v, runs, now, showProject }: { view: QueueView
         </button>
       )}
       {nothing && <div className="progress-queue-line faint">{tr(msg({ id: 'board.queue.empty', defaultMessage: 'Nothing queued.', description: "A merge queue's card in the Progress panel when no card is waiting or being merged." }))}</div>}
-      <button type="button" className="progress-queue-link" onClick={() => openVersionControl(v.projectPath, 'queue')}>
-        {tr(msg({ id: 'board.queue.inVersionControl', defaultMessage: 'Queue in Version Control', description: "A link on a merge queue's card in the Progress panel: shows the project's Version Control tab at its Merge queue section, with its history." }))} <Icon name="arrow-right" />
-      </button>
+      {!inVersionControl && (
+        <button type="button" className="progress-queue-link" onClick={() => openVersionControl(v.projectPath, 'queue')}>
+          {tr(msg({ id: 'board.queue.inVersionControl', defaultMessage: 'Queue in Version Control', description: "A link on a merge queue's card in the Progress panel: shows the project's Version Control tab at its Merge queue section, with its history." }))} <Icon name="arrow-right" />
+        </button>
+      )}
     </div>
   )
 }

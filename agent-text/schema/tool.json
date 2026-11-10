@@ -523,6 +523,9 @@
   "tool.queue.arg.override": {
     "placeholders": {}
   },
+  "tool.queue.arg.past": {
+    "placeholders": {}
+  },
   "tool.queue.arg.preview": {
     "placeholders": {}
   },

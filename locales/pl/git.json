@@ -198,6 +198,8 @@
   "git.queue.none": "Brak kolejki scalania. Gdy przepływ pracy projektu każe Combwork scalać jego karty (Kontrola wersji → Przepływ pracy: Kto scala), tutaj pojawi się kolejka każdej gałęzi docelowej z jej historią.",
   "git.queue.open": "Otwórz {card}",
   "git.queue.outcome": "Wynik",
+  "git.queue.past": "{n, plural, one {Dawne gałęzie (# gałąź)} few {Dawne gałęzie (# gałęzie)} many {Dawne gałęzie (# gałęzi)} other {Dawne gałęzie (# gałęzi)}}",
+  "git.queue.pastTip": "Gałęzie, do których praca nie jest już scalana, z pustą kolejką: co ich kolejki scaliły i zwróciły.",
   "git.queue.reading": "Odczytywanie kolejek scalania…",
   "git.queue.region": "Kolejki scalania",
   "git.queue.result": "Commit scalenia",

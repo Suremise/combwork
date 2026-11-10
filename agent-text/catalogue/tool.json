@@ -457,6 +457,10 @@
     "text": "forward: true only when the user explicitly asked for this merge against the release path (into an older version or main, or an unordered pair); recorded on its card.",
     "note": "HI-2892."
   },
+  "tool.queue.arg.past": {
+    "text": "list: true also lists past branches' queues (not a target now, nothing in them).",
+    "note": "HI-2893."
+  },
   "tool.queue.arg.preview": {
     "text": "retarget: the preview id a target change's reply gave; without it, from and target give a new preview, moving nothing."
   },
