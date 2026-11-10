@@ -265,7 +265,7 @@ export const EDGES = [
 export const SEAMS = {
   'src/main/agentFolders': { calls: { slotWorkspaces: 2 }, why: "a Resume's claim of a slot: the pool's platform (R5)" },
   'src/main/assistantUndo': { calls: { lineRepoOps: 1 }, why: "the Assistant's branch undo: the window's repository operations, whatever the project's workflow platform (R3)" },
-  'src/main/ipc': { calls: { lineRepoReads: 18 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792)" },
+  'src/main/ipc': { calls: { lineRepoReads: 18, slotWorkspaces: 1 }, why: "the window's repository reads: they read the folder whatever it is, as before (R2), the Changes tab's too (HI-2792); Slots and copies' submodules and LFS status, the slots' platform's (HI-1182)" },
   'src/main/lanes': { calls: { slotWorkspaces: 1 }, why: "a lane's start reads its slot through the pool's platform (R5)" },
   'src/main/projectAgents': { calls: { lineRepoOps: 1 }, why: "the 0.9 worktree merge through RepoOps (R3)" },
   'src/main/repoOpsIpc': { calls: { lineRepoOps: 1 }, why: "the window's repository operations (R3)" },
@@ -277,6 +277,7 @@ export const SEAMS = {
   'src/main/workflow/nextVersion': { calls: { lineRepoReads: 2, lineRepoOps: 2 }, why: "Start the next version: the window's repository reads and operations (R2, R3)" },
   'src/main/workflow/optionsForm': { calls: { lineHistory: 2 }, why: "the default target for kept targets and a changed form: reached with the project's path alone (HI-2792)" },
   'src/main/workflow/queueChecks': { calls: { lineHistory: 2 }, why: "the queue's check brackets (R6)" },
+  'src/main/workflow/queueChecksApp': { calls: { slotWorkspaces: 1 }, why: "the queue's folder's submodules and LFS step: a worktree made as slots are, their platform's (HI-1182)" },
   'src/main/workflow/queueControls': { calls: { lineHistory: 9, queueIntegration: 1 }, why: "forwarding, the default target and Resume's condition: the queue's controls name no card (R8, HI-2792)" },
   'src/main/workflow/queueHost': { calls: { queueIntegration: 2 }, why: "the host's pin clean-up (R8)" },
   'src/main/workflow/queueRunner': { calls: { queueIntegration: 2 }, why: "the runner's workspace removal (R8)" },

@@ -9,7 +9,9 @@ import { git, gitErrorLine } from '../git'
 import { copyIgnored, createWorktree, currentBranch, listWorktreesOrNull } from '../worktrees'
 import * as G from './git'
 import { gitRelocation } from './gitRelocation'
-import type { WorkspacePort, WorkspaceStep } from './workspacePort'
+import { GIT_FILES_TITLE, gitFilesNeeded, gitFilesStatus, gitReads, prepareGitFiles, SKIP_SMUDGE } from './gitModules'
+import { gitFilesExec } from './gitModulesRun'
+import type { CheckoutOptions, WorkspacePort, WorkspaceStep } from './workspacePort'
 
 /** A git command's answer as a step's: done, or git's own words. */
 const step = async (r: Promise<{ ok: boolean; err: string }>): Promise<WorkspaceStep> => {
@@ -34,6 +36,9 @@ async function prunable(repo: string): Promise<string[]> {
   return out
 }
 
+/** HI-1182: a checkout's options for git: with `skipSmudge`, git-lfs's smudge left out (GIT_LFS_SKIP_SMUDGE, this process only), else as before. */
+const smudge = (o?: CheckoutOptions): { env?: NodeJS.ProcessEnv } => (o?.skipSmudge ? { env: { ...process.env, ...SKIP_SMUDGE } } : {})
+
 export const gitWorkspacePort: WorkspacePort = {
   platform: 'git',
   list: async (repo) => (await listWorktreesOrNull(repo))?.map((w) => ({ path: w.path, line: w.branch })) ?? null,
@@ -51,15 +56,16 @@ export const gitWorkspacePort: WorkspacePort = {
   defaultLine: (repo) => G.defaultBranch(repo),
   lineExists: async (repo, line) => (await git(repo, ['rev-parse', '--verify', '--quiet', `refs/heads/${line}`])).ok,
   prunable,
-  create: (repo, folder, at) => step(git(repo, ['worktree', 'add', '--detach', folder, at])),
+  create: (repo, folder, at, o) => step(git(repo, ['worktree', 'add', '--detach', folder, at], undefined, undefined, smudge(o))),
   attach: (repo, folder, line) => step(git(repo, ['worktree', 'add', folder, line])),
   createOnNewLine: (repo, folder, line, base) => createWorktree(repo, folder, line, base),
   copyIgnored: (repo, folder, patterns) => copyIgnored(repo, folder, patterns),
+  files: { title: GIT_FILES_TITLE, needed: (folder, disposable) => gitFilesNeeded(gitReads, folder, disposable), prepare: prepareGitFiles, exec: gitFilesExec, status: (folder) => gitFilesStatus(gitReads, folder) },
   prune: async (repo) => void (await git(repo, ['worktree', 'prune'])),
-  prepare: (folder, line, base) => step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base])),
+  prepare: (folder, line, base, o) => step(git(folder, base === null ? ['switch', '--no-guess', line] : ['switch', '--no-guess', '-c', line, base], undefined, undefined, smudge(o))),
   detach: (folder, revision, o) => step(git(folder, o?.quiet ? ['switch', '-q', '--detach', revision] : ['switch', '--detach', revision])),
-  resetTo: async (folder, revision) => {
-    const co = await git(folder, ['checkout', '--detach', '--force', revision])
+  resetTo: async (folder, revision, o) => {
+    const co = await git(folder, ['checkout', '--detach', '--force', revision], undefined, undefined, smudge(o))
     if (!co.ok) return { ok: false, failed: 'checkout', err: co.err }
     const cl = await git(folder, ['clean', '-fd'])
     return cl.ok ? { ok: true } : { ok: false, failed: 'clean', err: cl.err }

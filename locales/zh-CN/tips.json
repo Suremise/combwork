@@ -498,6 +498,8 @@
   "tips.storageCleanup.title": "查看 Combwork 保存了什么，并进行清理",
   "tips.storagePurge.text": "在“项目设置”→“存储”中使用“彻底清除…”，或在会话上使用“彻底清除 Combwork 的文件…”，可删除 Combwork 为会话保留的内容：备份、附件和残留。它会先列出每个文件；智能体自己的文件和你的用量总数保持不变。",
   "tips.storagePurge.title": "彻底清除 Combwork 保留的内容",
+  "tips.submodulesLfs.text": "使用子模块或 Git LFS 时，Combwork 会在每个槽位和评审副本运行准备脚本之前检出子模块并获取 LFS 文件，且不更改仓库的设置。“槽位和副本”→“设置子模块和 LFS”可关闭此功能。",
+  "tips.submodulesLfs.title": "槽位中的子模块和 Git LFS",
   "tips.taskbarBadge.text": "Combwork 的任务栏按钮会显示有多少个智能体需要你；Combwork 在后台时，若有智能体向你提问，按钮会闪烁。",
   "tips.taskbarBadge.title": "看一眼任务栏",
   "tips.teamPreset.text": "“版本控制”→“工作流程”中的“团队”是检查更严格的“结对”：单元测试需在评审前和合并结果上通过，每次合并前都会从头安装依赖，带有 ui 或 release 标签的卡片会等待你的批准。",

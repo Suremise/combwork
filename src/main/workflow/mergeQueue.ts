@@ -109,6 +109,10 @@ export interface QueueConfig {
   runCheck: (name: string, command: string, folder: string, ctx: CheckContext) => Promise<CheckResult>
   /** Installs dependencies there; `clean` from scratch (`npm ci`). `skipped`: there was nothing to install. */
   install?: (folder: string, clean: boolean, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }>
+  /** HI-1182: the folder's submodules and LFS files set up before the install and checks; `skipped`: nothing to do. */
+  gitFiles?: (folder: string, ctx: CheckContext) => Promise<CheckResult & { skipped?: boolean }>
+  /** HI-1182: whether that is on, so the queue's checkouts of its folder leave LFS files for it. */
+  gitFilesOn?: () => Promise<boolean>
   /** The files whose change since the last install means a clean install (#187). */
   manifests?: string[]
   /**
@@ -1488,7 +1492,7 @@ export class MergeQueue {
 
   /** What a candidate's step is given of the queue: the repository, its own worktree, its runner and this round's reads. */
   private host(reads: EntryReads): CandidateHost {
-    return { project: this.project, folder: this.cfg.folder, run: (cwd, args, opts) => this.git(cwd, args, opts), signTimeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS, identity: () => this.identity(reads), reads }
+    return { project: this.project, folder: this.cfg.folder, run: (cwd, args, opts) => this.git(cwd, args, opts), signTimeoutMs: this.cfg.signTimeoutMs ?? SIGN_TIMEOUT_MS, identity: () => this.identity(reads), reads, skipSmudge: async () => !!(await this.cfg.gitFilesOn?.().catch(() => true)) }
   }
 
   /**
@@ -1549,6 +1553,11 @@ export class MergeQueue {
     const now = hash.digest('hex')
     const key = `queue:installed:${f}`
     let noInstall = false
+    // HI-1182: the merged result's submodules and LFS files, every time, before the install and checks.
+    if (this.cfg.gitFiles) {
+      const g = await this.cfg.gitFiles(f, ctx)
+      if (!g.ok) return { kind: 'red', transient: !!g.transient, ...(g.cause ? { cause: g.cause } : {}), output: g.output, check: g.command ?? '', ...(g.logPath ? { logPath: g.logPath } : {}) }
+    }
     if (this.cfg.install && (o.mergeInstall === 'always' || this.wf.store.meta(key) !== now)) {
       const i = await this.cfg.install(f, true, ctx)
       if (!i.ok) return { kind: 'red', transient: !!i.transient, ...(i.cause ? { cause: i.cause } : {}), output: i.output, check: 'install', ...(i.logPath ? { logPath: i.logPath } : {}) }

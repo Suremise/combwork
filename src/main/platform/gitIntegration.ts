@@ -4,6 +4,7 @@
 // platform's reads (head, sameChange) are platform/git.ts's as before. The queue's worktree is made or reused (never
 // removed or pruned), a failure leaves it clean at the target's head, and a result is kept on `refs/cw/queue/*`.
 
+import { SKIP_SMUDGE } from './gitModules'
 import { existsSync, readdirSync } from 'original-fs'
 import { resolve } from 'path'
 import { git } from '../git'
@@ -68,8 +69,9 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
   const key = (p: string): string => resolve(p).toLowerCase()
   const listed = list.out.split('\n').some((l) => l.startsWith('worktree ') && key(l.slice(9).trim()) === key(f))
   const there = existsSync(f)
+  const opts = (await h.skipSmudge?.()) ? { env: { ...process.env, ...SKIP_SMUDGE } } : {}
   if (listed && there) {
-    const co = await h.run(f, ['checkout', '--detach', '-f', at])
+    const co = await h.run(f, ['checkout', '--detach', '-f', at], opts)
     if (!co.ok) return again(co.err)
     await h.run(f, ['clean', '-fdq'])
     return null
@@ -83,7 +85,7 @@ async function folderAt(h: CandidateHost, at: string): Promise<Again | Candidate
     }
   }
   if (there && !empty()) return { pause: 'needsYou', files: [f], message: `${f} has files in it but isn't one of this repository's worktrees: left as it is.` } // i18n-ignore: git's side of a pause, in English as git's messages are
-  const add = await h.run(h.project, ['worktree', 'add', '--detach', f, at])
+  const add = await h.run(h.project, ['worktree', 'add', '--detach', f, at], opts)
   return add.ok ? null : again(add.err)
 }
 

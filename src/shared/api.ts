@@ -22,6 +22,7 @@ import type {
   CopyView,
   SlotTestOp,
   SlotOptions,
+  GitFilesStatus,
   SlotView,
   HeldWriter,
   BoardState,
@@ -441,7 +442,9 @@ export interface CombworkRequests {
   /** The project's slots (#1429, SPEC §16.10.1), each with its open lease. */
   'slots:list': (projectPath: string) => SlotView[]
   /** One setting of the Version Control tab's Slots and copies (#1445): set, or with null removed, under the project's lock. */
-  'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize', value: string | number | null) => { slots: SlotOptions; copies: { size?: number } }
+  'slots:setSetting': (projectPath: string, key: 'setup' | 'archive' | 'copy' | 'copiesSize' | 'gitFiles', value: string | number | boolean | null) => { slots: SlotOptions; copies: { size?: number } }
+  /** HI-1182: what the project folder uses of submodules and Git LFS, and git-lfs's version; null when git couldn't say. */
+  'slots:gitFiles': (projectPath: string) => GitFilesStatus | null
   /** A project's copied files as they inherit (HI-1765: its own, its workspace's, Combwork's, the default), and where they come from. */
   'slots:copyOf': (projectPath: string) => { value: string; origin: SlotOptionOrigin }
   /** A workspace's (null) or a project's GitHub host settings as they resolve (HI-2779), and a change to them. */

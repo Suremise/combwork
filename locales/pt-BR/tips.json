@@ -498,6 +498,8 @@
   "tips.storageCleanup.title": "Veja o que o Combwork guarda e faça uma limpeza",
   "tips.storagePurge.text": "Expurgar… em Configurações do projeto → Armazenamento, ou Expurgar os arquivos do Combwork… em uma sessão, remove o que o Combwork guarda das sessões: backups, anexos e sobras. Ele lista cada arquivo antes; os arquivos dos agentes e seus totais de uso ficam.",
   "tips.storagePurge.title": "Expurgar o que o Combwork guarda",
+  "tips.submodulesLfs.text": "Com submódulos ou Git LFS, o Combwork faz o checkout dos submódulos e baixa os arquivos LFS em cada slot e cópia de revisão antes do script de preparação, sem mudar as configurações do seu repositório. Slots e cópias → Preparar submódulos e LFS desliga isso.",
+  "tips.submodulesLfs.title": "Submódulos e Git LFS nos slots",
   "tips.taskbarBadge.text": "O botão do Combwork na barra de tarefas mostra quantos agentes precisam de você e pisca quando um deles pergunta algo enquanto o Combwork está em segundo plano.",
   "tips.taskbarBadge.title": "Dê uma olhada na barra de tarefas",
   "tips.teamPreset.text": "Equipe, em Controle de versão → Fluxo de trabalho, é a Dupla com verificações mais rígidas: os testes de unidade passam antes da revisão e no resultado mesclado, as dependências são instaladas do zero antes de cada merge, e cartões com o rótulo ui ou release esperam a sua aprovação.",

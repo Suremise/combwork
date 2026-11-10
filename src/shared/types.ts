@@ -1960,11 +1960,22 @@ export interface CopyView {
 /** What a test copy asks of a project's slot pool (`slots:test`, unpackaged builds only: #1429's e2e). */
 export type SlotTestOp = { op: 'lend'; agent: string; card?: number; lane?: string; slot?: string } | { op: 'release'; lease: string; why?: string } | { op: 'tidy'; at?: number } | { op: 'remove'; slot: string } | { op: 'carry'; agent: string; slot: string; folder: string } | { op: 'homes'; folders: string[] } | { op: 'writer'; slot: string; agent: string; run: string; pid: number; started: number } | { op: 'quit'; agent: string }
 
+/** HI-1182: what a project folder uses of submodules and Git LFS (Version Control → Slots and copies), and git-lfs's version line (null: not installed, or LFS unused). */
+export interface GitFilesStatus {
+  submodules: number
+  lfs: boolean
+  lfsVersion: string | null
+  /** Whether an LFS filter is configured (git lfs install); without one, LFS files stay pointers. */
+  lfsFilter: boolean
+}
+
 /** A project's slot options as project.json keeps them (ProjectConfig.slots): each left out falls back (slots.ts). */
 export interface SlotOptions {
   setup?: string
   archive?: string
   copy?: string
+  /** HI-1182: false turns off setting up submodules and Git LFS in slots and copies (left out: on, where either is used). */
+  gitFiles?: boolean
 }
 
 export interface ProjectProviderConfig {

@@ -520,6 +520,8 @@
   "tips.storageCleanup.title": "See what Combwork keeps, and clean up",
   "tips.storagePurge.text": "Purge… in Project Settings → Storage, or Purge Combwork's Files… on a session, removes everything Combwork keeps for sessions: backups, attachments and leftovers. It lists every file first; the coding agents' own files and your usage totals stay.",
   "tips.storagePurge.title": "Purge what Combwork keeps",
+  "tips.submodulesLfs.text": "With submodules or Git LFS, Combwork checks out the submodules and fetches the LFS files in each slot and review copy before its setup script, never changing your repository’s settings. Slots and copies → Set up submodules and LFS turns it off.",
+  "tips.submodulesLfs.title": "Submodules and Git LFS in slots",
   "tips.taskbarBadge.text": "Combwork's taskbar button shows how many agents need you, and flashes when one asks you something while Combwork is in the background.",
   "tips.taskbarBadge.title": "Glance at the taskbar",
   "tips.teamPreset.text": "Team, in Version Control → Workflow, is Pair with stricter checks: the unit tests pass before review and on the merged result, dependencies are installed from scratch before every merge, and cards labelled ui or release wait for your OK.",

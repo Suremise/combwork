@@ -4,6 +4,13 @@
 
 ### Added
 
+- **Submodules and Git LFS in slots and copies** (HI-1182). Slots, review and check copies and the merge queue's folder are worktrees, which git makes with empty submodule folders, and Combwork's had LFS files only where the project's setup did it. Now, in a repository that uses either, Combwork sets them up itself, before the setup script and before every card, review or merge check, as a run of its own in the Progress panel.
+  - **Submodules** are checked out at the folder's revision, nested ones too, each folder cloning its own. Your repository's config is never written (no `git submodule sync` or `init` there), so the project folder and your URL overrides stay as they are; a submodule you turned off (`active = false`, `update = none`) is left alone.
+  - **Git LFS files** are fetched with `git lfs pull`, downloaded once for every worktree of the repository. A submodule's own LFS files follow your git-lfs setup.
+  - **Never touches what isn't its own:** a submodule folder that already holds files or another repository stops the setup, saying so, and changes nothing. A review copy removes only the submodule folders it cloned itself once its revision no longer has them; uncommitted changes inside a slot's submodule count as uncommitted work.
+  - **No sign-in windows:** fetches never prompt, run within the setup's time limit and end with it. Without git-lfs, or with Git LFS not set up (`git lfs install`), slots and copies can't be prepared, and Version Control → Slots and copies says so.
+  - **Set up submodules and LFS**, in Version Control → Slots and copies, shows what the project uses and turns this off.
+
 - **jj (Jujutsu) as a project's version control** (HI-2799). In a jj repository colocated with Git, the Version Control tab offers **jj** beside None and Git; Combwork never takes it by itself, never creates a jj repository and never changes its colocation.
   - **Read-only views**: **Repository** (where it is, the jj version, its workspaces, what isn't supported), **History** (each change id beside its commit id, *conflicted*, *divergent*, *working copy*), **Compare** (an id naming several commits lists them all, never one picked), **Bookmarks** (conflicted ones with their sides, ones not the same in Git marked) and **Conflicts**. Every read is pinned at jj's single operation head and changes nothing; with more than one head, nothing is read until jj reconciles them.
   - **You integrate reviewed work yourself**: Combwork never merges under jj. **Waiting for you to integrate** lists the passed cards with their reviewed commit and a `jj rebase` to start from. Cards don't run in a jj project yet: a start is refused, saying so.

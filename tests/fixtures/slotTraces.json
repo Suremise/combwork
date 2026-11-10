@@ -2,6 +2,7 @@
   "lend a new slot": [
     "<ws>/project :: worktree add --detach <ws>.worktrees/project/slot-a <id>",
     "<ws>/project :: ls-files --others --ignored --exclude-standard --directory -z",
+    "<ws>.worktrees/project/slot-a :: ls-files -z -- :(top,literal).gitmodules :(attr:filter=lfs)",
     "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
   ],
   "prepare a new line": [
@@ -9,16 +10,19 @@
     "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
     "<ws>.worktrees/project/slot-a :: rev-parse --verify -q refs/heads/cw/am/am-1-one",
     "<ws>.worktrees/project/slot-a :: switch --no-guess -c cw/am/am-1-one <id>",
+    "<ws>.worktrees/project/slot-a :: ls-files -z -- :(top,literal).gitmodules :(attr:filter=lfs)",
     "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
   ],
   "prepare the line it is on": [
     "<ws>.worktrees/project/slot-a :: symbolic-ref -q head",
+    "<ws>.worktrees/project/slot-a :: ls-files -z -- :(top,literal).gitmodules :(attr:filter=lfs)",
     "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
   ],
   "prepare a line it has": [
     "<ws>.worktrees/project/slot-a :: symbolic-ref -q head",
     "<ws>.worktrees/project/slot-a :: status --porcelain=v2 -z --branch --no-ahead-behind --untracked-files=all",
     "<ws>.worktrees/project/slot-a :: switch --no-guess cw/am/am-1-one",
+    "<ws>.worktrees/project/slot-a :: ls-files -z -- :(top,literal).gitmodules :(attr:filter=lfs)",
     "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head"
   ],
   "release, settled and detached": [
@@ -59,6 +63,7 @@
     "<ws>/project :: worktree prune",
     "<ws>/project :: worktree add --detach <ws>.worktrees/project/slot-a <id>",
     "<ws>/project :: ls-files --others --ignored --exclude-standard --directory -z",
+    "<ws>.worktrees/project/slot-a :: ls-files -z -- :(top,literal).gitmodules :(attr:filter=lfs)",
     "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
     "<ws>.worktrees/project/slot-a :: rev-parse --verify -q head",
     "<ws>/project :: worktree list --porcelain",

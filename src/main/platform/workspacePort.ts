@@ -15,6 +15,8 @@
 
 import type { PlatformId } from '../../shared/platform/descriptors'
 import type { Maybe } from './types'
+import type { ChildProcess, SpawnOptions } from 'child_process'
+import type { GitFilesStatus } from '../../shared/types'
 
 /**
  * jj's id (HI-2795's J2, agreed with J1, HI-2794, which imports it): a project platform since J6 (HI-2799), so these are
@@ -76,6 +78,73 @@ export interface WorkspaceStep {
   err: string
 }
 
+/** HI-1182: how Combwork checks a folder out while submodules and Git LFS are set up there (Git: LFS files left as pointers, `git lfs pull` fills them). */
+export interface CheckoutOptions {
+  skipSmudge?: boolean
+}
+
+/** A tool's run in a files step (HI-1182): `code` null when it didn't exit by itself (ended, timed out, not started). */
+export interface WorkspaceToolRun {
+  ok: boolean
+  code: number | null
+  out: string
+  err: string
+}
+
+/**
+ * How a files step runs the platform's tool (HI-1182): in the run's job, in `cwd`, its env over the run's own (`env`'s
+ * entries win), with no shell. `log`: its output goes to the run's log (a step that changes the folder); a read's doesn't.
+ * `stopped()`: the run was ended (its time limit, the workspace closing), so nothing more starts.
+ */
+export interface WorkspaceFilesExec {
+  git(cwd: string, args: string[], o?: { env?: Record<string, string>; log?: boolean }): Promise<WorkspaceToolRun>
+  /** A line of Combwork's own in the run's log. */
+  note(line: string): void
+  /** The run's environment as the tool gets it (for composing GIT_CONFIG_*). */
+  baseEnv(): Record<string, string>
+  stopped(): boolean
+}
+
+/** A files step's folder (HI-1182): made or reset; `project` (a relative submodule URL's base); `disposable` (a copy or the queue's folder: nobody's work). */
+export interface WorkspaceFilesStep {
+  folder: string
+  project: string
+  disposable: boolean
+}
+
+/** A files step's outcome: done (`ran`: anything ran), or why not (stored, in the Default dialect). */
+export type WorkspaceFilesOutcome = { ok: true; ran: boolean } | { ok: false; error: string }
+
+/** What a files step's exec runs in (HI-1182): the run's spawn (its job), environment, log, time limit and end. */
+export interface WorkspaceFilesRunOptions {
+  spawn: (file: string, args: string[], opts: SpawnOptions) => ChildProcess
+  env: Record<string, string>
+  log: { write(chunk: Buffer): void }
+  timeoutMs: number
+  signal?: AbortSignal
+  platform?: NodeJS.Platform
+}
+
+/**
+ * HI-1182: a platform's step for what a checkout leaves out of its workspaces (Git: submodules and LFS files,
+ * platform/gitModules.ts). jj refuses repositories that use them (HI-2799), so only Git's port has it.
+ */
+export interface WorkspaceFiles {
+  /** The step's run title in the Progress panel (the commands it may run). */
+  title: string
+  /**
+   * Whether a folder made or reset needs the step, read before any run starts; `disposable` also when a removed
+   * submodule may have left its folder. `error`: it couldn't be told, never taken for no.
+   */
+  needed(folder: string, disposable: boolean): Promise<boolean | { error: string }>
+  /** The step itself, through a run's exec. */
+  prepare(x: WorkspaceFilesExec, step: WorkspaceFilesStep): Promise<WorkspaceFilesOutcome>
+  /** A run's exec of the platform's tool, and how it ended. */
+  exec(o: WorkspaceFilesRunOptions): WorkspaceFilesExec & { timedOut(): boolean; close(): void }
+  /** What the project folder uses, for the Version Control tab; null when the tool couldn't say. */
+  status(folder: string): Promise<GitFilesStatus | null>
+}
+
 /**
  * A platform's workspace lifecycle (the isolation capability, §16.3.6 Port 2). Every read answers a value, unknown or
  * null as each says (unknown is never clean, never gone, never removable: R2.1), and a step answers what the tool said.
@@ -110,20 +179,22 @@ export interface WorkspacePort {
   prunable(repo: string): Promise<string[]>
 
   // Creation and recreation (R2.6: only by the platform's own command for its workspaces).
-  /** A new workspace at `folder`, detached at the revision `at`. */
-  create(repo: string, folder: string, at: string): Promise<WorkspaceStep>
+  /** A new workspace at `folder`, detached at the revision `at` (`skipSmudge`, HI-1182: Git LFS files left as pointers). */
+  create(repo: string, folder: string, at: string, o?: CheckoutOptions): Promise<WorkspaceStep>
   /** A workspace made again at `folder` on its existing line. */
   attach(repo: string, folder: string, line: string): Promise<WorkspaceStep>
   /** A workspace at `folder` on a new line made from `base` (a 0.9 agent's worktree): throws the tool's words, or a refused line name. */
   createOnNewLine(repo: string, folder: string, line: string, base: string): Promise<void>
   /** The repository's ignored files matching `patterns` copied into a new workspace (as Settings say); those copied. */
   copyIgnored(repo: string, folder: string, patterns: string): Promise<string[]>
+  /** HI-1182: submodules and LFS files set up in its workspaces (Git's only: absent, the platform has none). */
+  files?: WorkspaceFiles
   /** Registrations of workspaces whose folders are gone dropped (callers check `prunable` first where others may need theirs). */
   prune(repo: string): Promise<void>
 
   // Preparation.
   /** The folder switched to a line: the one it has (`base` null) or a new one made from `base`. Refused by the tool rather than lose files. */
-  prepare(folder: string, line: string, base: string | null): Promise<WorkspaceStep>
+  prepare(folder: string, line: string, base: string | null, o?: CheckoutOptions): Promise<WorkspaceStep>
   /** The folder detached at `revision` (`quiet`: without the tool's notices). Refused by the tool rather than lose files. */
   detach(folder: string, revision: string, o?: { quiet?: boolean }): Promise<WorkspaceStep>
 
@@ -131,7 +202,7 @@ export interface WorkspacePort {
    * A check or review copy put at exactly `revision` (HI-2789: copies.ts's reuse of a copy): tracked changes dropped and
    * what isn't ignored removed (dependencies stay); `failed` names the step the tool refused.
    */
-  resetTo(folder: string, revision: string, o?: { identity?: WorkspaceIdentity | null; fence?: WorkspaceFence }): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
+  resetTo(folder: string, revision: string, o?: { identity?: WorkspaceIdentity | null; fence?: WorkspaceFence } & CheckoutOptions): Promise<{ ok: true } | { ok: false; failed: 'checkout' | 'clean'; err: string }>
 
   // Removal (R2.5: the platform's own, never forced on a folder holding anyone's work; the callers' guards first).
   /**

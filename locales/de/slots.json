@@ -8,5 +8,6 @@
   "slots.release.otherCombwork": "{slot} wird von einem anderen Combwork gehalten, das noch läuft (Prozess {pid}): Gib ihn dort frei oder beende zuerst dieses Combwork.",
   "slots.setting.bad": "Diese Slot-Einstellung gibt es in Combwork nicht.",
   "slots.setting.badSize": "Die Zahl der Review- und Check-Kopien ist eine ganze Zahl von {min, number} bis {max, number}.",
+  "slots.setting.badSwitch": "„Submodule und LFS einrichten“ ist ein- oder ausgeschaltet.",
   "slots.setting.badText": "Ein Slot-Skript oder eine Dateiliste ist Text mit höchstens {max, number} Zeichen."
 }

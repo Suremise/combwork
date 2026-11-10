@@ -753,9 +753,11 @@ describe('the pool (#1429)', { timeout: 60_000 }, () => {
   })
 
   it('reads the setup and copy patterns from the worktree settings while the slot options are unset', () => {
-    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: null }, {})).toEqual({ setup: 'npm install', archive: '', copy: '.env*' })
-    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: 'a.txt', slots: { setup: 'pnpm i', archive: 'node done.js' } }, {})).toEqual({ setup: 'pnpm i', archive: 'node done.js', copy: 'a.txt' })
-    expect(slotOptionsOf({ worktreeSetup: 'x', worktreeCopy: null, slots: { setup: '', copy: '' } }, {})).toEqual({ setup: '', archive: '', copy: '' })
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: null }, {})).toEqual({ setup: 'npm install', archive: '', copy: '.env*', gitFiles: true })
+    expect(slotOptionsOf({ worktreeSetup: 'npm install', worktreeCopy: 'a.txt', slots: { setup: 'pnpm i', archive: 'node done.js' } }, {})).toEqual({ setup: 'pnpm i', archive: 'node done.js', copy: 'a.txt', gitFiles: true })
+    expect(slotOptionsOf({ worktreeSetup: 'x', worktreeCopy: null, slots: { setup: '', copy: '' } }, {})).toEqual({ setup: '', archive: '', copy: '', gitFiles: true })
+    // HI-1182: Set up submodules and LFS is on unless turned off.
+    expect(slotOptionsOf({ worktreeSetup: '', worktreeCopy: null, slots: { gitFiles: false } }, {}).gitFiles).toBe(false)
   })
 })
 
