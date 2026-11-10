@@ -148,6 +148,36 @@ describe.skipIf(!jjExe)(`jj's control workspace, its attempts and their recovery
       expect(w3.record()!.residues).toEqual(expect.arrayContaining([expect.objectContaining({ why: 'unproved' })]))
     })
 
+    it("a ready control replaced, or given a file, while a slot's add waits for the store's lock: refused, the control untouched (HR1's round 1)", async () => {
+      let onLock: (() => void) | null = null
+      const w = setup('ctli', () => {
+        const f = onLock
+        onLock = null
+        f?.()
+      })
+      expect((await w.port.create(w.repo, join(w.root, 'slot-a'), w.base)).ok).toBe(true)
+      const ready = w.record()!
+      const ops = (): string => w.h.jj(w.repo, '--ignore-working-copy', 'op', 'log', '--no-graph', '--limit', '1', '-T', 'id').trim()
+      // Replaced byte for byte while the add waits for the lock (its control was proved before): no add from it.
+      onLock = () => {
+        renameSync(ready.ws!, `${ready.ws}-old`)
+        cpSync(`${ready.ws}-old`, ready.ws!, { recursive: true })
+        rmSync(`${ready.ws}-old`, { recursive: true, force: true })
+      }
+      const before = ops()
+      expect((await w.port.create(w.repo, join(w.root, 'slot-b'), w.base)).ok).toBe(false)
+      expect(ops()).toBe(before)
+      expect(existsSync(join(w.root, 'slot-b'))).toBe(false)
+      // The next creation recovers (a residue, a fresh control) and makes the slot; the replacement stays where it is.
+      expect((await w.port.create(w.repo, join(w.root, 'slot-b'), w.base)).ok).toBe(true)
+      expect(existsSync(ready.ws!)).toBe(true)
+      // A file added to the (new) control while an add waits: refused, the file kept.
+      const now = w.record()!
+      onLock = () => writeFileSync(join(now.ws!, 'stray.txt'), 'x\n')
+      expect((await w.port.create(w.repo, join(w.root, 'slot-c'), w.base)).ok).toBe(false)
+      expect(readFileSync(join(now.ws!, 'stray.txt'), 'utf8')).toBe('x\n')
+    })
+
     it('two simultaneous makings: one control; replaced while the recovery waits for the lock: kept, a fresh one made', async () => {
       const w = setup('ctlf')
       const [a, b] = await Promise.all([w.port.create(w.repo, join(w.root, 'slot-a'), w.base), w.port.create(w.repo, join(w.root, 'slot-b'), w.base)])
