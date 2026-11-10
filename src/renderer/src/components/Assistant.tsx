@@ -370,15 +370,7 @@ export function AssistantPanel() {
         </div>
       </div>
       <div className="assistant-footer">
-        <PaneFooter
-          project={a}
-          a={agent}
-          onSettings={() => set({ assistantSettingsOpen: true })}
-          onContext={() => undefined}
-          onTranscript={() => undefined}
-          transcriptAdvice={tr(M.transcriptAdvice)}
-          settingsName={tr(M.settingsName)}
-        />
+        <AssistantFooter project={a} a={agent} />
       </div>
     </div>
   )
@@ -396,6 +388,12 @@ function AssistantConnectionBanner({ a }: { a: AgentInfo }) {
   const cli = useAssistantCli(a)
   const need = assistantNeed(a, cli, view, settings, cliReadyOf(providers), (x) => accountState(x) === 'signedOut')
   return need.kind === 'ok' ? null : <AssistantAccountBanner need={need} settingsLabel={tr(M.settingsMenu)} />
+}
+
+/** The Assistant's footer (its model, effort, connection): of the CLI it would really start on (HI-2899). */
+function AssistantFooter({ project, a }: { project: ProjectInfo; a: AgentInfo }) {
+  const cli = useAssistantCli(a)
+  return <PaneFooter project={project} a={a} onSettings={() => set({ assistantSettingsOpen: true })} onContext={() => undefined} onTranscript={() => undefined} transcriptAdvice={tr(M.transcriptAdvice)} settingsName={tr(M.settingsName)} provider={cli} />
 }
 
 /** The Assistant's CLI as its launch picks it (HI-2899, assistantCli): never Automatic's guess while an account would do. */

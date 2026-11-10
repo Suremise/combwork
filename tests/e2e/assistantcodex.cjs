@@ -74,8 +74,10 @@ const homeAgent = () => JSON.parse(fs.readFileSync(path.join(assistantHome, '.co
     check('Work (Codex) signed in', !!(await lib.until(async () => (await view())?.accepted?.email === 'work@example.com', HUNG_MS)))
     await inv('connections:setOn', work.id, true)
     check('…on here: the Assistant panel has no account banner', !!(await lib.until(async () => (await banner.count()) === 0, HUNG_MS)), await banner.innerText().catch(() => ''))
+    // Its footer names Codex's model choice, not Claude Code's (Automatic's pick).
+    check("…its footer shows Codex's model, never Claude Code's", !!(await lib.until(async () => !/Opus|Sonnet|Haiku/.test(await page.locator('.assistant-footer').innerText().catch(() => 'Opus')), HUNG_MS)), await page.locator('.assistant-footer').innerText().catch(() => ''))
     await shots('codex-on')
-    await page.locator('.assistant-panel .act-start').first().click()
+    await page.locator('.assistant-panel .assistant-idle .act-start').click()
     const launched = await lib.until(() => lines(path.join(accountsRoot, work.id, 'fake-launches.jsonl')).find(inHome) ?? null, HUNG_MS)
     check('Start Assistant launches it on the fake Codex, in the Work connection’s folder', !!launched && launched.home === path.join(accountsRoot, work.id), JSON.stringify(launched))
     const live = await lib.until(async () => (await inv('session:live')).find((s) => s.agentId === 'assistant' && s.status !== 'stopped') ?? null, HUNG_MS)
