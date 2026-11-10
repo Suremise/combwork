@@ -19,6 +19,7 @@ const path = require('path')
 const { createHash } = require('crypto')
 const { processes, descendantsIn, suspensions } = require('../folderProcesses.cjs')
 const { startFakeCopilotApi, copilotTestEnv, copilotInstalled } = require('../fake-copilot-api.cjs')
+const { doorbellIds: doorbellsIn, newDelivery } = require('./doorbells.cjs')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 60000
 /** How long the CLI stays suspended once Combwork has written the line: input it then reads in one go. */
@@ -113,12 +114,10 @@ module.exports = async function run(provider) {
     /** What the agent's pane shows now (its terminal's lines, as drawn). */
     const screen = async (key) => ((await page.evaluate((k) => window.__cwTerminalLines(k), key)) ?? []).join('\n')
     const paneCols = async (key) => (await page.evaluate((k) => window.__cwTerminalState(k), key))?.cols
-    /**
-     * The doorbells on its screen, each by its id, however its rows were wrapped: by its "(m4). Call cw_inbox" with
-     * whitespace dropped, and up to a few non-letters between "Call" and "cw_inbox", as the CLI can draw in a doorbell's
-     * first row where it wraps (HI-2387: Copilot's time and its border, "(m4). Call   19:34 ┃" / "cw_inbox …").
-     */
-    const doorbellIds = async (key) => [...(await screen(key)).replace(/\s+/g, '').matchAll(/\((m\d+)\)\.Call[^A-Za-z]{0,16}cw_inbox/g)].map((x) => x[1])
+    /** The doorbells on its screen, each by its id (doorbells.cjs). */
+    const doorbellIds = async (key) => doorbellsIn(await screen(key))
+    /** Its deliveries, oldest first (its activity's inbox rows). */
+    const deliveries = async () => (await callApi('GET', '/v1/projects/alpha/agents/Tester/activity')).body?.inbox?.deliveries ?? []
     /** How many doorbells its screen shows for a message (`delivery`: one of them). */
     const copies = async (key, delivery) => (await doorbellIds(key)).filter((x) => x === delivery).length
     /** Combwork has written the whole line into the agent: its Enter too (Woke), or, for Codex, waiting for it to be drawn. */
@@ -181,19 +180,22 @@ module.exports = async function run(provider) {
       await page.getByText('alpha', { exact: true }).first().click()
       await lib.fitWindow(app, page, { width: 640, height: 900 })
       check('put off: its pane is narrow, and the CLI as wide', !!(await lib.until(async () => (await page.evaluate(() => window.__cwTerminalsFitted())) && (await paneCols(key)) <= 60 && (await inv('pty:size', key))?.cols === (await paneCols(key)), HUNG_MS, 300)), JSON.stringify({ pane: await paneCols(key), pty: await inv('pty:size', key) }))
-      const earlier = new Set(await doorbellIds(key))
+      const earlier = (await deliveries()).map((d) => d.id)
       const lines = wakeLines().length
       const logLines = combworkLog().split('\n').length - 1
       const since = (re) => combworkLog().split('\n').slice(logLines).some((l) => re.test(l))
       fs.writeFileSync(hold, '')
       const left = callApi('POST', `/v1/projects/alpha/agents/Tester/message`, { text: 'Last round: nothing to do. Read this, ack it, and reply with just: ok' })
       check('put off: its doorbell is typed, and held before its Enter', !!(await lib.until(() => since(/the line Combwork typed is held before its Enter/), HUNG_MS, 100)))
-      // Its delivery's id, from the line in its input (the message's reply waits for the line).
-      const m = await lib.until(async () => (await doorbellIds(key)).find((x) => !earlier.has(x)), HUNG_MS, 300)
-      check('put off: …it shows in its input', !!m && (await copies(key, m)) === 1, await screen(key))
+      // Its delivery's id, from Combwork's deliveries (the message's reply waits for the line), never from what the screen
+      // shows that it didn't before: Copilot redraws its whole conversation as its pane narrows, and an earlier doorbell
+      // drawn after a snapshot of the screen was taken for this one, and waited for to leave its history (HI-2875).
+      const m = await lib.until(async () => newDelivery(earlier, await deliveries()), HUNG_MS, 300)
+      check('put off: …it shows in its input', !!m && !!(await lib.until(async () => (await copies(key, m)) === 1, HUNG_MS, 300)), `${m}: ${await screen(key)}`)
       await inv('advanced:set', 'cw.inbox.idleWakes', false)
       check('put off: idle wakes turned off, the doorbell is put off part-way', !!(await lib.until(() => since(/put off: It is no longer wanted/), HUNG_MS, 100)))
-      check('put off: …what Combwork typed is taken back whole', !!m && !!(await lib.until(async () => (await copies(key, m)) === 0, HUNG_MS, 300)), await screen(key))
+      check('put off: …Combwork writes its take-back', !!(await lib.until(() => since(/the line Combwork typed is taken back: (\d+) of \1 /), HUNG_MS, 100)), combworkLog().split('\n').slice(logLines).join(' | '))
+      check('put off: …what Combwork typed is taken back whole', !!m && !!(await lib.until(async () => (await copies(key, m)) === 0, HUNG_MS, 300)), `${m}: ${await screen(key)}`)
       fs.rmSync(hold, { force: true })
       await inv('advanced:set', 'cw.inbox.idleWakes', null)
       const outcome = await lib.until(() => wakeLines().slice(lines).find((l) => /was taken after \d+ ms|wasn't taken/.test(l)), HUNG_MS, 300)
