@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as electron from 'electron'
 import type { CombworkEvent, ProjectConfig } from '../src/shared/types'
 import { PLATFORMS, revisionShort } from '../src/shared/platform/descriptors'
-import { detect, projectPlatform } from '../src/main/platform/registry'
+import { detect, foundKey, projectPlatform } from '../src/main/platform/registry'
 import { git, gitTestHooks } from '../src/main/git'
 import { checkGit } from '../src/main/gitTool'
 import { excludeCopies } from '../src/main/providers/common'
@@ -69,6 +69,29 @@ describe('detection, per case of §16.3.5', () => {
     const g = tempDir('cw-platform-jjgone-')
     gitInit(g)
     expect(projectPlatform(g, 'jj').offer).toEqual({ offer: 'git', why: 'jjGone' })
+  })
+
+  it('a non-colocated jj repository is offered jj too (HI-2896), and its found key is not the earlier jj:separate', () => {
+    const j = tempDir('cw-platform-jjsep-')
+    mkdirSync(join(j, '.jj'))
+    expect(projectPlatform(j, 'none').offer).toEqual({ offer: 'jj', why: 'jjFound' })
+    expect(foundKey(detect(j))).toBe('jj:noncolocated')
+    // A user who chose None while jj couldn't be switched to there (jj:separate recorded) is offered jj once.
+    expect(projectPlatform(j, 'none', 'jj:separate').offer).toEqual({ offer: 'jj', why: 'jjFound' })
+    expect(projectPlatform(j, 'none', 'jj:noncolocated').offer).toBeUndefined()
+  })
+
+  it('a non-colocated jj repository inside a Git working tree is found there (inGit) and not offered (HI-2896)', () => {
+    const top = tempDir('cw-platform-jjingit-')
+    gitInit(top)
+    const j = join(top, 'inner')
+    mkdirSync(join(j, '.jj'), { recursive: true })
+    expect(detect(j)).toEqual({ platform: 'jj', root: j, jj: { colocated: false, inGit: top } })
+    expect(projectPlatform(j, 'none').offer).toBeUndefined()
+    expect(projectPlatform(j, 'git').offer).toEqual({ offer: 'none', why: 'otherFound' })
+    // Colocated inside another Git repository: its own .git is nearer, so not inGit.
+    gitInit(j)
+    expect(detect(j)).toEqual({ platform: 'jj', root: j, jj: { colocated: true } })
   })
 })
 
