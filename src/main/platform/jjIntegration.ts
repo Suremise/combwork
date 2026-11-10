@@ -563,7 +563,7 @@ export function sourcesPrint(store: string, jjRepo: string, target: string, sour
   return rawSourcesPrint({
     jjRepo,
     env: sources.env,
-    files: [{ label: 'HEAD', path: join(store, 'HEAD') }, { label: 'ref', path: join(store, 'refs', 'heads', ...target.split('/')) }, { label: 'packed', path: join(store, 'packed-refs') }, ...sources.files.map((f) => ({ label: `config:${f.toLowerCase()}`, path: f }))]
+    files: [{ label: 'HEAD', path: join(store, 'HEAD') }, { label: 'ref', path: join(store, 'refs', 'heads', ...target.split('/')) }, { label: 'packed', path: join(store, 'packed-refs') }, ...sources.files.map((f) => ({ label: `config:${f.toLowerCase()}`, path: f }))] // i18n-ignore: a print's labels, hashed, never shown
   })
 }
 

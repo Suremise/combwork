@@ -125,8 +125,8 @@ function gitPrint(c: JjContext): string | undefined {
   const own = c.colocated ? workspaceGitDir(c.root) : null
   return rawSourcesPrint({
     jjRepo: c.jjRepo,
-    files: [{ label: 'HEAD', path: join(c.store, 'HEAD') }, ...(own && own !== c.store ? [{ label: 'workspace HEAD', path: join(own, 'HEAD') }] : []), { label: 'packed', path: join(c.store, 'packed-refs') }, { label: 'config', path: join(c.store, 'config') }],
-    trees: ['heads', 'tags', 'remotes'].map((t) => ({ label: `refs/${t}`, path: join(c.store, 'refs', t) })).concat([{ label: 'reftable', path: join(c.store, 'reftable') }])
+    files: [{ label: 'HEAD', path: join(c.store, 'HEAD') }, ...(own && own !== c.store ? [{ label: 'workspace HEAD', path: join(own, 'HEAD') }] : []), { label: 'packed', path: join(c.store, 'packed-refs') }, { label: 'config', path: join(c.store, 'config') }], // i18n-ignore: a print's labels, hashed, never shown
+    trees: ['heads', 'tags', 'remotes'].map((t) => ({ label: `refs/${t}`, path: join(c.store, 'refs', t) })).concat([{ label: 'reftable', path: join(c.store, 'reftable') }]) // i18n-ignore: a print's labels, hashed, never shown
   })
 }
 
