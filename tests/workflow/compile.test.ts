@@ -1,8 +1,8 @@
 // Options → rulesets (#1118, SPEC §16.5): presets compile, rulesets are plain data with a stable content hash, an unknown
 // piece refuses to load, a newer ruleset is read-only, and every refusal is three whole sentences.
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { allOff, preset } from '../../src/shared/workflow/options'
-import { canonical, compile, loadRuleset, mustCompile, RULESET_VERSION } from '../../src/shared/workflow/compile'
+import { canonical, compile, jjCardsTestSwitch, loadRuleset, mustCompile, RULESET_VERSION, setJjCardsReadyForTests } from '../../src/shared/workflow/compile'
 import { REFUSALS, refusal } from '../../src/shared/workflow/refusals'
 import { GUARDS } from '../../src/shared/workflow/pieces'
 import { foldCard, type Fact } from '../../src/shared/workflow/facts'
@@ -101,5 +101,27 @@ describe('the fold, card references and lane lists', () => {
     done.add(2)
     const n = nextCard(l, (c) => done.has(c))
     expect(n).toMatchObject({ card: 3, lane: { cards: [1, 2, 3, 4], pending: null } })
+  })
+})
+
+describe("the jj-card scenarios' switch (HI-2870)", () => {
+  const guarded = () => mustCompile(preset('jj', 'pair')).guards.start.includes('start.platformReady')
+  afterEach(() => setJjCardsReadyForTests(false))
+
+  it('a packaged build never turns jj card starts on, whatever its environment', () => {
+    expect(jjCardsTestSwitch(true, '1')).toBe(false)
+    expect(guarded()).toBe(true)
+  })
+
+  it('an unpackaged build without the flag, or with another value, keeps the guard', () => {
+    for (const flag of [undefined, '', '0', 'true', 'yes']) {
+      expect(jjCardsTestSwitch(false, flag)).toBe(false)
+      expect(guarded()).toBe(true)
+    }
+  })
+
+  it('only an unpackaged build with CW_TEST_JJ_CARDS=1 compiles jj rulesets without start.platformReady', () => {
+    expect(jjCardsTestSwitch(false, '1')).toBe(true)
+    expect(guarded()).toBe(false)
   })
 })

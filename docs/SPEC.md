@@ -2947,7 +2947,8 @@ start), and the skills' jj-slot workflow.
 - **Agents** (agent text, `contract.agent.jj`): a session whose project's platform is jj gets one more line after the
   contract (`platformRule`, like the latest handover's pointer: the project's part of a launch): record work with jj,
   run no git command that changes HEAD, the index, branches or refs, nor `jj git init`; `git status` may show what jj
-  already recorded; no card starts, and the user integrates. Claude Code gets it in the combwork server's instructions
+  already recorded; the user integrates finished work, and nothing an agent does moves a bookmark or pushes (J9d's
+  wording; it said no card starts before). Claude Code gets it in the combwork server's instructions
   (`CW_PLATFORM`, set at launch from the project's config, part of the tools' signature), the others in the launch's
   guidance (`sessions.combworkGuidance`). The gate plainGit stays closed; its reason now says agents are told. The
   scenario `jj-plain-git` (a colocated project switched to jj through Combwork, asked to commit a fix) checks the line
@@ -3133,6 +3134,40 @@ Combwork's only writes are J9a's owned slot writes, J3's boundary snapshots and 
   rewrite; a claim committed between the plan and the write; restart carry and the changed target; pin ownership and
   seq order; check credit, a transient edit, a throw, `--isolated`; the guard without the seam; the epoch).
 
+##### Agents in jj slots (1.5.0's J9d, HI-2870)
+
+Agent guidance for jj cards, before J9e turns their starts on. Its design is HI-2870/s7 (HR2's OK). One owner per rule:
+- **The rule** stays J7's `contract.agent.jj` line (above): record work with jj, no git command that moves HEAD, the
+  index, branches or refs. Its last sentence, which said no card starts in a jj project, is now "The user integrates
+  finished work: nothing you do moves a bookmark or pushes", so J9e changes no agent text. It's addressed to agents:
+  Combwork's owned slot writes and the user's integration aren't theirs.
+- **The gates** say their own next step (`submit.empty`, `platform.jjRefused`, `api.check.noCopies`); no skill repeats
+  them.
+- **The workflow** is the bundled skills':
+  - work-on-card: a jj card's work is a commit, as a Git card's ("for a code card in Git or jj": the run record names
+    it, and the submission is the card's own revision, so commit first; a change id named is refused by
+    `check.revisionMismatch`, so the skill doesn't say it). After a pass, where the user integrates, there is nothing for
+    the agent to merge: the card waits for the user.
+  - card-loop and review-agent-work: their "for a code card in Git" clauses (commit each round, name the commit, ask for
+    a missing one) are "in Git or jj".
+  - review-agent-work: a jj review copy's working copy is an empty commit on the revision, so the reviewer diffs the
+    base to the revision, not `@`.
+  - The skills' size budgets (`tests/guidance.test.ts`) grow by those words only.
+- **Scenarios:** `jj-plain-git` (J7's), and `jj-card-submit`, `jj-card-review` and `jj-card-passed` (a jj project with
+  slots: a card built and submitted, reviewed in its copy, and told it passed). They check `tests/scenarios/gitMutations.cjs`
+  and `tests/scenarios/jjPublishes.cjs` (a bookmark or tag moved, a push, a repository set up or a remote changed:
+  every attempt, a failed one too; unit-tested), the bookmarks unchanged and jj consistent. Before J9e they start jj
+  cards through `CW_TEST_JJ_CARDS=1` (`jjCardsTestSwitch`, compile.ts), honoured only by an unpackaged build;
+  J9e removes it with the seam.
+  - `jj-card-review` also checks the review copy is left as it was (HR2's round 1; `tests/scenarios/jjReviewCopy.cjs`,
+    unit-tested): the reviewer's tool calls (a file tool's edit there; a jj command that records, or a command that
+    writes files, run there), and the copy's files and jj's `@` and its parent looked at again while it is still the
+    reviewer's. Its review starts at the submitted revision.
+  - The fixture is a colocated repository only: a separate (non-colocated) one can't be switched to jj in 1.5.0
+    (`switchRefused`'s `jjSeparate`), so it has no cards to review.
+- **A slot's folder:** jj makes a workspace's folder but not its parent, so the port makes the parent first (the
+  project's worktrees folder is absent before its first slot), inside the store's lock and before the control's proof:
+  nothing is awaited between that proof's final check and the add (HI-2887).
 ##### jj cards reconciled to Integrated (1.5.0's J9b2, HI-2882)
 
 Still behind the guard (J9e lifts it). Its design is HI-2882/s7 to s22 (HR1's). Decision A holds: the user integrates;
