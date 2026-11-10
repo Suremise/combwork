@@ -841,14 +841,22 @@ public static class CombworkJobs {
   }
   /** Its whole membership as Members gives it (the job's and the running processes it follows), or null when unreadable. Under the turn. */
   static int[] MembersChecked(string id) {
-    var listed = ListChecked(id);
+    var mine = new List<int>();
+    foreach (var f in followed) if (f.Value.job == id) mine.Add(f.Key);
+    return Whole(ListChecked(id), mine, pid => { uint code; return GetExitCodeProcess(followed[pid].h, out code) ? (code == 259 ? 1 : 0) : -1; });
+  }
+  /**
+   * A membership read whole (MembersChecked, the OS's answers passed in: the unit tests give their own): the job's listed
+   * processes (null: unreadable) and each followed one that runs (stateOf: 1 runs, 0 has exited, -1 can't be told). Null
+   * when the list or any followed one's state can't be read.
+   */
+  public static int[] Whole(int[] listed, IEnumerable<int> followedIds, Func<int, int> stateOf) {
     if (listed == null) return null;
     var members = new List<int>(listed);
-    foreach (var f in followed) {
-      if (f.Value.job != id) continue;
-      uint code;
-      if (!GetExitCodeProcess(f.Value.h, out code)) return null;
-      if (code == 259) members.Add(f.Key);
+    foreach (int pid in followedIds) {
+      int state = stateOf(pid);
+      if (state < 0) return null;
+      if (state == 1) members.Add(pid);
     }
     return members.ToArray();
   }
@@ -1102,18 +1110,56 @@ public static class CombworkJobs {
     lock (turn) Untold(id);
     int[] all = Members(id);
     int took; adopted.TryGetValue(id, out took);
-    var b = new StringBuilder("{\"total\":" + all.Length + ",\"adopted\":" + took + ",\"processes\":[");
+    var b = new StringBuilder();
+    var described = new HashSet<int>();
     if (all.Length > 0) {
       var where = new StringBuilder();
       for (int i = 0; i < all.Length && i < max; i++) where.Append(i > 0 ? " OR " : "").Append("ProcessId=").Append(all[i]);
       bool first = true;
       using (var q = new ManagementObjectSearcher("SELECT ProcessId, ParentProcessId, Name, CommandLine FROM Win32_Process WHERE " + where))
         foreach (ManagementObject p in q.Get()) {
-          b.Append(first ? "" : ",").Append("{\"pid\":").Append(Convert.ToInt32(p["ProcessId"])).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"created\":\"").Append(CreatedOf(Convert.ToInt32(p["ProcessId"]))).Append("\"}");
+          int pid = Convert.ToInt32(p["ProcessId"]);
+          described.Add(pid);
+          b.Append(first ? "" : ",").Append("{\"pid\":").Append(pid).Append(",\"parent\":").Append(Convert.ToInt32(p["ParentProcessId"])).Append(",\"name\":").Append(Q((string)p["Name"])).Append(",\"cmd\":").Append(Q((string)p["CommandLine"])).Append(",\"created\":\"").Append(CreatedOf(pid)).Append("\"}");
           first = false;
         }
     }
-    return b.Append("]}").ToString();
+    // Those asked about and not described that have gone, and only then the membership again: whatever a departed member
+    // started before it exited joined the job before this second look (HR1's round 1), read whole or not at all (round 2).
+    var departed = new HashSet<int>();
+    for (int i = 0; i < all.Length && i < max; i++) if (!described.Contains(all[i]) && Gone(all[i])) departed.Add(all[i]);
+    int[] now = all;
+    if (departed.Count > 0) lock (turn) now = MembersChecked(id);
+    return "{\"total\":" + Counted(all, max, described, departed, now, Gone) + ",\"adopted\":" + took + ",\"processes\":[" + b.Append("]}").ToString();
+  }
+  /**
+   * How many members a job's listing counts (HI-2858). before: the membership it described (the first max asked about),
+   * departed: those asked about, not described, that had gone by then; now: the membership read after that. A member
+   * that exits between the job's list and its description (a console host, a CLI just ended) is no longer one: counted,
+   * it would hold its launch with nothing running in it. Everything else counts, so a job is never told empty while
+   * something may run in it: each described, each still running or that can't be told, those past max (not looked at),
+   * each member new by the second look (what a departed one started before it exited), and a departed id the job still
+   * lists unless it is still gone (goneNow): a later process may have its id. now null (the second look couldn't be read
+   * whole): nothing is dropped, every member of before counts.
+   */
+  public static int Counted(int[] before, int max, HashSet<int> described, HashSet<int> departed, int[] now, Func<int, bool> goneNow) {
+    if (now == null) return before.Length;
+    var listed = new HashSet<int>(now);
+    var seen = new HashSet<int>(before);
+    int n = 0;
+    for (int i = 0; i < before.Length; i++) {
+      int p = before[i];
+      if (i >= max || described.Contains(p) || !departed.Contains(p) || (listed.Contains(p) && !goneNow(p))) n++;
+    }
+    foreach (int p in now) if (!seen.Contains(p)) n++;
+    return n;
+  }
+  /** Whether no process runs by this id now: none has it, or the one that has it has exited (its object still held). */
+  static bool Gone(int pid) {
+    // PROCESS_QUERY_LIMITED_INFORMATION; ERROR_INVALID_PARAMETER: no process has the id.
+    IntPtr p = OpenProcess(0x1000, false, pid);
+    if (p == IntPtr.Zero) return Marshal.GetLastWin32Error() == 87;
+    try { uint code; return GetExitCodeProcess(p, out code) && code != 259; } finally { CloseHandle(p); }
   }
   /** The memory each job's processes use now (working sets, as Task Manager counts them), for "job,job,…": a JSON array in the same order (#562). */
   public static string Memory(string ids) {

@@ -1,6 +1,6 @@
 # Release Notes
 
-## Unreleased
+## 1.3.0 — 2026-11-10
 
 ### Added
 
@@ -49,6 +49,7 @@
 - **A `/rename` just before Stop survives a quick resume** (HI-2839). A Claude Code session renamed with `/rename` and resumed within seconds of stopping (sooner under load) went back to its older name for good: Combwork read the name from its usage history before that had the end of the transcript, and resumed the session with the older name. Now a resume reads the transcript itself when the history is behind it, and the name you gave in the CLI is kept. In 1.0 to 1.3.
 - **Merges into on a card never started** (HI-2825). Changing the branch a card On Hold merges into, from the card dialog or by the Assistant, was refused as if the card had work, with a message naming an empty branch ("made from ,"), and the rest of the Assistant's change was refused with it. A card On Hold now changes its Merges into as a Todo card does, while its branch has no work of its own, and a refusal always names a branch.
 - **A slot or copy is kept when git can't list worktrees for a moment** (HI-2810). When `git worktree list` failed (an index lock, a busy machine), a free slot or review copy was taken for gone and set up again at its next use, a slot in use was marked gone, and a recreation cut short was given up. Now an unreadable list leaves it as it is, and Combwork looks again next time.
+- **"Hooks arrive twice" with no admin snippet** (HI-2850). An agent that got a message while it worked (from another session, or one you typed ahead) was said to have hooks arriving twice, and Combwork missed that prompt. Only a true copy of a hook now counts as one.
 - **Stopping an agent a lane was about to start afresh** (HI-2815). A lane's builder that was busy as the lane started is owed a new conversation once it is free. If you stopped it meanwhile, Combwork counted it as free and started it again within a second. Now it stays stopped and the lane no longer waits to start it: start it yourself, or have the lane updated, which starts it on the lane. Nor does Combwork start a lane's next card on a builder you (or the Assistant) stopped: the lane says it waits until the builder is started again.
 - **A reviewer told of a design or follow-up to check sees how to answer it** (HI-2808). When a reviewer from the pool was given a card and its builder's follow-up at once, its inbox showed only "2 changes, read the card", and the reviewer often started a review or asked what to do instead of checking the follow-up. The check now leads that inbox line, with how to answer it.
 - **A stall after a safety filter stop says so** (HI-2754). When a lane's card stalls and the agent it waits on is idle because its latest turn was stopped by its provider's safety filter (Codex's cyber checks, Claude Code's safeguards), the stall's reason, the Assistant's lane wake and your lane notification now say so, with when and how many this session, and the provider's own advice. Before, it read as an ordinary wait ("only watches the card").

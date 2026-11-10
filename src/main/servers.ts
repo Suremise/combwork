@@ -136,7 +136,7 @@ import { API_EVENTS, apiEventFor, publicRun } from './apiEvents'
 import { clearDiscovery, writeDiscovery } from './apiDiscovery'
 import { createViewerToken, loadViewerTokens, revokeViewerToken, viewerForToken, viewerTokens } from './viewerTokens'
 import { hookTokenMatches, refusedHookNote, runForHookToken } from './hookTokens'
-import { carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
+import { answering, carrying, claimTwin, hasContext, type TwinEntry } from './hookTwins'
 import { fixedHookUrl, type ClaudeSnippetFacts } from '../shared/claudeHookHandlers'
 import { launchHookTimeouts } from './providers/claude/adapter'
 import { unusedWorktreeCounts } from './unusedWorktrees'
@@ -335,7 +335,9 @@ async function serveHook(req: IncomingMessage, res: ServerResponse, run: string)
       // with its reply: the turn ledger learns what the Stop was told (#648).
       // A delivery of an occurrence already taken (HI-2777: Claude Code ran both Combwork's and a differing admin snippet's
       // handler): answered from the first one's reply, its decision always and its context only if no response carried it.
-      const claim = claimTwin(run, sessions.hookOccurrence(run, body), () => sessions.hooksDoubled(run))
+      // Only a copy, its body the same; of a prompt, only while the first is being answered (HI-2850).
+      const claim = claimTwin(run, sessions.hookOccurrence(run, body), body, () => sessions.hooksDoubled(run))
+      if (claim?.first) answering(res, claim.entry)
       if (claim && !claim.first) {
         const twin = await claim.entry.twinReply(TWIN_WAIT_MS)
         if (twin.carries) carrying(res, claim.entry)
