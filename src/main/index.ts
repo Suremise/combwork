@@ -32,7 +32,8 @@ import { initConnections } from './accounts'
 import { initConnectionMoves } from './connectionMoves'
 import { initUsageMoves } from './usageMoves'
 import { checkRepoTools } from './platform/repoPorts'
-import { handoverSession, combworkInstructions, withLatestHandover, withPlatformRule, wrapsLongCommands } from '../shared/combworkGuidance'
+import { handoverSession, combworkInstructions, platformRuleKey, withLatestHandover, withPlatformRule, wrapsLongCommands } from '../shared/combworkGuidance'
+import { detect } from './platform/registry'
 import { handoversFor } from './notes'
 import { assistantInstructions } from './modes'
 import { ASSISTANT_NAME, assistantModeId } from '../shared/assistant'
@@ -1201,7 +1202,9 @@ app.whenReady().then(async () => {
       const pc = await workspace.projectConfig(projectPath)
       const off = new Set([...offNames(workspace.config.skillDelivery), ...offNames(pc.skillDelivery)])
       // A jj project's agents get the jj rule after the contract (HI-2800), as cw-mcp.ts gives Claude Code.
-      return withLatestHandover(withPlatformRule(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), pc.platform), latest?.relPath)
+      // A jj repository with no Git working copy gets its own variant (HI-2896).
+      const rule = platformRuleKey(pc.platform, pc.platform === 'jj' ? detect(projectPath) : null)
+      return withLatestHandover(withPlatformRule(combworkInstructions(project, 'agent', wrapsLongCommands(config.settings.general), off), rule), latest?.relPath)
     })
   // The Assistant's state view at each start and after each compaction, while its journal is on (#1032).
   sessions.startContext = async (state, source) => {

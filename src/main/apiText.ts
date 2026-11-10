@@ -392,7 +392,7 @@ export const API = {
     stopBeforeDeactivating: agentMsg({ id: 'api.project.stopBeforeDeactivating', text: 'Stop the running session before deactivating the project' }),
     vcsGit: agentMsg({ id: 'api.project.vcsGit', text: 'git at {root}{subfolder, select, yes { (a subfolder of that repository)} other {}}', note: 'The version control found in a project folder.' }),
     vcsUnsupported: agentMsg({ id: 'api.project.vcsUnsupported', text: '{name} (not supported: None)' }),
-    vcsJj: agentMsg({ id: 'api.project.vcsJj', text: 'jj at {root}{colocated, select, yes { (colocated with git)} other { (no colocated git: not supported)}}', note: 'HI-2799: a jj repository found in a project folder.' })
+    vcsJj: agentMsg({ id: 'api.project.vcsJj', text: 'jj at {root}{colocated, select, yes { (colocated with git)} other { (not colocated: no git working copy)}}', note: 'HI-2799: a jj repository found in a project folder.' })
   },
   provider: {
     notInstalled: agentMsg({ id: 'api.provider.notInstalled', text: 'not installed' })

@@ -29,8 +29,8 @@ export const M = {
   noRepo: msg({ id: 'git.vc.fact.none', defaultMessage: 'This folder has no version control.', description: 'Atop the Version Control tab, when the project folder has no repository.' }),
   other: msg({ id: 'git.vc.fact.other', defaultMessage: '{vcs} found: not supported yet, so this project uses None.', description: 'Atop the Version Control tab: another version control was found in the folder. {vcs} is its name (Mercurial, Jujutsu). None: glossary 2.1.' }),
   otherGit: msg({ id: 'git.vc.fact.otherGit', defaultMessage: '{vcs} found in this folder: not supported yet.', description: 'Atop the Version Control tab of a project still using Git, where another version control was found ({vcs}: Mercurial, Jujutsu). The offer under it says what to do.' }),
-  jjRepo: msg({ id: 'git.vc.fact.jj', defaultMessage: 'This folder is a jj repository at {root}{colocated, select, yes {, colocated with Git} other {}}.', description: 'Atop the Version Control tab (HI-2799): what Combwork found in the project folder, a jj (Jujutsu) repository. {root} is its root; colocated with Git means a .git folder beside .jj. Keep jj and Git.' }),
-  jjSeparate: msg({ id: 'git.vc.fact.jjSeparate', defaultMessage: 'This folder is a jj repository at {root} with no colocated Git repository: Combwork doesn’t support that yet.', description: 'Atop the Version Control tab (HI-2799): a jj (Jujutsu) repository whose Git data is inside .jj (not colocated), which Combwork can’t use yet. Keep jj and Git.' }),
+  jjRepo: msg({ id: 'git.vc.fact.jj', defaultMessage: 'This folder is a jj repository at {root}, {colocated, select, yes {colocated with Git} other {not colocated with Git}}.', description: 'Atop the Version Control tab (HI-2799, HI-2896): what Combwork found in the project folder, a jj (Jujutsu) repository. {root} is its root; colocated with Git means a .git folder beside .jj, not colocated that Git’s data is inside .jj (both are supported). Keep jj and Git.' }),
+  jjInGit: msg({ id: 'git.vc.fact.jjInGit', defaultMessage: 'This folder is a jj repository at {root}, not colocated, inside the Git repository at {git}: Combwork can’t use jj here.', description: 'Atop the Version Control tab (HI-2896): a jj (Jujutsu) repository whose Git data is inside .jj, in a folder that is itself inside a Git working tree ({git}); git commands in it would reach that repository, so jj isn’t offered. Keep jj and Git.' }),
   jjGone: msg({ id: 'git.vc.fact.jjGone', defaultMessage: 'The jj repository is gone from this folder.', description: 'Atop the Version Control tab of a project using jj (Jujutsu, HI-2799) whose .jj folder was removed or moved. Keep jj.' }),
   gone: msg({ id: 'git.vc.fact.gone', defaultMessage: 'The Git repository is gone from this folder. Until it’s back, what needs Git can’t be read.', description: 'Atop the Version Control tab of a Git project whose .git was removed or moved.' }),
   workflow: msg({ id: 'git.vc.workflow', defaultMessage: 'Workflow: {platform} · {state, select, preset {{preset}} custom {Custom (from {preset})} other {no preset chosen}}', description: 'A link atop the Version Control tab: the project’s workflow, its version control ({platform}: None or Git) and its preset ({preset}: Solo, Pair, Team); Custom when the options were changed after it. Opens the Workflow section. Glossary 2.1: workflow, preset, Custom.' }),
@@ -41,7 +41,7 @@ export const M = {
 const S = {
   gitFound: msg({ id: 'git.vc.offer.gitFound', defaultMessage: 'Git found at {root}: switch to Git?', description: 'An offer atop the Version Control tab of a project without version control, after someone ran git init: {root} is the repository root. Combwork never switches by itself.' }),
   repositoryGone: msg({ id: 'git.vc.offer.repositoryGone', defaultMessage: 'The Git repository is gone. Git’s rules hold until you switch, because what they check can’t be read.', description: 'An offer atop the Version Control tab of a Git project whose .git folder was removed or moved: its cards are refused until the user switches to None or the repository is back.' }),
-  jjFound: msg({ id: 'git.vc.offer.jjFound', defaultMessage: 'jj found at {root}: switch to jj?', description: 'An offer atop the Version Control tab (HI-2799): a jj (Jujutsu) repository colocated with Git was found in the project folder. Combwork never switches by itself. Keep jj.' }),
+  jjFound: msg({ id: 'git.vc.offer.jjFound', defaultMessage: 'jj found at {root}: switch to jj?', description: 'An offer atop the Version Control tab (HI-2799, HI-2896): a jj (Jujutsu) repository, colocated with Git or not, was found in the project folder. Combwork never switches by itself. Keep jj.' }),
   jjGone: msg({ id: 'git.vc.offer.jjGone', defaultMessage: 'The jj repository is gone: switch this project back to {platform}?', description: 'An offer atop the Version Control tab of a project using jj (HI-2799) whose .jj folder is gone. {platform} is Git or None. Keep jj.' }),
   switchJj: msg({ id: 'git.vc.offer.switchJj', defaultMessage: 'Switch to jj…', description: 'A button of the offer to switch a project to jj (Jujutsu, HI-2799): shows what changes, then asks. The … says it asks first: keep it. Keep jj.' }),
   otherFound: msg({ id: 'git.vc.offer.otherFound', defaultMessage: '{vcs} found: not supported yet, so this project can only use None.', description: 'An offer atop the Version Control tab of a Git project where another version control ({vcs}: Mercurial, Jujutsu) is found now. None: glossary 2.1.' }),
@@ -228,8 +228,8 @@ function factText(p: ProjectPlatform): string {
   const d = p.detected
   // Git still in force: what was found, not yet what it uses (the offer under the header says that).
   if (d.other) return tr(p.id === 'git' ? M.otherGit : M.other, { vcs: d.other })
-  // jj (HI-2799): colocated or not, and a jj project whose repository is gone.
-  if (d.platform === 'jj') return d.jj?.colocated ? tr(M.jjRepo, { root: d.root ?? '', colocated: 'yes' }) : tr(M.jjSeparate, { root: d.root ?? '' })
+  // jj (HI-2799): colocated or not (HI-2896), one inside a Git working tree, and a jj project whose repository is gone.
+  if (d.platform === 'jj') return d.jj?.inGit ? tr(M.jjInGit, { root: d.root ?? '', git: d.jj.inGit }) : tr(M.jjRepo, { root: d.root ?? '', colocated: d.jj?.colocated ? 'yes' : 'no' })
   if (p.id === 'jj') return tr(M.jjGone)
   // The repository its platform needs (Git's) gone from the folder.
   if (needsRepository(p.id) && d.platform !== p.id) return tr(M.gone)
@@ -314,7 +314,7 @@ export function VersionControlHeader({ project, platform, form, preview, onPrevi
           })}
         </div>
         {project.platform && !offer && (
-          <span className={cx('vc-fact', 'faint', project.platform.detected.other || (needsRepository(platform) && project.platform.detected.platform !== platform) || (project.platform.detected.platform === 'jj' && !project.platform.detected.jj?.colocated) ? 'caution' : null)} data-vc-fact="">
+          <span className={cx('vc-fact', 'faint', project.platform.detected.other || (needsRepository(platform) && project.platform.detected.platform !== platform) || (project.platform.detected.platform === 'jj' && !!project.platform.detected.jj?.inGit) ? 'caution' : null)} data-vc-fact="">
             {factText(project.platform)}
           </span>
         )}

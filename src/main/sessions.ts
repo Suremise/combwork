@@ -1,3 +1,5 @@
+import { platformRuleKey } from '../shared/combworkGuidance'
+import { detect } from './platform/registry'
 import { endReason, type SessionEnd, type StopCause } from '../shared/sessionEnd'
 import type { ActivityTask } from '../shared/activity'
 import { maskText } from '../shared/redact'
@@ -1796,7 +1798,8 @@ class SessionManager {
     }
     // A jj project's agents (HI-2800): its instructions add the jj rule (platformRule). Part of the signature, so a
     // switch to jj or back is told to a running agent at its next start.
-    if (mcpServers[TOOLS_SERVER] && !assistant && pc.platform === 'jj') mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PLATFORM: 'jj' } }
+    // A jj repository with no Git working copy (HI-2896): its own variant, `jj-separate` (platformRuleKey).
+    if (mcpServers[TOOLS_SERVER] && !assistant && pc.platform === 'jj') mcpServers[TOOLS_SERVER] = { ...mcpServers[TOOLS_SERVER], env: { ...mcpServers[TOOLS_SERVER].env, CW_PLATFORM: platformRuleKey('jj', detect(projectPath)) ?? 'jj' } }
 
     // Its connection (HI-2106; the Assistant's too): what it launches with, and the account it launches on, its own or
     // (decision H) its CLI's first usable here. A change of account asks for a restart; `connection` is null for an

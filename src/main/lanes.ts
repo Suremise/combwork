@@ -1137,8 +1137,9 @@ async function putBackForReorder(ws: WorkspaceService, s: StartLane, builder: La
   const state = wf.state(wf.store.card(flying.number))
   const folder = state.started?.folder
   if (folder && folder !== 'project') {
-    const { slotWorkspaces } = await import('./platform/workspacePorts')
-    const d = await slotWorkspaces().dirty(folder)
+    const { gitCantRead, slotWorkspaces } = await import('./platform/workspacePorts')
+    // A non-colocated jj slot (HI-2896): Git can't read it, and jj can't see unrecorded edits without a snapshot: kept.
+    const d = (await gitCantRead(folder)) ? null : await slotWorkspaces().dirty(folder)
     if (!Array.isArray(d) || d.length) throw new LaneError(409, say(A.uncommitted, { card: key, agent: builder.name }))
   }
   const { runIntent, CW_LANE_START } = await import('./tasks')

@@ -191,12 +191,26 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       expect(await jjContains(w.deps(), w.req())).toMatchObject({ refused: 'divergentChange' })
     })
 
-    it('an export disagreement: refused (colocated: a Git move jj has not imported; not colocated: an exported ref moved)', async () => {
+    it('a Git ref jj has not imported: colocated refused; not colocated the local bookmark is the target (HI-2896)', async () => {
       const w = await world(colocated)
       if (!colocated) w.jj('git', 'export')
       await w.git(['update-ref', 'refs/heads/main', w.fBase])
-      expect(await jjTargetHead(w.deps(), 'main')).toMatchObject({ refused: 'partialExport' })
+      if (colocated) expect(await jjTargetHead(w.deps(), 'main')).toMatchObject({ refused: 'partialExport' })
+      else expect(await jjTargetHead(w.deps(), 'main')).toMatchObject({ head: w.T, gitRef: w.fBase })
     })
+
+    if (!colocated)
+      it('not colocated: one manual export, then the bookmark moved and pushed: the target is the new local head, never partialExport (HI-2896)', async () => {
+        const w = await world(colocated)
+        w.jj('git', 'export')
+        w.jj('new', w.T, '--no-edit', '-m', 'later')
+        const later = w.log(`children(${w.T}) & description(substring:"later")`)[0]
+        w.setMain(later)
+        w.jj('git', 'push', '--remote', 'origin', '--bookmark', 'main')
+        // jj 0.47.1 non-colocated: neither the move nor the push exports, so T@git and refs/heads/main stay at the old T.
+        expect(await w.ref('refs/heads/main')).toBe(w.T)
+        expect(await jjTargetHead(w.deps(), 'main')).toMatchObject({ head: later, gitRef: w.T })
+      })
 
     it('two operation heads: unknown, nothing merged', async () => {
       const w = await world(colocated)
@@ -327,7 +341,8 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       }
       const out = await jjContains(w.deps({ gitContains }), w.req())
       expect(out, JSON.stringify(out)).not.toHaveProperty('containment')
-      expect(out).toMatchObject({ refused: 'partialExport' })
+      // Not colocated (HI-2896): the ref decides nothing, but the final fence still sees it moved.
+      expect(out).toMatchObject(colocated ? { refused: 'partialExport' } : { jjUnknown: 'moved' })
     })
 
     it('a plain Git move of the target after retention: refused, the proof never answered (the bundle kept for a retry)', async () => {
@@ -341,7 +356,7 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       }
       const out = await jjContains(w.deps({ hook }), w.req())
       expect(out, JSON.stringify(out)).not.toHaveProperty('containment')
-      expect(out).toMatchObject({ refused: 'partialExport' })
+      expect(out).toMatchObject(colocated ? { refused: 'partialExport' } : { jjUnknown: 'moved' })
     })
   })
 

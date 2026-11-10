@@ -96,13 +96,16 @@ export function parseBookmarkRows(out: string): BookmarkRow[] | null {
 
 /**
  * The export matrix (s14 §1′), pure: jj's local `T`, its `T@git` row (null: none) and the store's `refs/heads/T` (null:
- * none). A missing ref agrees only in a non-colocated store with no `@git` row (jj's normal there); wherever there is
- * `@git` evidence, the ref must be there and equal.
+ * none). Colocated, Git's working copy sees the store's refs, so `@git` and the ref must both be there and equal T.
+ * Non-colocated (HI-2896, HR1's s10 answer), the local bookmark alone is the target: nothing imports or exports without
+ * colocation (probed on 0.47.1: after one manual `jj git export`, a later `bookmark set` and even `jj git push` leave
+ * `T@git` and the ref behind), so a past export is a record, never a disagreement. The row and ref stay in the moment's
+ * print and its final fence, so their change still moves it; a raw Git write to the store is E8's (jjOpView).
  */
 export function exportProblem(colocated: boolean, local: string, gitRow: string | null, gitRef: string | null): string | null {
+  if (!colocated) return null
   if (gitRow !== null) return gitRow === local && gitRef === local ? null : `T=${local} T@git=${gitRow} ref=${gitRef ?? '-'}`
-  if (colocated) return `T=${local} T@git=- ref=${gitRef ?? '-'}`
-  return gitRef === null || gitRef === local ? null : `T=${local} ref=${gitRef}`
+  return `T=${local} T@git=- ref=${gitRef ?? '-'}`
 }
 
 /** The target's head as evidence, with the operation and Git ref it was read at. */

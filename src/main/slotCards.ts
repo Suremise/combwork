@@ -49,7 +49,7 @@ import { lanesWaitingForSlot, laneViewsChanged, onLanesWritten, rawLanes, setLan
 import { createLogger, userText } from './logger'
 import { lineHistory } from './platform/historyPorts'
 import type { WorkspaceCheckout, WorkspacePort } from './platform/workspacePort'
-import { isJjLineKey, slotWorkspaces } from './platform/workspacePorts'
+import { gitCantRead, isJjLineKey, slotWorkspaces } from './platform/workspacePorts'
 import { observer } from './platform/observe'
 import { isUnknown } from './platform/types'
 import { withRepoLock } from './repoLock'
@@ -607,6 +607,8 @@ async function carriedToHand(ws: WorkspaceService, projectPath: string, pool: Sl
  * ref that is gone, or anything unknown: null (kept). Its checkout as decided on, otherwise.
  */
 async function leavable(projectPath: string, folder: string, target: string | null): Promise<Checkout | null> {
+  // A non-colocated jj slot (HI-2896): Git can't read it: kept.
+  if (await gitCantRead(folder)) return null
   const d = await port().dirty(folder)
   if (isUnknown(d) || d.length) return null
   const checkout = port().checkout(folder)
@@ -701,6 +703,8 @@ async function takeWritten(ws: WorkspaceService, projectPath: string, pool: Slot
 
 /** Whether an adopted slot can be taken over by a start: no changes not committed, and its head in the target (merged). */
 async function cleanAndContained(projectPath: string, folder: string, target: string | null): Promise<boolean> {
+  // A non-colocated jj slot (HI-2896): Git can't read it (none there, or a repository above it): not taken over.
+  if (await gitCantRead(folder)) return false
   const d = await port().dirty(folder)
   if (isUnknown(d) || d.length) return false
   const head = await port().head(folder)

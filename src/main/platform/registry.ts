@@ -11,7 +11,7 @@ export type { Detection } from '../../shared/platform/descriptors'
 export function detect(folder: string): Detection {
   // Jujutsu (HI-2799): its nearest `.jj`, colocated with Git or not. jj is offered, never taken by itself (`initialOf`).
   const jj = jjOf(folder)
-  if (jj) return { platform: 'jj', root: jj.root, jj: { colocated: jj.colocated }, ...(resolve(jj.root) !== resolve(folder) ? { subfolder: true } : {}) }
+  if (jj) return { platform: 'jj', root: jj.root, jj: { colocated: jj.colocated, ...(jj.inGit ? { inGit: jj.inGit } : {}) }, ...(resolve(jj.root) !== resolve(folder) ? { subfolder: true } : {}) }
   const other = otherVcsOf(folder)
   if (other) return { platform: 'none', other: other.name }
   const v = vcsOf(folder)
@@ -26,8 +26,9 @@ export function detect(folder: string): Detection {
  */
 export function offer(current: PlatformId, found: Detection): PlatformOffer | null {
   if (current === found.platform) return null
-  // A Jujutsu repository found (HI-2799): offered only where jj can be switched to (colocated; J7 the rest).
-  if (found.platform === 'jj') return found.jj?.colocated ? { offer: 'jj', why: 'jjFound' } : current === 'git' ? { offer: 'none', why: 'otherFound' } : null // i18n-ignore: a reason's key, not text
+  // A Jujutsu repository found (HI-2799), colocated or not (HI-2896): offered where jj can be switched to (not one inside a
+  // Git working tree, whose Git project is offered None).
+  if (found.platform === 'jj') return !found.jj?.inGit ? { offer: 'jj', why: 'jjFound' } : current === 'git' ? { offer: 'none', why: 'otherFound' } : null // i18n-ignore: a reason's key, not text
   // A jj project whose .jj is gone: back to Git where Git is still there, else None.
   if (current === 'jj') return { offer: found.platform === 'git' ? 'git' : 'none', why: 'jjGone' } // i18n-ignore: a reason's key, not text
   if (current === 'none') return found.platform === 'git' ? { offer: 'git', why: 'gitFound' } : null // i18n-ignore: a reason's key, not text
@@ -40,8 +41,12 @@ export function offer(current: PlatformId, found: Detection): PlatformOffer | nu
  */
 export const initialOf = (d: Detection): PlatformId => (d.platform === 'jj' ? 'none' : d.platform)
 
-/** What detection found, as project.json keeps it when the user switches (`platformFound`, #1419). */
-export const foundKey = (d: Detection): string => (d.other ? `other:${d.other}` : d.platform === 'jj' && !d.jj?.colocated ? 'jj:separate' : d.platform)
+/**
+ * What detection found, as project.json keeps it when the user switches (`platformFound`, #1419). A non-colocated jj
+ * repository's key (HI-2896) isn't 1.5.0's earlier `jj:separate`: a project whose user chose None while jj couldn't be
+ * switched to there sees jj offered once, as for any new capability.
+ */
+export const foundKey = (d: Detection): string => (d.other ? `other:${d.other}` : d.platform === 'jj' && !d.jj?.colocated ? 'jj:noncolocated' : d.platform)
 
 /**
  * A project's platform for ProjectInfo: the recorded one (`recorded`, project.json's, as read: a project Combwork hasn't

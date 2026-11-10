@@ -146,11 +146,11 @@ export interface JjOperationsView {
 
 /**
  * Why a preview gives no command (HI-2800/s19's E1–E7): `tool`, `heads` and `moved` are E1's (the tested jj, one head,
- * the head shown); `parents` E2; `shape` and `bounds` E3; `unimported` E8 (Git's refs or HEAD aren't what jj recorded at the
+ * the head shown); `parents` E2; `shape` and `bounds` E3; `unimported` E8 (`unimportedStore` not colocated, HI-2896: the store's refs changed with git) (Git's refs or HEAD aren't what jj recorded at the
  * head: a plain Git change jj hasn't imported, HR2's HI-2800 round 1); `workingCopy` E4; `gitOwn` E5; `overlap` E6; `stale` E7;
  * `nothing`: the operation changed nothing a revert could undo.
  */
-export type JjOpRefusal = 'tool' | 'heads' | 'moved' | 'parents' | 'shape' | 'bounds' | 'unimported' | 'workingCopy' | 'gitOwn' | 'overlap' | 'stale' | 'nothing'
+export type JjOpRefusal = 'tool' | 'heads' | 'moved' | 'parents' | 'shape' | 'bounds' | 'unimported' | 'unimportedStore' | 'workingCopy' | 'gitOwn' | 'overlap' | 'stale' | 'nothing'
 
 /** One thing an operation changed: an entry's key (`bookmark:main`, `wc:default`…) and its value before and after (null: absent). */
 export interface JjOpChange {

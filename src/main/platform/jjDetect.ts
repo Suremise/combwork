@@ -6,12 +6,14 @@
 // never integrates; HI-2831). jj's files are read as hints (their format is not an API) and confirmed by jj itself: where the two disagree, or jj can't answer, the answer is unknown, never a
 // guess (rule 3). Not wired into detection (registry.ts) yet: a .jj stays None until jj is a platform (J2, J6).
 
-import { open, realpath, stat } from 'original-fs/promises'
 import { dirname, join, resolve } from 'path'
 import { jjSupported, type JjTool } from '../../shared/jjTool'
 import { sameStore } from './repoContext'
 import { jjRunner, type JjRunner, type JjRunOptions } from './jjRunner'
 import { readOpHeads } from './jjView'
+import { commonOf, gitCommonDir, isDir, kindOf, LEVELS_MAX, line, real } from './repoBoundary'
+
+export { LEVELS_MAX, MARKER_MAX } from './repoBoundary'
 
 /**
  * A folder's jj repository, as port 1's context will carry it (J2 registers it). `store`: the backing Git store (its git
@@ -64,38 +66,6 @@ export type JjDetection = { jj: JjContext } | { none: true; nestedGit?: string }
 
 /** Compared as Windows compares folders: case-insensitively, by their real paths (port 1's `sameStore`, for stores). */
 const same = (a: string, b: string): boolean => sameStore({ store: resolve(a) }, { store: resolve(b) })
-/**
- * A folder's one spelling, as Git's context and repository lock take a store (repoLock.ts `commonGitDir`: `realpath`,
- * links, junctions and drive aliases resolved), so a jj context's store is the same row of the same lock as Git's.
- */
-const real = (p: string): Promise<string | null> => realpath(p).then((r) => resolve(r), () => null)
-const isDir = (p: string): Promise<boolean> => stat(p).then((s) => s.isDirectory(), () => false)
-const kindOf = (p: string): Promise<'dir' | 'file' | null> => stat(p).then((s) => (s.isDirectory() ? 'dir' : s.isFile() ? 'file' : null), () => null)
-
-/** The most a marker file is read (a pointer, a store's type or target is a line); more is malformed. */
-export const MARKER_MAX = 4096
-/** The most folders looked at on the way up for a `.jj` (deeper than Windows' paths go). */
-export const LEVELS_MAX = 256
-
-/**
- * A marker file's one line, trimmed: null when it is unreadable, empty, larger than MARKER_MAX, more than one line or
- * holds a NUL (malformed: never followed).
- */
-async function line(p: string): Promise<string | null> {
-  const f = await open(p, 'r').catch(() => null)
-  if (!f) return null
-  try {
-    const buf = Buffer.alloc(MARKER_MAX + 1)
-    const { bytesRead } = await f.read(buf, 0, buf.length, 0)
-    if (bytesRead > MARKER_MAX) return null
-    const t = buf.subarray(0, bytesRead).toString('utf8').trim()
-    return t && !/[\r\n\0]/.test(t) ? t : null
-  } catch {
-    return null
-  } finally {
-    await f.close().catch(() => undefined)
-  }
-}
 
 /** The nearest `.jj` folder at or above `folder`, and a Git root met first on the way up. No process. */
 async function nearest(folder: string): Promise<{ root: string | null; nestedGit?: string }> {
@@ -109,26 +79,6 @@ async function nearest(folder: string): Promise<{ root: string | null; nestedGit
     dir = up
   }
   return { root: null, ...(nestedGit ? { nestedGit } : {}) }
-}
-
-/**
- * The common git dir of a git dir (`own`): a worktree's administrative folder names it in `commondir`, so it is never
- * taken for a store of its own (a second lock); else the folder itself. Real, and only a Git folder (it has a HEAD).
- */
-async function commonOf(own: string): Promise<string | null> {
-  const pointer = await line(join(own, 'commondir'))
-  const common = await real(pointer ? resolve(own, pointer) : own)
-  return common && (await kindOf(join(common, 'HEAD'))) === 'file' ? common : null
-}
-
-/** The common git dir a workspace root's `.git` names (a folder, or a worktree's `gitdir:` file), real; null for none. */
-async function gitCommonDir(root: string): Promise<string | null> {
-  const dot = join(root, '.git')
-  const k = await kindOf(dot)
-  if (k === 'dir') return commonOf(dot)
-  if (k !== 'file') return null
-  const gitdir = /^gitdir: (.+)$/.exec((await line(dot)) ?? '')?.[1]?.trim()
-  return gitdir ? commonOf(resolve(root, gitdir)) : null
 }
 
 /** jj's answer as a folder, real: null when it didn't answer (code -1), failed, or named nothing. */

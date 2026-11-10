@@ -25,6 +25,7 @@ import { jjSupported } from '../../shared/jjTool'
 import { UNREADABLE } from '../../shared/workflow/texts'
 import { isUnknown, unknown, withDetail, type Maybe, type Unknown } from './types'
 import { jjContextOf, type JjContext } from './jjDetect'
+import { boundaryOf } from './repoBoundary'
 import { jjRunner, type JjRunner, type JjRunResult } from './jjRunner'
 import type { OwnedWrite, WorkspaceHeads, WorkspaceIdentity, WorkspaceJournal, WorkspaceListing, WorkspacePort, WorkspaceStep } from './workspacePort'
 import { chainIsBinding, isJjLineKey, parseJjLineKey, sameBinding, type JjBinding, type JjPrepJournal, type JjPrepStore } from './jjSlotPrep'
@@ -52,6 +53,13 @@ export const JJ_REFUSED = {
   notBound: "the slot isn't bound to that card's preparation", // i18n-ignore: as above
   journal: "the preparation's record can't be read" // i18n-ignore: as above
 } as const
+
+/** A colocation change under a jj workspace since its context was read (HI-2896): refused inside the store's lock, nothing written. */
+export class JjStoreChanged extends Error {
+  constructor(readonly root: string) {
+    super(`the jj repository at ${root} changed its Git store (its colocation) since it was read: nothing was written`) // i18n-ignore: jj's side of an error, in English as jj's messages are
+  }
+}
 
 /** What jj's port needs beside jj: where a project's control workspace goes and its record, and the trash and the lock. */
 export interface JjPortDeps {
@@ -174,9 +182,17 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
   const runner = deps.runner ?? jjRunner
   const contexts = new Map<string, Promise<JjContext | null>>()
 
-  /** The jj repository holding a folder (cached per folder while it answers; detection's unknown is null). */
-  const contextOf = (folder: string): Promise<JjContext | null> => {
+  /**
+   * The jj repository holding a folder (cached per folder while it answers; detection's unknown is null). A cached one is
+   * used only while its folder's files still name its store (HI-2896, s13 §3): a colocation change (the store moving
+   * between `.jj/repo/store/git` and `.git`) drops it, and the folder is detected afresh.
+   */
+  const contextOf = async (folder: string): Promise<JjContext | null> => {
     const key = resolve(folder).toLowerCase()
+    const was = contexts.get(key)
+    const cached = was ? await was : null
+    if (cached && (await storeStill(cached))) return cached
+    if (was && contexts.get(key) === was) contexts.delete(key)
     let c = contexts.get(key)
     if (!c) {
       c = jjContextOf(folder, runner).then((d) => ('jj' in d ? d.jj : null))
@@ -185,6 +201,27 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     }
     return c
   }
+
+  /** Whether a context's root still names its store and colocation by its files (HI-2896: no colocation change since). */
+  const storeStill = async (ctx: JjContext): Promise<boolean> => {
+    const b = await boundaryOf(ctx.root)
+    if ('jj' in b) return !ctx.colocated && samePath(await realOr(b.jj.store), await realOr(ctx.store))
+    if ('colocated' in b) return ctx.colocated && samePath(await realOr(b.colocated.store), await realOr(ctx.store))
+    return false
+  }
+
+  /**
+   * The store's lock with the store checked again inside it (HI-2896, s13 §3): a colocation change after `ctx` was read
+   * refuses before anything is written (a JjStoreChanged), and the folder's context is detected afresh next time.
+   */
+  const lockCtx = <T>(ctx: JjContext, fn: () => Promise<T>): Promise<T> =>
+    deps.lock(ctx.store, async () => {
+      if (!(await storeStill(ctx))) {
+        for (const [k, v] of contexts) if ((await v)?.root === ctx.root) contexts.delete(k)
+        throw new JjStoreChanged(ctx.root)
+      }
+      return fn()
+    })
 
   const jj = (folder: string, args: readonly string[], o: { op?: string; write?: boolean } = {}): Promise<JjRunResult> =>
     runner.run(folder, o.op ? ['--at-op', o.op, ...args] : args, o.write ? { write: true } : {})
@@ -414,7 +451,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     type Residue = ControlResidue
     const fast = await usable(recNow())
     if (fast) return fast
-    return deps.lock(ctx.store, async () => {
+    return lockCtx(ctx, async () => {
       // Everything decided from the record as it is now, inside the lock (another caller may have made it ready).
       const rec = recNow()
       if (rec?.store && !samePath(rec.store, ctx.store)) return null
@@ -550,7 +587,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     const store = ctx.store
     const ws = identity.workspace
     let bound: JjBinding = { ...next, generation: identity.generation }
-    return deps.lock(store, async () => {
+    return lockCtx(ctx, async () => {
       const ptr0 = prep.pointer(store, ws)
       if (ptr0 === 'unreadable') return step(false, JJ_REFUSED.journal)
       // A restart of the same card in its own slot (HI-2868, s10 §3): its earlier binding carried, with no jj write, only
@@ -802,7 +839,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const from = await control(repo, ctx)
       if (!from) return step(false, JJ_REFUSED.control)
       const name = nameFor(await repoHash(repo), folder)
-      return deps.lock(ctx.store, async () => {
+      return lockCtx(ctx, async () => {
         // Its parent made first, which jj doesn't make (HI-2870): before the control's proof, so nothing is awaited
         // between the proof's final check and the add (HI-2887).
         await mkdir(dirname(folder), { recursive: true })
@@ -850,7 +887,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       if (isUnknown(op)) return
       const l = await listAt(repo, op)
       if (isUnknown(l)) return
-      await deps.lock(ctx.store, async () => {
+      await lockCtx(ctx, async () => {
         for (const w of l) {
           if (!gone.some((g) => samePath(g, w.root))) continue
           // The control proved for each forget; its synchronous check right before the forget starts (HI-2887).
@@ -881,7 +918,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
       const ctx = await contextOf(folder)
       const prep = ctx ? (deps.prep?.(ctx.store) ?? null) : null
       if (!ctx || !prep || !identity || !samePath(ctx.store, identity.store)) return false
-      return deps.lock(ctx.store, async () => {
+      return lockCtx(ctx, async () => {
         // The live folder is still the workspace the submission was made in (HR2's round 2): its generation, its
         // checkout's workspace and store, checked here and again right before the publication; a replaced folder whose
         // old pointer still names that generation gets nothing.
@@ -999,7 +1036,7 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
         // Inside the store's lock, right before the forget (HR1, round 1): the operation still holds the folder and the
         // folder is still the recorded workspace, else nothing (registration, files, journal) is touched. The intent is
         // written here, so a lock taken over meanwhile leaves no intent behind.
-        const forgot = await deps.lock(ctx.store, async () => {
+        const forgot = await lockCtx(ctx, async () => {
           if (!(await fenced())) return null
           if (existsSync(folder) && !(await owns(folder, identity))) return 'identity' as const
           // The control proved for the forget; the journal's intent written; then, with nothing awaited, its synchronous
