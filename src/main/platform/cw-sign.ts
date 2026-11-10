@@ -11,7 +11,7 @@
 // Only Node's built-ins and Combwork's chunks (it runs outside the asar).
 
 import '../../shared/agentText/processDialect'
-import { spawn, spawnSync } from 'child_process'
+import { spawn } from 'child_process'
 import { statSync } from 'fs'
 import { resolve } from 'path'
 import { agentMsg, say } from '../../shared/agentText'
@@ -62,6 +62,8 @@ const DEFAULT_TIMEOUT_MS = 120_000
 const KEEP = 64 * 1024
 /** How long, after the signer exits, its last output may take to arrive (a process it started may hold the pipes open). */
 const DRAIN_MS = 2_000
+/** The exit code of a signer ended at its bound: cw-sign.exe then ends what the signer started too (its job). */
+const TIMED_OUT = 124
 
 const fail = (text: string, code = 2): never => {
   process.stderr.write(`${text}\n`)
@@ -73,19 +75,6 @@ const isFile = async (p: string): Promise<boolean> => {
     return statSync(p).isFile()
   } catch {
     return false
-  }
-}
-
-/** Ends a signer and what it started (its own tree only). */
-function endTree(pid: number | undefined): void {
-  if (!pid) return
-  if (process.platform === 'win32') spawnSync('taskkill', ['/T', '/F', '/PID', String(pid)], { windowsHide: true, stdio: 'ignore' })
-  else {
-    try {
-      process.kill(-pid, 'SIGKILL')
-    } catch {
-      // gone
-    }
   }
 }
 
@@ -132,7 +121,8 @@ async function main(): Promise<void> {
   let timedOut = false
   const timer = setTimeout(() => {
     timedOut = true
-    endTree(c.pid)
+    // Its own process by its handle; what it started goes with cw-sign.exe's job, kept for this exit code (cw-sign.cs).
+    c.kill()
   }, timeoutMs)
   c.on('error', (e) => {
     clearTimeout(timer)
@@ -151,7 +141,7 @@ async function main(): Promise<void> {
     })
   })
   const finish = (code: number | null): void => {
-    if (timedOut) return fail(say(T.timedOut, { program, seconds: Math.round(timeoutMs / 1000)}), 1)
+    if (timedOut) return fail(say(T.timedOut, { program, seconds: Math.round(timeoutMs / 1000) }), TIMED_OUT)
     if (code === 0) process.exit(0)
     if (NEEDS.test(tail)) process.stderr.write(`${say(T.needsSomeone)}\n`)
     process.exit(code ?? 1)

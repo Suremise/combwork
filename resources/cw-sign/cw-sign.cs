@@ -154,6 +154,8 @@ static class CwSign {
   }
   /** How long, once cw-sign.js has exited, what it wrote may take to arrive (a process it left may hold its pipes). */
   const int DrainMs = 2000;
+  /** cw-sign.js's exit code for a signer it ended at its bound (cw-sign.ts TIMED_OUT). */
+  const int TimedOut = 124;
 
   [StructLayout(LayoutKind.Sequential)]
   struct BasicLimits {
@@ -275,9 +277,12 @@ static class CwSign {
     stdout.Flush();
     stderr.Flush();
     // Finished, not cancelled: what the signer left running on purpose (gpg starting its gpg-agent, which serves later
-    // commits and the user's own) stays. Only an ending of this process before here ends the job's processes.
-    limits.Basic.LimitFlags = 0;
-    SetInformationJobObject(job, ExtendedLimitInformation, ref limits, (uint)Marshal.SizeOf(limits));
+    // commits and the user's own) stays. Only an ending of this process before here ends the job's processes, and a
+    // signer cw-sign.js ended at its bound (TimedOut): what it started is ended with it, as this process exits.
+    if (code != TimedOut) {
+      limits.Basic.LimitFlags = 0;
+      SetInformationJobObject(job, ExtendedLimitInformation, ref limits, (uint)Marshal.SizeOf(limits));
+    }
     return code;
   }
 }
