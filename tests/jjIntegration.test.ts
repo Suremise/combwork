@@ -74,10 +74,11 @@ describe('parsers', () => {
 
 describe('obligations: one per integration, compare-and-set, idempotent reconstruction (s17 §2, s20)', () => {
   const fact = (card: string, bundle: string, result: string) => ({ card, cycle: 1, bundle, target: 'main', result, at: 1 })
+  const seenAt = (at: number, pushed: string | null) => ({ remote: 'origin', url: 'u', pushed, head: id('h'), op: 'op', print: 'p', at })
   it('a tombstone blocks its own key only; a new bundle in the same cycle is a new obligation', () => {
     const s = memoryObligations()
     expect(reconstructObligations(s, [fact('HI-1', 'b0-aaaaaa', id('a'))])).toBe(1)
-    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b0-aaaaaa' }, id('a'), 'published', 5, id('c'))).toBe(true)
+    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b0-aaaaaa' }, id('a'), 'published', seenAt(5, id('c')))).toBe(true)
     expect(reconstructObligations(s, [fact('HI-1', 'b0-aaaaaa', id('a'))])).toBe(0)
     expect(reconstructObligations(s, [fact('HI-1', 'b0-aaaaaa', id('a')), fact('HI-1', 'b1-bbbbbb', id('b'))])).toBe(1)
     expect(s.rows.map((r) => [r.bundle, r.state])).toEqual([['b0-aaaaaa', 'published'], ['b1-bbbbbb', 'owed']])
@@ -85,10 +86,10 @@ describe('obligations: one per integration, compare-and-set, idempotent reconstr
   it('a settle changes only its exact key and result, and only from owed (a late answer for another result does nothing)', () => {
     const s = memoryObligations()
     reconstructObligations(s, [fact('HI-1', 'b1-bbbbbb', id('b'))])
-    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b1-bbbbbb' }, id('a'), 'published', 5, id('c'))).toBe(false)
-    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b0-aaaaaa' }, id('b'), 'published', 5, id('c'))).toBe(false)
-    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b1-bbbbbb' }, id('b'), 'notHeld', 5)).toBe(true)
-    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b1-bbbbbb' }, id('b'), 'published', 6, id('c'))).toBe(false)
+    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b1-bbbbbb' }, id('a'), 'published', seenAt(5, id('c')))).toBe(false)
+    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b0-aaaaaa' }, id('b'), 'published', seenAt(5, id('c')))).toBe(false)
+    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b1-bbbbbb' }, id('b'), 'notHeld', seenAt(5, null))).toBe(true)
+    expect(s.settle({ card: 'HI-1', cycle: 1, bundle: 'b1-bbbbbb' }, id('b'), 'published', seenAt(6, id('c')))).toBe(false)
     expect(s.rows[0]).toMatchObject({ state: 'notHeld', at: 5 })
   })
 })

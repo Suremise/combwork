@@ -2795,8 +2795,7 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   different set or different bytes (unknown). Its end is a synchronous validator the caller runs **in its own
   continuation** straight before the synchronous settles (HR2's round 6: an awaited helper's return is a microtask in
   which a queued change could land): it takes the print again and checks the operation heads and the target's ref
-  against the moment. Whether J5 should settle
-  `published` automatically at all, or keep it re-verifiable, is put to Darren (the Assistant, after round 5). Any difference, whether or not it would matter (a mixed-case
+  against the moment. Any difference, whether or not it would matter (a mixed-case
   `[Remote "origin"]` section, a change in an included file), or a source it can't read, is unknown and every obligation
   stays owed. A pushed commit the store lacks is `notFetched`.
 - **Obligations, one per integration** (`(card, cycle, bundle)`, its result): created only where no row of that key
@@ -2804,6 +2803,36 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   back, and a reintegration in the same cycle has its own. An observation snapshots the owed rows and settles each on
   its own with a compare-and-set on its key, result and `owed` state: a late answer for one integration never settles
   another; the network read is shared, the bookkeeping never coalesced.
+- **A settled record keeps its evidence and is re-checked** (HI-2873, Darren's decision B on HI-2798's question, 10
+  Nov; design HI-2873/s7, s11, s14): a wrong permanent record can't be repaired, so a settle is a claim that is checked
+  again, as a safety net beside the verified capture and the synchronous boundary above (both unchanged). Each settle
+  keeps `seen`: the remote, its URL, what the remote had (`pushed`, null when absent), the target's head and the jj
+  operation, the sources print the final validator checked, and when. Every observation also re-checks settled rows
+  against what it sees now, through the same capture and in the same synchronous step as its settles, never writing a
+  jj operation or pushing: a remote or URL that differs (a verified change of destination, even with the result still
+  there) flags with no further read; a `published` row stays while its result is in what the remote has (the same
+  pushed id with no read; the remote advancing past it), and is flagged when the remote moved back past it or lost the
+  ref; a `notHeld` row is flagged once its result is in the remote or held by the target again. The print is kept for
+  diagnosis, never a reason to flag (an unrelated edit to a global config would flag every row). A flagged row becomes
+  **`checkThis`** with what differs (`remote`, `url`, `pushed`, `inRemote`, `held`: as recorded, and now), its `seen`
+  kept as it was; it is the user's to resolve (J9c, HI-2869's UI): nothing automatic moves it again, and reconstruction
+  never brings it back. No remote at all is a **verified absence** through the same capture: no owed row is settled
+  then, and the settled rows that named a remote are flagged; an ambiguous, unreadable or changing observation writes
+  nothing, as before. **The compare-and-sets** (s20's, extended): per key the only moves are owed → `published` |
+  `notHeld` (`settle`, which writes `seen` and the store's `seq`) and settled → `checkThis` (`flag`, on its key,
+  result, settled state and settle time); `seen` and the settle time never change once written. If J9c ever replaces
+  a row at the same key, the flag's compare-and-set needs a monotonic generation then. **Bounded and fair**: `seq` is
+  per target and strictly increasing, assigned only by a successful settle (so clock skew and tied times don't
+  matter); a sweep covers the rows settled up to its end, fixed when it starts (rows settled during it wait for the
+  next one); a pass reads one page of at most 64 rows from the store by `seq` (an index read for a durable store, never
+  every row) and spends at most 16 ancestry reads (a row needs at most two), carrying on after the last row it decided;
+  the sweep's position is separate scheduling state (an unchanged row is never written) with a **generation** that every
+  applied pass advances (a sweep completed or its position unchanged included), moved by its own compare-and-set on
+  that generation in the final synchronous step before any flag: a pass planned before another one applied writes no
+  flag, whatever values the schedule passed through meanwhile (HR2's round 1: no ABA), and a pass that writes nothing
+  leaves it unchanged. A row the sweep passed before it went stale is reached in the next sweep, however many rows keep
+  arriving. The observation's store reads are bounded too: its owed rows by an owed-only query (an index on target and
+  state), its settled history only through the page; never the target's whole history.
 - **Recovery** reads and never rewinds: a crash between proof, pins, fact and obligation is met by proving again
   (reusing an unconsumed bundle with the same endpoints), by the pins' journal, and by reconstructing obligations
   idempotently. J4's attempts recover with J4's own functions.
@@ -2817,7 +2846,14 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   a retry and a consumed bundle; a pin taken first, lost at the fact boundary and re-pinned; and publish: owed until
   pushed, the exact pushed id, the remote advancing, `notHeld` after a reset, `notFetched`, two tracked remotes and
   several untracked without origin, the remote URL and the target moving during `ls-remote`, two cards settled by one
-  push without coming back, and a reintegration's own obligation with a late answer for the earlier one.
+  push without coming back, and a reintegration's own obligation with a late answer for the earlier one. The re-check
+  (HI-2873): `tests/jjPublishRecheck.test.ts` (the flag's compare-and-set, `seq`, what flags, and the sweep's fairness:
+  a row going stale after the sweep passed it while more rows arrive each pass than it can take, an empty page
+  completing a sweep, a delayed concurrent pass within a sweep, after a completed one and after a full cycle back to
+  the same position, and the store's reads with 5,000 settled rows); on the real jj, the remote moved back past a published result, an
+  unchanged and an advanced remote, a changed URL, `notHeld` then pushed beside an owed row settled in the same pass,
+  the only remote removed (an owed row left owed), a removal at the final fence, and a change queued 1–3 microtasks
+  deep at the final fence before a flag.
 
 ##### jj's recovery, agents and compatibility (1.5.0's J7, HI-2800)
 

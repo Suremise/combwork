@@ -7,7 +7,9 @@
 //   reviewed input, else §16.3.2's test unchanged on the backing store; refusals around it; and, before it answers
 //   proved, every object the proof names retained in an immutable bundle of pins (one per observation);
 // - publish as an observation (`observePublish`): what the chosen remote has, read from the remote and revalidated across
-//   the read, settling each integration's own obligation (compare-and-set on its key, result and state), never pushing.
+//   the read, settling each integration's own obligation (compare-and-set on its key, result and state), never pushing;
+//   each settle keeps its evidence, and later observations re-check settled rows, flagging a mismatch `checkThis`
+//   (HI-2873, its design HI-2873/s7, s11, s14).
 // Unregistered, like J2–J4: jj has no `integration` capability; J6 composes jj's HistoryPort (`contains`, `lineHead`)
 // from these and the reconciler records `Integrated { by: 'outside' }` with this provenance (jjFacts.ts).
 
@@ -399,7 +401,42 @@ export async function ensureRetained(deps: JjIntegrationDeps, card: string, cycl
 // ---------------------------------------------------------------------------------------------------------------------
 // Publish: an observation (the user pushes), and an obligation per integration until it is seen (s14 §5′, s17 §2, s20).
 
-/** One integration's publish obligation: keyed by its card, cycle and bundle (its `Integrated` fact), its result. */
+/**
+ * What a settle was based on (HI-2873, Darren's B on HI-2798): the remote and its URL, what the remote had (null: not
+ * there), the target's head and jj operation, the sources print the final validator checked, and when. Immutable once
+ * written; a re-observation compares the remote, the URL and the verdict with it (the print is kept for diagnosis only).
+ */
+export interface PublishSeen {
+  remote: string
+  url: string
+  pushed: string | null
+  head: string
+  op: string
+  print: string
+  at: number
+}
+
+/** One way a settled row no longer matches a re-observation: what, as recorded, and now (null: none). */
+export interface PublishDiffer {
+  what: 'remote' | 'url' | 'pushed' | 'inRemote' | 'held'
+  was: string | null
+  now: string | null
+}
+
+/** A settled row a re-observation contradicted: what it was, what differs, when seen. Its `seen` is kept as it was. */
+export interface PublishCheck {
+  was: 'published' | 'notHeld'
+  differs: PublishDiffer[]
+  at: number
+}
+
+/**
+ * One integration's publish obligation: keyed by its card, cycle and bundle (its `Integrated` fact), its result.
+ * The only moves per key (HI-2873/s11 §3): owed → published | notHeld (`settle`, which writes `seen`, `at` and the
+ * store's `seq`), and published | notHeld → checkThis (`flag`, which keeps `seen`). `checkThis` is the user's to resolve
+ * (J9c, HI-2869): nothing automatic moves it again. Should J9c ever replace a row at the same key, the flag's
+ * compare-and-set needs a monotonic generation then: `at` alone is not unique enough.
+ */
 export interface JjObligation {
   card: string
   cycle: number
@@ -407,42 +444,278 @@ export interface JjObligation {
   target: string
   result: string
   since: number
-  state: 'owed' | 'published' | 'notHeld'
+  state: 'owed' | 'published' | 'notHeld' | 'checkThis'
   pushed?: string
   at?: number
+  /** The store's settle sequence, per target, strictly increasing, assigned only by a successful settle (HI-2873/s14). */
+  seq?: number
+  seen?: PublishSeen
+  check?: PublishCheck
 }
 
 export type ObligationKey = Pick<JjObligation, 'card' | 'cycle' | 'bundle'>
 const keyOf = (o: ObligationKey): string => `${o.card}\u0000${o.cycle}\u0000${o.bundle}`
 
-/** Where obligations are kept (durable: J6's board_meta rows; a test's memory). Every change a compare-and-set. */
-export interface ObligationStore {
-  list(target: string): JjObligation[]
-  /** Creates the row only when none exists for its key, in any state (a tombstone blocks it): whether it was created. */
-  create(o: JjObligation): boolean
-  /** owed → published | notHeld, only while the row is exactly that key and result, and owed: whether it changed. */
-  settle(k: ObligationKey, result: string, to: 'published' | 'notHeld', at: number, pushed?: string): boolean
+/**
+ * The re-check's schedule for one target (HI-2873/s14, HR2's round 1): the sweep in progress covers the rows with
+ * `after < seq ≤ end`, `end` fixed when it starts (rows settled later wait for the next one); `end` 0: none in progress,
+ * the next pass starts one. `gen` is the schedule's generation, advanced by every pass that applies (a sweep completed
+ * or its position unchanged included), so a delayed pass's compare-and-set fails whatever values the schedule passed
+ * through meanwhile (no ABA).
+ */
+export interface RecheckSweep {
+  gen: number
+  after: number
+  end: number
 }
 
-/** An in-memory store with the durable store's semantics (tests; and J6's model of its rows). */
-export function memoryObligations(rows: JjObligation[] = []): ObligationStore & { rows: JjObligation[] } {
+/**
+ * Where obligations are kept (durable: J6's board_meta rows; a test's memory). Every change a compare-and-set.
+ * Bounded reads on the observation path (HR2's round 1): `owed` and `recheckPage` only, each answered from an index
+ * (owed rows by target and state; settled rows by target and `seq`), never by reading the target's whole history.
+ */
+export interface ObligationStore {
+  /** Every row of the target, any state: diagnostics and tests, never the observation path (unbounded). */
+  list(target: string): JjObligation[]
+  /** The target's owed rows only (an index on target and state). */
+  owed(target: string): JjObligation[]
+  /** Creates the row only when none exists for its key, in any state (a tombstone blocks it): whether it was created. */
+  create(o: JjObligation): boolean
+  /**
+   * owed → published | notHeld, only while the row is exactly that key and result, and owed: whether it changed. Writes
+   * `seen`, `at` (seen's), `pushed` (published) and the next `seq` for the target in the same compare-and-set.
+   */
+  settle(k: ObligationKey, result: string, to: 'published' | 'notHeld', seen: PublishSeen): boolean
+  /** published | notHeld → checkThis, only while the row is that key and result, in state `from`, settled at `recordedAt`. */
+  flag(k: ObligationKey, result: string, from: 'published' | 'notHeld', recordedAt: number, check: PublishCheck): boolean
+  /**
+   * Up to `limit` rows of the target in state published or notHeld, with `seen`, and `after < seq ≤ end`, in `seq` order,
+   * from an index on (target, seq): its work bounded by `limit`, never by the target's history.
+   */
+  recheckPage(target: string, after: number, end: number, limit: number): JjObligation[]
+  /** The highest `seq` assigned for the target (0: none). */
+  maxSeq(target: string): number
+  /** The schedule, or null before any pass applied (generation 0). */
+  getSweep(target: string): RecheckSweep | null
+  /** Sets the schedule only while its generation is still `expectedGen` (0: none yet), `next.gen` above it: whether it changed. */
+  setSweep(target: string, expectedGen: number, next: RecheckSweep): boolean
+}
+
+/**
+ * An in-memory store with the durable store's semantics and its indexes (tests; and J6's model of its rows): rows by
+ * key, owed rows by target, settled rows by target in `seq` order. `work` counts the rows the observation path's reads
+ * touch (`owed`, `recheckPage`), so a test can hold them to their bounds.
+ */
+export function memoryObligations(initial: JjObligation[] = []): ObligationStore & { rows: JjObligation[]; sweeps: Map<string, RecheckSweep>; work: { rows: number } } {
+  const rows: JjObligation[] = []
+  const byKey = new Map<string, JjObligation>()
+  const owedBy = new Map<string, Map<string, JjObligation>>()
+  const settledBy = new Map<string, JjObligation[]>()
+  const seqs = new Map<string, number>()
+  const sweeps = new Map<string, RecheckSweep>()
+  const work = { rows: 0 }
+  const index = <V>(m: Map<string, V>, k: string, make: () => V): V => {
+    let v = m.get(k)
+    if (!v) m.set(k, (v = make()))
+    return v
+  }
+  /** The index of the first row with `seq > after` in a list in `seq` order (a binary search). */
+  const firstAfter = (list: JjObligation[], after: number): number => {
+    let lo = 0
+    let hi = list.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (list[mid].seq! <= after) lo = mid + 1
+      else hi = mid
+    }
+    return lo
+  }
+  const add = (r: JjObligation): void => {
+    rows.push(r)
+    byKey.set(keyOf(r), r)
+    if (r.state === 'owed') index(owedBy, r.target, () => new Map()).set(keyOf(r), r)
+    if (r.seq !== undefined) seqs.set(r.target, Math.max(seqs.get(r.target) ?? 0, r.seq))
+    if ((r.state === 'published' || r.state === 'notHeld') && r.seen && r.seq !== undefined) {
+      const list = index(settledBy, r.target, (): JjObligation[] => [])
+      list.splice(firstAfter(list, r.seq), 0, r)
+    }
+  }
+  for (const r of initial) add(r)
   return {
     rows,
-    list: (target) => rows.filter((r) => r.target === target).map((r) => ({ ...r })),
+    sweeps,
+    work,
+    list: (target) => rows.filter((r) => r.target === target).map((r) => structuredClone(r)),
+    owed: (target) => {
+      const out = [...(owedBy.get(target)?.values() ?? [])].map((r) => structuredClone(r))
+      work.rows += out.length
+      return out
+    },
     create: (o) => {
-      if (rows.some((r) => keyOf(r) === keyOf(o))) return false
-      rows.push({ ...o, state: 'owed' })
+      if (byKey.has(keyOf(o))) return false
+      add({ card: o.card, cycle: o.cycle, bundle: o.bundle, target: o.target, result: o.result, since: o.since, state: 'owed' })
       return true
     },
-    settle: (k, result, to, at, pushed) => {
-      const r = rows.find((x) => keyOf(x) === keyOf(k))
+    settle: (k, result, to, seen) => {
+      const r = byKey.get(keyOf(k))
       if (!r || r.result !== result || r.state !== 'owed') return false
+      const seq = (seqs.get(r.target) ?? 0) + 1
+      seqs.set(r.target, seq)
       r.state = to
-      r.at = at
-      if (pushed) r.pushed = pushed
+      r.at = seen.at
+      r.seq = seq
+      r.seen = { ...seen }
+      if (to === 'published' && seen.pushed) r.pushed = seen.pushed
+      owedBy.get(r.target)?.delete(keyOf(r))
+      index(settledBy, r.target, (): JjObligation[] => []).push(r) // the highest seq so far: the index stays in order
+      return true
+    },
+    flag: (k, result, from, recordedAt, check) => {
+      const r = byKey.get(keyOf(k))
+      if (!r || r.result !== result || r.state !== from || r.at !== recordedAt) return false
+      r.state = 'checkThis'
+      r.check = structuredClone(check)
+      const list = settledBy.get(r.target)
+      if (list && r.seq !== undefined) {
+        const i = firstAfter(list, r.seq - 1)
+        if (list[i] === r) list.splice(i, 1)
+      }
+      return true
+    },
+    recheckPage: (target, after, end, limit) => {
+      const list = settledBy.get(target) ?? []
+      const out: JjObligation[] = []
+      for (let i = firstAfter(list, after); i < list.length && out.length < limit && list[i].seq! <= end; i++) out.push(structuredClone(list[i]))
+      work.rows += out.length
+      return out
+    },
+    maxSeq: (target) => seqs.get(target) ?? 0,
+    getSweep: (target) => (sweeps.has(target) ? { ...sweeps.get(target)! } : null),
+    setSweep: (target, expectedGen, next) => {
+      if ((sweeps.get(target)?.gen ?? 0) !== expectedGen || next.gen <= expectedGen) return false
+      sweeps.set(target, { ...next })
       return true
     }
   }
+}
+
+/** How many settled rows one pass looks at, and how many ancestry reads it may spend on them (HI-2873/s14). */
+export const RECHECK_SCAN = 64
+export const RECHECK_MAX = 16
+/** The most ancestry reads one row's re-check can take (published: seen.pushed ⊂ P, then result ⊂ P; notHeld: in P, then held). */
+const READS_PER_ROW = 2
+
+/** What a re-observation sees now: the remote and its URL (null: verified absent), what it has, the target's head. */
+export interface PublishNow {
+  remote: string | null
+  url: string | null
+  pushed: string | null
+  head: string
+}
+
+/** One pass's plan of the re-check: the flags to write, and the sweep to move from `expected` to `next`. */
+export interface RecheckPlan {
+  flags: { o: JjObligation; check: Omit<PublishCheck, 'at'> }[]
+  /** The schedule's generation the plan was made at (0: none yet), and the schedule it moves to (the next generation). */
+  expectedGen: number
+  next: RecheckSweep
+  /** Rows decided in this pass (flagged or unchanged), and ancestry reads spent. */
+  decided: number
+  reads: number
+}
+
+/**
+ * Plans one bounded, fair pass of the re-check (HI-2873/s7 §4, s11, s14): the sweep's page of settled rows (at most
+ * RECHECK_SCAN), each decided against `now` in `seq` order until the next row's worst case would pass RECHECK_MAX
+ * ancestry reads. Reads nothing but the store and `ancestor` (cached per pair within the pass); writes nothing: the
+ * caller applies the plan in its synchronous final step. A remote or URL that differs (absent included) flags with no
+ * read; a published row stays while its result is still in what the remote has (the remote advancing included); a
+ * notHeld row is flagged once its result is in the remote or held by the target again.
+ */
+export async function planRecheck(store: ObligationStore, target: string, now: PublishNow, ancestor: (a: string, b: string) => Promise<boolean | JjReadUnknown>): Promise<RecheckPlan | JjReadUnknown> {
+  const expected = store.getSweep(target)
+  const expectedGen = expected?.gen ?? 0
+  const sweep = expected && expected.end > 0 ? expected : { after: 0, end: store.maxSeq(target) }
+  const page = sweep.end > sweep.after ? store.recheckPage(target, sweep.after, sweep.end, RECHECK_SCAN) : []
+  const cache = new Map<string, boolean>()
+  let reads = 0
+  const anc = async (a: string, b: string): Promise<boolean | JjReadUnknown> => {
+    if (a === b) return true
+    const k = `${a}..${b}`
+    const hit = cache.get(k)
+    if (hit !== undefined) return hit
+    reads++
+    const r = await ancestor(a, b)
+    if (typeof r === 'boolean') cache.set(k, r)
+    return r
+  }
+  const flags: RecheckPlan['flags'] = []
+  let last = sweep.after
+  let decided = 0
+  let stopped = false
+  for (const o of page) {
+    const seen = o.seen!
+    const was = o.state as 'published' | 'notHeld'
+    const differs: PublishDiffer[] = []
+    if (seen.remote !== now.remote) differs.push({ what: 'remote', was: seen.remote, now: now.remote })
+    if (seen.url !== now.url) differs.push({ what: 'url', was: seen.url, now: now.url })
+    const free = differs.length > 0 || (was === 'published' && (now.pushed === null || now.pushed === seen.pushed))
+    if (!free && reads + READS_PER_ROW > RECHECK_MAX) {
+      stopped = true
+      break
+    }
+    if (!differs.length) {
+      if (was === 'published') {
+        const P = now.pushed
+        let holds = P !== null && P === seen.pushed
+        if (!holds && P !== null) {
+          const via = seen.pushed ? await anc(seen.pushed, P) : false
+          if (isJjUnknown(via)) return via
+          holds = via
+          if (!holds) {
+            const own = await anc(o.result, P)
+            if (isJjUnknown(own)) return own
+            holds = own
+          }
+        }
+        if (!holds) differs.push({ what: 'pushed', was: seen.pushed, now: P }, { what: 'inRemote', was: 'yes', now: 'no' })
+      } else {
+        const inRemote = now.pushed ? await anc(o.result, now.pushed) : false
+        if (isJjUnknown(inRemote)) return inRemote
+        if (inRemote) differs.push({ what: 'pushed', was: seen.pushed, now: now.pushed }, { what: 'inRemote', was: 'no', now: 'yes' })
+        else {
+          const held = await anc(o.result, now.head)
+          if (isJjUnknown(held)) return held
+          if (held) differs.push({ what: 'held', was: 'no', now: 'yes' })
+        }
+      }
+    }
+    if (differs.length) flags.push({ o, check: { was, differs } })
+    last = o.seq!
+    decided++
+  }
+  // The sweep completes when the page ran out below its fixed end (an empty page included: rows flagged by another
+  // pass simply aren't in it); else it carries on after the last row decided, its end unchanged. Either way the
+  // generation advances.
+  const complete = !stopped && page.length < RECHECK_SCAN
+  const next = complete ? { gen: expectedGen + 1, after: 0, end: 0 } : { gen: expectedGen + 1, after: last, end: sweep.end }
+  return { flags, expectedGen, next, decided, reads }
+}
+
+/**
+ * Applies a re-check plan (synchronous; the caller runs it in the same continuation as its final validator): the
+ * schedule moved to its next generation by its compare-and-set first, and only if that held, each flag by its own
+ * compare-and-set. Any pass applied since this one was planned advanced the generation, so this one then writes nothing
+ * of the re-check (HR2's round 1: no ABA through a completed or unchanged schedule).
+ */
+export function applyRecheck(store: ObligationStore, target: string, plan: RecheckPlan, at: number): { key: ObligationKey; differs: PublishDiffer[] }[] {
+  if (!store.setSweep(target, plan.expectedGen, plan.next)) return []
+  const flagged: { key: ObligationKey; differs: PublishDiffer[] }[] = []
+  for (const { o, check } of plan.flags) {
+    const key = { card: o.card, cycle: o.cycle, bundle: o.bundle }
+    if (store.flag(key, o.result, check.was, o.at!, { ...check, at })) flagged.push({ key, differs: check.differs })
+  }
+  return flagged
 }
 
 /**
@@ -606,9 +879,12 @@ export function parseLsRemote(out: string, ref: string): string | null | 'malfor
   return rest.length || name !== ref || !/^[0-9a-f]{40}$/.test(oid ?? '') ? 'malformed' : oid
 }
 
+/** A settled row the pass turned into checkThis, and what differs. */
+export type PublishFlagged = { key: ObligationKey; differs: PublishDiffer[] }
+
 export type PublishObserved =
-  | { remote: string; url: string; pushed: string | null; settled: { key: ObligationKey; to: 'published' | 'notHeld' }[] }
-  | { noRemote: true }
+  | { remote: string; url: string; pushed: string | null; settled: { key: ObligationKey; to: 'published' | 'notHeld' }[]; flagged: PublishFlagged[] }
+  | { noRemote: true; flagged: PublishFlagged[] }
   | JjRefused
   | JjReadUnknown
 
@@ -618,10 +894,15 @@ export type PublishObserved =
  * remote's `refs/heads/T` read from the remote; then everything read again (the single head, the target's head, the
  * remote choice and both URLs). Moved, refused or unknown: nothing settled. Else each obligation on its own: in what the
  * remote has (its commit in the store, else `notFetched` for all), `published` with that id; else not in the local
- * target any more, `notHeld`; else still owed. Each settle is the store's compare-and-set on its key, result and state.
+ * target any more, `notHeld`; else still owed. Each settle is the store's compare-and-set on its key, result and state,
+ * and keeps what it was based on (`seen`, HI-2873).
+ * The same observation re-checks settled rows (HI-2873/s7, s11, s14): one bounded, fair pass of the sweep (`planRecheck`)
+ * against what is seen now; a row that no longer matches becomes checkThis with what differs. No remote at all is a
+ * verified absence through the same capture: owed rows are never settled then, and settled rows are flagged. The
+ * settles, the sweep and the flags are written together in the synchronous step after the final validator.
  */
 export async function observePublish(deps: JjIntegrationDeps, target: string, store: ObligationStore, now: () => number = Date.now): Promise<PublishObserved> {
-  const owed = store.list(target).filter((o) => o.state === 'owed')
+  const owed = store.owed(target)
   const reads = readsOf(deps)
   const remoteNow = async (op: string): Promise<JjEvidence<{ remote: string | null; url: string | null; rows: BookmarkRow[] }>> => {
     const out = await reads.run(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_T])
@@ -650,13 +931,18 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   if (!th) return jjUnknown('none', target)
   const r1 = await remoteNow(th.op)
   if (isJjUnknown(r1) || isRefused(r1)) return r1
-  if (!r1.remote || !r1.url) return { noRemote: true }
+  // No remote at all: a verified absence, through the same capture (HI-2873/s11 §2); nothing read from a remote.
+  const absent = !r1.remote || !r1.url
   const ref = `refs/heads/${target}`
-  const ls = await deps.git(['ls-remote', '--refs', r1.url, ref])
-  await deps.hook?.('afterRemote')
-  if (!ls.ok) return jjUnknown('failed', ls.err)
-  const pushed = parseLsRemote(ls.out, ref)
-  if (pushed === 'malformed') return jjUnknown('malformed', ls.out)
+  let pushed: string | null = null
+  if (!absent) {
+    const ls = await deps.git(['ls-remote', '--refs', r1.url!, ref])
+    await deps.hook?.('afterRemote')
+    if (!ls.ok) return jjUnknown('failed', ls.err)
+    const p = parseLsRemote(ls.out, ref)
+    if (p === 'malformed') return jjUnknown('malformed', ls.out)
+    pushed = p
+  }
   // The observation's whole context read again (the target, its export, the operation, the remote and both URLs): any
   // change, nothing settled. Run across the network read and again after every awaited decision read (HR1's round 1),
   // right before the settles, which are synchronous.
@@ -664,7 +950,9 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
   // the files with no await between them and the settles, so nothing (a plain Git move included) can come in after them.
   // The check returns its synchronous tail as a validator (HR2's round 6): the caller runs it in its own continuation
   // straight before the synchronous writes, so no awaited return (a microtask) comes between the last read and the CAS.
-  type Validator = () => JjReadUnknown | null
+  // It also hands back the print it validates against, kept as the settles' evidence (HI-2873).
+  type Validator = { check: () => JjReadUnknown | null; print: string }
+  const isValidator = (v: JjRefused | JjReadUnknown | Validator): v is Validator => typeof (v as Validator).check === 'function'
   const still = async (where: string): Promise<JjRefused | JjReadUnknown | Validator> => {
     // Every source fingerprinted before the awaited reads, and again at the synchronous end: any change between, or a
     // source that can't be read, is unknown (whether or not the change would matter).
@@ -689,17 +977,18 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     const moved = await fence(deps, target, th, where)
     if (moved) return moved
     await deps.hook?.('finalFence')
-    return (): JjReadUnknown | null => {
+    const check = (): JjReadUnknown | null => {
       if (readOpHeads(deps.view.jjRepo)?.join() !== th.op) return jjUnknown('moved', `heads:${where}`)
       const refNowSync = refFromFiles(deps.view.store, `refs/heads/${target}`)
       if (refNowSync === undefined || refNowSync !== th.gitRef) return jjUnknown('moved', `ref:${where}`)
       if (sourcesPrint(deps.view.store, deps.view.jjRepo, target, sources) !== before) return jjUnknown('moved', `sources:${where}`)
       return null
     }
+    return { check, print: before }
   }
   const afterRemote = await still('afterRemote')
-  if (typeof afterRemote !== 'function') return afterRemote
-  const afterRemoteNow = afterRemote()
+  if (!isValidator(afterRemote)) return afterRemote
+  const afterRemoteNow = afterRemote.check()
   if (afterRemoteNow) return afterRemoteNow
   const ancestor = async (a: string, b: string): Promise<boolean | JjReadUnknown> => {
     const r = await deps.git(['merge-base', '--is-ancestor', a, b])
@@ -710,8 +999,9 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     const there = await deps.git(['cat-file', '-e', `${pushed}^{commit}`])
     if (!there.ok) return refused('notFetched', pushed)
   }
+  // Absent: no publish evidence, so no owed row is decided (as before HI-2873); settled rows are still re-checked.
   const decided: { o: JjObligation; to: 'published' | 'notHeld' }[] = []
-  for (const o of owed) {
+  for (const o of absent ? [] : owed) {
     if (pushed) {
       const inPushed = await ancestor(o.result, pushed)
       if (isJjUnknown(inPushed)) return inPushed
@@ -724,16 +1014,22 @@ export async function observePublish(deps: JjIntegrationDeps, target: string, st
     if (isJjUnknown(held)) return held
     if (!held) decided.push({ o, to: 'notHeld' })
   }
+  const plan = await planRecheck(store, target, { remote: r1.remote, url: r1.url, pushed, head: th.head }, ancestor)
+  if (isJjUnknown(plan)) return plan
   const beforeSettle = await still('beforeSettle')
-  if (typeof beforeSettle !== 'function') return beforeSettle
-  // From here to the last settle: synchronous, one continuation. The validator's reads are the last before the writes.
-  const finalNow = beforeSettle()
+  if (!isValidator(beforeSettle)) return beforeSettle
+  // From here to the last write: synchronous, one continuation. The validator's reads are the last before the writes
+  // (the settles, the sweep and the flags alike).
+  const finalNow = beforeSettle.check()
   if (finalNow) return finalNow
-  const settled: { key: ObligationKey; to: 'published' | 'notHeld' }[] = []
   const at = now()
+  const flagged = applyRecheck(store, target, plan, at)
+  if (absent) return { noRemote: true, flagged }
+  const settled: { key: ObligationKey; to: 'published' | 'notHeld' }[] = []
+  const seen = { remote: r1.remote!, url: r1.url!, pushed, head: th.head, op: th.op, print: beforeSettle.print, at }
   for (const { o, to } of decided) {
     const key = { card: o.card, cycle: o.cycle, bundle: o.bundle }
-    if (store.settle(key, o.result, to, at, to === 'published' ? pushed! : undefined)) settled.push({ key, to })
+    if (store.settle(key, o.result, to, seen)) settled.push({ key, to })
   }
-  return { remote: r1.remote, url: r1.url, pushed, settled }
+  return { remote: r1.remote!, url: r1.url!, pushed, settled, flagged }
 }
