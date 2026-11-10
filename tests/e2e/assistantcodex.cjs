@@ -9,6 +9,8 @@ const fs = require('fs')
 const path = require('path')
 // The longest a wait here waits for what it waits on: a bound for a hung run, never how long it should take (#570).
 const HUNG_MS = 30000
+// A Codex launch's own bound: the fake answers no hook-hash check, which Combwork waits out (~30 s) before it launches.
+const LAUNCH_MS = 90000
 
 const userData = path.join(lib.WORK, 'assistantcodex-profile')
 const claudeHome = path.join(lib.WORK, 'assistantcodex-claude-home')
@@ -78,7 +80,7 @@ const homeAgent = () => JSON.parse(fs.readFileSync(path.join(assistantHome, '.co
     check("…its footer shows Codex's model, never Claude Code's", !!(await lib.until(async () => !/Opus|Sonnet|Haiku/.test(await page.locator('.assistant-footer').innerText().catch(() => 'Opus')), HUNG_MS)), await page.locator('.assistant-footer').innerText().catch(() => ''))
     await shots('codex-on')
     await page.locator('.assistant-panel .assistant-idle .act-start').click()
-    const launched = await lib.until(() => lines(path.join(accountsRoot, work.id, 'fake-launches.jsonl')).find(inHome) ?? null, HUNG_MS)
+    const launched = await lib.until(() => lines(path.join(accountsRoot, work.id, 'fake-launches.jsonl')).find(inHome) ?? null, LAUNCH_MS)
     let notes = []
     if (!launched) {
       await page.locator('.activity-btn.unread').click().catch(() => undefined)
