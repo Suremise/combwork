@@ -17,7 +17,7 @@
 // - Removal is `forget`, read back, then the folder to the Recycle Bin, journalled; the folder's creation generation
 //   (its file ids) is checked right before the trash, so a folder replaced at the same path is never trashed.
 
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { existsSync } from 'original-fs'
 import { lstat, readdir, readFile, realpath, stat } from 'original-fs/promises'
 import { basename, dirname, join, relative, resolve, sep } from 'path'
@@ -101,6 +101,9 @@ export interface JjWorkspacePort extends WorkspacePort {
 }
 
 const SEPARATOR = '\u001f'
+/** How far back the operation log is read for a preparation's marked write, and its records' end. */
+const OP_WALK = 200
+const OP_END = 'cw-op-end'
 const lines = (s: string): string[] => s.split(/\r?\n/).filter((l) => l.length)
 const step = (ok: boolean, err = ''): WorkspaceStep => ({ ok, err })
 const ownedPrefix = (repoHash: string): string => `cw-${repoHash}-`
@@ -355,13 +358,20 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
   }
 
   /**
-   * A slot moved onto `next.base` for a binding, as an owned, journalled write (HI-2866/s10 §2, s13): the journal planned
-   * with the pointer it starts from (`prev`), then under the store's lock the folder recorded, its chain over `prev`'s
-   * base checked (exactly `prev`'s submitted commits, contained in `prev`'s target; with no binding, an empty working
-   * copy), `next.base` visible, and for a detach the target still at it; right before the write the fence, the folder's
-   * identity, the pointer (still exactly `prev`) and the operation head (still the check's) all hold; then `jj new`, read
-   * back, and the binding published by compare and swap. Anything else refuses before the write. A crash resumes from
-   * the journal: after `writing`, the read-back decides whether the write landed.
+   * A slot moved onto `next.base` for a binding, as an owned, journalled write (HI-2866/s10 §2, s13; HR1's round 1):
+   * under the store's lock, the journal planned with the pointer it starts from (`prev`) and taken up by this attempt (a
+   * fresh `run`), then the folder recorded, its chain over `prev`'s base checked (exactly `prev`'s submitted commits,
+   * contained in `prev`'s target; with no binding, an empty working copy), `next.base` visible, and for a detach the
+   * target still at it. The guard (the fence, the folder's identity, the pointer still exactly `prev`, the operation head
+   * still the check's) runs after every journal write and right before each jj write, and again right before the binding
+   * is published, whose compare and swap also requires the journal still this attempt's.
+   *
+   * The write is marked: `jj --config=cw.prep=<mark> new <base>`, the mark journalled before it runs, so jj's operation
+   * log tells this preparation's own write apart from anyone else's. Landed means exactly one marked operation after the
+   * check's operation, its parent that operation, its working copy empty on the base; none marked means it never ran;
+   * anything else is uncertain and stays so (no blind retry). Before publishing, the folder is recorded (a snapshot) and
+   * its working copy must still be the very commit the marked write made, empty on the base: an edit or a foreign write
+   * since leaves it uncertain. A crash resumes from the journal by the same reading.
    */
   const ownedMove = async (folder: string, kind: JjPrepJournal['kind'], next: Omit<JjBinding, 'generation'>, o: OwnedWrite, target?: string): Promise<WorkspaceStep> => {
     if (!o.identity || !o.fence) return step(false, JJ_REFUSED.fence)
@@ -373,46 +383,80 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
     const store = ctx.store
     const ws = identity.workspace
     const bound: JjBinding = { ...next, generation: identity.generation }
-    const ptr0 = prep.pointer(store, ws)
-    if (ptr0 === 'unreadable') return step(false, JJ_REFUSED.journal)
-    // Already this preparation's (a retry after its publication, before the caller's fact): the same binding, nothing written.
-    if (ptr0 && ptr0.prep === bound.prep && ptr0.key === bound.key && ptr0.base === bound.base && ptr0.generation === bound.generation) return step(true)
-    let j0 = prep.journal(store, ws, bound.prep)
-    if (j0 === 'unreadable') return step(false, JJ_REFUSED.journal)
-    // A detach settles exactly the card's binding: never another's (a late settle after the slot was prepared again).
-    if (kind === 'detach' && (!ptr0 || ptr0.key !== o.settles)) return step(false, JJ_REFUSED.notBound)
-    if (!j0 || j0.phase === 'done' || j0.phase === 'superseded' || j0.phase === 'refused') {
-      j0 = { kind, prep: bound.prep, next: bound, prev: ptr0, phase: 'planned' }
-      await prep.writeJournal(store, ws, j0)
-    }
-    let j: JjPrepJournal = j0
-    const save = async (patch: Partial<JjPrepJournal>): Promise<void> => {
-      j = { ...j, ...patch }
-      await prep.writeJournal(store, ws, j)
-    }
     return deps.lock(store, async () => {
+      const ptr0 = prep.pointer(store, ws)
+      if (ptr0 === 'unreadable') return step(false, JJ_REFUSED.journal)
+      // Already this preparation's (a retry after its publication, before the caller's fact): the same binding, nothing written.
+      if (ptr0 && ptr0.prep === bound.prep && ptr0.key === bound.key && ptr0.base === bound.base && ptr0.generation === bound.generation) return step(true)
+      const j0 = prep.journal(store, ws, bound.prep)
+      if (j0 === 'unreadable') return step(false, JJ_REFUSED.journal)
+      // A detach settles exactly the card's binding: never another's (a late settle after the slot was prepared again).
+      if (kind === 'detach' && (!ptr0 || ptr0.key !== o.settles)) return step(false, JJ_REFUSED.notBound)
+      const run = randomUUID()
+      const fresh = !j0 || j0.phase === 'done' || j0.phase === 'superseded' || j0.phase === 'refused'
+      let j: JjPrepJournal = fresh ? { kind, prep: bound.prep, next: bound, prev: ptr0, phase: 'planned', run } : { ...j0, run }
+      const save = async (patch: Partial<JjPrepJournal>): Promise<void> => {
+        j = { ...j, ...patch }
+        await prep.writeJournal(store, ws, j)
+      }
+      await save({})
       const refuse = async (why: string, phase: JjPrepPhaseEnd = 'refused'): Promise<WorkspaceStep> => {
         await save({ phase, why })
         return step(false, why)
       }
-      // Every write's precondition: still the holder's (with the folder quiet), still the recorded workspace, and the
-      // slot's binding still exactly the one this preparation started from.
-      const guard = async (): Promise<string | null> => {
+      // Every write's precondition: still the holder's (with the folder quiet), still the recorded workspace, the slot's
+      // binding still exactly the one this preparation started from, and (when given) the operation head still `at`.
+      const guard = async (at?: string): Promise<string | null> => {
         if (!(await fence.still())) return JJ_REFUSED.fence
         if (!(await owns(folder, identity))) return JJ_REFUSED.identity
         const now = prep.pointer(store, ws)
-        return now === 'unreadable' || !sameBinding(now, j.prev) ? JJ_REFUSED.superseded : null
+        if (now === 'unreadable' || !sameBinding(now, j.prev)) return JJ_REFUSED.superseded
+        if (at !== undefined && (await pinned(folder)) !== at) return JJ_REFUSED.moved
+        return null
       }
+      const refuseFor = (g: string): Promise<WorkspaceStep> => refuse(g, g === JJ_REFUSED.superseded ? 'superseded' : 'refused')
+      // After the write landed, a failed guard keeps the journal at `written` (the holder's next attempt confirms and
+      // publishes it), except a pointer that moved, which supersedes it.
+      const stopAfterWrite = async (g: string): Promise<WorkspaceStep> => (g === JJ_REFUSED.superseded ? refuseFor(g) : step(false, g))
       const g0 = await guard()
-      if (g0) return refuse(g0, g0 === JJ_REFUSED.superseded ? 'superseded' : 'refused')
-      const onBase = (s: { wc: { empty: boolean; parents: string[] } }): boolean => s.wc.empty && s.wc.parents.length === 1 && s.wc.parents[0] === bound.base
-      // Resumed after its write began: the read-back decides.
-      if (j.phase === 'writing' || j.phase === 'written') {
-        const s = await state(folder)
-        if (isUnknown(s)) return step(false, JJ_REFUSED.uncertain)
-        if (onBase(s)) await save({ phase: 'written' })
-        else if (j.phase === 'writing') await save({ phase: 'recorded' })
-        else return step(false, JJ_REFUSED.uncertain)
+      if (g0) return j.phase === 'written' ? stopAfterWrite(g0) : refuseFor(g0)
+      /**
+       * Whether the marked write landed, read from jj's operation log (newest first, from the head back to the check's
+       * operation): its operation and commit (exactly one marked operation, its parent the check's, its working copy empty
+       * on the base), `none` (no marked operation since the check: it never ran), else `uncertain`.
+       */
+      const landed = async (): Promise<{ op: string; commit: string } | 'none' | 'uncertain'> => {
+        if (!j.checkedAt || !j.mark) return 'uncertain'
+        const head = await pinned(folder)
+        if (isUnknown(head)) return 'uncertain'
+        if (head === j.checkedAt) return 'none'
+        const out = await read(folder, head, ['op', 'log', '--no-graph', '--limit', String(OP_WALK), '-T', `id ++ "${SEPARATOR}" ++ parents.map(|p| p.id()).join(",") ++ "${SEPARATOR}" ++ self.attributes() ++ "${SEPARATOR}${OP_END}\\n"`], unknown(UNREADABLE.state, { folder }))
+        if (isUnknown(out)) return 'uncertain'
+        const ops: { id: string; parents: string[]; marked: boolean }[] = []
+        let reached = false
+        for (const rec of out.split(`${SEPARATOR}${OP_END}`)) {
+          const [id, parents, attrs] = rec.replace(/^\r?\n/, '').split(SEPARATOR)
+          if (!id) continue
+          if (id === j.checkedAt) {
+            reached = true
+            break
+          }
+          ops.push({ id, parents: parents ? parents.split(',') : [], marked: (attrs ?? '').includes(`cw.prep=${j.mark}`) })
+        }
+        if (!reached) return 'uncertain'
+        const marked = ops.filter((x) => x.marked)
+        if (!marked.length) return 'none'
+        if (marked.length > 1 || marked[0].parents.length !== 1 || marked[0].parents[0] !== j.checkedAt) return 'uncertain'
+        const wc = await wcAt(folder, marked[0].id, ws)
+        if (isUnknown(wc) || !wc.empty || wc.parents.length !== 1 || wc.parents[0] !== bound.base) return 'uncertain'
+        return { op: marked[0].id, commit: wc.commit }
+      }
+      // Resumed after its write began: jj's operation log decides.
+      if (j.phase === 'writing') {
+        const l = await landed()
+        if (l === 'uncertain') return step(false, JJ_REFUSED.uncertain)
+        if (l === 'none') await save({ phase: 'recorded', mark: undefined, wrote: undefined })
+        else await save({ phase: 'written', wrote: l })
       }
       if (j.phase !== 'written') {
         const rec = await port.record!(folder, fence, identity)
@@ -448,31 +492,42 @@ export function createJjWorkspacePort(deps: JjPortDeps): JjWorkspacePort {
           const th = await bookmarkAt(folder, H, target)
           if (isUnknown(th) || th !== bound.base) return refuse(JJ_REFUSED.moved)
         }
-        await save({ phase: 'checked', checkedAt: H })
-        // Right before the write.
-        const g1 = await guard()
-        if (g1) return refuse(g1, g1 === JJ_REFUSED.superseded ? 'superseded' : 'refused')
-        if ((await pinned(folder)) !== H) return refuse(JJ_REFUSED.moved)
-        await save({ phase: 'writing' })
-        const nu = await jj(folder, ['new', bound.base], { write: true })
-        const s = await state(folder)
-        if (isUnknown(s)) return step(false, JJ_REFUSED.uncertain)
-        if (!onBase(s)) {
-          // Not landed: the working copy is where it was (nothing changed), else uncertain until read again.
-          if (s.wc.commit === wc.commit) return refuse(nu.ok ? JJ_REFUSED.uncertain : nu.err)
-          return step(false, JJ_REFUSED.uncertain)
-        }
-        await save({ phase: 'written' })
-        // The previous working copy, if jj kept it (jj abandons an empty one itself): abandoned only as the slot's own.
-        if (wc.empty && wc.commit !== s.wc.commit) {
-          const kept = await read(folder, s.op, ['log', '--no-graph', '-r', `present(${wc.commit}) & visible_heads() & empty() & ~bookmarks() & ~working_copies()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: wc.commit }))
+        await save({ phase: 'checked', checkedAt: H, from: wc.commit })
+        const g1 = await guard(H)
+        if (g1) return refuseFor(g1)
+        await save({ phase: 'writing', mark: run })
+        // Right before the write, after the journal's await: everything again.
+        const g2 = await guard(H)
+        if (g2) return refuseFor(g2)
+        const nu = await jj(folder, [`--config=cw.prep=${run}`, 'new', bound.base], { write: true })
+        const l = await landed()
+        if (l === 'uncertain') return step(false, JJ_REFUSED.uncertain)
+        if (l === 'none') return refuse(nu.ok ? JJ_REFUSED.uncertain : nu.err)
+        await save({ phase: 'written', wrote: l })
+        // The previous working copy, if jj kept it (jj abandons an empty one itself): abandoned only as the slot's own,
+        // only with nothing else written since its own write.
+        if (wc.empty && wc.commit !== l.commit) {
+          const kept = await read(folder, l.op, ['log', '--no-graph', '-r', `present(${wc.commit}) & visible_heads() & empty() & ~bookmarks() & ~working_copies()`, '-T', 'commit_id ++ "\\n"'], unknown(UNREADABLE.revision, { revision: wc.commit }))
           if (!isUnknown(kept) && lines(kept).length) {
-            const g2 = await guard()
-            if (!g2) await jj(folder, ['abandon', wc.commit], { write: true })
+            const g3 = await guard(l.op)
+            if (g3) return stopAfterWrite(g3)
+            await jj(folder, ['abandon', wc.commit], { write: true })
           }
         }
       }
-      if (!(await prep.publish(store, ws, j.prev, bound, j))) return refuse(JJ_REFUSED.superseded, 'superseded')
+      // Confirmed before publishing: recorded (unrecorded edits become visible), the working copy still exactly the
+      // commit the marked write made, empty on the base; then the guard right before the compare and swap.
+      const wrote = j.wrote
+      if (!wrote) return step(false, JJ_REFUSED.uncertain)
+      const files = await port.record!(folder, fence, identity)
+      if (isUnknown(files)) return files.detail === JJ_REFUSED.fence || files.detail === JJ_REFUSED.identity ? stopAfterWrite(files.detail) : step(false, JJ_REFUSED.uncertain)
+      const s = await state(folder)
+      if (isUnknown(s)) return step(false, JJ_REFUSED.uncertain)
+      if (files.length || s.stale || s.wc.divergent || s.wc.commit !== wrote.commit || !s.wc.empty || s.wc.parents.length !== 1 || s.wc.parents[0] !== bound.base) return step(false, JJ_REFUSED.uncertain)
+      const g4 = await guard(s.op)
+      if (g4) return stopAfterWrite(g4)
+      // Not published: the pointer moved, or a later attempt took the preparation over (its journal is its own now).
+      if (!(await prep.publish(store, ws, j.prev, bound, j))) return step(false, JJ_REFUSED.superseded)
       return step(true)
     })
   }

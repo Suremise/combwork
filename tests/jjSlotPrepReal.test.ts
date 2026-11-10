@@ -8,10 +8,15 @@
 //   replaced, the binding changed by another preparation meanwhile; nothing in the slot changes.
 // - A detach after Done: the slot put back on the target's head; the target moving first refuses it.
 // - Crashes: before the write, and after it before publication: resumed, without a second write.
+// - HR1's round 1: a fence lost or a late writer while the `writing` record is saved writes nothing; a fence lost while
+//   `written` is saved publishes nothing (the holder's next attempt confirms and publishes); a later attempt taking the
+//   journal over refuses this one's publication. A crash before the write then a foreign `jj new` on the same base is
+//   rewritten by its own marked write, never taken for it; a crash after it then another operation is confirmed, and an
+//   unchanged retry writes nothing; then an unrecorded edit or a foreign write in the slot is uncertain, never published.
 //
 // Without the fetched jj (npm run jj:fetch) it is skipped, saying so; with CW_JJ_REAL=1 its absence fails.
 import { DatabaseSync } from 'node:sqlite'
-import { writeFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it } from 'vitest'
 import { TESTED_JJ } from '../src/shared/jjTool'
@@ -199,6 +204,101 @@ describe.skipIf(!jjExe)(`jj slot preparation on the real jj (${TESTED_JJ.version
       expect(await prepareFor(w, 1, 7)).toEqual({ ok: true, err: '' })
       expect(w.wc()).toBe(written)
       expect(await w.port.line(w.slot)).toBe(w.key(1, 7))
+    })
+
+    it("the journal's awaits (HR1): a fence lost or a late writer while `writing` is saved writes nothing; lost while `written` is saved publishes nothing", async () => {
+      const w = await world(colocated)
+      await prepareFor(w, 1, 5)
+      let holding = true
+      const fence: WorkspaceFence = { still: () => holding }
+      const onSave = (phase: string, then: () => void): void => {
+        w.setStore({ ...w.store, writeJournal: async (s, ws, j) => { await w.store.writeJournal(s, ws, j); if (j.phase === phase) then() } })
+      }
+      // The fence lost while the `writing` record is saved: refused before jj runs.
+      onSave('writing', () => (holding = false))
+      const at = w.wc()
+      const heads = w.heads()
+      expect((await prepareFor(w, 1, 6, { fence })).err).toMatch(/no longer holds/)
+      expect(w.heads()).toEqual(heads)
+      expect(w.wc()).toBe(at)
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 5))
+      // A late writer (another process's operation) while it is saved: the head moved, refused before jj runs.
+      holding = true
+      onSave('writing', () => void h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'late'))
+      expect((await prepareFor(w, 1, 6, { fence })).err).toMatch(/changed since the check/)
+      expect(w.wc()).toBe(at)
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 5))
+      // The fence lost while the `written` record is saved: the write landed but isn't published; the holder's next
+      // attempt confirms it and publishes, with no second write.
+      onSave('written', () => (holding = false))
+      expect((await prepareFor(w, 1, 7, { fence })).err).toMatch(/no longer holds/)
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 5))
+      const written = w.wc()
+      expect(written).not.toBe(at)
+      expect(w.store.journal(w.identity.store, w.ws, '1.7')).toMatchObject({ phase: 'written' })
+      holding = true
+      w.setStore(w.store)
+      const before = w.heads()
+      expect(await prepareFor(w, 1, 7, { fence })).toEqual({ ok: true, err: '' })
+      expect(w.wc()).toBe(written)
+      expect(w.heads()).toEqual(before)
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 7))
+      // A later attempt takes the preparation over while `written` is saved: this one's publication is refused.
+      onSave('written', () => {
+        const j = w.store.journal(w.identity.store, w.ws, '1.8')
+        if (j && j !== 'unreadable') void w.store.writeJournal(w.identity.store, w.ws, { ...j, run: 'a-later-attempt' })
+      })
+      expect((await prepareFor(w, 1, 8, { fence })).err).toMatch(/binding changed/)
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 7))
+    })
+
+    it('crashes beside foreign operations (HR1): before the write then a foreign `jj new` on the base, rewritten as its own; after it then another operation, confirmed; then an edit or a foreign write, uncertain', async () => {
+      const w = await world(colocated)
+      await prepareFor(w, 1, 5)
+      const crashAt = (phase: string): void => {
+        let once = true
+        w.setStore({ ...w.store, writeJournal: async (s, ws, j) => { if (j.phase === phase && once) { once = false; if (phase === 'writing') await w.store.writeJournal(s, ws, j); throw new Error('crash') } return w.store.writeJournal(s, ws, j) } })
+      }
+      // Crashed after `writing` was journalled, before jj ran; then someone's `jj new` on the same base in the slot.
+      crashAt('writing')
+      await expect(prepareFor(w, 1, 6)).rejects.toThrow('crash')
+      w.setStore(w.store)
+      h.jj(w.slot, 'new', w.main())
+      const foreign = w.wc()
+      expect(await prepareFor(w, 1, 6)).toEqual({ ok: true, err: '' })
+      expect(w.wc()).not.toBe(foreign)
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 6))
+      // Crashed after jj ran, before `written` was journalled; then another operation elsewhere: its own write, confirmed.
+      crashAt('written')
+      await expect(prepareFor(w, 1, 7)).rejects.toThrow('crash')
+      w.setStore(w.store)
+      const mine = w.wc()
+      h.jj(w.repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'other')
+      expect(await prepareFor(w, 1, 7)).toEqual({ ok: true, err: '' })
+      expect(w.wc()).toBe(mine)
+      // Retried unchanged: idempotent, nothing written.
+      const heads = w.heads()
+      expect(await prepareFor(w, 1, 7)).toEqual({ ok: true, err: '' })
+      expect(w.heads()).toEqual(heads)
+      // Crashed after jj ran; then an unrecorded edit in the folder: uncertain, never published, the edit kept; again, still.
+      crashAt('written')
+      await expect(prepareFor(w, 1, 8)).rejects.toThrow('crash')
+      w.setStore(w.store)
+      writeFileSync(join(w.slot, 'late.txt'), 'late\n')
+      expect((await prepareFor(w, 1, 8)).err).toMatch(/couldn't be read back/)
+      expect((await prepareFor(w, 1, 8)).err).toMatch(/couldn't be read back/)
+      expect(await w.port.line(w.slot)).toBe(w.key(1, 7))
+      expect(readFileSync(join(w.slot, 'late.txt'), 'utf8')).toBe('late\n')
+      // Crashed after jj ran; then someone's `jj new` on the same base replaced the slot's working copy: uncertain.
+      const w2 = await world(colocated)
+      await prepareFor(w2, 1, 5)
+      let once = true
+      w2.setStore({ ...w2.store, writeJournal: async (s, ws, j) => { if (j.phase === 'written' && once) { once = false; throw new Error('crash') } return w2.store.writeJournal(s, ws, j) } })
+      await expect(prepareFor(w2, 1, 6)).rejects.toThrow('crash')
+      w2.setStore(w2.store)
+      h.jj(w2.slot, 'new', w2.main())
+      expect((await prepareFor(w2, 1, 6)).err).toMatch(/couldn't be read back/)
+      expect(await w2.port.line(w2.slot)).toBe(w2.key(1, 5))
     })
   })
 })

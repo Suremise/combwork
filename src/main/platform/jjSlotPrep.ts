@@ -40,8 +40,16 @@ export interface JjPrepJournal {
   /** The pointer as read when it was planned (null: the slot had none), copied whole. */
   prev: JjBinding | null
   phase: JjPrepPhase
-  /** The operation head its check was made at (the write's expected parent). */
+  /** The operation head its check was made at: the write's expected parent operation. */
   checkedAt?: string
+  /** The attempt now running it (a fresh id each time it is taken up): only that attempt may publish its binding. */
+  run?: string
+  /** The working-copy commit the check examined (the commit the write moves the slot off). */
+  from?: string
+  /** Set with `writing`, before the write: the mark its `jj new` carries in its operation's arguments (`cw.prep=<mark>`). */
+  mark?: string
+  /** Set with `written`: the marked operation and the working-copy commit it made (read at that operation). */
+  wrote?: { op: string; commit: string }
   why?: string
 }
 
@@ -52,8 +60,9 @@ export interface JjPrepStore {
   journal(store: string, workspace: string, prep: string): JjPrepJournal | null | 'unreadable'
   writeJournal(store: string, workspace: string, j: JjPrepJournal): Promise<void>
   /**
-   * In one write: the pointer set to `next` only if it is still exactly `expect` (sameBinding), and the journal marked
-   * done. False, and nothing written, when the pointer moved meanwhile.
+   * In one write: the pointer set to `next` only if it is still exactly `expect` (sameBinding) and the preparation's
+   * journal is still `j`'s attempt (its `run`, when `j` has one), and the journal marked done. False, and nothing
+   * written, when the pointer moved or a later attempt took the preparation over meanwhile.
    */
   publish(store: string, workspace: string, expect: JjBinding | null, next: JjBinding, j: JjPrepJournal): Promise<boolean>
 }
@@ -98,7 +107,10 @@ export function journalOf(v: unknown): JjPrepJournal | null {
   const next = bindingOf(j.next)
   const prev = j.prev === null ? null : bindingOf(j.prev)
   if ((j.kind !== 'prepare' && j.kind !== 'detach') || typeof j.prep !== 'string' || !next || (j.prev !== null && !prev) || !PHASES.includes(j.phase as JjPrepPhase)) return null
-  return { kind: j.kind, prep: j.prep, next, prev, phase: j.phase as JjPrepPhase, ...(typeof j.checkedAt === 'string' ? { checkedAt: j.checkedAt } : {}), ...(typeof j.why === 'string' ? { why: j.why } : {}) }
+  const str = (k: 'checkedAt' | 'run' | 'from' | 'mark' | 'why'): Partial<JjPrepJournal> => (typeof j[k] === 'string' ? { [k]: j[k] } : {})
+  const w = j.wrote as { op?: unknown; commit?: unknown } | undefined
+  if (w !== undefined && (!w || typeof w.op !== 'string' || typeof w.commit !== 'string' || !COMMIT.test(w.commit))) return null
+  return { kind: j.kind, prep: j.prep, next, prev, phase: j.phase as JjPrepPhase, ...str('checkedAt'), ...str('run'), ...str('from'), ...str('mark'), ...(w ? { wrote: { op: w.op as string, commit: w.commit as string } } : {}), ...str('why') }
 }
 
 /**
@@ -151,6 +163,10 @@ export function boardPrepStore(conn: BoardRw): JjPrepStore {
       conn.write((db) => {
         const now = readPointer(db, store, workspace)
         if (now === 'unreadable' || !sameBinding(now, expect)) return false
+        if (j.run !== undefined) {
+          const held = get(db, journalKey(store, workspace, j.prep))
+          if (!held.found || (journalOf(held.value)?.run ?? null) !== j.run) return false
+        }
         put(db, pointerKey(store, workspace), next)
         put(db, journalKey(store, workspace, j.prep), { ...j, phase: 'done' })
         return true
