@@ -8295,7 +8295,7 @@ class SessionManager {
     let usage = await this.usageFor(projectPath, p, sessionId, provider, { ...o, noWait: true })
     if (!usage) {
       let timer: NodeJS.Timeout | undefined
-      const late = new Promise<null>((resolve) => (timer = setTimeout(() => resolve(null), this.resumeReadWaitMs)))
+      const late = new Promise<null>((done) => (timer = setTimeout(() => done(null), this.resumeReadWaitMs)))
       try {
         usage = await Promise.race([this.usageFor(projectPath, p, sessionId, provider, o), late])
       } finally {
