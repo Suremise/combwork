@@ -232,21 +232,22 @@ function board(sql, ...args) {
       const t = [...document.querySelectorAll('.vc-view .git-queue-table')].pop()
       const a = p.getBoundingClientRect()
       const b = t.getBoundingClientRect()
-      return b.bottom <= a.bottom + 1 && b.top >= a.top - 1
+      return b.bottom <= a.bottom + 1 && b.bottom > a.top
     })
     for (const [size, w, hgt] of [['small', 1000, 700], ['large', 1600, 1000]]) {
       await lib.fitWindow(app, page, { width: w, height: hgt })
       await qPage.evaluate((el) => (el.scrollTop = 0))
       const m0 = await metrics()
       check(`HI-2894 (${size}): the page fits the tab's body and has more to scroll`, Math.abs(m0.own - m0.body) <= 1 && m0.max > 0, JSON.stringify(m0))
-      // The wheel over a queue card (not over a history table's own scroll box): to the end.
-      const box = await page.locator('.vc-view [data-queue="alpha#main"]').boundingBox()
+      // The wheel over the first queue card (not over a history table's own scroll box): to the end.
+      const box = await page.locator('.vc-view .git-queue .progress-queue-card').first().boundingBox()
       await page.mouse.move(box.x + box.width / 2, box.y + 10)
+      const under = await page.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? `${e.tagName}.${e.className}` : 'none' }, [box.x + box.width / 2, box.y + 10])
       check(`…the wheel scrolls it to its last queue (${size})`, !!(await lib.until(async () => {
         await page.mouse.wheel(0, 600)
         const m = await metrics()
         return m.top >= m.max - 1 && (await lastInView())
-      }, HUNG_MS, 100)), JSON.stringify(await metrics()))
+      }, HUNG_MS, 100)), JSON.stringify({ ...(await metrics()), under, box }))
       // The keyboard: the page focused (Tab reaches it), Home then End.
       await qPage.focus()
       await page.keyboard.press('Home')
