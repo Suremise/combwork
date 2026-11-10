@@ -83,7 +83,7 @@ import { GZ, compressFile, decompressTo, expandBackup, isGz } from './transcript
 import { usesOwnPrices } from '../shared/prices'
 import { priceUsage, withCostFree } from '../shared/usageDays'
 import { summaryOf, usageFromRows, type LedgerRow } from '../shared/usageLedger'
-import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
+import type { AdoptionHandle, Ask, BackgroundTaskType, ExternalSession, HookEvent, HookOccurrence, LaunchContext, LaunchHooks, LaunchSkill, LiveDetails, NormalizedHook, ProviderAdapter, SkillDelivery } from './providers/types'
 import { HOOK_FIRED_MAX, HOOK_SHORT_MAX, clip, type ActivityHookBlock, type HookFired, type SessionHooks } from '../shared/hooks'
 import { providerService } from './providerService'
 import { config } from './config'
@@ -4583,26 +4583,32 @@ class SessionManager {
         writePty(key, '\r')
       }
     } catch (e) {
+      const who = userText(l ? this.label(l.state) : agentId)
       if (clearDraft && typed && same() && this.userTypedAt(projectPath, agentId) < since) {
         // A multi-line prompt: one Ctrl+U for each of its lines with text and each line break, each its own key, so no
         // line of it is left to go with a later prompt (HR6's round 1 of HI-1327); none past it. A CLI whose Ctrl+U
         // deletes one wrapped row gets a Backspace for each character instead, a few at a time as typing goes (HI-1974).
-        if (l?.adapter.descriptor.capabilities.ctrlUClearsRow) {
-          const n = backspaceKeys(lines ?? typedOut)
+        // Each take-back is logged as its keys are written (HI-2875: a put-off line's take-back had no time in the log).
+        let pressed = 0
+        const rows = !!l?.adapter.descriptor.capabilities.ctrlUClearsRow
+        const n = rows ? backspaceKeys(lines ?? typedOut) : lines ? rollbackKeys(lines) : 1
+        if (rows) {
           for (let i = 0; i < n; i += 8) {
             if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
             writePty(key, '\x7f'.repeat(Math.min(8, n - i)))
+            pressed += Math.min(8, n - i)
             if (i + 8 < n) await new Promise((r) => setTimeout(r, 10))
           }
         } else {
-          const n = lines ? rollbackKeys(lines) : 1
           for (let i = 0; i < n; i++) {
             if (!same() || this.userTypedAt(projectPath, agentId) >= since) break
             writePty(key, '\x15')
+            pressed++
             if (i + 1 < n) await new Promise((r) => setTimeout(r, 10))
           }
         }
-      }
+        log.info(`${who}: the line Combwork typed is taken back: ${pressed} of ${n} ${rows ? 'Backspace' : 'Ctrl+U'} written`)
+      } else if (typed) log.info(`${who}: the line Combwork typed is left as it is: ${!clearDraft ? 'clearing drafts is off' : !same() ? 'its run changed' : 'the user typed there'}`)
       throw e
     } finally {
       if (sent && l) l.typed = sent
@@ -6105,7 +6111,7 @@ class SessionManager {
 
   /** The launch a hook call belongs to: named by its run id, else (older launch folders) by session id. */
   /** A hook's occurrence identity (HI-2777: hookTwins), as its launch's CLI gives one; null when it gives none. */
-  hookOccurrence(runId: string, body: Record<string, any>): string | null {
+  hookOccurrence(runId: string, body: Record<string, any>): HookOccurrence | null {
     const l = this.findLaunch(runId, body.session_id)?.[1]
     return l?.adapter.hookOccurrence?.(body) ?? null
   }

@@ -16,7 +16,10 @@
 //   top-level field Claude Code doesn't send (cw_test_new_field: true), as a CLI update adding one would (#698). "edit <file>" first sends PreToolUse for
 //   an Edit of that file and records the tool call. "background N" starts a background command that ends after
 //   N seconds; its task notification then starts a turn by itself, as in Claude Code. "subagent N" (once or more)
-//   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "pad N" adds N KB to the
+//   launches a subagent in the background that finishes after N seconds, told the same way (#1584). "subtools N" (a step)
+//   runs a sub-agent in the foreground whose N tool calls carry its agent_id; "queued N" (a step) takes N messages that
+//   came meanwhile into the turn at tool boundaries, each a UserPromptSubmit under the turn's prompt_id, as 2.1.321 does
+//   ("queuedsame N": all one text, taken at one boundary; HI-2850). "pad N" adds N KB to the
 //   transcript. "context N": the reply's request reports N input tokens, so the session's context is about N. "ask" first asks for permission (a permission_prompt Notification), then carries on by itself.
 //   It connects the launch's Combwork MCP server as it starts (#865: the real server, which tells Combwork it has connected);
 //   with fake-mcp-hold-<agent> in its home, only once the test makes fake-mcp-go-<agent>. With fake-start-hold-<agent>,
@@ -655,6 +658,45 @@ async function followDoorbell() {
 }
 
 /** A tool call of its own (a Bash), whose PostToolUse reply may carry a notice (#650: "checkpoint" as a step). */
+/**
+ * "queued N": N messages that came while it works (another session's, as HB2's to HB3 on 10 Nov, HI-2850), each taken
+ * into the turn at the next tool boundary as Claude Code 2.1.321 takes one: queued (enqueue), a Bash call, then taken
+ * (remove, a queued_command attachment) with a UserPromptSubmit under the running turn's prompt_id and its own text.
+ * `same` ("queuedsame N"): every message the same text, all taken at one boundary, one after the other with no tool
+ * call between (HR2's case: each submitted once the one before has been answered).
+ */
+async function queuedMessages(n, same) {
+  for (let k = 1; k <= n; k++) {
+    const text = `<cross-session-message from="uds:fake" from-name="fake peer">\n${same ? 'Same again.' : `Message ${k} from a peer.`}\n</cross-session-message>`
+    write({ type: 'queue-operation', operation: 'enqueue', content: text })
+    if (!same || k === 1) await checkpoint()
+    write({ type: 'queue-operation', operation: 'remove', content: text })
+    write({ type: 'attachment', uuid: randomUUID(), attachment: { type: 'queued_command', prompt: text } })
+    await hook('UserPromptSubmit', { prompt: text })
+  }
+}
+
+/**
+ * "subtools N": a sub-agent the Agent tool runs in the foreground, its N tool calls (Read) sending their hooks with its
+ * agent_id and agent_type, as Claude Code 2.1's do, then the Agent call's PostToolUse (HI-2850; SubagentStop isn't one
+ * of Combwork's hooks).
+ */
+async function foregroundSubagent(n) {
+  const id = `toolu_${randomUUID().slice(0, 8)}`
+  const agentId = `a${randomUUID().replace(/-/g, '').slice(0, 16)}`
+  const input = { description: 'Look around', prompt: 'Read the files.', subagent_type: 'general-purpose' }
+  await hook('PreToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
+  write({ type: 'assistant', requestId: `req_${id}`, message: { model, content: [{ type: 'tool_use', id, name: 'Agent', input }], usage: { input_tokens: 10, output_tokens: 5 } } })
+  const sub = { agent_id: agentId, agent_type: 'general-purpose' }
+  for (let k = 1; k <= n; k++) {
+    const call = { tool_name: 'Read', tool_input: { file_path: path.join(cwd, 'x.txt') }, tool_use_id: `toolu_${randomUUID().slice(0, 8)}`, ...sub }
+    await hook('PreToolUse', call)
+    await hook('PostToolUse', call)
+  }
+  write({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: [{ type: 'text', text: 'Looked around.' }] }] } })
+  await hook('PostToolUse', { tool_name: 'Agent', tool_input: input, tool_use_id: id })
+}
+
 async function checkpoint() {
   const id = `toolu_${randomUUID().slice(0, 8)}`
   const call = { tool_name: 'Bash', tool_input: { command: 'echo checkpoint' }, tool_use_id: id }
@@ -808,6 +850,10 @@ async function runPrompt(text, enter = null) {
     const call = parseToolStep(step)
     if (call) await ownCall(call.tool, call.args)
     if (/\bcheckpoint\b/i.test(step)) await checkpoint()
+    const queued = /\bqueued(same)?\s+(\d+)/i.exec(step)
+    if (queued) await queuedMessages(Number(queued[2]), !!queued[1])
+    const subtools = /\bsubtools\s+(\d+)/i.exec(step)
+    if (subtools) await foregroundSubagent(Number(subtools[1]))
     if (/\bratelimited\b/i.test(step)) await rateLimited()
     // "shell: <command line>": runs it in cmd with the session's environment (PATH, CW_*), as an agent's shell
     // would; the agent, command, exit code and output go to fake-shell.jsonl in its home.
