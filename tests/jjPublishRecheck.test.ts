@@ -112,10 +112,10 @@ describe('what a re-observation flags (HI-2873/s7 §4, s11 §2)', () => {
   it('an unknown ancestry answer: nothing written, the sweep where it was', async () => {
     const s = memoryObligations()
     for (let i = 1; i <= 3; i++) settleRow(s, `HI-${i}`, hex(i), hex(i, 'b'))
-    s.sweeps.set('main', { after: 1, end: 3 })
+    s.sweeps.set('main', { gen: 4, after: 1, end: 3 })
     const plan = await planRecheck(s, 'main', now, async () => jjUnknown('failed', 'x'))
     expect(plan).toMatchObject({ jjUnknown: 'failed' })
-    expect(s.getSweep('main')).toEqual({ after: 1, end: 3 })
+    expect(s.getSweep('main')).toEqual({ gen: 4, after: 1, end: 3 })
     expect(s.rows.every((r) => r.state === 'published')).toBe(true)
   })
 })
@@ -136,21 +136,18 @@ describe('the sweep: bounded and fair (HI-2873/s14)', () => {
       }
     }
     add(n)
-    let scanned = 0
-    const page = s.recheckPage
-    s.recheckPage = (...a) => {
-      const r = page(...a)
-      scanned += r.length
-      return r
-    }
-    const pass = async () => {
-      scanned = 0
+    // One pass of the observation path's store reads (the owed rows, then the sweep's page): `scanned` is the rows the
+    // store's indexes touched for it, not what the page returned.
+    const pass = async (n2: PublishNow = now) => {
+      const before = s.work.rows
+      s.owed('main')
       let reads = 0
-      const plan = await planRecheck(s, 'main', now, async (a, b) => {
+      const plan = await planRecheck(s, 'main', n2, async (a, b) => {
         reads++
         return holds(stale, a, b)
       })
       if ('jjUnknown' in plan) throw new Error(JSON.stringify(plan))
+      const scanned = s.work.rows - before
       const flagged = applyRecheck(s, 'main', plan, 1)
       return { flagged, reads, scanned, plan }
     }
@@ -188,31 +185,77 @@ describe('the sweep: bounded and fair (HI-2873/s14)', () => {
 
   it('a sweep whose remaining rows were all flagged by another pass completes on an empty page', async () => {
     const w = world(10)
-    w.s.sweeps.set('main', { after: 4, end: 10 })
+    w.s.sweeps.set('main', { gen: 3, after: 4, end: 10 })
     for (let i = 5; i <= 10; i++) expect(w.s.flag(keyOf(`HI-${i}`), res(i), 'published', 1, { was: 'published', differs: [], at: 2 })).toBe(true)
     const p = await w.pass()
     expect(p.scanned).toBe(0)
-    expect(w.s.getSweep('main')).toBeNull()
+    expect(w.s.getSweep('main')).toEqual({ gen: 4, after: 0, end: 0 })
     // The next pass starts a new sweep at the current end.
     w.add(3)
     const q = await w.pass()
-    expect(q.plan.expected).toBeNull()
+    expect(q.plan.expectedGen).toBe(4)
     expect(q.scanned).toBe(7)
   })
 
-  it('a delayed concurrent pass never overwrites a newer sweep, and writes no flag', async () => {
-    const w = world(30)
-    w.stale.add(res(2))
-    const planOf = async () => {
-      const plan = await planRecheck(w.s, 'main', now, async (a, b) => holds(w.stale, a, b))
+  it("many settled rows and no owed ones: each pass's store reads stay within the page (HR2's round 1)", async () => {
+    const w = world(5000)
+    for (let i = 0; i < 3; i++) {
+      const p = await w.pass()
+      expect(p.scanned).toBeLessThanOrEqual(RECHECK_SCAN)
+    }
+    // The owed query reads owed rows only, however long the settled history.
+    const before = w.s.work.rows
+    expect(w.s.owed('main')).toEqual([])
+    expect(w.s.work.rows).toBe(before)
+  })
+
+  describe("a delayed concurrent pass writes nothing of the re-check (HR2's round 1: no ABA)", () => {
+    const planAt = async (w: ReturnType<typeof world>, n: PublishNow, anc: (a: string, b: string) => boolean) => {
+      const plan = await planRecheck(w.s, 'main', n, async (a, b) => anc(a, b))
       if ('jjUnknown' in plan) throw new Error(JSON.stringify(plan))
       return plan
     }
-    const late = await planOf()
-    const first = await planOf()
-    expect(applyRecheck(w.s, 'main', first, 1).map((f) => f.key.card)).toEqual(['HI-2'])
-    const newer = w.s.getSweep('main')
-    expect(applyRecheck(w.s, 'main', late, 1)).toEqual([])
-    expect(w.s.getSweep('main')).toEqual(newer)
+    const P2 = '9'.repeat(40)
+
+    it('within a sweep: the newer pass moves the schedule, the late one is refused', async () => {
+      const w = world(30)
+      w.stale.add(res(2))
+      const late = await planAt(w, now, (a, b) => holds(w.stale, a, b))
+      const first = await planAt(w, now, (a, b) => holds(w.stale, a, b))
+      expect(applyRecheck(w.s, 'main', first, 1).map((f) => f.key.card)).toEqual(['HI-2'])
+      const newer = w.s.getSweep('main')
+      expect(applyRecheck(w.s, 'main', late, 1)).toEqual([])
+      expect(w.s.getSweep('main')).toEqual(newer)
+    })
+
+    it("none → none: an old plan at P1 (the result gone) after a newer completed pass at P2 (it's there): no flag", async () => {
+      const w = world(1)
+      const late = await planAt(w, now, () => false)
+      expect(late.flags).toHaveLength(1)
+      const newer = await planAt(w, { ...now, pushed: P2 }, (a, b) => b === P2)
+      expect(newer.flags).toHaveLength(0)
+      expect(applyRecheck(w.s, 'main', newer, 1)).toEqual([])
+      expect(w.s.getSweep('main')).toEqual({ gen: 1, after: 0, end: 0 })
+      expect(applyRecheck(w.s, 'main', late, 1)).toEqual([])
+      expect(w.s.rows[0].state).toBe('published')
+    })
+
+    it('a full cycle back to the same position: the old plan is still refused', async () => {
+      const w = world(20)
+      w.stale.add(res(9))
+      // Pass 1 decides rows 1–8; the late plan is made there (it would flag row 9 next).
+      await w.pass()
+      const at = w.s.getSweep('main')!
+      const late = await planAt(w, now, (a, b) => holds(w.stale, a, b))
+      expect(late.flags.map((f) => f.o.card)).toEqual(['HI-9'])
+      // Newer passes, row 9 fine for them, complete the sweep and come round to the same position.
+      w.stale.delete(res(9))
+      while (w.s.getSweep('main')!.end !== 0) await w.pass()
+      await w.pass()
+      expect(w.s.getSweep('main')).toMatchObject({ after: at.after, end: at.end })
+      expect(w.s.getSweep('main')!.gen).toBeGreaterThan(at.gen)
+      expect(applyRecheck(w.s, 'main', late, 1)).toEqual([])
+      expect(w.s.rows.every((r) => r.state === 'published')).toBe(true)
+    })
   })
 })

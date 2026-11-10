@@ -457,17 +457,28 @@ export type ObligationKey = Pick<JjObligation, 'card' | 'cycle' | 'bundle'>
 const keyOf = (o: ObligationKey): string => `${o.card}\u0000${o.cycle}\u0000${o.bundle}`
 
 /**
- * The re-check's sweep of one target's settled rows (HI-2873/s14): rows with `after < seq ≤ end`, `end` fixed when the
- * sweep starts (rows settled later wait for the next one). Null: no sweep in progress, the next pass starts one.
+ * The re-check's schedule for one target (HI-2873/s14, HR2's round 1): the sweep in progress covers the rows with
+ * `after < seq ≤ end`, `end` fixed when it starts (rows settled later wait for the next one); `end` 0: none in progress,
+ * the next pass starts one. `gen` is the schedule's generation, advanced by every pass that applies (a sweep completed
+ * or its position unchanged included), so a delayed pass's compare-and-set fails whatever values the schedule passed
+ * through meanwhile (no ABA).
  */
 export interface RecheckSweep {
+  gen: number
   after: number
   end: number
 }
 
-/** Where obligations are kept (durable: J6's board_meta rows; a test's memory). Every change a compare-and-set. */
+/**
+ * Where obligations are kept (durable: J6's board_meta rows; a test's memory). Every change a compare-and-set.
+ * Bounded reads on the observation path (HR2's round 1): `owed` and `recheckPage` only, each answered from an index
+ * (owed rows by target and state; settled rows by target and `seq`), never by reading the target's whole history.
+ */
 export interface ObligationStore {
+  /** Every row of the target, any state: diagnostics and tests, never the observation path (unbounded). */
   list(target: string): JjObligation[]
+  /** The target's owed rows only (an index on target and state). */
+  owed(target: string): JjObligation[]
   /** Creates the row only when none exists for its key, in any state (a tombstone blocks it): whether it was created. */
   create(o: JjObligation): boolean
   /**
@@ -478,35 +489,75 @@ export interface ObligationStore {
   /** published | notHeld → checkThis, only while the row is that key and result, in state `from`, settled at `recordedAt`. */
   flag(k: ObligationKey, result: string, from: 'published' | 'notHeld', recordedAt: number, check: PublishCheck): boolean
   /**
-   * Up to `limit` rows of the target in state published or notHeld, with `seen`, and `after < seq ≤ end`, in `seq` order.
-   * Bounded by `limit` (a durable store answers it from an index on (target, seq), never by reading every row).
+   * Up to `limit` rows of the target in state published or notHeld, with `seen`, and `after < seq ≤ end`, in `seq` order,
+   * from an index on (target, seq): its work bounded by `limit`, never by the target's history.
    */
   recheckPage(target: string, after: number, end: number, limit: number): JjObligation[]
   /** The highest `seq` assigned for the target (0: none). */
   maxSeq(target: string): number
+  /** The schedule, or null before any pass applied (generation 0). */
   getSweep(target: string): RecheckSweep | null
-  /** Sets the sweep only while it is still `expected` (by value): whether it changed. */
-  setSweep(target: string, expected: RecheckSweep | null, next: RecheckSweep | null): boolean
+  /** Sets the schedule only while its generation is still `expectedGen` (0: none yet), `next.gen` above it: whether it changed. */
+  setSweep(target: string, expectedGen: number, next: RecheckSweep): boolean
 }
 
-const sameSweep = (a: RecheckSweep | null, b: RecheckSweep | null): boolean => (a && b ? a.after === b.after && a.end === b.end : a === b)
-
-/** An in-memory store with the durable store's semantics (tests; and J6's model of its rows). */
-export function memoryObligations(rows: JjObligation[] = []): ObligationStore & { rows: JjObligation[]; sweeps: Map<string, RecheckSweep> } {
+/**
+ * An in-memory store with the durable store's semantics and its indexes (tests; and J6's model of its rows): rows by
+ * key, owed rows by target, settled rows by target in `seq` order. `work` counts the rows the observation path's reads
+ * touch (`owed`, `recheckPage`), so a test can hold them to their bounds.
+ */
+export function memoryObligations(initial: JjObligation[] = []): ObligationStore & { rows: JjObligation[]; sweeps: Map<string, RecheckSweep>; work: { rows: number } } {
+  const rows: JjObligation[] = []
+  const byKey = new Map<string, JjObligation>()
+  const owedBy = new Map<string, Map<string, JjObligation>>()
+  const settledBy = new Map<string, JjObligation[]>()
   const seqs = new Map<string, number>()
   const sweeps = new Map<string, RecheckSweep>()
-  for (const r of rows) if (r.seq !== undefined) seqs.set(r.target, Math.max(seqs.get(r.target) ?? 0, r.seq))
+  const work = { rows: 0 }
+  const index = <V>(m: Map<string, V>, k: string, make: () => V): V => {
+    let v = m.get(k)
+    if (!v) m.set(k, (v = make()))
+    return v
+  }
+  /** The index of the first row with `seq > after` in a list in `seq` order (a binary search). */
+  const firstAfter = (list: JjObligation[], after: number): number => {
+    let lo = 0
+    let hi = list.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (list[mid].seq! <= after) lo = mid + 1
+      else hi = mid
+    }
+    return lo
+  }
+  const add = (r: JjObligation): void => {
+    rows.push(r)
+    byKey.set(keyOf(r), r)
+    if (r.state === 'owed') index(owedBy, r.target, () => new Map()).set(keyOf(r), r)
+    if (r.seq !== undefined) seqs.set(r.target, Math.max(seqs.get(r.target) ?? 0, r.seq))
+    if ((r.state === 'published' || r.state === 'notHeld') && r.seen && r.seq !== undefined) {
+      const list = index(settledBy, r.target, (): JjObligation[] => [])
+      list.splice(firstAfter(list, r.seq), 0, r)
+    }
+  }
+  for (const r of initial) add(r)
   return {
     rows,
     sweeps,
+    work,
     list: (target) => rows.filter((r) => r.target === target).map((r) => structuredClone(r)),
+    owed: (target) => {
+      const out = [...(owedBy.get(target)?.values() ?? [])].map((r) => structuredClone(r))
+      work.rows += out.length
+      return out
+    },
     create: (o) => {
-      if (rows.some((r) => keyOf(r) === keyOf(o))) return false
-      rows.push({ card: o.card, cycle: o.cycle, bundle: o.bundle, target: o.target, result: o.result, since: o.since, state: 'owed' })
+      if (byKey.has(keyOf(o))) return false
+      add({ card: o.card, cycle: o.cycle, bundle: o.bundle, target: o.target, result: o.result, since: o.since, state: 'owed' })
       return true
     },
     settle: (k, result, to, seen) => {
-      const r = rows.find((x) => keyOf(x) === keyOf(k))
+      const r = byKey.get(keyOf(k))
       if (!r || r.result !== result || r.state !== 'owed') return false
       const seq = (seqs.get(r.target) ?? 0) + 1
       seqs.set(r.target, seq)
@@ -515,27 +566,34 @@ export function memoryObligations(rows: JjObligation[] = []): ObligationStore & 
       r.seq = seq
       r.seen = { ...seen }
       if (to === 'published' && seen.pushed) r.pushed = seen.pushed
+      owedBy.get(r.target)?.delete(keyOf(r))
+      index(settledBy, r.target, (): JjObligation[] => []).push(r) // the highest seq so far: the index stays in order
       return true
     },
     flag: (k, result, from, recordedAt, check) => {
-      const r = rows.find((x) => keyOf(x) === keyOf(k))
+      const r = byKey.get(keyOf(k))
       if (!r || r.result !== result || r.state !== from || r.at !== recordedAt) return false
       r.state = 'checkThis'
       r.check = structuredClone(check)
+      const list = settledBy.get(r.target)
+      if (list && r.seq !== undefined) {
+        const i = firstAfter(list, r.seq - 1)
+        if (list[i] === r) list.splice(i, 1)
+      }
       return true
     },
-    recheckPage: (target, after, end, limit) =>
-      rows
-        .filter((r) => r.target === target && (r.state === 'published' || r.state === 'notHeld') && r.seen && r.seq !== undefined && r.seq > after && r.seq <= end)
-        .sort((a, b) => a.seq! - b.seq!)
-        .slice(0, limit)
-        .map((r) => structuredClone(r)),
+    recheckPage: (target, after, end, limit) => {
+      const list = settledBy.get(target) ?? []
+      const out: JjObligation[] = []
+      for (let i = firstAfter(list, after); i < list.length && out.length < limit && list[i].seq! <= end; i++) out.push(structuredClone(list[i]))
+      work.rows += out.length
+      return out
+    },
     maxSeq: (target) => seqs.get(target) ?? 0,
     getSweep: (target) => (sweeps.has(target) ? { ...sweeps.get(target)! } : null),
-    setSweep: (target, expected, next) => {
-      if (!sameSweep(sweeps.get(target) ?? null, expected)) return false
-      if (next) sweeps.set(target, { ...next })
-      else sweeps.delete(target)
+    setSweep: (target, expectedGen, next) => {
+      if ((sweeps.get(target)?.gen ?? 0) !== expectedGen || next.gen <= expectedGen) return false
+      sweeps.set(target, { ...next })
       return true
     }
   }
@@ -558,8 +616,9 @@ export interface PublishNow {
 /** One pass's plan of the re-check: the flags to write, and the sweep to move from `expected` to `next`. */
 export interface RecheckPlan {
   flags: { o: JjObligation; check: Omit<PublishCheck, 'at'> }[]
-  expected: RecheckSweep | null
-  next: RecheckSweep | null
+  /** The schedule's generation the plan was made at (0: none yet), and the schedule it moves to (the next generation). */
+  expectedGen: number
+  next: RecheckSweep
   /** Rows decided in this pass (flagged or unchanged), and ancestry reads spent. */
   decided: number
   reads: number
@@ -575,7 +634,8 @@ export interface RecheckPlan {
  */
 export async function planRecheck(store: ObligationStore, target: string, now: PublishNow, ancestor: (a: string, b: string) => Promise<boolean | JjReadUnknown>): Promise<RecheckPlan | JjReadUnknown> {
   const expected = store.getSweep(target)
-  const sweep = expected ?? { after: 0, end: store.maxSeq(target) }
+  const expectedGen = expected?.gen ?? 0
+  const sweep = expected && expected.end > 0 ? expected : { after: 0, end: store.maxSeq(target) }
   const page = sweep.end > sweep.after ? store.recheckPage(target, sweep.after, sweep.end, RECHECK_SCAN) : []
   const cache = new Map<string, boolean>()
   let reads = 0
@@ -635,20 +695,21 @@ export async function planRecheck(store: ObligationStore, target: string, now: P
     decided++
   }
   // The sweep completes when the page ran out below its fixed end (an empty page included: rows flagged by another
-  // pass simply aren't in it); else it carries on after the last row decided, its end unchanged.
+  // pass simply aren't in it); else it carries on after the last row decided, its end unchanged. Either way the
+  // generation advances.
   const complete = !stopped && page.length < RECHECK_SCAN
-  const next = complete ? null : { after: last, end: sweep.end }
-  return { flags, expected, next, decided, reads }
+  const next = complete ? { gen: expectedGen + 1, after: 0, end: 0 } : { gen: expectedGen + 1, after: last, end: sweep.end }
+  return { flags, expectedGen, next, decided, reads }
 }
 
 /**
  * Applies a re-check plan (synchronous; the caller runs it in the same continuation as its final validator): the
- * sweep moved by its compare-and-set first, and only if that held, each flag by its own compare-and-set. A concurrent
- * pass that moved the sweep meanwhile wins, and this one writes nothing of the re-check.
+ * schedule moved to its next generation by its compare-and-set first, and only if that held, each flag by its own
+ * compare-and-set. Any pass applied since this one was planned advanced the generation, so this one then writes nothing
+ * of the re-check (HR2's round 1: no ABA through a completed or unchanged schedule).
  */
 export function applyRecheck(store: ObligationStore, target: string, plan: RecheckPlan, at: number): { key: ObligationKey; differs: PublishDiffer[] }[] {
-  if (!sameSweep(plan.expected, plan.next) && !store.setSweep(target, plan.expected, plan.next)) return []
-  if (sameSweep(plan.expected, plan.next) && !sameSweep(store.getSweep(target), plan.expected)) return []
+  if (!store.setSweep(target, plan.expectedGen, plan.next)) return []
   const flagged: { key: ObligationKey; differs: PublishDiffer[] }[] = []
   for (const { o, check } of plan.flags) {
     const key = { card: o.card, cycle: o.cycle, bundle: o.bundle }
@@ -841,7 +902,7 @@ export type PublishObserved =
  * settles, the sweep and the flags are written together in the synchronous step after the final validator.
  */
 export async function observePublish(deps: JjIntegrationDeps, target: string, store: ObligationStore, now: () => number = Date.now): Promise<PublishObserved> {
-  const owed = store.list(target).filter((o) => o.state === 'owed')
+  const owed = store.owed(target)
   const reads = readsOf(deps)
   const remoteNow = async (op: string): Promise<JjEvidence<{ remote: string | null; url: string | null; rows: BookmarkRow[] }>> => {
     const out = await reads.run(op, ['bookmark', 'list', '--all-remotes', '-T', BOOKMARK_T])

@@ -723,6 +723,8 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       const w = await world(true)
       const store = await publishedT(w)
       reconstructObligations(store, [owe(w, 'HI-2', w.T)])
+      const sweep = store.getSweep('main')
+      expect(sweep).toMatchObject({ gen: 1 })
       let fenced = 0
       const hook = (p: JjIntegrationPoint): void => {
         if (p === 'finalFence' && ++fenced === 2) w.jj('git', 'remote', 'remove', 'origin')
@@ -731,7 +733,7 @@ describe.skipIf(!jjExe)(`jj integration evidence on the real jj (${TESTED_JJ.ver
       expect(fenced).toBe(2)
       expect(out, JSON.stringify(out)).toMatchObject({ jjUnknown: 'moved' })
       expect(store.rows.map((r) => r.state)).toEqual(['published', 'owed'])
-      expect(store.getSweep('main')).toBeNull()
+      expect(store.getSweep('main')).toEqual(sweep)
     })
 
     // As round 6 (HR2) for the settles: a change queued 1 or 2 microtasks deep at the final fence lands before the

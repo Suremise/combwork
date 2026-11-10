@@ -2826,9 +2826,13 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   matter); a sweep covers the rows settled up to its end, fixed when it starts (rows settled during it wait for the
   next one); a pass reads one page of at most 64 rows from the store by `seq` (an index read for a durable store, never
   every row) and spends at most 16 ancestry reads (a row needs at most two), carrying on after the last row it decided;
-  the sweep's position is separate scheduling state (an unchanged row is never written), moved by its own
-  compare-and-set in the final synchronous step, and a pass that writes nothing leaves it unchanged. A row the sweep
-  passed before it went stale is reached in the next sweep, however many rows keep arriving.
+  the sweep's position is separate scheduling state (an unchanged row is never written) with a **generation** that every
+  applied pass advances (a sweep completed or its position unchanged included), moved by its own compare-and-set on
+  that generation in the final synchronous step before any flag: a pass planned before another one applied writes no
+  flag, whatever values the schedule passed through meanwhile (HR2's round 1: no ABA), and a pass that writes nothing
+  leaves it unchanged. A row the sweep passed before it went stale is reached in the next sweep, however many rows keep
+  arriving. The observation's store reads are bounded too: its owed rows by an owed-only query (an index on target and
+  state), its settled history only through the page; never the target's whole history.
 - **Recovery** reads and never rewinds: a crash between proof, pins, fact and obligation is met by proving again
   (reusing an unconsumed bundle with the same endpoints), by the pins' journal, and by reconstructing obligations
   idempotently. J4's attempts recover with J4's own functions.
@@ -2845,7 +2849,8 @@ pushes. The reconciler's existing "integrated outside" path records the result o
   push without coming back, and a reintegration's own obligation with a late answer for the earlier one. The re-check
   (HI-2873): `tests/jjPublishRecheck.test.ts` (the flag's compare-and-set, `seq`, what flags, and the sweep's fairness:
   a row going stale after the sweep passed it while more rows arrive each pass than it can take, an empty page
-  completing a sweep, a delayed concurrent pass); on the real jj, the remote moved back past a published result, an
+  completing a sweep, a delayed concurrent pass within a sweep, after a completed one and after a full cycle back to
+  the same position, and the store's reads with 5,000 settled rows); on the real jj, the remote moved back past a published result, an
   unchanged and an advanced remote, a changed URL, `notHeld` then pushed beside an owed row settled in the same pass,
   the only remote removed (an owed row left owed), a removal at the final fence, and a change queued 1–3 microtasks
   deep at the final fence before a flag.
